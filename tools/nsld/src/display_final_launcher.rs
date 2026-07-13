@@ -500,6 +500,34 @@ pub(crate) fn print_nsld_final_executable_pipeline_emit_report(
         report.entrypoint_materialization_status
     );
     println!(
+        "  entrypoint_materialization_kind: {}",
+        report.entrypoint_materialization_kind
+    );
+    println!(
+        "  entrypoint_materialization_path: {}",
+        optional_string_text(report.entrypoint_materialization_path.as_deref())
+    );
+    println!(
+        "  entrypoint_materialization_ready: {}",
+        report.entrypoint_materialization_ready
+    );
+    println!(
+        "  entrypoint_materialization_first_blocker: {}",
+        optional_string_text(report.entrypoint_materialization_first_blocker.as_deref())
+    );
+    println!(
+        "  entrypoint_materialization_present: {}",
+        optional_bool_text(report.entrypoint_materialization_present)
+    );
+    println!(
+        "  entrypoint_materialization_hash: {}",
+        optional_string_text(report.entrypoint_materialization_hash.as_deref())
+    );
+    println!(
+        "  entrypoint_materialization_runner_command: {}",
+        optional_string_text(report.entrypoint_materialization_runner_command.as_deref())
+    );
+    println!(
         "  execution_handoff_contract: {}",
         report.execution_handoff_contract
     );
@@ -614,6 +642,78 @@ pub(crate) fn print_nsld_final_executable_pipeline_verify_report(
     println!(
         "  actual_entrypoint_materialization_status: {}",
         optional_string_text(report.actual_entrypoint_materialization_status.as_deref())
+    );
+    println!(
+        "  expected_entrypoint_materialization_kind: {}",
+        report.expected_entrypoint_materialization_kind
+    );
+    println!(
+        "  actual_entrypoint_materialization_kind: {}",
+        optional_string_text(report.actual_entrypoint_materialization_kind.as_deref())
+    );
+    println!(
+        "  expected_entrypoint_materialization_path: {}",
+        optional_string_text(report.expected_entrypoint_materialization_path.as_deref())
+    );
+    println!(
+        "  actual_entrypoint_materialization_path: {}",
+        optional_string_text(report.actual_entrypoint_materialization_path.as_deref())
+    );
+    println!(
+        "  expected_entrypoint_materialization_ready: {}",
+        report.expected_entrypoint_materialization_ready
+    );
+    println!(
+        "  actual_entrypoint_materialization_ready: {}",
+        optional_bool_text(report.actual_entrypoint_materialization_ready)
+    );
+    println!(
+        "  expected_entrypoint_materialization_first_blocker: {}",
+        optional_string_text(
+            report
+                .expected_entrypoint_materialization_first_blocker
+                .as_deref()
+        )
+    );
+    println!(
+        "  actual_entrypoint_materialization_first_blocker: {}",
+        optional_string_text(
+            report
+                .actual_entrypoint_materialization_first_blocker
+                .as_deref()
+        )
+    );
+    println!(
+        "  expected_entrypoint_materialization_present: {}",
+        optional_bool_text(report.expected_entrypoint_materialization_present)
+    );
+    println!(
+        "  actual_entrypoint_materialization_present: {}",
+        optional_bool_text(report.actual_entrypoint_materialization_present)
+    );
+    println!(
+        "  expected_entrypoint_materialization_hash: {}",
+        optional_string_text(report.expected_entrypoint_materialization_hash.as_deref())
+    );
+    println!(
+        "  actual_entrypoint_materialization_hash: {}",
+        optional_string_text(report.actual_entrypoint_materialization_hash.as_deref())
+    );
+    println!(
+        "  expected_entrypoint_materialization_runner_command: {}",
+        optional_string_text(
+            report
+                .expected_entrypoint_materialization_runner_command
+                .as_deref()
+        )
+    );
+    println!(
+        "  actual_entrypoint_materialization_runner_command: {}",
+        optional_string_text(
+            report
+                .actual_entrypoint_materialization_runner_command
+                .as_deref()
+        )
     );
     println!(
         "  expected_execution_handoff_contract: {}",

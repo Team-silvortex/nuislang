@@ -290,6 +290,27 @@ mod cpu Main {
     assert!(
         json.contains("\"nsld_final_executable_pipeline_execution_handoff_decision_code\":null")
     );
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_entrypoint_materialization_kind\":null")
+    );
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_entrypoint_materialization_path\":null")
+    );
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_entrypoint_materialization_ready\":null")
+    );
+    assert!(json.contains(
+        "\"nsld_final_executable_pipeline_entrypoint_materialization_first_blocker\":null"
+    ));
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_entrypoint_materialization_present\":null")
+    );
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_entrypoint_materialization_hash\":null")
+    );
+    assert!(json.contains(
+        "\"nsld_final_executable_pipeline_entrypoint_materialization_runner_command\":null"
+    ));
     assert!(json.contains("\"nsld_final_executable_pipeline_required_stage_path_count\":null"));
     assert!(
         json.contains("\"nsld_final_executable_pipeline_required_stage_path_present_count\":null")

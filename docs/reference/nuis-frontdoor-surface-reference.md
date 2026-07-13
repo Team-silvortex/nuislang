@@ -136,6 +136,21 @@ These fields now form the current visible link summary:
   first pipeline-level blocker for that handoff, or `null` / `<none>`
 * `nsld_final_executable_pipeline_execution_handoff_decision_code`
   compact pipeline-level route code for CI and future runner/materializer tools
+* `nsld_final_executable_pipeline_entrypoint_materialization_kind`
+  pipeline-level materializer plan kind, currently `host-shell-entrypoint-plan`
+  when the self-contained image route can hand off to a host entrypoint plan
+* `nsld_final_executable_pipeline_entrypoint_materialization_path`
+  planned materializer output path, or `null` until the pipeline TOML is present
+* `nsld_final_executable_pipeline_entrypoint_materialization_ready`
+  script-friendly gate for whether the entrypoint materialization plan is ready
+* `nsld_final_executable_pipeline_entrypoint_materialization_first_blocker`
+  first machine-readable blocker for that plan, or `null` / `<none>` when ready
+* `nsld_final_executable_pipeline_entrypoint_materialization_present`
+  whether the planned host entrypoint artifact is present on disk
+* `nsld_final_executable_pipeline_entrypoint_materialization_hash`
+  content hash for the generated host entrypoint handoff stub, or `null`
+* `nsld_final_executable_pipeline_entrypoint_materialization_runner_command`
+  script-facing summary of the host-runner handoff command
 * `nsld_final_executable_output_recommended_next_action`
   the script-facing next action for the current boundary, such as
   `emit-final-executable-pipeline`,

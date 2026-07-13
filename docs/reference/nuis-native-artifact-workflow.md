@@ -100,6 +100,13 @@ artifact-follow-up state:
 * `nsld_final_executable_pipeline_execution_handoff_evidence_status`
 * `nsld_final_executable_pipeline_execution_handoff_first_blocker`
 * `nsld_final_executable_pipeline_execution_handoff_decision_code`
+* `nsld_final_executable_pipeline_entrypoint_materialization_kind`
+* `nsld_final_executable_pipeline_entrypoint_materialization_path`
+* `nsld_final_executable_pipeline_entrypoint_materialization_ready`
+* `nsld_final_executable_pipeline_entrypoint_materialization_first_blocker`
+* `nsld_final_executable_pipeline_entrypoint_materialization_present`
+* `nsld_final_executable_pipeline_entrypoint_materialization_hash`
+* `nsld_final_executable_pipeline_entrypoint_materialization_runner_command`
 * `nsld_final_executable_output_recommended_next_action`
 * `nsld_final_executable_output_path_present`
 * `nsld_final_executable_output_nsld_owned`
@@ -160,6 +167,9 @@ Short reading rule:
 * `nsld_entrypoint_materialization_status` separates the next entrypoint layer
   from image readiness: `host-launcher-ready`,
   `image-ready-entrypoint-pending`, or `blocked`
+* on the current ready self-contained route, `nuis.host-entrypoint.sh` is a
+  generated host-runner handoff stub, not an OS package or embedded runner; the
+  pipeline exposes its presence, hash, and runner command for automation
 * heterogeneous-domain readiness fields summarize whether non-CPU domain units
   have the generic payload, lowering, sidecar, and bridge evidence needed by the
   current artifact route

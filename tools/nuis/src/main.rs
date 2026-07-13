@@ -1284,6 +1284,17 @@ fn print_run_artifact_link_plan_status(link_plan: Option<&nuisc::linker::LinkPla
         println!("  nsld_final_executable_pipeline_execution_handoff_evidence_status: <unknown>");
         println!("  nsld_final_executable_pipeline_execution_handoff_first_blocker: <none>");
         println!("  nsld_final_executable_pipeline_execution_handoff_decision_code: <unknown>");
+        println!("  nsld_final_executable_pipeline_entrypoint_materialization_kind: <unknown>");
+        println!("  nsld_final_executable_pipeline_entrypoint_materialization_path: <unknown>");
+        println!("  nsld_final_executable_pipeline_entrypoint_materialization_ready: <unknown>");
+        println!(
+            "  nsld_final_executable_pipeline_entrypoint_materialization_first_blocker: <none>"
+        );
+        println!("  nsld_final_executable_pipeline_entrypoint_materialization_present: <unknown>");
+        println!("  nsld_final_executable_pipeline_entrypoint_materialization_hash: <unknown>");
+        println!(
+            "  nsld_final_executable_pipeline_entrypoint_materialization_runner_command: <unknown>"
+        );
         println!("  nsld_final_executable_pipeline_scheduler_metadata_payload_id: <unknown>");
         println!("  nsld_final_executable_pipeline_scheduler_metadata_present: <unknown>");
         println!("  nsld_final_executable_pipeline_scheduler_metadata_hash: <unknown>");

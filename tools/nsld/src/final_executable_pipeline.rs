@@ -16,10 +16,15 @@ use super::{
         nsld_final_executable_launcher_manifest_report,
     },
     fnv1a64_hex,
-    reports::{NsldFinalExecutablePipelineEmitReport, NsldFinalExecutablePipelineVerifyReport},
+    reports::{
+        NsldFinalExecutableLauncherManifestReport, NsldFinalExecutablePipelineEmitReport,
+        NsldFinalExecutablePipelineVerifyReport,
+    },
     toml,
 };
 use std::{fs, path::Path};
+#[cfg(unix)]
+use std::{fs::Permissions, os::unix::fs::PermissionsExt};
 
 pub(crate) fn nsld_emit_final_executable_pipeline_report(
     manifest: &Path,
@@ -36,34 +41,12 @@ pub(crate) fn nsld_emit_final_executable_pipeline_report(
     let launcher_manifest_report = nsld_final_executable_launcher_manifest_report(manifest, plan);
     let launcher_dry_run_report = nsld_final_executable_launcher_dry_run_report(manifest, plan);
     let mut blockers = final_executable.blockers.clone();
-    let required_stage_paths = final_executable_pipeline_required_stage_paths(
-        final_executable.emitted,
-        &final_stage_plan.output_path,
-        &final_executable.output_path,
-        &writer_input.output_path,
-        &host_invoke_plan.output_path,
-        &layout_plan.output_path,
-        &image_dry_run.output_path,
-        &final_executable.blocked_report_path,
-        &launcher_manifest.output_path,
-        &launcher_dry_run.output_path,
-    );
-    let missing_required_stage_paths = missing_paths(&required_stage_paths);
     if !launcher_manifest.ready {
         blockers.push("final-executable-launcher-manifest:not-ready".to_owned());
     }
     if !launcher_dry_run.dry_run_ready {
         blockers.push("final-executable-launcher-dry-run:not-ready".to_owned());
     }
-    blockers.extend(
-        missing_required_stage_paths
-            .iter()
-            .map(|path| format!("required-stage-path-missing:{path}")),
-    );
-    let issues = blockers
-        .iter()
-        .map(|blocker| format!("pipeline:{blocker}"))
-        .collect::<Vec<_>>();
 
     let self_owned_image_status = nsld_pipeline_self_owned_image_status(
         launcher_manifest.ready,
@@ -79,6 +62,57 @@ pub(crate) fn nsld_emit_final_executable_pipeline_report(
         launcher_dry_run_report.would_enter_lifecycle_hook,
     )
     .to_owned();
+    let mut entrypoint_materialization = nsld_pipeline_entrypoint_materialization_plan(
+        plan,
+        entrypoint_materialization_status.as_str(),
+        launcher_manifest_report.execution_handoff_ready,
+        launcher_manifest_report.execution_handoff_target.as_str(),
+        launcher_manifest_report
+            .execution_handoff_first_blocker
+            .as_deref(),
+        &blockers,
+    );
+    if entrypoint_materialization.ready {
+        if let Err(error) = nsld_write_host_entrypoint_script(
+            manifest,
+            plan,
+            &launcher_manifest_report,
+            &entrypoint_materialization,
+        ) {
+            let blocker = format!("entrypoint-materialization:write-failed:{error}");
+            entrypoint_materialization.ready = false;
+            entrypoint_materialization.first_blocker = Some(blocker.clone());
+            blockers.push(blocker);
+        }
+    }
+    let (entrypoint_materialization_present, entrypoint_materialization_hash) =
+        entrypoint_materialization_evidence(entrypoint_materialization.path.as_deref());
+    let entrypoint_materialization_runner_command = entrypoint_materialization
+        .ready
+        .then(|| render_host_entrypoint_runner_command(manifest, plan, &launcher_manifest_report));
+    let required_stage_paths = final_executable_pipeline_required_stage_paths(
+        final_executable.emitted,
+        &final_stage_plan.output_path,
+        &final_executable.output_path,
+        &writer_input.output_path,
+        &host_invoke_plan.output_path,
+        &layout_plan.output_path,
+        &image_dry_run.output_path,
+        &final_executable.blocked_report_path,
+        &launcher_manifest.output_path,
+        &launcher_dry_run.output_path,
+        entrypoint_materialization.path.as_deref(),
+    );
+    let missing_required_stage_paths = missing_paths(&required_stage_paths);
+    blockers.extend(
+        missing_required_stage_paths
+            .iter()
+            .map(|path| format!("required-stage-path-missing:{path}")),
+    );
+    let issues = blockers
+        .iter()
+        .map(|blocker| format!("pipeline:{blocker}"))
+        .collect::<Vec<_>>();
 
     let report = NsldFinalExecutablePipelineEmitReport {
         manifest: manifest.display().to_string(),
@@ -98,6 +132,13 @@ pub(crate) fn nsld_emit_final_executable_pipeline_report(
         would_enter_lifecycle_hook: launcher_dry_run.dry_run_ready,
         self_owned_image_status,
         entrypoint_materialization_status,
+        entrypoint_materialization_kind: entrypoint_materialization.kind,
+        entrypoint_materialization_path: entrypoint_materialization.path,
+        entrypoint_materialization_ready: entrypoint_materialization.ready,
+        entrypoint_materialization_first_blocker: entrypoint_materialization.first_blocker,
+        entrypoint_materialization_present,
+        entrypoint_materialization_hash,
+        entrypoint_materialization_runner_command,
         execution_handoff_contract: launcher_manifest_report.execution_handoff_contract.clone(),
         execution_handoff_ready: launcher_manifest_report.execution_handoff_ready,
         execution_handoff_status: launcher_manifest_report.execution_handoff_status.clone(),
@@ -169,6 +210,13 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
         actual_would_enter_lifecycle_hook,
         actual_self_owned_image_status,
         actual_entrypoint_materialization_status,
+        actual_entrypoint_materialization_kind,
+        actual_entrypoint_materialization_path,
+        actual_entrypoint_materialization_ready,
+        actual_entrypoint_materialization_first_blocker,
+        actual_entrypoint_materialization_present,
+        actual_entrypoint_materialization_hash,
+        actual_entrypoint_materialization_runner_command,
         actual_execution_handoff_contract,
         actual_execution_handoff_ready,
         actual_execution_handoff_status,
@@ -194,6 +242,13 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
             toml::bool_value(source, "would_enter_lifecycle_hook"),
             non_empty_toml_string(source, "self_owned_image_status"),
             non_empty_toml_string(source, "entrypoint_materialization_status"),
+            non_empty_toml_string(source, "entrypoint_materialization_kind"),
+            non_empty_toml_string(source, "entrypoint_materialization_path"),
+            toml::bool_value(source, "entrypoint_materialization_ready"),
+            non_empty_toml_string(source, "entrypoint_materialization_first_blocker"),
+            toml::bool_value(source, "entrypoint_materialization_present"),
+            non_empty_toml_string(source, "entrypoint_materialization_hash"),
+            non_empty_toml_string(source, "entrypoint_materialization_runner_command"),
             non_empty_toml_string(source, "execution_handoff_contract"),
             toml::bool_value(source, "execution_handoff_ready"),
             non_empty_toml_string(source, "execution_handoff_status"),
@@ -213,6 +268,13 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
         Err(error) => {
             issues.push(error.clone());
             (
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
                 None,
                 None,
                 None,
@@ -279,6 +341,58 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
             "entrypoint_materialization_status",
             Some(expected.entrypoint_materialization_status.as_str()),
             actual_entrypoint_materialization_status.as_deref(),
+        );
+        push_optional_string_mismatch(
+            &mut issues,
+            "entrypoint_materialization_kind",
+            Some(expected.entrypoint_materialization_kind.as_str()),
+            actual_entrypoint_materialization_kind.as_deref(),
+        );
+        push_optional_string_mismatch(
+            &mut issues,
+            "entrypoint_materialization_path",
+            expected.entrypoint_materialization_path.as_deref(),
+            actual_entrypoint_materialization_path.as_deref(),
+        );
+        push_bool_mismatch(
+            &mut issues,
+            "entrypoint_materialization_ready",
+            expected.entrypoint_materialization_ready,
+            actual_entrypoint_materialization_ready,
+        );
+        push_optional_string_mismatch(
+            &mut issues,
+            "entrypoint_materialization_first_blocker",
+            expected.entrypoint_materialization_first_blocker.as_deref(),
+            actual_entrypoint_materialization_first_blocker.as_deref(),
+        );
+        if actual_entrypoint_materialization_present != expected.entrypoint_materialization_present
+        {
+            issues.push(format!(
+                "entrypoint_materialization_present mismatch: expected {}, found {}",
+                optional_bool_text(expected.entrypoint_materialization_present),
+                optional_bool_text(actual_entrypoint_materialization_present)
+            ));
+        }
+        if actual_entrypoint_materialization_hash != expected.entrypoint_materialization_hash {
+            issues.push(format!(
+                "entrypoint_materialization_hash mismatch: expected {}, found {}",
+                expected
+                    .entrypoint_materialization_hash
+                    .as_deref()
+                    .unwrap_or("missing"),
+                actual_entrypoint_materialization_hash
+                    .as_deref()
+                    .unwrap_or("missing")
+            ));
+        }
+        push_optional_string_mismatch(
+            &mut issues,
+            "entrypoint_materialization_runner_command",
+            expected
+                .entrypoint_materialization_runner_command
+                .as_deref(),
+            actual_entrypoint_materialization_runner_command.as_deref(),
         );
         push_optional_string_mismatch(
             &mut issues,
@@ -403,6 +517,22 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
         actual_self_owned_image_status,
         expected_entrypoint_materialization_status: expected.entrypoint_materialization_status,
         actual_entrypoint_materialization_status,
+        expected_entrypoint_materialization_kind: expected.entrypoint_materialization_kind,
+        actual_entrypoint_materialization_kind,
+        expected_entrypoint_materialization_path: expected.entrypoint_materialization_path,
+        actual_entrypoint_materialization_path,
+        expected_entrypoint_materialization_ready: expected.entrypoint_materialization_ready,
+        actual_entrypoint_materialization_ready,
+        expected_entrypoint_materialization_first_blocker: expected
+            .entrypoint_materialization_first_blocker,
+        actual_entrypoint_materialization_first_blocker,
+        expected_entrypoint_materialization_present: expected.entrypoint_materialization_present,
+        actual_entrypoint_materialization_present,
+        expected_entrypoint_materialization_hash: expected.entrypoint_materialization_hash,
+        actual_entrypoint_materialization_hash,
+        expected_entrypoint_materialization_runner_command: expected
+            .entrypoint_materialization_runner_command,
+        actual_entrypoint_materialization_runner_command,
         expected_execution_handoff_contract: expected.execution_handoff_contract,
         actual_execution_handoff_contract,
         expected_execution_handoff_ready: expected.execution_handoff_ready,
@@ -454,6 +584,52 @@ fn nsld_final_executable_pipeline_snapshot(
     if launcher_dry_run.actual_dry_run_ready != Some(true) {
         blockers.push("final-executable-launcher-dry-run:not-ready".to_owned());
     }
+    let self_owned_image_status = nsld_pipeline_self_owned_image_status(
+        launcher_manifest.actual_ready == Some(true),
+        launcher_manifest.actual_nsb_path.as_deref().unwrap_or(""),
+        launcher_manifest.actual_nsb_size_bytes.is_some(),
+        launcher_manifest.actual_nsb_hash.as_deref(),
+        launcher_manifest.actual_image_header_valid == Some(true),
+    )
+    .to_owned();
+    let entrypoint_materialization_status = nsld_pipeline_entrypoint_materialization_status(
+        self_owned_image_status.as_str(),
+        launcher_dry_run.actual_dry_run_ready == Some(true),
+        launcher_dry_run.actual_would_enter_lifecycle_hook == Some(true),
+    )
+    .to_owned();
+    let entrypoint_materialization = nsld_pipeline_entrypoint_materialization_plan(
+        plan,
+        entrypoint_materialization_status.as_str(),
+        launcher_manifest.actual_execution_handoff_ready == Some(true),
+        launcher_manifest
+            .actual_execution_handoff_target
+            .as_deref()
+            .unwrap_or(""),
+        launcher_manifest
+            .actual_execution_handoff_first_blocker
+            .as_deref(),
+        &blockers,
+    );
+    let (entrypoint_materialization_present, entrypoint_materialization_hash) =
+        entrypoint_materialization_evidence(entrypoint_materialization.path.as_deref());
+    let entrypoint_materialization_runner_command =
+        if let (true, Some(nsb_path), Some(scheduler_entry), Some(lifecycle_hook)) = (
+            entrypoint_materialization.ready,
+            launcher_manifest.actual_nsb_path.as_deref(),
+            launcher_manifest.actual_scheduler_entry.as_deref(),
+            launcher_manifest.actual_entry_lifecycle_hook.as_deref(),
+        ) {
+            Some(render_host_entrypoint_runner_command_parts(
+                manifest,
+                &plan.output_dir,
+                nsb_path,
+                scheduler_entry,
+                lifecycle_hook,
+            ))
+        } else {
+            None
+        };
     let required_stage_paths = final_executable_pipeline_required_stage_paths(
         final_executable.expected_emitted,
         &nsld_final_stage_plan_path(plan).display().to_string(),
@@ -475,6 +651,7 @@ fn nsld_final_executable_pipeline_snapshot(
             .to_string(),
         &launcher_manifest.input_path,
         &launcher_dry_run.input_path,
+        entrypoint_materialization.path.as_deref(),
     );
     let missing_required_stage_paths = missing_paths(&required_stage_paths);
     blockers.extend(
@@ -486,20 +663,6 @@ fn nsld_final_executable_pipeline_snapshot(
         .iter()
         .map(|blocker| format!("pipeline:{blocker}"))
         .collect::<Vec<_>>();
-    let self_owned_image_status = nsld_pipeline_self_owned_image_status(
-        launcher_manifest.actual_ready == Some(true),
-        launcher_manifest.actual_nsb_path.as_deref().unwrap_or(""),
-        launcher_manifest.actual_nsb_size_bytes.is_some(),
-        launcher_manifest.actual_nsb_hash.as_deref(),
-        launcher_manifest.actual_image_header_valid == Some(true),
-    )
-    .to_owned();
-    let entrypoint_materialization_status = nsld_pipeline_entrypoint_materialization_status(
-        self_owned_image_status.as_str(),
-        launcher_dry_run.actual_dry_run_ready == Some(true),
-        launcher_dry_run.actual_would_enter_lifecycle_hook == Some(true),
-    )
-    .to_owned();
 
     NsldFinalExecutablePipelineEmitReport {
         manifest: manifest.display().to_string(),
@@ -530,6 +693,13 @@ fn nsld_final_executable_pipeline_snapshot(
             == Some(true),
         self_owned_image_status,
         entrypoint_materialization_status,
+        entrypoint_materialization_kind: entrypoint_materialization.kind,
+        entrypoint_materialization_path: entrypoint_materialization.path,
+        entrypoint_materialization_ready: entrypoint_materialization.ready,
+        entrypoint_materialization_first_blocker: entrypoint_materialization.first_blocker,
+        entrypoint_materialization_present,
+        entrypoint_materialization_hash,
+        entrypoint_materialization_runner_command,
         execution_handoff_contract: launcher_manifest
             .actual_execution_handoff_contract
             .clone()
@@ -608,6 +778,146 @@ fn nsld_pipeline_entrypoint_materialization_status(
     "blocked"
 }
 
+struct NsldPipelineEntrypointMaterializationPlan {
+    kind: String,
+    path: Option<String>,
+    ready: bool,
+    first_blocker: Option<String>,
+}
+
+fn nsld_pipeline_entrypoint_materialization_plan(
+    plan: &nuisc::linker::LinkPlan,
+    status: &str,
+    execution_handoff_ready: bool,
+    execution_handoff_target: &str,
+    execution_handoff_first_blocker: Option<&str>,
+    blockers: &[String],
+) -> NsldPipelineEntrypointMaterializationPlan {
+    let ready = status == "host-launcher-ready"
+        && execution_handoff_ready
+        && execution_handoff_target == "entrypoint-materializer";
+    let path = if ready {
+        Some(
+            Path::new(&plan.output_dir)
+                .join("nuis.host-entrypoint.sh")
+                .display()
+                .to_string(),
+        )
+    } else {
+        None
+    };
+    let first_blocker = if ready {
+        None
+    } else {
+        execution_handoff_first_blocker
+            .map(str::to_owned)
+            .or_else(|| blockers.first().cloned())
+            .or_else(|| Some(format!("entrypoint-materialization:{status}")))
+    };
+    NsldPipelineEntrypointMaterializationPlan {
+        kind: if ready {
+            "host-shell-entrypoint-plan".to_owned()
+        } else {
+            "none".to_owned()
+        },
+        path,
+        ready,
+        first_blocker,
+    }
+}
+
+fn nsld_write_host_entrypoint_script(
+    manifest: &Path,
+    plan: &nuisc::linker::LinkPlan,
+    launcher: &NsldFinalExecutableLauncherManifestReport,
+    entrypoint: &NsldPipelineEntrypointMaterializationPlan,
+) -> Result<(), String> {
+    let Some(path) = entrypoint.path.as_deref() else {
+        return Ok(());
+    };
+    let source = render_host_entrypoint_script(manifest, plan, launcher);
+    fs::write(path, source).map_err(|error| format!("{}:{error}", path))?;
+    #[cfg(unix)]
+    fs::set_permissions(path, Permissions::from_mode(0o755))
+        .map_err(|error| format!("{}:{error}", path))?;
+    Ok(())
+}
+
+fn entrypoint_materialization_evidence(path: Option<&str>) -> (Option<bool>, Option<String>) {
+    let Some(path) = path else {
+        return (Some(false), None);
+    };
+    match fs::read(path) {
+        Ok(bytes) => (Some(true), Some(fnv1a64_hex(&bytes))),
+        Err(_) => (Some(false), None),
+    }
+}
+
+fn render_host_entrypoint_script(
+    manifest: &Path,
+    plan: &nuisc::linker::LinkPlan,
+    launcher: &NsldFinalExecutableLauncherManifestReport,
+) -> String {
+    let manifest_path = shell_single_quote(&manifest.display().to_string());
+    let nsb_path = shell_single_quote(&launcher.nsb_path);
+    let output_dir = shell_single_quote(&plan.output_dir);
+    let scheduler_entry = shell_single_quote(&launcher.scheduler_entry);
+    let lifecycle_hook = shell_single_quote(&launcher.entry_lifecycle_hook);
+    format!(
+        "#!/bin/sh\n\
+set -eu\n\
+# Generated by nsld. This is a host-shell entrypoint handoff stub.\n\
+# It delegates execution to the host runner without embedding runner logic in nsld.\n\
+MANIFEST_PATH={manifest_path}\n\
+NSB_PATH={nsb_path}\n\
+NUIS_OUTPUT_DIR={output_dir}\n\
+SCHEDULER_ENTRY={scheduler_entry}\n\
+LIFECYCLE_HOOK={lifecycle_hook}\n\
+: \"${{NUIS_HOST_RUNNER:=nuis-host-runner}}\"\n\
+exec \"$NUIS_HOST_RUNNER\" \\\n\
+  --manifest \"$MANIFEST_PATH\" \\\n\
+  --nsb \"$NSB_PATH\" \\\n\
+  --output-dir \"$NUIS_OUTPUT_DIR\" \\\n\
+  --scheduler-entry \"$SCHEDULER_ENTRY\" \\\n\
+  --lifecycle-hook \"$LIFECYCLE_HOOK\"\n"
+    )
+}
+
+fn render_host_entrypoint_runner_command(
+    manifest: &Path,
+    plan: &nuisc::linker::LinkPlan,
+    launcher: &NsldFinalExecutableLauncherManifestReport,
+) -> String {
+    render_host_entrypoint_runner_command_parts(
+        manifest,
+        &plan.output_dir,
+        &launcher.nsb_path,
+        &launcher.scheduler_entry,
+        &launcher.entry_lifecycle_hook,
+    )
+}
+
+fn render_host_entrypoint_runner_command_parts(
+    manifest: &Path,
+    output_dir: &str,
+    nsb_path: &str,
+    scheduler_entry: &str,
+    lifecycle_hook: &str,
+) -> String {
+    format!(
+        "nuis-host-runner --manifest {} --nsb {} --output-dir {} --scheduler-entry {} --lifecycle-hook {}",
+        manifest.display(),
+        nsb_path,
+        output_dir,
+        scheduler_entry,
+        lifecycle_hook
+    )
+}
+
+fn shell_single_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
+}
+
 fn render_final_executable_pipeline(report: &NsldFinalExecutablePipelineEmitReport) -> String {
     let mut out = String::new();
     out.push_str("schema = \"nuis-nsld-final-executable-pipeline-v1\"\n");
@@ -667,6 +977,39 @@ fn render_final_executable_pipeline(report: &NsldFinalExecutablePipelineEmitRepo
         &mut out,
         "entrypoint_materialization_status",
         &report.entrypoint_materialization_status,
+    );
+    push_str_field(
+        &mut out,
+        "entrypoint_materialization_kind",
+        &report.entrypoint_materialization_kind,
+    );
+    push_optional_str_field(
+        &mut out,
+        "entrypoint_materialization_path",
+        report.entrypoint_materialization_path.as_deref(),
+    );
+    out.push_str(&format!(
+        "entrypoint_materialization_ready = {}\n",
+        report.entrypoint_materialization_ready
+    ));
+    push_optional_str_field(
+        &mut out,
+        "entrypoint_materialization_first_blocker",
+        report.entrypoint_materialization_first_blocker.as_deref(),
+    );
+    out.push_str(&format!(
+        "entrypoint_materialization_present = {}\n",
+        report.entrypoint_materialization_present.unwrap_or(false)
+    ));
+    push_optional_str_field(
+        &mut out,
+        "entrypoint_materialization_hash",
+        report.entrypoint_materialization_hash.as_deref(),
+    );
+    push_optional_str_field(
+        &mut out,
+        "entrypoint_materialization_runner_command",
+        report.entrypoint_materialization_runner_command.as_deref(),
     );
     push_str_field(
         &mut out,
@@ -757,6 +1100,7 @@ fn final_executable_pipeline_required_stage_paths(
     final_executable_blocked_path: &str,
     launcher_manifest_path: &str,
     launcher_dry_run_path: &str,
+    entrypoint_materialization_path: Option<&str>,
 ) -> Vec<String> {
     let mut paths = vec![
         final_stage_plan_path.to_owned(),
@@ -770,6 +1114,9 @@ fn final_executable_pipeline_required_stage_paths(
     ];
     if final_executable_emitted {
         paths.push(final_output_path.to_owned());
+    }
+    if let Some(path) = entrypoint_materialization_path {
+        paths.push(path.to_owned());
     }
     paths
 }

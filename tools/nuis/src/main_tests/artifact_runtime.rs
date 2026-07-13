@@ -265,6 +265,27 @@ mod cpu Main {
     assert!(
         json.contains("\"nsld_final_executable_pipeline_execution_handoff_decision_code\":null")
     );
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_entrypoint_materialization_kind\":null")
+    );
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_entrypoint_materialization_path\":null")
+    );
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_entrypoint_materialization_ready\":null")
+    );
+    assert!(json.contains(
+        "\"nsld_final_executable_pipeline_entrypoint_materialization_first_blocker\":null"
+    ));
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_entrypoint_materialization_present\":null")
+    );
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_entrypoint_materialization_hash\":null")
+    );
+    assert!(json.contains(
+        "\"nsld_final_executable_pipeline_entrypoint_materialization_runner_command\":null"
+    ));
     assert!(json.contains("\"nsld_final_executable_pipeline_scheduler_metadata_payload_id\":null"));
     assert!(json.contains("\"nsld_final_executable_pipeline_required_stage_path_count\":null"));
     assert!(json.contains("\"nsld_self_owned_image_ready\":"));
@@ -431,12 +452,34 @@ mod cpu Main {
         "\"nsld_final_executable_pipeline_execution_handoff_decision_code\":\"handoff-entrypoint-materializer\""
     ));
     assert!(json.contains(
+        "\"nsld_final_executable_pipeline_entrypoint_materialization_kind\":\"host-shell-entrypoint-plan\""
+    ));
+    assert!(json.contains(
+        "\"nsld_final_executable_pipeline_entrypoint_materialization_path\":\"nuis.host-entrypoint.sh\""
+    ));
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_entrypoint_materialization_ready\":true")
+    );
+    assert!(json.contains(
+        "\"nsld_final_executable_pipeline_entrypoint_materialization_first_blocker\":null"
+    ));
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_entrypoint_materialization_present\":true")
+    );
+    assert!(json
+        .contains("\"nsld_final_executable_pipeline_entrypoint_materialization_hash\":\"0xabcd\""));
+    assert!(json.contains(
+        "\"nsld_final_executable_pipeline_entrypoint_materialization_runner_command\":\"nuis-host-runner --manifest manifest.toml"
+    ));
+    assert!(json.contains(
         "\"nsld_final_executable_pipeline_scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""
     ));
     assert!(json.contains("\"nsld_final_executable_pipeline_scheduler_metadata_present\":true"));
     assert!(json.contains("\"nsld_final_executable_pipeline_scheduler_metadata_hash\":\"0x1234\""));
-    assert!(json.contains("\"nsld_final_executable_pipeline_required_stage_path_count\":9"));
-    assert!(json.contains("\"nsld_final_executable_pipeline_required_stage_path_present_count\":9"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_required_stage_path_count\":10"));
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_required_stage_path_present_count\":10")
+    );
     assert!(
         json.contains("\"nsld_final_executable_pipeline_first_missing_required_stage_path\":null")
     );

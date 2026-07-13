@@ -513,6 +513,55 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
                 .unwrap_or("<unknown>")
         );
         println!(
+            "  nsld_final_executable_pipeline_entrypoint_materialization_kind: {}",
+            nsld_tail
+                .entrypoint_materialization_kind
+                .as_deref()
+                .unwrap_or("<unknown>")
+        );
+        println!(
+            "  nsld_final_executable_pipeline_entrypoint_materialization_path: {}",
+            nsld_tail
+                .entrypoint_materialization_path
+                .as_deref()
+                .unwrap_or("<unknown>")
+        );
+        println!(
+            "  nsld_final_executable_pipeline_entrypoint_materialization_ready: {}",
+            nsld_tail
+                .entrypoint_materialization_ready
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<unknown>".to_owned())
+        );
+        println!(
+            "  nsld_final_executable_pipeline_entrypoint_materialization_first_blocker: {}",
+            nsld_tail
+                .entrypoint_materialization_first_blocker
+                .as_deref()
+                .unwrap_or("<none>")
+        );
+        println!(
+            "  nsld_final_executable_pipeline_entrypoint_materialization_present: {}",
+            nsld_tail
+                .entrypoint_materialization_present
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<unknown>".to_owned())
+        );
+        println!(
+            "  nsld_final_executable_pipeline_entrypoint_materialization_hash: {}",
+            nsld_tail
+                .entrypoint_materialization_hash
+                .as_deref()
+                .unwrap_or("<unknown>")
+        );
+        println!(
+            "  nsld_final_executable_pipeline_entrypoint_materialization_runner_command: {}",
+            nsld_tail
+                .entrypoint_materialization_runner_command
+                .as_deref()
+                .unwrap_or("<unknown>")
+        );
+        println!(
             "  nsld_final_executable_pipeline_scheduler_metadata_payload_id: {}",
             nsld_tail
                 .scheduler_metadata_payload_id
@@ -710,6 +759,17 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
         println!("  nsld_final_executable_pipeline_execution_handoff_evidence_status: <unknown>");
         println!("  nsld_final_executable_pipeline_execution_handoff_first_blocker: <none>");
         println!("  nsld_final_executable_pipeline_execution_handoff_decision_code: <unknown>");
+        println!("  nsld_final_executable_pipeline_entrypoint_materialization_kind: <unknown>");
+        println!("  nsld_final_executable_pipeline_entrypoint_materialization_path: <unknown>");
+        println!("  nsld_final_executable_pipeline_entrypoint_materialization_ready: <unknown>");
+        println!(
+            "  nsld_final_executable_pipeline_entrypoint_materialization_first_blocker: <none>"
+        );
+        println!("  nsld_final_executable_pipeline_entrypoint_materialization_present: <unknown>");
+        println!("  nsld_final_executable_pipeline_entrypoint_materialization_hash: <unknown>");
+        println!(
+            "  nsld_final_executable_pipeline_entrypoint_materialization_runner_command: <unknown>"
+        );
         println!("  nsld_final_executable_pipeline_scheduler_metadata_payload_id: <unknown>");
         println!("  nsld_final_executable_pipeline_scheduler_metadata_present: <unknown>");
         println!("  nsld_final_executable_pipeline_scheduler_metadata_hash: <unknown>");

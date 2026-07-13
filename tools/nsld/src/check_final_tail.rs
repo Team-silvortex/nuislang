@@ -29,6 +29,20 @@ pub(crate) struct NsldCheckFinalTailSnapshot {
     pub(crate) final_executable_pipeline_emitted: Option<bool>,
     pub(crate) final_executable_pipeline_self_owned_image_status: Option<String>,
     pub(crate) final_executable_pipeline_entrypoint_materialization_status: Option<String>,
+    pub(crate) final_executable_pipeline_entrypoint_materialization_kind: Option<String>,
+    pub(crate) final_executable_pipeline_entrypoint_materialization_path: Option<String>,
+    pub(crate) final_executable_pipeline_entrypoint_materialization_ready: Option<bool>,
+    pub(crate) final_executable_pipeline_entrypoint_materialization_first_blocker: Option<String>,
+    pub(crate) final_executable_pipeline_entrypoint_materialization_present: Option<bool>,
+    pub(crate) final_executable_pipeline_entrypoint_materialization_hash: Option<String>,
+    pub(crate) final_executable_pipeline_entrypoint_materialization_runner_command: Option<String>,
+    pub(crate) final_executable_pipeline_execution_handoff_contract: Option<String>,
+    pub(crate) final_executable_pipeline_execution_handoff_ready: Option<bool>,
+    pub(crate) final_executable_pipeline_execution_handoff_status: Option<String>,
+    pub(crate) final_executable_pipeline_execution_handoff_target: Option<String>,
+    pub(crate) final_executable_pipeline_execution_handoff_evidence_status: Option<String>,
+    pub(crate) final_executable_pipeline_execution_handoff_first_blocker: Option<String>,
+    pub(crate) final_executable_pipeline_execution_handoff_decision_code: Option<String>,
     pub(crate) final_executable_pipeline_scheduler_metadata_payload_id: Option<String>,
     pub(crate) final_executable_pipeline_scheduler_metadata_present: Option<bool>,
     pub(crate) final_executable_pipeline_scheduler_metadata_hash: Option<String>,
@@ -124,6 +138,69 @@ pub(crate) fn nsld_check_final_tail_snapshot(
         final_executable_pipeline_verify_report
             .as_ref()
             .and_then(|report| report.actual_entrypoint_materialization_status.clone());
+    let final_executable_pipeline_entrypoint_materialization_kind =
+        final_executable_pipeline_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_entrypoint_materialization_kind.clone());
+    let final_executable_pipeline_entrypoint_materialization_path =
+        final_executable_pipeline_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_entrypoint_materialization_path.clone());
+    let final_executable_pipeline_entrypoint_materialization_ready =
+        final_executable_pipeline_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_entrypoint_materialization_ready);
+    let final_executable_pipeline_entrypoint_materialization_first_blocker =
+        final_executable_pipeline_verify_report
+            .as_ref()
+            .and_then(|report| {
+                report
+                    .actual_entrypoint_materialization_first_blocker
+                    .clone()
+            });
+    let final_executable_pipeline_entrypoint_materialization_present =
+        final_executable_pipeline_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_entrypoint_materialization_present);
+    let final_executable_pipeline_entrypoint_materialization_hash =
+        final_executable_pipeline_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_entrypoint_materialization_hash.clone());
+    let final_executable_pipeline_entrypoint_materialization_runner_command =
+        final_executable_pipeline_verify_report
+            .as_ref()
+            .and_then(|report| {
+                report
+                    .actual_entrypoint_materialization_runner_command
+                    .clone()
+            });
+    let final_executable_pipeline_execution_handoff_contract =
+        final_executable_pipeline_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_execution_handoff_contract.clone());
+    let final_executable_pipeline_execution_handoff_ready = final_executable_pipeline_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_execution_handoff_ready);
+    let final_executable_pipeline_execution_handoff_status =
+        final_executable_pipeline_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_execution_handoff_status.clone());
+    let final_executable_pipeline_execution_handoff_target =
+        final_executable_pipeline_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_execution_handoff_target.clone());
+    let final_executable_pipeline_execution_handoff_evidence_status =
+        final_executable_pipeline_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_execution_handoff_evidence_status.clone());
+    let final_executable_pipeline_execution_handoff_first_blocker =
+        final_executable_pipeline_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_execution_handoff_first_blocker.clone());
+    let final_executable_pipeline_execution_handoff_decision_code =
+        final_executable_pipeline_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_execution_handoff_decision_code.clone());
     let final_executable_pipeline_scheduler_metadata_payload_id =
         final_executable_pipeline_verify_report
             .as_ref()
@@ -177,6 +254,20 @@ pub(crate) fn nsld_check_final_tail_snapshot(
         final_executable_pipeline_emitted,
         final_executable_pipeline_self_owned_image_status,
         final_executable_pipeline_entrypoint_materialization_status,
+        final_executable_pipeline_entrypoint_materialization_kind,
+        final_executable_pipeline_entrypoint_materialization_path,
+        final_executable_pipeline_entrypoint_materialization_ready,
+        final_executable_pipeline_entrypoint_materialization_first_blocker,
+        final_executable_pipeline_entrypoint_materialization_present,
+        final_executable_pipeline_entrypoint_materialization_hash,
+        final_executable_pipeline_entrypoint_materialization_runner_command,
+        final_executable_pipeline_execution_handoff_contract,
+        final_executable_pipeline_execution_handoff_ready,
+        final_executable_pipeline_execution_handoff_status,
+        final_executable_pipeline_execution_handoff_target,
+        final_executable_pipeline_execution_handoff_evidence_status,
+        final_executable_pipeline_execution_handoff_first_blocker,
+        final_executable_pipeline_execution_handoff_decision_code,
         final_executable_pipeline_scheduler_metadata_payload_id,
         final_executable_pipeline_scheduler_metadata_present,
         final_executable_pipeline_scheduler_metadata_hash,

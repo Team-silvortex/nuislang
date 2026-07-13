@@ -133,6 +133,13 @@ pub(crate) struct NsldFinalExecutableTailSummary {
     pub(crate) first_missing_required_stage_path: Option<String>,
     pub(crate) self_owned_image_status: String,
     pub(crate) entrypoint_materialization_status: String,
+    pub(crate) entrypoint_materialization_kind: Option<String>,
+    pub(crate) entrypoint_materialization_path: Option<String>,
+    pub(crate) entrypoint_materialization_ready: Option<bool>,
+    pub(crate) entrypoint_materialization_first_blocker: Option<String>,
+    pub(crate) entrypoint_materialization_present: Option<bool>,
+    pub(crate) entrypoint_materialization_hash: Option<String>,
+    pub(crate) entrypoint_materialization_runner_command: Option<String>,
     pub(crate) self_owned_image_ready: Option<bool>,
     pub(crate) self_owned_image_path: Option<String>,
     pub(crate) self_owned_image_present: Option<bool>,
@@ -711,6 +718,13 @@ pub(crate) fn nsld_final_executable_tail_summary(
         first_missing_required_stage_path,
         pipeline_self_owned_image_status,
         pipeline_entrypoint_materialization_status,
+        pipeline_entrypoint_materialization_kind,
+        pipeline_entrypoint_materialization_path,
+        pipeline_entrypoint_materialization_ready,
+        pipeline_entrypoint_materialization_first_blocker,
+        pipeline_entrypoint_materialization_present,
+        pipeline_entrypoint_materialization_hash,
+        pipeline_entrypoint_materialization_runner_command,
     ) = fs::read_to_string(&pipeline)
         .ok()
         .map(|source| {
@@ -737,11 +751,19 @@ pub(crate) fn nsld_final_executable_tail_summary(
                 parse_first_string_array_item(&source, "missing_required_stage_paths"),
                 parse_string_field(&source, "self_owned_image_status"),
                 parse_string_field(&source, "entrypoint_materialization_status"),
+                parse_string_field(&source, "entrypoint_materialization_kind"),
+                parse_non_empty_string_field(&source, "entrypoint_materialization_path"),
+                parse_bool_field(&source, "entrypoint_materialization_ready"),
+                parse_non_empty_string_field(&source, "entrypoint_materialization_first_blocker"),
+                parse_bool_field(&source, "entrypoint_materialization_present"),
+                parse_non_empty_string_field(&source, "entrypoint_materialization_hash"),
+                parse_non_empty_string_field(&source, "entrypoint_materialization_runner_command"),
             )
         })
         .unwrap_or((
             None, None, None, None, None, None, None, None, None, None, None, None, None, None,
-            None, None, None, None, None, None, None, None,
+            None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+            None,
         ));
     let (
         self_owned_image_path,
@@ -806,6 +828,14 @@ pub(crate) fn nsld_final_executable_tail_summary(
         first_missing_required_stage_path,
         self_owned_image_status,
         entrypoint_materialization_status,
+        entrypoint_materialization_kind: pipeline_entrypoint_materialization_kind,
+        entrypoint_materialization_path: pipeline_entrypoint_materialization_path,
+        entrypoint_materialization_ready: pipeline_entrypoint_materialization_ready,
+        entrypoint_materialization_first_blocker: pipeline_entrypoint_materialization_first_blocker,
+        entrypoint_materialization_present: pipeline_entrypoint_materialization_present,
+        entrypoint_materialization_hash: pipeline_entrypoint_materialization_hash,
+        entrypoint_materialization_runner_command:
+            pipeline_entrypoint_materialization_runner_command,
         self_owned_image_ready,
         self_owned_image_path,
         self_owned_image_present,
@@ -1585,6 +1615,48 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
                 .and_then(|summary| summary.execution_handoff_decision_code.as_deref()),
         ),
         json_optional_string_field(
+            "nsld_final_executable_pipeline_entrypoint_materialization_kind",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.entrypoint_materialization_kind.as_deref()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_pipeline_entrypoint_materialization_path",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.entrypoint_materialization_path.as_deref()),
+        ),
+        json_optional_bool_field(
+            "nsld_final_executable_pipeline_entrypoint_materialization_ready",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.entrypoint_materialization_ready),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_pipeline_entrypoint_materialization_first_blocker",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.entrypoint_materialization_first_blocker.as_deref()),
+        ),
+        json_optional_bool_field(
+            "nsld_final_executable_pipeline_entrypoint_materialization_present",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.entrypoint_materialization_present),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_pipeline_entrypoint_materialization_hash",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.entrypoint_materialization_hash.as_deref()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_pipeline_entrypoint_materialization_runner_command",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.entrypoint_materialization_runner_command.as_deref()),
+        ),
+        json_optional_string_field(
             "nsld_final_executable_pipeline_scheduler_metadata_payload_id",
             nsld_tail
                 .as_ref()
@@ -1797,6 +1869,10 @@ fn parse_string_field(source: &str, key: &str) -> Option<String> {
     parse_scalar_field(source, key)
         .and_then(|value| value.trim().strip_prefix('"')?.strip_suffix('"'))
         .map(str::to_owned)
+}
+
+fn parse_non_empty_string_field(source: &str, key: &str) -> Option<String> {
+    parse_string_field(source, key).filter(|value| !value.is_empty())
 }
 
 fn parse_first_string_array_item(source: &str, key: &str) -> Option<String> {

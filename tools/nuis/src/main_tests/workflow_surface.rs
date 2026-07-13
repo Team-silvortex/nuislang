@@ -213,6 +213,27 @@ mod cpu Main {
     assert!(
         json.contains("\"nsld_final_executable_pipeline_execution_handoff_decision_code\":null")
     );
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_entrypoint_materialization_kind\":null")
+    );
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_entrypoint_materialization_path\":null")
+    );
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_entrypoint_materialization_ready\":null")
+    );
+    assert!(json.contains(
+        "\"nsld_final_executable_pipeline_entrypoint_materialization_first_blocker\":null"
+    ));
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_entrypoint_materialization_present\":null")
+    );
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_entrypoint_materialization_hash\":null")
+    );
+    assert!(json.contains(
+        "\"nsld_final_executable_pipeline_entrypoint_materialization_runner_command\":null"
+    ));
     assert!(json.contains("\"nsld_final_executable_pipeline_required_stage_path_count\":null"));
     assert!(
         json.contains("\"nsld_final_executable_pipeline_required_stage_path_present_count\":null")
@@ -296,7 +317,9 @@ mod cpu Main {
         "\"nsld_drive_recommended_reason\":\"artifact-chain has no mutating next action; inspect the final executable output boundary blocked by `final-executable-output:ownership-unknown`\""
     ));
     assert!(json.contains("\"nsld_final_executable_pipeline_valid\":true"));
-    assert!(json.contains("\"nsld_final_executable_pipeline_required_stage_path_present_count\":9"));
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_required_stage_path_present_count\":10")
+    );
     assert!(json.contains(
         "\"nsld_final_executable_pipeline_execution_handoff_contract\":\"nsld-final-output-handoff-v1\""
     ));
@@ -306,6 +329,26 @@ mod cpu Main {
     ));
     assert!(json.contains(
         "\"nsld_final_executable_pipeline_execution_handoff_decision_code\":\"handoff-entrypoint-materializer\""
+    ));
+    assert!(json.contains(
+        "\"nsld_final_executable_pipeline_entrypoint_materialization_kind\":\"host-shell-entrypoint-plan\""
+    ));
+    assert!(json.contains(
+        "\"nsld_final_executable_pipeline_entrypoint_materialization_path\":\"nuis.host-entrypoint.sh\""
+    ));
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_entrypoint_materialization_ready\":true")
+    );
+    assert!(json.contains(
+        "\"nsld_final_executable_pipeline_entrypoint_materialization_first_blocker\":null"
+    ));
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_entrypoint_materialization_present\":true")
+    );
+    assert!(json
+        .contains("\"nsld_final_executable_pipeline_entrypoint_materialization_hash\":\"0xabcd\""));
+    assert!(json.contains(
+        "\"nsld_final_executable_pipeline_entrypoint_materialization_runner_command\":\"nuis-host-runner --manifest manifest.toml"
     ));
     assert!(json.contains("\"nsld_self_owned_image_ready\":"));
     assert!(json.contains("\"nsld_self_owned_image_status\":"));

@@ -238,6 +238,34 @@ pub(super) fn write_link_plan_text_fields<W: fmt::Write>(
         )?;
         writeln!(
             out,
+            "  nsld_final_executable_pipeline_entrypoint_materialization_kind: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_entrypoint_materialization_path: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_entrypoint_materialization_ready: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_entrypoint_materialization_first_blocker: <none>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_entrypoint_materialization_present: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_entrypoint_materialization_hash: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_pipeline_entrypoint_materialization_runner_command: <unavailable>"
+        )?;
+        writeln!(
+            out,
             "  nsld_final_executable_pipeline_scheduler_metadata_payload_id: <unavailable>"
         )?;
         writeln!(
@@ -704,6 +732,48 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
             final_tail_summary
                 .as_ref()
                 .and_then(|summary| summary.execution_handoff_decision_code.as_deref()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_pipeline_entrypoint_materialization_kind",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.entrypoint_materialization_kind.as_deref()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_pipeline_entrypoint_materialization_path",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.entrypoint_materialization_path.as_deref()),
+        ),
+        json_optional_bool_field(
+            "nsld_final_executable_pipeline_entrypoint_materialization_ready",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.entrypoint_materialization_ready),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_pipeline_entrypoint_materialization_first_blocker",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.entrypoint_materialization_first_blocker.as_deref()),
+        ),
+        json_optional_bool_field(
+            "nsld_final_executable_pipeline_entrypoint_materialization_present",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.entrypoint_materialization_present),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_pipeline_entrypoint_materialization_hash",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.entrypoint_materialization_hash.as_deref()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_pipeline_entrypoint_materialization_runner_command",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.entrypoint_materialization_runner_command.as_deref()),
         ),
         crate::json_optional_string_field(
             "nsld_final_executable_pipeline_scheduler_metadata_payload_id",
@@ -1242,6 +1312,62 @@ fn write_nsld_artifact_chain_text_fields<W: fmt::Write>(
         "  nsld_final_executable_pipeline_execution_handoff_decision_code: {}",
         final_tail
             .execution_handoff_decision_code
+            .as_deref()
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_entrypoint_materialization_kind: {}",
+        final_tail
+            .entrypoint_materialization_kind
+            .as_deref()
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_entrypoint_materialization_path: {}",
+        final_tail
+            .entrypoint_materialization_path
+            .as_deref()
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_entrypoint_materialization_ready: {}",
+        final_tail
+            .entrypoint_materialization_ready
+            .map(crate::yes_no)
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_entrypoint_materialization_first_blocker: {}",
+        final_tail
+            .entrypoint_materialization_first_blocker
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_entrypoint_materialization_present: {}",
+        final_tail
+            .entrypoint_materialization_present
+            .map(crate::yes_no)
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_entrypoint_materialization_hash: {}",
+        final_tail
+            .entrypoint_materialization_hash
+            .as_deref()
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_pipeline_entrypoint_materialization_runner_command: {}",
+        final_tail
+            .entrypoint_materialization_runner_command
             .as_deref()
             .unwrap_or("<unavailable>")
     )?;

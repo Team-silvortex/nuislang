@@ -476,6 +476,48 @@ pub(crate) fn nsld_check_report(
         final_executable_pipeline_entrypoint_materialization_status: final_snapshot
             .tail
             .final_executable_pipeline_entrypoint_materialization_status,
+        final_executable_pipeline_entrypoint_materialization_kind: final_snapshot
+            .tail
+            .final_executable_pipeline_entrypoint_materialization_kind,
+        final_executable_pipeline_entrypoint_materialization_path: final_snapshot
+            .tail
+            .final_executable_pipeline_entrypoint_materialization_path,
+        final_executable_pipeline_entrypoint_materialization_ready: final_snapshot
+            .tail
+            .final_executable_pipeline_entrypoint_materialization_ready,
+        final_executable_pipeline_entrypoint_materialization_first_blocker: final_snapshot
+            .tail
+            .final_executable_pipeline_entrypoint_materialization_first_blocker,
+        final_executable_pipeline_entrypoint_materialization_present: final_snapshot
+            .tail
+            .final_executable_pipeline_entrypoint_materialization_present,
+        final_executable_pipeline_entrypoint_materialization_hash: final_snapshot
+            .tail
+            .final_executable_pipeline_entrypoint_materialization_hash,
+        final_executable_pipeline_entrypoint_materialization_runner_command: final_snapshot
+            .tail
+            .final_executable_pipeline_entrypoint_materialization_runner_command,
+        final_executable_pipeline_execution_handoff_contract: final_snapshot
+            .tail
+            .final_executable_pipeline_execution_handoff_contract,
+        final_executable_pipeline_execution_handoff_ready: final_snapshot
+            .tail
+            .final_executable_pipeline_execution_handoff_ready,
+        final_executable_pipeline_execution_handoff_status: final_snapshot
+            .tail
+            .final_executable_pipeline_execution_handoff_status,
+        final_executable_pipeline_execution_handoff_target: final_snapshot
+            .tail
+            .final_executable_pipeline_execution_handoff_target,
+        final_executable_pipeline_execution_handoff_evidence_status: final_snapshot
+            .tail
+            .final_executable_pipeline_execution_handoff_evidence_status,
+        final_executable_pipeline_execution_handoff_first_blocker: final_snapshot
+            .tail
+            .final_executable_pipeline_execution_handoff_first_blocker,
+        final_executable_pipeline_execution_handoff_decision_code: final_snapshot
+            .tail
+            .final_executable_pipeline_execution_handoff_decision_code,
         final_executable_pipeline_scheduler_metadata_payload_id: final_snapshot
             .tail
             .final_executable_pipeline_scheduler_metadata_payload_id,

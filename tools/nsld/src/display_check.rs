@@ -347,6 +347,70 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         )
     );
     println!(
+        "  final_executable_pipeline_entrypoint_materialization: kind={} path={} ready={} first_blocker={} present={} hash={} runner_command={}",
+        optional_string_text(
+            report
+                .final_executable_pipeline_entrypoint_materialization_kind
+                .as_deref()
+        ),
+        optional_string_text(
+            report
+                .final_executable_pipeline_entrypoint_materialization_path
+                .as_deref()
+        ),
+        optional_bool_text(report.final_executable_pipeline_entrypoint_materialization_ready),
+        optional_string_text(
+            report
+                .final_executable_pipeline_entrypoint_materialization_first_blocker
+                .as_deref()
+        ),
+        optional_bool_text(report.final_executable_pipeline_entrypoint_materialization_present),
+        optional_string_text(
+            report
+                .final_executable_pipeline_entrypoint_materialization_hash
+                .as_deref()
+        ),
+        optional_string_text(
+            report
+                .final_executable_pipeline_entrypoint_materialization_runner_command
+                .as_deref()
+        )
+    );
+    println!(
+        "  final_executable_pipeline_execution_handoff: contract={} ready={} status={} target={} evidence_status={} first_blocker={} decision_code={}",
+        optional_string_text(
+            report
+                .final_executable_pipeline_execution_handoff_contract
+                .as_deref()
+        ),
+        optional_bool_text(report.final_executable_pipeline_execution_handoff_ready),
+        optional_string_text(
+            report
+                .final_executable_pipeline_execution_handoff_status
+                .as_deref()
+        ),
+        optional_string_text(
+            report
+                .final_executable_pipeline_execution_handoff_target
+                .as_deref()
+        ),
+        optional_string_text(
+            report
+                .final_executable_pipeline_execution_handoff_evidence_status
+                .as_deref()
+        ),
+        optional_string_text(
+            report
+                .final_executable_pipeline_execution_handoff_first_blocker
+                .as_deref()
+        ),
+        optional_string_text(
+            report
+                .final_executable_pipeline_execution_handoff_decision_code
+                .as_deref()
+        )
+    );
+    println!(
         "  container_loader: readiness={} blockers={} metadata_table_hash={} external_imports={}",
         optional_string_text(report.container_loader_readiness.as_deref()),
         report.container_loader_blockers.len(),

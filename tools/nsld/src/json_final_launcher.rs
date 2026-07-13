@@ -474,6 +474,34 @@ pub(crate) fn nsld_final_executable_pipeline_emit_report_json(
             &report.entrypoint_materialization_status,
         ),
         json_string_field(
+            "entrypoint_materialization_kind",
+            &report.entrypoint_materialization_kind,
+        ),
+        json_optional_string_field(
+            "entrypoint_materialization_path",
+            report.entrypoint_materialization_path.as_deref(),
+        ),
+        json_bool_field(
+            "entrypoint_materialization_ready",
+            report.entrypoint_materialization_ready,
+        ),
+        json_optional_string_field(
+            "entrypoint_materialization_first_blocker",
+            report.entrypoint_materialization_first_blocker.as_deref(),
+        ),
+        json_optional_bool_field(
+            "entrypoint_materialization_present",
+            report.entrypoint_materialization_present,
+        ),
+        json_optional_string_field(
+            "entrypoint_materialization_hash",
+            report.entrypoint_materialization_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "entrypoint_materialization_runner_command",
+            report.entrypoint_materialization_runner_command.as_deref(),
+        ),
+        json_string_field(
             "execution_handoff_contract",
             &report.execution_handoff_contract,
         ),
@@ -586,6 +614,70 @@ pub(crate) fn nsld_final_executable_pipeline_verify_report_json(
         json_optional_string_field(
             "actual_entrypoint_materialization_status",
             report.actual_entrypoint_materialization_status.as_deref(),
+        ),
+        json_string_field(
+            "expected_entrypoint_materialization_kind",
+            &report.expected_entrypoint_materialization_kind,
+        ),
+        json_optional_string_field(
+            "actual_entrypoint_materialization_kind",
+            report.actual_entrypoint_materialization_kind.as_deref(),
+        ),
+        json_optional_string_field(
+            "expected_entrypoint_materialization_path",
+            report.expected_entrypoint_materialization_path.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_entrypoint_materialization_path",
+            report.actual_entrypoint_materialization_path.as_deref(),
+        ),
+        json_bool_field(
+            "expected_entrypoint_materialization_ready",
+            report.expected_entrypoint_materialization_ready,
+        ),
+        json_optional_bool_field(
+            "actual_entrypoint_materialization_ready",
+            report.actual_entrypoint_materialization_ready,
+        ),
+        json_optional_string_field(
+            "expected_entrypoint_materialization_first_blocker",
+            report
+                .expected_entrypoint_materialization_first_blocker
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_entrypoint_materialization_first_blocker",
+            report
+                .actual_entrypoint_materialization_first_blocker
+                .as_deref(),
+        ),
+        json_optional_bool_field(
+            "expected_entrypoint_materialization_present",
+            report.expected_entrypoint_materialization_present,
+        ),
+        json_optional_bool_field(
+            "actual_entrypoint_materialization_present",
+            report.actual_entrypoint_materialization_present,
+        ),
+        json_optional_string_field(
+            "expected_entrypoint_materialization_hash",
+            report.expected_entrypoint_materialization_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_entrypoint_materialization_hash",
+            report.actual_entrypoint_materialization_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "expected_entrypoint_materialization_runner_command",
+            report
+                .expected_entrypoint_materialization_runner_command
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_entrypoint_materialization_runner_command",
+            report
+                .actual_entrypoint_materialization_runner_command
+                .as_deref(),
         ),
         json_string_field(
             "expected_execution_handoff_contract",

@@ -261,7 +261,26 @@ tools can consume the launcher layer without re-deriving whether the output
 belongs to `host-runner`, `entrypoint-materializer`, or no execution owner yet.
 The final-executable pipeline summary also copies that same handoff group, so
 automation can route from the pipeline report without opening the launcher TOML
-unless it needs lower-level diagnostics.
+unless it needs lower-level diagnostics. The pipeline also exposes a plan-level
+entrypoint materialization group:
+`entrypoint_materialization_kind`, `entrypoint_materialization_path`,
+`entrypoint_materialization_ready`, and
+`entrypoint_materialization_first_blocker`. The current ready route is
+`host-shell-entrypoint-plan`; it describes the next handoff without making nsld
+an OS package builder. On the ready self-contained image route,
+`emit-final-executable-pipeline` also writes `nuis.host-entrypoint.sh`, a small
+handoff stub that delegates to `${NUIS_HOST_RUNNER:-nuis-host-runner}` with the
+manifest, NSB path, scheduler entry, and lifecycle hook. The script is part of
+the pipeline required-path closure, but the runner remains a separate runtime
+component. The pipeline exposes the stub's presence, content hash, and
+script-facing runner command through `entrypoint_materialization_present`,
+`entrypoint_materialization_hash`, and
+`entrypoint_materialization_runner_command`.
+`nsld check` mirrors the pipeline handoff fields as
+`final_executable_pipeline_execution_handoff_*`, so CI can inspect the same
+route from the aggregate verifier report. It also mirrors the entrypoint
+materialization group as
+`final_executable_pipeline_entrypoint_materialization_*`.
 
 `nsld assemble-plan` is the first dry-run view of binary assembly. It consumes
 the prepared bundle state and lists the sections that a future Nsld-owned
@@ -1248,6 +1267,14 @@ emit/verify JSON uses the shorter `self_owned_image_status` /
 `actual_entrypoint_materialization_status` fields. Image status is intentionally
 narrower than entrypoint readiness: it only answers whether the internal `.nsb`
 image layer is present, hashed, and header-valid.
+For host-shell entrypoint planning, the pipeline additionally records
+`entrypoint_materialization_kind`, `entrypoint_materialization_path`,
+`entrypoint_materialization_ready`, and
+`entrypoint_materialization_first_blocker`; `nsld check` mirrors those as
+`final_executable_pipeline_entrypoint_materialization_kind`,
+`final_executable_pipeline_entrypoint_materialization_path`,
+`final_executable_pipeline_entrypoint_materialization_ready`, and
+`final_executable_pipeline_entrypoint_materialization_first_blocker`.
 
 `nsld prepare` also returns the same compatibility-domain summary after it has
 emitted and verified the full artifact chain. This makes the prepare result a
