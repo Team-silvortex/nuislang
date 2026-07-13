@@ -389,6 +389,16 @@ pub(crate) fn nsld_check_report(
             .final_executable_output_validation_mode,
         final_executable_output_boundary_status: final_snapshot
             .final_executable_output_boundary_status,
+        final_executable_output_materialization_status: final_snapshot
+            .final_executable_output_materialization_status,
+        final_executable_output_execution_handoff_status: final_snapshot
+            .final_executable_output_execution_handoff_status,
+        final_executable_output_execution_handoff_target: final_snapshot
+            .final_executable_output_execution_handoff_target,
+        final_executable_output_execution_handoff_evidence_status: final_snapshot
+            .final_executable_output_execution_handoff_evidence_status,
+        final_executable_output_recommended_next_action: final_snapshot
+            .final_executable_output_recommended_next_action,
         final_executable_output_nsld_owned: final_snapshot.final_executable_output_nsld_owned,
         final_executable_output_present: final_snapshot.final_executable_output_present,
         final_executable_output_size_bytes: final_snapshot.final_executable_output_size_bytes,
@@ -452,6 +462,12 @@ pub(crate) fn nsld_check_report(
         final_executable_pipeline_hash: final_snapshot.tail.final_executable_pipeline_hash,
         final_executable_pipeline_ready: final_snapshot.tail.final_executable_pipeline_ready,
         final_executable_pipeline_emitted: final_snapshot.tail.final_executable_pipeline_emitted,
+        final_executable_pipeline_self_owned_image_status: final_snapshot
+            .tail
+            .final_executable_pipeline_self_owned_image_status,
+        final_executable_pipeline_entrypoint_materialization_status: final_snapshot
+            .tail
+            .final_executable_pipeline_entrypoint_materialization_status,
         final_executable_pipeline_scheduler_metadata_payload_id: final_snapshot
             .tail
             .final_executable_pipeline_scheduler_metadata_payload_id,

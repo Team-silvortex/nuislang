@@ -85,11 +85,17 @@ artifact-follow-up state:
 * `link_plan_heterogeneous_domain_first_unready`
 * `nsld_final_executable_output_ready`
 * `nsld_final_executable_output_boundary_status`
+* `nsld_final_executable_output_materialization_status`
+* `nsld_final_executable_output_execution_handoff_status`
+* `nsld_final_executable_output_execution_handoff_target`
+* `nsld_final_executable_output_execution_handoff_evidence_status`
+* `nsld_final_executable_output_recommended_next_action`
 * `nsld_final_executable_output_path_present`
 * `nsld_final_executable_output_nsld_owned`
 * `nsld_final_executable_output_blockers`
 * `nsld_self_owned_image_ready`
 * `nsld_self_owned_image_status`
+* `nsld_entrypoint_materialization_status`
 * `nsld_self_owned_image_path`
 * `nsld_self_owned_image_present`
 * `nsld_self_owned_image_hash`
@@ -106,8 +112,24 @@ Short reading rule:
   is missing, merely host-produced, or explicitly Nsld-owned
 * `nsld_final_executable_output_boundary_status` is the normalized script-facing
   state for the final-output boundary
+* `nsld_final_executable_output_materialization_status` distinguishes host-native
+  readiness from the self-contained internal image route
+* `nsld_final_executable_output_execution_handoff_status` distinguishes whether
+  the output can hand off directly to a runner, still needs entrypoint
+  materialization, or is blocked
+* `nsld_final_executable_output_execution_handoff_target` names the abstract
+  component that owns that handoff without binding the artifact to Mach-O, ELF,
+  PE, or a future Nuis-native shell
+* `nsld_final_executable_output_execution_handoff_evidence_status` names the
+  proof class backing the handoff, such as the host invoke plan or the internal
+  image header/hash evidence
+* `nsld_final_executable_output_recommended_next_action` gives scripts the next
+  boundary action without forcing them to interpret every blocker string
 * `nsld_self_owned_image_status` is the normalized script-facing state for the
   internal `.nsb` image layer before host-shell or OS-native materialization
+* `nsld_entrypoint_materialization_status` separates the next entrypoint layer
+  from image readiness: `host-launcher-ready`,
+  `image-ready-entrypoint-pending`, or `blocked`
 * heterogeneous-domain readiness fields summarize whether non-CPU domain units
   have the generic payload, lowering, sidecar, and bridge evidence needed by the
   current artifact route

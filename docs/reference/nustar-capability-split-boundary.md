@@ -66,6 +66,10 @@ Current practical meaning:
 * it is coarser than frontend syntax and finer than raw manifest text
 * it is the right place to attach future per-domain registered facts before
   inventing more ad hoc CLI-only fields
+* the contract now carries derived completeness fields:
+  `contract_status`, `required_contract_groups`, and `missing_contract_groups`
+  so scripts can distinguish a complete registered domain contract from a
+  partially declared one without reverse-engineering every manifest field
 
 Current contract groups inside that shape:
 
@@ -96,6 +100,8 @@ Short rule:
   `nustar-domain-contract-v2`
 * future domains should plug into this contract shape first, not invent
   one-off frontdoor reporting structures
+* completeness status is derived from the checked-in package manifest and common
+  domain contract skeleton, not authored as a separate manifest knob
 
 ## What “Capability Split” Should Mean Now
 

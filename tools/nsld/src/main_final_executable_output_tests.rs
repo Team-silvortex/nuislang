@@ -31,6 +31,14 @@ fn final_executable_output_reports_missing_until_real_output_exists() {
 
     assert!(!report.present);
     assert_eq!(report.boundary_status, "missing");
+    assert_eq!(report.materialization_status, "blocked");
+    assert_eq!(report.execution_handoff_status, "blocked");
+    assert_eq!(report.execution_handoff_target, "none");
+    assert_eq!(report.execution_handoff_evidence_status, "blocked");
+    assert_eq!(
+        report.recommended_next_action,
+        "emit-final-executable-pipeline"
+    );
     assert!(!report.runnable_candidate);
     assert!(!report.matches_expected_image);
     assert!(!report.output_image_header_valid);
@@ -46,6 +54,11 @@ fn final_executable_output_reports_missing_until_real_output_exists() {
         .any(|blocker| blocker == "final-executable-emit:not-emitted"));
     assert!(report_json.contains("\"kind\":\"nsld_final_executable_output\""));
     assert!(report_json.contains("\"boundary_status\":\"missing\""));
+    assert!(report_json.contains("\"materialization_status\":\"blocked\""));
+    assert!(report_json.contains("\"execution_handoff_status\":\"blocked\""));
+    assert!(report_json.contains("\"execution_handoff_target\":\"none\""));
+    assert!(report_json.contains("\"execution_handoff_evidence_status\":\"blocked\""));
+    assert!(report_json.contains("\"recommended_next_action\":\"emit-final-executable-pipeline\""));
     assert!(report_json.contains("\"present\":false"));
     assert!(report_json.contains("\"output_image_header_valid\":false"));
     assert!(report_json.contains("\"output_image_magic\":null"));
@@ -427,6 +440,20 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     );
     assert!(output.present);
     assert_eq!(output.boundary_status, "ready");
+    assert_eq!(output.materialization_status, "self-contained-image-ready");
+    assert_eq!(
+        output.execution_handoff_status,
+        "entrypoint-materializer-required"
+    );
+    assert_eq!(output.execution_handoff_target, "entrypoint-materializer");
+    assert_eq!(
+        output.execution_handoff_evidence_status,
+        "image-header-and-hash-ready"
+    );
+    assert_eq!(
+        output.recommended_next_action,
+        "materialize-host-shell-or-os-entrypoint"
+    );
     assert!(output.path_present);
     assert!(output.nsld_owned_output);
     assert!(output.runnable_candidate, "{:?}", output.blockers);
@@ -473,6 +500,15 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert_eq!(image_bytes, output_bytes);
     assert!(output_json.contains("\"present\":true"));
     assert!(output_json.contains("\"boundary_status\":\"ready\""));
+    assert!(output_json.contains("\"materialization_status\":\"self-contained-image-ready\""));
+    assert!(
+        output_json.contains("\"execution_handoff_status\":\"entrypoint-materializer-required\"")
+    );
+    assert!(output_json.contains("\"execution_handoff_target\":\"entrypoint-materializer\""));
+    assert!(output_json
+        .contains("\"execution_handoff_evidence_status\":\"image-header-and-hash-ready\""));
+    assert!(output_json
+        .contains("\"recommended_next_action\":\"materialize-host-shell-or-os-entrypoint\""));
     assert!(output_json.contains("\"path_present\":true"));
     assert!(output_json.contains("\"nsld_owned_output\":true"));
     assert!(output_json.contains("\"output_image_header_required\":true"));
@@ -624,6 +660,14 @@ fn final_executable_output_rejects_tampered_output_bytes() {
 
     assert!(output.present);
     assert_eq!(output.boundary_status, "invalid");
+    assert_eq!(output.materialization_status, "blocked");
+    assert_eq!(output.execution_handoff_status, "blocked");
+    assert_eq!(output.execution_handoff_target, "none");
+    assert_eq!(output.execution_handoff_evidence_status, "blocked");
+    assert_eq!(
+        output.recommended_next_action,
+        "inspect-final-output-diagnostics"
+    );
     assert!(!output.runnable_candidate);
     assert!(!output.matches_expected_image);
     assert!(!output.output_image_header_valid);
@@ -649,6 +693,26 @@ fn final_executable_output_rejects_tampered_output_bytes() {
         Some(false)
     );
     assert_eq!(check.final_executable_output_boundary_status, "invalid");
+    assert_eq!(
+        check.final_executable_output_materialization_status,
+        "blocked"
+    );
+    assert_eq!(
+        check.final_executable_output_execution_handoff_status,
+        "blocked"
+    );
+    assert_eq!(
+        check.final_executable_output_execution_handoff_target,
+        "none"
+    );
+    assert_eq!(
+        check.final_executable_output_execution_handoff_evidence_status,
+        "blocked"
+    );
+    assert_eq!(
+        check.final_executable_output_recommended_next_action,
+        "inspect-final-output-diagnostics"
+    );
     assert!(check
         .final_executable_output_issues
         .iter()
@@ -659,6 +723,13 @@ fn final_executable_output_rejects_tampered_output_bytes() {
         .any(|issue| issue.contains("hash mismatch")));
     assert!(output_json.contains("\"present\":true"));
     assert!(output_json.contains("\"boundary_status\":\"invalid\""));
+    assert!(output_json.contains("\"materialization_status\":\"blocked\""));
+    assert!(output_json.contains("\"execution_handoff_status\":\"blocked\""));
+    assert!(output_json.contains("\"execution_handoff_target\":\"none\""));
+    assert!(output_json.contains("\"execution_handoff_evidence_status\":\"blocked\""));
+    assert!(
+        output_json.contains("\"recommended_next_action\":\"inspect-final-output-diagnostics\"")
+    );
     assert!(output_json.contains("\"output_image_header_valid\":false"));
     assert!(output_json.contains("\"matches_expected_image\":false"));
     assert!(output_json.contains("\"runnable_candidate\":false"));

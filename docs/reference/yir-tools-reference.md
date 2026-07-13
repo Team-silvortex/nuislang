@@ -194,6 +194,9 @@ Current `nustar` loading policy is:
     * `scheduler_contract_cpu_observer_branch_class_type`
 * `nuis registry` now also prints the short scheduler-facing reading view for
   each package:
+  * `contract_status`
+  * `required_contract_groups`
+  * `missing_contract_groups`
   * `scheduler_contract_stack`
   * `scheduler_result_roles`
   * `scheduler_sample_navigation`

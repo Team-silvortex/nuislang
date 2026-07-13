@@ -152,6 +152,26 @@ pub(crate) fn check_report_final_fields(report: &NsldCheckReport) -> Vec<String>
             "final_executable_output_boundary_status",
             &report.final_executable_output_boundary_status,
         ),
+        json_string_field(
+            "final_executable_output_materialization_status",
+            &report.final_executable_output_materialization_status,
+        ),
+        json_string_field(
+            "final_executable_output_execution_handoff_status",
+            &report.final_executable_output_execution_handoff_status,
+        ),
+        json_string_field(
+            "final_executable_output_execution_handoff_target",
+            &report.final_executable_output_execution_handoff_target,
+        ),
+        json_string_field(
+            "final_executable_output_execution_handoff_evidence_status",
+            &report.final_executable_output_execution_handoff_evidence_status,
+        ),
+        json_string_field(
+            "final_executable_output_recommended_next_action",
+            &report.final_executable_output_recommended_next_action,
+        ),
         json_bool_field(
             "final_executable_output_nsld_owned",
             report.final_executable_output_nsld_owned,
@@ -281,6 +301,18 @@ pub(crate) fn check_report_final_fields(report: &NsldCheckReport) -> Vec<String>
         json_optional_bool_field(
             "final_executable_pipeline_emitted",
             report.final_executable_pipeline_emitted,
+        ),
+        json_optional_string_field(
+            "final_executable_pipeline_self_owned_image_status",
+            report
+                .final_executable_pipeline_self_owned_image_status
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "final_executable_pipeline_entrypoint_materialization_status",
+            report
+                .final_executable_pipeline_entrypoint_materialization_status
+                .as_deref(),
         ),
         json_optional_string_field(
             "final_executable_pipeline_scheduler_metadata_payload_id",

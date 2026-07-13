@@ -115,6 +115,9 @@ Current reading rule:
   * observer classification
     * `observer_source_class -> observer_stage_class -> observer_scope_class -> observer_branch_class`
 * `nuis registry` now exposes the same stack in a shorter package-facing form:
+  * `contract_status`
+  * `required_contract_groups`
+  * `missing_contract_groups`
   * `scheduler_contract_stack`
   * `scheduler_result_roles`
   * `scheduler_summary_api`

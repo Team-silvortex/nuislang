@@ -85,6 +85,7 @@ progress evidence anchors still exist in the repository, such as:
 * frontdoor JSON fields
 * workflow/artifact runtime regression assertions
 * reference-document field anchors
+* standard-library smoke-test and example-lane anchors
 
 The current status values are:
 
@@ -98,6 +99,17 @@ Short rule:
 `drift checks make the tensor less imaginary: if a progress cell claims a
 frontdoor or document exists, the tensor can at least notice when that anchor
 disappears`
+
+The first std-oriented checks deliberately anchor the bootstrap-critical
+`host-io-filesystem-text` cell to:
+
+* `tools/nuis/tests/std_filesystem_smoke.rs`
+* `examples/projects/tooling/README.md`
+* `stdlib/std/README.md`
+
+That keeps the standard-library progress cell tied to the project-form
+filesystem, IO, text, terminal, and tooling smoke chain instead of only a broad
+roadmap phrase.
 
 ## Current Role
 

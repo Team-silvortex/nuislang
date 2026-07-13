@@ -185,6 +185,34 @@ pub(crate) fn nsld_final_executable_output_report(
         &blockers,
     )
     .to_owned();
+    let materialization_status = final_executable_output_materialization_status(
+        boundary_status.as_str(),
+        host_native_output,
+        output_image_header_valid,
+        matches_expected_image,
+    )
+    .to_owned();
+    let execution_handoff_status = final_executable_output_execution_handoff_status(
+        boundary_status.as_str(),
+        host_native_output,
+    )
+    .to_owned();
+    let execution_handoff_target = final_executable_output_execution_handoff_target(
+        boundary_status.as_str(),
+        host_native_output,
+    )
+    .to_owned();
+    let execution_handoff_evidence_status =
+        final_executable_output_execution_handoff_evidence_status(
+            boundary_status.as_str(),
+            host_native_output,
+        )
+        .to_owned();
+    let recommended_next_action = final_executable_output_recommended_next_action(
+        boundary_status.as_str(),
+        host_native_output,
+    )
+    .to_owned();
 
     NsldFinalExecutableOutputReport {
         manifest: manifest.display().to_string(),
@@ -192,6 +220,11 @@ pub(crate) fn nsld_final_executable_output_report(
         output_kind,
         output_validation_mode,
         boundary_status,
+        materialization_status,
+        execution_handoff_status,
+        execution_handoff_target,
+        execution_handoff_evidence_status,
+        recommended_next_action,
         path_present,
         nsld_owned_output,
         present,
@@ -221,6 +254,72 @@ pub(crate) fn nsld_final_executable_output_report(
         runnable_candidate,
         blockers,
         issues,
+    }
+}
+
+fn final_executable_output_materialization_status(
+    boundary_status: &str,
+    host_native_output: bool,
+    output_image_header_valid: bool,
+    matches_expected_image: bool,
+) -> &'static str {
+    if boundary_status != "ready" {
+        return "blocked";
+    }
+    if host_native_output {
+        return "host-native-ready";
+    }
+    if output_image_header_valid && matches_expected_image {
+        return "self-contained-image-ready";
+    }
+    "invalid"
+}
+
+fn final_executable_output_recommended_next_action(
+    boundary_status: &str,
+    host_native_output: bool,
+) -> &'static str {
+    match boundary_status {
+        "ready" if host_native_output => "handoff-to-runner",
+        "ready" => "materialize-host-shell-or-os-entrypoint",
+        "missing" => "emit-final-executable-pipeline",
+        "not-nsld-owned" => "run-nsld-drive-or-inspect-output-boundary",
+        "unreadable" => "inspect-final-output-permissions",
+        "invalid" => "inspect-final-output-diagnostics",
+        _ => "inspect-final-output-boundary",
+    }
+}
+
+fn final_executable_output_execution_handoff_status(
+    boundary_status: &str,
+    host_native_output: bool,
+) -> &'static str {
+    match boundary_status {
+        "ready" if host_native_output => "runner-ready",
+        "ready" => "entrypoint-materializer-required",
+        _ => "blocked",
+    }
+}
+
+fn final_executable_output_execution_handoff_target(
+    boundary_status: &str,
+    host_native_output: bool,
+) -> &'static str {
+    match boundary_status {
+        "ready" if host_native_output => "host-runner",
+        "ready" => "entrypoint-materializer",
+        _ => "none",
+    }
+}
+
+fn final_executable_output_execution_handoff_evidence_status(
+    boundary_status: &str,
+    host_native_output: bool,
+) -> &'static str {
+    match boundary_status {
+        "ready" if host_native_output => "host-invoke-plan-ready",
+        "ready" => "image-header-and-hash-ready",
+        _ => "blocked",
     }
 }
 

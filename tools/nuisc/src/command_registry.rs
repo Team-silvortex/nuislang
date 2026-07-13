@@ -64,6 +64,22 @@ pub(crate) fn run_registry(json: bool) -> Result<(), String> {
         let build_contract = registry::domain_build_contract_summary(&manifest);
         println!("package: {}", manifest.package_id);
         println!("  schema: {}", manifest.manifest_schema);
+        println!(
+            "  contract_status: {}",
+            registration.contract.contract_status
+        );
+        println!(
+            "  required_contract_groups: {}",
+            registration.contract.required_contract_groups.join(", ")
+        );
+        println!(
+            "  missing_contract_groups: {}",
+            if registration.contract.missing_contract_groups.is_empty() {
+                "<none>".to_owned()
+            } else {
+                registration.contract.missing_contract_groups.join(", ")
+            }
+        );
         println!("  domain: {}", manifest.domain_family);
         println!("  frontend: {}", manifest.frontend);
         println!("  crate: {}", manifest.entry_crate);

@@ -768,6 +768,14 @@ fn domain_contract_collects_registered_runtime_and_loader_facts() {
     let manifest = load_manifest_for_domain(Path::new("nustar-packages"), "network").unwrap();
     let contract = domain_contract(&manifest);
     assert_eq!(contract.contract_schema, NUSTAR_DOMAIN_CONTRACT_SCHEMA);
+    assert_eq!(contract.contract_status, "complete");
+    assert!(contract.missing_contract_groups.is_empty());
+    assert!(contract
+        .required_contract_groups
+        .contains(&NUSTAR_DOMAIN_CONTRACT_GROUP_PACKAGE_IDENTITY.to_owned()));
+    assert!(contract
+        .required_contract_groups
+        .contains(&NUSTAR_DOMAIN_CONTRACT_GROUP_RUNTIME.to_owned()));
     assert!(contract
         .contract_groups
         .contains(&NUSTAR_DOMAIN_CONTRACT_GROUP_PACKAGE_IDENTITY.to_owned()));
@@ -816,6 +824,12 @@ fn domain_contract_collects_registered_runtime_and_loader_facts() {
         .unwrap_or_default()
         .contains("net_http_client_recipe"));
     let json = domain_contract_json(&contract);
+    assert!(json.contains("\"contract_status\":\"complete\""));
+    assert!(json.contains("\"contract_complete\":true"));
+    assert!(json.contains("\"required_contract_groups\":[\"package_identity\""));
+    assert!(json.contains("\"missing_contract_groups\":[]"));
+    assert!(json.contains("\"status\":\"complete\""));
+    assert!(json.contains("\"complete\":true"));
     assert!(json.contains("\"execution_skeleton_version\":\"nustar-execution-skeleton-v1\""));
     assert!(json.contains("\"execution_contract_family\":\"nustar.network\""));
     assert!(json.contains("\"capability_tags\":[\"io-reactor\""));

@@ -56,10 +56,10 @@ const DEV_TENSOR_CELLS: &[DevTensorCell] = &[
         module: "nsld",
         function: "final-output-boundary",
         status: "active",
-        progress: 68,
+        progress: 70,
         bootstrap_critical: true,
         closure_role: "executable-output-boundary",
-        evidence: "final-executable-output reports normalized boundary status, path presence, ownership, runnable candidate, blockers, and Nuis/Nsld mirrors",
+        evidence: "final-executable-output reports normalized boundary status, materialization status, recommended next action, path presence, ownership, runnable candidate, blockers, and Nuis/Nsld mirrors",
         next_step: "complete host-shell and OS-native materialization beyond the self-contained Nsld-owned image path",
     },
     DevTensorCell {
@@ -67,22 +67,22 @@ const DEV_TENSOR_CELLS: &[DevTensorCell] = &[
         module: "nustar",
         function: "registered-domain-contracts",
         status: "active",
-        progress: 69,
+        progress: 71,
         bootstrap_critical: true,
         closure_role: "heterogeneous-domain-registration",
-        evidence: "domain units, lowering targets, backend families, contract drift checks, and heterogeneous domain readiness are visible in build/link reports",
-        next_step: "connect shader/kernel/network execution-specific readiness to registered Nustar domain contracts without hardcoding nsld domain logic",
+        evidence: "domain units, lowering targets, backend families, contract completeness status, contract drift checks, and heterogeneous domain readiness are visible in build/link reports",
+        next_step: "connect shader/kernel/network execution-specific readiness and dispatch bridge materialization to registered Nustar domain contracts without hardcoding nsld domain logic",
     },
     DevTensorCell {
         architecture: "standard-library",
         module: "std",
         function: "host-io-filesystem-text",
         status: "usable",
-        progress: 67,
+        progress: 70,
         bootstrap_critical: true,
         closure_role: "bootstrap-std-foundation",
-        evidence: "std IO/filesystem/text examples and smoke tests can build and run through the current host path",
-        next_step: "separate minimal stable std surface from experimental hetero/runtime layers",
+        evidence: "std IO/filesystem/text examples, std_filesystem_smoke, tooling docs, and std lane docs anchor the current host-backed CLI foundation",
+        next_step: "promote the light std smoke chain into milestone-owned CLI closure evidence",
     },
     DevTensorCell {
         architecture: "standard-library",
@@ -122,11 +122,11 @@ const DEV_TENSOR_CELLS: &[DevTensorCell] = &[
         module: "nsb-nsld",
         function: "self-owned-binary-assembly",
         status: "active",
-        progress: 67,
+        progress: 71,
         bootstrap_critical: true,
         closure_role: "self-owned-native-binary",
-        evidence: "Nsld container, object/image dry-runs, final executable pipeline, self-contained NSB image emission, launcher dry-run checks, and Nuis self-owned image status are visible",
-        next_step: "bridge self-contained NSB image output toward host-shell and OS-native entrypoint materialization",
+        evidence: "Nsld container, object/image dry-runs, final executable pipeline, self-contained NSB image emission, launcher dry-run checks, Nsld pipeline self-owned image status, entrypoint materialization status, and Nuis frontdoor consumption are visible",
+        next_step: "materialize the host-shell or OS-native entrypoint from the ready self-contained NSB image route",
     },
     DevTensorCell {
         architecture: "developer-system",
@@ -154,7 +154,36 @@ const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuis/src/workflow/link_plan.rs",
         required_patterns: &[
             "nsld_final_executable_output_boundary_status",
+            "nsld_final_executable_output_materialization_status",
+            "nsld_final_executable_output_execution_handoff_status",
+            "nsld_final_executable_output_execution_handoff_target",
+            "nsld_final_executable_output_execution_handoff_evidence_status",
+            "nsld_final_executable_output_recommended_next_action",
             "nsld_final_executable_output_ready",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-final-output-materialization-status",
+        path: "tools/nsld/src/final_executable_output.rs",
+        required_patterns: &[
+            "final_executable_output_materialization_status",
+            "final_executable_output_execution_handoff_status",
+            "final_executable_output_execution_handoff_target",
+            "final_executable_output_execution_handoff_evidence_status",
+            "final_executable_output_recommended_next_action",
+            "self-contained-image-ready",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-final-output-materialization-regression",
+        path: "tools/nsld/src/main_final_executable_output_tests.rs",
+        required_patterns: &[
+            "materialization_status",
+            "execution_handoff_status",
+            "execution_handoff_target",
+            "execution_handoff_evidence_status",
+            "recommended_next_action",
+            "self-contained-image-ready",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -162,7 +191,49 @@ const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuis/src/workflow/link_plan.rs",
         required_patterns: &[
             "nsld_self_owned_image_status",
+            "nsld_entrypoint_materialization_status",
+            "pipeline_self_owned_image_status",
             "nsld_self_owned_image_header_valid",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-pipeline-self-owned-image-entrypoint-status",
+        path: "tools/nsld/src/final_executable_pipeline.rs",
+        required_patterns: &[
+            "self_owned_image_status",
+            "entrypoint_materialization_status",
+            "nsld_pipeline_self_owned_image_status",
+            "nsld_pipeline_entrypoint_materialization_status",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-pipeline-self-owned-image-regression",
+        path: "tools/nsld/src/main_final_executable_pipeline_tests.rs",
+        required_patterns: &[
+            "actual_self_owned_image_status",
+            "actual_entrypoint_materialization_status",
+            "self_owned_image_status",
+            "entrypoint_materialization_status",
+            "Some(\"ready\")",
+            "Some(\"host-launcher-ready\")",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nustar-domain-contract-completeness-status",
+        path: "tools/nuisc/src/registry_contract.rs",
+        required_patterns: &[
+            "contract_status",
+            "required_domain_contract_groups",
+            "missing_domain_contract_groups",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nustar-domain-contract-completeness-json",
+        path: "tools/nuisc/src/registry_domain_json.rs",
+        required_patterns: &[
+            "contract_complete",
+            "required_contract_groups",
+            "missing_contract_groups",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -170,6 +241,11 @@ const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuis/src/main_tests/workflow_surface.rs",
         required_patterns: &[
             "nsld_final_executable_output_boundary_status",
+            "nsld_final_executable_output_materialization_status",
+            "nsld_final_executable_output_execution_handoff_status",
+            "nsld_final_executable_output_execution_handoff_target",
+            "nsld_final_executable_output_execution_handoff_evidence_status",
+            "nsld_final_executable_output_recommended_next_action",
             "nsld_self_owned_image_status",
         ],
     },
@@ -178,6 +254,11 @@ const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nuis/src/main_tests/artifact_runtime.rs",
         required_patterns: &[
             "nsld_final_executable_output_boundary_status",
+            "nsld_final_executable_output_materialization_status",
+            "nsld_final_executable_output_execution_handoff_status",
+            "nsld_final_executable_output_execution_handoff_target",
+            "nsld_final_executable_output_execution_handoff_evidence_status",
+            "nsld_final_executable_output_recommended_next_action",
             "nsld_self_owned_image_status",
         ],
     },
@@ -186,15 +267,61 @@ const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "docs/reference/nuis-frontdoor-surface-reference.md",
         required_patterns: &[
             "nsld_final_executable_output_boundary_status",
+            "nsld_final_executable_output_materialization_status",
+            "nsld_final_executable_output_execution_handoff_status",
+            "nsld_final_executable_output_execution_handoff_target",
+            "nsld_final_executable_output_execution_handoff_evidence_status",
+            "nsld_final_executable_output_recommended_next_action",
             "nsld_self_owned_image_status",
         ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-binary-assembly-doc",
+        path: "docs/reference/nsld-binary-assembly-gap-map.md",
+        required_patterns: &["self_owned_image_status", "internal binary assembly layer"],
     },
     DevTensorDriftCheckSpec {
         id: "native-artifact-workflow-doc",
         path: "docs/reference/nuis-native-artifact-workflow.md",
         required_patterns: &[
             "nsld_final_executable_output_boundary_status",
+            "nsld_final_executable_output_materialization_status",
+            "nsld_final_executable_output_execution_handoff_status",
+            "nsld_final_executable_output_execution_handoff_target",
+            "nsld_final_executable_output_execution_handoff_evidence_status",
+            "nsld_final_executable_output_recommended_next_action",
             "nsld_self_owned_image_status",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "std-filesystem-light-smoke",
+        path: "tools/nuis/tests/std_filesystem_smoke.rs",
+        required_patterns: &[
+            "STD_TOOLING_LIGHT_SMOKE_PROJECTS",
+            "std_tooling_light_project_smokes_build_doctor_and_run",
+            "text_pipeline_demo",
+            "io_runtime_demo",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "std-tooling-doc-smoke-chain",
+        path: "examples/projects/tooling/README.md",
+        required_patterns: &[
+            "cargo test -q -p nuis --test std_filesystem_smoke",
+            "filesystem_io_report_demo",
+            "text_report_json_demo",
+            "terminal/stdin/TTY",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "std-readme-host-io-text-lane",
+        path: "stdlib/std/README.md",
+        required_patterns: &[
+            "host I/O and text",
+            "filesystem/path/location",
+            "lib/io_contracts.ns",
+            "lib/text_contracts.ns",
+            "lib/fs_contracts.ns",
         ],
     },
 ];
@@ -543,6 +670,7 @@ mod tests {
         assert!(json.contains("\"drift_status\":\"clean\""));
         assert!(json.contains("\"drift_checks\":["));
         assert!(json.contains("\"id\":\"frontdoor-self-owned-image-status\""));
+        assert!(json.contains("\"id\":\"std-filesystem-light-smoke\""));
         assert!(json.contains("\"missing_patterns\":[]"));
     }
 
@@ -557,6 +685,10 @@ mod tests {
             .checks
             .iter()
             .any(|check| check.id == "frontdoor-self-owned-image-status"));
+        assert!(drift
+            .checks
+            .iter()
+            .any(|check| check.id == "std-filesystem-light-smoke"));
     }
 
     #[test]
@@ -564,6 +696,7 @@ mod tests {
         let text = render_dev_tensor_text().join("\n");
         assert!(text.contains("drift_status: clean"));
         assert!(text.contains("drift_check: id=frontdoor-final-output-boundary-status"));
+        assert!(text.contains("drift_check: id=std-filesystem-light-smoke"));
         assert!(text.contains("drift_first_failed_check: <none>"));
     }
 }

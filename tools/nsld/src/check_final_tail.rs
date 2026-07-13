@@ -27,6 +27,8 @@ pub(crate) struct NsldCheckFinalTailSnapshot {
     pub(crate) final_executable_pipeline_hash: Option<String>,
     pub(crate) final_executable_pipeline_ready: Option<bool>,
     pub(crate) final_executable_pipeline_emitted: Option<bool>,
+    pub(crate) final_executable_pipeline_self_owned_image_status: Option<String>,
+    pub(crate) final_executable_pipeline_entrypoint_materialization_status: Option<String>,
     pub(crate) final_executable_pipeline_scheduler_metadata_payload_id: Option<String>,
     pub(crate) final_executable_pipeline_scheduler_metadata_present: Option<bool>,
     pub(crate) final_executable_pipeline_scheduler_metadata_hash: Option<String>,
@@ -115,6 +117,13 @@ pub(crate) fn nsld_check_final_tail_snapshot(
     let final_executable_pipeline_emitted = final_executable_pipeline_verify_report
         .as_ref()
         .and_then(|report| report.actual_final_executable_emitted);
+    let final_executable_pipeline_self_owned_image_status = final_executable_pipeline_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_self_owned_image_status.clone());
+    let final_executable_pipeline_entrypoint_materialization_status =
+        final_executable_pipeline_verify_report
+            .as_ref()
+            .and_then(|report| report.actual_entrypoint_materialization_status.clone());
     let final_executable_pipeline_scheduler_metadata_payload_id =
         final_executable_pipeline_verify_report
             .as_ref()
@@ -166,6 +175,8 @@ pub(crate) fn nsld_check_final_tail_snapshot(
         final_executable_pipeline_hash,
         final_executable_pipeline_ready,
         final_executable_pipeline_emitted,
+        final_executable_pipeline_self_owned_image_status,
+        final_executable_pipeline_entrypoint_materialization_status,
         final_executable_pipeline_scheduler_metadata_payload_id,
         final_executable_pipeline_scheduler_metadata_present,
         final_executable_pipeline_scheduler_metadata_hash,

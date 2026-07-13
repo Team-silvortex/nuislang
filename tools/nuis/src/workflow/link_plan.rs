@@ -125,6 +125,7 @@ pub(crate) struct NsldFinalExecutableTailSummary {
     pub(crate) required_stage_path_present_count: Option<usize>,
     pub(crate) first_missing_required_stage_path: Option<String>,
     pub(crate) self_owned_image_status: String,
+    pub(crate) entrypoint_materialization_status: String,
     pub(crate) self_owned_image_ready: Option<bool>,
     pub(crate) self_owned_image_path: Option<String>,
     pub(crate) self_owned_image_present: Option<bool>,
@@ -135,6 +136,11 @@ pub(crate) struct NsldFinalExecutableTailSummary {
 pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) ready: bool,
     pub(crate) boundary_status: String,
+    pub(crate) materialization_status: String,
+    pub(crate) execution_handoff_status: String,
+    pub(crate) execution_handoff_target: String,
+    pub(crate) execution_handoff_evidence_status: String,
+    pub(crate) recommended_next_action: String,
     pub(crate) path_present: bool,
     pub(crate) nsld_owned: Option<bool>,
     pub(crate) blockers: Vec<String>,
@@ -685,6 +691,8 @@ pub(crate) fn nsld_final_executable_tail_summary(
         required_stage_path_count,
         required_stage_path_present_count,
         first_missing_required_stage_path,
+        pipeline_self_owned_image_status,
+        pipeline_entrypoint_materialization_status,
     ) = fs::read_to_string(&pipeline)
         .ok()
         .map(|source| {
@@ -702,10 +710,13 @@ pub(crate) fn nsld_final_executable_tail_summary(
                 parse_usize_field(&source, "required_stage_path_count"),
                 parse_usize_field(&source, "required_stage_path_present_count"),
                 parse_first_string_array_item(&source, "missing_required_stage_paths"),
+                parse_string_field(&source, "self_owned_image_status"),
+                parse_string_field(&source, "entrypoint_materialization_status"),
             )
         })
         .unwrap_or((
-            None, None, None, None, None, None, None, None, None, None, None, None, None,
+            None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+            None,
         ));
     let (
         self_owned_image_path,
@@ -726,15 +737,21 @@ pub(crate) fn nsld_final_executable_tail_summary(
     let launcher_manifest_present = launcher_manifest.exists();
     let self_owned_image_ready = self_owned_image_present
         .map(|present| present && self_owned_image_header_valid == Some(true));
-    let self_owned_image_status = nsld_self_owned_image_status(
-        launcher_manifest_present,
-        self_owned_image_ready,
-        self_owned_image_path.as_deref(),
-        self_owned_image_present,
-        self_owned_image_hash.as_deref(),
-        self_owned_image_header_valid,
-    )
-    .to_owned();
+    let self_owned_image_status = pipeline_self_owned_image_status.unwrap_or_else(|| {
+        nsld_self_owned_image_status(
+            launcher_manifest_present,
+            self_owned_image_ready,
+            self_owned_image_path.as_deref(),
+            self_owned_image_present,
+            self_owned_image_hash.as_deref(),
+            self_owned_image_header_valid,
+        )
+        .to_owned()
+    });
+    let entrypoint_materialization_status = pipeline_entrypoint_materialization_status
+        .unwrap_or_else(|| {
+            nsld_entrypoint_materialization_status(self_owned_image_status.as_str())
+        });
     let stage_count = NSLD_FINAL_EXECUTABLE_TAIL_STAGES.len();
     NsldFinalExecutableTailSummary {
         ready: present_count == stage_count && pipeline_valid == Some(true),
@@ -756,6 +773,7 @@ pub(crate) fn nsld_final_executable_tail_summary(
         required_stage_path_present_count,
         first_missing_required_stage_path,
         self_owned_image_status,
+        entrypoint_materialization_status,
         self_owned_image_ready,
         self_owned_image_path,
         self_owned_image_present,
@@ -791,6 +809,14 @@ fn nsld_self_owned_image_status(
         return "hash-missing";
     }
     "unknown"
+}
+
+fn nsld_entrypoint_materialization_status(self_owned_image_status: &str) -> String {
+    if self_owned_image_status == "ready" {
+        "image-ready-entrypoint-pending".to_owned()
+    } else {
+        "blocked".to_owned()
+    }
 }
 
 pub(crate) fn nsld_final_executable_output_boundary_summary(
@@ -831,14 +857,107 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         &blockers,
     )
     .to_owned();
+    let host_native_output = plan.final_stage.link_mode == "host-toolchain-finalize";
+    let materialization_status = nsld_final_executable_output_materialization_status(
+        boundary_status.as_str(),
+        host_native_output,
+    )
+    .to_owned();
+    let execution_handoff_status = nsld_final_executable_output_execution_handoff_status(
+        boundary_status.as_str(),
+        host_native_output,
+    )
+    .to_owned();
+    let execution_handoff_target = nsld_final_executable_output_execution_handoff_target(
+        boundary_status.as_str(),
+        host_native_output,
+    )
+    .to_owned();
+    let execution_handoff_evidence_status =
+        nsld_final_executable_output_execution_handoff_evidence_status(
+            boundary_status.as_str(),
+            host_native_output,
+        )
+        .to_owned();
+    let recommended_next_action = nsld_final_executable_output_recommended_next_action(
+        boundary_status.as_str(),
+        host_native_output,
+    )
+    .to_owned();
 
     NsldFinalExecutableOutputBoundarySummary {
         ready,
         boundary_status,
+        materialization_status,
+        execution_handoff_status,
+        execution_handoff_target,
+        execution_handoff_evidence_status,
+        recommended_next_action,
         path_present,
         nsld_owned,
         blockers,
         first_blocker,
+    }
+}
+
+fn nsld_final_executable_output_materialization_status(
+    boundary_status: &str,
+    host_native_output: bool,
+) -> &'static str {
+    if boundary_status != "ready" {
+        return "blocked";
+    }
+    if host_native_output {
+        return "host-native-ready";
+    }
+    "self-contained-image-ready"
+}
+
+fn nsld_final_executable_output_recommended_next_action(
+    boundary_status: &str,
+    host_native_output: bool,
+) -> &'static str {
+    match boundary_status {
+        "ready" if host_native_output => "handoff-to-runner",
+        "ready" => "materialize-host-shell-or-os-entrypoint",
+        "missing" => "emit-final-executable-pipeline",
+        "not-nsld-owned" | "ownership-unknown" => "run-nsld-drive-or-inspect-output-boundary",
+        "unreadable" => "inspect-final-output-permissions",
+        "invalid" | "blocked" => "inspect-final-output-diagnostics",
+        _ => "inspect-final-output-boundary",
+    }
+}
+
+fn nsld_final_executable_output_execution_handoff_status(
+    boundary_status: &str,
+    host_native_output: bool,
+) -> &'static str {
+    match boundary_status {
+        "ready" if host_native_output => "runner-ready",
+        "ready" => "entrypoint-materializer-required",
+        _ => "blocked",
+    }
+}
+
+fn nsld_final_executable_output_execution_handoff_target(
+    boundary_status: &str,
+    host_native_output: bool,
+) -> &'static str {
+    match boundary_status {
+        "ready" if host_native_output => "host-runner",
+        "ready" => "entrypoint-materializer",
+        _ => "none",
+    }
+}
+
+fn nsld_final_executable_output_execution_handoff_evidence_status(
+    boundary_status: &str,
+    host_native_output: bool,
+) -> &'static str {
+    match boundary_status {
+        "ready" if host_native_output => "host-invoke-plan-ready",
+        "ready" => "image-header-and-hash-ready",
+        _ => "blocked",
     }
 }
 
@@ -1368,6 +1487,12 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
                 .map(|summary| summary.self_owned_image_status.as_str()),
         ),
         json_optional_string_field(
+            "nsld_entrypoint_materialization_status",
+            nsld_tail
+                .as_ref()
+                .map(|summary| summary.entrypoint_materialization_status.as_str()),
+        ),
+        json_optional_string_field(
             "nsld_self_owned_image_path",
             nsld_tail
                 .as_ref()
@@ -1402,6 +1527,36 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
             nsld_final_output
                 .as_ref()
                 .map(|summary| summary.boundary_status.as_str()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_materialization_status",
+            nsld_final_output
+                .as_ref()
+                .map(|summary| summary.materialization_status.as_str()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_execution_handoff_status",
+            nsld_final_output
+                .as_ref()
+                .map(|summary| summary.execution_handoff_status.as_str()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_execution_handoff_target",
+            nsld_final_output
+                .as_ref()
+                .map(|summary| summary.execution_handoff_target.as_str()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_execution_handoff_evidence_status",
+            nsld_final_output
+                .as_ref()
+                .map(|summary| summary.execution_handoff_evidence_status.as_str()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_recommended_next_action",
+            nsld_final_output
+                .as_ref()
+                .map(|summary| summary.recommended_next_action.as_str()),
         ),
         json_bool_field(
             "nsld_final_executable_output_path_present",

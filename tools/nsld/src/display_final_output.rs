@@ -9,6 +9,27 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         "  output_validation_mode: {}",
         report.output_validation_mode
     );
+    println!("  boundary_status: {}", report.boundary_status);
+    println!(
+        "  materialization_status: {}",
+        report.materialization_status
+    );
+    println!(
+        "  execution_handoff_status: {}",
+        report.execution_handoff_status
+    );
+    println!(
+        "  execution_handoff_target: {}",
+        report.execution_handoff_target
+    );
+    println!(
+        "  execution_handoff_evidence_status: {}",
+        report.execution_handoff_evidence_status
+    );
+    println!(
+        "  recommended_next_action: {}",
+        report.recommended_next_action
+    );
     println!("  path_present: {}", report.path_present);
     println!("  nsld_owned_output: {}", report.nsld_owned_output);
     println!("  present: {}", report.present);

@@ -170,7 +170,10 @@ impl NustarClockSummary {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NustarDomainContract {
     pub contract_schema: String,
+    pub contract_status: String,
     pub contract_groups: Vec<String>,
+    pub required_contract_groups: Vec<String>,
+    pub missing_contract_groups: Vec<String>,
     pub extension_groups: Vec<String>,
     pub package_id: String,
     pub domain_family: String,

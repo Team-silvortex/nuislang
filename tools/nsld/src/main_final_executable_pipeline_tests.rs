@@ -39,6 +39,14 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
     assert_eq!(verify.actual_launcher_dry_run_ready, Some(true));
     assert_eq!(verify.actual_would_enter_lifecycle_hook, Some(true));
     assert_eq!(
+        verify.actual_self_owned_image_status.as_deref(),
+        Some("ready")
+    );
+    assert_eq!(
+        verify.actual_entrypoint_materialization_status.as_deref(),
+        Some("host-launcher-ready")
+    );
+    assert_eq!(
         verify.actual_scheduler_metadata_payload_id.as_deref(),
         Some("payload0004.scheduler-metadata")
     );
@@ -51,6 +59,11 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
     assert!(pipeline.launcher_manifest_ready);
     assert!(pipeline.launcher_dry_run_ready);
     assert!(pipeline.would_enter_lifecycle_hook);
+    assert_eq!(pipeline.self_owned_image_status, "ready");
+    assert_eq!(
+        pipeline.entrypoint_materialization_status,
+        "host-launcher-ready"
+    );
     assert_eq!(
         pipeline.scheduler_metadata_payload_id.as_deref(),
         Some("payload0004.scheduler-metadata")
@@ -71,6 +84,8 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
     assert!(pipeline_json.contains("\"final_executable_emitted\":true"));
     assert!(pipeline_json.contains("\"launcher_manifest_ready\":true"));
     assert!(pipeline_json.contains("\"launcher_dry_run_ready\":true"));
+    assert!(pipeline_json.contains("\"self_owned_image_status\":\"ready\""));
+    assert!(pipeline_json.contains("\"entrypoint_materialization_status\":\"host-launcher-ready\""));
     assert!(pipeline_json
         .contains("\"scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
     assert!(pipeline_json.contains("\"scheduler_metadata_present\":true"));
@@ -78,6 +93,9 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
     assert!(pipeline_json.contains("\"required_stage_path_present_count\":9"));
     assert!(verify_json.contains("\"kind\":\"nsld_final_executable_pipeline_verify\""));
     assert!(verify_json.contains("\"actual_valid\":true"));
+    assert!(verify_json.contains("\"actual_self_owned_image_status\":\"ready\""));
+    assert!(verify_json
+        .contains("\"actual_entrypoint_materialization_status\":\"host-launcher-ready\""));
     assert!(verify_json
         .contains("\"actual_scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
     assert!(check.valid);
@@ -88,6 +106,18 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
     assert_eq!(check.final_executable_pipeline_valid, Some(true));
     assert_eq!(check.final_executable_pipeline_ready, Some(true));
     assert_eq!(check.final_executable_pipeline_emitted, Some(true));
+    assert_eq!(
+        check
+            .final_executable_pipeline_self_owned_image_status
+            .as_deref(),
+        Some("ready")
+    );
+    assert_eq!(
+        check
+            .final_executable_pipeline_entrypoint_materialization_status
+            .as_deref(),
+        Some("host-launcher-ready")
+    );
     assert_eq!(
         check
             .final_executable_pipeline_scheduler_metadata_payload_id

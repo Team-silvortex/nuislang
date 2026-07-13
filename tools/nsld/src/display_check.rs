@@ -249,8 +249,13 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         report.final_executable_blocked_issues.len()
     );
     println!(
-        "  final_executable_output: status={} path_present={} kind={} validation={} nsld_owned={} present={} header_required={} header_valid={} magic={} version={} runnable={} size={} hash={} blockers={} issues={}",
+        "  final_executable_output: status={} materialization={} handoff={} handoff_target={} handoff_evidence={} next_action={} path_present={} kind={} validation={} nsld_owned={} present={} header_required={} header_valid={} magic={} version={} runnable={} size={} hash={} blockers={} issues={}",
         report.final_executable_output_boundary_status,
+        report.final_executable_output_materialization_status,
+        report.final_executable_output_execution_handoff_status,
+        report.final_executable_output_execution_handoff_target,
+        report.final_executable_output_execution_handoff_evidence_status,
+        report.final_executable_output_recommended_next_action,
         report.final_executable_output_path_present,
         report.final_executable_output_kind,
         report.final_executable_output_validation_mode,
@@ -295,11 +300,21 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         report.final_executable_launcher_dry_run_issues.len()
     );
     println!(
-        "  final_executable_pipeline: present={} valid={} ready={} emitted={} hash={} required_paths={} present_paths={} missing_paths={} blockers={} issues={}",
+        "  final_executable_pipeline: present={} valid={} ready={} emitted={} self_owned_image_status={} entrypoint_materialization_status={} hash={} required_paths={} present_paths={} missing_paths={} blockers={} issues={}",
         report.final_executable_pipeline_present,
         optional_bool_text(report.final_executable_pipeline_valid),
         optional_bool_text(report.final_executable_pipeline_ready),
         optional_bool_text(report.final_executable_pipeline_emitted),
+        optional_string_text(
+            report
+                .final_executable_pipeline_self_owned_image_status
+                .as_deref()
+        ),
+        optional_string_text(
+            report
+                .final_executable_pipeline_entrypoint_materialization_status
+                .as_deref()
+        ),
         optional_string_text(report.final_executable_pipeline_hash.as_deref()),
         optional_usize_text(report.final_executable_pipeline_required_stage_path_count),
         optional_usize_text(report.final_executable_pipeline_required_stage_path_present_count),

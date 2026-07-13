@@ -1174,6 +1174,11 @@ If the Nsld-owned final-stage output is present, `nsld check` runs the same
 read-only output boundary exposed by `final-executable-output` and reports
 `final_executable_output_path_present`,
 `final_executable_output_boundary_status`,
+`final_executable_output_materialization_status`,
+`final_executable_output_execution_handoff_status`,
+`final_executable_output_execution_handoff_target`,
+`final_executable_output_execution_handoff_evidence_status`,
+`final_executable_output_recommended_next_action`,
 `final_executable_output_nsld_owned`,
 `final_executable_output_present`,
 `final_executable_output_size_bytes`,
@@ -1192,8 +1197,31 @@ preparation workflows can stop before the explicit final emit step, but a
 present Nsld-owned output must be consistent with the emitted final-executable
 boundary.
 Scripts should prefer the normalized `boundary_status` /
-`final_executable_output_boundary_status` field for high-level branching, then
-read blockers and issues for diagnostics.
+`final_executable_output_boundary_status` field for high-level branching, use
+`materialization_status` /
+`final_executable_output_materialization_status` to distinguish host-native from
+self-contained image readiness, use `execution_handoff_status` /
+`final_executable_output_execution_handoff_status` to distinguish runner-ready
+outputs from outputs that still need an entrypoint materializer, use
+`execution_handoff_target` /
+`final_executable_output_execution_handoff_target` to name the abstract owner of
+that handoff, use `execution_handoff_evidence_status` /
+`final_executable_output_execution_handoff_evidence_status` to identify the
+proof class backing the handoff, and use
+`recommended_next_action` /
+`final_executable_output_recommended_next_action` for the next scripted boundary
+step. Blockers and issues remain diagnostic detail.
+
+When `nuis.nsld.final-executable-pipeline.toml` is present, `nsld check` also
+mirrors the pipeline's self-owned image summary through
+`final_executable_pipeline_self_owned_image_status` and the next entrypoint
+layer through
+`final_executable_pipeline_entrypoint_materialization_status`. The pipeline
+emit/verify JSON uses the shorter `self_owned_image_status` /
+`actual_self_owned_image_status` and `entrypoint_materialization_status` /
+`actual_entrypoint_materialization_status` fields. Image status is intentionally
+narrower than entrypoint readiness: it only answers whether the internal `.nsb`
+image layer is present, hashed, and header-valid.
 
 `nsld prepare` also returns the same compatibility-domain summary after it has
 emitted and verified the full artifact chain. This makes the prepare result a

@@ -6,7 +6,8 @@ use crate::registry::{
     NUSTAR_DOMAIN_CONTRACT_GROUP_STD_NET,
 };
 use crate::registry_json::{
-    json_field, json_object_field, json_optional_string_field, json_string_array_field,
+    json_bool_field, json_field, json_object_field, json_optional_string_field,
+    json_string_array_field,
 };
 
 pub fn domain_contract_object_json(contract: &NustarDomainContract) -> String {
@@ -95,7 +96,11 @@ pub fn domain_contract_object_json(contract: &NustarDomainContract) -> String {
     ];
     let contract_fields = vec![
         json_field("schema", &contract.contract_schema),
+        json_field("status", &contract.contract_status),
+        json_bool_field("complete", contract.missing_contract_groups.is_empty()),
         json_string_array_field("groups", &contract.contract_groups),
+        json_string_array_field("required_groups", &contract.required_contract_groups),
+        json_string_array_field("missing_groups", &contract.missing_contract_groups),
         json_string_array_field("extensions", &contract.extension_groups),
         json_object_field(
             NUSTAR_DOMAIN_CONTRACT_GROUP_PACKAGE_IDENTITY,
@@ -132,7 +137,17 @@ pub fn domain_contract_json(contract: &NustarDomainContract) -> String {
         json_field("package", &contract.package_id),
         json_field("domain", &contract.domain_family),
         json_field("contract_schema", &contract.contract_schema),
+        json_field("contract_status", &contract.contract_status),
+        json_bool_field(
+            "contract_complete",
+            contract.missing_contract_groups.is_empty(),
+        ),
         json_string_array_field("contract_groups", &contract.contract_groups),
+        json_string_array_field(
+            "required_contract_groups",
+            &contract.required_contract_groups,
+        ),
+        json_string_array_field("missing_contract_groups", &contract.missing_contract_groups),
         json_string_array_field("extension_groups", &contract.extension_groups),
         json_field("frontend", &contract.frontend),
         json_field("loader_abi", &contract.loader_abi),

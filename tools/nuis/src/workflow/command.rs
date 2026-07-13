@@ -514,6 +514,10 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
             nsld_tail.self_owned_image_status
         );
         println!(
+            "  nsld_entrypoint_materialization_status: {}",
+            nsld_tail.entrypoint_materialization_status
+        );
+        println!(
             "  nsld_self_owned_image_path: {}",
             nsld_tail
                 .self_owned_image_path
@@ -548,6 +552,26 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
         println!(
             "  nsld_final_executable_output_boundary_status: {}",
             nsld_final_output.boundary_status
+        );
+        println!(
+            "  nsld_final_executable_output_materialization_status: {}",
+            nsld_final_output.materialization_status
+        );
+        println!(
+            "  nsld_final_executable_output_execution_handoff_status: {}",
+            nsld_final_output.execution_handoff_status
+        );
+        println!(
+            "  nsld_final_executable_output_execution_handoff_target: {}",
+            nsld_final_output.execution_handoff_target
+        );
+        println!(
+            "  nsld_final_executable_output_execution_handoff_evidence_status: {}",
+            nsld_final_output.execution_handoff_evidence_status
+        );
+        println!(
+            "  nsld_final_executable_output_recommended_next_action: {}",
+            nsld_final_output.recommended_next_action
         );
         println!(
             "  nsld_final_executable_output_path_present: {}",
@@ -618,12 +642,18 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
         println!("  nsld_final_executable_pipeline_first_missing_required_stage_path: <none>");
         println!("  nsld_self_owned_image_ready: <unavailable>");
         println!("  nsld_self_owned_image_status: <unavailable>");
+        println!("  nsld_entrypoint_materialization_status: <unavailable>");
         println!("  nsld_self_owned_image_path: <unavailable>");
         println!("  nsld_self_owned_image_present: <unavailable>");
         println!("  nsld_self_owned_image_hash: <unavailable>");
         println!("  nsld_self_owned_image_header_valid: <unavailable>");
         println!("  nsld_final_executable_output_ready: <unavailable>");
         println!("  nsld_final_executable_output_boundary_status: <unavailable>");
+        println!("  nsld_final_executable_output_materialization_status: <unavailable>");
+        println!("  nsld_final_executable_output_execution_handoff_status: <unavailable>");
+        println!("  nsld_final_executable_output_execution_handoff_target: <unavailable>");
+        println!("  nsld_final_executable_output_execution_handoff_evidence_status: <unavailable>");
+        println!("  nsld_final_executable_output_recommended_next_action: <unavailable>");
         println!("  nsld_final_executable_output_path_present: <unavailable>");
         println!("  nsld_final_executable_output_nsld_owned: <unavailable>");
         println!("  nsld_final_executable_output_blocker_count: <unavailable>");

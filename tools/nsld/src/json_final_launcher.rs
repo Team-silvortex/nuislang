@@ -368,6 +368,11 @@ pub(crate) fn nsld_final_executable_pipeline_emit_report_json(
             "would_enter_lifecycle_hook",
             report.would_enter_lifecycle_hook,
         ),
+        json_string_field("self_owned_image_status", &report.self_owned_image_status),
+        json_string_field(
+            "entrypoint_materialization_status",
+            &report.entrypoint_materialization_status,
+        ),
         json_optional_string_field(
             "scheduler_metadata_payload_id",
             report.scheduler_metadata_payload_id.as_deref(),
@@ -446,6 +451,22 @@ pub(crate) fn nsld_final_executable_pipeline_verify_report_json(
         json_optional_bool_field(
             "actual_would_enter_lifecycle_hook",
             report.actual_would_enter_lifecycle_hook,
+        ),
+        json_string_field(
+            "expected_self_owned_image_status",
+            &report.expected_self_owned_image_status,
+        ),
+        json_optional_string_field(
+            "actual_self_owned_image_status",
+            report.actual_self_owned_image_status.as_deref(),
+        ),
+        json_string_field(
+            "expected_entrypoint_materialization_status",
+            &report.expected_entrypoint_materialization_status,
+        ),
+        json_optional_string_field(
+            "actual_entrypoint_materialization_status",
+            report.actual_entrypoint_materialization_status.as_deref(),
         ),
         json_optional_string_field(
             "expected_scheduler_metadata_payload_id",

@@ -57,6 +57,8 @@ It currently owns:
 * deterministic self-contained final image dry-run and image bytes
 * Nsld-owned self-contained `.nsb` image output for the internal image route
 * deterministic blocked/final-output boundary report for host-assisted routes
+* normalized final-output materialization status and recommended next action for
+  scripts that need to advance the binary assembly chain deterministically
 
 It does not yet own:
 
@@ -181,6 +183,15 @@ current `object-plan` and object image dry-run remain compatibility planning
 layers; native object bytes and relocation application are optional
 compatibility/finalization layers rather than the mandatory internal form of
 Nsld.
+
+The final executable pipeline now carries a normalized
+`self_owned_image_status` field and a separate
+`entrypoint_materialization_status` field. For the self-contained internal image
+route, `self_owned_image_status = ready` means the `.nsb` image layer is present,
+hash-visible, and header-valid. `entrypoint_materialization_status` then says
+whether the next entrypoint layer is `host-launcher-ready`,
+`image-ready-entrypoint-pending`, or `blocked`. This keeps host-shell and
+OS-native entrypoint work separate from the internal binary assembly layer.
 
 The plan already assigns each Nsld section a writer-facing object section
 record with a stable object section name, object section role, source section

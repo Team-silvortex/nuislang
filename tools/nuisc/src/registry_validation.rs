@@ -236,6 +236,20 @@ pub fn validate_registered_domains(root: &Path) -> Result<Vec<NustarRegistryIssu
                 message: error,
             });
         }
+        let missing_contract_groups =
+            crate::registry_contract::missing_domain_contract_groups(&manifest);
+        if !missing_contract_groups.is_empty() {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::DomainContractMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(manifest.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: format!(
+                    "domain contract is incomplete; missing groups: {}",
+                    missing_contract_groups.join(", ")
+                ),
+            });
+        }
         issues.extend(validate_build_contract_fields(&manifest, &manifest_path));
         issues.extend(validate_domain_specific_contracts(
             &manifest,

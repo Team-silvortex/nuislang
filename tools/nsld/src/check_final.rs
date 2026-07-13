@@ -55,6 +55,11 @@ pub(crate) struct NsldCheckFinalSnapshot {
     pub(crate) final_executable_output_kind: String,
     pub(crate) final_executable_output_validation_mode: String,
     pub(crate) final_executable_output_boundary_status: String,
+    pub(crate) final_executable_output_materialization_status: String,
+    pub(crate) final_executable_output_execution_handoff_status: String,
+    pub(crate) final_executable_output_execution_handoff_target: String,
+    pub(crate) final_executable_output_execution_handoff_evidence_status: String,
+    pub(crate) final_executable_output_recommended_next_action: String,
     pub(crate) final_executable_output_nsld_owned: bool,
     pub(crate) final_executable_output_present: bool,
     pub(crate) final_executable_output_size_bytes: Option<usize>,
@@ -228,6 +233,21 @@ pub(crate) fn nsld_check_final_snapshot(
         .clone();
     let final_executable_output_boundary_status =
         final_executable_output_report.boundary_status.clone();
+    let final_executable_output_materialization_status = final_executable_output_report
+        .materialization_status
+        .clone();
+    let final_executable_output_execution_handoff_status = final_executable_output_report
+        .execution_handoff_status
+        .clone();
+    let final_executable_output_execution_handoff_target = final_executable_output_report
+        .execution_handoff_target
+        .clone();
+    let final_executable_output_execution_handoff_evidence_status = final_executable_output_report
+        .execution_handoff_evidence_status
+        .clone();
+    let final_executable_output_recommended_next_action = final_executable_output_report
+        .recommended_next_action
+        .clone();
     let final_executable_output_nsld_owned = final_executable_output_report.nsld_owned_output;
     let final_executable_output_present = final_executable_output_report.present;
     let final_executable_output_size_bytes = final_executable_output_report.size_bytes;
@@ -300,6 +320,11 @@ pub(crate) fn nsld_check_final_snapshot(
         final_executable_output_kind,
         final_executable_output_validation_mode,
         final_executable_output_boundary_status,
+        final_executable_output_materialization_status,
+        final_executable_output_execution_handoff_status,
+        final_executable_output_execution_handoff_target,
+        final_executable_output_execution_handoff_evidence_status,
+        final_executable_output_recommended_next_action,
         final_executable_output_nsld_owned,
         final_executable_output_present,
         final_executable_output_size_bytes,

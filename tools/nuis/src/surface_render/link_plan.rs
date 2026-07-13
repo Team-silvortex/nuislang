@@ -230,6 +230,10 @@ pub(super) fn write_link_plan_text_fields<W: fmt::Write>(
         )?;
         writeln!(out, "  nsld_self_owned_image_ready: <unavailable>")?;
         writeln!(out, "  nsld_self_owned_image_status: <unavailable>")?;
+        writeln!(
+            out,
+            "  nsld_entrypoint_materialization_status: <unavailable>"
+        )?;
         writeln!(out, "  nsld_self_owned_image_path: <unavailable>")?;
         writeln!(out, "  nsld_self_owned_image_present: <unavailable>")?;
         writeln!(out, "  nsld_self_owned_image_hash: <unavailable>")?;
@@ -238,6 +242,26 @@ pub(super) fn write_link_plan_text_fields<W: fmt::Write>(
         writeln!(
             out,
             "  nsld_final_executable_output_boundary_status: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_output_materialization_status: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_output_execution_handoff_status: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_output_execution_handoff_target: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_output_execution_handoff_evidence_status: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_output_recommended_next_action: <unavailable>"
         )?;
         writeln!(
             out,
@@ -644,6 +668,12 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
                 .map(|summary| summary.self_owned_image_status.as_str()),
         ),
         crate::json_optional_string_field(
+            "nsld_entrypoint_materialization_status",
+            final_tail_summary
+                .as_ref()
+                .map(|summary| summary.entrypoint_materialization_status.as_str()),
+        ),
+        crate::json_optional_string_field(
             "nsld_self_owned_image_path",
             final_tail_summary
                 .as_ref()
@@ -666,6 +696,82 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
             final_tail_summary
                 .as_ref()
                 .and_then(|summary| summary.self_owned_image_header_valid),
+        ),
+        crate::json_bool_field(
+            "nsld_final_executable_output_ready",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.ready)
+                .unwrap_or(false),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_boundary_status",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.boundary_status.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_materialization_status",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.materialization_status.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_execution_handoff_status",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.execution_handoff_status.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_execution_handoff_target",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.execution_handoff_target.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_execution_handoff_evidence_status",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.execution_handoff_evidence_status.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_recommended_next_action",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.recommended_next_action.as_str()),
+        ),
+        crate::json_bool_field(
+            "nsld_final_executable_output_path_present",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.path_present)
+                .unwrap_or(false),
+        ),
+        json_optional_bool_field(
+            "nsld_final_executable_output_nsld_owned",
+            final_output_summary
+                .as_ref()
+                .and_then(|summary| summary.nsld_owned),
+        ),
+        crate::json_usize_field(
+            "nsld_final_executable_output_blocker_count",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.blockers.len())
+                .unwrap_or(0),
+        ),
+        crate::json_string_array_field(
+            "nsld_final_executable_output_blockers",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.blockers.as_slice())
+                .unwrap_or(&[]),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_first_blocker",
+            final_output_summary
+                .as_ref()
+                .and_then(|summary| summary.first_blocker.as_deref()),
         ),
     ]
 }
@@ -1032,6 +1138,11 @@ fn write_nsld_artifact_chain_text_fields<W: fmt::Write>(
     )?;
     writeln!(
         out,
+        "  nsld_entrypoint_materialization_status: {}",
+        final_tail.entrypoint_materialization_status
+    )?;
+    writeln!(
+        out,
         "  nsld_self_owned_image_path: {}",
         final_tail
             .self_owned_image_path
@@ -1071,6 +1182,31 @@ fn write_nsld_artifact_chain_text_fields<W: fmt::Write>(
         out,
         "  nsld_final_executable_output_boundary_status: {}",
         final_output.boundary_status
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_materialization_status: {}",
+        final_output.materialization_status
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_execution_handoff_status: {}",
+        final_output.execution_handoff_status
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_execution_handoff_target: {}",
+        final_output.execution_handoff_target
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_execution_handoff_evidence_status: {}",
+        final_output.execution_handoff_evidence_status
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_recommended_next_action: {}",
+        final_output.recommended_next_action
     )?;
     writeln!(
         out,

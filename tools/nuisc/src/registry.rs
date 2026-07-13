@@ -11,6 +11,7 @@ pub use crate::registry_build_contract_summary::{
 };
 pub use crate::registry_contract::{
     capability_summary, domain_contract, execution_summary, load_domain_contract_for_domain,
+    missing_domain_contract_groups, required_domain_contract_groups,
     NUSTAR_DOMAIN_CONTRACT_GROUP_ABI, NUSTAR_DOMAIN_CONTRACT_GROUP_EXECUTION,
     NUSTAR_DOMAIN_CONTRACT_GROUP_HOST_BRIDGE, NUSTAR_DOMAIN_CONTRACT_GROUP_LOADER,
     NUSTAR_DOMAIN_CONTRACT_GROUP_PACKAGE_IDENTITY, NUSTAR_DOMAIN_CONTRACT_GROUP_RUNTIME,

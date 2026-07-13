@@ -65,6 +65,21 @@ pub(crate) fn nsld_emit_final_executable_pipeline_report(
         .map(|blocker| format!("pipeline:{blocker}"))
         .collect::<Vec<_>>();
 
+    let self_owned_image_status = nsld_pipeline_self_owned_image_status(
+        launcher_manifest.ready,
+        launcher_manifest_report.nsb_path.as_str(),
+        launcher_manifest_report.nsb_present,
+        launcher_manifest_report.nsb_hash.as_deref(),
+        launcher_manifest_report.image_header_valid,
+    )
+    .to_owned();
+    let entrypoint_materialization_status = nsld_pipeline_entrypoint_materialization_status(
+        self_owned_image_status.as_str(),
+        launcher_dry_run.dry_run_ready,
+        launcher_dry_run_report.would_enter_lifecycle_hook,
+    )
+    .to_owned();
+
     let report = NsldFinalExecutablePipelineEmitReport {
         manifest: manifest.display().to_string(),
         valid: blockers.is_empty(),
@@ -81,6 +96,8 @@ pub(crate) fn nsld_emit_final_executable_pipeline_report(
         launcher_manifest_ready: launcher_manifest.ready,
         launcher_dry_run_ready: launcher_dry_run.dry_run_ready,
         would_enter_lifecycle_hook: launcher_dry_run.dry_run_ready,
+        self_owned_image_status,
+        entrypoint_materialization_status,
         scheduler_metadata_payload_id: launcher_manifest_report
             .scheduler_metadata_payload_id
             .clone()
@@ -137,6 +154,8 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
         actual_launcher_manifest_ready,
         actual_launcher_dry_run_ready,
         actual_would_enter_lifecycle_hook,
+        actual_self_owned_image_status,
+        actual_entrypoint_materialization_status,
         actual_scheduler_metadata_payload_id,
         actual_scheduler_metadata_present,
         actual_scheduler_metadata_hash,
@@ -153,6 +172,8 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
             toml::bool_value(source, "launcher_manifest_ready"),
             toml::bool_value(source, "launcher_dry_run_ready"),
             toml::bool_value(source, "would_enter_lifecycle_hook"),
+            non_empty_toml_string(source, "self_owned_image_status"),
+            non_empty_toml_string(source, "entrypoint_materialization_status"),
             non_empty_toml_string(source, "scheduler_metadata_payload_id"),
             toml::bool_value(source, "scheduler_metadata_present"),
             non_empty_toml_string(source, "scheduler_metadata_hash"),
@@ -165,6 +186,8 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
         Err(error) => {
             issues.push(error.clone());
             (
+                None,
+                None,
                 None,
                 None,
                 None,
@@ -210,6 +233,18 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
             "would_enter_lifecycle_hook",
             expected.would_enter_lifecycle_hook,
             actual_would_enter_lifecycle_hook,
+        );
+        push_optional_string_mismatch(
+            &mut issues,
+            "self_owned_image_status",
+            Some(expected.self_owned_image_status.as_str()),
+            actual_self_owned_image_status.as_deref(),
+        );
+        push_optional_string_mismatch(
+            &mut issues,
+            "entrypoint_materialization_status",
+            Some(expected.entrypoint_materialization_status.as_str()),
+            actual_entrypoint_materialization_status.as_deref(),
         );
         push_optional_string_mismatch(
             &mut issues,
@@ -288,6 +323,10 @@ pub(crate) fn nsld_verify_final_executable_pipeline_report(
         actual_launcher_dry_run_ready,
         expected_would_enter_lifecycle_hook: expected.would_enter_lifecycle_hook,
         actual_would_enter_lifecycle_hook,
+        expected_self_owned_image_status: expected.self_owned_image_status,
+        actual_self_owned_image_status,
+        expected_entrypoint_materialization_status: expected.entrypoint_materialization_status,
+        actual_entrypoint_materialization_status,
         expected_scheduler_metadata_payload_id: expected.scheduler_metadata_payload_id,
         actual_scheduler_metadata_payload_id,
         expected_scheduler_metadata_present: expected.scheduler_metadata_present,
@@ -357,6 +396,21 @@ fn nsld_final_executable_pipeline_snapshot(
         .iter()
         .map(|blocker| format!("pipeline:{blocker}"))
         .collect::<Vec<_>>();
+    let self_owned_image_status = nsld_pipeline_self_owned_image_status(
+        launcher_manifest.actual_ready == Some(true),
+        launcher_manifest.actual_nsb_path.as_deref().unwrap_or(""),
+        launcher_manifest.actual_nsb_size_bytes.is_some(),
+        launcher_manifest.actual_nsb_hash.as_deref(),
+        launcher_manifest.actual_image_header_valid == Some(true),
+    )
+    .to_owned();
+    let entrypoint_materialization_status = nsld_pipeline_entrypoint_materialization_status(
+        self_owned_image_status.as_str(),
+        launcher_dry_run.actual_dry_run_ready == Some(true),
+        launcher_dry_run.actual_would_enter_lifecycle_hook == Some(true),
+    )
+    .to_owned();
+
     NsldFinalExecutablePipelineEmitReport {
         manifest: manifest.display().to_string(),
         valid: blockers.is_empty(),
@@ -384,6 +438,8 @@ fn nsld_final_executable_pipeline_snapshot(
         launcher_dry_run_ready: launcher_dry_run.actual_dry_run_ready == Some(true),
         would_enter_lifecycle_hook: launcher_dry_run.actual_would_enter_lifecycle_hook
             == Some(true),
+        self_owned_image_status,
+        entrypoint_materialization_status,
         scheduler_metadata_payload_id: launcher_manifest
             .actual_scheduler_metadata_payload_id
             .clone(),
@@ -397,6 +453,45 @@ fn nsld_final_executable_pipeline_snapshot(
         blockers,
         issues,
     }
+}
+
+fn nsld_pipeline_self_owned_image_status(
+    launcher_manifest_ready: bool,
+    nsb_path: &str,
+    nsb_present: bool,
+    nsb_hash: Option<&str>,
+    image_header_valid: bool,
+) -> &'static str {
+    if launcher_manifest_ready && nsb_present && image_header_valid {
+        return "ready";
+    }
+    if nsb_path.is_empty() {
+        return "path-missing";
+    }
+    if !nsb_present {
+        return "missing";
+    }
+    if !image_header_valid {
+        return "header-invalid";
+    }
+    if nsb_hash.is_none() {
+        return "hash-missing";
+    }
+    "blocked"
+}
+
+fn nsld_pipeline_entrypoint_materialization_status(
+    self_owned_image_status: &str,
+    launcher_dry_run_ready: bool,
+    would_enter_lifecycle_hook: bool,
+) -> &'static str {
+    if launcher_dry_run_ready && would_enter_lifecycle_hook {
+        return "host-launcher-ready";
+    }
+    if self_owned_image_status == "ready" {
+        return "image-ready-entrypoint-pending";
+    }
+    "blocked"
 }
 
 fn render_final_executable_pipeline(report: &NsldFinalExecutablePipelineEmitReport) -> String {
@@ -449,6 +544,16 @@ fn render_final_executable_pipeline(report: &NsldFinalExecutablePipelineEmitRepo
         "would_enter_lifecycle_hook = {}\n",
         report.would_enter_lifecycle_hook
     ));
+    push_str_field(
+        &mut out,
+        "self_owned_image_status",
+        &report.self_owned_image_status,
+    );
+    push_str_field(
+        &mut out,
+        "entrypoint_materialization_status",
+        &report.entrypoint_materialization_status,
+    );
     push_optional_str_field(
         &mut out,
         "scheduler_metadata_payload_id",

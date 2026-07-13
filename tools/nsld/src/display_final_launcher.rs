@@ -436,6 +436,14 @@ pub(crate) fn print_nsld_final_executable_pipeline_emit_report(
         report.would_enter_lifecycle_hook
     );
     println!(
+        "  self_owned_image_status: {}",
+        report.self_owned_image_status
+    );
+    println!(
+        "  entrypoint_materialization_status: {}",
+        report.entrypoint_materialization_status
+    );
+    println!(
         "  required_stage_path_count: {}",
         report.required_stage_path_count
     );
@@ -506,6 +514,22 @@ pub(crate) fn print_nsld_final_executable_pipeline_verify_report(
     println!(
         "  actual_would_enter_lifecycle_hook: {}",
         optional_bool_text(report.actual_would_enter_lifecycle_hook)
+    );
+    println!(
+        "  expected_self_owned_image_status: {}",
+        report.expected_self_owned_image_status
+    );
+    println!(
+        "  actual_self_owned_image_status: {}",
+        optional_string_text(report.actual_self_owned_image_status.as_deref())
+    );
+    println!(
+        "  expected_entrypoint_materialization_status: {}",
+        report.expected_entrypoint_materialization_status
+    );
+    println!(
+        "  actual_entrypoint_materialization_status: {}",
+        optional_string_text(report.actual_entrypoint_materialization_status.as_deref())
     );
     println!(
         "  expected_required_stage_path_count: {}",

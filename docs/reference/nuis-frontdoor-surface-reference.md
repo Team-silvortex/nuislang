@@ -92,6 +92,22 @@ These fields now form the current visible link summary:
 * `nsld_final_executable_output_boundary_status`
   the normalized final-output boundary state for scripts and release gates:
   `ready`, `missing`, `not-nsld-owned`, `unreadable`, or `invalid`
+* `nsld_final_executable_output_materialization_status`
+  the normalized materialization layer for the visible output:
+  `host-native-ready`, `self-contained-image-ready`, or `blocked`
+* `nsld_final_executable_output_execution_handoff_status`
+  the normalized execution handoff layer for the visible output:
+  `runner-ready`, `entrypoint-materializer-required`, or `blocked`
+* `nsld_final_executable_output_execution_handoff_target`
+  the abstract component that owns the next execution handoff:
+  `host-runner`, `entrypoint-materializer`, or `none`
+* `nsld_final_executable_output_execution_handoff_evidence_status`
+  the normalized evidence source for that handoff:
+  `host-invoke-plan-ready`, `image-header-and-hash-ready`, or `blocked`
+* `nsld_final_executable_output_recommended_next_action`
+  the script-facing next action for the current boundary, such as
+  `emit-final-executable-pipeline`,
+  `materialize-host-shell-or-os-entrypoint`, or `handoff-to-runner`
 * `nsld_final_executable_output_path_present`
   whether the current final-stage output path exists on disk
 * `nsld_final_executable_output_nsld_owned`
@@ -120,6 +136,10 @@ These fields now form the current visible link summary:
   the normalized self-owned image state for scripts: `ready`,
   `manifest-missing`, `path-missing`, `missing`, `header-invalid`,
   `hash-missing`, or `unknown`
+* `nsld_entrypoint_materialization_status`
+  the normalized next entrypoint layer state derived from the Nsld final
+  executable pipeline: `host-launcher-ready`,
+  `image-ready-entrypoint-pending`, or `blocked`
 * `nsld_self_owned_image_path`
   the self-owned `.nsb` image path from the Nsld launcher manifest when
   available

@@ -439,6 +439,41 @@ fn handle_release_check(
                 .unwrap_or("<unknown>")
         );
         println!(
+            "  final_executable_output_materialization_status: {}",
+            final_output
+                .as_ref()
+                .map(|summary| summary.materialization_status.as_str())
+                .unwrap_or("<unknown>")
+        );
+        println!(
+            "  final_executable_output_execution_handoff_status: {}",
+            final_output
+                .as_ref()
+                .map(|summary| summary.execution_handoff_status.as_str())
+                .unwrap_or("<unknown>")
+        );
+        println!(
+            "  final_executable_output_execution_handoff_target: {}",
+            final_output
+                .as_ref()
+                .map(|summary| summary.execution_handoff_target.as_str())
+                .unwrap_or("<unknown>")
+        );
+        println!(
+            "  final_executable_output_execution_handoff_evidence_status: {}",
+            final_output
+                .as_ref()
+                .map(|summary| summary.execution_handoff_evidence_status.as_str())
+                .unwrap_or("<unknown>")
+        );
+        println!(
+            "  final_executable_output_recommended_next_action: {}",
+            final_output
+                .as_ref()
+                .map(|summary| summary.recommended_next_action.as_str())
+                .unwrap_or("<unknown>")
+        );
+        println!(
             "  final_executable_output_path_present: {}",
             final_output
                 .as_ref()
@@ -1221,12 +1256,18 @@ fn print_run_artifact_link_plan_status(link_plan: Option<&nuisc::linker::LinkPla
         println!("  nsld_final_executable_pipeline_first_missing_required_stage_path: <none>");
         println!("  nsld_self_owned_image_ready: <unavailable>");
         println!("  nsld_self_owned_image_status: <unavailable>");
+        println!("  nsld_entrypoint_materialization_status: <unavailable>");
         println!("  nsld_self_owned_image_path: <unavailable>");
         println!("  nsld_self_owned_image_present: <unavailable>");
         println!("  nsld_self_owned_image_hash: <unavailable>");
         println!("  nsld_self_owned_image_header_valid: <unavailable>");
         println!("  nsld_final_executable_output_ready: <unavailable>");
         println!("  nsld_final_executable_output_boundary_status: <unavailable>");
+        println!("  nsld_final_executable_output_materialization_status: <unavailable>");
+        println!("  nsld_final_executable_output_execution_handoff_status: <unavailable>");
+        println!("  nsld_final_executable_output_execution_handoff_target: <unavailable>");
+        println!("  nsld_final_executable_output_execution_handoff_evidence_status: <unavailable>");
+        println!("  nsld_final_executable_output_recommended_next_action: <unavailable>");
         println!("  nsld_final_executable_output_path_present: <unavailable>");
         println!("  nsld_final_executable_output_nsld_owned: <unavailable>");
         println!("  nsld_final_executable_output_blocker_count: <unavailable>");
@@ -2753,6 +2794,10 @@ fn print_nsld_artifact_chain_status(plan: &nuisc::linker::LinkPlan) {
         nsld_tail.self_owned_image_status
     );
     println!(
+        "  nsld_entrypoint_materialization_status: {}",
+        nsld_tail.entrypoint_materialization_status
+    );
+    println!(
         "  nsld_self_owned_image_path: {}",
         nsld_tail
             .self_owned_image_path
@@ -2787,6 +2832,26 @@ fn print_nsld_artifact_chain_status(plan: &nuisc::linker::LinkPlan) {
     println!(
         "  nsld_final_executable_output_boundary_status: {}",
         nsld_final_output.boundary_status
+    );
+    println!(
+        "  nsld_final_executable_output_materialization_status: {}",
+        nsld_final_output.materialization_status
+    );
+    println!(
+        "  nsld_final_executable_output_execution_handoff_status: {}",
+        nsld_final_output.execution_handoff_status
+    );
+    println!(
+        "  nsld_final_executable_output_execution_handoff_target: {}",
+        nsld_final_output.execution_handoff_target
+    );
+    println!(
+        "  nsld_final_executable_output_execution_handoff_evidence_status: {}",
+        nsld_final_output.execution_handoff_evidence_status
+    );
+    println!(
+        "  nsld_final_executable_output_recommended_next_action: {}",
+        nsld_final_output.recommended_next_action
     );
     println!(
         "  nsld_final_executable_output_path_present: {}",
@@ -3122,6 +3187,22 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
     surface_render::render_project_doctor_json(input)
 }
 
+fn print_domain_contract_completeness(contract: &nuisc::registry::NustarDomainContract) {
+    println!("contract_status: {}", contract.contract_status);
+    print_scheduler_sample_field(
+        "required_contract_groups",
+        &contract.required_contract_groups.join("; "),
+    );
+    if contract.missing_contract_groups.is_empty() {
+        println!("missing_contract_groups: <none>");
+    } else {
+        print_scheduler_sample_field(
+            "missing_contract_groups",
+            &contract.missing_contract_groups.join("; "),
+        );
+    }
+}
+
 fn print_domain_contract_group(contract: &nuisc::registry::NustarDomainContract, group: &str) {
     println!("    {}:", group);
     match group {
@@ -3281,6 +3362,7 @@ fn print_project_scheduler_contract_view(domain: &str) -> Result<(), String> {
     if !registration.ops.is_empty() {
         print_scheduler_sample_field("      ops", &registration.ops.join("; "));
     }
+    print_domain_contract_completeness(&contract);
     print_scheduler_sample_field("contract_groups", &contract.contract_groups.join("; "));
     if !contract.extension_groups.is_empty() {
         print_scheduler_sample_field("extension_groups", &contract.extension_groups.join("; "));
