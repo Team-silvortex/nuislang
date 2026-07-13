@@ -54,6 +54,7 @@ pub(crate) struct NsldCheckFinalSnapshot {
     pub(crate) final_executable_output_path_present: bool,
     pub(crate) final_executable_output_kind: String,
     pub(crate) final_executable_output_validation_mode: String,
+    pub(crate) final_executable_output_boundary_status: String,
     pub(crate) final_executable_output_nsld_owned: bool,
     pub(crate) final_executable_output_present: bool,
     pub(crate) final_executable_output_size_bytes: Option<usize>,
@@ -225,6 +226,8 @@ pub(crate) fn nsld_check_final_snapshot(
     let final_executable_output_validation_mode = final_executable_output_report
         .output_validation_mode
         .clone();
+    let final_executable_output_boundary_status =
+        final_executable_output_report.boundary_status.clone();
     let final_executable_output_nsld_owned = final_executable_output_report.nsld_owned_output;
     let final_executable_output_present = final_executable_output_report.present;
     let final_executable_output_size_bytes = final_executable_output_report.size_bytes;
@@ -296,6 +299,7 @@ pub(crate) fn nsld_check_final_snapshot(
         final_executable_output_path_present,
         final_executable_output_kind,
         final_executable_output_validation_mode,
+        final_executable_output_boundary_status,
         final_executable_output_nsld_owned,
         final_executable_output_present,
         final_executable_output_size_bytes,

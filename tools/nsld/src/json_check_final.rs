@@ -148,6 +148,10 @@ pub(crate) fn check_report_final_fields(report: &NsldCheckReport) -> Vec<String>
             "final_executable_output_validation_mode",
             &report.final_executable_output_validation_mode,
         ),
+        json_string_field(
+            "final_executable_output_boundary_status",
+            &report.final_executable_output_boundary_status,
+        ),
         json_bool_field(
             "final_executable_output_nsld_owned",
             report.final_executable_output_nsld_owned,

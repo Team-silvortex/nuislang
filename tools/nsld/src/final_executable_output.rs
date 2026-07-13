@@ -177,12 +177,21 @@ pub(crate) fn nsld_final_executable_output_report(
         } else {
             matches_expected_image && output_image_header_valid
         };
+    let boundary_status = final_executable_output_boundary_status(
+        runnable_candidate,
+        path_present,
+        nsld_owned_output,
+        present,
+        &blockers,
+    )
+    .to_owned();
 
     NsldFinalExecutableOutputReport {
         manifest: manifest.display().to_string(),
         output_path,
         output_kind,
         output_validation_mode,
+        boundary_status,
         path_present,
         nsld_owned_output,
         present,
@@ -213,4 +222,26 @@ pub(crate) fn nsld_final_executable_output_report(
         blockers,
         issues,
     }
+}
+
+fn final_executable_output_boundary_status(
+    runnable_candidate: bool,
+    path_present: bool,
+    nsld_owned_output: bool,
+    present: bool,
+    blockers: &[String],
+) -> &'static str {
+    if runnable_candidate && blockers.is_empty() {
+        return "ready";
+    }
+    if !path_present {
+        return "missing";
+    }
+    if !nsld_owned_output {
+        return "not-nsld-owned";
+    }
+    if !present {
+        return "unreadable";
+    }
+    "invalid"
 }

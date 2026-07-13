@@ -1,4 +1,28 @@
 use super::*;
+use std::collections::BTreeSet;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct LinkPlanDomainReadiness {
+    package_id: String,
+    domain_family: String,
+    ready: bool,
+    selected_lowering_target_present: bool,
+    payload_blob_present: bool,
+    payload_format_present: bool,
+    bridge_stub_present: bool,
+    ir_sidecar_present: bool,
+    issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct LinkPlanDomainReadinessSummary {
+    hetero_units: usize,
+    ready_units: usize,
+    ready: bool,
+    domain_families: Vec<String>,
+    first_unready: Option<String>,
+    units: Vec<LinkPlanDomainReadiness>,
+}
 
 pub(super) fn append_json_object_strings(out: &mut String, values: &[String]) {
     for (index, value) in values.iter().enumerate() {
@@ -50,6 +74,39 @@ pub(super) fn write_link_plan_text_fields<W: fmt::Write>(
             plan.lowering_plan_index_source
         )?;
         writeln!(out, "  link_plan_domain_units: {}", plan.domain_units.len())?;
+        let domain_readiness = link_plan_domain_readiness_summary(plan);
+        writeln!(
+            out,
+            "  link_plan_heterogeneous_domain_units: {}",
+            domain_readiness.hetero_units
+        )?;
+        writeln!(
+            out,
+            "  link_plan_heterogeneous_domain_ready_units: {}",
+            domain_readiness.ready_units
+        )?;
+        writeln!(
+            out,
+            "  link_plan_heterogeneous_domain_readiness_ready: {}",
+            crate::yes_no(domain_readiness.ready)
+        )?;
+        writeln!(
+            out,
+            "  link_plan_heterogeneous_domain_families: {}",
+            if domain_readiness.domain_families.is_empty() {
+                "<none>".to_owned()
+            } else {
+                domain_readiness.domain_families.join(", ")
+            }
+        )?;
+        writeln!(
+            out,
+            "  link_plan_heterogeneous_domain_first_unready: {}",
+            domain_readiness
+                .first_unready
+                .as_deref()
+                .unwrap_or("<none>")
+        )?;
         write_nsld_artifact_chain_text_fields(out, plan)?;
     } else {
         writeln!(out, "  link_plan_final_stage: <unavailable>")?;
@@ -59,6 +116,14 @@ pub(super) fn write_link_plan_text_fields<W: fmt::Write>(
         writeln!(out, "  link_plan_lowering_plan_index_path: <unavailable>")?;
         writeln!(out, "  link_plan_lowering_plan_index_source: <unavailable>")?;
         writeln!(out, "  link_plan_domain_units: 0")?;
+        writeln!(out, "  link_plan_heterogeneous_domain_units: 0")?;
+        writeln!(out, "  link_plan_heterogeneous_domain_ready_units: 0")?;
+        writeln!(out, "  link_plan_heterogeneous_domain_readiness_ready: no")?;
+        writeln!(out, "  link_plan_heterogeneous_domain_families: <none>")?;
+        writeln!(
+            out,
+            "  link_plan_heterogeneous_domain_first_unready: <none>"
+        )?;
         writeln!(out, "  nsld_prepare_command: <unavailable>")?;
         writeln!(out, "  nsld_drive_dry_run_command: <unavailable>")?;
         writeln!(out, "  nsld_drive_dry_run_json_command: <unavailable>")?;
@@ -163,7 +228,17 @@ pub(super) fn write_link_plan_text_fields<W: fmt::Write>(
             out,
             "  nsld_final_executable_pipeline_first_missing_required_stage_path: <none>"
         )?;
+        writeln!(out, "  nsld_self_owned_image_ready: <unavailable>")?;
+        writeln!(out, "  nsld_self_owned_image_status: <unavailable>")?;
+        writeln!(out, "  nsld_self_owned_image_path: <unavailable>")?;
+        writeln!(out, "  nsld_self_owned_image_present: <unavailable>")?;
+        writeln!(out, "  nsld_self_owned_image_hash: <unavailable>")?;
+        writeln!(out, "  nsld_self_owned_image_header_valid: <unavailable>")?;
         writeln!(out, "  nsld_final_executable_output_ready: <unavailable>")?;
+        writeln!(
+            out,
+            "  nsld_final_executable_output_boundary_status: <unavailable>"
+        )?;
         writeln!(
             out,
             "  nsld_final_executable_output_path_present: <unavailable>"
@@ -219,6 +294,7 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
     let nsld_drive_command_set = link_plan.map(|plan| {
         crate::workflow::nsld_drive_command_set_for_output_dir(Path::new(&plan.output_dir))
     });
+    let domain_readiness = link_plan.map(link_plan_domain_readiness_summary);
 
     vec![
         crate::json_bool_field("link_plan_available", link_plan.is_some()),
@@ -249,6 +325,47 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
         crate::json_usize_field(
             "link_plan_domain_units",
             link_plan.map(|plan| plan.domain_units.len()).unwrap_or(0),
+        ),
+        crate::json_usize_field(
+            "link_plan_heterogeneous_domain_units",
+            domain_readiness
+                .as_ref()
+                .map(|summary| summary.hetero_units)
+                .unwrap_or(0),
+        ),
+        crate::json_usize_field(
+            "link_plan_heterogeneous_domain_ready_units",
+            domain_readiness
+                .as_ref()
+                .map(|summary| summary.ready_units)
+                .unwrap_or(0),
+        ),
+        crate::json_bool_field(
+            "link_plan_heterogeneous_domain_readiness_ready",
+            domain_readiness
+                .as_ref()
+                .map(|summary| summary.ready)
+                .unwrap_or(false),
+        ),
+        crate::json_string_array_field(
+            "link_plan_heterogeneous_domain_families",
+            &domain_readiness
+                .as_ref()
+                .map(|summary| summary.domain_families.clone())
+                .unwrap_or_default(),
+        ),
+        crate::json_optional_string_field(
+            "link_plan_heterogeneous_domain_first_unready",
+            domain_readiness
+                .as_ref()
+                .and_then(|summary| summary.first_unready.as_deref()),
+        ),
+        format!(
+            "\"link_plan_heterogeneous_domain_readiness\":[{}]",
+            domain_readiness
+                .as_ref()
+                .map(link_plan_domain_readiness_units_json)
+                .unwrap_or_default()
         ),
         crate::json_optional_string_field(
             "nsld_prepare_command",
@@ -514,7 +631,131 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
                 .as_ref()
                 .and_then(|summary| summary.first_missing_required_stage_path.as_deref()),
         ),
+        json_optional_bool_field(
+            "nsld_self_owned_image_ready",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.self_owned_image_ready),
+        ),
+        crate::json_optional_string_field(
+            "nsld_self_owned_image_status",
+            final_tail_summary
+                .as_ref()
+                .map(|summary| summary.self_owned_image_status.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_self_owned_image_path",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.self_owned_image_path.as_deref()),
+        ),
+        json_optional_bool_field(
+            "nsld_self_owned_image_present",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.self_owned_image_present),
+        ),
+        crate::json_optional_string_field(
+            "nsld_self_owned_image_hash",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.self_owned_image_hash.as_deref()),
+        ),
+        json_optional_bool_field(
+            "nsld_self_owned_image_header_valid",
+            final_tail_summary
+                .as_ref()
+                .and_then(|summary| summary.self_owned_image_header_valid),
+        ),
     ]
+}
+
+fn link_plan_domain_readiness_summary(
+    plan: &nuisc::linker::LinkPlan,
+) -> LinkPlanDomainReadinessSummary {
+    let units = plan
+        .domain_units
+        .iter()
+        .filter(|unit| unit.domain_family != "cpu")
+        .map(link_plan_domain_readiness)
+        .collect::<Vec<_>>();
+    let hetero_units = units.len();
+    let ready_units = units.iter().filter(|unit| unit.ready).count();
+    let mut domain_families = units
+        .iter()
+        .map(|unit| unit.domain_family.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    domain_families.sort();
+    let first_unready = units
+        .iter()
+        .find(|unit| !unit.ready)
+        .map(|unit| format!("{}[{}]", unit.package_id, unit.domain_family));
+    LinkPlanDomainReadinessSummary {
+        hetero_units,
+        ready_units,
+        ready: hetero_units == ready_units,
+        domain_families,
+        first_unready,
+        units,
+    }
+}
+
+fn link_plan_domain_readiness(unit: &nuisc::linker::LinkPlanDomainUnit) -> LinkPlanDomainReadiness {
+    let selected_lowering_target_present = unit.selected_lowering_target.is_some();
+    let payload_blob_present = unit.artifact_payload_blob_path.is_some();
+    let payload_format_present = unit.artifact_payload_format.is_some();
+    let bridge_stub_present = unit.artifact_bridge_stub_path.is_some();
+    let ir_sidecar_present = unit.artifact_ir_sidecar_path.is_some();
+    let mut issues = Vec::new();
+    if !payload_blob_present {
+        issues.push("payload_blob_missing".to_owned());
+    }
+    if !payload_format_present {
+        issues.push("payload_format_missing".to_owned());
+    }
+    if !bridge_stub_present {
+        issues.push("bridge_stub_missing".to_owned());
+    }
+    LinkPlanDomainReadiness {
+        package_id: unit.package_id.clone(),
+        domain_family: unit.domain_family.clone(),
+        ready: issues.is_empty(),
+        selected_lowering_target_present,
+        payload_blob_present,
+        payload_format_present,
+        bridge_stub_present,
+        ir_sidecar_present,
+        issues,
+    }
+}
+
+fn link_plan_domain_readiness_units_json(summary: &LinkPlanDomainReadinessSummary) -> String {
+    summary
+        .units
+        .iter()
+        .map(link_plan_domain_readiness_json)
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn link_plan_domain_readiness_json(unit: &LinkPlanDomainReadiness) -> String {
+    let fields = [
+        crate::json_field("package_id", &unit.package_id),
+        crate::json_field("domain_family", &unit.domain_family),
+        crate::json_bool_field("ready", unit.ready),
+        crate::json_bool_field(
+            "selected_lowering_target_present",
+            unit.selected_lowering_target_present,
+        ),
+        crate::json_bool_field("payload_blob_present", unit.payload_blob_present),
+        crate::json_bool_field("payload_format_present", unit.payload_format_present),
+        crate::json_bool_field("bridge_stub_present", unit.bridge_stub_present),
+        crate::json_bool_field("ir_sidecar_present", unit.ir_sidecar_present),
+        crate::json_string_array_field("issues", &unit.issues),
+    ];
+    format!("{{{}}}", fields.join(","))
 }
 
 pub(super) fn append_link_plan_json_fields(
@@ -778,8 +1019,58 @@ fn write_nsld_artifact_chain_text_fields<W: fmt::Write>(
     )?;
     writeln!(
         out,
+        "  nsld_self_owned_image_ready: {}",
+        final_tail
+            .self_owned_image_ready
+            .map(crate::yes_no)
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_self_owned_image_status: {}",
+        final_tail.self_owned_image_status
+    )?;
+    writeln!(
+        out,
+        "  nsld_self_owned_image_path: {}",
+        final_tail
+            .self_owned_image_path
+            .as_deref()
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_self_owned_image_present: {}",
+        final_tail
+            .self_owned_image_present
+            .map(crate::yes_no)
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_self_owned_image_hash: {}",
+        final_tail
+            .self_owned_image_hash
+            .as_deref()
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_self_owned_image_header_valid: {}",
+        final_tail
+            .self_owned_image_header_valid
+            .map(crate::yes_no)
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
         "  nsld_final_executable_output_ready: {}",
         crate::yes_no(final_output.ready)
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_boundary_status: {}",
+        final_output.boundary_status
     )?;
     writeln!(
         out,

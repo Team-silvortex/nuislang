@@ -254,7 +254,11 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_pipeline_launcher_manifest_ready\":null"));
     assert!(json.contains("\"nsld_final_executable_pipeline_scheduler_metadata_payload_id\":null"));
     assert!(json.contains("\"nsld_final_executable_pipeline_required_stage_path_count\":null"));
+    assert!(json.contains("\"nsld_self_owned_image_ready\":"));
+    assert!(json.contains("\"nsld_self_owned_image_status\":"));
+    assert!(json.contains("\"nsld_self_owned_image_path\":"));
     assert!(json.contains("\"nsld_final_executable_output_ready\":"));
+    assert!(json.contains("\"nsld_final_executable_output_boundary_status\":"));
     assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
     assert!(json.contains("\"nsld_final_executable_output_blockers\":["));
@@ -317,7 +321,11 @@ mod cpu Main {
     assert!(json.contains(
         "\"nsld_final_executable_tail_stage_records\":[{\"stage\":\"final-executable-writer-input\",\"file\":\"nuis.nsld.final-executable-writer-input.toml\",\"present\":false"
     ));
+    assert!(json.contains("\"nsld_self_owned_image_ready\":"));
+    assert!(json.contains("\"nsld_self_owned_image_status\":"));
+    assert!(json.contains("\"nsld_self_owned_image_path\":"));
     assert!(json.contains("\"nsld_final_executable_output_ready\":"));
+    assert!(json.contains("\"nsld_final_executable_output_boundary_status\":"));
     assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
     assert!(json.contains("\"nsld_final_executable_output_blockers\":["));
@@ -385,7 +393,11 @@ mod cpu Main {
     assert!(
         json.contains("\"nsld_final_executable_pipeline_first_missing_required_stage_path\":null")
     );
+    assert!(json.contains("\"nsld_self_owned_image_ready\":"));
+    assert!(json.contains("\"nsld_self_owned_image_status\":"));
+    assert!(json.contains("\"nsld_self_owned_image_path\":"));
     assert!(json.contains("\"nsld_final_executable_output_ready\":"));
+    assert!(json.contains("\"nsld_final_executable_output_boundary_status\":"));
     assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
     assert!(json.contains("\"nsld_final_executable_output_blockers\":["));
@@ -590,6 +602,12 @@ fn build_report_json_exposes_bridge_bearing_exchange_summary() {
     assert!(json.contains("\"link_plan_final_stage\":\"heterogeneous-bundle-pack\""));
     assert!(json.contains("\"link_plan_final_driver\":\"yir-pack-aot\""));
     assert!(json.contains("\"link_plan_domain_units\":3"));
+    assert!(json.contains("\"link_plan_heterogeneous_domain_units\":2"));
+    assert!(json.contains("\"link_plan_heterogeneous_domain_ready_units\":2"));
+    assert!(json.contains("\"link_plan_heterogeneous_domain_readiness_ready\":true"));
+    assert!(json.contains("\"link_plan_heterogeneous_domain_families\":[\"data\",\"shader\"]"));
+    assert!(json.contains("\"link_plan_heterogeneous_domain_first_unready\":null"));
+    assert!(json.contains("\"link_plan_heterogeneous_domain_readiness\":[{"));
 }
 
 #[test]
@@ -618,6 +636,10 @@ fn build_report_json_exposes_shader_result_enum_bundle_summary() {
     assert!(json.contains("\"link_plan_final_stage\":\"heterogeneous-bundle-pack\""));
     assert!(json.contains("\"link_plan_final_driver\":\"yir-pack-aot\""));
     assert!(json.contains("\"link_plan_domain_units\":3"));
+    assert!(json.contains("\"link_plan_heterogeneous_domain_units\":2"));
+    assert!(json.contains("\"link_plan_heterogeneous_domain_ready_units\":2"));
+    assert!(json.contains("\"link_plan_heterogeneous_domain_readiness_ready\":true"));
+    assert!(json.contains("\"link_plan_heterogeneous_domain_families\":[\"data\",\"shader\"]"));
 }
 
 #[test]

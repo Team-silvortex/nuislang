@@ -78,10 +78,22 @@ artifact-follow-up state:
 * `link_plan_final_link_mode`
 * `link_plan_final_output`
 * `link_plan_domain_units`
+* `link_plan_heterogeneous_domain_units`
+* `link_plan_heterogeneous_domain_ready_units`
+* `link_plan_heterogeneous_domain_readiness_ready`
+* `link_plan_heterogeneous_domain_families`
+* `link_plan_heterogeneous_domain_first_unready`
 * `nsld_final_executable_output_ready`
+* `nsld_final_executable_output_boundary_status`
 * `nsld_final_executable_output_path_present`
 * `nsld_final_executable_output_nsld_owned`
 * `nsld_final_executable_output_blockers`
+* `nsld_self_owned_image_ready`
+* `nsld_self_owned_image_status`
+* `nsld_self_owned_image_path`
+* `nsld_self_owned_image_present`
+* `nsld_self_owned_image_hash`
+* `nsld_self_owned_image_header_valid`
 
 Short reading rule:
 
@@ -92,9 +104,18 @@ Short reading rule:
   closed enough to run
 * final-output ownership fields tell you whether the visible host-native output
   is missing, merely host-produced, or explicitly Nsld-owned
+* `nsld_final_executable_output_boundary_status` is the normalized script-facing
+  state for the final-output boundary
+* `nsld_self_owned_image_status` is the normalized script-facing state for the
+  internal `.nsb` image layer before host-shell or OS-native materialization
+* heterogeneous-domain readiness fields summarize whether non-CPU domain units
+  have the generic payload, lowering, sidecar, and bridge evidence needed by the
+  current artifact route
 * `ready_to_run` and `nsld_final_executable_output_ready` are deliberately
   separate: the first describes the current launchable AOT host binary path,
   while the second describes the stricter Nsld-owned final-output boundary
+* self-contained Nsld `.nsb` image output is now a real Nsld-owned output
+  boundary, but it is not yet the same thing as an OS-native executable
 
 ## Current Link Truth
 
@@ -106,9 +127,11 @@ The current line should be described honestly:
   `nuis.build.manifest.toml`
 * the current native CPU final stage still resolves to host-native linking
   through `clang`
+* the self-contained internal image route can produce an Nsld-owned `.nsb`
+  image and launcher dry-run metadata
 * heterogeneous bundle packing is modeled separately from host-native final
   link
-* this is not yet the final self-owned `nuis` linker architecture
+* this is not yet the final host-shell / OS-native `nuis` linker architecture
 
 Short rule:
 

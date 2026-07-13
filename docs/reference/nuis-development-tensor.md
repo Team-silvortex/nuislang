@@ -61,6 +61,12 @@ The JSON surface is intentionally simple:
 * `weakest_bootstrap_architecture`
 * `weakest_bootstrap_module`
 * `weakest_bootstrap_function`
+* `drift_status`
+* `drift_check_count`
+* `drift_check_passed_count`
+* `drift_check_failed_count`
+* `drift_first_failed_check`
+* `drift_checks = [...]`
 * `cells = [...]`
 
 Each cell includes both named coordinates and a `coordinates` array so scripts
@@ -69,12 +75,37 @@ can read it either as records or as tensor coordinates.
 `nuis status` also prints the short tensor summary. That makes the model part
 of the toolchain self-orientation surface, not just a separate report command.
 
+## Drift Checks
+
+The tensor now includes a first lightweight drift-check layer.
+
+These checks do not replace the real test suite. They only verify that selected
+progress evidence anchors still exist in the repository, such as:
+
+* frontdoor JSON fields
+* workflow/artifact runtime regression assertions
+* reference-document field anchors
+
+The current status values are:
+
+* `clean`
+  every configured evidence anchor is still visible
+* `drift`
+  at least one configured evidence anchor is missing
+
+Short rule:
+
+`drift checks make the tensor less imaginary: if a progress cell claims a
+frontdoor or document exists, the tensor can at least notice when that anchor
+disappears`
+
 ## Current Role
 
 The first implementation is static and intentionally conservative. It is not a
 replacement for tests, release checklists, or Nsld/Nuis frontdoor reports.
 
-It is a development-system index over those surfaces.
+It is a development-system index over those surfaces, with a small drift-check
+layer over the most bootstrap-critical anchors.
 
 The first useful jobs are:
 
@@ -106,3 +137,7 @@ from:
 * docs/reference anchors
 * package manifests
 * roadmap milestones
+
+The first drift checks are intentionally narrow. Future checks should become
+milestone-owned instead of merely field-owned, so they can verify examples,
+packages, and command workflows as well as names in source files.

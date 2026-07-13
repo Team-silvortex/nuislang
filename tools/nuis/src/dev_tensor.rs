@@ -2,7 +2,7 @@ use crate::{
     json_bool_field, json_field, json_string_array_field, json_usize_field,
     surface_render::append_json_field_strings,
 };
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, fs, path::PathBuf};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct DevTensorCell {
@@ -56,22 +56,22 @@ const DEV_TENSOR_CELLS: &[DevTensorCell] = &[
         module: "nsld",
         function: "final-output-boundary",
         status: "active",
-        progress: 61,
+        progress: 68,
         bootstrap_critical: true,
         closure_role: "executable-output-boundary",
-        evidence: "final-executable-output reports path presence, ownership, runnable candidate, blockers, and check/artifact-chain mirrors",
-        next_step: "complete a self-owned final executable path beyond host-assisted outputs",
+        evidence: "final-executable-output reports normalized boundary status, path presence, ownership, runnable candidate, blockers, and Nuis/Nsld mirrors",
+        next_step: "complete host-shell and OS-native materialization beyond the self-contained Nsld-owned image path",
     },
     DevTensorCell {
         architecture: "heterogeneous-runtime",
         module: "nustar",
         function: "registered-domain-contracts",
         status: "active",
-        progress: 58,
+        progress: 69,
         bootstrap_critical: true,
         closure_role: "heterogeneous-domain-registration",
-        evidence: "domain units, lowering targets, backend families, and sidecar capability checks are visible in build/link reports",
-        next_step: "make shader/kernel/network domain readiness comparable through the same progress cells",
+        evidence: "domain units, lowering targets, backend families, contract drift checks, and heterogeneous domain readiness are visible in build/link reports",
+        next_step: "connect shader/kernel/network execution-specific readiness to registered Nustar domain contracts without hardcoding nsld domain logic",
     },
     DevTensorCell {
         architecture: "standard-library",
@@ -121,25 +121,101 @@ const DEV_TENSOR_CELLS: &[DevTensorCell] = &[
         architecture: "native-binary-system",
         module: "nsb-nsld",
         function: "self-owned-binary-assembly",
-        status: "blocked",
-        progress: 43,
+        status: "active",
+        progress: 67,
         bootstrap_critical: true,
         closure_role: "self-owned-native-binary",
-        evidence: "Nsld container, object/image dry-runs, final executable pipeline, and binary protocol docs exist",
-        next_step: "turn dry-run/image/container protocol into a real self-owned executable output path",
+        evidence: "Nsld container, object/image dry-runs, final executable pipeline, self-contained NSB image emission, launcher dry-run checks, and Nuis self-owned image status are visible",
+        next_step: "bridge self-contained NSB image output toward host-shell and OS-native entrypoint materialization",
     },
     DevTensorCell {
         architecture: "developer-system",
         module: "dev-tensor",
         function: "architecture-module-function-progress-model",
-        status: "early-usable",
-        progress: 45,
+        status: "active",
+        progress: 70,
         bootstrap_critical: true,
         closure_role: "bootstrap-progress-model",
-        evidence: "tensor frontdoor maps progress by architecture, module, and function and is summarized by nuis status",
-        next_step: "wire tensor cells to tests, docs, and frontdoor outputs for automatic drift checks",
+        evidence: "tensor frontdoor maps progress by architecture, module, and function, summarizes through nuis status, and runs drift checks over key docs/tests/frontdoor fields",
+        next_step: "expand drift checks from field anchors to milestone-owned test and example evidence",
     },
 ];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DevTensorDriftCheckSpec {
+    id: &'static str,
+    path: &'static str,
+    required_patterns: &'static [&'static str],
+}
+
+const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
+    DevTensorDriftCheckSpec {
+        id: "frontdoor-final-output-boundary-status",
+        path: "tools/nuis/src/workflow/link_plan.rs",
+        required_patterns: &[
+            "nsld_final_executable_output_boundary_status",
+            "nsld_final_executable_output_ready",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "frontdoor-self-owned-image-status",
+        path: "tools/nuis/src/workflow/link_plan.rs",
+        required_patterns: &[
+            "nsld_self_owned_image_status",
+            "nsld_self_owned_image_header_valid",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "workflow-surface-json-regression",
+        path: "tools/nuis/src/main_tests/workflow_surface.rs",
+        required_patterns: &[
+            "nsld_final_executable_output_boundary_status",
+            "nsld_self_owned_image_status",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "artifact-runtime-json-regression",
+        path: "tools/nuis/src/main_tests/artifact_runtime.rs",
+        required_patterns: &[
+            "nsld_final_executable_output_boundary_status",
+            "nsld_self_owned_image_status",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "frontdoor-reference-doc",
+        path: "docs/reference/nuis-frontdoor-surface-reference.md",
+        required_patterns: &[
+            "nsld_final_executable_output_boundary_status",
+            "nsld_self_owned_image_status",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "native-artifact-workflow-doc",
+        path: "docs/reference/nuis-native-artifact-workflow.md",
+        required_patterns: &[
+            "nsld_final_executable_output_boundary_status",
+            "nsld_self_owned_image_status",
+        ],
+    },
+];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DevTensorDriftCheck {
+    pub(crate) id: &'static str,
+    pub(crate) path: &'static str,
+    pub(crate) passed: bool,
+    pub(crate) missing_patterns: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DevTensorDriftSummary {
+    pub(crate) check_count: usize,
+    pub(crate) passed_count: usize,
+    pub(crate) failed_count: usize,
+    pub(crate) status: &'static str,
+    pub(crate) first_failed_check: Option<&'static str>,
+    pub(crate) checks: Vec<DevTensorDriftCheck>,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct DevTensorSummary {
@@ -210,11 +286,60 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
     }
 }
 
+pub(crate) fn dev_tensor_drift_summary() -> DevTensorDriftSummary {
+    let checks = DEV_TENSOR_DRIFT_CHECKS
+        .iter()
+        .map(run_dev_tensor_drift_check)
+        .collect::<Vec<_>>();
+    let check_count = checks.len();
+    let passed_count = checks.iter().filter(|check| check.passed).count();
+    let failed_count = check_count.saturating_sub(passed_count);
+    let first_failed_check = checks
+        .iter()
+        .find(|check| !check.passed)
+        .map(|check| check.id);
+    DevTensorDriftSummary {
+        check_count,
+        passed_count,
+        failed_count,
+        status: if failed_count == 0 { "clean" } else { "drift" },
+        first_failed_check,
+        checks,
+    }
+}
+
+fn run_dev_tensor_drift_check(spec: &DevTensorDriftCheckSpec) -> DevTensorDriftCheck {
+    let path = repo_root().join(spec.path);
+    let source = fs::read_to_string(path).unwrap_or_default();
+    let missing_patterns = spec
+        .required_patterns
+        .iter()
+        .filter(|pattern| !source.contains(**pattern))
+        .map(|pattern| (*pattern).to_owned())
+        .collect::<Vec<_>>();
+    DevTensorDriftCheck {
+        id: spec.id,
+        path: spec.path,
+        passed: missing_patterns.is_empty(),
+        missing_patterns,
+    }
+}
+
+fn repo_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
 pub(crate) fn render_dev_tensor_json() -> String {
     let summary = dev_tensor_summary();
+    let drift = dev_tensor_drift_summary();
     let cells = DEV_TENSOR_CELLS
         .iter()
         .map(dev_tensor_cell_json)
+        .collect::<Vec<_>>();
+    let drift_checks = drift
+        .checks
+        .iter()
+        .map(dev_tensor_drift_check_json)
         .collect::<Vec<_>>();
     let mut out = String::from("{");
     append_json_field_strings(
@@ -250,6 +375,15 @@ pub(crate) fn render_dev_tensor_json() -> String {
                 "weakest_bootstrap_progress",
                 summary.weakest_bootstrap_progress,
             ),
+            json_usize_field("drift_check_count", drift.check_count),
+            json_usize_field("drift_check_passed_count", drift.passed_count),
+            json_usize_field("drift_check_failed_count", drift.failed_count),
+            json_field("drift_status", drift.status),
+            json_field(
+                "drift_first_failed_check",
+                drift.first_failed_check.unwrap_or("<none>"),
+            ),
+            format!("\"drift_checks\":[{}]", drift_checks.join(",")),
             format!("\"cells\":[{}]", cells.join(",")),
         ],
     );
@@ -259,6 +393,7 @@ pub(crate) fn render_dev_tensor_json() -> String {
 
 pub(crate) fn render_dev_tensor_text() -> Vec<String> {
     let summary = dev_tensor_summary();
+    let drift = dev_tensor_drift_summary();
     let mut lines = vec![
         "nuis development tensor".to_owned(),
         "  model: architecture-module-function-progress-tensor".to_owned(),
@@ -293,7 +428,28 @@ pub(crate) fn render_dev_tensor_text() -> Vec<String> {
             "  weakest_bootstrap_progress: {}",
             summary.weakest_bootstrap_progress
         ),
+        format!("  drift_status: {}", drift.status),
+        format!("  drift_check_count: {}", drift.check_count),
+        format!("  drift_check_passed_count: {}", drift.passed_count),
+        format!("  drift_check_failed_count: {}", drift.failed_count),
+        format!(
+            "  drift_first_failed_check: {}",
+            drift.first_failed_check.unwrap_or("<none>")
+        ),
     ];
+    for check in &drift.checks {
+        lines.push(format!(
+            "  drift_check: id={} path={} passed={} missing={}",
+            check.id,
+            check.path,
+            check.passed,
+            if check.missing_patterns.is_empty() {
+                "<none>".to_owned()
+            } else {
+                check.missing_patterns.join("|")
+            }
+        ));
+    }
     for cell in DEV_TENSOR_CELLS {
         lines.push(format!(
             "  cell: architecture={} module={} function={} status={} progress={} bootstrap_critical={} closure_role={}",
@@ -335,6 +491,19 @@ fn dev_tensor_cell_json(cell: &DevTensorCell) -> String {
     )
 }
 
+fn dev_tensor_drift_check_json(check: &DevTensorDriftCheck) -> String {
+    format!(
+        "{{{}}}",
+        [
+            json_field("id", check.id),
+            json_field("path", check.path),
+            json_bool_field("passed", check.passed),
+            json_string_array_field("missing_patterns", &check.missing_patterns),
+        ]
+        .join(",")
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -349,15 +518,11 @@ mod tests {
         assert!(summary.average_progress > 0);
         assert!(summary.bootstrap_critical_count >= 5);
         assert!(summary.bootstrap_critical_average_progress > 0);
-        assert_eq!(
-            summary.weakest_bootstrap_architecture,
-            "native-binary-system"
-        );
-        assert_eq!(summary.weakest_bootstrap_module, "nsb-nsld");
-        assert_eq!(
-            summary.weakest_bootstrap_function,
-            "self-owned-binary-assembly"
-        );
+        assert_ne!(summary.weakest_bootstrap_architecture, "<none>");
+        assert_ne!(summary.weakest_bootstrap_module, "<none>");
+        assert_ne!(summary.weakest_bootstrap_function, "<none>");
+        assert!(summary.weakest_bootstrap_progress > 0);
+        assert!(summary.weakest_bootstrap_progress <= summary.bootstrap_critical_average_progress);
     }
 
     #[test]
@@ -375,5 +540,30 @@ mod tests {
         assert!(json.contains("\"weakest_bootstrap_function\""));
         assert!(json.contains("\"module\":\"nsld\""));
         assert!(json.contains("\"function\":\"final-output-boundary\""));
+        assert!(json.contains("\"drift_status\":\"clean\""));
+        assert!(json.contains("\"drift_checks\":["));
+        assert!(json.contains("\"id\":\"frontdoor-self-owned-image-status\""));
+        assert!(json.contains("\"missing_patterns\":[]"));
+    }
+
+    #[test]
+    fn dev_tensor_drift_checks_are_currently_clean() {
+        let drift = dev_tensor_drift_summary();
+        assert_eq!(drift.status, "clean");
+        assert_eq!(drift.failed_count, 0);
+        assert_eq!(drift.passed_count, drift.check_count);
+        assert!(drift.first_failed_check.is_none());
+        assert!(drift
+            .checks
+            .iter()
+            .any(|check| check.id == "frontdoor-self-owned-image-status"));
+    }
+
+    #[test]
+    fn dev_tensor_text_exposes_drift_status() {
+        let text = render_dev_tensor_text().join("\n");
+        assert!(text.contains("drift_status: clean"));
+        assert!(text.contains("drift_check: id=frontdoor-final-output-boundary-status"));
+        assert!(text.contains("drift_first_failed_check: <none>"));
     }
 }

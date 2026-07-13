@@ -1,4 +1,28 @@
 use super::*;
+use std::collections::BTreeSet;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct WorkflowDomainReadiness {
+    package_id: String,
+    domain_family: String,
+    ready: bool,
+    selected_lowering_target_present: bool,
+    payload_blob_present: bool,
+    payload_format_present: bool,
+    bridge_stub_present: bool,
+    ir_sidecar_present: bool,
+    issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct WorkflowDomainReadinessSummary {
+    hetero_units: usize,
+    ready_units: usize,
+    ready: bool,
+    domain_families: Vec<String>,
+    first_unready: Option<String>,
+    units: Vec<WorkflowDomainReadiness>,
+}
 
 pub(crate) fn artifact_doctor_command_for_output_dir(output_dir: &Path) -> String {
     format!("nuis artifact-doctor {}", output_dir.display())
@@ -100,10 +124,17 @@ pub(crate) struct NsldFinalExecutableTailSummary {
     pub(crate) required_stage_path_count: Option<usize>,
     pub(crate) required_stage_path_present_count: Option<usize>,
     pub(crate) first_missing_required_stage_path: Option<String>,
+    pub(crate) self_owned_image_status: String,
+    pub(crate) self_owned_image_ready: Option<bool>,
+    pub(crate) self_owned_image_path: Option<String>,
+    pub(crate) self_owned_image_present: Option<bool>,
+    pub(crate) self_owned_image_hash: Option<String>,
+    pub(crate) self_owned_image_header_valid: Option<bool>,
 }
 
 pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) ready: bool,
+    pub(crate) boundary_status: String,
     pub(crate) path_present: bool,
     pub(crate) nsld_owned: Option<bool>,
     pub(crate) blockers: Vec<String>,
@@ -639,6 +670,7 @@ pub(crate) fn nsld_final_executable_tail_summary(
         }
     }
     let pipeline = output_dir.join("nuis.nsld.final-executable-pipeline.toml");
+    let launcher_manifest = output_dir.join("nuis.nsld.final-executable-launcher.toml");
     let (
         pipeline_valid,
         final_executable_emitted,
@@ -675,6 +707,34 @@ pub(crate) fn nsld_final_executable_tail_summary(
         .unwrap_or((
             None, None, None, None, None, None, None, None, None, None, None, None, None,
         ));
+    let (
+        self_owned_image_path,
+        self_owned_image_present,
+        self_owned_image_hash,
+        self_owned_image_header_valid,
+    ) = fs::read_to_string(&launcher_manifest)
+        .ok()
+        .map(|source| {
+            (
+                parse_string_field(&source, "nsb_path"),
+                parse_bool_field(&source, "nsb_present"),
+                parse_string_field(&source, "nsb_hash"),
+                parse_bool_field(&source, "image_header_valid"),
+            )
+        })
+        .unwrap_or((None, None, None, None));
+    let launcher_manifest_present = launcher_manifest.exists();
+    let self_owned_image_ready = self_owned_image_present
+        .map(|present| present && self_owned_image_header_valid == Some(true));
+    let self_owned_image_status = nsld_self_owned_image_status(
+        launcher_manifest_present,
+        self_owned_image_ready,
+        self_owned_image_path.as_deref(),
+        self_owned_image_present,
+        self_owned_image_hash.as_deref(),
+        self_owned_image_header_valid,
+    )
+    .to_owned();
     let stage_count = NSLD_FINAL_EXECUTABLE_TAIL_STAGES.len();
     NsldFinalExecutableTailSummary {
         ready: present_count == stage_count && pipeline_valid == Some(true),
@@ -695,7 +755,42 @@ pub(crate) fn nsld_final_executable_tail_summary(
         required_stage_path_count,
         required_stage_path_present_count,
         first_missing_required_stage_path,
+        self_owned_image_status,
+        self_owned_image_ready,
+        self_owned_image_path,
+        self_owned_image_present,
+        self_owned_image_hash,
+        self_owned_image_header_valid,
     }
+}
+
+fn nsld_self_owned_image_status(
+    launcher_manifest_present: bool,
+    ready: Option<bool>,
+    path: Option<&str>,
+    present: Option<bool>,
+    hash: Option<&str>,
+    header_valid: Option<bool>,
+) -> &'static str {
+    if ready == Some(true) {
+        return "ready";
+    }
+    if !launcher_manifest_present {
+        return "manifest-missing";
+    }
+    if path.is_none() {
+        return "path-missing";
+    }
+    if present == Some(false) {
+        return "missing";
+    }
+    if header_valid == Some(false) {
+        return "header-invalid";
+    }
+    if hash.is_none() && present == Some(true) {
+        return "hash-missing";
+    }
+    "unknown"
 }
 
 pub(crate) fn nsld_final_executable_output_boundary_summary(
@@ -704,9 +799,16 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
     let output_path = Path::new(&plan.final_stage.output_path);
     let path_present = output_path.exists();
     let blocked_path = Path::new(&plan.output_dir).join("nuis.nsld.final-executable.blocked.toml");
-    let emitted = fs::read_to_string(blocked_path)
-        .ok()
-        .and_then(|source| parse_bool_field(&source, "emitted"));
+    let blocked_source = fs::read_to_string(blocked_path).ok();
+    let emitted = blocked_source
+        .as_deref()
+        .and_then(|source| parse_bool_field(source, "emitted"));
+    let final_output_present = blocked_source
+        .as_deref()
+        .and_then(|source| parse_bool_field(source, "final_output_present"));
+    let final_output_runnable_candidate = blocked_source
+        .as_deref()
+        .and_then(|source| parse_bool_field(source, "final_output_runnable_candidate"));
     let nsld_owned = emitted.map(|emitted| emitted && path_present);
     let mut blockers = Vec::new();
     if !path_present {
@@ -717,15 +819,56 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         blockers.push("final-executable-output:not-nsld-owned".to_owned());
     }
     let first_blocker = blockers.first().cloned();
-    let ready = nsld_owned == Some(true) && blockers.is_empty();
+    let ready = nsld_owned == Some(true)
+        && blockers.is_empty()
+        && final_output_runnable_candidate.unwrap_or(true);
+    let boundary_status = nsld_final_executable_output_boundary_status(
+        ready,
+        path_present,
+        nsld_owned,
+        final_output_present,
+        final_output_runnable_candidate,
+        &blockers,
+    )
+    .to_owned();
 
     NsldFinalExecutableOutputBoundarySummary {
         ready,
+        boundary_status,
         path_present,
         nsld_owned,
         blockers,
         first_blocker,
     }
+}
+
+fn nsld_final_executable_output_boundary_status(
+    ready: bool,
+    path_present: bool,
+    nsld_owned: Option<bool>,
+    final_output_present: Option<bool>,
+    final_output_runnable_candidate: Option<bool>,
+    blockers: &[String],
+) -> &'static str {
+    if ready {
+        return "ready";
+    }
+    if !path_present {
+        return "missing";
+    }
+    if nsld_owned.is_none() {
+        return "ownership-unknown";
+    }
+    if nsld_owned == Some(false) {
+        return "not-nsld-owned";
+    }
+    if final_output_present == Some(false) {
+        return "unreadable";
+    }
+    if final_output_runnable_candidate == Some(false) || !blockers.is_empty() {
+        return "invalid";
+    }
+    "blocked"
 }
 
 pub(crate) fn load_link_plan_for_output_dir(output_dir: &Path) -> Option<nuisc::linker::LinkPlan> {
@@ -770,6 +913,92 @@ fn workflow_link_plan_domain_unit_record(unit: &nuisc::linker::LinkPlanDomainUni
     out
 }
 
+fn workflow_domain_readiness_summary(
+    plan: &nuisc::linker::LinkPlan,
+) -> WorkflowDomainReadinessSummary {
+    let units = plan
+        .domain_units
+        .iter()
+        .filter(|unit| unit.domain_family != "cpu")
+        .map(workflow_domain_readiness)
+        .collect::<Vec<_>>();
+    let hetero_units = units.len();
+    let ready_units = units.iter().filter(|unit| unit.ready).count();
+    let domain_families = units
+        .iter()
+        .map(|unit| unit.domain_family.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let first_unready = units
+        .iter()
+        .find(|unit| !unit.ready)
+        .map(|unit| format!("{}[{}]", unit.package_id, unit.domain_family));
+    WorkflowDomainReadinessSummary {
+        hetero_units,
+        ready_units,
+        ready: hetero_units == ready_units,
+        domain_families,
+        first_unready,
+        units,
+    }
+}
+
+fn workflow_domain_readiness(unit: &nuisc::linker::LinkPlanDomainUnit) -> WorkflowDomainReadiness {
+    let selected_lowering_target_present = unit.selected_lowering_target.is_some();
+    let payload_blob_present = unit.artifact_payload_blob_path.is_some();
+    let payload_format_present = unit.artifact_payload_format.is_some();
+    let bridge_stub_present = unit.artifact_bridge_stub_path.is_some();
+    let ir_sidecar_present = unit.artifact_ir_sidecar_path.is_some();
+    let mut issues = Vec::new();
+    if !payload_blob_present {
+        issues.push("payload_blob_missing".to_owned());
+    }
+    if !payload_format_present {
+        issues.push("payload_format_missing".to_owned());
+    }
+    if !bridge_stub_present {
+        issues.push("bridge_stub_missing".to_owned());
+    }
+    WorkflowDomainReadiness {
+        package_id: unit.package_id.clone(),
+        domain_family: unit.domain_family.clone(),
+        ready: issues.is_empty(),
+        selected_lowering_target_present,
+        payload_blob_present,
+        payload_format_present,
+        bridge_stub_present,
+        ir_sidecar_present,
+        issues,
+    }
+}
+
+fn workflow_domain_readiness_units_json(summary: &WorkflowDomainReadinessSummary) -> Vec<String> {
+    summary
+        .units
+        .iter()
+        .map(workflow_domain_readiness_json)
+        .collect()
+}
+
+fn workflow_domain_readiness_json(unit: &WorkflowDomainReadiness) -> String {
+    let fields = [
+        json_field("package_id", &unit.package_id),
+        json_field("domain_family", &unit.domain_family),
+        json_bool_field("ready", unit.ready),
+        json_bool_field(
+            "selected_lowering_target_present",
+            unit.selected_lowering_target_present,
+        ),
+        json_bool_field("payload_blob_present", unit.payload_blob_present),
+        json_bool_field("payload_format_present", unit.payload_format_present),
+        json_bool_field("bridge_stub_present", unit.bridge_stub_present),
+        json_bool_field("ir_sidecar_present", unit.ir_sidecar_present),
+        json_string_array_field("issues", &unit.issues),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
 fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -> Vec<String> {
     let domain_unit_records = link_plan
         .map(|plan| {
@@ -804,6 +1033,7 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
     );
     let nsld_drive_command_set =
         link_plan.map(|plan| nsld_drive_command_set_for_output_dir(Path::new(&plan.output_dir)));
+    let domain_readiness = link_plan.map(workflow_domain_readiness_summary);
     vec![
         json_bool_field("link_plan_available", link_plan.is_some()),
         json_optional_string_field(
@@ -833,6 +1063,47 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
         json_usize_field(
             "link_plan_domain_units",
             link_plan.map(|plan| plan.domain_units.len()).unwrap_or(0),
+        ),
+        json_usize_field(
+            "link_plan_heterogeneous_domain_units",
+            domain_readiness
+                .as_ref()
+                .map(|summary| summary.hetero_units)
+                .unwrap_or(0),
+        ),
+        json_usize_field(
+            "link_plan_heterogeneous_domain_ready_units",
+            domain_readiness
+                .as_ref()
+                .map(|summary| summary.ready_units)
+                .unwrap_or(0),
+        ),
+        json_bool_field(
+            "link_plan_heterogeneous_domain_readiness_ready",
+            domain_readiness
+                .as_ref()
+                .map(|summary| summary.ready)
+                .unwrap_or(false),
+        ),
+        json_string_array_field(
+            "link_plan_heterogeneous_domain_families",
+            &domain_readiness
+                .as_ref()
+                .map(|summary| summary.domain_families.clone())
+                .unwrap_or_default(),
+        ),
+        json_optional_string_field(
+            "link_plan_heterogeneous_domain_first_unready",
+            domain_readiness
+                .as_ref()
+                .and_then(|summary| summary.first_unready.as_deref()),
+        ),
+        json_object_array_field(
+            "link_plan_heterogeneous_domain_readiness",
+            &domain_readiness
+                .as_ref()
+                .map(workflow_domain_readiness_units_json)
+                .unwrap_or_default(),
         ),
         json_object_array_field("link_plan_domain_unit_records", &domain_unit_records),
         json_optional_string_field(
@@ -1084,11 +1355,53 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
                 .as_ref()
                 .and_then(|summary| summary.first_missing_required_stage_path.as_deref()),
         ),
+        json_optional_bool_field(
+            "nsld_self_owned_image_ready",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.self_owned_image_ready),
+        ),
+        json_optional_string_field(
+            "nsld_self_owned_image_status",
+            nsld_tail
+                .as_ref()
+                .map(|summary| summary.self_owned_image_status.as_str()),
+        ),
+        json_optional_string_field(
+            "nsld_self_owned_image_path",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.self_owned_image_path.as_deref()),
+        ),
+        json_optional_bool_field(
+            "nsld_self_owned_image_present",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.self_owned_image_present),
+        ),
+        json_optional_string_field(
+            "nsld_self_owned_image_hash",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.self_owned_image_hash.as_deref()),
+        ),
+        json_optional_bool_field(
+            "nsld_self_owned_image_header_valid",
+            nsld_tail
+                .as_ref()
+                .and_then(|summary| summary.self_owned_image_header_valid),
+        ),
         json_bool_field(
             "nsld_final_executable_output_ready",
             nsld_final_output
                 .as_ref()
                 .is_some_and(|summary| summary.ready),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_boundary_status",
+            nsld_final_output
+                .as_ref()
+                .map(|summary| summary.boundary_status.as_str()),
         ),
         json_bool_field(
             "nsld_final_executable_output_path_present",

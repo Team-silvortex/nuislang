@@ -75,6 +75,36 @@ stage/graph is backend-eligible:
 detail. That keeps the classic host/C world visible as one execution family
 inside the Nuis artifact graph.
 
+## Frontdoor Readiness
+
+`nuis` link-plan frontdoors expose a generic heterogeneous readiness summary so
+scripts do not need to understand every shader, kernel, data, or network
+backend contract directly.
+
+Current fields include:
+
+* `link_plan_heterogeneous_domain_units`
+* `link_plan_heterogeneous_domain_ready_units`
+* `link_plan_heterogeneous_domain_readiness_ready`
+* `link_plan_heterogeneous_domain_families`
+* `link_plan_heterogeneous_domain_first_unready`
+* `link_plan_heterogeneous_domain_readiness`
+
+The current generic readiness check is intentionally about assembly evidence,
+not domain-specific execution semantics. A non-CPU domain unit is ready when it
+has:
+
+* an artifact payload blob
+* an artifact payload format
+* a bridge stub
+
+Domain-specific validation still belongs to the registered `nustar` contract.
+For example, shader and kernel domains can additionally require selected
+lowering targets and IR sidecars, while data-fabric contract units may be
+assembly-ready without those execution-side fields. The readiness summary is a
+cross-domain frontdoor signal for workflow routing, not a replacement for
+shader/kernel/network contract validation.
+
 ## Nsld Boundary
 
 `nsld` should not need to understand shader or kernel semantics directly.
@@ -93,4 +123,3 @@ For multi-backend artifacts, its intended job is:
 The compiler may still bootstrap some domain knowledge in-tree today, but the
 artifact contract should be explicit enough that future `nustar` registration can
 own the backend matrix without turning nsld into a pile of special cases.
-

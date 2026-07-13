@@ -23,7 +23,7 @@ pub(crate) fn run_status_command() {
     );
     println!("  implementation: reuses nuisc::linker while linker ownership is split out");
     println!(
-        "  final_link_status: final executable emission is still blocked before real binary linking"
+        "  final_link_status: self-contained Nsld image emission is available; host-native and OS-native finalization remain staged"
     );
 }
 

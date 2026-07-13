@@ -443,6 +443,7 @@ pub(crate) fn nsld_final_executable_output_report_json(
         json_string_field("output_path", &report.output_path),
         json_string_field("output_kind", &report.output_kind),
         json_string_field("output_validation_mode", &report.output_validation_mode),
+        json_string_field("boundary_status", &report.boundary_status),
         json_bool_field("path_present", report.path_present),
         json_bool_field("nsld_owned_output", report.nsld_owned_output),
         json_bool_field("present", report.present),

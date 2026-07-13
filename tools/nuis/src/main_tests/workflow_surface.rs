@@ -207,7 +207,11 @@ mod cpu Main {
     assert!(
         json.contains("\"nsld_final_executable_pipeline_first_missing_required_stage_path\":null")
     );
+    assert!(json.contains("\"nsld_self_owned_image_ready\":"));
+    assert!(json.contains("\"nsld_self_owned_image_status\":"));
+    assert!(json.contains("\"nsld_self_owned_image_path\":"));
     assert!(json.contains("\"nsld_final_executable_output_ready\":"));
+    assert!(json.contains("\"nsld_final_executable_output_boundary_status\":"));
     assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
     assert!(json.contains("\"nsld_final_executable_output_blocker_count\":"));
@@ -266,7 +270,11 @@ mod cpu Main {
     ));
     assert!(json.contains("\"nsld_final_executable_pipeline_valid\":true"));
     assert!(json.contains("\"nsld_final_executable_pipeline_required_stage_path_present_count\":9"));
+    assert!(json.contains("\"nsld_self_owned_image_ready\":"));
+    assert!(json.contains("\"nsld_self_owned_image_status\":"));
+    assert!(json.contains("\"nsld_self_owned_image_path\":"));
     assert!(json.contains("\"nsld_final_executable_output_ready\":"));
+    assert!(json.contains("\"nsld_final_executable_output_boundary_status\":"));
     assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
     assert!(json.contains("\"nsld_final_executable_output_blocker_count\":"));

@@ -523,6 +523,7 @@ pub(crate) struct NsldFinalExecutableOutputReport {
     pub(crate) output_path: String,
     pub(crate) output_kind: String,
     pub(crate) output_validation_mode: String,
+    pub(crate) boundary_status: String,
     pub(crate) path_present: bool,
     pub(crate) nsld_owned_output: bool,
     pub(crate) present: bool,

@@ -30,6 +30,7 @@ fn final_executable_output_reports_missing_until_real_output_exists() {
     fs::remove_dir_all(dir).unwrap();
 
     assert!(!report.present);
+    assert_eq!(report.boundary_status, "missing");
     assert!(!report.runnable_candidate);
     assert!(!report.matches_expected_image);
     assert!(!report.output_image_header_valid);
@@ -44,6 +45,7 @@ fn final_executable_output_reports_missing_until_real_output_exists() {
         .iter()
         .any(|blocker| blocker == "final-executable-emit:not-emitted"));
     assert!(report_json.contains("\"kind\":\"nsld_final_executable_output\""));
+    assert!(report_json.contains("\"boundary_status\":\"missing\""));
     assert!(report_json.contains("\"present\":false"));
     assert!(report_json.contains("\"output_image_header_valid\":false"));
     assert!(report_json.contains("\"output_image_magic\":null"));
@@ -424,6 +426,7 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
         Some(true)
     );
     assert!(output.present);
+    assert_eq!(output.boundary_status, "ready");
     assert!(output.path_present);
     assert!(output.nsld_owned_output);
     assert!(output.runnable_candidate, "{:?}", output.blockers);
@@ -469,6 +472,7 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert_eq!(output.expected_image_hash, Some(fnv1a64_hex(&image_bytes)));
     assert_eq!(image_bytes, output_bytes);
     assert!(output_json.contains("\"present\":true"));
+    assert!(output_json.contains("\"boundary_status\":\"ready\""));
     assert!(output_json.contains("\"path_present\":true"));
     assert!(output_json.contains("\"nsld_owned_output\":true"));
     assert!(output_json.contains("\"output_image_header_required\":true"));
@@ -619,6 +623,7 @@ fn final_executable_output_rejects_tampered_output_bytes() {
     fs::remove_dir_all(dir).unwrap();
 
     assert!(output.present);
+    assert_eq!(output.boundary_status, "invalid");
     assert!(!output.runnable_candidate);
     assert!(!output.matches_expected_image);
     assert!(!output.output_image_header_valid);
@@ -643,6 +648,7 @@ fn final_executable_output_rejects_tampered_output_bytes() {
         check.final_executable_output_runnable_candidate,
         Some(false)
     );
+    assert_eq!(check.final_executable_output_boundary_status, "invalid");
     assert!(check
         .final_executable_output_issues
         .iter()
@@ -652,6 +658,7 @@ fn final_executable_output_rejects_tampered_output_bytes() {
         .iter()
         .any(|issue| issue.contains("hash mismatch")));
     assert!(output_json.contains("\"present\":true"));
+    assert!(output_json.contains("\"boundary_status\":\"invalid\""));
     assert!(output_json.contains("\"output_image_header_valid\":false"));
     assert!(output_json.contains("\"matches_expected_image\":false"));
     assert!(output_json.contains("\"runnable_candidate\":false"));

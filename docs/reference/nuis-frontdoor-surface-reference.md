@@ -89,6 +89,9 @@ These fields now form the current visible link summary:
   no lightweight final-output boundary blockers. This is intentionally
   narrower than `ready_to_run`, which can still describe the current
   host-toolchain AOT binary launch path.
+* `nsld_final_executable_output_boundary_status`
+  the normalized final-output boundary state for scripts and release gates:
+  `ready`, `missing`, `not-nsld-owned`, `unreadable`, or `invalid`
 * `nsld_final_executable_output_path_present`
   whether the current final-stage output path exists on disk
 * `nsld_final_executable_output_nsld_owned`
@@ -110,6 +113,23 @@ These fields now form the current visible link summary:
   `nsld_final_executable_output_blocker` lines.
   `nuis release-check` prints the same boundary in its `release-check:
   nsld-drive` block with the shorter `final_executable_output_*` field prefix.
+* `nsld_self_owned_image_ready`
+  whether the current Nsld launcher manifest exposes a present `.nsb` image
+  with a valid Nuis image header
+* `nsld_self_owned_image_status`
+  the normalized self-owned image state for scripts: `ready`,
+  `manifest-missing`, `path-missing`, `missing`, `header-invalid`,
+  `hash-missing`, or `unknown`
+* `nsld_self_owned_image_path`
+  the self-owned `.nsb` image path from the Nsld launcher manifest when
+  available
+* `nsld_self_owned_image_present`
+  whether the launcher manifest sees the `.nsb` image bytes on disk
+* `nsld_self_owned_image_hash`
+  the launcher-manifest hash for the self-owned `.nsb` image when available
+* `nsld_self_owned_image_header_valid`
+  whether the `.nsb` image header validates under the current Nsld image
+  protocol
 * `nsld_final_executable_output_first_blocker`
   the first lightweight final-output boundary blocker, or `null` / `<none>`
   when no blocker is currently visible

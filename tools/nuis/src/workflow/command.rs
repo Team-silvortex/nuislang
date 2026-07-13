@@ -503,8 +503,51 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
                 .unwrap_or("<none>")
         );
         println!(
+            "  nsld_self_owned_image_ready: {}",
+            nsld_tail
+                .self_owned_image_ready
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<unknown>".to_owned())
+        );
+        println!(
+            "  nsld_self_owned_image_status: {}",
+            nsld_tail.self_owned_image_status
+        );
+        println!(
+            "  nsld_self_owned_image_path: {}",
+            nsld_tail
+                .self_owned_image_path
+                .as_deref()
+                .unwrap_or("<unknown>")
+        );
+        println!(
+            "  nsld_self_owned_image_present: {}",
+            nsld_tail
+                .self_owned_image_present
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<unknown>".to_owned())
+        );
+        println!(
+            "  nsld_self_owned_image_hash: {}",
+            nsld_tail
+                .self_owned_image_hash
+                .as_deref()
+                .unwrap_or("<unknown>")
+        );
+        println!(
+            "  nsld_self_owned_image_header_valid: {}",
+            nsld_tail
+                .self_owned_image_header_valid
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<unknown>".to_owned())
+        );
+        println!(
             "  nsld_final_executable_output_ready: {}",
             nsld_final_output.ready
+        );
+        println!(
+            "  nsld_final_executable_output_boundary_status: {}",
+            nsld_final_output.boundary_status
         );
         println!(
             "  nsld_final_executable_output_path_present: {}",
@@ -573,7 +616,14 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
         println!("  nsld_final_executable_pipeline_scheduler_metadata_hash: <unknown>");
         println!("  nsld_final_executable_pipeline_required_stage_paths: <unknown>/<unknown>");
         println!("  nsld_final_executable_pipeline_first_missing_required_stage_path: <none>");
+        println!("  nsld_self_owned_image_ready: <unavailable>");
+        println!("  nsld_self_owned_image_status: <unavailable>");
+        println!("  nsld_self_owned_image_path: <unavailable>");
+        println!("  nsld_self_owned_image_present: <unavailable>");
+        println!("  nsld_self_owned_image_hash: <unavailable>");
+        println!("  nsld_self_owned_image_header_valid: <unavailable>");
         println!("  nsld_final_executable_output_ready: <unavailable>");
+        println!("  nsld_final_executable_output_boundary_status: <unavailable>");
         println!("  nsld_final_executable_output_path_present: <unavailable>");
         println!("  nsld_final_executable_output_nsld_owned: <unavailable>");
         println!("  nsld_final_executable_output_blocker_count: <unavailable>");

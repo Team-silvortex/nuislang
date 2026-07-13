@@ -139,6 +139,7 @@ pub(crate) struct NsldCheckReport {
     pub(crate) final_executable_output_path_present: bool,
     pub(crate) final_executable_output_kind: String,
     pub(crate) final_executable_output_validation_mode: String,
+    pub(crate) final_executable_output_boundary_status: String,
     pub(crate) final_executable_output_nsld_owned: bool,
     pub(crate) final_executable_output_present: bool,
     pub(crate) final_executable_output_size_bytes: Option<usize>,

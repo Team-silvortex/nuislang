@@ -1173,6 +1173,7 @@ remains an explicit boundary command.
 If the Nsld-owned final-stage output is present, `nsld check` runs the same
 read-only output boundary exposed by `final-executable-output` and reports
 `final_executable_output_path_present`,
+`final_executable_output_boundary_status`,
 `final_executable_output_nsld_owned`,
 `final_executable_output_present`,
 `final_executable_output_size_bytes`,
@@ -1190,6 +1191,9 @@ states. A missing Nsld-owned final output remains non-fatal so ordinary
 preparation workflows can stop before the explicit final emit step, but a
 present Nsld-owned output must be consistent with the emitted final-executable
 boundary.
+Scripts should prefer the normalized `boundary_status` /
+`final_executable_output_boundary_status` field for high-level branching, then
+read blockers and issues for diagnostics.
 
 `nsld prepare` also returns the same compatibility-domain summary after it has
 emitted and verified the full artifact chain. This makes the prepare result a

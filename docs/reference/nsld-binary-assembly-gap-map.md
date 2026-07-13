@@ -24,7 +24,9 @@ link plan
   -> container payload
   -> closure snapshot
   -> final-stage plan
-  -> final executable readiness / blocked report
+  -> final executable writer input
+  -> final executable layout and image dry-run
+  -> self-contained NSB image output or host-assisted boundary report
 ```
 
 `nsld prepare` can emit and verify this chain today. This is already useful
@@ -51,14 +53,18 @@ It currently owns:
 * payload hash and container hash
 * verification of metadata and payload consistency
 * deterministic final-stage plan before executable finalization
-* deterministic blocked final-executable emission report
+* deterministic final executable writer input
+* deterministic self-contained final image dry-run and image bytes
+* Nsld-owned self-contained `.nsb` image output for the internal image route
+* deterministic blocked/final-output boundary report for host-assisted routes
 
 It does not yet own:
 
 * ELF or PE compatibility object emission
 * native relocation application
 * final executable entrypoint generation
-* host-shell or Nuis-native executable materialization
+* host-shell executable materialization
+* OS-native executable entrypoint materialization
 * Nuis lifecycle runtime bootstrapping
 * heterogeneous dispatch at runtime
 
@@ -152,24 +158,29 @@ semantic view.
 
 The next useful milestone is not "replace the system linker immediately".
 
+Nsld can already emit a self-contained Nuis image for the internal image route.
+That is a real Nsld-owned final-output boundary, but it is not yet the same as
+a host-shell executable or an OS-native entrypoint.
+
 The current next milestone is now represented by:
 
 ```text
-nsld prepare
-  -> nsld object-plan
-  -> nsld emit-object-plan
-  -> nsld verify-object-plan
-  -> nsld object-byte-layout
-  -> nsld object-file-layout
-  -> nsld object-image-dry-run
+nsld prepare / drive
+  -> object image dry-run
+  -> container + payload
+  -> closure snapshot
+  -> final executable layout
+  -> self-contained NSB image output
+  -> launcher manifest / dry-run
 ```
 
-That gives the compatibility object writer a deterministic planning layer
-before bytes are emitted. It mirrors the existing assemble/container path and
-keeps the project moving without pretending the native executable story is
-finished. The current `object-plan` is intentionally non-mutating; native object
-bytes and relocation application remain optional compatibility/finalization
-layers rather than the mandatory internal form of Nsld.
+That gives the self-owned image route a deterministic final-output layer before
+the host-shell and OS-native entrypoint layers are finished. It keeps the
+project moving without pretending the native executable story is complete. The
+current `object-plan` and object image dry-run remain compatibility planning
+layers; native object bytes and relocation application are optional
+compatibility/finalization layers rather than the mandatory internal form of
+Nsld.
 
 The plan already assigns each Nsld section a writer-facing object section
 record with a stable object section name, object section role, source section

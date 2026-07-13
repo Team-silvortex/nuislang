@@ -33,13 +33,13 @@ project
   -> closure snapshot
   -> final-stage plan
   -> executable writer input
-  -> runnable host-assisted artifact or explicit blocked executable artifact
+  -> self-contained Nsld image output or host-assisted finalization boundary
 ```
 
 This does not yet mean final self-hosting, final std API stability, or a fully
-self-owned linker. Safe current wording is `binary-linking convergence`,
-`executable-artifact closure`, `minimal runnable route`, and
-`host-assisted finalization` where applicable.
+self-owned OS-native linker. Safe current wording is `binary-linking
+convergence`, `executable-artifact closure`, `Nsld-owned self-contained image`,
+`minimal runnable route`, and `host-assisted finalization` where applicable.
 
 Start here for the current line:
 
@@ -72,7 +72,8 @@ Implemented or actively usable surfaces:
 * `YIR` as the central semantic execution boundary, with result-family,
   artifact, clock, ABI, and domain validation surfaces.
 * `nsld` as the linker frontdoor over the current linker core, with object,
-  container, closure, final-stage, and readiness diagnostics.
+  container, closure, final-stage, self-contained image output, and readiness
+  diagnostics.
 * `nsdb` as the YIR-level debugger metadata frontdoor.
 * `nsbdr` as the future OS bundle/distribution frontdoor over final `nsld`
   outputs.
@@ -85,7 +86,7 @@ Implemented or actively usable surfaces:
 
 Still incomplete or intentionally soft:
 
-* final self-owned executable linking
+* final host-shell / OS-native executable linking
 * stable std import/autoinjection semantics
 * complete unsafe/raw-pointer policy
 * final GPU/NPU backend maturity
