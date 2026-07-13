@@ -47,10 +47,10 @@ these stops happens:
 * `repeated-next-action` means the same action would be applied again
 * `max-steps` means the internal loop cap stopped the drive
 
-`repeated-next-action` is expected for some blocked/reporting routes. For
-example, a host-assisted final executable route can repeatedly emit a blocked
-pipeline report until a later backend or policy gate makes finalization
-available.
+`repeated-next-action` should be treated as a loop guard, not as the preferred
+blocked-artifact status. Host-assisted final executable routes should now
+materialize the current final pipeline once, then stop as `clean` while the
+pipeline/output reports carry the remaining blocker details.
 
 JSON output reports `mutates_artifacts` for all drive modes:
 

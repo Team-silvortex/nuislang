@@ -24,6 +24,8 @@ Use this first when the question is:
 * what the current `alpha-0.10.*` line adds on top of the binary-linking
   convergence predecessor
 * why executable-artifact closure is now the first-read Nsld/toolchain pressure
+* which native executable back-half gaps are currently the weakest self-hosting
+  prerequisites
 * what the predecessor `alpha-0.8.*` line established for binary-linking
   convergence
 * what the predecessor `alpha-0.7.*` line established for std-backed tooling smoke

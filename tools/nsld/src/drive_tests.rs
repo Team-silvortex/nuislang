@@ -254,22 +254,13 @@ fn drive_apply_until_clean_reaches_host_assisted_pipeline_blockers() {
     let final_output_present = Path::new(&plan.final_stage.output_path).exists();
     fs::remove_dir_all(dir).unwrap();
 
-    assert!(!report.completed, "{:?}", report.messages);
+    assert!(report.completed, "{:?}", report.messages);
     assert!(!report.capped);
-    assert_eq!(report.stop_reason, "repeated-next-action");
-    assert_eq!(
-        report.stop_command_id.as_deref(),
-        Some("emit-final-executable-pipeline")
-    );
-    assert_eq!(report.stop_source.as_deref(), Some("optional"));
-    assert_eq!(
-        report.stop_command_resolved.as_deref(),
-        Some("nsld emit-final-executable-pipeline manifest.toml")
-    );
-    assert!(report
-        .stop_action_reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("optional artifact stage")));
+    assert_eq!(report.stop_reason, "clean");
+    assert_eq!(report.stop_command_id, None);
+    assert_eq!(report.stop_source, None);
+    assert_eq!(report.stop_command_resolved, None);
+    assert_eq!(report.stop_action_reason, None);
     assert_eq!(
         report.last_command_id.as_deref(),
         Some("emit-final-executable-pipeline")
@@ -281,7 +272,7 @@ fn drive_apply_until_clean_reaches_host_assisted_pipeline_blockers() {
         .any(|message| message == "applied emit-final-executable-pipeline"));
     assert_eq!(
         report.messages.last().map(String::as_str),
-        Some("repeated-next-action:emit-final-executable-pipeline")
+        Some("no-next-action")
     );
     assert!(
         check.valid,
@@ -340,6 +331,7 @@ fn drive_until_clean_command_reaches_host_assisted_pipeline_block() {
     let plan = nuisc::linker::build_link_plan_from_manifest(Path::new(&manifest)).unwrap();
     let check = nsld_check_report(Path::new(&manifest), &plan);
     let output = nsld_final_executable_output_report(Path::new(&manifest), &plan);
+    let expected_boundary_command = format!("nsld final-executable-output {manifest}");
     let final_output_present = Path::new(&plan.final_stage.output_path).exists();
     fs::remove_dir_all(dir).unwrap();
 
@@ -348,19 +340,38 @@ fn drive_until_clean_command_reaches_host_assisted_pipeline_block() {
         "failures={} issues={:?} artifact_chain={:?}",
         check.failures, check.issues, check.artifact_chain_issues
     );
-    assert!(check.artifact_chain_next_action_available);
+    assert!(!check.artifact_chain_next_action_available);
+    assert_eq!(check.artifact_chain_next_action_command_id, None);
+    assert_eq!(check.artifact_chain_next_action_source, None);
+    assert!(!check.artifact_chain_final_output_boundary_ready);
     assert_eq!(
-        check.artifact_chain_next_action_command_id.as_deref(),
-        Some("emit-final-executable-pipeline")
+        check
+            .artifact_chain_final_output_boundary_command_id
+            .as_deref(),
+        Some("final-executable-output")
     );
     assert_eq!(
-        check.artifact_chain_next_action_source.as_deref(),
-        Some("optional")
+        check
+            .artifact_chain_final_output_boundary_command_resolved
+            .as_deref(),
+        Some(expected_boundary_command.as_str())
     );
+    assert!(check
+        .artifact_chain_final_output_boundary_reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("final-executable-output:not-nsld-owned")));
     assert!(final_output_present);
     assert!(output.path_present);
     assert!(!output.nsld_owned_output);
     assert!(!output.present);
+    assert!(output
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "final-executable-output:not-nsld-owned"));
+    assert!(!output
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "final-executable-output:missing"));
     assert!(check.final_executable_output_path_present);
     assert!(!check.final_executable_output_nsld_owned);
     assert!(!check.final_executable_output_present);
@@ -368,6 +379,10 @@ fn drive_until_clean_command_reaches_host_assisted_pipeline_block() {
         check.final_executable_output_runnable_candidate,
         Some(false)
     );
+    assert!(check
+        .final_executable_output_blockers
+        .iter()
+        .any(|blocker| blocker == "final-executable-output:not-nsld-owned"));
 }
 
 fn write_test_build_manifest(dir: &Path) -> String {

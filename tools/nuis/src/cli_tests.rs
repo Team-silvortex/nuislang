@@ -14,6 +14,13 @@ fn parses_workflow_with_default_input() {
 }
 
 #[test]
+fn parses_dev_tensor_json() {
+    let command = parse_args(["dev-tensor".to_owned(), "--json".to_owned()].into_iter())
+        .expect("dev-tensor parses");
+    assert_eq!(command, CommandKind::DevTensor { json: true });
+}
+
+#[test]
 fn parses_workflow_json_with_explicit_input() {
     let command = parse_args(
         [

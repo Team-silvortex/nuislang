@@ -367,6 +367,7 @@ fn check_reports_valid_final_executable_output_when_present() {
         Some(layout.byte_map_hash.as_str())
     );
     assert_eq!(report.final_executable_output_blocker_count, Some(0));
+    assert!(report.final_executable_output_blockers.is_empty());
     assert!(report.final_executable_output_issues.is_empty());
     assert!(report_json.contains("\"final_executable_output_path_present\":true"));
     assert!(report_json.contains("\"final_executable_output_kind\":\"nuis-image\""));
@@ -378,6 +379,7 @@ fn check_reports_valid_final_executable_output_when_present() {
     assert!(report_json.contains("\"final_executable_output_image_header_required\":true"));
     assert!(report_json.contains("\"final_executable_output_image_header_valid\":true"));
     assert!(report_json.contains("\"final_executable_output_image_magic\":\"NUIFIMG\""));
+    assert!(report_json.contains("\"final_executable_output_blockers\":[]"));
     assert!(report_json.contains("\"final_executable_output_image_version\":1"));
     assert!(report_json.contains("\"final_executable_output_image_layout_hash\":\"0x"));
     assert!(report_json.contains("\"final_executable_output_image_byte_map_hash\":\"0x"));

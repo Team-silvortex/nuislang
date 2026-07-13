@@ -75,6 +75,7 @@ pub(crate) fn nsld_artifact_chain_action_plan(
     stages: &[NsldArtifactStage],
     first_missing_required_stage: Option<String>,
     advisories: &[String],
+    suppressed_optional_stage: Option<NsldArtifactStageKind>,
 ) -> NsldArtifactChainActionPlan {
     let first_missing_required = stages.iter().find(|stage| stage.required && !stage.present);
     let next_required_stage = first_missing_required_stage.clone();
@@ -89,9 +90,9 @@ pub(crate) fn nsld_artifact_chain_action_plan(
     let first_missing_optional = first_missing_required
         .is_none()
         .then(|| {
-            stages
-                .iter()
-                .find(|stage| !stage.required && !stage.present)
+            stages.iter().find(|stage| {
+                !stage.required && !stage.present && suppressed_optional_stage != Some(stage.kind)
+            })
         })
         .flatten();
     let next_optional_stage =

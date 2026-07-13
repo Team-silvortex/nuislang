@@ -25,6 +25,7 @@ contracts, start with:
 Start in this order:
 
 * `YIR` foundation
+  - [nuis-development-tensor.md](nuis-development-tensor.md)
   - [yir-reference.md](yir-reference.md)
   - [yir-langref.md](yir-langref.md)
   - [yir-tools-reference.md](yir-tools-reference.md)
@@ -76,6 +77,10 @@ Start in this order:
 If your question is specifically “what command should I run next for this
 project?”, start with
 [yir-tools-reference.md](yir-tools-reference.md).
+
+If your question is specifically “how do architecture, module, and function
+progress line up right now?”, start with
+[nuis-development-tensor.md](nuis-development-tensor.md).
 
 If your question is specifically “what is the shortest real native binary
 closure route today?”, start with

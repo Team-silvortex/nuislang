@@ -1,5 +1,6 @@
 mod build_report_runtime;
 mod cli;
+mod dev_tensor;
 mod galaxy;
 mod json_helpers;
 mod json_surface;
@@ -53,11 +54,11 @@ pub(crate) use workflow::{
     nsld_drive_apply_until_clean_json_command_for_output_dir,
     nsld_drive_command_set_for_output_dir, nsld_drive_dry_run_command_for_output_dir,
     nsld_drive_dry_run_json_command_for_output_dir, nsld_drive_recommendation_for_output_dir,
-    nsld_final_executable_tail_summary, nsld_prepare_command_for_output_dir,
-    nsld_prepared_artifact_chain_summary, print_workflow_frontdoor_surface,
-    project_abi_checks_json, project_domain_registry_checks_json, project_frontdoor_surface,
-    project_lowering_checks_json, single_source_frontdoor_surface, toolchain_frontdoor_surface,
-    workflow_frontdoor_json_object_field, WorkflowFrontdoorSurface,
+    nsld_final_executable_output_boundary_summary, nsld_final_executable_tail_summary,
+    nsld_prepare_command_for_output_dir, nsld_prepared_artifact_chain_summary,
+    print_workflow_frontdoor_surface, project_abi_checks_json, project_domain_registry_checks_json,
+    project_frontdoor_surface, project_lowering_checks_json, single_source_frontdoor_surface,
+    toolchain_frontdoor_surface, workflow_frontdoor_json_object_field, WorkflowFrontdoorSurface,
 };
 #[cfg(test)]
 pub(crate) use workflow::{
@@ -117,7 +118,31 @@ fn run() -> Result<(), String> {
             println!("  indexed_nustar: {}", index.len());
             println!("  nustar_loading: lazy");
             println!("  external_projects: yalivia, vulpoya");
+            let dev_tensor = dev_tensor::dev_tensor_summary();
+            println!("  dev_tensor_model: architecture-module-function-progress-tensor");
+            println!("  dev_tensor_cells: {}", dev_tensor.cell_count);
+            println!(
+                "  dev_tensor_bootstrap_critical_cells: {}",
+                dev_tensor.bootstrap_critical_count
+            );
+            println!(
+                "  dev_tensor_bootstrap_critical_average_progress: {}",
+                dev_tensor.bootstrap_critical_average_progress
+            );
+            println!(
+                "  dev_tensor_weakest_bootstrap_architecture: {}",
+                dev_tensor.weakest_bootstrap_architecture
+            );
+            println!(
+                "  dev_tensor_weakest_bootstrap_module: {}",
+                dev_tensor.weakest_bootstrap_module
+            );
+            println!(
+                "  dev_tensor_weakest_bootstrap_function: {}",
+                dev_tensor.weakest_bootstrap_function
+            );
         }
+        cli::CommandKind::DevTensor { json } => handle_dev_tensor(json),
         cli::CommandKind::Registry { json } => {
             nuisc::run(nuisc::CommandKind::Registry { json })?;
         }
@@ -342,6 +367,9 @@ fn handle_release_check(
     })?;
     if success_logs_enabled() {
         let nsld_drive_commands = nsld_drive_command_set_for_output_dir(&output_dir);
+        let final_output = load_link_plan_for_output_dir(&output_dir)
+            .as_ref()
+            .map(nsld_final_executable_output_boundary_summary);
         println!("release-check: nsld-drive");
         println!("  protocol: {}", nsld_drive_commands.protocol);
         println!(
@@ -389,6 +417,43 @@ fn handle_release_check(
             "  apply_until_clean_mutates_artifacts: {}",
             nsld_drive_commands.apply_until_clean_mutates_artifacts
         );
+        println!(
+            "  final_executable_output_ready: {}",
+            final_output.as_ref().is_some_and(|summary| summary.ready)
+        );
+        println!(
+            "  final_executable_output_path_present: {}",
+            final_output
+                .as_ref()
+                .is_some_and(|summary| summary.path_present)
+        );
+        println!(
+            "  final_executable_output_nsld_owned: {}",
+            final_output
+                .as_ref()
+                .and_then(|summary| summary.nsld_owned)
+                .map(|owned: bool| owned.to_string())
+                .unwrap_or_else(|| "<unknown>".to_owned())
+        );
+        println!(
+            "  final_executable_output_blocker_count: {}",
+            final_output
+                .as_ref()
+                .map(|summary| summary.blockers.len())
+                .unwrap_or(0)
+        );
+        println!(
+            "  final_executable_output_first_blocker: {}",
+            final_output
+                .as_ref()
+                .and_then(|summary| summary.first_blocker.as_deref())
+                .unwrap_or("<none>")
+        );
+        if let Some(summary) = final_output.as_ref() {
+            for blocker in &summary.blockers {
+                println!("  final_executable_output_blocker: {blocker}");
+            }
+        }
         println!("  mode: apply-next");
         println!(
             "  note: nsld drive is reported as the linker artifact-chain closure step; release-check does not auto-apply or mutate artifacts yet"
@@ -853,6 +918,16 @@ fn success_logs_enabled() -> bool {
     std::env::var_os("NUIS_TEST_QUIET_SUCCESS_LOGS").is_none()
 }
 
+fn handle_dev_tensor(json: bool) {
+    if json {
+        println!("{}", dev_tensor::render_dev_tensor_json());
+        return;
+    }
+    for line in dev_tensor::render_dev_tensor_text() {
+        println!("{line}");
+    }
+}
+
 fn render_artifact_materialization_json(
     kind: &str,
     input: &Path,
@@ -1127,6 +1202,11 @@ fn print_run_artifact_link_plan_status(link_plan: Option<&nuisc::linker::LinkPla
         println!("  nsld_final_executable_pipeline_scheduler_metadata_hash: <unknown>");
         println!("  nsld_final_executable_pipeline_required_stage_paths: <unknown>/<unknown>");
         println!("  nsld_final_executable_pipeline_first_missing_required_stage_path: <none>");
+        println!("  nsld_final_executable_output_ready: <unavailable>");
+        println!("  nsld_final_executable_output_path_present: <unavailable>");
+        println!("  nsld_final_executable_output_nsld_owned: <unavailable>");
+        println!("  nsld_final_executable_output_blocker_count: <unavailable>");
+        println!("  nsld_final_executable_output_first_blocker: <none>");
     }
 }
 
@@ -2460,11 +2540,19 @@ fn print_nsld_artifact_chain_status(plan: &nuisc::linker::LinkPlan) {
         nsld_drive_apply_until_clean_json_command_for_output_dir(output_dir)
     );
     let nsld_tail = nsld_final_executable_tail_summary(output_dir);
-    let nsld_next = workflow::nsld_next_action_summary(Some(&nsld_chain), Some(&nsld_tail));
+    let nsld_final_output = nsld_final_executable_output_boundary_summary(plan);
+    let nsld_next = workflow::nsld_next_action_summary(
+        Some(&nsld_chain),
+        Some(&nsld_tail),
+        Some(&nsld_final_output),
+    );
     let nsld_chain_next =
         workflow::nsld_artifact_chain_next_action_mirror(Some(&nsld_chain), Some(&nsld_tail));
-    let nsld_drive_recommendation =
-        nsld_drive_recommendation_for_output_dir(Some(output_dir), &nsld_chain_next);
+    let nsld_drive_recommendation = nsld_drive_recommendation_for_output_dir(
+        Some(output_dir),
+        &nsld_chain_next,
+        Some(&nsld_final_output),
+    );
     println!(
         "  nsld_drive_recommended_available: {}",
         nsld_drive_recommendation.available
@@ -2629,6 +2717,35 @@ fn print_nsld_artifact_chain_status(plan: &nuisc::linker::LinkPlan) {
             .as_deref()
             .unwrap_or("<none>")
     );
+    println!(
+        "  nsld_final_executable_output_ready: {}",
+        nsld_final_output.ready
+    );
+    println!(
+        "  nsld_final_executable_output_path_present: {}",
+        nsld_final_output.path_present
+    );
+    println!(
+        "  nsld_final_executable_output_nsld_owned: {}",
+        nsld_final_output
+            .nsld_owned
+            .map(|owned| owned.to_string())
+            .unwrap_or_else(|| "<unknown>".to_owned())
+    );
+    println!(
+        "  nsld_final_executable_output_blocker_count: {}",
+        nsld_final_output.blockers.len()
+    );
+    println!(
+        "  nsld_final_executable_output_first_blocker: {}",
+        nsld_final_output
+            .first_blocker
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    for blocker in &nsld_final_output.blockers {
+        println!("  nsld_final_executable_output_blocker: {blocker}");
+    }
 }
 
 fn handle_dump_ast(input: std::path::PathBuf) -> Result<(), String> {
@@ -3456,6 +3573,7 @@ fn print_help() {
     );
     println!("  general:");
     println!("    nuis status");
+    println!("    nuis dev-tensor [--json]");
     println!("    nuis registry");
     println!("    nuis fmt [input.ns|project-dir|nuis.toml]");
     println!("    nuis bindings <input.ns|project-dir|nuis.toml>");

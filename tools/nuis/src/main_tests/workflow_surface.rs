@@ -207,6 +207,12 @@ mod cpu Main {
     assert!(
         json.contains("\"nsld_final_executable_pipeline_first_missing_required_stage_path\":null")
     );
+    assert!(json.contains("\"nsld_final_executable_output_ready\":"));
+    assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
+    assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
+    assert!(json.contains("\"nsld_final_executable_output_blocker_count\":"));
+    assert!(json.contains("\"nsld_final_executable_output_blockers\":["));
+    assert!(json.contains("\"nsld_final_executable_output_first_blocker\":"));
     assert!(json.contains("\"compile_pipeline_available\":true"));
     assert!(json.contains("\"compile_pipeline_ready_for_aot\":true"));
     assert!(json.contains("\"compile_pipeline_summary\":\"source_kind=project"));
@@ -246,17 +252,25 @@ mod cpu Main {
         "\"nsld_final_executable_tail_stage_records\":[{\"stage\":\"final-executable-writer-input\",\"file\":\"nuis.nsld.final-executable-writer-input.toml\",\"present\":true"
     ));
     assert!(json.contains("\"nsld_next_action_source\":\"nuis-summary\""));
-    assert!(json.contains("\"nsld_next_action\":\"ready\""));
-    assert!(json.contains("\"nsld_next_action_command\":null"));
+    assert!(json.contains("\"nsld_next_action\":\"inspect-final-executable-output\""));
+    assert!(json.contains("\"nsld_next_action_command\":\"nsld final-executable-output "));
     assert!(json.contains(
-        "\"nsld_next_action_reason\":\"nsld prepared chain and final executable tail are ready\""
+        "\"nsld_next_action_reason\":\"final executable output boundary is blocked by `final-executable-output:ownership-unknown`\""
     ));
     assert!(json.contains("\"nsld_artifact_chain_next_action_available\":false"));
     assert!(json.contains("\"nsld_artifact_chain_next_action_command_id\":null"));
     assert!(json.contains("\"nsld_drive_recommended_mode\":\"dry-run\""));
     assert!(json.contains("\"nsld_drive_recommended_mutates_artifacts\":false"));
+    assert!(json.contains(
+        "\"nsld_drive_recommended_reason\":\"artifact-chain has no mutating next action; inspect the final executable output boundary blocked by `final-executable-output:ownership-unknown`\""
+    ));
     assert!(json.contains("\"nsld_final_executable_pipeline_valid\":true"));
     assert!(json.contains("\"nsld_final_executable_pipeline_required_stage_path_present_count\":9"));
+    assert!(json.contains("\"nsld_final_executable_output_ready\":"));
+    assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
+    assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
+    assert!(json.contains("\"nsld_final_executable_output_blocker_count\":"));
+    assert!(json.contains("\"nsld_final_executable_output_blockers\":["));
 }
 
 #[test]

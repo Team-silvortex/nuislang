@@ -97,6 +97,29 @@ pub(crate) fn print_nsld_artifact_chain_report(report: &NsldArtifactChainReport)
         optional_string_text(report.next_action_source.as_deref())
     );
     println!("  next_action_available: {}", report.next_action_available);
+    println!(
+        "  final_output_boundary_ready: {}",
+        report.final_output_boundary_ready
+    );
+    println!(
+        "  final_output_boundary_command_id: {}",
+        optional_string_text(report.final_output_boundary_command_id.as_deref())
+    );
+    println!(
+        "  final_output_boundary_command: {}",
+        optional_string_text(report.final_output_boundary_command.as_deref())
+    );
+    println!(
+        "  final_output_boundary_command_resolved: {}",
+        optional_string_text(report.final_output_boundary_command_resolved.as_deref())
+    );
+    println!(
+        "  final_output_boundary_reason: {}",
+        optional_string_text(report.final_output_boundary_reason.as_deref())
+    );
+    for blocker in &report.final_output_boundary_blockers {
+        println!("  final_output_boundary_blocker: {blocker}");
+    }
     for stage in &report.stages {
         println!(
             "  stage: order={} id={} required={} present={} file={} path={}",

@@ -96,6 +96,20 @@ pub(crate) fn nsld_check_report(
         artifact_chain_report.next_action_command_reason.clone();
     let artifact_chain_next_action_source = artifact_chain_report.next_action_source.clone();
     let artifact_chain_next_action_available = artifact_chain_report.next_action_available;
+    let artifact_chain_final_output_boundary_ready =
+        artifact_chain_report.final_output_boundary_ready;
+    let artifact_chain_final_output_boundary_command_id = artifact_chain_report
+        .final_output_boundary_command_id
+        .clone();
+    let artifact_chain_final_output_boundary_command =
+        artifact_chain_report.final_output_boundary_command.clone();
+    let artifact_chain_final_output_boundary_command_resolved = artifact_chain_report
+        .final_output_boundary_command_resolved
+        .clone();
+    let artifact_chain_final_output_boundary_reason =
+        artifact_chain_report.final_output_boundary_reason.clone();
+    let artifact_chain_final_output_boundary_blockers =
+        artifact_chain_report.final_output_boundary_blockers.clone();
     let next_action_command_id = artifact_chain_next_action_command_id.clone();
     let next_action_command = artifact_chain_next_action_command.clone();
     let next_action_command_resolved = artifact_chain_next_action_command_resolved.clone();
@@ -390,6 +404,7 @@ pub(crate) fn nsld_check_report(
         final_executable_output_runnable_candidate: final_snapshot
             .final_executable_output_runnable_candidate,
         final_executable_output_blocker_count: final_snapshot.final_executable_output_blocker_count,
+        final_executable_output_blockers: final_snapshot.final_executable_output_blockers,
         final_executable_output_issues: final_snapshot.final_executable_output_issues,
         final_executable_launcher_manifest_present: final_snapshot
             .tail
@@ -514,6 +529,12 @@ pub(crate) fn nsld_check_report(
         artifact_chain_next_action_command_reason,
         artifact_chain_next_action_source,
         artifact_chain_next_action_available,
+        artifact_chain_final_output_boundary_ready,
+        artifact_chain_final_output_boundary_command_id,
+        artifact_chain_final_output_boundary_command,
+        artifact_chain_final_output_boundary_command_resolved,
+        artifact_chain_final_output_boundary_reason,
+        artifact_chain_final_output_boundary_blockers,
         artifact_chain_issues,
         final_stage_link_mode: plan.final_stage.link_mode.clone(),
         domains: core_snapshot.domains,

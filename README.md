@@ -44,6 +44,7 @@ self-owned linker. Safe current wording is `binary-linking convergence`,
 Start here for the current line:
 
 * [docs/current-mainline-map.md](docs/current-mainline-map.md)
+* [docs/reference/nuis-development-tensor.md](docs/reference/nuis-development-tensor.md)
 * [docs/versioning/nuis-alpha-0.10-mainline-entry.md](docs/versioning/nuis-alpha-0.10-mainline-entry.md)
 * [docs/versioning/nuis-alpha-0.8-mainline-entry.md](docs/versioning/nuis-alpha-0.8-mainline-entry.md)
 * [docs/versioning/nuis-alpha-0.8-doc-sync-inventory.md](docs/versioning/nuis-alpha-0.8-doc-sync-inventory.md)
@@ -62,7 +63,8 @@ when you intentionally need history.
 Implemented or actively usable surfaces:
 
 * `nuis` project workflow commands for `workflow`, `project-doctor`, `check`,
-  `test`, `build`, artifact inspection, and release checks.
+  `test`, `build`, artifact inspection, release checks, and the
+  `dev-tensor` progress model.
 * `nuisc` compiler core with parser/frontend, NIR/YIR generation, verifier
   checks, LLVM lowering, AOT artifact emission, and project metadata.
 * `nustar` registration for the main domain set: `cpu`, `data`, `shader`,
@@ -96,6 +98,8 @@ Use `nuis workflow` first when you are not sure which command should own the
 next step:
 
 ```bash
+cargo run -p nuis -- dev-tensor
+cargo run -p nuis -- dev-tensor --json
 cargo run -p nuis -- workflow examples/projects/window_controls_demo
 cargo run -p nuis -- project-doctor examples/projects/window_controls_demo
 cargo run -p nuis -- check examples/projects/window_controls_demo
@@ -133,14 +137,18 @@ cargo run -p nuis -- run-artifact \
 
 `nsld drive` without `--apply` is a non-mutating dry run. `--apply` writes at
 most one whitelisted linker artifact step, while `--apply --until-clean` keeps
-applying whitelisted steps until the chain is clean, blocked, repeated, or
-capped. Add `--json` to any drive mode when a script needs the structured
+applying whitelisted steps until the chain is clean or reaches a structured
+driver stop. Blocked host-assisted finalization is reported through the emitted
+pipeline/output metadata instead of by repeating the same drive action. Add
+`--json` to any drive mode when a script needs the structured
 `mutates_artifacts` and next-action/status fields.
 
 `nuis release-check` also reports the `nsld-drive-command-set-v1` summary after
 build and artifact self-checks pass. It does not mutate linker artifacts on its
 own; use the reported dry-run JSON command before handing off to an applying
-`nsld drive` mode.
+`nsld drive` mode. The same block also surfaces the current final executable
+output boundary, including whether the path is present, whether Nsld ownership
+is known, and the first ownership/output blocker.
 
 Explicit CPU target examples:
 
@@ -275,9 +283,12 @@ See [docs/repo-file-line-policy.md](docs/repo-file-line-policy.md).
 Nuis is intentionally not designed as a classic C-shaped systems language with a
 thin new syntax layer. The long-range direction is a Nuis-owned heterogeneous
 computing stack: AOT-first today, linker/debugger/bundler convergence next,
-eventually self-hosting before beta, and later Nuis OS / XR heterogeneous
-workstation ideas without binding the architecture too tightly to libc or a
-single von-Neumann host model.
+self-hosting pressure through the beta line, and later Vulpoya, Yalivia,
+Nuis OS, and XR heterogeneous workstation ideas without binding the architecture
+too tightly to libc or a single von-Neumann host model. A rough current horizon
+puts meaningful self-hosting pressure around `beta-0.10.0`, with a later
+`gamma` line reserved for whole-toolchain coordination and native-framework
+maturity before any final `1.0.0` claim.
 
 Long-range design notes:
 

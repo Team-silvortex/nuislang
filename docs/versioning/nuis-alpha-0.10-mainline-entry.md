@@ -88,6 +88,30 @@ Prefer work in this order:
 8. keep shader/kernel/network/CFFI outputs registered through Nustar contracts
    instead of coupling Nsld to domain-specific logic
 
+## Current Weakest Links Toward Bootstrap
+
+The weakest link is no longer "does the language have enough surface syntax?"
+It is the back half of the native compilation loop.
+
+Read the current pressure order as:
+
+1. finish the Nsld final-executable boundary so the current driver can move
+   from verified writer/final-stage inputs to an explicit final output, even if
+   the first output is still host-assisted
+2. keep lowering honest under larger examples, especially when std, CFFI,
+   shader, kernel, network, and project imports meet in one build route
+3. make std capable enough for real CLI/tooling programs without creating
+   hidden host-only side channels
+4. keep package/import/module behavior stable enough that future self-hosted
+   compiler pieces can depend on it without special bootstrap rules
+5. grow diagnostics, debug metadata, and blocked-artifact reports so the
+   toolchain can explain why a build cannot yet become runnable
+
+This is the alpha-0.10 bridge into the longer self-hosting roadmap: executable
+closure first, richer self-use later. The route can stay incremental, but it
+should not blur whether a step is a verified Nsld-owned artifact, a host-assisted
+compatibility layer, or a future self-owned linker/runtime responsibility.
+
 ## What Already Exists From The Predecessor Lines
 
 The current repository already has enough structure to make this closure work

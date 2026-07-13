@@ -166,6 +166,24 @@ Working target language:
 This direction should influence design decisions now, but it should not be
 misrepresented as current product maturity.
 
+The current long-range version posture is:
+
+* `alpha`
+  complete and harden the executable-artifact route, std/tooling base, Nustar
+  registration discipline, and native binary/linker contracts
+* early `beta`
+  stabilize enough of that base that compiler/tooling self-use can stop being
+  a sketch and become a repeated engineering pressure
+* around `beta-0.10.0`
+  treat self-hosting as a serious central gate rather than a distant direction
+* late `beta` into `gamma`
+  begin substantial Vulpoya and Yalivia work, mature Nsld/Nsdb/Nsbdr-style
+  toolchain coordination, and grow native framework surfaces
+* `gamma`
+  absorb whole-stack coordination, analyzer/runtime cooperation, and
+  native-framework maturity so `1.0.0` is delayed until the ecosystem shape is
+  honest, not merely until the compiler can emit binaries
+
 Current alpha work should keep prioritizing:
 
 * source-to-YIR-to-AOT repeatability

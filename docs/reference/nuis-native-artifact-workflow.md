@@ -48,9 +48,11 @@ cargo run -p nsld -- drive \
 ```
 
 `check-next-action` is read-only. `drive --apply --until-clean` walks the
-registered artifact chain with the internal Nsld whitelist until it is clean or
-reaches a structured stop such as `not-applied`, `repeated-next-action`, or
-`max-steps`.
+registered artifact chain with the internal Nsld whitelist until no next action
+remains or it reaches a structured stop such as `not-applied`,
+`repeated-next-action`, or `max-steps`. Host-assisted final executable blockers
+should be read from the final pipeline/output reports rather than from a
+repeated driver action.
 
 If you want the CLI to classify the route before you build, use:
 
@@ -76,6 +78,10 @@ artifact-follow-up state:
 * `link_plan_final_link_mode`
 * `link_plan_final_output`
 * `link_plan_domain_units`
+* `nsld_final_executable_output_ready`
+* `nsld_final_executable_output_path_present`
+* `nsld_final_executable_output_nsld_owned`
+* `nsld_final_executable_output_blockers`
 
 Short reading rule:
 
@@ -84,6 +90,11 @@ Short reading rule:
 * `project-doctor` tells you the same route with more preflight/health detail
 * `artifact-doctor` tells you whether the emitted native bundle is actually
   closed enough to run
+* final-output ownership fields tell you whether the visible host-native output
+  is missing, merely host-produced, or explicitly Nsld-owned
+* `ready_to_run` and `nsld_final_executable_output_ready` are deliberately
+  separate: the first describes the current launchable AOT host binary path,
+  while the second describes the stricter Nsld-owned final-output boundary
 
 ## Current Link Truth
 
@@ -119,8 +130,8 @@ Today this route proves all of these together:
 * `nsld check-next-action` can expose the next linker artifact action without
   mutating the build directory
 * `nsld drive --apply --until-clean` can materialize the current whitelisted
-  Nsld artifact chain or return a structured stop report when the chain reaches
-  a blocked host-assisted finalization point
+  Nsld artifact chain; host-assisted finalization blockers are carried by the
+  emitted final pipeline/output metadata instead of by repeating the drive step
 * the compiled artifact and manifest both survive verifier checks
 * the produced native binary actually launches successfully through the `nuis`
   frontdoor

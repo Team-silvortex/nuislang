@@ -15,6 +15,9 @@ use support::{
 pub enum CommandKind {
     Help,
     Status,
+    DevTensor {
+        json: bool,
+    },
     Registry {
         json: bool,
     },
@@ -162,6 +165,17 @@ where
     match command.as_str() {
         "help" | "--help" | "-h" => Ok(CommandKind::Help),
         "status" => Ok(CommandKind::Status),
+        "dev-tensor" => {
+            let mut json = false;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else {
+                    return Err("usage: nuis dev-tensor [--json]".to_owned());
+                }
+            }
+            Ok(CommandKind::DevTensor { json })
+        }
         "registry" => {
             let mut json = false;
             for arg in args.by_ref() {
@@ -392,7 +406,7 @@ where
         }),
         "galaxy" => parse_galaxy_args(args),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
         )),
     }
 }

@@ -297,8 +297,13 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
         let output_dir = std::path::Path::new(&plan.output_dir);
         let nsld_chain = nsld_prepared_artifact_chain_summary(output_dir);
         let nsld_tail = nsld_final_executable_tail_summary(output_dir);
-        let nsld_next =
-            crate::workflow::nsld_next_action_summary(Some(&nsld_chain), Some(&nsld_tail));
+        let nsld_final_output =
+            crate::workflow::nsld_final_executable_output_boundary_summary(plan);
+        let nsld_next = crate::workflow::nsld_next_action_summary(
+            Some(&nsld_chain),
+            Some(&nsld_tail),
+            Some(&nsld_final_output),
+        );
         let nsld_chain_next = crate::workflow::nsld_artifact_chain_next_action_mirror(
             Some(&nsld_chain),
             Some(&nsld_tail),
@@ -306,6 +311,7 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
         let nsld_drive_recommendation = crate::workflow::nsld_drive_recommendation_for_output_dir(
             Some(output_dir),
             &nsld_chain_next,
+            Some(&nsld_final_output),
         );
         println!("  nsld_prepare_command: {}", nsld_chain.prepare_command);
         println!(
@@ -496,6 +502,35 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
                 .as_deref()
                 .unwrap_or("<none>")
         );
+        println!(
+            "  nsld_final_executable_output_ready: {}",
+            nsld_final_output.ready
+        );
+        println!(
+            "  nsld_final_executable_output_path_present: {}",
+            nsld_final_output.path_present
+        );
+        println!(
+            "  nsld_final_executable_output_nsld_owned: {}",
+            nsld_final_output
+                .nsld_owned
+                .map(|owned| owned.to_string())
+                .unwrap_or_else(|| "<unknown>".to_owned())
+        );
+        println!(
+            "  nsld_final_executable_output_blocker_count: {}",
+            nsld_final_output.blockers.len()
+        );
+        println!(
+            "  nsld_final_executable_output_first_blocker: {}",
+            nsld_final_output
+                .first_blocker
+                .as_deref()
+                .unwrap_or("<none>")
+        );
+        for blocker in &nsld_final_output.blockers {
+            println!("  nsld_final_executable_output_blocker: {blocker}");
+        }
     } else {
         println!("  nsld_prepare_command: <unavailable>");
         println!("  nsld_drive_dry_run_command: <unavailable>");
@@ -538,5 +573,10 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
         println!("  nsld_final_executable_pipeline_scheduler_metadata_hash: <unknown>");
         println!("  nsld_final_executable_pipeline_required_stage_paths: <unknown>/<unknown>");
         println!("  nsld_final_executable_pipeline_first_missing_required_stage_path: <none>");
+        println!("  nsld_final_executable_output_ready: <unavailable>");
+        println!("  nsld_final_executable_output_path_present: <unavailable>");
+        println!("  nsld_final_executable_output_nsld_owned: <unavailable>");
+        println!("  nsld_final_executable_output_blocker_count: <unavailable>");
+        println!("  nsld_final_executable_output_first_blocker: <none>");
     }
 }

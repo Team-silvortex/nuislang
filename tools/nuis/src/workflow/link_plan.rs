@@ -102,6 +102,14 @@ pub(crate) struct NsldFinalExecutableTailSummary {
     pub(crate) first_missing_required_stage_path: Option<String>,
 }
 
+pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
+    pub(crate) ready: bool,
+    pub(crate) path_present: bool,
+    pub(crate) nsld_owned: Option<bool>,
+    pub(crate) blockers: Vec<String>,
+    pub(crate) first_blocker: Option<String>,
+}
+
 pub(crate) struct NsldNextActionSummary {
     pub(crate) source: String,
     pub(crate) action: String,
@@ -143,6 +151,7 @@ pub(crate) struct NsldDriveCommandSet {
 pub(crate) fn nsld_next_action_summary(
     prepared: Option<&NsldPreparedArtifactChainSummary>,
     final_tail: Option<&NsldFinalExecutableTailSummary>,
+    final_output: Option<&NsldFinalExecutableOutputBoundarySummary>,
 ) -> NsldNextActionSummary {
     let Some(prepared) = prepared else {
         return NsldNextActionSummary {
@@ -190,11 +199,42 @@ pub(crate) fn nsld_next_action_summary(
                 .unwrap_or_else(|| "final executable pipeline is not ready".to_owned()),
         };
     }
+    let Some(final_output) = final_output else {
+        return NsldNextActionSummary {
+            source: "nuis-summary".to_owned(),
+            action: "inspect-final-executable-output".to_owned(),
+            command: Some(format!(
+                "nsld final-executable-output {}",
+                prepared.manifest_path
+            )),
+            reason:
+                "final executable tail is ready, but final output boundary summary is unavailable"
+                    .to_owned(),
+        };
+    };
+    if !final_output.ready {
+        return NsldNextActionSummary {
+            source: "nuis-summary".to_owned(),
+            action: "inspect-final-executable-output".to_owned(),
+            command: Some(format!(
+                "nsld final-executable-output {}",
+                prepared.manifest_path
+            )),
+            reason: final_output
+                .first_blocker
+                .as_ref()
+                .map(|blocker| {
+                    format!("final executable output boundary is blocked by `{blocker}`")
+                })
+                .unwrap_or_else(|| "final executable output boundary is not ready".to_owned()),
+        };
+    }
     NsldNextActionSummary {
         source: "nuis-summary".to_owned(),
         action: "ready".to_owned(),
         command: None,
-        reason: "nsld prepared chain and final executable tail are ready".to_owned(),
+        reason: "nsld prepared chain, final executable tail, and final output boundary are ready"
+            .to_owned(),
     }
 }
 
@@ -241,6 +281,7 @@ pub(crate) fn nsld_artifact_chain_next_action_mirror(
 pub(crate) fn nsld_drive_recommendation_for_output_dir(
     output_dir: Option<&Path>,
     next_action: &NsldArtifactChainNextActionMirror,
+    final_output: Option<&NsldFinalExecutableOutputBoundarySummary>,
 ) -> NsldDriveRecommendation {
     let Some(output_dir) = output_dir else {
         return NsldDriveRecommendation {
@@ -265,6 +306,27 @@ pub(crate) fn nsld_drive_recommendation_for_output_dir(
                 })
                 .unwrap_or_else(|| "apply the current nsld artifact-chain next action".to_owned()),
         };
+    }
+    if let Some(final_output) = final_output {
+        if !final_output.ready {
+            return NsldDriveRecommendation {
+                available: true,
+                mode: "dry-run".to_owned(),
+                command: Some(nsld_drive_dry_run_command_for_output_dir(output_dir)),
+                mutates_artifacts: false,
+                reason: final_output
+                    .first_blocker
+                    .as_ref()
+                    .map(|blocker| {
+                        format!(
+                            "artifact-chain has no mutating next action; inspect the final executable output boundary blocked by `{blocker}`"
+                        )
+                    })
+                    .unwrap_or_else(|| {
+                        "artifact-chain has no mutating next action; inspect the final executable output boundary".to_owned()
+                    }),
+            };
+        }
     }
     NsldDriveRecommendation {
         available: true,
@@ -636,6 +698,36 @@ pub(crate) fn nsld_final_executable_tail_summary(
     }
 }
 
+pub(crate) fn nsld_final_executable_output_boundary_summary(
+    plan: &nuisc::linker::LinkPlan,
+) -> NsldFinalExecutableOutputBoundarySummary {
+    let output_path = Path::new(&plan.final_stage.output_path);
+    let path_present = output_path.exists();
+    let blocked_path = Path::new(&plan.output_dir).join("nuis.nsld.final-executable.blocked.toml");
+    let emitted = fs::read_to_string(blocked_path)
+        .ok()
+        .and_then(|source| parse_bool_field(&source, "emitted"));
+    let nsld_owned = emitted.map(|emitted| emitted && path_present);
+    let mut blockers = Vec::new();
+    if !path_present {
+        blockers.push("final-executable-output:missing".to_owned());
+    } else if nsld_owned.is_none() {
+        blockers.push("final-executable-output:ownership-unknown".to_owned());
+    } else if nsld_owned == Some(false) {
+        blockers.push("final-executable-output:not-nsld-owned".to_owned());
+    }
+    let first_blocker = blockers.first().cloned();
+    let ready = nsld_owned == Some(true) && blockers.is_empty();
+
+    NsldFinalExecutableOutputBoundarySummary {
+        ready,
+        path_present,
+        nsld_owned,
+        blockers,
+        first_blocker,
+    }
+}
+
 pub(crate) fn load_link_plan_for_output_dir(output_dir: &Path) -> Option<nuisc::linker::LinkPlan> {
     let manifest = output_dir.join("nuis.build.manifest.toml");
     if !manifest.exists() {
@@ -697,12 +789,18 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
     let final_tail_stage_records = link_plan
         .map(|plan| nsld_final_executable_tail_stage_records_json(Path::new(&plan.output_dir)))
         .unwrap_or_default();
-    let nsld_next = nsld_next_action_summary(nsld_chain.as_ref(), nsld_tail.as_ref());
+    let nsld_final_output = link_plan.map(nsld_final_executable_output_boundary_summary);
+    let nsld_next = nsld_next_action_summary(
+        nsld_chain.as_ref(),
+        nsld_tail.as_ref(),
+        nsld_final_output.as_ref(),
+    );
     let nsld_chain_next =
         nsld_artifact_chain_next_action_mirror(nsld_chain.as_ref(), nsld_tail.as_ref());
     let nsld_drive_recommendation = nsld_drive_recommendation_for_output_dir(
         link_plan.map(|plan| Path::new(&plan.output_dir)),
         &nsld_chain_next,
+        nsld_final_output.as_ref(),
     );
     let nsld_drive_command_set =
         link_plan.map(|plan| nsld_drive_command_set_for_output_dir(Path::new(&plan.output_dir)));
@@ -985,6 +1083,44 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
             nsld_tail
                 .as_ref()
                 .and_then(|summary| summary.first_missing_required_stage_path.as_deref()),
+        ),
+        json_bool_field(
+            "nsld_final_executable_output_ready",
+            nsld_final_output
+                .as_ref()
+                .is_some_and(|summary| summary.ready),
+        ),
+        json_bool_field(
+            "nsld_final_executable_output_path_present",
+            nsld_final_output
+                .as_ref()
+                .is_some_and(|summary| summary.path_present),
+        ),
+        json_optional_bool_field(
+            "nsld_final_executable_output_nsld_owned",
+            nsld_final_output
+                .as_ref()
+                .and_then(|summary| summary.nsld_owned),
+        ),
+        json_usize_field(
+            "nsld_final_executable_output_blocker_count",
+            nsld_final_output
+                .as_ref()
+                .map(|summary| summary.blockers.len())
+                .unwrap_or(0),
+        ),
+        json_string_array_field(
+            "nsld_final_executable_output_blockers",
+            nsld_final_output
+                .as_ref()
+                .map(|summary| summary.blockers.as_slice())
+                .unwrap_or(&[]),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_first_blocker",
+            nsld_final_output
+                .as_ref()
+                .and_then(|summary| summary.first_blocker.as_deref()),
         ),
     ]
 }

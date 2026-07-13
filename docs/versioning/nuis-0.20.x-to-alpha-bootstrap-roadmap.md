@@ -2,7 +2,7 @@
 
 This file records the intended transition from the late `0.19.*` cleanup line
 into the `0.20.*` base-completion line, then into `alpha-0.0.1`, and finally
-toward the pre-`beta` self-hosting gate.
+toward the beta-line self-hosting gate.
 
 The point is not “add more version numbers”.
 
@@ -19,10 +19,17 @@ Use the phases this way:
   base capability completion, cleanup, and contract tightening
 * `alpha-0.0.1`
   first explicit “nuis is now trying to stand as a real product line” marker
-* pre-`beta`
-  self-hosting pressure line; the main question becomes how much of the
-  compiler/tooling story can already be expressed and defended by `nuis`
-  itself
+* `alpha`
+  executable closure, std/tooling maturity, package/import discipline, and
+  compiler pipeline hardening before self-hosting becomes the central delivery
+  claim
+* `beta`
+  self-hosting pressure line; the rough current horizon puts the first
+  meaningful self-hosting target around `beta-0.10.0`, not at the start of
+  beta
+* `gamma`
+  whole-toolchain coordination, Vulpoya/Yalivia integration, native framework
+  maturity, and delayed finalization work before any serious `1.0.0` claim
 
 ## What `0.20.*` Is For
 
@@ -85,9 +92,13 @@ So `alpha-0.0.1` means:
 
 `nuis is no longer only accumulating capabilities; it is beginning to organize those capabilities into a toolchain that must eventually help build itself`
 
-## Pre-`beta` Self-Hosting Goal
+## Beta-Line Self-Hosting Goal
 
-Before `beta`, the central pressure should be self-hosting.
+During `beta`, the central pressure should become self-hosting.
+
+The current planning estimate is not "self-host before beta". It is closer to:
+
+`alpha builds the executable/toolchain base -> early beta hardens it -> around beta-0.10.0 self-hosting becomes the serious gate`
 
 That does not require a fake all-at-once jump where every compiler subsystem is
 already written in `nuis`.
@@ -108,9 +119,9 @@ The honest question is:
 
 `is nuis visibly becoming more able to define, validate, and sustain its own mainline?`
 
-## Pre-`beta` Bootstrap Gate
+## Beta-Line Bootstrap Gate
 
-The pre-`beta` bootstrap gate should be read in layers.
+The beta-line bootstrap gate should be read in layers.
 
 ### 1. Workflow Self-Description
 
@@ -161,9 +172,31 @@ Signals:
 * the repository increasingly reads like one intentional toolchain, not a long
   archive of experiments
 
+## Current Bootstrap Weakest-Link Rule
+
+For the current alpha line, the self-hosting bottleneck should be read as a
+toolchain-closure problem before it is read as a language-feature problem.
+
+The highest-pressure gap is the native executable back half:
+
+* Nsld final-executable closure must become a checked output, not only a family
+  of plans and dry-run readiness reports
+* lowering must survive larger real programs where std, package imports, CFFI,
+  and heterogeneous Nustar outputs meet
+* std must be useful enough for ordinary CLI/tooling work without depending on
+  hidden host-only shortcuts
+* import/package resolution must be stable enough to support future compiler
+  pieces written in `nuis`
+* diagnostics, debug metadata, and blocked-artifact reports must make failures
+  machine-readable enough for future self-hosting tools to consume
+
+This does not mean self-hosting is near. It means the next self-hosting
+prerequisite is clear: `nuis` needs a repeatable native artifact route that can
+either run or prove exactly why it is blocked.
+
 ## What Still Does Not Need To Be True Yet
 
-Before `beta`, these do not all need to be completely finished:
+Before the self-hosting gate, these do not all need to be completely finished:
 
 * every trait/generic case
 * every async/runtime ambition
@@ -179,14 +212,14 @@ architectural drift.
 
 ## Practical Reading Rule
 
-When evaluating work from now through `alpha` and toward `beta`, ask:
+When evaluating work from now through `alpha` and into `beta`, ask:
 
 1. Does this strengthen the current mainline?
 2. Does this reduce ambiguity or drift?
 3. Does this help `nuis` describe/build/check more of itself?
 4. If not, is it still important enough to justify delaying the bootstrap line?
 
-If the answer is mostly “no”, the work is probably not core to the pre-`beta`
+If the answer is mostly “no”, the work is probably not core to the bootstrap
 roadmap.
 
 ## Companion Docs

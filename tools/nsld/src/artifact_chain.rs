@@ -461,7 +461,27 @@ pub(crate) fn nsld_artifact_chain_report(
         &stages,
         first_missing_required_stage.clone(),
         &advisories,
+        suppressed_optional_stage(&stages, &final_output),
     );
+    let final_output_boundary_ready =
+        final_output.runnable_candidate && final_output.blockers.is_empty();
+    let final_output_boundary_command_id =
+        (!final_output_boundary_ready).then(|| "final-executable-output".to_owned());
+    let final_output_boundary_command = final_output_boundary_command_id
+        .as_ref()
+        .map(|command_id| format!("nsld {command_id} <input>"));
+    let final_output_boundary_command_resolved = final_output_boundary_command
+        .as_ref()
+        .map(|command| command.replace("<input>", &manifest.display().to_string()));
+    let final_output_boundary_reason = (!final_output_boundary_ready).then(|| {
+        final_output
+            .blockers
+            .iter()
+            .find(|blocker| blocker.starts_with("final-executable-output:"))
+            .or_else(|| final_output.blockers.first())
+            .map(|blocker| format!("final executable output boundary is blocked by `{blocker}`"))
+            .unwrap_or_else(|| "final executable output boundary is not ready".to_owned())
+    });
 
     NsldArtifactChainReport {
         manifest: manifest.display().to_string(),
@@ -493,8 +513,27 @@ pub(crate) fn nsld_artifact_chain_report(
         next_action_command_reason: action_plan.next_action_command_reason,
         next_action_source: action_plan.next_action_source,
         next_action_available: action_plan.next_action_available,
+        final_output_boundary_ready,
+        final_output_boundary_command_id,
+        final_output_boundary_command,
+        final_output_boundary_command_resolved,
+        final_output_boundary_reason,
+        final_output_boundary_blockers: final_output.blockers.clone(),
         stages: diagnostics,
         advisories,
         issues,
     }
+}
+
+fn suppressed_optional_stage(
+    stages: &[NsldArtifactStage],
+    final_output: &super::reports::NsldFinalExecutableOutputReport,
+) -> Option<NsldArtifactStageKind> {
+    let final_pipeline_present =
+        nsld_artifact_stage_present(stages, NsldArtifactStageKind::FinalExecutablePipeline);
+    let host_native_boundary = final_output.output_kind == "host-native-executable"
+        && !final_output.nsld_owned_output
+        && final_pipeline_present;
+
+    host_native_boundary.then_some(NsldArtifactStageKind::FinalExecutableOutput)
 }

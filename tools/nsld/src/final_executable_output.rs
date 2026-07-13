@@ -100,8 +100,15 @@ pub(crate) fn nsld_final_executable_output_report(
         blockers.push("final-executable-emit:not-emitted".to_owned());
     }
     if !present {
-        blockers.push("final-executable-output:missing".to_owned());
-        if emitted {
+        if !path_present {
+            blockers.push("final-executable-output:missing".to_owned());
+        } else if !nsld_owned_output {
+            blockers.push("final-executable-output:not-nsld-owned".to_owned());
+            issues.push(format!(
+                "final executable output path exists but was not emitted by Nsld `{output_path}`"
+            ));
+        } else {
+            blockers.push("final-executable-output:unreadable".to_owned());
             issues.push(format!(
                 "missing_or_unreadable_final_executable_output `{output_path}`"
             ));

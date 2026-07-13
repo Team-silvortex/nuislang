@@ -406,6 +406,45 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         "  artifact_chain_next_action_available: {}",
         report.artifact_chain_next_action_available
     );
+    println!(
+        "  artifact_chain_final_output_boundary_ready: {}",
+        report.artifact_chain_final_output_boundary_ready
+    );
+    println!(
+        "  artifact_chain_final_output_boundary_command_id: {}",
+        optional_string_text(
+            report
+                .artifact_chain_final_output_boundary_command_id
+                .as_deref()
+        )
+    );
+    println!(
+        "  artifact_chain_final_output_boundary_command: {}",
+        optional_string_text(
+            report
+                .artifact_chain_final_output_boundary_command
+                .as_deref()
+        )
+    );
+    println!(
+        "  artifact_chain_final_output_boundary_command_resolved: {}",
+        optional_string_text(
+            report
+                .artifact_chain_final_output_boundary_command_resolved
+                .as_deref()
+        )
+    );
+    println!(
+        "  artifact_chain_final_output_boundary_reason: {}",
+        optional_string_text(
+            report
+                .artifact_chain_final_output_boundary_reason
+                .as_deref()
+        )
+    );
+    for blocker in &report.artifact_chain_final_output_boundary_blockers {
+        println!("  artifact_chain_final_output_boundary_blocker: {blocker}");
+    }
     println!("  final_stage_link_mode: {}", report.final_stage_link_mode);
     println!("  domains: {}", report.domains.len());
     for domain in &report.domains {
@@ -551,6 +590,9 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
     }
     for issue in &report.final_executable_blocked_issues {
         println!("  final_executable_blocked_issue: {issue}");
+    }
+    for blocker in &report.final_executable_output_blockers {
+        println!("  final_executable_output_blocker: {blocker}");
     }
     for issue in &report.final_executable_output_issues {
         println!("  final_executable_output_issue: {issue}");

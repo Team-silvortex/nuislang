@@ -199,6 +199,10 @@ pub(crate) fn check_report_final_fields(report: &NsldCheckReport) -> Vec<String>
             report.final_executable_output_blocker_count,
         ),
         json_string_array_field(
+            "final_executable_output_blockers",
+            &report.final_executable_output_blockers,
+        ),
+        json_string_array_field(
             "final_executable_output_issues",
             &report.final_executable_output_issues,
         ),

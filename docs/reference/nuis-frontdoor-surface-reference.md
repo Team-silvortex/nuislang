@@ -84,10 +84,57 @@ These fields now form the current visible link summary:
   the current final output path when available
 * `link_plan_domain_units`
   the number of domain build units carried by the current build plan
+* `nsld_final_executable_output_ready`
+  whether the visible final executable output is currently Nsld-owned and has
+  no lightweight final-output boundary blockers. This is intentionally
+  narrower than `ready_to_run`, which can still describe the current
+  host-toolchain AOT binary launch path.
+* `nsld_final_executable_output_path_present`
+  whether the current final-stage output path exists on disk
+* `nsld_final_executable_output_nsld_owned`
+  the lightweight `nuis` mirror of final output ownership when
+  `nuis.nsld.final-executable.blocked.toml` exposes an `emitted` value; `null`
+  means the frontdoor is not guessing ownership
+* `nsld_final_executable_output_blocker_count`
+  the number of lightweight final-output boundary blockers visible from the
+  `nuis` frontdoor
+* `nsld_final_executable_output_blockers`
+  lightweight final-output boundary blockers such as
+  `final-executable-output:missing`,
+  `final-executable-output:ownership-unknown`, or
+  `final-executable-output:not-nsld-owned`; `nsld check` remains the
+  authoritative deep verifier. `ownership-unknown` means the path may already
+  exist as a host/compiler output, but the `nuis` frontdoor has not seen Nsld
+  emitted metadata proving ownership.
+  Text output mirrors this array with repeated
+  `nsld_final_executable_output_blocker` lines.
+  `nuis release-check` prints the same boundary in its `release-check:
+  nsld-drive` block with the shorter `final_executable_output_*` field prefix.
+* `nsld_final_executable_output_first_blocker`
+  the first lightweight final-output boundary blocker, or `null` / `<none>`
+  when no blocker is currently visible
 
 Short rule:
 
 `these fields do not mean nuis already owns a finished self-hosted linker; they mean the current final-link route is now visible as a first-class modeled surface`
+
+Boundary rule:
+
+`missing` means there is no final-stage output path on disk; `ownership-unknown`
+means a path exists but no Nsld emitted marker has been observed by the
+frontdoor; `not-nsld-owned` means Nsld has explicitly reported that the visible
+host-native output exists outside Nsld ownership.
+
+Next-action rule:
+
+`nsld_next_action` only reports `ready` when the prepared chain, final
+executable tail, and final output boundary are all ready. If the tail is ready
+but the final output boundary is not, the frontdoor recommends
+`nsld final-executable-output <manifest>` instead of treating host-native launch
+readiness as Nsld-owned final-output readiness.
+In that state, `nsld_drive_recommended_mode` can still be `dry-run`: that means
+there is no remaining mutating artifact-chain action, not that the final output
+boundary is complete.
 
 ## Command Surface By Entry Point
 

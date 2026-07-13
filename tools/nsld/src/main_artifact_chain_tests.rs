@@ -379,6 +379,7 @@ fn artifact_chain_does_not_treat_host_binary_as_nsld_final_output() {
     fs::write(&plan.final_stage.output_path, b"host-binary").unwrap();
 
     let report = nsld_artifact_chain_report(Path::new("manifest.toml"), &plan);
+    let report_json = json::nsld_artifact_chain_report_json(&report);
     let output_path = plan.final_stage.output_path.clone();
     fs::remove_dir_all(dir).unwrap();
 
@@ -389,6 +390,37 @@ fn artifact_chain_does_not_treat_host_binary_as_nsld_final_output() {
             && !stage.present
             && !stage.required
     }));
+    assert!(!report.final_output_boundary_ready);
+    assert_eq!(
+        report.final_output_boundary_command_id.as_deref(),
+        Some("final-executable-output")
+    );
+    assert_eq!(
+        report.final_output_boundary_command.as_deref(),
+        Some("nsld final-executable-output <input>")
+    );
+    assert_eq!(
+        report.final_output_boundary_command_resolved.as_deref(),
+        Some("nsld final-executable-output manifest.toml")
+    );
+    assert!(report
+        .final_output_boundary_reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("final-executable-output:not-nsld-owned")));
+    assert!(report
+        .final_output_boundary_blockers
+        .iter()
+        .any(|blocker| blocker == "final-executable-output:not-nsld-owned"));
+    assert!(report_json.contains("\"final_output_boundary_ready\":false"));
+    assert!(
+        report_json.contains("\"final_output_boundary_command_id\":\"final-executable-output\"")
+    );
+    assert!(report_json
+        .contains("\"final_output_boundary_command\":\"nsld final-executable-output <input>\""));
+    assert!(report_json.contains(
+        "\"final_output_boundary_command_resolved\":\"nsld final-executable-output manifest.toml\""
+    ));
+    assert!(report_json.contains("\"final-executable-output:not-nsld-owned\""));
 }
 
 fn test_artifact_stage(file_name: &'static str, present: bool) -> NsldArtifactStage {

@@ -163,6 +163,20 @@ pub(super) fn write_link_plan_text_fields<W: fmt::Write>(
             out,
             "  nsld_final_executable_pipeline_first_missing_required_stage_path: <none>"
         )?;
+        writeln!(out, "  nsld_final_executable_output_ready: <unavailable>")?;
+        writeln!(
+            out,
+            "  nsld_final_executable_output_path_present: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_output_nsld_owned: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_final_executable_output_blocker_count: <unavailable>"
+        )?;
+        writeln!(out, "  nsld_final_executable_output_first_blocker: <none>")?;
     }
     Ok(())
 }
@@ -174,6 +188,8 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
     let final_tail_summary = link_plan.map(|plan| {
         crate::workflow::nsld_final_executable_tail_summary(Path::new(&plan.output_dir))
     });
+    let final_output_summary =
+        link_plan.map(crate::workflow::nsld_final_executable_output_boundary_summary);
     let prepared_stage_records = link_plan
         .map(|plan| {
             crate::workflow::nsld_prepared_artifact_stage_records_json(Path::new(&plan.output_dir))
@@ -189,6 +205,7 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
     let nsld_next = crate::workflow::nsld_next_action_summary(
         prepared_summary.as_ref(),
         final_tail_summary.as_ref(),
+        final_output_summary.as_ref(),
     );
     let nsld_chain_next = crate::workflow::nsld_artifact_chain_next_action_mirror(
         prepared_summary.as_ref(),
@@ -197,6 +214,7 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
     let nsld_drive_recommendation = crate::workflow::nsld_drive_recommendation_for_output_dir(
         link_plan.map(|plan| Path::new(&plan.output_dir)),
         &nsld_chain_next,
+        final_output_summary.as_ref(),
     );
     let nsld_drive_command_set = link_plan.map(|plan| {
         crate::workflow::nsld_drive_command_set_for_output_dir(Path::new(&plan.output_dir))
@@ -513,12 +531,18 @@ fn write_nsld_artifact_chain_text_fields<W: fmt::Write>(
     let output_dir = Path::new(&plan.output_dir);
     let prepared = crate::workflow::nsld_prepared_artifact_chain_summary(output_dir);
     let final_tail = crate::workflow::nsld_final_executable_tail_summary(output_dir);
-    let nsld_next = crate::workflow::nsld_next_action_summary(Some(&prepared), Some(&final_tail));
+    let final_output = crate::workflow::nsld_final_executable_output_boundary_summary(plan);
+    let nsld_next = crate::workflow::nsld_next_action_summary(
+        Some(&prepared),
+        Some(&final_tail),
+        Some(&final_output),
+    );
     let nsld_chain_next =
         crate::workflow::nsld_artifact_chain_next_action_mirror(Some(&prepared), Some(&final_tail));
     let nsld_drive_recommendation = crate::workflow::nsld_drive_recommendation_for_output_dir(
         Some(output_dir),
         &nsld_chain_next,
+        Some(&final_output),
     );
     writeln!(out, "  nsld_prepare_command: {}", prepared.prepare_command)?;
     writeln!(
@@ -752,6 +776,37 @@ fn write_nsld_artifact_chain_text_fields<W: fmt::Write>(
             .as_deref()
             .unwrap_or("<none>")
     )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_ready: {}",
+        crate::yes_no(final_output.ready)
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_path_present: {}",
+        crate::yes_no(final_output.path_present)
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_nsld_owned: {}",
+        final_output
+            .nsld_owned
+            .map(crate::yes_no)
+            .unwrap_or("<unavailable>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_blocker_count: {}",
+        final_output.blockers.len()
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_first_blocker: {}",
+        final_output.first_blocker.as_deref().unwrap_or("<none>")
+    )?;
+    for blocker in &final_output.blockers {
+        writeln!(out, "  nsld_final_executable_output_blocker: {blocker}")?;
+    }
     Ok(())
 }
 

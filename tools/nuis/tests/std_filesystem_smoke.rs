@@ -303,6 +303,29 @@ fn std_path_safety_release_check_reports_nsld_drive_command_set() {
         "release-check output did not mark apply-next as mutating\n{stdout}"
     );
     assert!(
+        stdout.contains("final_executable_output_ready: false"),
+        "release-check output should not report the host final executable as Nsld-owned ready before nsld drive\n{stdout}"
+    );
+    assert!(
+        stdout.contains("final_executable_output_path_present: true"),
+        "release-check output did not report the host final executable output path\n{stdout}"
+    );
+    assert!(
+        stdout.contains("final_executable_output_nsld_owned: <unknown>"),
+        "release-check output should not guess final executable ownership before nsld drive\n{stdout}"
+    );
+    assert!(
+        stdout.contains(
+            "final_executable_output_first_blocker: final-executable-output:ownership-unknown"
+        ),
+        "release-check output did not surface the final executable output blocker\n{stdout}"
+    );
+    assert!(
+        stdout
+            .contains("final_executable_output_blocker: final-executable-output:ownership-unknown"),
+        "release-check output did not surface the final executable output blocker list\n{stdout}"
+    );
+    assert!(
         stdout.contains("release-check: ok"),
         "release-check output did not finish cleanly\n{stdout}"
     );
@@ -382,17 +405,16 @@ fn std_path_safety_release_check_reports_nsld_drive_command_set() {
         "nsld drive until-clean did not apply the expected remaining stage count\n{nsld_until_clean_stdout}"
     );
     assert!(
-        nsld_until_clean_stdout.contains("\"stop_reason\":\"repeated-next-action\""),
-        "nsld drive until-clean did not stop at the expected repeated finalization boundary\n{nsld_until_clean_stdout}"
+        nsld_until_clean_stdout.contains("\"stop_reason\":\"clean\""),
+        "nsld drive until-clean did not stop cleanly after materializing the current chain\n{nsld_until_clean_stdout}"
     );
     assert!(
-        nsld_until_clean_stdout.contains("\"stop_command_id\":\"emit-final-executable-pipeline\""),
-        "nsld drive until-clean did not report the final pipeline stop command\n{nsld_until_clean_stdout}"
+        nsld_until_clean_stdout.contains("\"stop_command_id\":null"),
+        "nsld drive until-clean should not repeat the host-assisted final pipeline command\n{nsld_until_clean_stdout}"
     );
     assert!(
-        nsld_until_clean_stdout
-            .contains("\"stop_action_reason\":\"first missing optional artifact stage `final-executable-output`\""),
-        "nsld drive until-clean did not explain the final executable output boundary\n{nsld_until_clean_stdout}"
+        nsld_until_clean_stdout.contains("\"last_command_id\":\"emit-final-executable-pipeline\""),
+        "nsld drive until-clean did not finish at the final executable pipeline stage\n{nsld_until_clean_stdout}"
     );
     assert_output_files_have_schema(
         &output_dir,
@@ -419,6 +441,30 @@ fn std_path_safety_release_check_reports_nsld_drive_command_set() {
             ),
         ],
         "nsld until-clean",
+    );
+
+    let run_artifact_json = run_nuis(&["run-artifact", &manifest_path_text, "--json"]);
+    assert_success(
+        &run_artifact_json,
+        "nuis run-artifact json after nsld until-clean",
+    );
+    let run_artifact_stdout = String::from_utf8_lossy(&run_artifact_json.stdout);
+    assert!(
+        run_artifact_stdout.contains("\"nsld_final_executable_output_ready\":false"),
+        "run-artifact json should distinguish host runnable output from Nsld-owned final output readiness\n{run_artifact_stdout}"
+    );
+    assert!(
+        run_artifact_stdout.contains("\"nsld_final_executable_output_path_present\":true"),
+        "run-artifact json did not report the host final output path after nsld drive\n{run_artifact_stdout}"
+    );
+    assert!(
+        run_artifact_stdout.contains("\"nsld_final_executable_output_nsld_owned\":false"),
+        "run-artifact json did not resolve final output ownership after nsld drive\n{run_artifact_stdout}"
+    );
+    assert!(
+        run_artifact_stdout
+            .contains("\"nsld_final_executable_output_blockers\":[\"final-executable-output:not-nsld-owned\"]"),
+        "run-artifact json did not report the not-nsld-owned final output blocker after nsld drive\n{run_artifact_stdout}"
     );
 }
 

@@ -1107,6 +1107,18 @@ when the final-stage plan or final-executable emit report is invalid, when the
 blocked emit report still says `emitted = false`, or when the output file is
 missing. That separates "protocol snapshots are internally consistent" from "a
 controlled executable file actually exists".
+`nsld artifact-chain` also mirrors this as a read-only final-output boundary
+hint with `final_output_boundary_ready`,
+`final_output_boundary_command_id`,
+`final_output_boundary_command_resolved`, `final_output_boundary_reason`, and
+`final_output_boundary_blockers`. This hint intentionally does not replace the
+mutating `next_action_*` fields consumed by `nsld drive --apply`; it points
+operators and scripts to `nsld final-executable-output <manifest>` when the
+artifact chain has no more safe apply step but the final output boundary is
+still blocked.
+`nsld check` mirrors the same hint with the
+`artifact_chain_final_output_boundary_*` fields so check-oriented scripts can
+see the read-only output boundary without treating it as the drive next action.
 The final-stage plan file is also checked by `nsld check`, which exposes
 `final_stage_plan_present`, `final_stage_plan_valid`,
 `final_stage_plan_ready`, `final_stage_plan_hash`,
@@ -1166,11 +1178,15 @@ read-only output boundary exposed by `final-executable-output` and reports
 `final_executable_output_size_bytes`,
 `final_executable_output_hash`,
 `final_executable_output_runnable_candidate`,
-`final_executable_output_blocker_count`, and
+`final_executable_output_blocker_count`,
+`final_executable_output_blockers`, and
 `final_executable_output_issues`. The standalone `final-executable-output`
 report distinguishes `path_present` from `nsld_owned_output`: a host-native
 binary can exist at the final-stage path without being treated as a Nuis image
-emitted by Nsld. A missing Nsld-owned final output remains non-fatal so ordinary
+emitted by Nsld. Output blockers distinguish `final-executable-output:missing`
+from `final-executable-output:not-nsld-owned` and
+`final-executable-output:unreadable`, because those are different linker
+states. A missing Nsld-owned final output remains non-fatal so ordinary
 preparation workflows can stop before the explicit final emit step, but a
 present Nsld-owned output must be consistent with the emitted final-executable
 boundary.

@@ -372,6 +372,38 @@ pub(crate) fn check_report_tail_fields(report: &NsldCheckReport) -> Vec<String> 
             "artifact_chain_next_action_available",
             report.artifact_chain_next_action_available,
         ),
+        json_bool_field(
+            "artifact_chain_final_output_boundary_ready",
+            report.artifact_chain_final_output_boundary_ready,
+        ),
+        json_optional_string_field(
+            "artifact_chain_final_output_boundary_command_id",
+            report
+                .artifact_chain_final_output_boundary_command_id
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "artifact_chain_final_output_boundary_command",
+            report
+                .artifact_chain_final_output_boundary_command
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "artifact_chain_final_output_boundary_command_resolved",
+            report
+                .artifact_chain_final_output_boundary_command_resolved
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "artifact_chain_final_output_boundary_reason",
+            report
+                .artifact_chain_final_output_boundary_reason
+                .as_deref(),
+        ),
+        json_string_array_field(
+            "artifact_chain_final_output_boundary_blockers",
+            &report.artifact_chain_final_output_boundary_blockers,
+        ),
         json_string_array_field("artifact_chain_issues", &report.artifact_chain_issues),
         json_string_field("final_stage_link_mode", &report.final_stage_link_mode),
         format!("\"domains\":[{}]", domains_json(&report.domains)),

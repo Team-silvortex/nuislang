@@ -66,6 +66,7 @@ pub(crate) struct NsldCheckFinalSnapshot {
     pub(crate) final_executable_output_image_byte_map_hash: Option<String>,
     pub(crate) final_executable_output_runnable_candidate: Option<bool>,
     pub(crate) final_executable_output_blocker_count: Option<usize>,
+    pub(crate) final_executable_output_blockers: Vec<String>,
     pub(crate) final_executable_output_issues: Vec<String>,
     pub(crate) tail: NsldCheckFinalTailSnapshot,
 }
@@ -242,6 +243,7 @@ pub(crate) fn nsld_check_final_snapshot(
     let final_executable_output_runnable_candidate =
         Some(final_executable_output_report.runnable_candidate);
     let final_executable_output_blocker_count = Some(final_executable_output_report.blockers.len());
+    let final_executable_output_blockers = final_executable_output_report.blockers.clone();
     let mut final_executable_output_issues = final_executable_output_report.issues.clone();
     if final_executable_output_report.present && !final_executable_output_report.runnable_candidate
     {
@@ -306,6 +308,7 @@ pub(crate) fn nsld_check_final_snapshot(
         final_executable_output_image_byte_map_hash,
         final_executable_output_runnable_candidate,
         final_executable_output_blocker_count,
+        final_executable_output_blockers,
         final_executable_output_issues,
         tail,
     }

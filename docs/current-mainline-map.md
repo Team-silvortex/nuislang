@@ -10,30 +10,31 @@ local README for the area you are actively touching.
 If you only need the shortest current `alpha-0.10.*` reading route, use this order:
 
 1. [versioning/nuis-alpha-0.10-mainline-entry.md](versioning/nuis-alpha-0.10-mainline-entry.md)
-2. [versioning/nuis-alpha-0.8-mainline-entry.md](versioning/nuis-alpha-0.8-mainline-entry.md)
-3. [versioning/nuis-alpha-0.8-doc-sync-inventory.md](versioning/nuis-alpha-0.8-doc-sync-inventory.md)
-4. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
-5. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
-6. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
-7. [reference/toolchain-galaxy-core-boundary.md](reference/toolchain-galaxy-core-boundary.md)
-8. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
-9. [versioning/nuis-alpha-0.7-mainline-entry.md](versioning/nuis-alpha-0.7-mainline-entry.md)
-10. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
-11. [versioning/nuis-alpha-0.6-mainline-entry.md](versioning/nuis-alpha-0.6-mainline-entry.md)
-12. [versioning/nuis-alpha-0.4-system-inventory.md](versioning/nuis-alpha-0.4-system-inventory.md)
-13. [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
-14. [versioning/nuis-alpha-0.4-doc-sync-inventory.md](versioning/nuis-alpha-0.4-doc-sync-inventory.md)
-15. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
-16. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
-17. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
-18. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
-19. [reference/ffi-pointer-safety-boundary.md](reference/ffi-pointer-safety-boundary.md)
-20. [reference/nustar-capability-split-boundary.md](reference/nustar-capability-split-boundary.md)
-21. [versioning/nuis-long-range-heterogeneous-os-roadmap.md](versioning/nuis-long-range-heterogeneous-os-roadmap.md)
-22. [versioning/nuis-alpha-0.1-mainline-status.md](versioning/nuis-alpha-0.1-mainline-status.md)
-23. [versioning/nuis-0.20.0-abi-compile-vocabulary.md](versioning/nuis-0.20.0-abi-compile-vocabulary.md)
-24. [versioning/nuis-0.20.0-std-refactor-frontdoor.md](versioning/nuis-0.20.0-std-refactor-frontdoor.md)
-25. [versioning/nuis-0.20.0-compile-gap-checklist.md](versioning/nuis-0.20.0-compile-gap-checklist.md)
+2. [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
+3. [versioning/nuis-alpha-0.8-mainline-entry.md](versioning/nuis-alpha-0.8-mainline-entry.md)
+4. [versioning/nuis-alpha-0.8-doc-sync-inventory.md](versioning/nuis-alpha-0.8-doc-sync-inventory.md)
+5. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
+6. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
+7. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
+8. [reference/toolchain-galaxy-core-boundary.md](reference/toolchain-galaxy-core-boundary.md)
+9. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
+10. [versioning/nuis-alpha-0.7-mainline-entry.md](versioning/nuis-alpha-0.7-mainline-entry.md)
+11. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
+12. [versioning/nuis-alpha-0.6-mainline-entry.md](versioning/nuis-alpha-0.6-mainline-entry.md)
+13. [versioning/nuis-alpha-0.4-system-inventory.md](versioning/nuis-alpha-0.4-system-inventory.md)
+14. [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+15. [versioning/nuis-alpha-0.4-doc-sync-inventory.md](versioning/nuis-alpha-0.4-doc-sync-inventory.md)
+16. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
+17. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
+18. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
+19. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
+20. [reference/ffi-pointer-safety-boundary.md](reference/ffi-pointer-safety-boundary.md)
+21. [reference/nustar-capability-split-boundary.md](reference/nustar-capability-split-boundary.md)
+22. [versioning/nuis-long-range-heterogeneous-os-roadmap.md](versioning/nuis-long-range-heterogeneous-os-roadmap.md)
+23. [versioning/nuis-alpha-0.1-mainline-status.md](versioning/nuis-alpha-0.1-mainline-status.md)
+24. [versioning/nuis-0.20.0-abi-compile-vocabulary.md](versioning/nuis-0.20.0-abi-compile-vocabulary.md)
+25. [versioning/nuis-0.20.0-std-refactor-frontdoor.md](versioning/nuis-0.20.0-std-refactor-frontdoor.md)
+26. [versioning/nuis-0.20.0-compile-gap-checklist.md](versioning/nuis-0.20.0-compile-gap-checklist.md)
 
 Short rule:
 
@@ -43,6 +44,8 @@ Short rule:
 
 * repo status and current toolchain spine:
   [README.md](../README.md)
+* current development tensor progress model:
+  [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
 * current `alpha-0.10.*` entry:
   [versioning/nuis-alpha-0.10-mainline-entry.md](versioning/nuis-alpha-0.10-mainline-entry.md)
 * predecessor `alpha-0.8.*` binary convergence entry:
@@ -107,7 +110,10 @@ Short rule:
   [repo-layout.md](repo-layout.md)
 
 Current CLI frontdoor rule:
-`nuis status/help -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build -> artifact-doctor/run-artifact -> release-check`
+`nuis status/help/dev-tensor -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build -> artifact-doctor/run-artifact -> release-check`
+
+Current bootstrap pressure rule:
+`native executable back half first -> lowering coverage under real programs -> std/tooling self-use -> package/import stability -> diagnostics/debug metadata`
 
 Current example-tree rule:
 `frontdoor first -> grouped companions next -> explicit probe routes after that`
