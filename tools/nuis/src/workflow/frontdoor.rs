@@ -156,8 +156,8 @@ pub(crate) fn toolchain_frontdoor_surface() -> WorkflowFrontdoorSurface {
         WorkflowSourceProfile {
             source_kind: "toolchain",
             workflow_kind: "default_compile_frontdoor",
-            workflow_brief: "workflow -> project_doctor -> check -> test -> build -> artifact_doctor -> run_artifact -> release_check",
-            workflow_samples: "workflow=nuis workflow [input]; doctor=nuis project-doctor [project-dir|nuis.toml]; check=nuis check [input]; test=nuis test [input]; build=nuis build [input] <output-dir>; artifact=nuis artifact-doctor <output-dir>; run=nuis run-artifact <output-dir>; release=nuis release-check [input] [output-dir]",
+            workflow_brief: "workflow -> project_doctor -> check -> test -> build -> artifact_doctor -> nsld_drive -> run_artifact -> release_check",
+            workflow_samples: "workflow=nuis workflow [input]; doctor=nuis project-doctor [project-dir|nuis.toml]; check=nuis check [input]; test=nuis test [input]; build=nuis build [input] <output-dir>; artifact=nuis artifact-doctor <output-dir>; linker=nsld drive <output-dir>/nuis.build.manifest.toml --apply; run=nuis run-artifact <output-dir>; release=nuis release-check [input] [output-dir]",
         },
         WorkflowRecommendation {
             label: "workflow",

@@ -430,6 +430,42 @@ mod cpu StdFsContracts {
       + host_fs_value_or_zero(has_extension);
   }
 
+  /// Combines path safety probes into a compact path analysis score.
+  pub fn path_safety_status_total(
+    is_empty: i64,
+    is_dot: i64,
+    is_dotdot: i64,
+    is_relative: i64,
+    is_root: i64,
+    is_hidden: i64,
+    depth: i64
+  ) -> i64 {
+    return host_fs_value_or_zero(is_empty)
+      + host_fs_value_or_zero(is_dot)
+      + host_fs_value_or_zero(is_dotdot)
+      + host_fs_value_or_zero(is_relative)
+      + host_fs_value_or_zero(is_root)
+      + host_fs_value_or_zero(is_hidden)
+      + host_fs_value_or_zero(depth);
+  }
+
+  /// Scores whether path probes describe a usable non-traversal relative path.
+  pub fn path_relative_safety_validation_total(
+    is_empty: i64,
+    is_dot: i64,
+    is_dotdot: i64,
+    is_relative: i64,
+    is_root: i64,
+    depth: i64
+  ) -> i64 {
+    return encode_fs_gate(!metadata_exists(is_empty))
+      + encode_fs_gate(!metadata_exists(is_dot))
+      + encode_fs_gate(!metadata_exists(is_dotdot))
+      + encode_fs_gate(metadata_exists(is_relative))
+      + encode_fs_gate(!metadata_exists(is_root))
+      + encode_fs_gate(depth > 0);
+  }
+
   /// Combines path, metadata, directory, file, and report probes for filesystem reports.
   pub fn filesystem_report_status_total(
     joined_len: i64,

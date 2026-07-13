@@ -117,9 +117,30 @@ cargo run -p nuis -- verify-artifact \
   examples/bins/native_artifact_closure_demo_project/nuis.compiled.artifact
 cargo run -p nuis -- artifact-doctor \
   examples/bins/native_artifact_closure_demo_project
+cargo run -p nsld -- drive \
+  examples/bins/native_artifact_closure_demo_project/nuis.build.manifest.toml --json
+cargo run -p nsld -- drive \
+  examples/bins/native_artifact_closure_demo_project/nuis.build.manifest.toml --apply
+cargo run -p nsld -- drive \
+  examples/bins/native_artifact_closure_demo_project/nuis.build.manifest.toml --apply --json
+cargo run -p nsld -- drive \
+  examples/bins/native_artifact_closure_demo_project/nuis.build.manifest.toml --apply --until-clean
+cargo run -p nsld -- drive \
+  examples/bins/native_artifact_closure_demo_project/nuis.build.manifest.toml --apply --until-clean --json
 cargo run -p nuis -- run-artifact \
   examples/bins/native_artifact_closure_demo_project/nuis.build.manifest.toml
 ```
+
+`nsld drive` without `--apply` is a non-mutating dry run. `--apply` writes at
+most one whitelisted linker artifact step, while `--apply --until-clean` keeps
+applying whitelisted steps until the chain is clean, blocked, repeated, or
+capped. Add `--json` to any drive mode when a script needs the structured
+`mutates_artifacts` and next-action/status fields.
+
+`nuis release-check` also reports the `nsld-drive-command-set-v1` summary after
+build and artifact self-checks pass. It does not mutate linker artifacts on its
+own; use the reported dry-run JSON command before handing off to an applying
+`nsld drive` mode.
 
 Explicit CPU target examples:
 

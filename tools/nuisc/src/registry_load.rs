@@ -11,19 +11,24 @@ use yir_core::YirModule;
 pub(crate) const INDEX_FILE: &str = "index.toml";
 
 pub(crate) fn resolve_registry_root(root: &Path) -> PathBuf {
+    if root.is_absolute() {
+        return root.to_path_buf();
+    }
+    let workspace_candidate = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join(root);
+    if workspace_candidate.exists() {
+        return workspace_candidate;
+    }
     if root.exists() {
         return root.to_path_buf();
     }
-    let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..");
-    let candidate = workspace_root.join(root);
-    if candidate.exists() {
-        candidate
-    } else {
-        root.to_path_buf()
-    }
+    root.to_path_buf()
 }
 
 pub fn load_index(root: &Path) -> Result<Vec<NustarPackageIndexEntry>, String> {
+    let root = resolve_registry_root(root);
     let path = root.join(INDEX_FILE);
     if !path.exists() {
         return Ok(Vec::new());

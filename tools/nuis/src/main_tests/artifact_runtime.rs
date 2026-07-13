@@ -205,6 +205,175 @@ mod cpu Main {
     assert!(json.contains("\"host_bridge_plan_units\":0"));
     assert!(json.contains("\"link_plan_available\":true"));
     assert!(json.contains("\"link_plan_final_stage\":\"host-native-link\""));
+    assert!(json.contains("\"nsld_drive_dry_run_command\":\"nsld drive "));
+    assert!(json.contains("\"nsld_drive_dry_run_json_command\":\"nsld drive "));
+    assert!(json.contains(" --json\""));
+    assert!(json.contains("\"nsld_drive_apply_next_command\":\"nsld drive "));
+    assert!(json.contains("\"nsld_drive_apply_next_json_command\":\"nsld drive "));
+    assert!(json.contains(" --apply --json\""));
+    assert!(json.contains(" --apply\""));
+    assert!(json.contains("\"nsld_drive_apply_until_clean_command\":\"nsld drive "));
+    assert!(json.contains("\"nsld_drive_apply_until_clean_json_command\":\"nsld drive "));
+    assert!(json.contains(" --apply --until-clean --json\""));
+    assert!(json.contains(" --apply --until-clean\""));
+    assert!(json.contains("\"nsld_drive_command_set\":{"));
+    assert!(json.contains("\"protocol\":\"nsld-drive-command-set-v1\""));
+    assert!(json.contains("\"recommended_first_json_command\":\"nsld drive "));
+    assert!(json.contains("\"dry_run_mutates_artifacts\":false"));
+    assert!(json.contains("\"apply_next_mutates_artifacts\":true"));
+    assert!(json.contains("\"apply_until_clean_mutates_artifacts\":true"));
+    assert!(json.contains("\"apply_next_json_command\":\"nsld drive "));
+    assert!(json.contains("\"apply_until_clean_json_command\":\"nsld drive "));
+    assert!(json.contains("\"nsld_drive_recommended_available\":true"));
+    assert!(json.contains("\"nsld_drive_recommended_mode\":\"apply-next\""));
+    assert!(json.contains("\"nsld_drive_recommended_command\":\"nsld drive "));
+    assert!(json.contains("\"nsld_drive_recommended_mutates_artifacts\":true"));
+    assert!(json.contains("\"nsld_next_action_source\":\"nuis-summary\""));
+    assert!(json.contains("\"nsld_next_action\":\"prepare\""));
+    assert!(json.contains("\"nsld_next_action_command\":\"nsld prepare "));
+    assert!(json.contains(
+        "\"nsld_next_action_reason\":\"prepared artifact chain is missing `link-inputs`\""
+    ));
+    assert!(json.contains("\"nsld_artifact_chain_next_action_available\":true"));
+    assert!(json.contains("\"nsld_artifact_chain_next_action_source\":\"required\""));
+    assert!(json.contains("\"nsld_artifact_chain_next_action_command_id\":\"emit-inputs\""));
+    assert!(
+        json.contains("\"nsld_artifact_chain_next_action_command\":\"nsld emit-inputs <input>\"")
+    );
+    assert!(
+        json.contains("\"nsld_artifact_chain_next_action_command_resolved\":\"nsld emit-inputs ")
+    );
+    assert!(json.contains(
+        "\"nsld_artifact_chain_next_action_reason\":\"first missing required artifact stage `link-inputs`\""
+    ));
+    assert!(json.contains(
+        "\"nsld_final_executable_pipeline_command\":\"nsld emit-final-executable-pipeline "
+    ));
+    assert!(json.contains("\"nsld_final_executable_tail_ready\":false"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_final_executable_emitted\":null"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_launcher_manifest_ready\":null"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_scheduler_metadata_payload_id\":null"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_required_stage_path_count\":null"));
+}
+
+#[test]
+fn run_artifact_json_recommends_final_pipeline_after_prepared_chain_exists() {
+    let project_root = write_temp_project_fixture(
+        "run_artifact_json_prepared_nsld_smoke",
+        r#"
+name = "run_artifact_json_prepared_nsld_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+        .trim_start(),
+        r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 0;
+  }
+}
+"#,
+    );
+    let output_dir = temp_dir("run_artifact_json_prepared_nsld_outputs");
+
+    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    write_prepared_nsld_chain_placeholders(&output_dir);
+
+    let json = render_run_artifact_json(&output_dir.join("nuis.build.manifest.toml"));
+
+    assert!(json.contains("\"nsld_prepared_artifact_chain_ready\":true"));
+    assert!(json.contains("\"nsld_prepared_artifact_next_missing_stage\":null"));
+    assert!(json.contains(
+        "\"nsld_prepared_artifact_stage_records\":[{\"stage\":\"link-inputs\",\"file\":\"nuis.nsld.link-inputs.toml\",\"present\":true"
+    ));
+    assert!(json.contains("\"nsld_next_action_source\":\"nuis-summary\""));
+    assert!(json.contains("\"nsld_next_action\":\"emit-final-executable-pipeline\""));
+    assert!(json.contains("\"nsld_next_action_command\":\"nsld emit-final-executable-pipeline "));
+    assert!(json.contains(
+        "\"nsld_next_action_reason\":\"final executable tail is missing `final-executable-writer-input`\""
+    ));
+    assert!(json.contains("\"nsld_artifact_chain_next_action_available\":true"));
+    assert!(json.contains("\"nsld_artifact_chain_next_action_source\":\"optional\""));
+    assert!(json.contains(
+        "\"nsld_artifact_chain_next_action_command_id\":\"emit-final-executable-pipeline\""
+    ));
+    assert!(json.contains(
+        "\"nsld_artifact_chain_next_action_command\":\"nsld emit-final-executable-pipeline <input>\""
+    ));
+    assert!(json.contains(
+        "\"nsld_artifact_chain_next_action_command_resolved\":\"nsld emit-final-executable-pipeline "
+    ));
+    assert!(json.contains(
+        "\"nsld_artifact_chain_next_action_reason\":\"first missing optional artifact stage `final-executable-writer-input`\""
+    ));
+    assert!(json.contains(
+        "\"nsld_final_executable_tail_next_missing_stage\":\"final-executable-writer-input\""
+    ));
+    assert!(json.contains(
+        "\"nsld_final_executable_tail_stage_records\":[{\"stage\":\"final-executable-writer-input\",\"file\":\"nuis.nsld.final-executable-writer-input.toml\",\"present\":false"
+    ));
+}
+
+#[test]
+fn run_artifact_json_reports_ready_after_final_pipeline_exists() {
+    let project_root = write_temp_project_fixture(
+        "run_artifact_json_ready_nsld_smoke",
+        r#"
+name = "run_artifact_json_ready_nsld_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+        .trim_start(),
+        r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 0;
+  }
+}
+"#,
+    );
+    let output_dir = temp_dir("run_artifact_json_ready_nsld_outputs");
+
+    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    write_prepared_nsld_chain_placeholders(&output_dir);
+    write_ready_nsld_final_tail_placeholders(&output_dir);
+
+    let json = render_run_artifact_json(&output_dir.join("nuis.build.manifest.toml"));
+
+    assert!(json.contains("\"nsld_prepared_artifact_chain_ready\":true"));
+    assert!(json.contains("\"nsld_final_executable_tail_ready\":true"));
+    assert!(json.contains(
+        "\"nsld_final_executable_tail_stage_records\":[{\"stage\":\"final-executable-writer-input\",\"file\":\"nuis.nsld.final-executable-writer-input.toml\",\"present\":true"
+    ));
+    assert!(json.contains("\"nsld_next_action_source\":\"nuis-summary\""));
+    assert!(json.contains("\"nsld_next_action\":\"ready\""));
+    assert!(json.contains("\"nsld_next_action_command\":null"));
+    assert!(json.contains(
+        "\"nsld_next_action_reason\":\"nsld prepared chain and final executable tail are ready\""
+    ));
+    assert!(json.contains("\"nsld_artifact_chain_next_action_available\":false"));
+    assert!(json.contains("\"nsld_artifact_chain_next_action_source\":null"));
+    assert!(json.contains("\"nsld_artifact_chain_next_action_command_id\":null"));
+    assert!(json.contains("\"nsld_artifact_chain_next_action_command_resolved\":null"));
+    assert!(json.contains("\"nsld_drive_recommended_mode\":\"dry-run\""));
+    assert!(json.contains("\"nsld_drive_recommended_mutates_artifacts\":false"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_valid\":true"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_final_executable_emitted\":true"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_launcher_manifest_ready\":true"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_launcher_dry_run_ready\":true"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_would_enter_lifecycle_hook\":true"));
+    assert!(json.contains(
+        "\"nsld_final_executable_pipeline_scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""
+    ));
+    assert!(json.contains("\"nsld_final_executable_pipeline_scheduler_metadata_present\":true"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_scheduler_metadata_hash\":\"0x1234\""));
+    assert!(json.contains("\"nsld_final_executable_pipeline_required_stage_path_count\":9"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_required_stage_path_present_count\":9"));
+    assert!(
+        json.contains("\"nsld_final_executable_pipeline_first_missing_required_stage_path\":null")
+    );
 }
 
 #[test]

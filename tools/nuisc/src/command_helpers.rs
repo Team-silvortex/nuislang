@@ -10,7 +10,7 @@ pub(crate) struct CompiledCommandInput {
 }
 
 pub fn project_compile_workflow_brief() -> &'static str {
-    "health -> structure -> scheduler -> abi_lock -> check -> test -> build -> project_metadata_inspect -> artifact_doctor -> metadata_repair -> run_artifact -> release_check"
+    "health -> structure -> scheduler -> abi_lock -> check -> test -> build -> project_metadata_inspect -> artifact_doctor -> nsld_drive -> metadata_repair -> run_artifact -> release_check"
 }
 
 pub fn nuisc_compile_pipeline_brief() -> &'static str {
@@ -18,7 +18,7 @@ pub fn nuisc_compile_pipeline_brief() -> &'static str {
 }
 
 pub fn project_compile_samples_brief() -> &'static str {
-    "health=nuis project-doctor <project-dir>; structure=nuis project-status <project-dir>; scheduler=nuis scheduler-view <project-dir>; abi_lock=nuis project-lock-abi <project-dir>; compile=nuis check <project-dir> -> nuis test <project-dir> -> nuis build <project-dir> <output-dir> -> nuisc inspect-project-metadata --summary <output-dir> -> nuis artifact-doctor <output-dir> -> nuisc repair-project-metadata --dry-run <output-dir> -> nuis run-artifact <output-dir> -> nuis release-check <project-dir> <output-dir>"
+    "health=nuis project-doctor <project-dir>; structure=nuis project-status <project-dir>; scheduler=nuis scheduler-view <project-dir>; abi_lock=nuis project-lock-abi <project-dir>; compile=nuis check <project-dir> -> nuis test <project-dir> -> nuis build <project-dir> <output-dir> -> nuisc inspect-project-metadata --summary <output-dir> -> nuis artifact-doctor <output-dir> -> nsld drive <output-dir>/nuis.build.manifest.toml --apply -> nuisc repair-project-metadata --dry-run <output-dir> -> nuis run-artifact <output-dir> -> nuis release-check <project-dir> <output-dir>"
 }
 
 pub fn project_test_workflow_brief() -> &'static str {

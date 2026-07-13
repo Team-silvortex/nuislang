@@ -215,6 +215,7 @@ If you want one shortest checked-in route per question, use:
   [filesystem_report_file_demo](../examples/projects/tooling/filesystem_report_file_demo) ->
   [filesystem_io_report_demo](../examples/projects/tooling/filesystem_io_report_demo) ->
   [path_analysis_demo](../examples/projects/tooling/path_analysis_demo) ->
+  [path_safety_demo](../examples/projects/tooling/path_safety_demo) ->
   [path_copy_remove_demo](../examples/projects/tooling/path_copy_remove_demo)
   current rule:
   these are `std=workspace` contract consumers and should return process-style

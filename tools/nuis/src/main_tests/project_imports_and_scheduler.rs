@@ -224,8 +224,45 @@ mod cpu Main {
     assert!(json.contains("\"link_plan_final_link_mode\":\"host-toolchain-finalize\""));
     assert!(json.contains("\"link_plan_domain_units\":"));
     assert!(json.contains("\"nsld_prepare_command\":\"nsld prepare "));
+    assert!(json.contains("\"nsld_drive_dry_run_command\":\"nsld drive "));
+    assert!(json.contains("\"nsld_drive_dry_run_json_command\":\"nsld drive "));
+    assert!(json.contains(" --json\""));
+    assert!(json.contains("\"nsld_drive_apply_next_command\":\"nsld drive "));
+    assert!(json.contains("\"nsld_drive_apply_next_json_command\":\"nsld drive "));
+    assert!(json.contains(" --apply --json\""));
+    assert!(json.contains("\"nsld_drive_apply_until_clean_command\":\"nsld drive "));
+    assert!(json.contains("\"nsld_drive_apply_until_clean_json_command\":\"nsld drive "));
+    assert!(json.contains(" --apply --until-clean --json\""));
+    assert!(json.contains("\"nsld_drive_command_set\":{"));
+    assert!(json.contains("\"protocol\":\"nsld-drive-command-set-v1\""));
+    assert!(json.contains("\"recommended_first_json_command\":\"nsld drive "));
+    assert!(json.contains("\"dry_run_mutates_artifacts\":false"));
+    assert!(json.contains("\"apply_next_mutates_artifacts\":true"));
+    assert!(json.contains("\"apply_until_clean_mutates_artifacts\":true"));
+    assert!(json.contains("\"apply_next_json_command\":\"nsld drive "));
+    assert!(json.contains("\"apply_until_clean_json_command\":\"nsld drive "));
+    assert!(json.contains("\"nsld_drive_recommended_mode\":\"apply-next\""));
+    assert!(json.contains("\"nsld_drive_recommended_mutates_artifacts\":true"));
     assert!(json.contains("\"nsld_prepared_artifact_chain_ready\":false"));
     assert!(json.contains("\"nsld_prepared_artifact_next_missing_stage\":\"link-inputs\""));
+    assert!(json.contains(
+        "\"nsld_prepared_artifact_stage_records\":[{\"stage\":\"link-inputs\",\"file\":\"nuis.nsld.link-inputs.toml\",\"present\":false,\"required\":true,\"next_action_source\":\"required\",\"command_id\":\"emit-inputs\""
+    ));
+    assert!(json.contains("\"nsld_next_action_source\":\"nuis-summary\""));
+    assert!(json.contains("\"nsld_next_action\":\"prepare\""));
+    assert!(json.contains("\"nsld_next_action_command\":\"nsld prepare "));
+    assert!(json.contains(
+        "\"nsld_next_action_reason\":\"prepared artifact chain is missing `link-inputs`\""
+    ));
+    assert!(json.contains("\"nsld_artifact_chain_next_action_available\":true"));
+    assert!(json.contains("\"nsld_artifact_chain_next_action_source\":\"required\""));
+    assert!(json.contains("\"nsld_artifact_chain_next_action_command_id\":\"emit-inputs\""));
+    assert!(
+        json.contains("\"nsld_artifact_chain_next_action_command\":\"nsld emit-inputs <input>\"")
+    );
+    assert!(json.contains(
+        "\"nsld_artifact_chain_next_action_reason\":\"first missing required artifact stage `link-inputs`\""
+    ));
     assert!(json.contains(
         "\"nsld_final_executable_pipeline_command\":\"nsld emit-final-executable-pipeline "
     ));
@@ -286,9 +323,7 @@ mod cpu Main {
 #[test]
 fn scheduler_view_json_reports_single_file_domain_surface() {
     let input = repo_root().join("stdlib/core/basic_scalars.ns");
-    let json = with_repo_root_cwd(|| {
-        render_scheduler_view_json(&input).expect("render scheduler single-file json")
-    });
+    let json = render_scheduler_view_json(&input).expect("render scheduler single-file json");
 
     assert!(json.contains("\"source_kind\":\"single-file\""));
     assert!(json.contains("\"ast_domain\":\"cpu\""));

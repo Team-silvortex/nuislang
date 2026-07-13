@@ -382,6 +382,8 @@ mod cpu Main {
         + StdFsContracts.directory_status_total(6, 7, 0)
         + StdFsContracts.directory_mutation_status_total(0, 1, 0, 0)
         + StdFsContracts.path_probe_status_total(0, 1, 1)
+        + StdFsContracts.path_safety_status_total(0, 0, 0, 1, 0, 0, 2)
+        + StdFsContracts.path_relative_safety_validation_total(0, 0, 0, 1, 0, 2)
         + StdFsContracts.filesystem_report_status_total(2, 3, 1, 2, 3, 4, 5, 0, 6, 7, 0, 8, 9)
         + StdFsContracts.filesystem_report_file_status_total(
           2, 3, 1, 2, 3, 4, 5, 0, 6, 7, 0, 8, 9, 10, 11, 0, 0
@@ -427,6 +429,8 @@ mod cpu Main {
         "StdFsContracts.directory_status_total",
         "StdFsContracts.directory_mutation_status_total",
         "StdFsContracts.path_probe_status_total",
+        "StdFsContracts.path_safety_status_total",
+        "StdFsContracts.path_relative_safety_validation_total",
         "StdFsContracts.filesystem_report_status_total",
         "StdFsContracts.filesystem_report_file_status_total",
         "StdCliContracts.workflow_step_executed_count",

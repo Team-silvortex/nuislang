@@ -147,6 +147,7 @@ Short rule:
   [filesystem_report_file_demo](filesystem_report_file_demo),
   [filesystem_io_report_demo](filesystem_io_report_demo),
   [path_analysis_demo](path_analysis_demo),
+  [path_safety_demo](path_safety_demo),
   [path_copy_remove_demo](path_copy_remove_demo)
   as the current project-form filesystem std contract smoke chain
 

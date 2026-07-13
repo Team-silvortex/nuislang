@@ -1,0 +1,44 @@
+mod cpu Main {
+  extern "c" fn host_path_is_empty(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_dot(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_dotdot(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_relative(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_root(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_hidden(path_handle: i64) -> i64;
+  extern "c" fn host_path_depth(path_handle: i64) -> i64;
+
+  struct PathSafetyFacadeSummary {
+    is_empty: i64,
+    is_dot: i64,
+    is_dotdot: i64,
+    is_relative: i64,
+    is_root: i64,
+    is_hidden: i64,
+    depth: i64
+  }
+
+  fn capture_path_safety_facades() -> PathSafetyFacadeSummary {
+    return PathSafetyFacadeSummary {
+      is_empty: host_path_is_empty(31),
+      is_dot: host_path_is_dot(31),
+      is_dotdot: host_path_is_dotdot(31),
+      is_relative: host_path_is_relative(31),
+      is_root: host_path_is_root(31),
+      is_hidden: host_path_is_hidden(31),
+      depth: host_path_depth(31)
+    };
+  }
+
+  fn main() {
+    let summary: PathSafetyFacadeSummary = capture_path_safety_facades();
+    print(
+      summary.is_empty
+        + summary.is_dot
+        + summary.is_dotdot
+        + summary.is_relative
+        + summary.is_root
+        + summary.is_hidden
+        + summary.depth
+    );
+  }
+}

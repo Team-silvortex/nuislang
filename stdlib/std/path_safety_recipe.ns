@@ -1,0 +1,56 @@
+mod cpu Main {
+  extern "c" fn host_path_is_empty(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_dot(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_dotdot(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_relative(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_root(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_hidden(path_handle: i64) -> i64;
+  extern "c" fn host_path_depth(path_handle: i64) -> i64;
+
+  struct PathSafetySeed {
+    path_handle: i64
+  }
+
+  struct PathSafetySummary {
+    is_empty: i64,
+    is_dot: i64,
+    is_dotdot: i64,
+    is_relative: i64,
+    is_root: i64,
+    is_hidden: i64,
+    depth: i64
+  }
+
+  fn build_path_safety_seed(path_handle: i64) -> PathSafetySeed {
+    return PathSafetySeed {
+      path_handle: path_handle
+    };
+  }
+
+  fn capture_path_safety(seed: PathSafetySeed) -> PathSafetySummary {
+    return PathSafetySummary {
+      is_empty: host_path_is_empty(seed.path_handle),
+      is_dot: host_path_is_dot(seed.path_handle),
+      is_dotdot: host_path_is_dotdot(seed.path_handle),
+      is_relative: host_path_is_relative(seed.path_handle),
+      is_root: host_path_is_root(seed.path_handle),
+      is_hidden: host_path_is_hidden(seed.path_handle),
+      depth: host_path_depth(seed.path_handle)
+    };
+  }
+
+  fn summarize_path_safety_recipe(path_handle: i64) -> i64 {
+    let summary: PathSafetySummary = capture_path_safety(build_path_safety_seed(path_handle));
+    return summary.is_empty
+      + summary.is_dot
+      + summary.is_dotdot
+      + summary.is_relative
+      + summary.is_root
+      + summary.is_hidden
+      + summary.depth;
+  }
+
+  fn main() {
+    print(summarize_path_safety_recipe(31));
+  }
+}

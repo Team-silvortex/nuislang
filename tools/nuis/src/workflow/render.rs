@@ -69,6 +69,34 @@ pub(crate) fn render_workflow_json(input: &Path) -> Result<String, String> {
                     &artifact_doctor_command_for_output_dir(&output_dir),
                 ),
                 json_field(
+                    "artifact_nsld_drive_dry_run_command",
+                    &nsld_drive_dry_run_command_for_output_dir(&output_dir),
+                ),
+                json_field(
+                    "artifact_nsld_drive_dry_run_json_command",
+                    &nsld_drive_dry_run_json_command_for_output_dir(&output_dir),
+                ),
+                json_field(
+                    "artifact_nsld_drive_apply_next_command",
+                    &nsld_drive_apply_next_command_for_output_dir(&output_dir),
+                ),
+                json_field(
+                    "artifact_nsld_drive_apply_next_json_command",
+                    &nsld_drive_apply_next_json_command_for_output_dir(&output_dir),
+                ),
+                json_field(
+                    "artifact_nsld_drive_apply_until_clean_command",
+                    &nsld_drive_apply_until_clean_command_for_output_dir(&output_dir),
+                ),
+                json_field(
+                    "artifact_nsld_drive_apply_until_clean_json_command",
+                    &nsld_drive_apply_until_clean_json_command_for_output_dir(&output_dir),
+                ),
+                nsld_drive_command_set_json_field(
+                    "artifact_nsld_drive_command_set",
+                    Some(&nsld_drive_command_set_for_output_dir(&output_dir)),
+                ),
+                json_field(
                     "run_artifact_command",
                     &run_artifact_command_for_output_dir(&output_dir),
                 ),
@@ -130,6 +158,34 @@ pub(crate) fn render_workflow_json(input: &Path) -> Result<String, String> {
             json_field(
                 "artifact_doctor_command",
                 &artifact_doctor_command_for_output_dir(&output_dir),
+            ),
+            json_field(
+                "artifact_nsld_drive_dry_run_command",
+                &nsld_drive_dry_run_command_for_output_dir(&output_dir),
+            ),
+            json_field(
+                "artifact_nsld_drive_dry_run_json_command",
+                &nsld_drive_dry_run_json_command_for_output_dir(&output_dir),
+            ),
+            json_field(
+                "artifact_nsld_drive_apply_next_command",
+                &nsld_drive_apply_next_command_for_output_dir(&output_dir),
+            ),
+            json_field(
+                "artifact_nsld_drive_apply_next_json_command",
+                &nsld_drive_apply_next_json_command_for_output_dir(&output_dir),
+            ),
+            json_field(
+                "artifact_nsld_drive_apply_until_clean_command",
+                &nsld_drive_apply_until_clean_command_for_output_dir(&output_dir),
+            ),
+            json_field(
+                "artifact_nsld_drive_apply_until_clean_json_command",
+                &nsld_drive_apply_until_clean_json_command_for_output_dir(&output_dir),
+            ),
+            nsld_drive_command_set_json_field(
+                "artifact_nsld_drive_command_set",
+                Some(&nsld_drive_command_set_for_output_dir(&output_dir)),
             ),
             json_field(
                 "run_artifact_command",

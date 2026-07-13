@@ -3,9 +3,16 @@ use super::{
     artifact_workflow_brief, benchmark_run_report_json, build_workflow_frontdoor_surface,
     collect_language_benchmark_run_report, default_build_output_dir, find_abi_block_span,
     handle_build, handle_check, handle_materialize_artifact, handle_release_check,
-    handle_run_artifact, handle_test, handle_unpack_artifact_support, project_abi_checks_json,
+    handle_run_artifact, handle_test, handle_unpack_artifact_support,
+    nsld_drive_command_set_for_output_dir, project_abi_checks_json,
     project_compile_workflow_source_profile, project_domain_registry_checks_json,
-    project_workflow_json_fields, recommend_project_workflow_step, render_artifact_doctor_json,
+    project_workflow_json_fields, recommend_project_workflow_step,
+    release_check_nsld_drive_command_for_output_dir,
+    release_check_nsld_drive_dry_run_command_for_output_dir,
+    release_check_nsld_drive_dry_run_json_command_for_output_dir,
+    release_check_nsld_drive_json_command_for_output_dir,
+    release_check_nsld_drive_until_clean_command_for_output_dir,
+    release_check_nsld_drive_until_clean_json_command_for_output_dir, render_artifact_doctor_json,
     render_build_report_json, render_project_doctor_json, render_project_imports_apply_json,
     render_project_imports_json, render_project_status_json, render_run_artifact_json,
     render_scheduler_view_json, render_workflow_json, resolve_run_artifact_binary_path,
@@ -25,7 +32,7 @@ use std::{
     env, fs,
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    sync::{Mutex, Once, OnceLock},
+    sync::Once,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -49,6 +56,66 @@ fn checked_in_path(relative_from_manifest_dir: &str) -> PathBuf {
         .join(relative_from_manifest_dir)
         .canonicalize()
         .unwrap_or_else(|error| panic!("checked-in path `{relative_from_manifest_dir}`: {error}"))
+}
+
+fn write_prepared_nsld_chain_placeholders(output_dir: &Path) {
+    for file_name in [
+        "nuis.nsld.link-inputs.toml",
+        "nuis.nsld.link-units.toml",
+        "nuis.nsld.link-bundle.toml",
+        "nuis.nsld.assemble-plan.toml",
+        "nuis.nsld.section-manifest.toml",
+        "nuis.nsld.object-plan.toml",
+        "nuis.nsld.object-writer-input.toml",
+        "nuis.nsld.object-byte-layout.toml",
+        "nuis.nsld.object-file-layout.toml",
+        "nuis.nsld.object-image-dry-run.toml",
+        "nuis.nsld.object.blocked.toml",
+        "nuis.nsld.object-writer-dry-run.toml",
+        "nuis.nsld.container-plan.toml",
+        "nuis.nsld.container",
+        "nuis.nsld.closure.toml",
+        "nuis.nsld.final-stage-plan.toml",
+    ] {
+        fs::write(output_dir.join(file_name), "prepared-stage-placeholder\n")
+            .expect("write prepared nsld placeholder");
+    }
+}
+
+fn write_ready_nsld_final_tail_placeholders(output_dir: &Path) {
+    for file_name in [
+        "nuis.nsld.final-executable-writer-input.toml",
+        "nuis.nsld.final-executable-host-invoke-plan.toml",
+        "nuis.nsld.final-executable-layout.toml",
+        "nuis.nsld.final-executable-image-dry-run.toml",
+        "nuis.nsld.final-executable-image-dry-run.bin",
+        "nuis.nsld.final-executable.blocked.toml",
+        "nuis.nsld.final-executable-launcher.toml",
+        "nuis.nsld.final-executable-launcher-dry-run.toml",
+    ] {
+        fs::write(output_dir.join(file_name), "final-tail-stage-placeholder\n")
+            .expect("write final tail nsld placeholder");
+    }
+    fs::write(
+        output_dir.join("nuis.nsld.final-executable-pipeline.toml"),
+        r#"
+valid = true
+final_executable_emitted = true
+launcher_manifest_ready = true
+launcher_dry_run_ready = true
+would_enter_lifecycle_hook = true
+scheduler_metadata_payload_id = "payload0004.scheduler-metadata"
+scheduler_metadata_present = true
+scheduler_metadata_hash = "0x1234"
+required_stage_path_count = 9
+required_stage_path_present_count = 9
+missing_required_stage_paths = []
+blocker_count = 0
+blockers = []
+"#
+        .trim_start(),
+    )
+    .expect("write ready final executable pipeline placeholder");
 }
 
 fn load_stdlib_source_modules(root: &Path, module_dir: &str) -> Vec<String> {
@@ -120,18 +187,6 @@ fn assert_checked_in_tooling_project_runs(project_root: &str, output_label: &str
     handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
     handle_run_artifact(output_dir.join("nuis.build.manifest.toml"), false)
         .expect("checked-in tooling project run-artifact passes");
-}
-
-fn with_repo_root_cwd<T>(f: impl FnOnce() -> T) -> T {
-    static CWD_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-    let lock = CWD_LOCK.get_or_init(|| Mutex::new(()));
-    let _guard = lock.lock().expect("lock cwd guard");
-    let original = env::current_dir().expect("current dir");
-    let root = repo_root();
-    env::set_current_dir(&root).expect("set repo root cwd");
-    let result = f();
-    env::set_current_dir(original).expect("restore cwd");
-    result
 }
 
 fn empty_galaxy_doctor(project_root: &Path) -> galaxy::GalaxyDoctorReport {

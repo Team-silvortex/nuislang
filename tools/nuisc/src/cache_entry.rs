@@ -24,14 +24,14 @@ pub fn store_compile_cache(
     let entry_dir = key.root.join(&key.key);
     if entry_dir.exists() {
         if entry_dir.is_dir() {
-            fs::remove_dir_all(&entry_dir).map_err(|error| {
+            remove_dir_all_if_present(&entry_dir).map_err(|error| {
                 format!(
                     "failed to refresh compile cache entry `{}`: {error}",
                     entry_dir.display()
                 )
             })?;
         } else {
-            fs::remove_file(&entry_dir).map_err(|error| {
+            remove_file_if_present(&entry_dir).map_err(|error| {
                 format!(
                     "failed to reset compile cache entry `{}`: {error}",
                     entry_dir.display()
@@ -75,6 +75,22 @@ pub fn store_compile_cache(
         key: key.key.clone(),
         entry_dir,
     })
+}
+
+fn remove_dir_all_if_present(path: &Path) -> std::io::Result<()> {
+    match fs::remove_dir_all(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
+fn remove_file_if_present(path: &Path) -> std::io::Result<()> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+    }
 }
 
 pub fn restore_compile_cache(entry: &CompileCacheEntry, output_dir: &Path) -> Result<(), String> {

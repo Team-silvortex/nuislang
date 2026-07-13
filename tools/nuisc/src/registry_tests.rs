@@ -6,7 +6,7 @@ use crate::project::{
 use crate::registry_abi_target::{
     host_arch, host_calling_abi, host_clang_target, host_object_format, host_os,
 };
-use crate::registry_load::INDEX_FILE;
+use crate::registry_load::{resolve_registry_root, INDEX_FILE};
 use crate::registry_manifest_parse::parse_optional_string_array;
 use crate::registry_support_usage::{
     collect_resource_usage_hints, covered_profile_slots, detect_matched_support_usage,
@@ -436,6 +436,16 @@ fn temp_registry_root(label: &str) -> PathBuf {
     let root = std::env::temp_dir().join(format!("nuisc-{label}-{nanos}"));
     fs::create_dir_all(&root).unwrap();
     root
+}
+
+#[test]
+fn relative_checked_in_registry_root_resolves_to_workspace_path() {
+    let root = resolve_registry_root(Path::new("nustar-packages"));
+
+    assert!(root.is_absolute());
+    assert!(root.join("cpu.toml").exists());
+    let manifest = load_manifest_for_domain(Path::new("nustar-packages"), "cpu").unwrap();
+    assert_eq!(manifest.package_id, "official.cpu");
 }
 
 fn write_registry_fixture(

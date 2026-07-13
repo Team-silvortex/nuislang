@@ -125,8 +125,8 @@ First auto-injectable library module:
   filesystem metadata/stat probes, file read/write/copy status, directory
   mutation/stat summaries, and path/report/session probe summaries, including
   file report output validation gates, file read/write/chunk-read/roundtrip
-  readiness gates, and directory mutation plus path copy/rename/remove
-  readiness gates
+  readiness gates, directory mutation plus path copy/rename/remove readiness
+  gates, and relative path safety gates for CLI/filesystem frontdoors
 * [lib/cli_contracts.ns](lib/cli_contracts.ns)
   exposes the initial `StdCliContracts` helper surface for normalizing
   argv/env/process probes, result/error/diagnostic summaries, command

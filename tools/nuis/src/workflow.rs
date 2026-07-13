@@ -24,9 +24,26 @@ pub(crate) use json_bits::{
 };
 pub(crate) use link_plan::{
     append_workflow_link_plan_json_fields, artifact_doctor_command_for_output_dir,
-    load_link_plan_for_output_dir, nsld_final_executable_tail_summary,
+    load_link_plan_for_output_dir, nsld_artifact_chain_next_action_mirror,
+    nsld_drive_apply_next_command_for_output_dir,
+    nsld_drive_apply_next_json_command_for_output_dir,
+    nsld_drive_apply_until_clean_command_for_output_dir,
+    nsld_drive_apply_until_clean_json_command_for_output_dir,
+    nsld_drive_command_set_for_output_dir, nsld_drive_command_set_json_field,
+    nsld_drive_dry_run_command_for_output_dir, nsld_drive_dry_run_json_command_for_output_dir,
+    nsld_drive_recommendation_for_output_dir, nsld_final_executable_tail_stage_records_json,
+    nsld_final_executable_tail_summary, nsld_next_action_summary,
     nsld_prepare_command_for_output_dir, nsld_prepared_artifact_chain_summary,
-    run_artifact_command_for_output_dir,
+    nsld_prepared_artifact_stage_records_json, run_artifact_command_for_output_dir,
+};
+#[cfg(test)]
+pub(crate) use link_plan::{
+    release_check_nsld_drive_command_for_output_dir,
+    release_check_nsld_drive_dry_run_command_for_output_dir,
+    release_check_nsld_drive_dry_run_json_command_for_output_dir,
+    release_check_nsld_drive_json_command_for_output_dir,
+    release_check_nsld_drive_until_clean_command_for_output_dir,
+    release_check_nsld_drive_until_clean_json_command_for_output_dir,
 };
 pub(crate) use render::render_workflow_json;
 
@@ -39,13 +56,13 @@ pub(crate) fn debug_workflow_samples_brief() -> &'static str {
 }
 
 pub(crate) fn single_source_compile_workflow_brief() -> &'static str {
-    "check -> test -> build -> artifact_doctor -> run_artifact -> release_check"
+    "check -> test -> build -> artifact_doctor -> nsld_drive -> run_artifact -> release_check"
 }
 
 pub(crate) fn single_source_compile_samples_brief() -> &'static str {
-    "check=nuis check <input.ns>; test=nuis test <input.ns>; build=nuis build <input.ns> <output-dir>; artifact=nuis artifact-doctor <output-dir>; run=nuis run-artifact <output-dir>; release=nuis release-check <input.ns> <output-dir>"
+    "check=nuis check <input.ns>; test=nuis test <input.ns>; build=nuis build <input.ns> <output-dir>; artifact=nuis artifact-doctor <output-dir>; linker=nsld drive <output-dir>/nuis.build.manifest.toml --apply; run=nuis run-artifact <output-dir>; release=nuis release-check <input.ns> <output-dir>"
 }
 
 pub(crate) fn artifact_workflow_brief() -> &'static str {
-    "build -> inspect_artifact -> verify_artifact -> artifact_doctor -> verify_build_manifest -> run_artifact"
+    "build -> inspect_artifact -> verify_artifact -> artifact_doctor -> nsld_drive -> verify_build_manifest -> run_artifact"
 }

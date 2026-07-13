@@ -156,6 +156,44 @@ pub(crate) fn write_project_doctor_text_summary<W: fmt::Write>(
         artifact_report.recommended_command
     )
     .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  artifact_nsld_drive_dry_run_command: {}",
+        crate::workflow::nsld_drive_dry_run_command_for_output_dir(&artifact_output_dir)
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  artifact_nsld_drive_dry_run_json_command: {}",
+        crate::workflow::nsld_drive_dry_run_json_command_for_output_dir(&artifact_output_dir)
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  artifact_nsld_drive_apply_next_command: {}",
+        crate::workflow::nsld_drive_apply_next_command_for_output_dir(&artifact_output_dir)
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  artifact_nsld_drive_apply_next_json_command: {}",
+        crate::workflow::nsld_drive_apply_next_json_command_for_output_dir(&artifact_output_dir)
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  artifact_nsld_drive_apply_until_clean_command: {}",
+        crate::workflow::nsld_drive_apply_until_clean_command_for_output_dir(&artifact_output_dir)
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  artifact_nsld_drive_apply_until_clean_json_command: {}",
+        crate::workflow::nsld_drive_apply_until_clean_json_command_for_output_dir(
+            &artifact_output_dir
+        )
+    )
+    .map_err(|e| e.to_string())?;
     writeln!(out, "  modules: {}", project.modules.len()).map_err(|e| e.to_string())?;
     writeln!(
         out,

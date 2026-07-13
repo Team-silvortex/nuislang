@@ -283,6 +283,46 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
                 "artifact_recommended_command",
                 &artifact_report.recommended_command,
             ),
+            crate::json_field(
+                "artifact_nsld_drive_dry_run_command",
+                &crate::workflow::nsld_drive_dry_run_command_for_output_dir(&artifact_output_dir),
+            ),
+            crate::json_field(
+                "artifact_nsld_drive_dry_run_json_command",
+                &crate::workflow::nsld_drive_dry_run_json_command_for_output_dir(
+                    &artifact_output_dir,
+                ),
+            ),
+            crate::json_field(
+                "artifact_nsld_drive_apply_next_command",
+                &crate::workflow::nsld_drive_apply_next_command_for_output_dir(
+                    &artifact_output_dir,
+                ),
+            ),
+            crate::json_field(
+                "artifact_nsld_drive_apply_next_json_command",
+                &crate::workflow::nsld_drive_apply_next_json_command_for_output_dir(
+                    &artifact_output_dir,
+                ),
+            ),
+            crate::json_field(
+                "artifact_nsld_drive_apply_until_clean_command",
+                &crate::workflow::nsld_drive_apply_until_clean_command_for_output_dir(
+                    &artifact_output_dir,
+                ),
+            ),
+            crate::json_field(
+                "artifact_nsld_drive_apply_until_clean_json_command",
+                &crate::workflow::nsld_drive_apply_until_clean_json_command_for_output_dir(
+                    &artifact_output_dir,
+                ),
+            ),
+            crate::workflow::nsld_drive_command_set_json_field(
+                "artifact_nsld_drive_command_set",
+                Some(&crate::workflow::nsld_drive_command_set_for_output_dir(
+                    &artifact_output_dir,
+                )),
+            ),
         ],
     );
     append_link_plan_json_fields(&mut out, link_plan.as_ref());

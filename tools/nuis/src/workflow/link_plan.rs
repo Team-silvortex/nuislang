@@ -77,6 +77,7 @@ pub(crate) struct NsldPreparedArtifactChainSummary {
     pub(crate) stage_count: usize,
     pub(crate) present_count: usize,
     pub(crate) next_missing_stage: Option<String>,
+    pub(crate) manifest_path: String,
     pub(crate) prepare_command: String,
 }
 
@@ -101,11 +102,385 @@ pub(crate) struct NsldFinalExecutableTailSummary {
     pub(crate) first_missing_required_stage_path: Option<String>,
 }
 
+pub(crate) struct NsldNextActionSummary {
+    pub(crate) source: String,
+    pub(crate) action: String,
+    pub(crate) command: Option<String>,
+    pub(crate) reason: String,
+}
+
+pub(crate) struct NsldArtifactChainNextActionMirror {
+    pub(crate) source: Option<String>,
+    pub(crate) command_id: Option<String>,
+    pub(crate) command: Option<String>,
+    pub(crate) command_resolved: Option<String>,
+    pub(crate) reason: Option<String>,
+    pub(crate) available: bool,
+}
+
+pub(crate) struct NsldDriveRecommendation {
+    pub(crate) available: bool,
+    pub(crate) mode: String,
+    pub(crate) command: Option<String>,
+    pub(crate) mutates_artifacts: bool,
+    pub(crate) reason: String,
+}
+
+pub(crate) struct NsldDriveCommandSet {
+    pub(crate) protocol: String,
+    pub(crate) recommended_first_json_command: String,
+    pub(crate) dry_run_command: String,
+    pub(crate) dry_run_json_command: String,
+    pub(crate) dry_run_mutates_artifacts: bool,
+    pub(crate) apply_next_command: String,
+    pub(crate) apply_next_json_command: String,
+    pub(crate) apply_next_mutates_artifacts: bool,
+    pub(crate) apply_until_clean_command: String,
+    pub(crate) apply_until_clean_json_command: String,
+    pub(crate) apply_until_clean_mutates_artifacts: bool,
+}
+
+pub(crate) fn nsld_next_action_summary(
+    prepared: Option<&NsldPreparedArtifactChainSummary>,
+    final_tail: Option<&NsldFinalExecutableTailSummary>,
+) -> NsldNextActionSummary {
+    let Some(prepared) = prepared else {
+        return NsldNextActionSummary {
+            source: "nuis-summary".to_owned(),
+            action: "unavailable".to_owned(),
+            command: None,
+            reason: "link plan is unavailable, so nsld cannot resolve an artifact chain yet"
+                .to_owned(),
+        };
+    };
+    if !prepared.ready {
+        return NsldNextActionSummary {
+            source: "nuis-summary".to_owned(),
+            action: "prepare".to_owned(),
+            command: Some(prepared.prepare_command.clone()),
+            reason: prepared
+                .next_missing_stage
+                .as_ref()
+                .map(|stage| format!("prepared artifact chain is missing `{stage}`"))
+                .unwrap_or_else(|| "prepared artifact chain is incomplete".to_owned()),
+        };
+    }
+    let Some(final_tail) = final_tail else {
+        return NsldNextActionSummary {
+            source: "nuis-summary".to_owned(),
+            action: "emit-final-executable-pipeline".to_owned(),
+            command: None,
+            reason: "final executable tail summary is unavailable after prepare".to_owned(),
+        };
+    };
+    if !final_tail.ready {
+        return NsldNextActionSummary {
+            source: "nuis-summary".to_owned(),
+            action: "emit-final-executable-pipeline".to_owned(),
+            command: Some(final_tail.pipeline_command.clone()),
+            reason: final_tail
+                .next_missing_stage
+                .as_ref()
+                .map(|stage| format!("final executable tail is missing `{stage}`"))
+                .or_else(|| {
+                    final_tail.first_blocker.as_ref().map(|blocker| {
+                        format!("final executable pipeline is blocked by `{blocker}`")
+                    })
+                })
+                .unwrap_or_else(|| "final executable pipeline is not ready".to_owned()),
+        };
+    }
+    NsldNextActionSummary {
+        source: "nuis-summary".to_owned(),
+        action: "ready".to_owned(),
+        command: None,
+        reason: "nsld prepared chain and final executable tail are ready".to_owned(),
+    }
+}
+
+pub(crate) fn nsld_artifact_chain_next_action_mirror(
+    prepared: Option<&NsldPreparedArtifactChainSummary>,
+    final_tail: Option<&NsldFinalExecutableTailSummary>,
+) -> NsldArtifactChainNextActionMirror {
+    let Some(prepared) = prepared else {
+        return NsldArtifactChainNextActionMirror::unavailable();
+    };
+    if let Some(stage) = prepared.next_missing_stage.as_deref() {
+        let command_id = nsld_artifact_chain_command_id_for_stage(stage).to_owned();
+        let command = format!("nsld {command_id} <input>");
+        let command_resolved = format!("nsld {command_id} {}", prepared.manifest_path);
+        return NsldArtifactChainNextActionMirror {
+            source: Some("required".to_owned()),
+            command_id: Some(command_id),
+            command: Some(command),
+            command_resolved: Some(command_resolved),
+            reason: Some(format!("first missing required artifact stage `{stage}`")),
+            available: true,
+        };
+    }
+    let Some(final_tail) = final_tail else {
+        return NsldArtifactChainNextActionMirror::unavailable();
+    };
+    if let Some(blocker) = final_tail.first_blocker.as_deref() {
+        return final_tail_command_mirror(
+            prepared,
+            "advisory",
+            format!("first artifact-chain advisory: {blocker}"),
+        );
+    }
+    if let Some(stage) = final_tail.next_missing_stage.as_deref() {
+        return final_tail_command_mirror(
+            prepared,
+            "optional",
+            format!("first missing optional artifact stage `{stage}`"),
+        );
+    }
+    NsldArtifactChainNextActionMirror::unavailable()
+}
+
+pub(crate) fn nsld_drive_recommendation_for_output_dir(
+    output_dir: Option<&Path>,
+    next_action: &NsldArtifactChainNextActionMirror,
+) -> NsldDriveRecommendation {
+    let Some(output_dir) = output_dir else {
+        return NsldDriveRecommendation {
+            available: false,
+            mode: "unavailable".to_owned(),
+            command: None,
+            mutates_artifacts: false,
+            reason: "link plan is unavailable, so nsld drive cannot resolve an input".to_owned(),
+        };
+    };
+    if next_action.available {
+        return NsldDriveRecommendation {
+            available: true,
+            mode: "apply-next".to_owned(),
+            command: Some(nsld_drive_apply_next_command_for_output_dir(output_dir)),
+            mutates_artifacts: true,
+            reason: next_action
+                .reason
+                .as_ref()
+                .map(|reason| {
+                    format!("apply the current nsld artifact-chain next action: {reason}")
+                })
+                .unwrap_or_else(|| "apply the current nsld artifact-chain next action".to_owned()),
+        };
+    }
+    NsldDriveRecommendation {
+        available: true,
+        mode: "dry-run".to_owned(),
+        command: Some(nsld_drive_dry_run_command_for_output_dir(output_dir)),
+        mutates_artifacts: false,
+        reason: "no artifact-chain next action is currently available; dry-run verifies nsld drive state without mutating artifacts".to_owned(),
+    }
+}
+
+impl NsldArtifactChainNextActionMirror {
+    fn unavailable() -> Self {
+        Self {
+            source: None,
+            command_id: None,
+            command: None,
+            command_resolved: None,
+            reason: None,
+            available: false,
+        }
+    }
+}
+
+fn final_tail_command_mirror(
+    prepared: &NsldPreparedArtifactChainSummary,
+    source: &str,
+    reason: String,
+) -> NsldArtifactChainNextActionMirror {
+    let command_id = "emit-final-executable-pipeline";
+    NsldArtifactChainNextActionMirror {
+        source: Some(source.to_owned()),
+        command_id: Some(command_id.to_owned()),
+        command: Some(format!("nsld {command_id} <input>")),
+        command_resolved: Some(format!("nsld {command_id} {}", prepared.manifest_path)),
+        reason: Some(reason),
+        available: true,
+    }
+}
+
+fn nsld_artifact_chain_command_id_for_stage(stage: &str) -> &'static str {
+    match stage {
+        "link-inputs" => "emit-inputs",
+        "link-units" => "emit-units",
+        "link-bundle" => "emit-bundle",
+        "assemble-plan" => "emit-assemble-plan",
+        "section-manifest" => "emit-section-manifest",
+        "object-plan" => "emit-object-plan",
+        "object-byte-layout" => "emit-object-byte-layout",
+        "object-file-layout" => "emit-object-file-layout",
+        "object-image-dry-run" => "emit-object-image-dry-run",
+        "object-emit-blocked" => "emit-object",
+        "object-writer-dry-run" => "emit-object-writer-dry-run",
+        "container-plan" => "emit-container-plan",
+        "container" => "emit-container",
+        "closure" => "emit-closure",
+        "final-stage-plan" => "emit-final-executable-pipeline",
+        "object-writer-input" => "prepare",
+        _ => "prepare",
+    }
+}
+
 pub(crate) fn nsld_prepare_command_for_output_dir(output_dir: &Path) -> String {
     format!(
         "nsld prepare {}",
         output_dir.join("nuis.build.manifest.toml").display()
     )
+}
+
+pub(crate) fn nsld_drive_dry_run_command_for_output_dir(output_dir: &Path) -> String {
+    format!(
+        "nsld drive {}",
+        nsld_manifest_path_for_output_dir(output_dir)
+    )
+}
+
+pub(crate) fn nsld_drive_dry_run_json_command_for_output_dir(output_dir: &Path) -> String {
+    format!(
+        "nsld drive {} --json",
+        nsld_manifest_path_for_output_dir(output_dir)
+    )
+}
+
+pub(crate) fn nsld_drive_apply_next_command_for_output_dir(output_dir: &Path) -> String {
+    format!(
+        "nsld drive {} --apply",
+        nsld_manifest_path_for_output_dir(output_dir)
+    )
+}
+
+pub(crate) fn nsld_drive_apply_next_json_command_for_output_dir(output_dir: &Path) -> String {
+    format!(
+        "nsld drive {} --apply --json",
+        nsld_manifest_path_for_output_dir(output_dir)
+    )
+}
+
+pub(crate) fn nsld_drive_apply_until_clean_command_for_output_dir(output_dir: &Path) -> String {
+    format!(
+        "nsld drive {} --apply --until-clean",
+        nsld_manifest_path_for_output_dir(output_dir)
+    )
+}
+
+pub(crate) fn nsld_drive_apply_until_clean_json_command_for_output_dir(
+    output_dir: &Path,
+) -> String {
+    format!(
+        "nsld drive {} --apply --until-clean --json",
+        nsld_manifest_path_for_output_dir(output_dir)
+    )
+}
+
+pub(crate) fn nsld_drive_command_set_for_output_dir(output_dir: &Path) -> NsldDriveCommandSet {
+    let dry_run_json_command = nsld_drive_dry_run_json_command_for_output_dir(output_dir);
+    NsldDriveCommandSet {
+        protocol: "nsld-drive-command-set-v1".to_owned(),
+        recommended_first_json_command: dry_run_json_command.clone(),
+        dry_run_command: nsld_drive_dry_run_command_for_output_dir(output_dir),
+        dry_run_json_command,
+        dry_run_mutates_artifacts: false,
+        apply_next_command: nsld_drive_apply_next_command_for_output_dir(output_dir),
+        apply_next_json_command: nsld_drive_apply_next_json_command_for_output_dir(output_dir),
+        apply_next_mutates_artifacts: true,
+        apply_until_clean_command: nsld_drive_apply_until_clean_command_for_output_dir(output_dir),
+        apply_until_clean_json_command: nsld_drive_apply_until_clean_json_command_for_output_dir(
+            output_dir,
+        ),
+        apply_until_clean_mutates_artifacts: true,
+    }
+}
+
+pub(crate) fn nsld_drive_command_set_json_field(
+    name: &str,
+    command_set: Option<&NsldDriveCommandSet>,
+) -> String {
+    let Some(command_set) = command_set else {
+        return format!("\"{name}\":null");
+    };
+    let fields = [
+        json_field("protocol", &command_set.protocol),
+        json_field(
+            "recommended_first_json_command",
+            &command_set.recommended_first_json_command,
+        ),
+        json_field("dry_run_command", &command_set.dry_run_command),
+        json_field("dry_run_json_command", &command_set.dry_run_json_command),
+        json_bool_field(
+            "dry_run_mutates_artifacts",
+            command_set.dry_run_mutates_artifacts,
+        ),
+        json_field("apply_next_command", &command_set.apply_next_command),
+        json_field(
+            "apply_next_json_command",
+            &command_set.apply_next_json_command,
+        ),
+        json_bool_field(
+            "apply_next_mutates_artifacts",
+            command_set.apply_next_mutates_artifacts,
+        ),
+        json_field(
+            "apply_until_clean_command",
+            &command_set.apply_until_clean_command,
+        ),
+        json_field(
+            "apply_until_clean_json_command",
+            &command_set.apply_until_clean_json_command,
+        ),
+        json_bool_field(
+            "apply_until_clean_mutates_artifacts",
+            command_set.apply_until_clean_mutates_artifacts,
+        ),
+    ];
+    format!("\"{name}\":{{{}}}", fields.join(","))
+}
+
+#[cfg(test)]
+pub(crate) fn release_check_nsld_drive_command_for_output_dir(output_dir: &Path) -> String {
+    nsld_drive_apply_next_command_for_output_dir(output_dir)
+}
+
+#[cfg(test)]
+pub(crate) fn release_check_nsld_drive_json_command_for_output_dir(output_dir: &Path) -> String {
+    nsld_drive_apply_next_json_command_for_output_dir(output_dir)
+}
+
+#[cfg(test)]
+pub(crate) fn release_check_nsld_drive_dry_run_command_for_output_dir(output_dir: &Path) -> String {
+    nsld_drive_dry_run_command_for_output_dir(output_dir)
+}
+
+#[cfg(test)]
+pub(crate) fn release_check_nsld_drive_dry_run_json_command_for_output_dir(
+    output_dir: &Path,
+) -> String {
+    nsld_drive_dry_run_json_command_for_output_dir(output_dir)
+}
+
+#[cfg(test)]
+pub(crate) fn release_check_nsld_drive_until_clean_command_for_output_dir(
+    output_dir: &Path,
+) -> String {
+    nsld_drive_apply_until_clean_command_for_output_dir(output_dir)
+}
+
+#[cfg(test)]
+pub(crate) fn release_check_nsld_drive_until_clean_json_command_for_output_dir(
+    output_dir: &Path,
+) -> String {
+    nsld_drive_apply_until_clean_json_command_for_output_dir(output_dir)
+}
+
+fn nsld_manifest_path_for_output_dir(output_dir: &Path) -> String {
+    output_dir
+        .join("nuis.build.manifest.toml")
+        .display()
+        .to_string()
 }
 
 pub(crate) fn nsld_prepared_artifact_chain_summary(
@@ -126,6 +501,7 @@ pub(crate) fn nsld_prepared_artifact_chain_summary(
         stage_count,
         present_count,
         next_missing_stage,
+        manifest_path: nsld_manifest_path_for_output_dir(output_dir),
         prepare_command: nsld_prepare_command_for_output_dir(output_dir),
     }
 }
@@ -135,6 +511,57 @@ pub(crate) fn nsld_final_executable_pipeline_command_for_output_dir(output_dir: 
         "nsld emit-final-executable-pipeline {}",
         output_dir.join("nuis.build.manifest.toml").display()
     )
+}
+
+pub(crate) fn nsld_prepared_artifact_stage_records_json(output_dir: &Path) -> Vec<String> {
+    NSLD_PREPARED_ARTIFACT_STAGES
+        .iter()
+        .map(|(stage, file_name)| {
+            nsld_artifact_stage_record_json(
+                output_dir,
+                stage,
+                file_name,
+                true,
+                "required",
+                nsld_artifact_chain_command_id_for_stage(stage),
+            )
+        })
+        .collect()
+}
+
+pub(crate) fn nsld_final_executable_tail_stage_records_json(output_dir: &Path) -> Vec<String> {
+    NSLD_FINAL_EXECUTABLE_TAIL_STAGES
+        .iter()
+        .map(|(stage, file_name)| {
+            nsld_artifact_stage_record_json(
+                output_dir,
+                stage,
+                file_name,
+                false,
+                "optional",
+                "emit-final-executable-pipeline",
+            )
+        })
+        .collect()
+}
+
+fn nsld_artifact_stage_record_json(
+    output_dir: &Path,
+    stage: &str,
+    file_name: &str,
+    required: bool,
+    next_action_source: &str,
+    command_id: &str,
+) -> String {
+    let fields = [
+        json_field("stage", stage),
+        json_field("file", file_name),
+        json_bool_field("present", output_dir.join(file_name).exists()),
+        json_bool_field("required", required),
+        json_field("next_action_source", next_action_source),
+        json_field("command_id", command_id),
+    ];
+    format!("{{{}}}", fields.join(","))
 }
 
 pub(crate) fn nsld_final_executable_tail_summary(
@@ -264,6 +691,21 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
         link_plan.map(|plan| nsld_prepared_artifact_chain_summary(Path::new(&plan.output_dir)));
     let nsld_tail =
         link_plan.map(|plan| nsld_final_executable_tail_summary(Path::new(&plan.output_dir)));
+    let prepared_stage_records = link_plan
+        .map(|plan| nsld_prepared_artifact_stage_records_json(Path::new(&plan.output_dir)))
+        .unwrap_or_default();
+    let final_tail_stage_records = link_plan
+        .map(|plan| nsld_final_executable_tail_stage_records_json(Path::new(&plan.output_dir)))
+        .unwrap_or_default();
+    let nsld_next = nsld_next_action_summary(nsld_chain.as_ref(), nsld_tail.as_ref());
+    let nsld_chain_next =
+        nsld_artifact_chain_next_action_mirror(nsld_chain.as_ref(), nsld_tail.as_ref());
+    let nsld_drive_recommendation = nsld_drive_recommendation_for_output_dir(
+        link_plan.map(|plan| Path::new(&plan.output_dir)),
+        &nsld_chain_next,
+    );
+    let nsld_drive_command_set =
+        link_plan.map(|plan| nsld_drive_command_set_for_output_dir(Path::new(&plan.output_dir)));
     vec![
         json_bool_field("link_plan_available", link_plan.is_some()),
         json_optional_string_field(
@@ -301,6 +743,78 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
                 .as_ref()
                 .map(|summary| summary.prepare_command.as_str()),
         ),
+        json_optional_string_field(
+            "nsld_drive_dry_run_command",
+            link_plan
+                .map(|plan| nsld_drive_dry_run_command_for_output_dir(Path::new(&plan.output_dir)))
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "nsld_drive_dry_run_json_command",
+            link_plan
+                .map(|plan| {
+                    nsld_drive_dry_run_json_command_for_output_dir(Path::new(&plan.output_dir))
+                })
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "nsld_drive_apply_next_command",
+            link_plan
+                .map(|plan| {
+                    nsld_drive_apply_next_command_for_output_dir(Path::new(&plan.output_dir))
+                })
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "nsld_drive_apply_next_json_command",
+            link_plan
+                .map(|plan| {
+                    nsld_drive_apply_next_json_command_for_output_dir(Path::new(&plan.output_dir))
+                })
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "nsld_drive_apply_until_clean_command",
+            link_plan
+                .map(|plan| {
+                    nsld_drive_apply_until_clean_command_for_output_dir(Path::new(&plan.output_dir))
+                })
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "nsld_drive_apply_until_clean_json_command",
+            link_plan
+                .map(|plan| {
+                    nsld_drive_apply_until_clean_json_command_for_output_dir(Path::new(
+                        &plan.output_dir,
+                    ))
+                })
+                .as_deref(),
+        ),
+        nsld_drive_command_set_json_field(
+            "nsld_drive_command_set",
+            nsld_drive_command_set.as_ref(),
+        ),
+        json_bool_field(
+            "nsld_drive_recommended_available",
+            nsld_drive_recommendation.available,
+        ),
+        json_field(
+            "nsld_drive_recommended_mode",
+            &nsld_drive_recommendation.mode,
+        ),
+        json_optional_string_field(
+            "nsld_drive_recommended_command",
+            nsld_drive_recommendation.command.as_deref(),
+        ),
+        json_bool_field(
+            "nsld_drive_recommended_mutates_artifacts",
+            nsld_drive_recommendation.mutates_artifacts,
+        ),
+        json_field(
+            "nsld_drive_recommended_reason",
+            &nsld_drive_recommendation.reason,
+        ),
         json_bool_field(
             "nsld_prepared_artifact_chain_ready",
             nsld_chain.as_ref().is_some_and(|summary| summary.ready),
@@ -324,6 +838,38 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
             nsld_chain
                 .as_ref()
                 .and_then(|summary| summary.next_missing_stage.as_deref()),
+        ),
+        json_object_array_field(
+            "nsld_prepared_artifact_stage_records",
+            &prepared_stage_records,
+        ),
+        json_field("nsld_next_action_source", &nsld_next.source),
+        json_field("nsld_next_action", &nsld_next.action),
+        json_optional_string_field("nsld_next_action_command", nsld_next.command.as_deref()),
+        json_field("nsld_next_action_reason", &nsld_next.reason),
+        json_bool_field(
+            "nsld_artifact_chain_next_action_available",
+            nsld_chain_next.available,
+        ),
+        json_optional_string_field(
+            "nsld_artifact_chain_next_action_source",
+            nsld_chain_next.source.as_deref(),
+        ),
+        json_optional_string_field(
+            "nsld_artifact_chain_next_action_command_id",
+            nsld_chain_next.command_id.as_deref(),
+        ),
+        json_optional_string_field(
+            "nsld_artifact_chain_next_action_command",
+            nsld_chain_next.command.as_deref(),
+        ),
+        json_optional_string_field(
+            "nsld_artifact_chain_next_action_command_resolved",
+            nsld_chain_next.command_resolved.as_deref(),
+        ),
+        json_optional_string_field(
+            "nsld_artifact_chain_next_action_reason",
+            nsld_chain_next.reason.as_deref(),
         ),
         json_optional_string_field(
             "nsld_final_executable_pipeline_command",
@@ -354,6 +900,10 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
             nsld_tail
                 .as_ref()
                 .and_then(|summary| summary.next_missing_stage.as_deref()),
+        ),
+        json_object_array_field(
+            "nsld_final_executable_tail_stage_records",
+            &final_tail_stage_records,
         ),
         match nsld_tail
             .as_ref()

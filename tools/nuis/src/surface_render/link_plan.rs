@@ -60,11 +60,53 @@ pub(super) fn write_link_plan_text_fields<W: fmt::Write>(
         writeln!(out, "  link_plan_lowering_plan_index_source: <unavailable>")?;
         writeln!(out, "  link_plan_domain_units: 0")?;
         writeln!(out, "  nsld_prepare_command: <unavailable>")?;
+        writeln!(out, "  nsld_drive_dry_run_command: <unavailable>")?;
+        writeln!(out, "  nsld_drive_dry_run_json_command: <unavailable>")?;
+        writeln!(out, "  nsld_drive_apply_next_command: <unavailable>")?;
+        writeln!(out, "  nsld_drive_apply_next_json_command: <unavailable>")?;
+        writeln!(out, "  nsld_drive_apply_until_clean_command: <unavailable>")?;
+        writeln!(
+            out,
+            "  nsld_drive_apply_until_clean_json_command: <unavailable>"
+        )?;
+        writeln!(out, "  nsld_drive_recommended_available: no")?;
+        writeln!(out, "  nsld_drive_recommended_mode: unavailable")?;
+        writeln!(out, "  nsld_drive_recommended_command: <unavailable>")?;
+        writeln!(out, "  nsld_drive_recommended_mutates_artifacts: no")?;
+        writeln!(
+            out,
+            "  nsld_drive_recommended_reason: link plan is unavailable"
+        )?;
         writeln!(out, "  nsld_prepared_artifact_chain_ready: no")?;
         writeln!(out, "  nsld_prepared_artifact_stages: 0/0")?;
         writeln!(
             out,
             "  nsld_prepared_artifact_next_missing_stage: <unavailable>"
+        )?;
+        writeln!(out, "  nsld_next_action_source: nuis-summary")?;
+        writeln!(out, "  nsld_next_action: unavailable")?;
+        writeln!(out, "  nsld_next_action_command: <unavailable>")?;
+        writeln!(out, "  nsld_next_action_reason: link plan is unavailable")?;
+        writeln!(out, "  nsld_artifact_chain_next_action_available: no")?;
+        writeln!(
+            out,
+            "  nsld_artifact_chain_next_action_source: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_artifact_chain_next_action_command_id: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_artifact_chain_next_action_command: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_artifact_chain_next_action_command_resolved: <unavailable>"
+        )?;
+        writeln!(
+            out,
+            "  nsld_artifact_chain_next_action_reason: <unavailable>"
         )?;
         writeln!(
             out,
@@ -132,6 +174,33 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
     let final_tail_summary = link_plan.map(|plan| {
         crate::workflow::nsld_final_executable_tail_summary(Path::new(&plan.output_dir))
     });
+    let prepared_stage_records = link_plan
+        .map(|plan| {
+            crate::workflow::nsld_prepared_artifact_stage_records_json(Path::new(&plan.output_dir))
+        })
+        .unwrap_or_default();
+    let final_tail_stage_records = link_plan
+        .map(|plan| {
+            crate::workflow::nsld_final_executable_tail_stage_records_json(Path::new(
+                &plan.output_dir,
+            ))
+        })
+        .unwrap_or_default();
+    let nsld_next = crate::workflow::nsld_next_action_summary(
+        prepared_summary.as_ref(),
+        final_tail_summary.as_ref(),
+    );
+    let nsld_chain_next = crate::workflow::nsld_artifact_chain_next_action_mirror(
+        prepared_summary.as_ref(),
+        final_tail_summary.as_ref(),
+    );
+    let nsld_drive_recommendation = crate::workflow::nsld_drive_recommendation_for_output_dir(
+        link_plan.map(|plan| Path::new(&plan.output_dir)),
+        &nsld_chain_next,
+    );
+    let nsld_drive_command_set = link_plan.map(|plan| {
+        crate::workflow::nsld_drive_command_set_for_output_dir(Path::new(&plan.output_dir))
+    });
 
     vec![
         crate::json_bool_field("link_plan_available", link_plan.is_some()),
@@ -169,6 +238,90 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
                 .as_ref()
                 .map(|summary| summary.prepare_command.as_str()),
         ),
+        crate::json_optional_string_field(
+            "nsld_drive_dry_run_command",
+            link_plan
+                .map(|plan| {
+                    crate::workflow::nsld_drive_dry_run_command_for_output_dir(Path::new(
+                        &plan.output_dir,
+                    ))
+                })
+                .as_deref(),
+        ),
+        crate::json_optional_string_field(
+            "nsld_drive_dry_run_json_command",
+            link_plan
+                .map(|plan| {
+                    crate::workflow::nsld_drive_dry_run_json_command_for_output_dir(Path::new(
+                        &plan.output_dir,
+                    ))
+                })
+                .as_deref(),
+        ),
+        crate::json_optional_string_field(
+            "nsld_drive_apply_next_command",
+            link_plan
+                .map(|plan| {
+                    crate::workflow::nsld_drive_apply_next_command_for_output_dir(Path::new(
+                        &plan.output_dir,
+                    ))
+                })
+                .as_deref(),
+        ),
+        crate::json_optional_string_field(
+            "nsld_drive_apply_next_json_command",
+            link_plan
+                .map(|plan| {
+                    crate::workflow::nsld_drive_apply_next_json_command_for_output_dir(Path::new(
+                        &plan.output_dir,
+                    ))
+                })
+                .as_deref(),
+        ),
+        crate::json_optional_string_field(
+            "nsld_drive_apply_until_clean_command",
+            link_plan
+                .map(|plan| {
+                    crate::workflow::nsld_drive_apply_until_clean_command_for_output_dir(Path::new(
+                        &plan.output_dir,
+                    ))
+                })
+                .as_deref(),
+        ),
+        crate::json_optional_string_field(
+            "nsld_drive_apply_until_clean_json_command",
+            link_plan
+                .map(|plan| {
+                    crate::workflow::nsld_drive_apply_until_clean_json_command_for_output_dir(
+                        Path::new(&plan.output_dir),
+                    )
+                })
+                .as_deref(),
+        ),
+        crate::workflow::nsld_drive_command_set_json_field(
+            "nsld_drive_command_set",
+            nsld_drive_command_set.as_ref(),
+        ),
+        crate::json_bool_field(
+            "nsld_drive_recommended_available",
+            nsld_drive_recommendation.available,
+        ),
+        crate::json_field(
+            "nsld_drive_recommended_mode",
+            &nsld_drive_recommendation.mode,
+        ),
+        crate::json_optional_string_field(
+            "nsld_drive_recommended_command",
+            nsld_drive_recommendation.command.as_deref(),
+        ),
+        crate::json_bool_field(
+            "nsld_drive_recommended_mutates_artifacts",
+            nsld_drive_recommendation.mutates_artifacts,
+        ),
+        crate::json_field(
+            "nsld_drive_recommended_reason",
+            &nsld_drive_recommendation.reason,
+        ),
         crate::json_bool_field(
             "nsld_prepared_artifact_chain_ready",
             prepared_summary
@@ -195,6 +348,38 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
             prepared_summary
                 .as_ref()
                 .and_then(|summary| summary.next_missing_stage.as_deref()),
+        ),
+        crate::json_object_array_field(
+            "nsld_prepared_artifact_stage_records",
+            &prepared_stage_records,
+        ),
+        crate::json_field("nsld_next_action_source", &nsld_next.source),
+        crate::json_field("nsld_next_action", &nsld_next.action),
+        crate::json_optional_string_field("nsld_next_action_command", nsld_next.command.as_deref()),
+        crate::json_field("nsld_next_action_reason", &nsld_next.reason),
+        crate::json_bool_field(
+            "nsld_artifact_chain_next_action_available",
+            nsld_chain_next.available,
+        ),
+        crate::json_optional_string_field(
+            "nsld_artifact_chain_next_action_source",
+            nsld_chain_next.source.as_deref(),
+        ),
+        crate::json_optional_string_field(
+            "nsld_artifact_chain_next_action_command_id",
+            nsld_chain_next.command_id.as_deref(),
+        ),
+        crate::json_optional_string_field(
+            "nsld_artifact_chain_next_action_command",
+            nsld_chain_next.command.as_deref(),
+        ),
+        crate::json_optional_string_field(
+            "nsld_artifact_chain_next_action_command_resolved",
+            nsld_chain_next.command_resolved.as_deref(),
+        ),
+        crate::json_optional_string_field(
+            "nsld_artifact_chain_next_action_reason",
+            nsld_chain_next.reason.as_deref(),
         ),
         crate::json_optional_string_field(
             "nsld_final_executable_pipeline_command",
@@ -228,6 +413,10 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
             final_tail_summary
                 .as_ref()
                 .and_then(|summary| summary.next_missing_stage.as_deref()),
+        ),
+        crate::json_object_array_field(
+            "nsld_final_executable_tail_stage_records",
+            &final_tail_stage_records,
         ),
         json_optional_bool_field(
             "nsld_final_executable_pipeline_valid",
@@ -324,7 +513,72 @@ fn write_nsld_artifact_chain_text_fields<W: fmt::Write>(
     let output_dir = Path::new(&plan.output_dir);
     let prepared = crate::workflow::nsld_prepared_artifact_chain_summary(output_dir);
     let final_tail = crate::workflow::nsld_final_executable_tail_summary(output_dir);
+    let nsld_next = crate::workflow::nsld_next_action_summary(Some(&prepared), Some(&final_tail));
+    let nsld_chain_next =
+        crate::workflow::nsld_artifact_chain_next_action_mirror(Some(&prepared), Some(&final_tail));
+    let nsld_drive_recommendation = crate::workflow::nsld_drive_recommendation_for_output_dir(
+        Some(output_dir),
+        &nsld_chain_next,
+    );
     writeln!(out, "  nsld_prepare_command: {}", prepared.prepare_command)?;
+    writeln!(
+        out,
+        "  nsld_drive_dry_run_command: {}",
+        crate::workflow::nsld_drive_dry_run_command_for_output_dir(output_dir)
+    )?;
+    writeln!(
+        out,
+        "  nsld_drive_dry_run_json_command: {}",
+        crate::workflow::nsld_drive_dry_run_json_command_for_output_dir(output_dir)
+    )?;
+    writeln!(
+        out,
+        "  nsld_drive_apply_next_command: {}",
+        crate::workflow::nsld_drive_apply_next_command_for_output_dir(output_dir)
+    )?;
+    writeln!(
+        out,
+        "  nsld_drive_apply_next_json_command: {}",
+        crate::workflow::nsld_drive_apply_next_json_command_for_output_dir(output_dir)
+    )?;
+    writeln!(
+        out,
+        "  nsld_drive_apply_until_clean_command: {}",
+        crate::workflow::nsld_drive_apply_until_clean_command_for_output_dir(output_dir)
+    )?;
+    writeln!(
+        out,
+        "  nsld_drive_apply_until_clean_json_command: {}",
+        crate::workflow::nsld_drive_apply_until_clean_json_command_for_output_dir(output_dir)
+    )?;
+    writeln!(
+        out,
+        "  nsld_drive_recommended_available: {}",
+        crate::yes_no(nsld_drive_recommendation.available)
+    )?;
+    writeln!(
+        out,
+        "  nsld_drive_recommended_mode: {}",
+        nsld_drive_recommendation.mode
+    )?;
+    writeln!(
+        out,
+        "  nsld_drive_recommended_command: {}",
+        nsld_drive_recommendation
+            .command
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_drive_recommended_mutates_artifacts: {}",
+        crate::yes_no(nsld_drive_recommendation.mutates_artifacts)
+    )?;
+    writeln!(
+        out,
+        "  nsld_drive_recommended_reason: {}",
+        nsld_drive_recommendation.reason
+    )?;
     writeln!(
         out,
         "  nsld_prepared_artifact_chain_ready: {}",
@@ -339,6 +593,47 @@ fn write_nsld_artifact_chain_text_fields<W: fmt::Write>(
         out,
         "  nsld_prepared_artifact_next_missing_stage: {}",
         prepared.next_missing_stage.as_deref().unwrap_or("<none>")
+    )?;
+    writeln!(out, "  nsld_next_action_source: {}", nsld_next.source)?;
+    writeln!(out, "  nsld_next_action: {}", nsld_next.action)?;
+    writeln!(
+        out,
+        "  nsld_next_action_command: {}",
+        nsld_next.command.as_deref().unwrap_or("<none>")
+    )?;
+    writeln!(out, "  nsld_next_action_reason: {}", nsld_next.reason)?;
+    writeln!(
+        out,
+        "  nsld_artifact_chain_next_action_available: {}",
+        crate::yes_no(nsld_chain_next.available)
+    )?;
+    writeln!(
+        out,
+        "  nsld_artifact_chain_next_action_source: {}",
+        nsld_chain_next.source.as_deref().unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_artifact_chain_next_action_command_id: {}",
+        nsld_chain_next.command_id.as_deref().unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_artifact_chain_next_action_command: {}",
+        nsld_chain_next.command.as_deref().unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_artifact_chain_next_action_command_resolved: {}",
+        nsld_chain_next
+            .command_resolved
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_artifact_chain_next_action_reason: {}",
+        nsld_chain_next.reason.as_deref().unwrap_or("<none>")
     )?;
     writeln!(
         out,

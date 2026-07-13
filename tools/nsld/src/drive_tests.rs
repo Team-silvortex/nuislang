@@ -25,6 +25,7 @@ fn drive_dry_run_json_reports_next_action_without_execution() {
 
     assert!(json.contains("\"kind\":\"nsld_drive_dry_run\""));
     assert!(json.contains("\"would_execute\":true"));
+    assert!(json.contains("\"mutates_artifacts\":false"));
     assert!(json.contains("\"command_resolved\":\"nsld emit-inputs manifest.toml\""));
 }
 
@@ -50,6 +51,7 @@ fn drive_until_clean_json_reports_loop_shape() {
     assert!(json.contains("\"kind\":\"nsld_drive_until_clean\""));
     assert!(json.contains("\"completed\":true"));
     assert!(json.contains("\"applied_steps\":2"));
+    assert!(json.contains("\"mutates_artifacts\":true"));
     assert!(json.contains("\"stop_reason\":\"clean\""));
     assert!(json.contains("\"stop_command_id\":null"));
     assert!(json.contains("\"stop_source\":null"));
@@ -86,6 +88,7 @@ fn drive_apply_dispatches_whitelisted_emit_inputs() {
     assert_eq!(report.command_id.as_deref(), Some("emit-inputs"));
     assert!(output_present);
     assert_eq!(report.message, "applied emit-inputs");
+    assert!(nsld_drive_apply_report_json(&report).contains("\"mutates_artifacts\":true"));
 }
 
 #[test]
@@ -137,7 +140,9 @@ fn drive_apply_rejects_unlisted_next_action() {
         report.message,
         "next-action-not-whitelisted:emit-native-object"
     );
-    assert!(nsld_drive_apply_report_json(&report).contains("\"applied\":false"));
+    let json = nsld_drive_apply_report_json(&report);
+    assert!(json.contains("\"applied\":false"));
+    assert!(json.contains("\"mutates_artifacts\":false"));
 }
 
 #[test]

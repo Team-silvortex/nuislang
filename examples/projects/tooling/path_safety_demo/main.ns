@@ -1,0 +1,96 @@
+use cpu StdFsContracts;
+
+mod cpu Main {
+  extern "c" fn host_temp_file_handle(prefix_handle: i64) -> i64;
+  extern "c" fn host_path_is_empty(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_dot(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_dotdot(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_relative(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_root(path_handle: i64) -> i64;
+  extern "c" fn host_path_is_hidden(path_handle: i64) -> i64;
+  extern "c" fn host_path_depth(path_handle: i64) -> i64;
+  extern "c" fn host_path_remove(path_handle: i64) -> i64;
+
+  struct PathSafetyProjectSummary {
+    path_handle: i64,
+    is_empty: i64,
+    is_dot: i64,
+    is_dotdot: i64,
+    is_relative: i64,
+    is_root: i64,
+    is_hidden: i64,
+    depth: i64,
+    remove_status: i64
+  }
+
+  fn capture_path_safety_project(prefix_handle: i64) -> PathSafetyProjectSummary {
+    let path_handle: i64 = host_temp_file_handle(prefix_handle);
+    return PathSafetyProjectSummary {
+      path_handle: path_handle,
+      is_empty: host_path_is_empty(path_handle),
+      is_dot: host_path_is_dot(path_handle),
+      is_dotdot: host_path_is_dotdot(path_handle),
+      is_relative: host_path_is_relative(path_handle),
+      is_root: host_path_is_root(path_handle),
+      is_hidden: host_path_is_hidden(path_handle),
+      depth: host_path_depth(path_handle),
+      remove_status: host_path_remove(path_handle)
+    };
+  }
+
+  fn path_safety_total(summary: PathSafetyProjectSummary) -> i64 {
+    return StdFsContracts.path_safety_status_total(
+      summary.is_empty,
+      summary.is_dot,
+      summary.is_dotdot,
+      summary.is_relative,
+      summary.is_root,
+      summary.is_hidden,
+      summary.depth
+    ) + StdFsContracts.host_fs_value_or_zero(summary.path_handle)
+      + StdFsContracts.host_fs_value_exit_code(summary.remove_status);
+  }
+
+  fn main() -> i64 {
+    let summary: PathSafetyProjectSummary = capture_path_safety_project(2333);
+    let relative_safety_score: i64 = StdFsContracts.path_relative_safety_validation_total(
+      summary.is_empty,
+      summary.is_dot,
+      summary.is_dotdot,
+      summary.is_relative,
+      summary.is_root,
+      summary.depth
+    );
+    if summary.path_handle <= 0 {
+      return StdFsContracts.fs_error();
+    }
+    if summary.is_empty != 0 {
+      return StdFsContracts.fs_error();
+    }
+    if summary.is_dot != 0 {
+      return StdFsContracts.fs_error();
+    }
+    if summary.is_dotdot != 0 {
+      return StdFsContracts.fs_error();
+    }
+    if summary.is_relative != 0 {
+      return StdFsContracts.fs_error();
+    }
+    if summary.is_root != 0 {
+      return StdFsContracts.fs_error();
+    }
+    if summary.depth <= 1 {
+      return StdFsContracts.fs_error();
+    }
+    if summary.remove_status <= 0 {
+      return StdFsContracts.fs_error();
+    }
+    if relative_safety_score != 5 {
+      return StdFsContracts.fs_error();
+    }
+    if path_safety_total(summary) > 0 {
+      return StdFsContracts.fs_ok();
+    }
+    return StdFsContracts.fs_error();
+  }
+}

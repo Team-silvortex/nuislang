@@ -46,11 +46,18 @@ use surface_render::append_json_field_strings;
 pub(crate) use workflow::{
     append_json_object_fields, append_workflow_link_plan_json_fields, artifact_lowering_units_json,
     debug_workflow_brief, debug_workflow_samples_brief, default_build_output_dir, handle_workflow,
-    json_object_array_field, load_link_plan_for_output_dir, nsld_final_executable_tail_summary,
-    nsld_prepare_command_for_output_dir, nsld_prepared_artifact_chain_summary,
-    print_workflow_frontdoor_surface, project_abi_checks_json, project_domain_registry_checks_json,
-    project_frontdoor_surface, project_lowering_checks_json, single_source_frontdoor_surface,
-    toolchain_frontdoor_surface, workflow_frontdoor_json_object_field, WorkflowFrontdoorSurface,
+    json_object_array_field, load_link_plan_for_output_dir,
+    nsld_drive_apply_next_command_for_output_dir,
+    nsld_drive_apply_next_json_command_for_output_dir,
+    nsld_drive_apply_until_clean_command_for_output_dir,
+    nsld_drive_apply_until_clean_json_command_for_output_dir,
+    nsld_drive_command_set_for_output_dir, nsld_drive_dry_run_command_for_output_dir,
+    nsld_drive_dry_run_json_command_for_output_dir, nsld_drive_recommendation_for_output_dir,
+    nsld_final_executable_tail_summary, nsld_prepare_command_for_output_dir,
+    nsld_prepared_artifact_chain_summary, print_workflow_frontdoor_surface,
+    project_abi_checks_json, project_domain_registry_checks_json, project_frontdoor_surface,
+    project_lowering_checks_json, single_source_frontdoor_surface, toolchain_frontdoor_surface,
+    workflow_frontdoor_json_object_field, WorkflowFrontdoorSurface,
 };
 #[cfg(test)]
 pub(crate) use workflow::{
@@ -58,6 +65,15 @@ pub(crate) use workflow::{
     build_workflow_frontdoor_surface, project_compile_workflow_source_profile,
     recommend_project_workflow_step, render_workflow_json, run_artifact_command_for_output_dir,
     single_source_workflow_source_profile, WorkflowRecommendation,
+};
+#[cfg(test)]
+pub(crate) use workflow::{
+    release_check_nsld_drive_command_for_output_dir,
+    release_check_nsld_drive_dry_run_command_for_output_dir,
+    release_check_nsld_drive_dry_run_json_command_for_output_dir,
+    release_check_nsld_drive_json_command_for_output_dir,
+    release_check_nsld_drive_until_clean_command_for_output_dir,
+    release_check_nsld_drive_until_clean_json_command_for_output_dir,
 };
 
 fn main() {
@@ -324,6 +340,60 @@ fn handle_release_check(
     run_build_output_self_check(&output_dir).map_err(|error| {
         format!("release-check aborted because built outputs failed self-check: {error}")
     })?;
+    if success_logs_enabled() {
+        let nsld_drive_commands = nsld_drive_command_set_for_output_dir(&output_dir);
+        println!("release-check: nsld-drive");
+        println!("  protocol: {}", nsld_drive_commands.protocol);
+        println!(
+            "  recommended_first_json_command: {}",
+            nsld_drive_commands.recommended_first_json_command
+        );
+        println!("  dry_run_command: {}", nsld_drive_commands.dry_run_command);
+        println!(
+            "  dry_run_json_command: {}",
+            nsld_drive_commands.dry_run_json_command
+        );
+        println!(
+            "  dry_run_mutates_artifacts: {}",
+            nsld_drive_commands.dry_run_mutates_artifacts
+        );
+        println!(
+            "  recommended_command: {}",
+            nsld_drive_commands.apply_next_command
+        );
+        println!(
+            "  recommended_json_command: {}",
+            nsld_drive_commands.apply_next_json_command
+        );
+        println!(
+            "  apply_next_command: {}",
+            nsld_drive_commands.apply_next_command
+        );
+        println!(
+            "  apply_next_json_command: {}",
+            nsld_drive_commands.apply_next_json_command
+        );
+        println!(
+            "  apply_next_mutates_artifacts: {}",
+            nsld_drive_commands.apply_next_mutates_artifacts
+        );
+        println!(
+            "  until_clean_command: {}",
+            nsld_drive_commands.apply_until_clean_command
+        );
+        println!(
+            "  until_clean_json_command: {}",
+            nsld_drive_commands.apply_until_clean_json_command
+        );
+        println!(
+            "  apply_until_clean_mutates_artifacts: {}",
+            nsld_drive_commands.apply_until_clean_mutates_artifacts
+        );
+        println!("  mode: apply-next");
+        println!(
+            "  note: nsld drive is reported as the linker artifact-chain closure step; release-check does not auto-apply or mutate artifacts yet"
+        );
+    }
     if success_logs_enabled() {
         println!("release-check: ok");
         println!("  output_dir: {}", output_dir.display());
@@ -1017,9 +1087,30 @@ fn print_run_artifact_link_plan_status(link_plan: Option<&nuisc::linker::LinkPla
         println!("  link_plan_lowering_plan_index_path: <unavailable>");
         println!("  link_plan_lowering_plan_index_source: <unavailable>");
         println!("  nsld_prepare_command: <unavailable>");
+        println!("  nsld_drive_dry_run_command: <unavailable>");
+        println!("  nsld_drive_dry_run_json_command: <unavailable>");
+        println!("  nsld_drive_apply_next_command: <unavailable>");
+        println!("  nsld_drive_apply_next_json_command: <unavailable>");
+        println!("  nsld_drive_apply_until_clean_command: <unavailable>");
+        println!("  nsld_drive_apply_until_clean_json_command: <unavailable>");
+        println!("  nsld_drive_recommended_available: false");
+        println!("  nsld_drive_recommended_mode: unavailable");
+        println!("  nsld_drive_recommended_command: <unavailable>");
+        println!("  nsld_drive_recommended_mutates_artifacts: false");
+        println!("  nsld_drive_recommended_reason: link plan is unavailable");
         println!("  nsld_prepared_artifact_chain_ready: false");
         println!("  nsld_prepared_artifact_stages: 0/0");
         println!("  nsld_prepared_artifact_next_missing_stage: <unavailable>");
+        println!("  nsld_next_action_source: nuis-summary");
+        println!("  nsld_next_action: unavailable");
+        println!("  nsld_next_action_command: <unavailable>");
+        println!("  nsld_next_action_reason: link plan is unavailable");
+        println!("  nsld_artifact_chain_next_action_available: false");
+        println!("  nsld_artifact_chain_next_action_source: <unavailable>");
+        println!("  nsld_artifact_chain_next_action_command_id: <unavailable>");
+        println!("  nsld_artifact_chain_next_action_command: <unavailable>");
+        println!("  nsld_artifact_chain_next_action_command_resolved: <unavailable>");
+        println!("  nsld_artifact_chain_next_action_reason: <unavailable>");
         println!("  nsld_final_executable_pipeline_command: <unavailable>");
         println!("  nsld_final_executable_tail_ready: false");
         println!("  nsld_final_executable_tail_stages: 0/0");
@@ -2344,6 +2435,59 @@ fn print_nsld_artifact_chain_status(plan: &nuisc::linker::LinkPlan) {
         "  nsld_prepare_command: {}",
         nsld_prepare_command_for_output_dir(output_dir)
     );
+    println!(
+        "  nsld_drive_dry_run_command: {}",
+        nsld_drive_dry_run_command_for_output_dir(output_dir)
+    );
+    println!(
+        "  nsld_drive_dry_run_json_command: {}",
+        nsld_drive_dry_run_json_command_for_output_dir(output_dir)
+    );
+    println!(
+        "  nsld_drive_apply_next_command: {}",
+        nsld_drive_apply_next_command_for_output_dir(output_dir)
+    );
+    println!(
+        "  nsld_drive_apply_next_json_command: {}",
+        nsld_drive_apply_next_json_command_for_output_dir(output_dir)
+    );
+    println!(
+        "  nsld_drive_apply_until_clean_command: {}",
+        nsld_drive_apply_until_clean_command_for_output_dir(output_dir)
+    );
+    println!(
+        "  nsld_drive_apply_until_clean_json_command: {}",
+        nsld_drive_apply_until_clean_json_command_for_output_dir(output_dir)
+    );
+    let nsld_tail = nsld_final_executable_tail_summary(output_dir);
+    let nsld_next = workflow::nsld_next_action_summary(Some(&nsld_chain), Some(&nsld_tail));
+    let nsld_chain_next =
+        workflow::nsld_artifact_chain_next_action_mirror(Some(&nsld_chain), Some(&nsld_tail));
+    let nsld_drive_recommendation =
+        nsld_drive_recommendation_for_output_dir(Some(output_dir), &nsld_chain_next);
+    println!(
+        "  nsld_drive_recommended_available: {}",
+        nsld_drive_recommendation.available
+    );
+    println!(
+        "  nsld_drive_recommended_mode: {}",
+        nsld_drive_recommendation.mode
+    );
+    println!(
+        "  nsld_drive_recommended_command: {}",
+        nsld_drive_recommendation
+            .command
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    println!(
+        "  nsld_drive_recommended_mutates_artifacts: {}",
+        nsld_drive_recommendation.mutates_artifacts
+    );
+    println!(
+        "  nsld_drive_recommended_reason: {}",
+        nsld_drive_recommendation.reason
+    );
     println!("  nsld_prepared_artifact_chain_ready: {}", nsld_chain.ready);
     println!(
         "  nsld_prepared_artifact_stages: {}/{}",
@@ -2353,7 +2497,40 @@ fn print_nsld_artifact_chain_status(plan: &nuisc::linker::LinkPlan) {
         "  nsld_prepared_artifact_next_missing_stage: {}",
         nsld_chain.next_missing_stage.as_deref().unwrap_or("<none>")
     );
-    let nsld_tail = nsld_final_executable_tail_summary(output_dir);
+    println!("  nsld_next_action_source: {}", nsld_next.source);
+    println!("  nsld_next_action: {}", nsld_next.action);
+    println!(
+        "  nsld_next_action_command: {}",
+        nsld_next.command.as_deref().unwrap_or("<none>")
+    );
+    println!("  nsld_next_action_reason: {}", nsld_next.reason);
+    println!(
+        "  nsld_artifact_chain_next_action_available: {}",
+        nsld_chain_next.available
+    );
+    println!(
+        "  nsld_artifact_chain_next_action_source: {}",
+        nsld_chain_next.source.as_deref().unwrap_or("<none>")
+    );
+    println!(
+        "  nsld_artifact_chain_next_action_command_id: {}",
+        nsld_chain_next.command_id.as_deref().unwrap_or("<none>")
+    );
+    println!(
+        "  nsld_artifact_chain_next_action_command: {}",
+        nsld_chain_next.command.as_deref().unwrap_or("<none>")
+    );
+    println!(
+        "  nsld_artifact_chain_next_action_command_resolved: {}",
+        nsld_chain_next
+            .command_resolved
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    println!(
+        "  nsld_artifact_chain_next_action_reason: {}",
+        nsld_chain_next.reason.as_deref().unwrap_or("<none>")
+    );
     println!(
         "  nsld_final_executable_pipeline_command: {}",
         nsld_tail.pipeline_command
@@ -3265,6 +3442,12 @@ fn print_help() {
     println!(
         "    nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] <output-dir>"
     );
+    println!("    nsld drive <output-dir>/nuis.build.manifest.toml");
+    println!("    nsld drive <output-dir>/nuis.build.manifest.toml --json");
+    println!("    nsld drive <output-dir>/nuis.build.manifest.toml --apply");
+    println!("    nsld drive <output-dir>/nuis.build.manifest.toml --apply --json");
+    println!("    nsld drive <output-dir>/nuis.build.manifest.toml --apply --until-clean");
+    println!("    nsld drive <output-dir>/nuis.build.manifest.toml --apply --until-clean --json");
     println!(
         "    nuis run-artifact [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
     );

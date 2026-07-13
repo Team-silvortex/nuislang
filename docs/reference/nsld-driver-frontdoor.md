@@ -15,6 +15,8 @@ cargo run -p nsld -- check-next-action <artifact-output-dir> --json
 cargo run -p nsld -- drive <artifact-output-dir>
 cargo run -p nsld -- drive <artifact-output-dir> --json
 cargo run -p nsld -- drive <artifact-output-dir> --apply
+cargo run -p nsld -- drive <artifact-output-dir> --apply --json
+cargo run -p nsld -- drive <artifact-output-dir> --apply --until-clean
 cargo run -p nsld -- drive <artifact-output-dir> --apply --until-clean --json
 ```
 
@@ -50,6 +52,30 @@ example, a host-assisted final executable route can repeatedly emit a blocked
 pipeline report until a later backend or policy gate makes finalization
 available.
 
+JSON output reports `mutates_artifacts` for all drive modes:
+
+* dry-run always reports `false`
+* `--apply` reports whether one step was actually applied
+* `--apply --until-clean` reports whether at least one step was applied
+
+## Command Set
+
+`nuis` workflow and artifact surfaces expose the same commands as a structured
+`nsld_drive_command_set` or `artifact_nsld_drive_command_set` object. The object
+uses `protocol = "nsld-drive-command-set-v1"` and includes
+`recommended_first_json_command`, which should point at the non-mutating
+`nsld drive ... --json` command.
+
+Automation should read `recommended_first_json_command` before applying a
+mutating step, then choose `apply_next_json_command` or
+`apply_until_clean_json_command` only after inspecting the dry-run result.
+
+`nuis release-check` prints the same protocol and command set summary after the
+build manifest and artifact self-check pass. The release-check frontdoor does
+not apply linker actions by itself; it reports the safe dry-run command first
+and labels mutating commands explicitly so automation can make the handoff to
+`nsld drive` deliberately.
+
 ## Until-Clean JSON
 
 The JSON shape for `nsld drive --apply --until-clean --json` is:
@@ -60,6 +86,7 @@ The JSON shape for `nsld drive --apply --until-clean --json` is:
   "kind": "nsld_drive_until_clean",
   "completed": false,
   "applied_steps": 0,
+  "mutates_artifacts": false,
   "capped": false,
   "stop_reason": "not-applied",
   "stop_command_id": "emit-native-object",

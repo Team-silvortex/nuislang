@@ -95,6 +95,7 @@ source_modules = [
   "path_extension_is_recipe.ns",
   "path_starts_with_dot_recipe.ns",
   "path_is_hidden_recipe.ns",
+  "path_safety_recipe.ns",
   "path_is_relative_recipe.ns",
   "path_is_root_recipe.ns",
   "path_ends_with_slash_recipe.ns",

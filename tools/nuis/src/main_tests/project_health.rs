@@ -101,6 +101,23 @@ mod cpu Main {
     assert!(json.contains("\"artifact_output_dir\":\""));
     assert!(json.contains("\"artifact_ready_to_run\":false"));
     assert!(json.contains("\"artifact_recommended_next_step\":\"build\""));
+    assert!(json.contains("\"artifact_nsld_drive_dry_run_command\":\"nsld drive "));
+    assert!(json.contains("\"artifact_nsld_drive_dry_run_json_command\":\"nsld drive "));
+    assert!(json.contains(" --json\""));
+    assert!(json.contains("\"artifact_nsld_drive_apply_next_command\":\"nsld drive "));
+    assert!(json.contains("\"artifact_nsld_drive_apply_next_json_command\":\"nsld drive "));
+    assert!(json.contains(" --apply --json\""));
+    assert!(json.contains("\"artifact_nsld_drive_apply_until_clean_command\":\"nsld drive "));
+    assert!(json.contains("\"artifact_nsld_drive_apply_until_clean_json_command\":\"nsld drive "));
+    assert!(json.contains(" --apply --until-clean --json\""));
+    assert!(json.contains("\"artifact_nsld_drive_command_set\":{"));
+    assert!(json.contains("\"protocol\":\"nsld-drive-command-set-v1\""));
+    assert!(json.contains("\"recommended_first_json_command\":\"nsld drive "));
+    assert!(json.contains("\"dry_run_mutates_artifacts\":false"));
+    assert!(json.contains("\"apply_next_mutates_artifacts\":true"));
+    assert!(json.contains("\"apply_until_clean_mutates_artifacts\":true"));
+    assert!(json.contains("\"apply_next_json_command\":\"nsld drive "));
+    assert!(json.contains("\"apply_until_clean_json_command\":\"nsld drive "));
     assert!(json.contains("\"link_plan_available\":false"));
     assert!(json.contains("\"link_plan_final_stage\":null"));
     assert!(json.contains("\"tests_declared\":1"));
@@ -166,6 +183,25 @@ mod cpu Main {
     assert!(lines
         .iter()
         .any(|line| line == "  text_handle_rewrite_total_hits: 2"));
+    assert!(lines
+        .iter()
+        .any(|line| line.starts_with("  artifact_nsld_drive_dry_run_command: nsld drive ")));
+    assert!(lines
+        .iter()
+        .any(|line| line.starts_with("  artifact_nsld_drive_dry_run_json_command: nsld drive ")));
+    assert!(lines.iter().any(|line| line.ends_with(" --json")));
+    assert!(
+        lines
+            .iter()
+            .any(|line| line
+                .starts_with("  artifact_nsld_drive_apply_next_json_command: nsld drive "))
+    );
+    assert!(lines.iter().any(|line| line.ends_with(" --apply --json")));
+    assert!(lines.iter().any(|line| line
+        .starts_with("  artifact_nsld_drive_apply_until_clean_json_command: nsld drive ")));
+    assert!(lines
+        .iter()
+        .any(|line| line.ends_with(" --apply --until-clean --json")));
 
     let mut written = String::new();
     surface_render::write_project_status_text_summary(&mut written, &project_root)
@@ -220,6 +256,23 @@ mod cpu Main {
     assert!(json.contains("\"lowering_checks_ok\":true"));
     assert!(json.contains("\"artifact_output_dir\":\""));
     assert!(json.contains("\"artifact_ready_to_run\":false"));
+    assert!(json.contains("\"artifact_nsld_drive_dry_run_command\":\"nsld drive "));
+    assert!(json.contains("\"artifact_nsld_drive_dry_run_json_command\":\"nsld drive "));
+    assert!(json.contains(" --json\""));
+    assert!(json.contains("\"artifact_nsld_drive_apply_next_command\":\"nsld drive "));
+    assert!(json.contains("\"artifact_nsld_drive_apply_next_json_command\":\"nsld drive "));
+    assert!(json.contains(" --apply --json\""));
+    assert!(json.contains("\"artifact_nsld_drive_apply_until_clean_command\":\"nsld drive "));
+    assert!(json.contains("\"artifact_nsld_drive_apply_until_clean_json_command\":\"nsld drive "));
+    assert!(json.contains(" --apply --until-clean --json\""));
+    assert!(json.contains("\"artifact_nsld_drive_command_set\":{"));
+    assert!(json.contains("\"protocol\":\"nsld-drive-command-set-v1\""));
+    assert!(json.contains("\"recommended_first_json_command\":\"nsld drive "));
+    assert!(json.contains("\"dry_run_mutates_artifacts\":false"));
+    assert!(json.contains("\"apply_next_mutates_artifacts\":true"));
+    assert!(json.contains("\"apply_until_clean_mutates_artifacts\":true"));
+    assert!(json.contains("\"apply_next_json_command\":\"nsld drive "));
+    assert!(json.contains("\"apply_until_clean_json_command\":\"nsld drive "));
     assert!(json.contains("\"link_plan_available\":false"));
     assert!(json.contains("\"galaxy_check_status\":\"skipped\""));
     assert!(json.contains("\"galaxy_lock_status\":\"missing\""));

@@ -35,11 +35,12 @@ fn single_source_frontdoor_surface_matches_compile_contract() {
     assert_eq!(frontdoor.workflow_kind, "compile_workflow");
     assert_eq!(
         frontdoor.workflow_brief,
-        "check -> test -> build -> artifact_doctor -> run_artifact -> release_check"
+        "check -> test -> build -> artifact_doctor -> nsld_drive -> run_artifact -> release_check"
     );
     assert!(frontdoor
         .workflow_samples
         .contains("nuis artifact-doctor <output-dir>"));
+    assert!(frontdoor.workflow_samples.contains("nsld drive"));
     assert_eq!(frontdoor.recommended_next_step, "check");
 }
 
@@ -69,8 +70,10 @@ fn project_frontdoor_surface_uses_project_compile_profile() {
 #[test]
 fn project_compile_workflow_brief_includes_artifact_follow_up() {
     assert!(nuisc::project_compile_workflow_brief().contains("artifact_doctor"));
+    assert!(nuisc::project_compile_workflow_brief().contains("nsld_drive"));
     assert!(nuisc::project_compile_workflow_brief().contains("run_artifact"));
     assert!(nuisc::project_compile_samples_brief().contains("nuis artifact-doctor"));
+    assert!(nuisc::project_compile_samples_brief().contains("nsld drive"));
 }
 
 #[test]
@@ -78,8 +81,72 @@ fn single_source_workflow_helpers_emit_artifact_follow_up_commands() {
     let input = Path::new("examples/demo.ns");
     let output_dir = default_build_output_dir(input);
     assert!(artifact_workflow_brief().contains("artifact_doctor"));
+    assert!(artifact_workflow_brief().contains("nsld_drive"));
     assert!(artifact_doctor_command_for_output_dir(&output_dir).contains("nuis artifact-doctor"));
     assert!(run_artifact_command_for_output_dir(&output_dir).contains("nuis run-artifact"));
+    assert_eq!(
+        release_check_nsld_drive_dry_run_command_for_output_dir(&output_dir),
+        format!(
+            "nsld drive {}/nuis.build.manifest.toml",
+            output_dir.display()
+        )
+    );
+    assert_eq!(
+        release_check_nsld_drive_dry_run_json_command_for_output_dir(&output_dir),
+        format!(
+            "nsld drive {}/nuis.build.manifest.toml --json",
+            output_dir.display()
+        )
+    );
+    assert_eq!(
+        release_check_nsld_drive_command_for_output_dir(&output_dir),
+        format!(
+            "nsld drive {}/nuis.build.manifest.toml --apply",
+            output_dir.display()
+        )
+    );
+    assert_eq!(
+        release_check_nsld_drive_json_command_for_output_dir(&output_dir),
+        format!(
+            "nsld drive {}/nuis.build.manifest.toml --apply --json",
+            output_dir.display()
+        )
+    );
+    assert_eq!(
+        release_check_nsld_drive_until_clean_command_for_output_dir(&output_dir),
+        format!(
+            "nsld drive {}/nuis.build.manifest.toml --apply --until-clean",
+            output_dir.display()
+        )
+    );
+    assert_eq!(
+        release_check_nsld_drive_until_clean_json_command_for_output_dir(&output_dir),
+        format!(
+            "nsld drive {}/nuis.build.manifest.toml --apply --until-clean --json",
+            output_dir.display()
+        )
+    );
+    let command_set = nsld_drive_command_set_for_output_dir(&output_dir);
+    assert_eq!(command_set.protocol, "nsld-drive-command-set-v1");
+    assert_eq!(
+        command_set.recommended_first_json_command,
+        release_check_nsld_drive_dry_run_json_command_for_output_dir(&output_dir)
+    );
+    assert_eq!(
+        command_set.dry_run_command,
+        release_check_nsld_drive_dry_run_command_for_output_dir(&output_dir)
+    );
+    assert_eq!(
+        command_set.apply_next_command,
+        release_check_nsld_drive_command_for_output_dir(&output_dir)
+    );
+    assert_eq!(
+        command_set.apply_until_clean_command,
+        release_check_nsld_drive_until_clean_command_for_output_dir(&output_dir)
+    );
+    assert!(!command_set.dry_run_mutates_artifacts);
+    assert!(command_set.apply_next_mutates_artifacts);
+    assert!(command_set.apply_until_clean_mutates_artifacts);
     assert_eq!(
         run_artifact_command_for_output_dir(&output_dir),
         format!("nuis run-artifact {}", output_dir.display())

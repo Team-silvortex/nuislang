@@ -43,7 +43,40 @@ mod cpu Main {
         "\"default_build_output_dir\":\"{}\"",
         output_dir.display()
     )));
-    assert!(json.contains("\"artifact_workflow\":\"build -> inspect_artifact -> verify_artifact -> artifact_doctor -> verify_build_manifest -> run_artifact\""));
+    assert!(json.contains("\"artifact_workflow\":\"build -> inspect_artifact -> verify_artifact -> artifact_doctor -> nsld_drive -> verify_build_manifest -> run_artifact\""));
+    assert!(json.contains(&format!(
+        "\"artifact_nsld_drive_dry_run_command\":\"nsld drive {}/nuis.build.manifest.toml\"",
+        output_dir.display()
+    )));
+    assert!(json.contains(&format!(
+        "\"artifact_nsld_drive_dry_run_json_command\":\"nsld drive {}/nuis.build.manifest.toml --json\"",
+        output_dir.display()
+    )));
+    assert!(json.contains(&format!(
+        "\"artifact_nsld_drive_apply_next_command\":\"nsld drive {}/nuis.build.manifest.toml --apply\"",
+        output_dir.display()
+    )));
+    assert!(json.contains(&format!(
+        "\"artifact_nsld_drive_apply_next_json_command\":\"nsld drive {}/nuis.build.manifest.toml --apply --json\"",
+        output_dir.display()
+    )));
+    assert!(json.contains(&format!(
+        "\"artifact_nsld_drive_apply_until_clean_command\":\"nsld drive {}/nuis.build.manifest.toml --apply --until-clean\"",
+        output_dir.display()
+    )));
+    assert!(json.contains(&format!(
+        "\"artifact_nsld_drive_apply_until_clean_json_command\":\"nsld drive {}/nuis.build.manifest.toml --apply --until-clean --json\"",
+        output_dir.display()
+    )));
+    assert!(json.contains("\"artifact_nsld_drive_command_set\":{"));
+    assert!(json.contains("\"protocol\":\"nsld-drive-command-set-v1\""));
+    assert!(json.contains("\"recommended_first_json_command\":\"nsld drive "));
+    assert!(json.contains("\"dry_run_mutates_artifacts\":false"));
+    assert!(json.contains("\"apply_next_mutates_artifacts\":true"));
+    assert!(json.contains("\"apply_until_clean_mutates_artifacts\":true"));
+    assert!(json.contains("\"dry_run_json_command\":\"nsld drive "));
+    assert!(json.contains("\"apply_next_json_command\":\"nsld drive "));
+    assert!(json.contains("\"apply_until_clean_json_command\":\"nsld drive "));
     assert!(json.contains("\"artifact_ready_to_run\":false"));
     assert!(json.contains("\"artifact_diagnostic_code\":\"missing_outputs\""));
     assert!(json.contains("\"artifact_self_check_ready\":false"));
@@ -114,8 +147,45 @@ mod cpu Main {
     assert!(json.contains("\"link_plan_final_link_mode\":\"host-toolchain-finalize\""));
     assert!(json.contains("\"link_plan_lowering_plan_index_source\":\"compiled_artifact_section\""));
     assert!(json.contains("\"nsld_prepare_command\":\"nsld prepare "));
+    assert!(json.contains("\"nsld_drive_dry_run_command\":\"nsld drive "));
+    assert!(json.contains("\"nsld_drive_dry_run_json_command\":\"nsld drive "));
+    assert!(json.contains(" --json\""));
+    assert!(json.contains("\"nsld_drive_apply_next_command\":\"nsld drive "));
+    assert!(json.contains("\"nsld_drive_apply_next_json_command\":\"nsld drive "));
+    assert!(json.contains(" --apply --json\""));
+    assert!(json.contains("\"nsld_drive_apply_until_clean_command\":\"nsld drive "));
+    assert!(json.contains("\"nsld_drive_apply_until_clean_json_command\":\"nsld drive "));
+    assert!(json.contains(" --apply --until-clean --json\""));
+    assert!(json.contains("\"nsld_drive_command_set\":{"));
+    assert!(json.contains("\"protocol\":\"nsld-drive-command-set-v1\""));
+    assert!(json.contains("\"recommended_first_json_command\":\"nsld drive "));
+    assert!(json.contains("\"dry_run_mutates_artifacts\":false"));
+    assert!(json.contains("\"apply_next_mutates_artifacts\":true"));
+    assert!(json.contains("\"apply_until_clean_mutates_artifacts\":true"));
+    assert!(json.contains("\"apply_next_json_command\":\"nsld drive "));
+    assert!(json.contains("\"apply_until_clean_json_command\":\"nsld drive "));
+    assert!(json.contains("\"nsld_drive_recommended_mode\":\"apply-next\""));
+    assert!(json.contains("\"nsld_drive_recommended_mutates_artifacts\":true"));
     assert!(json.contains("\"nsld_prepared_artifact_chain_ready\":false"));
     assert!(json.contains("\"nsld_prepared_artifact_next_missing_stage\":\"link-inputs\""));
+    assert!(json.contains(
+        "\"nsld_prepared_artifact_stage_records\":[{\"stage\":\"link-inputs\",\"file\":\"nuis.nsld.link-inputs.toml\",\"present\":false,\"required\":true,\"next_action_source\":\"required\",\"command_id\":\"emit-inputs\""
+    ));
+    assert!(json.contains("\"nsld_next_action_source\":\"nuis-summary\""));
+    assert!(json.contains("\"nsld_next_action\":\"prepare\""));
+    assert!(json.contains("\"nsld_next_action_command\":\"nsld prepare "));
+    assert!(json.contains(
+        "\"nsld_next_action_reason\":\"prepared artifact chain is missing `link-inputs`\""
+    ));
+    assert!(json.contains("\"nsld_artifact_chain_next_action_available\":true"));
+    assert!(json.contains("\"nsld_artifact_chain_next_action_source\":\"required\""));
+    assert!(json.contains("\"nsld_artifact_chain_next_action_command_id\":\"emit-inputs\""));
+    assert!(
+        json.contains("\"nsld_artifact_chain_next_action_command\":\"nsld emit-inputs <input>\"")
+    );
+    assert!(json.contains(
+        "\"nsld_artifact_chain_next_action_reason\":\"first missing required artifact stage `link-inputs`\""
+    ));
     assert!(json.contains(
         "\"nsld_final_executable_pipeline_command\":\"nsld emit-final-executable-pipeline "
     ));
@@ -143,6 +213,53 @@ mod cpu Main {
 }
 
 #[test]
+fn workflow_json_reports_ready_nsld_next_action_for_complete_final_tail() {
+    let project_root = write_temp_project_fixture(
+        "workflow_json_ready_nsld_smoke",
+        r#"
+name = "workflow_json_ready_nsld_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+        .trim_start(),
+        r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 8;
+  }
+}
+"#,
+    );
+    let output_dir = default_build_output_dir(&project_root);
+
+    handle_build(project_root.clone(), output_dir.clone(), false, None, None)
+        .expect("build passes");
+    write_prepared_nsld_chain_placeholders(&output_dir);
+    write_ready_nsld_final_tail_placeholders(&output_dir);
+
+    let json = render_workflow_json(&project_root).expect("render workflow json");
+
+    assert!(json.contains("\"nsld_prepared_artifact_chain_ready\":true"));
+    assert!(json.contains("\"nsld_final_executable_tail_ready\":true"));
+    assert!(json.contains(
+        "\"nsld_final_executable_tail_stage_records\":[{\"stage\":\"final-executable-writer-input\",\"file\":\"nuis.nsld.final-executable-writer-input.toml\",\"present\":true"
+    ));
+    assert!(json.contains("\"nsld_next_action_source\":\"nuis-summary\""));
+    assert!(json.contains("\"nsld_next_action\":\"ready\""));
+    assert!(json.contains("\"nsld_next_action_command\":null"));
+    assert!(json.contains(
+        "\"nsld_next_action_reason\":\"nsld prepared chain and final executable tail are ready\""
+    ));
+    assert!(json.contains("\"nsld_artifact_chain_next_action_available\":false"));
+    assert!(json.contains("\"nsld_artifact_chain_next_action_command_id\":null"));
+    assert!(json.contains("\"nsld_drive_recommended_mode\":\"dry-run\""));
+    assert!(json.contains("\"nsld_drive_recommended_mutates_artifacts\":false"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_valid\":true"));
+    assert!(json.contains("\"nsld_final_executable_pipeline_required_stage_path_present_count\":9"));
+}
+
+#[test]
 fn workflow_json_reports_frontdoor_and_artifact_fields_for_single_source() {
     let dir = temp_dir("workflow_json_single_source");
     let input = dir.join("hello.ns");
@@ -167,6 +284,32 @@ mod cpu Main {
         "\"default_build_output_dir\":\"{}\"",
         output_dir.display()
     )));
+    assert!(json.contains(&format!(
+        "\"artifact_nsld_drive_dry_run_command\":\"nsld drive {}/nuis.build.manifest.toml\"",
+        output_dir.display()
+    )));
+    assert!(json.contains(&format!(
+        "\"artifact_nsld_drive_dry_run_json_command\":\"nsld drive {}/nuis.build.manifest.toml --json\"",
+        output_dir.display()
+    )));
+    assert!(json.contains(&format!(
+        "\"artifact_nsld_drive_apply_next_command\":\"nsld drive {}/nuis.build.manifest.toml --apply\"",
+        output_dir.display()
+    )));
+    assert!(json.contains(&format!(
+        "\"artifact_nsld_drive_apply_next_json_command\":\"nsld drive {}/nuis.build.manifest.toml --apply --json\"",
+        output_dir.display()
+    )));
+    assert!(json.contains(&format!(
+        "\"artifact_nsld_drive_apply_until_clean_command\":\"nsld drive {}/nuis.build.manifest.toml --apply --until-clean\"",
+        output_dir.display()
+    )));
+    assert!(json.contains(&format!(
+        "\"artifact_nsld_drive_apply_until_clean_json_command\":\"nsld drive {}/nuis.build.manifest.toml --apply --until-clean --json\"",
+        output_dir.display()
+    )));
+    assert!(json.contains("\"artifact_nsld_drive_command_set\":{"));
+    assert!(json.contains("\"protocol\":\"nsld-drive-command-set-v1\""));
     assert!(json.contains("\"artifact_ready_to_run\":false"));
     assert!(json.contains("\"artifact_diagnostic_code\":\"missing_outputs\""));
     assert!(json.contains("\"artifact_self_check_ready\":false"));
