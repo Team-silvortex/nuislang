@@ -4,6 +4,8 @@ mod command;
 mod frontdoor;
 mod json_bits;
 mod link_plan;
+mod link_plan_commands;
+mod link_plan_tail;
 mod render;
 
 pub(crate) use command::{
@@ -25,26 +27,31 @@ pub(crate) use json_bits::{
 pub(crate) use link_plan::{
     append_workflow_link_plan_json_fields, artifact_doctor_command_for_output_dir,
     load_link_plan_for_output_dir, nsld_artifact_chain_next_action_mirror,
+    nsld_drive_recommendation_for_output_dir, nsld_final_executable_output_boundary_summary,
+    nsld_final_executable_tail_stage_records_json, nsld_next_action_summary,
+    nsld_prepared_artifact_chain_summary, nsld_prepared_artifact_stage_records_json,
+    run_artifact_command_for_output_dir,
+};
+pub(crate) use link_plan_commands::{
     nsld_drive_apply_next_command_for_output_dir,
     nsld_drive_apply_next_json_command_for_output_dir,
     nsld_drive_apply_until_clean_command_for_output_dir,
     nsld_drive_apply_until_clean_json_command_for_output_dir,
     nsld_drive_command_set_for_output_dir, nsld_drive_command_set_json_field,
     nsld_drive_dry_run_command_for_output_dir, nsld_drive_dry_run_json_command_for_output_dir,
-    nsld_drive_recommendation_for_output_dir, nsld_final_executable_output_boundary_summary,
-    nsld_final_executable_tail_stage_records_json, nsld_final_executable_tail_summary,
-    nsld_next_action_summary, nsld_prepare_command_for_output_dir,
-    nsld_prepared_artifact_chain_summary, nsld_prepared_artifact_stage_records_json,
-    run_artifact_command_for_output_dir,
+    nsld_prepare_command_for_output_dir,
 };
 #[cfg(test)]
-pub(crate) use link_plan::{
+pub(crate) use link_plan_commands::{
     release_check_nsld_drive_command_for_output_dir,
     release_check_nsld_drive_dry_run_command_for_output_dir,
     release_check_nsld_drive_dry_run_json_command_for_output_dir,
     release_check_nsld_drive_json_command_for_output_dir,
     release_check_nsld_drive_until_clean_command_for_output_dir,
     release_check_nsld_drive_until_clean_json_command_for_output_dir,
+};
+pub(crate) use link_plan_tail::{
+    nsld_final_executable_tail_summary, NsldFinalExecutableTailSummary,
 };
 pub(crate) use render::render_workflow_json;
 
