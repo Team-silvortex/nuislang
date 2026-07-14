@@ -137,6 +137,9 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
             |command| command.contains("--output-dir '") && command.contains("path space")
         ));
     assert!(entrypoint_source.starts_with("#!/bin/sh\n"));
+    assert!(entrypoint_source
+        .contains("NUIS_HOST_ENTRYPOINT_STUB_PROTOCOL='nuis-nsld-host-entrypoint-v1'"));
+    assert!(entrypoint_source.contains("export NUIS_HOST_ENTRYPOINT_STUB_PROTOCOL"));
     assert!(entrypoint_source.contains("NUIS_HOST_RUNNER"));
     assert!(entrypoint_source.contains("NUIS_OUTPUT_DIR='"));
     assert!(entrypoint_source.contains("path space"));

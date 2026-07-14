@@ -5,6 +5,20 @@ use super::{
         nsld_final_executable_pipeline_path, nsld_final_executable_writer_input_path,
         nsld_final_stage_plan_path,
     },
+    final_executable_pipeline_entrypoint::{
+        entrypoint_materialization_evidence, nsld_pipeline_entrypoint_materialization_plan,
+        nsld_pipeline_entrypoint_materialization_status, nsld_write_host_entrypoint_script,
+        render_host_entrypoint_runner_command, render_host_entrypoint_runner_command_parts,
+    },
+    final_executable_pipeline_mismatch::{
+        optional_bool_text, push_bool_mismatch, push_optional_string_mismatch, push_usize_mismatch,
+    },
+    final_executable_pipeline_paths::{
+        final_executable_pipeline_required_stage_paths, missing_paths,
+        NsldFinalExecutablePipelineRequiredPaths,
+    },
+    final_executable_pipeline_render::render_final_executable_pipeline,
+    final_executable_pipeline_status::nsld_pipeline_self_owned_image_status,
     final_stage::{
         nsld_emit_final_executable_host_invoke_plan_report,
         nsld_emit_final_executable_image_dry_run_report,
@@ -16,15 +30,10 @@ use super::{
         nsld_final_executable_launcher_manifest_report,
     },
     fnv1a64_hex,
-    reports::{
-        NsldFinalExecutableLauncherManifestReport, NsldFinalExecutablePipelineEmitReport,
-        NsldFinalExecutablePipelineVerifyReport,
-    },
+    reports::{NsldFinalExecutablePipelineEmitReport, NsldFinalExecutablePipelineVerifyReport},
     toml,
 };
 use std::{fs, path::Path};
-#[cfg(unix)]
-use std::{fs::Permissions, os::unix::fs::PermissionsExt};
 
 pub(crate) fn nsld_emit_final_executable_pipeline_report(
     manifest: &Path,
@@ -90,19 +99,20 @@ pub(crate) fn nsld_emit_final_executable_pipeline_report(
     let entrypoint_materialization_runner_command = entrypoint_materialization
         .ready
         .then(|| render_host_entrypoint_runner_command(manifest, plan, &launcher_manifest_report));
-    let required_stage_paths = final_executable_pipeline_required_stage_paths(
-        final_executable.emitted,
-        &final_stage_plan.output_path,
-        &final_executable.output_path,
-        &writer_input.output_path,
-        &host_invoke_plan.output_path,
-        &layout_plan.output_path,
-        &image_dry_run.output_path,
-        &final_executable.blocked_report_path,
-        &launcher_manifest.output_path,
-        &launcher_dry_run.output_path,
-        entrypoint_materialization.path.as_deref(),
-    );
+    let required_stage_paths =
+        final_executable_pipeline_required_stage_paths(NsldFinalExecutablePipelineRequiredPaths {
+            final_executable_emitted: final_executable.emitted,
+            final_stage_plan_path: &final_stage_plan.output_path,
+            final_output_path: &final_executable.output_path,
+            writer_input_path: &writer_input.output_path,
+            host_invoke_plan_path: &host_invoke_plan.output_path,
+            layout_plan_path: &layout_plan.output_path,
+            image_dry_run_path: &image_dry_run.output_path,
+            final_executable_blocked_path: &final_executable.blocked_report_path,
+            launcher_manifest_path: &launcher_manifest.output_path,
+            launcher_dry_run_path: &launcher_dry_run.output_path,
+            entrypoint_materialization_path: entrypoint_materialization.path.as_deref(),
+        });
     let missing_required_stage_paths = missing_paths(&required_stage_paths);
     blockers.extend(
         missing_required_stage_paths
@@ -630,29 +640,36 @@ fn nsld_final_executable_pipeline_snapshot(
         } else {
             None
         };
-    let required_stage_paths = final_executable_pipeline_required_stage_paths(
-        final_executable.expected_emitted,
-        &nsld_final_stage_plan_path(plan).display().to_string(),
-        &plan.final_stage.output_path,
-        &nsld_final_executable_writer_input_path(plan)
-            .display()
-            .to_string(),
-        &nsld_final_executable_host_invoke_plan_path(plan)
-            .display()
-            .to_string(),
-        &nsld_final_executable_layout_plan_path(plan)
-            .display()
-            .to_string(),
-        &nsld_final_executable_image_dry_run_path(plan)
-            .display()
-            .to_string(),
-        &nsld_final_executable_blocked_path(plan)
-            .display()
-            .to_string(),
-        &launcher_manifest.input_path,
-        &launcher_dry_run.input_path,
-        entrypoint_materialization.path.as_deref(),
-    );
+    let final_stage_plan_path = nsld_final_stage_plan_path(plan).display().to_string();
+    let writer_input_path = nsld_final_executable_writer_input_path(plan)
+        .display()
+        .to_string();
+    let host_invoke_plan_path = nsld_final_executable_host_invoke_plan_path(plan)
+        .display()
+        .to_string();
+    let layout_plan_path = nsld_final_executable_layout_plan_path(plan)
+        .display()
+        .to_string();
+    let image_dry_run_path = nsld_final_executable_image_dry_run_path(plan)
+        .display()
+        .to_string();
+    let final_executable_blocked_path = nsld_final_executable_blocked_path(plan)
+        .display()
+        .to_string();
+    let required_stage_paths =
+        final_executable_pipeline_required_stage_paths(NsldFinalExecutablePipelineRequiredPaths {
+            final_executable_emitted: final_executable.expected_emitted,
+            final_stage_plan_path: &final_stage_plan_path,
+            final_output_path: &plan.final_stage.output_path,
+            writer_input_path: &writer_input_path,
+            host_invoke_plan_path: &host_invoke_plan_path,
+            layout_plan_path: &layout_plan_path,
+            image_dry_run_path: &image_dry_run_path,
+            final_executable_blocked_path: &final_executable_blocked_path,
+            launcher_manifest_path: &launcher_manifest.input_path,
+            launcher_dry_run_path: &launcher_dry_run.input_path,
+            entrypoint_materialization_path: entrypoint_materialization.path.as_deref(),
+        });
     let missing_required_stage_paths = missing_paths(&required_stage_paths);
     blockers.extend(
         missing_required_stage_paths
@@ -739,455 +756,6 @@ fn nsld_final_executable_pipeline_snapshot(
     }
 }
 
-fn nsld_pipeline_self_owned_image_status(
-    launcher_manifest_ready: bool,
-    nsb_path: &str,
-    nsb_present: bool,
-    nsb_hash: Option<&str>,
-    image_header_valid: bool,
-) -> &'static str {
-    if launcher_manifest_ready && nsb_present && image_header_valid {
-        return "ready";
-    }
-    if nsb_path.is_empty() {
-        return "path-missing";
-    }
-    if !nsb_present {
-        return "missing";
-    }
-    if !image_header_valid {
-        return "header-invalid";
-    }
-    if nsb_hash.is_none() {
-        return "hash-missing";
-    }
-    "blocked"
-}
-
-fn nsld_pipeline_entrypoint_materialization_status(
-    self_owned_image_status: &str,
-    launcher_dry_run_ready: bool,
-    would_enter_lifecycle_hook: bool,
-) -> &'static str {
-    if launcher_dry_run_ready && would_enter_lifecycle_hook {
-        return "host-launcher-ready";
-    }
-    if self_owned_image_status == "ready" {
-        return "image-ready-entrypoint-pending";
-    }
-    "blocked"
-}
-
-struct NsldPipelineEntrypointMaterializationPlan {
-    kind: String,
-    path: Option<String>,
-    ready: bool,
-    first_blocker: Option<String>,
-}
-
-fn nsld_pipeline_entrypoint_materialization_plan(
-    plan: &nuisc::linker::LinkPlan,
-    status: &str,
-    execution_handoff_ready: bool,
-    execution_handoff_target: &str,
-    execution_handoff_first_blocker: Option<&str>,
-    blockers: &[String],
-) -> NsldPipelineEntrypointMaterializationPlan {
-    let ready = status == "host-launcher-ready"
-        && execution_handoff_ready
-        && execution_handoff_target == "entrypoint-materializer";
-    let path = if ready {
-        Some(
-            Path::new(&plan.output_dir)
-                .join("nuis.host-entrypoint.sh")
-                .display()
-                .to_string(),
-        )
-    } else {
-        None
-    };
-    let first_blocker = if ready {
-        None
-    } else {
-        execution_handoff_first_blocker
-            .map(str::to_owned)
-            .or_else(|| blockers.first().cloned())
-            .or_else(|| Some(format!("entrypoint-materialization:{status}")))
-    };
-    NsldPipelineEntrypointMaterializationPlan {
-        kind: if ready {
-            "host-shell-entrypoint-plan".to_owned()
-        } else {
-            "none".to_owned()
-        },
-        path,
-        ready,
-        first_blocker,
-    }
-}
-
-fn nsld_write_host_entrypoint_script(
-    manifest: &Path,
-    plan: &nuisc::linker::LinkPlan,
-    launcher: &NsldFinalExecutableLauncherManifestReport,
-    entrypoint: &NsldPipelineEntrypointMaterializationPlan,
-) -> Result<(), String> {
-    let Some(path) = entrypoint.path.as_deref() else {
-        return Ok(());
-    };
-    let source = render_host_entrypoint_script(manifest, plan, launcher);
-    fs::write(path, source).map_err(|error| format!("{}:{error}", path))?;
-    #[cfg(unix)]
-    fs::set_permissions(path, Permissions::from_mode(0o755))
-        .map_err(|error| format!("{}:{error}", path))?;
-    Ok(())
-}
-
-fn entrypoint_materialization_evidence(path: Option<&str>) -> (Option<bool>, Option<String>) {
-    let Some(path) = path else {
-        return (Some(false), None);
-    };
-    match fs::read(path) {
-        Ok(bytes) => (Some(true), Some(fnv1a64_hex(&bytes))),
-        Err(_) => (Some(false), None),
-    }
-}
-
-fn render_host_entrypoint_script(
-    manifest: &Path,
-    plan: &nuisc::linker::LinkPlan,
-    launcher: &NsldFinalExecutableLauncherManifestReport,
-) -> String {
-    let manifest_path = shell_single_quote(&manifest.display().to_string());
-    let nsb_path = shell_single_quote(&launcher.nsb_path);
-    let output_dir = shell_single_quote(&plan.output_dir);
-    let scheduler_entry = shell_single_quote(&launcher.scheduler_entry);
-    let lifecycle_hook = shell_single_quote(&launcher.entry_lifecycle_hook);
-    format!(
-        "#!/bin/sh\n\
-set -eu\n\
-# Generated by nsld. This is a host-shell entrypoint handoff stub.\n\
-# It delegates execution to the host runner without embedding runner logic in nsld.\n\
-MANIFEST_PATH={manifest_path}\n\
-NSB_PATH={nsb_path}\n\
-NUIS_OUTPUT_DIR={output_dir}\n\
-SCHEDULER_ENTRY={scheduler_entry}\n\
-LIFECYCLE_HOOK={lifecycle_hook}\n\
-: \"${{NUIS_HOST_RUNNER:=nuis-host-runner}}\"\n\
-exec \"$NUIS_HOST_RUNNER\" \\\n\
-  --manifest \"$MANIFEST_PATH\" \\\n\
-  --nsb \"$NSB_PATH\" \\\n\
-  --output-dir \"$NUIS_OUTPUT_DIR\" \\\n\
-  --scheduler-entry \"$SCHEDULER_ENTRY\" \\\n\
-  --lifecycle-hook \"$LIFECYCLE_HOOK\"\n"
-    )
-}
-
-fn render_host_entrypoint_runner_command(
-    manifest: &Path,
-    plan: &nuisc::linker::LinkPlan,
-    launcher: &NsldFinalExecutableLauncherManifestReport,
-) -> String {
-    render_host_entrypoint_runner_command_parts(
-        manifest,
-        &plan.output_dir,
-        &launcher.nsb_path,
-        &launcher.scheduler_entry,
-        &launcher.entry_lifecycle_hook,
-    )
-}
-
-fn render_host_entrypoint_runner_command_parts(
-    manifest: &Path,
-    output_dir: &str,
-    nsb_path: &str,
-    scheduler_entry: &str,
-    lifecycle_hook: &str,
-) -> String {
-    format!(
-        "nuis-host-runner --manifest {} --nsb {} --output-dir {} --scheduler-entry {} --lifecycle-hook {}",
-        shell_single_quote(&manifest.display().to_string()),
-        shell_single_quote(nsb_path),
-        shell_single_quote(output_dir),
-        shell_single_quote(scheduler_entry),
-        shell_single_quote(lifecycle_hook)
-    )
-}
-
-fn shell_single_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "'\\''"))
-}
-
-fn render_final_executable_pipeline(report: &NsldFinalExecutablePipelineEmitReport) -> String {
-    let mut out = String::new();
-    out.push_str("schema = \"nuis-nsld-final-executable-pipeline-v1\"\n");
-    push_str_field(&mut out, "manifest", &report.manifest);
-    out.push_str(&format!("valid = {}\n", report.valid));
-    push_str_field(
-        &mut out,
-        "final_stage_plan_path",
-        &report.final_stage_plan_path,
-    );
-    push_str_field(&mut out, "final_output_path", &report.final_output_path);
-    push_str_field(&mut out, "writer_input_path", &report.writer_input_path);
-    push_str_field(
-        &mut out,
-        "host_invoke_plan_path",
-        &report.host_invoke_plan_path,
-    );
-    push_str_field(&mut out, "layout_plan_path", &report.layout_plan_path);
-    push_str_field(&mut out, "image_dry_run_path", &report.image_dry_run_path);
-    push_str_field(
-        &mut out,
-        "final_executable_blocked_path",
-        &report.final_executable_blocked_path,
-    );
-    push_str_field(
-        &mut out,
-        "launcher_manifest_path",
-        &report.launcher_manifest_path,
-    );
-    push_str_field(
-        &mut out,
-        "launcher_dry_run_path",
-        &report.launcher_dry_run_path,
-    );
-    out.push_str(&format!(
-        "final_executable_emitted = {}\n",
-        report.final_executable_emitted
-    ));
-    out.push_str(&format!(
-        "launcher_manifest_ready = {}\n",
-        report.launcher_manifest_ready
-    ));
-    out.push_str(&format!(
-        "launcher_dry_run_ready = {}\n",
-        report.launcher_dry_run_ready
-    ));
-    out.push_str(&format!(
-        "would_enter_lifecycle_hook = {}\n",
-        report.would_enter_lifecycle_hook
-    ));
-    push_str_field(
-        &mut out,
-        "self_owned_image_status",
-        &report.self_owned_image_status,
-    );
-    push_str_field(
-        &mut out,
-        "entrypoint_materialization_status",
-        &report.entrypoint_materialization_status,
-    );
-    push_str_field(
-        &mut out,
-        "entrypoint_materialization_kind",
-        &report.entrypoint_materialization_kind,
-    );
-    push_optional_str_field(
-        &mut out,
-        "entrypoint_materialization_path",
-        report.entrypoint_materialization_path.as_deref(),
-    );
-    out.push_str(&format!(
-        "entrypoint_materialization_ready = {}\n",
-        report.entrypoint_materialization_ready
-    ));
-    push_optional_str_field(
-        &mut out,
-        "entrypoint_materialization_first_blocker",
-        report.entrypoint_materialization_first_blocker.as_deref(),
-    );
-    out.push_str(&format!(
-        "entrypoint_materialization_present = {}\n",
-        report.entrypoint_materialization_present.unwrap_or(false)
-    ));
-    push_optional_str_field(
-        &mut out,
-        "entrypoint_materialization_hash",
-        report.entrypoint_materialization_hash.as_deref(),
-    );
-    push_optional_str_field(
-        &mut out,
-        "entrypoint_materialization_runner_command",
-        report.entrypoint_materialization_runner_command.as_deref(),
-    );
-    push_str_field(
-        &mut out,
-        "execution_handoff_contract",
-        &report.execution_handoff_contract,
-    );
-    out.push_str(&format!(
-        "execution_handoff_ready = {}\n",
-        report.execution_handoff_ready
-    ));
-    push_str_field(
-        &mut out,
-        "execution_handoff_status",
-        &report.execution_handoff_status,
-    );
-    push_str_field(
-        &mut out,
-        "execution_handoff_target",
-        &report.execution_handoff_target,
-    );
-    push_str_field(
-        &mut out,
-        "execution_handoff_evidence_status",
-        &report.execution_handoff_evidence_status,
-    );
-    push_optional_str_field(
-        &mut out,
-        "execution_handoff_first_blocker",
-        report.execution_handoff_first_blocker.as_deref(),
-    );
-    push_str_field(
-        &mut out,
-        "execution_handoff_decision_code",
-        &report.execution_handoff_decision_code,
-    );
-    push_optional_str_field(
-        &mut out,
-        "scheduler_metadata_payload_id",
-        report.scheduler_metadata_payload_id.as_deref(),
-    );
-    out.push_str(&format!(
-        "scheduler_metadata_present = {}\n",
-        report.scheduler_metadata_present.unwrap_or(false)
-    ));
-    push_optional_str_field(
-        &mut out,
-        "scheduler_metadata_hash",
-        report.scheduler_metadata_hash.as_deref(),
-    );
-    out.push_str(&format!(
-        "required_stage_path_count = {}\n",
-        report.required_stage_path_count
-    ));
-    out.push_str(&format!(
-        "required_stage_path_present_count = {}\n",
-        report.required_stage_path_present_count
-    ));
-    out.push_str(&format!(
-        "missing_required_stage_paths = [{}]\n",
-        report
-            .missing_required_stage_paths
-            .iter()
-            .map(|value| format!("\"{}\"", toml::escape_toml_string(value)))
-            .collect::<Vec<_>>()
-            .join(", ")
-    ));
-    out.push_str(&format!("blocker_count = {}\n", report.blockers.len()));
-    out.push_str(&format!(
-        "blockers = [{}]\n",
-        report
-            .blockers
-            .iter()
-            .map(|value| format!("\"{}\"", toml::escape_toml_string(value)))
-            .collect::<Vec<_>>()
-            .join(", ")
-    ));
-    out
-}
-
-fn final_executable_pipeline_required_stage_paths(
-    final_executable_emitted: bool,
-    final_stage_plan_path: &str,
-    final_output_path: &str,
-    writer_input_path: &str,
-    host_invoke_plan_path: &str,
-    layout_plan_path: &str,
-    image_dry_run_path: &str,
-    final_executable_blocked_path: &str,
-    launcher_manifest_path: &str,
-    launcher_dry_run_path: &str,
-    entrypoint_materialization_path: Option<&str>,
-) -> Vec<String> {
-    let mut paths = vec![
-        final_stage_plan_path.to_owned(),
-        writer_input_path.to_owned(),
-        host_invoke_plan_path.to_owned(),
-        layout_plan_path.to_owned(),
-        image_dry_run_path.to_owned(),
-        final_executable_blocked_path.to_owned(),
-        launcher_manifest_path.to_owned(),
-        launcher_dry_run_path.to_owned(),
-    ];
-    if final_executable_emitted {
-        paths.push(final_output_path.to_owned());
-    }
-    if let Some(path) = entrypoint_materialization_path {
-        paths.push(path.to_owned());
-    }
-    paths
-}
-
-fn missing_paths(paths: &[String]) -> Vec<String> {
-    paths
-        .iter()
-        .filter(|path| !Path::new(path.as_str()).exists())
-        .cloned()
-        .collect()
-}
-
-fn push_str_field(out: &mut String, key: &str, value: &str) {
-    out.push_str(&format!(
-        "{key} = \"{}\"\n",
-        toml::escape_toml_string(value)
-    ));
-}
-
-fn push_optional_str_field(out: &mut String, key: &str, value: Option<&str>) {
-    push_str_field(out, key, value.unwrap_or(""));
-}
-
 fn non_empty_toml_string(source: &str, key: &str) -> Option<String> {
     toml::string_value(source, key).filter(|value| !value.is_empty())
-}
-
-fn optional_bool_text(value: Option<bool>) -> String {
-    value
-        .map(|value| value.to_string())
-        .unwrap_or_else(|| "missing".to_owned())
-}
-
-fn push_usize_mismatch(
-    issues: &mut Vec<String>,
-    key: &str,
-    expected: usize,
-    actual: Option<usize>,
-) {
-    if actual != Some(expected) {
-        issues.push(format!(
-            "{key} mismatch: expected {expected}, found {}",
-            actual
-                .map(|value| value.to_string())
-                .unwrap_or_else(|| "missing".to_owned())
-        ));
-    }
-}
-
-fn push_bool_mismatch(issues: &mut Vec<String>, key: &str, expected: bool, actual: Option<bool>) {
-    if actual != Some(expected) {
-        issues.push(format!(
-            "{key} mismatch: expected {expected}, found {}",
-            actual
-                .map(|value| value.to_string())
-                .unwrap_or_else(|| "missing".to_owned())
-        ));
-    }
-}
-
-fn push_optional_string_mismatch(
-    issues: &mut Vec<String>,
-    key: &str,
-    expected: Option<&str>,
-    actual: Option<&str>,
-) {
-    if actual != expected {
-        issues.push(format!(
-            "{key} mismatch: expected {}, found {}",
-            expected.unwrap_or("missing"),
-            actual.unwrap_or("missing")
-        ));
-    }
 }

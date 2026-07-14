@@ -192,6 +192,10 @@ hash-visible, and header-valid. `entrypoint_materialization_status` then says
 whether the next entrypoint layer is `host-launcher-ready`,
 `image-ready-entrypoint-pending`, or `blocked`. This keeps host-shell and
 OS-native entrypoint work separate from the internal binary assembly layer.
+The generated host-shell entrypoint identifies itself with
+`NUIS_HOST_ENTRYPOINT_STUB_PROTOCOL=nuis-nsld-host-entrypoint-v1` before
+delegating to `NUIS_HOST_RUNNER`, giving nsdb, nsbdr, and future runners a
+stable protocol hook without baking runner implementation details into Nsld.
 
 The plan already assigns each Nsld section a writer-facing object section
 record with a stable object section name, object section role, source section

@@ -131,7 +131,7 @@ blockers = []
     .expect("write ready final executable pipeline placeholder");
     fs::write(
         output_dir.join("nuis.host-entrypoint.sh"),
-        "#!/bin/sh\nset -eu\nexec nuis-host-runner --manifest 'manifest.toml' --nsb 'nuis-app.nsb' --output-dir 'out' --scheduler-entry 'nuis.scheduler.loop.v1' --lifecycle-hook 'on_process_start'\n",
+        "#!/bin/sh\nset -eu\nNUIS_HOST_ENTRYPOINT_STUB_PROTOCOL='nuis-nsld-host-entrypoint-v1'\nexport NUIS_HOST_ENTRYPOINT_STUB_PROTOCOL\nexec nuis-host-runner --manifest 'manifest.toml' --nsb 'nuis-app.nsb' --output-dir 'out' --scheduler-entry 'nuis.scheduler.loop.v1' --lifecycle-hook 'on_process_start'\n",
     )
     .expect("write host entrypoint placeholder");
 }
@@ -174,6 +174,8 @@ fn load_stdlib_source_modules(root: &Path, module_dir: &str) -> Vec<String> {
 mod abi_surface;
 #[path = "main_tests/artifact_runtime.rs"]
 mod artifact_runtime;
+#[path = "main_tests/artifact_runtime_run_artifact.rs"]
+mod artifact_runtime_run_artifact;
 #[path = "main_tests/language_runner.rs"]
 mod language_runner;
 #[path = "main_tests/project_health.rs"]

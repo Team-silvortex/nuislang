@@ -182,6 +182,15 @@ Short reading rule:
   pipeline exposes its presence, hash, and runner command for automation, and
   verifier/check reports fail if the stub is deleted or its content no longer
   matches the emitted pipeline snapshot
+* that host entrypoint stub declares
+  `NUIS_HOST_ENTRYPOINT_STUB_PROTOCOL=nuis-nsld-host-entrypoint-v1` and exports
+  it before delegating to `NUIS_HOST_RUNNER`, so future runner, debugger, and
+  bundler layers can recognize the stub as an Nsld protocol artifact rather
+  than treating it as an anonymous shell script
+* `run-artifact` treats the protocol marker as part of the entrypoint closure:
+  a reported stub path that exists but does not declare/export
+  `nuis-nsld-host-entrypoint-v1` is still `blocked`, preventing an arbitrary
+  host shell script from being mistaken for a verified Nsld entrypoint
 * `run-artifact --json` additionally emits the `run_artifact_prelaunch_*`
   aggregate fields so scripts can choose between a verified Nsld host
   entrypoint and the older host-binary launch path without re-interpreting every
