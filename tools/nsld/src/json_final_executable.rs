@@ -564,6 +564,31 @@ pub(crate) fn nsld_final_executable_output_report_json(
             "execution_handoff_decision_code",
             &report.execution_handoff_decision_code,
         ),
+        json_string_field(
+            "entrypoint_materialization_evidence_status",
+            &report.entrypoint_materialization_evidence_status,
+        ),
+        json_string_field("launcher_manifest_path", &report.launcher_manifest_path),
+        json_bool_field(
+            "launcher_manifest_present",
+            report.launcher_manifest_present,
+        ),
+        json_optional_bool_field("launcher_manifest_ready", report.launcher_manifest_ready),
+        json_optional_usize_field(
+            "launcher_manifest_blocker_count",
+            report.launcher_manifest_blocker_count,
+        ),
+        json_string_field("launcher_dry_run_path", &report.launcher_dry_run_path),
+        json_bool_field("launcher_dry_run_present", report.launcher_dry_run_present),
+        json_optional_bool_field("launcher_dry_run_ready", report.launcher_dry_run_ready),
+        json_optional_bool_field(
+            "launcher_dry_run_would_enter_lifecycle_hook",
+            report.launcher_dry_run_would_enter_lifecycle_hook,
+        ),
+        json_optional_usize_field(
+            "launcher_dry_run_blocker_count",
+            report.launcher_dry_run_blocker_count,
+        ),
         json_string_field("recommended_next_action", &report.recommended_next_action),
         json_bool_field("path_present", report.path_present),
         json_bool_field("nsld_owned_output", report.nsld_owned_output),

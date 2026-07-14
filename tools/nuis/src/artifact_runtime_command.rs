@@ -129,7 +129,43 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
         println!("{}", render_run_artifact_json(&input));
         return Ok(());
     }
-    let binary = resolve_run_artifact_binary_path(&input)?;
+    let doctor = probe_artifact_doctor(&input);
+    let resolved_binary_result = resolve_run_artifact_binary_path(&input);
+    let resolved_binary = resolved_binary_result.as_ref().ok();
+    let prelaunch = run_artifact_prelaunch_summary(
+        doctor.output_dir.as_deref(),
+        resolved_binary.map(|path| path.as_path()),
+    );
+    if resolved_binary.is_none() && prelaunch.nsld_runtime_handoff_ready() {
+        if success_logs_enabled() {
+            println!(
+                "run-artifact: {}",
+                prelaunch
+                    .entrypoint_path
+                    .as_deref()
+                    .unwrap_or("<nsld-host-entrypoint>")
+            );
+            println!("  exit_status: runtime-handoff-ready");
+            println!("  prelaunch_kind: {}", prelaunch.kind);
+            println!("  prelaunch_status: {}", prelaunch.status);
+            println!(
+                "  prelaunch_command: {}",
+                prelaunch.command.as_deref().unwrap_or("<none>")
+            );
+            println!(
+                "  prelaunch_entrypoint_path: {}",
+                prelaunch.entrypoint_path.as_deref().unwrap_or("<none>")
+            );
+            println!("  prelaunch_reason: {}", prelaunch.reason);
+            let link_plan = doctor
+                .output_dir
+                .as_ref()
+                .and_then(|output_dir| load_link_plan_for_output_dir(output_dir));
+            print_run_artifact_link_plan_status(link_plan.as_ref());
+        }
+        return Ok(());
+    }
+    let binary = resolved_binary_result?;
     let mut command = Command::new(&binary);
     if cfg!(test) {
         command.stdout(Stdio::null()).stderr(Stdio::null());
@@ -146,13 +182,10 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
                 .map(|code| code.to_string())
                 .unwrap_or_else(|| "signal".to_owned())
         );
-        let doctor = probe_artifact_doctor(&input);
         let link_plan = doctor
             .output_dir
             .as_ref()
             .and_then(|output_dir| load_link_plan_for_output_dir(output_dir));
-        let prelaunch =
-            run_artifact_prelaunch_summary(doctor.output_dir.as_deref(), Some(binary.as_path()));
         println!("  prelaunch_kind: {}", prelaunch.kind);
         println!("  prelaunch_status: {}", prelaunch.status);
         println!(

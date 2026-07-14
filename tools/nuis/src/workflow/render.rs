@@ -3,7 +3,6 @@ use super::frontdoor::{
     single_source_workflow_next_step_label, single_source_workflow_source_profile,
     WorkflowRecommendation,
 };
-use super::link_plan::workflow_compile_pipeline_json_fields;
 use super::*;
 
 pub(crate) fn render_workflow_json(input: &Path) -> Result<String, String> {

@@ -133,6 +133,8 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
         Path::new("manifest.toml"),
         &plan,
     );
+    let output_after_launcher =
+        nsld_final_executable_output_report(Path::new("manifest.toml"), &plan);
     let manifest_json = super::json::nsld_final_executable_launcher_manifest_report_json(&manifest);
     let verify_json =
         super::json::nsld_final_executable_launcher_manifest_verify_report_json(&verify);
@@ -266,6 +268,30 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
     assert!(dry_run_emit.dry_run_ready);
     assert_eq!(dry_run_emit.blocker_count, 0);
     assert!(dry_run_verify.valid, "{:?}", dry_run_verify.issues);
+    assert_eq!(
+        output_after_launcher.entrypoint_materialization_evidence_status,
+        "launcher-dry-run-ready"
+    );
+    assert!(output_after_launcher.launcher_manifest_present);
+    assert_eq!(output_after_launcher.launcher_manifest_ready, Some(true));
+    assert_eq!(
+        output_after_launcher.launcher_manifest_blocker_count,
+        Some(0)
+    );
+    assert!(output_after_launcher.launcher_dry_run_present);
+    assert_eq!(output_after_launcher.launcher_dry_run_ready, Some(true));
+    assert_eq!(
+        output_after_launcher.launcher_dry_run_would_enter_lifecycle_hook,
+        Some(true)
+    );
+    assert_eq!(
+        output_after_launcher.launcher_dry_run_blocker_count,
+        Some(0)
+    );
+    assert_eq!(
+        output_after_launcher.recommended_next_action,
+        "run-artifact-or-handoff-to-runtime"
+    );
     assert_eq!(dry_run_verify.actual_dry_run_ready, Some(true));
     assert_eq!(dry_run_verify.actual_would_enter_lifecycle_hook, Some(true));
     assert_eq!(
@@ -552,8 +578,19 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
         "handoff-entrypoint-materializer"
     );
     assert_eq!(
+        output.entrypoint_materialization_evidence_status,
+        "launcher-evidence-missing"
+    );
+    assert!(!output.launcher_manifest_present);
+    assert_eq!(output.launcher_manifest_ready, None);
+    assert_eq!(output.launcher_manifest_blocker_count, None);
+    assert!(!output.launcher_dry_run_present);
+    assert_eq!(output.launcher_dry_run_ready, None);
+    assert_eq!(output.launcher_dry_run_would_enter_lifecycle_hook, None);
+    assert_eq!(output.launcher_dry_run_blocker_count, None);
+    assert_eq!(
         output.recommended_next_action,
-        "materialize-host-shell-or-os-entrypoint"
+        "emit-final-executable-launcher-manifest"
     );
     assert!(output.path_present);
     assert!(output.nsld_owned_output);
@@ -631,7 +668,13 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert!(output_json
         .contains("\"execution_handoff_decision_code\":\"handoff-entrypoint-materializer\""));
     assert!(output_json
-        .contains("\"recommended_next_action\":\"materialize-host-shell-or-os-entrypoint\""));
+        .contains("\"entrypoint_materialization_evidence_status\":\"launcher-evidence-missing\""));
+    assert!(output_json.contains("\"launcher_manifest_present\":false"));
+    assert!(output_json.contains("\"launcher_manifest_ready\":null"));
+    assert!(output_json.contains("\"launcher_dry_run_present\":false"));
+    assert!(output_json.contains("\"launcher_dry_run_ready\":null"));
+    assert!(output_json
+        .contains("\"recommended_next_action\":\"emit-final-executable-launcher-manifest\""));
     assert!(output_json.contains("\"path_present\":true"));
     assert!(output_json.contains("\"nsld_owned_output\":true"));
     assert!(output_json.contains("\"output_image_header_required\":true"));

@@ -162,6 +162,14 @@ Short reading rule:
   full blocker list for the common branch
 * `nsld_final_executable_output_execution_handoff_decision_code` is the compact
   branch code for CI, nsdb, and future runner/materializer routing
+* `nsld_final_executable_output_entrypoint_materialization_evidence_status`
+  reports whether a ready self-contained output still lacks launcher evidence,
+  has a ready launcher manifest, or has a launcher dry-run that would enter the
+  lifecycle hook
+* `nsld_final_executable_output_launcher_manifest_*` and
+  `nsld_final_executable_output_launcher_dry_run_*` mirror the materialized
+  launcher evidence from the final-output boundary, so scripts can distinguish
+  "output ready" from "entrypoint handoff evidence ready"
 * Nsld launcher manifest and launcher dry-run artifacts preserve the same
   `nsld-final-output-handoff-v1` decision group instead of inventing a second
   launch-readiness model
@@ -191,6 +199,16 @@ Short reading rule:
   a reported stub path that exists but does not declare/export
   `nuis-nsld-host-entrypoint-v1` is still `blocked`, preventing an arbitrary
   host shell script from being mistaken for a verified Nsld entrypoint
+* when the legacy host binary is absent but a verified Nsld host-entrypoint is
+  present, non-JSON `run-artifact` now reports `runtime-handoff-ready` instead
+  of failing on the older binary-only path; this is a runner handoff, not a
+  claim that payload execution has completed
+* `nuis-host-runner` is the first thin runtime-side consumer for that handoff:
+  it verifies the launcher manifest, `.nsb` path/header/hash, scheduler entry,
+  and lifecycle hook before reporting that it would enter the lifecycle hook.
+  Its report also exposes the parsed `.nsb` payload offset/span plus layout and
+  byte-map hashes, giving the future runtime loop a concrete payload region to
+  map rather than treating the image as an opaque hashed blob
 * `run-artifact --json` additionally emits the `run_artifact_prelaunch_*`
   aggregate fields so scripts can choose between a verified Nsld host
   entrypoint and the older host-binary launch path without re-interpreting every

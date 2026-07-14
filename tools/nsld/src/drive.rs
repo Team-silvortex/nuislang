@@ -14,6 +14,8 @@ use crate::object_writer_input::nsld_emit_object_writer_dry_run_report;
 use crate::{
     context::load_link_input_context, nsld_check_report, nsld_emit_assemble_plan_report,
     nsld_emit_closure_report, nsld_emit_container_plan_report, nsld_emit_container_report,
+    nsld_emit_final_executable_launcher_dry_run_report,
+    nsld_emit_final_executable_launcher_manifest_report,
     nsld_emit_final_executable_pipeline_report, nsld_emit_final_stage_plan_report,
     nsld_emit_link_bundle_report, nsld_emit_link_inputs_report, nsld_emit_link_units_report,
     nsld_emit_section_manifest_report, nsld_prepare_report,
@@ -258,6 +260,20 @@ pub(crate) fn nsld_drive_apply_next_action(
             Ok(applied_report(
                 next_action,
                 "applied emit-final-executable-pipeline",
+            ))
+        }
+        "emit-final-executable-launcher-manifest" => {
+            nsld_emit_final_executable_launcher_manifest_report(manifest, plan)?;
+            Ok(applied_report(
+                next_action,
+                "applied emit-final-executable-launcher-manifest",
+            ))
+        }
+        "emit-final-executable-launcher-dry-run" => {
+            nsld_emit_final_executable_launcher_dry_run_report(manifest, plan)?;
+            Ok(applied_report(
+                next_action,
+                "applied emit-final-executable-launcher-dry-run",
             ))
         }
         other => Ok(NsldDriveApplyReport {

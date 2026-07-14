@@ -5,6 +5,8 @@ use super::{
 };
 use crate::{
     commands::NsldCheckNextAction, main_test_support::empty_link_plan, nsld_check_report,
+    nsld_emit_final_executable_image_dry_run_report, nsld_emit_final_executable_layout_plan_report,
+    nsld_emit_final_executable_report, nsld_emit_final_executable_writer_input_report,
     nsld_final_executable_output_report,
 };
 use nuisc::aot::{BuildManifestContext, CompileArtifacts};
@@ -118,6 +120,84 @@ fn drive_apply_dispatches_whitelisted_emit_object() {
     assert_eq!(report.command_id.as_deref(), Some("emit-object"));
     assert!(blocked_report_present);
     assert_eq!(report.message, "applied emit-object");
+}
+
+#[test]
+fn drive_apply_dispatches_whitelisted_launcher_manifest_and_dry_run() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-drive-apply-launcher-evidence-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+    plan.final_stage.kind = "nuis-self-contained-image".to_owned();
+    plan.final_stage.driver = "nsld-internal-image-writer".to_owned();
+    plan.final_stage.link_mode = "self-contained".to_owned();
+    plan.final_stage.output_path = dir.join("nuis-app.nsb").display().to_string();
+    super::nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    super::nsld_emit_final_stage_plan_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_writer_input_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_layout_plan_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_report(Path::new("manifest.toml"), &plan).unwrap();
+    let manifest_action = NsldCheckNextAction {
+        available: true,
+        source: Some("final-output-materialization".to_owned()),
+        command_id: Some("emit-final-executable-launcher-manifest".to_owned()),
+        command: Some("nsld emit-final-executable-launcher-manifest <input>".to_owned()),
+        command_resolved: Some(
+            "nsld emit-final-executable-launcher-manifest manifest.toml".to_owned(),
+        ),
+        reason: Some("final executable output is ready".to_owned()),
+    };
+    let dry_run_action = NsldCheckNextAction {
+        available: true,
+        source: Some("final-output-materialization".to_owned()),
+        command_id: Some("emit-final-executable-launcher-dry-run".to_owned()),
+        command: Some("nsld emit-final-executable-launcher-dry-run <input>".to_owned()),
+        command_resolved: Some(
+            "nsld emit-final-executable-launcher-dry-run manifest.toml".to_owned(),
+        ),
+        reason: Some("launcher manifest is ready".to_owned()),
+    };
+
+    let manifest_report =
+        nsld_drive_apply_next_action(Path::new("manifest.toml"), &plan, &manifest_action).unwrap();
+    let dry_run_report =
+        nsld_drive_apply_next_action(Path::new("manifest.toml"), &plan, &dry_run_action).unwrap();
+    let output = nsld_final_executable_output_report(Path::new("manifest.toml"), &plan);
+    let launcher_manifest_present = dir
+        .join("nuis.nsld.final-executable-launcher.toml")
+        .exists();
+    let launcher_dry_run_present = dir
+        .join("nuis.nsld.final-executable-launcher-dry-run.toml")
+        .exists();
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(manifest_report.applied);
+    assert_eq!(
+        manifest_report.message,
+        "applied emit-final-executable-launcher-manifest"
+    );
+    assert!(dry_run_report.applied);
+    assert_eq!(
+        dry_run_report.message,
+        "applied emit-final-executable-launcher-dry-run"
+    );
+    assert!(launcher_manifest_present);
+    assert!(launcher_dry_run_present);
+    assert_eq!(
+        output.entrypoint_materialization_evidence_status,
+        "launcher-dry-run-ready"
+    );
+    assert_eq!(
+        output.recommended_next_action,
+        "run-artifact-or-handoff-to-runtime"
+    );
 }
 
 #[test]

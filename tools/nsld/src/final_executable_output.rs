@@ -4,9 +4,13 @@ use super::{
         FINAL_EXECUTABLE_IMAGE_MAGIC_TEXT, FINAL_EXECUTABLE_IMAGE_VERSION,
     },
     final_executable_image_stage::nsld_verify_final_executable_image_dry_run_report,
+    final_executable_paths::{
+        nsld_final_executable_launcher_dry_run_path, nsld_final_executable_launcher_manifest_path,
+    },
     final_stage::{nsld_verify_final_executable_emit_report, nsld_verify_final_stage_plan_report},
     fnv1a64_hex,
     reports::NsldFinalExecutableOutputReport,
+    toml,
 };
 use std::{fs, path::Path};
 
@@ -228,9 +232,40 @@ pub(crate) fn nsld_final_executable_output_report(
         host_native_output,
         &blockers,
     );
+    let launcher_manifest_path = nsld_final_executable_launcher_manifest_path(plan);
+    let launcher_manifest_source = fs::read_to_string(&launcher_manifest_path).ok();
+    let launcher_manifest_present = launcher_manifest_source.is_some();
+    let launcher_manifest_ready = launcher_manifest_source
+        .as_deref()
+        .and_then(|source| toml::bool_value(source, "ready"));
+    let launcher_manifest_blocker_count = launcher_manifest_source
+        .as_deref()
+        .and_then(|source| toml::usize_value(source, "blocker_count"));
+    let launcher_dry_run_path = nsld_final_executable_launcher_dry_run_path(plan);
+    let launcher_dry_run_source = fs::read_to_string(&launcher_dry_run_path).ok();
+    let launcher_dry_run_present = launcher_dry_run_source.is_some();
+    let launcher_dry_run_ready = launcher_dry_run_source
+        .as_deref()
+        .and_then(|source| toml::bool_value(source, "dry_run_ready"));
+    let launcher_dry_run_would_enter_lifecycle_hook = launcher_dry_run_source
+        .as_deref()
+        .and_then(|source| toml::bool_value(source, "would_enter_lifecycle_hook"));
+    let launcher_dry_run_blocker_count = launcher_dry_run_source
+        .as_deref()
+        .and_then(|source| toml::usize_value(source, "blocker_count"));
+    let entrypoint_materialization_evidence_status =
+        final_executable_output_entrypoint_materialization_evidence_status(
+            boundary_status.as_str(),
+            host_native_output,
+            launcher_manifest_ready,
+            launcher_dry_run_ready,
+            launcher_dry_run_would_enter_lifecycle_hook,
+        )
+        .to_owned();
     let recommended_next_action = final_executable_output_recommended_next_action(
         boundary_status.as_str(),
         host_native_output,
+        entrypoint_materialization_evidence_status.as_str(),
     )
     .to_owned();
 
@@ -248,6 +283,16 @@ pub(crate) fn nsld_final_executable_output_report(
         execution_handoff_evidence_status: execution_handoff.evidence_status,
         execution_handoff_first_blocker: execution_handoff.first_blocker,
         execution_handoff_decision_code: execution_handoff.decision_code,
+        entrypoint_materialization_evidence_status,
+        launcher_manifest_path: launcher_manifest_path.display().to_string(),
+        launcher_manifest_present,
+        launcher_manifest_ready,
+        launcher_manifest_blocker_count,
+        launcher_dry_run_path: launcher_dry_run_path.display().to_string(),
+        launcher_dry_run_present,
+        launcher_dry_run_ready,
+        launcher_dry_run_would_enter_lifecycle_hook,
+        launcher_dry_run_blocker_count,
         recommended_next_action,
         path_present,
         nsld_owned_output,
@@ -318,16 +363,47 @@ fn final_executable_output_materialization_status(
 fn final_executable_output_recommended_next_action(
     boundary_status: &str,
     host_native_output: bool,
+    entrypoint_materialization_evidence_status: &str,
 ) -> &'static str {
     match boundary_status {
         "ready" if host_native_output => "handoff-to-runner",
-        "ready" => "materialize-host-shell-or-os-entrypoint",
+        "ready" if entrypoint_materialization_evidence_status == "launcher-dry-run-ready" => {
+            "run-artifact-or-handoff-to-runtime"
+        }
+        "ready" if entrypoint_materialization_evidence_status == "launcher-manifest-ready" => {
+            "emit-final-executable-launcher-dry-run"
+        }
+        "ready" => "emit-final-executable-launcher-manifest",
         "missing" => "emit-final-executable-pipeline",
         "not-nsld-owned" => "run-nsld-drive-or-inspect-output-boundary",
         "unreadable" => "inspect-final-output-permissions",
         "invalid" => "inspect-final-output-diagnostics",
         _ => "inspect-final-output-boundary",
     }
+}
+
+fn final_executable_output_entrypoint_materialization_evidence_status(
+    boundary_status: &str,
+    host_native_output: bool,
+    launcher_manifest_ready: Option<bool>,
+    launcher_dry_run_ready: Option<bool>,
+    launcher_dry_run_would_enter_lifecycle_hook: Option<bool>,
+) -> &'static str {
+    if boundary_status != "ready" {
+        return "blocked";
+    }
+    if host_native_output {
+        return "host-runner-ready";
+    }
+    if launcher_dry_run_ready == Some(true)
+        && launcher_dry_run_would_enter_lifecycle_hook == Some(true)
+    {
+        return "launcher-dry-run-ready";
+    }
+    if launcher_manifest_ready == Some(true) {
+        return "launcher-manifest-ready";
+    }
+    "launcher-evidence-missing"
 }
 
 fn final_executable_output_execution_handoff_contract() -> &'static str {

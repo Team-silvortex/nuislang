@@ -125,6 +125,38 @@ mod cpu Main {
 }
 
 #[test]
+fn run_artifact_accepts_ready_nsld_entrypoint_when_legacy_binary_is_missing() {
+    let project_root = write_temp_project_fixture(
+        "run_artifact_nsld_entrypoint_without_legacy_binary",
+        r#"
+name = "run_artifact_nsld_entrypoint_without_legacy_binary"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+        .trim_start(),
+        r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 0;
+  }
+}
+"#,
+    );
+    let output_dir = temp_dir("run_artifact_nsld_entrypoint_without_legacy_binary_outputs");
+    let manifest_path = output_dir.join("nuis.build.manifest.toml");
+
+    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    let legacy_binary =
+        resolve_run_artifact_binary_path(&manifest_path).expect("legacy binary path resolves");
+    fs::remove_file(&legacy_binary).expect("remove legacy binary");
+    write_prepared_nsld_chain_placeholders(&output_dir);
+    write_ready_nsld_final_tail_placeholders(&output_dir);
+
+    handle_run_artifact(manifest_path, false).expect("run-artifact accepts nsld handoff");
+}
+
+#[test]
 fn run_artifact_json_blocks_nsld_prelaunch_when_entrypoint_stub_is_missing() {
     let project_root = write_temp_project_fixture(
         "run_artifact_json_missing_entrypoint_smoke",

@@ -35,6 +35,10 @@ name = "nuis-artifact"
 version = "0.1.0"
 
 [[package]]
+name = "nuis-host-runner"
+version = "0.1.0"
+
+[[package]]
 name = "nuis-rc"
 version = "0.1.0"
 

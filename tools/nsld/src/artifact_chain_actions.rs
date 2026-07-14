@@ -51,9 +51,13 @@ pub(crate) fn nsld_artifact_stage_suggested_command(kind: NsldArtifactStageKind)
         | NsldArtifactStageKind::FinalExecutableLayoutPlan
         | NsldArtifactStageKind::FinalExecutableBlocked
         | NsldArtifactStageKind::FinalExecutableOutput
-        | NsldArtifactStageKind::FinalExecutableLauncherManifest
-        | NsldArtifactStageKind::FinalExecutableLauncherDryRun
         | NsldArtifactStageKind::FinalExecutablePipeline => "emit-final-executable-pipeline",
+        NsldArtifactStageKind::FinalExecutableLauncherManifest => {
+            "emit-final-executable-launcher-manifest"
+        }
+        NsldArtifactStageKind::FinalExecutableLauncherDryRun => {
+            "emit-final-executable-launcher-dry-run"
+        }
         NsldArtifactStageKind::FinalExecutableImageDryRun
         | NsldArtifactStageKind::FinalExecutableImageDryRunBytes => {
             "emit-final-executable-pipeline"

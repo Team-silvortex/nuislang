@@ -14,6 +14,15 @@ pub(crate) struct RunArtifactPrelaunchSummary {
     pub(crate) reason: String,
 }
 
+impl RunArtifactPrelaunchSummary {
+    pub(crate) fn nsld_runtime_handoff_ready(&self) -> bool {
+        self.kind == "nsld-host-entrypoint"
+            && self.status == "ready"
+            && self.command.is_some()
+            && self.entrypoint_path.is_some()
+    }
+}
+
 pub(crate) fn run_artifact_prelaunch_summary(
     output_dir: Option<&Path>,
     resolved_binary: Option<&Path>,

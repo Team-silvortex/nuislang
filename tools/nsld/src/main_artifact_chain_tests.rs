@@ -355,7 +355,7 @@ fn artifact_chain_marks_self_contained_final_executable_output_as_chain_tail() {
     );
     assert_eq!(
         report.next_optional_command_id.as_deref(),
-        Some("emit-final-executable-pipeline")
+        Some("emit-final-executable-launcher-manifest")
     );
     assert!(report.stages.iter().any(|stage| {
         stage.stage_id == "final-executable-output"

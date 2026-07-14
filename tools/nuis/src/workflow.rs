@@ -1,16 +1,21 @@
 use super::*;
 
 mod command;
+mod compile_pipeline;
 mod frontdoor;
 mod json_bits;
 mod link_plan;
 mod link_plan_commands;
+mod link_plan_domain;
+mod link_plan_final_output;
+mod link_plan_json;
 mod link_plan_tail;
 mod render;
 
 pub(crate) use command::{
     default_build_output_dir, default_release_check_output_dir, handle_workflow,
 };
+pub(crate) use compile_pipeline::workflow_compile_pipeline_json_fields;
 #[cfg(test)]
 pub(crate) use frontdoor::{
     build_workflow_frontdoor_surface, project_compile_workflow_source_profile,
@@ -25,9 +30,8 @@ pub(crate) use json_bits::{
     project_abi_checks_json, project_domain_registry_checks_json, project_lowering_checks_json,
 };
 pub(crate) use link_plan::{
-    append_workflow_link_plan_json_fields, artifact_doctor_command_for_output_dir,
-    load_link_plan_for_output_dir, nsld_artifact_chain_next_action_mirror,
-    nsld_drive_recommendation_for_output_dir, nsld_final_executable_output_boundary_summary,
+    artifact_doctor_command_for_output_dir, load_link_plan_for_output_dir,
+    nsld_artifact_chain_next_action_mirror, nsld_drive_recommendation_for_output_dir,
     nsld_final_executable_tail_stage_records_json, nsld_next_action_summary,
     nsld_prepared_artifact_chain_summary, nsld_prepared_artifact_stage_records_json,
     run_artifact_command_for_output_dir,
@@ -50,6 +54,10 @@ pub(crate) use link_plan_commands::{
     release_check_nsld_drive_until_clean_command_for_output_dir,
     release_check_nsld_drive_until_clean_json_command_for_output_dir,
 };
+pub(crate) use link_plan_final_output::{
+    nsld_final_executable_output_boundary_summary, NsldFinalExecutableOutputBoundarySummary,
+};
+pub(crate) use link_plan_json::append_workflow_link_plan_json_fields;
 pub(crate) use link_plan_tail::{
     nsld_final_executable_tail_summary, NsldFinalExecutableTailSummary,
 };

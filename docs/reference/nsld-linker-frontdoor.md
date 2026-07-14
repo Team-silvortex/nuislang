@@ -256,9 +256,10 @@ The launcher artifacts are still non-executing protocol artifacts. The launcher
 manifest carries the `nsld-final-output-handoff-v1` field group copied from the
 verified final-output boundary, and the launcher dry-run preserves the same
 handoff contract, target, evidence status, first blocker, and decision code.
-That means future host runners, entrypoint materializers, nsdb, or packaging
-tools can consume the launcher layer without re-deriving whether the output
-belongs to `host-runner`, `entrypoint-materializer`, or no execution owner yet.
+That means `nuis-host-runner`, future richer entrypoint materializers, nsdb, or
+packaging tools can consume the launcher layer without re-deriving whether the
+output belongs to `host-runner`, `entrypoint-materializer`, or no execution
+owner yet.
 The final-executable pipeline summary also copies that same handoff group, so
 automation can route from the pipeline report without opening the launcher TOML
 unless it needs lower-level diagnostics. The pipeline also exposes a plan-level
@@ -281,6 +282,11 @@ automation. `verify-final-executable-pipeline`
 re-computes those entrypoint facts from disk, so deleting the stub fails the
 required-path closure and changing the stub fails the entrypoint hash check
 without making nsld responsible for executing the runner.
+The initial `nuis-host-runner` implementation deliberately remains thin: it
+consumes the manifest and `.nsb`, verifies the header/hash/scheduler/lifecycle
+handoff, parses the `.nsb` payload offset/span and layout/byte-map hashes, and
+reports lifecycle-entry readiness before a fuller runtime maps and executes
+payload code.
 `nsld check` mirrors the pipeline handoff fields as
 `final_executable_pipeline_execution_handoff_*`, so CI can inspect the same
 route from the aggregate verifier report. It also mirrors the entrypoint
@@ -1289,6 +1295,14 @@ read-only output boundary exposed by `final-executable-output` and reports
 `final_executable_output_execution_handoff_evidence_status`,
 `final_executable_output_execution_handoff_first_blocker`,
 `final_executable_output_execution_handoff_decision_code`,
+`final_executable_output_entrypoint_materialization_evidence_status`,
+`final_executable_output_launcher_manifest_present`,
+`final_executable_output_launcher_manifest_ready`,
+`final_executable_output_launcher_manifest_blocker_count`,
+`final_executable_output_launcher_dry_run_present`,
+`final_executable_output_launcher_dry_run_ready`,
+`final_executable_output_launcher_dry_run_would_enter_lifecycle_hook`,
+`final_executable_output_launcher_dry_run_blocker_count`,
 `final_executable_output_recommended_next_action`,
 `final_executable_output_nsld_owned`,
 `final_executable_output_present`,
@@ -1329,6 +1343,18 @@ report records `expected_image_resolver_status`,
 `final_executable_output_matches_verified_patched_image`. A matching hash
 without resolved/applied/verified patch evidence is not enough to become a
 runnable candidate.
+The standalone `final-executable-output` report also records the post-output
+entrypoint materialization evidence. For self-contained images, a ready output
+with no launcher artifacts reports
+`entrypoint_materialization_evidence_status =
+"launcher-evidence-missing"` and recommends
+`emit-final-executable-launcher-manifest`; once the launcher manifest is ready it
+recommends `emit-final-executable-launcher-dry-run`; once the dry-run is ready
+and would enter the lifecycle hook it reports
+`entrypoint_materialization_evidence_status = "launcher-dry-run-ready"` and
+recommends `run-artifact-or-handoff-to-runtime`. This keeps the final output
+boundary read-only while still making the next execution handoff evidence
+script-visible.
 Scripts should prefer the normalized `boundary_status` /
 `final_executable_output_boundary_status` field for high-level branching, use
 `materialization_status` /

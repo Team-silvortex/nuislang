@@ -35,11 +35,19 @@ Current source layers:
 * `final-output-boundary` means the artifact chain itself has no more safe
   apply step, but the final executable output boundary is still blocked and
   should be inspected with `nsld final-executable-output <input>`
+* `final-output-materialization` means the final executable output is ready and
+  the remaining safe action only writes launcher evidence, such as
+  `emit-final-executable-launcher-manifest` or
+  `emit-final-executable-launcher-dry-run`
 
 The `final-output-boundary` source is intentionally read-only. It makes the
 current linker boundary visible to automation without turning `nsld drive
 --apply` into a host-finalizer runner. Host-assisted final executable emission
 still requires the explicit host-finalizer policy and allow gates.
+
+The `final-output-materialization` source is intentionally narrower: it may
+write Nsld-owned launcher manifest or launcher dry-run protocol files, but it
+does not execute the produced binary or jump into payload code.
 
 ## Drive Modes
 

@@ -98,6 +98,11 @@ pub(crate) fn nsld_check_next_action_json(next_action: &NsldCheckNextAction) -> 
 }
 
 pub(crate) fn nsld_check_next_action(report: &NsldCheckReport) -> NsldCheckNextAction {
+    if !report.next_action_available {
+        if let Some(action) = final_output_materialization_next_action(report) {
+            return action;
+        }
+    }
     NsldCheckNextAction {
         available: report.next_action_available,
         source: report.next_action_source.clone(),
@@ -106,6 +111,31 @@ pub(crate) fn nsld_check_next_action(report: &NsldCheckReport) -> NsldCheckNextA
         command_resolved: report.next_action_command_resolved.clone(),
         reason: report.next_action_command_reason.clone(),
     }
+}
+
+fn final_output_materialization_next_action(
+    report: &NsldCheckReport,
+) -> Option<NsldCheckNextAction> {
+    let command_id = match report
+        .final_executable_output_recommended_next_action
+        .as_str()
+    {
+        "emit-final-executable-launcher-manifest" => "emit-final-executable-launcher-manifest",
+        "emit-final-executable-launcher-dry-run" => "emit-final-executable-launcher-dry-run",
+        _ => return None,
+    };
+    let command = format!("nsld {command_id} <input>");
+    Some(NsldCheckNextAction {
+        available: true,
+        source: Some("final-output-materialization".to_owned()),
+        command_id: Some(command_id.to_owned()),
+        command_resolved: Some(command.replace("<input>", &report.manifest)),
+        command: Some(command),
+        reason: Some(format!(
+            "final executable output is ready; {}",
+            report.final_executable_output_recommended_next_action
+        )),
+    })
 }
 
 pub(crate) fn nsld_check_next_action_dry_run(report: &NsldCheckReport) -> Option<String> {

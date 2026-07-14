@@ -43,6 +43,43 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         report.execution_handoff_decision_code
     );
     println!(
+        "  entrypoint_materialization_evidence_status: {}",
+        report.entrypoint_materialization_evidence_status
+    );
+    println!(
+        "  launcher_manifest_path: {}",
+        report.launcher_manifest_path
+    );
+    println!(
+        "  launcher_manifest_present: {}",
+        report.launcher_manifest_present
+    );
+    println!(
+        "  launcher_manifest_ready: {}",
+        optional_bool_text(report.launcher_manifest_ready)
+    );
+    println!(
+        "  launcher_manifest_blocker_count: {}",
+        optional_usize_text(report.launcher_manifest_blocker_count)
+    );
+    println!("  launcher_dry_run_path: {}", report.launcher_dry_run_path);
+    println!(
+        "  launcher_dry_run_present: {}",
+        report.launcher_dry_run_present
+    );
+    println!(
+        "  launcher_dry_run_ready: {}",
+        optional_bool_text(report.launcher_dry_run_ready)
+    );
+    println!(
+        "  launcher_dry_run_would_enter_lifecycle_hook: {}",
+        optional_bool_text(report.launcher_dry_run_would_enter_lifecycle_hook)
+    );
+    println!(
+        "  launcher_dry_run_blocker_count: {}",
+        optional_usize_text(report.launcher_dry_run_blocker_count)
+    );
+    println!(
         "  recommended_next_action: {}",
         report.recommended_next_action
     );

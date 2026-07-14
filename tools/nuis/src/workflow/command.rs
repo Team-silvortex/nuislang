@@ -4,7 +4,6 @@ use super::frontdoor::{
     WorkflowRecommendation,
 };
 use super::*;
-
 pub(crate) fn default_build_output_dir(input: &Path) -> PathBuf {
     PathBuf::from(format!(
         "target/nuis-build/{}",
