@@ -61,6 +61,16 @@ The JSON surface is intentionally simple:
 * `weakest_bootstrap_architecture`
 * `weakest_bootstrap_module`
 * `weakest_bootstrap_function`
+* `coverage_status`
+* `coverage_expected_count`
+* `coverage_covered_count`
+* `coverage_missing_count`
+* `coverage_orphaned_count`
+* `coverage_stale_count`
+* `coverage_first_gap`
+* `coverage_missing_coordinates`
+* `coverage_orphaned_coordinates`
+* `coverage_stale_coordinates`
 * `drift_status`
 * `drift_check_count`
 * `drift_check_passed_count`
@@ -74,6 +84,38 @@ can read it either as records or as tensor coordinates.
 
 `nuis status` also prints the short tensor summary. That makes the model part
 of the toolchain self-orientation surface, not just a separate report command.
+
+## Coverage Manifest
+
+The tensor now has a small built-in coverage manifest. The manifest lists the
+coordinates that the alpha line expects to see in the tensor:
+
+`expected architecture/module/function coordinates`
+
+The coverage layer compares that expected coordinate set with the actual
+`DEV_TENSOR_CELLS` entries and reports:
+
+* `coverage_status`
+  `clean` when required expected coordinates are covered and no stale/orphaned
+  cells are present; otherwise `gap`
+* `coverage_missing_coordinates`
+  expected coordinates that do not currently have a tensor cell
+* `coverage_orphaned_coordinates`
+  tensor cells that exist but are not declared by the coverage manifest
+* `coverage_stale_coordinates`
+  cells with invalid metadata, such as empty evidence or out-of-range progress
+* `coverage_first_gap`
+  the first missing, orphaned, or stale coordinate for quick CLI triage
+
+Short rule:
+
+`drift checks ask whether evidence anchors still exist; coverage asks whether
+the tensor itself still spans the expected project map`
+
+This is not yet automatic repository discovery. It is the first guardrail that
+prevents the tensor from becoming only a hand-written status list. Future
+versions can derive expected coordinates from galaxy manifests, Nustar
+registries, std module manifests, and milestone files.
 
 ## Drift Checks
 

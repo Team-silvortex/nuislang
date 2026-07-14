@@ -906,11 +906,11 @@ fn render_host_entrypoint_runner_command_parts(
 ) -> String {
     format!(
         "nuis-host-runner --manifest {} --nsb {} --output-dir {} --scheduler-entry {} --lifecycle-hook {}",
-        manifest.display(),
-        nsb_path,
-        output_dir,
-        scheduler_entry,
-        lifecycle_hook
+        shell_single_quote(&manifest.display().to_string()),
+        shell_single_quote(nsb_path),
+        shell_single_quote(output_dir),
+        shell_single_quote(scheduler_entry),
+        shell_single_quote(lifecycle_hook)
     )
 }
 

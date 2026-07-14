@@ -116,7 +116,7 @@ entrypoint_materialization_ready = true
 entrypoint_materialization_first_blocker = ""
 entrypoint_materialization_present = true
 entrypoint_materialization_hash = "0xabcd"
-entrypoint_materialization_runner_command = "nuis-host-runner --manifest manifest.toml --nsb nuis-app.nsb --output-dir out --scheduler-entry nuis.scheduler.loop.v1 --lifecycle-hook on_process_start"
+entrypoint_materialization_runner_command = "nuis-host-runner --manifest 'manifest.toml' --nsb 'nuis-app.nsb' --output-dir 'out' --scheduler-entry 'nuis.scheduler.loop.v1' --lifecycle-hook 'on_process_start'"
 scheduler_metadata_payload_id = "payload0004.scheduler-metadata"
 scheduler_metadata_present = true
 scheduler_metadata_hash = "0x1234"
@@ -129,6 +129,11 @@ blockers = []
         .trim_start(),
     )
     .expect("write ready final executable pipeline placeholder");
+    fs::write(
+        output_dir.join("nuis.host-entrypoint.sh"),
+        "#!/bin/sh\nset -eu\nexec nuis-host-runner --manifest 'manifest.toml' --nsb 'nuis-app.nsb' --output-dir 'out' --scheduler-entry 'nuis.scheduler.loop.v1' --lifecycle-hook 'on_process_start'\n",
+    )
+    .expect("write host entrypoint placeholder");
 }
 
 fn load_stdlib_source_modules(root: &Path, module_dir: &str) -> Vec<String> {

@@ -151,6 +151,20 @@ These fields now form the current visible link summary:
   content hash for the generated host entrypoint handoff stub, or `null`
 * `nsld_final_executable_pipeline_entrypoint_materialization_runner_command`
   script-facing summary of the host-runner handoff command
+* `run_artifact_prelaunch_kind`
+  `run-artifact --json` aggregate launch recommendation, currently
+  `nsld-host-entrypoint`, `host-binary`, or `none`
+* `run_artifact_prelaunch_status`
+  `ready` when the recommended launch surface is usable, otherwise `blocked`
+* `run_artifact_prelaunch_command`
+  command-like launch summary for the recommended surface, or `null`
+* `run_artifact_prelaunch_entrypoint_path`
+  resolved host entrypoint path when `run_artifact_prelaunch_kind` is
+  `nsld-host-entrypoint`
+* `run_artifact_prelaunch_reason`
+  human-readable explanation for the aggregate recommendation; a missing Nsld
+  host entrypoint stub is reported as `blocked` instead of being hidden by the
+  legacy host-binary fallback
 * `nsld_final_executable_output_recommended_next_action`
   the script-facing next action for the current boundary, such as
   `emit-final-executable-pipeline`,

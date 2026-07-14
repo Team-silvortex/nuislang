@@ -142,6 +142,26 @@ fn run() -> Result<(), String> {
                 "  dev_tensor_weakest_bootstrap_function: {}",
                 dev_tensor.weakest_bootstrap_function
             );
+            println!(
+                "  dev_tensor_coverage_status: {}",
+                dev_tensor.coverage_status
+            );
+            println!(
+                "  dev_tensor_coverage: {}/{}",
+                dev_tensor.coverage_covered_count, dev_tensor.coverage_expected_count
+            );
+            println!(
+                "  dev_tensor_coverage_missing: {}",
+                dev_tensor.coverage_missing_count
+            );
+            println!(
+                "  dev_tensor_coverage_orphaned: {}",
+                dev_tensor.coverage_orphaned_count
+            );
+            println!(
+                "  dev_tensor_coverage_stale: {}",
+                dev_tensor.coverage_stale_count
+            );
             println!("  dev_tensor_drift_status: {}", dev_tensor_drift.status);
             println!(
                 "  dev_tensor_drift_checks: {}/{}",
@@ -968,6 +988,76 @@ fn resolve_run_artifact_binary_path(input: &Path) -> Result<PathBuf, String> {
     ))
 }
 
+struct RunArtifactPrelaunchSummary {
+    kind: String,
+    status: String,
+    command: Option<String>,
+    entrypoint_path: Option<String>,
+    reason: String,
+}
+
+fn run_artifact_prelaunch_summary(
+    output_dir: Option<&Path>,
+    resolved_binary: Option<&Path>,
+) -> RunArtifactPrelaunchSummary {
+    if let Some(output_dir) = output_dir {
+        let nsld_tail = nsld_final_executable_tail_summary(output_dir);
+        if nsld_tail.entrypoint_materialization_ready == Some(true)
+            && nsld_tail.entrypoint_materialization_present == Some(true)
+            && nsld_tail.entrypoint_materialization_hash.is_some()
+            && nsld_tail
+                .entrypoint_materialization_runner_command
+                .is_some()
+        {
+            if let Some(entrypoint_path) = nsld_tail.entrypoint_materialization_path.as_deref() {
+                let resolved_entrypoint_path =
+                    resolve_output_relative_path(output_dir, entrypoint_path);
+                if resolved_entrypoint_path.is_file() {
+                    return RunArtifactPrelaunchSummary {
+                        kind: "nsld-host-entrypoint".to_owned(),
+                        status: "ready".to_owned(),
+                        command: nsld_tail.entrypoint_materialization_runner_command,
+                        entrypoint_path: Some(resolved_entrypoint_path.display().to_string()),
+                        reason: "nsld final executable pipeline materialized a verified host entrypoint stub".to_owned(),
+                    };
+                }
+                return RunArtifactPrelaunchSummary {
+                    kind: "nsld-host-entrypoint".to_owned(),
+                    status: "blocked".to_owned(),
+                    command: nsld_tail.entrypoint_materialization_runner_command,
+                    entrypoint_path: Some(resolved_entrypoint_path.display().to_string()),
+                    reason: "nsld final executable pipeline reports an entrypoint, but the host entrypoint stub is missing on disk".to_owned(),
+                };
+            }
+        }
+    }
+    if let Some(binary) = resolved_binary {
+        return RunArtifactPrelaunchSummary {
+            kind: "host-binary".to_owned(),
+            status: "ready".to_owned(),
+            command: Some(binary.display().to_string()),
+            entrypoint_path: None,
+            reason: "legacy host binary path is resolved and can be executed directly".to_owned(),
+        };
+    }
+    RunArtifactPrelaunchSummary {
+        kind: "none".to_owned(),
+        status: "blocked".to_owned(),
+        command: None,
+        entrypoint_path: None,
+        reason: "no runnable host entrypoint or legacy host binary could be resolved".to_owned(),
+    }
+}
+
+fn resolve_output_relative_path(output_dir: &Path, value: &str) -> PathBuf {
+    let path = Path::new(value);
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        output_dir.join(path)
+    }
+}
+
 fn load_frontdoor_compiled_artifact(
     input: &Path,
 ) -> Result<nuisc::aot::NuisCompiledArtifact, String> {
@@ -1142,6 +1232,8 @@ pub(crate) fn render_run_artifact_json(input: &Path) -> String {
         .output_dir
         .as_ref()
         .and_then(|output_dir| load_link_plan_for_output_dir(output_dir));
+    let prelaunch =
+        run_artifact_prelaunch_summary(doctor.output_dir.as_deref(), resolved_binary.as_deref());
     let mut out = String::from("{");
     append_json_field_strings(
         &mut out,
@@ -1161,6 +1253,17 @@ pub(crate) fn render_run_artifact_json(input: &Path) -> String {
                     .as_deref(),
             ),
             json_bool_field("binary_resolved", resolved_binary.is_some()),
+            json_field("run_artifact_prelaunch_kind", &prelaunch.kind),
+            json_field("run_artifact_prelaunch_status", &prelaunch.status),
+            json_optional_string_field(
+                "run_artifact_prelaunch_command",
+                prelaunch.command.as_deref(),
+            ),
+            json_optional_string_field(
+                "run_artifact_prelaunch_entrypoint_path",
+                prelaunch.entrypoint_path.as_deref(),
+            ),
+            json_field("run_artifact_prelaunch_reason", &prelaunch.reason),
         ],
     );
     append_runtime_session_json_fields(&mut out, manifest_verify.as_ref());
@@ -1203,6 +1306,19 @@ fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), String> {
             .output_dir
             .as_ref()
             .and_then(|output_dir| load_link_plan_for_output_dir(output_dir));
+        let prelaunch =
+            run_artifact_prelaunch_summary(doctor.output_dir.as_deref(), Some(binary.as_path()));
+        println!("  prelaunch_kind: {}", prelaunch.kind);
+        println!("  prelaunch_status: {}", prelaunch.status);
+        println!(
+            "  prelaunch_command: {}",
+            prelaunch.command.as_deref().unwrap_or("<none>")
+        );
+        println!(
+            "  prelaunch_entrypoint_path: {}",
+            prelaunch.entrypoint_path.as_deref().unwrap_or("<none>")
+        );
+        println!("  prelaunch_reason: {}", prelaunch.reason);
         print_run_artifact_link_plan_status(link_plan.as_ref());
     }
     if status.success() {

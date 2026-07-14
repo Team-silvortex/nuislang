@@ -275,7 +275,12 @@ the pipeline required-path closure, but the runner remains a separate runtime
 component. The pipeline exposes the stub's presence, content hash, and
 script-facing runner command through `entrypoint_materialization_present`,
 `entrypoint_materialization_hash`, and
-`entrypoint_materialization_runner_command`.
+`entrypoint_materialization_runner_command`; the runner command is rendered with
+shell-quoted arguments so paths with spaces remain unambiguous in logs and
+automation. `verify-final-executable-pipeline`
+re-computes those entrypoint facts from disk, so deleting the stub fails the
+required-path closure and changing the stub fails the entrypoint hash check
+without making nsld responsible for executing the runner.
 `nsld check` mirrors the pipeline handoff fields as
 `final_executable_pipeline_execution_handoff_*`, so CI can inspect the same
 route from the aggregate verifier report. It also mirrors the entrypoint
@@ -1274,7 +1279,10 @@ For host-shell entrypoint planning, the pipeline additionally records
 `final_executable_pipeline_entrypoint_materialization_kind`,
 `final_executable_pipeline_entrypoint_materialization_path`,
 `final_executable_pipeline_entrypoint_materialization_ready`, and
-`final_executable_pipeline_entrypoint_materialization_first_blocker`.
+`final_executable_pipeline_entrypoint_materialization_first_blocker`. The
+presence/hash/runner-command fields are also mirrored, so scripts can
+distinguish "entrypoint plan exists", "entrypoint artifact is still present",
+and "entrypoint artifact content still matches the emitted pipeline snapshot".
 
 `nsld prepare` also returns the same compatibility-domain summary after it has
 emitted and verified the full artifact chain. This makes the prepare result a

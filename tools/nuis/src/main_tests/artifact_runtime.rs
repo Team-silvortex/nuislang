@@ -200,6 +200,13 @@ mod cpu Main {
     assert!(json.contains("\"ready_to_run\":true"));
     assert!(json.contains("\"binary_resolved\":true"));
     assert!(json.contains("\"binary_path\":\""));
+    assert!(json.contains("\"run_artifact_prelaunch_kind\":\"host-binary\""));
+    assert!(json.contains("\"run_artifact_prelaunch_status\":\"ready\""));
+    assert!(json.contains("\"run_artifact_prelaunch_command\":\""));
+    assert!(json.contains("\"run_artifact_prelaunch_entrypoint_path\":null"));
+    assert!(json.contains(
+        "\"run_artifact_prelaunch_reason\":\"legacy host binary path is resolved and can be executed directly\""
+    ));
     assert!(json.contains("\"heterogeneous_domain_count\":0"));
     assert!(json.contains("\"bridge_registry_units\":0"));
     assert!(json.contains("\"host_bridge_plan_units\":0"));
@@ -418,6 +425,16 @@ mod cpu Main {
 
     assert!(json.contains("\"nsld_prepared_artifact_chain_ready\":true"));
     assert!(json.contains("\"nsld_final_executable_tail_ready\":true"));
+    assert!(json.contains("\"run_artifact_prelaunch_kind\":\"nsld-host-entrypoint\""));
+    assert!(json.contains("\"run_artifact_prelaunch_status\":\"ready\""));
+    assert!(json.contains(
+        "\"run_artifact_prelaunch_command\":\"nuis-host-runner --manifest 'manifest.toml'"
+    ));
+    assert!(json.contains("\"run_artifact_prelaunch_entrypoint_path\":\""));
+    assert!(json.contains("nuis.host-entrypoint.sh"));
+    assert!(json.contains(
+        "\"run_artifact_prelaunch_reason\":\"nsld final executable pipeline materialized a verified host entrypoint stub\""
+    ));
     assert!(json.contains(
         "\"nsld_final_executable_tail_stage_records\":[{\"stage\":\"final-executable-writer-input\",\"file\":\"nuis.nsld.final-executable-writer-input.toml\",\"present\":true"
     ));
@@ -469,7 +486,7 @@ mod cpu Main {
     assert!(json
         .contains("\"nsld_final_executable_pipeline_entrypoint_materialization_hash\":\"0xabcd\""));
     assert!(json.contains(
-        "\"nsld_final_executable_pipeline_entrypoint_materialization_runner_command\":\"nuis-host-runner --manifest manifest.toml"
+        "\"nsld_final_executable_pipeline_entrypoint_materialization_runner_command\":\"nuis-host-runner --manifest 'manifest.toml'"
     ));
     assert!(json.contains(
         "\"nsld_final_executable_pipeline_scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""
@@ -501,6 +518,47 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
     assert!(json.contains("\"nsld_final_executable_output_blockers\":["));
+}
+
+#[test]
+fn run_artifact_json_blocks_nsld_prelaunch_when_entrypoint_stub_is_missing() {
+    let project_root = write_temp_project_fixture(
+        "run_artifact_json_missing_entrypoint_smoke",
+        r#"
+name = "run_artifact_json_missing_entrypoint_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+        .trim_start(),
+        r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 0;
+  }
+}
+"#,
+    );
+    let output_dir = temp_dir("run_artifact_json_missing_entrypoint_outputs");
+
+    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    write_prepared_nsld_chain_placeholders(&output_dir);
+    write_ready_nsld_final_tail_placeholders(&output_dir);
+    fs::remove_file(output_dir.join("nuis.host-entrypoint.sh")).expect("remove entrypoint stub");
+
+    let json = render_run_artifact_json(&output_dir.join("nuis.build.manifest.toml"));
+
+    assert!(json.contains("\"nsld_final_executable_tail_ready\":true"));
+    assert!(json.contains("\"run_artifact_prelaunch_kind\":\"nsld-host-entrypoint\""));
+    assert!(json.contains("\"run_artifact_prelaunch_status\":\"blocked\""));
+    assert!(json.contains(
+        "\"run_artifact_prelaunch_command\":\"nuis-host-runner --manifest 'manifest.toml'"
+    ));
+    assert!(json.contains("\"run_artifact_prelaunch_entrypoint_path\":\""));
+    assert!(json.contains("nuis.host-entrypoint.sh"));
+    assert!(json.contains(
+        "\"run_artifact_prelaunch_reason\":\"nsld final executable pipeline reports an entrypoint, but the host entrypoint stub is missing on disk\""
+    ));
 }
 
 #[test]

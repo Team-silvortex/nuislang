@@ -8,7 +8,7 @@ use std::{env, fs, path::Path};
 #[test]
 fn emit_final_executable_pipeline_writes_launcher_closure() {
     let dir = env::temp_dir().join(format!(
-        "nsld-final-executable-pipeline-{}",
+        "nsld-final-executable-pipeline path space-{}",
         std::process::id()
     ));
     fs::create_dir_all(&dir).unwrap();
@@ -129,9 +129,17 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
     assert!(pipeline
         .entrypoint_materialization_runner_command
         .as_deref()
-        .is_some_and(|command| command.contains("nuis-host-runner --manifest")));
+        .is_some_and(|command| command.contains("nuis-host-runner --manifest 'manifest.toml'")));
+    assert!(pipeline
+        .entrypoint_materialization_runner_command
+        .as_deref()
+        .is_some_and(
+            |command| command.contains("--output-dir '") && command.contains("path space")
+        ));
     assert!(entrypoint_source.starts_with("#!/bin/sh\n"));
     assert!(entrypoint_source.contains("NUIS_HOST_RUNNER"));
+    assert!(entrypoint_source.contains("NUIS_OUTPUT_DIR='"));
+    assert!(entrypoint_source.contains("path space"));
     assert!(entrypoint_source.contains("--scheduler-entry"));
     assert!(entrypoint_source.contains("--lifecycle-hook"));
     assert_eq!(
@@ -182,7 +190,7 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
     assert!(pipeline_json.contains("\"entrypoint_materialization_present\":true"));
     assert!(pipeline_json.contains("\"entrypoint_materialization_hash\":\"0x"));
     assert!(pipeline_json
-        .contains("\"entrypoint_materialization_runner_command\":\"nuis-host-runner --manifest "));
+        .contains("\"entrypoint_materialization_runner_command\":\"nuis-host-runner --manifest 'manifest.toml'"));
     assert!(pipeline_json.contains("\"execution_handoff_ready\":true"));
     assert!(pipeline_json.contains("\"execution_handoff_target\":\"entrypoint-materializer\""));
     assert!(pipeline_json
@@ -203,7 +211,7 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
     assert!(verify_json.contains("\"actual_entrypoint_materialization_present\":true"));
     assert!(verify_json.contains("\"actual_entrypoint_materialization_hash\":\"0x"));
     assert!(verify_json.contains(
-        "\"actual_entrypoint_materialization_runner_command\":\"nuis-host-runner --manifest "
+        "\"actual_entrypoint_materialization_runner_command\":\"nuis-host-runner --manifest 'manifest.toml'"
     ));
     assert!(verify_json.contains("\"actual_execution_handoff_ready\":true"));
     assert!(verify_json.contains("\"actual_execution_handoff_target\":\"entrypoint-materializer\""));
@@ -229,7 +237,7 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
         check_json.contains("\"final_executable_pipeline_entrypoint_materialization_hash\":\"0x")
     );
     assert!(check_json.contains(
-        "\"final_executable_pipeline_entrypoint_materialization_runner_command\":\"nuis-host-runner --manifest "
+        "\"final_executable_pipeline_entrypoint_materialization_runner_command\":\"nuis-host-runner --manifest 'manifest.toml'"
     ));
     assert!(check_json.contains("\"final_executable_pipeline_execution_handoff_ready\":true"));
     assert!(check_json.contains(
@@ -578,5 +586,87 @@ fn verify_final_executable_pipeline_reports_missing_entrypoint_materialization()
     assert!(verify_json.contains("\"expected_entrypoint_materialization_present\":false"));
     assert!(verify_json.contains("\"actual_entrypoint_materialization_present\":true"));
     assert!(verify_json.contains("\"expected_entrypoint_materialization_hash\":null"));
+    assert!(verify_json.contains("\"actual_entrypoint_materialization_hash\":\"0x"));
+}
+
+#[test]
+fn verify_final_executable_pipeline_reports_tampered_entrypoint_materialization() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-pipeline-tampered-entrypoint-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+    plan.final_stage.kind = "nuis-self-contained-image".to_owned();
+    plan.final_stage.driver = "nsld-internal-image-writer".to_owned();
+    plan.final_stage.link_mode = "self-contained".to_owned();
+    plan.final_stage.output_path = dir.join("nuis-app.nsb").display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let pipeline =
+        nsld_emit_final_executable_pipeline_report(Path::new("manifest.toml"), &plan).unwrap();
+    let entrypoint_path = pipeline
+        .entrypoint_materialization_path
+        .clone()
+        .expect("entrypoint path");
+    fs::write(
+        &entrypoint_path,
+        "#!/bin/sh\nset -eu\necho tampered-entrypoint\n",
+    )
+    .unwrap();
+
+    let verify = nsld_verify_final_executable_pipeline_report(Path::new("manifest.toml"), &plan);
+    let check = nsld_check_report(Path::new("manifest.toml"), &plan);
+    let verify_json = super::json::nsld_final_executable_pipeline_verify_report_json(&verify);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!verify.valid);
+    assert_eq!(
+        verify.expected_entrypoint_materialization_present,
+        Some(true)
+    );
+    assert_eq!(verify.actual_entrypoint_materialization_present, Some(true));
+    assert!(verify
+        .expected_entrypoint_materialization_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
+    assert!(verify
+        .actual_entrypoint_materialization_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
+    assert_ne!(
+        verify.expected_entrypoint_materialization_hash,
+        verify.actual_entrypoint_materialization_hash
+    );
+    assert_eq!(verify.expected_required_stage_path_count, 10);
+    assert_eq!(verify.actual_required_stage_path_count, Some(10));
+    assert_eq!(verify.expected_required_stage_path_present_count, 10);
+    assert_eq!(verify.actual_required_stage_path_present_count, Some(10));
+    assert!(verify.expected_missing_required_stage_paths.is_empty());
+    assert!(verify.actual_missing_required_stage_paths.is_empty());
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue.contains("entrypoint_materialization_hash mismatch")));
+
+    assert!(!check.valid);
+    assert_eq!(
+        check.final_executable_pipeline_required_stage_path_present_count,
+        Some(10)
+    );
+    assert!(check
+        .final_executable_pipeline_missing_required_stage_paths
+        .is_empty());
+    assert!(check
+        .final_executable_pipeline_issues
+        .iter()
+        .any(|issue| issue.contains("entrypoint_materialization_hash mismatch")));
+    assert!(verify_json.contains("\"expected_entrypoint_materialization_present\":true"));
+    assert!(verify_json.contains("\"actual_entrypoint_materialization_present\":true"));
+    assert!(verify_json.contains("\"expected_entrypoint_materialization_hash\":\"0x"));
     assert!(verify_json.contains("\"actual_entrypoint_materialization_hash\":\"0x"));
 }

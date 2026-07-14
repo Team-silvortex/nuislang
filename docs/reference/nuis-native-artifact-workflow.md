@@ -107,6 +107,11 @@ artifact-follow-up state:
 * `nsld_final_executable_pipeline_entrypoint_materialization_present`
 * `nsld_final_executable_pipeline_entrypoint_materialization_hash`
 * `nsld_final_executable_pipeline_entrypoint_materialization_runner_command`
+* `run_artifact_prelaunch_kind`
+* `run_artifact_prelaunch_status`
+* `run_artifact_prelaunch_command`
+* `run_artifact_prelaunch_entrypoint_path`
+* `run_artifact_prelaunch_reason`
 * `nsld_final_executable_output_recommended_next_action`
 * `nsld_final_executable_output_path_present`
 * `nsld_final_executable_output_nsld_owned`
@@ -169,7 +174,15 @@ Short reading rule:
   `image-ready-entrypoint-pending`, or `blocked`
 * on the current ready self-contained route, `nuis.host-entrypoint.sh` is a
   generated host-runner handoff stub, not an OS package or embedded runner; the
-  pipeline exposes its presence, hash, and runner command for automation
+  pipeline exposes its presence, hash, and runner command for automation, and
+  verifier/check reports fail if the stub is deleted or its content no longer
+  matches the emitted pipeline snapshot
+* `run-artifact --json` additionally emits the `run_artifact_prelaunch_*`
+  aggregate fields so scripts can choose between a verified Nsld host
+  entrypoint and the older host-binary launch path without re-interpreting every
+  lower-level Nsld field; if the pipeline snapshot claims an entrypoint but the
+  stub is missing on disk, the aggregate prelaunch status is `blocked` instead
+  of silently falling back to a different launch surface
 * heterogeneous-domain readiness fields summarize whether non-CPU domain units
   have the generic payload, lowering, sidecar, and bridge evidence needed by the
   current artifact route

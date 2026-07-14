@@ -17,6 +17,15 @@ pub(crate) struct DevTensorCell {
     pub(crate) next_step: &'static str,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DevTensorExpectedCoordinate {
+    architecture: &'static str,
+    module: &'static str,
+    function: &'static str,
+    milestone: &'static str,
+    required: bool,
+}
+
 const DEV_TENSOR_CELLS: &[DevTensorCell] = &[
     DevTensorCell {
         architecture: "compiler-frontdoor",
@@ -138,6 +147,86 @@ const DEV_TENSOR_CELLS: &[DevTensorCell] = &[
         closure_role: "bootstrap-progress-model",
         evidence: "tensor frontdoor maps progress by architecture, module, and function, summarizes through nuis status, and runs drift checks over key docs/tests/frontdoor fields",
         next_step: "expand drift checks from field anchors to milestone-owned test and example evidence",
+    },
+];
+
+const DEV_TENSOR_EXPECTED_COORDINATES: &[DevTensorExpectedCoordinate] = &[
+    DevTensorExpectedCoordinate {
+        architecture: "compiler-frontdoor",
+        module: "nuis-cli",
+        function: "workflow-and-project-orientation",
+        milestone: "alpha-frontdoor",
+        required: true,
+    },
+    DevTensorExpectedCoordinate {
+        architecture: "compiler-frontdoor",
+        module: "nuis-cli",
+        function: "artifact-runtime-closure",
+        milestone: "alpha-frontdoor",
+        required: true,
+    },
+    DevTensorExpectedCoordinate {
+        architecture: "linker-toolchain",
+        module: "nsld",
+        function: "artifact-chain-drive",
+        milestone: "alpha-linker",
+        required: true,
+    },
+    DevTensorExpectedCoordinate {
+        architecture: "linker-toolchain",
+        module: "nsld",
+        function: "final-output-boundary",
+        milestone: "alpha-linker",
+        required: true,
+    },
+    DevTensorExpectedCoordinate {
+        architecture: "heterogeneous-runtime",
+        module: "nustar",
+        function: "registered-domain-contracts",
+        milestone: "alpha-heterogeneous",
+        required: true,
+    },
+    DevTensorExpectedCoordinate {
+        architecture: "standard-library",
+        module: "std",
+        function: "host-io-filesystem-text",
+        milestone: "alpha-stdlib",
+        required: true,
+    },
+    DevTensorExpectedCoordinate {
+        architecture: "standard-library",
+        module: "pixelmagic",
+        function: "image-processing-lane",
+        milestone: "alpha-official-galaxy",
+        required: false,
+    },
+    DevTensorExpectedCoordinate {
+        architecture: "standard-library",
+        module: "witsage",
+        function: "classical-ml-lane",
+        milestone: "alpha-official-galaxy",
+        required: false,
+    },
+    DevTensorExpectedCoordinate {
+        architecture: "language-core",
+        module: "nuisc",
+        function: "type-control-flow-generics",
+        milestone: "alpha-language-core",
+        required: true,
+    },
+    DevTensorExpectedCoordinate {
+        architecture: "native-binary-system",
+        module: "nsb-nsld",
+        function: "self-owned-binary-assembly",
+        milestone: "alpha-native-binary",
+        required: true,
+    },
+    DevTensorExpectedCoordinate {
+        architecture: "developer-system",
+        module: "dev-tensor",
+        function: "architecture-module-function-progress-model",
+        milestone: "alpha-governance",
+        required: true,
     },
 ];
 
@@ -284,6 +373,9 @@ const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
             "NUIS_HOST_RUNNER",
             "nuis-host-runner --manifest",
             "required_stage_path_count, 10",
+            "verify_final_executable_pipeline_reports_missing_entrypoint_materialization",
+            "verify_final_executable_pipeline_reports_tampered_entrypoint_materialization",
+            "entrypoint_materialization_hash mismatch",
             "nsld-final-output-handoff-v1",
             "handoff-entrypoint-materializer",
             "Some(\"ready\")",
@@ -354,6 +446,11 @@ const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
             "nsld_final_executable_pipeline_execution_handoff_decision_code",
             "nsld_final_executable_output_recommended_next_action",
             "nsld_self_owned_image_status",
+            "run_artifact_prelaunch_kind",
+            "run_artifact_prelaunch_status",
+            "nsld-host-entrypoint",
+            "run_artifact_json_blocks_nsld_prelaunch_when_entrypoint_stub_is_missing",
+            "host entrypoint stub is missing on disk",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -378,6 +475,9 @@ const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
             "nsld_final_executable_pipeline_execution_handoff_decision_code",
             "nsld_final_executable_output_recommended_next_action",
             "nsld_self_owned_image_status",
+            "run_artifact_prelaunch_kind",
+            "run_artifact_prelaunch_status",
+            "run_artifact_prelaunch_command",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -407,6 +507,9 @@ const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
             "nsld_final_executable_pipeline_execution_handoff_decision_code",
             "nsld_final_executable_output_recommended_next_action",
             "nsld_self_owned_image_status",
+            "run_artifact_prelaunch_kind",
+            "run_artifact_prelaunch_status",
+            "run_artifact_prelaunch_command",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -440,6 +543,18 @@ const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
             "lib/fs_contracts.ns",
         ],
     },
+    DevTensorDriftCheckSpec {
+        id: "dev-tensor-coverage-doc",
+        path: "docs/reference/nuis-development-tensor.md",
+        required_patterns: &[
+            "Coverage Manifest",
+            "coverage_status",
+            "coverage_missing_coordinates",
+            "coverage_orphaned_coordinates",
+            "coverage_stale_coordinates",
+            "coverage_first_gap",
+        ],
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -460,6 +575,21 @@ pub(crate) struct DevTensorDriftSummary {
     pub(crate) checks: Vec<DevTensorDriftCheck>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DevTensorCoverageSummary {
+    pub(crate) expected_count: usize,
+    pub(crate) covered_count: usize,
+    pub(crate) missing_count: usize,
+    pub(crate) required_missing_count: usize,
+    pub(crate) orphaned_count: usize,
+    pub(crate) stale_count: usize,
+    pub(crate) status: &'static str,
+    pub(crate) first_gap: Option<String>,
+    pub(crate) missing_coordinates: Vec<String>,
+    pub(crate) orphaned_coordinates: Vec<String>,
+    pub(crate) stale_coordinates: Vec<String>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct DevTensorSummary {
     pub(crate) architecture_count: usize,
@@ -473,9 +603,16 @@ pub(crate) struct DevTensorSummary {
     pub(crate) weakest_bootstrap_module: &'static str,
     pub(crate) weakest_bootstrap_function: &'static str,
     pub(crate) weakest_bootstrap_progress: usize,
+    pub(crate) coverage_status: &'static str,
+    pub(crate) coverage_expected_count: usize,
+    pub(crate) coverage_covered_count: usize,
+    pub(crate) coverage_missing_count: usize,
+    pub(crate) coverage_orphaned_count: usize,
+    pub(crate) coverage_stale_count: usize,
 }
 
 pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
+    let coverage = dev_tensor_coverage_summary();
     let mut architectures = BTreeSet::new();
     let mut modules = BTreeSet::new();
     let mut functions = BTreeSet::new();
@@ -526,7 +663,106 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
             .map(|cell| cell.function)
             .unwrap_or("<none>"),
         weakest_bootstrap_progress: weakest_bootstrap.map_or(0, |cell| cell.progress),
+        coverage_status: coverage.status,
+        coverage_expected_count: coverage.expected_count,
+        coverage_covered_count: coverage.covered_count,
+        coverage_missing_count: coverage.missing_count,
+        coverage_orphaned_count: coverage.orphaned_count,
+        coverage_stale_count: coverage.stale_count,
     }
+}
+
+pub(crate) fn dev_tensor_coverage_summary() -> DevTensorCoverageSummary {
+    let cell_coordinates = DEV_TENSOR_CELLS
+        .iter()
+        .map(|cell| dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function))
+        .collect::<BTreeSet<_>>();
+    let expected_coordinates = DEV_TENSOR_EXPECTED_COORDINATES
+        .iter()
+        .map(|coordinate| {
+            dev_tensor_coordinate_key(
+                coordinate.architecture,
+                coordinate.module,
+                coordinate.function,
+            )
+        })
+        .collect::<BTreeSet<_>>();
+    let missing_coordinates = DEV_TENSOR_EXPECTED_COORDINATES
+        .iter()
+        .filter_map(|coordinate| {
+            let key = dev_tensor_coordinate_key(
+                coordinate.architecture,
+                coordinate.module,
+                coordinate.function,
+            );
+            (!cell_coordinates.contains(&key)).then(|| {
+                format!(
+                    "{}{}",
+                    key,
+                    if coordinate.required {
+                        ":required"
+                    } else {
+                        ":optional"
+                    }
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+    let required_missing_count = missing_coordinates
+        .iter()
+        .filter(|coordinate| coordinate.ends_with(":required"))
+        .count();
+    let orphaned_coordinates = DEV_TENSOR_CELLS
+        .iter()
+        .filter_map(|cell| {
+            let key = dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function);
+            (!expected_coordinates.contains(&key)).then_some(key)
+        })
+        .collect::<Vec<_>>();
+    let stale_coordinates = DEV_TENSOR_CELLS
+        .iter()
+        .filter_map(|cell| {
+            let stale = cell.status.is_empty()
+                || cell.closure_role.is_empty()
+                || cell.evidence.is_empty()
+                || cell.next_step.is_empty()
+                || cell.progress > 100;
+            stale.then(|| dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function))
+        })
+        .collect::<Vec<_>>();
+    let covered_count = DEV_TENSOR_EXPECTED_COORDINATES
+        .len()
+        .saturating_sub(missing_coordinates.len());
+    let status = if required_missing_count == 0
+        && orphaned_coordinates.is_empty()
+        && stale_coordinates.is_empty()
+    {
+        "clean"
+    } else {
+        "gap"
+    };
+    let first_gap = missing_coordinates
+        .first()
+        .or_else(|| orphaned_coordinates.first())
+        .or_else(|| stale_coordinates.first())
+        .cloned();
+    DevTensorCoverageSummary {
+        expected_count: DEV_TENSOR_EXPECTED_COORDINATES.len(),
+        covered_count,
+        missing_count: missing_coordinates.len(),
+        required_missing_count,
+        orphaned_count: orphaned_coordinates.len(),
+        stale_count: stale_coordinates.len(),
+        status,
+        first_gap,
+        missing_coordinates,
+        orphaned_coordinates,
+        stale_coordinates,
+    }
+}
+
+fn dev_tensor_coordinate_key(architecture: &str, module: &str, function: &str) -> String {
+    format!("{architecture}/{module}/{function}")
 }
 
 pub(crate) fn dev_tensor_drift_summary() -> DevTensorDriftSummary {
@@ -574,6 +810,7 @@ fn repo_root() -> PathBuf {
 
 pub(crate) fn render_dev_tensor_json() -> String {
     let summary = dev_tensor_summary();
+    let coverage = dev_tensor_coverage_summary();
     let drift = dev_tensor_drift_summary();
     let cells = DEV_TENSOR_CELLS
         .iter()
@@ -618,6 +855,29 @@ pub(crate) fn render_dev_tensor_json() -> String {
                 "weakest_bootstrap_progress",
                 summary.weakest_bootstrap_progress,
             ),
+            json_field("coverage_status", coverage.status),
+            json_usize_field("coverage_expected_count", coverage.expected_count),
+            json_usize_field("coverage_covered_count", coverage.covered_count),
+            json_usize_field("coverage_missing_count", coverage.missing_count),
+            json_usize_field(
+                "coverage_required_missing_count",
+                coverage.required_missing_count,
+            ),
+            json_usize_field("coverage_orphaned_count", coverage.orphaned_count),
+            json_usize_field("coverage_stale_count", coverage.stale_count),
+            json_field(
+                "coverage_first_gap",
+                coverage.first_gap.as_deref().unwrap_or("<none>"),
+            ),
+            json_string_array_field(
+                "coverage_missing_coordinates",
+                &coverage.missing_coordinates,
+            ),
+            json_string_array_field(
+                "coverage_orphaned_coordinates",
+                &coverage.orphaned_coordinates,
+            ),
+            json_string_array_field("coverage_stale_coordinates", &coverage.stale_coordinates),
             json_usize_field("drift_check_count", drift.check_count),
             json_usize_field("drift_check_passed_count", drift.passed_count),
             json_usize_field("drift_check_failed_count", drift.failed_count),
@@ -636,6 +896,7 @@ pub(crate) fn render_dev_tensor_json() -> String {
 
 pub(crate) fn render_dev_tensor_text() -> Vec<String> {
     let summary = dev_tensor_summary();
+    let coverage = dev_tensor_coverage_summary();
     let drift = dev_tensor_drift_summary();
     let mut lines = vec![
         "nuis development tensor".to_owned(),
@@ -671,6 +932,20 @@ pub(crate) fn render_dev_tensor_text() -> Vec<String> {
             "  weakest_bootstrap_progress: {}",
             summary.weakest_bootstrap_progress
         ),
+        format!("  coverage_status: {}", coverage.status),
+        format!("  coverage_expected_count: {}", coverage.expected_count),
+        format!("  coverage_covered_count: {}", coverage.covered_count),
+        format!("  coverage_missing_count: {}", coverage.missing_count),
+        format!(
+            "  coverage_required_missing_count: {}",
+            coverage.required_missing_count
+        ),
+        format!("  coverage_orphaned_count: {}", coverage.orphaned_count),
+        format!("  coverage_stale_count: {}", coverage.stale_count),
+        format!(
+            "  coverage_first_gap: {}",
+            coverage.first_gap.as_deref().unwrap_or("<none>")
+        ),
         format!("  drift_status: {}", drift.status),
         format!("  drift_check_count: {}", drift.check_count),
         format!("  drift_check_passed_count: {}", drift.passed_count),
@@ -680,6 +955,15 @@ pub(crate) fn render_dev_tensor_text() -> Vec<String> {
             drift.first_failed_check.unwrap_or("<none>")
         ),
     ];
+    for coordinate in &coverage.missing_coordinates {
+        lines.push(format!("  coverage_missing_coordinate: {coordinate}"));
+    }
+    for coordinate in &coverage.orphaned_coordinates {
+        lines.push(format!("  coverage_orphaned_coordinate: {coordinate}"));
+    }
+    for coordinate in &coverage.stale_coordinates {
+        lines.push(format!("  coverage_stale_coordinate: {coordinate}"));
+    }
     for check in &drift.checks {
         lines.push(format!(
             "  drift_check: id={} path={} passed={} missing={}",
@@ -766,6 +1050,14 @@ mod tests {
         assert_ne!(summary.weakest_bootstrap_function, "<none>");
         assert!(summary.weakest_bootstrap_progress > 0);
         assert!(summary.weakest_bootstrap_progress <= summary.bootstrap_critical_average_progress);
+        assert_eq!(summary.coverage_status, "clean");
+        assert_eq!(
+            summary.coverage_expected_count,
+            DEV_TENSOR_EXPECTED_COORDINATES.len()
+        );
+        assert_eq!(summary.coverage_missing_count, 0);
+        assert_eq!(summary.coverage_orphaned_count, 0);
+        assert_eq!(summary.coverage_stale_count, 0);
     }
 
     #[test]
@@ -783,6 +1075,12 @@ mod tests {
         assert!(json.contains("\"weakest_bootstrap_function\""));
         assert!(json.contains("\"module\":\"nsld\""));
         assert!(json.contains("\"function\":\"final-output-boundary\""));
+        assert!(json.contains("\"coverage_status\":\"clean\""));
+        assert!(json.contains("\"coverage_expected_count\":"));
+        assert!(json.contains("\"coverage_missing_count\":0"));
+        assert!(json.contains("\"coverage_orphaned_count\":0"));
+        assert!(json.contains("\"coverage_stale_count\":0"));
+        assert!(json.contains("\"coverage_missing_coordinates\":[]"));
         assert!(json.contains("\"drift_status\":\"clean\""));
         assert!(json.contains("\"drift_checks\":["));
         assert!(json.contains("\"id\":\"frontdoor-self-owned-image-status\""));
@@ -810,9 +1108,32 @@ mod tests {
     #[test]
     fn dev_tensor_text_exposes_drift_status() {
         let text = render_dev_tensor_text().join("\n");
+        assert!(text.contains("coverage_status: clean"));
+        assert!(text.contains("coverage_missing_count: 0"));
+        assert!(text.contains("coverage_orphaned_count: 0"));
+        assert!(text.contains("coverage_stale_count: 0"));
         assert!(text.contains("drift_status: clean"));
         assert!(text.contains("drift_check: id=frontdoor-final-output-boundary-status"));
         assert!(text.contains("drift_check: id=std-filesystem-light-smoke"));
         assert!(text.contains("drift_first_failed_check: <none>"));
+    }
+
+    #[test]
+    fn dev_tensor_coverage_manifest_matches_current_cells() {
+        let coverage = dev_tensor_coverage_summary();
+        assert_eq!(coverage.status, "clean");
+        assert_eq!(
+            coverage.expected_count,
+            DEV_TENSOR_EXPECTED_COORDINATES.len()
+        );
+        assert_eq!(coverage.covered_count, DEV_TENSOR_CELLS.len());
+        assert_eq!(coverage.missing_count, 0);
+        assert_eq!(coverage.required_missing_count, 0);
+        assert_eq!(coverage.orphaned_count, 0);
+        assert_eq!(coverage.stale_count, 0);
+        assert!(coverage.first_gap.is_none());
+        assert!(coverage.missing_coordinates.is_empty());
+        assert!(coverage.orphaned_coordinates.is_empty());
+        assert!(coverage.stale_coordinates.is_empty());
     }
 }
