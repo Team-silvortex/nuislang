@@ -6,10 +6,11 @@ use crate::{
     build_report_render::append_runtime_session_json_fields,
     json_bool_field, json_field, json_optional_bool_field, json_optional_string_field,
     load_link_plan_for_output_dir, resolve_frontdoor_build_manifest_path,
-    run_artifact::run_artifact_prelaunch_summary,
+    run_artifact::{run_artifact_prelaunch_summary, self_contained_link_plan_selected},
     runtime_host_yir, success_logs_enabled,
 };
 use std::{
+    env,
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
@@ -18,6 +19,13 @@ pub(crate) fn resolve_run_artifact_binary_path(input: &Path) -> Result<PathBuf, 
     if input.is_dir() {
         let manifest_path = resolve_frontdoor_build_manifest_path(input)?;
         let report = nuisc::aot::verify_build_manifest(&manifest_path)?;
+        if report.packaging_mode == "nuis-self-contained-image" {
+            return Err(format!(
+                "output directory `{}` selects self-contained Nuis image packaging; run `nsld drive {} --apply --until-clean` before runtime handoff",
+                input.display(),
+                manifest_path.display()
+            ));
+        }
         let binary = Path::new(&report.output_dir).join(&report.artifact_binary_name);
         if binary.exists() {
             return Ok(binary);
@@ -31,6 +39,13 @@ pub(crate) fn resolve_run_artifact_binary_path(input: &Path) -> Result<PathBuf, 
     let file_name = input.file_name().and_then(|value| value.to_str());
     if file_name == Some("nuis.build.manifest.toml") {
         let report = nuisc::aot::verify_build_manifest(input)?;
+        if report.packaging_mode == "nuis-self-contained-image" {
+            return Err(format!(
+                "manifest `{}` selects self-contained Nuis image packaging; run `nsld drive {} --apply --until-clean` before runtime handoff",
+                input.display(),
+                input.display()
+            ));
+        }
         let binary = Path::new(&report.output_dir).join(&report.artifact_binary_name);
         if binary.exists() {
             return Ok(binary);
@@ -43,6 +58,12 @@ pub(crate) fn resolve_run_artifact_binary_path(input: &Path) -> Result<PathBuf, 
     }
     if file_name == Some("nuis.compiled.artifact") {
         let artifact = nuisc::aot::parse_nuis_compiled_artifact(input)?;
+        if artifact.packaging_mode == "nuis-self-contained-image" {
+            return Err(format!(
+                "artifact `{}` selects self-contained Nuis image packaging; run nsld drive on its build manifest before runtime handoff",
+                input.display()
+            ));
+        }
         let binary = input
             .parent()
             .unwrap_or_else(|| Path::new("."))
@@ -79,6 +100,7 @@ pub(crate) fn render_run_artifact_json(input: &Path) -> String {
         .and_then(|output_dir| load_link_plan_for_output_dir(output_dir));
     let prelaunch =
         run_artifact_prelaunch_summary(doctor.output_dir.as_deref(), resolved_binary.as_deref());
+    let host_runner_surface = run_artifact_host_runner_surface(&doctor, &prelaunch);
     let mut out = String::from("{");
     append_json_field_strings(
         &mut out,
@@ -131,6 +153,7 @@ pub(crate) fn render_run_artifact_json(input: &Path) -> String {
             json_field("run_artifact_prelaunch_reason", &prelaunch.reason),
         ],
     );
+    append_json_field_strings(&mut out, host_runner_surface.json_fields());
     append_runtime_session_json_fields(&mut out, manifest_verify.as_ref());
     append_json_field_strings(
         &mut out,
@@ -157,6 +180,12 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
         resolved_binary.map(|path| path.as_path()),
     );
     if resolved_binary.is_none() && prelaunch.nsld_runtime_handoff_ready() {
+        let runner_output = doctor
+            .output_dir
+            .as_deref()
+            .filter(|output_dir| self_contained_link_plan_selected(output_dir))
+            .map(|_| run_nsld_host_runner(&doctor, &prelaunch))
+            .transpose()?;
         if success_logs_enabled() {
             println!(
                 "run-artifact: {}",
@@ -194,6 +223,13 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
                 optional_bool_text(prelaunch.entrypoint_protocol_valid)
             );
             println!("  prelaunch_reason: {}", prelaunch.reason);
+            if let Some(runner_output) = runner_output.as_ref() {
+                println!("  host_runner_program: {}", runner_output.program.display());
+                println!("  host_runner_status: {}", runner_output.status_code_text());
+            } else {
+                println!("  host_runner_program: <not-required>");
+                println!("  host_runner_status: handoff-ready");
+            }
             let link_plan = doctor
                 .output_dir
                 .as_ref()
@@ -261,6 +297,276 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
         binary.display(),
         status.code()
     ))
+}
+
+struct HostRunnerOutput {
+    program: PathBuf,
+    status: std::process::ExitStatus,
+    stdout: String,
+    stderr: String,
+}
+
+impl HostRunnerOutput {
+    fn status_code_text(&self) -> String {
+        self.status
+            .code()
+            .map(|code| code.to_string())
+            .unwrap_or_else(|| "signal".to_owned())
+    }
+}
+
+struct HostRunnerJsonSurface {
+    invoked: bool,
+    status: String,
+    program: Option<String>,
+    exit_status: Option<String>,
+    error: Option<String>,
+    ready: Option<bool>,
+    would_enter_lifecycle_hook: Option<bool>,
+    nsb_readable: Option<bool>,
+    nsb_hash_matches: Option<bool>,
+    nsb_payload_region_mapped: Option<bool>,
+    nsb_payload_scan_kind: Option<String>,
+    container_loader_status: Option<String>,
+    container_ready: Option<bool>,
+    container_loader_handoff_ready: Option<bool>,
+    container_loader_handoff_status: Option<String>,
+}
+
+impl HostRunnerJsonSurface {
+    fn not_invoked(status: &str) -> Self {
+        Self {
+            invoked: false,
+            status: status.to_owned(),
+            program: None,
+            exit_status: None,
+            error: None,
+            ready: None,
+            would_enter_lifecycle_hook: None,
+            nsb_readable: None,
+            nsb_hash_matches: None,
+            nsb_payload_region_mapped: None,
+            nsb_payload_scan_kind: None,
+            container_loader_status: None,
+            container_ready: None,
+            container_loader_handoff_ready: None,
+            container_loader_handoff_status: None,
+        }
+    }
+
+    fn from_error(program: PathBuf, status: &str, error: String) -> Self {
+        Self {
+            invoked: true,
+            status: status.to_owned(),
+            program: Some(program.display().to_string()),
+            exit_status: None,
+            error: Some(error),
+            ready: None,
+            would_enter_lifecycle_hook: None,
+            nsb_readable: None,
+            nsb_hash_matches: None,
+            nsb_payload_region_mapped: None,
+            nsb_payload_scan_kind: None,
+            container_loader_status: None,
+            container_ready: None,
+            container_loader_handoff_ready: None,
+            container_loader_handoff_status: None,
+        }
+    }
+
+    fn from_output(output: &HostRunnerOutput) -> Self {
+        let status = if output.status.success() {
+            json_bool_value(&output.stdout, "ready")
+                .map(|ready| if ready { "ready" } else { "blocked" })
+                .unwrap_or("reported")
+        } else {
+            "failed"
+        };
+        Self {
+            invoked: true,
+            status: status.to_owned(),
+            program: Some(output.program.display().to_string()),
+            exit_status: Some(output.status_code_text()),
+            error: if output.status.success() {
+                None
+            } else {
+                Some(format!(
+                    "stdout:\n{}\nstderr:\n{}",
+                    output.stdout, output.stderr
+                ))
+            },
+            ready: json_bool_value(&output.stdout, "ready"),
+            would_enter_lifecycle_hook: json_bool_value(
+                &output.stdout,
+                "would_enter_lifecycle_hook",
+            ),
+            nsb_readable: json_bool_value(&output.stdout, "nsb_readable"),
+            nsb_hash_matches: json_bool_value(&output.stdout, "nsb_hash_matches"),
+            nsb_payload_region_mapped: json_bool_value(&output.stdout, "nsb_payload_region_mapped"),
+            nsb_payload_scan_kind: json_string_value(&output.stdout, "nsb_payload_scan_kind"),
+            container_loader_status: json_string_value(&output.stdout, "container_loader_status"),
+            container_ready: json_bool_value(&output.stdout, "container_ready"),
+            container_loader_handoff_ready: json_bool_value(
+                &output.stdout,
+                "container_loader_handoff_ready",
+            ),
+            container_loader_handoff_status: json_string_value(
+                &output.stdout,
+                "container_loader_handoff_status",
+            ),
+        }
+    }
+
+    fn json_fields(&self) -> Vec<String> {
+        vec![
+            json_bool_field("host_runner_invoked", self.invoked),
+            json_field("host_runner_status", &self.status),
+            json_optional_string_field("host_runner_program", self.program.as_deref()),
+            json_optional_string_field("host_runner_exit_status", self.exit_status.as_deref()),
+            json_optional_string_field("host_runner_error", self.error.as_deref()),
+            json_optional_bool_field("host_runner_ready", self.ready),
+            json_optional_bool_field(
+                "host_runner_would_enter_lifecycle_hook",
+                self.would_enter_lifecycle_hook,
+            ),
+            json_optional_bool_field("host_runner_nsb_readable", self.nsb_readable),
+            json_optional_bool_field("host_runner_nsb_hash_matches", self.nsb_hash_matches),
+            json_optional_bool_field(
+                "host_runner_nsb_payload_region_mapped",
+                self.nsb_payload_region_mapped,
+            ),
+            json_optional_string_field(
+                "host_runner_nsb_payload_scan_kind",
+                self.nsb_payload_scan_kind.as_deref(),
+            ),
+            json_optional_string_field(
+                "host_runner_container_loader_status",
+                self.container_loader_status.as_deref(),
+            ),
+            json_optional_bool_field("host_runner_container_ready", self.container_ready),
+            json_optional_bool_field(
+                "host_runner_container_loader_handoff_ready",
+                self.container_loader_handoff_ready,
+            ),
+            json_optional_string_field(
+                "host_runner_container_loader_handoff_status",
+                self.container_loader_handoff_status.as_deref(),
+            ),
+        ]
+    }
+}
+
+fn run_artifact_host_runner_surface(
+    doctor: &crate::artifact_doctor::ArtifactDoctorReport,
+    prelaunch: &crate::run_artifact::RunArtifactPrelaunchSummary,
+) -> HostRunnerJsonSurface {
+    let Some(output_dir) = doctor.output_dir.as_deref() else {
+        return HostRunnerJsonSurface::not_invoked("output-dir-unavailable");
+    };
+    if !prelaunch.nsld_runtime_handoff_ready() {
+        return HostRunnerJsonSurface::not_invoked("handoff-not-ready");
+    }
+    if !self_contained_link_plan_selected(output_dir) {
+        return HostRunnerJsonSurface::not_invoked("not-required");
+    }
+    match try_run_nsld_host_runner(doctor) {
+        Ok(output) => HostRunnerJsonSurface::from_output(&output),
+        Err((program, error)) => HostRunnerJsonSurface::from_error(program, "unavailable", error),
+    }
+}
+
+fn run_nsld_host_runner(
+    doctor: &crate::artifact_doctor::ArtifactDoctorReport,
+    prelaunch: &crate::run_artifact::RunArtifactPrelaunchSummary,
+) -> Result<HostRunnerOutput, String> {
+    let Some(_) = doctor.output_dir.as_deref() else {
+        return Err("nsld host handoff is ready, but output_dir is unavailable".to_owned());
+    };
+    let runner_output = try_run_nsld_host_runner(doctor).map_err(|(program, error)| {
+        format!(
+            "failed to run nsld host runner `{}` for `{}`: {error}",
+            program.display(),
+            prelaunch
+                .entrypoint_path
+                .as_deref()
+                .unwrap_or("<nsld-host-entrypoint>")
+        )
+    })?;
+    if runner_output.status.success() {
+        return Ok(runner_output);
+    }
+    Err(format!(
+        "nsld host runner `{}` failed with status {}; stdout:\n{}\nstderr:\n{}",
+        runner_output.program.display(),
+        runner_output.status_code_text(),
+        runner_output.stdout,
+        runner_output.stderr
+    ))
+}
+
+fn try_run_nsld_host_runner(
+    doctor: &crate::artifact_doctor::ArtifactDoctorReport,
+) -> Result<HostRunnerOutput, (PathBuf, String)> {
+    let Some(output_dir) = doctor.output_dir.as_deref() else {
+        let program = resolve_nuis_host_runner_program();
+        return Err((program, "output_dir is unavailable".to_owned()));
+    };
+    let manifest = output_dir.join("nuis.nsld.final-executable-launcher.toml");
+    let program = resolve_nuis_host_runner_program();
+    let output = Command::new(&program)
+        .arg("--manifest")
+        .arg(&manifest)
+        .arg("--json")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|error| (program.clone(), error.to_string()))?;
+    Ok(HostRunnerOutput {
+        program,
+        status: output.status,
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+    })
+}
+
+fn resolve_nuis_host_runner_program() -> PathBuf {
+    if let Some(path) = env::var_os("NUIS_HOST_RUNNER").map(PathBuf::from) {
+        return path;
+    }
+    if let Ok(current_exe) = env::current_exe() {
+        if let Some(dir) = current_exe.parent() {
+            let sibling = dir.join("nuis-host-runner");
+            if sibling.exists() {
+                return sibling;
+            }
+        }
+    }
+    let workspace_debug =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/debug/nuis-host-runner");
+    if workspace_debug.exists() {
+        return workspace_debug;
+    }
+    PathBuf::from("nuis-host-runner")
+}
+
+fn json_bool_value(source: &str, key: &str) -> Option<bool> {
+    let true_needle = format!("\"{key}\":true");
+    if source.contains(&true_needle) {
+        return Some(true);
+    }
+    let false_needle = format!("\"{key}\":false");
+    if source.contains(&false_needle) {
+        return Some(false);
+    }
+    None
+}
+
+fn json_string_value(source: &str, key: &str) -> Option<String> {
+    let needle = format!("\"{key}\":\"");
+    let start = source.find(&needle)? + needle.len();
+    let tail = &source[start..];
+    let end = tail.find('"')?;
+    Some(tail[..end].to_owned())
 }
 
 fn optional_bool_text(value: Option<bool>) -> &'static str {

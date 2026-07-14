@@ -373,7 +373,7 @@ fn blocks_container_loader_handoff_when_first_relocation_targets_wrong_symbol() 
 }
 
 #[test]
-fn blocks_container_handoff_when_required_external_import_is_declared() {
+fn allows_host_assisted_container_handoff_when_required_external_import_is_declared() {
     let mut bytes = nsb_bytes();
     let source = String::from_utf8(bytes[IMAGE_HEADER_SIZE..].to_vec()).unwrap();
     let tampered = source.replace("external_import_count = 0", "external_import_count = 1")
@@ -402,14 +402,57 @@ fn blocks_container_handoff_when_required_external_import_is_declared() {
         &manifest,
     );
 
-    assert!(!report.ready);
+    assert!(report.ready);
     assert_eq!(report.external_import_count, Some(1));
     assert_eq!(report.external_import_parsed_count, 1);
     assert_eq!(
         report.external_import_required_imports,
         vec!["final-stage-driver:cc".to_owned()]
     );
+    assert_eq!(report.container_loader_handoff_status, "ready");
+    assert!(report.container_loader_handoff_ready);
+    assert!(report.container_loader_handoff_blockers.is_empty());
+    assert!(report.blockers.is_empty());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn blocks_self_contained_container_handoff_when_required_external_import_is_declared() {
+    let mut bytes = nsb_bytes();
+    let source = String::from_utf8(bytes[IMAGE_HEADER_SIZE..].to_vec()).unwrap();
+    let tampered = (source
+        + "\n[[external_import]]\nimport_id = \"imp0000.final-stage-driver\"\nimport_kind = \"final-stage-driver\"\nimport_name = \"cc\"\nprovider = \"host-toolchain\"\nrequired = true\n")
+        .replace(
+            "loader_readiness = \"host-assisted\"",
+            "loader_readiness = \"self-contained\"",
+        );
+    bytes.truncate(IMAGE_HEADER_SIZE);
+    bytes.extend_from_slice(tampered.as_bytes());
+    bytes[24..32].copy_from_slice(&(tampered.len() as u64).to_le_bytes());
+
+    let manifest = parse_launcher_manifest(&manifest_source(&fnv1a64_hex(&bytes), bytes.len()))
+        .expect("manifest parses");
+    let dir = env::temp_dir().join(format!(
+        "nuis-host-runner-self-contained-external-import-test-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let nsb_path = dir.join("nuis-app.nsb");
+    fs::write(&nsb_path, bytes).expect("write nsb");
+
+    let report = validate_handoff(
+        &dir.join("nuis.nsld.final-executable-launcher.toml"),
+        &nsb_path,
+        Some(&dir),
+        "nuis.scheduler.loop.v1",
+        "on_process_start",
+        &manifest,
+    );
+
+    assert!(!report.ready);
     assert_eq!(report.container_loader_handoff_status, "blocked");
+    assert!(!report.container_loader_handoff_ready);
     assert!(report
         .container_loader_handoff_blockers
         .contains(&"container-external-import:required:final-stage-driver:cc".to_owned()));
@@ -507,7 +550,8 @@ fn blocks_container_loader_handoff_when_symbol_table_mismatches_entry() {
 }
 
 #[test]
-fn blocks_container_loader_handoff_when_loader_blockers_are_declared() {
+fn allows_host_assisted_container_loader_handoff_when_external_import_loader_blockers_are_declared()
+{
     let mut bytes = nsb_bytes();
     let source = String::from_utf8(bytes[IMAGE_HEADER_SIZE..].to_vec()).unwrap();
     let tampered = source.replace(
@@ -538,19 +582,15 @@ fn blocks_container_loader_handoff_when_loader_blockers_are_declared() {
         &manifest,
     );
 
-    assert!(!report.ready);
+    assert!(report.ready);
     assert_eq!(
         report.container_loader_blockers,
         vec!["external-import:final-stage-driver:cc".to_owned()]
     );
-    assert_eq!(report.container_loader_handoff_status, "blocked");
-    assert!(!report.container_loader_handoff_ready);
-    assert!(report
-        .container_loader_handoff_blockers
-        .contains(&"container-loader:blocker:external-import:final-stage-driver:cc".to_owned()));
-    assert!(report
-        .blockers
-        .contains(&"container-loader:blocker:external-import:final-stage-driver:cc".to_owned()));
+    assert_eq!(report.container_loader_handoff_status, "ready");
+    assert!(report.container_loader_handoff_ready);
+    assert!(report.container_loader_handoff_blockers.is_empty());
+    assert!(report.blockers.is_empty());
     let _ = fs::remove_dir_all(&dir);
 }
 

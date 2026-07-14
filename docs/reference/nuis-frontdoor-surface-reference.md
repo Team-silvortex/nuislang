@@ -174,7 +174,8 @@ These fields now form the current visible link summary:
   `ready` when the recommended launch surface is usable, otherwise `blocked`
 * `run_artifact_prelaunch_evidence_status`
   compact launch evidence code: `host-binary-ready`, `entrypoint-ready`,
-  `entrypoint-missing`, `entrypoint-protocol-invalid`, or `no-launch-surface`
+  `entrypoint-missing`, `entrypoint-protocol-invalid`,
+  `self-contained-image-awaiting-nsld-handoff`, or `no-launch-surface`
 * `run_artifact_prelaunch_command`
   command-like launch summary for the recommended surface, or `null`
 * `run_artifact_prelaunch_runner_command_present`
@@ -192,7 +193,43 @@ These fields now form the current visible link summary:
 * `run_artifact_prelaunch_reason`
   human-readable explanation for the aggregate recommendation; a missing Nsld
   host entrypoint stub is reported as `blocked` instead of being hidden by the
-  legacy host-binary fallback
+  legacy host-binary fallback. A self-contained `.nsb` route also blocks the
+  legacy host-binary fallback until Nsld materializes a verified handoff.
+* `host_runner_invoked`
+  true when `run-artifact --json` performed a non-fatal `nuis-host-runner`
+  probe for a ready self-contained Nsld handoff
+* `host_runner_status`
+  compact probe status: `handoff-not-ready`, `not-required`, `ready`, `blocked`,
+  `reported`, `unavailable`, or `failed`
+* `host_runner_program`
+  resolved runner program used by the probe, or `null` when no probe was needed
+* `host_runner_exit_status`
+  runner process exit status text when the probe launched
+* `host_runner_error`
+  runner launch/error text when the probe cannot run or exits unsuccessfully
+* `host_runner_ready`
+  runner-reported readiness, or `null` when no runner report was available
+* `host_runner_would_enter_lifecycle_hook`
+  true when the runner says it would enter the configured lifecycle hook
+* `host_runner_nsb_readable`
+  true when the runner could read the selected `.nsb` image
+* `host_runner_nsb_hash_matches`
+  true when the runner's observed image hash matches the launcher manifest
+* `host_runner_nsb_payload_region_mapped`
+  true when the runner could map the payload region described by the image
+* `host_runner_nsb_payload_scan_kind`
+  coarse payload scanner classification such as `nsld-container-toml`,
+  `toml-like`, or `opaque-bytes`
+* `host_runner_container_loader_status`
+  container-loader probe status for the mapped payload region
+* `host_runner_container_ready`
+  container-level readiness when the payload is parseable as an Nsld container
+* `host_runner_container_loader_handoff_ready`
+  true when the parsed container/loader contract can hand off to the lifecycle
+  entrypoint; currently false for opaque final-image payloads
+* `host_runner_container_loader_handoff_status`
+  compact container-loader handoff status, such as `ready`, `blocked`, or
+  `not-container-toml`
 * `artifact_closure_kind`
   `artifact-doctor --json` aggregate closure kind, currently
   `nsld-host-entrypoint`, `host-binary`, or `none`

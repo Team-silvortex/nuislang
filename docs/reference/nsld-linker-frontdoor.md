@@ -313,9 +313,11 @@ table, reads the first `[[loader_symbol]]` row, checks that its symbol kind,
 symbol name, and section match the loader entry summary, checks
 `relocation_count`, verifies that the first `[[relocation]]` binds the entry
 section to the first loader symbol, checks compatibility-domain and
-external-import counts, blocks on required `[[external_import]]` entries, and
-reports lifecycle-entry readiness before a fuller runtime scans and executes
-payload code.
+external-import counts, and reports lifecycle-entry readiness before a fuller
+runtime scans and executes payload code. Required `[[external_import]]` entries
+still block a `self-contained` loader handoff; for `host-assisted` loaders they
+remain visible compatibility evidence but do not prevent the host runner from
+entering the lifecycle handoff.
 `nsld check` mirrors the pipeline handoff fields as
 `final_executable_pipeline_execution_handoff_*`, so CI can inspect the same
 route from the aggregate verifier report. It also mirrors the entrypoint

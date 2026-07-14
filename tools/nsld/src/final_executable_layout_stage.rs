@@ -428,7 +428,7 @@ fn final_executable_relocation_application_records(
     let source = fs::read_to_string(&container_input.path).unwrap_or_default();
     let container_payload_offset = byte_map_entries
         .iter()
-        .find(|entry| entry.payload_id == "payload0000.container")
+        .find(|entry| entry.payload_id == "payload0001.container-payload")
         .map(|entry| entry.offset)
         .unwrap_or(0);
 
@@ -440,7 +440,7 @@ fn final_executable_relocation_application_records(
                 order_index: index,
                 relocation_id: relocation.relocation_id,
                 relocation_kind: relocation.relocation_kind,
-                source_payload_id: "payload0000.container".to_owned(),
+                source_payload_id: "payload0001.container-payload".to_owned(),
                 source_section_id: relocation.source_section_id,
                 source_offset: relocation.source_offset,
                 image_offset: container_payload_offset.saturating_add(relocation.source_offset),

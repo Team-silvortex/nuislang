@@ -104,7 +104,12 @@ pub(super) fn scan_container_loader(
     let Some(region) = region else {
         return empty_container_loader("not-mapped", Vec::new());
     };
-    let Ok(source) = std::str::from_utf8(region) else {
+    let source_region = region
+        .iter()
+        .position(|byte| *byte == 0)
+        .and_then(|end| region.get(..end))
+        .unwrap_or(region);
+    let Ok(source) = std::str::from_utf8(source_region) else {
         return empty_container_loader(
             "invalid-utf8",
             vec!["container-loader:invalid-utf8".to_owned()],
@@ -460,6 +465,7 @@ fn container_loader_handoff_blockers(
     relocation: &ContainerRelocationSummary,
 ) -> Vec<String> {
     let mut blockers = Vec::new();
+    let host_assisted_loader = loader_readiness == Some("host-assisted");
     match container_schema {
         Some(CONTAINER_SCHEMA) => {}
         Some(_) => blockers.push("container:schema-unsupported".to_owned()),
@@ -533,12 +539,14 @@ fn container_loader_handoff_blockers(
     if external_import.declared_count.unwrap_or(0) > 0 && external_import.status != "parsed" {
         blockers.push("container:external-import-table-missing".to_owned());
     }
-    blockers.extend(
-        external_import
-            .required_imports
-            .iter()
-            .map(|import| format!("container-external-import:required:{import}")),
-    );
+    if !host_assisted_loader {
+        blockers.extend(
+            external_import
+                .required_imports
+                .iter()
+                .map(|import| format!("container-external-import:required:{import}")),
+        );
+    }
     if container_payload_size_bytes.is_none() {
         blockers.push("container:payload-size-missing".to_owned());
     }
@@ -554,6 +562,7 @@ fn container_loader_handoff_blockers(
     blockers.extend(
         loader_blockers
             .iter()
+            .filter(|blocker| !(host_assisted_loader && blocker.starts_with("external-import:")))
             .map(|blocker| format!("container-loader:blocker:{blocker}")),
     );
     if loader_entry_symbol.is_none_or(str::is_empty) {

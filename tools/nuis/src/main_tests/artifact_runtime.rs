@@ -204,6 +204,8 @@ mod cpu Main {
     .expect("build passes");
     let json = render_build_report_json(&output_dir);
 
+    assert!(json.contains("\"ready_to_run\":false"));
+    assert!(json.contains("\"recommended_next_step\":\"nsld_drive\""));
     assert!(json.contains("\"packaging_mode\":\"nuis-self-contained-image\""));
     assert!(json.contains("\"link_plan_final_stage\":\"nuis-self-contained-image\""));
     assert!(json.contains("\"link_plan_final_driver\":\"nsld-internal-image-writer\""));
@@ -490,6 +492,98 @@ mod cpu Main {
         "\"artifact_closure_reason\":\"nsld final executable pipeline materialized a verified host entrypoint stub\""
     ));
     assert!(json.contains("\"nsld_final_executable_tail_ready\":true"));
+}
+
+#[test]
+fn artifact_doctor_json_blocks_self_contained_route_until_nsld_handoff_exists() {
+    let project_root = write_temp_project_fixture(
+        "artifact_doctor_self_contained_without_handoff_smoke",
+        r#"
+name = "artifact_doctor_self_contained_without_handoff_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+        .trim_start(),
+        r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 0;
+  }
+}
+"#,
+    );
+    let output_dir = temp_dir("artifact_doctor_self_contained_without_handoff_outputs");
+
+    handle_build(
+        project_root,
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        Some("nuis-self-contained-image".to_owned()),
+    )
+    .expect("build passes");
+    let json = render_artifact_doctor_json(&output_dir);
+
+    assert!(json.contains("\"ready_to_run\":false"));
+    assert!(json.contains("\"recommended_next_step\":\"nsld_drive\""));
+    assert!(json.contains("\"link_plan_final_stage\":\"nuis-self-contained-image\""));
+    assert!(json.contains("\"link_plan_final_link_mode\":\"self-contained\""));
+    assert!(json.contains("\"artifact_closure_kind\":\"none\""));
+    assert!(json.contains("\"artifact_closure_status\":\"blocked\""));
+    assert!(json.contains(
+        "\"artifact_closure_evidence_status\":\"self-contained-image-awaiting-nsld-handoff\""
+    ));
+    assert!(json.contains(
+        "\"artifact_closure_reason\":\"self-contained Nuis image route is selected, but no verified Nsld host entrypoint handoff is materialized yet\""
+    ));
+    assert!(!json.contains("\"artifact_closure_kind\":\"host-binary\""));
+    assert!(json.contains("\"nsld_final_executable_output_recommended_next_action\":\"emit-final-executable-pipeline\""));
+}
+
+#[test]
+fn artifact_doctor_json_reports_ready_self_contained_nsld_handoff() {
+    let project_root = write_temp_project_fixture(
+        "artifact_doctor_self_contained_ready_handoff_smoke",
+        r#"
+name = "artifact_doctor_self_contained_ready_handoff_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+        .trim_start(),
+        r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 0;
+  }
+}
+"#,
+    );
+    let output_dir = temp_dir("artifact_doctor_self_contained_ready_handoff_outputs");
+
+    handle_build(
+        project_root,
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        Some("nuis-self-contained-image".to_owned()),
+    )
+    .expect("build passes");
+    write_prepared_nsld_chain_placeholders(&output_dir);
+    write_ready_nsld_final_tail_placeholders(&output_dir);
+    let json = render_artifact_doctor_json(&output_dir);
+
+    assert!(json.contains("\"ready_to_run\":true"));
+    assert!(json.contains("\"recommended_next_step\":\"run_artifact\""));
+    assert!(json.contains("\"link_plan_final_stage\":\"nuis-self-contained-image\""));
+    assert!(json.contains("\"artifact_closure_kind\":\"nsld-host-entrypoint\""));
+    assert!(json.contains("\"artifact_closure_status\":\"ready\""));
+    assert!(json.contains("\"artifact_closure_evidence_status\":\"entrypoint-ready\""));
+    assert!(json.contains("nuis.host-entrypoint.sh"));
+    assert!(!json.contains("\"artifact_closure_kind\":\"host-binary\""));
 }
 
 #[test]

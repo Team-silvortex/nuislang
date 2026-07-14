@@ -132,6 +132,51 @@ mod cpu Main {
 }
 
 #[test]
+fn run_artifact_json_blocks_self_contained_route_until_nsld_handoff_exists() {
+    let project_root = write_temp_project_fixture(
+        "run_artifact_self_contained_without_handoff_smoke",
+        r#"
+name = "run_artifact_self_contained_without_handoff_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+        .trim_start(),
+        r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 0;
+  }
+}
+"#,
+    );
+    let output_dir = temp_dir("run_artifact_self_contained_without_handoff_outputs");
+
+    handle_build(
+        project_root,
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        Some("nuis-self-contained-image".to_owned()),
+    )
+    .expect("build passes");
+    let json = render_run_artifact_json(&output_dir.join("nuis.build.manifest.toml"));
+
+    assert!(json.contains("\"ready_to_run\":false"));
+    assert!(json.contains("\"recommended_next_step\":\"nsld_drive\""));
+    assert!(json.contains("\"binary_resolved\":false"));
+    assert!(json.contains("\"run_artifact_prelaunch_kind\":\"none\""));
+    assert!(json.contains("\"run_artifact_prelaunch_status\":\"blocked\""));
+    assert!(json.contains(
+        "\"run_artifact_prelaunch_evidence_status\":\"self-contained-image-awaiting-nsld-handoff\""
+    ));
+    assert!(json.contains("\"run_artifact_prelaunch_command\":null"));
+    assert!(!json.contains("\"run_artifact_prelaunch_kind\":\"host-binary\""));
+    assert!(json.contains("\"nsld_final_executable_output_recommended_next_action\":\"emit-final-executable-pipeline\""));
+}
+
+#[test]
 fn run_artifact_accepts_ready_nsld_entrypoint_when_legacy_binary_is_missing() {
     let project_root = write_temp_project_fixture(
         "run_artifact_nsld_entrypoint_without_legacy_binary",
@@ -161,6 +206,49 @@ mod cpu Main {
     write_ready_nsld_final_tail_placeholders(&output_dir);
 
     handle_run_artifact(manifest_path, false).expect("run-artifact accepts nsld handoff");
+}
+
+#[test]
+fn run_artifact_accepts_self_contained_nsld_handoff_without_host_binary_fallback() {
+    let project_root = write_temp_project_fixture(
+        "run_artifact_self_contained_ready_handoff",
+        r#"
+name = "run_artifact_self_contained_ready_handoff"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+        .trim_start(),
+        r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 0;
+  }
+}
+"#,
+    );
+    let output_dir = temp_dir("run_artifact_self_contained_ready_handoff_outputs");
+    let manifest_path = output_dir.join("nuis.build.manifest.toml");
+
+    handle_build(
+        project_root,
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        Some("nuis-self-contained-image".to_owned()),
+    )
+    .expect("build passes");
+    write_prepared_nsld_chain_placeholders(&output_dir);
+    write_ready_nsld_final_tail_placeholders(&output_dir);
+
+    let json = render_run_artifact_json(&manifest_path);
+
+    assert!(json.contains("\"binary_resolved\":false"));
+    assert!(json.contains("\"run_artifact_prelaunch_kind\":\"nsld-host-entrypoint\""));
+    assert!(json.contains("\"run_artifact_prelaunch_status\":\"ready\""));
+    assert!(json.contains("\"run_artifact_prelaunch_evidence_status\":\"entrypoint-ready\""));
+    assert!(!json.contains("\"run_artifact_prelaunch_kind\":\"host-binary\""));
 }
 
 #[test]

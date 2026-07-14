@@ -1,4 +1,10 @@
-use crate::{resolve_frontdoor_build_manifest_path, workflow::load_link_plan_for_output_dir};
+use crate::{
+    resolve_frontdoor_build_manifest_path,
+    run_artifact::{run_artifact_prelaunch_summary, self_contained_link_plan_selected},
+    workflow::{
+        load_link_plan_for_output_dir, nsld_drive_apply_until_clean_command_for_output_dir,
+    },
+};
 use std::path::{Path, PathBuf};
 
 pub(crate) fn run_build_output_self_check(
@@ -24,7 +30,11 @@ pub(crate) fn run_build_output_self_check(
             )
         },
     )?;
-    if !doctor.ready_to_run {
+    let self_contained_route = doctor
+        .output_dir
+        .as_deref()
+        .is_some_and(self_contained_link_plan_selected);
+    if !doctor.ready_to_run && !self_contained_route {
         return Err(format!(
             "build self-check found incomplete runnable output in `{}`; next step: {} ({})",
             output_dir.display(),
@@ -290,7 +300,15 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
     let manifest_exists = manifest_path.as_ref().is_some_and(|path| path.exists());
     let artifact_exists = artifact_path.as_ref().is_some_and(|path| path.exists());
     let binary_exists = binary_path.as_ref().is_some_and(|path| path.exists());
-    let ready_to_run = binary_exists && manifest_verified && artifact_verified;
+    let self_contained_route = output_dir
+        .as_deref()
+        .is_some_and(self_contained_link_plan_selected);
+    let nsld_handoff_ready = output_dir.as_deref().is_some_and(|path| {
+        run_artifact_prelaunch_summary(Some(path), None).nsld_runtime_handoff_ready()
+    });
+    let direct_host_binary_ready = binary_exists && !self_contained_route;
+    let ready_to_run =
+        (direct_host_binary_ready || nsld_handoff_ready) && manifest_verified && artifact_verified;
 
     let (recommended_next_step, recommended_command, recommended_reason) = if !manifest_exists
         && !artifact_exists
@@ -342,6 +360,15 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
                 })
                 .unwrap_or_else(|| "nuis run-artifact <output-dir>".to_owned()),
             "the binary, manifest, and compiled artifact are all present and verified, so the next step is to launch the built output through the nuis frontdoor".to_owned(),
+        )
+    } else if self_contained_route && manifest_verified && artifact_verified {
+        (
+            "nsld_drive".to_owned(),
+            output_dir
+                .as_ref()
+                .map(|path| nsld_drive_apply_until_clean_command_for_output_dir(path))
+                .unwrap_or_else(|| "nsld drive <output-dir> --apply --until-clean".to_owned()),
+            "self-contained Nuis image packaging is selected, so the next step is to materialize the Nsld-owned image and runtime handoff artifacts".to_owned(),
         )
     } else if manifest_exists || artifact_exists {
         (

@@ -304,9 +304,9 @@ fn resolved_symbol_image_offsets(
     else {
         return BTreeMap::new();
     };
-    let container_payload_offset = byte_map_entries
+    let executable_payload_offset = byte_map_entries
         .iter()
-        .find(|entry| entry.payload_id == "payload0000.container")
+        .find(|entry| entry.payload_id == "payload0001.container-payload")
         .map(|entry| entry.offset)
         .unwrap_or(0);
     let source = fs::read_to_string(&container_payload.path).unwrap_or_default();
@@ -316,7 +316,7 @@ fn resolved_symbol_image_offsets(
             (
                 symbol.symbol_id,
                 FINAL_EXECUTABLE_IMAGE_HEADER_SIZE
-                    .saturating_add(container_payload_offset)
+                    .saturating_add(executable_payload_offset)
                     .saturating_add(symbol.offset),
             )
         })

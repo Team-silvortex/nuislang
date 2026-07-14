@@ -76,6 +76,11 @@ the same `nsld drive --apply --until-clean` route stays inside Nsld's own
 finalizer and materializes the `.nsb` output selected by the link plan. This is
 the current protocol-level smoke path for the Nuis-native binary image before a
 full standalone `nsld` linker replaces the remaining host-native tail.
+Before that drive step, `nuis artifact-doctor --json` and
+`nuis run-artifact --json` should report
+`self-contained-image-awaiting-nsld-handoff` rather than falling back to the
+legacy host binary. After the drive step, they should report
+`nsld-host-entrypoint` / `ready` / `entrypoint-ready`.
 
 If you want the CLI to classify the route before you build, use:
 
@@ -145,6 +150,21 @@ artifact-follow-up state:
 * `run_artifact_prelaunch_entrypoint_protocol`
 * `run_artifact_prelaunch_entrypoint_protocol_valid`
 * `run_artifact_prelaunch_reason`
+* `host_runner_invoked`
+* `host_runner_status`
+* `host_runner_program`
+* `host_runner_exit_status`
+* `host_runner_error`
+* `host_runner_ready`
+* `host_runner_would_enter_lifecycle_hook`
+* `host_runner_nsb_readable`
+* `host_runner_nsb_hash_matches`
+* `host_runner_nsb_payload_region_mapped`
+* `host_runner_nsb_payload_scan_kind`
+* `host_runner_container_loader_status`
+* `host_runner_container_ready`
+* `host_runner_container_loader_handoff_ready`
+* `host_runner_container_loader_handoff_status`
 * `artifact_closure_kind`
 * `artifact_closure_status`
 * `artifact_closure_evidence_status`
@@ -237,10 +257,12 @@ Short reading rule:
   a reported stub path that exists but does not declare/export
   `nuis-nsld-host-entrypoint-v1` is still `blocked`, preventing an arbitrary
   host shell script from being mistaken for a verified Nsld entrypoint
-* when the legacy host binary is absent but a verified Nsld host-entrypoint is
-  present, non-JSON `run-artifact` now reports `runtime-handoff-ready` instead
-  of failing on the older binary-only path; this is a runner handoff, not a
-  claim that payload execution has completed
+* when the legacy host binary is absent or intentionally ignored by the
+  self-contained route, a verified Nsld host-entrypoint makes non-JSON
+  `run-artifact` invoke `nuis-host-runner` instead of falling back to the older
+  binary-only path. The runner validates the image handoff and reports that it
+  would enter the lifecycle hook; this is still a loader/handoff step, not a
+  claim that payload execution has completed.
 * `nuis-host-runner` is the first thin runtime-side consumer for that handoff:
   it verifies the launcher manifest, `.nsb` path/header/hash, scheduler entry,
   and lifecycle hook before reporting that it would enter the lifecycle hook.
@@ -280,11 +302,33 @@ Short reading rule:
   entrypoint and the older host-binary launch path without re-interpreting every
   lower-level Nsld field. The group includes a compact evidence status
   (`host-binary-ready`, `entrypoint-ready`, `entrypoint-missing`,
-  `entrypoint-protocol-invalid`, or `no-launch-surface`), runner-command
-  presence, entrypoint presence, expected entrypoint protocol, and
-  protocol-validity fields; if the pipeline snapshot claims an entrypoint but
-  the stub is missing on disk, the aggregate prelaunch status is `blocked`
-  instead of silently falling back to a different launch surface
+  `entrypoint-protocol-invalid`,
+  `self-contained-image-awaiting-nsld-handoff`, or `no-launch-surface`),
+  runner-command presence, entrypoint presence, expected entrypoint protocol,
+  and protocol-validity fields; if the pipeline snapshot claims an entrypoint
+  but the stub is missing on disk, the aggregate prelaunch status is `blocked`
+  instead of silently falling back to a different launch surface. A
+  self-contained `.nsb` route is also blocked until Nsld materializes a verified
+  runtime handoff, even if a legacy host artifact exists in the output folder.
+  After `nsld drive --apply --until-clean` materializes that handoff, the same
+  aggregate fields should move to `nsld-host-entrypoint` / `ready` /
+  `entrypoint-ready`.
+* on that ready self-contained route, `run-artifact --json` also performs a
+  non-fatal `nuis-host-runner` probe and emits `host_runner_*` fields. These
+  fields tell automation whether the runner was invoked, which runner program
+  was selected, whether the runner itself reported ready, whether the `.nsb`
+  was readable, whether the expected image hash matched, whether the payload
+  region was mapped, and what coarse payload scan/container-loader boundary was
+  observed. Runner probe failure is surfaced as `host_runner_status =
+  "unavailable"` or `failed`; JSON classification still remains an inspection
+  surface rather than a hard launch command.
+* the current self-contained smoke proves the host-runner image boundary:
+  `.nsb` readable, image hash matched, payload region mapped, and lifecycle
+  hook handoff ready. The payload scanner now sees `nsld-container-toml`, the
+  runner parses the container metadata prefix before the binary payload region,
+  and host-assisted external-import declarations no longer block the host-runner
+  handoff. They remain visible as compatibility evidence rather than being
+  treated as a pure self-contained closure.
 * `workflow` and LinkPlan JSON mirror that decision under
   `workflow_run_artifact_prelaunch_*`, so the main workflow surface can show the
   launch closure that `run-artifact` would prefer without forcing callers to run
@@ -353,8 +397,9 @@ Today this route proves all of these together:
   `nsld drive --apply --until-clean` can materialize the current pure Nsld
   `.nsb` image route from a manifest-selected link plan
 * the compiled artifact and manifest both survive verifier checks
-* the produced native binary actually launches successfully through the `nuis`
-  frontdoor
+* host-native outputs can still launch directly through the `nuis` frontdoor
+* self-contained `.nsb` outputs can move from Nsld-drive-required to verified
+  `nsld-host-entrypoint` handoff through the same `nuis` frontdoor surfaces
 
 ## Current Checked-In Gates
 
@@ -366,6 +411,8 @@ The current checked-in coverage is split deliberately:
   [lib.rs](../../tools/nuisc/src/lib.rs)
 * representative native control-flow compile/launch smoke:
   [artifact_cli.rs](../../tools/nuisc/tests/artifact_cli.rs)
+* self-contained Nsld image handoff smoke:
+  [self_contained_nsb_smoke.rs](../../tools/nuis/tests/self_contained_nsb_smoke.rs)
 
 Short rule:
 

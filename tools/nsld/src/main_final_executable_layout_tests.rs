@@ -60,7 +60,7 @@ fn final_executable_layout_plan_captures_nsld_owned_binary_boundary() {
         report.relocation_applications.len()
     );
     assert!(report.relocation_applications.iter().all(|record| {
-        record.source_payload_id == "payload0000.container"
+        record.source_payload_id == "payload0001.container-payload"
             && record.application_status == "planned"
             && record.image_offset >= record.source_offset
     }));

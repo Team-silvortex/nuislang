@@ -1,4 +1,4 @@
-use crate::workflow::nsld_final_executable_tail_summary;
+use crate::workflow::{load_link_plan_for_output_dir, nsld_final_executable_tail_summary};
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -49,6 +49,20 @@ pub(crate) fn run_artifact_prelaunch_summary(
                 );
             }
         }
+        if self_contained_link_plan_selected(output_dir) {
+            return RunArtifactPrelaunchSummary {
+                kind: "none".to_owned(),
+                status: "blocked".to_owned(),
+                evidence_status: "self-contained-image-awaiting-nsld-handoff".to_owned(),
+                command: None,
+                runner_command_present: false,
+                entrypoint_path: None,
+                entrypoint_present: false,
+                entrypoint_protocol: Some(NSLD_HOST_ENTRYPOINT_STUB_PROTOCOL.to_owned()),
+                entrypoint_protocol_valid: None,
+                reason: "self-contained Nuis image route is selected, but no verified Nsld host entrypoint handoff is materialized yet".to_owned(),
+            };
+        }
     }
     if let Some(binary) = resolved_binary {
         return RunArtifactPrelaunchSummary {
@@ -76,6 +90,13 @@ pub(crate) fn run_artifact_prelaunch_summary(
         entrypoint_protocol_valid: None,
         reason: "no runnable host entrypoint or legacy host binary could be resolved".to_owned(),
     }
+}
+
+pub(crate) fn self_contained_link_plan_selected(output_dir: &Path) -> bool {
+    load_link_plan_for_output_dir(output_dir).is_some_and(|plan| {
+        plan.final_stage.kind == "nuis-self-contained-image"
+            || plan.final_stage.link_mode == "self-contained"
+    })
 }
 
 fn nsld_host_entrypoint_prelaunch_summary(
