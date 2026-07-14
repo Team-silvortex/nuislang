@@ -284,9 +284,17 @@ required-path closure and changing the stub fails the entrypoint hash check
 without making nsld responsible for executing the runner.
 The initial `nuis-host-runner` implementation deliberately remains thin: it
 consumes the manifest and `.nsb`, verifies the header/hash/scheduler/lifecycle
-handoff, parses the `.nsb` payload offset/span and layout/byte-map hashes, and
-reports lifecycle-entry readiness before a fuller runtime maps and executes
-payload code.
+handoff, parses the `.nsb` payload offset/span and layout/byte-map hashes, maps
+the payload region enough to report its byte count/hash, performs a bounded
+first-layer payload scan (`nsld-container-toml`, `toml-like`, `opaque-bytes`, or
+`empty`), extracts Nsld container contract fields when the payload is container
+TOML, validates that the container is ready, has no top-level `blockers`, uses
+the expected magic/version, and declares payload size/hash metadata. It also
+validates that the container loader handoff is not blocked, has no declared
+`loader_blockers`, has an entry kind/symbol/section plus loader symbols, reads
+the first `[[loader_symbol]]` row, checks that its symbol kind, symbol name, and
+section match the loader entry summary, and reports lifecycle-entry readiness
+before a fuller runtime scans and executes payload code.
 `nsld check` mirrors the pipeline handoff fields as
 `final_executable_pipeline_execution_handoff_*`, so CI can inspect the same
 route from the aggregate verifier report. It also mirrors the entrypoint
@@ -685,9 +693,11 @@ loader-facing bootstrap records in the Nsld container. They currently bind the
 lifecycle bootstrap symbol from the link plan to the compiled artifact section
 and its payload range with `on_lifecycle_bootstrap`; heterogeneous nodes use
 their declared lifecycle hook; native-object compatibility payloads use
-`on_cffi_native_object`. Future loader/runtime work can extend that into richer
-symbol and relocation tables without changing the container's basic entry
-contract.
+`on_cffi_native_object`. The thin host runner currently verifies the first
+loader-symbol row against the summary entry kind, symbol, and section before it
+reports the handoff as ready. Future loader/runtime work can extend that into
+richer symbol and relocation tables without changing the container's basic
+entry contract.
 
 `relocation_count` and `relocation_table_hash` describe the loader-facing
 relocation table. The current metadata container emits a deterministic

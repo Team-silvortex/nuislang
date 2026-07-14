@@ -206,9 +206,24 @@ Short reading rule:
 * `nuis-host-runner` is the first thin runtime-side consumer for that handoff:
   it verifies the launcher manifest, `.nsb` path/header/hash, scheduler entry,
   and lifecycle hook before reporting that it would enter the lifecycle hook.
-  Its report also exposes the parsed `.nsb` payload offset/span plus layout and
-  byte-map hashes, giving the future runtime loop a concrete payload region to
-  map rather than treating the image as an opaque hashed blob
+  Its report also exposes the parsed `.nsb` payload offset/span, mapped payload
+  region byte count/hash, plus layout and byte-map hashes, giving the future
+  runtime loop a concrete payload region to scan rather than treating the image
+  as an opaque hashed blob. The first scanner layer reports payload scan status,
+  a coarse payload kind such as `nsld-container-toml` / `toml-like` /
+  `opaque-bytes`, and bounded hex/text prefixes for diagnostics. When the
+  payload is an Nsld container TOML, the runner also extracts the current
+  container contract fields: `ready`, top-level `blockers`, magic/version, and
+  payload size/hash metadata. It then extracts loader summary fields: readiness,
+  declared loader blockers, entry kind, entry symbol, entry section id, and
+  loader symbol count. It also reads the first `[[loader_symbol]]` row and
+  checks that the bootstrap symbol kind, symbol name, and section match the
+  loader entry summary. Those container and loader fields now participate in
+  runner readiness: a blocked container/loader, non-empty `blockers` or
+  `loader_blockers`, unsupported magic/version, missing payload metadata,
+  missing entry kind/symbol/section, empty loader-symbol table, missing
+  bootstrap row, or mismatched first loader symbol prevents the host handoff
+  from being reported as ready
 * `run-artifact --json` additionally emits the `run_artifact_prelaunch_*`
   aggregate fields so scripts can choose between a verified Nsld host
   entrypoint and the older host-binary launch path without re-interpreting every
