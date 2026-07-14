@@ -212,18 +212,31 @@ Short reading rule:
   as an opaque hashed blob. The first scanner layer reports payload scan status,
   a coarse payload kind such as `nsld-container-toml` / `toml-like` /
   `opaque-bytes`, and bounded hex/text prefixes for diagnostics. When the
-  payload is an Nsld container TOML, the runner also extracts the current
-  container contract fields: `ready`, top-level `blockers`, magic/version, and
-  payload size/hash metadata. It then extracts loader summary fields: readiness,
-  declared loader blockers, entry kind, entry symbol, entry section id, and
-  loader symbol count. It also reads the first `[[loader_symbol]]` row and
-  checks that the bootstrap symbol kind, symbol name, and section match the
-  loader entry summary. Those container and loader fields now participate in
-  runner readiness: a blocked container/loader, non-empty `blockers` or
-  `loader_blockers`, unsupported magic/version, missing payload metadata,
-  missing entry kind/symbol/section, empty loader-symbol table, missing
-  bootstrap row, or mismatched first loader symbol prevents the host handoff
-  from being reported as ready
+  payload is an Nsld container TOML or TOML-like candidate, the runner also
+  extracts the current container contract fields: schema/version,
+  container-kind, producer, `ready`, top-level `blockers`, magic/version, and
+  payload size/hash metadata, including the declared payload path plus the
+  container/table hashes that are useful to nsdb and CI diagnostics. The runner
+  reports those hashes but deliberately does not recompute them; deep hash
+  verification remains the job of `nsld check` and the container verifier. It
+  then extracts loader summary fields: readiness, declared loader blockers,
+  entry kind, entry symbol, entry section id, and loader symbol count. It checks
+  `section_count` against parsed `[[section]]` rows and requires the loader
+  entry section to exist in that table. It reads the first `[[loader_symbol]]`
+  row and checks that the bootstrap symbol kind, symbol name, and section match
+  the loader entry summary. It also checks `relocation_count` and verifies that
+  the first `[[relocation]]` binds the entry section to the first loader symbol.
+  Compatibility-domain and external-import counts are checked as container
+  tables; any required `[[external_import]]` becomes a runner blocker because
+  the handoff still depends on host-side compatibility. Those container and
+  loader fields now
+  participate in runner readiness: a blocked container/loader, non-empty
+  `blockers` or `loader_blockers`, required external imports, unsupported
+  schema/version/kind/producer/magic/version, missing payload metadata, missing
+  or mismatched section/relocation/compat/import table, missing entry
+  kind/symbol/section, empty loader-symbol table, missing bootstrap row, or
+  mismatched first loader symbol/relocation prevents the host handoff from being
+  reported as ready
 * `run-artifact --json` additionally emits the `run_artifact_prelaunch_*`
   aggregate fields so scripts can choose between a verified Nsld host
   entrypoint and the older host-binary launch path without re-interpreting every

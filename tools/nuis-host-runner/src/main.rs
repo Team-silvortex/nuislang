@@ -3,14 +3,23 @@ use std::{
     path::{Path, PathBuf},
 };
 
+mod container;
+mod report;
+
+use container::scan_container_loader;
+#[cfg(test)]
+use container::{
+    CONTAINER_KIND, CONTAINER_MAGIC, CONTAINER_PRODUCER, CONTAINER_SCHEMA,
+    CONTAINER_SCHEMA_VERSION, CONTAINER_VERSION,
+};
+use report::{print_text_report, render_json_report};
+
 const RUNNER_PROTOCOL: &str = "nuis-host-runner-v1";
 const MANIFEST_SCHEMA: &str = "nuis-host-launcher-manifest-v1";
 const HANDOFF_CONTRACT: &str = "nsld-final-output-handoff-v1";
 const IMAGE_MAGIC: &[u8; 8] = b"NUIFIMG\0";
 const IMAGE_VERSION: u32 = 1;
 const IMAGE_HEADER_SIZE: usize = 64;
-const CONTAINER_MAGIC: &str = "NUISNSLD";
-const CONTAINER_VERSION: usize = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct RunnerArgs {
@@ -55,37 +64,6 @@ struct PayloadRegionScan {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ContainerLoaderSymbolSummary {
-    status: String,
-    symbol_id: Option<String>,
-    symbol_kind: Option<String>,
-    symbol_name: Option<String>,
-    lifecycle_hook: Option<String>,
-    section_id: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ContainerLoaderSummary {
-    status: String,
-    container_ready: Option<bool>,
-    container_blockers: Vec<String>,
-    container_magic: Option<String>,
-    container_version: Option<usize>,
-    container_payload_size_bytes: Option<usize>,
-    container_payload_hash: Option<String>,
-    loader_readiness: Option<String>,
-    loader_blockers: Vec<String>,
-    loader_entry_kind: Option<String>,
-    loader_entry_symbol: Option<String>,
-    loader_entry_section_id: Option<String>,
-    loader_symbol_count: Option<usize>,
-    loader_symbol: ContainerLoaderSymbolSummary,
-    handoff_status: String,
-    handoff_ready: bool,
-    handoff_blockers: Vec<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 struct RunnerReport {
     ready: bool,
     would_enter_lifecycle_hook: bool,
@@ -105,10 +83,23 @@ struct RunnerReport {
     nsb_payload_prefix_hex: Option<String>,
     nsb_payload_prefix_text: Option<String>,
     container_loader_status: String,
+    container_schema: Option<String>,
+    container_schema_version: Option<usize>,
+    container_kind: Option<String>,
+    container_producer: Option<String>,
+    container_producer_phase: Option<String>,
     container_ready: Option<bool>,
     container_blockers: Vec<String>,
     container_magic: Option<String>,
     container_version: Option<usize>,
+    container_metadata_table_hash: Option<String>,
+    container_section_table_hash: Option<String>,
+    container_hash: Option<String>,
+    container_section_count: Option<usize>,
+    container_section_parsed_count: usize,
+    container_first_section_id: Option<String>,
+    container_first_section_kind: Option<String>,
+    container_entry_section_found: bool,
     container_payload_size_bytes: Option<usize>,
     container_payload_hash: Option<String>,
     container_loader_readiness: Option<String>,
@@ -123,6 +114,27 @@ struct RunnerReport {
     container_loader_symbol_name: Option<String>,
     container_loader_symbol_lifecycle_hook: Option<String>,
     container_loader_symbol_section_id: Option<String>,
+    container_relocation_count: Option<usize>,
+    container_relocation_parsed_count: usize,
+    container_first_relocation_kind: Option<String>,
+    container_first_relocation_source_section_id: Option<String>,
+    container_first_relocation_target_symbol_id: Option<String>,
+    container_first_relocation_targets_loader_symbol: bool,
+    container_first_relocation_source_matches_loader_symbol: bool,
+    compatibility_domain_count: Option<usize>,
+    compatibility_domain_parsed_count: usize,
+    compatibility_domain_first_kind: Option<String>,
+    compatibility_domain_required_count: usize,
+    loader_symbol_table_hash: Option<String>,
+    relocation_table_hash: Option<String>,
+    compatibility_domain_table_hash: Option<String>,
+    external_import_table_hash: Option<String>,
+    external_import_count: Option<usize>,
+    external_import_parsed_count: usize,
+    external_import_first_kind: Option<String>,
+    external_import_first_name: Option<String>,
+    external_import_required_imports: Vec<String>,
+    container_payload_path: Option<String>,
     container_loader_handoff_status: String,
     container_loader_handoff_ready: bool,
     container_loader_handoff_blockers: Vec<String>,
@@ -349,10 +361,23 @@ fn validate_handoff(
         nsb_payload_prefix_hex: payload_scan.prefix_hex,
         nsb_payload_prefix_text: payload_scan.prefix_text,
         container_loader_status: container_loader.status,
+        container_schema: container_loader.container_schema,
+        container_schema_version: container_loader.container_schema_version,
+        container_kind: container_loader.container_kind,
+        container_producer: container_loader.container_producer,
+        container_producer_phase: container_loader.container_producer_phase,
         container_ready: container_loader.container_ready,
         container_blockers: container_loader.container_blockers,
         container_magic: container_loader.container_magic,
         container_version: container_loader.container_version,
+        container_metadata_table_hash: container_loader.container_metadata_table_hash,
+        container_section_table_hash: container_loader.container_section_table_hash,
+        container_hash: container_loader.container_hash,
+        container_section_count: container_loader.container_section.declared_count,
+        container_section_parsed_count: container_loader.container_section.parsed_count,
+        container_first_section_id: container_loader.container_section.first_section_id,
+        container_first_section_kind: container_loader.container_section.first_section_kind,
+        container_entry_section_found: container_loader.container_section.entry_section_found,
         container_payload_size_bytes: container_loader.container_payload_size_bytes,
         container_payload_hash: container_loader.container_payload_hash,
         container_loader_readiness: container_loader.loader_readiness,
@@ -367,6 +392,35 @@ fn validate_handoff(
         container_loader_symbol_name: container_loader.loader_symbol.symbol_name,
         container_loader_symbol_lifecycle_hook: container_loader.loader_symbol.lifecycle_hook,
         container_loader_symbol_section_id: container_loader.loader_symbol.section_id,
+        container_relocation_count: container_loader.relocation.declared_count,
+        container_relocation_parsed_count: container_loader.relocation.parsed_count,
+        container_first_relocation_kind: container_loader.relocation.first_relocation_kind,
+        container_first_relocation_source_section_id: container_loader
+            .relocation
+            .first_source_section_id,
+        container_first_relocation_target_symbol_id: container_loader
+            .relocation
+            .first_target_symbol_id,
+        container_first_relocation_targets_loader_symbol: container_loader
+            .relocation
+            .first_targets_loader_symbol,
+        container_first_relocation_source_matches_loader_symbol: container_loader
+            .relocation
+            .first_source_matches_loader_symbol,
+        compatibility_domain_count: container_loader.compatibility_domain.declared_count,
+        compatibility_domain_parsed_count: container_loader.compatibility_domain.parsed_count,
+        compatibility_domain_first_kind: container_loader.compatibility_domain.first_domain_kind,
+        compatibility_domain_required_count: container_loader.compatibility_domain.required_count,
+        loader_symbol_table_hash: container_loader.loader_symbol_table_hash,
+        relocation_table_hash: container_loader.relocation_table_hash,
+        compatibility_domain_table_hash: container_loader.compatibility_domain_table_hash,
+        external_import_table_hash: container_loader.external_import_table_hash,
+        external_import_count: container_loader.external_import.declared_count,
+        external_import_parsed_count: container_loader.external_import.parsed_count,
+        external_import_first_kind: container_loader.external_import.first_import_kind,
+        external_import_first_name: container_loader.external_import.first_import_name,
+        external_import_required_imports: container_loader.external_import.required_imports,
+        container_payload_path: container_loader.container_payload_path,
         container_loader_handoff_status: container_loader.handoff_status,
         container_loader_handoff_ready: container_loader.handoff_ready,
         container_loader_handoff_blockers: container_loader.handoff_blockers,
@@ -486,264 +540,6 @@ fn ascii_preview(bytes: &[u8], limit: usize) -> String {
         .collect()
 }
 
-fn scan_container_loader(region: Option<&[u8]>, payload_kind: &str) -> ContainerLoaderSummary {
-    if payload_kind != "nsld-container-toml" {
-        return ContainerLoaderSummary {
-            status: "not-container-toml".to_owned(),
-            container_ready: None,
-            container_blockers: Vec::new(),
-            container_magic: None,
-            container_version: None,
-            container_payload_size_bytes: None,
-            container_payload_hash: None,
-            loader_readiness: None,
-            loader_blockers: Vec::new(),
-            loader_entry_kind: None,
-            loader_entry_symbol: None,
-            loader_entry_section_id: None,
-            loader_symbol_count: None,
-            loader_symbol: ContainerLoaderSymbolSummary::empty("not-container-toml"),
-            handoff_status: "not-container-toml".to_owned(),
-            handoff_ready: false,
-            handoff_blockers: Vec::new(),
-        };
-    }
-    let Some(region) = region else {
-        return ContainerLoaderSummary {
-            status: "not-mapped".to_owned(),
-            container_ready: None,
-            container_blockers: Vec::new(),
-            container_magic: None,
-            container_version: None,
-            container_payload_size_bytes: None,
-            container_payload_hash: None,
-            loader_readiness: None,
-            loader_blockers: Vec::new(),
-            loader_entry_kind: None,
-            loader_entry_symbol: None,
-            loader_entry_section_id: None,
-            loader_symbol_count: None,
-            loader_symbol: ContainerLoaderSymbolSummary::empty("not-mapped"),
-            handoff_status: "not-mapped".to_owned(),
-            handoff_ready: false,
-            handoff_blockers: Vec::new(),
-        };
-    };
-    let Ok(source) = std::str::from_utf8(region) else {
-        return ContainerLoaderSummary {
-            status: "invalid-utf8".to_owned(),
-            container_ready: None,
-            container_blockers: Vec::new(),
-            container_magic: None,
-            container_version: None,
-            container_payload_size_bytes: None,
-            container_payload_hash: None,
-            loader_readiness: None,
-            loader_blockers: Vec::new(),
-            loader_entry_kind: None,
-            loader_entry_symbol: None,
-            loader_entry_section_id: None,
-            loader_symbol_count: None,
-            loader_symbol: ContainerLoaderSymbolSummary::empty("invalid-utf8"),
-            handoff_status: "invalid-utf8".to_owned(),
-            handoff_ready: false,
-            handoff_blockers: vec!["container-loader:invalid-utf8".to_owned()],
-        };
-    };
-    let container_ready = bool_value(source, "ready");
-    let container_blockers = string_array_value(source, "blockers");
-    let container_magic = string_value(source, "container_magic");
-    let container_version = usize_value(source, "container_version");
-    let container_payload_size_bytes = usize_value(source, "payload_size_bytes");
-    let container_payload_hash = string_value(source, "payload_hash");
-    let loader_readiness = string_value(source, "loader_readiness");
-    let loader_blockers = string_array_value(source, "loader_blockers");
-    let loader_entry_kind = string_value(source, "loader_entry_kind");
-    let loader_entry_symbol = string_value(source, "loader_entry_symbol");
-    let loader_entry_section_id = string_value(source, "loader_entry_section_id");
-    let loader_symbol_count = usize_value(source, "loader_symbol_count");
-    let loader_symbol = scan_first_loader_symbol(source);
-    let handoff_blockers = container_loader_handoff_blockers(
-        container_ready,
-        &container_blockers,
-        container_magic.as_deref(),
-        container_version,
-        container_payload_size_bytes,
-        container_payload_hash.as_deref(),
-        loader_readiness.as_deref(),
-        &loader_blockers,
-        loader_entry_kind.as_deref(),
-        loader_entry_symbol.as_deref(),
-        loader_entry_section_id.as_deref(),
-        loader_symbol_count,
-        &loader_symbol,
-    );
-    let handoff_ready = handoff_blockers.is_empty();
-    ContainerLoaderSummary {
-        status: "parsed".to_owned(),
-        container_ready,
-        container_blockers,
-        container_magic,
-        container_version,
-        container_payload_size_bytes,
-        container_payload_hash,
-        loader_readiness,
-        loader_blockers,
-        loader_entry_kind,
-        loader_entry_symbol,
-        loader_entry_section_id,
-        loader_symbol_count,
-        loader_symbol,
-        handoff_status: if handoff_ready { "ready" } else { "blocked" }.to_owned(),
-        handoff_ready,
-        handoff_blockers,
-    }
-}
-
-impl ContainerLoaderSymbolSummary {
-    fn empty(status: &str) -> Self {
-        Self {
-            status: status.to_owned(),
-            symbol_id: None,
-            symbol_kind: None,
-            symbol_name: None,
-            lifecycle_hook: None,
-            section_id: None,
-        }
-    }
-}
-
-fn scan_first_loader_symbol(source: &str) -> ContainerLoaderSymbolSummary {
-    let Some(block) = first_array_table_block(source, "loader_symbol") else {
-        return ContainerLoaderSymbolSummary::empty("missing");
-    };
-    ContainerLoaderSymbolSummary {
-        status: "parsed".to_owned(),
-        symbol_id: string_value_from_lines(&block, "symbol_id"),
-        symbol_kind: string_value_from_lines(&block, "symbol_kind"),
-        symbol_name: string_value_from_lines(&block, "symbol_name"),
-        lifecycle_hook: string_value_from_lines(&block, "lifecycle_hook"),
-        section_id: string_value_from_lines(&block, "section_id"),
-    }
-}
-
-fn container_loader_handoff_blockers(
-    container_ready: Option<bool>,
-    container_blockers: &[String],
-    container_magic: Option<&str>,
-    container_version: Option<usize>,
-    container_payload_size_bytes: Option<usize>,
-    container_payload_hash: Option<&str>,
-    loader_readiness: Option<&str>,
-    loader_blockers: &[String],
-    loader_entry_kind: Option<&str>,
-    loader_entry_symbol: Option<&str>,
-    loader_entry_section_id: Option<&str>,
-    loader_symbol_count: Option<usize>,
-    loader_symbol: &ContainerLoaderSymbolSummary,
-) -> Vec<String> {
-    let mut blockers = Vec::new();
-    match container_ready {
-        Some(true) => {}
-        Some(false) => blockers.push("container:not-ready".to_owned()),
-        None => blockers.push("container:ready-missing".to_owned()),
-    }
-    blockers.extend(
-        container_blockers
-            .iter()
-            .map(|blocker| format!("container:blocker:{blocker}")),
-    );
-    match container_magic {
-        Some(CONTAINER_MAGIC) => {}
-        Some(_) => blockers.push("container:magic-unsupported".to_owned()),
-        None => blockers.push("container:magic-missing".to_owned()),
-    }
-    match container_version {
-        Some(CONTAINER_VERSION) => {}
-        Some(_) => blockers.push("container:version-unsupported".to_owned()),
-        None => blockers.push("container:version-missing".to_owned()),
-    }
-    if container_payload_size_bytes.is_none() {
-        blockers.push("container:payload-size-missing".to_owned());
-    }
-    if container_payload_hash.is_none_or(str::is_empty) {
-        blockers.push("container:payload-hash-missing".to_owned());
-    }
-    match loader_readiness {
-        Some("self-contained" | "host-assisted") => {}
-        Some("blocked") => blockers.push("container-loader:readiness-blocked".to_owned()),
-        Some(_) => blockers.push("container-loader:readiness-unsupported".to_owned()),
-        None => blockers.push("container-loader:readiness-missing".to_owned()),
-    }
-    blockers.extend(
-        loader_blockers
-            .iter()
-            .map(|blocker| format!("container-loader:blocker:{blocker}")),
-    );
-    if loader_entry_symbol.is_none_or(str::is_empty) {
-        blockers.push("container-loader:entry-symbol-missing".to_owned());
-    }
-    if loader_entry_kind.is_none_or(str::is_empty) {
-        blockers.push("container-loader:entry-kind-missing".to_owned());
-    }
-    if loader_entry_section_id.is_none_or(str::is_empty) {
-        blockers.push("container-loader:entry-section-missing".to_owned());
-    }
-    if loader_symbol_count.unwrap_or(0) == 0 {
-        blockers.push("container-loader:symbols-missing".to_owned());
-    }
-    if loader_symbol_count.unwrap_or(0) > 0 {
-        if loader_symbol.status != "parsed" {
-            blockers.push("container-loader:symbol-table-missing".to_owned());
-        } else {
-            match (loader_entry_kind, loader_symbol.symbol_kind.as_deref()) {
-                (Some(entry_kind), Some(symbol_kind)) if entry_kind == symbol_kind => {}
-                (Some(_), Some(_)) => {
-                    blockers.push("container-loader:entry-kind-mismatch".to_owned())
-                }
-                (_, None) => blockers.push("container-loader:symbol-kind-missing".to_owned()),
-                (None, Some(_)) => {}
-            }
-            match loader_symbol.lifecycle_hook.as_deref() {
-                Some("on_lifecycle_bootstrap") => {}
-                Some(_) => blockers.push("container-loader:lifecycle-hook-unsupported".to_owned()),
-                None => blockers.push("container-loader:lifecycle-hook-missing".to_owned()),
-            }
-            if loader_entry_symbol.is_some_and(|entry| {
-                loader_symbol
-                    .symbol_name
-                    .as_deref()
-                    .is_some_and(|symbol| symbol != entry)
-            }) {
-                blockers.push("container-loader:entry-symbol-mismatch".to_owned());
-            }
-            if loader_entry_section_id.is_some_and(|entry| {
-                loader_symbol
-                    .section_id
-                    .as_deref()
-                    .is_some_and(|section| section != entry)
-            }) {
-                blockers.push("container-loader:entry-section-mismatch".to_owned());
-            }
-            if loader_symbol
-                .symbol_name
-                .as_deref()
-                .is_none_or(str::is_empty)
-            {
-                blockers.push("container-loader:symbol-name-missing".to_owned());
-            }
-            if loader_symbol
-                .section_id
-                .as_deref()
-                .is_none_or(str::is_empty)
-            {
-                blockers.push("container-loader:symbol-section-missing".to_owned());
-            }
-        }
-    }
-    blockers
-}
-
 fn read_u32_le(bytes: &[u8], offset: usize) -> Option<u32> {
     let chunk: [u8; 4] = bytes.get(offset..offset + 4)?.try_into().ok()?;
     Some(u32::from_le_bytes(chunk))
@@ -788,36 +584,6 @@ fn non_zero_usize_value(source: &str, key: &str) -> Option<usize> {
         .filter(|value| *value != 0)
 }
 
-fn usize_value(source: &str, key: &str) -> Option<usize> {
-    raw_value(source, key)?.trim().parse().ok()
-}
-
-fn string_array_value(source: &str, key: &str) -> Vec<String> {
-    let Some(raw) = raw_value(source, key) else {
-        return Vec::new();
-    };
-    let Some(body) = raw
-        .trim()
-        .strip_prefix('[')
-        .and_then(|value| value.strip_suffix(']'))
-    else {
-        return Vec::new();
-    };
-    body.split(',')
-        .filter_map(|entry| {
-            let entry = entry.trim();
-            let quoted = entry.strip_prefix('"')?.strip_suffix('"')?;
-            Some(quoted.replace("\\\"", "\"").replace("\\\\", "\\"))
-        })
-        .collect()
-}
-
-fn string_value_from_lines(lines: &[&str], key: &str) -> Option<String> {
-    let raw = raw_value_from_lines(lines, key)?.trim();
-    let quoted = raw.strip_prefix('"')?.strip_suffix('"')?;
-    Some(quoted.replace("\\\"", "\"").replace("\\\\", "\\"))
-}
-
 fn raw_value<'a>(source: &'a str, key: &str) -> Option<&'a str> {
     raw_value_from_lines(&source.lines().collect::<Vec<_>>(), key)
 }
@@ -829,29 +595,6 @@ fn raw_value_from_lines<'a>(lines: &[&'a str], key: &str) -> Option<&'a str> {
     })
 }
 
-fn first_array_table_block<'a>(source: &'a str, table: &str) -> Option<Vec<&'a str>> {
-    let header = format!("[[{table}]]");
-    let mut in_table = false;
-    let mut block = Vec::new();
-    for line in source.lines() {
-        let trimmed = line.trim();
-        if trimmed == header {
-            if in_table {
-                break;
-            }
-            in_table = true;
-            continue;
-        }
-        if in_table && trimmed.starts_with("[[") {
-            break;
-        }
-        if in_table {
-            block.push(line);
-        }
-    }
-    (!block.is_empty()).then_some(block)
-}
-
 fn fnv1a64_hex(bytes: &[u8]) -> String {
     let mut hash = 0xcbf29ce484222325u64;
     for byte in bytes {
@@ -861,694 +604,5 @@ fn fnv1a64_hex(bytes: &[u8]) -> String {
     format!("0x{hash:016x}")
 }
 
-fn print_text_report(report: &RunnerReport) {
-    println!("nuis-host-runner: {}", RUNNER_PROTOCOL);
-    println!("  ready: {}", report.ready);
-    println!(
-        "  would_enter_lifecycle_hook: {}",
-        report.would_enter_lifecycle_hook
-    );
-    println!("  manifest_path: {}", report.manifest_path);
-    println!(
-        "  nsb_path: {}",
-        report.nsb_path.as_deref().unwrap_or("<none>")
-    );
-    println!("  nsb_readable: {}", report.nsb_readable);
-    println!("  nsb_hash_matches: {}", report.nsb_hash_matches);
-    println!(
-        "  nsb_payload_offset: {}",
-        optional_usize_text(report.nsb_payload_offset)
-    );
-    println!(
-        "  nsb_payload_span: {}",
-        optional_usize_text(report.nsb_payload_span)
-    );
-    println!(
-        "  nsb_payload_region_mapped: {}",
-        report.nsb_payload_region_mapped
-    );
-    println!(
-        "  nsb_payload_region_bytes: {}",
-        optional_usize_text(report.nsb_payload_region_bytes)
-    );
-    println!(
-        "  nsb_payload_region_hash: {}",
-        report
-            .nsb_payload_region_hash
-            .as_deref()
-            .unwrap_or("<none>")
-    );
-    println!(
-        "  nsb_payload_scan_status: {}",
-        report.nsb_payload_scan_status
-    );
-    println!("  nsb_payload_scan_kind: {}", report.nsb_payload_scan_kind);
-    println!(
-        "  nsb_payload_prefix_hex: {}",
-        report.nsb_payload_prefix_hex.as_deref().unwrap_or("<none>")
-    );
-    println!(
-        "  nsb_payload_prefix_text: {}",
-        report
-            .nsb_payload_prefix_text
-            .as_deref()
-            .unwrap_or("<none>")
-    );
-    println!(
-        "  container_loader_status: {}",
-        report.container_loader_status
-    );
-    println!(
-        "  container_ready: {}",
-        report
-            .container_ready
-            .map(|value| value.to_string())
-            .unwrap_or_else(|| "<none>".to_owned())
-    );
-    println!(
-        "  container_blockers: {}",
-        if report.container_blockers.is_empty() {
-            "<none>".to_owned()
-        } else {
-            report.container_blockers.join(", ")
-        }
-    );
-    println!(
-        "  container_magic: {}",
-        report.container_magic.as_deref().unwrap_or("<none>")
-    );
-    println!(
-        "  container_version: {}",
-        optional_usize_text(report.container_version)
-    );
-    println!(
-        "  container_payload_size_bytes: {}",
-        optional_usize_text(report.container_payload_size_bytes)
-    );
-    println!(
-        "  container_payload_hash: {}",
-        report.container_payload_hash.as_deref().unwrap_or("<none>")
-    );
-    println!(
-        "  container_loader_readiness: {}",
-        report
-            .container_loader_readiness
-            .as_deref()
-            .unwrap_or("<none>")
-    );
-    println!(
-        "  container_loader_blockers: {}",
-        if report.container_loader_blockers.is_empty() {
-            "<none>".to_owned()
-        } else {
-            report.container_loader_blockers.join(", ")
-        }
-    );
-    println!(
-        "  container_loader_entry_kind: {}",
-        report
-            .container_loader_entry_kind
-            .as_deref()
-            .unwrap_or("<none>")
-    );
-    println!(
-        "  container_loader_entry_symbol: {}",
-        report
-            .container_loader_entry_symbol
-            .as_deref()
-            .unwrap_or("<none>")
-    );
-    println!(
-        "  container_loader_entry_section_id: {}",
-        report
-            .container_loader_entry_section_id
-            .as_deref()
-            .unwrap_or("<none>")
-    );
-    println!(
-        "  container_loader_symbol_count: {}",
-        optional_usize_text(report.container_loader_symbol_count)
-    );
-    println!(
-        "  container_loader_symbol_status: {}",
-        report.container_loader_symbol_status
-    );
-    println!(
-        "  container_loader_symbol_id: {}",
-        report
-            .container_loader_symbol_id
-            .as_deref()
-            .unwrap_or("<none>")
-    );
-    println!(
-        "  container_loader_symbol_kind: {}",
-        report
-            .container_loader_symbol_kind
-            .as_deref()
-            .unwrap_or("<none>")
-    );
-    println!(
-        "  container_loader_symbol_name: {}",
-        report
-            .container_loader_symbol_name
-            .as_deref()
-            .unwrap_or("<none>")
-    );
-    println!(
-        "  container_loader_symbol_lifecycle_hook: {}",
-        report
-            .container_loader_symbol_lifecycle_hook
-            .as_deref()
-            .unwrap_or("<none>")
-    );
-    println!(
-        "  container_loader_symbol_section_id: {}",
-        report
-            .container_loader_symbol_section_id
-            .as_deref()
-            .unwrap_or("<none>")
-    );
-    println!(
-        "  container_loader_handoff_status: {}",
-        report.container_loader_handoff_status
-    );
-    println!(
-        "  container_loader_handoff_ready: {}",
-        report.container_loader_handoff_ready
-    );
-    println!(
-        "  container_loader_handoff_blockers: {}",
-        if report.container_loader_handoff_blockers.is_empty() {
-            "<none>".to_owned()
-        } else {
-            report.container_loader_handoff_blockers.join(", ")
-        }
-    );
-    println!(
-        "  nsb_layout_hash: {}",
-        report.nsb_layout_hash.as_deref().unwrap_or("<none>")
-    );
-    println!(
-        "  nsb_byte_map_hash: {}",
-        report.nsb_byte_map_hash.as_deref().unwrap_or("<none>")
-    );
-    println!("  scheduler_entry: {}", report.scheduler_entry);
-    println!("  lifecycle_hook: {}", report.lifecycle_hook);
-    println!(
-        "  launch_steps: {}",
-        if report.launch_steps.is_empty() {
-            "<none>".to_owned()
-        } else {
-            report.launch_steps.join(", ")
-        }
-    );
-    println!(
-        "  blockers: {}",
-        if report.blockers.is_empty() {
-            "<none>".to_owned()
-        } else {
-            report.blockers.join(", ")
-        }
-    );
-}
-
-fn render_json_report(report: &RunnerReport) -> String {
-    format!(
-        "{{\"kind\":\"nuis_host_runner\",\"protocol\":\"{}\",\"ready\":{},\"would_enter_lifecycle_hook\":{},\"manifest_path\":\"{}\",\"nsb_path\":{},\"nsb_readable\":{},\"nsb_hash_expected\":{},\"nsb_hash_actual\":{},\"nsb_hash_matches\":{},\"nsb_payload_offset\":{},\"nsb_payload_span\":{},\"nsb_payload_region_mapped\":{},\"nsb_payload_region_bytes\":{},\"nsb_payload_region_hash\":{},\"nsb_payload_scan_status\":\"{}\",\"nsb_payload_scan_kind\":\"{}\",\"nsb_payload_prefix_hex\":{},\"nsb_payload_prefix_text\":{},\"container_loader_status\":\"{}\",\"container_ready\":{},\"container_blockers\":[{}],\"container_magic\":{},\"container_version\":{},\"container_payload_size_bytes\":{},\"container_payload_hash\":{},\"container_loader_readiness\":{},\"container_loader_blockers\":[{}],\"container_loader_entry_kind\":{},\"container_loader_entry_symbol\":{},\"container_loader_entry_section_id\":{},\"container_loader_symbol_count\":{},\"container_loader_symbol_status\":\"{}\",\"container_loader_symbol_id\":{},\"container_loader_symbol_kind\":{},\"container_loader_symbol_name\":{},\"container_loader_symbol_lifecycle_hook\":{},\"container_loader_symbol_section_id\":{},\"container_loader_handoff_status\":\"{}\",\"container_loader_handoff_ready\":{},\"container_loader_handoff_blockers\":[{}],\"nsb_layout_hash\":{},\"nsb_byte_map_hash\":{},\"scheduler_entry\":\"{}\",\"lifecycle_hook\":\"{}\",\"launch_steps\":[{}],\"blockers\":[{}]}}",
-        json_escape(RUNNER_PROTOCOL),
-        report.ready,
-        report.would_enter_lifecycle_hook,
-        json_escape(&report.manifest_path),
-        json_optional_string(report.nsb_path.as_deref()),
-        report.nsb_readable,
-        json_optional_string(report.nsb_hash_expected.as_deref()),
-        json_optional_string(report.nsb_hash_actual.as_deref()),
-        report.nsb_hash_matches,
-        json_optional_usize(report.nsb_payload_offset),
-        json_optional_usize(report.nsb_payload_span),
-        report.nsb_payload_region_mapped,
-        json_optional_usize(report.nsb_payload_region_bytes),
-        json_optional_string(report.nsb_payload_region_hash.as_deref()),
-        json_escape(&report.nsb_payload_scan_status),
-        json_escape(&report.nsb_payload_scan_kind),
-        json_optional_string(report.nsb_payload_prefix_hex.as_deref()),
-        json_optional_string(report.nsb_payload_prefix_text.as_deref()),
-        json_escape(&report.container_loader_status),
-        json_optional_bool(report.container_ready),
-        json_string_array(&report.container_blockers),
-        json_optional_string(report.container_magic.as_deref()),
-        json_optional_usize(report.container_version),
-        json_optional_usize(report.container_payload_size_bytes),
-        json_optional_string(report.container_payload_hash.as_deref()),
-        json_optional_string(report.container_loader_readiness.as_deref()),
-        json_string_array(&report.container_loader_blockers),
-        json_optional_string(report.container_loader_entry_kind.as_deref()),
-        json_optional_string(report.container_loader_entry_symbol.as_deref()),
-        json_optional_string(report.container_loader_entry_section_id.as_deref()),
-        json_optional_usize(report.container_loader_symbol_count),
-        json_escape(&report.container_loader_symbol_status),
-        json_optional_string(report.container_loader_symbol_id.as_deref()),
-        json_optional_string(report.container_loader_symbol_kind.as_deref()),
-        json_optional_string(report.container_loader_symbol_name.as_deref()),
-        json_optional_string(report.container_loader_symbol_lifecycle_hook.as_deref()),
-        json_optional_string(report.container_loader_symbol_section_id.as_deref()),
-        json_escape(&report.container_loader_handoff_status),
-        report.container_loader_handoff_ready,
-        json_string_array(&report.container_loader_handoff_blockers),
-        json_optional_string(report.nsb_layout_hash.as_deref()),
-        json_optional_string(report.nsb_byte_map_hash.as_deref()),
-        json_escape(&report.scheduler_entry),
-        json_escape(&report.lifecycle_hook),
-        json_string_array(&report.launch_steps),
-        json_string_array(&report.blockers)
-    )
-}
-
-fn optional_usize_text(value: Option<usize>) -> String {
-    value
-        .map(|value| value.to_string())
-        .unwrap_or_else(|| "<none>".to_owned())
-}
-
-fn json_optional_usize(value: Option<usize>) -> String {
-    value
-        .map(|value| value.to_string())
-        .unwrap_or_else(|| "null".to_owned())
-}
-
-fn json_optional_bool(value: Option<bool>) -> String {
-    value
-        .map(|value| value.to_string())
-        .unwrap_or_else(|| "null".to_owned())
-}
-
-fn json_optional_string(value: Option<&str>) -> String {
-    value
-        .map(|value| format!("\"{}\"", json_escape(value)))
-        .unwrap_or_else(|| "null".to_owned())
-}
-
-fn json_string_array(values: &[String]) -> String {
-    values
-        .iter()
-        .map(|value| format!("\"{}\"", json_escape(value)))
-        .collect::<Vec<_>>()
-        .join(",")
-}
-
-fn json_escape(value: &str) -> String {
-    value.replace('\\', "\\\\").replace('"', "\\\"")
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn nsb_payload() -> &'static [u8] {
-        b"schema = \"nuis-nsld-container-v1\"\nschema_version = 1\ncontainer_kind = \"deterministic-hetero-container\"\nproducer = \"nsld\"\nproducer_phase = \"alpha-0.10.0\"\nready = true\ncontainer_magic = \"NUISNSLD\"\ncontainer_version = 1\ncontainer_hash = \"0xaaaaaaaaaaaaaaaa\"\nloader_readiness = \"host-assisted\"\nloader_blockers = []\nloader_entry_kind = \"lifecycle-bootstrap\"\nloader_entry_symbol = \"main\"\nloader_entry_section_id = \"sec0000.compiled-artifact\"\nloader_symbol_count = 3\npayload_size_bytes = 128\npayload_hash = \"0xbbbbbbbbbbbbbbbb\"\nblockers = []\n\n[[loader_symbol]]\nsymbol_id = \"sym0000.loader-entry\"\nsymbol_kind = \"lifecycle-bootstrap\"\nsymbol_name = \"main\"\nlifecycle_hook = \"on_lifecycle_bootstrap\"\nsection_id = \"sec0000.compiled-artifact\"\n"
-    }
-
-    fn nsb_bytes() -> Vec<u8> {
-        let payload = nsb_payload();
-        let mut bytes = vec![0u8; IMAGE_HEADER_SIZE + payload.len()];
-        bytes[0..8].copy_from_slice(IMAGE_MAGIC);
-        bytes[8..12].copy_from_slice(&IMAGE_VERSION.to_le_bytes());
-        bytes[12..16].copy_from_slice(&(IMAGE_HEADER_SIZE as u32).to_le_bytes());
-        bytes[24..32].copy_from_slice(&(payload.len() as u64).to_le_bytes());
-        bytes[32..40].copy_from_slice(&(IMAGE_HEADER_SIZE as u64).to_le_bytes());
-        bytes[40..48].copy_from_slice(&0x1234u64.to_le_bytes());
-        bytes[48..56].copy_from_slice(&0x5678u64.to_le_bytes());
-        bytes[IMAGE_HEADER_SIZE..].copy_from_slice(payload);
-        bytes
-    }
-
-    fn manifest_source(nsb_hash: &str, nsb_size: usize) -> String {
-        format!(
-            "schema = \"{MANIFEST_SCHEMA}\"\nready = true\nexecution_handoff_contract = \"{HANDOFF_CONTRACT}\"\nexecution_handoff_ready = true\nnsb_path = \"nuis-app.nsb\"\nnsb_hash = \"{nsb_hash}\"\nnsb_size_bytes = {nsb_size}\nimage_header_required = true\nimage_header_valid = true\nscheduler_entry = \"nuis.scheduler.loop.v1\"\nentry_lifecycle_hook = \"on_process_start\"\n"
-        )
-    }
-
-    #[test]
-    fn validates_ready_launcher_handoff() {
-        let bytes = nsb_bytes();
-        let manifest = parse_launcher_manifest(&manifest_source(&fnv1a64_hex(&bytes), bytes.len()))
-            .expect("manifest parses");
-        let dir = env::temp_dir().join(format!("nuis-host-runner-test-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).expect("create temp dir");
-        let nsb_path = dir.join("nuis-app.nsb");
-        fs::write(&nsb_path, bytes).expect("write nsb");
-
-        let report = validate_handoff(
-            &dir.join("nuis.nsld.final-executable-launcher.toml"),
-            &nsb_path,
-            Some(&dir),
-            "nuis.scheduler.loop.v1",
-            "on_process_start",
-            &manifest,
-        );
-
-        assert!(report.ready);
-        assert!(report.would_enter_lifecycle_hook);
-        assert!(report
-            .launch_steps
-            .contains(&"map-payload-region".to_owned()));
-        assert!(report
-            .launch_steps
-            .contains(&"enter-lifecycle-hook:on_process_start".to_owned()));
-        assert_eq!(report.nsb_payload_offset, Some(IMAGE_HEADER_SIZE));
-        assert_eq!(report.nsb_payload_span, Some(nsb_payload().len()));
-        assert!(report.nsb_payload_region_mapped);
-        assert_eq!(report.nsb_payload_region_bytes, Some(nsb_payload().len()));
-        let expected_payload_region_hash = fnv1a64_hex(nsb_payload());
-        assert_eq!(
-            report.nsb_payload_region_hash.as_deref(),
-            Some(expected_payload_region_hash.as_str())
-        );
-        assert_eq!(report.nsb_payload_scan_status, "scanned");
-        assert_eq!(report.nsb_payload_scan_kind, "nsld-container-toml");
-        assert!(report
-            .nsb_payload_prefix_text
-            .as_deref()
-            .is_some_and(|prefix| prefix.contains("nuis-nsld-container-v1")));
-        assert!(report
-            .nsb_payload_prefix_hex
-            .as_deref()
-            .is_some_and(|prefix| prefix.starts_with("736368656d6120")));
-        assert_eq!(report.container_loader_status, "parsed");
-        assert_eq!(report.container_ready, Some(true));
-        assert!(report.container_blockers.is_empty());
-        assert_eq!(report.container_magic.as_deref(), Some(CONTAINER_MAGIC));
-        assert_eq!(report.container_version, Some(CONTAINER_VERSION));
-        assert_eq!(report.container_payload_size_bytes, Some(128));
-        assert_eq!(
-            report.container_payload_hash.as_deref(),
-            Some("0xbbbbbbbbbbbbbbbb")
-        );
-        assert_eq!(
-            report.container_loader_readiness.as_deref(),
-            Some("host-assisted")
-        );
-        assert!(report.container_loader_blockers.is_empty());
-        assert_eq!(
-            report.container_loader_entry_kind.as_deref(),
-            Some("lifecycle-bootstrap")
-        );
-        assert_eq!(
-            report.container_loader_entry_symbol.as_deref(),
-            Some("main")
-        );
-        assert_eq!(
-            report.container_loader_entry_section_id.as_deref(),
-            Some("sec0000.compiled-artifact")
-        );
-        assert_eq!(report.container_loader_symbol_count, Some(3));
-        assert_eq!(report.container_loader_symbol_status, "parsed");
-        assert_eq!(
-            report.container_loader_symbol_id.as_deref(),
-            Some("sym0000.loader-entry")
-        );
-        assert_eq!(
-            report.container_loader_symbol_kind.as_deref(),
-            Some("lifecycle-bootstrap")
-        );
-        assert_eq!(report.container_loader_symbol_name.as_deref(), Some("main"));
-        assert_eq!(
-            report.container_loader_symbol_lifecycle_hook.as_deref(),
-            Some("on_lifecycle_bootstrap")
-        );
-        assert_eq!(
-            report.container_loader_symbol_section_id.as_deref(),
-            Some("sec0000.compiled-artifact")
-        );
-        assert_eq!(report.container_loader_handoff_status, "ready");
-        assert!(report.container_loader_handoff_ready);
-        assert!(report.container_loader_handoff_blockers.is_empty());
-        assert_eq!(
-            report.nsb_layout_hash.as_deref(),
-            Some("0x0000000000001234")
-        );
-        assert_eq!(
-            report.nsb_byte_map_hash.as_deref(),
-            Some("0x0000000000005678")
-        );
-        assert!(report.blockers.is_empty());
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn blocks_hash_mismatch() {
-        let bytes = nsb_bytes();
-        let manifest = parse_launcher_manifest(&manifest_source("0x0000000000000000", bytes.len()))
-            .expect("manifest parses");
-        let dir =
-            env::temp_dir().join(format!("nuis-host-runner-hash-test-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).expect("create temp dir");
-        let nsb_path = dir.join("nuis-app.nsb");
-        fs::write(&nsb_path, bytes).expect("write nsb");
-
-        let report = validate_handoff(
-            &dir.join("nuis.nsld.final-executable-launcher.toml"),
-            &nsb_path,
-            Some(&dir),
-            "nuis.scheduler.loop.v1",
-            "on_process_start",
-            &manifest,
-        );
-
-        assert!(!report.ready);
-        assert!(report.blockers.contains(&"nsb:hash-mismatch".to_owned()));
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn blocks_container_loader_handoff_when_loader_is_blocked() {
-        let mut bytes = nsb_bytes();
-        let source = String::from_utf8(bytes[IMAGE_HEADER_SIZE..].to_vec()).unwrap();
-        let tampered = source.replace(
-            "loader_readiness = \"host-assisted\"",
-            "loader_readiness = \"blocked\"",
-        );
-        bytes.truncate(IMAGE_HEADER_SIZE);
-        bytes.extend_from_slice(tampered.as_bytes());
-        bytes[24..32].copy_from_slice(&(tampered.len() as u64).to_le_bytes());
-
-        let manifest = parse_launcher_manifest(&manifest_source(&fnv1a64_hex(&bytes), bytes.len()))
-            .expect("manifest parses");
-        let dir = env::temp_dir().join(format!(
-            "nuis-host-runner-loader-blocked-test-{}",
-            std::process::id()
-        ));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).expect("create temp dir");
-        let nsb_path = dir.join("nuis-app.nsb");
-        fs::write(&nsb_path, bytes).expect("write nsb");
-
-        let report = validate_handoff(
-            &dir.join("nuis.nsld.final-executable-launcher.toml"),
-            &nsb_path,
-            Some(&dir),
-            "nuis.scheduler.loop.v1",
-            "on_process_start",
-            &manifest,
-        );
-
-        assert!(!report.ready);
-        assert_eq!(report.container_loader_handoff_status, "blocked");
-        assert!(!report.container_loader_handoff_ready);
-        assert!(report
-            .container_loader_handoff_blockers
-            .contains(&"container-loader:readiness-blocked".to_owned()));
-        assert!(report
-            .blockers
-            .contains(&"container-loader:readiness-blocked".to_owned()));
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn blocks_container_loader_handoff_when_symbol_table_mismatches_entry() {
-        let mut bytes = nsb_bytes();
-        let source = String::from_utf8(bytes[IMAGE_HEADER_SIZE..].to_vec()).unwrap();
-        let tampered = source.replace("symbol_name = \"main\"", "symbol_name = \"boot\"");
-        bytes.truncate(IMAGE_HEADER_SIZE);
-        bytes.extend_from_slice(tampered.as_bytes());
-        bytes[24..32].copy_from_slice(&(tampered.len() as u64).to_le_bytes());
-
-        let manifest = parse_launcher_manifest(&manifest_source(&fnv1a64_hex(&bytes), bytes.len()))
-            .expect("manifest parses");
-        let dir = env::temp_dir().join(format!(
-            "nuis-host-runner-loader-symbol-test-{}",
-            std::process::id()
-        ));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).expect("create temp dir");
-        let nsb_path = dir.join("nuis-app.nsb");
-        fs::write(&nsb_path, bytes).expect("write nsb");
-
-        let report = validate_handoff(
-            &dir.join("nuis.nsld.final-executable-launcher.toml"),
-            &nsb_path,
-            Some(&dir),
-            "nuis.scheduler.loop.v1",
-            "on_process_start",
-            &manifest,
-        );
-
-        assert!(!report.ready);
-        assert_eq!(report.container_loader_symbol_status, "parsed");
-        assert_eq!(report.container_loader_symbol_name.as_deref(), Some("boot"));
-        assert_eq!(report.container_loader_handoff_status, "blocked");
-        assert!(!report.container_loader_handoff_ready);
-        assert!(report
-            .container_loader_handoff_blockers
-            .contains(&"container-loader:entry-symbol-mismatch".to_owned()));
-        assert!(report
-            .blockers
-            .contains(&"container-loader:entry-symbol-mismatch".to_owned()));
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn blocks_container_loader_handoff_when_loader_blockers_are_declared() {
-        let mut bytes = nsb_bytes();
-        let source = String::from_utf8(bytes[IMAGE_HEADER_SIZE..].to_vec()).unwrap();
-        let tampered = source.replace(
-            "loader_blockers = []",
-            "loader_blockers = [\"external-import:final-stage-driver:cc\"]",
-        );
-        bytes.truncate(IMAGE_HEADER_SIZE);
-        bytes.extend_from_slice(tampered.as_bytes());
-        bytes[24..32].copy_from_slice(&(tampered.len() as u64).to_le_bytes());
-
-        let manifest = parse_launcher_manifest(&manifest_source(&fnv1a64_hex(&bytes), bytes.len()))
-            .expect("manifest parses");
-        let dir = env::temp_dir().join(format!(
-            "nuis-host-runner-loader-blocker-test-{}",
-            std::process::id()
-        ));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).expect("create temp dir");
-        let nsb_path = dir.join("nuis-app.nsb");
-        fs::write(&nsb_path, bytes).expect("write nsb");
-
-        let report = validate_handoff(
-            &dir.join("nuis.nsld.final-executable-launcher.toml"),
-            &nsb_path,
-            Some(&dir),
-            "nuis.scheduler.loop.v1",
-            "on_process_start",
-            &manifest,
-        );
-
-        assert!(!report.ready);
-        assert_eq!(
-            report.container_loader_blockers,
-            vec!["external-import:final-stage-driver:cc".to_owned()]
-        );
-        assert_eq!(report.container_loader_handoff_status, "blocked");
-        assert!(!report.container_loader_handoff_ready);
-        assert!(report.container_loader_handoff_blockers.contains(
-            &"container-loader:blocker:external-import:final-stage-driver:cc".to_owned()
-        ));
-        assert!(report.blockers.contains(
-            &"container-loader:blocker:external-import:final-stage-driver:cc".to_owned()
-        ));
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn blocks_container_handoff_when_container_blockers_are_declared() {
-        let mut bytes = nsb_bytes();
-        let source = String::from_utf8(bytes[IMAGE_HEADER_SIZE..].to_vec()).unwrap();
-        let tampered = source.replace("\nblockers = []", "\nblockers = [\"payload-not-sealed\"]");
-        bytes.truncate(IMAGE_HEADER_SIZE);
-        bytes.extend_from_slice(tampered.as_bytes());
-        bytes[24..32].copy_from_slice(&(tampered.len() as u64).to_le_bytes());
-
-        let manifest = parse_launcher_manifest(&manifest_source(&fnv1a64_hex(&bytes), bytes.len()))
-            .expect("manifest parses");
-        let dir = env::temp_dir().join(format!(
-            "nuis-host-runner-container-blocker-test-{}",
-            std::process::id()
-        ));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).expect("create temp dir");
-        let nsb_path = dir.join("nuis-app.nsb");
-        fs::write(&nsb_path, bytes).expect("write nsb");
-
-        let report = validate_handoff(
-            &dir.join("nuis.nsld.final-executable-launcher.toml"),
-            &nsb_path,
-            Some(&dir),
-            "nuis.scheduler.loop.v1",
-            "on_process_start",
-            &manifest,
-        );
-
-        assert!(!report.ready);
-        assert_eq!(
-            report.container_blockers,
-            vec!["payload-not-sealed".to_owned()]
-        );
-        assert_eq!(report.container_loader_handoff_status, "blocked");
-        assert!(report
-            .container_loader_handoff_blockers
-            .contains(&"container:blocker:payload-not-sealed".to_owned()));
-        assert!(report
-            .blockers
-            .contains(&"container:blocker:payload-not-sealed".to_owned()));
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn blocks_container_loader_handoff_when_entry_kind_mismatches_symbol_kind() {
-        let mut bytes = nsb_bytes();
-        let source = String::from_utf8(bytes[IMAGE_HEADER_SIZE..].to_vec()).unwrap();
-        let tampered = source.replace(
-            "loader_entry_kind = \"lifecycle-bootstrap\"",
-            "loader_entry_kind = \"host-entry-bootstrap\"",
-        );
-        bytes.truncate(IMAGE_HEADER_SIZE);
-        bytes.extend_from_slice(tampered.as_bytes());
-        bytes[24..32].copy_from_slice(&(tampered.len() as u64).to_le_bytes());
-
-        let manifest = parse_launcher_manifest(&manifest_source(&fnv1a64_hex(&bytes), bytes.len()))
-            .expect("manifest parses");
-        let dir = env::temp_dir().join(format!(
-            "nuis-host-runner-entry-kind-test-{}",
-            std::process::id()
-        ));
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).expect("create temp dir");
-        let nsb_path = dir.join("nuis-app.nsb");
-        fs::write(&nsb_path, bytes).expect("write nsb");
-
-        let report = validate_handoff(
-            &dir.join("nuis.nsld.final-executable-launcher.toml"),
-            &nsb_path,
-            Some(&dir),
-            "nuis.scheduler.loop.v1",
-            "on_process_start",
-            &manifest,
-        );
-
-        assert!(!report.ready);
-        assert_eq!(
-            report.container_loader_entry_kind.as_deref(),
-            Some("host-entry-bootstrap")
-        );
-        assert_eq!(
-            report.container_loader_symbol_kind.as_deref(),
-            Some("lifecycle-bootstrap")
-        );
-        assert_eq!(report.container_loader_handoff_status, "blocked");
-        assert!(report
-            .container_loader_handoff_blockers
-            .contains(&"container-loader:entry-kind-mismatch".to_owned()));
-        assert!(report
-            .blockers
-            .contains(&"container-loader:entry-kind-mismatch".to_owned()));
-        let _ = fs::remove_dir_all(&dir);
-    }
-}
+mod tests;

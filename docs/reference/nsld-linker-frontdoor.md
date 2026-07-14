@@ -288,13 +288,22 @@ handoff, parses the `.nsb` payload offset/span and layout/byte-map hashes, maps
 the payload region enough to report its byte count/hash, performs a bounded
 first-layer payload scan (`nsld-container-toml`, `toml-like`, `opaque-bytes`, or
 `empty`), extracts Nsld container contract fields when the payload is container
-TOML, validates that the container is ready, has no top-level `blockers`, uses
-the expected magic/version, and declares payload size/hash metadata. It also
-validates that the container loader handoff is not blocked, has no declared
-`loader_blockers`, has an entry kind/symbol/section plus loader symbols, reads
-the first `[[loader_symbol]]` row, checks that its symbol kind, symbol name, and
-section match the loader entry summary, and reports lifecycle-entry readiness
-before a fuller runtime scans and executes payload code.
+TOML or a TOML-like candidate, validates schema/version, container kind,
+producer, readiness, top-level `blockers`, expected magic/version, and payload
+size/hash metadata. It also reports the declared container/table hashes and
+`payload_path` as handoff observability for CI, nsdb, and future runtimes, while
+leaving hash recomputation to `nsld check` and container verification rather
+than duplicating verifier logic in the thin runner. It validates that the
+container loader handoff is not blocked, has no declared `loader_blockers`, has
+an entry kind/symbol/section plus loader symbols, checks `section_count` against
+parsed `[[section]]` rows, requires the loader entry section to exist in that
+table, reads the first `[[loader_symbol]]` row, checks that its symbol kind,
+symbol name, and section match the loader entry summary, checks
+`relocation_count`, verifies that the first `[[relocation]]` binds the entry
+section to the first loader symbol, checks compatibility-domain and
+external-import counts, blocks on required `[[external_import]]` entries, and
+reports lifecycle-entry readiness before a fuller runtime scans and executes
+payload code.
 `nsld check` mirrors the pipeline handoff fields as
 `final_executable_pipeline_execution_handoff_*`, so CI can inspect the same
 route from the aggregate verifier report. It also mirrors the entrypoint
