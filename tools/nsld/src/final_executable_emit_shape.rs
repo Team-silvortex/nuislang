@@ -63,6 +63,13 @@ pub(crate) fn nsld_final_executable_emit_report_shape(
     report.image_dry_run_valid = Some(image_dry_run.valid);
     report.image_dry_run_hash = image_dry_run.actual_image_hash;
     report.image_dry_run_size_bytes = image_dry_run.actual_image_size_bytes;
+    report.image_dry_run_resolver_status = image_dry_run.actual_relocation_patch_preview_status;
+    report.image_dry_run_patch_application_status =
+        image_dry_run.actual_relocation_patch_application_status;
+    report.image_dry_run_patch_byte_audit_status =
+        image_dry_run.actual_relocation_patch_byte_audit_status;
+    report.image_dry_run_patch_byte_audit_hash =
+        image_dry_run.actual_relocation_patch_byte_audit_hash;
     report.image_dry_run_issues = image_dry_run.issues;
     if !writer_input.valid {
         report

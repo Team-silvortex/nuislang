@@ -90,9 +90,13 @@ pub(crate) fn parse_final_executable_image_header(
 pub(crate) fn verify_final_executable_image_payload_region(
     layout: &NsldFinalExecutableLayoutPlanReport,
     image_path: &Path,
+    expected_image: Option<&[u8]>,
     issues: &mut Vec<String>,
 ) -> FinalExecutablePayloadRegionVerify {
-    let expected_payload_region = encode_final_executable_payload_region(layout);
+    let expected_payload_region =
+        expected_image.and_then(|bytes| image_payload_region(bytes).map(|region| region.to_vec()));
+    let expected_payload_region =
+        expected_payload_region.or_else(|| encode_final_executable_payload_region(layout));
     let expected_hash = expected_payload_region
         .as_ref()
         .map(|bytes| fnv1a64_hex(bytes));
@@ -166,11 +170,19 @@ pub(crate) fn verify_final_executable_image_payload_region(
             ));
             continue;
         };
+        let expected_slice = expected_image
+            .and_then(image_payload_region)
+            .and_then(|region| {
+                region.get(entry.offset..entry.offset.saturating_add(entry.size_bytes))
+            });
+        let expected_payload_hash = expected_slice
+            .map(fnv1a64_hex)
+            .unwrap_or_else(|| payload.content_hash.clone());
         let actual_payload_hash = fnv1a64_hex(slice);
-        if actual_payload_hash != payload.content_hash {
+        if actual_payload_hash != expected_payload_hash {
             issues.push(format!(
                 "image_payload_region_entry_hash mismatch for {}: expected {}, found {}",
-                entry.payload_id, payload.content_hash, actual_payload_hash
+                entry.payload_id, expected_payload_hash, actual_payload_hash
             ));
         }
     }
@@ -179,6 +191,12 @@ pub(crate) fn verify_final_executable_image_payload_region(
         actual_hash,
         actual_count: Some(actual_count),
     }
+}
+
+fn image_payload_region(bytes: &[u8]) -> Option<&[u8]> {
+    let header = parse_final_executable_image_header(bytes)?;
+    let payload_end = header.payload_offset.saturating_add(header.payload_span);
+    bytes.get(header.payload_offset..payload_end)
 }
 
 fn final_executable_image_header(layout: &NsldFinalExecutableLayoutPlanReport) -> Option<Vec<u8>> {

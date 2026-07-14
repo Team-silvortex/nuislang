@@ -117,6 +117,22 @@ fn nsld_final_executable_report_json_with_kind(
         json_optional_bool_field("image_dry_run_valid", report.image_dry_run_valid),
         json_optional_string_field("image_dry_run_hash", report.image_dry_run_hash.as_deref()),
         json_optional_usize_field("image_dry_run_size_bytes", report.image_dry_run_size_bytes),
+        json_optional_string_field(
+            "image_dry_run_resolver_status",
+            report.image_dry_run_resolver_status.as_deref(),
+        ),
+        json_optional_string_field(
+            "image_dry_run_patch_application_status",
+            report.image_dry_run_patch_application_status.as_deref(),
+        ),
+        json_optional_string_field(
+            "image_dry_run_patch_byte_audit_status",
+            report.image_dry_run_patch_byte_audit_status.as_deref(),
+        ),
+        json_optional_string_field(
+            "image_dry_run_patch_byte_audit_hash",
+            report.image_dry_run_patch_byte_audit_hash.as_deref(),
+        ),
         json_string_array_field("image_dry_run_issues", &report.image_dry_run_issues),
         json_bool_field("final_output_checked", report.final_output_checked),
         json_bool_field("final_output_present", report.final_output_present),
@@ -410,6 +426,48 @@ pub(crate) fn nsld_final_executable_emit_verify_report_json(
             "actual_image_dry_run_size_bytes",
             report.actual_image_dry_run_size_bytes,
         ),
+        json_optional_string_field(
+            "expected_image_dry_run_resolver_status",
+            report.expected_image_dry_run_resolver_status.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_image_dry_run_resolver_status",
+            report.actual_image_dry_run_resolver_status.as_deref(),
+        ),
+        json_optional_string_field(
+            "expected_image_dry_run_patch_application_status",
+            report
+                .expected_image_dry_run_patch_application_status
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_image_dry_run_patch_application_status",
+            report
+                .actual_image_dry_run_patch_application_status
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "expected_image_dry_run_patch_byte_audit_status",
+            report
+                .expected_image_dry_run_patch_byte_audit_status
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_image_dry_run_patch_byte_audit_status",
+            report
+                .actual_image_dry_run_patch_byte_audit_status
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "expected_image_dry_run_patch_byte_audit_hash",
+            report
+                .expected_image_dry_run_patch_byte_audit_hash
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_image_dry_run_patch_byte_audit_hash",
+            report.actual_image_dry_run_patch_byte_audit_hash.as_deref(),
+        ),
         json_string_array_field(
             "expected_image_dry_run_issues",
             &report.expected_image_dry_run_issues,
@@ -555,6 +613,26 @@ pub(crate) fn nsld_final_executable_output_report_json(
         ),
         json_optional_string_field("expected_image_hash", report.expected_image_hash.as_deref()),
         json_bool_field("matches_expected_image", report.matches_expected_image),
+        json_optional_string_field(
+            "expected_image_resolver_status",
+            report.expected_image_resolver_status.as_deref(),
+        ),
+        json_optional_string_field(
+            "expected_image_patch_application_status",
+            report.expected_image_patch_application_status.as_deref(),
+        ),
+        json_optional_string_field(
+            "expected_image_patch_byte_audit_status",
+            report.expected_image_patch_byte_audit_status.as_deref(),
+        ),
+        json_optional_string_field(
+            "expected_image_patch_byte_audit_hash",
+            report.expected_image_patch_byte_audit_hash.as_deref(),
+        ),
+        json_bool_field(
+            "matches_verified_patched_image",
+            report.matches_verified_patched_image,
+        ),
         json_bool_field("final_stage_plan_valid", report.final_stage_plan_valid),
         json_optional_string_field(
             "final_stage_plan_hash",

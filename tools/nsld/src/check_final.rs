@@ -76,6 +76,11 @@ pub(crate) struct NsldCheckFinalSnapshot {
     pub(crate) final_executable_output_image_version: Option<usize>,
     pub(crate) final_executable_output_image_layout_hash: Option<String>,
     pub(crate) final_executable_output_image_byte_map_hash: Option<String>,
+    pub(crate) final_executable_output_expected_image_resolver_status: Option<String>,
+    pub(crate) final_executable_output_expected_image_patch_application_status: Option<String>,
+    pub(crate) final_executable_output_expected_image_patch_byte_audit_status: Option<String>,
+    pub(crate) final_executable_output_expected_image_patch_byte_audit_hash: Option<String>,
+    pub(crate) final_executable_output_matches_verified_patched_image: bool,
     pub(crate) final_executable_output_runnable_candidate: Option<bool>,
     pub(crate) final_executable_output_blocker_count: Option<usize>,
     pub(crate) final_executable_output_blockers: Vec<String>,
@@ -286,6 +291,23 @@ pub(crate) fn nsld_check_final_snapshot(
         final_executable_output_report.output_layout_hash.clone();
     let final_executable_output_image_byte_map_hash =
         final_executable_output_report.output_byte_map_hash.clone();
+    let final_executable_output_expected_image_resolver_status = final_executable_output_report
+        .expected_image_resolver_status
+        .clone();
+    let final_executable_output_expected_image_patch_application_status =
+        final_executable_output_report
+            .expected_image_patch_application_status
+            .clone();
+    let final_executable_output_expected_image_patch_byte_audit_status =
+        final_executable_output_report
+            .expected_image_patch_byte_audit_status
+            .clone();
+    let final_executable_output_expected_image_patch_byte_audit_hash =
+        final_executable_output_report
+            .expected_image_patch_byte_audit_hash
+            .clone();
+    let final_executable_output_matches_verified_patched_image =
+        final_executable_output_report.matches_verified_patched_image;
     let final_executable_output_runnable_candidate =
         Some(final_executable_output_report.runnable_candidate);
     let final_executable_output_blocker_count = Some(final_executable_output_report.blockers.len());
@@ -364,6 +386,11 @@ pub(crate) fn nsld_check_final_snapshot(
         final_executable_output_image_version,
         final_executable_output_image_layout_hash,
         final_executable_output_image_byte_map_hash,
+        final_executable_output_expected_image_resolver_status,
+        final_executable_output_expected_image_patch_application_status,
+        final_executable_output_expected_image_patch_byte_audit_status,
+        final_executable_output_expected_image_patch_byte_audit_hash,
+        final_executable_output_matches_verified_patched_image,
         final_executable_output_runnable_candidate,
         final_executable_output_blocker_count,
         final_executable_output_blockers,

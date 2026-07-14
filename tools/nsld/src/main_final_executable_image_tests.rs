@@ -93,7 +93,7 @@ fn final_executable_image_dry_run_emit_and_verify_round_trip() {
         .relocation_application_audit_table_hash
         .starts_with("0x"));
     assert!(report.relocation_application_audit_blockers.is_empty());
-    assert_eq!(report.relocation_patch_preview_status, "planned");
+    assert_eq!(report.relocation_patch_preview_status, "resolved");
     assert_eq!(
         report.relocation_patch_preview_count,
         report.relocation_application_count
@@ -104,11 +104,32 @@ fn final_executable_image_dry_run_emit_and_verify_round_trip() {
         report.relocation_patch_previews.len()
     );
     assert!(report.relocation_patch_previews.iter().all(|record| {
-        record.patch_kind == "u64-le-zero-placeholder"
+        record.patch_kind == "u64-le-resolved-image-offset"
             && record.patch_width_bytes == 8
+            && record.resolved_patch_value.is_some()
             && record.patch_value_hash.starts_with("0x")
-            && record.preview_status == "planned"
+            && record.target_symbol_image_offset.is_some()
+            && record.preview_status == "resolved"
+            && record.resolver_status == "resolved"
     }));
+    assert_eq!(report.relocation_patch_application_status, "applied");
+    assert_eq!(
+        report.relocation_patch_application_count,
+        report.relocation_patch_preview_count
+    );
+    assert!(report
+        .relocation_patch_application_table_hash
+        .starts_with("0x"));
+    assert!(report.relocation_patch_application_blockers.is_empty());
+    let first_patch = report.relocation_patch_previews.first().unwrap();
+    let patch_start = first_patch.patch_offset;
+    let patch_end = patch_start + first_patch.patch_width_bytes;
+    let patched_value = u64::from_le_bytes(
+        image_bytes[patch_start..patch_end]
+            .try_into()
+            .expect("8-byte relocation patch"),
+    ) as usize;
+    assert_eq!(Some(patched_value), first_patch.resolved_patch_value);
     assert!(verify.valid, "{:?}", verify.issues);
     assert_eq!(verify.actual_image_hash, emit.image_hash);
     assert_eq!(
@@ -220,10 +241,10 @@ fn final_executable_image_dry_run_emit_and_verify_round_trip() {
     assert!(verify
         .actual_relocation_application_audit_blockers
         .is_empty());
-    assert_eq!(verify.expected_relocation_patch_preview_status, "planned");
+    assert_eq!(verify.expected_relocation_patch_preview_status, "resolved");
     assert_eq!(
         verify.actual_relocation_patch_preview_status.as_deref(),
-        Some("planned")
+        Some("resolved")
     );
     assert_eq!(
         verify.expected_relocation_patch_preview_count,
@@ -271,10 +292,16 @@ fn final_executable_image_dry_run_emit_and_verify_round_trip() {
     assert!(report_source.contains("relocation_application_table_hash = \"0x"));
     assert!(report_source.contains("relocation_application_audit_status = \"ready\""));
     assert!(report_source.contains("relocation_application_audit_blockers = []"));
-    assert!(report_source.contains("relocation_patch_preview_status = \"planned\""));
+    assert!(report_source.contains("relocation_patch_preview_status = \"resolved\""));
     assert!(report_source.contains("relocation_patch_preview_table_hash = \"0x"));
+    assert!(report_source.contains("relocation_patch_application_status = \"applied\""));
+    assert!(report_source.contains("relocation_patch_application_table_hash = \"0x"));
+    assert!(report_source.contains("relocation_patch_application_blockers = []"));
     assert!(report_source.contains("[[relocation_patch_preview]]"));
-    assert!(report_source.contains("patch_kind = \"u64-le-zero-placeholder\""));
+    assert!(report_source.contains("patch_kind = \"u64-le-resolved-image-offset\""));
+    assert!(report_source.contains("resolved_patch_value = "));
+    assert!(report_source.contains("target_symbol_image_offset = "));
+    assert!(report_source.contains("resolver_status = \"resolved\""));
     assert!(report_json.contains("\"kind\":\"nsld_final_executable_image_dry_run\""));
     assert!(report_json.contains("\"image_magic\":\"NUIFIMG\""));
     assert!(report_json
@@ -286,10 +313,16 @@ fn final_executable_image_dry_run_emit_and_verify_round_trip() {
     assert!(report_json.contains("\"relocation_application_table_hash\":\"0x"));
     assert!(report_json.contains("\"relocation_application_audit_status\":\"ready\""));
     assert!(report_json.contains("\"relocation_application_audit_blockers\":[]"));
-    assert!(report_json.contains("\"relocation_patch_preview_status\":\"planned\""));
+    assert!(report_json.contains("\"relocation_patch_preview_status\":\"resolved\""));
     assert!(report_json.contains("\"relocation_patch_preview_table_hash\":\"0x"));
+    assert!(report_json.contains("\"relocation_patch_application_status\":\"applied\""));
+    assert!(report_json.contains("\"relocation_patch_application_table_hash\":\"0x"));
+    assert!(report_json.contains("\"relocation_patch_application_blockers\":[]"));
     assert!(report_json.contains("\"relocation_patch_previews\":["));
-    assert!(report_json.contains("\"patch_kind\":\"u64-le-zero-placeholder\""));
+    assert!(report_json.contains("\"patch_kind\":\"u64-le-resolved-image-offset\""));
+    assert!(report_json.contains("\"resolved_patch_value\":"));
+    assert!(report_json.contains("\"target_symbol_image_offset\":"));
+    assert!(report_json.contains("\"resolver_status\":\"resolved\""));
     assert!(emit_json.contains("\"kind\":\"nsld_final_executable_image_dry_run_emit\""));
     assert!(emit_json.contains("\"image_header_size\":64"));
     assert!(verify_json.contains("\"kind\":\"nsld_final_executable_image_dry_run_verify\""));
@@ -305,10 +338,16 @@ fn final_executable_image_dry_run_emit_and_verify_round_trip() {
     assert!(verify_json.contains("\"actual_relocation_application_table_hash\":\"0x"));
     assert!(verify_json.contains("\"actual_relocation_application_audit_status\":\"ready\""));
     assert!(verify_json.contains("\"actual_relocation_application_audit_blockers\":[]"));
-    assert!(verify_json.contains("\"actual_relocation_patch_preview_status\":\"planned\""));
+    assert!(verify_json.contains("\"actual_relocation_patch_preview_status\":\"resolved\""));
     assert!(verify_json.contains("\"actual_relocation_patch_preview_table_hash\":\"0x"));
     assert!(verify_json.contains("\"actual_relocation_patch_preview_entry_count\":"));
     assert!(verify_json.contains("\"actual_relocation_patch_preview_record_table_hash\":\"0x"));
+    assert!(verify_json.contains("\"actual_relocation_patch_application_status\":\"applied\""));
+    assert!(verify_json.contains("\"actual_relocation_patch_application_table_hash\":\"0x"));
+    assert!(verify_json.contains("\"actual_relocation_patch_application_blockers\":[]"));
+    assert!(verify_json.contains("\"actual_relocation_patch_byte_audit_status\":\"verified\""));
+    assert!(verify_json.contains("\"actual_relocation_patch_byte_audit_hash\":\"0x"));
+    assert!(verify_json.contains("\"actual_relocation_patch_byte_audit_blockers\":[]"));
     assert!(verify_json.contains("\"actual_image_header_size\":64"));
     assert!(verify_json.contains("\"valid\":true"));
 }
@@ -445,6 +484,68 @@ fn verify_final_executable_image_dry_run_reports_payload_region_drift() {
 }
 
 #[test]
+fn verify_final_executable_image_dry_run_reports_patch_byte_drift() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-image-dry-run-patch-byte-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report = nsld_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan);
+    let emit =
+        nsld_emit_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan).unwrap();
+    let first_patch = report.relocation_patch_previews.first().unwrap();
+    let mut image_bytes = fs::read(&emit.image_path).unwrap();
+    image_bytes[first_patch.patch_offset] ^= 0x7f;
+    fs::write(&emit.image_path, image_bytes).unwrap();
+    let verify =
+        nsld_verify_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan);
+    let verify_json = super::json::nsld_final_executable_image_dry_run_verify_report_json(&verify);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!verify.valid);
+    assert_eq!(
+        verify.actual_relocation_patch_byte_audit_status.as_deref(),
+        Some("blocked")
+    );
+    assert_eq!(
+        verify.actual_relocation_patch_byte_audit_count,
+        Some(report.relocation_patch_preview_count - 1)
+    );
+    assert!(verify
+        .actual_relocation_patch_byte_audit_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
+    assert!(verify
+        .actual_relocation_patch_byte_audit_blockers
+        .iter()
+        .any(|blocker| blocker.ends_with(":patch-value-mismatch")));
+    assert!(verify.issues.iter().any(|issue| {
+        issue == "relocation_patch_byte_audit_status mismatch: expected verified, found blocked"
+    }));
+    assert!(verify.issues.iter().any(|issue| {
+        issue.starts_with("relocation_patch_byte_audit_blockers mismatch: expected [], found [")
+    }));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("image_bytes_hash mismatch: expected 0x")));
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue.starts_with("image_payload_region_hash mismatch")));
+    assert!(verify_json.contains("\"actual_relocation_patch_byte_audit_status\":\"blocked\""));
+    assert!(verify_json.contains("\"actual_relocation_patch_byte_audit_hash\":\"0x"));
+    assert!(verify_json.contains("patch-value-mismatch"));
+}
+
+#[test]
 fn verify_final_executable_image_dry_run_reports_patch_preview_record_drift() {
     let dir = env::temp_dir().join(format!(
         "nsld-final-executable-image-dry-run-patch-preview-drift-{}",
@@ -464,7 +565,7 @@ fn verify_final_executable_image_dry_run_reports_patch_preview_record_drift() {
     fs::write(
         &emit.output_path,
         report_source.replacen(
-            "patch_kind = \"u64-le-zero-placeholder\"",
+            "patch_kind = \"u64-le-resolved-image-offset\"",
             "patch_kind = \"tampered-placeholder\"",
             1,
         ),
@@ -522,6 +623,22 @@ fn emit_final_executable_consumes_valid_image_dry_run_snapshot() {
     assert_eq!(emit.image_dry_run_valid, Some(true));
     assert_eq!(emit.image_dry_run_hash, image.image_hash);
     assert_eq!(emit.image_dry_run_size_bytes, image.image_size_bytes);
+    assert_eq!(
+        emit.image_dry_run_resolver_status.as_deref(),
+        Some("resolved")
+    );
+    assert_eq!(
+        emit.image_dry_run_patch_application_status.as_deref(),
+        Some("applied")
+    );
+    assert_eq!(
+        emit.image_dry_run_patch_byte_audit_status.as_deref(),
+        Some("verified")
+    );
+    assert!(emit
+        .image_dry_run_patch_byte_audit_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
     assert!(emit.image_dry_run_issues.is_empty());
     assert!(!emit
         .blockers
@@ -530,9 +647,53 @@ fn emit_final_executable_consumes_valid_image_dry_run_snapshot() {
     assert!(emit_json.contains("\"image_dry_run_valid\":true"));
     assert!(emit_json.contains("\"image_dry_run_hash\":\"0x"));
     assert!(emit_json.contains("\"image_dry_run_size_bytes\":"));
+    assert!(emit_json.contains("\"image_dry_run_resolver_status\":\"resolved\""));
+    assert!(emit_json.contains("\"image_dry_run_patch_application_status\":\"applied\""));
+    assert!(emit_json.contains("\"image_dry_run_patch_byte_audit_status\":\"verified\""));
+    assert!(emit_json.contains("\"image_dry_run_patch_byte_audit_hash\":\"0x"));
     assert!(verify.valid, "{:?}", verify.issues);
     assert_eq!(verify.expected_image_dry_run_valid, Some(true));
     assert_eq!(verify.actual_image_dry_run_valid, Some(true));
     assert_eq!(verify.expected_image_dry_run_hash, image.image_hash);
     assert_eq!(verify.actual_image_dry_run_hash, image.image_hash);
+    assert_eq!(
+        verify.expected_image_dry_run_resolver_status.as_deref(),
+        Some("resolved")
+    );
+    assert_eq!(
+        verify.actual_image_dry_run_resolver_status.as_deref(),
+        Some("resolved")
+    );
+    assert_eq!(
+        verify
+            .expected_image_dry_run_patch_application_status
+            .as_deref(),
+        Some("applied")
+    );
+    assert_eq!(
+        verify
+            .actual_image_dry_run_patch_application_status
+            .as_deref(),
+        Some("applied")
+    );
+    assert_eq!(
+        verify
+            .expected_image_dry_run_patch_byte_audit_status
+            .as_deref(),
+        Some("verified")
+    );
+    assert_eq!(
+        verify
+            .actual_image_dry_run_patch_byte_audit_status
+            .as_deref(),
+        Some("verified")
+    );
+    assert_eq!(
+        verify.expected_image_dry_run_patch_byte_audit_hash,
+        emit.image_dry_run_patch_byte_audit_hash
+    );
+    assert_eq!(
+        verify.actual_image_dry_run_patch_byte_audit_hash,
+        emit.image_dry_run_patch_byte_audit_hash
+    );
 }

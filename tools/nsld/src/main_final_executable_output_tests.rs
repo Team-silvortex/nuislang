@@ -166,7 +166,7 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
     assert_eq!(manifest.execution_handoff_target, "entrypoint-materializer");
     assert_eq!(
         manifest.execution_handoff_evidence_status,
-        "image-header-and-hash-ready"
+        "verified-patched-image-ready"
     );
     assert_eq!(manifest.execution_handoff_first_blocker, None);
     assert_eq!(
@@ -214,7 +214,7 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
     );
     assert_eq!(
         verify.actual_execution_handoff_evidence_status.as_deref(),
-        Some("image-header-and-hash-ready")
+        Some("verified-patched-image-ready")
     );
     assert_eq!(verify.actual_execution_handoff_first_blocker, None);
     assert_eq!(
@@ -544,7 +544,7 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert_eq!(output.execution_handoff_target, "entrypoint-materializer");
     assert_eq!(
         output.execution_handoff_evidence_status,
-        "image-header-and-hash-ready"
+        "verified-patched-image-ready"
     );
     assert_eq!(output.execution_handoff_first_blocker, None);
     assert_eq!(
@@ -559,6 +559,7 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert!(output.nsld_owned_output);
     assert!(output.runnable_candidate, "{:?}", output.blockers);
     assert!(output.matches_expected_image, "{:?}", output.issues);
+    assert!(output.matches_verified_patched_image, "{:?}", output.issues);
     assert_eq!(output.size_bytes, Some(output_bytes.len()));
     assert_eq!(output.output_hash, Some(fnv1a64_hex(&output_bytes)));
     assert!(output.output_image_header_required);
@@ -598,6 +599,22 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     );
     assert_eq!(output.expected_image_size_bytes, Some(image_bytes.len()));
     assert_eq!(output.expected_image_hash, Some(fnv1a64_hex(&image_bytes)));
+    assert_eq!(
+        output.expected_image_resolver_status.as_deref(),
+        Some("resolved")
+    );
+    assert_eq!(
+        output.expected_image_patch_application_status.as_deref(),
+        Some("applied")
+    );
+    assert_eq!(
+        output.expected_image_patch_byte_audit_status.as_deref(),
+        Some("verified")
+    );
+    assert!(output
+        .expected_image_patch_byte_audit_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
     assert_eq!(image_bytes, output_bytes);
     assert!(output_json.contains("\"present\":true"));
     assert!(output_json.contains("\"boundary_status\":\"ready\""));
@@ -609,7 +626,7 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     );
     assert!(output_json.contains("\"execution_handoff_target\":\"entrypoint-materializer\""));
     assert!(output_json
-        .contains("\"execution_handoff_evidence_status\":\"image-header-and-hash-ready\""));
+        .contains("\"execution_handoff_evidence_status\":\"verified-patched-image-ready\""));
     assert!(output_json.contains("\"execution_handoff_first_blocker\":null"));
     assert!(output_json
         .contains("\"execution_handoff_decision_code\":\"handoff-entrypoint-materializer\""));
@@ -628,6 +645,11 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert!(output_json.contains("\"scheduler_metadata_present\":true"));
     assert!(output_json.contains("\"scheduler_metadata_hash\":\"0x"));
     assert!(output_json.contains("\"matches_expected_image\":true"));
+    assert!(output_json.contains("\"expected_image_resolver_status\":\"resolved\""));
+    assert!(output_json.contains("\"expected_image_patch_application_status\":\"applied\""));
+    assert!(output_json.contains("\"expected_image_patch_byte_audit_status\":\"verified\""));
+    assert!(output_json.contains("\"expected_image_patch_byte_audit_hash\":\"0x"));
+    assert!(output_json.contains("\"matches_verified_patched_image\":true"));
     assert!(output_json.contains("\"final_stage_plan_valid\":true"));
     assert!(output_json.contains("\"final_executable_emit_valid\":true"));
     assert!(output_json.contains("\"final_executable_emitted\":true"));
@@ -789,6 +811,7 @@ fn final_executable_output_rejects_tampered_output_bytes() {
     );
     assert!(!output.runnable_candidate);
     assert!(!output.matches_expected_image);
+    assert!(!output.matches_verified_patched_image);
     assert!(!output.output_image_header_valid);
     assert!(output
         .blockers
@@ -811,6 +834,7 @@ fn final_executable_output_rejects_tampered_output_bytes() {
         check.final_executable_output_runnable_candidate,
         Some(false)
     );
+    assert!(!check.final_executable_output_matches_verified_patched_image);
     assert_eq!(check.final_executable_output_boundary_status, "invalid");
     assert_eq!(
         check.final_executable_output_materialization_status,

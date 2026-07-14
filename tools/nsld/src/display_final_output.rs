@@ -119,6 +119,26 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         report.matches_expected_image
     );
     println!(
+        "  expected_image_resolver_status: {}",
+        optional_string_text(report.expected_image_resolver_status.as_deref())
+    );
+    println!(
+        "  expected_image_patch_application_status: {}",
+        optional_string_text(report.expected_image_patch_application_status.as_deref())
+    );
+    println!(
+        "  expected_image_patch_byte_audit_status: {}",
+        optional_string_text(report.expected_image_patch_byte_audit_status.as_deref())
+    );
+    println!(
+        "  expected_image_patch_byte_audit_hash: {}",
+        optional_string_text(report.expected_image_patch_byte_audit_hash.as_deref())
+    );
+    println!(
+        "  matches_verified_patched_image: {}",
+        report.matches_verified_patched_image
+    );
+    println!(
         "  final_stage_plan_valid: {}",
         report.final_stage_plan_valid
     );

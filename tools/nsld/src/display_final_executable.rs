@@ -164,6 +164,22 @@ fn print_nsld_final_executable_report_with_title(
         "  image_dry_run_size_bytes: {}",
         optional_usize_text(report.image_dry_run_size_bytes)
     );
+    println!(
+        "  image_dry_run_resolver_status: {}",
+        optional_string_text(report.image_dry_run_resolver_status.as_deref())
+    );
+    println!(
+        "  image_dry_run_patch_application_status: {}",
+        optional_string_text(report.image_dry_run_patch_application_status.as_deref())
+    );
+    println!(
+        "  image_dry_run_patch_byte_audit_status: {}",
+        optional_string_text(report.image_dry_run_patch_byte_audit_status.as_deref())
+    );
+    println!(
+        "  image_dry_run_patch_byte_audit_hash: {}",
+        optional_string_text(report.image_dry_run_patch_byte_audit_hash.as_deref())
+    );
     for issue in &report.image_dry_run_issues {
         println!("  image_dry_run_issue: {issue}");
     }
@@ -467,6 +483,58 @@ pub(crate) fn print_nsld_final_executable_emit_verify_report(
     println!(
         "  actual_image_dry_run_size_bytes: {}",
         optional_usize_text(report.actual_image_dry_run_size_bytes)
+    );
+    println!(
+        "  expected_image_dry_run_resolver_status: {}",
+        optional_string_text(report.expected_image_dry_run_resolver_status.as_deref())
+    );
+    println!(
+        "  actual_image_dry_run_resolver_status: {}",
+        optional_string_text(report.actual_image_dry_run_resolver_status.as_deref())
+    );
+    println!(
+        "  expected_image_dry_run_patch_application_status: {}",
+        optional_string_text(
+            report
+                .expected_image_dry_run_patch_application_status
+                .as_deref()
+        )
+    );
+    println!(
+        "  actual_image_dry_run_patch_application_status: {}",
+        optional_string_text(
+            report
+                .actual_image_dry_run_patch_application_status
+                .as_deref()
+        )
+    );
+    println!(
+        "  expected_image_dry_run_patch_byte_audit_status: {}",
+        optional_string_text(
+            report
+                .expected_image_dry_run_patch_byte_audit_status
+                .as_deref()
+        )
+    );
+    println!(
+        "  actual_image_dry_run_patch_byte_audit_status: {}",
+        optional_string_text(
+            report
+                .actual_image_dry_run_patch_byte_audit_status
+                .as_deref()
+        )
+    );
+    println!(
+        "  expected_image_dry_run_patch_byte_audit_hash: {}",
+        optional_string_text(
+            report
+                .expected_image_dry_run_patch_byte_audit_hash
+                .as_deref()
+        )
+    );
+    println!(
+        "  actual_image_dry_run_patch_byte_audit_hash: {}",
+        optional_string_text(report.actual_image_dry_run_patch_byte_audit_hash.as_deref())
     );
     for issue in &report.expected_image_dry_run_issues {
         println!("  expected_image_dry_run_issue: {issue}");

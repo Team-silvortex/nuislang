@@ -36,6 +36,10 @@ pub(crate) struct NsldFinalExecutableEmitActual {
     pub(crate) image_dry_run_valid: Option<bool>,
     pub(crate) image_dry_run_hash: Option<String>,
     pub(crate) image_dry_run_size_bytes: Option<usize>,
+    pub(crate) image_dry_run_resolver_status: Option<String>,
+    pub(crate) image_dry_run_patch_application_status: Option<String>,
+    pub(crate) image_dry_run_patch_byte_audit_status: Option<String>,
+    pub(crate) image_dry_run_patch_byte_audit_hash: Option<String>,
     pub(crate) image_dry_run_issues: Vec<String>,
     pub(crate) final_output_checked: Option<bool>,
     pub(crate) final_output_present: Option<bool>,
@@ -100,6 +104,22 @@ pub(crate) fn nsld_final_executable_emit_actual_from_source(
         image_dry_run_valid: toml::bool_value(source, "image_dry_run_valid"),
         image_dry_run_hash: non_empty_toml_string(source, "image_dry_run_hash"),
         image_dry_run_size_bytes: optional_usize_value(source, "image_dry_run_size_bytes"),
+        image_dry_run_resolver_status: non_empty_toml_string(
+            source,
+            "image_dry_run_resolver_status",
+        ),
+        image_dry_run_patch_application_status: non_empty_toml_string(
+            source,
+            "image_dry_run_patch_application_status",
+        ),
+        image_dry_run_patch_byte_audit_status: non_empty_toml_string(
+            source,
+            "image_dry_run_patch_byte_audit_status",
+        ),
+        image_dry_run_patch_byte_audit_hash: non_empty_toml_string(
+            source,
+            "image_dry_run_patch_byte_audit_hash",
+        ),
         image_dry_run_issues: toml::string_array_value(source, "image_dry_run_issues"),
         final_output_checked: toml::bool_value(source, "final_output_checked"),
         final_output_present: toml::bool_value(source, "final_output_present"),

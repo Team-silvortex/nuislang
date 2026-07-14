@@ -1077,9 +1077,23 @@ The dry-run also emits a patch-preview layer:
 `relocation_patch_preview_status`, `relocation_patch_preview_count`,
 `relocation_patch_preview_table_hash`, and `[[relocation_patch_preview]]`
 records. These preview records intentionally use
-`u64-le-zero-placeholder` patch values today; they are a stable patch table
-shape for the future resolver/applier, not proof that final target addresses
-have already been written into the image.
+`u64-le-resolved-image-offset` patch values when the target loader symbol can
+be resolved inside the Nsld-owned payload map, with `resolved_patch_value`,
+`target_symbol_image_offset`, and `resolver_status` recorded per entry. This is
+the first resolver layer for the Nuis internal binary protocol; platform
+Mach-O/ELF/PE object resolution remains a separate compatibility concern.
+Resolved patch previews are applied to the emitted dry-run image bytes before
+`image_hash` is computed. The report records
+`relocation_patch_application_status`,
+`relocation_patch_application_count`,
+`relocation_patch_application_table_hash`, and
+`relocation_patch_application_blockers` so the resolver and byte patch stages
+remain separately auditable.
+Verification then re-reads the emitted image bytes and performs a
+`relocation_patch_byte_audit_*` pass against the actual
+`[[relocation_patch_preview]]` records. This catches drift where the TOML report
+still claims the patch was applied but the binary bytes at `patch_offset` no
+longer match `resolved_patch_value`.
 Verification also re-parses the emitted `[[relocation_patch_preview]]` records,
 checks the preview entry count, and recomputes the record table hash so a
 drifted patch entry cannot hide behind an unchanged top-level preview hash.
@@ -1147,7 +1161,10 @@ layout protocol rather than only to host linker arguments.
 It also consumes `verify-final-executable-image-dry-run`: missing or drifted
 internal image snapshots add `final-executable-image-dry-run:invalid`, and the
 report records `image_dry_run_valid`, `image_dry_run_hash`,
-`image_dry_run_size_bytes`, and `image_dry_run_issues`. This makes the final
+`image_dry_run_size_bytes`, `image_dry_run_resolver_status`,
+`image_dry_run_patch_application_status`,
+`image_dry_run_patch_byte_audit_status`,
+`image_dry_run_patch_byte_audit_hash`, and `image_dry_run_issues`. This makes the final
 blocked boundary depend on the actual Nsld-owned image checkpoint, not only on
 the abstract byte-map layout.
 `nsld verify-final-executable-emit` re-computes that blocked report and catches
@@ -1167,7 +1184,10 @@ fields such as `host_invoke_plan_valid`, `host_invoke_plan_hash`,
 `host_invoke_plan_issues`, and layout fields such
 as `layout_plan_valid`, `layout_plan_hash`, and `layout_plan_issues`, plus
 image dry-run fields such as `image_dry_run_valid`, `image_dry_run_hash`,
-`image_dry_run_size_bytes`, and `image_dry_run_issues`. The
+`image_dry_run_size_bytes`, `image_dry_run_resolver_status`,
+`image_dry_run_patch_application_status`,
+`image_dry_run_patch_byte_audit_status`,
+`image_dry_run_patch_byte_audit_hash`, and `image_dry_run_issues`. The
 blocked report also includes
 `host_dry_run_blocker_count` so scripts can check the host-finalizer blocker
 summary without parsing the blocker array. The readiness report currently exposes
@@ -1274,6 +1294,17 @@ read-only output boundary exposed by `final-executable-output` and reports
 `final_executable_output_present`,
 `final_executable_output_size_bytes`,
 `final_executable_output_hash`,
+`final_executable_output_image_header_required`,
+`final_executable_output_image_header_valid`,
+`final_executable_output_image_magic`,
+`final_executable_output_image_version`,
+`final_executable_output_image_layout_hash`,
+`final_executable_output_image_byte_map_hash`,
+`final_executable_output_expected_image_resolver_status`,
+`final_executable_output_expected_image_patch_application_status`,
+`final_executable_output_expected_image_patch_byte_audit_status`,
+`final_executable_output_expected_image_patch_byte_audit_hash`,
+`final_executable_output_matches_verified_patched_image`,
 `final_executable_output_runnable_candidate`,
 `final_executable_output_blocker_count`,
 `final_executable_output_blockers`, and
@@ -1287,6 +1318,17 @@ states. A missing Nsld-owned final output remains non-fatal so ordinary
 preparation workflows can stop before the explicit final emit step, but a
 present Nsld-owned output must be consistent with the emitted final-executable
 boundary.
+For self-contained Nuis images, output readiness now depends on the verified
+patched image evidence propagated from `emit-final-executable`: the output
+report records `expected_image_resolver_status`,
+`expected_image_patch_application_status`,
+`expected_image_patch_byte_audit_status`,
+`expected_image_patch_byte_audit_hash`, and
+`matches_verified_patched_image`; `nsld check` mirrors these as the
+`final_executable_output_expected_image_*` fields plus
+`final_executable_output_matches_verified_patched_image`. A matching hash
+without resolved/applied/verified patch evidence is not enough to become a
+runnable candidate.
 Scripts should prefer the normalized `boundary_status` /
 `final_executable_output_boundary_status` field for high-level branching, use
 `materialization_status` /

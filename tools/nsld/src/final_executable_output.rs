@@ -71,10 +71,25 @@ pub(crate) fn nsld_final_executable_output_report(
     });
     let expected_image_size_bytes = final_emit.actual_image_dry_run_size_bytes;
     let expected_image_hash = final_emit.actual_image_dry_run_hash.clone();
+    let expected_image_resolver_status = final_emit.actual_image_dry_run_resolver_status.clone();
+    let expected_image_patch_application_status = final_emit
+        .actual_image_dry_run_patch_application_status
+        .clone();
+    let expected_image_patch_byte_audit_status = final_emit
+        .actual_image_dry_run_patch_byte_audit_status
+        .clone();
+    let expected_image_patch_byte_audit_hash = final_emit
+        .actual_image_dry_run_patch_byte_audit_hash
+        .clone();
     let matches_expected_image = present
         && size_bytes == expected_image_size_bytes
         && output_hash == expected_image_hash
         && expected_image_hash.is_some();
+    let matches_verified_patched_image = matches_expected_image
+        && expected_image_resolver_status.as_deref() == Some("resolved")
+        && expected_image_patch_application_status.as_deref() == Some("applied")
+        && expected_image_patch_byte_audit_status.as_deref() == Some("verified")
+        && expected_image_patch_byte_audit_hash.is_some();
     let mut blockers = Vec::new();
     let mut issues = Vec::new();
 
@@ -167,6 +182,22 @@ pub(crate) fn nsld_final_executable_output_report(
             output_hash.clone().unwrap_or_else(|| "missing".to_owned())
         ));
     }
+    if !host_native_output && present && matches_expected_image && !matches_verified_patched_image {
+        blockers.push("final-executable-output:verified-patch-evidence-missing".to_owned());
+        issues.push(format!(
+            "final executable output patch evidence incomplete: resolver={} application={} byte_audit={} byte_audit_hash={}",
+            expected_image_resolver_status.as_deref().unwrap_or("missing"),
+            expected_image_patch_application_status
+                .as_deref()
+                .unwrap_or("missing"),
+            expected_image_patch_byte_audit_status
+                .as_deref()
+                .unwrap_or("missing"),
+            expected_image_patch_byte_audit_hash
+                .as_deref()
+                .unwrap_or("missing")
+        ));
+    }
 
     let runnable_candidate = present
         && final_stage.valid
@@ -175,7 +206,7 @@ pub(crate) fn nsld_final_executable_output_report(
         && if host_native_output {
             final_emit.actual_host_invoke_plan_would_invoke == Some(true)
         } else {
-            matches_expected_image && output_image_header_valid
+            matches_verified_patched_image && output_image_header_valid
         };
     let boundary_status = final_executable_output_boundary_status(
         runnable_candidate,
@@ -189,7 +220,7 @@ pub(crate) fn nsld_final_executable_output_report(
         boundary_status.as_str(),
         host_native_output,
         output_image_header_valid,
-        matches_expected_image,
+        matches_verified_patched_image,
     )
     .to_owned();
     let execution_handoff = final_executable_output_execution_handoff(
@@ -239,6 +270,11 @@ pub(crate) fn nsld_final_executable_output_report(
         expected_image_size_bytes,
         expected_image_hash,
         matches_expected_image,
+        expected_image_resolver_status,
+        expected_image_patch_application_status,
+        expected_image_patch_byte_audit_status,
+        expected_image_patch_byte_audit_hash,
+        matches_verified_patched_image,
         final_stage_plan_valid: final_stage.valid,
         final_stage_plan_hash: final_stage.actual_plan_hash,
         final_executable_emit_valid: final_emit.valid,
@@ -392,7 +428,7 @@ fn final_executable_output_execution_handoff_evidence_status(
 ) -> &'static str {
     match boundary_status {
         "ready" if host_native_output => "host-invoke-plan-ready",
-        "ready" => "image-header-and-hash-ready",
+        "ready" => "verified-patched-image-ready",
         _ => "blocked",
     }
 }

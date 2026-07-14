@@ -86,7 +86,7 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
     );
     assert_eq!(
         verify.actual_execution_handoff_evidence_status.as_deref(),
-        Some("image-header-and-hash-ready")
+        Some("verified-patched-image-ready")
     );
     assert_eq!(verify.actual_execution_handoff_first_blocker, None);
     assert_eq!(
@@ -154,7 +154,7 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
     assert_eq!(pipeline.execution_handoff_target, "entrypoint-materializer");
     assert_eq!(
         pipeline.execution_handoff_evidence_status,
-        "image-header-and-hash-ready"
+        "verified-patched-image-ready"
     );
     assert_eq!(pipeline.execution_handoff_first_blocker, None);
     assert_eq!(
@@ -247,7 +247,7 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
         "\"final_executable_pipeline_execution_handoff_target\":\"entrypoint-materializer\""
     ));
     assert!(check_json.contains(
-        "\"final_executable_pipeline_execution_handoff_evidence_status\":\"image-header-and-hash-ready\""
+        "\"final_executable_pipeline_execution_handoff_evidence_status\":\"verified-patched-image-ready\""
     ));
     assert!(
         check_json.contains("\"final_executable_pipeline_execution_handoff_first_blocker\":null")
@@ -331,7 +331,7 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
         check
             .final_executable_pipeline_execution_handoff_evidence_status
             .as_deref(),
-        Some("image-header-and-hash-ready")
+        Some("verified-patched-image-ready")
     );
     assert_eq!(
         check.final_executable_pipeline_execution_handoff_first_blocker,

@@ -345,6 +345,53 @@ const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
             "relocation_patch_preview_status",
             "relocation_patch_preview_table_hash",
             "relocation_patch_preview_record_table_hash",
+            "resolved_patch_value",
+            "target_symbol_image_offset",
+            "resolver_status",
+            "relocation_patch_application_status",
+            "relocation_patch_application_table_hash",
+            "relocation_patch_byte_audit_status",
+            "relocation_patch_byte_audit_hash",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-nsb-relocation-final-emit-surface",
+        path: "tools/nsld/src/final_executable_emit_shape.rs",
+        required_patterns: &[
+            "image_dry_run_resolver_status",
+            "image_dry_run_patch_application_status",
+            "image_dry_run_patch_byte_audit_status",
+            "image_dry_run_patch_byte_audit_hash",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-nsb-relocation-final-output-surface",
+        path: "tools/nsld/src/final_executable_output.rs",
+        required_patterns: &[
+            "expected_image_resolver_status",
+            "expected_image_patch_application_status",
+            "expected_image_patch_byte_audit_status",
+            "matches_verified_patched_image",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-nsb-relocation-final-output-check-surface",
+        path: "tools/nsld/src/check_final.rs",
+        required_patterns: &[
+            "final_executable_output_expected_image_resolver_status",
+            "final_executable_output_expected_image_patch_application_status",
+            "final_executable_output_expected_image_patch_byte_audit_status",
+            "final_executable_output_matches_verified_patched_image",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-nsb-relocation-final-output-check-json",
+        path: "tools/nsld/src/json_check_final.rs",
+        required_patterns: &[
+            "final_executable_output_expected_image_resolver_status",
+            "final_executable_output_expected_image_patch_application_status",
+            "final_executable_output_expected_image_patch_byte_audit_status",
+            "final_executable_output_matches_verified_patched_image",
         ],
     },
     DevTensorDriftCheckSpec {

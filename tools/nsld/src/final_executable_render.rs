@@ -312,6 +312,42 @@ pub(crate) fn render_final_executable_blocked(report: &NsldFinalExecutableEmitRe
         optional_usize_toml(report.image_dry_run_size_bytes)
     ));
     out.push_str(&format!(
+        "image_dry_run_resolver_status = \"{}\"\n",
+        toml::escape_toml_string(
+            report
+                .image_dry_run_resolver_status
+                .as_deref()
+                .unwrap_or("")
+        )
+    ));
+    out.push_str(&format!(
+        "image_dry_run_patch_application_status = \"{}\"\n",
+        toml::escape_toml_string(
+            report
+                .image_dry_run_patch_application_status
+                .as_deref()
+                .unwrap_or("")
+        )
+    ));
+    out.push_str(&format!(
+        "image_dry_run_patch_byte_audit_status = \"{}\"\n",
+        toml::escape_toml_string(
+            report
+                .image_dry_run_patch_byte_audit_status
+                .as_deref()
+                .unwrap_or("")
+        )
+    ));
+    out.push_str(&format!(
+        "image_dry_run_patch_byte_audit_hash = \"{}\"\n",
+        toml::escape_toml_string(
+            report
+                .image_dry_run_patch_byte_audit_hash
+                .as_deref()
+                .unwrap_or("")
+        )
+    ));
+    out.push_str(&format!(
         "image_dry_run_issues = [{}]\n",
         toml::toml_string_array_literal(&report.image_dry_run_issues)
     ));
@@ -695,6 +731,22 @@ pub(crate) fn render_final_executable_image_dry_run(
         toml::escape_toml_string(&report.relocation_patch_preview_table_hash)
     ));
     out.push_str(&format!(
+        "relocation_patch_application_status = \"{}\"\n",
+        toml::escape_toml_string(&report.relocation_patch_application_status)
+    ));
+    out.push_str(&format!(
+        "relocation_patch_application_count = {}\n",
+        report.relocation_patch_application_count
+    ));
+    out.push_str(&format!(
+        "relocation_patch_application_table_hash = \"{}\"\n",
+        toml::escape_toml_string(&report.relocation_patch_application_table_hash)
+    ));
+    out.push_str(&format!(
+        "relocation_patch_application_blockers = [{}]\n",
+        toml::toml_string_array_literal(&report.relocation_patch_application_blockers)
+    ));
+    out.push_str(&format!(
         "image_constructed = {}\n",
         report.image_constructed
     ));
@@ -728,6 +780,10 @@ pub(crate) fn render_final_executable_image_dry_run(
             record.patch_width_bytes
         ));
         out.push_str(&format!(
+            "resolved_patch_value = {}\n",
+            optional_usize_toml(record.resolved_patch_value)
+        ));
+        out.push_str(&format!(
             "patch_value_hash = \"{}\"\n",
             toml::escape_toml_string(&record.patch_value_hash)
         ));
@@ -736,8 +792,16 @@ pub(crate) fn render_final_executable_image_dry_run(
             toml::escape_toml_string(&record.target_symbol_id)
         ));
         out.push_str(&format!(
+            "target_symbol_image_offset = {}\n",
+            optional_usize_toml(record.target_symbol_image_offset)
+        ));
+        out.push_str(&format!(
             "preview_status = \"{}\"\n",
             toml::escape_toml_string(&record.preview_status)
+        ));
+        out.push_str(&format!(
+            "resolver_status = \"{}\"\n",
+            toml::escape_toml_string(&record.resolver_status)
         ));
     }
     out

@@ -262,17 +262,41 @@ pub(crate) fn print_nsld_final_executable_image_dry_run_report(
         "  relocation_patch_preview_table_hash: {}",
         report.relocation_patch_preview_table_hash
     );
+    println!(
+        "  relocation_patch_application_status: {}",
+        report.relocation_patch_application_status
+    );
+    println!(
+        "  relocation_patch_application_count: {}",
+        report.relocation_patch_application_count
+    );
+    println!(
+        "  relocation_patch_application_table_hash: {}",
+        report.relocation_patch_application_table_hash
+    );
+    for blocker in &report.relocation_patch_application_blockers {
+        println!("  relocation_patch_application_blocker: {blocker}");
+    }
     for record in &report.relocation_patch_previews {
         println!(
-            "  relocation_patch_preview: order={} relocation={} kind={} offset={} width={} value_hash={} target={} status={}",
+            "  relocation_patch_preview: order={} relocation={} kind={} offset={} width={} resolved_value={} value_hash={} target={} target_image_offset={} status={} resolver={}",
             record.order_index,
             record.relocation_id,
             record.patch_kind,
             record.patch_offset,
             record.patch_width_bytes,
+            record
+                .resolved_patch_value
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "none".to_owned()),
             record.patch_value_hash,
             record.target_symbol_id,
-            record.preview_status
+            record
+                .target_symbol_image_offset
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "none".to_owned()),
+            record.preview_status,
+            record.resolver_status
         );
     }
     println!("  image_constructed: {}", report.image_constructed);

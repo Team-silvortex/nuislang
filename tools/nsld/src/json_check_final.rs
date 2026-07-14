@@ -244,6 +244,34 @@ pub(crate) fn check_report_final_fields(report: &NsldCheckReport) -> Vec<String>
                 .final_executable_output_image_byte_map_hash
                 .as_deref(),
         ),
+        json_optional_string_field(
+            "final_executable_output_expected_image_resolver_status",
+            report
+                .final_executable_output_expected_image_resolver_status
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "final_executable_output_expected_image_patch_application_status",
+            report
+                .final_executable_output_expected_image_patch_application_status
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "final_executable_output_expected_image_patch_byte_audit_status",
+            report
+                .final_executable_output_expected_image_patch_byte_audit_status
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "final_executable_output_expected_image_patch_byte_audit_hash",
+            report
+                .final_executable_output_expected_image_patch_byte_audit_hash
+                .as_deref(),
+        ),
+        json_bool_field(
+            "final_executable_output_matches_verified_patched_image",
+            report.final_executable_output_matches_verified_patched_image,
+        ),
         json_optional_bool_field(
             "final_executable_output_runnable_candidate",
             report.final_executable_output_runnable_candidate,

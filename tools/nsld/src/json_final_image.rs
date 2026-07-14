@@ -74,6 +74,22 @@ pub(crate) fn nsld_final_executable_image_dry_run_report_json(
             "relocation_patch_preview_table_hash",
             &report.relocation_patch_preview_table_hash,
         ),
+        json_string_field(
+            "relocation_patch_application_status",
+            &report.relocation_patch_application_status,
+        ),
+        json_usize_field(
+            "relocation_patch_application_count",
+            report.relocation_patch_application_count,
+        ),
+        json_string_field(
+            "relocation_patch_application_table_hash",
+            &report.relocation_patch_application_table_hash,
+        ),
+        json_string_array_field(
+            "relocation_patch_application_blockers",
+            &report.relocation_patch_application_blockers,
+        ),
         format!(
             "\"relocation_patch_previews\":[{}]",
             relocation_patch_previews_json(&report.relocation_patch_previews)
@@ -297,6 +313,64 @@ pub(crate) fn nsld_final_executable_image_dry_run_verify_report_json(
                 .actual_relocation_patch_preview_record_table_hash
                 .as_deref(),
         ),
+        json_string_field(
+            "expected_relocation_patch_application_status",
+            &report.expected_relocation_patch_application_status,
+        ),
+        json_optional_string_field(
+            "actual_relocation_patch_application_status",
+            report.actual_relocation_patch_application_status.as_deref(),
+        ),
+        json_usize_field(
+            "expected_relocation_patch_application_count",
+            report.expected_relocation_patch_application_count,
+        ),
+        json_optional_usize_field(
+            "actual_relocation_patch_application_count",
+            report.actual_relocation_patch_application_count,
+        ),
+        json_string_field(
+            "expected_relocation_patch_application_table_hash",
+            &report.expected_relocation_patch_application_table_hash,
+        ),
+        json_optional_string_field(
+            "actual_relocation_patch_application_table_hash",
+            report
+                .actual_relocation_patch_application_table_hash
+                .as_deref(),
+        ),
+        json_string_array_field(
+            "expected_relocation_patch_application_blockers",
+            &report.expected_relocation_patch_application_blockers,
+        ),
+        json_string_array_field(
+            "actual_relocation_patch_application_blockers",
+            &report.actual_relocation_patch_application_blockers,
+        ),
+        json_string_field(
+            "expected_relocation_patch_byte_audit_status",
+            &report.expected_relocation_patch_byte_audit_status,
+        ),
+        json_optional_string_field(
+            "actual_relocation_patch_byte_audit_status",
+            report.actual_relocation_patch_byte_audit_status.as_deref(),
+        ),
+        json_usize_field(
+            "expected_relocation_patch_byte_audit_count",
+            report.expected_relocation_patch_byte_audit_count,
+        ),
+        json_optional_usize_field(
+            "actual_relocation_patch_byte_audit_count",
+            report.actual_relocation_patch_byte_audit_count,
+        ),
+        json_optional_string_field(
+            "actual_relocation_patch_byte_audit_hash",
+            report.actual_relocation_patch_byte_audit_hash.as_deref(),
+        ),
+        json_string_array_field(
+            "actual_relocation_patch_byte_audit_blockers",
+            &report.actual_relocation_patch_byte_audit_blockers,
+        ),
         json_string_array_field(
             "expected_relocation_application_audit_blockers",
             &report.expected_relocation_application_audit_blockers,
@@ -338,9 +412,15 @@ fn relocation_patch_previews_json(
                 json_string_field("patch_kind", &record.patch_kind),
                 json_usize_field("patch_offset", record.patch_offset),
                 json_usize_field("patch_width_bytes", record.patch_width_bytes),
+                json_optional_usize_field("resolved_patch_value", record.resolved_patch_value),
                 json_string_field("patch_value_hash", &record.patch_value_hash),
                 json_string_field("target_symbol_id", &record.target_symbol_id),
+                json_optional_usize_field(
+                    "target_symbol_image_offset",
+                    record.target_symbol_image_offset,
+                ),
                 json_string_field("preview_status", &record.preview_status),
+                json_string_field("resolver_status", &record.resolver_status),
             ];
             format!("{{{}}}", fields.join(","))
         })

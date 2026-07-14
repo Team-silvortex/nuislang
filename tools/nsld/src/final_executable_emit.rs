@@ -127,6 +127,10 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
         image_dry_run_valid: actual_image_dry_run_valid,
         image_dry_run_hash: actual_image_dry_run_hash,
         image_dry_run_size_bytes: actual_image_dry_run_size_bytes,
+        image_dry_run_resolver_status: actual_image_dry_run_resolver_status,
+        image_dry_run_patch_application_status: actual_image_dry_run_patch_application_status,
+        image_dry_run_patch_byte_audit_status: actual_image_dry_run_patch_byte_audit_status,
+        image_dry_run_patch_byte_audit_hash: actual_image_dry_run_patch_byte_audit_hash,
         image_dry_run_issues: actual_image_dry_run_issues,
         final_output_checked: actual_final_output_checked,
         final_output_present: actual_final_output_present,
@@ -419,6 +423,60 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
                 optional_usize_toml(actual_image_dry_run_size_bytes)
             ));
         }
+        if actual_image_dry_run_resolver_status != expected.image_dry_run_resolver_status {
+            issues.push(format!(
+                "image_dry_run_resolver_status mismatch: expected {}, found {}",
+                expected
+                    .image_dry_run_resolver_status
+                    .as_deref()
+                    .unwrap_or("missing"),
+                actual_image_dry_run_resolver_status
+                    .as_deref()
+                    .unwrap_or("missing")
+            ));
+        }
+        if actual_image_dry_run_patch_application_status
+            != expected.image_dry_run_patch_application_status
+        {
+            issues.push(format!(
+                "image_dry_run_patch_application_status mismatch: expected {}, found {}",
+                expected
+                    .image_dry_run_patch_application_status
+                    .as_deref()
+                    .unwrap_or("missing"),
+                actual_image_dry_run_patch_application_status
+                    .as_deref()
+                    .unwrap_or("missing")
+            ));
+        }
+        if actual_image_dry_run_patch_byte_audit_status
+            != expected.image_dry_run_patch_byte_audit_status
+        {
+            issues.push(format!(
+                "image_dry_run_patch_byte_audit_status mismatch: expected {}, found {}",
+                expected
+                    .image_dry_run_patch_byte_audit_status
+                    .as_deref()
+                    .unwrap_or("missing"),
+                actual_image_dry_run_patch_byte_audit_status
+                    .as_deref()
+                    .unwrap_or("missing")
+            ));
+        }
+        if actual_image_dry_run_patch_byte_audit_hash
+            != expected.image_dry_run_patch_byte_audit_hash
+        {
+            issues.push(format!(
+                "image_dry_run_patch_byte_audit_hash mismatch: expected {}, found {}",
+                expected
+                    .image_dry_run_patch_byte_audit_hash
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned()),
+                actual_image_dry_run_patch_byte_audit_hash
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
         if actual_image_dry_run_issues != expected.image_dry_run_issues {
             issues.push(format!(
                 "image_dry_run_issues mismatch: expected [{}], found [{}]",
@@ -528,6 +586,16 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
         actual_image_dry_run_hash,
         expected_image_dry_run_size_bytes: expected.image_dry_run_size_bytes,
         actual_image_dry_run_size_bytes,
+        expected_image_dry_run_resolver_status: expected.image_dry_run_resolver_status,
+        actual_image_dry_run_resolver_status,
+        expected_image_dry_run_patch_application_status: expected
+            .image_dry_run_patch_application_status,
+        actual_image_dry_run_patch_application_status,
+        expected_image_dry_run_patch_byte_audit_status: expected
+            .image_dry_run_patch_byte_audit_status,
+        actual_image_dry_run_patch_byte_audit_status,
+        expected_image_dry_run_patch_byte_audit_hash: expected.image_dry_run_patch_byte_audit_hash,
+        actual_image_dry_run_patch_byte_audit_hash,
         expected_image_dry_run_issues: expected.image_dry_run_issues,
         actual_image_dry_run_issues,
         expected_final_output_checked: expected.final_output_checked,

@@ -366,6 +366,29 @@ fn check_reports_valid_final_executable_output_when_present() {
             .as_deref(),
         Some(layout.byte_map_hash.as_str())
     );
+    assert_eq!(
+        report
+            .final_executable_output_expected_image_resolver_status
+            .as_deref(),
+        Some("resolved")
+    );
+    assert_eq!(
+        report
+            .final_executable_output_expected_image_patch_application_status
+            .as_deref(),
+        Some("applied")
+    );
+    assert_eq!(
+        report
+            .final_executable_output_expected_image_patch_byte_audit_status
+            .as_deref(),
+        Some("verified")
+    );
+    assert!(report
+        .final_executable_output_expected_image_patch_byte_audit_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("0x")));
+    assert!(report.final_executable_output_matches_verified_patched_image);
     assert_eq!(report.final_executable_output_blocker_count, Some(0));
     assert!(report.final_executable_output_blockers.is_empty());
     assert!(report.final_executable_output_issues.is_empty());
@@ -383,6 +406,17 @@ fn check_reports_valid_final_executable_output_when_present() {
     assert!(report_json.contains("\"final_executable_output_image_version\":1"));
     assert!(report_json.contains("\"final_executable_output_image_layout_hash\":\"0x"));
     assert!(report_json.contains("\"final_executable_output_image_byte_map_hash\":\"0x"));
+    assert!(report_json
+        .contains("\"final_executable_output_expected_image_resolver_status\":\"resolved\""));
+    assert!(report_json.contains(
+        "\"final_executable_output_expected_image_patch_application_status\":\"applied\""
+    ));
+    assert!(report_json.contains(
+        "\"final_executable_output_expected_image_patch_byte_audit_status\":\"verified\""
+    ));
+    assert!(report_json
+        .contains("\"final_executable_output_expected_image_patch_byte_audit_hash\":\"0x"));
+    assert!(report_json.contains("\"final_executable_output_matches_verified_patched_image\":true"));
     assert!(report_json.contains("\"final_executable_output_runnable_candidate\":true"));
     assert!(report_json.contains("\"final_executable_output_hash\":\"0x"));
 }
