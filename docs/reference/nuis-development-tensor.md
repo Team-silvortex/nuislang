@@ -22,8 +22,8 @@ The development tensor is a 3-axis progress model:
 Each tensor cell carries:
 
 * `status`
-  short maturity label such as `stable`, `active`, `usable`, `early`,
-  `blocked`, or `new`
+  protocol-owned maturity label. In `dev-tensor-status-v1`, valid values are
+  `stable`, `usable`, `active`, and `early`
 * `progress`
   current alpha-era progress score from `0` to `100`
 * `bootstrap_critical`
@@ -56,6 +56,11 @@ The JSON surface is intentionally simple:
 * `axis_0 = "architecture"`
 * `axis_1 = "module"`
 * `axis_2 = "function"`
+* `status_protocol_version`
+* `status_protocol = [...]`
+* `hierarchy_root_status`
+* `hierarchy_root_progress`
+* `hierarchy_root_weakest_child_path`
 * `bootstrap_critical_count`
 * `bootstrap_critical_average_progress`
 * `weakest_bootstrap_architecture`
@@ -77,10 +82,55 @@ The JSON surface is intentionally simple:
 * `drift_check_failed_count`
 * `drift_first_failed_check`
 * `drift_checks = [...]`
+* `hierarchy = {...}`
 * `cells = [...]`
 
 Each cell includes both named coordinates and a `coordinates` array so scripts
 can read it either as records or as tensor coordinates.
+
+## Status Protocol
+
+The tensor status field is now protocolized rather than free-form text. The
+current protocol is `dev-tensor-status-v1`:
+
+* `stable`
+  rank `4`, phase `validated`, terminal for the current milestone slice
+* `usable`
+  rank `3`, phase `usable`, strong enough to consume but still evolving
+* `active`
+  rank `2`, phase `in-progress`, actively maturing and allowed to move fast
+* `early`
+  rank `1`, phase `exploratory`, not mature enough to anchor bootstrap-critical
+  closure by itself
+
+Coverage treats an unknown status as stale metadata. This keeps the tensor from
+quietly drifting into ad-hoc labels.
+
+## Recursive Hierarchy
+
+The flat `architecture/module/function` cells are also projected into a
+recursive hierarchy:
+
+`root -> architecture -> module -> function`
+
+Each hierarchy node carries:
+
+* `level`
+* `path`
+* `status`
+* `status_rank`
+* `progress`
+* `cell_count`
+* `bootstrap_critical_count`
+* `weakest_child_path`
+* `children`
+
+Branch status is derived from the weakest child status, and branch progress is
+the weighted average of descendant function cells. This means the tensor can be
+read both as a table and as a recursively inspectable project tree. The
+recursive form is intended to support future bootstrap planning where a weak
+architecture lane can be expanded into its weakest module and then into the
+exact function cell that needs work.
 
 `nuis status` also prints the short tensor summary. That makes the model part
 of the toolchain self-orientation surface, not just a separate report command.

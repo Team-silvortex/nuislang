@@ -1,6 +1,11 @@
 mod build_report_runtime;
 mod cli;
 mod dev_tensor;
+mod dev_tensor_data;
+mod dev_tensor_drift;
+mod dev_tensor_hierarchy;
+mod dev_tensor_render;
+mod dev_tensor_status;
 mod galaxy;
 mod json_helpers;
 mod json_surface;
