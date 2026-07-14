@@ -79,7 +79,7 @@ pub fn compile_artifacts_for_output_dir_with_packaging_mode(
     packaging_mode: &str,
 ) -> Result<CompileArtifacts, String> {
     let layout = output_layout(input, output_dir);
-    if packaging_mode != "window-aot-bundle" && packaging_mode != "native-cpu-llvm" {
+    if !is_supported_packaging_mode(packaging_mode) {
         return Err(format!(
             "unsupported cached packaging_mode `{packaging_mode}` for `{}`",
             output_dir.display()
@@ -93,4 +93,11 @@ pub fn compile_artifacts_for_output_dir_with_packaging_mode(
         binary_path: layout.binary_stub_path.display().to_string(),
         packaging_mode: packaging_mode.to_owned(),
     })
+}
+
+fn is_supported_packaging_mode(packaging_mode: &str) -> bool {
+    matches!(
+        packaging_mode,
+        "window-aot-bundle" | "native-cpu-llvm" | "nuis-self-contained-image"
+    )
 }

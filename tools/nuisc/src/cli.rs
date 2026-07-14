@@ -119,6 +119,7 @@ pub enum CommandKind {
         verbose_cache: bool,
         cpu_abi: Option<String>,
         target: Option<String>,
+        packaging_mode: Option<String>,
     },
 }
 

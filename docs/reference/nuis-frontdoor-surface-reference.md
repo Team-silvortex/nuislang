@@ -75,13 +75,29 @@ These fields now form the current visible link summary:
 * `link_plan_available`
   whether a `LinkPlan` could be recovered from the current build manifest
 * `link_plan_final_stage`
-  the current final-stage kind such as `host-native-link`
+  the current final-stage kind such as `host-native-link` or
+  `nuis-self-contained-image`
 * `link_plan_final_driver`
-  the current final-stage driver such as `clang`
+  the current final-stage driver such as `clang` or
+  `nsld-internal-image-writer`
 * `link_plan_final_link_mode`
-  the current link-mode summary such as `host-toolchain-finalize`
+  the current link-mode summary such as `host-toolchain-finalize` or
+  `self-contained`
 * `link_plan_final_output`
-  the current final output path when available
+  the current final output path when available, including `.nsb` paths selected
+  by `packaging_mode = "nuis-self-contained-image"`
+* `workflow_run_artifact_prelaunch_kind`
+  workflow-level mirror of the launch surface that `run-artifact` would prefer:
+  `nsld-host-entrypoint`, `host-binary`, or `none`
+* `workflow_run_artifact_prelaunch_status`
+  `ready` when workflow can see a usable launch surface, otherwise `blocked`
+* `workflow_run_artifact_prelaunch_evidence_status`
+  compact workflow launch evidence code, matching the `run-artifact`
+  prelaunch evidence status family
+* `workflow_run_artifact_prelaunch_command`
+  command-like launch summary selected from the current workflow output
+* `workflow_run_artifact_prelaunch_reason`
+  human-readable explanation for that workflow launch recommendation
 * `link_plan_domain_units`
   the number of domain build units carried by the current build plan
 * `nsld_final_executable_output_ready`
@@ -156,11 +172,23 @@ These fields now form the current visible link summary:
   `nsld-host-entrypoint`, `host-binary`, or `none`
 * `run_artifact_prelaunch_status`
   `ready` when the recommended launch surface is usable, otherwise `blocked`
+* `run_artifact_prelaunch_evidence_status`
+  compact launch evidence code: `host-binary-ready`, `entrypoint-ready`,
+  `entrypoint-missing`, `entrypoint-protocol-invalid`, or `no-launch-surface`
 * `run_artifact_prelaunch_command`
   command-like launch summary for the recommended surface, or `null`
+* `run_artifact_prelaunch_runner_command_present`
+  true when the recommended surface carries a concrete runner command
 * `run_artifact_prelaunch_entrypoint_path`
   resolved host entrypoint path when `run_artifact_prelaunch_kind` is
   `nsld-host-entrypoint`
+* `run_artifact_prelaunch_entrypoint_present`
+  true when the resolved host entrypoint stub exists on disk
+* `run_artifact_prelaunch_entrypoint_protocol`
+  expected host entrypoint stub protocol for Nsld handoff routes, or `null`
+* `run_artifact_prelaunch_entrypoint_protocol_valid`
+  true or false when a protocol-bearing entrypoint stub is present, otherwise
+  `null`
 * `run_artifact_prelaunch_reason`
   human-readable explanation for the aggregate recommendation; a missing Nsld
   host entrypoint stub is reported as `blocked` instead of being hidden by the
@@ -171,11 +199,23 @@ These fields now form the current visible link summary:
 * `artifact_closure_status`
   `ready` when the artifact closure has a usable launch surface, otherwise
   `blocked`
+* `artifact_closure_evidence_status`
+  compact artifact closure evidence code mirroring
+  `run_artifact_prelaunch_evidence_status`
 * `artifact_closure_command`
   command-like launch summary for the artifact closure, or `null`
+* `artifact_closure_runner_command_present`
+  true when the artifact closure carries a concrete runner command
 * `artifact_closure_entrypoint_path`
   resolved host entrypoint path when the artifact closure prefers the Nsld
   host-entrypoint route
+* `artifact_closure_entrypoint_present`
+  true when the artifact closure entrypoint exists on disk
+* `artifact_closure_entrypoint_protocol`
+  expected artifact closure entrypoint protocol when applicable, or `null`
+* `artifact_closure_entrypoint_protocol_valid`
+  true or false when a protocol-bearing closure entrypoint is present,
+  otherwise `null`
 * `artifact_closure_reason`
   human-readable explanation for the artifact closure recommendation
 * `nsld_final_executable_output_recommended_next_action`
@@ -294,6 +334,8 @@ The current line should be described carefully:
   self-hosting direction
 * they are not yet a promise of frozen long-term public schema
 * the current native CPU final link is still host-toolchain-backed
+* the pure Nsld `.nsb` route is now visible through the same frontdoor fields,
+  but the standalone linker/loader story is still maturing
 
 Short rule:
 

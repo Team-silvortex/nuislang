@@ -312,6 +312,7 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
             &nsld_chain_next,
             Some(&nsld_final_output),
         );
+        let workflow_prelaunch = workflow_run_artifact_prelaunch_summary(output_dir);
         println!("  nsld_prepare_command: {}", nsld_chain.prepare_command);
         println!(
             "  nsld_drive_dry_run_command: {}",
@@ -359,6 +360,26 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
         println!(
             "  nsld_drive_recommended_reason: {}",
             nsld_drive_recommendation.reason
+        );
+        println!(
+            "  workflow_run_artifact_prelaunch_kind: {}",
+            workflow_prelaunch.kind
+        );
+        println!(
+            "  workflow_run_artifact_prelaunch_status: {}",
+            workflow_prelaunch.status
+        );
+        println!(
+            "  workflow_run_artifact_prelaunch_evidence_status: {}",
+            workflow_prelaunch.evidence_status
+        );
+        println!(
+            "  workflow_run_artifact_prelaunch_command: {}",
+            workflow_prelaunch.command.as_deref().unwrap_or("<none>")
+        );
+        println!(
+            "  workflow_run_artifact_prelaunch_reason: {}",
+            workflow_prelaunch.reason
         );
         println!("  nsld_prepared_artifact_chain_ready: {}", nsld_chain.ready);
         println!(
@@ -727,6 +748,11 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
         println!("  nsld_drive_recommended_command: <unavailable>");
         println!("  nsld_drive_recommended_mutates_artifacts: false");
         println!("  nsld_drive_recommended_reason: link plan is unavailable");
+        println!("  workflow_run_artifact_prelaunch_kind: <unavailable>");
+        println!("  workflow_run_artifact_prelaunch_status: <unavailable>");
+        println!("  workflow_run_artifact_prelaunch_evidence_status: <unavailable>");
+        println!("  workflow_run_artifact_prelaunch_command: <none>");
+        println!("  workflow_run_artifact_prelaunch_reason: link plan is unavailable");
         println!("  nsld_prepared_artifact_chain_ready: false");
         println!("  nsld_prepared_artifact_stages: 0/0");
         println!("  nsld_prepared_artifact_next_missing_stage: <unavailable>");
@@ -797,4 +823,15 @@ fn print_nsld_prepared_artifact_chain(link_plan: Option<&nuisc::linker::LinkPlan
         println!("  nsld_final_executable_output_blocker_count: <unavailable>");
         println!("  nsld_final_executable_output_first_blocker: <none>");
     }
+}
+
+fn workflow_run_artifact_prelaunch_summary(
+    output_dir: &std::path::Path,
+) -> crate::run_artifact::RunArtifactPrelaunchSummary {
+    let doctor = crate::artifact_doctor::probe_artifact_doctor(output_dir);
+    let resolved_binary = doctor.binary_path.filter(|path| path.exists());
+    crate::run_artifact::run_artifact_prelaunch_summary(
+        Some(output_dir),
+        resolved_binary.as_ref().map(std::path::PathBuf::as_path),
+    )
 }

@@ -29,6 +29,13 @@ pub(crate) fn json_bool_field(name: &str, value: bool) -> String {
     format!("\"{}\":{}", name, if value { "true" } else { "false" })
 }
 
+pub(crate) fn json_optional_bool_field(name: &str, value: Option<bool>) -> String {
+    match value {
+        Some(value) => json_bool_field(name, value),
+        None => format!("\"{}\":null", name),
+    }
+}
+
 pub(crate) fn json_usize_field(name: &str, value: usize) -> String {
     format!("\"{}\":{}", name, value)
 }

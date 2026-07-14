@@ -161,8 +161,9 @@ semantic view.
 The next useful milestone is not "replace the system linker immediately".
 
 Nsld can already emit a self-contained Nuis image for the internal image route.
-That is a real Nsld-owned final-output boundary, but it is not yet the same as
-a host-shell executable or an OS-native entrypoint.
+That route is selected by `packaging_mode = "nuis-self-contained-image"` and is
+a real Nsld-owned final-output boundary, but it is not yet the same as a
+host-shell executable or an OS-native entrypoint.
 
 The current next milestone is now represented by:
 
@@ -220,6 +221,9 @@ the deterministic image bytes. Unprepared input, ELF, and COFF still report
 blockers. The command also materializes diagnostic artifacts: the future byte
 writer's deterministic input snapshot, the alpha emit report at
 `nuis.nsld.object.blocked.toml`, and the object image dry-run report/bin pair.
+Artifact-chain and drive recommendations use the `emit-native-object` alias for
+this lane so native-object stages read naturally while preserving the same
+deterministic object-output contract.
 `verify-object-emit` checks that
 those artifacts still agree on the object plan hash and dry-run image hash.
 `verify-object-output` checks the emitted native object bytes themselves by

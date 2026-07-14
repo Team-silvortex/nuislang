@@ -2,6 +2,32 @@ use super::{parse_args, CommandKind};
 use std::path::PathBuf;
 
 #[test]
+fn parse_compile_with_packaging_mode() {
+    let command = parse_args(
+        vec![
+            "compile".to_owned(),
+            "--packaging-mode".to_owned(),
+            "nuis-self-contained-image".to_owned(),
+            "main.ns".to_owned(),
+            "out".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .unwrap();
+    assert_eq!(
+        command,
+        CommandKind::Compile {
+            input: PathBuf::from("main.ns"),
+            output_dir: PathBuf::from("out"),
+            verbose_cache: false,
+            cpu_abi: None,
+            target: None,
+            packaging_mode: Some("nuis-self-contained-image".to_owned()),
+        }
+    );
+}
+
+#[test]
 fn parse_pack_envelope_command() {
     let command = parse_args(
         vec![

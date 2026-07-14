@@ -20,7 +20,7 @@ mod cpu Main {
 "#,
     );
     let output_dir = temp_dir("build_output_self_check_outputs");
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     let doctor = run_build_output_self_check(&output_dir).expect("self-check passes");
     assert!(doctor.ready_to_run);
     assert_eq!(doctor.source_kind, "output_dir");
@@ -47,7 +47,7 @@ mod cpu Main {
 "#,
     );
     let output_dir = temp_dir("build_output_self_check_missing_artifact_outputs");
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     fs::remove_file(output_dir.join("nuis.compiled.artifact")).expect("remove artifact");
 
     let error = match run_build_output_self_check(&output_dir) {
@@ -85,7 +85,7 @@ mod cpu Main {
 "#,
     );
     let output_dir = temp_dir("build_output_self_check_missing_binary_outputs");
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     fs::remove_file(output_dir.join("build_output_self_check_missing_binary"))
         .expect("remove binary");
 
@@ -128,7 +128,7 @@ mod cpu Main {
     );
     let output_dir = temp_dir("build_report_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     let json = render_build_report_json(&output_dir);
 
     assert!(json.contains("\"kind\":\"build_report\""));
@@ -173,6 +173,49 @@ mod cpu Main {
 }
 
 #[test]
+fn build_report_json_exposes_self_contained_nsb_packaging_route() {
+    let project_root = write_temp_project_fixture(
+        "build_report_self_contained_nsb_smoke",
+        r#"
+name = "build_report_self_contained_nsb_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+        .trim_start(),
+        r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 0;
+  }
+}
+"#,
+    );
+    let output_dir = temp_dir("build_report_self_contained_nsb_outputs");
+
+    handle_build(
+        project_root,
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        Some("nuis-self-contained-image".to_owned()),
+    )
+    .expect("build passes");
+    let json = render_build_report_json(&output_dir);
+
+    assert!(json.contains("\"packaging_mode\":\"nuis-self-contained-image\""));
+    assert!(json.contains("\"link_plan_final_stage\":\"nuis-self-contained-image\""));
+    assert!(json.contains("\"link_plan_final_driver\":\"nsld-internal-image-writer\""));
+    assert!(json.contains("\"link_plan_final_link_mode\":\"self-contained\""));
+    assert!(json.contains("\"link_plan_final_output\":\""));
+    assert!(json.contains("\"binary_path\":\""));
+    assert!(json.contains(".nsb"));
+    assert!(json.contains("\"nsld_drive_recommended_mode\":\"apply-next\""));
+    assert!(json.contains("\"nsld_artifact_chain_next_action_command_id\":\"emit-inputs\""));
+}
+
+#[test]
 fn run_artifact_json_reports_prelaunch_summary_for_built_output() {
     let project_root = write_temp_project_fixture(
         "run_artifact_json_smoke",
@@ -193,7 +236,7 @@ mod cpu Main {
     );
     let output_dir = temp_dir("run_artifact_json_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     let json = render_run_artifact_json(&output_dir.join("nuis.build.manifest.toml"));
 
     assert!(json.contains("\"kind\":\"run_artifact\""));
@@ -202,8 +245,13 @@ mod cpu Main {
     assert!(json.contains("\"binary_path\":\""));
     assert!(json.contains("\"run_artifact_prelaunch_kind\":\"host-binary\""));
     assert!(json.contains("\"run_artifact_prelaunch_status\":\"ready\""));
+    assert!(json.contains("\"run_artifact_prelaunch_evidence_status\":\"host-binary-ready\""));
     assert!(json.contains("\"run_artifact_prelaunch_command\":\""));
+    assert!(json.contains("\"run_artifact_prelaunch_runner_command_present\":true"));
     assert!(json.contains("\"run_artifact_prelaunch_entrypoint_path\":null"));
+    assert!(json.contains("\"run_artifact_prelaunch_entrypoint_present\":false"));
+    assert!(json.contains("\"run_artifact_prelaunch_entrypoint_protocol\":null"));
+    assert!(json.contains("\"run_artifact_prelaunch_entrypoint_protocol_valid\":null"));
     assert!(json.contains(
         "\"run_artifact_prelaunch_reason\":\"legacy host binary path is resolved and can be executed directly\""
     ));
@@ -340,7 +388,7 @@ mod cpu Main {
     );
     let output_dir = temp_dir("run_artifact_json_prepared_nsld_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     write_prepared_nsld_chain_placeholders(&output_dir);
 
     let json = render_run_artifact_json(&output_dir.join("nuis.build.manifest.toml"));
@@ -417,7 +465,7 @@ mod cpu Main {
     );
     let output_dir = temp_dir("artifact_doctor_json_ready_nsld_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     write_prepared_nsld_chain_placeholders(&output_dir);
     write_ready_nsld_final_tail_placeholders(&output_dir);
 
@@ -426,11 +474,18 @@ mod cpu Main {
     assert!(json.contains("\"ready_to_run\":true"));
     assert!(json.contains("\"artifact_closure_kind\":\"nsld-host-entrypoint\""));
     assert!(json.contains("\"artifact_closure_status\":\"ready\""));
+    assert!(json.contains("\"artifact_closure_evidence_status\":\"entrypoint-ready\""));
     assert!(
         json.contains("\"artifact_closure_command\":\"nuis-host-runner --manifest 'manifest.toml'")
     );
+    assert!(json.contains("\"artifact_closure_runner_command_present\":true"));
     assert!(json.contains("\"artifact_closure_entrypoint_path\":\""));
     assert!(json.contains("nuis.host-entrypoint.sh"));
+    assert!(json.contains("\"artifact_closure_entrypoint_present\":true"));
+    assert!(
+        json.contains("\"artifact_closure_entrypoint_protocol\":\"nuis-nsld-host-entrypoint-v1\"")
+    );
+    assert!(json.contains("\"artifact_closure_entrypoint_protocol_valid\":true"));
     assert!(json.contains(
         "\"artifact_closure_reason\":\"nsld final executable pipeline materialized a verified host entrypoint stub\""
     ));
@@ -442,7 +497,7 @@ fn build_report_json_exposes_real_heterogeneous_runtime_summary() {
     let project_root = checked_in_path("../../examples/projects/domains/shader_profile_demo");
     let output_dir = temp_dir("build_report_shader_profile_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     let json = render_build_report_json(&output_dir);
 
     assert!(json.contains("\"domain_units_count\":2"));
@@ -515,7 +570,7 @@ mod shader SurfaceShader {
     .expect("write shader surface");
     let output_dir = temp_dir("build_report_shader_cpu_fallback_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     let json = render_build_report_json(&output_dir);
 
     assert!(json.contains("\"domain_family\":\"shader\""));
@@ -552,7 +607,7 @@ mod cpu Main {
     );
     let output_dir = temp_dir("build_report_kernel_host_yir_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     let json = render_build_report_json(&output_dir);
 
     assert!(json.contains("\"runtime_host_yir_attempted\":true"));
@@ -570,7 +625,7 @@ fn build_report_json_exposes_kernel_result_profile_bundle_summary() {
         checked_in_path("../../examples/projects/domains/kernel_result_profile_demo");
     let output_dir = temp_dir("build_report_kernel_result_profile_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     let json = render_build_report_json(&output_dir);
 
     assert!(json.contains("\"ready_to_run\":true"));
@@ -601,7 +656,7 @@ fn run_artifact_json_exposes_real_heterogeneous_runtime_summary() {
     let project_root = checked_in_path("../../examples/projects/domains/shader_profile_demo");
     let output_dir = temp_dir("run_artifact_shader_profile_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     let json = render_run_artifact_json(&output_dir.join("nuis.build.manifest.toml"));
 
     assert!(json.contains("\"binary_resolved\":true"));
@@ -618,7 +673,7 @@ fn build_report_json_exposes_bridge_bearing_exchange_summary() {
     let project_root = checked_in_path("../../examples/projects/domains/shader_packet_bridge_demo");
     let output_dir = temp_dir("build_report_shader_packet_bridge_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     let json = render_build_report_json(&output_dir);
 
     assert!(json.contains("\"packaging_mode\":\"window-aot-bundle\""));
@@ -649,7 +704,7 @@ fn build_report_json_exposes_shader_result_enum_bundle_summary() {
     let project_root = checked_in_path("../../examples/projects/domains/shader_result_enum_demo");
     let output_dir = temp_dir("build_report_shader_result_enum_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     let json = render_build_report_json(&output_dir);
 
     assert!(json.contains("\"ready_to_run\":true"));
@@ -681,7 +736,7 @@ fn run_artifact_json_exposes_bridge_bearing_exchange_summary() {
     let project_root = checked_in_path("../../examples/projects/domains/shader_packet_bridge_demo");
     let output_dir = temp_dir("run_artifact_shader_packet_bridge_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     let json = render_run_artifact_json(&output_dir.join("nuis.build.manifest.toml"));
 
     assert!(json.contains("\"binary_resolved\":true"));
@@ -701,7 +756,7 @@ fn unpack_artifact_support_materializes_embedded_sidecars_for_bridge_project() {
     let output_dir = temp_dir("unpack_artifact_support_bridge_build_outputs");
     let unpack_dir = temp_dir("unpack_artifact_support_bridge_unpack_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     handle_unpack_artifact_support(
         output_dir.join("nuis.compiled.artifact"),
         unpack_dir.clone(),
@@ -735,7 +790,15 @@ fn materialize_artifact_rebuilds_frontdoor_bundle_and_support_sidecars() {
     let build_output_dir = temp_dir("materialize_artifact_bridge_build_outputs");
     let materialize_dir = temp_dir("materialize_artifact_bridge_bundle_outputs");
 
-    handle_build(project_root, build_output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(
+        project_root,
+        build_output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
     handle_materialize_artifact(
         build_output_dir.join("nuis.build.manifest.toml"),
         materialize_dir.clone(),

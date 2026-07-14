@@ -265,7 +265,15 @@ pub fn run(command: CommandKind) -> Result<(), String> {
             verbose_cache,
             cpu_abi,
             target,
-        } => command_compile::run_compile(input, output_dir, verbose_cache, cpu_abi, target)?,
+            packaging_mode,
+        } => command_compile::run_compile(
+            input,
+            output_dir,
+            verbose_cache,
+            cpu_abi,
+            target,
+            packaging_mode,
+        )?,
     }
 
     Ok(())

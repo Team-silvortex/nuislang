@@ -3,7 +3,8 @@ use super::link_plan_domain::{
     workflow_link_plan_domain_unit_record,
 };
 use super::*;
-use std::path::Path;
+use crate::{artifact_doctor::probe_artifact_doctor, run_artifact::run_artifact_prelaunch_summary};
+use std::path::{Path, PathBuf};
 
 fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -> Vec<String> {
     let domain_unit_records = link_plan
@@ -40,6 +41,8 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
     let nsld_drive_command_set =
         link_plan.map(|plan| nsld_drive_command_set_for_output_dir(Path::new(&plan.output_dir)));
     let domain_readiness = link_plan.map(workflow_domain_readiness_summary);
+    let workflow_prelaunch =
+        link_plan.map(|plan| workflow_run_artifact_prelaunch_summary(Path::new(&plan.output_dir)));
     vec![
         json_bool_field("link_plan_available", link_plan.is_some()),
         json_optional_string_field(
@@ -65,6 +68,36 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
         json_optional_string_field(
             "link_plan_lowering_plan_index_source",
             link_plan.map(|plan| plan.lowering_plan_index_source.as_str()),
+        ),
+        json_optional_string_field(
+            "workflow_run_artifact_prelaunch_kind",
+            workflow_prelaunch
+                .as_ref()
+                .map(|prelaunch| prelaunch.kind.as_str()),
+        ),
+        json_optional_string_field(
+            "workflow_run_artifact_prelaunch_status",
+            workflow_prelaunch
+                .as_ref()
+                .map(|prelaunch| prelaunch.status.as_str()),
+        ),
+        json_optional_string_field(
+            "workflow_run_artifact_prelaunch_evidence_status",
+            workflow_prelaunch
+                .as_ref()
+                .map(|prelaunch| prelaunch.evidence_status.as_str()),
+        ),
+        json_optional_string_field(
+            "workflow_run_artifact_prelaunch_command",
+            workflow_prelaunch
+                .as_ref()
+                .and_then(|prelaunch| prelaunch.command.as_deref()),
+        ),
+        json_optional_string_field(
+            "workflow_run_artifact_prelaunch_reason",
+            workflow_prelaunch
+                .as_ref()
+                .map(|prelaunch| prelaunch.reason.as_str()),
         ),
         json_usize_field(
             "link_plan_domain_units",
@@ -648,6 +681,17 @@ fn json_optional_usize_field(name: &str, value: Option<usize>) -> String {
         Some(value) => json_usize_field(name, value),
         None => format!("\"{name}\":null"),
     }
+}
+
+fn workflow_run_artifact_prelaunch_summary(
+    output_dir: &Path,
+) -> crate::run_artifact::RunArtifactPrelaunchSummary {
+    let doctor = probe_artifact_doctor(output_dir);
+    let resolved_binary = doctor.binary_path.filter(|path| path.exists());
+    run_artifact_prelaunch_summary(
+        Some(output_dir),
+        resolved_binary.as_ref().map(PathBuf::as_path),
+    )
 }
 
 pub(crate) fn append_workflow_link_plan_json_fields(

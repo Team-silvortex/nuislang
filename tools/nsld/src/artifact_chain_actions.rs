@@ -39,8 +39,8 @@ pub(crate) fn nsld_artifact_stage_suggested_command(kind: NsldArtifactStageKind)
         NsldArtifactStageKind::ObjectByteLayout => "emit-object-byte-layout",
         NsldArtifactStageKind::ObjectFileLayout => "emit-object-file-layout",
         NsldArtifactStageKind::ObjectImageDryRun => "emit-object-image-dry-run",
-        NsldArtifactStageKind::ObjectEmitBlocked => "emit-object",
-        NsldArtifactStageKind::ObjectOutput => "emit-object",
+        NsldArtifactStageKind::ObjectEmitBlocked => "emit-native-object",
+        NsldArtifactStageKind::ObjectOutput => "emit-native-object",
         NsldArtifactStageKind::ObjectWriterDryRun => "emit-object-writer-dry-run",
         NsldArtifactStageKind::ContainerPlan => "emit-container-plan",
         NsldArtifactStageKind::Container => "emit-container",
@@ -183,5 +183,29 @@ fn next_action_source(
         Some("optional".to_owned())
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::artifact_chain::NsldArtifactStageKind;
+
+    #[test]
+    fn recommends_native_object_alias_for_object_output_stages() {
+        assert_eq!(
+            nsld_artifact_stage_suggested_command(NsldArtifactStageKind::ObjectEmitBlocked),
+            "emit-native-object"
+        );
+        assert_eq!(
+            nsld_artifact_stage_suggested_command(NsldArtifactStageKind::ObjectOutput),
+            "emit-native-object"
+        );
+    }
+
+    #[test]
+    fn reports_optional_source_for_optional_next_action() {
+        let source = next_action_source(None, None, Some(&"emit-native-object".to_owned()));
+        assert_eq!(source.as_deref(), Some("optional"));
     }
 }

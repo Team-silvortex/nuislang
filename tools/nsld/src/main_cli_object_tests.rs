@@ -97,6 +97,25 @@ fn parses_emit_object_input_and_json_flag() {
 }
 
 #[test]
+fn parses_emit_native_object_alias_input_and_json_flag() {
+    let command = parse_args(
+        vec![
+            "emit-native-object".to_owned(),
+            "out".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::EmitObject {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}
+
+#[test]
 fn parses_verify_object_emit_input_and_json_flag() {
     let command = parse_args(
         vec![

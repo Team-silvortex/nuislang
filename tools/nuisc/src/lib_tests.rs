@@ -386,6 +386,7 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         verbose_cache: false,
         cpu_abi: None,
         target: None,
+        packaging_mode: None,
     })
     .unwrap();
 
@@ -451,6 +452,7 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         verbose_cache: false,
         cpu_abi: None,
         target: None,
+        packaging_mode: None,
     })
     .unwrap();
 
@@ -529,6 +531,7 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         verbose_cache: false,
         cpu_abi: None,
         target: None,
+        packaging_mode: None,
     })
     .unwrap();
 
@@ -603,6 +606,7 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         verbose_cache: false,
         cpu_abi: None,
         target: None,
+        packaging_mode: None,
     })
     .unwrap();
 
@@ -658,6 +662,7 @@ fn benchmark_report_file_tooling_outputs_support_inspect_and_verify_json() {
         verbose_cache: false,
         cpu_abi: None,
         target: None,
+        packaging_mode: None,
     })
     .unwrap();
 
@@ -797,6 +802,7 @@ mod cpu Main {
         verbose_cache: false,
         cpu_abi: None,
         target: None,
+        packaging_mode: None,
     })
     .unwrap();
 
@@ -825,6 +831,7 @@ fn inspect_project_metadata_reports_host_ffi_footprint_for_proxy_output() {
         verbose_cache: false,
         cpu_abi: None,
         target: None,
+        packaging_mode: None,
     })
     .unwrap();
 
@@ -933,6 +940,7 @@ mod cpu Main {
         verbose_cache: false,
         cpu_abi: None,
         target: None,
+        packaging_mode: None,
     })
     .unwrap();
     fs::remove_dir_all(&project_root).unwrap();
@@ -969,6 +977,7 @@ mod cpu Main {
         verbose_cache: false,
         cpu_abi: None,
         target: None,
+        packaging_mode: None,
     })
     .unwrap();
     let manifest_path = output_dir.join("nuis.build.manifest.toml");
@@ -1004,6 +1013,7 @@ mod cpu Main {
         verbose_cache: false,
         cpu_abi: None,
         target: None,
+        packaging_mode: None,
     })
     .unwrap();
     let (resolved_input, resolved_output_dir) =
@@ -1423,6 +1433,7 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         verbose_cache: false,
         cpu_abi: None,
         target: None,
+        packaging_mode: None,
     })
     .unwrap();
 
@@ -1563,6 +1574,7 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         verbose_cache: false,
         cpu_abi: None,
         target: None,
+        packaging_mode: None,
     })
     .unwrap();
 
@@ -1577,6 +1589,7 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         verbose_cache: false,
         cpu_abi: None,
         target: None,
+        packaging_mode: None,
     })
     .unwrap();
 
@@ -1630,6 +1643,7 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         verbose_cache: false,
         cpu_abi: None,
         target: None,
+        packaging_mode: None,
     })
     .unwrap();
 
@@ -1683,6 +1697,7 @@ fn compile_command_writes_benchmark_report_file_tooling_outputs() {
         verbose_cache: false,
         cpu_abi: None,
         target: None,
+        packaging_mode: None,
     })
     .unwrap();
 
@@ -1758,6 +1773,7 @@ galaxy = ["std=workspace"]
         verbose_cache: false,
         cpu_abi: None,
         target: None,
+        packaging_mode: None,
     })
     .unwrap();
 
@@ -1870,6 +1886,7 @@ mod cpu Main {
         verbose_cache: false,
         cpu_abi: None,
         target: None,
+        packaging_mode: None,
     })
     .unwrap();
 

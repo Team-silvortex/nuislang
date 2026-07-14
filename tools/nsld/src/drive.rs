@@ -16,11 +16,14 @@ use crate::{
     nsld_emit_closure_report, nsld_emit_container_plan_report, nsld_emit_container_report,
     nsld_emit_final_executable_launcher_dry_run_report,
     nsld_emit_final_executable_launcher_manifest_report,
-    nsld_emit_final_executable_pipeline_report, nsld_emit_final_stage_plan_report,
-    nsld_emit_link_bundle_report, nsld_emit_link_inputs_report, nsld_emit_link_units_report,
-    nsld_emit_section_manifest_report, nsld_prepare_report,
+    nsld_emit_final_executable_pipeline_report, nsld_emit_final_executable_report,
+    nsld_emit_final_stage_plan_report, nsld_emit_link_bundle_report, nsld_emit_link_inputs_report,
+    nsld_emit_link_units_report, nsld_emit_section_manifest_report, nsld_prepare_report,
 };
-use std::path::Path;
+use std::{env, path::Path};
+
+const HOST_FINALIZER_ALLOW_ENV: &str = "NUIS_NSLD_ALLOW_HOST_FINALIZER";
+const HOST_FINALIZER_POLICY_ENV: &str = "NUIS_NSLD_HOST_FINALIZER_POLICY";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldDriveApplyReport {
@@ -171,6 +174,26 @@ pub(crate) fn nsld_drive_apply_next_action(
         });
     };
     if next_action.source.as_deref() == Some("final-output-boundary") {
+        if command_id == "final-executable-output" && final_output_boundary_crossing_enabled() {
+            let emit = nsld_emit_final_executable_report(manifest, plan)?;
+            if emit.emitted {
+                return Ok(applied_report(
+                    next_action,
+                    "applied final-executable-output",
+                ));
+            }
+            let blocker = emit
+                .blockers
+                .first()
+                .map(String::as_str)
+                .unwrap_or("unknown");
+            return Ok(NsldDriveApplyReport {
+                applied: false,
+                command_id: Some(command_id.to_owned()),
+                command_resolved: next_action.command_resolved.clone(),
+                message: format!("final-output-boundary-not-emitted:{blocker}"),
+            });
+        }
         return Ok(NsldDriveApplyReport {
             applied: false,
             command_id: Some(command_id.to_owned()),
@@ -228,9 +251,12 @@ pub(crate) fn nsld_drive_apply_next_action(
                 "applied emit-object-image-dry-run",
             ))
         }
-        "emit-object" => {
+        "emit-object" | "emit-native-object" => {
             nsld_emit_object_report(manifest, plan)?;
-            Ok(applied_report(next_action, "applied emit-object"))
+            Ok(applied_report(
+                next_action,
+                &format!("applied {command_id}"),
+            ))
         }
         "emit-object-writer-dry-run" => {
             nsld_emit_object_writer_dry_run_report(manifest, plan)?;
@@ -322,7 +348,7 @@ pub(crate) fn nsld_drive_apply_until_clean(
         messages.push(apply_report.message);
         if !applied {
             let stop_reason = if next_action.source.as_deref() == Some("final-output-boundary") {
-                "blocked-boundary"
+                final_output_boundary_stop_reason(next_action.reason.as_deref())
             } else if next_action.available {
                 "not-applied"
             } else {
@@ -358,6 +384,50 @@ pub(crate) fn nsld_drive_apply_until_clean(
         last_command_id: applied_command_ids.last().cloned(),
         messages,
     })
+}
+
+fn final_output_boundary_stop_reason(reason: Option<&str>) -> &'static str {
+    match reason {
+        Some(reason) if reason.contains("final-executable-output:not-nsld-owned") => {
+            "host-finalizer-policy-required"
+        }
+        Some(reason) if reason.contains("final-executable-output:missing") => {
+            "final-output-missing"
+        }
+        Some(reason) if reason.contains("final-executable-output:image-header-invalid") => {
+            "final-output-invalid"
+        }
+        Some(reason) if reason.contains("final-executable-output:hash-mismatch") => {
+            "final-output-invalid"
+        }
+        Some(reason) if reason.contains("final-executable-output:size-mismatch") => {
+            "final-output-invalid"
+        }
+        _ => "blocked-boundary",
+    }
+}
+
+fn final_output_boundary_crossing_enabled() -> bool {
+    final_output_boundary_crossing_enabled_for(
+        env::var(HOST_FINALIZER_POLICY_ENV).ok().as_deref(),
+        env::var(HOST_FINALIZER_ALLOW_ENV).ok().as_deref(),
+    )
+}
+
+fn final_output_boundary_crossing_enabled_for(policy: Option<&str>, allow: Option<&str>) -> bool {
+    value_allows(policy, &["allow-host-invoke", "allow"])
+        && value_allows(allow, &["1", "true", "yes", "allow"])
+}
+
+fn value_allows(value: Option<&str>, accepted: &[&str]) -> bool {
+    value
+        .map(|value| {
+            let value = value.trim();
+            accepted
+                .iter()
+                .any(|accepted| value.eq_ignore_ascii_case(accepted))
+        })
+        .unwrap_or(false)
 }
 
 fn applied_report(next_action: &NsldCheckNextAction, message: &str) -> NsldDriveApplyReport {

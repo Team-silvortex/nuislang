@@ -2,6 +2,32 @@ use super::{parse_args, CommandKind};
 use std::path::PathBuf;
 
 #[test]
+fn parses_build_with_self_contained_packaging_mode() {
+    let command = parse_args(
+        [
+            "build".to_owned(),
+            "--packaging-mode".to_owned(),
+            "nuis-self-contained-image".to_owned(),
+            "examples/demo.ns".to_owned(),
+            "target/demo".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .expect("build packaging mode parses");
+    assert_eq!(
+        command,
+        CommandKind::Build {
+            input: PathBuf::from("examples/demo.ns"),
+            output_dir: PathBuf::from("target/demo"),
+            verbose_cache: false,
+            cpu_abi: None,
+            target: None,
+            packaging_mode: Some("nuis-self-contained-image".to_owned()),
+        }
+    );
+}
+
+#[test]
 fn parses_workflow_with_default_input() {
     let command = parse_args(["workflow".to_owned()].into_iter()).expect("workflow parses");
     assert_eq!(

@@ -1,8 +1,8 @@
 use crate::{
     append_json_field_strings,
     artifact_doctor::{ArtifactOutputDiagnostics, ProjectValidationSnapshot},
-    json_bool_field, json_field, json_object_array_field, json_optional_string_field,
-    json_string_array_field, json_surface, json_usize_field,
+    json_bool_field, json_field, json_object_array_field, json_optional_bool_field,
+    json_optional_string_field, json_string_array_field, json_surface, json_usize_field,
     run_artifact::run_artifact_prelaunch_summary,
     workflow::{
         append_workflow_link_plan_json_fields, artifact_lowering_units_json,
@@ -163,13 +163,33 @@ pub(crate) fn render_artifact_doctor_json(input: &Path) -> String {
             json_bool_field("ready_to_run", report.ready_to_run),
             json_field("artifact_closure_kind", &artifact_closure.kind),
             json_field("artifact_closure_status", &artifact_closure.status),
+            json_field(
+                "artifact_closure_evidence_status",
+                &artifact_closure.evidence_status,
+            ),
             json_optional_string_field(
                 "artifact_closure_command",
                 artifact_closure.command.as_deref(),
             ),
+            json_bool_field(
+                "artifact_closure_runner_command_present",
+                artifact_closure.runner_command_present,
+            ),
             json_optional_string_field(
                 "artifact_closure_entrypoint_path",
                 artifact_closure.entrypoint_path.as_deref(),
+            ),
+            json_bool_field(
+                "artifact_closure_entrypoint_present",
+                artifact_closure.entrypoint_present,
+            ),
+            json_optional_string_field(
+                "artifact_closure_entrypoint_protocol",
+                artifact_closure.entrypoint_protocol.as_deref(),
+            ),
+            json_optional_bool_field(
+                "artifact_closure_entrypoint_protocol_valid",
+                artifact_closure.entrypoint_protocol_valid,
             ),
             json_field("artifact_closure_reason", &artifact_closure.reason),
             json_field("recommended_next_step", &report.recommended_next_step),

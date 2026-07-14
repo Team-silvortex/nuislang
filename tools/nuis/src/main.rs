@@ -308,7 +308,15 @@ fn run() -> Result<(), String> {
             verbose_cache,
             cpu_abi,
             target,
-        } => handle_build(input, output_dir, verbose_cache, cpu_abi, target)?,
+            packaging_mode,
+        } => handle_build(
+            input,
+            output_dir,
+            verbose_cache,
+            cpu_abi,
+            target,
+            packaging_mode,
+        )?,
         cli::CommandKind::RunArtifact { input, json } => handle_run_artifact(input, json)?,
         cli::CommandKind::DumpAst { input } => handle_dump_ast(input)?,
         cli::CommandKind::DumpNir { input } => handle_dump_nir(input)?,
@@ -416,6 +424,7 @@ fn handle_release_check(
         verbose_cache: false,
         cpu_abi,
         target,
+        packaging_mode: None,
     })?;
     if success_logs_enabled() {
         println!("release-check: verify-build-manifest");
@@ -634,6 +643,7 @@ fn handle_build(
     verbose_cache: bool,
     cpu_abi: Option<String>,
     target: Option<String>,
+    packaging_mode: Option<String>,
 ) -> Result<(), String> {
     nuisc::run(nuisc::CommandKind::Compile {
         input,
@@ -641,6 +651,7 @@ fn handle_build(
         verbose_cache,
         cpu_abi,
         target,
+        packaging_mode,
     })?;
     let doctor = run_build_output_self_check(&output_dir)?;
     if success_logs_enabled() {
@@ -724,7 +735,7 @@ fn print_help() {
         "    nuis bench [--list] [--json] [--exact] [input.ns|project-dir|nuis.toml] [filter]"
     );
     println!(
-        "    nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] <output-dir>"
+        "    nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [--packaging-mode MODE] [input.ns|project-dir|nuis.toml] <output-dir>"
     );
     println!("    nsld drive <output-dir>/nuis.build.manifest.toml");
     println!("    nsld drive <output-dir>/nuis.build.manifest.toml --json");

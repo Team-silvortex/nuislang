@@ -1,5 +1,6 @@
 use super::{
-    build_nuis_lifecycle_contract, c_shim_source, decode_domain_build_unit_payload_blob,
+    build_nuis_lifecycle_contract, c_shim_source,
+    compile_artifacts_for_output_dir_with_packaging_mode, decode_domain_build_unit_payload_blob,
     decode_nuis_compiled_artifact_binary, decode_nuis_executable_envelope_binary,
     encode_nuis_compiled_artifact_binary, encode_nuis_compiled_artifact_section_table_binary,
     encode_nuis_executable_envelope_binary, inspect_nuis_compiled_artifact_container,
@@ -99,6 +100,23 @@ fn write_minimal_cpu_artifact(label: &str) -> (PathBuf, PathBuf) {
     )
     .unwrap();
     (dir, PathBuf::from(manifest))
+}
+
+#[test]
+fn cached_compile_artifacts_accept_self_contained_nsb_packaging_mode() {
+    let dir = temp_dir("cached_self_contained_packaging_mode");
+    let input = dir.join("main.ns");
+    fs::write(&input, "mod cpu Main { fn main() -> i64 { return 0; } }").unwrap();
+
+    let written = compile_artifacts_for_output_dir_with_packaging_mode(
+        &input,
+        &dir,
+        "nuis-self-contained-image",
+    )
+    .unwrap();
+
+    assert_eq!(written.packaging_mode, "nuis-self-contained-image");
+    assert_eq!(written.binary_path, dir.join("main").display().to_string());
 }
 
 fn i64_ty() -> AstTypeRef {

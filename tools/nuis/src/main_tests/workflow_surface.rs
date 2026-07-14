@@ -125,8 +125,15 @@ mod cpu Main {
     );
     let output_dir = default_build_output_dir(&project_root);
 
-    handle_build(project_root.clone(), output_dir.clone(), false, None, None)
-        .expect("build passes");
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
 
     let json = render_workflow_json(&project_root).expect("render workflow json");
 
@@ -291,8 +298,15 @@ mod cpu Main {
     );
     let output_dir = default_build_output_dir(&project_root);
 
-    handle_build(project_root.clone(), output_dir.clone(), false, None, None)
-        .expect("build passes");
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
     write_prepared_nsld_chain_placeholders(&output_dir);
     write_ready_nsld_final_tail_placeholders(&output_dir);
 
@@ -349,6 +363,17 @@ mod cpu Main {
         .contains("\"nsld_final_executable_pipeline_entrypoint_materialization_hash\":\"0xabcd\""));
     assert!(json.contains(
         "\"nsld_final_executable_pipeline_entrypoint_materialization_runner_command\":\"nuis-host-runner --manifest 'manifest.toml'"
+    ));
+    assert!(json.contains("\"workflow_run_artifact_prelaunch_kind\":\"nsld-host-entrypoint\""));
+    assert!(json.contains("\"workflow_run_artifact_prelaunch_status\":\"ready\""));
+    assert!(
+        json.contains("\"workflow_run_artifact_prelaunch_evidence_status\":\"entrypoint-ready\"")
+    );
+    assert!(json.contains(
+        "\"workflow_run_artifact_prelaunch_command\":\"nuis-host-runner --manifest 'manifest.toml'"
+    ));
+    assert!(json.contains(
+        "\"workflow_run_artifact_prelaunch_reason\":\"nsld final executable pipeline materialized a verified host entrypoint stub\""
     ));
     assert!(json.contains("\"nsld_self_owned_image_ready\":"));
     assert!(json.contains("\"nsld_self_owned_image_status\":"));
@@ -464,8 +489,15 @@ mod cpu Main {
 "#,
     );
     let output_dir = default_build_output_dir(&project_root);
-    handle_build(project_root.clone(), output_dir.clone(), false, None, None)
-        .expect("build passes");
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
     fs::remove_file(output_dir.join("nuis.compiled.artifact")).expect("remove artifact");
 
     let json = render_workflow_json(&project_root).expect("render workflow json");

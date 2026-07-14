@@ -26,6 +26,15 @@ pub(super) fn derive_final_stage(
                 "this stage is the temporary backend-facing tail of the larger nuis federated linking model".to_owned(),
             ],
         ),
+        "nuis-self-contained-image" => (
+            "nuis-self-contained-image".to_owned(),
+            "nsld-internal-image-writer".to_owned(),
+            "self-contained".to_owned(),
+            vec![
+                "pure Nsld finalization writes a self-contained Nuis image without delegating the final link to the host toolchain".to_owned(),
+                "this route is the protocol-first path for the Nuis-native binary format".to_owned(),
+            ],
+        ),
         "window-aot-bundle" => (
             "heterogeneous-bundle-pack".to_owned(),
             "yir-pack-aot".to_owned(),

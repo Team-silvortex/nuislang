@@ -87,7 +87,12 @@ pub(crate) fn run_compile(
     verbose_cache: bool,
     cpu_abi: Option<String>,
     target: Option<String>,
+    packaging_mode: Option<String>,
 ) -> Result<(), String> {
+    let requested_packaging_mode = packaging_mode
+        .as_deref()
+        .map(validate_packaging_mode)
+        .transpose()?;
     let resolved = resolve_compile_input(&input)?;
     let cpu_target = aot::resolve_cpu_build_target(
         Path::new("nustar-packages"),
@@ -110,7 +115,7 @@ pub(crate) fn run_compile(
                 &cpu_target,
             )),
         })?;
-        let written = aot::write_and_link(
+        let mut written = aot::write_and_link(
             &resolved.effective_input_path,
             &output_dir,
             &artifacts.ast,
@@ -119,6 +124,9 @@ pub(crate) fn run_compile(
             &artifacts.llvm_ir,
             &cpu_target,
         )?;
+        if let Some(packaging_mode) = requested_packaging_mode {
+            written.packaging_mode = packaging_mode.to_owned();
+        }
         let _ = cache::store_compile_cache(&cache_key, &output_dir)?;
         Ok((written, artifacts.loaded_nustar))
     };
@@ -127,10 +135,12 @@ pub(crate) fn run_compile(
             .and_then(|_| aot::verify_build_manifest(&output_dir.join("nuis.build.manifest.toml")))
         {
             Ok(restored_manifest) => {
+                let packaging_mode =
+                    requested_packaging_mode.unwrap_or(restored_manifest.packaging_mode.as_str());
                 let written = aot::compile_artifacts_for_output_dir_with_packaging_mode(
                     &resolved.effective_input_path,
                     &output_dir,
-                    &restored_manifest.packaging_mode,
+                    packaging_mode,
                 )?;
                 (written, restored_manifest.loaded_nustar, true)
             }
@@ -408,4 +418,13 @@ pub(crate) fn run_compile(
     }
 
     Ok(())
+}
+
+fn validate_packaging_mode(packaging_mode: &str) -> Result<&str, String> {
+    match packaging_mode {
+        "native-cpu-llvm" | "window-aot-bundle" | "nuis-self-contained-image" => Ok(packaging_mode),
+        other => Err(format!(
+            "unsupported packaging mode `{other}`; expected `native-cpu-llvm`, `window-aot-bundle`, or `nuis-self-contained-image`"
+        )),
+    }
 }

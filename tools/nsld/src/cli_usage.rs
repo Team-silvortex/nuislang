@@ -50,6 +50,7 @@ pub(crate) fn usage() -> &'static str {
         "  nsld verify-object-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld object-writer-readiness <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld emit-object <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld emit-native-object <nuis.build.manifest.toml|artifact-output-dir> [--json]  # alias for emit-object\n",
         "  nsld verify-object-emit <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld verify-object-output <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld verify-object-writer-input <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",

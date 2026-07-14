@@ -4,8 +4,8 @@ use crate::{
     artifact_doctor_render::render_artifact_doctor_json,
     build_report_nsld_status::print_nsld_artifact_chain_status,
     build_report_render::append_runtime_session_json_fields,
-    json_bool_field, json_field, json_optional_string_field, load_link_plan_for_output_dir,
-    resolve_frontdoor_build_manifest_path,
+    json_bool_field, json_field, json_optional_bool_field, json_optional_string_field,
+    load_link_plan_for_output_dir, resolve_frontdoor_build_manifest_path,
     run_artifact::run_artifact_prelaunch_summary,
     runtime_host_yir, success_logs_enabled,
 };
@@ -100,13 +100,33 @@ pub(crate) fn render_run_artifact_json(input: &Path) -> String {
             json_bool_field("binary_resolved", resolved_binary.is_some()),
             json_field("run_artifact_prelaunch_kind", &prelaunch.kind),
             json_field("run_artifact_prelaunch_status", &prelaunch.status),
+            json_field(
+                "run_artifact_prelaunch_evidence_status",
+                &prelaunch.evidence_status,
+            ),
             json_optional_string_field(
                 "run_artifact_prelaunch_command",
                 prelaunch.command.as_deref(),
             ),
+            json_bool_field(
+                "run_artifact_prelaunch_runner_command_present",
+                prelaunch.runner_command_present,
+            ),
             json_optional_string_field(
                 "run_artifact_prelaunch_entrypoint_path",
                 prelaunch.entrypoint_path.as_deref(),
+            ),
+            json_bool_field(
+                "run_artifact_prelaunch_entrypoint_present",
+                prelaunch.entrypoint_present,
+            ),
+            json_optional_string_field(
+                "run_artifact_prelaunch_entrypoint_protocol",
+                prelaunch.entrypoint_protocol.as_deref(),
+            ),
+            json_optional_bool_field(
+                "run_artifact_prelaunch_entrypoint_protocol_valid",
+                prelaunch.entrypoint_protocol_valid,
             ),
             json_field("run_artifact_prelaunch_reason", &prelaunch.reason),
         ],
@@ -148,13 +168,30 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
             println!("  exit_status: runtime-handoff-ready");
             println!("  prelaunch_kind: {}", prelaunch.kind);
             println!("  prelaunch_status: {}", prelaunch.status);
+            println!("  prelaunch_evidence_status: {}", prelaunch.evidence_status);
             println!(
                 "  prelaunch_command: {}",
                 prelaunch.command.as_deref().unwrap_or("<none>")
             );
             println!(
+                "  prelaunch_runner_command_present: {}",
+                prelaunch.runner_command_present
+            );
+            println!(
                 "  prelaunch_entrypoint_path: {}",
                 prelaunch.entrypoint_path.as_deref().unwrap_or("<none>")
+            );
+            println!(
+                "  prelaunch_entrypoint_present: {}",
+                prelaunch.entrypoint_present
+            );
+            println!(
+                "  prelaunch_entrypoint_protocol: {}",
+                prelaunch.entrypoint_protocol.as_deref().unwrap_or("<none>")
+            );
+            println!(
+                "  prelaunch_entrypoint_protocol_valid: {}",
+                optional_bool_text(prelaunch.entrypoint_protocol_valid)
             );
             println!("  prelaunch_reason: {}", prelaunch.reason);
             let link_plan = doctor
@@ -188,13 +225,30 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
             .and_then(|output_dir| load_link_plan_for_output_dir(output_dir));
         println!("  prelaunch_kind: {}", prelaunch.kind);
         println!("  prelaunch_status: {}", prelaunch.status);
+        println!("  prelaunch_evidence_status: {}", prelaunch.evidence_status);
         println!(
             "  prelaunch_command: {}",
             prelaunch.command.as_deref().unwrap_or("<none>")
         );
         println!(
+            "  prelaunch_runner_command_present: {}",
+            prelaunch.runner_command_present
+        );
+        println!(
             "  prelaunch_entrypoint_path: {}",
             prelaunch.entrypoint_path.as_deref().unwrap_or("<none>")
+        );
+        println!(
+            "  prelaunch_entrypoint_present: {}",
+            prelaunch.entrypoint_present
+        );
+        println!(
+            "  prelaunch_entrypoint_protocol: {}",
+            prelaunch.entrypoint_protocol.as_deref().unwrap_or("<none>")
+        );
+        println!(
+            "  prelaunch_entrypoint_protocol_valid: {}",
+            optional_bool_text(prelaunch.entrypoint_protocol_valid)
         );
         println!("  prelaunch_reason: {}", prelaunch.reason);
         print_run_artifact_link_plan_status(link_plan.as_ref());
@@ -207,6 +261,14 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
         binary.display(),
         status.code()
     ))
+}
+
+fn optional_bool_text(value: Option<bool>) -> &'static str {
+    match value {
+        Some(true) => "true",
+        Some(false) => "false",
+        None => "<none>",
+    }
 }
 
 fn print_run_artifact_link_plan_status(link_plan: Option<&nuisc::linker::LinkPlan>) {
@@ -382,8 +444,16 @@ pub(crate) fn handle_artifact_doctor(input: PathBuf, json: bool) -> Result<(), S
     println!("  artifact_closure_kind: {}", artifact_closure.kind);
     println!("  artifact_closure_status: {}", artifact_closure.status);
     println!(
+        "  artifact_closure_evidence_status: {}",
+        artifact_closure.evidence_status
+    );
+    println!(
         "  artifact_closure_command: {}",
         artifact_closure.command.as_deref().unwrap_or("<none>")
+    );
+    println!(
+        "  artifact_closure_runner_command_present: {}",
+        artifact_closure.runner_command_present
     );
     println!(
         "  artifact_closure_entrypoint_path: {}",
@@ -391,6 +461,21 @@ pub(crate) fn handle_artifact_doctor(input: PathBuf, json: bool) -> Result<(), S
             .entrypoint_path
             .as_deref()
             .unwrap_or("<none>")
+    );
+    println!(
+        "  artifact_closure_entrypoint_present: {}",
+        artifact_closure.entrypoint_present
+    );
+    println!(
+        "  artifact_closure_entrypoint_protocol: {}",
+        artifact_closure
+            .entrypoint_protocol
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    println!(
+        "  artifact_closure_entrypoint_protocol_valid: {}",
+        optional_bool_text(artifact_closure.entrypoint_protocol_valid)
     );
     println!("  artifact_closure_reason: {}", artifact_closure.reason);
     println!(

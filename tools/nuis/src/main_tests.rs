@@ -204,7 +204,7 @@ fn assert_checked_in_tooling_project_runs(project_root: &str, output_label: &str
     let project_root = checked_in_path(project_root);
     let output_dir = temp_dir(output_label);
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     handle_run_artifact(output_dir.join("nuis.build.manifest.toml"), false)
         .expect("checked-in tooling project run-artifact passes");
 }

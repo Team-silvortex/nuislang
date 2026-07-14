@@ -36,6 +36,23 @@ cargo run -p nuis -- run-artifact \
   examples/bins/native_artifact_closure_demo_project/nuis.build.manifest.toml
 ```
 
+To select the pure Nsld self-contained image route at the `nuis` frontdoor,
+pass `--packaging-mode nuis-self-contained-image` during build:
+
+```bash
+cargo run -p nuis -- build \
+  --packaging-mode nuis-self-contained-image \
+  examples/projects/tooling/native_artifact_closure_demo \
+  examples/bins/native_artifact_closure_demo_project
+```
+
+That produces a build manifest whose link plan selects
+`final_stage_kind = "nuis-self-contained-image"`,
+`final_stage_driver = "nsld-internal-image-writer"`,
+`final_stage_link_mode = "self-contained"`, and a `.nsb` final output path.
+The default build route remains `native-cpu-llvm`, which keeps the current
+host-native compatibility path available while Nsld's own binary route matures.
+
 To hand the emitted manifest to the current linker frontdoor, use:
 
 ```bash
@@ -53,6 +70,12 @@ remains or it reaches a structured stop such as `not-applied`,
 `repeated-next-action`, or `max-steps`. Host-assisted final executable blockers
 should be read from the final pipeline/output reports rather than from a
 repeated driver action.
+
+When the manifest was built with `--packaging-mode nuis-self-contained-image`,
+the same `nsld drive --apply --until-clean` route stays inside Nsld's own
+finalizer and materializes the `.nsb` output selected by the link plan. This is
+the current protocol-level smoke path for the Nuis-native binary image before a
+full standalone `nsld` linker replaces the remaining host-native tail.
 
 If you want the CLI to classify the route before you build, use:
 
@@ -83,6 +106,11 @@ artifact-follow-up state:
 * `link_plan_heterogeneous_domain_readiness_ready`
 * `link_plan_heterogeneous_domain_families`
 * `link_plan_heterogeneous_domain_first_unready`
+* `workflow_run_artifact_prelaunch_kind`
+* `workflow_run_artifact_prelaunch_status`
+* `workflow_run_artifact_prelaunch_evidence_status`
+* `workflow_run_artifact_prelaunch_command`
+* `workflow_run_artifact_prelaunch_reason`
 * `nsld_final_executable_output_ready`
 * `nsld_final_executable_output_boundary_status`
 * `nsld_final_executable_output_materialization_status`
@@ -109,13 +137,23 @@ artifact-follow-up state:
 * `nsld_final_executable_pipeline_entrypoint_materialization_runner_command`
 * `run_artifact_prelaunch_kind`
 * `run_artifact_prelaunch_status`
+* `run_artifact_prelaunch_evidence_status`
 * `run_artifact_prelaunch_command`
+* `run_artifact_prelaunch_runner_command_present`
 * `run_artifact_prelaunch_entrypoint_path`
+* `run_artifact_prelaunch_entrypoint_present`
+* `run_artifact_prelaunch_entrypoint_protocol`
+* `run_artifact_prelaunch_entrypoint_protocol_valid`
 * `run_artifact_prelaunch_reason`
 * `artifact_closure_kind`
 * `artifact_closure_status`
+* `artifact_closure_evidence_status`
 * `artifact_closure_command`
+* `artifact_closure_runner_command_present`
 * `artifact_closure_entrypoint_path`
+* `artifact_closure_entrypoint_present`
+* `artifact_closure_entrypoint_protocol`
+* `artifact_closure_entrypoint_protocol_valid`
 * `artifact_closure_reason`
 * `nsld_final_executable_output_recommended_next_action`
 * `nsld_final_executable_output_path_present`
@@ -240,14 +278,24 @@ Short reading rule:
 * `run-artifact --json` additionally emits the `run_artifact_prelaunch_*`
   aggregate fields so scripts can choose between a verified Nsld host
   entrypoint and the older host-binary launch path without re-interpreting every
-  lower-level Nsld field; if the pipeline snapshot claims an entrypoint but the
-  stub is missing on disk, the aggregate prelaunch status is `blocked` instead
-  of silently falling back to a different launch surface
+  lower-level Nsld field. The group includes a compact evidence status
+  (`host-binary-ready`, `entrypoint-ready`, `entrypoint-missing`,
+  `entrypoint-protocol-invalid`, or `no-launch-surface`), runner-command
+  presence, entrypoint presence, expected entrypoint protocol, and
+  protocol-validity fields; if the pipeline snapshot claims an entrypoint but
+  the stub is missing on disk, the aggregate prelaunch status is `blocked`
+  instead of silently falling back to a different launch surface
+* `workflow` and LinkPlan JSON mirror that decision under
+  `workflow_run_artifact_prelaunch_*`, so the main workflow surface can show the
+  launch closure that `run-artifact` would prefer without forcing callers to run
+  a second command just to classify the final handoff
 * `artifact-doctor --json` emits the matching `artifact_closure_*` aggregate
   fields. These describe the current runnable artifact closure before execution:
   `host-binary` for the older direct binary path, `nsld-host-entrypoint` for the
   self-contained Nsld entrypoint route, or `none` when no launch surface is
-  available yet
+  available yet. The closure group mirrors evidence status, runner-command
+  presence, entrypoint presence, expected entrypoint protocol, and protocol
+  validity
 * heterogeneous-domain readiness fields summarize whether non-CPU domain units
   have the generic payload, lowering, sidecar, and bridge evidence needed by the
   current artifact route
@@ -301,6 +349,9 @@ Today this route proves all of these together:
 * `nsld drive --apply --until-clean` can materialize the current whitelisted
   Nsld artifact chain; host-assisted finalization blockers are carried by the
   emitted final pipeline/output metadata instead of by repeating the drive step
+* `nuis build --packaging-mode nuis-self-contained-image` followed by
+  `nsld drive --apply --until-clean` can materialize the current pure Nsld
+  `.nsb` image route from a manifest-selected link plan
 * the compiled artifact and manifest both survive verifier checks
 * the produced native binary actually launches successfully through the `nuis`
   frontdoor

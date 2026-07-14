@@ -40,10 +40,12 @@ Current source layers:
   `emit-final-executable-launcher-manifest` or
   `emit-final-executable-launcher-dry-run`
 
-The `final-output-boundary` source is intentionally read-only. It makes the
-current linker boundary visible to automation without turning `nsld drive
---apply` into a host-finalizer runner. Host-assisted final executable emission
-still requires the explicit host-finalizer policy and allow gates.
+The `final-output-boundary` source is read-only by default. It makes the current
+linker boundary visible to automation without turning `nsld drive --apply` into
+an implicit host-finalizer runner. Host-assisted final executable emission can
+cross this boundary only when both explicit gates are set:
+`NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke` and
+`NUIS_NSLD_ALLOW_HOST_FINALIZER=1`.
 
 The `final-output-materialization` source is intentionally narrower: it may
 write Nsld-owned launcher manifest or launcher dry-run protocol files, but it
@@ -60,16 +62,33 @@ these stops happens:
 
 * `clean` means no next action remains
 * `not-applied` means a next action exists but the driver refused to apply it
+* `host-finalizer-policy-required` means the artifact chain reached a
+  host-assisted final output that is present but not Nsld-owned, so an explicit
+  host-finalizer policy gate must be unlocked before native host finalization
+* `final-output-missing` means the final executable output is still absent after
+  the materialization pipeline reached the output boundary
+* `final-output-invalid` means the final executable output is present but failed
+  a final boundary validation such as image header, size, or hash checks
 * `blocked-boundary` means the artifact chain reached a read-only final-output
-  boundary that must be inspected or unlocked by an explicit policy gate
+  boundary that must be inspected, and no narrower stop reason was available
 * `repeated-next-action` means the same action would be applied again
 * `max-steps` means the internal loop cap stopped the drive
 
 `repeated-next-action` should be treated as a loop guard, not as the preferred
 blocked-artifact status. Host-assisted final executable routes should now
-materialize the current final pipeline once, then stop as `blocked-boundary`
-when the remaining action is the read-only final executable output boundary.
-The pipeline/output reports carry the remaining blocker details.
+materialize the current final pipeline once, then stop as
+`host-finalizer-policy-required` when the remaining default-read-only final
+executable output boundary is blocked by `final-executable-output:not-nsld-owned`.
+With both host-finalizer gates enabled, `drive` may invoke the final executable
+emitter for that one boundary step and report `applied final-executable-output`
+only if Nsld actually emitted the final output. The pipeline/output reports
+carry the remaining blocker details.
+
+Manifests built with `packaging_mode = "nuis-self-contained-image"` select the
+Nsld-owned self-contained final stage instead. For that route,
+`drive --apply --until-clean` can stay inside the whitelisted Nsld pipeline,
+materialize the selected `.nsb` output, and stop as `clean` without unlocking
+the host-finalizer gate.
 
 JSON output reports `mutates_artifacts` for all drive modes:
 
@@ -95,6 +114,11 @@ not apply linker actions by itself; it reports the safe dry-run command first
 and labels mutating commands explicitly so automation can make the handoff to
 `nsld drive` deliberately.
 
+`emit-native-object` is accepted by the CLI and driver as a protocol-facing
+alias for the deterministic object emitter. It keeps final-stage/native-object
+recommendations readable while still using the existing `emit-object` pipeline
+and output contracts.
+
 ## Until-Clean JSON
 
 The JSON shape for `nsld drive --apply --until-clean --json` is:
@@ -103,17 +127,17 @@ The JSON shape for `nsld drive --apply --until-clean --json` is:
 {
   "tool": "nsld",
   "kind": "nsld_drive_until_clean",
-  "completed": false,
-  "applied_steps": 0,
-  "mutates_artifacts": false,
+  "completed": true,
+  "applied_steps": 1,
+  "mutates_artifacts": true,
   "capped": false,
-  "stop_reason": "not-applied",
-  "stop_command_id": "emit-native-object",
-  "stop_source": "required",
-  "stop_command_resolved": "nsld emit-native-object manifest.toml",
-  "stop_action_reason": "future native object stage is not whitelisted yet",
-  "last_command_id": null,
-  "messages": ["next-action-not-whitelisted:emit-native-object"]
+  "stop_reason": "clean",
+  "stop_command_id": null,
+  "stop_source": null,
+  "stop_command_resolved": null,
+  "stop_action_reason": null,
+  "last_command_id": "emit-native-object",
+  "messages": ["applied emit-native-object", "no-next-action"]
 }
 ```
 

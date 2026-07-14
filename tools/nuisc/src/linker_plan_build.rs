@@ -13,10 +13,7 @@ pub fn build_link_plan(
     report: &aot::BuildManifestVerifyReport,
     artifact: &aot::NuisCompiledArtifact,
 ) -> LinkPlan {
-    let binary_path = Path::new(&report.output_dir)
-        .join(&artifact.binary_name)
-        .display()
-        .to_string();
+    let binary_path = final_output_path(report, artifact);
     let domain_units = report
         .domain_build_units
         .iter()
@@ -177,4 +174,19 @@ fn lowering_plan_index_source(path: Option<&str>, artifact: &LinkPlanArtifact) -
     } else {
         "unavailable".to_owned()
     }
+}
+
+fn final_output_path(
+    report: &aot::BuildManifestVerifyReport,
+    artifact: &aot::NuisCompiledArtifact,
+) -> String {
+    let file_name = if report.packaging_mode == "nuis-self-contained-image" {
+        format!("{}.nsb", artifact.binary_name)
+    } else {
+        artifact.binary_name.clone()
+    };
+    Path::new(&report.output_dir)
+        .join(file_name)
+        .display()
+        .to_string()
 }

@@ -498,18 +498,24 @@ where
             let mut verbose_cache = false;
             let mut cpu_abi = None;
             let mut target = None;
+            let mut packaging_mode = None;
             let mut positional = Vec::new();
             while let Some(arg) = args.next() {
                 if arg == "--verbose-cache" {
                     verbose_cache = true;
                 } else if arg == "--cpu-abi" {
                     cpu_abi = Some(args.next().ok_or_else(|| {
-                        "usage: nuisc compile [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] <input.ns|project-dir|nuis.toml> <output-dir>"
+                        "usage: nuisc compile [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [--packaging-mode MODE] <input.ns|project-dir|nuis.toml> <output-dir>"
                             .to_owned()
                     })?);
                 } else if arg == "--target" {
                     target = Some(args.next().ok_or_else(|| {
-                        "usage: nuisc compile [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] <input.ns|project-dir|nuis.toml> <output-dir>"
+                        "usage: nuisc compile [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [--packaging-mode MODE] <input.ns|project-dir|nuis.toml> <output-dir>"
+                            .to_owned()
+                    })?);
+                } else if arg == "--packaging-mode" {
+                    packaging_mode = Some(args.next().ok_or_else(|| {
+                        "usage: nuisc compile [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [--packaging-mode MODE] <input.ns|project-dir|nuis.toml> <output-dir>"
                             .to_owned()
                     })?);
                 } else {
@@ -518,7 +524,7 @@ where
             }
             if positional.len() != 2 {
                 return Err(
-                    "usage: nuisc compile [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] <input.ns|project-dir|nuis.toml> <output-dir>"
+                    "usage: nuisc compile [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [--packaging-mode MODE] <input.ns|project-dir|nuis.toml> <output-dir>"
                         .to_owned(),
                 );
             }
@@ -528,6 +534,7 @@ where
                 verbose_cache,
                 cpu_abi,
                 target,
+                packaging_mode,
             })
         }
         other => Err(format!(

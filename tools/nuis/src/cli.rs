@@ -113,6 +113,7 @@ pub enum CommandKind {
         verbose_cache: bool,
         cpu_abi: Option<String>,
         target: Option<String>,
+        packaging_mode: Option<String>,
     },
     RunArtifact {
         input: PathBuf,
@@ -340,6 +341,7 @@ where
                 verbose_cache: parsed.verbose_cache,
                 cpu_abi: parsed.cpu_abi,
                 target: parsed.target,
+                packaging_mode: parsed.packaging_mode,
             })
         }
         "run-artifact" => {

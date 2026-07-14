@@ -45,7 +45,14 @@ pub(crate) fn run_repair_project_metadata(input: PathBuf, dry_run: bool) -> Resu
         );
         return Ok(());
     }
-    command_compile::run_compile(project_input.clone(), output_dir.clone(), false, None, None)?;
+    command_compile::run_compile(
+        project_input.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )?;
     let repaired_manifest = output_dir.join("nuis.build.manifest.toml");
     let repaired_summary = inspect_project_metadata(&repaired_manifest)?;
     println!(

@@ -50,6 +50,7 @@ pub(super) struct BuildArgs {
     pub(super) verbose_cache: bool,
     pub(super) cpu_abi: Option<String>,
     pub(super) target: Option<String>,
+    pub(super) packaging_mode: Option<String>,
 }
 
 pub(super) fn parse_required_json_input<I>(
@@ -342,10 +343,11 @@ pub(super) fn parse_build_args<I>(args: &mut I) -> Result<BuildArgs, String>
 where
     I: Iterator<Item = String>,
 {
-    let usage = "usage: nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] <output-dir>";
+    let usage = "usage: nuis build [--verbose-cache] [--cpu-abi ABI] [--target TRIPLE] [--packaging-mode MODE] [input.ns|project-dir|nuis.toml] <output-dir>";
     let mut verbose_cache = false;
     let mut cpu_abi = None;
     let mut target = None;
+    let mut packaging_mode = None;
     let mut positional = Vec::new();
     while let Some(arg) = args.next() {
         if arg == "--verbose-cache" {
@@ -354,6 +356,8 @@ where
             cpu_abi = Some(args.next().ok_or_else(|| usage.to_owned())?);
         } else if arg == "--target" {
             target = Some(args.next().ok_or_else(|| usage.to_owned())?);
+        } else if arg == "--packaging-mode" {
+            packaging_mode = Some(args.next().ok_or_else(|| usage.to_owned())?);
         } else {
             positional.push(arg);
         }
@@ -369,6 +373,7 @@ where
         verbose_cache,
         cpu_abi,
         target,
+        packaging_mode,
     })
 }
 

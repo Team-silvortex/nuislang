@@ -94,7 +94,7 @@ where
         "emit-object-plan" => Command::EmitObjectPlan { input, json },
         "verify-object-plan" => Command::VerifyObjectPlan { input, json },
         "object-writer-readiness" => Command::ObjectWriterReadiness { input, json },
-        "emit-object" => Command::EmitObject { input, json },
+        "emit-object" | "emit-native-object" => Command::EmitObject { input, json },
         "verify-object-emit" => Command::VerifyObjectEmit { input, json },
         "verify-object-output" => Command::VerifyObjectOutput { input, json },
         "verify-object-writer-input" => Command::VerifyObjectWriterInput { input, json },

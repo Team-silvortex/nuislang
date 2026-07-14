@@ -157,7 +157,7 @@ fn single_source_workflow_helpers_emit_artifact_follow_up_commands() {
 fn resolve_run_artifact_binary_path_accepts_output_dir() {
     let project_root = checked_in_path("../../examples/projects/tooling/cli_runtime_demo");
     let output_dir = temp_dir("resolve_run_artifact_binary_path_output_dir");
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     let binary = resolve_run_artifact_binary_path(&output_dir).expect("resolve output-dir");
     assert_eq!(binary, output_dir.join("cli_runtime_demo"));
 }
@@ -225,7 +225,7 @@ mod cpu Main {
     );
     let output_dir = temp_dir("build_command_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
 
     for path in [
         output_dir.join("build_command_smoke.ast.txt"),
@@ -319,7 +319,7 @@ mod cpu Main {
     );
     let output_dir = temp_dir("run_artifact_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     handle_run_artifact(output_dir.join("nuis.build.manifest.toml"), false)
         .expect("run-artifact passes");
 }
@@ -435,7 +435,7 @@ fn cli_pgm_info_binary_accepts_real_pgm_input_file() {
     let input_path = output_dir.join("probe.pgm");
     fs::write(&input_path, b"P2\n2 2\n15\n0 1 2 3\n").expect("write pgm fixture");
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     let binary = resolve_run_artifact_binary_path(&output_dir.join("nuis.build.manifest.toml"))
         .expect("resolve built binary");
     let status = Command::new(&binary)
@@ -453,7 +453,7 @@ fn cli_pgm_invert_binary_writes_inverted_pgm_output_file() {
     let output_path = output_dir.join("probe_out.pgm");
     fs::write(&input_path, b"P2\n2 2\n15\n0 1 2 3\n").expect("write pgm fixture");
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     let binary = resolve_run_artifact_binary_path(&output_dir.join("nuis.build.manifest.toml"))
         .expect("resolve built binary");
     let status = Command::new(&binary)
@@ -475,7 +475,7 @@ fn cli_pgm_threshold_binary_writes_mask_pgm_output_file() {
     let output_path = output_dir.join("probe_out.pgm");
     fs::write(&input_path, b"P2\n2 2\n15\n0 1 2 3\n").expect("write pgm fixture");
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     let binary = resolve_run_artifact_binary_path(&output_dir.join("nuis.build.manifest.toml"))
         .expect("resolve built binary");
     let status = Command::new(&binary)
@@ -519,7 +519,7 @@ mod cpu Main {
     );
     let output_dir = temp_dir("artifact_doctor_outputs");
 
-    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
     let json = render_artifact_doctor_json(&output_dir);
 
     assert!(json.contains("\"kind\":\"artifact_doctor\""));
@@ -541,8 +541,13 @@ mod cpu Main {
     assert!(json.contains("\"ready_to_run\":true"));
     assert!(json.contains("\"artifact_closure_kind\":\"host-binary\""));
     assert!(json.contains("\"artifact_closure_status\":\"ready\""));
+    assert!(json.contains("\"artifact_closure_evidence_status\":\"host-binary-ready\""));
     assert!(json.contains("\"artifact_closure_command\":\""));
+    assert!(json.contains("\"artifact_closure_runner_command_present\":true"));
     assert!(json.contains("\"artifact_closure_entrypoint_path\":null"));
+    assert!(json.contains("\"artifact_closure_entrypoint_present\":false"));
+    assert!(json.contains("\"artifact_closure_entrypoint_protocol\":null"));
+    assert!(json.contains("\"artifact_closure_entrypoint_protocol_valid\":null"));
     assert!(json.contains(
         "\"artifact_closure_reason\":\"legacy host binary path is resolved and can be executed directly\""
     ));

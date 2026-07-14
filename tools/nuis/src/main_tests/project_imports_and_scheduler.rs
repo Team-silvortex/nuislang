@@ -208,8 +208,15 @@ mod cpu Main {
     );
     let output_dir = default_build_output_dir(&project_root);
 
-    handle_build(project_root.clone(), output_dir.clone(), false, None, None)
-        .expect("build passes");
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
 
     let json = render_project_status_json(&project_root).expect("render status json");
 

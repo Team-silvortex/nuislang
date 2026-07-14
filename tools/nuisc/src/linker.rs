@@ -346,6 +346,62 @@ mod tests {
     }
 
     #[test]
+    fn builds_self_contained_nsb_link_plan_without_host_finalizer() {
+        let report = sample_report(
+            "nuis-self-contained-image",
+            vec![aot::BuildManifestDomainBuildUnit {
+                package_id: "official.cpu".to_owned(),
+                domain_family: "cpu".to_owned(),
+                abi: Some("cpu.arm64.apple_aapcs64".to_owned()),
+                machine_arch: Some("arm64".to_owned()),
+                machine_os: Some("darwin".to_owned()),
+                backend_family: Some("llvm".to_owned()),
+                vendor: None,
+                device_class: None,
+                target_device: Some("host-cpu".to_owned()),
+                ir_format: Some("llvm-bitcode".to_owned()),
+                dispatch_abi: Some("nuis-host-call".to_owned()),
+                backend_priority: Some(100),
+                verification: Some("contract-only".to_owned()),
+                selected_lowering_target: Some("llvm".to_owned()),
+                artifact_stub_path: None,
+                artifact_stub_inline: None,
+                artifact_payload_path: None,
+                artifact_bridge_stub_path: None,
+                artifact_ir_sidecar_path: None,
+                artifact_bridge_stub_inline: None,
+                artifact_payload_blob_path: None,
+                artifact_payload_blob_bytes: None,
+                artifact_payload_format: None,
+                artifact_payload_blob_inline: None,
+                contract_family: "nustar.cpu".to_owned(),
+                packaging_role: "self-contained-payload".to_owned(),
+            }],
+        );
+        let mut artifact = sample_artifact();
+        artifact.packaging_mode = "nuis-self-contained-image".to_owned();
+
+        let plan = build_link_plan(&report, &artifact);
+
+        assert_eq!(plan.packaging_mode, "nuis-self-contained-image");
+        assert_eq!(plan.final_stage.driver, "nsld-internal-image-writer");
+        assert_eq!(plan.final_stage.kind, "nuis-self-contained-image");
+        assert_eq!(plan.final_stage.link_mode, "self-contained");
+        assert_eq!(plan.final_stage.output_path, "out/demo.nsb");
+        assert_eq!(plan.compiled_artifact.binary_path, "out/demo.nsb");
+        assert!(plan
+            .final_stage
+            .notes
+            .iter()
+            .any(|note| note.contains("without delegating the final link")));
+        assert!(plan
+            .final_stage
+            .inputs
+            .iter()
+            .any(|input| input == "out/nuis.compiled.artifact"));
+    }
+
+    #[test]
     fn builds_bundle_link_plan_with_heterogeneous_domain_units() {
         let report = sample_report(
             "window-aot-bundle",

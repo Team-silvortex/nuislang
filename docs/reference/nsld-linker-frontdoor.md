@@ -282,6 +282,18 @@ automation. `verify-final-executable-pipeline`
 re-computes those entrypoint facts from disk, so deleting the stub fails the
 required-path closure and changing the stub fails the entrypoint hash check
 without making nsld responsible for executing the runner.
+
+The pure Nsld route enters through the build/link packaging mode
+`nuis-self-contained-image`. `nuisc` maps that mode to
+`final_stage_kind = "nuis-self-contained-image"`,
+`final_stage_driver = "nsld-internal-image-writer"`, and
+`final_stage_link_mode = "self-contained"`, with a `.nsb` final output path.
+This is distinct from the compatibility route
+`native-cpu-llvm -> host-native-link -> clang -> host-toolchain-finalize`.
+The compatibility route remains useful while CPU lowering and C-world wrapping
+are maturing, but the self-contained route is the protocol-first Nsld-owned
+binary path.
+
 The initial `nuis-host-runner` implementation deliberately remains thin: it
 consumes the manifest and `.nsb`, verifies the header/hash/scheduler/lifecycle
 handoff, parses the `.nsb` payload offset/span and layout/byte-map hashes, maps
@@ -422,6 +434,9 @@ bytes and reports `emitted = true`. For unprepared input or backends that
 remain blocked, it still reports `emitted = false` with blockers. This is not a
 claim that Nsld's core must consume `.o` files; it is a host-system
 compatibility lane alongside the Nuis-native container/link graph lane.
+`nsld emit-native-object` is the protocol-facing alias used by artifact-chain
+and drive recommendations for this native-object lane; it currently delegates
+to the same deterministic `emit-object` implementation and contracts.
 The command also materializes the current diagnostic artifacts:
 `nuis.nsld.object-writer-input.toml`, `nuis.nsld.object.blocked.toml`,
 `nuis.nsld.object-image-dry-run.toml`, and
