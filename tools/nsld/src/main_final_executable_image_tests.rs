@@ -78,6 +78,37 @@ fn final_executable_image_dry_run_emit_and_verify_round_trip() {
     assert!(report
         .scheduler_metadata_offset
         .is_some_and(|offset| offset < report.payload_byte_span));
+    assert_eq!(
+        report.relocation_application_strategy,
+        "nsb-loader-relocation-table"
+    );
+    assert!(report.relocation_application_count > 0);
+    assert!(report.relocation_application_table_hash.starts_with("0x"));
+    assert_eq!(report.relocation_application_audit_status, "ready");
+    assert_eq!(
+        report.relocation_application_audit_count,
+        report.relocation_application_count
+    );
+    assert!(report
+        .relocation_application_audit_table_hash
+        .starts_with("0x"));
+    assert!(report.relocation_application_audit_blockers.is_empty());
+    assert_eq!(report.relocation_patch_preview_status, "planned");
+    assert_eq!(
+        report.relocation_patch_preview_count,
+        report.relocation_application_count
+    );
+    assert!(report.relocation_patch_preview_table_hash.starts_with("0x"));
+    assert_eq!(
+        report.relocation_patch_preview_count,
+        report.relocation_patch_previews.len()
+    );
+    assert!(report.relocation_patch_previews.iter().all(|record| {
+        record.patch_kind == "u64-le-zero-placeholder"
+            && record.patch_width_bytes == 8
+            && record.patch_value_hash.starts_with("0x")
+            && record.preview_status == "planned"
+    }));
     assert!(verify.valid, "{:?}", verify.issues);
     assert_eq!(verify.actual_image_hash, emit.image_hash);
     assert_eq!(
@@ -136,6 +167,94 @@ fn final_executable_image_dry_run_emit_and_verify_round_trip() {
         verify.actual_scheduler_metadata_hash,
         report.scheduler_metadata_hash
     );
+    assert_eq!(
+        verify.expected_relocation_application_strategy,
+        "nsb-loader-relocation-table"
+    );
+    assert_eq!(
+        verify.actual_relocation_application_strategy.as_deref(),
+        Some("nsb-loader-relocation-table")
+    );
+    assert_eq!(
+        verify.expected_relocation_application_count,
+        report.relocation_application_count
+    );
+    assert_eq!(
+        verify.actual_relocation_application_count,
+        Some(report.relocation_application_count)
+    );
+    assert_eq!(
+        verify.expected_relocation_application_table_hash,
+        report.relocation_application_table_hash
+    );
+    assert_eq!(
+        verify.actual_relocation_application_table_hash.as_deref(),
+        Some(report.relocation_application_table_hash.as_str())
+    );
+    assert_eq!(verify.expected_relocation_application_audit_status, "ready");
+    assert_eq!(
+        verify.actual_relocation_application_audit_status.as_deref(),
+        Some("ready")
+    );
+    assert_eq!(
+        verify.expected_relocation_application_audit_count,
+        report.relocation_application_audit_count
+    );
+    assert_eq!(
+        verify.actual_relocation_application_audit_count,
+        Some(report.relocation_application_audit_count)
+    );
+    assert_eq!(
+        verify.expected_relocation_application_audit_table_hash,
+        report.relocation_application_audit_table_hash
+    );
+    assert_eq!(
+        verify
+            .actual_relocation_application_audit_table_hash
+            .as_deref(),
+        Some(report.relocation_application_audit_table_hash.as_str())
+    );
+    assert!(verify
+        .expected_relocation_application_audit_blockers
+        .is_empty());
+    assert!(verify
+        .actual_relocation_application_audit_blockers
+        .is_empty());
+    assert_eq!(verify.expected_relocation_patch_preview_status, "planned");
+    assert_eq!(
+        verify.actual_relocation_patch_preview_status.as_deref(),
+        Some("planned")
+    );
+    assert_eq!(
+        verify.expected_relocation_patch_preview_count,
+        report.relocation_patch_preview_count
+    );
+    assert_eq!(
+        verify.actual_relocation_patch_preview_count,
+        Some(report.relocation_patch_preview_count)
+    );
+    assert_eq!(
+        verify.expected_relocation_patch_preview_table_hash,
+        report.relocation_patch_preview_table_hash
+    );
+    assert_eq!(
+        verify.actual_relocation_patch_preview_table_hash.as_deref(),
+        Some(report.relocation_patch_preview_table_hash.as_str())
+    );
+    assert_eq!(
+        verify.expected_relocation_patch_preview_entry_count,
+        report.relocation_patch_previews.len()
+    );
+    assert_eq!(
+        verify.actual_relocation_patch_preview_entry_count,
+        Some(report.relocation_patch_previews.len())
+    );
+    assert_eq!(
+        verify
+            .actual_relocation_patch_preview_record_table_hash
+            .as_deref(),
+        Some(report.relocation_patch_preview_table_hash.as_str())
+    );
     assert!(verify
         .actual_payload_region_hash
         .as_deref()
@@ -146,11 +265,31 @@ fn final_executable_image_dry_run_emit_and_verify_round_trip() {
     assert!(report_source
         .contains("scheduler_metadata_payload_id = \"payload0004.scheduler-metadata\""));
     assert!(report_source.contains("scheduler_metadata_present = true"));
+    assert!(
+        report_source.contains("relocation_application_strategy = \"nsb-loader-relocation-table\"")
+    );
+    assert!(report_source.contains("relocation_application_table_hash = \"0x"));
+    assert!(report_source.contains("relocation_application_audit_status = \"ready\""));
+    assert!(report_source.contains("relocation_application_audit_blockers = []"));
+    assert!(report_source.contains("relocation_patch_preview_status = \"planned\""));
+    assert!(report_source.contains("relocation_patch_preview_table_hash = \"0x"));
+    assert!(report_source.contains("[[relocation_patch_preview]]"));
+    assert!(report_source.contains("patch_kind = \"u64-le-zero-placeholder\""));
     assert!(report_json.contains("\"kind\":\"nsld_final_executable_image_dry_run\""));
     assert!(report_json.contains("\"image_magic\":\"NUIFIMG\""));
     assert!(report_json
         .contains("\"scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
     assert!(report_json.contains("\"scheduler_metadata_present\":true"));
+    assert!(
+        report_json.contains("\"relocation_application_strategy\":\"nsb-loader-relocation-table\"")
+    );
+    assert!(report_json.contains("\"relocation_application_table_hash\":\"0x"));
+    assert!(report_json.contains("\"relocation_application_audit_status\":\"ready\""));
+    assert!(report_json.contains("\"relocation_application_audit_blockers\":[]"));
+    assert!(report_json.contains("\"relocation_patch_preview_status\":\"planned\""));
+    assert!(report_json.contains("\"relocation_patch_preview_table_hash\":\"0x"));
+    assert!(report_json.contains("\"relocation_patch_previews\":["));
+    assert!(report_json.contains("\"patch_kind\":\"u64-le-zero-placeholder\""));
     assert!(emit_json.contains("\"kind\":\"nsld_final_executable_image_dry_run_emit\""));
     assert!(emit_json.contains("\"image_header_size\":64"));
     assert!(verify_json.contains("\"kind\":\"nsld_final_executable_image_dry_run_verify\""));
@@ -161,6 +300,15 @@ fn final_executable_image_dry_run_emit_and_verify_round_trip() {
     assert!(verify_json
         .contains("\"actual_scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
     assert!(verify_json.contains("\"actual_scheduler_metadata_present\":true"));
+    assert!(verify_json
+        .contains("\"actual_relocation_application_strategy\":\"nsb-loader-relocation-table\""));
+    assert!(verify_json.contains("\"actual_relocation_application_table_hash\":\"0x"));
+    assert!(verify_json.contains("\"actual_relocation_application_audit_status\":\"ready\""));
+    assert!(verify_json.contains("\"actual_relocation_application_audit_blockers\":[]"));
+    assert!(verify_json.contains("\"actual_relocation_patch_preview_status\":\"planned\""));
+    assert!(verify_json.contains("\"actual_relocation_patch_preview_table_hash\":\"0x"));
+    assert!(verify_json.contains("\"actual_relocation_patch_preview_entry_count\":"));
+    assert!(verify_json.contains("\"actual_relocation_patch_preview_record_table_hash\":\"0x"));
     assert!(verify_json.contains("\"actual_image_header_size\":64"));
     assert!(verify_json.contains("\"valid\":true"));
 }
@@ -294,6 +442,60 @@ fn verify_final_executable_image_dry_run_reports_payload_region_drift() {
         .any(|issue| issue.starts_with("image_payload_region_entry_hash mismatch for ")));
     assert!(verify_json.contains("\"actual_payload_region_hash\":\"0x"));
     assert!(verify_json.contains("image_payload_region_hash mismatch"));
+}
+
+#[test]
+fn verify_final_executable_image_dry_run_reports_patch_preview_record_drift() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-image-dry-run-patch-preview-drift-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    let emit =
+        nsld_emit_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report_source = fs::read_to_string(&emit.output_path).unwrap();
+    fs::write(
+        &emit.output_path,
+        report_source.replacen(
+            "patch_kind = \"u64-le-zero-placeholder\"",
+            "patch_kind = \"tampered-placeholder\"",
+            1,
+        ),
+    )
+    .unwrap();
+    let verify =
+        nsld_verify_final_executable_image_dry_run_report(Path::new("manifest.toml"), &plan);
+    let verify_json = super::json::nsld_final_executable_image_dry_run_verify_report_json(&verify);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!verify.valid);
+    assert_eq!(
+        verify.actual_relocation_patch_preview_entry_count,
+        Some(verify.expected_relocation_patch_preview_entry_count)
+    );
+    assert_ne!(
+        verify.expected_relocation_patch_preview_table_hash,
+        verify
+            .actual_relocation_patch_preview_record_table_hash
+            .clone()
+            .unwrap()
+    );
+    assert!(verify
+        .issues
+        .iter()
+        .any(|issue| issue == "final-executable-image-dry-run-content-mismatch"));
+    assert!(verify.issues.iter().any(|issue| issue
+        .starts_with("relocation_patch_preview_record_table_hash mismatch: expected 0x")));
+    assert!(verify_json.contains("\"actual_relocation_patch_preview_entry_count\":"));
+    assert!(verify_json.contains("\"actual_relocation_patch_preview_record_table_hash\":\"0x"));
+    assert!(verify_json.contains("relocation_patch_preview_record_table_hash mismatch"));
 }
 
 #[test]

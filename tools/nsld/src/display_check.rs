@@ -240,12 +240,14 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         report.final_executable_image_dry_run_issues.len()
     );
     println!(
-        "  final_executable_blocked: present={} valid={} emitted={} hash={} blockers={} issues={}",
+        "  final_executable_blocked: present={} valid={} emitted={} hash={} blockers={} gate_status={} gate_action={} issues={}",
         report.final_executable_blocked_present,
         optional_bool_text(report.final_executable_blocked_valid),
         optional_bool_text(report.final_executable_blocked_emitted),
         optional_string_text(report.final_executable_blocked_plan_hash.as_deref()),
         optional_usize_text(report.final_executable_blocked_blocker_count),
+        optional_string_text(report.final_executable_host_finalizer_gate_status.as_deref()),
+        optional_string_text(report.final_executable_host_finalizer_gate_action.as_deref()),
         report.final_executable_blocked_issues.len()
     );
     println!(

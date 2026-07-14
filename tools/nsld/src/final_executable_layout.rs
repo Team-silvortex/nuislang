@@ -3,7 +3,7 @@ use super::{
     fnv1a64_hex,
     reports::{
         NsldFinalExecutableByteMapEntry, NsldFinalExecutablePayloadDiagnostic,
-        NsldFinalStagePlanReport,
+        NsldFinalExecutableRelocationApplicationRecord, NsldFinalStagePlanReport,
     },
 };
 
@@ -79,6 +79,11 @@ pub(crate) fn nsld_final_executable_layout_hash(
     scheduler_wait_event_count: usize,
     scheduler_emit_event_count: usize,
     data_segment_ordering: &str,
+    relocation_application_strategy: &str,
+    relocation_application_table_source: &str,
+    relocation_application_count: usize,
+    relocation_application_table_hash: &str,
+    relocation_applications: &[NsldFinalExecutableRelocationApplicationRecord],
     native_object_path: &str,
     native_object_required: bool,
     native_object_present: bool,
@@ -120,6 +125,37 @@ pub(crate) fn nsld_final_executable_layout_hash(
     material.push('\t');
     material.push_str(data_segment_ordering);
     material.push('\n');
+    material.push_str(relocation_application_strategy);
+    material.push('\t');
+    material.push_str(relocation_application_table_source);
+    material.push('\t');
+    material.push_str(&relocation_application_count.to_string());
+    material.push('\t');
+    material.push_str(relocation_application_table_hash);
+    material.push('\n');
+    for record in relocation_applications {
+        material.push_str("relocation-application\t");
+        material.push_str(&record.order_index.to_string());
+        material.push('\t');
+        material.push_str(&record.relocation_id);
+        material.push('\t');
+        material.push_str(&record.relocation_kind);
+        material.push('\t');
+        material.push_str(&record.source_payload_id);
+        material.push('\t');
+        material.push_str(&record.source_section_id);
+        material.push('\t');
+        material.push_str(&record.source_offset.to_string());
+        material.push('\t');
+        material.push_str(&record.image_offset.to_string());
+        material.push('\t');
+        material.push_str(&record.target_symbol_id);
+        material.push('\t');
+        material.push_str(&record.addend.to_string());
+        material.push('\t');
+        material.push_str(&record.application_status);
+        material.push('\n');
+    }
     material.push_str(native_object_path);
     material.push('\t');
     material.push_str(if native_object_required {
@@ -212,6 +248,35 @@ pub(crate) fn nsld_final_executable_byte_map_hash(
         material.push_str(&entry.alignment.to_string());
         material.push('\t');
         material.push_str(&entry.content_hash);
+        material.push('\n');
+    }
+    fnv1a64_hex(material.as_bytes())
+}
+
+pub(crate) fn nsld_final_executable_relocation_application_table_hash(
+    records: &[NsldFinalExecutableRelocationApplicationRecord],
+) -> String {
+    let mut material = String::new();
+    for record in records {
+        material.push_str(&record.order_index.to_string());
+        material.push('\t');
+        material.push_str(&record.relocation_id);
+        material.push('\t');
+        material.push_str(&record.relocation_kind);
+        material.push('\t');
+        material.push_str(&record.source_payload_id);
+        material.push('\t');
+        material.push_str(&record.source_section_id);
+        material.push('\t');
+        material.push_str(&record.source_offset.to_string());
+        material.push('\t');
+        material.push_str(&record.image_offset.to_string());
+        material.push('\t');
+        material.push_str(&record.target_symbol_id);
+        material.push('\t');
+        material.push_str(&record.addend.to_string());
+        material.push('\t');
+        material.push_str(&record.application_status);
         material.push('\n');
     }
     fnv1a64_hex(material.as_bytes())

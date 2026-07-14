@@ -16,7 +16,8 @@ use super::{
     fnv1a64_hex,
     reports::{
         NsldFinalExecutableImageDryRunEmitReport, NsldFinalExecutableImageDryRunReport,
-        NsldFinalExecutableImageDryRunVerifyReport,
+        NsldFinalExecutableImageDryRunVerifyReport, NsldFinalExecutableRelocationApplicationRecord,
+        NsldFinalExecutableRelocationPatchPreviewRecord,
     },
     toml,
 };
@@ -40,6 +41,18 @@ pub(crate) fn nsld_final_executable_image_dry_run_report(
     if layout.byte_map_entries.len() != layout.payloads.len() {
         blockers.push("final-executable-byte-map:payload-count-mismatch".to_owned());
     }
+    let relocation_audit = relocation_application_audit(
+        &layout.relocation_applications,
+        FINAL_EXECUTABLE_IMAGE_HEADER_SIZE,
+        layout.byte_span,
+    );
+    blockers.extend(
+        relocation_audit
+            .blockers
+            .iter()
+            .map(|blocker| format!("relocation-application-audit:{blocker}")),
+    );
+    let patch_preview = relocation_patch_preview(&layout.relocation_applications);
     let image_constructed = image.is_some();
     let image_ready = image_constructed && blockers.is_empty();
     let image_size_bytes = image.as_ref().map(Vec::len);
@@ -81,6 +94,17 @@ pub(crate) fn nsld_final_executable_image_dry_run_report(
         scheduler_metadata_present,
         scheduler_metadata_offset,
         scheduler_metadata_hash,
+        relocation_application_strategy: layout.relocation_application_strategy,
+        relocation_application_count: layout.relocation_application_count,
+        relocation_application_table_hash: layout.relocation_application_table_hash,
+        relocation_application_audit_status: relocation_audit.status,
+        relocation_application_audit_count: relocation_audit.count,
+        relocation_application_audit_table_hash: relocation_audit.table_hash,
+        relocation_application_audit_blockers: relocation_audit.blockers,
+        relocation_patch_preview_status: patch_preview.status,
+        relocation_patch_preview_count: patch_preview.count,
+        relocation_patch_preview_table_hash: patch_preview.table_hash,
+        relocation_patch_previews: patch_preview.records,
         image_constructed,
         image_ready,
         image_size_bytes,
@@ -163,6 +187,17 @@ pub(crate) fn nsld_verify_final_executable_image_dry_run_report(
         actual_scheduler_metadata_present,
         actual_scheduler_metadata_offset,
         actual_scheduler_metadata_hash,
+        actual_relocation_application_strategy,
+        actual_relocation_application_count,
+        actual_relocation_application_table_hash,
+        actual_relocation_application_audit_status,
+        actual_relocation_application_audit_count,
+        actual_relocation_application_audit_table_hash,
+        actual_relocation_application_audit_blockers,
+        actual_relocation_patch_preview_status,
+        actual_relocation_patch_preview_count,
+        actual_relocation_patch_preview_table_hash,
+        actual_relocation_patch_preview_records,
         actual_blockers,
     ) = match actual.as_ref() {
         Ok(source) => (
@@ -178,6 +213,17 @@ pub(crate) fn nsld_verify_final_executable_image_dry_run_report(
             toml::bool_value(source, "scheduler_metadata_present"),
             optional_usize_value(source, "scheduler_metadata_offset"),
             non_empty_toml_string(source, "scheduler_metadata_hash"),
+            non_empty_toml_string(source, "relocation_application_strategy"),
+            toml::usize_value(source, "relocation_application_count"),
+            non_empty_toml_string(source, "relocation_application_table_hash"),
+            non_empty_toml_string(source, "relocation_application_audit_status"),
+            toml::usize_value(source, "relocation_application_audit_count"),
+            non_empty_toml_string(source, "relocation_application_audit_table_hash"),
+            toml::string_array_value(source, "relocation_application_audit_blockers"),
+            non_empty_toml_string(source, "relocation_patch_preview_status"),
+            toml::usize_value(source, "relocation_patch_preview_count"),
+            non_empty_toml_string(source, "relocation_patch_preview_table_hash"),
+            relocation_patch_preview_records_from_source(source),
             toml::string_array_value(source, "blockers"),
         ),
         Err(error) => {
@@ -195,10 +241,29 @@ pub(crate) fn nsld_verify_final_executable_image_dry_run_report(
                 None,
                 None,
                 None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Vec::new(),
+                None,
+                None,
+                None,
+                Vec::new(),
                 Vec::new(),
             )
         }
     };
+    let actual_relocation_patch_preview_entry_count = actual
+        .as_ref()
+        .ok()
+        .map(|_| actual_relocation_patch_preview_records.len());
+    let actual_relocation_patch_preview_record_table_hash = actual
+        .as_ref()
+        .ok()
+        .map(|_| relocation_patch_preview_table_hash(&actual_relocation_patch_preview_records));
     if let Ok(actual) = actual {
         if actual != expected_source {
             issues.push("final-executable-image-dry-run-content-mismatch".to_owned());
@@ -304,6 +369,97 @@ pub(crate) fn nsld_verify_final_executable_image_dry_run_report(
                     .unwrap_or_else(|| "missing".to_owned())
             ));
         }
+        push_optional_string_mismatch(
+            &mut issues,
+            "relocation_application_strategy",
+            Some(expected.relocation_application_strategy.as_str()),
+            actual_relocation_application_strategy.as_deref(),
+        );
+        if actual_relocation_application_count != Some(expected.relocation_application_count) {
+            issues.push(format!(
+                "relocation_application_count mismatch: expected {}, found {}",
+                expected.relocation_application_count,
+                actual_relocation_application_count
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        push_optional_string_mismatch(
+            &mut issues,
+            "relocation_application_table_hash",
+            Some(expected.relocation_application_table_hash.as_str()),
+            actual_relocation_application_table_hash.as_deref(),
+        );
+        push_optional_string_mismatch(
+            &mut issues,
+            "relocation_application_audit_status",
+            Some(expected.relocation_application_audit_status.as_str()),
+            actual_relocation_application_audit_status.as_deref(),
+        );
+        if actual_relocation_application_audit_count
+            != Some(expected.relocation_application_audit_count)
+        {
+            issues.push(format!(
+                "relocation_application_audit_count mismatch: expected {}, found {}",
+                expected.relocation_application_audit_count,
+                actual_relocation_application_audit_count
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        push_optional_string_mismatch(
+            &mut issues,
+            "relocation_application_audit_table_hash",
+            Some(expected.relocation_application_audit_table_hash.as_str()),
+            actual_relocation_application_audit_table_hash.as_deref(),
+        );
+        if actual_relocation_application_audit_blockers
+            != expected.relocation_application_audit_blockers
+        {
+            issues.push(format!(
+                "relocation_application_audit_blockers mismatch: expected [{}], found [{}]",
+                expected.relocation_application_audit_blockers.join(", "),
+                actual_relocation_application_audit_blockers.join(", ")
+            ));
+        }
+        push_optional_string_mismatch(
+            &mut issues,
+            "relocation_patch_preview_status",
+            Some(expected.relocation_patch_preview_status.as_str()),
+            actual_relocation_patch_preview_status.as_deref(),
+        );
+        if actual_relocation_patch_preview_count != Some(expected.relocation_patch_preview_count) {
+            issues.push(format!(
+                "relocation_patch_preview_count mismatch: expected {}, found {}",
+                expected.relocation_patch_preview_count,
+                actual_relocation_patch_preview_count
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        push_optional_string_mismatch(
+            &mut issues,
+            "relocation_patch_preview_table_hash",
+            Some(expected.relocation_patch_preview_table_hash.as_str()),
+            actual_relocation_patch_preview_table_hash.as_deref(),
+        );
+        if actual_relocation_patch_preview_entry_count
+            != Some(expected.relocation_patch_previews.len())
+        {
+            issues.push(format!(
+                "relocation_patch_preview_entry_count mismatch: expected {}, found {}",
+                expected.relocation_patch_previews.len(),
+                actual_relocation_patch_preview_entry_count
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        push_optional_string_mismatch(
+            &mut issues,
+            "relocation_patch_preview_record_table_hash",
+            Some(expected.relocation_patch_preview_table_hash.as_str()),
+            actual_relocation_patch_preview_record_table_hash.as_deref(),
+        );
         if actual_blockers != expected.blockers {
             issues.push(format!(
                 "blockers mismatch: expected [{}], found [{}]",
@@ -434,6 +590,31 @@ pub(crate) fn nsld_verify_final_executable_image_dry_run_report(
         actual_scheduler_metadata_offset,
         expected_scheduler_metadata_hash: expected.scheduler_metadata_hash,
         actual_scheduler_metadata_hash,
+        expected_relocation_application_strategy: expected.relocation_application_strategy,
+        actual_relocation_application_strategy,
+        expected_relocation_application_count: expected.relocation_application_count,
+        actual_relocation_application_count,
+        expected_relocation_application_table_hash: expected.relocation_application_table_hash,
+        actual_relocation_application_table_hash,
+        expected_relocation_application_audit_status: expected.relocation_application_audit_status,
+        actual_relocation_application_audit_status,
+        expected_relocation_application_audit_count: expected.relocation_application_audit_count,
+        actual_relocation_application_audit_count,
+        expected_relocation_application_audit_table_hash: expected
+            .relocation_application_audit_table_hash,
+        actual_relocation_application_audit_table_hash,
+        expected_relocation_application_audit_blockers: expected
+            .relocation_application_audit_blockers,
+        actual_relocation_application_audit_blockers,
+        expected_relocation_patch_preview_status: expected.relocation_patch_preview_status,
+        actual_relocation_patch_preview_status,
+        expected_relocation_patch_preview_count: expected.relocation_patch_preview_count,
+        actual_relocation_patch_preview_count,
+        expected_relocation_patch_preview_table_hash: expected.relocation_patch_preview_table_hash,
+        actual_relocation_patch_preview_table_hash,
+        expected_relocation_patch_preview_entry_count: expected.relocation_patch_previews.len(),
+        actual_relocation_patch_preview_entry_count,
+        actual_relocation_patch_preview_record_table_hash,
         expected_image_constructed: expected.image_constructed,
         actual_image_constructed,
         expected_image_ready: expected.image_ready,
@@ -445,5 +626,188 @@ pub(crate) fn nsld_verify_final_executable_image_dry_run_report(
         expected_blockers: expected.blockers,
         actual_blockers,
         issues,
+    }
+}
+
+struct RelocationPatchPreview {
+    status: String,
+    count: usize,
+    table_hash: String,
+    records: Vec<NsldFinalExecutableRelocationPatchPreviewRecord>,
+}
+
+fn relocation_patch_preview_records_from_source(
+    source: &str,
+) -> Vec<NsldFinalExecutableRelocationPatchPreviewRecord> {
+    toml_table_blocks(source, "relocation_patch_preview")
+        .into_iter()
+        .filter_map(|block| {
+            Some(NsldFinalExecutableRelocationPatchPreviewRecord {
+                order_index: toml_block_usize_value(&block, "order_index")?,
+                relocation_id: toml_block_string_value(&block, "relocation_id")?,
+                patch_kind: toml_block_string_value(&block, "patch_kind")?,
+                patch_offset: toml_block_usize_value(&block, "patch_offset")?,
+                patch_width_bytes: toml_block_usize_value(&block, "patch_width_bytes")?,
+                patch_value_hash: toml_block_string_value(&block, "patch_value_hash")?,
+                target_symbol_id: toml_block_string_value(&block, "target_symbol_id")?,
+                preview_status: toml_block_string_value(&block, "preview_status")?,
+            })
+        })
+        .collect()
+}
+
+fn toml_table_blocks<'a>(source: &'a str, table: &str) -> Vec<Vec<&'a str>> {
+    let header = format!("[[{table}]]");
+    let mut blocks = Vec::new();
+    let mut current: Option<Vec<&'a str>> = None;
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("[[") && trimmed.ends_with("]]") {
+            if let Some(block) = current.take() {
+                blocks.push(block);
+            }
+            current = (trimmed == header).then(Vec::new);
+        } else if let Some(block) = current.as_mut() {
+            block.push(line);
+        }
+    }
+    if let Some(block) = current {
+        blocks.push(block);
+    }
+    blocks
+}
+
+fn toml_block_string_value(block: &[&str], key: &str) -> Option<String> {
+    let raw = toml_block_value(block, key)?.trim();
+    let quoted = raw.strip_prefix('"')?.strip_suffix('"')?;
+    Some(quoted.replace("\\\"", "\"").replace("\\\\", "\\"))
+}
+
+fn toml_block_usize_value(block: &[&str], key: &str) -> Option<usize> {
+    toml_block_value(block, key)?.trim().parse().ok()
+}
+
+fn toml_block_value<'a>(block: &'a [&str], key: &str) -> Option<&'a str> {
+    let prefix = format!("{key} =");
+    block
+        .iter()
+        .map(|line| line.trim())
+        .find_map(|line| line.strip_prefix(&prefix))
+}
+
+fn relocation_patch_preview(
+    applications: &[NsldFinalExecutableRelocationApplicationRecord],
+) -> RelocationPatchPreview {
+    let records = applications
+        .iter()
+        .map(
+            |application| NsldFinalExecutableRelocationPatchPreviewRecord {
+                order_index: application.order_index,
+                relocation_id: application.relocation_id.clone(),
+                patch_kind: "u64-le-zero-placeholder".to_owned(),
+                patch_offset: FINAL_EXECUTABLE_IMAGE_HEADER_SIZE
+                    .saturating_add(application.image_offset),
+                patch_width_bytes: 8,
+                patch_value_hash: fnv1a64_hex(&[0; 8]),
+                target_symbol_id: application.target_symbol_id.clone(),
+                preview_status: "planned".to_owned(),
+            },
+        )
+        .collect::<Vec<_>>();
+    let table_hash = relocation_patch_preview_table_hash(&records);
+    RelocationPatchPreview {
+        status: if records.is_empty() {
+            "empty".to_owned()
+        } else {
+            "planned".to_owned()
+        },
+        count: records.len(),
+        table_hash,
+        records,
+    }
+}
+
+fn relocation_patch_preview_table_hash(
+    records: &[NsldFinalExecutableRelocationPatchPreviewRecord],
+) -> String {
+    let mut material = String::new();
+    for record in records {
+        material.push_str(&record.order_index.to_string());
+        material.push('\t');
+        material.push_str(&record.relocation_id);
+        material.push('\t');
+        material.push_str(&record.patch_kind);
+        material.push('\t');
+        material.push_str(&record.patch_offset.to_string());
+        material.push('\t');
+        material.push_str(&record.patch_width_bytes.to_string());
+        material.push('\t');
+        material.push_str(&record.patch_value_hash);
+        material.push('\t');
+        material.push_str(&record.target_symbol_id);
+        material.push('\t');
+        material.push_str(&record.preview_status);
+        material.push('\n');
+    }
+    fnv1a64_hex(material.as_bytes())
+}
+
+struct RelocationApplicationAudit {
+    status: String,
+    count: usize,
+    table_hash: String,
+    blockers: Vec<String>,
+}
+
+fn relocation_application_audit(
+    records: &[NsldFinalExecutableRelocationApplicationRecord],
+    payload_byte_offset: usize,
+    payload_byte_span: usize,
+) -> RelocationApplicationAudit {
+    let payload_end = payload_byte_offset.saturating_add(payload_byte_span);
+    let mut blockers = Vec::new();
+    let mut material = String::new();
+    for record in records {
+        let image_offset = payload_byte_offset.saturating_add(record.image_offset);
+        let status = if record.application_status != "planned" {
+            "status-blocked"
+        } else if image_offset >= payload_end {
+            "out-of-bounds"
+        } else {
+            "audited"
+        };
+        if status != "audited" {
+            blockers.push(format!("{}:{status}", record.relocation_id));
+        }
+        material.push_str(&record.order_index.to_string());
+        material.push('\t');
+        material.push_str(&record.relocation_id);
+        material.push('\t');
+        material.push_str(&record.relocation_kind);
+        material.push('\t');
+        material.push_str(&record.source_payload_id);
+        material.push('\t');
+        material.push_str(&record.source_section_id);
+        material.push('\t');
+        material.push_str(&record.source_offset.to_string());
+        material.push('\t');
+        material.push_str(&image_offset.to_string());
+        material.push('\t');
+        material.push_str(&record.target_symbol_id);
+        material.push('\t');
+        material.push_str(&record.addend.to_string());
+        material.push('\t');
+        material.push_str(status);
+        material.push('\n');
+    }
+    RelocationApplicationAudit {
+        status: if blockers.is_empty() {
+            "ready".to_owned()
+        } else {
+            "blocked".to_owned()
+        },
+        count: records.len(),
+        table_hash: fnv1a64_hex(material.as_bytes()),
+        blockers,
     }
 }

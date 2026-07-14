@@ -165,6 +165,19 @@ These fields now form the current visible link summary:
   human-readable explanation for the aggregate recommendation; a missing Nsld
   host entrypoint stub is reported as `blocked` instead of being hidden by the
   legacy host-binary fallback
+* `artifact_closure_kind`
+  `artifact-doctor --json` aggregate closure kind, currently
+  `nsld-host-entrypoint`, `host-binary`, or `none`
+* `artifact_closure_status`
+  `ready` when the artifact closure has a usable launch surface, otherwise
+  `blocked`
+* `artifact_closure_command`
+  command-like launch summary for the artifact closure, or `null`
+* `artifact_closure_entrypoint_path`
+  resolved host entrypoint path when the artifact closure prefers the Nsld
+  host-entrypoint route
+* `artifact_closure_reason`
+  human-readable explanation for the artifact closure recommendation
 * `nsld_final_executable_output_recommended_next_action`
   the script-facing next action for the current boundary, such as
   `emit-final-executable-pipeline`,

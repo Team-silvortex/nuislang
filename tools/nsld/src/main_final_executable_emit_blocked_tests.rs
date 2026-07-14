@@ -111,6 +111,9 @@ fn emit_final_executable_writes_blocked_boundary_report() {
     assert!(report_source.contains("host_invoke_plan_valid = false"));
     assert!(report_source.contains("host_invoke_plan_hash = \"\""));
     assert!(report_source.contains("host_invoke_plan_invocation_policy = \"\""));
+    assert!(report_source.contains("host_finalizer_gate_status = \"invoke-plan-invalid\""));
+    assert!(report_source
+        .contains("host_finalizer_gate_action = \"emit-final-executable-host-invoke-plan\""));
     assert!(report_source.contains("host_invoke_plan_requires_explicit_allow = false"));
     assert!(report_source.contains("host_invoke_plan_explicit_allow_present = false"));
     assert!(report_source.contains("host_invoke_plan_would_invoke = false"));
@@ -128,6 +131,9 @@ fn emit_final_executable_writes_blocked_boundary_report() {
     assert!(emit_json.contains("\"host_dry_run_environment_ready\":"));
     assert!(emit_json.contains("\"host_invoke_plan_valid\":false"));
     assert!(emit_json.contains("\"host_invoke_plan_invocation_policy\":null"));
+    assert!(emit_json.contains("\"host_finalizer_gate_status\":\"invoke-plan-invalid\""));
+    assert!(emit_json
+        .contains("\"host_finalizer_gate_action\":\"emit-final-executable-host-invoke-plan\""));
     assert!(emit_json.contains("\"host_invoke_plan_requires_explicit_allow\":false"));
     assert!(emit_json.contains("\"host_invoke_plan_explicit_allow_present\":false"));
     assert!(emit_json.contains("\"host_invoke_plan_would_invoke\":false"));

@@ -50,6 +50,8 @@ pub(crate) struct NsldCheckFinalSnapshot {
     pub(crate) final_executable_blocked_emitted: Option<bool>,
     pub(crate) final_executable_blocked_plan_hash: Option<String>,
     pub(crate) final_executable_blocked_blocker_count: Option<usize>,
+    pub(crate) final_executable_host_finalizer_gate_status: Option<String>,
+    pub(crate) final_executable_host_finalizer_gate_action: Option<String>,
     pub(crate) final_executable_blocked_issues: Vec<String>,
     pub(crate) final_executable_output_path_present: bool,
     pub(crate) final_executable_output_kind: String,
@@ -225,6 +227,12 @@ pub(crate) fn nsld_check_final_snapshot(
     let final_executable_blocked_blocker_count = final_executable_blocked_verify_report
         .as_ref()
         .and_then(|report| report.actual_blocker_count);
+    let final_executable_host_finalizer_gate_status = final_executable_blocked_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_host_finalizer_gate_status.clone());
+    let final_executable_host_finalizer_gate_action = final_executable_blocked_verify_report
+        .as_ref()
+        .and_then(|report| report.actual_host_finalizer_gate_action.clone());
     let final_executable_blocked_issues = final_executable_blocked_verify_report
         .as_ref()
         .map(|report| report.issues.clone())
@@ -330,6 +338,8 @@ pub(crate) fn nsld_check_final_snapshot(
         final_executable_blocked_emitted,
         final_executable_blocked_plan_hash,
         final_executable_blocked_blocker_count,
+        final_executable_host_finalizer_gate_status,
+        final_executable_host_finalizer_gate_action,
         final_executable_blocked_issues,
         final_executable_output_path_present,
         final_executable_output_kind,

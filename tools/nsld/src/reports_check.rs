@@ -135,6 +135,8 @@ pub(crate) struct NsldCheckReport {
     pub(crate) final_executable_blocked_emitted: Option<bool>,
     pub(crate) final_executable_blocked_plan_hash: Option<String>,
     pub(crate) final_executable_blocked_blocker_count: Option<usize>,
+    pub(crate) final_executable_host_finalizer_gate_status: Option<String>,
+    pub(crate) final_executable_host_finalizer_gate_action: Option<String>,
     pub(crate) final_executable_blocked_issues: Vec<String>,
     pub(crate) final_executable_output_path_present: bool,
     pub(crate) final_executable_output_kind: String,

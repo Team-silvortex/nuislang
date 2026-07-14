@@ -119,6 +119,8 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
         host_invoke_plan_explicit_allow_present: actual_host_invoke_plan_explicit_allow_present,
         host_invoke_plan_blocker_count: actual_host_invoke_plan_blocker_count,
         host_invoke_plan_issues: actual_host_invoke_plan_issues,
+        host_finalizer_gate_status: actual_host_finalizer_gate_status,
+        host_finalizer_gate_action: actual_host_finalizer_gate_action,
         layout_plan_valid: actual_layout_plan_valid,
         layout_plan_hash: actual_layout_plan_hash,
         layout_plan_issues: actual_layout_plan_issues,
@@ -452,6 +454,11 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
         }
     }
 
+    let expected_host_finalizer_gate_status =
+        super::final_executable_render::host_finalizer_gate_status(&expected).to_owned();
+    let expected_host_finalizer_gate_action =
+        super::final_executable_render::host_finalizer_gate_action(&expected).to_owned();
+
     NsldFinalExecutableEmitVerifyReport {
         manifest: manifest.display().to_string(),
         input_path: input_path.display().to_string(),
@@ -505,6 +512,10 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
         actual_host_invoke_plan_blocker_count,
         expected_host_invoke_plan_issues: expected.host_invoke_plan_issues,
         actual_host_invoke_plan_issues,
+        expected_host_finalizer_gate_status,
+        actual_host_finalizer_gate_status,
+        expected_host_finalizer_gate_action,
+        actual_host_finalizer_gate_action,
         expected_layout_plan_valid: expected.layout_plan_valid,
         actual_layout_plan_valid,
         expected_layout_plan_hash: expected.layout_plan_hash,

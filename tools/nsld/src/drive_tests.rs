@@ -146,6 +146,36 @@ fn drive_apply_rejects_unlisted_next_action() {
 }
 
 #[test]
+fn drive_apply_treats_final_output_boundary_as_read_only() {
+    let plan = empty_link_plan();
+    let next_action = NsldCheckNextAction {
+        available: true,
+        source: Some("final-output-boundary".to_owned()),
+        command_id: Some("final-executable-output".to_owned()),
+        command: Some("nsld final-executable-output <input>".to_owned()),
+        command_resolved: Some("nsld final-executable-output manifest.toml".to_owned()),
+        reason: Some(
+            "final executable output boundary is blocked by `final-executable-output:not-nsld-owned`"
+                .to_owned(),
+        ),
+    };
+
+    let report =
+        nsld_drive_apply_next_action(Path::new("manifest.toml"), &plan, &next_action).unwrap();
+
+    assert!(!report.applied);
+    assert_eq!(
+        report.command_id.as_deref(),
+        Some("final-executable-output")
+    );
+    assert_eq!(report.message, "read-only-boundary:final-executable-output");
+    let json = nsld_drive_apply_report_json(&report);
+    assert!(json.contains("\"applied\":false"));
+    assert!(json.contains("\"mutates_artifacts\":false"));
+    assert!(json.contains("\"command_id\":\"final-executable-output\""));
+}
+
+#[test]
 fn drive_until_clean_reports_not_applied_stop_for_unlisted_action() {
     let plan = empty_link_plan();
     let next_action = NsldCheckNextAction {
@@ -254,13 +284,22 @@ fn drive_apply_until_clean_reaches_host_assisted_pipeline_blockers() {
     let final_output_present = Path::new(&plan.final_stage.output_path).exists();
     fs::remove_dir_all(dir).unwrap();
 
-    assert!(report.completed, "{:?}", report.messages);
+    assert!(!report.completed, "{:?}", report.messages);
     assert!(!report.capped);
-    assert_eq!(report.stop_reason, "clean");
-    assert_eq!(report.stop_command_id, None);
-    assert_eq!(report.stop_source, None);
-    assert_eq!(report.stop_command_resolved, None);
-    assert_eq!(report.stop_action_reason, None);
+    assert_eq!(report.stop_reason, "blocked-boundary");
+    assert_eq!(
+        report.stop_command_id.as_deref(),
+        Some("final-executable-output")
+    );
+    assert_eq!(report.stop_source.as_deref(), Some("final-output-boundary"));
+    assert!(report
+        .stop_command_resolved
+        .as_deref()
+        .is_some_and(|command| command.contains("nsld final-executable-output")));
+    assert!(report
+        .stop_action_reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("final-executable-output")));
     assert_eq!(
         report.last_command_id.as_deref(),
         Some("emit-final-executable-pipeline")
@@ -272,7 +311,7 @@ fn drive_apply_until_clean_reaches_host_assisted_pipeline_blockers() {
         .any(|message| message == "applied emit-final-executable-pipeline"));
     assert_eq!(
         report.messages.last().map(String::as_str),
-        Some("no-next-action")
+        Some("read-only-boundary:final-executable-output")
     );
     assert!(
         check.valid,
@@ -343,6 +382,19 @@ fn drive_until_clean_command_reaches_host_assisted_pipeline_block() {
     assert!(!check.artifact_chain_next_action_available);
     assert_eq!(check.artifact_chain_next_action_command_id, None);
     assert_eq!(check.artifact_chain_next_action_source, None);
+    assert!(check.next_action_available);
+    assert_eq!(
+        check.next_action_source.as_deref(),
+        Some("final-output-boundary")
+    );
+    assert_eq!(
+        check.next_action_command_id.as_deref(),
+        Some("final-executable-output")
+    );
+    assert_eq!(
+        check.next_action_command_resolved.as_deref(),
+        Some(expected_boundary_command.as_str())
+    );
     assert!(!check.artifact_chain_final_output_boundary_ready);
     assert_eq!(
         check
@@ -383,6 +435,14 @@ fn drive_until_clean_command_reaches_host_assisted_pipeline_block() {
         .final_executable_output_blockers
         .iter()
         .any(|blocker| blocker == "final-executable-output:not-nsld-owned"));
+    assert_eq!(
+        check.final_executable_host_finalizer_gate_status.as_deref(),
+        Some("policy-blocked")
+    );
+    assert_eq!(
+        check.final_executable_host_finalizer_gate_action.as_deref(),
+        Some("set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke")
+    );
 }
 
 fn write_test_build_manifest(dir: &Path) -> String {

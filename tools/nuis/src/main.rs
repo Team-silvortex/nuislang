@@ -1690,6 +1690,9 @@ pub(crate) fn render_artifact_doctor_json(input: &Path) -> String {
         .binary_path
         .as_ref()
         .map(|path| path.display().to_string());
+    let resolved_binary = report.binary_path.as_deref().filter(|path| path.exists());
+    let artifact_closure =
+        run_artifact_prelaunch_summary(report.output_dir.as_deref(), resolved_binary);
     let mut out = String::from("{");
     append_json_field_strings(
         &mut out,
@@ -1731,6 +1734,17 @@ pub(crate) fn render_artifact_doctor_json(input: &Path) -> String {
             json_string_array_field("lowering_targets", &report.lowering_targets),
             artifact_lowering_units_json(&report.lowering_units),
             json_bool_field("ready_to_run", report.ready_to_run),
+            json_field("artifact_closure_kind", &artifact_closure.kind),
+            json_field("artifact_closure_status", &artifact_closure.status),
+            json_optional_string_field(
+                "artifact_closure_command",
+                artifact_closure.command.as_deref(),
+            ),
+            json_optional_string_field(
+                "artifact_closure_entrypoint_path",
+                artifact_closure.entrypoint_path.as_deref(),
+            ),
+            json_field("artifact_closure_reason", &artifact_closure.reason),
             json_field("recommended_next_step", &report.recommended_next_step),
             json_field("recommended_command", &report.recommended_command),
             json_field("recommended_reason", &report.recommended_reason),
@@ -2300,6 +2314,23 @@ fn handle_artifact_doctor(input: PathBuf, json: bool) -> Result<(), String> {
         println!("  lowering_targets: {}", report.lowering_targets.join(", "));
     }
     println!("  ready_to_run: {}", report.ready_to_run);
+    let resolved_binary = report.binary_path.as_deref().filter(|path| path.exists());
+    let artifact_closure =
+        run_artifact_prelaunch_summary(report.output_dir.as_deref(), resolved_binary);
+    println!("  artifact_closure_kind: {}", artifact_closure.kind);
+    println!("  artifact_closure_status: {}", artifact_closure.status);
+    println!(
+        "  artifact_closure_command: {}",
+        artifact_closure.command.as_deref().unwrap_or("<none>")
+    );
+    println!(
+        "  artifact_closure_entrypoint_path: {}",
+        artifact_closure
+            .entrypoint_path
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    println!("  artifact_closure_reason: {}", artifact_closure.reason);
     println!(
         "  artifact_diagnostic_code: {}",
         diagnostics.artifact_diagnostic_code

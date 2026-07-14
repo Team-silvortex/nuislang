@@ -37,6 +37,22 @@ pub(crate) fn nsld_final_executable_layout_plan_report_json(
             report.scheduler_emit_event_count,
         ),
         json_string_field("data_segment_ordering", &report.data_segment_ordering),
+        json_string_field(
+            "relocation_application_strategy",
+            &report.relocation_application_strategy,
+        ),
+        json_string_field(
+            "relocation_application_table_source",
+            &report.relocation_application_table_source,
+        ),
+        json_usize_field(
+            "relocation_application_count",
+            report.relocation_application_count,
+        ),
+        json_string_field(
+            "relocation_application_table_hash",
+            &report.relocation_application_table_hash,
+        ),
         json_string_field("native_object_path", &report.native_object_path),
         json_bool_field("native_object_required", report.native_object_required),
         json_bool_field("native_object_present", report.native_object_present),
@@ -57,6 +73,10 @@ pub(crate) fn nsld_final_executable_layout_plan_report_json(
         format!(
             "\"byte_map_entries\":[{}]",
             final_executable_byte_map_entries_json(&report.byte_map_entries)
+        ),
+        format!(
+            "\"relocation_applications\":[{}]",
+            final_executable_relocation_applications_json(&report.relocation_applications)
         ),
         json_string_array_field("notes", &report.notes),
     ];
@@ -134,6 +154,30 @@ pub(crate) fn nsld_final_executable_layout_plan_verify_report_json(
             report.actual_scheduler_hetero_node_count,
         ),
         json_string_field(
+            "expected_relocation_application_strategy",
+            &report.expected_relocation_application_strategy,
+        ),
+        json_optional_string_field(
+            "actual_relocation_application_strategy",
+            report.actual_relocation_application_strategy.as_deref(),
+        ),
+        json_usize_field(
+            "expected_relocation_application_count",
+            report.expected_relocation_application_count,
+        ),
+        json_optional_usize_field(
+            "actual_relocation_application_count",
+            report.actual_relocation_application_count,
+        ),
+        json_string_field(
+            "expected_relocation_application_table_hash",
+            &report.expected_relocation_application_table_hash,
+        ),
+        json_optional_string_field(
+            "actual_relocation_application_table_hash",
+            report.actual_relocation_application_table_hash.as_deref(),
+        ),
+        json_string_field(
             "expected_platform_envelope_family",
             &report.expected_platform_envelope_family,
         ),
@@ -180,6 +224,30 @@ fn final_executable_byte_map_entries_json(entries: &[NsldFinalExecutableByteMapE
                 json_usize_field("size_bytes", entry.size_bytes),
                 json_usize_field("alignment", entry.alignment),
                 json_string_field("content_hash", &entry.content_hash),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn final_executable_relocation_applications_json(
+    records: &[NsldFinalExecutableRelocationApplicationRecord],
+) -> String {
+    records
+        .iter()
+        .map(|record| {
+            let fields = [
+                json_usize_field("order_index", record.order_index),
+                json_string_field("relocation_id", &record.relocation_id),
+                json_string_field("relocation_kind", &record.relocation_kind),
+                json_string_field("source_payload_id", &record.source_payload_id),
+                json_string_field("source_section_id", &record.source_section_id),
+                json_usize_field("source_offset", record.source_offset),
+                json_usize_field("image_offset", record.image_offset),
+                json_string_field("target_symbol_id", &record.target_symbol_id),
+                json_isize_field("addend", record.addend),
+                json_string_field("application_status", &record.application_status),
             ];
             format!("{{{}}}", fields.join(","))
         })

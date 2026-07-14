@@ -168,6 +168,14 @@ pub(crate) fn nsld_drive_apply_next_action(
             message: "next-action-command-id-missing".to_owned(),
         });
     };
+    if next_action.source.as_deref() == Some("final-output-boundary") {
+        return Ok(NsldDriveApplyReport {
+            applied: false,
+            command_id: Some(command_id.to_owned()),
+            command_resolved: next_action.command_resolved.clone(),
+            message: format!("read-only-boundary:{command_id}"),
+        });
+    }
     match command_id {
         "prepare" => {
             nsld_prepare_report(manifest, plan)?;
@@ -297,15 +305,18 @@ pub(crate) fn nsld_drive_apply_until_clean(
         let applied = apply_report.applied;
         messages.push(apply_report.message);
         if !applied {
+            let stop_reason = if next_action.source.as_deref() == Some("final-output-boundary") {
+                "blocked-boundary"
+            } else if next_action.available {
+                "not-applied"
+            } else {
+                "clean"
+            };
             return Ok(NsldDriveUntilCleanReport {
                 completed: !next_action.available,
                 applied_steps,
                 capped: false,
-                stop_reason: if next_action.available {
-                    "not-applied".to_owned()
-                } else {
-                    "clean".to_owned()
-                },
+                stop_reason: stop_reason.to_owned(),
                 stop_command_id: command_id,
                 stop_source: next_action.source.clone(),
                 stop_command_resolved: next_action.command_resolved.clone(),

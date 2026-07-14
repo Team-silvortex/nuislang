@@ -562,6 +562,47 @@ mod cpu Main {
 }
 
 #[test]
+fn artifact_doctor_json_prefers_ready_nsld_entrypoint_closure() {
+    let project_root = write_temp_project_fixture(
+        "artifact_doctor_json_ready_nsld_smoke",
+        r#"
+name = "artifact_doctor_json_ready_nsld_smoke"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+        .trim_start(),
+        r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 0;
+  }
+}
+"#,
+    );
+    let output_dir = temp_dir("artifact_doctor_json_ready_nsld_outputs");
+
+    handle_build(project_root, output_dir.clone(), false, None, None).expect("build passes");
+    write_prepared_nsld_chain_placeholders(&output_dir);
+    write_ready_nsld_final_tail_placeholders(&output_dir);
+
+    let json = render_artifact_doctor_json(&output_dir);
+
+    assert!(json.contains("\"ready_to_run\":true"));
+    assert!(json.contains("\"artifact_closure_kind\":\"nsld-host-entrypoint\""));
+    assert!(json.contains("\"artifact_closure_status\":\"ready\""));
+    assert!(
+        json.contains("\"artifact_closure_command\":\"nuis-host-runner --manifest 'manifest.toml'")
+    );
+    assert!(json.contains("\"artifact_closure_entrypoint_path\":\""));
+    assert!(json.contains("nuis.host-entrypoint.sh"));
+    assert!(json.contains(
+        "\"artifact_closure_reason\":\"nsld final executable pipeline materialized a verified host entrypoint stub\""
+    ));
+    assert!(json.contains("\"nsld_final_executable_tail_ready\":true"));
+}
+
+#[test]
 fn build_report_json_exposes_real_heterogeneous_runtime_summary() {
     let project_root = checked_in_path("../../examples/projects/domains/shader_profile_demo");
     let output_dir = temp_dir("build_report_shader_profile_outputs");

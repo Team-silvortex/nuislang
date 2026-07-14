@@ -110,12 +110,34 @@ pub(crate) fn nsld_check_report(
         artifact_chain_report.final_output_boundary_reason.clone();
     let artifact_chain_final_output_boundary_blockers =
         artifact_chain_report.final_output_boundary_blockers.clone();
-    let next_action_command_id = artifact_chain_next_action_command_id.clone();
-    let next_action_command = artifact_chain_next_action_command.clone();
-    let next_action_command_resolved = artifact_chain_next_action_command_resolved.clone();
-    let next_action_command_reason = artifact_chain_next_action_command_reason.clone();
-    let next_action_source = artifact_chain_next_action_source.clone();
-    let next_action_available = artifact_chain_next_action_available;
+    let (
+        next_action_command_id,
+        next_action_command,
+        next_action_command_resolved,
+        next_action_command_reason,
+        next_action_source,
+        next_action_available,
+    ) = if artifact_chain_next_action_available {
+        (
+            artifact_chain_next_action_command_id.clone(),
+            artifact_chain_next_action_command.clone(),
+            artifact_chain_next_action_command_resolved.clone(),
+            artifact_chain_next_action_command_reason.clone(),
+            artifact_chain_next_action_source.clone(),
+            true,
+        )
+    } else if !artifact_chain_final_output_boundary_ready {
+        (
+            artifact_chain_final_output_boundary_command_id.clone(),
+            artifact_chain_final_output_boundary_command.clone(),
+            artifact_chain_final_output_boundary_command_resolved.clone(),
+            artifact_chain_final_output_boundary_reason.clone(),
+            Some("final-output-boundary".to_owned()),
+            artifact_chain_final_output_boundary_command_id.is_some(),
+        )
+    } else {
+        (None, None, None, None, None, false)
+    };
     let artifact_chain_issues = artifact_chain_report.issues.clone();
     let mut issues = Vec::new();
 
@@ -382,6 +404,10 @@ pub(crate) fn nsld_check_report(
         final_executable_blocked_plan_hash: final_snapshot.final_executable_blocked_plan_hash,
         final_executable_blocked_blocker_count: final_snapshot
             .final_executable_blocked_blocker_count,
+        final_executable_host_finalizer_gate_status: final_snapshot
+            .final_executable_host_finalizer_gate_status,
+        final_executable_host_finalizer_gate_action: final_snapshot
+            .final_executable_host_finalizer_gate_action,
         final_executable_blocked_issues: final_snapshot.final_executable_blocked_issues,
         final_executable_output_path_present: final_snapshot.final_executable_output_path_present,
         final_executable_output_kind: final_snapshot.final_executable_output_kind,

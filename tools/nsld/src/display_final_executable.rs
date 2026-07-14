@@ -82,6 +82,14 @@ fn print_nsld_final_executable_report_with_title(
         optional_string_text(report.host_dry_run_invocation_policy_reason.as_deref())
     );
     println!(
+        "  host_finalizer_gate_status: {}",
+        host_finalizer_gate_status(report)
+    );
+    println!(
+        "  host_finalizer_gate_action: {}",
+        host_finalizer_gate_action(report)
+    );
+    println!(
         "  host_dry_run_command_arg_count: {}",
         report.host_dry_run_command_arg_count
     );
@@ -182,6 +190,40 @@ fn print_nsld_final_executable_report_with_title(
     }
     for note in &report.notes {
         println!("  note: {note}");
+    }
+}
+
+fn host_finalizer_gate_status(report: &NsldFinalExecutableEmitReport) -> &'static str {
+    if !report.host_wrapper_required {
+        return "not-required";
+    }
+    if report.host_invoke_plan_would_invoke == Some(true) {
+        return "open";
+    }
+    if report.host_dry_run_environment_ready == Some(false) {
+        return "environment-blocked";
+    }
+    if report.host_invoke_plan_valid == Some(false) {
+        return "invoke-plan-invalid";
+    }
+    if report.host_dry_run_invocation_policy.as_deref() != Some("allow-host-invoke") {
+        return "policy-blocked";
+    }
+    if report.host_invoke_plan_explicit_allow_present == Some(false) {
+        return "explicit-allow-missing";
+    }
+    "blocked"
+}
+
+fn host_finalizer_gate_action(report: &NsldFinalExecutableEmitReport) -> &'static str {
+    match host_finalizer_gate_status(report) {
+        "not-required" => "none",
+        "open" => "emit-final-executable",
+        "environment-blocked" => "fix-host-finalizer-environment",
+        "invoke-plan-invalid" => "emit-final-executable-host-invoke-plan",
+        "policy-blocked" => "set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke",
+        "explicit-allow-missing" => "set-env:NUIS_NSLD_ALLOW_HOST_FINALIZER=1",
+        _ => "inspect-host-finalizer-blockers",
     }
 }
 

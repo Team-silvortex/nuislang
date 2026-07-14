@@ -1,15 +1,18 @@
 use super::{
     artifact_chain::{nsld_artifact_stage_kind_path_for_plan, NsldArtifactStageKind},
+    container_verify,
     final_executable_layout::{
         final_executable_byte_map_entries, final_executable_payloads,
         nsld_final_executable_byte_map_hash, nsld_final_executable_layout_hash,
+        nsld_final_executable_relocation_application_table_hash,
     },
     final_executable_paths::nsld_final_executable_layout_plan_path,
     final_executable_render::render_final_executable_layout_plan,
     final_stage::nsld_final_stage_plan_report,
     reports::{
         NsldFinalExecutableLayoutPlanEmitReport, NsldFinalExecutableLayoutPlanReport,
-        NsldFinalExecutableLayoutPlanVerifyReport,
+        NsldFinalExecutableLayoutPlanVerifyReport, NsldFinalExecutableRelocationApplicationRecord,
+        NsldFinalStagePlanReport,
     },
     toml,
 };
@@ -43,6 +46,8 @@ pub(crate) fn nsld_final_executable_layout_plan_report(
         .map(|entry| entry.offset + entry.size_bytes)
         .unwrap_or(0);
     let byte_map_hash = nsld_final_executable_byte_map_hash(&byte_map_entries);
+    let relocation_applications =
+        final_executable_relocation_application_records(&final_stage, &byte_map_entries);
     let platform_envelope_family = if plan.cpu_target.object_format.is_empty() {
         "host-native".to_owned()
     } else {
@@ -72,6 +77,15 @@ pub(crate) fn nsld_final_executable_layout_plan_report(
         .map(|node| node.emits.len())
         .sum::<usize>();
     let data_segment_ordering = "deterministic-data-segment-order".to_owned();
+    let relocation_application_count = relocation_applications.len();
+    let relocation_application_table_hash =
+        nsld_final_executable_relocation_application_table_hash(&relocation_applications);
+    let relocation_application_table_source = if relocation_applications.is_empty() {
+        "none".to_owned()
+    } else {
+        "payload0000.container".to_owned()
+    };
+    let relocation_application_strategy = "nsb-loader-relocation-table".to_owned();
     let compatibility_domain = if final_stage.native_object_required {
         "cffi-native-object".to_owned()
     } else {
@@ -101,6 +115,11 @@ pub(crate) fn nsld_final_executable_layout_plan_report(
         scheduler_wait_event_count,
         scheduler_emit_event_count,
         &data_segment_ordering,
+        &relocation_application_strategy,
+        &relocation_application_table_source,
+        relocation_application_count,
+        &relocation_application_table_hash,
+        &relocation_applications,
         &native_object_path,
         final_stage.native_object_required,
         final_stage.native_object_present,
@@ -131,6 +150,11 @@ pub(crate) fn nsld_final_executable_layout_plan_report(
         scheduler_wait_event_count,
         scheduler_emit_event_count,
         data_segment_ordering,
+        relocation_application_strategy,
+        relocation_application_table_source,
+        relocation_application_count,
+        relocation_application_table_hash,
+        relocation_applications,
         native_object_path,
         native_object_required: final_stage.native_object_required,
         native_object_present: final_stage.native_object_present,
@@ -194,6 +218,9 @@ pub(crate) fn nsld_verify_final_executable_layout_plan_report(
         actual_byte_map_hash,
         actual_lifecycle_entry_hook,
         actual_scheduler_hetero_node_count,
+        actual_relocation_application_strategy,
+        actual_relocation_application_count,
+        actual_relocation_application_table_hash,
         actual_platform_envelope_family,
     ) = match actual.as_ref() {
         Ok(source) => (
@@ -206,11 +233,28 @@ pub(crate) fn nsld_verify_final_executable_layout_plan_report(
             toml::string_value(source, "byte_map_hash"),
             toml::string_value(source, "lifecycle_entry_hook"),
             toml::usize_value(source, "scheduler_hetero_node_count"),
+            toml::string_value(source, "relocation_application_strategy"),
+            toml::usize_value(source, "relocation_application_count"),
+            toml::string_value(source, "relocation_application_table_hash"),
             toml::string_value(source, "platform_envelope_family"),
         ),
         Err(error) => {
             issues.push(error.clone());
-            (None, None, Vec::new(), 0, 0, None, None, None, None, None)
+            (
+                None,
+                None,
+                Vec::new(),
+                0,
+                0,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
         }
     };
     if let Ok(actual) = actual {
@@ -292,6 +336,37 @@ pub(crate) fn nsld_verify_final_executable_layout_plan_report(
                     .unwrap_or_else(|| "missing".to_owned())
             ));
         }
+        if actual_relocation_application_strategy.as_deref()
+            != Some(expected.relocation_application_strategy.as_str())
+        {
+            issues.push(format!(
+                "relocation_application_strategy mismatch: expected {}, found {}",
+                expected.relocation_application_strategy,
+                actual_relocation_application_strategy
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_relocation_application_count != Some(expected.relocation_application_count) {
+            issues.push(format!(
+                "relocation_application_count mismatch: expected {}, found {}",
+                expected.relocation_application_count,
+                actual_relocation_application_count
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
+        if actual_relocation_application_table_hash.as_deref()
+            != Some(expected.relocation_application_table_hash.as_str())
+        {
+            issues.push(format!(
+                "relocation_application_table_hash mismatch: expected {}, found {}",
+                expected.relocation_application_table_hash,
+                actual_relocation_application_table_hash
+                    .clone()
+                    .unwrap_or_else(|| "missing".to_owned())
+            ));
+        }
         if actual_platform_envelope_family.as_deref()
             != Some(expected.platform_envelope_family.as_str())
         {
@@ -327,10 +402,54 @@ pub(crate) fn nsld_verify_final_executable_layout_plan_report(
         actual_lifecycle_entry_hook,
         expected_scheduler_hetero_node_count: expected.scheduler_hetero_node_count,
         actual_scheduler_hetero_node_count,
+        expected_relocation_application_strategy: expected.relocation_application_strategy,
+        actual_relocation_application_strategy,
+        expected_relocation_application_count: expected.relocation_application_count,
+        actual_relocation_application_count,
+        expected_relocation_application_table_hash: expected.relocation_application_table_hash,
+        actual_relocation_application_table_hash,
         expected_platform_envelope_family: expected.platform_envelope_family,
         actual_platform_envelope_family,
         issues,
     }
+}
+
+fn final_executable_relocation_application_records(
+    final_stage: &NsldFinalStagePlanReport,
+    byte_map_entries: &[super::reports::NsldFinalExecutableByteMapEntry],
+) -> Vec<NsldFinalExecutableRelocationApplicationRecord> {
+    let Some(container_input) = final_stage
+        .inputs
+        .iter()
+        .find(|input| input.input_id == "fsi0000.container")
+    else {
+        return Vec::new();
+    };
+    let source = fs::read_to_string(&container_input.path).unwrap_or_default();
+    let container_payload_offset = byte_map_entries
+        .iter()
+        .find(|entry| entry.payload_id == "payload0000.container")
+        .map(|entry| entry.offset)
+        .unwrap_or(0);
+
+    container_verify::relocation_entries(&source)
+        .into_iter()
+        .enumerate()
+        .map(
+            |(index, relocation)| NsldFinalExecutableRelocationApplicationRecord {
+                order_index: index,
+                relocation_id: relocation.relocation_id,
+                relocation_kind: relocation.relocation_kind,
+                source_payload_id: "payload0000.container".to_owned(),
+                source_section_id: relocation.source_section_id,
+                source_offset: relocation.source_offset,
+                image_offset: container_payload_offset.saturating_add(relocation.source_offset),
+                target_symbol_id: relocation.target_symbol_id,
+                addend: relocation.addend,
+                application_status: "planned".to_owned(),
+            },
+        )
+        .collect()
 }
 
 fn table_entry_count(source: &str, table: &str) -> usize {

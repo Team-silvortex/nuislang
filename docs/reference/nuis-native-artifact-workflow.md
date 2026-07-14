@@ -112,6 +112,11 @@ artifact-follow-up state:
 * `run_artifact_prelaunch_command`
 * `run_artifact_prelaunch_entrypoint_path`
 * `run_artifact_prelaunch_reason`
+* `artifact_closure_kind`
+* `artifact_closure_status`
+* `artifact_closure_command`
+* `artifact_closure_entrypoint_path`
+* `artifact_closure_reason`
 * `nsld_final_executable_output_recommended_next_action`
 * `nsld_final_executable_output_path_present`
 * `nsld_final_executable_output_nsld_owned`
@@ -183,6 +188,11 @@ Short reading rule:
   lower-level Nsld field; if the pipeline snapshot claims an entrypoint but the
   stub is missing on disk, the aggregate prelaunch status is `blocked` instead
   of silently falling back to a different launch surface
+* `artifact-doctor --json` emits the matching `artifact_closure_*` aggregate
+  fields. These describe the current runnable artifact closure before execution:
+  `host-binary` for the older direct binary path, `nsld-host-entrypoint` for the
+  self-contained Nsld entrypoint route, or `none` when no launch surface is
+  available yet
 * heterogeneous-domain readiness fields summarize whether non-CPU domain units
   have the generic payload, lowering, sidecar, and bridge evidence needed by the
   current artifact route
@@ -230,7 +240,9 @@ Today this route proves all of these together:
 * the current frontdoor can restate whether the artifact closure is ready to
   run and what the current final link stage looks like
 * `nsld check-next-action` can expose the next linker artifact action without
-  mutating the build directory
+  mutating the build directory, and now falls through to a read-only
+  `final-output-boundary` action when the artifact chain is otherwise clean but
+  the final executable output still needs diagnosis
 * `nsld drive --apply --until-clean` can materialize the current whitelisted
   Nsld artifact chain; host-assisted finalization blockers are carried by the
   emitted final pipeline/output metadata instead of by repeating the drive step

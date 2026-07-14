@@ -288,6 +288,105 @@ const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "nsld-host-finalizer-gate-surface",
+        path: "tools/nsld/src/json_final_executable.rs",
+        required_patterns: &[
+            "host_finalizer_gate_status",
+            "host_finalizer_gate_action",
+            "policy-blocked",
+            "explicit-allow-missing",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-host-finalizer-gate-artifact",
+        path: "tools/nsld/src/final_executable_render.rs",
+        required_patterns: &[
+            "host_finalizer_gate_status",
+            "host_finalizer_gate_action",
+            "set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-host-finalizer-gate-regression",
+        path: "tools/nsld/src/main_final_executable_emit_tests.rs",
+        required_patterns: &[
+            "host_finalizer_gate_status",
+            "policy-blocked",
+            "set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-check-host-finalizer-gate-surface",
+        path: "tools/nsld/src/json_check_final.rs",
+        required_patterns: &[
+            "final_executable_host_finalizer_gate_status",
+            "final_executable_host_finalizer_gate_action",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-nsb-relocation-application-layout",
+        path: "tools/nsld/src/final_executable_layout_stage.rs",
+        required_patterns: &[
+            "relocation_application_strategy",
+            "nsb-loader-relocation-table",
+            "relocation_application_table_hash",
+            "relocation_applications",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-nsb-relocation-application-image",
+        path: "tools/nsld/src/final_executable_image_stage.rs",
+        required_patterns: &[
+            "relocation_application_strategy",
+            "relocation_application_count",
+            "relocation_application_table_hash",
+            "relocation_application_audit_status",
+            "relocation_application_audit_blockers",
+            "relocation_patch_preview_status",
+            "relocation_patch_preview_table_hash",
+            "relocation_patch_preview_record_table_hash",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-nsb-relocation-application-regression",
+        path: "tools/nsld/src/main_final_executable_layout_tests.rs",
+        required_patterns: &[
+            "relocation_application_strategy",
+            "relocation_application_count",
+            "relocation_application_table_hash",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-check-next-action-final-output-boundary",
+        path: "tools/nsld/src/check.rs",
+        required_patterns: &[
+            "artifact_chain_final_output_boundary_ready",
+            "final-output-boundary",
+            "artifact_chain_final_output_boundary_command_resolved",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-check-next-action-final-output-boundary-regression",
+        path: "tools/nsld/src/drive_tests.rs",
+        required_patterns: &[
+            "drive_until_clean_command_reaches_host_assisted_pipeline_block",
+            "final-output-boundary",
+            "final-executable-output",
+            "blocked-boundary",
+            "read-only-boundary:final-executable-output",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-driver-final-output-boundary-doc",
+        path: "docs/reference/nsld-driver-frontdoor.md",
+        required_patterns: &[
+            "final-output-boundary",
+            "blocked-boundary",
+            "nsld final-executable-output <input>",
+            "Host-assisted final executable emission",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "frontdoor-self-owned-image-status",
         path: "tools/nuis/src/workflow/link_plan.rs",
         required_patterns: &[
@@ -449,6 +548,8 @@ const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
             "run_artifact_prelaunch_kind",
             "run_artifact_prelaunch_status",
             "nsld-host-entrypoint",
+            "artifact_closure_kind",
+            "artifact_closure_status",
             "run_artifact_json_blocks_nsld_prelaunch_when_entrypoint_stub_is_missing",
             "host entrypoint stub is missing on disk",
         ],
@@ -478,6 +579,9 @@ const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
             "run_artifact_prelaunch_kind",
             "run_artifact_prelaunch_status",
             "run_artifact_prelaunch_command",
+            "artifact_closure_kind",
+            "artifact_closure_status",
+            "artifact_closure_command",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -510,6 +614,9 @@ const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
             "run_artifact_prelaunch_kind",
             "run_artifact_prelaunch_status",
             "run_artifact_prelaunch_command",
+            "artifact_closure_kind",
+            "artifact_closure_status",
+            "artifact_closure_command",
         ],
     },
     DevTensorDriftCheckSpec {

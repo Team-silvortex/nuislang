@@ -39,6 +39,22 @@ pub(crate) fn print_nsld_final_executable_layout_plan_report(
     println!("  byte_alignment: {}", report.byte_alignment);
     println!("  byte_span: {}", report.byte_span);
     println!("  byte_map_hash: {}", report.byte_map_hash);
+    println!(
+        "  relocation_application_strategy: {}",
+        report.relocation_application_strategy
+    );
+    println!(
+        "  relocation_application_table_source: {}",
+        report.relocation_application_table_source
+    );
+    println!(
+        "  relocation_application_count: {}",
+        report.relocation_application_count
+    );
+    println!(
+        "  relocation_application_table_hash: {}",
+        report.relocation_application_table_hash
+    );
     for payload in &report.payload_names {
         println!("  payload: {payload}");
     }
@@ -65,6 +81,21 @@ pub(crate) fn print_nsld_final_executable_layout_plan_report(
             entry.size_bytes,
             entry.alignment,
             entry.content_hash
+        );
+    }
+    for record in &report.relocation_applications {
+        println!(
+            "  relocation_application: order={} id={} kind={} payload={} section={} source_offset={} image_offset={} target={} addend={} status={}",
+            record.order_index,
+            record.relocation_id,
+            record.relocation_kind,
+            record.source_payload_id,
+            record.source_section_id,
+            record.source_offset,
+            record.image_offset,
+            record.target_symbol_id,
+            record.addend,
+            record.application_status
         );
     }
     for note in &report.notes {
@@ -192,6 +223,58 @@ pub(crate) fn print_nsld_final_executable_image_dry_run_report(
         "  scheduler_metadata_hash: {}",
         optional_string_text(report.scheduler_metadata_hash.as_deref())
     );
+    println!(
+        "  relocation_application_strategy: {}",
+        report.relocation_application_strategy
+    );
+    println!(
+        "  relocation_application_count: {}",
+        report.relocation_application_count
+    );
+    println!(
+        "  relocation_application_table_hash: {}",
+        report.relocation_application_table_hash
+    );
+    println!(
+        "  relocation_application_audit_status: {}",
+        report.relocation_application_audit_status
+    );
+    println!(
+        "  relocation_application_audit_count: {}",
+        report.relocation_application_audit_count
+    );
+    println!(
+        "  relocation_application_audit_table_hash: {}",
+        report.relocation_application_audit_table_hash
+    );
+    for blocker in &report.relocation_application_audit_blockers {
+        println!("  relocation_application_audit_blocker: {blocker}");
+    }
+    println!(
+        "  relocation_patch_preview_status: {}",
+        report.relocation_patch_preview_status
+    );
+    println!(
+        "  relocation_patch_preview_count: {}",
+        report.relocation_patch_preview_count
+    );
+    println!(
+        "  relocation_patch_preview_table_hash: {}",
+        report.relocation_patch_preview_table_hash
+    );
+    for record in &report.relocation_patch_previews {
+        println!(
+            "  relocation_patch_preview: order={} relocation={} kind={} offset={} width={} value_hash={} target={} status={}",
+            record.order_index,
+            record.relocation_id,
+            record.patch_kind,
+            record.patch_offset,
+            record.patch_width_bytes,
+            record.patch_value_hash,
+            record.target_symbol_id,
+            record.preview_status
+        );
+    }
     println!("  image_constructed: {}", report.image_constructed);
     println!("  image_ready: {}", report.image_ready);
     println!(

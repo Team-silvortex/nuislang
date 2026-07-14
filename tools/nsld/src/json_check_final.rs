@@ -132,6 +132,18 @@ pub(crate) fn check_report_final_fields(report: &NsldCheckReport) -> Vec<String>
             "final_executable_blocked_blocker_count",
             report.final_executable_blocked_blocker_count,
         ),
+        json_optional_string_field(
+            "final_executable_host_finalizer_gate_status",
+            report
+                .final_executable_host_finalizer_gate_status
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "final_executable_host_finalizer_gate_action",
+            report
+                .final_executable_host_finalizer_gate_action
+                .as_deref(),
+        ),
         json_string_array_field(
             "final_executable_blocked_issues",
             &report.final_executable_blocked_issues,

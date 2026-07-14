@@ -68,6 +68,10 @@ fn emit_final_executable_consumes_valid_host_invoke_plan_snapshot() {
     assert!(report_source.contains("host_invoke_plan_requires_explicit_allow = true"));
     assert!(report_source.contains("host_invoke_plan_explicit_allow_present = false"));
     assert!(report_source.contains("host_invoke_plan_would_invoke = false"));
+    assert!(report_source.contains("host_finalizer_gate_status = \"policy-blocked\""));
+    assert!(report_source.contains(
+        "host_finalizer_gate_action = \"set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke\""
+    ));
     assert!(report_source.contains(&format!(
         "host_invoke_plan_blocker_count = {}",
         invoke_plan.blocker_count
@@ -78,6 +82,10 @@ fn emit_final_executable_consumes_valid_host_invoke_plan_snapshot() {
     assert!(emit_json.contains("\"host_invoke_plan_requires_explicit_allow\":true"));
     assert!(emit_json.contains("\"host_invoke_plan_explicit_allow_present\":false"));
     assert!(emit_json.contains("\"host_invoke_plan_would_invoke\":false"));
+    assert!(emit_json.contains("\"host_finalizer_gate_status\":\"policy-blocked\""));
+    assert!(emit_json.contains(
+        "\"host_finalizer_gate_action\":\"set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke\""
+    ));
     assert!(emit_json.contains("\"host_invoke_plan_blocker_count\":"));
 }
 

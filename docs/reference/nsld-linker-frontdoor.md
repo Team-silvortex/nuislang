@@ -1005,8 +1005,9 @@ explicit allow gate, and reports whether `NUIS_NSLD_ALLOW_HOST_FINALIZER` is
 present with an allow-like value (`1`, `true`, `yes`, or `allow`). By default
 `explicit_allow_present = false` and `would_invoke = false`. Even when the
 explicit allow marker and `NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke`
-are both present, alpha-0.8.x remains non-mutating because the writer blockers
-still prevent host linker execution. The command records
+are both present, the invoke-plan reports `would_invoke = true`; the standalone
+plan command itself remains non-mutating and leaves actual execution to the
+explicit final executable emit boundary. The command records
 `host-invoke-plan-is-non-mutating` and
 `host-finalizer-process-is-not-spawned`, adds
 `host-finalizer-explicit-allow:missing` to blockers when that marker is absent,
@@ -1034,12 +1035,23 @@ path, content hash, required flag, and present flag for future linker and nsdb
 consumers. It also derives a deterministic internal byte map with
 `byte_alignment`, `byte_span`, `byte_map_hash`, and `[[byte_map_entry]]`
 records containing payload offset, size, alignment, and content hash.
+The layout now also carries the first Nsld-owned relocation application
+contract: `relocation_application_strategy`,
+`relocation_application_table_source`, `relocation_application_count`, and
+`relocation_application_table_hash`. These fields deliberately describe the
+`.nsb` loader/application table that Nsld will own; they are not a promise to
+reuse lld's platform-specific relocation executor. The same plan also emits
+`[[relocation_application]]` records with relocation id/kind, source payload,
+source section/offset, final image offset, target symbol, addend, and
+application status. These records are still a verified apply plan rather than
+byte patch execution, but they are now the direct input shape for the future
+Nsld `.nsb` relocation applier.
 `nsld emit-final-executable-layout` writes this protocol snapshot as
 `nuis.nsld.final-executable-layout.toml`; `nsld verify-final-executable-layout`
 re-renders it and checks focused drift in `layout_hash`, `payload_count`,
 the payload-name array, `[[payload]]` entry count, `[[byte_map_entry]]` entry
-count, `byte_span`, `byte_map_hash`, `lifecycle_entry_hook`, and
-`platform_envelope_family`. This keeps Nsld's
+count, `byte_span`, `byte_map_hash`, `lifecycle_entry_hook`,
+`relocation_application_*`, and `platform_envelope_family`. This keeps Nsld's
 internal executable protocol decoupled from Mach-O, ELF, PE/COFF, or any
 future Nuis-native shell writer.
 `nsld final-executable-image-dry-run` consumes that layout protocol and builds
@@ -1051,7 +1063,26 @@ offset, `layout_hash`, and `byte_map_hash`. Payload bytes then begin at
 `payload_byte_offset` and keep the offsets described by the layout byte map.
 The report records `image_format`, `image_magic`, `image_header_size`,
 `payload_byte_offset`, `payload_byte_span`, `layout_hash`, `byte_map_hash`,
-`payload_count`, `byte_span`, `image_size_bytes`, and `image_hash`.
+`payload_count`, `byte_span`, `relocation_application_strategy`,
+`relocation_application_count`, `relocation_application_table_hash`,
+`relocation_application_audit_status`,
+`relocation_application_audit_count`,
+`relocation_application_audit_table_hash`,
+`relocation_application_audit_blockers`, `image_size_bytes`, and `image_hash`.
+The audit simulates the planned `.nsb` relocation application table without
+patching bytes yet: it checks that every planned record maps into the image
+payload region and leaves any out-of-bounds or non-planned status as an image
+blocker.
+The dry-run also emits a patch-preview layer:
+`relocation_patch_preview_status`, `relocation_patch_preview_count`,
+`relocation_patch_preview_table_hash`, and `[[relocation_patch_preview]]`
+records. These preview records intentionally use
+`u64-le-zero-placeholder` patch values today; they are a stable patch table
+shape for the future resolver/applier, not proof that final target addresses
+have already been written into the image.
+Verification also re-parses the emitted `[[relocation_patch_preview]]` records,
+checks the preview entry count, and recomputes the record table hash so a
+drifted patch entry cannot hide behind an unchanged top-level preview hash.
 `nsld emit-final-executable-image-dry-run` writes both
 `nuis.nsld.final-executable-image-dry-run.toml` and
 `nuis.nsld.final-executable-image-dry-run.bin`; `verify-final-executable-image-dry-run`
@@ -1086,7 +1117,17 @@ shape is also copied as `host_dry_run_command_arg_count` and
 the blocked report as
 `host_dry_run_invocation_policy` and
 `host_dry_run_invocation_policy_reason`, preserving the alpha execution gate at
-the executable boundary. The blocked report now also consumes
+the executable boundary. The blocked report also derives
+`host_finalizer_gate_status` and `host_finalizer_gate_action` so scripts can
+branch on the closed gate directly. Current statuses include `not-required`,
+`open`, `environment-blocked`, `invoke-plan-invalid`, `policy-blocked`,
+`explicit-allow-missing`, and `blocked`; current actions include `none`,
+`emit-final-executable`, `fix-host-finalizer-environment`,
+`emit-final-executable-host-invoke-plan`,
+`set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke`,
+`set-env:NUIS_NSLD_ALLOW_HOST_FINALIZER=1`, and
+`inspect-host-finalizer-blockers`.
+The blocked report now also consumes
 `verify-final-executable-host-invoke-plan`: missing or drifted invoke-plan
 snapshots add `host-finalizer-invoke-plan:invalid`, and the current missing
 explicit allow gate adds `host-finalizer-invoke-plan:not-allowed`. The report
@@ -1156,6 +1197,13 @@ still blocked.
 `nsld check` mirrors the same hint with the
 `artifact_chain_final_output_boundary_*` fields so check-oriented scripts can
 see the read-only output boundary without treating it as the drive next action.
+When the ordinary artifact-chain `next_action_*` fields are empty but that
+boundary is still blocked, top-level `nsld check-next-action` reports
+`next_action_source = "final-output-boundary"` and resolves the read-only
+`nsld final-executable-output <manifest>` command. This keeps the final-output
+blocker visible after `drive --apply --until-clean` reaches `clean`, while still
+preserving the rule that host-finalizer execution needs its explicit policy and
+allow gates.
 The final-stage plan file is also checked by `nsld check`, which exposes
 `final_stage_plan_present`, `final_stage_plan_valid`,
 `final_stage_plan_ready`, `final_stage_plan_hash`,
@@ -1203,7 +1251,9 @@ If `nuis.nsld.final-executable.blocked.toml` is present, `nsld check` also
 verifies it and exposes `final_executable_blocked_present`,
 `final_executable_blocked_valid`, `final_executable_blocked_emitted`,
 `final_executable_blocked_plan_hash`,
-`final_executable_blocked_blocker_count`, and
+`final_executable_blocked_blocker_count`,
+`final_executable_host_finalizer_gate_status`,
+`final_executable_host_finalizer_gate_action`, and
 `final_executable_blocked_issues`. The file remains optional so `prepare` can
 stay a deterministic artifact preparation step while final executable emission
 remains an explicit boundary command.

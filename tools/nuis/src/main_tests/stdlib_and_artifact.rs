@@ -539,6 +539,13 @@ mod cpu Main {
     assert!(json.contains("\"lowering_targets\":[\"llvm\"]"));
     assert!(json.contains("\"lowering_units\":[{"));
     assert!(json.contains("\"ready_to_run\":true"));
+    assert!(json.contains("\"artifact_closure_kind\":\"host-binary\""));
+    assert!(json.contains("\"artifact_closure_status\":\"ready\""));
+    assert!(json.contains("\"artifact_closure_command\":\""));
+    assert!(json.contains("\"artifact_closure_entrypoint_path\":null"));
+    assert!(json.contains(
+        "\"artifact_closure_reason\":\"legacy host binary path is resolved and can be executed directly\""
+    ));
     assert!(json.contains("\"artifact_diagnostic_code\":\"ready_to_run\""));
     assert!(json.contains("\"self_check_ready\":true"));
     assert!(json.contains("\"self_check_code\":\"ok\""));

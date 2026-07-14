@@ -32,6 +32,14 @@ Current source layers:
 * `advisory` means required artifacts are present but a consistency/readiness
   report recommends a follow-up action
 * `optional` means the remaining artifact tail can still be materialized
+* `final-output-boundary` means the artifact chain itself has no more safe
+  apply step, but the final executable output boundary is still blocked and
+  should be inspected with `nsld final-executable-output <input>`
+
+The `final-output-boundary` source is intentionally read-only. It makes the
+current linker boundary visible to automation without turning `nsld drive
+--apply` into a host-finalizer runner. Host-assisted final executable emission
+still requires the explicit host-finalizer policy and allow gates.
 
 ## Drive Modes
 
@@ -44,13 +52,16 @@ these stops happens:
 
 * `clean` means no next action remains
 * `not-applied` means a next action exists but the driver refused to apply it
+* `blocked-boundary` means the artifact chain reached a read-only final-output
+  boundary that must be inspected or unlocked by an explicit policy gate
 * `repeated-next-action` means the same action would be applied again
 * `max-steps` means the internal loop cap stopped the drive
 
 `repeated-next-action` should be treated as a loop guard, not as the preferred
 blocked-artifact status. Host-assisted final executable routes should now
-materialize the current final pipeline once, then stop as `clean` while the
-pipeline/output reports carry the remaining blocker details.
+materialize the current final pipeline once, then stop as `blocked-boundary`
+when the remaining action is the read-only final executable output boundary.
+The pipeline/output reports carry the remaining blocker details.
 
 JSON output reports `mutates_artifacts` for all drive modes:
 

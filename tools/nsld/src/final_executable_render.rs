@@ -211,6 +211,14 @@ pub(crate) fn render_final_executable_blocked(report: &NsldFinalExecutableEmitRe
         )
     ));
     out.push_str(&format!(
+        "host_finalizer_gate_status = \"{}\"\n",
+        host_finalizer_gate_status(report)
+    ));
+    out.push_str(&format!(
+        "host_finalizer_gate_action = \"{}\"\n",
+        host_finalizer_gate_action(report)
+    ));
+    out.push_str(&format!(
         "host_dry_run_command_arg_count = {}\n",
         report.host_dry_run_command_args.len()
     ));
@@ -344,6 +352,40 @@ pub(crate) fn render_final_executable_blocked(report: &NsldFinalExecutableEmitRe
     out
 }
 
+pub(crate) fn host_finalizer_gate_status(report: &NsldFinalExecutableEmitReport) -> &'static str {
+    if !report.host_wrapper_required {
+        return "not-required";
+    }
+    if report.host_invoke_plan_would_invoke == Some(true) {
+        return "open";
+    }
+    if report.host_dry_run_environment_ready == Some(false) {
+        return "environment-blocked";
+    }
+    if report.host_invoke_plan_valid == Some(false) {
+        return "invoke-plan-invalid";
+    }
+    if report.host_dry_run_invocation_policy.as_deref() != Some("allow-host-invoke") {
+        return "policy-blocked";
+    }
+    if report.host_invoke_plan_explicit_allow_present == Some(false) {
+        return "explicit-allow-missing";
+    }
+    "blocked"
+}
+
+pub(crate) fn host_finalizer_gate_action(report: &NsldFinalExecutableEmitReport) -> &'static str {
+    match host_finalizer_gate_status(report) {
+        "not-required" => "none",
+        "open" => "emit-final-executable",
+        "environment-blocked" => "fix-host-finalizer-environment",
+        "invoke-plan-invalid" => "emit-final-executable-host-invoke-plan",
+        "policy-blocked" => "set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke",
+        "explicit-allow-missing" => "set-env:NUIS_NSLD_ALLOW_HOST_FINALIZER=1",
+        _ => "inspect-host-finalizer-blockers",
+    }
+}
+
 pub(crate) fn render_final_executable_layout_plan(
     report: &NsldFinalExecutableLayoutPlanReport,
 ) -> String {
@@ -415,6 +457,22 @@ pub(crate) fn render_final_executable_layout_plan(
     out.push_str(&format!(
         "data_segment_ordering = \"{}\"\n",
         toml::escape_toml_string(&report.data_segment_ordering)
+    ));
+    out.push_str(&format!(
+        "relocation_application_strategy = \"{}\"\n",
+        toml::escape_toml_string(&report.relocation_application_strategy)
+    ));
+    out.push_str(&format!(
+        "relocation_application_table_source = \"{}\"\n",
+        toml::escape_toml_string(&report.relocation_application_table_source)
+    ));
+    out.push_str(&format!(
+        "relocation_application_count = {}\n",
+        report.relocation_application_count
+    ));
+    out.push_str(&format!(
+        "relocation_application_table_hash = \"{}\"\n",
+        toml::escape_toml_string(&report.relocation_application_table_hash)
     ));
     out.push_str(&format!(
         "native_object_path = \"{}\"\n",
@@ -496,6 +554,37 @@ pub(crate) fn render_final_executable_layout_plan(
             toml::escape_toml_string(&entry.content_hash)
         ));
     }
+    for record in &report.relocation_applications {
+        out.push_str("\n[[relocation_application]]\n");
+        out.push_str(&format!("order_index = {}\n", record.order_index));
+        out.push_str(&format!(
+            "relocation_id = \"{}\"\n",
+            toml::escape_toml_string(&record.relocation_id)
+        ));
+        out.push_str(&format!(
+            "relocation_kind = \"{}\"\n",
+            toml::escape_toml_string(&record.relocation_kind)
+        ));
+        out.push_str(&format!(
+            "source_payload_id = \"{}\"\n",
+            toml::escape_toml_string(&record.source_payload_id)
+        ));
+        out.push_str(&format!(
+            "source_section_id = \"{}\"\n",
+            toml::escape_toml_string(&record.source_section_id)
+        ));
+        out.push_str(&format!("source_offset = {}\n", record.source_offset));
+        out.push_str(&format!("image_offset = {}\n", record.image_offset));
+        out.push_str(&format!(
+            "target_symbol_id = \"{}\"\n",
+            toml::escape_toml_string(&record.target_symbol_id)
+        ));
+        out.push_str(&format!("addend = {}\n", record.addend));
+        out.push_str(&format!(
+            "application_status = \"{}\"\n",
+            toml::escape_toml_string(&record.application_status)
+        ));
+    }
     out
 }
 
@@ -566,6 +655,46 @@ pub(crate) fn render_final_executable_image_dry_run(
         toml::escape_toml_string(report.scheduler_metadata_hash.as_deref().unwrap_or(""))
     ));
     out.push_str(&format!(
+        "relocation_application_strategy = \"{}\"\n",
+        toml::escape_toml_string(&report.relocation_application_strategy)
+    ));
+    out.push_str(&format!(
+        "relocation_application_count = {}\n",
+        report.relocation_application_count
+    ));
+    out.push_str(&format!(
+        "relocation_application_table_hash = \"{}\"\n",
+        toml::escape_toml_string(&report.relocation_application_table_hash)
+    ));
+    out.push_str(&format!(
+        "relocation_application_audit_status = \"{}\"\n",
+        toml::escape_toml_string(&report.relocation_application_audit_status)
+    ));
+    out.push_str(&format!(
+        "relocation_application_audit_count = {}\n",
+        report.relocation_application_audit_count
+    ));
+    out.push_str(&format!(
+        "relocation_application_audit_table_hash = \"{}\"\n",
+        toml::escape_toml_string(&report.relocation_application_audit_table_hash)
+    ));
+    out.push_str(&format!(
+        "relocation_application_audit_blockers = [{}]\n",
+        toml::toml_string_array_literal(&report.relocation_application_audit_blockers)
+    ));
+    out.push_str(&format!(
+        "relocation_patch_preview_status = \"{}\"\n",
+        toml::escape_toml_string(&report.relocation_patch_preview_status)
+    ));
+    out.push_str(&format!(
+        "relocation_patch_preview_count = {}\n",
+        report.relocation_patch_preview_count
+    ));
+    out.push_str(&format!(
+        "relocation_patch_preview_table_hash = \"{}\"\n",
+        toml::escape_toml_string(&report.relocation_patch_preview_table_hash)
+    ));
+    out.push_str(&format!(
         "image_constructed = {}\n",
         report.image_constructed
     ));
@@ -582,6 +711,35 @@ pub(crate) fn render_final_executable_image_dry_run(
         "blockers = [{}]\n",
         toml::toml_string_array_literal(&report.blockers)
     ));
+    for record in &report.relocation_patch_previews {
+        out.push_str("\n[[relocation_patch_preview]]\n");
+        out.push_str(&format!("order_index = {}\n", record.order_index));
+        out.push_str(&format!(
+            "relocation_id = \"{}\"\n",
+            toml::escape_toml_string(&record.relocation_id)
+        ));
+        out.push_str(&format!(
+            "patch_kind = \"{}\"\n",
+            toml::escape_toml_string(&record.patch_kind)
+        ));
+        out.push_str(&format!("patch_offset = {}\n", record.patch_offset));
+        out.push_str(&format!(
+            "patch_width_bytes = {}\n",
+            record.patch_width_bytes
+        ));
+        out.push_str(&format!(
+            "patch_value_hash = \"{}\"\n",
+            toml::escape_toml_string(&record.patch_value_hash)
+        ));
+        out.push_str(&format!(
+            "target_symbol_id = \"{}\"\n",
+            toml::escape_toml_string(&record.target_symbol_id)
+        ));
+        out.push_str(&format!(
+            "preview_status = \"{}\"\n",
+            toml::escape_toml_string(&record.preview_status)
+        ));
+    }
     out
 }
 
