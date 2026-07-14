@@ -334,7 +334,7 @@ const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
         ],
     },
     DevTensorDriftCheckSpec {
-        id: "nsld-nsb-relocation-application-image",
+        id: "nsld-nsb-relocation-application-image-report",
         path: "tools/nsld/src/final_executable_image_stage.rs",
         required_patterns: &[
             "relocation_application_strategy",
@@ -344,14 +344,42 @@ const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
             "relocation_application_audit_blockers",
             "relocation_patch_preview_status",
             "relocation_patch_preview_table_hash",
+            "relocation_patch_application_status",
+            "relocation_patch_application_table_hash",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-nsb-relocation-application-image-verify",
+        path: "tools/nsld/src/final_executable_image_verify.rs",
+        required_patterns: &[
+            "relocation_patch_preview_record_table_hash",
+            "relocation_patch_byte_audit_status",
+            "relocation_patch_byte_audit_hash",
+            "parse_final_executable_image_header",
+            "verify_final_executable_image_payload_region",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-nsb-relocation-application-image-resolver",
+        path: "tools/nsld/src/final_executable_image_relocation.rs",
+        required_patterns: &[
+            "resolved_patch_value",
+            "target_symbol_image_offset",
+            "resolver_status",
+            "u64-le-resolved-image-offset",
+            "apply_relocation_patches",
+            "relocation_patch_byte_audit",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-nsb-relocation-application-image-actual",
+        path: "tools/nsld/src/final_executable_image_actual.rs",
+        required_patterns: &[
+            "relocation_patch_preview_records_from_source",
             "relocation_patch_preview_record_table_hash",
             "resolved_patch_value",
             "target_symbol_image_offset",
             "resolver_status",
-            "relocation_patch_application_status",
-            "relocation_patch_application_table_hash",
-            "relocation_patch_byte_audit_status",
-            "relocation_patch_byte_audit_hash",
         ],
     },
     DevTensorDriftCheckSpec {
