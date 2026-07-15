@@ -95,6 +95,9 @@ Practical shader rule:
 * for future `PixelMagic` image-processing work, treat the current host-side
   closure as a prep path:
   `filesystem_io_report -> shader profile/render lanes`
+* the first checked-in `PixelMagic` report-file workload that reuses the std
+  host report lane is:
+  [pixelmagic_report_file_demo](pixelmagic_report_file_demo)
 * the first checked-in `PixelMagic` seed scaffold is:
   [pixelmagic_profile_demo](pixelmagic_profile_demo)
 * the first checked-in `PixelMagic` packet consumer scaffold is:
@@ -105,6 +108,9 @@ Practical shader rule:
   [pixelmagic_pipeline_demo](pixelmagic_pipeline_demo)
 * the first checked-in `PixelMagic` single-binary render scaffold is:
   [pixelmagic_render_demo](pixelmagic_render_demo)
+* the first checked-in `WitSage` report-file workload that reuses the std host
+  report lane is:
+  [witsage_report_file_demo](witsage_report_file_demo)
 * the current prep sketch for that future lane is:
   [galaxy-frontdoor-prep-sketch.md](../../../docs/reference/galaxy-frontdoor-prep-sketch.md)
 * the current next-step texture handoff note is:

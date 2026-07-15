@@ -151,9 +151,9 @@ pub(super) fn lower_nir_to_yir_builtin_cpu_with_target(
         let mut bindings = BTreeMap::<String, String>::new();
         let returned = lower_function_body(main, &mut state, &mut bindings, true)?;
         if returned.is_none() && main.return_type.is_none() {
-            let name = next_name(&mut state, "implicit_main_return");
+            let value = next_name(&mut state, "implicit_main_return_value");
             state.yir.nodes.push(Node {
-                name,
+                name: value.clone(),
                 resource: "cpu0".to_owned(),
                 op: Operation {
                     module: "cpu".to_owned(),
@@ -161,6 +161,17 @@ pub(super) fn lower_nir_to_yir_builtin_cpu_with_target(
                     args: vec!["0".to_owned()],
                 },
             });
+            let name = next_name(&mut state, "implicit_main_return");
+            state.yir.nodes.push(Node {
+                name: name.clone(),
+                resource: "cpu0".to_owned(),
+                op: Operation {
+                    module: "cpu".to_owned(),
+                    instruction: "return_i64".to_owned(),
+                    args: vec![value.clone()],
+                },
+            });
+            push_dep_edges(&mut state, &value, &name);
         }
     }
     materialize_doc_contract_nodes(&mut yir, module);

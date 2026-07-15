@@ -23,6 +23,13 @@ pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) recommended_next_action: String,
     pub(crate) path_present: bool,
     pub(crate) nsld_owned: Option<bool>,
+    pub(crate) object_valid: bool,
+    pub(crate) object_path: String,
+    pub(crate) object_expected_size_bytes: Option<usize>,
+    pub(crate) object_actual_size_bytes: Option<usize>,
+    pub(crate) object_expected_hash: Option<String>,
+    pub(crate) object_actual_hash: Option<String>,
+    pub(crate) object_issues: Vec<String>,
     pub(crate) blockers: Vec<String>,
     pub(crate) first_blocker: Option<String>,
 }
@@ -114,6 +121,7 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         entrypoint_materialization_evidence_status.as_str(),
     )
     .to_owned();
+    let object_evidence = nsld_final_executable_output_object_evidence(plan);
 
     NsldFinalExecutableOutputBoundarySummary {
         ready,
@@ -137,9 +145,105 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         recommended_next_action,
         path_present,
         nsld_owned,
+        object_valid: object_evidence.valid,
+        object_path: object_evidence.object_path,
+        object_expected_size_bytes: object_evidence.expected_size_bytes,
+        object_actual_size_bytes: object_evidence.actual_size_bytes,
+        object_expected_hash: object_evidence.expected_hash,
+        object_actual_hash: object_evidence.actual_hash,
+        object_issues: object_evidence.issues,
         blockers,
         first_blocker,
     }
+}
+
+struct NsldFinalExecutableOutputObjectEvidence {
+    valid: bool,
+    object_path: String,
+    expected_size_bytes: Option<usize>,
+    actual_size_bytes: Option<usize>,
+    expected_hash: Option<String>,
+    actual_hash: Option<String>,
+    issues: Vec<String>,
+}
+
+fn nsld_final_executable_output_object_evidence(
+    plan: &nuisc::linker::LinkPlan,
+) -> NsldFinalExecutableOutputObjectEvidence {
+    let object_path = Path::new(&plan.output_dir).join(nsld_object_output_file_name(
+        plan.cpu_target.object_format.as_str(),
+    ));
+    let image_dry_run_path = Path::new(&plan.output_dir).join("nuis.nsld.object-image-dry-run.bin");
+    let object_bytes = fs::read(&object_path);
+    let image_bytes = fs::read(&image_dry_run_path);
+    let expected_size_bytes = image_bytes.as_ref().ok().map(Vec::len);
+    let actual_size_bytes = object_bytes.as_ref().ok().map(Vec::len);
+    let expected_hash = image_bytes.as_ref().ok().map(|bytes| fnv1a64_hex(bytes));
+    let actual_hash = object_bytes.as_ref().ok().map(|bytes| fnv1a64_hex(bytes));
+    let mut issues = Vec::new();
+    if let Err(error) = &object_bytes {
+        issues.push(format!(
+            "missing_or_unreadable_object_output `{}`: {error}",
+            object_path.display()
+        ));
+    }
+    if let Err(error) = &image_bytes {
+        issues.push(format!(
+            "missing_or_unreadable_object_image_dry_run_bytes `{}`: {error}",
+            image_dry_run_path.display()
+        ));
+    }
+    if let (Some(expected), Some(actual)) = (expected_size_bytes, actual_size_bytes) {
+        if expected != actual {
+            issues.push(format!(
+                "object_output_size mismatch: expected {expected}, found {actual}"
+            ));
+        }
+    }
+    if let (Some(expected), Some(actual)) = (expected_hash.as_deref(), actual_hash.as_deref()) {
+        if expected != actual {
+            issues.push(format!(
+                "object_output_hash mismatch: expected {expected}, found {actual}"
+            ));
+        }
+    }
+
+    NsldFinalExecutableOutputObjectEvidence {
+        valid: issues.is_empty(),
+        object_path: object_path.display().to_string(),
+        expected_size_bytes,
+        actual_size_bytes,
+        expected_hash,
+        actual_hash,
+        issues,
+    }
+}
+
+fn nsld_object_output_file_name(object_format: &str) -> String {
+    let format = object_format.trim();
+    let format = if format.is_empty() { "object" } else { format };
+    let safe_format = format
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.') {
+                ch
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>();
+    format!("nuis.nsld.{safe_format}")
+}
+
+fn fnv1a64_hex(bytes: &[u8]) -> String {
+    const FNV_OFFSET: u64 = 0xcbf29ce484222325;
+    const FNV_PRIME: u64 = 0x100000001b3;
+    let mut hash = FNV_OFFSET;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    format!("0x{hash:016x}")
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

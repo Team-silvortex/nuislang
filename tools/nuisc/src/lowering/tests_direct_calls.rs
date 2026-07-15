@@ -23,6 +23,16 @@ fn lowers_void_main_print_into_explicit_zero_entry_return() {
         node.op.module == "cpu"
             && node.op.instruction == "const_i64"
             && node.op.args == ["0".to_owned()]
+            && node.name.starts_with("implicit_main_return_value_")
+    });
+    let has_implicit_return = yir.nodes.iter().any(|node| {
+        node.op.module == "cpu"
+            && node.op.instruction == "return_i64"
+            && node
+                .op
+                .args
+                .first()
+                .is_some_and(|arg| arg.starts_with("implicit_main_return_value_"))
             && node.name.starts_with("implicit_main_return_")
     });
 
@@ -31,6 +41,10 @@ fn lowers_void_main_print_into_explicit_zero_entry_return() {
         "expected void main to preserve print side effect"
     );
     assert!(has_implicit_zero, "expected void main to exit with zero");
+    assert!(
+        has_implicit_return,
+        "expected void main zero value to feed an explicit return_i64"
+    );
 }
 
 #[test]

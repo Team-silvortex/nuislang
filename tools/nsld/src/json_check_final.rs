@@ -276,6 +276,36 @@ pub(crate) fn check_report_final_fields(report: &NsldCheckReport) -> Vec<String>
             "final_executable_output_runnable_candidate",
             report.final_executable_output_runnable_candidate,
         ),
+        json_bool_field(
+            "final_executable_output_object_valid",
+            report.final_executable_output_object_valid,
+        ),
+        json_string_field(
+            "final_executable_output_object_path",
+            &report.final_executable_output_object_path,
+        ),
+        json_optional_usize_field(
+            "final_executable_output_object_expected_size_bytes",
+            report.final_executable_output_object_expected_size_bytes,
+        ),
+        json_optional_usize_field(
+            "final_executable_output_object_actual_size_bytes",
+            report.final_executable_output_object_actual_size_bytes,
+        ),
+        json_optional_string_field(
+            "final_executable_output_object_expected_hash",
+            report
+                .final_executable_output_object_expected_hash
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "final_executable_output_object_actual_hash",
+            report.final_executable_output_object_actual_hash.as_deref(),
+        ),
+        json_string_array_field(
+            "final_executable_output_object_issues",
+            &report.final_executable_output_object_issues,
+        ),
         json_optional_usize_field(
             "final_executable_output_blocker_count",
             report.final_executable_output_blocker_count,

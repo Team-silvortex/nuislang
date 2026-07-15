@@ -82,6 +82,13 @@ pub(crate) struct NsldCheckFinalSnapshot {
     pub(crate) final_executable_output_expected_image_patch_byte_audit_hash: Option<String>,
     pub(crate) final_executable_output_matches_verified_patched_image: bool,
     pub(crate) final_executable_output_runnable_candidate: Option<bool>,
+    pub(crate) final_executable_output_object_valid: bool,
+    pub(crate) final_executable_output_object_path: String,
+    pub(crate) final_executable_output_object_expected_size_bytes: Option<usize>,
+    pub(crate) final_executable_output_object_actual_size_bytes: Option<usize>,
+    pub(crate) final_executable_output_object_expected_hash: Option<String>,
+    pub(crate) final_executable_output_object_actual_hash: Option<String>,
+    pub(crate) final_executable_output_object_issues: Vec<String>,
     pub(crate) final_executable_output_blocker_count: Option<usize>,
     pub(crate) final_executable_output_blockers: Vec<String>,
     pub(crate) final_executable_output_issues: Vec<String>,
@@ -310,6 +317,21 @@ pub(crate) fn nsld_check_final_snapshot(
         final_executable_output_report.matches_verified_patched_image;
     let final_executable_output_runnable_candidate =
         Some(final_executable_output_report.runnable_candidate);
+    let final_executable_output_object_valid = final_executable_output_report.object_output_valid;
+    let final_executable_output_object_path =
+        final_executable_output_report.object_output_path.clone();
+    let final_executable_output_object_expected_size_bytes =
+        final_executable_output_report.object_output_expected_size_bytes;
+    let final_executable_output_object_actual_size_bytes =
+        final_executable_output_report.object_output_actual_size_bytes;
+    let final_executable_output_object_expected_hash = final_executable_output_report
+        .object_output_expected_hash
+        .clone();
+    let final_executable_output_object_actual_hash = final_executable_output_report
+        .object_output_actual_hash
+        .clone();
+    let final_executable_output_object_issues =
+        final_executable_output_report.object_output_issues.clone();
     let final_executable_output_blocker_count = Some(final_executable_output_report.blockers.len());
     let final_executable_output_blockers = final_executable_output_report.blockers.clone();
     let mut final_executable_output_issues = final_executable_output_report.issues.clone();
@@ -392,6 +414,13 @@ pub(crate) fn nsld_check_final_snapshot(
         final_executable_output_expected_image_patch_byte_audit_hash,
         final_executable_output_matches_verified_patched_image,
         final_executable_output_runnable_candidate,
+        final_executable_output_object_valid,
+        final_executable_output_object_path,
+        final_executable_output_object_expected_size_bytes,
+        final_executable_output_object_actual_size_bytes,
+        final_executable_output_object_expected_hash,
+        final_executable_output_object_actual_hash,
+        final_executable_output_object_issues,
         final_executable_output_blocker_count,
         final_executable_output_blockers,
         final_executable_output_issues,

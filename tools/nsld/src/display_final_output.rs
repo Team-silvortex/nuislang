@@ -271,6 +271,27 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         "  final_executable_blocker_count: {}",
         optional_usize_text(report.final_executable_blocker_count)
     );
+    println!("  object_output_valid: {}", report.object_output_valid);
+    println!("  object_output_path: {}", report.object_output_path);
+    println!(
+        "  object_output_expected_size_bytes: {}",
+        optional_usize_text(report.object_output_expected_size_bytes)
+    );
+    println!(
+        "  object_output_actual_size_bytes: {}",
+        optional_usize_text(report.object_output_actual_size_bytes)
+    );
+    println!(
+        "  object_output_expected_hash: {}",
+        optional_string_text(report.object_output_expected_hash.as_deref())
+    );
+    println!(
+        "  object_output_actual_hash: {}",
+        optional_string_text(report.object_output_actual_hash.as_deref())
+    );
+    for issue in &report.object_output_issues {
+        println!("  object_output_issue: {issue}");
+    }
     println!("  runnable_candidate: {}", report.runnable_candidate);
     println!(
         "  backend_artifact_candidate_count: {}",

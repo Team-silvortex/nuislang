@@ -5,6 +5,7 @@ mod link_plan;
 mod link_plan_nsld_tail;
 mod link_plan_readiness;
 mod link_plan_text;
+mod link_plan_text_nsld_output;
 mod project_doctor;
 mod project_doctor_json;
 mod project_status;

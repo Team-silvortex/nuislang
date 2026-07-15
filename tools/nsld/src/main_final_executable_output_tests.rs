@@ -1003,6 +1003,26 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert!(output_json.contains("\"final_stage_plan_valid\":true"));
     assert!(output_json.contains("\"final_executable_emit_valid\":true"));
     assert!(output_json.contains("\"final_executable_emitted\":true"));
+    assert!(
+        output.object_output_valid,
+        "{:?}",
+        output.object_output_issues
+    );
+    assert!(output.object_output_path.ends_with("nuis.nsld.mach-o"));
+    assert_eq!(
+        output.object_output_expected_size_bytes,
+        output.object_output_actual_size_bytes
+    );
+    assert_eq!(
+        output.object_output_expected_hash,
+        output.object_output_actual_hash
+    );
+    assert!(output.object_output_issues.is_empty());
+    assert!(output_json.contains("\"object_output_valid\":true"));
+    assert!(output_json.contains("\"object_output_path\":"));
+    assert!(output_json.contains("\"object_output_expected_hash\":\"0x"));
+    assert!(output_json.contains("\"object_output_actual_hash\":\"0x"));
+    assert!(output_json.contains("\"object_output_issues\":[]"));
     assert!(output_json.contains("\"runnable_candidate\":true"));
     assert!(output_json.contains("\"blockers\":[]"));
     assert!(output_json.contains("\"issues\":[]"));

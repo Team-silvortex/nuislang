@@ -26,6 +26,7 @@ mod container_verify;
 mod context;
 mod display;
 mod display_check;
+mod display_check_issues;
 mod display_container;
 mod display_container_verify;
 mod display_final_executable;

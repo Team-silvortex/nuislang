@@ -39,6 +39,13 @@ pub(crate) struct HostRunnerJsonSurface {
     container_loader_entry_section_id: Option<String>,
     pub(crate) container_loader_handoff_ready: Option<bool>,
     container_loader_handoff_status: Option<String>,
+    backend_artifact_payload_count: Option<usize>,
+    backend_artifact_payload_parsed_count: Option<usize>,
+    backend_artifact_payload_ready_count: Option<usize>,
+    backend_artifact_payload_first_id: Option<String>,
+    backend_artifact_payload_first_kind: Option<String>,
+    backend_artifact_payload_first_role_status: Option<String>,
+    backend_artifact_payload_table_hash: Option<String>,
 }
 
 pub(crate) struct RunArtifactLaunchEvidence {
@@ -246,6 +253,13 @@ impl HostRunnerJsonSurface {
             container_loader_entry_section_id: None,
             container_loader_handoff_ready: None,
             container_loader_handoff_status: None,
+            backend_artifact_payload_count: None,
+            backend_artifact_payload_parsed_count: None,
+            backend_artifact_payload_ready_count: None,
+            backend_artifact_payload_first_id: None,
+            backend_artifact_payload_first_kind: None,
+            backend_artifact_payload_first_role_status: None,
+            backend_artifact_payload_table_hash: None,
         }
     }
 
@@ -269,6 +283,13 @@ impl HostRunnerJsonSurface {
             container_loader_entry_section_id: None,
             container_loader_handoff_ready: None,
             container_loader_handoff_status: None,
+            backend_artifact_payload_count: None,
+            backend_artifact_payload_parsed_count: None,
+            backend_artifact_payload_ready_count: None,
+            backend_artifact_payload_first_id: None,
+            backend_artifact_payload_first_kind: None,
+            backend_artifact_payload_first_role_status: None,
+            backend_artifact_payload_table_hash: None,
         }
     }
 
@@ -324,6 +345,34 @@ impl HostRunnerJsonSurface {
                 &output.stdout,
                 "container_loader_handoff_status",
             ),
+            backend_artifact_payload_count: json_usize_value(
+                &output.stdout,
+                "backend_artifact_payload_count",
+            ),
+            backend_artifact_payload_parsed_count: json_usize_value(
+                &output.stdout,
+                "backend_artifact_payload_parsed_count",
+            ),
+            backend_artifact_payload_ready_count: json_usize_value(
+                &output.stdout,
+                "backend_artifact_payload_ready_count",
+            ),
+            backend_artifact_payload_first_id: json_string_value(
+                &output.stdout,
+                "backend_artifact_payload_first_id",
+            ),
+            backend_artifact_payload_first_kind: json_string_value(
+                &output.stdout,
+                "backend_artifact_payload_first_kind",
+            ),
+            backend_artifact_payload_first_role_status: json_string_value(
+                &output.stdout,
+                "backend_artifact_payload_first_role_status",
+            ),
+            backend_artifact_payload_table_hash: json_string_value(
+                &output.stdout,
+                "backend_artifact_payload_table_hash",
+            ),
         }
     }
 
@@ -373,6 +422,34 @@ impl HostRunnerJsonSurface {
             json_optional_string_field(
                 "host_runner_container_loader_handoff_status",
                 self.container_loader_handoff_status.as_deref(),
+            ),
+            json_optional_usize_field(
+                "host_runner_backend_artifact_payload_count",
+                self.backend_artifact_payload_count,
+            ),
+            json_optional_usize_field(
+                "host_runner_backend_artifact_payload_parsed_count",
+                self.backend_artifact_payload_parsed_count,
+            ),
+            json_optional_usize_field(
+                "host_runner_backend_artifact_payload_ready_count",
+                self.backend_artifact_payload_ready_count,
+            ),
+            json_optional_string_field(
+                "host_runner_backend_artifact_payload_first_id",
+                self.backend_artifact_payload_first_id.as_deref(),
+            ),
+            json_optional_string_field(
+                "host_runner_backend_artifact_payload_first_kind",
+                self.backend_artifact_payload_first_kind.as_deref(),
+            ),
+            json_optional_string_field(
+                "host_runner_backend_artifact_payload_first_role_status",
+                self.backend_artifact_payload_first_role_status.as_deref(),
+            ),
+            json_optional_string_field(
+                "host_runner_backend_artifact_payload_table_hash",
+                self.backend_artifact_payload_table_hash.as_deref(),
             ),
         ]
     }
@@ -565,10 +642,68 @@ fn json_string_value(source: &str, key: &str) -> Option<String> {
     Some(tail[..end].to_owned())
 }
 
+fn json_usize_value(source: &str, key: &str) -> Option<usize> {
+    let needle = format!("\"{key}\":");
+    let start = source.find(&needle)? + needle.len();
+    let tail = &source[start..];
+    let end = tail
+        .find(|value: char| !value.is_ascii_digit())
+        .unwrap_or(tail.len());
+    if end == 0 {
+        return None;
+    }
+    tail[..end].parse().ok()
+}
+
+fn json_optional_usize_field(name: &str, value: Option<usize>) -> String {
+    match value {
+        Some(value) => json_usize_field(name, value),
+        None => format!("\"{name}\":null"),
+    }
+}
+
 pub(crate) fn optional_bool_text(value: Option<bool>) -> &'static str {
     match value {
         Some(true) => "true",
         Some(false) => "false",
         None => "<none>",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::process::Command;
+
+    #[test]
+    fn host_runner_surface_mirrors_backend_payload_scan_fields() {
+        let status = Command::new("true")
+            .status()
+            .expect("true command should be available");
+        let output = HostRunnerOutput {
+            program: PathBuf::from("nuis-host-runner"),
+            status,
+            stdout: r#"{"ready":true,"backend_artifact_payload_count":2,"backend_artifact_payload_parsed_count":2,"backend_artifact_payload_ready_count":1,"backend_artifact_payload_first_id":"payload0005.backend-artifact","backend_artifact_payload_first_kind":"nustar-backend-artifact:kernel:aarch64:apple-silicon-cpu","backend_artifact_payload_first_role_status":"ready","backend_artifact_payload_table_hash":"0x7777777777777777"}"#.to_owned(),
+            stderr: String::new(),
+        };
+
+        let surface = HostRunnerJsonSurface::from_output(&output);
+        let json = surface.json_fields().join(",");
+
+        assert!(json.contains("\"host_runner_backend_artifact_payload_count\":2"));
+        assert!(json.contains("\"host_runner_backend_artifact_payload_parsed_count\":2"));
+        assert!(json.contains("\"host_runner_backend_artifact_payload_ready_count\":1"));
+        assert!(json.contains(
+            "\"host_runner_backend_artifact_payload_first_id\":\"payload0005.backend-artifact\""
+        ));
+        assert!(json.contains(
+            "\"host_runner_backend_artifact_payload_first_kind\":\"nustar-backend-artifact:kernel:aarch64:apple-silicon-cpu\""
+        ));
+        assert!(
+            json.contains("\"host_runner_backend_artifact_payload_first_role_status\":\"ready\"")
+        );
+        assert!(json.contains(
+            "\"host_runner_backend_artifact_payload_table_hash\":\"0x7777777777777777\""
+        ));
     }
 }

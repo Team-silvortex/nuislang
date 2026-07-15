@@ -325,6 +325,49 @@ pub(super) fn nsld_tail_json_fields(
                 .as_ref()
                 .and_then(|summary| summary.nsld_owned),
         ),
+        crate::json_bool_field(
+            "nsld_final_executable_output_object_valid",
+            final_output_summary
+                .as_ref()
+                .is_some_and(|summary| summary.object_valid),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_object_path",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.object_path.as_str()),
+        ),
+        json_optional_usize_field(
+            "nsld_final_executable_output_object_expected_size_bytes",
+            final_output_summary
+                .as_ref()
+                .and_then(|summary| summary.object_expected_size_bytes),
+        ),
+        json_optional_usize_field(
+            "nsld_final_executable_output_object_actual_size_bytes",
+            final_output_summary
+                .as_ref()
+                .and_then(|summary| summary.object_actual_size_bytes),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_object_expected_hash",
+            final_output_summary
+                .as_ref()
+                .and_then(|summary| summary.object_expected_hash.as_deref()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_object_actual_hash",
+            final_output_summary
+                .as_ref()
+                .and_then(|summary| summary.object_actual_hash.as_deref()),
+        ),
+        crate::json_string_array_field(
+            "nsld_final_executable_output_object_issues",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.object_issues.as_slice())
+                .unwrap_or(&[]),
+        ),
         crate::json_usize_field(
             "nsld_final_executable_output_blocker_count",
             final_output_summary

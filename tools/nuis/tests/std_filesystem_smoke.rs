@@ -324,9 +324,107 @@ fn assert_std_tooling_project_smoke(projects: &[(&str, &str)]) {
     }
 }
 
+fn assert_official_galaxy_hetero_build(
+    label: &str,
+    project: &str,
+    domain: &str,
+    yir_needles: &[&str],
+    sidecar_needles: &[&str],
+    payload_needles: &[&str],
+) {
+    let output_dir = temp_dir(label);
+    let output_dir_text = output_dir.display().to_string();
+
+    let build = run_nuis(&["build", project, &output_dir_text]);
+    assert_success(&build, "nuis build official galaxy hetero smoke");
+
+    let yir_path = output_dir.join(format!("{label}.yir"));
+    for needle in yir_needles {
+        assert_file_contains(&yir_path, needle, "official galaxy hetero YIR");
+    }
+
+    assert_file_contains(
+        &output_dir.join(format!("nuis.domain.{domain}.artifact.toml")),
+        "schema = \"nuis-domain-build-unit-v1\"",
+        "official galaxy hetero artifact",
+    );
+    assert_file_contains(
+        &output_dir.join(format!("nuis.domain.{domain}.payload.toml")),
+        "schema = \"nuis-domain-build-payload-v1\"",
+        "official galaxy hetero payload",
+    );
+    assert_file_contains(
+        &output_dir.join("nuis.hetero-calculate.plan.toml"),
+        "schema = \"nuis-hetero-calculate-link-plan-v1\"",
+        "official galaxy hetero plan",
+    );
+
+    let sidecar_path = output_dir.join(format!("nuis.domain.{domain}.lowering.ir.txt"));
+    for needle in sidecar_needles {
+        assert_file_contains(&sidecar_path, needle, "official galaxy hetero sidecar");
+    }
+    let payload_path = output_dir.join(format!("nuis.domain.{domain}.payload.toml"));
+    for needle in payload_needles {
+        assert_file_contains(&payload_path, needle, "official galaxy hetero payload");
+    }
+    assert_file_contains(
+        &output_dir.join("nuis.hetero-calculate.plan.toml"),
+        &format!("domain_family = \"{domain}\""),
+        "official galaxy hetero plan",
+    );
+}
+
 #[test]
 fn std_tooling_light_project_smokes_build_doctor_and_run() {
     assert_std_tooling_project_smoke(STD_TOOLING_LIGHT_SMOKE_PROJECTS);
+}
+
+#[test]
+fn official_galaxy_hetero_projects_emit_shader_and_kernel_artifacts() {
+    assert_official_galaxy_hetero_build(
+        "pixelmagic_pipeline_demo",
+        "../../examples/projects/domains/pixelmagic_pipeline_demo",
+        "shader",
+        &[
+            "shader.begin_pass",
+            "shader.draw_instanced",
+            "shader.inline_wgsl",
+            "PixelMagicContracts.shader_pipeline_total",
+        ],
+        &[
+            "shader_stage_model = \"metal-render-pipeline\"",
+            "lowering_capabilities",
+            "pipeline_lowering = \"metal-render-pipeline-state\"",
+            "execution_route = \"unified-render-graph\"",
+        ],
+        &[
+            "backend_family = \"metal\"",
+            "target_device = \"apple-silicon-gpu\"",
+            "shader.inline_wgsl",
+        ],
+    );
+
+    assert_official_galaxy_hetero_build(
+        "witsage_kernel_demo",
+        "../../examples/projects/domains/witsage_kernel_demo",
+        "kernel",
+        &[
+            "kernel.tensor",
+            "kernel.reduce_mean_axis",
+            "kernel.topk_axis",
+            "WitSageContracts.kernel_pipeline_total",
+        ],
+        &[
+            "kernel_ir = \"coreml-program\"",
+            "kernel_entry_model = \"mlmodelc-function\"",
+            "tensor_lowering = \"ranked-tensor-graph\"",
+        ],
+        &[
+            "backend_family = \"coreml\"",
+            "target_device = \"apple-ane\"",
+            "kernel.reduce_mean_axis",
+        ],
+    );
 }
 
 #[test]
@@ -514,6 +612,81 @@ fn std_tooling_observable_cli_smoke_checks_reports_and_stdin() {
         &report_output_path,
         "output: report-file",
         "cli report file generated report",
+    );
+
+    let pixelmagic_output_dir = temp_dir("pixelmagic_report_file_observable");
+    let pixelmagic_output_dir_text = pixelmagic_output_dir.display().to_string();
+    let pixelmagic_build = run_nuis(&[
+        "build",
+        "../../examples/projects/domains/pixelmagic_report_file_demo",
+        &pixelmagic_output_dir_text,
+    ]);
+    assert_success(&pixelmagic_build, "nuis build pixelmagic report file smoke");
+    assert_file_contains(
+        &pixelmagic_output_dir.join("pixelmagic_report_file_demo.yir"),
+        "StdReportContracts.cli_report_file_validation_total",
+        "pixelmagic report file YIR std report contract",
+    );
+    assert_file_contains(
+        &pixelmagic_output_dir.join("pixelmagic_report_file_demo.yir"),
+        "PixelMagicContracts.filter_chain_total",
+        "pixelmagic report file YIR package contract",
+    );
+    let pixelmagic_report_path = pixelmagic_output_dir.join("pixelmagic-report.txt");
+    let pixelmagic_report_text = pixelmagic_report_path.display().to_string();
+    let pixelmagic_binary = pixelmagic_output_dir.join("pixelmagic_report_file_demo");
+    let pixelmagic_run = run_binary_with_args(&pixelmagic_binary, &[&pixelmagic_report_text]);
+    assert_success(
+        &pixelmagic_run,
+        "direct pixelmagic report file binary smoke",
+    );
+    let pixelmagic_stdout = String::from_utf8_lossy(&pixelmagic_run.stdout);
+    assert!(
+        pixelmagic_stdout.contains("package: pixelmagic")
+            && pixelmagic_stdout.contains("route: std-report-file")
+            && pixelmagic_stdout.contains("workload: image-analysis"),
+        "pixelmagic report stdout did not expose expected report\n{pixelmagic_stdout}"
+    );
+    assert_file_contains(
+        &pixelmagic_report_path,
+        "status: ready",
+        "pixelmagic generated report",
+    );
+
+    let witsage_output_dir = temp_dir("witsage_report_file_observable");
+    let witsage_output_dir_text = witsage_output_dir.display().to_string();
+    let witsage_build = run_nuis(&[
+        "build",
+        "../../examples/projects/domains/witsage_report_file_demo",
+        &witsage_output_dir_text,
+    ]);
+    assert_success(&witsage_build, "nuis build witsage report file smoke");
+    assert_file_contains(
+        &witsage_output_dir.join("witsage_report_file_demo.yir"),
+        "StdReportContracts.cli_report_file_validation_total",
+        "witsage report file YIR std report contract",
+    );
+    assert_file_contains(
+        &witsage_output_dir.join("witsage_report_file_demo.yir"),
+        "WitSageContracts.classifier_pipeline_total",
+        "witsage report file YIR package contract",
+    );
+    let witsage_report_path = witsage_output_dir.join("witsage-report.txt");
+    let witsage_report_text = witsage_report_path.display().to_string();
+    let witsage_binary = witsage_output_dir.join("witsage_report_file_demo");
+    let witsage_run = run_binary_with_args(&witsage_binary, &[&witsage_report_text]);
+    assert_success(&witsage_run, "direct witsage report file binary smoke");
+    let witsage_stdout = String::from_utf8_lossy(&witsage_run.stdout);
+    assert!(
+        witsage_stdout.contains("package: witsage")
+            && witsage_stdout.contains("route: std-report-file")
+            && witsage_stdout.contains("workload: classical-ml"),
+        "witsage report stdout did not expose expected report\n{witsage_stdout}"
+    );
+    assert_file_contains(
+        &witsage_report_path,
+        "status: ready",
+        "witsage generated report",
     );
 }
 

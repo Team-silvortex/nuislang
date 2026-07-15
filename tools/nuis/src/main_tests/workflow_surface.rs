@@ -275,6 +275,13 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_output_recommended_next_action\":"));
     assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
+    assert!(json.contains("\"nsld_final_executable_output_object_valid\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_path\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_expected_size_bytes\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_actual_size_bytes\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_expected_hash\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_actual_hash\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_issues\":["));
     assert!(json.contains("\"nsld_final_executable_output_blocker_count\":"));
     assert!(json.contains("\"nsld_final_executable_output_blockers\":["));
     assert!(json.contains("\"nsld_final_executable_output_first_blocker\":"));
@@ -413,6 +420,13 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_output_recommended_next_action\":"));
     assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
+    assert!(json.contains("\"nsld_final_executable_output_object_valid\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_path\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_expected_size_bytes\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_actual_size_bytes\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_expected_hash\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_actual_hash\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_issues\":["));
     assert!(json.contains("\"nsld_final_executable_output_blocker_count\":"));
     assert!(json.contains("\"nsld_final_executable_output_blockers\":["));
 }

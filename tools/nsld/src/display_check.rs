@@ -1,5 +1,6 @@
 use super::{
     display::{optional_bool_text, optional_string_text, optional_usize_text},
+    display_check_issues::print_check_report_issue_lines,
     reports::NsldCheckReport,
 };
 
@@ -251,7 +252,7 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         report.final_executable_blocked_issues.len()
     );
     println!(
-        "  final_executable_output: status={} materialization={} handoff_contract={} handoff_ready={} handoff={} handoff_target={} handoff_evidence={} handoff_first_blocker={} handoff_decision={} next_action={} path_present={} kind={} validation={} nsld_owned={} present={} header_required={} header_valid={} magic={} version={} runnable={} size={} hash={} blockers={} issues={}",
+        "  final_executable_output: status={} materialization={} handoff_contract={} handoff_ready={} handoff={} handoff_target={} handoff_evidence={} handoff_first_blocker={} handoff_decision={} next_action={} path_present={} kind={} validation={} nsld_owned={} present={} header_required={} header_valid={} magic={} version={} runnable={} size={} hash={} object_valid={} object_path={} object_size={}/{} blockers={} issues={}",
         report.final_executable_output_boundary_status,
         report.final_executable_output_materialization_status,
         report.final_executable_output_execution_handoff_contract,
@@ -278,6 +279,10 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         optional_bool_text(report.final_executable_output_runnable_candidate),
         optional_usize_text(report.final_executable_output_size_bytes),
         optional_string_text(report.final_executable_output_hash.as_deref()),
+        report.final_executable_output_object_valid,
+        report.final_executable_output_object_path,
+        optional_usize_text(report.final_executable_output_object_actual_size_bytes),
+        optional_usize_text(report.final_executable_output_object_expected_size_bytes),
         optional_usize_text(report.final_executable_output_blocker_count),
         report.final_executable_output_issues.len()
     );
@@ -289,6 +294,16 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
                 .final_executable_output_image_byte_map_hash
                 .as_deref()
         )
+    );
+    println!(
+        "  final_executable_output_object_hashes: expected={} actual={} issues={}",
+        optional_string_text(
+            report
+                .final_executable_output_object_expected_hash
+                .as_deref()
+        ),
+        optional_string_text(report.final_executable_output_object_actual_hash.as_deref()),
+        report.final_executable_output_object_issues.len()
     );
     println!(
         "  final_executable_launcher_manifest: present={} valid={} ready={} hash={} blockers={} issues={}",
@@ -591,130 +606,5 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
             segment.source_path
         );
     }
-    for issue in &report.issues {
-        println!("  issue: {issue}");
-    }
-    for issue in &report.link_input_table_issues {
-        println!("  link_input_table_issue: {issue}");
-    }
-    for issue in &report.link_unit_table_issues {
-        println!("  link_unit_table_issue: {issue}");
-    }
-    for issue in &report.link_bundle_issues {
-        println!("  link_bundle_issue: {issue}");
-    }
-    for issue in &report.assemble_plan_issues {
-        println!("  assemble_plan_issue: {issue}");
-    }
-    for issue in &report.section_manifest_issues {
-        println!("  section_manifest_issue: {issue}");
-    }
-    for issue in &report.object_plan_issues {
-        println!("  object_plan_issue: {issue}");
-    }
-    for issue in &report.object_writer_input_issues {
-        println!("  object_writer_input_issue: {issue}");
-    }
-    for issue in &report.object_byte_layout_issues {
-        println!("  object_byte_layout_issue: {issue}");
-    }
-    for issue in &report.object_file_layout_issues {
-        println!("  object_file_layout_issue: {issue}");
-    }
-    for issue in &report.object_image_dry_run_issues {
-        println!("  object_image_dry_run_issue: {issue}");
-    }
-    for issue in &report.object_image_relocation_lowering_issues {
-        println!("  object_image_relocation_lowering_issue: {issue}");
-    }
-    for issue in &report.object_emit_blocked_issues {
-        println!("  object_emit_blocked_issue: {issue}");
-    }
-    for issue in &report.object_output_issues {
-        println!("  object_output_issue: {issue}");
-    }
-    for issue in &report.object_writer_dry_run_issues {
-        println!("  object_writer_dry_run_issue: {issue}");
-    }
-    for issue in &report.container_plan_issues {
-        println!("  container_plan_issue: {issue}");
-    }
-    for issue in &report.container_issues {
-        println!("  container_issue: {issue}");
-    }
-    for issue in &report.container_section_issues {
-        println!("  container_section_issue: {issue}");
-    }
-    for issue in &report.container_loader_symbol_issues {
-        println!("  container_loader_symbol_issue: {issue}");
-    }
-    for issue in &report.container_relocation_issues {
-        println!("  container_relocation_issue: {issue}");
-    }
-    for issue in &report.container_compatibility_domain_issues {
-        println!("  container_compatibility_domain_issue: {issue}");
-    }
-    for issue in &report.container_external_import_issues {
-        println!("  container_external_import_issue: {issue}");
-    }
-    for issue in &report.container_payload_issues {
-        println!("  container_payload_issue: {issue}");
-    }
-    for issue in &report.closure_snapshot_issues {
-        println!("  closure_snapshot_issue: {issue}");
-    }
-    for issue in &report.final_stage_plan_issues {
-        println!("  final_stage_plan_issue: {issue}");
-    }
-    for issue in &report.final_executable_writer_input_issues {
-        println!("  final_executable_writer_input_issue: {issue}");
-    }
-    for issue in &report.final_executable_host_invoke_plan_issues {
-        println!("  final_executable_host_invoke_plan_issue: {issue}");
-    }
-    for issue in &report.final_executable_layout_plan_issues {
-        println!("  final_executable_layout_plan_issue: {issue}");
-    }
-    for issue in &report.final_executable_image_dry_run_issues {
-        println!("  final_executable_image_dry_run_issue: {issue}");
-    }
-    for issue in &report.final_executable_blocked_issues {
-        println!("  final_executable_blocked_issue: {issue}");
-    }
-    for blocker in &report.final_executable_output_blockers {
-        println!("  final_executable_output_blocker: {blocker}");
-    }
-    for issue in &report.final_executable_output_issues {
-        println!("  final_executable_output_issue: {issue}");
-    }
-    for issue in &report.final_executable_launcher_manifest_issues {
-        println!("  final_executable_launcher_manifest_issue: {issue}");
-    }
-    for issue in &report.final_executable_launcher_dry_run_issues {
-        println!("  final_executable_launcher_dry_run_issue: {issue}");
-    }
-    for issue in &report.final_executable_pipeline_issues {
-        println!("  final_executable_pipeline_issue: {issue}");
-    }
-    for path in &report.final_executable_pipeline_missing_required_stage_paths {
-        println!("  final_executable_pipeline_missing_required_stage_path: {path}");
-    }
-    for blocker in &report.container_loader_blockers {
-        println!("  container_loader_blocker: {blocker}");
-    }
-    for advisory in &report.artifact_chain_advisories {
-        println!("  artifact_chain_advisory: {advisory}");
-    }
-    if let Some(reason) = report.artifact_chain_advisory_command_reason.as_deref() {
-        println!("  artifact_chain_advisory_command_reason: {reason}");
-    }
-    if let Some(reason) = report.artifact_chain_next_action_command_reason.as_deref() {
-        println!("  artifact_chain_next_action_command_reason: {reason}");
-    }
-    if let Some(reason) = report.next_action_command_reason.as_deref() {
-        println!("  next_action_command_reason: {reason}");
-    }
-    for issue in &report.artifact_chain_issues {
-        println!("  artifact_chain_issue: {issue}");
-    }
+    print_check_report_issue_lines(report);
 }

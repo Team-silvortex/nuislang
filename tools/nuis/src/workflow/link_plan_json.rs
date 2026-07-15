@@ -2,6 +2,7 @@ use super::link_plan_domain::{
     workflow_domain_readiness_summary, workflow_domain_readiness_units_json,
     workflow_link_plan_domain_unit_record,
 };
+use super::link_plan_json_nsld_output::nsld_final_output_json_fields;
 use super::*;
 use crate::{
     artifact_doctor::probe_artifact_doctor,
@@ -577,153 +578,8 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
                 .as_ref()
                 .and_then(|summary| summary.self_owned_image_header_valid),
         ),
-        json_bool_field(
-            "nsld_final_executable_output_ready",
-            nsld_final_output
-                .as_ref()
-                .is_some_and(|summary| summary.ready),
-        ),
-        json_optional_string_field(
-            "nsld_final_executable_output_boundary_status",
-            nsld_final_output
-                .as_ref()
-                .map(|summary| summary.boundary_status.as_str()),
-        ),
-        json_optional_string_field(
-            "nsld_final_executable_output_materialization_status",
-            nsld_final_output
-                .as_ref()
-                .map(|summary| summary.materialization_status.as_str()),
-        ),
-        json_optional_string_field(
-            "nsld_final_executable_output_execution_handoff_contract",
-            nsld_final_output
-                .as_ref()
-                .map(|summary| summary.execution_handoff_contract.as_str()),
-        ),
-        json_bool_field(
-            "nsld_final_executable_output_execution_handoff_ready",
-            nsld_final_output
-                .as_ref()
-                .is_some_and(|summary| summary.execution_handoff_ready),
-        ),
-        json_optional_string_field(
-            "nsld_final_executable_output_execution_handoff_status",
-            nsld_final_output
-                .as_ref()
-                .map(|summary| summary.execution_handoff_status.as_str()),
-        ),
-        json_optional_string_field(
-            "nsld_final_executable_output_execution_handoff_target",
-            nsld_final_output
-                .as_ref()
-                .map(|summary| summary.execution_handoff_target.as_str()),
-        ),
-        json_optional_string_field(
-            "nsld_final_executable_output_execution_handoff_evidence_status",
-            nsld_final_output
-                .as_ref()
-                .map(|summary| summary.execution_handoff_evidence_status.as_str()),
-        ),
-        json_optional_string_field(
-            "nsld_final_executable_output_execution_handoff_first_blocker",
-            nsld_final_output
-                .as_ref()
-                .and_then(|summary| summary.execution_handoff_first_blocker.as_deref()),
-        ),
-        json_optional_string_field(
-            "nsld_final_executable_output_execution_handoff_decision_code",
-            nsld_final_output
-                .as_ref()
-                .map(|summary| summary.execution_handoff_decision_code.as_str()),
-        ),
-        json_optional_string_field(
-            "nsld_final_executable_output_entrypoint_materialization_evidence_status",
-            nsld_final_output
-                .as_ref()
-                .map(|summary| summary.entrypoint_materialization_evidence_status.as_str()),
-        ),
-        json_bool_field(
-            "nsld_final_executable_output_launcher_manifest_present",
-            nsld_final_output
-                .as_ref()
-                .is_some_and(|summary| summary.launcher_manifest_present),
-        ),
-        json_optional_bool_field(
-            "nsld_final_executable_output_launcher_manifest_ready",
-            nsld_final_output
-                .as_ref()
-                .and_then(|summary| summary.launcher_manifest_ready),
-        ),
-        json_optional_usize_field(
-            "nsld_final_executable_output_launcher_manifest_blocker_count",
-            nsld_final_output
-                .as_ref()
-                .and_then(|summary| summary.launcher_manifest_blocker_count),
-        ),
-        json_bool_field(
-            "nsld_final_executable_output_launcher_dry_run_present",
-            nsld_final_output
-                .as_ref()
-                .is_some_and(|summary| summary.launcher_dry_run_present),
-        ),
-        json_optional_bool_field(
-            "nsld_final_executable_output_launcher_dry_run_ready",
-            nsld_final_output
-                .as_ref()
-                .and_then(|summary| summary.launcher_dry_run_ready),
-        ),
-        json_optional_bool_field(
-            "nsld_final_executable_output_launcher_dry_run_would_enter_lifecycle_hook",
-            nsld_final_output
-                .as_ref()
-                .and_then(|summary| summary.launcher_dry_run_would_enter_lifecycle_hook),
-        ),
-        json_optional_usize_field(
-            "nsld_final_executable_output_launcher_dry_run_blocker_count",
-            nsld_final_output
-                .as_ref()
-                .and_then(|summary| summary.launcher_dry_run_blocker_count),
-        ),
-        json_optional_string_field(
-            "nsld_final_executable_output_recommended_next_action",
-            nsld_final_output
-                .as_ref()
-                .map(|summary| summary.recommended_next_action.as_str()),
-        ),
-        json_bool_field(
-            "nsld_final_executable_output_path_present",
-            nsld_final_output
-                .as_ref()
-                .is_some_and(|summary| summary.path_present),
-        ),
-        json_optional_bool_field(
-            "nsld_final_executable_output_nsld_owned",
-            nsld_final_output
-                .as_ref()
-                .and_then(|summary| summary.nsld_owned),
-        ),
-        json_usize_field(
-            "nsld_final_executable_output_blocker_count",
-            nsld_final_output
-                .as_ref()
-                .map(|summary| summary.blockers.len())
-                .unwrap_or(0),
-        ),
-        json_string_array_field(
-            "nsld_final_executable_output_blockers",
-            nsld_final_output
-                .as_ref()
-                .map(|summary| summary.blockers.as_slice())
-                .unwrap_or(&[]),
-        ),
-        json_optional_string_field(
-            "nsld_final_executable_output_first_blocker",
-            nsld_final_output
-                .as_ref()
-                .and_then(|summary| summary.first_blocker.as_deref()),
-        ),
     ];
+    fields.extend(nsld_final_output_json_fields(nsld_final_output.as_ref()));
     if let Some(evidence) = workflow_launch_evidence {
         fields.extend(evidence.json_fields_with_prefix("workflow_launch_evidence"));
     }

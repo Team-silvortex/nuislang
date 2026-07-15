@@ -25,9 +25,11 @@ pub(crate) struct DevTensorDriftSummary {
     pub(crate) checks: Vec<DevTensorDriftCheck>,
 }
 
-pub(crate) fn dev_tensor_drift_summary(specs: &[DevTensorDriftCheckSpec]) -> DevTensorDriftSummary {
+pub(crate) fn dev_tensor_drift_summary<'a>(
+    specs: impl IntoIterator<Item = &'a DevTensorDriftCheckSpec>,
+) -> DevTensorDriftSummary {
     let checks = specs
-        .iter()
+        .into_iter()
         .map(run_dev_tensor_drift_check)
         .collect::<Vec<_>>();
     let check_count = checks.len();

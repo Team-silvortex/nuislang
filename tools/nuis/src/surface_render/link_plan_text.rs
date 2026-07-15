@@ -1,3 +1,6 @@
+use super::link_plan_text_nsld_output::{
+    write_nsld_final_output_text_fields, write_unavailable_nsld_final_output_text_fields,
+};
 use std::{fmt, path::Path};
 
 pub(super) fn write_unavailable_link_plan_text_fields<W: fmt::Write>(out: &mut W) -> fmt::Result {
@@ -206,60 +209,7 @@ fn write_unavailable_nsld_text_fields<W: fmt::Write>(out: &mut W) -> fmt::Result
     writeln!(out, "  nsld_self_owned_image_present: <unavailable>")?;
     writeln!(out, "  nsld_self_owned_image_hash: <unavailable>")?;
     writeln!(out, "  nsld_self_owned_image_header_valid: <unavailable>")?;
-    writeln!(out, "  nsld_final_executable_output_ready: <unavailable>")?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_boundary_status: <unavailable>"
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_materialization_status: <unavailable>"
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_execution_handoff_contract: <unavailable>"
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_execution_handoff_ready: <unavailable>"
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_execution_handoff_status: <unavailable>"
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_execution_handoff_target: <unavailable>"
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_execution_handoff_evidence_status: <unavailable>"
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_execution_handoff_first_blocker: <none>"
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_execution_handoff_decision_code: <unavailable>"
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_recommended_next_action: <unavailable>"
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_path_present: <unavailable>"
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_nsld_owned: <unavailable>"
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_blocker_count: <unavailable>"
-    )?;
-    writeln!(out, "  nsld_final_executable_output_first_blocker: <none>")
+    write_unavailable_nsld_final_output_text_fields(out)
 }
 
 pub(super) fn write_nsld_artifact_chain_text_fields<W: fmt::Write>(
@@ -676,89 +626,5 @@ pub(super) fn write_nsld_artifact_chain_text_fields<W: fmt::Write>(
             .map(crate::yes_no)
             .unwrap_or("<unavailable>")
     )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_ready: {}",
-        crate::yes_no(final_output.ready)
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_boundary_status: {}",
-        final_output.boundary_status
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_materialization_status: {}",
-        final_output.materialization_status
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_execution_handoff_contract: {}",
-        final_output.execution_handoff_contract
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_execution_handoff_ready: {}",
-        crate::yes_no(final_output.execution_handoff_ready)
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_execution_handoff_status: {}",
-        final_output.execution_handoff_status
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_execution_handoff_target: {}",
-        final_output.execution_handoff_target
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_execution_handoff_evidence_status: {}",
-        final_output.execution_handoff_evidence_status
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_execution_handoff_first_blocker: {}",
-        final_output
-            .execution_handoff_first_blocker
-            .as_deref()
-            .unwrap_or("<none>")
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_execution_handoff_decision_code: {}",
-        final_output.execution_handoff_decision_code
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_recommended_next_action: {}",
-        final_output.recommended_next_action
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_path_present: {}",
-        crate::yes_no(final_output.path_present)
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_nsld_owned: {}",
-        final_output
-            .nsld_owned
-            .map(crate::yes_no)
-            .unwrap_or("<unavailable>")
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_blocker_count: {}",
-        final_output.blockers.len()
-    )?;
-    writeln!(
-        out,
-        "  nsld_final_executable_output_first_blocker: {}",
-        final_output.first_blocker.as_deref().unwrap_or("<none>")
-    )?;
-    for blocker in &final_output.blockers {
-        writeln!(out, "  nsld_final_executable_output_blocker: {blocker}")?;
-    }
-    Ok(())
+    write_nsld_final_output_text_fields(out, &final_output)
 }

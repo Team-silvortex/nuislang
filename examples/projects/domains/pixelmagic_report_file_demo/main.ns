@@ -1,0 +1,96 @@
+use cpu PixelMagicContracts;
+use cpu StdReportContracts;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_argv_at(index: i64) -> i64;
+  extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
+  extern "c" fn host_file_close(file_handle: i64) -> i64;
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_stdout_flush() -> i64;
+  extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_len(text_handle: i64) -> i64;
+
+  struct PixelMagicReportSummary {
+    argv_count: i64,
+    report_handle: i64,
+    report_len: i64,
+    output_file_handle: i64,
+    written_len: i64,
+    close_status: i64,
+    stdout_written: i64,
+    stdout_flushed: i64,
+    package_score: i64,
+    validation_total: i64,
+    exit_status: i64
+  }
+
+  fn text_from_literal(value: String) -> i64 {
+    return text_handle(value);
+  }
+
+  fn build_pixelmagic_report_text() -> i64 {
+    let title: i64 = text_from_literal("pixelmagic report\n");
+    let package_line: i64 = text_from_literal("package: pixelmagic\n");
+    let route_line: i64 = text_from_literal("route: std-report-file\n");
+    let workload_line: i64 = text_from_literal("workload: image-analysis\n");
+    let status_line: i64 = text_from_literal("status: ready\n");
+    return host_text_concat(
+      host_text_concat(host_text_concat(title, package_line), route_line),
+      host_text_concat(workload_line, status_line)
+    );
+  }
+
+  fn pixelmagic_package_score() -> i64 {
+    return PixelMagicContracts.filter_chain_total(
+      5301,
+      128,
+      96,
+      PixelMagicContracts.edge_op_kind(),
+      PixelMagicContracts.sharpen_op_kind(),
+      12,
+      9
+    ) + PixelMagicContracts.analysis_quality_total(5301, 128, 96, 256, 4, 0);
+  }
+
+  fn capture_pixelmagic_report(argv_count: i64, output_path_handle: i64) -> PixelMagicReportSummary {
+    let report_handle: i64 = build_pixelmagic_report_text();
+    let report_len: i64 = host_text_len(report_handle);
+    let output_file_handle: i64 = host_file_open(output_path_handle, 1537);
+    let written_len: i64 = host_file_write(output_file_handle, report_handle);
+    let close_status: i64 = host_file_close(output_file_handle);
+    let stdout_written: i64 = host_stdout_write(report_handle);
+    let stdout_flushed: i64 = host_stdout_flush();
+    let package_score: i64 = pixelmagic_package_score();
+    let validation_total: i64 = StdReportContracts.cli_report_file_validation_total(
+      argv_count,
+      report_handle,
+      report_len,
+      output_file_handle,
+      written_len,
+      close_status,
+      stdout_written,
+      stdout_flushed
+    ) + StdReportContracts.encode_report_gate(package_score > 0);
+    let exit_status: i64 = host_stdout_flush();
+    return PixelMagicReportSummary {
+      argv_count: argv_count,
+      report_handle: report_handle,
+      report_len: report_len,
+      output_file_handle: output_file_handle,
+      written_len: written_len,
+      close_status: close_status,
+      stdout_written: stdout_written,
+      stdout_flushed: stdout_flushed,
+      package_score: package_score,
+      validation_total: validation_total,
+      exit_status: exit_status
+    };
+  }
+
+  fn main() {
+    let summary: PixelMagicReportSummary =
+      capture_pixelmagic_report(host_argv_count(), host_argv_at(1));
+  }
+}

@@ -74,10 +74,16 @@ At the current repo stage:
 * the live implementation focus is still on `nuis / nuisc / YIR / nustar`
 * but `stdlib` is no longer empty scaffolding; all five layers now carry real
   checked-in `.ns` assets
-* for the `alpha-0.8.*` line, `std`, PixelMagic, and WitSage are the practical
+* for the `alpha-0.10.*` line, `std`, PixelMagic, and WitSage are the practical
   proving surfaces for buildable CLI/tooling, image/resource, and kernel-facing
   classical ML contracts before `ns-nova` grows into a larger GUI/framework
   layer
+* PixelMagic and WitSage now each have a small report-file workload under
+  `examples/projects/domains/` that consumes their official package contracts
+  while reusing `StdReportContracts` from `std`
+* the std smoke lane also builds one PixelMagic shader pipeline demo and one
+  WitSage kernel tensor demo, checking their hetero domain artifacts, payload
+  metadata, and sidecar lowering IR without claiming full device execution yet
 
 Asset view by layer:
 

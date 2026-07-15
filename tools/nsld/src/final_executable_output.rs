@@ -20,6 +20,7 @@ use super::{
     },
     final_stage::{nsld_verify_final_executable_emit_report, nsld_verify_final_stage_plan_report},
     fnv1a64_hex,
+    object_output::nsld_verify_object_output_report,
     reports::NsldFinalExecutableOutputReport,
     toml,
 };
@@ -31,6 +32,7 @@ pub(crate) fn nsld_final_executable_output_report(
 ) -> NsldFinalExecutableOutputReport {
     let final_stage = nsld_verify_final_stage_plan_report(manifest, plan);
     let final_emit = nsld_verify_final_executable_emit_report(manifest, plan);
+    let object_output = nsld_verify_object_output_report(manifest, plan);
     let final_layout = nsld_final_executable_layout_plan_report(manifest, plan);
     let image_dry_run = nsld_verify_final_executable_image_dry_run_report(manifest, plan);
     let output_path = plan.final_stage.output_path.clone();
@@ -387,6 +389,13 @@ pub(crate) fn nsld_final_executable_output_report(
         final_executable_emit_valid: final_emit.valid,
         final_executable_emitted: final_emit.actual_emitted,
         final_executable_blocker_count: final_emit.actual_blocker_count,
+        object_output_valid: object_output.valid,
+        object_output_path: object_output.object_output_path,
+        object_output_expected_size_bytes: object_output.expected_size_bytes,
+        object_output_actual_size_bytes: object_output.actual_size_bytes,
+        object_output_expected_hash: object_output.expected_hash,
+        object_output_actual_hash: object_output.actual_hash,
+        object_output_issues: object_output.issues,
         runnable_candidate,
         backend_artifact_candidate_count: backend_artifacts.candidate_count,
         backend_artifact_ready_count: backend_artifacts.ready_count,

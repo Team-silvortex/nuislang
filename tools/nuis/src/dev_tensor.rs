@@ -1,8 +1,9 @@
 use crate::{
-    dev_tensor_data::{DEV_TENSOR_CELLS, DEV_TENSOR_DRIFT_CHECKS},
+    dev_tensor_data::DEV_TENSOR_CELLS,
     dev_tensor_drift::{
         dev_tensor_drift_summary as build_dev_tensor_drift_summary, DevTensorDriftSummary,
     },
+    dev_tensor_drift_data::dev_tensor_drift_checks,
     dev_tensor_manifest::{dev_tensor_manifest_coverage, DevTensorManifestCoverage},
     dev_tensor_milestones::{
         dev_tensor_milestone_coverage, expected_coordinates_from_milestones,
@@ -288,7 +289,7 @@ pub(crate) fn dev_tensor_coordinate_key(
 }
 
 pub(crate) fn dev_tensor_drift_summary() -> DevTensorDriftSummary {
-    build_dev_tensor_drift_summary(DEV_TENSOR_DRIFT_CHECKS)
+    build_dev_tensor_drift_summary(dev_tensor_drift_checks())
 }
 
 pub(crate) fn render_dev_tensor_json() -> String {

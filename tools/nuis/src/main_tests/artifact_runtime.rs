@@ -122,6 +122,10 @@ backend_artifact_payload_first_missing = ""
     assert!(run_json.contains(
         "\"launch_evidence_backend_artifact_payload_kinds\":[\"nustar-backend-artifact:kernel:aarch64:apple-silicon-cpu\"]"
     ));
+    assert!(run_json.contains("\"host_runner_backend_artifact_payload_count\":null"));
+    assert!(run_json.contains("\"host_runner_backend_artifact_payload_parsed_count\":null"));
+    assert!(run_json.contains("\"host_runner_backend_artifact_payload_ready_count\":null"));
+    assert!(run_json.contains("\"host_runner_backend_artifact_payload_first_kind\":null"));
 }
 
 #[test]
@@ -324,6 +328,13 @@ mod cpu Main {
     assert!(json.contains("\"launch_evidence_command\":\""));
     assert!(json.contains("\"launch_evidence_host_runner_probe_status\":\"not-required\""));
     assert!(json.contains("\"launch_evidence_host_runner_probe_ready\":null"));
+    assert!(json.contains("\"host_runner_backend_artifact_payload_count\":null"));
+    assert!(json.contains("\"host_runner_backend_artifact_payload_parsed_count\":null"));
+    assert!(json.contains("\"host_runner_backend_artifact_payload_ready_count\":null"));
+    assert!(json.contains("\"host_runner_backend_artifact_payload_first_id\":null"));
+    assert!(json.contains("\"host_runner_backend_artifact_payload_first_kind\":null"));
+    assert!(json.contains("\"host_runner_backend_artifact_payload_first_role_status\":null"));
+    assert!(json.contains("\"host_runner_backend_artifact_payload_table_hash\":null"));
     assert!(json.contains("\"launch_evidence_first_payload_status\":null"));
     assert!(json.contains("\"launch_evidence_first_payload_ready\":null"));
     assert!(json.contains("\"launch_evidence_first_payload_target\":null"));
@@ -808,7 +819,7 @@ mod cpu Main {
     assert!(json.contains("\"runtime_host_yir_ok\":true"));
     assert!(json.contains("\"runtime_host_yir_kernel_nodes\":4"));
     assert!(json.contains("\"runtime_host_yir_tensor_values\":3"));
-    assert!(json.contains("\"runtime_host_yir_scalar_values\":2"));
+    assert!(json.contains("\"runtime_host_yir_scalar_values\":3"));
     assert!(json.contains("\"runtime_host_yir_kernel_integer_checksum\":73"));
     assert!(json.contains("\"runtime_execution_kernel_host_reference_events\":4"));
 }
@@ -977,6 +988,19 @@ fn run_artifact_json_exposes_bridge_bearing_exchange_summary() {
         json.contains("\"link_plan_heterogeneous_domain_registry_dispatch_first_blocked\":null")
     );
     assert!(json.contains("\"registry_dispatch_readiness_status\":\"ready\""));
+    assert!(json.contains("\"hetero_runtime_trace_available\":true"));
+    assert!(json.contains("\"hetero_runtime_trace_status\":\"execution-pending\""));
+    assert!(json.contains(
+        "\"hetero_runtime_trace_debugger_contract\":\"nsdb-yir-hetero-runtime-trace-v1\""
+    ));
+    assert!(json.contains("\"hetero_runtime_trace_domain_count\":2"));
+    assert!(json.contains("\"hetero_runtime_trace_backend_artifact_count\":1"));
+    assert!(json.contains("\"hetero_runtime_trace_backend_artifact_ready_count\":1"));
+    assert!(json.contains("\"hetero_runtime_trace_domain_families\":[\"data\",\"shader\"]"));
+    assert!(json.contains("\"hetero_runtime_trace_target_devices\":[\"apple-silicon-gpu\"]"));
+    assert!(json.contains("\"hetero_runtime_trace_first_blocker\":null"));
+    assert!(json
+        .contains("\"hetero_runtime_trace_next_action\":\"materialize-device-execution-trace\""));
 }
 
 #[test]

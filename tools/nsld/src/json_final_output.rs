@@ -206,6 +206,25 @@ pub(crate) fn nsld_final_executable_output_report_json(
             "final_executable_blocker_count",
             report.final_executable_blocker_count,
         ),
+        json_bool_field("object_output_valid", report.object_output_valid),
+        json_string_field("object_output_path", &report.object_output_path),
+        json_optional_usize_field(
+            "object_output_expected_size_bytes",
+            report.object_output_expected_size_bytes,
+        ),
+        json_optional_usize_field(
+            "object_output_actual_size_bytes",
+            report.object_output_actual_size_bytes,
+        ),
+        json_optional_string_field(
+            "object_output_expected_hash",
+            report.object_output_expected_hash.as_deref(),
+        ),
+        json_optional_string_field(
+            "object_output_actual_hash",
+            report.object_output_actual_hash.as_deref(),
+        ),
+        json_string_array_field("object_output_issues", &report.object_output_issues),
         json_bool_field("runnable_candidate", report.runnable_candidate),
         json_usize_field(
             "backend_artifact_candidate_count",

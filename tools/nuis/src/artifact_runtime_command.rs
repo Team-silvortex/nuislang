@@ -6,6 +6,7 @@ use crate::{
         optional_bool_text, print_launch_evidence_text, HostRunnerJsonSurface, HostRunnerOutput,
         RunArtifactLaunchEvidence,
     },
+    artifact_runtime_trace::HeteroRuntimeTraceSummary,
     build_report_nsld_status::print_nsld_artifact_chain_status,
     build_report_render::append_runtime_session_json_fields,
     json_bool_field, json_field, json_optional_bool_field, json_optional_string_field,
@@ -106,6 +107,10 @@ pub(crate) fn render_run_artifact_json(input: &Path) -> String {
         run_artifact_prelaunch_summary(doctor.output_dir.as_deref(), resolved_binary.as_deref());
     let host_runner_surface = run_artifact_host_runner_surface(&doctor, &prelaunch);
     let diagnostics = collect_artifact_output_diagnostics(input, &doctor);
+    let hetero_trace = HeteroRuntimeTraceSummary::from_link_plan(
+        diagnostics.link_plan.as_ref(),
+        &diagnostics.backend_artifact_payload_evidence,
+    );
     let launch_evidence = RunArtifactLaunchEvidence::from_surfaces_with_backend_payload_evidence(
         &prelaunch,
         &host_runner_surface,
@@ -165,6 +170,7 @@ pub(crate) fn render_run_artifact_json(input: &Path) -> String {
     );
     append_json_field_strings(&mut out, host_runner_surface.json_fields());
     append_json_field_strings(&mut out, launch_evidence.json_fields());
+    append_json_field_strings(&mut out, hetero_trace.json_fields());
     append_runtime_session_json_fields(&mut out, manifest_verify.as_ref());
     append_json_field_strings(
         &mut out,
@@ -191,6 +197,11 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
         resolved_binary.map(|path| path.as_path()),
     );
     if resolved_binary.is_none() && prelaunch.nsld_runtime_handoff_ready() {
+        let diagnostics = collect_artifact_output_diagnostics(&input, &doctor);
+        let hetero_trace = HeteroRuntimeTraceSummary::from_link_plan(
+            diagnostics.link_plan.as_ref(),
+            &diagnostics.backend_artifact_payload_evidence,
+        );
         let runner_output = doctor
             .output_dir
             .as_deref()
@@ -202,7 +213,11 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
             .map(HostRunnerJsonSurface::from_output)
             .unwrap_or_else(|| HostRunnerJsonSurface::not_invoked("not-required"));
         let launch_evidence =
-            RunArtifactLaunchEvidence::from_surfaces(&prelaunch, &host_runner_surface);
+            RunArtifactLaunchEvidence::from_surfaces_with_backend_payload_evidence(
+                &prelaunch,
+                &host_runner_surface,
+                &diagnostics.backend_artifact_payload_evidence,
+            );
         if success_logs_enabled() {
             println!(
                 "run-artifact: {}",
@@ -248,6 +263,7 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
                 println!("  host_runner_status: handoff-ready");
             }
             print_launch_evidence_text(&launch_evidence);
+            hetero_trace.print_text();
             let link_plan = doctor
                 .output_dir
                 .as_ref()
@@ -309,6 +325,12 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
         let launch_evidence =
             RunArtifactLaunchEvidence::from_surfaces(&prelaunch, &host_runner_surface);
         print_launch_evidence_text(&launch_evidence);
+        let diagnostics = collect_artifact_output_diagnostics(&input, &doctor);
+        let hetero_trace = HeteroRuntimeTraceSummary::from_link_plan(
+            diagnostics.link_plan.as_ref(),
+            &diagnostics.backend_artifact_payload_evidence,
+        );
+        hetero_trace.print_text();
         print_run_artifact_link_plan_status(link_plan.as_ref());
     }
     if status.success() {

@@ -459,6 +459,17 @@ pub(crate) fn nsld_check_report(
             .final_executable_output_matches_verified_patched_image,
         final_executable_output_runnable_candidate: final_snapshot
             .final_executable_output_runnable_candidate,
+        final_executable_output_object_valid: final_snapshot.final_executable_output_object_valid,
+        final_executable_output_object_path: final_snapshot.final_executable_output_object_path,
+        final_executable_output_object_expected_size_bytes: final_snapshot
+            .final_executable_output_object_expected_size_bytes,
+        final_executable_output_object_actual_size_bytes: final_snapshot
+            .final_executable_output_object_actual_size_bytes,
+        final_executable_output_object_expected_hash: final_snapshot
+            .final_executable_output_object_expected_hash,
+        final_executable_output_object_actual_hash: final_snapshot
+            .final_executable_output_object_actual_hash,
+        final_executable_output_object_issues: final_snapshot.final_executable_output_object_issues,
         final_executable_output_blocker_count: final_snapshot.final_executable_output_blocker_count,
         final_executable_output_blockers: final_snapshot.final_executable_output_blockers,
         final_executable_output_issues: final_snapshot.final_executable_output_issues,
