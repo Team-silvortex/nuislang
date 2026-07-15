@@ -42,6 +42,22 @@ pub(super) fn write_unavailable_nsld_final_output_text_fields<W: fmt::Write>(
     )?;
     writeln!(
         out,
+        "  nsld_final_executable_output_payload_execution_trace_protocol: <unavailable>"
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_payload_execution_trace_available: <unavailable>"
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_payload_execution_trace_record_count: <unavailable>"
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_payload_execution_trace_ready_record_count: <unavailable>"
+    )?;
+    writeln!(
+        out,
         "  nsld_final_executable_output_recommended_next_action: <unavailable>"
     )?;
     writeln!(
@@ -131,6 +147,26 @@ pub(super) fn write_nsld_final_output_text_fields<W: fmt::Write>(
         out,
         "  nsld_final_executable_output_execution_handoff_decision_code: {}",
         final_output.execution_handoff_decision_code
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_payload_execution_trace_protocol: {}",
+        final_output.payload_execution_trace_protocol
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_payload_execution_trace_available: {}",
+        crate::yes_no(final_output.payload_execution_trace_available)
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_payload_execution_trace_record_count: {}",
+        final_output.payload_execution_trace_record_count
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_payload_execution_trace_ready_record_count: {}",
+        final_output.payload_execution_trace_ready_record_count
     )?;
     writeln!(
         out,

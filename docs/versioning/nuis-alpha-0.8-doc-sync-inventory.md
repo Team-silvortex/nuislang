@@ -27,7 +27,7 @@ The intended order is:
 
 1. top-level README for the current repo shape
 2. current mainline map for detailed routing
-3. alpha-0.10 mainline entry for current line wording
+3. alpha-0.13 mainline entry for current line wording
 4. alpha-0.8 mainline entry for predecessor binary-convergence wording
 5. reference docs for implementation truth
 6. examples and stdlib READMEs for local routes

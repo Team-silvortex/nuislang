@@ -328,6 +328,10 @@ fn assert_official_galaxy_hetero_build(
     label: &str,
     project: &str,
     domain: &str,
+    backend_family: &str,
+    target_device: &str,
+    trace_record_count: usize,
+    expected_trace_id: &str,
     yir_needles: &[&str],
     sidecar_needles: &[&str],
     payload_needles: &[&str],
@@ -372,6 +376,27 @@ fn assert_official_galaxy_hetero_build(
         &format!("domain_family = \"{domain}\""),
         "official galaxy hetero plan",
     );
+
+    let run_json = run_nuis(&["run-artifact", &output_dir_text, "--json"]);
+    assert_success(
+        &run_json,
+        "nuis run-artifact json official galaxy hetero smoke",
+    );
+    let run_json_stdout = String::from_utf8_lossy(&run_json.stdout);
+    let trace_id = format!("\"trace_id\":\"{expected_trace_id}\"");
+    assert!(
+        run_json_stdout.contains("\"hetero_runtime_trace_available\":true")
+            && run_json_stdout.contains("\"hetero_runtime_trace_status\":\"execution-pending\"")
+            && run_json_stdout.contains("\"hetero_runtime_trace_debugger_contract\":\"nsdb-yir-hetero-runtime-trace-v1\"")
+            && run_json_stdout.contains(&format!("\"hetero_runtime_trace_record_count\":{trace_record_count}"))
+            && run_json_stdout.contains("\"hetero_runtime_trace_backend_execution_record_count\":1")
+            && run_json_stdout.contains(&format!("\"hetero_runtime_trace_backend_families\":[\"{backend_family}\"]"))
+            && run_json_stdout.contains(&format!("\"hetero_runtime_trace_target_devices\":[\"{target_device}\"]"))
+            && run_json_stdout.contains(&trace_id)
+            && run_json_stdout.contains("\"trace_role\":\"backend-artifact\"")
+            && run_json_stdout.contains("\"next_action\":\"materialize-device-execution-trace\""),
+        "run-artifact json did not expose expected official galaxy hetero trace for {label}\n{run_json_stdout}"
+    );
 }
 
 #[test]
@@ -385,6 +410,10 @@ fn official_galaxy_hetero_projects_emit_shader_and_kernel_artifacts() {
         "pixelmagic_pipeline_demo",
         "../../examples/projects/domains/pixelmagic_pipeline_demo",
         "shader",
+        "metal",
+        "apple-silicon-gpu",
+        2,
+        "hetero-trace:shader:metal:apple-silicon-gpu",
         &[
             "shader.begin_pass",
             "shader.draw_instanced",
@@ -408,6 +437,10 @@ fn official_galaxy_hetero_projects_emit_shader_and_kernel_artifacts() {
         "witsage_kernel_demo",
         "../../examples/projects/domains/witsage_kernel_demo",
         "kernel",
+        "coreml",
+        "apple-ane",
+        1,
+        "hetero-trace:kernel:coreml:apple-ane",
         &[
             "kernel.tensor",
             "kernel.reduce_mean_axis",

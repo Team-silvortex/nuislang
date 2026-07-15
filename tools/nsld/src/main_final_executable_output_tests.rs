@@ -981,6 +981,19 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert!(output_json
         .contains("\"first_payload_execution_entry_section_id\":\"sec0000.compiled-artifact\""));
     assert!(output_json.contains("\"first_payload_execution_first_blocker\":null"));
+    assert!(output_json
+        .contains("\"payload_execution_trace_protocol\":\"nsdb-yir-payload-execution-trace-v1\""));
+    assert!(output_json.contains("\"payload_execution_trace_available\":true"));
+    assert!(output_json.contains("\"payload_execution_trace_record_count\":1"));
+    assert!(output_json.contains("\"payload_execution_trace_ready_record_count\":1"));
+    assert!(output_json.contains("\"payload_execution_trace_records\":[{"));
+    assert!(output_json.contains("\"trace_id\":\"payload-trace:container-loader:main\""));
+    assert!(output_json.contains("\"execution_phase\":\"container-loader-handoff\""));
+    assert!(output_json.contains("\"target\":\"container-loader\""));
+    assert!(output_json.contains("\"entry_symbol\":\"main\""));
+    assert!(output_json.contains("\"entry_kind\":\"lifecycle-bootstrap\""));
+    assert!(output_json.contains("\"entry_section_id\":\"sec0000.compiled-artifact\""));
+    assert!(output_json.contains("\"next_action\":\"handoff-payload-trace-to-nsdb\""));
     assert!(output_json.contains("\"recommended_next_action\":\"handoff-to-container-loader\""));
     assert!(output_json.contains("\"path_present\":true"));
     assert!(output_json.contains("\"nsld_owned_output\":true"));

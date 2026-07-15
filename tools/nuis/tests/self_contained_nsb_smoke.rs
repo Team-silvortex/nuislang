@@ -199,8 +199,47 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
             && run_json_stdout.contains("\"launch_evidence_first_payload_entry_kind\":\"lifecycle-bootstrap\"")
             && run_json_stdout.contains("\"launch_evidence_first_payload_entry_section_id\":\"sec0000.compiled-artifact\"")
             && run_json_stdout.contains("\"launch_evidence_first_payload_first_blocker\":null")
+            && run_json_stdout.contains("\"launch_evidence_payload_execution_trace_protocol\":\"nsdb-yir-payload-execution-trace-v1\"")
+            && run_json_stdout.contains("\"launch_evidence_payload_execution_trace_available\":true")
+            && run_json_stdout.contains("\"launch_evidence_payload_execution_trace_record_count\":1")
+            && run_json_stdout.contains("\"launch_evidence_payload_execution_trace_ready_record_count\":1")
+            && run_json_stdout.contains("\"launch_evidence_payload_execution_trace_records\":[{")
+            && run_json_stdout.contains("\"trace_id\":\"payload-trace:container-loader:nuis.bootstrap.lifecycle.v1\"")
+            && run_json_stdout.contains("\"execution_phase\":\"container-loader-handoff\"")
+            && run_json_stdout.contains("\"next_action\":\"handoff-payload-trace-to-nsdb\"")
+            && run_json_stdout.contains("\"launch_evidence_nsdb_handoff_protocol\":\"nuis-nsdb-payload-execution-handoff-v1\"")
+            && run_json_stdout.contains("\"launch_evidence_nsdb_handoff_persisted\":true")
+            && run_json_stdout.contains("\"launch_evidence_nsdb_handoff_path\":")
+            && run_json_stdout.contains("\"launch_evidence_nsdb_handoff_record_count\":1")
+            && run_json_stdout.contains("\"launch_evidence_nsdb_handoff_ready_record_count\":1")
+            && run_json_stdout.contains("\"launch_evidence_nsdb_handoff_first_trace_id\":\"payload-trace:container-loader:nuis.bootstrap.lifecycle.v1\"")
             && run_json_stdout.contains("\"launch_evidence_first_blocker\":null"),
         "run-artifact json should surface the host runner image and container-loader evidence for the self-contained handoff\n{run_json_stdout}"
+    );
+    let nsdb_handoff_path = output_dir.join("nuis.nsdb.payload-execution-handoff.toml");
+    let nsdb_handoff = fs::read_to_string(&nsdb_handoff_path).unwrap_or_else(|error| {
+        panic!(
+            "missing nsdb payload execution handoff metadata `{}`: {error}",
+            nsdb_handoff_path.display()
+        )
+    });
+    assert!(
+        nsdb_handoff.contains("protocol = \"nuis-nsdb-payload-execution-handoff-v1\"")
+            && nsdb_handoff.contains("debugger_contract = \"nsdb-yir-payload-execution-trace-v1\"")
+            && nsdb_handoff.contains("source = \"run-artifact-launch-evidence\"")
+            && nsdb_handoff.contains("record_count = 1")
+            && nsdb_handoff.contains("ready_record_count = 1")
+            && nsdb_handoff.contains(
+                "trace_id = \"payload-trace:container-loader:nuis.bootstrap.lifecycle.v1\""
+            )
+            && nsdb_handoff.contains("status = \"ready\"")
+            && nsdb_handoff.contains("execution_phase = \"container-loader-handoff\"")
+            && nsdb_handoff.contains("target = \"container-loader\"")
+            && nsdb_handoff.contains("entry_symbol = \"nuis.bootstrap.lifecycle.v1\"")
+            && nsdb_handoff.contains("entry_kind = \"lifecycle-bootstrap\"")
+            && nsdb_handoff.contains("entry_section_id = \"sec0000.compiled-artifact\"")
+            && nsdb_handoff.contains("next_action = \"handoff-payload-trace-to-nsdb\""),
+        "run-artifact should persist nsdb payload execution handoff metadata\n{nsdb_handoff}"
     );
 
     let run = run_nuis(&["run-artifact", &output_dir.display().to_string()]);
@@ -220,6 +259,23 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
             )
             && run_stdout.contains(
                 "launch_evidence_first_payload_entry_section_id: sec0000.compiled-artifact"
+            )
+            && run_stdout.contains(
+                "launch_evidence_payload_execution_trace_protocol: nsdb-yir-payload-execution-trace-v1"
+            )
+            && run_stdout.contains("launch_evidence_payload_execution_trace_available: true")
+            && run_stdout.contains("launch_evidence_payload_execution_trace_record_count: 1")
+            && run_stdout.contains(
+                "launch_evidence_payload_execution_trace_record: payload-trace:container-loader:nuis.bootstrap.lifecycle.v1 container-loader-handoff ready"
+            )
+            && run_stdout.contains(
+                "launch_evidence_nsdb_handoff_protocol: nuis-nsdb-payload-execution-handoff-v1"
+            )
+            && run_stdout.contains("launch_evidence_nsdb_handoff_persisted: true")
+            && run_stdout.contains("launch_evidence_nsdb_handoff_record_count: 1")
+            && run_stdout.contains("launch_evidence_nsdb_handoff_ready_record_count: 1")
+            && run_stdout.contains(
+                "launch_evidence_nsdb_handoff_first_trace_id: payload-trace:container-loader:nuis.bootstrap.lifecycle.v1"
             )
             && run_stdout.contains("launch_evidence_first_blocker: <none>"),
         "run-artifact text should expose the launch evidence contract\n{run_stdout}"

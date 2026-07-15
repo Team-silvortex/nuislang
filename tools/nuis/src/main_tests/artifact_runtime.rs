@@ -452,6 +452,11 @@ mod cpu Main {
     assert!(json.contains(
         "\"nsld_final_executable_output_execution_handoff_decision_code\":\"inspect-output-boundary\""
     ));
+    assert!(json.contains("\"nsld_final_executable_output_payload_execution_trace_protocol\":"));
+    assert!(json.contains("\"nsld_final_executable_output_payload_execution_trace_available\":"));
+    assert!(json.contains("\"nsld_final_executable_output_payload_execution_trace_record_count\":"));
+    assert!(json
+        .contains("\"nsld_final_executable_output_payload_execution_trace_ready_record_count\":"));
     assert!(json.contains("\"nsld_final_executable_output_recommended_next_action\":"));
     assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
@@ -529,6 +534,11 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_output_execution_handoff_evidence_status\":"));
     assert!(json.contains("\"nsld_final_executable_output_execution_handoff_first_blocker\":"));
     assert!(json.contains("\"nsld_final_executable_output_execution_handoff_decision_code\":"));
+    assert!(json.contains("\"nsld_final_executable_output_payload_execution_trace_protocol\":"));
+    assert!(json.contains("\"nsld_final_executable_output_payload_execution_trace_available\":"));
+    assert!(json.contains("\"nsld_final_executable_output_payload_execution_trace_record_count\":"));
+    assert!(json
+        .contains("\"nsld_final_executable_output_payload_execution_trace_ready_record_count\":"));
     assert!(json.contains("\"nsld_final_executable_output_recommended_next_action\":"));
     assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
@@ -678,6 +688,7 @@ mod cpu Main {
     .expect("build passes");
     write_prepared_nsld_chain_placeholders(&output_dir);
     write_ready_nsld_final_tail_placeholders(&output_dir);
+    write_nsdb_payload_handoff_placeholder(&output_dir);
     let json = render_artifact_doctor_json(&output_dir);
 
     assert!(json.contains("\"ready_to_run\":true"));
@@ -694,6 +705,20 @@ mod cpu Main {
     assert!(json.contains(
         "\"artifact_launch_evidence_host_runner_probe_status\":\"artifact-doctor-mirror\""
     ));
+    assert!(json.contains("\"artifact_nsdb_handoff_available\":true"));
+    assert!(json
+        .contains("\"artifact_nsdb_handoff_protocol\":\"nuis-nsdb-payload-execution-handoff-v1\""));
+    assert!(json.contains(
+        "\"artifact_nsdb_handoff_debugger_contract\":\"nsdb-yir-payload-execution-trace-v1\""
+    ));
+    assert!(json.contains("\"artifact_nsdb_handoff_record_count\":1"));
+    assert!(json.contains("\"artifact_nsdb_handoff_ready_record_count\":1"));
+    assert!(json.contains(
+        "\"artifact_nsdb_handoff_first_trace_id\":\"payload-trace:container-loader:nuis.bootstrap.lifecycle.v1\""
+    ));
+    assert!(json.contains("\"artifact_nsdb_handoff_first_status\":\"ready\""));
+    assert!(json
+        .contains("\"artifact_nsdb_handoff_first_next_action\":\"handoff-payload-trace-to-nsdb\""));
     assert!(!json.contains("\"artifact_closure_kind\":\"host-binary\""));
 }
 
@@ -996,8 +1021,19 @@ fn run_artifact_json_exposes_bridge_bearing_exchange_summary() {
     assert!(json.contains("\"hetero_runtime_trace_domain_count\":2"));
     assert!(json.contains("\"hetero_runtime_trace_backend_artifact_count\":1"));
     assert!(json.contains("\"hetero_runtime_trace_backend_artifact_ready_count\":1"));
+    assert!(json.contains("\"hetero_runtime_trace_record_count\":2"));
+    assert!(json.contains("\"hetero_runtime_trace_ready_record_count\":0"));
+    assert!(json.contains("\"hetero_runtime_trace_backend_execution_record_count\":1"));
     assert!(json.contains("\"hetero_runtime_trace_domain_families\":[\"data\",\"shader\"]"));
     assert!(json.contains("\"hetero_runtime_trace_target_devices\":[\"apple-silicon-gpu\"]"));
+    assert!(json.contains("\"hetero_runtime_trace_records\":[{"));
+    assert!(json.contains("\"trace_id\":\"hetero-trace:data:none:none\""));
+    assert!(json.contains("\"trace_role\":\"domain-metadata\""));
+    assert!(json.contains("\"status\":\"metadata-only\""));
+    assert!(json.contains("\"trace_id\":\"hetero-trace:shader:metal:apple-silicon-gpu\""));
+    assert!(json.contains("\"trace_role\":\"backend-artifact\""));
+    assert!(json.contains("\"status\":\"execution-pending\""));
+    assert!(json.contains("\"next_action\":\"materialize-device-execution-trace\""));
     assert!(json.contains("\"hetero_runtime_trace_first_blocker\":null"));
     assert!(json
         .contains("\"hetero_runtime_trace_next_action\":\"materialize-device-execution-trace\""));

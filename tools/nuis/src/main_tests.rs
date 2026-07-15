@@ -136,6 +136,35 @@ blockers = []
     .expect("write host entrypoint placeholder");
 }
 
+fn write_nsdb_payload_handoff_placeholder(output_dir: &Path) {
+    fs::write(
+        output_dir.join("nuis.nsdb.payload-execution-handoff.toml"),
+        r#"
+protocol = "nuis-nsdb-payload-execution-handoff-v1"
+debugger_contract = "nsdb-yir-payload-execution-trace-v1"
+source = "run-artifact-launch-evidence"
+record_count = 1
+ready_record_count = 1
+first_trace_id = "payload-trace:container-loader:nuis.bootstrap.lifecycle.v1"
+first_status = "ready"
+first_next_action = "handoff-payload-trace-to-nsdb"
+
+[[records]]
+trace_id = "payload-trace:container-loader:nuis.bootstrap.lifecycle.v1"
+status = "ready"
+execution_phase = "container-loader-handoff"
+target = "container-loader"
+entry_symbol = "nuis.bootstrap.lifecycle.v1"
+entry_kind = "lifecycle-bootstrap"
+entry_section_id = "sec0000.compiled-artifact"
+first_blocker = ""
+next_action = "handoff-payload-trace-to-nsdb"
+"#
+        .trim_start(),
+    )
+    .expect("write nsdb payload handoff placeholder");
+}
+
 fn load_stdlib_source_modules(root: &Path, module_dir: &str) -> Vec<String> {
     let module_path = root.join("stdlib").join(module_dir).join("module.toml");
     let source = fs::read_to_string(&module_path)

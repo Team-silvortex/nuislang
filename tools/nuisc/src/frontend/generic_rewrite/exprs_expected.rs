@@ -155,8 +155,7 @@ fn generic_template_arg_expected_type_from_return(
         .into_iter()
         .map(|(name, ty)| (name, lower_type_ref(&ty)))
         .collect::<BTreeMap<_, _>>();
-    let specialized = specialize_ast_type_ref(&param.ty, &lowered_substitutions).ok()?;
-    (!contains_ast_placeholder_generic_name(&specialized, &generic_names)).then_some(specialized)
+    specialize_ast_type_ref(&param.ty, &lowered_substitutions).ok()
 }
 
 fn generic_signature_arg_expected_type_from_return(

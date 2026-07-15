@@ -7,7 +7,7 @@
 
 ## Current Status
 
-The repository is on the `alpha-0.10.*` line. This is still an architecture
+The repository is on the `alpha-0.13.*` line. This is still an architecture
 building line, not a beta-stability line, but the project now has one connected
 compiler/toolchain spine instead of separate experimental islands.
 
@@ -23,7 +23,8 @@ nuis source / nuis.toml project
   -> nsld binary-linking convergence
 ```
 
-The current `alpha-0.10.*` goal is an honest minimal executable-artifact loop:
+The current `alpha-0.13.*` goal is tensor-guided closure hardening over the
+minimal executable-artifact loop:
 
 ```text
 project
@@ -34,6 +35,8 @@ project
   -> final-stage plan
   -> executable writer input
   -> self-contained Nsld image output or host-assisted finalization boundary
+  -> run-artifact / trace readiness evidence
+  -> development tensor status update
 ```
 
 This does not yet mean final self-hosting, final std API stability, or a fully
@@ -45,6 +48,7 @@ Start here for the current line:
 
 * [docs/current-mainline-map.md](docs/current-mainline-map.md)
 * [docs/reference/nuis-development-tensor.md](docs/reference/nuis-development-tensor.md)
+* [docs/versioning/nuis-alpha-0.13-mainline-entry.md](docs/versioning/nuis-alpha-0.13-mainline-entry.md)
 * [docs/versioning/nuis-alpha-0.10-mainline-entry.md](docs/versioning/nuis-alpha-0.10-mainline-entry.md)
 * [docs/versioning/nuis-alpha-0.8-mainline-entry.md](docs/versioning/nuis-alpha-0.8-mainline-entry.md)
 * [docs/versioning/nuis-alpha-0.8-doc-sync-inventory.md](docs/versioning/nuis-alpha-0.8-doc-sync-inventory.md)

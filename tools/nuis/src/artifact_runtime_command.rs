@@ -6,6 +6,7 @@ use crate::{
         optional_bool_text, print_launch_evidence_text, HostRunnerJsonSurface, HostRunnerOutput,
         RunArtifactLaunchEvidence,
     },
+    artifact_nsdb_handoff::persist_launch_evidence_nsdb_handoff,
     artifact_runtime_trace::HeteroRuntimeTraceSummary,
     build_report_nsld_status::print_nsld_artifact_chain_status,
     build_report_render::append_runtime_session_json_fields,
@@ -116,6 +117,8 @@ pub(crate) fn render_run_artifact_json(input: &Path) -> String {
         &host_runner_surface,
         &diagnostics.backend_artifact_payload_evidence,
     );
+    let nsdb_handoff =
+        persist_launch_evidence_nsdb_handoff(doctor.output_dir.as_deref(), &launch_evidence);
     let mut out = String::from("{");
     append_json_field_strings(
         &mut out,
@@ -170,6 +173,7 @@ pub(crate) fn render_run_artifact_json(input: &Path) -> String {
     );
     append_json_field_strings(&mut out, host_runner_surface.json_fields());
     append_json_field_strings(&mut out, launch_evidence.json_fields());
+    append_json_field_strings(&mut out, nsdb_handoff.json_fields());
     append_json_field_strings(&mut out, hetero_trace.json_fields());
     append_runtime_session_json_fields(&mut out, manifest_verify.as_ref());
     append_json_field_strings(
@@ -263,6 +267,11 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
                 println!("  host_runner_status: handoff-ready");
             }
             print_launch_evidence_text(&launch_evidence);
+            let nsdb_handoff = persist_launch_evidence_nsdb_handoff(
+                doctor.output_dir.as_deref(),
+                &launch_evidence,
+            );
+            nsdb_handoff.print_text();
             hetero_trace.print_text();
             let link_plan = doctor
                 .output_dir
@@ -325,6 +334,9 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
         let launch_evidence =
             RunArtifactLaunchEvidence::from_surfaces(&prelaunch, &host_runner_surface);
         print_launch_evidence_text(&launch_evidence);
+        let nsdb_handoff =
+            persist_launch_evidence_nsdb_handoff(doctor.output_dir.as_deref(), &launch_evidence);
+        nsdb_handoff.print_text();
         let diagnostics = collect_artifact_output_diagnostics(&input, &doctor);
         let hetero_trace = HeteroRuntimeTraceSummary::from_link_plan(
             diagnostics.link_plan.as_ref(),

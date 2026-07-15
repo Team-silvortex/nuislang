@@ -1,6 +1,6 @@
 use crate::{
-    json_bool_field, json_field, json_optional_bool_field, json_optional_string_field,
-    json_string_array_field, json_usize_field,
+    json_bool_field, json_field, json_object_array_field, json_optional_bool_field,
+    json_optional_string_field, json_string_array_field, json_usize_field,
 };
 use std::path::PathBuf;
 
@@ -64,6 +64,9 @@ pub(crate) struct RunArtifactLaunchEvidence {
     first_payload_entry_kind: Option<String>,
     first_payload_entry_section_id: Option<String>,
     first_payload_first_blocker: Option<String>,
+    payload_execution_trace_protocol: &'static str,
+    payload_execution_trace_available: bool,
+    payload_execution_trace_records: Vec<PayloadExecutionTraceRecord>,
     backend_artifact_payload_evidence_available: bool,
     backend_artifact_payload_count: usize,
     backend_artifact_payload_present_count: usize,
@@ -73,6 +76,18 @@ pub(crate) struct RunArtifactLaunchEvidence {
     backend_artifact_payload_first_missing: Option<String>,
     first_blocker: Option<String>,
     reason: String,
+}
+
+pub(crate) struct PayloadExecutionTraceRecord {
+    pub(crate) trace_id: String,
+    pub(crate) status: String,
+    pub(crate) execution_phase: String,
+    pub(crate) target: Option<String>,
+    pub(crate) entry_symbol: Option<String>,
+    pub(crate) entry_kind: Option<String>,
+    pub(crate) entry_section_id: Option<String>,
+    pub(crate) first_blocker: Option<String>,
+    pub(crate) next_action: String,
 }
 
 impl RunArtifactLaunchEvidence {
@@ -94,6 +109,35 @@ impl RunArtifactLaunchEvidence {
     ) -> Self {
         let first_blocker = launch_evidence_first_blocker(prelaunch, host_runner);
         let first_payload_ready = launch_evidence_first_payload_ready(prelaunch, host_runner);
+        let first_payload_target = launch_evidence_first_payload_target(prelaunch);
+        let first_payload_entry_symbol = if first_payload_ready.is_some() {
+            host_runner.container_loader_entry_symbol.clone()
+        } else {
+            None
+        };
+        let first_payload_entry_kind = if first_payload_ready.is_some() {
+            host_runner.container_loader_entry_kind.clone()
+        } else {
+            None
+        };
+        let first_payload_entry_section_id = if first_payload_ready.is_some() {
+            host_runner.container_loader_entry_section_id.clone()
+        } else {
+            None
+        };
+        let first_payload_first_blocker = launch_evidence_first_payload_first_blocker(
+            prelaunch,
+            host_runner,
+            first_payload_ready,
+        );
+        let payload_execution_trace_records = payload_execution_trace_records(
+            first_payload_ready,
+            first_payload_target.clone(),
+            first_payload_entry_symbol.clone(),
+            first_payload_entry_kind.clone(),
+            first_payload_entry_section_id.clone(),
+            first_payload_first_blocker.clone(),
+        );
         Self {
             protocol: "nuis-run-artifact-launch-evidence-v1",
             status: if first_blocker.is_none() {
@@ -109,27 +153,14 @@ impl RunArtifactLaunchEvidence {
             host_runner_probe_ready: host_runner.ready,
             first_payload_status: launch_evidence_first_payload_status(first_payload_ready),
             first_payload_ready,
-            first_payload_target: launch_evidence_first_payload_target(prelaunch),
-            first_payload_entry_symbol: if first_payload_ready.is_some() {
-                host_runner.container_loader_entry_symbol.clone()
-            } else {
-                None
-            },
-            first_payload_entry_kind: if first_payload_ready.is_some() {
-                host_runner.container_loader_entry_kind.clone()
-            } else {
-                None
-            },
-            first_payload_entry_section_id: if first_payload_ready.is_some() {
-                host_runner.container_loader_entry_section_id.clone()
-            } else {
-                None
-            },
-            first_payload_first_blocker: launch_evidence_first_payload_first_blocker(
-                prelaunch,
-                host_runner,
-                first_payload_ready,
-            ),
+            first_payload_target,
+            first_payload_entry_symbol,
+            first_payload_entry_kind,
+            first_payload_entry_section_id,
+            first_payload_first_blocker,
+            payload_execution_trace_protocol: "nsdb-yir-payload-execution-trace-v1",
+            payload_execution_trace_available: !payload_execution_trace_records.is_empty(),
+            payload_execution_trace_records,
             backend_artifact_payload_evidence_available: backend_evidence.available,
             backend_artifact_payload_count: backend_evidence.count,
             backend_artifact_payload_present_count: backend_evidence.present_count,
@@ -146,9 +177,23 @@ impl RunArtifactLaunchEvidence {
         self.json_fields_with_prefix("launch_evidence")
     }
 
+    pub(crate) fn payload_execution_trace_protocol(&self) -> &'static str {
+        self.payload_execution_trace_protocol
+    }
+
+    pub(crate) fn payload_execution_trace_records(&self) -> &[PayloadExecutionTraceRecord] {
+        &self.payload_execution_trace_records
+    }
+
     pub(crate) fn json_fields_with_prefix(&self, prefix: &str) -> Vec<String> {
         // Contract anchors: launch_evidence_backend_artifact_payload_ids,
-        // launch_evidence_backend_artifact_payload_kinds.
+        // launch_evidence_backend_artifact_payload_kinds,
+        // launch_evidence_payload_execution_trace_records.
+        let payload_trace_ready_count = self
+            .payload_execution_trace_records
+            .iter()
+            .filter(|record| record.status == "ready")
+            .count();
         vec![
             json_field(&format!("{prefix}_protocol"), self.protocol),
             json_field(&format!("{prefix}_status"), &self.status),
@@ -195,6 +240,30 @@ impl RunArtifactLaunchEvidence {
                 &format!("{prefix}_first_payload_first_blocker"),
                 self.first_payload_first_blocker.as_deref(),
             ),
+            json_field(
+                &format!("{prefix}_payload_execution_trace_protocol"),
+                self.payload_execution_trace_protocol,
+            ),
+            json_bool_field(
+                &format!("{prefix}_payload_execution_trace_available"),
+                self.payload_execution_trace_available,
+            ),
+            json_usize_field(
+                &format!("{prefix}_payload_execution_trace_record_count"),
+                self.payload_execution_trace_records.len(),
+            ),
+            json_usize_field(
+                &format!("{prefix}_payload_execution_trace_ready_record_count"),
+                payload_trace_ready_count,
+            ),
+            json_object_array_field(
+                &format!("{prefix}_payload_execution_trace_records"),
+                &self
+                    .payload_execution_trace_records
+                    .iter()
+                    .map(PayloadExecutionTraceRecord::json_object)
+                    .collect::<Vec<_>>(),
+            ),
             json_bool_field(
                 &format!("{prefix}_backend_artifact_payload_evidence_available"),
                 self.backend_artifact_payload_evidence_available,
@@ -229,6 +298,23 @@ impl RunArtifactLaunchEvidence {
             ),
             json_field(&format!("{prefix}_reason"), &self.reason),
         ]
+    }
+}
+
+impl PayloadExecutionTraceRecord {
+    fn json_object(&self) -> String {
+        let fields = vec![
+            json_field("trace_id", &self.trace_id),
+            json_field("status", &self.status),
+            json_field("execution_phase", &self.execution_phase),
+            json_optional_string_field("target", self.target.as_deref()),
+            json_optional_string_field("entry_symbol", self.entry_symbol.as_deref()),
+            json_optional_string_field("entry_kind", self.entry_kind.as_deref()),
+            json_optional_string_field("entry_section_id", self.entry_section_id.as_deref()),
+            json_optional_string_field("first_blocker", self.first_blocker.as_deref()),
+            json_field("next_action", &self.next_action),
+        ];
+        format!("{{{}}}", fields.join(","))
     }
 }
 
@@ -522,6 +608,39 @@ fn launch_evidence_first_payload_first_blocker(
     Some(format!("container-loader-handoff:{status}"))
 }
 
+fn payload_execution_trace_records(
+    first_payload_ready: Option<bool>,
+    target: Option<String>,
+    entry_symbol: Option<String>,
+    entry_kind: Option<String>,
+    entry_section_id: Option<String>,
+    first_blocker: Option<String>,
+) -> Vec<PayloadExecutionTraceRecord> {
+    let Some(ready) = first_payload_ready else {
+        return Vec::new();
+    };
+    let target_value = target.as_deref().unwrap_or("unknown-target");
+    let symbol_value = entry_symbol.as_deref().unwrap_or("unknown-symbol");
+    let status = if ready { "ready" } else { "blocked" };
+    let next_action = if ready {
+        "handoff-payload-trace-to-nsdb"
+    } else {
+        "resolve-payload-execution-blocker"
+    };
+
+    vec![PayloadExecutionTraceRecord {
+        trace_id: format!("payload-trace:{target_value}:{symbol_value}"),
+        status: status.to_owned(),
+        execution_phase: "container-loader-handoff".to_owned(),
+        target,
+        entry_symbol,
+        entry_kind,
+        entry_section_id,
+        first_blocker,
+        next_action: next_action.to_owned(),
+    }]
+}
+
 pub(crate) fn print_launch_evidence_text(evidence: &RunArtifactLaunchEvidence) {
     println!("  launch_evidence_protocol: {}", evidence.protocol);
     println!("  launch_evidence_status: {}", evidence.status);
@@ -586,6 +705,33 @@ pub(crate) fn print_launch_evidence_text(evidence: &RunArtifactLaunchEvidence) {
             .as_deref()
             .unwrap_or("<none>")
     );
+    let payload_trace_ready_count = evidence
+        .payload_execution_trace_records
+        .iter()
+        .filter(|record| record.status == "ready")
+        .count();
+    println!(
+        "  launch_evidence_payload_execution_trace_protocol: {}",
+        evidence.payload_execution_trace_protocol
+    );
+    println!(
+        "  launch_evidence_payload_execution_trace_available: {}",
+        evidence.payload_execution_trace_available
+    );
+    println!(
+        "  launch_evidence_payload_execution_trace_record_count: {}",
+        evidence.payload_execution_trace_records.len()
+    );
+    println!(
+        "  launch_evidence_payload_execution_trace_ready_record_count: {}",
+        payload_trace_ready_count
+    );
+    for record in &evidence.payload_execution_trace_records {
+        println!(
+            "  launch_evidence_payload_execution_trace_record: {} {} {}",
+            record.trace_id, record.execution_phase, record.status
+        );
+    }
     println!(
         "  launch_evidence_backend_artifact_payload_evidence_available: {}",
         evidence.backend_artifact_payload_evidence_available
@@ -705,5 +851,65 @@ mod tests {
         assert!(json.contains(
             "\"host_runner_backend_artifact_payload_table_hash\":\"0x7777777777777777\""
         ));
+    }
+
+    #[test]
+    fn launch_evidence_emits_payload_execution_trace_record_for_container_handoff() {
+        let prelaunch = crate::run_artifact::RunArtifactPrelaunchSummary {
+            kind: "nsld-host-entrypoint".to_owned(),
+            status: "ready".to_owned(),
+            evidence_status: "entrypoint-ready".to_owned(),
+            command: Some("nuis-host-runner app.nsb".to_owned()),
+            runner_command_present: true,
+            entrypoint_path: Some("nuis.nsld.final-executable-launcher.toml".to_owned()),
+            entrypoint_present: true,
+            entrypoint_protocol: Some("nuis-nsld-launcher-v1".to_owned()),
+            entrypoint_protocol_valid: Some(true),
+            reason: "ready".to_owned(),
+        };
+        let host_runner = HostRunnerJsonSurface {
+            invoked: true,
+            status: "ready".to_owned(),
+            program: Some("nuis-host-runner".to_owned()),
+            exit_status: Some("0".to_owned()),
+            error: None,
+            ready: Some(true),
+            would_enter_lifecycle_hook: Some(true),
+            nsb_readable: Some(true),
+            nsb_hash_matches: Some(true),
+            nsb_payload_region_mapped: Some(true),
+            nsb_payload_scan_kind: Some("nsld-container-toml".to_owned()),
+            container_loader_status: Some("parsed".to_owned()),
+            container_ready: Some(true),
+            container_loader_entry_kind: Some("lifecycle-bootstrap".to_owned()),
+            container_loader_entry_symbol: Some("main".to_owned()),
+            container_loader_entry_section_id: Some("sec0000.compiled-artifact".to_owned()),
+            container_loader_handoff_ready: Some(true),
+            container_loader_handoff_status: Some("ready".to_owned()),
+            backend_artifact_payload_count: Some(0),
+            backend_artifact_payload_parsed_count: Some(0),
+            backend_artifact_payload_ready_count: Some(0),
+            backend_artifact_payload_first_id: None,
+            backend_artifact_payload_first_kind: None,
+            backend_artifact_payload_first_role_status: None,
+            backend_artifact_payload_table_hash: None,
+        };
+
+        let evidence = RunArtifactLaunchEvidence::from_surfaces(&prelaunch, &host_runner);
+        let json = evidence.json_fields().join(",");
+
+        assert!(json.contains(
+            "\"launch_evidence_payload_execution_trace_protocol\":\"nsdb-yir-payload-execution-trace-v1\""
+        ));
+        assert!(json.contains("\"launch_evidence_payload_execution_trace_available\":true"));
+        assert!(json.contains("\"launch_evidence_payload_execution_trace_record_count\":1"));
+        assert!(json.contains("\"launch_evidence_payload_execution_trace_ready_record_count\":1"));
+        assert!(json.contains("\"launch_evidence_payload_execution_trace_records\":[{"));
+        assert!(json.contains("\"trace_id\":\"payload-trace:container-loader:main\""));
+        assert!(json.contains("\"execution_phase\":\"container-loader-handoff\""));
+        assert!(json.contains("\"target\":\"container-loader\""));
+        assert!(json.contains("\"entry_symbol\":\"main\""));
+        assert!(json.contains("\"entry_section_id\":\"sec0000.compiled-artifact\""));
+        assert!(json.contains("\"next_action\":\"handoff-payload-trace-to-nsdb\""));
     }
 }

@@ -1,8 +1,24 @@
 use crate::{
     artifact_doctor::BackendArtifactPayloadEvidence, json_bool_field, json_field,
-    json_optional_string_field, json_string_array_field, json_usize_field,
+    json_object_array_field, json_optional_string_field, json_string_array_field, json_usize_field,
 };
 use std::collections::BTreeSet;
+
+struct HeteroRuntimeTraceRecord {
+    trace_id: String,
+    trace_role: String,
+    status: String,
+    domain_family: String,
+    backend_family: Option<String>,
+    target_device: Option<String>,
+    backend_artifact_key: String,
+    selected_lowering_target: Option<String>,
+    payload_format: Option<String>,
+    payload_path: Option<String>,
+    bridge_stub_path: Option<String>,
+    missing_signals: Vec<String>,
+    next_action: String,
+}
 
 pub(crate) struct HeteroRuntimeTraceSummary {
     available: bool,
@@ -11,6 +27,9 @@ pub(crate) struct HeteroRuntimeTraceSummary {
     domain_count: usize,
     backend_artifact_count: usize,
     backend_artifact_ready_count: usize,
+    trace_record_count: usize,
+    trace_ready_record_count: usize,
+    backend_execution_record_count: usize,
     payload_evidence_available: bool,
     payload_evidence_count: usize,
     payload_evidence_present_count: usize,
@@ -18,6 +37,7 @@ pub(crate) struct HeteroRuntimeTraceSummary {
     domain_families: Vec<String>,
     backend_families: Vec<String>,
     target_devices: Vec<String>,
+    records: Vec<HeteroRuntimeTraceRecord>,
     first_blocker: Option<String>,
     next_action: String,
 }
@@ -53,6 +73,19 @@ impl HeteroRuntimeTraceSummary {
         let backend_artifact_ready_count = backend_units
             .iter()
             .filter(|unit| backend_artifact_missing_signals(unit).is_empty())
+            .count();
+        let records = hetero_units
+            .iter()
+            .map(|unit| trace_record_for_unit(unit, payload_evidence))
+            .collect::<Vec<_>>();
+        let trace_record_count = records.len();
+        let trace_ready_record_count = records
+            .iter()
+            .filter(|record| record.status == "trace-ready")
+            .count();
+        let backend_execution_record_count = records
+            .iter()
+            .filter(|record| record.trace_role == "backend-artifact")
             .count();
         let first_backend_blocker = backend_units.iter().find_map(|unit| {
             backend_artifact_missing_signals(unit)
@@ -98,6 +131,9 @@ impl HeteroRuntimeTraceSummary {
             domain_count,
             backend_artifact_count,
             backend_artifact_ready_count,
+            trace_record_count,
+            trace_ready_record_count,
+            backend_execution_record_count,
             payload_evidence_available: payload_evidence.available,
             payload_evidence_count: payload_evidence.count,
             payload_evidence_present_count: payload_evidence.present_count,
@@ -105,6 +141,7 @@ impl HeteroRuntimeTraceSummary {
             domain_families,
             backend_families,
             target_devices,
+            records,
             first_blocker,
             next_action: next_action.to_owned(),
         }
@@ -118,6 +155,9 @@ impl HeteroRuntimeTraceSummary {
             domain_count: 0,
             backend_artifact_count: 0,
             backend_artifact_ready_count: 0,
+            trace_record_count: 0,
+            trace_ready_record_count: 0,
+            backend_execution_record_count: 0,
             payload_evidence_available: false,
             payload_evidence_count: 0,
             payload_evidence_present_count: 0,
@@ -125,6 +165,7 @@ impl HeteroRuntimeTraceSummary {
             domain_families: Vec::new(),
             backend_families: Vec::new(),
             target_devices: Vec::new(),
+            records: Vec::new(),
             first_blocker: Some(first_blocker.to_owned()),
             next_action: "build-heterogeneous-artifact".to_owned(),
         }
@@ -146,6 +187,15 @@ impl HeteroRuntimeTraceSummary {
             json_usize_field(
                 "hetero_runtime_trace_backend_artifact_ready_count",
                 self.backend_artifact_ready_count,
+            ),
+            json_usize_field("hetero_runtime_trace_record_count", self.trace_record_count),
+            json_usize_field(
+                "hetero_runtime_trace_ready_record_count",
+                self.trace_ready_record_count,
+            ),
+            json_usize_field(
+                "hetero_runtime_trace_backend_execution_record_count",
+                self.backend_execution_record_count,
             ),
             json_bool_field(
                 "hetero_runtime_trace_payload_evidence_available",
@@ -172,6 +222,14 @@ impl HeteroRuntimeTraceSummary {
                 &self.backend_families,
             ),
             json_string_array_field("hetero_runtime_trace_target_devices", &self.target_devices),
+            json_object_array_field(
+                "hetero_runtime_trace_records",
+                &self
+                    .records
+                    .iter()
+                    .map(HeteroRuntimeTraceRecord::json_object)
+                    .collect::<Vec<_>>(),
+            ),
             json_optional_string_field(
                 "hetero_runtime_trace_first_blocker",
                 self.first_blocker.as_deref(),
@@ -195,6 +253,18 @@ impl HeteroRuntimeTraceSummary {
         println!(
             "  hetero_runtime_trace_backend_artifact_ready_count: {}",
             self.backend_artifact_ready_count
+        );
+        println!(
+            "  hetero_runtime_trace_record_count: {}",
+            self.trace_record_count
+        );
+        println!(
+            "  hetero_runtime_trace_ready_record_count: {}",
+            self.trace_ready_record_count
+        );
+        println!(
+            "  hetero_runtime_trace_backend_execution_record_count: {}",
+            self.backend_execution_record_count
         );
         println!(
             "  hetero_runtime_trace_payload_evidence_available: {}",
@@ -224,12 +294,92 @@ impl HeteroRuntimeTraceSummary {
             "  hetero_runtime_trace_target_devices: {}",
             joined_or_none(&self.target_devices)
         );
+        for record in &self.records {
+            println!(
+                "  hetero_runtime_trace_record: {} {} {}",
+                record.trace_id, record.trace_role, record.status
+            );
+        }
         println!(
             "  hetero_runtime_trace_first_blocker: {}",
             self.first_blocker.as_deref().unwrap_or("<none>")
         );
         println!("  hetero_runtime_trace_next_action: {}", self.next_action);
     }
+}
+
+impl HeteroRuntimeTraceRecord {
+    fn json_object(&self) -> String {
+        let fields = vec![
+            json_field("trace_id", &self.trace_id),
+            json_field("trace_role", &self.trace_role),
+            json_field("status", &self.status),
+            json_field("domain_family", &self.domain_family),
+            json_optional_string_field("backend_family", self.backend_family.as_deref()),
+            json_optional_string_field("target_device", self.target_device.as_deref()),
+            json_field("backend_artifact_key", &self.backend_artifact_key),
+            json_optional_string_field(
+                "selected_lowering_target",
+                self.selected_lowering_target.as_deref(),
+            ),
+            json_optional_string_field("payload_format", self.payload_format.as_deref()),
+            json_optional_string_field("payload_path", self.payload_path.as_deref()),
+            json_optional_string_field("bridge_stub_path", self.bridge_stub_path.as_deref()),
+            json_string_array_field("missing_signals", &self.missing_signals),
+            json_field("next_action", &self.next_action),
+        ];
+        format!("{{{}}}", fields.join(","))
+    }
+}
+
+fn trace_record_for_unit(
+    unit: &nuisc::linker::LinkPlanDomainUnit,
+    payload_evidence: &BackendArtifactPayloadEvidence,
+) -> HeteroRuntimeTraceRecord {
+    let missing_signals = backend_artifact_missing_signals(unit);
+    let trace_role = if is_backend_artifact_unit(unit) {
+        "backend-artifact"
+    } else {
+        "domain-metadata"
+    };
+    let status = if trace_role == "domain-metadata" {
+        "metadata-only"
+    } else if !missing_signals.is_empty() {
+        "blocked"
+    } else if payload_evidence.present_count > 0 {
+        "trace-ready"
+    } else {
+        "execution-pending"
+    };
+    let next_action = match status {
+        "trace-ready" => "handoff-domain-record-to-nsdb",
+        "execution-pending" => "materialize-device-execution-trace",
+        "metadata-only" => "wait-for-backend-execution-record",
+        _ => "resolve-domain-trace-blocker",
+    };
+    let backend_artifact_key = backend_artifact_key(unit);
+
+    HeteroRuntimeTraceRecord {
+        trace_id: format!("hetero-trace:{backend_artifact_key}"),
+        trace_role: trace_role.to_owned(),
+        status: status.to_owned(),
+        domain_family: unit.domain_family.clone(),
+        backend_family: unit.backend_family.clone(),
+        target_device: unit.target_device.clone(),
+        backend_artifact_key,
+        selected_lowering_target: unit.selected_lowering_target.clone(),
+        payload_format: unit.artifact_payload_format.clone(),
+        payload_path: unit.artifact_payload_blob_path.clone(),
+        bridge_stub_path: unit.artifact_bridge_stub_path.clone(),
+        missing_signals,
+        next_action: next_action.to_owned(),
+    }
+}
+
+fn is_backend_artifact_unit(unit: &nuisc::linker::LinkPlanDomainUnit) -> bool {
+    unit.backend_family.is_some()
+        || unit.target_device.is_some()
+        || unit.selected_lowering_target.is_some()
 }
 
 fn backend_artifact_key(unit: &nuisc::linker::LinkPlanDomainUnit) -> String {

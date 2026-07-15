@@ -24,6 +24,13 @@ YIR-debug core / galaxy capability boundary, not as a CLI-only tool. See
 cargo run -p nsdb -- status
 cargo run -p nsdb -- inspect <artifact-output-dir>
 cargo run -p nsdb -- inspect <artifact-output-dir> --json
+cargo run -p nsdb -- inspect <artifact-output-dir> --event-status blocked
+cargo run -p nsdb -- inspect <artifact-output-dir> --event-phase device-dispatch
+cargo run -p nsdb -- inspect <artifact-output-dir> --trace-id payload-trace:...
+cargo run -p nsdb -- events <artifact-output-dir>
+cargo run -p nsdb -- events <artifact-output-dir> --json --event-status ready
+cargo run -p nsdb -- replay-plan <artifact-output-dir>
+cargo run -p nsdb -- replay-plan <artifact-output-dir> --json --event-status blocked
 ```
 
 When given an output directory, `Nsdb` resolves
@@ -41,9 +48,28 @@ It reports:
 * `nsdb_visibility = domains+clock+segments+lowering-units`
 * `sidecar_count`
 * `sidecars`
+* `payload_execution_handoff_available`
+* `payload_execution_handoff_protocol`
+* `payload_execution_handoff_debugger_contract`
+* `payload_execution_handoff_status`
+* `payload_execution_handoff_record_count`
+* `payload_execution_handoff_first_trace_id`
+* `payload_execution_handoff_first_entry_symbol`
+* `payload_execution_handoff_first_execution_phase`
+* `payload_execution_event_filter_active`
+* `payload_execution_event_filter_status`
+* `payload_execution_event_filter_phase`
+* `payload_execution_event_filter_trace_id`
+* `payload_execution_event_count`
+* `payload_execution_events`
+* `replay_protocol = nsdb-payload-execution-replay-plan-v1` for
+  `replay-plan`
+* `replay_checkpoint_count`
+* `replayable_checkpoint_count`
+* `replay_checkpoints`
 * `debug_readiness = yir-debug-ready` when the linker graph, clock protocol,
-  hetero calculate plan, lowering units, and referenced lowering IR sidecars are
-  all readable
+  hetero calculate plan, lowering units, referenced lowering IR sidecars, and
+  persisted payload execution handoff metadata are all readable
 
 `Nsdb` can now expose sidecar capability metadata such as the owning Nustar,
 frontend IR, native IR, backend lowering model, validation contracts, and entry
@@ -62,6 +88,25 @@ symbol. The same view is used across current heterogeneous domains:
 This means `Nsdb` is pointed at the right layer and can see real lowering
 capability metadata, but source-level stepping, breakpoints, value inspection,
 and replay still need dedicated debug sidecars.
+
+`Nsdb` also consumes `nuis.nsdb.payload-execution-handoff.toml` from the
+artifact output directory. The current handoff consumer validates
+`nuis-nsdb-payload-execution-handoff-v1` and
+`nsdb-yir-payload-execution-trace-v1`, then exposes each `[[records]]` row as a
+payload execution event with trace id, status, execution phase, target, entry
+symbol, entry kind, entry section id, first blocker, and next action.
+`inspect` and the event-focused `events` command can filter those events with
+`--event-status`, `--event-phase`, and `--trace-id`; filters are ANDed when
+multiple flags are present. This is still an inspect-time event view rather
+than full replay, but it proves that `run-artifact` metadata can cross into the
+debugger frontdoor without asking `nsdb` to rerun the host probe.
+
+`replay-plan` maps the filtered payload execution events into read-only
+checkpoints. `container-loader-handoff` becomes a loader checkpoint,
+`device-dispatch` becomes a device-dispatch checkpoint, and blocked events
+carry their first blocker into the plan. This is not execution or time-travel
+debugging yet; it is the stable checkpoint skeleton that later YIR frame/value
+state can attach to.
 
 ## Relationship To Nsld
 

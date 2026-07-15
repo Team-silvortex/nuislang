@@ -138,6 +138,10 @@ artifact-follow-up state:
 * `nsld_final_executable_output_execution_handoff_evidence_status`
 * `nsld_final_executable_output_execution_handoff_first_blocker`
 * `nsld_final_executable_output_execution_handoff_decision_code`
+* `nsld_final_executable_output_payload_execution_trace_protocol`
+* `nsld_final_executable_output_payload_execution_trace_available`
+* `nsld_final_executable_output_payload_execution_trace_record_count`
+* `nsld_final_executable_output_payload_execution_trace_ready_record_count`
 * `nsld_final_executable_pipeline_execution_handoff_contract`
 * `nsld_final_executable_pipeline_execution_handoff_ready`
 * `nsld_final_executable_pipeline_execution_handoff_status`
@@ -195,6 +199,8 @@ artifact-follow-up state:
 * `launch_evidence_first_payload_entry_kind`
 * `launch_evidence_first_payload_entry_section_id`
 * `launch_evidence_first_payload_first_blocker`
+* `launch_evidence_payload_execution_trace_protocol`
+* `launch_evidence_payload_execution_trace_record_count`
 * `launch_evidence_first_blocker`
 * `launch_evidence_reason`
 * `artifact_closure_kind`
@@ -361,6 +367,22 @@ Short reading rule:
   observed. Runner probe failure is surfaced as `host_runner_status =
   "unavailable"` or `failed`; JSON classification still remains an inspection
   surface rather than a hard launch command.
+* when payload execution trace records are available, `run-artifact` persists a
+  debugger handoff file named `nuis.nsdb.payload-execution-handoff.toml` in the
+  artifact output directory. The file uses
+  `nuis-nsdb-payload-execution-handoff-v1`, mirrors the
+  `nsdb-yir-payload-execution-trace-v1` debugger contract, and records the
+  first container-loader handoff trace so future nsdb tooling can consume YIR
+  payload execution metadata without re-running the host probe. Passive
+  frontdoors such as `artifact-doctor --json` and `workflow --json` read the
+  same file back as `artifact_nsdb_handoff_*` fields plus
+  `workflow_nsdb_handoff_available`, `workflow_nsdb_handoff_protocol`, and
+  `workflow_nsdb_handoff_record_count`, keeping debugger handoff state
+  observable without forcing a runtime launch. `nsdb inspect` consumes that
+  same file as `payload_execution_handoff_*` fields, validating the
+  `nuis-nsdb-payload-execution-handoff-v1` /
+  `nsdb-yir-payload-execution-trace-v1` pair before treating the first
+  container-loader handoff as debugger metadata.
 * the current self-contained smoke proves the host-runner image boundary:
   `.nsb` readable, image hash matched, payload region mapped, and lifecycle
   hook handoff ready. The payload scanner now sees `nsld-container-toml`, the

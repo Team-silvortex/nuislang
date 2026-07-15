@@ -123,6 +123,23 @@ pub(crate) fn nsld_final_executable_output_report_json(
             "first_payload_execution_first_blocker",
             report.first_payload_execution_first_blocker.as_deref(),
         ),
+        json_string_field(
+            "payload_execution_trace_protocol",
+            payload_execution_trace_protocol(),
+        ),
+        json_bool_field(
+            "payload_execution_trace_available",
+            payload_execution_trace_available(report),
+        ),
+        json_usize_field(
+            "payload_execution_trace_record_count",
+            payload_execution_trace_record_count(report),
+        ),
+        json_usize_field(
+            "payload_execution_trace_ready_record_count",
+            payload_execution_trace_ready_record_count(report),
+        ),
+        payload_execution_trace_records_json(report),
         json_string_field("recommended_next_action", &report.recommended_next_action),
         json_bool_field("path_present", report.path_present),
         json_bool_field("nsld_owned_output", report.nsld_owned_output),
@@ -274,4 +291,68 @@ pub(crate) fn nsld_final_executable_output_report_json(
         json_string_array_field("issues", &report.issues),
     ];
     format!("{{{}}}", fields.join(","))
+}
+
+fn payload_execution_trace_protocol() -> &'static str {
+    "nsdb-yir-payload-execution-trace-v1"
+}
+
+fn payload_execution_trace_available(report: &NsldFinalExecutableOutputReport) -> bool {
+    report.first_payload_execution_target == "container-loader"
+}
+
+fn payload_execution_trace_record_count(report: &NsldFinalExecutableOutputReport) -> usize {
+    usize::from(payload_execution_trace_available(report))
+}
+
+fn payload_execution_trace_ready_record_count(report: &NsldFinalExecutableOutputReport) -> usize {
+    usize::from(payload_execution_trace_available(report) && report.first_payload_execution_ready)
+}
+
+fn payload_execution_trace_records_json(report: &NsldFinalExecutableOutputReport) -> String {
+    if !payload_execution_trace_available(report) {
+        return "\"payload_execution_trace_records\":[]".to_owned();
+    }
+
+    let symbol = report
+        .first_payload_execution_entry_symbol
+        .as_deref()
+        .unwrap_or("unknown-symbol");
+    let trace_id = format!(
+        "payload-trace:{}:{}",
+        report.first_payload_execution_target, symbol
+    );
+    let next_action = if report.first_payload_execution_ready {
+        "handoff-payload-trace-to-nsdb"
+    } else {
+        "resolve-payload-execution-blocker"
+    };
+    let fields = [
+        json_string_field("trace_id", &trace_id),
+        json_string_field("status", &report.first_payload_execution_status),
+        json_string_field("execution_phase", "container-loader-handoff"),
+        json_string_field("target", &report.first_payload_execution_target),
+        json_optional_string_field(
+            "entry_symbol",
+            report.first_payload_execution_entry_symbol.as_deref(),
+        ),
+        json_optional_string_field(
+            "entry_kind",
+            report.first_payload_execution_entry_kind.as_deref(),
+        ),
+        json_optional_string_field(
+            "entry_section_id",
+            report.first_payload_execution_entry_section_id.as_deref(),
+        ),
+        json_optional_string_field(
+            "first_blocker",
+            report.first_payload_execution_first_blocker.as_deref(),
+        ),
+        json_string_field("next_action", next_action),
+    ];
+
+    format!(
+        "\"payload_execution_trace_records\":[{{{}}}]",
+        fields.join(",")
+    )
 }

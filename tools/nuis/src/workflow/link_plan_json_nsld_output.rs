@@ -80,6 +80,26 @@ pub(super) fn nsld_final_output_json_fields(
             nsld_final_output.and_then(|summary| summary.launcher_dry_run_blocker_count),
         ),
         json_optional_string_field(
+            "nsld_final_executable_output_payload_execution_trace_protocol",
+            nsld_final_output.map(|summary| summary.payload_execution_trace_protocol.as_str()),
+        ),
+        json_bool_field(
+            "nsld_final_executable_output_payload_execution_trace_available",
+            nsld_final_output.is_some_and(|summary| summary.payload_execution_trace_available),
+        ),
+        json_usize_field(
+            "nsld_final_executable_output_payload_execution_trace_record_count",
+            nsld_final_output
+                .map(|summary| summary.payload_execution_trace_record_count)
+                .unwrap_or(0),
+        ),
+        json_usize_field(
+            "nsld_final_executable_output_payload_execution_trace_ready_record_count",
+            nsld_final_output
+                .map(|summary| summary.payload_execution_trace_ready_record_count)
+                .unwrap_or(0),
+        ),
+        json_optional_string_field(
             "nsld_final_executable_output_recommended_next_action",
             nsld_final_output.map(|summary| summary.recommended_next_action.as_str()),
         ),

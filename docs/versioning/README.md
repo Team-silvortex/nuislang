@@ -9,6 +9,7 @@ workflow/history checkpoints, and policy notes.
 
 If you want the current line instead of historical backfill, start with:
 
+* [nuis-alpha-0.13-mainline-entry.md](nuis-alpha-0.13-mainline-entry.md)
 * [nuis-alpha-0.10-mainline-entry.md](nuis-alpha-0.10-mainline-entry.md)
 * [nuis-alpha-0.8-mainline-entry.md](nuis-alpha-0.8-mainline-entry.md)
 * [nuis-alpha-0.8-doc-sync-inventory.md](nuis-alpha-0.8-doc-sync-inventory.md)
@@ -21,8 +22,10 @@ If you want the current line instead of historical backfill, start with:
 
 Use this first when the question is:
 
-* what the current `alpha-0.10.*` line adds on top of the binary-linking
-  convergence predecessor
+* what the current `alpha-0.13.*` line adds on top of executable-artifact
+  closure by making development tensor evidence the main steering surface
+* what the predecessor `alpha-0.10.*` line added on top of binary-linking
+  convergence
 * why executable-artifact closure is now the first-read Nsld/toolchain pressure
 * which native executable back-half gaps are currently the weakest self-hosting
   prerequisites
@@ -31,10 +34,10 @@ Use this first when the question is:
 * what the predecessor `alpha-0.7.*` line established for std-backed tooling smoke
 * what the predecessor `alpha-0.6.*` line established for Nsld
 * what exists and what is still soft in the `alpha-0.4.*` hardening baseline
-* what the current mainline should optimize during `alpha-0.10.*`
-* which documentation routes and wording are current after the alpha-0.10
+* what the current mainline should optimize during `alpha-0.13.*`
+* which documentation routes and wording are current after the alpha-0.13
   entry refresh
-* which broad README surfaces were refreshed for alpha-0.10
+* which broad README surfaces were refreshed for alpha-0.13
 * what the `alpha-0.1.*` mainline established before this hardening pass
 * what should count as present-tense repo truth
 * which older files should now be treated as predecessor anchors

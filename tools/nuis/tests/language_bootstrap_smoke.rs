@@ -243,8 +243,38 @@ fn generic_result_buffer_lambda_project_combines_language_bootstrap_features() {
         "generic Result/buffer/lambda AST",
     );
     assert_file_contains(
+        &output_dir.join("generic_result_buffer_lambda_helper_demo.ast.txt"),
+        "return Result.Err(error)",
+        "generic Result/buffer/lambda AST",
+    );
+    assert_file_contains(
+        &output_dir.join("generic_result_buffer_lambda_helper_demo.ast.txt"),
+        "if (seed == 3)",
+        "generic Result/buffer/lambda AST",
+    );
+    assert_file_contains(
         &output_dir.join("generic_result_buffer_lambda_helper_demo.nir.txt"),
         "__hof_result_map___lambda_build_report_0__i64__i64__HelperError",
+        "generic Result/buffer/lambda NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("generic_result_buffer_lambda_helper_demo.nir.txt"),
+        "err__i64__HelperError(HelperError.Invalid",
+        "generic Result/buffer/lambda NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("generic_result_buffer_lambda_helper_demo.nir.txt"),
+        "__hof_result_map___lambda_build_report_2__i64__i64__HelperError",
+        "generic Result/buffer/lambda NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("generic_result_buffer_lambda_helper_demo.nir.txt"),
+        "ok__i64__HelperError(seed)",
+        "generic Result/buffer/lambda NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("generic_result_buffer_lambda_helper_demo.nir.txt"),
+        "return Result.Err<i64, HelperError>",
         "generic Result/buffer/lambda NIR",
     );
     assert_file_contains(
@@ -274,7 +304,7 @@ fn generic_result_buffer_lambda_project_combines_language_bootstrap_features() {
     );
     assert_binary_exit(
         &output_dir.join("generic_result_buffer_lambda_helper_demo"),
-        52,
+        59,
         "generic Result/buffer/lambda helper binary",
     );
 }

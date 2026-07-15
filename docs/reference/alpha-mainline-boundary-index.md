@@ -3,8 +3,9 @@
 This file is the shortest predecessor index for the mainline boundaries that
 mattered most before `alpha-0.0.1`.
 
-For present-tense `alpha-0.10.*` work, start with:
+For present-tense `alpha-0.13.*` work, start with:
 
+* [../versioning/nuis-alpha-0.13-mainline-entry.md](../../docs/versioning/nuis-alpha-0.13-mainline-entry.md)
 * [../versioning/nuis-alpha-0.10-mainline-entry.md](../../docs/versioning/nuis-alpha-0.10-mainline-entry.md)
 * [../versioning/nuis-alpha-0.8-mainline-entry.md](../../docs/versioning/nuis-alpha-0.8-mainline-entry.md)
 * [../versioning/nuis-alpha-0.7-mainline-entry.md](../../docs/versioning/nuis-alpha-0.7-mainline-entry.md)
@@ -12,9 +13,8 @@ For present-tense `alpha-0.10.*` work, start with:
 * [../versioning/nuis-alpha-0.4-system-inventory.md](../../docs/versioning/nuis-alpha-0.4-system-inventory.md)
 * [../versioning/nuis-alpha-0.4-mainline-hardening-plan.md](../../docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
 
-Treat the `alpha-0.8.*` and earlier files as predecessor context. Treat the
-`alpha-0.4.*` files as the current hardening baseline, not as the present minor
-line.
+Treat the `alpha-0.10.*` and earlier files as predecessor context. Treat the
+`alpha-0.4.*` files as the hardening baseline, not as the present minor line.
 
 It is not a full architecture manual.
 

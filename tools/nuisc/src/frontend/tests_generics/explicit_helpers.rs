@@ -399,3 +399,62 @@ fn monomorphizes_zero_arg_generic_from_alias_struct_literal_call_parameter_expec
                 )
     ));
 }
+
+#[test]
+fn monomorphizes_nested_result_ok_from_partial_return_expected_type() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          enum HelperError {
+            Invalid,
+          }
+
+          fn ok<T, E>(value: T) -> Result<T, E> {
+            return Result.Ok(value);
+          }
+
+          fn result_map<T, R, E>(result: Result<T, E>, mapper: Fn1<T, R>) -> Result<R, E> {
+            match result {
+              Result.Ok(value) => {
+                return Result.Ok(mapper(value));
+              }
+              Result.Err(error) => {
+                return Result.Err(error);
+              }
+            }
+          }
+
+          fn main() -> i64 {
+            let mapped: Result<i64, HelperError> =
+              result_map(ok(3), |value: i64| -> i64 { return value + 1; });
+            match mapped {
+              Result.Ok(value) => {
+                return value;
+              }
+              Result.Err(_) => {
+                return 0;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(stmt_tree_contains_call(&main.body, &|callee, _| {
+        callee == "ok__i64__HelperError"
+    }));
+    assert!(module.functions.iter().any(|function| {
+        function.name == "__hof_result_map___lambda_main_0__i64__i64__HelperError"
+    }));
+}

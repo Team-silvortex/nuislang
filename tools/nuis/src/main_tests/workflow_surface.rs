@@ -272,6 +272,11 @@ mod cpu Main {
     assert!(json.contains(
         "\"nsld_final_executable_output_execution_handoff_decision_code\":\"inspect-output-boundary\""
     ));
+    assert!(json.contains("\"nsld_final_executable_output_payload_execution_trace_protocol\":"));
+    assert!(json.contains("\"nsld_final_executable_output_payload_execution_trace_available\":"));
+    assert!(json.contains("\"nsld_final_executable_output_payload_execution_trace_record_count\":"));
+    assert!(json
+        .contains("\"nsld_final_executable_output_payload_execution_trace_ready_record_count\":"));
     assert!(json.contains("\"nsld_final_executable_output_recommended_next_action\":"));
     assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
@@ -322,6 +327,7 @@ mod cpu Main {
     .expect("build passes");
     write_prepared_nsld_chain_placeholders(&output_dir);
     write_ready_nsld_final_tail_placeholders(&output_dir);
+    write_nsdb_payload_handoff_placeholder(&output_dir);
 
     let json = render_workflow_json(&project_root).expect("render workflow json");
 
@@ -403,6 +409,20 @@ mod cpu Main {
     assert!(json.contains(
         "\"workflow_launch_evidence_first_blocker\":\"host-runner-probe:workflow-mirror\""
     ));
+    assert!(json.contains("\"workflow_nsdb_handoff_available\":true"));
+    assert!(json
+        .contains("\"workflow_nsdb_handoff_protocol\":\"nuis-nsdb-payload-execution-handoff-v1\""));
+    assert!(json.contains(
+        "\"workflow_nsdb_handoff_debugger_contract\":\"nsdb-yir-payload-execution-trace-v1\""
+    ));
+    assert!(json.contains("\"workflow_nsdb_handoff_record_count\":1"));
+    assert!(json.contains("\"workflow_nsdb_handoff_ready_record_count\":1"));
+    assert!(json.contains(
+        "\"workflow_nsdb_handoff_first_trace_id\":\"payload-trace:container-loader:nuis.bootstrap.lifecycle.v1\""
+    ));
+    assert!(json.contains("\"workflow_nsdb_handoff_first_status\":\"ready\""));
+    assert!(json
+        .contains("\"workflow_nsdb_handoff_first_next_action\":\"handoff-payload-trace-to-nsdb\""));
     assert!(json.contains("\"nsld_self_owned_image_ready\":"));
     assert!(json.contains("\"nsld_self_owned_image_status\":"));
     assert!(json.contains("\"nsld_entrypoint_materialization_status\":"));
@@ -417,6 +437,11 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_output_execution_handoff_evidence_status\":"));
     assert!(json.contains("\"nsld_final_executable_output_execution_handoff_first_blocker\":"));
     assert!(json.contains("\"nsld_final_executable_output_execution_handoff_decision_code\":"));
+    assert!(json.contains("\"nsld_final_executable_output_payload_execution_trace_protocol\":"));
+    assert!(json.contains("\"nsld_final_executable_output_payload_execution_trace_available\":"));
+    assert!(json.contains("\"nsld_final_executable_output_payload_execution_trace_record_count\":"));
+    assert!(json
+        .contains("\"nsld_final_executable_output_payload_execution_trace_ready_record_count\":"));
     assert!(json.contains("\"nsld_final_executable_output_recommended_next_action\":"));
     assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));

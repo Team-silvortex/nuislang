@@ -74,7 +74,7 @@ At the current repo stage:
 * the live implementation focus is still on `nuis / nuisc / YIR / nustar`
 * but `stdlib` is no longer empty scaffolding; all five layers now carry real
   checked-in `.ns` assets
-* for the `alpha-0.10.*` line, `std`, PixelMagic, and WitSage are the practical
+* for the `alpha-0.13.*` line, `std`, PixelMagic, and WitSage are the practical
   proving surfaces for buildable CLI/tooling, image/resource, and kernel-facing
   classical ML contracts before `ns-nova` grows into a larger GUI/framework
   layer
@@ -153,7 +153,7 @@ Current boundaries:
 * `ns-nova` remains deliberately later-stage because it depends on the lower
   AOT, library, shader, kernel, and future runtime layers
 
-Current alpha-0.8 priority order:
+Current alpha-0.13 priority order:
 
 1. keep `core` and `std` contracts buildable and boring
 2. keep filesystem, IO, text, result/error, benchmark, network, and host helpers

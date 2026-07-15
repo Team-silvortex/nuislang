@@ -156,6 +156,29 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         optional_string_text(report.first_payload_execution_first_blocker.as_deref())
     );
     println!(
+        "  payload_execution_trace_protocol: {}",
+        payload_execution_trace_protocol()
+    );
+    println!(
+        "  payload_execution_trace_available: {}",
+        payload_execution_trace_available(report)
+    );
+    println!(
+        "  payload_execution_trace_record_count: {}",
+        payload_execution_trace_record_count(report)
+    );
+    println!(
+        "  payload_execution_trace_ready_record_count: {}",
+        payload_execution_trace_ready_record_count(report)
+    );
+    if payload_execution_trace_available(report) {
+        println!(
+            "  payload_execution_trace_record: {} container-loader-handoff {}",
+            payload_execution_trace_id(report),
+            report.first_payload_execution_status
+        );
+    }
+    println!(
         "  recommended_next_action: {}",
         report.recommended_next_action
     );
@@ -342,4 +365,31 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
     for issue in &report.issues {
         println!("  issue: {issue}");
     }
+}
+
+fn payload_execution_trace_protocol() -> &'static str {
+    "nsdb-yir-payload-execution-trace-v1"
+}
+
+fn payload_execution_trace_available(report: &NsldFinalExecutableOutputReport) -> bool {
+    report.first_payload_execution_target == "container-loader"
+}
+
+fn payload_execution_trace_record_count(report: &NsldFinalExecutableOutputReport) -> usize {
+    usize::from(payload_execution_trace_available(report))
+}
+
+fn payload_execution_trace_ready_record_count(report: &NsldFinalExecutableOutputReport) -> usize {
+    usize::from(payload_execution_trace_available(report) && report.first_payload_execution_ready)
+}
+
+fn payload_execution_trace_id(report: &NsldFinalExecutableOutputReport) -> String {
+    let symbol = report
+        .first_payload_execution_entry_symbol
+        .as_deref()
+        .unwrap_or("unknown-symbol");
+    format!(
+        "payload-trace:{}:{}",
+        report.first_payload_execution_target, symbol
+    )
 }

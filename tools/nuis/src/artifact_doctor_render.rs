@@ -2,6 +2,7 @@ use crate::{
     append_json_field_strings,
     artifact_doctor::{ArtifactOutputDiagnostics, ProjectValidationSnapshot},
     artifact_launch_evidence::{HostRunnerJsonSurface, RunArtifactLaunchEvidence},
+    artifact_nsdb_handoff::read_persisted_nsdb_handoff,
     json_bool_field, json_field, json_object_array_field, json_optional_bool_field,
     json_optional_string_field, json_string_array_field, json_surface, json_usize_field,
     run_artifact::run_artifact_prelaunch_summary,
@@ -168,6 +169,7 @@ pub(crate) fn render_artifact_doctor_json(input: &Path) -> String {
         &HostRunnerJsonSurface::not_invoked("artifact-doctor-mirror"),
         &diagnostics.backend_artifact_payload_evidence,
     );
+    let persisted_nsdb_handoff = read_persisted_nsdb_handoff(report.output_dir.as_deref());
     let mut out = String::from("{");
     append_json_field_strings(
         &mut out,
@@ -256,6 +258,10 @@ pub(crate) fn render_artifact_doctor_json(input: &Path) -> String {
     append_json_field_strings(
         &mut out,
         launch_evidence.json_fields_with_prefix("artifact_launch_evidence"),
+    );
+    append_json_field_strings(
+        &mut out,
+        persisted_nsdb_handoff.json_fields_with_prefix("artifact_nsdb_handoff"),
     );
     append_artifact_output_diagnostic_json_fields(
         &mut out,

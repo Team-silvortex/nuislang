@@ -42,6 +42,10 @@ mod cpu Main {
     return Result.Ok(value);
   }
 
+  fn err<T, E>(error: E) -> Result<T, E> {
+    return Result.Err(error);
+  }
+
   fn result_map<T, R, E>(result: Result<T, E>, mapper: Fn1<T, R>) -> Result<R, E> {
     match result {
       Result.Ok(value) => {
@@ -79,6 +83,15 @@ mod cpu Main {
     let mapped_result: Result<i64, HelperError> =
       result_map(ok(raw_score), |value: i64| -> i64 { return bump(value); });
     let mapped_score: i64 = result_unwrap_or(mapped_result, 0);
+    let fallback_result: Result<i64, HelperError> =
+      result_map(err(HelperError.Invalid), |value: i64| -> i64 { return bump(value); });
+    let fallback_seed: i64 = if seed == 3 {
+      result_unwrap_or(fallback_result, 7)
+    } else {
+      let passthrough_result: Result<i64, HelperError> =
+        result_map(ok(seed), |value: i64| -> i64 { return value; });
+      result_unwrap_or(passthrough_result, 0)
+    };
     let buffer_len: i64 = 4;
     let buffer_value: i64 = raw_score - buffer_len;
     return HelperReport {
@@ -86,7 +99,7 @@ mod cpu Main {
       mapped_score: mapped_score,
       buffer_len: buffer_len,
       buffer_value: buffer_value,
-      final_score: raw_score + mapped_score + buffer_len + buffer_value
+      final_score: raw_score + mapped_score + buffer_len + buffer_value + fallback_seed
     };
   }
 

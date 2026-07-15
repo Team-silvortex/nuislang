@@ -163,6 +163,16 @@ These fields now form the current visible link summary:
   the compact machine branch for CI and future debugger/linker routing, such as
   `handoff-host-runner`, `handoff-entrypoint-materializer`,
   `emit-final-executable`, or `inspect-output-diagnostics`
+* `nsld_final_executable_output_payload_execution_trace_protocol`
+  the nsdb-facing trace protocol exposed by the final-output boundary,
+  currently `nsdb-yir-payload-execution-trace-v1`
+* `nsld_final_executable_output_payload_execution_trace_available`
+  whether the final output can expose a payload-execution trace handoff
+* `nsld_final_executable_output_payload_execution_trace_record_count`
+  the number of payload-execution trace records exposed by the boundary
+* `nsld_final_executable_output_payload_execution_trace_ready_record_count`
+  the number of payload-execution trace records already ready for debugger
+  handoff
   Nsld launcher manifest and launcher dry-run artifacts carry the same
   `nsld-final-output-handoff-v1` decision group forward; they do not define a
   separate launch-readiness protocol. The final-executable pipeline summary
@@ -303,6 +313,33 @@ These fields now form the current visible link summary:
 * `launch_evidence_first_payload_first_blocker`
   first normalized payload-level blocker, or `null` when the first payload is
   ready or the route has no payload handoff
+* `launch_evidence_payload_execution_trace_protocol`
+  nsdb-facing payload execution trace protocol for the first payload handoff;
+  currently `nsdb-yir-payload-execution-trace-v1`
+* `launch_evidence_payload_execution_trace_record_count`
+  number of payload execution trace records emitted by `run-artifact`
+* `launch_evidence_nsdb_handoff_protocol`
+  persisted debugger handoff metadata protocol, currently
+  `nuis-nsdb-payload-execution-handoff-v1`
+* `launch_evidence_nsdb_handoff_persisted`
+  true when `run-artifact` wrote `nuis.nsdb.payload-execution-handoff.toml`
+  next to the output manifest for the current launch evidence
+* `launch_evidence_nsdb_handoff_record_count`
+  number of payload execution trace records mirrored into the persisted nsdb
+  handoff metadata
+* `launch_evidence_nsdb_handoff_first_trace_id`
+  first payload execution trace id persisted for nsdb handoff
+* `artifact_nsdb_handoff_available`
+  `artifact-doctor --json` passive readback of the persisted nsdb handoff file;
+  this does not run the host probe
+* `workflow_nsdb_handoff_available`
+  `workflow --json` passive readback of the persisted nsdb handoff file for the
+  selected build output directory
+* `workflow_nsdb_handoff_protocol`
+  persisted nsdb handoff protocol observed by `workflow --json`
+* `artifact_nsdb_handoff_record_count` / `workflow_nsdb_handoff_record_count`
+  number of persisted payload execution trace records observed by passive
+  frontdoors
 * `launch_evidence_first_blocker`
   first normalized launch blocker for scripts and nsdb handoff triage
 * `launch_evidence_reason`

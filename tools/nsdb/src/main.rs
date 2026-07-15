@@ -1,14 +1,16 @@
 mod cli;
 mod display;
+mod handoff;
 mod json;
 mod model;
+mod replay;
 mod report;
 mod sidecar;
 
 use crate::{
     cli::{parse_args, resolve_manifest_input, Command},
-    display::print_nsdb_inspect_report,
-    json::nsdb_inspect_report_json,
+    display::{print_nsdb_events_report, print_nsdb_inspect_report, print_nsdb_replay_plan},
+    json::{nsdb_events_report_json, nsdb_inspect_report_json, nsdb_replay_plan_json},
     report::nsdb_inspect_report,
 };
 use std::{env, process};
@@ -30,14 +32,46 @@ fn run() -> Result<(), String> {
             println!("  native_debugger_visibility: host-shell-only");
             println!("  nsdb_visibility: yir domains, clock edges, data segments, lowering units");
         }
-        Command::Inspect { input, json } => {
+        Command::Inspect {
+            input,
+            json,
+            event_filter,
+        } => {
             let manifest = resolve_manifest_input(&input)?;
             let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsdb_inspect_report(&manifest, &plan);
+            let report = nsdb_inspect_report(&manifest, &plan, event_filter);
             if json {
                 println!("{}", nsdb_inspect_report_json(&report));
             } else {
                 print_nsdb_inspect_report(&report);
+            }
+        }
+        Command::Events {
+            input,
+            json,
+            event_filter,
+        } => {
+            let manifest = resolve_manifest_input(&input)?;
+            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
+            let report = nsdb_inspect_report(&manifest, &plan, event_filter);
+            if json {
+                println!("{}", nsdb_events_report_json(&report));
+            } else {
+                print_nsdb_events_report(&report);
+            }
+        }
+        Command::ReplayPlan {
+            input,
+            json,
+            event_filter,
+        } => {
+            let manifest = resolve_manifest_input(&input)?;
+            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
+            let report = nsdb_inspect_report(&manifest, &plan, event_filter);
+            if json {
+                println!("{}", nsdb_replay_plan_json(&report));
+            } else {
+                print_nsdb_replay_plan(&report);
             }
         }
     }

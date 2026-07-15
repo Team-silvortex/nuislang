@@ -1,7 +1,8 @@
 use crate::model::{
     NsdbClockEdgeDebugInfo, NsdbDataSegmentDebugInfo, NsdbDomainDebugInfo, NsdbInspectReport,
-    NsdbLoweringUnitDebugInfo, NsdbSidecarDebugInfo,
+    NsdbLoweringUnitDebugInfo, NsdbPayloadExecutionEvent, NsdbSidecarDebugInfo,
 };
+use crate::replay::{build_replay_plan, NsdbReplayCheckpoint};
 
 pub(crate) fn nsdb_inspect_report_json(report: &NsdbInspectReport) -> String {
     let fields = vec![
@@ -22,6 +23,78 @@ pub(crate) fn nsdb_inspect_report_json(report: &NsdbInspectReport) -> String {
         json_usize_field("data_segment_count", report.data_segment_count),
         json_usize_field("lowering_unit_count", report.lowering_unit_count),
         json_usize_field("sidecar_count", report.sidecar_count),
+        json_bool_field(
+            "payload_execution_event_filter_active",
+            report.payload_execution_event_filter.active(),
+        ),
+        json_optional_string_field(
+            "payload_execution_event_filter_status",
+            report.payload_execution_event_filter.status.as_deref(),
+        ),
+        json_optional_string_field(
+            "payload_execution_event_filter_phase",
+            report.payload_execution_event_filter.phase.as_deref(),
+        ),
+        json_optional_string_field(
+            "payload_execution_event_filter_trace_id",
+            report.payload_execution_event_filter.trace_id.as_deref(),
+        ),
+        json_bool_field(
+            "payload_execution_handoff_available",
+            report.payload_execution_handoff.available,
+        ),
+        json_string_field(
+            "payload_execution_handoff_path",
+            &report.payload_execution_handoff.path,
+        ),
+        json_string_field(
+            "payload_execution_handoff_protocol",
+            &report.payload_execution_handoff.protocol,
+        ),
+        json_string_field(
+            "payload_execution_handoff_debugger_contract",
+            &report.payload_execution_handoff.debugger_contract,
+        ),
+        json_string_field(
+            "payload_execution_handoff_status",
+            &report.payload_execution_handoff.status,
+        ),
+        json_usize_field(
+            "payload_execution_handoff_record_count",
+            report.payload_execution_handoff.record_count,
+        ),
+        json_usize_field(
+            "payload_execution_handoff_ready_record_count",
+            report.payload_execution_handoff.ready_record_count,
+        ),
+        json_string_field(
+            "payload_execution_handoff_first_trace_id",
+            &report.payload_execution_handoff.first_trace_id,
+        ),
+        json_string_field(
+            "payload_execution_handoff_first_status",
+            &report.payload_execution_handoff.first_status,
+        ),
+        json_string_field(
+            "payload_execution_handoff_first_next_action",
+            &report.payload_execution_handoff.first_next_action,
+        ),
+        json_string_field(
+            "payload_execution_handoff_first_entry_symbol",
+            &report.payload_execution_handoff.first_entry_symbol,
+        ),
+        json_string_field(
+            "payload_execution_handoff_first_execution_phase",
+            &report.payload_execution_handoff.first_execution_phase,
+        ),
+        json_usize_field(
+            "payload_execution_event_count",
+            report.payload_execution_handoff.events.len(),
+        ),
+        format!(
+            "\"payload_execution_events\":[{}]",
+            payload_execution_events_json(&report.payload_execution_handoff.events)
+        ),
         format!("\"domains\":[{}]", domains_json(&report.domains)),
         format!(
             "\"clock_edges\":[{}]",
@@ -39,6 +112,111 @@ pub(crate) fn nsdb_inspect_report_json(report: &NsdbInspectReport) -> String {
         json_string_array_field("missing_metadata", &report.missing_metadata),
     ];
     format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsdb_events_report_json(report: &NsdbInspectReport) -> String {
+    let fields = vec![
+        json_string_field("tool", "nsdb"),
+        json_string_field("kind", "nsdb_payload_execution_events"),
+        json_string_field("manifest", &report.manifest),
+        json_bool_field(
+            "payload_execution_event_filter_active",
+            report.payload_execution_event_filter.active(),
+        ),
+        json_optional_string_field(
+            "payload_execution_event_filter_status",
+            report.payload_execution_event_filter.status.as_deref(),
+        ),
+        json_optional_string_field(
+            "payload_execution_event_filter_phase",
+            report.payload_execution_event_filter.phase.as_deref(),
+        ),
+        json_optional_string_field(
+            "payload_execution_event_filter_trace_id",
+            report.payload_execution_event_filter.trace_id.as_deref(),
+        ),
+        json_bool_field(
+            "payload_execution_handoff_available",
+            report.payload_execution_handoff.available,
+        ),
+        json_string_field(
+            "payload_execution_handoff_status",
+            &report.payload_execution_handoff.status,
+        ),
+        json_usize_field(
+            "payload_execution_event_count",
+            report.payload_execution_handoff.events.len(),
+        ),
+        format!(
+            "\"payload_execution_events\":[{}]",
+            payload_execution_events_json(&report.payload_execution_handoff.events)
+        ),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+pub(crate) fn nsdb_replay_plan_json(report: &NsdbInspectReport) -> String {
+    let plan = build_replay_plan(report);
+    let fields = vec![
+        json_string_field("tool", "nsdb"),
+        json_string_field("kind", "nsdb_payload_execution_replay_plan"),
+        json_string_field("manifest", &report.manifest),
+        json_string_field("replay_protocol", plan.protocol),
+        json_string_field("replay_status", &plan.status),
+        json_usize_field("replay_checkpoint_count", plan.checkpoint_count),
+        json_usize_field(
+            "replayable_checkpoint_count",
+            plan.replayable_checkpoint_count,
+        ),
+        json_optional_string_field("replay_first_blocker", plan.first_blocker.as_deref()),
+        format!(
+            "\"replay_checkpoints\":[{}]",
+            replay_checkpoints_json(&plan.checkpoints)
+        ),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn replay_checkpoints_json(checkpoints: &[NsdbReplayCheckpoint]) -> String {
+    checkpoints
+        .iter()
+        .map(|checkpoint| {
+            let fields = vec![
+                json_usize_field("index", checkpoint.index),
+                json_string_field("trace_id", &checkpoint.trace_id),
+                json_string_field("checkpoint_kind", &checkpoint.checkpoint_kind),
+                json_string_field("replay_status", &checkpoint.replay_status),
+                json_string_field("execution_phase", &checkpoint.execution_phase),
+                json_string_field("entry_symbol", &checkpoint.entry_symbol),
+                json_optional_string_field("first_blocker", checkpoint.first_blocker.as_deref()),
+                json_string_field("next_action", &checkpoint.next_action),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn payload_execution_events_json(events: &[NsdbPayloadExecutionEvent]) -> String {
+    events
+        .iter()
+        .map(|event| {
+            let fields = vec![
+                json_usize_field("index", event.index),
+                json_string_field("trace_id", &event.trace_id),
+                json_string_field("status", &event.status),
+                json_string_field("execution_phase", &event.execution_phase),
+                json_string_field("target", &event.target),
+                json_string_field("entry_symbol", &event.entry_symbol),
+                json_string_field("entry_kind", &event.entry_kind),
+                json_string_field("entry_section_id", &event.entry_section_id),
+                json_string_field("first_blocker", &event.first_blocker),
+                json_string_field("next_action", &event.next_action),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn domains_json(domains: &[NsdbDomainDebugInfo]) -> String {
@@ -155,6 +333,12 @@ fn json_string_field(name: &str, value: &str) -> String {
 
 fn json_usize_field(name: &str, value: usize) -> String {
     format!("\"{name}\":{value}")
+}
+
+fn json_optional_string_field(name: &str, value: Option<&str>) -> String {
+    value
+        .map(|value| json_string_field(name, value))
+        .unwrap_or_else(|| format!("\"{name}\":null"))
 }
 
 fn json_string_array_field(name: &str, values: &[String]) -> String {

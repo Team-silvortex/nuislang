@@ -1,6 +1,7 @@
 # `nuis` `alpha-0.10.*` Mainline Entry
 
-This file is the current short entry point for the `alpha-0.10.*` line.
+This file is now the predecessor short entry point for the `alpha-0.10.*`
+line.
 
 It does not replace the `alpha-0.8.*` binary-linking convergence entry, the
 `alpha-0.7.*` std/tooling smoke entry, the `alpha-0.6.*` Nsld entry, or the
@@ -10,7 +11,7 @@ alpha-0.10" target language into the active alpha-0.10 closure window.
 
 Short rule:
 
-`alpha-0.10.*` is where nuis starts treating the minimal executable artifact
+`alpha-0.10.*` is where nuis started treating the minimal executable artifact
 loop as the main integration gate: not final self-hosting, not a finished
 self-owned linker, but an honest route from project inputs through Nsld-owned
 metadata to a runnable or explicitly blocked executable boundary.
@@ -24,8 +25,8 @@ Read the current line as:
 * `alpha-0.7.*` made std-backed tooling examples the default smoke surface
 * `alpha-0.8.*` made binary-linking convergence the default toolchain pressure
 * `alpha-0.10.*` makes executable-artifact closure the active integration gate
-* current docs should say `alpha-0.10.*` for present-tense work and link older
-  alpha docs as predecessor/baseline context
+* current docs should say `alpha-0.13.*` for present-tense work and link this
+  file as predecessor executable-artifact context
 
 ## Current Front Doors
 
@@ -147,4 +148,4 @@ Safe wording:
   until the final executable emitter is real
 * say `blocked executable artifact` when the pipeline can prove the boundary but
   cannot yet produce a runnable host artifact
-* say `current line` for `alpha-0.10.*`
+* say `predecessor executable-artifact closure line` for `alpha-0.10.*`

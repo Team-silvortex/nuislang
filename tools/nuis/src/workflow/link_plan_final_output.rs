@@ -1,4 +1,4 @@
-use super::link_plan::{parse_bool_field, parse_usize_field};
+use super::link_plan::{parse_bool_field, parse_string_field, parse_usize_field};
 use std::{fs, path::Path};
 
 pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
@@ -20,6 +20,10 @@ pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) launcher_dry_run_ready: Option<bool>,
     pub(crate) launcher_dry_run_would_enter_lifecycle_hook: Option<bool>,
     pub(crate) launcher_dry_run_blocker_count: Option<usize>,
+    pub(crate) payload_execution_trace_protocol: String,
+    pub(crate) payload_execution_trace_available: bool,
+    pub(crate) payload_execution_trace_record_count: usize,
+    pub(crate) payload_execution_trace_ready_record_count: usize,
     pub(crate) recommended_next_action: String,
     pub(crate) path_present: bool,
     pub(crate) nsld_owned: Option<bool>,
@@ -121,6 +125,11 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         entrypoint_materialization_evidence_status.as_str(),
     )
     .to_owned();
+    let payload_execution_trace = nsld_final_executable_output_payload_execution_trace(
+        blocked_source.as_deref(),
+        ready,
+        host_native_output,
+    );
     let object_evidence = nsld_final_executable_output_object_evidence(plan);
 
     NsldFinalExecutableOutputBoundarySummary {
@@ -142,6 +151,10 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         launcher_dry_run_ready,
         launcher_dry_run_would_enter_lifecycle_hook,
         launcher_dry_run_blocker_count,
+        payload_execution_trace_protocol: payload_execution_trace.protocol,
+        payload_execution_trace_available: payload_execution_trace.available,
+        payload_execution_trace_record_count: payload_execution_trace.record_count,
+        payload_execution_trace_ready_record_count: payload_execution_trace.ready_record_count,
         recommended_next_action,
         path_present,
         nsld_owned,
@@ -154,6 +167,40 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         object_issues: object_evidence.issues,
         blockers,
         first_blocker,
+    }
+}
+
+struct NsldFinalExecutableOutputPayloadExecutionTrace {
+    protocol: String,
+    available: bool,
+    record_count: usize,
+    ready_record_count: usize,
+}
+
+fn nsld_final_executable_output_payload_execution_trace(
+    blocked_source: Option<&str>,
+    ready: bool,
+    host_native_output: bool,
+) -> NsldFinalExecutableOutputPayloadExecutionTrace {
+    let protocol = blocked_source
+        .and_then(|source| parse_string_field(source, "payload_execution_trace_protocol"))
+        .unwrap_or_else(|| "nsdb-yir-payload-execution-trace-v1".to_owned());
+    let fallback_available = ready && !host_native_output;
+    let available = blocked_source
+        .and_then(|source| parse_bool_field(source, "payload_execution_trace_available"))
+        .unwrap_or(fallback_available);
+    let record_count = blocked_source
+        .and_then(|source| parse_usize_field(source, "payload_execution_trace_record_count"))
+        .unwrap_or(usize::from(available));
+    let ready_record_count = blocked_source
+        .and_then(|source| parse_usize_field(source, "payload_execution_trace_ready_record_count"))
+        .unwrap_or(usize::from(available && ready));
+
+    NsldFinalExecutableOutputPayloadExecutionTrace {
+        protocol,
+        available,
+        record_count,
+        ready_record_count,
     }
 }
 

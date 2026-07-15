@@ -1,7 +1,8 @@
 use crate::{
+    handoff::read_payload_execution_handoff,
     model::{
         NsdbClockEdgeDebugInfo, NsdbDataSegmentDebugInfo, NsdbDomainDebugInfo, NsdbInspectReport,
-        NsdbLoweringUnitDebugInfo,
+        NsdbLoweringUnitDebugInfo, NsdbPayloadExecutionEventFilter,
     },
     sidecar::read_sidecar_debug_info,
 };
@@ -10,6 +11,7 @@ use std::path::Path;
 pub(crate) fn nsdb_inspect_report(
     manifest: &Path,
     plan: &nuisc::linker::LinkPlan,
+    event_filter: NsdbPayloadExecutionEventFilter,
 ) -> NsdbInspectReport {
     let domains = plan
         .domain_units
@@ -92,6 +94,7 @@ pub(crate) fn nsdb_inspect_report(
         .filter(|unit| unit.artifact_ir_sidecar_path != "none")
         .filter_map(read_sidecar_debug_info)
         .collect::<Vec<_>>();
+    let mut payload_execution_handoff = read_payload_execution_handoff(Path::new(&plan.output_dir));
     let mut missing_metadata = Vec::new();
     if !plan.clock_protocol.validation.valid {
         missing_metadata.push("valid-clock-protocol".to_owned());
@@ -108,6 +111,16 @@ pub(crate) fn nsdb_inspect_report(
         .count();
     if sidecars.len() != expected_sidecars {
         missing_metadata.push("readable-ir-sidecars".to_owned());
+    }
+    if !payload_execution_handoff.available {
+        missing_metadata.push("payload-execution-handoff".to_owned());
+    } else if payload_execution_handoff.status != "ready" {
+        missing_metadata.push("ready-payload-execution-handoff".to_owned());
+    }
+    if event_filter.active() {
+        payload_execution_handoff
+            .events
+            .retain(|event| event_filter.matches(event));
     }
 
     NsdbInspectReport {
@@ -131,6 +144,8 @@ pub(crate) fn nsdb_inspect_report(
         data_segment_count: data_segments.len(),
         lowering_unit_count: lowering_units.len(),
         sidecar_count: sidecars.len(),
+        payload_execution_event_filter: event_filter,
+        payload_execution_handoff,
         domains,
         clock_edges,
         data_segments,

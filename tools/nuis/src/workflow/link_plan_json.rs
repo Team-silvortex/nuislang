@@ -7,6 +7,7 @@ use super::*;
 use crate::{
     artifact_doctor::probe_artifact_doctor,
     artifact_launch_evidence::{HostRunnerJsonSurface, RunArtifactLaunchEvidence},
+    artifact_nsdb_handoff::read_persisted_nsdb_handoff,
     run_artifact::run_artifact_prelaunch_summary,
 };
 use std::path::{Path, PathBuf};
@@ -54,6 +55,8 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
             &HostRunnerJsonSurface::not_invoked("workflow-mirror"),
         )
     });
+    let workflow_nsdb_handoff =
+        link_plan.map(|plan| read_persisted_nsdb_handoff(Some(Path::new(&plan.output_dir))));
     let mut fields = vec![
         json_bool_field("link_plan_available", link_plan.is_some()),
         json_optional_string_field(
@@ -582,6 +585,9 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
     fields.extend(nsld_final_output_json_fields(nsld_final_output.as_ref()));
     if let Some(evidence) = workflow_launch_evidence {
         fields.extend(evidence.json_fields_with_prefix("workflow_launch_evidence"));
+    }
+    if let Some(handoff) = workflow_nsdb_handoff {
+        fields.extend(handoff.json_fields_with_prefix("workflow_nsdb_handoff"));
     }
     fields
 }
