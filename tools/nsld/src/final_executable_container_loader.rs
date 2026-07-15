@@ -1,6 +1,9 @@
 use super::final_executable_image::parse_final_executable_image_header;
 use super::toml;
 
+const CONTAINER_TOML_SCHEMA_MARKER: &[u8] = b"schema = \"nuis-nsld-container-v1\"";
+const CONTAINER_TOML_HANDOFF_END_MARKER: &[u8] = b"\nloader_symbol_count = ";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FinalExecutableContainerLoaderEvidence {
     pub(crate) status: String,
@@ -43,28 +46,23 @@ pub(crate) fn final_executable_container_loader_evidence(
         );
     }
     let payload = &bytes[header.payload_offset..payload_end];
-    let Some(nul_index) = payload.iter().position(|byte| *byte == 0) else {
-        return empty_evidence(
-            "not-container-toml",
-            "payload-without-toml-prefix",
-            Some("container-loader:toml-prefix-missing"),
-        );
+    let prefix = match container_toml_capsule(payload) {
+        Ok(Some(prefix)) => prefix,
+        Ok(None) => {
+            return empty_evidence(
+                "not-container-toml",
+                "payload-without-container-toml-capsule",
+                Some("container-loader:toml-prefix-missing"),
+            );
+        }
+        Err(()) => {
+            return empty_evidence(
+                "invalid-utf8",
+                "nsld-container-toml",
+                Some("container-loader:invalid-utf8"),
+            );
+        }
     };
-    let Ok(prefix) = std::str::from_utf8(&payload[..nul_index]) else {
-        return empty_evidence(
-            "invalid-utf8",
-            "nsld-container-toml",
-            Some("container-loader:invalid-utf8"),
-        );
-    };
-    let schema = toml::string_value(prefix, "schema");
-    if schema.as_deref() != Some("nuis-nsld-container-v1") {
-        return empty_evidence(
-            "unsupported-schema",
-            "nsld-container-toml",
-            Some("container-loader:unsupported-schema"),
-        );
-    }
 
     let readiness = toml::string_value(prefix, "loader_readiness");
     let ready = toml::bool_value(prefix, "ready");
@@ -110,6 +108,61 @@ pub(crate) fn final_executable_container_loader_evidence(
         entry_section_id,
         symbol_count,
     }
+}
+
+fn container_toml_capsule(payload: &[u8]) -> Result<Option<&str>, ()> {
+    let mut search_offset = 0usize;
+    let mut invalid_utf8_candidate_seen = false;
+    while search_offset < payload.len() {
+        let Some(relative_marker_offset) =
+            find_bytes(&payload[search_offset..], CONTAINER_TOML_SCHEMA_MARKER)
+        else {
+            break;
+        };
+        let marker_offset = search_offset + relative_marker_offset;
+        let capsule = &payload[marker_offset..];
+        let Some(capsule_end) = container_toml_capsule_end(capsule) else {
+            search_offset = marker_offset.saturating_add(1);
+            continue;
+        };
+        match std::str::from_utf8(&capsule[..capsule_end]) {
+            Ok(prefix)
+                if toml::string_value(prefix, "schema").as_deref()
+                    == Some("nuis-nsld-container-v1") =>
+            {
+                return Ok(Some(prefix));
+            }
+            Ok(_) => {}
+            Err(_) => invalid_utf8_candidate_seen = true,
+        }
+        search_offset = marker_offset.saturating_add(1);
+    }
+    if invalid_utf8_candidate_seen {
+        Err(())
+    } else {
+        Ok(None)
+    }
+}
+
+fn container_toml_capsule_end(capsule: &[u8]) -> Option<usize> {
+    if let Some(line_offset) = find_bytes(capsule, CONTAINER_TOML_HANDOFF_END_MARKER) {
+        let line_start = line_offset.saturating_add(1);
+        let line_end = capsule[line_start..]
+            .iter()
+            .position(|byte| *byte == b'\n')
+            .map(|offset| line_start + offset + 1)?;
+        return Some(line_end);
+    }
+    capsule.iter().position(|byte| *byte == 0)
+}
+
+fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() {
+        return Some(0);
+    }
+    haystack
+        .windows(needle.len())
+        .position(|window| window == needle)
 }
 
 fn empty_evidence(

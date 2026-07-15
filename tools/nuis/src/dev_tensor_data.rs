@@ -254,7 +254,7 @@ pub(crate) const DEV_TENSOR_EXPECTED_COORDINATES: &[DevTensorExpectedCoordinate]
 pub(crate) const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
         id: "frontdoor-final-output-boundary-status",
-        path: "tools/nuis/src/surface_render/link_plan.rs",
+        path: "tools/nuis/src/surface_render/link_plan_nsld_tail.rs",
         required_patterns: &[
             "nsld_final_executable_output_boundary_status",
             "nsld_final_executable_output_materialization_status",
@@ -271,7 +271,7 @@ pub(crate) const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     },
     DevTensorDriftCheckSpec {
         id: "nsld-final-output-materialization-status",
-        path: "tools/nsld/src/final_executable_output.rs",
+        path: "tools/nsld/src/final_executable_output_handoff.rs",
         required_patterns: &[
             "final_executable_output_materialization_status",
             "final_executable_output_execution_handoff_contract",
@@ -282,16 +282,24 @@ pub(crate) const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
             "final_executable_output_execution_handoff_first_blocker",
             "final_executable_output_execution_handoff_decision_code",
             "final_executable_output_recommended_next_action",
-            "final_executable_container_loader_evidence",
             "final_executable_first_payload_execution",
             "first_payload_execution.ready",
             "handoff-to-container-loader",
             "handoff-container-loader-first-payload",
+            "self-contained-image-ready",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-final-output-report-assembly",
+        path: "tools/nsld/src/final_executable_output.rs",
+        required_patterns: &[
+            "final_executable_container_loader_evidence",
             "container_loader_handoff_ready",
             "container_loader_payload_scan_kind",
             "nsld_nustar_dispatch_blockers",
             "nustar-dispatch:",
-            "self-contained-image-ready",
+            "backend_artifact_assembly_status",
+            "first_payload_execution_status",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -495,7 +503,7 @@ pub(crate) const DEV_TENSOR_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     },
     DevTensorDriftCheckSpec {
         id: "frontdoor-self-owned-image-status",
-        path: "tools/nuis/src/surface_render/link_plan.rs",
+        path: "tools/nuis/src/surface_render/link_plan_nsld_tail.rs",
         required_patterns: &[
             "nsld_self_owned_image_status",
             "nsld_entrypoint_materialization_status",

@@ -11,7 +11,7 @@ use super::{
     final_executable_paths::{
         nsld_final_executable_image_dry_run_bytes_path, nsld_final_executable_image_dry_run_path,
     },
-    final_executable_render::render_final_executable_image_dry_run,
+    final_executable_render_image::render_final_executable_image_dry_run,
     fnv1a64_hex,
     reports::{
         NsldFinalExecutableImageDryRunEmitReport, NsldFinalExecutableImageDryRunReport,

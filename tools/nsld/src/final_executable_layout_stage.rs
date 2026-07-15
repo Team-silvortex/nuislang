@@ -7,7 +7,7 @@ use super::{
         nsld_final_executable_layout_hash, nsld_final_executable_relocation_application_table_hash,
     },
     final_executable_paths::nsld_final_executable_layout_plan_path,
-    final_executable_render::render_final_executable_layout_plan,
+    final_executable_render_layout::render_final_executable_layout_plan,
     final_stage::nsld_final_stage_plan_report,
     reports::{
         NsldFinalExecutableLayoutPlanEmitReport, NsldFinalExecutableLayoutPlanReport,

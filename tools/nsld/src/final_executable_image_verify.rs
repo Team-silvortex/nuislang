@@ -12,7 +12,8 @@ use super::{
     final_executable_paths::{
         nsld_final_executable_image_dry_run_bytes_path, nsld_final_executable_image_dry_run_path,
     },
-    final_executable_render::{optional_usize_toml, render_final_executable_image_dry_run},
+    final_executable_render::optional_usize_toml,
+    final_executable_render_image::render_final_executable_image_dry_run,
     final_executable_verify_helpers::push_optional_string_mismatch,
     fnv1a64_hex,
     reports::NsldFinalExecutableImageDryRunVerifyReport,
