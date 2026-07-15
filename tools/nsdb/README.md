@@ -61,3 +61,24 @@ Replay checkpoints surface materialized sample descriptors via
 typed value decoding is still a later layer.
 They also expose `value_slot_*` and `value_schema_*` fields so future decoders
 can attach typed YIR value snapshots without changing checkpoint identity.
+`value_snapshot_*` fields now report the current typed snapshot reference:
+metadata-only for payload handoff records and opaque-payload for runtime
+payload descriptors.
+`value_content_*` fields expose metadata summaries today and mark opaque
+runtime payloads with readable paths as safe file summaries until a dedicated
+decoder exists.
+`value_decoder_*` fields report the selected decoder registry entry, currently
+using opaque summary decoders for Metal, SPIR-V, and CoreML-style payloads.
+They also expose capability, detail level, and whether the decoder read a file
+summary so callers can distinguish semantic metadata from opaque file metadata.
+Registered opaque decoders now perform a lightweight format probe, such as
+`MTLB` for Metal libraries or the SPIR-V magic word, before deeper decoding
+exists.
+The decoder registry is spec-driven internally, so new payload families can add
+their decoder id, status, and optional magic probe without adding scattered
+format-specific branches.
+Artifact outputs may also provide `nuis.nsdb.payload-decoders.toml` with
+`[[decoders]]` records for experimental payload families. The first supported
+external fields are `payload_format`, `decoder_id`, `magic_label`, and
+`magic_ascii` or `magic_hex`. Hex magic accepts spaces or underscores between
+byte pairs for readability.

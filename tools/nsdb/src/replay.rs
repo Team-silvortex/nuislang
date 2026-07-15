@@ -1,4 +1,7 @@
-use crate::model::{NsdbInspectReport, NsdbPayloadExecutionEvent};
+use crate::{
+    model::{NsdbInspectReport, NsdbPayloadExecutionEvent},
+    payload_decoder::decode_payload_content,
+};
 
 pub(crate) struct NsdbReplayPlan {
     pub(crate) protocol: &'static str,
@@ -32,6 +35,22 @@ pub(crate) struct NsdbReplayCheckpoint {
     pub(crate) value_schema_contract: &'static str,
     pub(crate) value_schema_status: String,
     pub(crate) value_schema_hint: String,
+    pub(crate) value_snapshot_contract: &'static str,
+    pub(crate) value_snapshot_status: String,
+    pub(crate) value_snapshot_type: String,
+    pub(crate) value_snapshot_ref: String,
+    pub(crate) value_snapshot_summary: String,
+    pub(crate) value_content_status: String,
+    pub(crate) value_content_type: String,
+    pub(crate) value_content_summary: String,
+    pub(crate) value_decoder_id: String,
+    pub(crate) value_decoder_status: String,
+    pub(crate) value_decoder_detail: String,
+    pub(crate) value_decoder_capability: &'static str,
+    pub(crate) value_decoder_detail_level: &'static str,
+    pub(crate) value_decoder_reads_file_summary: bool,
+    pub(crate) value_decoder_format_probe_status: String,
+    pub(crate) value_decoder_format_probe_detail: String,
     pub(crate) execution_phase: String,
     pub(crate) entry_symbol: String,
     pub(crate) first_blocker: Option<String>,
@@ -81,6 +100,8 @@ fn replay_checkpoint_for_event(
     let sample_resolution = value_sample_resolution_for_event(report, event);
     let slot_scope = slot_scope_for_event(event);
     let value_schema = value_schema_for_sample(&sample_resolution.payload_format);
+    let value_snapshot = value_snapshot_for_schema(event, &sample_resolution, &value_schema);
+    let value_content = value_content_for_snapshot(report, event, &value_snapshot);
     NsdbReplayCheckpoint {
         index: event.index,
         trace_id: event.trace_id.clone(),
@@ -109,6 +130,22 @@ fn replay_checkpoint_for_event(
         value_schema_contract: "nsdb-yir-value-schema-ref-v1",
         value_schema_status: value_schema.status,
         value_schema_hint: value_schema.hint,
+        value_snapshot_contract: "nsdb-yir-value-snapshot-v1",
+        value_snapshot_status: value_snapshot.status,
+        value_snapshot_type: value_snapshot.value_type,
+        value_snapshot_ref: value_snapshot.value_ref,
+        value_snapshot_summary: value_snapshot.summary,
+        value_content_status: value_content.status,
+        value_content_type: value_content.value_type,
+        value_content_summary: value_content.summary,
+        value_decoder_id: value_content.decoder_id,
+        value_decoder_status: value_content.decoder_status,
+        value_decoder_detail: value_content.decoder_detail,
+        value_decoder_capability: value_content.decoder_capability,
+        value_decoder_detail_level: value_content.decoder_detail_level,
+        value_decoder_reads_file_summary: value_content.decoder_reads_file_summary,
+        value_decoder_format_probe_status: value_content.decoder_format_probe_status,
+        value_decoder_format_probe_detail: value_content.decoder_format_probe_detail,
         execution_phase: event.execution_phase.clone(),
         entry_symbol: event.entry_symbol.clone(),
         first_blocker,
@@ -137,6 +174,27 @@ struct ValueSampleResolution {
 struct ValueSchemaRef {
     status: String,
     hint: String,
+}
+
+struct ValueSnapshotRef {
+    status: String,
+    value_type: String,
+    value_ref: String,
+    summary: String,
+}
+
+struct ValueContentRef {
+    decoder_id: String,
+    decoder_status: String,
+    decoder_detail: String,
+    decoder_capability: &'static str,
+    decoder_detail_level: &'static str,
+    decoder_reads_file_summary: bool,
+    decoder_format_probe_status: String,
+    decoder_format_probe_detail: String,
+    status: String,
+    value_type: String,
+    summary: String,
 }
 
 fn value_sample_resolution_for_event(
@@ -299,6 +357,99 @@ fn value_schema_for_sample(payload_format: &str) -> ValueSchemaRef {
     }
 }
 
+fn value_snapshot_for_schema(
+    event: &NsdbPayloadExecutionEvent,
+    sample: &ValueSampleResolution,
+    schema: &ValueSchemaRef,
+) -> ValueSnapshotRef {
+    match schema.status.as_str() {
+        "schema-metadata-only" => ValueSnapshotRef {
+            status: "snapshot-metadata-only".to_owned(),
+            value_type: "payload-execution-metadata".to_owned(),
+            value_ref: format!("snapshot:{}:metadata", event.trace_id),
+            summary: sample.materialization_detail.clone(),
+        },
+        "schema-opaque-payload" => ValueSnapshotRef {
+            status: "snapshot-opaque-payload".to_owned(),
+            value_type: sample.payload_format.clone(),
+            value_ref: sample.payload_path.clone(),
+            summary: format!(
+                "opaque-payload:{}:{}",
+                sample.payload_format, sample.payload_path
+            ),
+        },
+        _ => ValueSnapshotRef {
+            status: "snapshot-missing".to_owned(),
+            value_type: "none".to_owned(),
+            value_ref: "none".to_owned(),
+            summary: "no-decodable-sample".to_owned(),
+        },
+    }
+}
+
+fn value_content_for_snapshot(
+    report: &NsdbInspectReport,
+    event: &NsdbPayloadExecutionEvent,
+    snapshot: &ValueSnapshotRef,
+) -> ValueContentRef {
+    match snapshot.status.as_str() {
+        "snapshot-metadata-only" => ValueContentRef {
+            decoder_id: "nsdb-metadata-summary-decoder-v1".to_owned(),
+            decoder_status: "decoder-ready".to_owned(),
+            decoder_detail: "metadata-summary".to_owned(),
+            decoder_capability: "metadata-summary",
+            decoder_detail_level: "semantic-metadata",
+            decoder_reads_file_summary: false,
+            decoder_format_probe_status: "format-probe-not-needed".to_owned(),
+            decoder_format_probe_detail: "metadata-summary".to_owned(),
+            status: "content-metadata-summary".to_owned(),
+            value_type: snapshot.value_type.clone(),
+            summary: format!(
+                "entry={} phase={} trace={}",
+                event.entry_symbol, event.execution_phase, event.trace_id
+            ),
+        },
+        "snapshot-opaque-payload" => opaque_payload_content(report, snapshot),
+        _ => ValueContentRef {
+            decoder_id: "nsdb-noop-decoder-v1".to_owned(),
+            decoder_status: "decoder-missing".to_owned(),
+            decoder_detail: "no snapshot content".to_owned(),
+            decoder_capability: "none",
+            decoder_detail_level: "none",
+            decoder_reads_file_summary: false,
+            decoder_format_probe_status: "format-probe-not-needed".to_owned(),
+            decoder_format_probe_detail: "no snapshot content".to_owned(),
+            status: "content-missing".to_owned(),
+            value_type: "none".to_owned(),
+            summary: "no snapshot content".to_owned(),
+        },
+    }
+}
+
+fn opaque_payload_content(
+    report: &NsdbInspectReport,
+    snapshot: &ValueSnapshotRef,
+) -> ValueContentRef {
+    let decoded = decode_payload_content(
+        &report.output_dir,
+        &snapshot.value_type,
+        &snapshot.value_ref,
+    );
+    ValueContentRef {
+        decoder_id: decoded.decoder_id,
+        decoder_status: decoded.decoder_status,
+        decoder_detail: decoded.decoder_detail,
+        decoder_capability: decoded.decoder_capability,
+        decoder_detail_level: decoded.decoder_detail_level,
+        decoder_reads_file_summary: decoded.decoder_reads_file_summary,
+        decoder_format_probe_status: decoded.decoder_format_probe_status,
+        decoder_format_probe_detail: decoded.decoder_format_probe_detail,
+        status: decoded.content_status,
+        value_type: decoded.content_type,
+        summary: decoded.content_summary,
+    }
+}
+
 fn frame_kind_for_phase(phase: &str) -> &'static str {
     match phase {
         "container-loader-handoff" => "loader",
@@ -338,246 +489,5 @@ fn value_sample_source_for_phase(phase: &str) -> &'static str {
         "device-dispatch" => "hetero-runtime-trace",
         "container-loader-handoff" => "payload-execution-handoff",
         _ => "payload-execution-event",
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::build_replay_plan;
-    use crate::model::{
-        NsdbDomainDebugInfo, NsdbHeteroRuntimeTraceInfo, NsdbHeteroRuntimeTraceRecord,
-        NsdbInspectReport, NsdbPayloadExecutionEvent, NsdbPayloadExecutionEventFilter,
-        NsdbPayloadExecutionHandoffInfo, NsdbSidecarDebugInfo,
-    };
-
-    #[test]
-    fn builds_replay_checkpoints_from_payload_events() {
-        let report = NsdbInspectReport {
-            manifest: "manifest.toml".to_owned(),
-            debug_model: "yir-metadata".to_owned(),
-            native_debugger_visibility: "host-shell-only".to_owned(),
-            nsdb_visibility: "domains+clock+segments+lowering-units".to_owned(),
-            debug_readiness: "metadata-partial".to_owned(),
-            yir_debuggable: false,
-            domain_count: 0,
-            hetero_domain_count: 0,
-            clock_edge_count: 0,
-            data_segment_count: 0,
-            lowering_unit_count: 0,
-            sidecar_count: 0,
-            payload_execution_event_filter: NsdbPayloadExecutionEventFilter::default(),
-            payload_execution_handoff: NsdbPayloadExecutionHandoffInfo {
-                available: true,
-                path: "nuis.nsdb.payload-execution-handoff.toml".to_owned(),
-                protocol: "nuis-nsdb-payload-execution-handoff-v1".to_owned(),
-                debugger_contract: "nsdb-yir-payload-execution-trace-v1".to_owned(),
-                status: "ready".to_owned(),
-                record_count: 2,
-                ready_record_count: 1,
-                first_trace_id: "payload-trace:container-loader:nuis.bootstrap.lifecycle.v1"
-                    .to_owned(),
-                first_status: "ready".to_owned(),
-                first_next_action: "handoff-payload-trace-to-nsdb".to_owned(),
-                first_entry_symbol: "nuis.bootstrap.lifecycle.v1".to_owned(),
-                first_execution_phase: "container-loader-handoff".to_owned(),
-                events: vec![
-                    NsdbPayloadExecutionEvent {
-                        index: 0,
-                        trace_id: "payload-trace:container-loader:nuis.bootstrap.lifecycle.v1"
-                            .to_owned(),
-                        status: "ready".to_owned(),
-                        execution_phase: "container-loader-handoff".to_owned(),
-                        target: "container-loader".to_owned(),
-                        entry_symbol: "nuis.bootstrap.lifecycle.v1".to_owned(),
-                        entry_kind: "lifecycle-bootstrap".to_owned(),
-                        entry_section_id: "sec0000.compiled-artifact".to_owned(),
-                        first_blocker: "none".to_owned(),
-                        next_action: "handoff-payload-trace-to-nsdb".to_owned(),
-                    },
-                    NsdbPayloadExecutionEvent {
-                        index: 1,
-                        trace_id: "payload-trace:shader:pixelmagic.blur".to_owned(),
-                        status: "blocked".to_owned(),
-                        execution_phase: "device-dispatch".to_owned(),
-                        target: "shader".to_owned(),
-                        entry_symbol: "pixelmagic.blur".to_owned(),
-                        entry_kind: "shader-kernel".to_owned(),
-                        entry_section_id: "sec0002.shader".to_owned(),
-                        first_blocker: "device-execution-sample-missing".to_owned(),
-                        next_action: "materialize-device-execution-trace".to_owned(),
-                    },
-                ],
-            },
-            hetero_runtime_trace: NsdbHeteroRuntimeTraceInfo {
-                available: true,
-                path: "nuis.nsdb.hetero-runtime-trace.toml".to_owned(),
-                protocol: "nuis-nsdb-hetero-runtime-trace-v1".to_owned(),
-                debugger_contract: "nsdb-yir-hetero-runtime-trace-v1".to_owned(),
-                status: "execution-pending".to_owned(),
-                record_count: 1,
-                ready_record_count: 0,
-                backend_execution_record_count: 1,
-                first_trace_id: "hetero-trace:shader:metal:apple-silicon-gpu".to_owned(),
-                first_blocker: "none".to_owned(),
-                next_action: "materialize-device-execution-trace".to_owned(),
-                records: vec![NsdbHeteroRuntimeTraceRecord {
-                    index: 0,
-                    trace_id: "hetero-trace:shader:metal:apple-silicon-gpu".to_owned(),
-                    trace_role: "backend-artifact".to_owned(),
-                    status: "execution-pending".to_owned(),
-                    domain_family: "shader".to_owned(),
-                    backend_family: "metal".to_owned(),
-                    target_device: "apple-silicon-gpu".to_owned(),
-                    backend_artifact_key: "shader:metal:apple-silicon-gpu".to_owned(),
-                    selected_lowering_target: "metal".to_owned(),
-                    payload_format: "metallib".to_owned(),
-                    payload_path: "pixelmagic.metallib".to_owned(),
-                    bridge_stub_path: "pixelmagic.bridge".to_owned(),
-                    missing_signals: Vec::new(),
-                    next_action: "materialize-device-execution-trace".to_owned(),
-                }],
-            },
-            domains: vec![NsdbDomainDebugInfo {
-                domain_family: "shader".to_owned(),
-                package_id: "pixelmagic".to_owned(),
-                kind: "heterogeneous".to_owned(),
-                lowering_target: "metal".to_owned(),
-                backend_family: "metal".to_owned(),
-                debug_scope: "yir-domain".to_owned(),
-            }],
-            clock_edges: Vec::new(),
-            data_segments: Vec::new(),
-            lowering_units: Vec::new(),
-            sidecars: vec![NsdbSidecarDebugInfo {
-                domain_family: "shader".to_owned(),
-                package_id: "pixelmagic".to_owned(),
-                path: "pixelmagic.shader.sidecar.json".to_owned(),
-                schema: "nuis-yir-sidecar-v1".to_owned(),
-                capability_owner: "shader".to_owned(),
-                frontend_ir: "nuis-yir.shader".to_owned(),
-                native_ir: "msl2.4".to_owned(),
-                pipeline_lowering: "metal-compute-pipeline".to_owned(),
-                resource_lowering: "metal-buffer".to_owned(),
-                dispatch_lowering: "metal-dispatch-threadgroups".to_owned(),
-                texture_lowering: "metal-texture".to_owned(),
-                transport_lowering: "none".to_owned(),
-                tensor_lowering: "none".to_owned(),
-                memory_lowering: "metal-shared-buffer".to_owned(),
-                result_lowering: "metal-buffer-readback".to_owned(),
-                validation_contracts: vec!["shader-yir-contract".to_owned()],
-                entry_symbol: "pixelmagic.blur".to_owned(),
-                stage_kind: "compute".to_owned(),
-            }],
-            missing_metadata: Vec::new(),
-        };
-
-        let plan = build_replay_plan(&report);
-
-        assert_eq!(plan.protocol, "nsdb-payload-execution-replay-plan-v1");
-        assert_eq!(plan.status, "blocked");
-        assert_eq!(plan.checkpoint_count, 2);
-        assert_eq!(plan.replayable_checkpoint_count, 1);
-        assert_eq!(plan.checkpoints[0].checkpoint_kind, "loader-checkpoint");
-        assert_eq!(plan.checkpoints[0].replay_status, "replayable");
-        assert_eq!(plan.checkpoints[0].frame_id, "frame:payload:0:loader");
-        assert_eq!(
-            plan.checkpoints[0].slot_scope,
-            "container-loader:nuis.bootstrap.lifecycle.v1"
-        );
-        assert_eq!(plan.checkpoints[0].value_state_status, "metadata-only");
-        assert_eq!(
-            plan.checkpoints[0].value_sample_contract,
-            "nsdb-yir-value-sample-ref-v1"
-        );
-        assert_eq!(
-            plan.checkpoints[0].value_sample_ref,
-            "value-sample:payload-trace:container-loader:nuis.bootstrap.lifecycle.v1:container-loader:nuis.bootstrap.lifecycle.v1"
-        );
-        assert_eq!(
-            plan.checkpoints[0].value_sample_source,
-            "payload-execution-handoff"
-        );
-        assert_eq!(
-            plan.checkpoints[0].value_sample_resolution_status,
-            "metadata-resolved"
-        );
-        assert_eq!(
-            plan.checkpoints[0].value_sample_materialization_status,
-            "metadata-sample-materialized"
-        );
-        assert_eq!(
-            plan.checkpoints[0].value_sample_payload_format,
-            "payload-execution-metadata"
-        );
-        assert_eq!(plan.checkpoints[0].value_slot_id, "slot:payload:0:loader");
-        assert_eq!(
-            plan.checkpoints[0].value_slot_scope,
-            "container-loader:nuis.bootstrap.lifecycle.v1"
-        );
-        assert_eq!(
-            plan.checkpoints[0].value_schema_contract,
-            "nsdb-yir-value-schema-ref-v1"
-        );
-        assert_eq!(
-            plan.checkpoints[0].value_schema_status,
-            "schema-metadata-only"
-        );
-        assert_eq!(
-            plan.checkpoints[0].value_schema_hint,
-            "payload-execution-event-metadata"
-        );
-        assert_eq!(
-            plan.checkpoints[1].checkpoint_kind,
-            "device-dispatch-checkpoint"
-        );
-        assert_eq!(plan.checkpoints[1].frame_id, "frame:payload:1:device");
-        assert_eq!(plan.checkpoints[1].slot_scope, "shader:pixelmagic.blur");
-        assert_eq!(plan.checkpoints[1].value_state_status, "blocked");
-        assert_eq!(
-            plan.checkpoints[1].value_sample_ref,
-            "value-sample:payload-trace:shader:pixelmagic.blur:shader:pixelmagic.blur"
-        );
-        assert_eq!(
-            plan.checkpoints[1].value_sample_source,
-            "hetero-runtime-trace"
-        );
-        assert_eq!(
-            plan.checkpoints[1].value_sample_resolution_status,
-            "trace-record-observed"
-        );
-        assert_eq!(
-            plan.checkpoints[1].value_sample_resolution_detail,
-            "hetero-runtime-trace:hetero-trace:shader:metal:apple-silicon-gpu:execution-pending"
-        );
-        assert_eq!(
-            plan.checkpoints[1].value_sample_materialization_status,
-            "sample-descriptor-materialized"
-        );
-        assert_eq!(plan.checkpoints[1].value_sample_payload_format, "metallib");
-        assert_eq!(
-            plan.checkpoints[1].value_sample_payload_path,
-            "pixelmagic.metallib"
-        );
-        assert_eq!(
-            plan.checkpoints[1].value_sample_bridge_stub_path,
-            "pixelmagic.bridge"
-        );
-        assert_eq!(plan.checkpoints[1].value_slot_id, "slot:payload:1:device");
-        assert_eq!(
-            plan.checkpoints[1].value_slot_scope,
-            "shader:pixelmagic.blur"
-        );
-        assert_eq!(
-            plan.checkpoints[1].value_schema_status,
-            "schema-opaque-payload"
-        );
-        assert_eq!(
-            plan.checkpoints[1].value_schema_hint,
-            "opaque-runtime-payload:metallib"
-        );
-        assert_eq!(
-            plan.first_blocker.as_deref(),
-            Some("device-execution-sample-missing")
-        );
     }
 }

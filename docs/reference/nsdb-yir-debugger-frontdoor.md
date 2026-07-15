@@ -141,6 +141,28 @@ Replay checkpoints also expose `value_slot_id`, `value_slot_scope`,
 fields give future decoders a stable typed-slot target while keeping opaque
 runtime payloads opaque until a real decoder is available.
 
+`value_snapshot_*` fields provide the current typed snapshot reference. Metadata
+snapshots are marked as metadata-only, while runtime payloads are represented as
+opaque payload snapshots until a concrete payload decoder exists.
+
+`value_content_*` fields expose the first concrete content layer. Payload
+execution metadata can produce a readable summary immediately; opaque runtime
+payloads produce a safe file summary when the payload path is readable, and
+remain marked as awaiting a dedicated decoder for format-specific contents.
+`value_decoder_*` identifies the decoder selected by the registry; current
+Metal/SPIR-V/CoreML entries are intentionally opaque summary decoders. Decoder
+capability and detail-level fields make that boundary explicit for replay tools.
+Registered opaque decoders also expose a lightweight format probe status so
+replay can tell whether a payload file matches the expected container header
+before full format-specific decoding exists.
+The current registry keeps decoder ids, statuses, and optional magic probes in
+one payload-family spec rather than scattering per-format decisions through the
+replay planner.
+Artifact outputs can extend that registry with
+`nuis.nsdb.payload-decoders.toml`; its initial `[[decoders]]` records support
+`payload_format`, `decoder_id`, `magic_label`, ASCII magic probes, and hex
+magic probes for binary payload headers.
+
 ## Relationship To Nsld
 
 `Nsld` freezes and validates the linker-facing contract graph.

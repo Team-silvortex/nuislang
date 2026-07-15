@@ -10,6 +10,7 @@ pub(crate) fn nsdb_inspect_report_json(report: &NsdbInspectReport) -> String {
         json_string_field("tool", "nsdb"),
         json_string_field("kind", "nsdb_yir_debug_inspect"),
         json_string_field("manifest", &report.manifest),
+        json_string_field("output_dir", &report.output_dir),
         json_string_field("debug_model", &report.debug_model),
         json_string_field(
             "native_debugger_visibility",
@@ -274,6 +275,40 @@ fn replay_checkpoints_json(checkpoints: &[NsdbReplayCheckpoint]) -> String {
                 json_string_field("value_schema_contract", checkpoint.value_schema_contract),
                 json_string_field("value_schema_status", &checkpoint.value_schema_status),
                 json_string_field("value_schema_hint", &checkpoint.value_schema_hint),
+                json_string_field(
+                    "value_snapshot_contract",
+                    checkpoint.value_snapshot_contract,
+                ),
+                json_string_field("value_snapshot_status", &checkpoint.value_snapshot_status),
+                json_string_field("value_snapshot_type", &checkpoint.value_snapshot_type),
+                json_string_field("value_snapshot_ref", &checkpoint.value_snapshot_ref),
+                json_string_field("value_snapshot_summary", &checkpoint.value_snapshot_summary),
+                json_string_field("value_content_status", &checkpoint.value_content_status),
+                json_string_field("value_content_type", &checkpoint.value_content_type),
+                json_string_field("value_content_summary", &checkpoint.value_content_summary),
+                json_string_field("value_decoder_id", &checkpoint.value_decoder_id),
+                json_string_field("value_decoder_status", &checkpoint.value_decoder_status),
+                json_string_field("value_decoder_detail", &checkpoint.value_decoder_detail),
+                json_string_field(
+                    "value_decoder_capability",
+                    checkpoint.value_decoder_capability,
+                ),
+                json_string_field(
+                    "value_decoder_detail_level",
+                    checkpoint.value_decoder_detail_level,
+                ),
+                json_bool_field(
+                    "value_decoder_reads_file_summary",
+                    checkpoint.value_decoder_reads_file_summary,
+                ),
+                json_string_field(
+                    "value_decoder_format_probe_status",
+                    &checkpoint.value_decoder_format_probe_status,
+                ),
+                json_string_field(
+                    "value_decoder_format_probe_detail",
+                    &checkpoint.value_decoder_format_probe_detail,
+                ),
                 json_string_field("execution_phase", &checkpoint.execution_phase),
                 json_string_field("entry_symbol", &checkpoint.entry_symbol),
                 json_optional_string_field("first_blocker", checkpoint.first_blocker.as_deref()),

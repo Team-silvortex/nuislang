@@ -1,6 +1,7 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsdbInspectReport {
     pub(crate) manifest: String,
+    pub(crate) output_dir: String,
     pub(crate) debug_model: String,
     pub(crate) native_debugger_visibility: String,
     pub(crate) nsdb_visibility: String,

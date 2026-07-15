@@ -130,6 +130,7 @@ pub(crate) fn nsdb_inspect_report(
 
     NsdbInspectReport {
         manifest: manifest.display().to_string(),
+        output_dir: plan.output_dir.clone(),
         debug_model: "yir-metadata".to_owned(),
         native_debugger_visibility: "host-shell-only".to_owned(),
         nsdb_visibility: "domains+clock+segments+lowering-units".to_owned(),

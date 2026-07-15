@@ -4,6 +4,7 @@ use crate::replay::build_replay_plan;
 pub(crate) fn print_nsdb_inspect_report(report: &NsdbInspectReport) {
     println!("Nsdb YIR debug inspect");
     println!("  manifest: {}", report.manifest);
+    println!("  output_dir: {}", report.output_dir);
     println!("  debug_model: {}", report.debug_model);
     println!(
         "  native_debugger_visibility: {}",
@@ -252,7 +253,7 @@ pub(crate) fn print_nsdb_replay_plan(report: &NsdbInspectReport) {
     );
     for checkpoint in &plan.checkpoints {
         println!(
-            "  replay_checkpoint: index={} trace={} kind={} status={} frame={} slot={} value_state={} value_sample_contract={} value_sample_ref={} value_sample_source={} value_sample_resolution={} value_sample_detail={} value_sample_materialization={} value_sample_payload={} value_sample_bridge_stub={} value_slot_id={} value_schema_status={} value_schema_hint={} phase={} entry={} blocker={} next={}",
+            "  replay_checkpoint: index={} trace={} kind={} status={} frame={} slot={} value_state={} value_sample_contract={} value_sample_ref={} value_sample_source={} value_sample_resolution={} value_sample_detail={} value_sample_materialization={} value_sample_payload={} value_sample_bridge_stub={} value_slot_id={} value_schema_status={} value_schema_hint={} value_snapshot_status={} value_snapshot_type={} value_snapshot_ref={} value_content_status={} value_content_type={} value_decoder_id={} value_decoder_status={} value_decoder_capability={} value_decoder_detail_level={} value_decoder_reads_file_summary={} value_decoder_format_probe_status={} value_decoder_format_probe_detail={} phase={} entry={} blocker={} next={}",
             checkpoint.index,
             checkpoint.trace_id,
             checkpoint.checkpoint_kind,
@@ -271,6 +272,18 @@ pub(crate) fn print_nsdb_replay_plan(report: &NsdbInspectReport) {
             checkpoint.value_slot_id,
             checkpoint.value_schema_status,
             checkpoint.value_schema_hint,
+            checkpoint.value_snapshot_status,
+            checkpoint.value_snapshot_type,
+            checkpoint.value_snapshot_ref,
+            checkpoint.value_content_status,
+            checkpoint.value_content_type,
+            checkpoint.value_decoder_id,
+            checkpoint.value_decoder_status,
+            checkpoint.value_decoder_capability,
+            checkpoint.value_decoder_detail_level,
+            checkpoint.value_decoder_reads_file_summary,
+            checkpoint.value_decoder_format_probe_status,
+            checkpoint.value_decoder_format_probe_detail,
             checkpoint.execution_phase,
             checkpoint.entry_symbol,
             checkpoint.first_blocker.as_deref().unwrap_or("<none>"),

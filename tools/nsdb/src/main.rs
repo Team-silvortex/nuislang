@@ -4,7 +4,10 @@ mod handoff;
 mod hetero_trace;
 mod json;
 mod model;
+mod payload_decoder;
 mod replay;
+#[cfg(test)]
+mod replay_tests;
 mod report;
 mod sidecar;
 

@@ -329,7 +329,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
                 "payload_execution_event_count",
                 "nsdb_replay_plan_json",
                 "frame_id",
-                "value_schema_status",
+                "value_decoder_format_probe_status",
             ],
         },
     DevTensorDriftCheckSpec {
