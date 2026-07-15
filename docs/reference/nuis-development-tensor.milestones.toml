@@ -1,0 +1,61 @@
+schema = "nuis-dev-tensor-milestones-v1"
+source = "docs/reference/nuis-development-tensor.milestones.toml"
+
+[[milestones]]
+id = "alpha-frontdoor"
+required = true
+coordinates = [
+  "compiler-frontdoor/nuis-cli/workflow-and-project-orientation",
+  "compiler-frontdoor/nuis-cli/artifact-runtime-closure",
+]
+
+[[milestones]]
+id = "alpha-linker"
+required = true
+coordinates = [
+  "linker-toolchain/nsld/artifact-chain-drive",
+  "linker-toolchain/nsld/final-output-boundary",
+]
+
+[[milestones]]
+id = "alpha-heterogeneous"
+required = true
+coordinates = [
+  "heterogeneous-runtime/nustar/registered-domain-contracts",
+]
+
+[[milestones]]
+id = "alpha-stdlib"
+required = true
+coordinates = [
+  "standard-library/std/host-io-filesystem-text",
+]
+
+[[milestones]]
+id = "alpha-official-galaxy"
+required = false
+coordinates = [
+  "standard-library/pixelmagic/image-processing-lane",
+  "standard-library/witsage/classical-ml-lane",
+]
+
+[[milestones]]
+id = "alpha-language-core"
+required = true
+coordinates = [
+  "language-core/nuisc/type-control-flow-generics",
+]
+
+[[milestones]]
+id = "alpha-native-binary"
+required = true
+coordinates = [
+  "native-binary-system/nsb-nsld/self-owned-binary-assembly",
+]
+
+[[milestones]]
+id = "alpha-governance"
+required = true
+coordinates = [
+  "developer-system/dev-tensor/architecture-module-function-progress-model",
+]

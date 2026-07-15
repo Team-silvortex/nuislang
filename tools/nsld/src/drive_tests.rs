@@ -196,7 +196,7 @@ fn drive_apply_dispatches_whitelisted_launcher_manifest_and_dry_run() {
     );
     assert_eq!(
         output.recommended_next_action,
-        "run-artifact-or-handoff-to-runtime"
+        "handoff-to-container-loader"
     );
 }
 

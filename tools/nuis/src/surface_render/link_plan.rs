@@ -11,6 +11,11 @@ struct LinkPlanDomainReadiness {
     payload_format_present: bool,
     bridge_stub_present: bool,
     ir_sidecar_present: bool,
+    registry_dispatch_readiness_status: String,
+    registry_dispatch_readiness_ready: bool,
+    registry_dispatch_missing_signals: Vec<String>,
+    registry_dispatch_bridge_materialized: bool,
+    registry_execution_readiness_materialized: bool,
     issues: Vec<String>,
 }
 
@@ -18,9 +23,11 @@ struct LinkPlanDomainReadiness {
 struct LinkPlanDomainReadinessSummary {
     hetero_units: usize,
     ready_units: usize,
+    registry_dispatch_ready_units: usize,
     ready: bool,
     domain_families: Vec<String>,
     first_unready: Option<String>,
+    registry_dispatch_first_blocked: Option<String>,
     units: Vec<LinkPlanDomainReadiness>,
 }
 
@@ -87,6 +94,11 @@ pub(super) fn write_link_plan_text_fields<W: fmt::Write>(
         )?;
         writeln!(
             out,
+            "  link_plan_heterogeneous_domain_registry_dispatch_ready_units: {}",
+            domain_readiness.registry_dispatch_ready_units
+        )?;
+        writeln!(
+            out,
             "  link_plan_heterogeneous_domain_readiness_ready: {}",
             crate::yes_no(domain_readiness.ready)
         )?;
@@ -107,6 +119,14 @@ pub(super) fn write_link_plan_text_fields<W: fmt::Write>(
                 .as_deref()
                 .unwrap_or("<none>")
         )?;
+        writeln!(
+            out,
+            "  link_plan_heterogeneous_domain_registry_dispatch_first_blocked: {}",
+            domain_readiness
+                .registry_dispatch_first_blocked
+                .as_deref()
+                .unwrap_or("<none>")
+        )?;
         write_nsld_artifact_chain_text_fields(out, plan)?;
     } else {
         writeln!(out, "  link_plan_final_stage: <unavailable>")?;
@@ -118,11 +138,19 @@ pub(super) fn write_link_plan_text_fields<W: fmt::Write>(
         writeln!(out, "  link_plan_domain_units: 0")?;
         writeln!(out, "  link_plan_heterogeneous_domain_units: 0")?;
         writeln!(out, "  link_plan_heterogeneous_domain_ready_units: 0")?;
+        writeln!(
+            out,
+            "  link_plan_heterogeneous_domain_registry_dispatch_ready_units: 0"
+        )?;
         writeln!(out, "  link_plan_heterogeneous_domain_readiness_ready: no")?;
         writeln!(out, "  link_plan_heterogeneous_domain_families: <none>")?;
         writeln!(
             out,
             "  link_plan_heterogeneous_domain_first_unready: <none>"
+        )?;
+        writeln!(
+            out,
+            "  link_plan_heterogeneous_domain_registry_dispatch_first_blocked: <none>"
         )?;
         writeln!(out, "  nsld_prepare_command: <unavailable>")?;
         writeln!(out, "  nsld_drive_dry_run_command: <unavailable>")?;
@@ -436,6 +464,13 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
                 .map(|summary| summary.ready_units)
                 .unwrap_or(0),
         ),
+        crate::json_usize_field(
+            "link_plan_heterogeneous_domain_registry_dispatch_ready_units",
+            domain_readiness
+                .as_ref()
+                .map(|summary| summary.registry_dispatch_ready_units)
+                .unwrap_or(0),
+        ),
         crate::json_bool_field(
             "link_plan_heterogeneous_domain_readiness_ready",
             domain_readiness
@@ -455,6 +490,12 @@ pub(super) fn link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>)
             domain_readiness
                 .as_ref()
                 .and_then(|summary| summary.first_unready.as_deref()),
+        ),
+        crate::json_optional_string_field(
+            "link_plan_heterogeneous_domain_registry_dispatch_first_blocked",
+            domain_readiness
+                .as_ref()
+                .and_then(|summary| summary.registry_dispatch_first_blocked.as_deref()),
         ),
         format!(
             "\"link_plan_heterogeneous_domain_readiness\":[{}]",
@@ -967,6 +1008,10 @@ fn link_plan_domain_readiness_summary(
         .collect::<Vec<_>>();
     let hetero_units = units.len();
     let ready_units = units.iter().filter(|unit| unit.ready).count();
+    let registry_dispatch_ready_units = units
+        .iter()
+        .filter(|unit| unit.registry_dispatch_readiness_ready)
+        .count();
     let mut domain_families = units
         .iter()
         .map(|unit| unit.domain_family.clone())
@@ -978,12 +1023,18 @@ fn link_plan_domain_readiness_summary(
         .iter()
         .find(|unit| !unit.ready)
         .map(|unit| format!("{}[{}]", unit.package_id, unit.domain_family));
+    let registry_dispatch_first_blocked = units
+        .iter()
+        .find(|unit| !unit.registry_dispatch_readiness_ready)
+        .map(|unit| format!("{}[{}]", unit.package_id, unit.domain_family));
     LinkPlanDomainReadinessSummary {
         hetero_units,
         ready_units,
+        registry_dispatch_ready_units,
         ready: hetero_units == ready_units,
         domain_families,
         first_unready,
+        registry_dispatch_first_blocked,
         units,
     }
 }
@@ -994,6 +1045,7 @@ fn link_plan_domain_readiness(unit: &nuisc::linker::LinkPlanDomainUnit) -> LinkP
     let payload_format_present = unit.artifact_payload_format.is_some();
     let bridge_stub_present = unit.artifact_bridge_stub_path.is_some();
     let ir_sidecar_present = unit.artifact_ir_sidecar_path.is_some();
+    let registry_dispatch = link_plan_registry_dispatch_readiness(unit);
     let mut issues = Vec::new();
     if !payload_blob_present {
         issues.push("payload_blob_missing".to_owned());
@@ -1004,6 +1056,9 @@ fn link_plan_domain_readiness(unit: &nuisc::linker::LinkPlanDomainUnit) -> LinkP
     if !bridge_stub_present {
         issues.push("bridge_stub_missing".to_owned());
     }
+    if !registry_dispatch.ready {
+        issues.push("registry_dispatch_readiness_blocked".to_owned());
+    }
     LinkPlanDomainReadiness {
         package_id: unit.package_id.clone(),
         domain_family: unit.domain_family.clone(),
@@ -1013,7 +1068,48 @@ fn link_plan_domain_readiness(unit: &nuisc::linker::LinkPlanDomainUnit) -> LinkP
         payload_format_present,
         bridge_stub_present,
         ir_sidecar_present,
+        registry_dispatch_readiness_status: registry_dispatch.status,
+        registry_dispatch_readiness_ready: registry_dispatch.ready,
+        registry_dispatch_missing_signals: registry_dispatch.missing_signals,
+        registry_dispatch_bridge_materialized: registry_dispatch.dispatch_bridge_materialized,
+        registry_execution_readiness_materialized: registry_dispatch
+            .execution_readiness_materialized,
         issues,
+    }
+}
+
+struct LinkPlanRegistryDispatchReadiness {
+    status: String,
+    ready: bool,
+    missing_signals: Vec<String>,
+    dispatch_bridge_materialized: bool,
+    execution_readiness_materialized: bool,
+}
+
+fn link_plan_registry_dispatch_readiness(
+    unit: &nuisc::linker::LinkPlanDomainUnit,
+) -> LinkPlanRegistryDispatchReadiness {
+    match nuisc::registry::load_manifest_for_domain(
+        Path::new("nustar-packages"),
+        &unit.domain_family,
+    ) {
+        Ok(manifest) => {
+            let dispatch = nuisc::registry::dispatch_readiness_summary(&manifest);
+            LinkPlanRegistryDispatchReadiness {
+                status: dispatch.status.clone(),
+                ready: dispatch.status == "ready",
+                missing_signals: dispatch.missing_signals,
+                dispatch_bridge_materialized: dispatch.dispatch_bridge_materialized,
+                execution_readiness_materialized: dispatch.execution_readiness_materialized,
+            }
+        }
+        Err(error) => LinkPlanRegistryDispatchReadiness {
+            status: "unavailable".to_owned(),
+            ready: false,
+            missing_signals: vec![format!("registry_manifest_unavailable:{error}")],
+            dispatch_bridge_materialized: false,
+            execution_readiness_materialized: false,
+        },
     }
 }
 
@@ -1039,6 +1135,26 @@ fn link_plan_domain_readiness_json(unit: &LinkPlanDomainReadiness) -> String {
         crate::json_bool_field("payload_format_present", unit.payload_format_present),
         crate::json_bool_field("bridge_stub_present", unit.bridge_stub_present),
         crate::json_bool_field("ir_sidecar_present", unit.ir_sidecar_present),
+        crate::json_field(
+            "registry_dispatch_readiness_status",
+            &unit.registry_dispatch_readiness_status,
+        ),
+        crate::json_bool_field(
+            "registry_dispatch_readiness_ready",
+            unit.registry_dispatch_readiness_ready,
+        ),
+        crate::json_string_array_field(
+            "registry_dispatch_missing_signals",
+            &unit.registry_dispatch_missing_signals,
+        ),
+        crate::json_bool_field(
+            "registry_dispatch_bridge_materialized",
+            unit.registry_dispatch_bridge_materialized,
+        ),
+        crate::json_bool_field(
+            "registry_execution_readiness_materialized",
+            unit.registry_execution_readiness_materialized,
+        ),
         crate::json_string_array_field("issues", &unit.issues),
     ];
     format!("{{{}}}", fields.join(","))

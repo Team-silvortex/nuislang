@@ -66,6 +66,11 @@ The JSON surface is intentionally simple:
 * `weakest_bootstrap_architecture`
 * `weakest_bootstrap_module`
 * `weakest_bootstrap_function`
+* `weakest_bootstrap_status`
+* `weakest_bootstrap_progress`
+* `weakest_bootstrap_closure_role`
+* `weakest_bootstrap_evidence`
+* `weakest_bootstrap_next_step`
 * `coverage_status`
 * `coverage_expected_count`
 * `coverage_covered_count`
@@ -76,6 +81,19 @@ The JSON surface is intentionally simple:
 * `coverage_missing_coordinates`
 * `coverage_orphaned_coordinates`
 * `coverage_stale_coordinates`
+* `manifest_coverage_status`
+* `manifest_coverage_source`
+* `manifest_backed_coordinates`
+* `manifest_missing_modules`
+* `manifest_untracked_modules`
+* `milestone_coverage_status`
+* `milestone_coverage_source`
+* `milestone_schema`
+* `milestone_coordinates`
+* `milestone_missing_coordinates`
+* `milestone_untracked_coordinates`
+* `milestone_constant_drift_count`
+* `milestone_constant_drift_coordinates`
 * `drift_status`
 * `drift_check_count`
 * `drift_check_passed_count`
@@ -132,6 +150,10 @@ recursive form is intended to support future bootstrap planning where a weak
 architecture lane can be expanded into its weakest module and then into the
 exact function cell that needs work.
 
+The summary also mirrors the weakest bootstrap-critical function cell as a
+small navigation bundle: status, progress, closure role, evidence, and next
+step. This is the preferred first read when choosing the next mainline task.
+
 `nuis status` also prints the short tensor summary. That makes the model part
 of the toolchain self-orientation surface, not just a separate report command.
 
@@ -167,6 +189,71 @@ prevents the tensor from becoming only a hand-written status list. Future
 versions can derive expected coordinates from galaxy manifests, Nustar
 registries, std module manifests, and milestone files.
 
+## Manifest-Backed Coordinate Coverage
+
+The tensor now has a first manifest-backed coordinate view. It reads the stdlib
+galaxy layout from `stdlib/index.toml`, compares those module names with the
+current `standard-library/*/*` tensor cells, and reports:
+
+* `manifest_coverage_status`
+* `manifest_coverage_source`
+* `manifest_backed_coordinates`
+* `manifest_missing_modules`
+* `manifest_untracked_modules`
+
+This is intentionally advisory for alpha. A manifest module such as `core` or
+`ns-nova` can be reported as untracked without failing coverage, because not
+every official galaxy is ready to become a tensor cell at the same time.
+
+The useful invariant is narrower:
+
+`if a standard-library tensor cell claims progress for std, PixelMagic, or
+WitSage, the dev tensor can now verify that the matching official stdlib module
+manifest still exists`
+
+## Milestone-Owned Coordinate Coverage
+
+The tensor now also has a milestone-owned expected-coordinate manifest:
+
+`docs/reference/nuis-development-tensor.milestones.toml`
+
+This file groups expected tensor coordinates by alpha milestone, marks whether
+the milestone is bootstrap-required or optional, and gives the tensor a
+project-owned source of truth outside the Rust constant table.
+
+The current Rust `DEV_TENSOR_EXPECTED_COORDINATES` table still exists as a
+checked snapshot and fallback. The important change is that the tensor now
+derives a second coordinate view from the milestone manifest and compares all
+three sides:
+
+* milestone manifest coordinates
+* current `DEV_TENSOR_CELLS`
+* Rust expected-coordinate snapshot
+
+The milestone coverage reports:
+
+* `milestone_coverage_status`
+  `clean` when the milestone manifest covers all cells, all manifest
+  coordinates have cells, and the Rust snapshot has no drift
+* `milestone_coordinates`
+  derived records in `milestone:requiredness:architecture/module/function`
+  form
+* `milestone_missing_coordinates`
+  milestone coordinates that do not have tensor cells
+* `milestone_untracked_coordinates`
+  tensor cells that are not owned by any milestone manifest entry
+* `milestone_constant_drift_count`
+  parity failures between the manifest-derived coordinates and the Rust
+  expected-coordinate snapshot
+
+Short rule:
+
+`milestone coverage makes the tensor less hand-written: milestones own the map,
+Rust constants must prove they still mirror it`
+
+The next step is to make `DEV_TENSOR_EXPECTED_COORDINATES` generated or cached
+from this manifest instead of treating the manifest as a parity peer.
+
 ## Drift Checks
 
 The tensor now includes a first lightweight drift-check layer.
@@ -178,6 +265,8 @@ progress evidence anchors still exist in the repository, such as:
 * workflow/artifact runtime regression assertions
 * reference-document field anchors
 * standard-library smoke-test and example-lane anchors
+* registered Nustar domain contract anchors, including dispatch readiness and
+  bridge materialization fields
 
 The current status values are:
 
@@ -201,7 +290,50 @@ The first std-oriented checks deliberately anchor the bootstrap-critical
 
 That keeps the standard-library progress cell tied to the project-form
 filesystem, IO, text, terminal, and tooling smoke chain instead of only a broad
-roadmap phrase.
+roadmap phrase. The current std evidence also includes the observable CLI smoke
+`std_tooling_observable_cli_smoke_checks_reports_and_stdin`, which checks
+`run-artifact --json` prelaunch readiness, stdout/stderr report output from the
+host IO report lane, direct stdin consumption by the built binary, and
+`host_stdin_read` / `host_stdout_write` / `host_stderr_write` lowering anchors.
+
+The language-core checks anchor the bootstrap-critical
+`language-core/nuisc/type-control-flow-generics` cell to:
+
+* `tools/nuis/tests/language_bootstrap_smoke.rs`
+* `examples/projects/task/task_result_enum_demo`
+* `examples/projects/state/generic_method_bound_guarded_nested_match_demo`
+* `examples/projects/state/glm_buffer_roundtrip_state_demo`
+
+That smoke is intentionally higher-level than an isolated parser or frontend
+unit test. It builds the project through the `nuis` CLI, checks the
+`run-artifact --json` prelaunch contract, verifies NIR/YIR/LLVM anchors for
+generic `Result<T, E>`, higher-order specialization, enum variant lowering,
+task-result control flow, and host-FFI signature whitelist evidence, then runs
+the produced binary and asserts its deterministic Result/task/error exit code.
+It also builds and directly executes the generic trait-bound guarded nested
+match project and the GLM buffer roundtrip project. Those checks anchor
+monomorphized trait method calls (`impl.Addable.for.i64.add`), alias-expanded
+generic functions (`bump__i64`), buffer length/load/store/free lowering, and
+YIR lifetime/effect edges around `cpu.store_at` / `cpu.free`. The next gap is
+to combine these once-separate language proofs into a std-style helper workload
+that mixes `Result`, `Buffer`, lambdas, trait bounds, and pointer-heavy control
+flow in one project.
+
+The Nustar checks anchor the bootstrap-critical
+`heterogeneous-runtime/nustar/registered-domain-contracts` cell to:
+
+* `tools/nuisc/src/registry_contract.rs`
+* `tools/nuisc/src/registry_domain_json.rs`
+* `tools/nuis/src/surface_render/link_plan.rs`
+* `tools/nuis/src/workflow/link_plan_domain.rs`
+
+That keeps shader/kernel/network execution readiness in the registry contract
+surface itself. Nuis workflow and link-plan readiness now consume the registry
+dispatch readiness status, missing signals, bridge materialization, and
+execution-readiness materialization for each heterogeneous domain. Nsld final
+output blocker ordering is still the next integration point; the current
+frontdoor deliberately exposes enough normalized facts for that step without
+hardcoding shader/kernel/network-specific logic.
 
 ## Current Role
 

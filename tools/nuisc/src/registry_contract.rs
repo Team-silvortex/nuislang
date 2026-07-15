@@ -1,10 +1,13 @@
 use std::path::Path;
 
+use crate::registry_build_contract_summary::{
+    domain_build_contract_summary, NustarDomainBuildContractSummary,
+};
 use crate::registry_load::load_manifest_for_domain;
 use crate::registry_scheduler_summary::{scheduler_summary, std_net_summary};
 use crate::registry_types::{
-    NustarCapabilitySummary, NustarClockSummary, NustarDomainContract, NustarExecutionSummary,
-    NustarPackageManifest,
+    NustarCapabilitySummary, NustarClockSummary, NustarDispatchReadinessSummary,
+    NustarDomainContract, NustarExecutionSummary, NustarPackageManifest,
 };
 
 pub const NUSTAR_DOMAIN_CONTRACT_SCHEMA: &str = "nustar-domain-contract-v1";
@@ -15,6 +18,7 @@ pub const NUSTAR_DOMAIN_CONTRACT_GROUP_HOST_BRIDGE: &str = "host_bridge_contract
 pub const NUSTAR_DOMAIN_CONTRACT_GROUP_RUNTIME: &str = "runtime_capability_contract";
 pub const NUSTAR_DOMAIN_CONTRACT_GROUP_SCHEDULER: &str = "scheduler_contract";
 pub const NUSTAR_DOMAIN_CONTRACT_GROUP_EXECUTION: &str = "execution_skeleton_contract";
+pub const NUSTAR_DOMAIN_CONTRACT_GROUP_DISPATCH_READINESS: &str = "dispatch_readiness_contract";
 pub const NUSTAR_DOMAIN_CONTRACT_GROUP_STD_NET: &str = "std_net_extension";
 
 pub fn required_domain_contract_groups(manifest: &NustarPackageManifest) -> Vec<String> {
@@ -24,6 +28,7 @@ pub fn required_domain_contract_groups(manifest: &NustarPackageManifest) -> Vec<
         NUSTAR_DOMAIN_CONTRACT_GROUP_ABI.to_owned(),
         NUSTAR_DOMAIN_CONTRACT_GROUP_RUNTIME.to_owned(),
         NUSTAR_DOMAIN_CONTRACT_GROUP_EXECUTION.to_owned(),
+        NUSTAR_DOMAIN_CONTRACT_GROUP_DISPATCH_READINESS.to_owned(),
         NUSTAR_DOMAIN_CONTRACT_GROUP_SCHEDULER.to_owned(),
     ];
     if !manifest.host_ffi_surface.is_empty() {
@@ -69,6 +74,9 @@ fn group_is_complete(manifest: &NustarPackageManifest, group: &str) -> bool {
                 && !manifest.clock_bridge_default.is_empty()
         }
         NUSTAR_DOMAIN_CONTRACT_GROUP_EXECUTION => !manifest.lowering_targets.is_empty(),
+        NUSTAR_DOMAIN_CONTRACT_GROUP_DISPATCH_READINESS => dispatch_readiness_summary(manifest)
+            .missing_signals
+            .is_empty(),
         NUSTAR_DOMAIN_CONTRACT_GROUP_SCHEDULER => {
             let scheduler = scheduler_summary(manifest);
             !scheduler.contract_stack.is_empty()
@@ -82,6 +90,102 @@ fn group_is_complete(manifest: &NustarPackageManifest, group: &str) -> bool {
         }
         _ => false,
     }
+}
+
+fn required_dispatch_readiness_signals() -> Vec<String> {
+    [
+        "lowering_targets",
+        "bridge_surface",
+        "bridge_entry",
+        "backend_stub_kind",
+        "submission_mode",
+        "wake_policy",
+        "scheduler_binding",
+        "phase_order",
+        "phase_bind",
+        "phase_submit",
+        "phase_wait",
+        "phase_finalize",
+        "host_bridge_plan_begin",
+        "host_bridge_plan_end",
+    ]
+    .into_iter()
+    .map(str::to_owned)
+    .collect()
+}
+
+fn missing_dispatch_readiness_signals(
+    manifest: &NustarPackageManifest,
+    build_contract: &NustarDomainBuildContractSummary,
+) -> Vec<String> {
+    let mut missing = Vec::new();
+    if manifest.lowering_targets.is_empty() {
+        missing.push("lowering_targets".to_owned());
+    }
+    if build_contract.lowering.bridge_surface.is_empty() {
+        missing.push("bridge_surface".to_owned());
+    }
+    if build_contract.backend.bridge_entry.is_empty() {
+        missing.push("bridge_entry".to_owned());
+    }
+    if build_contract.backend.stub_kind.is_empty() {
+        missing.push("backend_stub_kind".to_owned());
+    }
+    if build_contract.backend.submission_mode.is_empty() {
+        missing.push("submission_mode".to_owned());
+    }
+    if build_contract.backend.wake_policy.is_empty() {
+        missing.push("wake_policy".to_owned());
+    }
+    if build_contract.backend.scheduler_binding.is_empty() {
+        missing.push("scheduler_binding".to_owned());
+    }
+    if build_contract.host_bridge.phase_order.is_empty() {
+        missing.push("phase_order".to_owned());
+    }
+    if build_contract
+        .backend
+        .phase_bind
+        .as_deref()
+        .unwrap_or_default()
+        .is_empty()
+    {
+        missing.push("phase_bind".to_owned());
+    }
+    if build_contract
+        .backend
+        .phase_submit
+        .as_deref()
+        .unwrap_or_default()
+        .is_empty()
+    {
+        missing.push("phase_submit".to_owned());
+    }
+    if build_contract
+        .backend
+        .phase_wait
+        .as_deref()
+        .unwrap_or_default()
+        .is_empty()
+    {
+        missing.push("phase_wait".to_owned());
+    }
+    if build_contract
+        .backend
+        .phase_finalize
+        .as_deref()
+        .unwrap_or_default()
+        .is_empty()
+    {
+        missing.push("phase_finalize".to_owned());
+    }
+    if !build_contract.host_bridge.bridge_plan_begin {
+        missing.push("host_bridge_plan_begin".to_owned());
+    }
+    if !build_contract.host_bridge.bridge_plan_end {
+        missing.push("host_bridge_plan_end".to_owned());
+    }
+    missing
 }
 
 pub fn missing_domain_contract_groups(manifest: &NustarPackageManifest) -> Vec<String> {
@@ -119,6 +223,43 @@ pub fn execution_summary(manifest: &NustarPackageManifest) -> NustarExecutionSum
     }
 }
 
+pub fn dispatch_readiness_summary(
+    manifest: &NustarPackageManifest,
+) -> NustarDispatchReadinessSummary {
+    let build_contract = domain_build_contract_summary(manifest);
+    let missing_signals = missing_dispatch_readiness_signals(manifest, &build_contract);
+    let dispatch_bridge_materialized = missing_signals
+        .iter()
+        .all(|signal| signal != "bridge_surface" && signal != "bridge_entry")
+        && !build_contract.backend.stub_kind.is_empty()
+        && build_contract.host_bridge.bridge_plan_begin
+        && build_contract.host_bridge.bridge_plan_end;
+    let execution_readiness_materialized = missing_signals
+        .iter()
+        .all(|signal| signal != "lowering_targets" && signal != "scheduler_binding")
+        && !build_contract.backend.submission_mode.is_empty()
+        && !build_contract.backend.wake_policy.is_empty();
+    NustarDispatchReadinessSummary {
+        status: if missing_signals.is_empty() {
+            "ready"
+        } else {
+            "blocked"
+        }
+        .to_owned(),
+        required_signals: required_dispatch_readiness_signals(),
+        missing_signals,
+        execution_readiness_materialized,
+        dispatch_bridge_materialized,
+        lifecycle_phase_order: build_contract.host_bridge.phase_order,
+        scheduler_binding: build_contract.backend.scheduler_binding,
+        bridge_entry: build_contract.backend.bridge_entry,
+        bridge_surface: build_contract.lowering.bridge_surface,
+        backend_stub_kind: build_contract.backend.stub_kind,
+        submission_mode: build_contract.backend.submission_mode,
+        wake_policy: build_contract.backend.wake_policy,
+    }
+}
+
 pub fn domain_contract(manifest: &NustarPackageManifest) -> NustarDomainContract {
     let required_contract_groups = required_domain_contract_groups(manifest);
     let contract_groups = required_contract_groups
@@ -137,6 +278,8 @@ pub fn domain_contract(manifest: &NustarPackageManifest) -> NustarDomainContract
         "incomplete"
     }
     .to_owned();
+    let build_contract = domain_build_contract_summary(manifest);
+    let dispatch_readiness = dispatch_readiness_summary(manifest);
     NustarDomainContract {
         contract_schema: NUSTAR_DOMAIN_CONTRACT_SCHEMA.to_owned(),
         contract_status,
@@ -160,6 +303,8 @@ pub fn domain_contract(manifest: &NustarPackageManifest) -> NustarDomainContract
         },
         capability: capability_summary(manifest),
         execution: execution_summary(manifest),
+        build_contract,
+        dispatch_readiness,
         scheduler: scheduler_summary(manifest),
         std_net: std_net_summary(&manifest.domain_family),
     }

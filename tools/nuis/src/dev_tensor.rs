@@ -3,6 +3,8 @@ use crate::{
     dev_tensor_drift::{
         dev_tensor_drift_summary as build_dev_tensor_drift_summary, DevTensorDriftSummary,
     },
+    dev_tensor_manifest::{dev_tensor_manifest_coverage, DevTensorManifestCoverage},
+    dev_tensor_milestones::{dev_tensor_milestone_coverage, DevTensorMilestoneCoverage},
     dev_tensor_status::dev_tensor_status_rank,
 };
 use std::collections::BTreeSet;
@@ -42,6 +44,8 @@ pub(crate) struct DevTensorCoverageSummary {
     pub(crate) missing_coordinates: Vec<String>,
     pub(crate) orphaned_coordinates: Vec<String>,
     pub(crate) stale_coordinates: Vec<String>,
+    pub(crate) manifest: DevTensorManifestCoverage,
+    pub(crate) milestone: DevTensorMilestoneCoverage,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -56,7 +60,11 @@ pub(crate) struct DevTensorSummary {
     pub(crate) weakest_bootstrap_architecture: &'static str,
     pub(crate) weakest_bootstrap_module: &'static str,
     pub(crate) weakest_bootstrap_function: &'static str,
+    pub(crate) weakest_bootstrap_status: &'static str,
     pub(crate) weakest_bootstrap_progress: usize,
+    pub(crate) weakest_bootstrap_closure_role: &'static str,
+    pub(crate) weakest_bootstrap_evidence: &'static str,
+    pub(crate) weakest_bootstrap_next_step: &'static str,
     pub(crate) coverage_status: &'static str,
     pub(crate) coverage_expected_count: usize,
     pub(crate) coverage_covered_count: usize,
@@ -116,7 +124,19 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
         weakest_bootstrap_function: weakest_bootstrap
             .map(|cell| cell.function)
             .unwrap_or("<none>"),
+        weakest_bootstrap_status: weakest_bootstrap
+            .map(|cell| cell.status)
+            .unwrap_or("<none>"),
         weakest_bootstrap_progress: weakest_bootstrap.map_or(0, |cell| cell.progress),
+        weakest_bootstrap_closure_role: weakest_bootstrap
+            .map(|cell| cell.closure_role)
+            .unwrap_or("<none>"),
+        weakest_bootstrap_evidence: weakest_bootstrap
+            .map(|cell| cell.evidence)
+            .unwrap_or("<none>"),
+        weakest_bootstrap_next_step: weakest_bootstrap
+            .map(|cell| cell.next_step)
+            .unwrap_or("<none>"),
         coverage_status: coverage.status,
         coverage_expected_count: coverage.expected_count,
         coverage_covered_count: coverage.covered_count,
@@ -127,6 +147,8 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
 }
 
 pub(crate) fn dev_tensor_coverage_summary() -> DevTensorCoverageSummary {
+    let manifest = dev_tensor_manifest_coverage();
+    let milestone = dev_tensor_milestone_coverage();
     let cell_coordinates = DEV_TENSOR_CELLS
         .iter()
         .map(|cell| dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function))
@@ -191,6 +213,7 @@ pub(crate) fn dev_tensor_coverage_summary() -> DevTensorCoverageSummary {
     let status = if required_missing_count == 0
         && orphaned_coordinates.is_empty()
         && stale_coordinates.is_empty()
+        && milestone.status == "clean"
     {
         "clean"
     } else {
@@ -200,6 +223,7 @@ pub(crate) fn dev_tensor_coverage_summary() -> DevTensorCoverageSummary {
         .first()
         .or_else(|| orphaned_coordinates.first())
         .or_else(|| stale_coordinates.first())
+        .or_else(|| milestone.first_gap.as_ref())
         .cloned();
     DevTensorCoverageSummary {
         expected_count: DEV_TENSOR_EXPECTED_COORDINATES.len(),
@@ -213,6 +237,8 @@ pub(crate) fn dev_tensor_coverage_summary() -> DevTensorCoverageSummary {
         missing_coordinates,
         orphaned_coordinates,
         stale_coordinates,
+        manifest,
+        milestone,
     }
 }
 
@@ -253,7 +279,11 @@ mod tests {
         assert_ne!(summary.weakest_bootstrap_architecture, "<none>");
         assert_ne!(summary.weakest_bootstrap_module, "<none>");
         assert_ne!(summary.weakest_bootstrap_function, "<none>");
+        assert_ne!(summary.weakest_bootstrap_status, "<none>");
         assert!(summary.weakest_bootstrap_progress > 0);
+        assert_ne!(summary.weakest_bootstrap_closure_role, "<none>");
+        assert_ne!(summary.weakest_bootstrap_evidence, "<none>");
+        assert_ne!(summary.weakest_bootstrap_next_step, "<none>");
         assert!(summary.weakest_bootstrap_progress <= summary.bootstrap_critical_average_progress);
         let hierarchy = crate::dev_tensor_hierarchy::dev_tensor_hierarchy_summary();
         assert_eq!(hierarchy.protocol_version, "dev-tensor-status-v1");
@@ -270,6 +300,14 @@ mod tests {
         assert_eq!(summary.coverage_missing_count, 0);
         assert_eq!(summary.coverage_orphaned_count, 0);
         assert_eq!(summary.coverage_stale_count, 0);
+        let coverage = dev_tensor_coverage_summary();
+        assert_eq!(coverage.manifest.status, "clean");
+        assert!(coverage.manifest.manifest_backed_coordinate_count >= 3);
+        assert_eq!(coverage.milestone.status, "clean");
+        assert_eq!(
+            coverage.milestone.milestone_coordinate_count,
+            DEV_TENSOR_EXPECTED_COORDINATES.len()
+        );
     }
 
     #[test]
@@ -293,6 +331,10 @@ mod tests {
         assert!(json.contains("\"weakest_bootstrap_architecture\""));
         assert!(json.contains("\"weakest_bootstrap_module\""));
         assert!(json.contains("\"weakest_bootstrap_function\""));
+        assert!(json.contains("\"weakest_bootstrap_status\""));
+        assert!(json.contains("\"weakest_bootstrap_closure_role\""));
+        assert!(json.contains("\"weakest_bootstrap_evidence\""));
+        assert!(json.contains("\"weakest_bootstrap_next_step\""));
         assert!(json.contains("\"module\":\"nsld\""));
         assert!(json.contains("\"function\":\"final-output-boundary\""));
         assert!(json.contains("\"coverage_status\":\"clean\""));
@@ -300,6 +342,17 @@ mod tests {
         assert!(json.contains("\"coverage_missing_count\":0"));
         assert!(json.contains("\"coverage_orphaned_count\":0"));
         assert!(json.contains("\"coverage_stale_count\":0"));
+        assert!(json.contains("\"manifest_coverage_status\":\"clean\""));
+        assert!(json.contains("\"manifest_coverage_source\":\"stdlib/index.toml\""));
+        assert!(json.contains("\"manifest_backed_coordinates\":["));
+        assert!(json.contains("\"standard-library/std/host-io-filesystem-text\""));
+        assert!(json.contains("\"manifest_untracked_modules\":["));
+        assert!(json.contains("\"milestone_coverage_status\":\"clean\""));
+        assert!(json.contains(
+            "\"milestone_coverage_source\":\"docs/reference/nuis-development-tensor.milestones.toml\""
+        ));
+        assert!(json.contains("\"milestone_constant_drift_count\":0"));
+        assert!(json.contains("\"milestone_coordinates\":["));
         assert!(json.contains("\"coverage_missing_coordinates\":[]"));
         assert!(json.contains("\"drift_status\":\"clean\""));
         assert!(json.contains("\"drift_checks\":["));
@@ -332,10 +385,25 @@ mod tests {
         assert!(text.contains("coverage_missing_count: 0"));
         assert!(text.contains("coverage_orphaned_count: 0"));
         assert!(text.contains("coverage_stale_count: 0"));
+        assert!(text.contains("manifest_coverage_status: clean"));
+        assert!(text.contains("manifest_coverage_source: stdlib/index.toml"));
+        assert!(text
+            .contains("manifest_backed_coordinate: standard-library/std/host-io-filesystem-text"));
+        assert!(text.contains("manifest_untracked_module: core"));
+        assert!(text.contains("milestone_coverage_status: clean"));
+        assert!(text.contains(
+            "milestone_coverage_source: docs/reference/nuis-development-tensor.milestones.toml"
+        ));
+        assert!(text.contains("milestone_constant_drift_count: 0"));
+        assert!(text.contains(
+            "milestone_coordinate: alpha-governance:required:developer-system/dev-tensor/architecture-module-function-progress-model"
+        ));
         assert!(text.contains("drift_status: clean"));
         assert!(text.contains("status_protocol_version: dev-tensor-status-v1"));
         assert!(text.contains("hierarchy_root_status:"));
         assert!(text.contains("hierarchy_root_weakest_child_path:"));
+        assert!(text.contains("weakest_bootstrap_next_step:"));
+        assert!(text.contains("weakest_bootstrap_evidence:"));
         assert!(text.contains("status_protocol: status=stable rank=4"));
         assert!(text.contains("hierarchy_node: level=root path=nuislang"));
         assert!(text.contains("drift_check: id=frontdoor-final-output-boundary-status"));
@@ -356,6 +424,13 @@ mod tests {
         assert_eq!(coverage.required_missing_count, 0);
         assert_eq!(coverage.orphaned_count, 0);
         assert_eq!(coverage.stale_count, 0);
+        assert_eq!(coverage.manifest.status, "clean");
+        assert_eq!(coverage.manifest.manifest_missing_module_count, 0);
+        assert!(coverage.manifest.manifest_untracked_module_count >= 1);
+        assert_eq!(coverage.milestone.status, "clean");
+        assert_eq!(coverage.milestone.milestone_missing_coordinate_count, 0);
+        assert_eq!(coverage.milestone.milestone_untracked_coordinate_count, 0);
+        assert_eq!(coverage.milestone.milestone_constant_drift_count, 0);
         assert!(coverage.first_gap.is_none());
         assert!(coverage.missing_coordinates.is_empty());
         assert!(coverage.orphaned_coordinates.is_empty());

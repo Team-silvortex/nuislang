@@ -11,6 +11,8 @@ mod dev_tensor;
 mod dev_tensor_data;
 mod dev_tensor_drift;
 mod dev_tensor_hierarchy;
+mod dev_tensor_manifest;
+mod dev_tensor_milestones;
 mod dev_tensor_render;
 mod dev_tensor_status;
 mod galaxy;

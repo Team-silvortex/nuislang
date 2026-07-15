@@ -1,4 +1,7 @@
 use super::{
+    final_executable_container_loader::{
+        final_executable_container_loader_evidence, FinalExecutableContainerLoaderEvidence,
+    },
     final_executable_image::{
         parse_final_executable_image_header, FINAL_EXECUTABLE_IMAGE_HEADER_SIZE,
         FINAL_EXECUTABLE_IMAGE_MAGIC_TEXT, FINAL_EXECUTABLE_IMAGE_VERSION,
@@ -227,11 +230,6 @@ pub(crate) fn nsld_final_executable_output_report(
         matches_verified_patched_image,
     )
     .to_owned();
-    let execution_handoff = final_executable_output_execution_handoff(
-        boundary_status.as_str(),
-        host_native_output,
-        &blockers,
-    );
     let launcher_manifest_path = nsld_final_executable_launcher_manifest_path(plan);
     let launcher_manifest_source = fs::read_to_string(&launcher_manifest_path).ok();
     let launcher_manifest_present = launcher_manifest_source.is_some();
@@ -262,10 +260,24 @@ pub(crate) fn nsld_final_executable_output_report(
             launcher_dry_run_would_enter_lifecycle_hook,
         )
         .to_owned();
+    let container_loader_evidence =
+        final_executable_container_loader_evidence(output_bytes.as_deref(), host_native_output);
+    let first_payload_execution = final_executable_first_payload_execution(
+        boundary_status.as_str(),
+        host_native_output,
+        &container_loader_evidence,
+    );
+    let execution_handoff = final_executable_output_execution_handoff(
+        boundary_status.as_str(),
+        host_native_output,
+        &blockers,
+        &first_payload_execution,
+    );
     let recommended_next_action = final_executable_output_recommended_next_action(
         boundary_status.as_str(),
         host_native_output,
         entrypoint_materialization_evidence_status.as_str(),
+        &first_payload_execution,
     )
     .to_owned();
 
@@ -293,6 +305,25 @@ pub(crate) fn nsld_final_executable_output_report(
         launcher_dry_run_ready,
         launcher_dry_run_would_enter_lifecycle_hook,
         launcher_dry_run_blocker_count,
+        container_loader_status: container_loader_evidence.status,
+        container_loader_payload_scan_kind: container_loader_evidence.payload_scan_kind,
+        container_loader_parsed: container_loader_evidence.parsed,
+        container_loader_readiness: container_loader_evidence.readiness,
+        container_loader_ready: container_loader_evidence.ready,
+        container_loader_handoff_status: container_loader_evidence.handoff_status,
+        container_loader_handoff_ready: container_loader_evidence.handoff_ready,
+        container_loader_handoff_first_blocker: container_loader_evidence.handoff_first_blocker,
+        container_loader_entry_symbol: container_loader_evidence.entry_symbol,
+        container_loader_entry_kind: container_loader_evidence.entry_kind,
+        container_loader_entry_section_id: container_loader_evidence.entry_section_id,
+        container_loader_symbol_count: container_loader_evidence.symbol_count,
+        first_payload_execution_status: first_payload_execution.status,
+        first_payload_execution_ready: first_payload_execution.ready,
+        first_payload_execution_target: first_payload_execution.target,
+        first_payload_execution_entry_symbol: first_payload_execution.entry_symbol,
+        first_payload_execution_entry_kind: first_payload_execution.entry_kind,
+        first_payload_execution_entry_section_id: first_payload_execution.entry_section_id,
+        first_payload_execution_first_blocker: first_payload_execution.first_blocker,
         recommended_next_action,
         path_present,
         nsld_owned_output,
@@ -342,6 +373,17 @@ struct FinalExecutableOutputHandoff {
     decision_code: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FinalExecutableFirstPayloadExecution {
+    status: String,
+    ready: bool,
+    target: String,
+    entry_symbol: Option<String>,
+    entry_kind: Option<String>,
+    entry_section_id: Option<String>,
+    first_blocker: Option<String>,
+}
+
 fn final_executable_output_materialization_status(
     boundary_status: &str,
     host_native_output: bool,
@@ -364,9 +406,14 @@ fn final_executable_output_recommended_next_action(
     boundary_status: &str,
     host_native_output: bool,
     entrypoint_materialization_evidence_status: &str,
+    first_payload_execution: &FinalExecutableFirstPayloadExecution,
 ) -> &'static str {
     match boundary_status {
         "ready" if host_native_output => "handoff-to-runner",
+        "ready" if first_payload_execution.ready => "handoff-to-container-loader",
+        "ready" if first_payload_execution.target == "container-loader" => {
+            "inspect-container-loader-handoff"
+        }
         "ready" if entrypoint_materialization_evidence_status == "launcher-dry-run-ready" => {
             "run-artifact-or-handoff-to-runtime"
         }
@@ -414,45 +461,71 @@ fn final_executable_output_execution_handoff(
     boundary_status: &str,
     host_native_output: bool,
     blockers: &[String],
+    first_payload_execution: &FinalExecutableFirstPayloadExecution,
 ) -> FinalExecutableOutputHandoff {
-    let ready = final_executable_output_execution_handoff_ready(boundary_status);
+    let ready = final_executable_output_execution_handoff_ready(
+        boundary_status,
+        host_native_output,
+        first_payload_execution,
+    );
     FinalExecutableOutputHandoff {
         contract: final_executable_output_execution_handoff_contract().to_owned(),
         ready,
         status: final_executable_output_execution_handoff_status(
             boundary_status,
             host_native_output,
+            first_payload_execution,
         )
         .to_owned(),
         target: final_executable_output_execution_handoff_target(
             boundary_status,
             host_native_output,
+            first_payload_execution,
         )
         .to_owned(),
         evidence_status: final_executable_output_execution_handoff_evidence_status(
             boundary_status,
             host_native_output,
+            first_payload_execution,
         )
         .to_owned(),
-        first_blocker: final_executable_output_execution_handoff_first_blocker(ready, blockers),
+        first_blocker: final_executable_output_execution_handoff_first_blocker(
+            ready,
+            blockers,
+            first_payload_execution,
+        ),
         decision_code: final_executable_output_execution_handoff_decision_code(
             boundary_status,
             host_native_output,
+            first_payload_execution,
         )
         .to_owned(),
     }
 }
 
-fn final_executable_output_execution_handoff_ready(boundary_status: &str) -> bool {
-    boundary_status == "ready"
+fn final_executable_output_execution_handoff_ready(
+    boundary_status: &str,
+    host_native_output: bool,
+    first_payload_execution: &FinalExecutableFirstPayloadExecution,
+) -> bool {
+    boundary_status == "ready" && (host_native_output || first_payload_execution.ready)
 }
 
 fn final_executable_output_execution_handoff_first_blocker(
     execution_handoff_ready: bool,
     blockers: &[String],
+    first_payload_execution: &FinalExecutableFirstPayloadExecution,
 ) -> Option<String> {
     if execution_handoff_ready {
         None
+    } else if first_payload_execution.target == "container-loader" {
+        first_payload_execution.first_blocker.clone().or_else(|| {
+            blockers
+                .iter()
+                .find(|blocker| blocker.starts_with("final-executable-output:"))
+                .or_else(|| blockers.first())
+                .cloned()
+        })
     } else {
         blockers
             .iter()
@@ -465,10 +538,12 @@ fn final_executable_output_execution_handoff_first_blocker(
 fn final_executable_output_execution_handoff_decision_code(
     boundary_status: &str,
     host_native_output: bool,
+    first_payload_execution: &FinalExecutableFirstPayloadExecution,
 ) -> &'static str {
     match boundary_status {
         "ready" if host_native_output => "handoff-host-runner",
-        "ready" => "handoff-entrypoint-materializer",
+        "ready" if first_payload_execution.ready => "handoff-container-loader-first-payload",
+        "ready" => "inspect-container-loader-handoff",
         "missing" => "emit-final-executable",
         "not-nsld-owned" | "unreadable" => "inspect-output-boundary",
         "invalid" => "inspect-output-diagnostics",
@@ -479,10 +554,12 @@ fn final_executable_output_execution_handoff_decision_code(
 fn final_executable_output_execution_handoff_status(
     boundary_status: &str,
     host_native_output: bool,
+    first_payload_execution: &FinalExecutableFirstPayloadExecution,
 ) -> &'static str {
     match boundary_status {
         "ready" if host_native_output => "runner-ready",
-        "ready" => "entrypoint-materializer-required",
+        "ready" if first_payload_execution.ready => "container-loader-handoff-ready",
+        "ready" => "container-loader-handoff-blocked",
         _ => "blocked",
     }
 }
@@ -490,10 +567,12 @@ fn final_executable_output_execution_handoff_status(
 fn final_executable_output_execution_handoff_target(
     boundary_status: &str,
     host_native_output: bool,
+    first_payload_execution: &FinalExecutableFirstPayloadExecution,
 ) -> &'static str {
     match boundary_status {
         "ready" if host_native_output => "host-runner",
-        "ready" => "entrypoint-materializer",
+        "ready" if first_payload_execution.target == "container-loader" => "container-loader",
+        "ready" => "none",
         _ => "none",
     }
 }
@@ -501,11 +580,65 @@ fn final_executable_output_execution_handoff_target(
 fn final_executable_output_execution_handoff_evidence_status(
     boundary_status: &str,
     host_native_output: bool,
+    first_payload_execution: &FinalExecutableFirstPayloadExecution,
 ) -> &'static str {
     match boundary_status {
         "ready" if host_native_output => "host-invoke-plan-ready",
-        "ready" => "verified-patched-image-ready",
+        "ready" if first_payload_execution.ready => "container-loader-handoff-ready",
+        "ready" => "container-loader-handoff-blocked",
         _ => "blocked",
+    }
+}
+
+fn final_executable_first_payload_execution(
+    boundary_status: &str,
+    host_native_output: bool,
+    container_loader_evidence: &FinalExecutableContainerLoaderEvidence,
+) -> FinalExecutableFirstPayloadExecution {
+    if boundary_status != "ready" {
+        return FinalExecutableFirstPayloadExecution {
+            status: "blocked".to_owned(),
+            ready: false,
+            target: "none".to_owned(),
+            entry_symbol: None,
+            entry_kind: None,
+            entry_section_id: None,
+            first_blocker: Some(format!("final-output-boundary:{boundary_status}")),
+        };
+    }
+    if host_native_output {
+        return FinalExecutableFirstPayloadExecution {
+            status: "host-native-runner".to_owned(),
+            ready: true,
+            target: "host-runner".to_owned(),
+            entry_symbol: None,
+            entry_kind: None,
+            entry_section_id: None,
+            first_blocker: None,
+        };
+    }
+
+    let first_blocker = container_loader_evidence
+        .handoff_first_blocker
+        .clone()
+        .or_else(|| Some("container-loader:handoff-not-ready".to_owned()));
+    FinalExecutableFirstPayloadExecution {
+        status: if container_loader_evidence.handoff_ready {
+            "ready"
+        } else {
+            "blocked"
+        }
+        .to_owned(),
+        ready: container_loader_evidence.handoff_ready,
+        target: "container-loader".to_owned(),
+        entry_symbol: container_loader_evidence.entry_symbol.clone(),
+        entry_kind: container_loader_evidence.entry_kind.clone(),
+        entry_section_id: container_loader_evidence.entry_section_id.clone(),
+        first_blocker: if container_loader_evidence.handoff_ready {
+            None
+        } else {
+            first_blocker
+        },
     }
 }
 

@@ -117,6 +117,13 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
                 .map(|summary| summary.ready_units)
                 .unwrap_or(0),
         ),
+        json_usize_field(
+            "link_plan_heterogeneous_domain_registry_dispatch_ready_units",
+            domain_readiness
+                .as_ref()
+                .map(|summary| summary.registry_dispatch_ready_units)
+                .unwrap_or(0),
+        ),
         json_bool_field(
             "link_plan_heterogeneous_domain_readiness_ready",
             domain_readiness
@@ -136,6 +143,12 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
             domain_readiness
                 .as_ref()
                 .and_then(|summary| summary.first_unready.as_deref()),
+        ),
+        json_optional_string_field(
+            "link_plan_heterogeneous_domain_registry_dispatch_first_blocked",
+            domain_readiness
+                .as_ref()
+                .and_then(|summary| summary.registry_dispatch_first_blocked.as_deref()),
         ),
         json_object_array_field(
             "link_plan_heterogeneous_domain_readiness",

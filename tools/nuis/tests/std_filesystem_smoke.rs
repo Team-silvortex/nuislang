@@ -1,7 +1,8 @@
 use std::{
     fs,
+    io::Write,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -71,6 +72,47 @@ fn assert_output_files_have_schema(output_dir: &Path, files: &[(&str, &str)], co
     }
 }
 
+fn run_binary_with_stdin(binary: &Path, stdin: &[u8]) -> std::process::Output {
+    let mut child = Command::new(binary)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap_or_else(|error| panic!("failed to spawn {}: {error}", binary.display()));
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin pipe")
+        .write_all(stdin)
+        .unwrap_or_else(|error| panic!("failed to write stdin for {}: {error}", binary.display()));
+    child
+        .wait_with_output()
+        .unwrap_or_else(|error| panic!("failed to wait for {}: {error}", binary.display()))
+}
+
+fn run_binary_with_args(binary: &Path, args: &[&str]) -> std::process::Output {
+    Command::new(binary)
+        .args(args)
+        .output()
+        .unwrap_or_else(|error| {
+            panic!(
+                "failed to run {} with args {:?}: {error}",
+                binary.display(),
+                args
+            )
+        })
+}
+
+fn assert_file_contains(path: &Path, needle: &str, context: &str) {
+    let source = fs::read_to_string(path)
+        .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
+    assert!(
+        source.contains(needle),
+        "expected {context} file {} to contain `{needle}`\n{source}",
+        path.display()
+    );
+}
+
 const STD_TOOLING_LIGHT_SMOKE_PROJECTS: &[(&str, &str)] = &[
     (
         "file_read",
@@ -107,6 +149,14 @@ const STD_TOOLING_LIGHT_SMOKE_PROJECTS: &[(&str, &str)] = &[
     (
         "terminal_io",
         "../../examples/projects/tooling/terminal_io_demo",
+    ),
+    (
+        "stdin_runtime",
+        "../../examples/projects/tooling/stdin_runtime_demo",
+    ),
+    (
+        "filesystem_io_report",
+        "../../examples/projects/tooling/filesystem_io_report_demo",
     ),
     (
         "argv_runtime",
@@ -269,6 +319,159 @@ fn assert_std_tooling_project_smoke(projects: &[(&str, &str)]) {
 #[test]
 fn std_tooling_light_project_smokes_build_doctor_and_run() {
     assert_std_tooling_project_smoke(STD_TOOLING_LIGHT_SMOKE_PROJECTS);
+}
+
+#[test]
+fn std_tooling_observable_cli_smoke_checks_reports_and_stdin() {
+    let report_output_dir = temp_dir("filesystem_io_report_observable");
+    let report_output_dir_text = report_output_dir.display().to_string();
+    let report_build = run_nuis(&[
+        "build",
+        "../../examples/projects/tooling/filesystem_io_report_demo",
+        &report_output_dir_text,
+    ]);
+    assert_success(
+        &report_build,
+        "nuis build filesystem IO report observable smoke",
+    );
+
+    let report_json = run_nuis(&["run-artifact", &report_output_dir_text, "--json"]);
+    assert_success(
+        &report_json,
+        "nuis run-artifact json filesystem IO report observable smoke",
+    );
+    let report_json_stdout = String::from_utf8_lossy(&report_json.stdout);
+    assert!(
+        report_json_stdout.contains("\"run_artifact_prelaunch_kind\":\"host-binary\""),
+        "run-artifact json did not expose host-binary prelaunch for filesystem report\n{report_json_stdout}"
+    );
+    assert!(
+        report_json_stdout.contains("\"run_artifact_prelaunch_status\":\"ready\""),
+        "run-artifact json did not expose ready prelaunch for filesystem report\n{report_json_stdout}"
+    );
+
+    let report_run = run_nuis(&["run-artifact", &report_output_dir_text]);
+    assert_success(
+        &report_run,
+        "nuis run-artifact filesystem IO report observable smoke",
+    );
+    let report_stdout = String::from_utf8_lossy(&report_run.stdout);
+    let report_stderr = String::from_utf8_lossy(&report_run.stderr);
+    let run_artifact_index = report_stdout
+        .find("run-artifact:")
+        .expect("filesystem report stdout should include run-artifact summary");
+    let report_stdout_prefix = &report_stdout[..run_artifact_index];
+    assert!(
+        !report_stdout_prefix.is_empty()
+            && report_stdout_prefix.chars().all(|ch| ch.is_ascii_digit()),
+        "filesystem report stdout should start with observable report digits before run-artifact summary\n{report_stdout}"
+    );
+    assert!(
+        !report_stderr.trim().is_empty()
+            && report_stderr.trim().chars().all(|ch| ch.is_ascii_digit()),
+        "filesystem report stderr should contain observable report digits\n{report_stderr}"
+    );
+    assert!(
+        report_stdout.contains("exit_status: 0")
+            && report_stdout.contains("prelaunch_status: ready")
+            && report_stdout.contains("link_plan_final_stage: host-native-link"),
+        "filesystem report run-artifact output did not expose expected launch fields\n{report_stdout}"
+    );
+    assert_file_contains(
+        &report_output_dir.join("filesystem_io_report_demo.ll"),
+        "host_stdout_write",
+        "filesystem IO report LLVM",
+    );
+    assert_file_contains(
+        &report_output_dir.join("filesystem_io_report_demo.yir"),
+        "host_stderr_write",
+        "filesystem IO report YIR",
+    );
+
+    let stdin_output_dir = temp_dir("stdin_runtime_observable");
+    let stdin_output_dir_text = stdin_output_dir.display().to_string();
+    let stdin_build = run_nuis(&[
+        "build",
+        "../../examples/projects/tooling/stdin_runtime_demo",
+        &stdin_output_dir_text,
+    ]);
+    assert_success(&stdin_build, "nuis build stdin observable smoke");
+    assert_file_contains(
+        &stdin_output_dir.join("stdin_runtime_demo.ll"),
+        "host_stdin_read",
+        "stdin runtime LLVM",
+    );
+    assert_file_contains(
+        &stdin_output_dir.join("stdin_runtime_demo.yir"),
+        "host_stdin_read",
+        "stdin runtime YIR",
+    );
+    let stdin_binary = stdin_output_dir.join("stdin_runtime_demo");
+    let stdin_run = run_binary_with_stdin(
+        &stdin_binary,
+        b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+    );
+    assert_success(&stdin_run, "direct stdin runtime binary smoke");
+    assert!(
+        stdin_run.stdout.is_empty() && stdin_run.stderr.is_empty(),
+        "stdin runtime should consume piped stdin without producing report output\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&stdin_run.stdout),
+        String::from_utf8_lossy(&stdin_run.stderr)
+    );
+    let stdin_json = run_nuis(&["run-artifact", &stdin_output_dir_text, "--json"]);
+    assert_success(&stdin_json, "nuis run-artifact json stdin observable smoke");
+    let stdin_json_stdout = String::from_utf8_lossy(&stdin_json.stdout);
+    assert!(
+        stdin_json_stdout.contains("\"run_artifact_prelaunch_kind\":\"host-binary\"")
+            && stdin_json_stdout.contains("\"run_artifact_prelaunch_status\":\"ready\"")
+            && stdin_json_stdout.contains("\"binary_resolved\":true"),
+        "stdin run-artifact json did not expose expected executable readiness\n{stdin_json_stdout}"
+    );
+
+    let wc_output_dir = temp_dir("cli_wc_observable");
+    let wc_output_dir_text = wc_output_dir.display().to_string();
+    let wc_build = run_nuis(&[
+        "build",
+        "../../examples/projects/tooling/cli_wc_demo",
+        &wc_output_dir_text,
+    ]);
+    assert_success(&wc_build, "nuis build cli wc observable smoke");
+    assert_file_contains(
+        &wc_output_dir.join("cli_wc_demo.ll"),
+        "host_argv_count",
+        "cli wc LLVM argv bridge",
+    );
+    assert_file_contains(
+        &wc_output_dir.join("cli_wc_demo.ll"),
+        "host_file_read",
+        "cli wc LLVM file read bridge",
+    );
+    assert_file_contains(
+        &wc_output_dir.join("cli_wc_demo.yir"),
+        "host_text_word_count",
+        "cli wc YIR text word-count bridge",
+    );
+    let wc_input_path = wc_output_dir.join("wc-input.txt");
+    fs::write(&wc_input_path, b"alpha beta\ngamma delta\nepsilon\n")
+        .unwrap_or_else(|error| panic!("failed to write {}: {error}", wc_input_path.display()));
+    let wc_input_text = wc_input_path.display().to_string();
+    let wc_binary = wc_output_dir.join("cli_wc_demo");
+    let wc_run = run_binary_with_args(&wc_binary, &[&wc_input_text]);
+    assert_success(&wc_run, "direct cli wc binary smoke");
+    let wc_stdout = String::from_utf8_lossy(&wc_run.stdout);
+    assert!(
+        wc_stdout.contains("bytes: 31\n")
+            && wc_stdout.contains("text_len: 31\n")
+            && wc_stdout.contains("lines: 3\n")
+            && wc_stdout.contains("words: 5\n")
+            && wc_stdout.contains("scan_ns: "),
+        "cli wc stdout did not expose expected text report\n{wc_stdout}"
+    );
+    assert!(
+        wc_run.stderr.is_empty(),
+        "cli wc should not write stderr on success\n{}",
+        String::from_utf8_lossy(&wc_run.stderr)
+    );
 }
 
 #[test]

@@ -589,6 +589,73 @@ pub(crate) fn nsld_final_executable_output_report_json(
             "launcher_dry_run_blocker_count",
             report.launcher_dry_run_blocker_count,
         ),
+        json_string_field("container_loader_status", &report.container_loader_status),
+        json_string_field(
+            "container_loader_payload_scan_kind",
+            &report.container_loader_payload_scan_kind,
+        ),
+        json_bool_field("container_loader_parsed", report.container_loader_parsed),
+        json_optional_string_field(
+            "container_loader_readiness",
+            report.container_loader_readiness.as_deref(),
+        ),
+        json_optional_bool_field("container_loader_ready", report.container_loader_ready),
+        json_string_field(
+            "container_loader_handoff_status",
+            &report.container_loader_handoff_status,
+        ),
+        json_bool_field(
+            "container_loader_handoff_ready",
+            report.container_loader_handoff_ready,
+        ),
+        json_optional_string_field(
+            "container_loader_handoff_first_blocker",
+            report.container_loader_handoff_first_blocker.as_deref(),
+        ),
+        json_optional_string_field(
+            "container_loader_entry_symbol",
+            report.container_loader_entry_symbol.as_deref(),
+        ),
+        json_optional_string_field(
+            "container_loader_entry_kind",
+            report.container_loader_entry_kind.as_deref(),
+        ),
+        json_optional_string_field(
+            "container_loader_entry_section_id",
+            report.container_loader_entry_section_id.as_deref(),
+        ),
+        json_optional_usize_field(
+            "container_loader_symbol_count",
+            report.container_loader_symbol_count,
+        ),
+        json_string_field(
+            "first_payload_execution_status",
+            &report.first_payload_execution_status,
+        ),
+        json_bool_field(
+            "first_payload_execution_ready",
+            report.first_payload_execution_ready,
+        ),
+        json_string_field(
+            "first_payload_execution_target",
+            &report.first_payload_execution_target,
+        ),
+        json_optional_string_field(
+            "first_payload_execution_entry_symbol",
+            report.first_payload_execution_entry_symbol.as_deref(),
+        ),
+        json_optional_string_field(
+            "first_payload_execution_entry_kind",
+            report.first_payload_execution_entry_kind.as_deref(),
+        ),
+        json_optional_string_field(
+            "first_payload_execution_entry_section_id",
+            report.first_payload_execution_entry_section_id.as_deref(),
+        ),
+        json_optional_string_field(
+            "first_payload_execution_first_blocker",
+            report.first_payload_execution_first_blocker.as_deref(),
+        ),
         json_string_field("recommended_next_action", &report.recommended_next_action),
         json_bool_field("path_present", report.path_present),
         json_bool_field("nsld_owned_output", report.nsld_owned_output),

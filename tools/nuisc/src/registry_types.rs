@@ -1,3 +1,4 @@
+use crate::registry_build_contract_summary::NustarDomainBuildContractSummary;
 use crate::registry_scheduler_summary::{NustarSchedulerSummary, NustarStdNetSummary};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -158,6 +159,22 @@ pub struct NustarExecutionSummary {
     pub lowering_targets: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarDispatchReadinessSummary {
+    pub status: String,
+    pub required_signals: Vec<String>,
+    pub missing_signals: Vec<String>,
+    pub execution_readiness_materialized: bool,
+    pub dispatch_bridge_materialized: bool,
+    pub lifecycle_phase_order: Vec<String>,
+    pub scheduler_binding: String,
+    pub bridge_entry: String,
+    pub bridge_surface: String,
+    pub backend_stub_kind: String,
+    pub submission_mode: String,
+    pub wake_policy: String,
+}
+
 impl NustarClockSummary {
     pub fn brief(&self) -> String {
         format!(
@@ -187,6 +204,8 @@ pub struct NustarDomainContract {
     pub host_ffi_bridge: Option<String>,
     pub capability: NustarCapabilitySummary,
     pub execution: NustarExecutionSummary,
+    pub build_contract: NustarDomainBuildContractSummary,
+    pub dispatch_readiness: NustarDispatchReadinessSummary,
     pub scheduler: NustarSchedulerSummary,
     pub std_net: NustarStdNetSummary,
 }

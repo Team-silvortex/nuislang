@@ -78,20 +78,20 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
     assert_eq!(verify.actual_execution_handoff_ready, Some(true));
     assert_eq!(
         verify.actual_execution_handoff_status.as_deref(),
-        Some("entrypoint-materializer-required")
+        Some("container-loader-handoff-ready")
     );
     assert_eq!(
         verify.actual_execution_handoff_target.as_deref(),
-        Some("entrypoint-materializer")
+        Some("container-loader")
     );
     assert_eq!(
         verify.actual_execution_handoff_evidence_status.as_deref(),
-        Some("verified-patched-image-ready")
+        Some("container-loader-handoff-ready")
     );
     assert_eq!(verify.actual_execution_handoff_first_blocker, None);
     assert_eq!(
         verify.actual_execution_handoff_decision_code.as_deref(),
-        Some("handoff-entrypoint-materializer")
+        Some("handoff-container-loader-first-payload")
     );
     assert_eq!(
         verify.actual_scheduler_metadata_payload_id.as_deref(),
@@ -152,17 +152,17 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
     assert!(pipeline.execution_handoff_ready);
     assert_eq!(
         pipeline.execution_handoff_status,
-        "entrypoint-materializer-required"
+        "container-loader-handoff-ready"
     );
-    assert_eq!(pipeline.execution_handoff_target, "entrypoint-materializer");
+    assert_eq!(pipeline.execution_handoff_target, "container-loader");
     assert_eq!(
         pipeline.execution_handoff_evidence_status,
-        "verified-patched-image-ready"
+        "container-loader-handoff-ready"
     );
     assert_eq!(pipeline.execution_handoff_first_blocker, None);
     assert_eq!(
         pipeline.execution_handoff_decision_code,
-        "handoff-entrypoint-materializer"
+        "handoff-container-loader-first-payload"
     );
     assert_eq!(
         pipeline.scheduler_metadata_payload_id.as_deref(),
@@ -195,9 +195,10 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
     assert!(pipeline_json
         .contains("\"entrypoint_materialization_runner_command\":\"nuis-host-runner --manifest 'manifest.toml'"));
     assert!(pipeline_json.contains("\"execution_handoff_ready\":true"));
-    assert!(pipeline_json.contains("\"execution_handoff_target\":\"entrypoint-materializer\""));
-    assert!(pipeline_json
-        .contains("\"execution_handoff_decision_code\":\"handoff-entrypoint-materializer\""));
+    assert!(pipeline_json.contains("\"execution_handoff_target\":\"container-loader\""));
+    assert!(pipeline_json.contains(
+        "\"execution_handoff_decision_code\":\"handoff-container-loader-first-payload\""
+    ));
     assert!(pipeline_json
         .contains("\"scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
     assert!(pipeline_json.contains("\"scheduler_metadata_present\":true"));
@@ -217,9 +218,9 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
         "\"actual_entrypoint_materialization_runner_command\":\"nuis-host-runner --manifest 'manifest.toml'"
     ));
     assert!(verify_json.contains("\"actual_execution_handoff_ready\":true"));
-    assert!(verify_json.contains("\"actual_execution_handoff_target\":\"entrypoint-materializer\""));
+    assert!(verify_json.contains("\"actual_execution_handoff_target\":\"container-loader\""));
     assert!(verify_json.contains(
-        "\"actual_execution_handoff_decision_code\":\"handoff-entrypoint-materializer\""
+        "\"actual_execution_handoff_decision_code\":\"handoff-container-loader-first-payload\""
     ));
     assert!(verify_json
         .contains("\"actual_scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
@@ -244,19 +245,18 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
     ));
     assert!(check_json.contains("\"final_executable_pipeline_execution_handoff_ready\":true"));
     assert!(check_json.contains(
-        "\"final_executable_pipeline_execution_handoff_status\":\"entrypoint-materializer-required\""
+        "\"final_executable_pipeline_execution_handoff_status\":\"container-loader-handoff-ready\""
     ));
+    assert!(check_json
+        .contains("\"final_executable_pipeline_execution_handoff_target\":\"container-loader\""));
     assert!(check_json.contains(
-        "\"final_executable_pipeline_execution_handoff_target\":\"entrypoint-materializer\""
-    ));
-    assert!(check_json.contains(
-        "\"final_executable_pipeline_execution_handoff_evidence_status\":\"verified-patched-image-ready\""
+        "\"final_executable_pipeline_execution_handoff_evidence_status\":\"container-loader-handoff-ready\""
     ));
     assert!(
         check_json.contains("\"final_executable_pipeline_execution_handoff_first_blocker\":null")
     );
     assert!(check_json.contains(
-        "\"final_executable_pipeline_execution_handoff_decision_code\":\"handoff-entrypoint-materializer\""
+        "\"final_executable_pipeline_execution_handoff_decision_code\":\"handoff-container-loader-first-payload\""
     ));
     assert!(check.valid);
     assert!(check.final_executable_output_present);
@@ -322,19 +322,19 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
         check
             .final_executable_pipeline_execution_handoff_status
             .as_deref(),
-        Some("entrypoint-materializer-required")
+        Some("container-loader-handoff-ready")
     );
     assert_eq!(
         check
             .final_executable_pipeline_execution_handoff_target
             .as_deref(),
-        Some("entrypoint-materializer")
+        Some("container-loader")
     );
     assert_eq!(
         check
             .final_executable_pipeline_execution_handoff_evidence_status
             .as_deref(),
-        Some("verified-patched-image-ready")
+        Some("container-loader-handoff-ready")
     );
     assert_eq!(
         check.final_executable_pipeline_execution_handoff_first_blocker,
@@ -344,7 +344,7 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
         check
             .final_executable_pipeline_execution_handoff_decision_code
             .as_deref(),
-        Some("handoff-entrypoint-materializer")
+        Some("handoff-container-loader-first-payload")
     );
     assert_eq!(
         check

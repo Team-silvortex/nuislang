@@ -34,9 +34,13 @@ pub(crate) fn nsld_pipeline_entrypoint_materialization_plan(
     execution_handoff_first_blocker: Option<&str>,
     blockers: &[String],
 ) -> NsldPipelineEntrypointMaterializationPlan {
+    let handoff_target_can_enter_host_entrypoint = matches!(
+        execution_handoff_target,
+        "entrypoint-materializer" | "container-loader"
+    );
     let ready = status == "host-launcher-ready"
         && execution_handoff_ready
-        && execution_handoff_target == "entrypoint-materializer";
+        && handoff_target_can_enter_host_entrypoint;
     let path = if ready {
         Some(
             Path::new(&plan.output_dir)

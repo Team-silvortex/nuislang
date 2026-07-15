@@ -1,0 +1,219 @@
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+fn temp_dir(label: &str) -> PathBuf {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("nuis_language_{label}_{nonce}"));
+    fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+fn run_nuis(args: &[&str]) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_nuis"))
+        .args(args)
+        .output()
+        .unwrap_or_else(|error| panic!("failed to run nuis {:?}: {error}", args))
+}
+
+fn assert_success(output: &std::process::Output, context: &str) {
+    assert!(
+        output.status.success(),
+        "{context} failed\nstatus: {:?}\nstdout:\n{}\nstderr:\n{}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+}
+
+fn assert_contains(haystack: &str, needle: &str, context: &str) {
+    assert!(
+        haystack.contains(needle),
+        "{context} missing `{needle}`\nfull output:\n{haystack}"
+    );
+}
+
+fn assert_file_contains(path: &Path, needle: &str, context: &str) {
+    let source = fs::read_to_string(path)
+        .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
+    assert!(
+        source.contains(needle),
+        "expected {context} file {} to contain `{needle}`\n{source}",
+        path.display()
+    );
+}
+
+fn assert_binary_exit(binary: &Path, expected: i32, context: &str) {
+    let output = Command::new(binary)
+        .output()
+        .unwrap_or_else(|error| panic!("failed to run {}: {error}", binary.display()));
+    assert_eq!(
+        output.status.code(),
+        Some(expected),
+        "{context} should exit with {expected}\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn task_result_enum_project_anchors_language_bootstrap_smoke() {
+    let output_dir = temp_dir("task_result_enum_bootstrap");
+    let output_dir_text = output_dir.display().to_string();
+
+    let build = run_nuis(&[
+        "build",
+        "../../examples/projects/task/task_result_enum_demo",
+        &output_dir_text,
+    ]);
+    assert_success(
+        &build,
+        "nuis build task result enum language bootstrap smoke",
+    );
+
+    let run_json = run_nuis(&["run-artifact", &output_dir_text, "--json"]);
+    assert_success(
+        &run_json,
+        "nuis run-artifact json task result enum language bootstrap smoke",
+    );
+    let run_json_stdout = String::from_utf8_lossy(&run_json.stdout);
+    assert_contains(
+        &run_json_stdout,
+        "\"run_artifact_prelaunch_status\":\"ready\"",
+        "task result enum run-artifact json",
+    );
+    assert_contains(
+        &run_json_stdout,
+        "\"link_plan_final_stage\":\"host-native-link\"",
+        "task result enum run-artifact json",
+    );
+
+    assert_file_contains(
+        &output_dir.join("task_result_enum_demo.nir.txt"),
+        "__hof_result_map_raise_value__i64__i64__ErrorEnvelope",
+        "task result enum NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("task_result_enum_demo.nir.txt"),
+        "Result<i64, ErrorEnvelope>",
+        "task result enum NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("task_result_enum_demo.yir"),
+        "cpu.variant_is",
+        "task result enum YIR",
+    );
+    assert_file_contains(
+        &output_dir.join("task_result_enum_demo.yir"),
+        "cpu.task_completed",
+        "task result enum YIR",
+    );
+    assert_file_contains(
+        &output_dir.join("task_result_enum_demo.yir"),
+        "c host_error_code",
+        "task result enum YIR",
+    );
+    assert_file_contains(
+        &output_dir.join("task_result_enum_demo.ll"),
+        "declare i64 @host_error_code(i64)",
+        "task result enum LLVM IR",
+    );
+    assert_file_contains(
+        &output_dir.join("nuis.project.host_ffi.txt"),
+        "policy=signature-whitelist-required",
+        "task result enum host FFI project report",
+    );
+
+    assert_binary_exit(
+        &output_dir.join("task_result_enum_demo"),
+        39,
+        "task_result_enum_demo should execute the Result/task/error path to a deterministic exit code",
+    );
+}
+
+#[test]
+fn generic_trait_and_glm_buffer_projects_anchor_language_bootstrap_smoke() {
+    let generic_output_dir = temp_dir("generic_trait_bound_bootstrap");
+    let generic_output_dir_text = generic_output_dir.display().to_string();
+    let generic_build = run_nuis(&[
+        "build",
+        "../../examples/projects/state/generic_method_bound_guarded_nested_match_demo",
+        &generic_output_dir_text,
+    ]);
+    assert_success(
+        &generic_build,
+        "nuis build generic trait-bound language bootstrap smoke",
+    );
+
+    assert_file_contains(
+        &generic_output_dir.join("generic_method_bound_guarded_nested_match_demo.ast.txt"),
+        "trait Addable",
+        "generic trait-bound AST",
+    );
+    assert_file_contains(
+        &generic_output_dir.join("generic_method_bound_guarded_nested_match_demo.ast.txt"),
+        "type Outer<T> = Alias<T>",
+        "generic alias AST",
+    );
+    assert_file_contains(
+        &generic_output_dir.join("generic_method_bound_guarded_nested_match_demo.nir.txt"),
+        "fn bump__i64(value: i64) -> i64",
+        "generic monomorphized NIR",
+    );
+    assert_file_contains(
+        &generic_output_dir.join("generic_method_bound_guarded_nested_match_demo.nir.txt"),
+        "impl.Addable.for.i64.add(local, local)",
+        "generic trait method call NIR",
+    );
+    assert_binary_exit(
+        &generic_output_dir.join("generic_method_bound_guarded_nested_match_demo"),
+        8,
+        "generic trait-bound guarded nested match binary",
+    );
+
+    let glm_output_dir = temp_dir("glm_buffer_bootstrap");
+    let glm_output_dir_text = glm_output_dir.display().to_string();
+    let glm_build = run_nuis(&[
+        "build",
+        "../../examples/projects/state/glm_buffer_roundtrip_state_demo",
+        &glm_output_dir_text,
+    ]);
+    assert_success(&glm_build, "nuis build GLM buffer language bootstrap smoke");
+
+    assert_file_contains(
+        &glm_output_dir.join("glm_buffer_roundtrip_state_demo.nir.txt"),
+        "let len: i64 = buffer_len(buffer)",
+        "GLM buffer NIR",
+    );
+    assert_file_contains(
+        &glm_output_dir.join("glm_buffer_roundtrip_state_demo.nir.txt"),
+        "expr free(buffer)",
+        "GLM buffer NIR",
+    );
+    assert_file_contains(
+        &glm_output_dir.join("glm_buffer_roundtrip_state_demo.yir"),
+        "cpu.store_at",
+        "GLM buffer YIR",
+    );
+    assert_file_contains(
+        &glm_output_dir.join("glm_buffer_roundtrip_state_demo.yir"),
+        "edge lifetime",
+        "GLM buffer YIR",
+    );
+    assert_file_contains(
+        &glm_output_dir.join("glm_buffer_roundtrip_state_demo.ll"),
+        "declare void @free(ptr)",
+        "GLM buffer LLVM IR",
+    );
+    assert_binary_exit(
+        &glm_output_dir.join("glm_buffer_roundtrip_state_demo"),
+        10,
+        "GLM buffer roundtrip binary",
+    );
+}

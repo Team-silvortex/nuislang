@@ -69,9 +69,22 @@ pub(crate) fn render_dev_tensor_json_impl() -> String {
                 "weakest_bootstrap_function",
                 summary.weakest_bootstrap_function,
             ),
+            json_field("weakest_bootstrap_status", summary.weakest_bootstrap_status),
             json_usize_field(
                 "weakest_bootstrap_progress",
                 summary.weakest_bootstrap_progress,
+            ),
+            json_field(
+                "weakest_bootstrap_closure_role",
+                summary.weakest_bootstrap_closure_role,
+            ),
+            json_field(
+                "weakest_bootstrap_evidence",
+                summary.weakest_bootstrap_evidence,
+            ),
+            json_field(
+                "weakest_bootstrap_next_step",
+                summary.weakest_bootstrap_next_step,
             ),
             json_field("coverage_status", coverage.status),
             json_usize_field("coverage_expected_count", coverage.expected_count),
@@ -96,6 +109,88 @@ pub(crate) fn render_dev_tensor_json_impl() -> String {
                 &coverage.orphaned_coordinates,
             ),
             json_string_array_field("coverage_stale_coordinates", &coverage.stale_coordinates),
+            json_field("manifest_coverage_status", coverage.manifest.status),
+            json_field("manifest_coverage_source", coverage.manifest.source),
+            json_usize_field(
+                "manifest_module_count",
+                coverage.manifest.manifest_module_count,
+            ),
+            json_usize_field(
+                "manifest_tracked_module_count",
+                coverage.manifest.tracked_manifest_module_count,
+            ),
+            json_usize_field(
+                "manifest_backed_coordinate_count",
+                coverage.manifest.manifest_backed_coordinate_count,
+            ),
+            json_usize_field(
+                "manifest_missing_module_count",
+                coverage.manifest.manifest_missing_module_count,
+            ),
+            json_usize_field(
+                "manifest_untracked_module_count",
+                coverage.manifest.manifest_untracked_module_count,
+            ),
+            json_field(
+                "manifest_first_gap",
+                coverage.manifest.first_gap.as_deref().unwrap_or("<none>"),
+            ),
+            json_string_array_field(
+                "manifest_backed_coordinates",
+                &coverage.manifest.manifest_backed_coordinates,
+            ),
+            json_string_array_field(
+                "manifest_missing_modules",
+                &coverage.manifest.manifest_missing_modules,
+            ),
+            json_string_array_field(
+                "manifest_untracked_modules",
+                &coverage.manifest.manifest_untracked_modules,
+            ),
+            json_field("milestone_coverage_status", coverage.milestone.status),
+            json_field("milestone_coverage_source", coverage.milestone.source),
+            json_field("milestone_schema", &coverage.milestone.schema),
+            json_usize_field("milestone_count", coverage.milestone.milestone_count),
+            json_usize_field(
+                "milestone_coordinate_count",
+                coverage.milestone.milestone_coordinate_count,
+            ),
+            json_usize_field(
+                "milestone_required_coordinate_count",
+                coverage.milestone.milestone_required_coordinate_count,
+            ),
+            json_usize_field(
+                "milestone_missing_coordinate_count",
+                coverage.milestone.milestone_missing_coordinate_count,
+            ),
+            json_usize_field(
+                "milestone_untracked_coordinate_count",
+                coverage.milestone.milestone_untracked_coordinate_count,
+            ),
+            json_usize_field(
+                "milestone_constant_drift_count",
+                coverage.milestone.milestone_constant_drift_count,
+            ),
+            json_field(
+                "milestone_first_gap",
+                coverage.milestone.first_gap.as_deref().unwrap_or("<none>"),
+            ),
+            json_string_array_field(
+                "milestone_coordinates",
+                &coverage.milestone.milestone_coordinates,
+            ),
+            json_string_array_field(
+                "milestone_missing_coordinates",
+                &coverage.milestone.milestone_missing_coordinates,
+            ),
+            json_string_array_field(
+                "milestone_untracked_coordinates",
+                &coverage.milestone.milestone_untracked_coordinates,
+            ),
+            json_string_array_field(
+                "milestone_constant_drift_coordinates",
+                &coverage.milestone.milestone_constant_drift_coordinates,
+            ),
             json_usize_field("drift_check_count", drift.check_count),
             json_usize_field("drift_check_passed_count", drift.passed_count),
             json_usize_field("drift_check_failed_count", drift.failed_count),
@@ -164,8 +259,24 @@ pub(crate) fn render_dev_tensor_text_impl() -> Vec<String> {
             summary.weakest_bootstrap_function
         ),
         format!(
+            "  weakest_bootstrap_status: {}",
+            summary.weakest_bootstrap_status
+        ),
+        format!(
             "  weakest_bootstrap_progress: {}",
             summary.weakest_bootstrap_progress
+        ),
+        format!(
+            "  weakest_bootstrap_closure_role: {}",
+            summary.weakest_bootstrap_closure_role
+        ),
+        format!(
+            "  weakest_bootstrap_evidence: {}",
+            summary.weakest_bootstrap_evidence
+        ),
+        format!(
+            "  weakest_bootstrap_next_step: {}",
+            summary.weakest_bootstrap_next_step
         ),
         format!("  coverage_status: {}", coverage.status),
         format!("  coverage_expected_count: {}", coverage.expected_count),
@@ -180,6 +291,60 @@ pub(crate) fn render_dev_tensor_text_impl() -> Vec<String> {
         format!(
             "  coverage_first_gap: {}",
             coverage.first_gap.as_deref().unwrap_or("<none>")
+        ),
+        format!("  manifest_coverage_status: {}", coverage.manifest.status),
+        format!("  manifest_coverage_source: {}", coverage.manifest.source),
+        format!(
+            "  manifest_module_count: {}",
+            coverage.manifest.manifest_module_count
+        ),
+        format!(
+            "  manifest_tracked_module_count: {}",
+            coverage.manifest.tracked_manifest_module_count
+        ),
+        format!(
+            "  manifest_backed_coordinate_count: {}",
+            coverage.manifest.manifest_backed_coordinate_count
+        ),
+        format!(
+            "  manifest_missing_module_count: {}",
+            coverage.manifest.manifest_missing_module_count
+        ),
+        format!(
+            "  manifest_untracked_module_count: {}",
+            coverage.manifest.manifest_untracked_module_count
+        ),
+        format!(
+            "  manifest_first_gap: {}",
+            coverage.manifest.first_gap.as_deref().unwrap_or("<none>")
+        ),
+        format!("  milestone_coverage_status: {}", coverage.milestone.status),
+        format!("  milestone_coverage_source: {}", coverage.milestone.source),
+        format!("  milestone_schema: {}", coverage.milestone.schema),
+        format!("  milestone_count: {}", coverage.milestone.milestone_count),
+        format!(
+            "  milestone_coordinate_count: {}",
+            coverage.milestone.milestone_coordinate_count
+        ),
+        format!(
+            "  milestone_required_coordinate_count: {}",
+            coverage.milestone.milestone_required_coordinate_count
+        ),
+        format!(
+            "  milestone_missing_coordinate_count: {}",
+            coverage.milestone.milestone_missing_coordinate_count
+        ),
+        format!(
+            "  milestone_untracked_coordinate_count: {}",
+            coverage.milestone.milestone_untracked_coordinate_count
+        ),
+        format!(
+            "  milestone_constant_drift_count: {}",
+            coverage.milestone.milestone_constant_drift_count
+        ),
+        format!(
+            "  milestone_first_gap: {}",
+            coverage.milestone.first_gap.as_deref().unwrap_or("<none>")
         ),
         format!("  drift_status: {}", drift.status),
         format!("  drift_check_count: {}", drift.check_count),
@@ -198,6 +363,29 @@ pub(crate) fn render_dev_tensor_text_impl() -> Vec<String> {
     }
     for coordinate in &coverage.stale_coordinates {
         lines.push(format!("  coverage_stale_coordinate: {coordinate}"));
+    }
+    for coordinate in &coverage.manifest.manifest_backed_coordinates {
+        lines.push(format!("  manifest_backed_coordinate: {coordinate}"));
+    }
+    for module in &coverage.manifest.manifest_missing_modules {
+        lines.push(format!("  manifest_missing_module: {module}"));
+    }
+    for module in &coverage.manifest.manifest_untracked_modules {
+        lines.push(format!("  manifest_untracked_module: {module}"));
+    }
+    for coordinate in &coverage.milestone.milestone_coordinates {
+        lines.push(format!("  milestone_coordinate: {coordinate}"));
+    }
+    for coordinate in &coverage.milestone.milestone_missing_coordinates {
+        lines.push(format!("  milestone_missing_coordinate: {coordinate}"));
+    }
+    for coordinate in &coverage.milestone.milestone_untracked_coordinates {
+        lines.push(format!("  milestone_untracked_coordinate: {coordinate}"));
+    }
+    for coordinate in &coverage.milestone.milestone_constant_drift_coordinates {
+        lines.push(format!(
+            "  milestone_constant_drift_coordinate: {coordinate}"
+        ));
     }
     for check in &drift.checks {
         lines.push(format!(

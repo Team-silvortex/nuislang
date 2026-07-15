@@ -163,17 +163,17 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
     assert!(manifest.execution_handoff_ready);
     assert_eq!(
         manifest.execution_handoff_status,
-        "entrypoint-materializer-required"
+        "container-loader-handoff-ready"
     );
-    assert_eq!(manifest.execution_handoff_target, "entrypoint-materializer");
+    assert_eq!(manifest.execution_handoff_target, "container-loader");
     assert_eq!(
         manifest.execution_handoff_evidence_status,
-        "verified-patched-image-ready"
+        "container-loader-handoff-ready"
     );
     assert_eq!(manifest.execution_handoff_first_blocker, None);
     assert_eq!(
         manifest.execution_handoff_decision_code,
-        "handoff-entrypoint-materializer"
+        "handoff-container-loader-first-payload"
     );
     assert_eq!(
         manifest.scheduler_metadata_payload_id.as_deref(),
@@ -208,20 +208,20 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
     assert_eq!(verify.actual_execution_handoff_ready, Some(true));
     assert_eq!(
         verify.actual_execution_handoff_status.as_deref(),
-        Some("entrypoint-materializer-required")
+        Some("container-loader-handoff-ready")
     );
     assert_eq!(
         verify.actual_execution_handoff_target.as_deref(),
-        Some("entrypoint-materializer")
+        Some("container-loader")
     );
     assert_eq!(
         verify.actual_execution_handoff_evidence_status.as_deref(),
-        Some("verified-patched-image-ready")
+        Some("container-loader-handoff-ready")
     );
     assert_eq!(verify.actual_execution_handoff_first_blocker, None);
     assert_eq!(
         verify.actual_execution_handoff_decision_code.as_deref(),
-        Some("handoff-entrypoint-materializer")
+        Some("handoff-container-loader-first-payload")
     );
     assert_eq!(
         verify.actual_scheduler_metadata_payload_id.as_deref(),
@@ -251,11 +251,11 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
     assert_eq!(dry_run.execution_handoff_ready, Some(true));
     assert_eq!(
         dry_run.execution_handoff_target.as_deref(),
-        Some("entrypoint-materializer")
+        Some("container-loader")
     );
     assert_eq!(
         dry_run.execution_handoff_decision_code.as_deref(),
-        Some("handoff-entrypoint-materializer")
+        Some("handoff-container-loader-first-payload")
     );
     assert_eq!(
         dry_run.scheduler_metadata_hash,
@@ -290,7 +290,7 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
     );
     assert_eq!(
         output_after_launcher.recommended_next_action,
-        "run-artifact-or-handoff-to-runtime"
+        "handoff-to-container-loader"
     );
     assert_eq!(dry_run_verify.actual_dry_run_ready, Some(true));
     assert_eq!(dry_run_verify.actual_would_enter_lifecycle_hook, Some(true));
@@ -303,9 +303,9 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
     assert!(manifest_source.contains("entry_lifecycle_hook = \"on_process_start\""));
     assert!(manifest_source.contains("scheduler_entry = \"nuis.scheduler.loop.v1\""));
     assert!(manifest_source.contains("execution_handoff_ready = true"));
-    assert!(manifest_source.contains("execution_handoff_target = \"entrypoint-materializer\""));
+    assert!(manifest_source.contains("execution_handoff_target = \"container-loader\""));
     assert!(manifest_source
-        .contains("execution_handoff_decision_code = \"handoff-entrypoint-materializer\""));
+        .contains("execution_handoff_decision_code = \"handoff-container-loader-first-payload\""));
     assert!(manifest_source
         .contains("scheduler_metadata_payload_id = \"payload0004.scheduler-metadata\""));
     assert!(manifest_source.contains("scheduler_metadata_present = true"));
@@ -315,20 +315,20 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
         dry_run_source.contains("execution_handoff_contract = \"nsld-final-output-handoff-v1\"")
     );
     assert!(dry_run_source
-        .contains("execution_handoff_decision_code = \"handoff-entrypoint-materializer\""));
+        .contains("execution_handoff_decision_code = \"handoff-container-loader-first-payload\""));
     assert!(dry_run_source.contains("scheduler_metadata_present = true"));
     assert!(manifest_json.contains("\"kind\":\"nsld_final_executable_launcher_manifest\""));
     assert!(manifest_json.contains("\"ready\":true"));
     assert!(manifest_json.contains("\"nsb_hash\":\"0x"));
     assert!(manifest_json.contains("\"execution_handoff_ready\":true"));
-    assert!(manifest_json.contains("\"execution_handoff_target\":\"entrypoint-materializer\""));
+    assert!(manifest_json.contains("\"execution_handoff_target\":\"container-loader\""));
     assert!(manifest_json
         .contains("\"scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
     assert!(manifest_json.contains("\"scheduler_metadata_present\":true"));
     assert!(verify_json.contains("\"kind\":\"nsld_final_executable_launcher_manifest_verify\""));
     assert!(verify_json.contains("\"valid\":true"));
     assert!(verify_json.contains(
-        "\"actual_execution_handoff_decision_code\":\"handoff-entrypoint-materializer\""
+        "\"actual_execution_handoff_decision_code\":\"handoff-container-loader-first-payload\""
     ));
     assert!(verify_json
         .contains("\"actual_scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
@@ -338,8 +338,9 @@ fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
     assert!(
         dry_run_json.contains("\"execution_handoff_contract\":\"nsld-final-output-handoff-v1\"")
     );
-    assert!(dry_run_json
-        .contains("\"execution_handoff_decision_code\":\"handoff-entrypoint-materializer\""));
+    assert!(dry_run_json.contains(
+        "\"execution_handoff_decision_code\":\"handoff-container-loader-first-payload\""
+    ));
     assert!(dry_run_json
         .contains("\"scheduler_metadata_payload_id\":\"payload0004.scheduler-metadata\""));
     assert!(dry_run_emit_json.contains("\"kind\":\"nsld_final_executable_launcher_dry_run_emit\""));
@@ -565,17 +566,17 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert!(output.execution_handoff_ready);
     assert_eq!(
         output.execution_handoff_status,
-        "entrypoint-materializer-required"
+        "container-loader-handoff-ready"
     );
-    assert_eq!(output.execution_handoff_target, "entrypoint-materializer");
+    assert_eq!(output.execution_handoff_target, "container-loader");
     assert_eq!(
         output.execution_handoff_evidence_status,
-        "verified-patched-image-ready"
+        "container-loader-handoff-ready"
     );
     assert_eq!(output.execution_handoff_first_blocker, None);
     assert_eq!(
         output.execution_handoff_decision_code,
-        "handoff-entrypoint-materializer"
+        "handoff-container-loader-first-payload"
     );
     assert_eq!(
         output.entrypoint_materialization_evidence_status,
@@ -588,9 +589,52 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert_eq!(output.launcher_dry_run_ready, None);
     assert_eq!(output.launcher_dry_run_would_enter_lifecycle_hook, None);
     assert_eq!(output.launcher_dry_run_blocker_count, None);
+    assert_eq!(output.container_loader_status, "parsed");
+    assert_eq!(
+        output.container_loader_payload_scan_kind,
+        "nsld-container-toml"
+    );
+    assert!(output.container_loader_parsed);
+    assert_eq!(
+        output.container_loader_readiness.as_deref(),
+        Some("host-assisted")
+    );
+    assert_eq!(output.container_loader_ready, Some(true));
+    assert_eq!(output.container_loader_handoff_status, "ready");
+    assert!(output.container_loader_handoff_ready);
+    assert_eq!(output.container_loader_handoff_first_blocker, None);
+    assert_eq!(
+        output.container_loader_entry_symbol.as_deref(),
+        Some("main")
+    );
+    assert_eq!(
+        output.container_loader_entry_kind.as_deref(),
+        Some("lifecycle-bootstrap")
+    );
+    assert_eq!(
+        output.container_loader_entry_section_id.as_deref(),
+        Some("sec0000.compiled-artifact")
+    );
+    assert_eq!(output.container_loader_symbol_count, Some(2));
+    assert_eq!(output.first_payload_execution_status, "ready");
+    assert!(output.first_payload_execution_ready);
+    assert_eq!(output.first_payload_execution_target, "container-loader");
+    assert_eq!(
+        output.first_payload_execution_entry_symbol.as_deref(),
+        Some("main")
+    );
+    assert_eq!(
+        output.first_payload_execution_entry_kind.as_deref(),
+        Some("lifecycle-bootstrap")
+    );
+    assert_eq!(
+        output.first_payload_execution_entry_section_id.as_deref(),
+        Some("sec0000.compiled-artifact")
+    );
+    assert_eq!(output.first_payload_execution_first_blocker, None);
     assert_eq!(
         output.recommended_next_action,
-        "emit-final-executable-launcher-manifest"
+        "handoff-to-container-loader"
     );
     assert!(output.path_present);
     assert!(output.nsld_owned_output);
@@ -658,23 +702,43 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert!(output_json.contains("\"materialization_status\":\"self-contained-image-ready\""));
     assert!(output_json.contains("\"execution_handoff_contract\":\"nsld-final-output-handoff-v1\""));
     assert!(output_json.contains("\"execution_handoff_ready\":true"));
-    assert!(
-        output_json.contains("\"execution_handoff_status\":\"entrypoint-materializer-required\"")
-    );
-    assert!(output_json.contains("\"execution_handoff_target\":\"entrypoint-materializer\""));
+    assert!(output_json.contains("\"execution_handoff_status\":\"container-loader-handoff-ready\""));
+    assert!(output_json.contains("\"execution_handoff_target\":\"container-loader\""));
     assert!(output_json
-        .contains("\"execution_handoff_evidence_status\":\"verified-patched-image-ready\""));
+        .contains("\"execution_handoff_evidence_status\":\"container-loader-handoff-ready\""));
     assert!(output_json.contains("\"execution_handoff_first_blocker\":null"));
-    assert!(output_json
-        .contains("\"execution_handoff_decision_code\":\"handoff-entrypoint-materializer\""));
+    assert!(output_json.contains(
+        "\"execution_handoff_decision_code\":\"handoff-container-loader-first-payload\""
+    ));
     assert!(output_json
         .contains("\"entrypoint_materialization_evidence_status\":\"launcher-evidence-missing\""));
     assert!(output_json.contains("\"launcher_manifest_present\":false"));
     assert!(output_json.contains("\"launcher_manifest_ready\":null"));
     assert!(output_json.contains("\"launcher_dry_run_present\":false"));
     assert!(output_json.contains("\"launcher_dry_run_ready\":null"));
+    assert!(output_json.contains("\"container_loader_status\":\"parsed\""));
+    assert!(output_json.contains("\"container_loader_payload_scan_kind\":\"nsld-container-toml\""));
+    assert!(output_json.contains("\"container_loader_parsed\":true"));
+    assert!(output_json.contains("\"container_loader_readiness\":\"host-assisted\""));
+    assert!(output_json.contains("\"container_loader_ready\":true"));
+    assert!(output_json.contains("\"container_loader_handoff_status\":\"ready\""));
+    assert!(output_json.contains("\"container_loader_handoff_ready\":true"));
+    assert!(output_json.contains("\"container_loader_handoff_first_blocker\":null"));
+    assert!(output_json.contains("\"container_loader_entry_symbol\":\"main\""));
+    assert!(output_json.contains("\"container_loader_entry_kind\":\"lifecycle-bootstrap\""));
+    assert!(
+        output_json.contains("\"container_loader_entry_section_id\":\"sec0000.compiled-artifact\"")
+    );
+    assert!(output_json.contains("\"container_loader_symbol_count\":2"));
+    assert!(output_json.contains("\"first_payload_execution_status\":\"ready\""));
+    assert!(output_json.contains("\"first_payload_execution_ready\":true"));
+    assert!(output_json.contains("\"first_payload_execution_target\":\"container-loader\""));
+    assert!(output_json.contains("\"first_payload_execution_entry_symbol\":\"main\""));
+    assert!(output_json.contains("\"first_payload_execution_entry_kind\":\"lifecycle-bootstrap\""));
     assert!(output_json
-        .contains("\"recommended_next_action\":\"emit-final-executable-launcher-manifest\""));
+        .contains("\"first_payload_execution_entry_section_id\":\"sec0000.compiled-artifact\""));
+    assert!(output_json.contains("\"first_payload_execution_first_blocker\":null"));
+    assert!(output_json.contains("\"recommended_next_action\":\"handoff-to-container-loader\""));
     assert!(output_json.contains("\"path_present\":true"));
     assert!(output_json.contains("\"nsld_owned_output\":true"));
     assert!(output_json.contains("\"output_image_header_required\":true"));

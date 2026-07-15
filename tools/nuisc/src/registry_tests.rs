@@ -793,6 +793,9 @@ fn domain_contract_collects_registered_runtime_and_loader_facts() {
         .contains(&NUSTAR_DOMAIN_CONTRACT_GROUP_EXECUTION.to_owned()));
     assert!(contract
         .contract_groups
+        .contains(&NUSTAR_DOMAIN_CONTRACT_GROUP_DISPATCH_READINESS.to_owned()));
+    assert!(contract
+        .contract_groups
         .contains(&NUSTAR_DOMAIN_CONTRACT_GROUP_SCHEDULER.to_owned()));
     assert!(contract
         .extension_groups
@@ -816,6 +819,27 @@ fn domain_contract_collects_registered_runtime_and_loader_facts() {
         .contains(&"socket-transport".to_owned()));
     assert_eq!(contract.execution.execution_domain, "network");
     assert_eq!(contract.execution.contract_family, "nustar.network");
+    assert_eq!(contract.dispatch_readiness.status, "ready");
+    assert!(contract.dispatch_readiness.missing_signals.is_empty());
+    assert!(contract
+        .dispatch_readiness
+        .required_signals
+        .contains(&"bridge_entry".to_owned()));
+    assert!(contract.dispatch_readiness.dispatch_bridge_materialized);
+    assert!(contract.dispatch_readiness.execution_readiness_materialized);
+    assert_eq!(
+        contract.dispatch_readiness.bridge_entry,
+        "nuis.network.bridge.dispatch.v1"
+    );
+    assert_eq!(
+        contract.dispatch_readiness.lifecycle_phase_order,
+        vec![
+            "bind".to_owned(),
+            "submit".to_owned(),
+            "wait".to_owned(),
+            "finalize".to_owned()
+        ]
+    );
     assert_eq!(contract.scheduler.clock.domain_id, "network.clock.io.v1");
     assert!(contract
         .std_net
@@ -832,6 +856,11 @@ fn domain_contract_collects_registered_runtime_and_loader_facts() {
     assert!(json.contains("\"complete\":true"));
     assert!(json.contains("\"execution_skeleton_version\":\"nustar-execution-skeleton-v1\""));
     assert!(json.contains("\"execution_contract_family\":\"nustar.network\""));
+    assert!(json.contains("\"dispatch_readiness_status\":\"ready\""));
+    assert!(json.contains("\"dispatch_bridge_materialized\":true"));
+    assert!(json.contains("\"execution_readiness_materialized\":true"));
+    assert!(json.contains("\"dispatch_bridge_entry\":\"nuis.network.bridge.dispatch.v1\""));
+    assert!(json.contains("\"dispatch_readiness_contract\""));
     assert!(json.contains("\"capability_tags\":[\"io-reactor\""));
 }
 

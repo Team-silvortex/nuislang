@@ -1379,6 +1379,27 @@ report records `expected_image_resolver_status`,
 `final_executable_output_matches_verified_patched_image`. A matching hash
 without resolved/applied/verified patch evidence is not enough to become a
 runnable candidate.
+For self-contained Nuis images, the standalone `final-executable-output` report
+also inspects the final output payload as an Nsld container prefix and records a
+container-loader evidence group: `container_loader_status`,
+`container_loader_payload_scan_kind`, `container_loader_parsed`,
+`container_loader_readiness`, `container_loader_ready`,
+`container_loader_handoff_status`, `container_loader_handoff_ready`,
+`container_loader_handoff_first_blocker`, `container_loader_entry_symbol`,
+`container_loader_entry_kind`, `container_loader_entry_section_id`, and
+`container_loader_symbol_count`. The same evidence now feeds the first payload
+execution group: `first_payload_execution_status`,
+`first_payload_execution_ready`, `first_payload_execution_target`,
+`first_payload_execution_entry_symbol`,
+`first_payload_execution_entry_kind`,
+`first_payload_execution_entry_section_id`, and
+`first_payload_execution_first_blocker`. A self-contained image whose
+container-loader handoff is ready reports `execution_handoff_target =
+"container-loader"`, `execution_handoff_decision_code =
+"handoff-container-loader-first-payload"`, and `recommended_next_action =
+"handoff-to-container-loader"`. These fields are still read-only final-output
+evidence: they do not run the image, but they make the inner loader handoff the
+first explicit execution boundary before a future runtime/debugger consumes it.
 The standalone `final-executable-output` report also records the post-output
 entrypoint materialization evidence. For self-contained images, a ready output
 with no launcher artifacts reports

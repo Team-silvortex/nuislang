@@ -1,9 +1,9 @@
 use crate::registry::{
     NustarDomainContract, NustarDomainRegistration, NUSTAR_DOMAIN_CONTRACT_GROUP_ABI,
-    NUSTAR_DOMAIN_CONTRACT_GROUP_EXECUTION, NUSTAR_DOMAIN_CONTRACT_GROUP_HOST_BRIDGE,
-    NUSTAR_DOMAIN_CONTRACT_GROUP_LOADER, NUSTAR_DOMAIN_CONTRACT_GROUP_PACKAGE_IDENTITY,
-    NUSTAR_DOMAIN_CONTRACT_GROUP_RUNTIME, NUSTAR_DOMAIN_CONTRACT_GROUP_SCHEDULER,
-    NUSTAR_DOMAIN_CONTRACT_GROUP_STD_NET,
+    NUSTAR_DOMAIN_CONTRACT_GROUP_DISPATCH_READINESS, NUSTAR_DOMAIN_CONTRACT_GROUP_EXECUTION,
+    NUSTAR_DOMAIN_CONTRACT_GROUP_HOST_BRIDGE, NUSTAR_DOMAIN_CONTRACT_GROUP_LOADER,
+    NUSTAR_DOMAIN_CONTRACT_GROUP_PACKAGE_IDENTITY, NUSTAR_DOMAIN_CONTRACT_GROUP_RUNTIME,
+    NUSTAR_DOMAIN_CONTRACT_GROUP_SCHEDULER, NUSTAR_DOMAIN_CONTRACT_GROUP_STD_NET,
 };
 use crate::registry_json::{
     json_bool_field, json_field, json_object_field, json_optional_string_field,
@@ -54,6 +54,47 @@ pub fn domain_contract_object_json(contract: &NustarDomainContract) -> String {
         json_field("default_time_mode", &contract.execution.default_time_mode),
         json_field("contract_family", &contract.execution.contract_family),
         json_string_array_field("lowering_targets", &contract.execution.lowering_targets),
+    ];
+    let dispatch_readiness_fields = vec![
+        json_field("status", &contract.dispatch_readiness.status),
+        json_string_array_field(
+            "required_signals",
+            &contract.dispatch_readiness.required_signals,
+        ),
+        json_string_array_field(
+            "missing_signals",
+            &contract.dispatch_readiness.missing_signals,
+        ),
+        json_bool_field(
+            "execution_readiness_materialized",
+            contract.dispatch_readiness.execution_readiness_materialized,
+        ),
+        json_bool_field(
+            "dispatch_bridge_materialized",
+            contract.dispatch_readiness.dispatch_bridge_materialized,
+        ),
+        json_string_array_field(
+            "lifecycle_phase_order",
+            &contract.dispatch_readiness.lifecycle_phase_order,
+        ),
+        json_field(
+            "scheduler_binding",
+            &contract.dispatch_readiness.scheduler_binding,
+        ),
+        json_field("bridge_entry", &contract.dispatch_readiness.bridge_entry),
+        json_field(
+            "bridge_surface",
+            &contract.dispatch_readiness.bridge_surface,
+        ),
+        json_field(
+            "backend_stub_kind",
+            &contract.dispatch_readiness.backend_stub_kind,
+        ),
+        json_field(
+            "submission_mode",
+            &contract.dispatch_readiness.submission_mode,
+        ),
+        json_field("wake_policy", &contract.dispatch_readiness.wake_policy),
     ];
     let scheduler_contract_fields = vec![
         json_field(
@@ -121,6 +162,10 @@ pub fn domain_contract_object_json(contract: &NustarDomainContract) -> String {
             &execution_contract_fields,
         ),
         json_object_field(
+            NUSTAR_DOMAIN_CONTRACT_GROUP_DISPATCH_READINESS,
+            &dispatch_readiness_fields,
+        ),
+        json_object_field(
             NUSTAR_DOMAIN_CONTRACT_GROUP_SCHEDULER,
             &scheduler_contract_fields,
         ),
@@ -182,6 +227,54 @@ pub fn domain_contract_json(contract: &NustarDomainContract) -> String {
         json_string_array_field(
             "execution_lowering_targets",
             &contract.execution.lowering_targets,
+        ),
+        json_field(
+            "dispatch_readiness_status",
+            &contract.dispatch_readiness.status,
+        ),
+        json_bool_field(
+            "dispatch_bridge_materialized",
+            contract.dispatch_readiness.dispatch_bridge_materialized,
+        ),
+        json_bool_field(
+            "execution_readiness_materialized",
+            contract.dispatch_readiness.execution_readiness_materialized,
+        ),
+        json_string_array_field(
+            "dispatch_readiness_required_signals",
+            &contract.dispatch_readiness.required_signals,
+        ),
+        json_string_array_field(
+            "dispatch_readiness_missing_signals",
+            &contract.dispatch_readiness.missing_signals,
+        ),
+        json_string_array_field(
+            "dispatch_lifecycle_phase_order",
+            &contract.dispatch_readiness.lifecycle_phase_order,
+        ),
+        json_field(
+            "dispatch_scheduler_binding",
+            &contract.dispatch_readiness.scheduler_binding,
+        ),
+        json_field(
+            "dispatch_bridge_entry",
+            &contract.dispatch_readiness.bridge_entry,
+        ),
+        json_field(
+            "dispatch_bridge_surface",
+            &contract.dispatch_readiness.bridge_surface,
+        ),
+        json_field(
+            "dispatch_backend_stub_kind",
+            &contract.dispatch_readiness.backend_stub_kind,
+        ),
+        json_field(
+            "dispatch_submission_mode",
+            &contract.dispatch_readiness.submission_mode,
+        ),
+        json_field(
+            "dispatch_wake_policy",
+            &contract.dispatch_readiness.wake_policy,
         ),
         json_field(
             "scheduler_contract_stack",

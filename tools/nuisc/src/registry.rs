@@ -10,9 +10,10 @@ pub use crate::registry_build_contract_summary::{
     NustarDomainBuildContractSummary, NustarDomainLoweringPlanSummary, NustarHostBridgeSpecSummary,
 };
 pub use crate::registry_contract::{
-    capability_summary, domain_contract, execution_summary, load_domain_contract_for_domain,
-    missing_domain_contract_groups, required_domain_contract_groups,
-    NUSTAR_DOMAIN_CONTRACT_GROUP_ABI, NUSTAR_DOMAIN_CONTRACT_GROUP_EXECUTION,
+    capability_summary, dispatch_readiness_summary, domain_contract, execution_summary,
+    load_domain_contract_for_domain, missing_domain_contract_groups,
+    required_domain_contract_groups, NUSTAR_DOMAIN_CONTRACT_GROUP_ABI,
+    NUSTAR_DOMAIN_CONTRACT_GROUP_DISPATCH_READINESS, NUSTAR_DOMAIN_CONTRACT_GROUP_EXECUTION,
     NUSTAR_DOMAIN_CONTRACT_GROUP_HOST_BRIDGE, NUSTAR_DOMAIN_CONTRACT_GROUP_LOADER,
     NUSTAR_DOMAIN_CONTRACT_GROUP_PACKAGE_IDENTITY, NUSTAR_DOMAIN_CONTRACT_GROUP_RUNTIME,
     NUSTAR_DOMAIN_CONTRACT_GROUP_SCHEDULER, NUSTAR_DOMAIN_CONTRACT_GROUP_STD_NET,
@@ -39,9 +40,10 @@ pub use crate::registry_scheduler_summary::{
 };
 pub use crate::registry_types::{
     NustarBinding, NustarBindingPlan, NustarCapabilitySummary, NustarClockSummary,
-    NustarDomainContract, NustarDomainRegistration, NustarExecutionSummary,
-    NustarPackageIndexEntry, NustarPackageManifest, NustarRegistryIssue, NustarRegistryIssueKind,
-    ProjectDomainRegistryCheck, ProjectDomainRegistryIssue, ProjectDomainRegistryIssueKind,
+    NustarDispatchReadinessSummary, NustarDomainContract, NustarDomainRegistration,
+    NustarExecutionSummary, NustarPackageIndexEntry, NustarPackageManifest, NustarRegistryIssue,
+    NustarRegistryIssueKind, ProjectDomainRegistryCheck, ProjectDomainRegistryIssue,
+    ProjectDomainRegistryIssueKind,
 };
 pub use crate::registry_validation::{
     domain_registration, ensure_project_domain_registry_valid, ensure_registered_domains_valid,

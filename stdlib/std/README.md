@@ -74,7 +74,17 @@ Use these as the primary cluster names when placing new work:
   - shortest lane route:
     `io_runtime_recipe -> terminal_io_recipe -> host_text_runtime_recipe -> text_format_runtime_recipe -> json_runtime_recipe -> text_pipeline_recipe -> text_report_builder_recipe -> io_report_recipe -> text_json_recipe`
   - current project smoke:
-    `io_runtime_demo -> terminal_io_demo -> host_text_runtime_demo -> text_pipeline_demo -> io_report_demo -> filesystem_io_report_demo`
+    `io_runtime_demo -> terminal_io_demo -> stdin_runtime_demo -> host_text_runtime_demo -> text_pipeline_demo -> io_report_demo -> filesystem_io_report_demo`
+  - observable CLI smoke:
+    `std_tooling_observable_cli_smoke_checks_reports_and_stdin` builds
+    `filesystem_io_report_demo`, `stdin_runtime_demo`, and `cli_wc_demo`, checks
+    `run-artifact --json` prelaunch readiness, verifies stdout/stderr report
+    output from the host IO report lane, and runs the stdin demo binary with
+    piped input while checking `host_stdin_read` lowering anchors. It also
+    direct-runs the compiled `cli_wc_demo` binary through the
+    `argv -> file.read -> buffer` path with a real input file and
+    checks the generated `bytes/text_len/lines/words/scan_ns` text report plus
+    argv, file-read, and word-count lowering anchors.
 * task/runtime
   - local router:
     [task/README.md](task/README.md)

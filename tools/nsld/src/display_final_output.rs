@@ -80,6 +80,82 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         optional_usize_text(report.launcher_dry_run_blocker_count)
     );
     println!(
+        "  container_loader_status: {}",
+        report.container_loader_status
+    );
+    println!(
+        "  container_loader_payload_scan_kind: {}",
+        report.container_loader_payload_scan_kind
+    );
+    println!(
+        "  container_loader_parsed: {}",
+        report.container_loader_parsed
+    );
+    println!(
+        "  container_loader_readiness: {}",
+        optional_string_text(report.container_loader_readiness.as_deref())
+    );
+    println!(
+        "  container_loader_ready: {}",
+        optional_bool_text(report.container_loader_ready)
+    );
+    println!(
+        "  container_loader_handoff_status: {}",
+        report.container_loader_handoff_status
+    );
+    println!(
+        "  container_loader_handoff_ready: {}",
+        report.container_loader_handoff_ready
+    );
+    println!(
+        "  container_loader_handoff_first_blocker: {}",
+        optional_string_text(report.container_loader_handoff_first_blocker.as_deref())
+    );
+    println!(
+        "  container_loader_entry_symbol: {}",
+        optional_string_text(report.container_loader_entry_symbol.as_deref())
+    );
+    println!(
+        "  container_loader_entry_kind: {}",
+        optional_string_text(report.container_loader_entry_kind.as_deref())
+    );
+    println!(
+        "  container_loader_entry_section_id: {}",
+        optional_string_text(report.container_loader_entry_section_id.as_deref())
+    );
+    println!(
+        "  container_loader_symbol_count: {}",
+        optional_usize_text(report.container_loader_symbol_count)
+    );
+    println!(
+        "  first_payload_execution_status: {}",
+        report.first_payload_execution_status
+    );
+    println!(
+        "  first_payload_execution_ready: {}",
+        report.first_payload_execution_ready
+    );
+    println!(
+        "  first_payload_execution_target: {}",
+        report.first_payload_execution_target
+    );
+    println!(
+        "  first_payload_execution_entry_symbol: {}",
+        optional_string_text(report.first_payload_execution_entry_symbol.as_deref())
+    );
+    println!(
+        "  first_payload_execution_entry_kind: {}",
+        optional_string_text(report.first_payload_execution_entry_kind.as_deref())
+    );
+    println!(
+        "  first_payload_execution_entry_section_id: {}",
+        optional_string_text(report.first_payload_execution_entry_section_id.as_deref())
+    );
+    println!(
+        "  first_payload_execution_first_blocker: {}",
+        optional_string_text(report.first_payload_execution_first_blocker.as_deref())
+    );
+    println!(
         "  recommended_next_action: {}",
         report.recommended_next_action
     );

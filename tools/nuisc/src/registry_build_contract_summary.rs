@@ -1,5 +1,5 @@
-use crate::registry::NustarPackageManifest;
 use crate::registry_build_contract_preset::fallback_domain_build_preset;
+use crate::registry_types::NustarPackageManifest;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NustarDomainLoweringPlanSummary {

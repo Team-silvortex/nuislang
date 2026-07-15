@@ -787,10 +787,19 @@ fn build_report_json_exposes_bridge_bearing_exchange_summary() {
     assert!(json.contains("\"link_plan_domain_units\":3"));
     assert!(json.contains("\"link_plan_heterogeneous_domain_units\":2"));
     assert!(json.contains("\"link_plan_heterogeneous_domain_ready_units\":2"));
+    assert!(json.contains("\"link_plan_heterogeneous_domain_registry_dispatch_ready_units\":2"));
     assert!(json.contains("\"link_plan_heterogeneous_domain_readiness_ready\":true"));
     assert!(json.contains("\"link_plan_heterogeneous_domain_families\":[\"data\",\"shader\"]"));
     assert!(json.contains("\"link_plan_heterogeneous_domain_first_unready\":null"));
+    assert!(
+        json.contains("\"link_plan_heterogeneous_domain_registry_dispatch_first_blocked\":null")
+    );
     assert!(json.contains("\"link_plan_heterogeneous_domain_readiness\":[{"));
+    assert!(json.contains("\"registry_dispatch_readiness_status\":\"ready\""));
+    assert!(json.contains("\"registry_dispatch_readiness_ready\":true"));
+    assert!(json.contains("\"registry_dispatch_missing_signals\":[]"));
+    assert!(json.contains("\"registry_dispatch_bridge_materialized\":true"));
+    assert!(json.contains("\"registry_execution_readiness_materialized\":true"));
 }
 
 #[test]
@@ -821,8 +830,14 @@ fn build_report_json_exposes_shader_result_enum_bundle_summary() {
     assert!(json.contains("\"link_plan_domain_units\":3"));
     assert!(json.contains("\"link_plan_heterogeneous_domain_units\":2"));
     assert!(json.contains("\"link_plan_heterogeneous_domain_ready_units\":2"));
+    assert!(json.contains("\"link_plan_heterogeneous_domain_registry_dispatch_ready_units\":2"));
     assert!(json.contains("\"link_plan_heterogeneous_domain_readiness_ready\":true"));
     assert!(json.contains("\"link_plan_heterogeneous_domain_families\":[\"data\",\"shader\"]"));
+    assert!(
+        json.contains("\"link_plan_heterogeneous_domain_registry_dispatch_first_blocked\":null")
+    );
+    assert!(json.contains("\"registry_dispatch_readiness_status\":\"ready\""));
+    assert!(json.contains("\"registry_dispatch_readiness_ready\":true"));
 }
 
 #[test]
@@ -842,6 +857,11 @@ fn run_artifact_json_exposes_bridge_bearing_exchange_summary() {
     assert!(json.contains("\"link_plan_final_stage\":\"heterogeneous-bundle-pack\""));
     assert!(json.contains("\"link_plan_final_driver\":\"yir-pack-aot\""));
     assert!(json.contains("\"link_plan_domain_units\":3"));
+    assert!(json.contains("\"link_plan_heterogeneous_domain_registry_dispatch_ready_units\":2"));
+    assert!(
+        json.contains("\"link_plan_heterogeneous_domain_registry_dispatch_first_blocked\":null")
+    );
+    assert!(json.contains("\"registry_dispatch_readiness_status\":\"ready\""));
 }
 
 #[test]
