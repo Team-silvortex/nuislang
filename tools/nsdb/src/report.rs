@@ -1,5 +1,6 @@
 use crate::{
     handoff::read_payload_execution_handoff,
+    hetero_trace::read_hetero_runtime_trace,
     model::{
         NsdbClockEdgeDebugInfo, NsdbDataSegmentDebugInfo, NsdbDomainDebugInfo, NsdbInspectReport,
         NsdbLoweringUnitDebugInfo, NsdbPayloadExecutionEventFilter,
@@ -95,6 +96,7 @@ pub(crate) fn nsdb_inspect_report(
         .filter_map(read_sidecar_debug_info)
         .collect::<Vec<_>>();
     let mut payload_execution_handoff = read_payload_execution_handoff(Path::new(&plan.output_dir));
+    let hetero_runtime_trace = read_hetero_runtime_trace(Path::new(&plan.output_dir));
     let mut missing_metadata = Vec::new();
     if !plan.clock_protocol.validation.valid {
         missing_metadata.push("valid-clock-protocol".to_owned());
@@ -116,6 +118,9 @@ pub(crate) fn nsdb_inspect_report(
         missing_metadata.push("payload-execution-handoff".to_owned());
     } else if payload_execution_handoff.status != "ready" {
         missing_metadata.push("ready-payload-execution-handoff".to_owned());
+    }
+    if !hetero_runtime_trace.available {
+        missing_metadata.push("hetero-runtime-trace".to_owned());
     }
     if event_filter.active() {
         payload_execution_handoff
@@ -146,6 +151,7 @@ pub(crate) fn nsdb_inspect_report(
         sidecar_count: sidecars.len(),
         payload_execution_event_filter: event_filter,
         payload_execution_handoff,
+        hetero_runtime_trace,
         domains,
         clock_edges,
         data_segments,

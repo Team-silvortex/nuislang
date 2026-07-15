@@ -85,6 +85,39 @@ pub(crate) fn print_nsdb_inspect_report(report: &NsdbInspectReport) {
             event.next_action
         );
     }
+    println!(
+        "  hetero_runtime_trace_available: {}",
+        report.hetero_runtime_trace.available
+    );
+    println!(
+        "  hetero_runtime_trace_status: {}",
+        report.hetero_runtime_trace.status
+    );
+    println!(
+        "  hetero_runtime_trace_protocol: {}",
+        report.hetero_runtime_trace.protocol
+    );
+    println!(
+        "  hetero_runtime_trace_record_count: {}",
+        report.hetero_runtime_trace.record_count
+    );
+    println!(
+        "  hetero_runtime_trace_first_trace_id: {}",
+        report.hetero_runtime_trace.first_trace_id
+    );
+    for record in &report.hetero_runtime_trace.records {
+        println!(
+            "  hetero_runtime_trace_record: index={} trace={} role={} status={} domain={} backend={} target={} next={}",
+            record.index,
+            record.trace_id,
+            record.trace_role,
+            record.status,
+            record.domain_family,
+            record.backend_family,
+            record.target_device,
+            record.next_action
+        );
+    }
     for domain in &report.domains {
         println!(
             "  domain: {} package={} kind={} lowering={} backend={} scope={}",
@@ -219,11 +252,25 @@ pub(crate) fn print_nsdb_replay_plan(report: &NsdbInspectReport) {
     );
     for checkpoint in &plan.checkpoints {
         println!(
-            "  replay_checkpoint: index={} trace={} kind={} status={} phase={} entry={} blocker={} next={}",
+            "  replay_checkpoint: index={} trace={} kind={} status={} frame={} slot={} value_state={} value_sample_contract={} value_sample_ref={} value_sample_source={} value_sample_resolution={} value_sample_detail={} value_sample_materialization={} value_sample_payload={} value_sample_bridge_stub={} value_slot_id={} value_schema_status={} value_schema_hint={} phase={} entry={} blocker={} next={}",
             checkpoint.index,
             checkpoint.trace_id,
             checkpoint.checkpoint_kind,
             checkpoint.replay_status,
+            checkpoint.frame_id,
+            checkpoint.slot_scope,
+            checkpoint.value_state_status,
+            checkpoint.value_sample_contract,
+            checkpoint.value_sample_ref,
+            checkpoint.value_sample_source,
+            checkpoint.value_sample_resolution_status,
+            checkpoint.value_sample_resolution_detail,
+            checkpoint.value_sample_materialization_status,
+            checkpoint.value_sample_payload_path,
+            checkpoint.value_sample_bridge_stub_path,
+            checkpoint.value_slot_id,
+            checkpoint.value_schema_status,
+            checkpoint.value_schema_hint,
             checkpoint.execution_phase,
             checkpoint.entry_symbol,
             checkpoint.first_blocker.as_deref().unwrap_or("<none>"),

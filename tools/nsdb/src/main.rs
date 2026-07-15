@@ -1,6 +1,7 @@
 mod cli;
 mod display;
 mod handoff;
+mod hetero_trace;
 mod json;
 mod model;
 mod replay;

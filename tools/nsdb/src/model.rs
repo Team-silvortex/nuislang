@@ -14,12 +14,47 @@ pub(crate) struct NsdbInspectReport {
     pub(crate) sidecar_count: usize,
     pub(crate) payload_execution_event_filter: NsdbPayloadExecutionEventFilter,
     pub(crate) payload_execution_handoff: NsdbPayloadExecutionHandoffInfo,
+    pub(crate) hetero_runtime_trace: NsdbHeteroRuntimeTraceInfo,
     pub(crate) domains: Vec<NsdbDomainDebugInfo>,
     pub(crate) clock_edges: Vec<NsdbClockEdgeDebugInfo>,
     pub(crate) data_segments: Vec<NsdbDataSegmentDebugInfo>,
     pub(crate) lowering_units: Vec<NsdbLoweringUnitDebugInfo>,
     pub(crate) sidecars: Vec<NsdbSidecarDebugInfo>,
     pub(crate) missing_metadata: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsdbHeteroRuntimeTraceInfo {
+    pub(crate) available: bool,
+    pub(crate) path: String,
+    pub(crate) protocol: String,
+    pub(crate) debugger_contract: String,
+    pub(crate) status: String,
+    pub(crate) record_count: usize,
+    pub(crate) ready_record_count: usize,
+    pub(crate) backend_execution_record_count: usize,
+    pub(crate) first_trace_id: String,
+    pub(crate) first_blocker: String,
+    pub(crate) next_action: String,
+    pub(crate) records: Vec<NsdbHeteroRuntimeTraceRecord>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsdbHeteroRuntimeTraceRecord {
+    pub(crate) index: usize,
+    pub(crate) trace_id: String,
+    pub(crate) trace_role: String,
+    pub(crate) status: String,
+    pub(crate) domain_family: String,
+    pub(crate) backend_family: String,
+    pub(crate) target_device: String,
+    pub(crate) backend_artifact_key: String,
+    pub(crate) selected_lowering_target: String,
+    pub(crate) payload_format: String,
+    pub(crate) payload_path: String,
+    pub(crate) bridge_stub_path: String,
+    pub(crate) missing_signals: Vec<String>,
+    pub(crate) next_action: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

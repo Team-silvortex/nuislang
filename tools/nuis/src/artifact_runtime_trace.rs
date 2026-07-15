@@ -2,7 +2,14 @@ use crate::{
     artifact_doctor::BackendArtifactPayloadEvidence, json_bool_field, json_field,
     json_object_array_field, json_optional_string_field, json_string_array_field, json_usize_field,
 };
-use std::collections::BTreeSet;
+use std::{
+    collections::BTreeSet,
+    fs,
+    path::{Path, PathBuf},
+};
+
+const HETERO_RUNTIME_TRACE_FILE_NAME: &str = "nuis.nsdb.hetero-runtime-trace.toml";
+const HETERO_RUNTIME_TRACE_PROTOCOL: &str = "nuis-nsdb-hetero-runtime-trace-v1";
 
 struct HeteroRuntimeTraceRecord {
     trace_id: String,
@@ -40,6 +47,14 @@ pub(crate) struct HeteroRuntimeTraceSummary {
     records: Vec<HeteroRuntimeTraceRecord>,
     first_blocker: Option<String>,
     next_action: String,
+}
+
+pub(crate) struct HeteroRuntimeTracePersistence {
+    persisted: bool,
+    path: Option<PathBuf>,
+    record_count: usize,
+    first_trace_id: Option<String>,
+    error: Option<String>,
 }
 
 impl HeteroRuntimeTraceSummary {
@@ -238,6 +253,77 @@ impl HeteroRuntimeTraceSummary {
         ]
     }
 
+    pub(crate) fn persist_nsdb_trace(
+        &self,
+        output_dir: Option<&Path>,
+    ) -> HeteroRuntimeTracePersistence {
+        let first_trace_id = self.records.first().map(|record| record.trace_id.clone());
+        let Some(output_dir) = output_dir else {
+            return HeteroRuntimeTracePersistence {
+                persisted: false,
+                path: None,
+                record_count: self.records.len(),
+                first_trace_id,
+                error: Some("output_dir-unavailable".to_owned()),
+            };
+        };
+        let path = output_dir.join(HETERO_RUNTIME_TRACE_FILE_NAME);
+        if !self.available {
+            return HeteroRuntimeTracePersistence {
+                persisted: false,
+                path: Some(path),
+                record_count: self.records.len(),
+                first_trace_id,
+                error: Some("hetero-runtime-trace-unavailable".to_owned()),
+            };
+        }
+        match fs::write(&path, self.render_nsdb_trace_toml()) {
+            Ok(()) => HeteroRuntimeTracePersistence {
+                persisted: true,
+                path: Some(path),
+                record_count: self.records.len(),
+                first_trace_id,
+                error: None,
+            },
+            Err(error) => HeteroRuntimeTracePersistence {
+                persisted: false,
+                path: Some(path),
+                record_count: self.records.len(),
+                first_trace_id,
+                error: Some(error.to_string()),
+            },
+        }
+    }
+
+    fn render_nsdb_trace_toml(&self) -> String {
+        let mut out = String::new();
+        push_toml_string(&mut out, "protocol", HETERO_RUNTIME_TRACE_PROTOCOL);
+        push_toml_string(&mut out, "debugger_contract", self.debugger_contract);
+        push_toml_string(&mut out, "source", "run-artifact-hetero-runtime-trace");
+        push_toml_string(&mut out, "status", &self.status);
+        out.push_str(&format!("record_count = {}\n", self.records.len()));
+        out.push_str(&format!(
+            "ready_record_count = {}\n",
+            self.trace_ready_record_count
+        ));
+        out.push_str(&format!(
+            "backend_execution_record_count = {}\n",
+            self.backend_execution_record_count
+        ));
+        push_toml_optional_string(
+            &mut out,
+            "first_trace_id",
+            self.records.first().map(|record| record.trace_id.as_str()),
+        );
+        push_toml_optional_string(&mut out, "first_blocker", self.first_blocker.as_deref());
+        push_toml_string(&mut out, "next_action", &self.next_action);
+        for record in &self.records {
+            out.push_str("\n[[records]]\n");
+            record.push_toml_fields(&mut out);
+        }
+        out
+    }
+
     pub(crate) fn print_text(&self) {
         println!("  hetero_runtime_trace_available: {}", self.available);
         println!("  hetero_runtime_trace_status: {}", self.status);
@@ -308,6 +394,58 @@ impl HeteroRuntimeTraceSummary {
     }
 }
 
+impl HeteroRuntimeTracePersistence {
+    pub(crate) fn json_fields(&self) -> Vec<String> {
+        vec![
+            json_field(
+                "hetero_runtime_trace_persistence_protocol",
+                HETERO_RUNTIME_TRACE_PROTOCOL,
+            ),
+            json_bool_field("hetero_runtime_trace_persisted", self.persisted),
+            json_optional_string_field(
+                "hetero_runtime_trace_path",
+                self.path
+                    .as_ref()
+                    .map(|path| path.display().to_string())
+                    .as_deref(),
+            ),
+            json_usize_field(
+                "hetero_runtime_trace_persisted_record_count",
+                self.record_count,
+            ),
+            json_optional_string_field(
+                "hetero_runtime_trace_persisted_first_trace_id",
+                self.first_trace_id.as_deref(),
+            ),
+            json_optional_string_field("hetero_runtime_trace_persist_error", self.error.as_deref()),
+        ]
+    }
+
+    pub(crate) fn print_text(&self) {
+        println!("  hetero_runtime_trace_persistence_protocol: {HETERO_RUNTIME_TRACE_PROTOCOL}");
+        println!("  hetero_runtime_trace_persisted: {}", self.persisted);
+        println!(
+            "  hetero_runtime_trace_path: {}",
+            self.path
+                .as_ref()
+                .map(|path| path.display().to_string())
+                .unwrap_or_else(|| "<none>".to_owned())
+        );
+        println!(
+            "  hetero_runtime_trace_persisted_record_count: {}",
+            self.record_count
+        );
+        println!(
+            "  hetero_runtime_trace_persisted_first_trace_id: {}",
+            self.first_trace_id.as_deref().unwrap_or("<none>")
+        );
+        println!(
+            "  hetero_runtime_trace_persist_error: {}",
+            self.error.as_deref().unwrap_or("<none>")
+        );
+    }
+}
+
 impl HeteroRuntimeTraceRecord {
     fn json_object(&self) -> String {
         let fields = vec![
@@ -329,6 +467,26 @@ impl HeteroRuntimeTraceRecord {
             json_field("next_action", &self.next_action),
         ];
         format!("{{{}}}", fields.join(","))
+    }
+
+    fn push_toml_fields(&self, out: &mut String) {
+        push_toml_string(out, "trace_id", &self.trace_id);
+        push_toml_string(out, "trace_role", &self.trace_role);
+        push_toml_string(out, "status", &self.status);
+        push_toml_string(out, "domain_family", &self.domain_family);
+        push_toml_optional_string(out, "backend_family", self.backend_family.as_deref());
+        push_toml_optional_string(out, "target_device", self.target_device.as_deref());
+        push_toml_string(out, "backend_artifact_key", &self.backend_artifact_key);
+        push_toml_optional_string(
+            out,
+            "selected_lowering_target",
+            self.selected_lowering_target.as_deref(),
+        );
+        push_toml_optional_string(out, "payload_format", self.payload_format.as_deref());
+        push_toml_optional_string(out, "payload_path", self.payload_path.as_deref());
+        push_toml_optional_string(out, "bridge_stub_path", self.bridge_stub_path.as_deref());
+        push_toml_string_array(out, "missing_signals", &self.missing_signals);
+        push_toml_string(out, "next_action", &self.next_action);
     }
 }
 
@@ -417,4 +575,38 @@ fn joined_or_none(values: &[String]) -> String {
     } else {
         values.join(", ")
     }
+}
+
+fn push_toml_optional_string(out: &mut String, key: &str, value: Option<&str>) {
+    match value {
+        Some(value) => push_toml_string(out, key, value),
+        None => out.push_str(&format!("{key} = \"\"\n")),
+    }
+}
+
+fn push_toml_string(out: &mut String, key: &str, value: &str) {
+    out.push_str(key);
+    out.push_str(" = \"");
+    out.push_str(&toml_escape(value));
+    out.push_str("\"\n");
+}
+
+fn push_toml_string_array(out: &mut String, key: &str, values: &[String]) {
+    out.push_str(key);
+    out.push_str(" = [");
+    out.push_str(
+        &values
+            .iter()
+            .map(|value| format!("\"{}\"", toml_escape(value)))
+            .collect::<Vec<_>>()
+            .join(", "),
+    );
+    out.push_str("]\n");
+}
+
+fn toml_escape(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
 }

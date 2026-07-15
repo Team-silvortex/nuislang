@@ -67,6 +67,12 @@ It reports:
 * `replay_checkpoint_count`
 * `replayable_checkpoint_count`
 * `replay_checkpoints`
+* `frame_id`, `slot_scope`, and `value_state_status` inside each replay
+  checkpoint
+* `value_sample_contract`, `value_sample_ref`, and `value_sample_source` inside
+  each replay checkpoint
+* `value_sample_resolution_status` and `value_sample_resolution_detail` inside
+  each replay checkpoint
 * `debug_readiness = yir-debug-ready` when the linker graph, clock protocol,
   hetero calculate plan, lowering units, referenced lowering IR sidecars, and
   persisted payload execution handoff metadata are all readable
@@ -104,9 +110,36 @@ debugger frontdoor without asking `nsdb` to rerun the host probe.
 `replay-plan` maps the filtered payload execution events into read-only
 checkpoints. `container-loader-handoff` becomes a loader checkpoint,
 `device-dispatch` becomes a device-dispatch checkpoint, and blocked events
-carry their first blocker into the plan. This is not execution or time-travel
-debugging yet; it is the stable checkpoint skeleton that later YIR frame/value
-state can attach to.
+carry their first blocker into the plan. Each checkpoint also exposes a stable
+`frame_id`, `slot_scope`, and `value_state_status` so nsdb can attach future
+YIR frame/value samples without changing the checkpoint identity. The
+`value_sample_*` fields are references into later payload-execution or
+heterogeneous runtime trace records, not inline values. This keeps replay-plan
+as a deterministic debug plan while leaving actual value materialization to the
+runtime/device trace resolver. `value_sample_resolution_*` reports whether the
+current nsdb metadata can resolve that reference through payload handoff
+metadata, a visible domain, or a readable sidecar. This is not execution or
+time-travel debugging yet; it is the stable checkpoint skeleton that later YIR
+frame/value state can attach to.
+
+`run-artifact` persists the device/runtime sample source as
+`nuis.nsdb.hetero-runtime-trace.toml` using
+`nuis-nsdb-hetero-runtime-trace-v1` and
+`nsdb-yir-hetero-runtime-trace-v1`. `Nsdb` inspect reads this file as
+`hetero_runtime_trace_*` metadata, and replay planning uses its records before
+falling back to sidecar/domain metadata. The trace still carries metadata
+references rather than inline checkpoint values.
+
+Replay checkpoints now expose `value_sample_materialization_*` plus
+`value_sample_payload_format`, `value_sample_payload_path`, and
+`value_sample_bridge_stub_path`. These fields materialize a stable sample
+descriptor from the hetero trace record; they do not decode the payload into
+typed YIR values yet.
+
+Replay checkpoints also expose `value_slot_id`, `value_slot_scope`,
+`value_schema_contract`, `value_schema_status`, and `value_schema_hint`. These
+fields give future decoders a stable typed-slot target while keeping opaque
+runtime payloads opaque until a real decoder is available.
 
 ## Relationship To Nsld
 

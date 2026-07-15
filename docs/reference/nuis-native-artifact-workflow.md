@@ -383,6 +383,12 @@ Short reading rule:
   `nuis-nsdb-payload-execution-handoff-v1` /
   `nsdb-yir-payload-execution-trace-v1` pair before treating the first
   container-loader handoff as debugger metadata.
+* when heterogeneous runtime trace records are available, `run-artifact` also
+  persists `nuis.nsdb.hetero-runtime-trace.toml` beside the build manifest. The
+  file uses `nuis-nsdb-hetero-runtime-trace-v1`, mirrors the
+  `nsdb-yir-hetero-runtime-trace-v1` debugger contract, and records domain
+  metadata plus backend-artifact trace records so nsdb value-sample resolution
+  can read runtime/device trace metadata without scraping JSON output.
 * the current self-contained smoke proves the host-runner image boundary:
   `.nsb` readable, image hash matched, payload region mapped, and lifecycle
   hook handoff ready. The payload scanner now sees `nsld-container-toml`, the

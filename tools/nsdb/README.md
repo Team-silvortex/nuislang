@@ -49,5 +49,15 @@ Use `--event-status`, `--event-phase`, and `--trace-id` on `inspect` or
 `events` is the focused surface for scripts that only need payload execution
 event metadata.
 `replay-plan` turns the same filtered events into read-only
-`nsdb-payload-execution-replay-plan-v1` checkpoints; it does not execute or
+`nsdb-payload-execution-replay-plan-v1` checkpoints with stable frame/value
+anchors, `nsdb-yir-value-sample-ref-v1` sample references, and metadata-backed
+sample resolution status; it does not execute, inspect real values, or
 time-travel yet.
+`run-artifact` also writes `nuis.nsdb.hetero-runtime-trace.toml`; `nsdb`
+consumes that trace file for replay-plan sample resolution rather than
+embedding runtime values in replay plans.
+Replay checkpoints surface materialized sample descriptors via
+`value_sample_materialization_*`, payload format/path, and bridge stub path;
+typed value decoding is still a later layer.
+They also expose `value_slot_*` and `value_schema_*` fields so future decoders
+can attach typed YIR value snapshots without changing checkpoint identity.

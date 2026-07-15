@@ -1,6 +1,7 @@
 use crate::model::{
-    NsdbClockEdgeDebugInfo, NsdbDataSegmentDebugInfo, NsdbDomainDebugInfo, NsdbInspectReport,
-    NsdbLoweringUnitDebugInfo, NsdbPayloadExecutionEvent, NsdbSidecarDebugInfo,
+    NsdbClockEdgeDebugInfo, NsdbDataSegmentDebugInfo, NsdbDomainDebugInfo,
+    NsdbHeteroRuntimeTraceRecord, NsdbInspectReport, NsdbLoweringUnitDebugInfo,
+    NsdbPayloadExecutionEvent, NsdbSidecarDebugInfo,
 };
 use crate::replay::{build_replay_plan, NsdbReplayCheckpoint};
 
@@ -95,6 +96,54 @@ pub(crate) fn nsdb_inspect_report_json(report: &NsdbInspectReport) -> String {
             "\"payload_execution_events\":[{}]",
             payload_execution_events_json(&report.payload_execution_handoff.events)
         ),
+        json_bool_field(
+            "hetero_runtime_trace_available",
+            report.hetero_runtime_trace.available,
+        ),
+        json_string_field(
+            "hetero_runtime_trace_path",
+            &report.hetero_runtime_trace.path,
+        ),
+        json_string_field(
+            "hetero_runtime_trace_protocol",
+            &report.hetero_runtime_trace.protocol,
+        ),
+        json_string_field(
+            "hetero_runtime_trace_debugger_contract",
+            &report.hetero_runtime_trace.debugger_contract,
+        ),
+        json_string_field(
+            "hetero_runtime_trace_status",
+            &report.hetero_runtime_trace.status,
+        ),
+        json_usize_field(
+            "hetero_runtime_trace_record_count",
+            report.hetero_runtime_trace.record_count,
+        ),
+        json_usize_field(
+            "hetero_runtime_trace_ready_record_count",
+            report.hetero_runtime_trace.ready_record_count,
+        ),
+        json_usize_field(
+            "hetero_runtime_trace_backend_execution_record_count",
+            report.hetero_runtime_trace.backend_execution_record_count,
+        ),
+        json_string_field(
+            "hetero_runtime_trace_first_trace_id",
+            &report.hetero_runtime_trace.first_trace_id,
+        ),
+        json_string_field(
+            "hetero_runtime_trace_first_blocker",
+            &report.hetero_runtime_trace.first_blocker,
+        ),
+        json_string_field(
+            "hetero_runtime_trace_next_action",
+            &report.hetero_runtime_trace.next_action,
+        ),
+        format!(
+            "\"hetero_runtime_trace_records\":[{}]",
+            hetero_runtime_trace_records_json(&report.hetero_runtime_trace.records)
+        ),
         format!("\"domains\":[{}]", domains_json(&report.domains)),
         format!(
             "\"clock_edges\":[{}]",
@@ -186,6 +235,45 @@ fn replay_checkpoints_json(checkpoints: &[NsdbReplayCheckpoint]) -> String {
                 json_string_field("trace_id", &checkpoint.trace_id),
                 json_string_field("checkpoint_kind", &checkpoint.checkpoint_kind),
                 json_string_field("replay_status", &checkpoint.replay_status),
+                json_string_field("frame_id", &checkpoint.frame_id),
+                json_string_field("slot_scope", &checkpoint.slot_scope),
+                json_string_field("value_state_status", &checkpoint.value_state_status),
+                json_string_field("value_sample_contract", checkpoint.value_sample_contract),
+                json_string_field("value_sample_ref", &checkpoint.value_sample_ref),
+                json_string_field("value_sample_source", &checkpoint.value_sample_source),
+                json_string_field(
+                    "value_sample_resolution_status",
+                    &checkpoint.value_sample_resolution_status,
+                ),
+                json_string_field(
+                    "value_sample_resolution_detail",
+                    &checkpoint.value_sample_resolution_detail,
+                ),
+                json_string_field(
+                    "value_sample_materialization_status",
+                    &checkpoint.value_sample_materialization_status,
+                ),
+                json_string_field(
+                    "value_sample_materialization_detail",
+                    &checkpoint.value_sample_materialization_detail,
+                ),
+                json_string_field(
+                    "value_sample_payload_format",
+                    &checkpoint.value_sample_payload_format,
+                ),
+                json_string_field(
+                    "value_sample_payload_path",
+                    &checkpoint.value_sample_payload_path,
+                ),
+                json_string_field(
+                    "value_sample_bridge_stub_path",
+                    &checkpoint.value_sample_bridge_stub_path,
+                ),
+                json_string_field("value_slot_id", &checkpoint.value_slot_id),
+                json_string_field("value_slot_scope", &checkpoint.value_slot_scope),
+                json_string_field("value_schema_contract", checkpoint.value_schema_contract),
+                json_string_field("value_schema_status", &checkpoint.value_schema_status),
+                json_string_field("value_schema_hint", &checkpoint.value_schema_hint),
                 json_string_field("execution_phase", &checkpoint.execution_phase),
                 json_string_field("entry_symbol", &checkpoint.entry_symbol),
                 json_optional_string_field("first_blocker", checkpoint.first_blocker.as_deref()),
@@ -212,6 +300,32 @@ fn payload_execution_events_json(events: &[NsdbPayloadExecutionEvent]) -> String
                 json_string_field("entry_section_id", &event.entry_section_id),
                 json_string_field("first_blocker", &event.first_blocker),
                 json_string_field("next_action", &event.next_action),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn hetero_runtime_trace_records_json(records: &[NsdbHeteroRuntimeTraceRecord]) -> String {
+    records
+        .iter()
+        .map(|record| {
+            let fields = vec![
+                json_usize_field("index", record.index),
+                json_string_field("trace_id", &record.trace_id),
+                json_string_field("trace_role", &record.trace_role),
+                json_string_field("status", &record.status),
+                json_string_field("domain_family", &record.domain_family),
+                json_string_field("backend_family", &record.backend_family),
+                json_string_field("target_device", &record.target_device),
+                json_string_field("backend_artifact_key", &record.backend_artifact_key),
+                json_string_field("selected_lowering_target", &record.selected_lowering_target),
+                json_string_field("payload_format", &record.payload_format),
+                json_string_field("payload_path", &record.payload_path),
+                json_string_field("bridge_stub_path", &record.bridge_stub_path),
+                json_string_array_field("missing_signals", &record.missing_signals),
+                json_string_field("next_action", &record.next_action),
             ];
             format!("{{{}}}", fields.join(","))
         })

@@ -1027,6 +1027,13 @@ fn run_artifact_json_exposes_bridge_bearing_exchange_summary() {
     assert!(json.contains("\"hetero_runtime_trace_domain_families\":[\"data\",\"shader\"]"));
     assert!(json.contains("\"hetero_runtime_trace_target_devices\":[\"apple-silicon-gpu\"]"));
     assert!(json.contains("\"hetero_runtime_trace_records\":[{"));
+    assert!(json.contains("\"hetero_runtime_trace_persisted\":true"));
+    assert!(json.contains(
+        "\"hetero_runtime_trace_persistence_protocol\":\"nuis-nsdb-hetero-runtime-trace-v1\""
+    ));
+    assert!(json.contains("\"hetero_runtime_trace_path\":\""));
+    assert!(json.contains("\"hetero_runtime_trace_persisted_record_count\":2"));
+    assert!(json.contains("\"hetero_runtime_trace_persist_error\":null"));
     assert!(json.contains("\"trace_id\":\"hetero-trace:data:none:none\""));
     assert!(json.contains("\"trace_role\":\"domain-metadata\""));
     assert!(json.contains("\"status\":\"metadata-only\""));
@@ -1037,6 +1044,14 @@ fn run_artifact_json_exposes_bridge_bearing_exchange_summary() {
     assert!(json.contains("\"hetero_runtime_trace_first_blocker\":null"));
     assert!(json
         .contains("\"hetero_runtime_trace_next_action\":\"materialize-device-execution-trace\""));
+    let persisted_trace =
+        fs::read_to_string(output_dir.join("nuis.nsdb.hetero-runtime-trace.toml"))
+            .expect("hetero runtime trace metadata is persisted");
+    assert!(persisted_trace.contains("protocol = \"nuis-nsdb-hetero-runtime-trace-v1\""));
+    assert!(persisted_trace.contains("debugger_contract = \"nsdb-yir-hetero-runtime-trace-v1\""));
+    assert!(persisted_trace.contains("[[records]]"));
+    assert!(persisted_trace.contains("trace_id = \"hetero-trace:shader:metal:apple-silicon-gpu\""));
+    assert!(persisted_trace.contains("next_action = \"materialize-device-execution-trace\""));
 }
 
 #[test]

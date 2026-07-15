@@ -119,6 +119,7 @@ pub(crate) fn render_run_artifact_json(input: &Path) -> String {
     );
     let nsdb_handoff =
         persist_launch_evidence_nsdb_handoff(doctor.output_dir.as_deref(), &launch_evidence);
+    let hetero_trace_persistence = hetero_trace.persist_nsdb_trace(doctor.output_dir.as_deref());
     let mut out = String::from("{");
     append_json_field_strings(
         &mut out,
@@ -175,6 +176,7 @@ pub(crate) fn render_run_artifact_json(input: &Path) -> String {
     append_json_field_strings(&mut out, launch_evidence.json_fields());
     append_json_field_strings(&mut out, nsdb_handoff.json_fields());
     append_json_field_strings(&mut out, hetero_trace.json_fields());
+    append_json_field_strings(&mut out, hetero_trace_persistence.json_fields());
     append_runtime_session_json_fields(&mut out, manifest_verify.as_ref());
     append_json_field_strings(
         &mut out,
@@ -273,6 +275,9 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
             );
             nsdb_handoff.print_text();
             hetero_trace.print_text();
+            hetero_trace
+                .persist_nsdb_trace(doctor.output_dir.as_deref())
+                .print_text();
             let link_plan = doctor
                 .output_dir
                 .as_ref()
@@ -343,6 +348,9 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
             &diagnostics.backend_artifact_payload_evidence,
         );
         hetero_trace.print_text();
+        hetero_trace
+            .persist_nsdb_trace(doctor.output_dir.as_deref())
+            .print_text();
         print_run_artifact_link_plan_status(link_plan.as_ref());
     }
     if status.success() {
