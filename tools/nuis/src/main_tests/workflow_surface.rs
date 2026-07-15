@@ -156,6 +156,9 @@ mod cpu Main {
     assert!(json.contains("\"link_plan_heterogeneous_backend_artifact_units\":0"));
     assert!(json.contains("\"link_plan_heterogeneous_backend_artifact_ready_units\":0"));
     assert!(json.contains("\"link_plan_heterogeneous_backend_artifact_first_unready\":null"));
+    assert!(json.contains("\"nsld_backend_artifact_payload_evidence_available\":"));
+    assert!(json.contains("\"nsld_backend_artifact_payload_count\":"));
+    assert!(json.contains("\"nsld_backend_artifact_payload_role_status\":"));
     assert!(json.contains("\"nsld_prepare_command\":\"nsld prepare "));
     assert!(json.contains("\"nsld_drive_dry_run_command\":\"nsld drive "));
     assert!(json.contains("\"nsld_drive_dry_run_json_command\":\"nsld drive "));

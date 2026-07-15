@@ -58,6 +58,7 @@ mod final_executable_launcher_dry_run;
 mod final_executable_layout;
 mod final_executable_layout_stage;
 mod final_executable_output;
+mod final_executable_output_backend;
 mod final_executable_output_summary;
 mod final_executable_paths;
 mod final_executable_pipeline;

@@ -13,9 +13,63 @@ use super::{
     },
     final_executable_render::render_final_executable_image_dry_run,
     fnv1a64_hex,
-    reports::{NsldFinalExecutableImageDryRunEmitReport, NsldFinalExecutableImageDryRunReport},
+    reports::{
+        NsldFinalExecutableImageDryRunEmitReport, NsldFinalExecutableImageDryRunReport,
+        NsldFinalExecutablePayloadDiagnostic,
+    },
 };
 use std::{fs, path::Path};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BackendArtifactPayloadRoleEvidence {
+    count: usize,
+    present_count: usize,
+    status: String,
+    ids: Vec<String>,
+    kinds: Vec<String>,
+    first_missing: Option<String>,
+}
+
+fn backend_artifact_payload_role_evidence(
+    payloads: &[NsldFinalExecutablePayloadDiagnostic],
+) -> BackendArtifactPayloadRoleEvidence {
+    let backend_payloads = payloads
+        .iter()
+        .filter(|payload| payload.payload_kind.starts_with("nustar-backend-artifact:"));
+    let mut ids = Vec::new();
+    let mut kinds = Vec::new();
+    let mut present_count = 0usize;
+    let mut first_missing = None;
+    for payload in backend_payloads {
+        ids.push(payload.payload_id.clone());
+        kinds.push(payload.payload_kind.clone());
+        if payload.present {
+            present_count += 1;
+        } else if first_missing.is_none() {
+            first_missing = Some(payload.payload_id.clone());
+        }
+    }
+    let count = ids.len();
+    let status = if count == 0 {
+        "none"
+    } else if present_count == count {
+        "ready"
+    } else if present_count > 0 {
+        "partial"
+    } else {
+        "blocked"
+    }
+    .to_owned();
+
+    BackendArtifactPayloadRoleEvidence {
+        count,
+        present_count,
+        status,
+        ids,
+        kinds,
+        first_missing,
+    }
+}
 
 pub(crate) fn nsld_final_executable_image_dry_run_report(
     manifest: &Path,
@@ -91,6 +145,7 @@ pub(crate) fn nsld_final_executable_image_dry_run_report(
         .unwrap_or(false);
     let scheduler_metadata_hash =
         scheduler_metadata_payload.map(|payload| payload.content_hash.clone());
+    let backend_artifact_payloads = backend_artifact_payload_role_evidence(&layout.payloads);
 
     NsldFinalExecutableImageDryRunReport {
         manifest: manifest.display().to_string(),
@@ -113,6 +168,12 @@ pub(crate) fn nsld_final_executable_image_dry_run_report(
         scheduler_metadata_present,
         scheduler_metadata_offset,
         scheduler_metadata_hash,
+        backend_artifact_payload_count: backend_artifact_payloads.count,
+        backend_artifact_payload_present_count: backend_artifact_payloads.present_count,
+        backend_artifact_payload_role_status: backend_artifact_payloads.status,
+        backend_artifact_payload_ids: backend_artifact_payloads.ids,
+        backend_artifact_payload_kinds: backend_artifact_payloads.kinds,
+        backend_artifact_payload_first_missing: backend_artifact_payloads.first_missing,
         relocation_application_strategy: layout.relocation_application_strategy,
         relocation_application_count: layout.relocation_application_count,
         relocation_application_table_hash: layout.relocation_application_table_hash,

@@ -2,9 +2,9 @@ use super::{
     artifact_chain::{nsld_artifact_stage_kind_path_for_plan, NsldArtifactStageKind},
     container_verify,
     final_executable_layout::{
-        final_executable_byte_map_entries, final_executable_payloads,
-        nsld_final_executable_byte_map_hash, nsld_final_executable_layout_hash,
-        nsld_final_executable_relocation_application_table_hash,
+        final_executable_backend_artifact_payloads, final_executable_byte_map_entries,
+        final_executable_payloads, nsld_final_executable_byte_map_hash,
+        nsld_final_executable_layout_hash, nsld_final_executable_relocation_application_table_hash,
     },
     final_executable_paths::nsld_final_executable_layout_plan_path,
     final_executable_render::render_final_executable_layout_plan,
@@ -34,7 +34,11 @@ pub(crate) fn nsld_final_executable_layout_plan_report(
                 .display()
                 .to_string()
         });
-    let payloads = final_executable_payloads(&final_stage);
+    let mut payloads = final_executable_payloads(&final_stage);
+    payloads.extend(final_executable_backend_artifact_payloads(
+        plan,
+        payloads.len(),
+    ));
     let payload_names = payloads
         .iter()
         .map(|payload| payload.payload_kind.clone())

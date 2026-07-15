@@ -2,6 +2,8 @@ use std::fmt;
 use std::path::Path;
 
 mod link_plan;
+mod link_plan_readiness;
+mod link_plan_text;
 mod project_doctor;
 mod project_doctor_json;
 mod project_status;

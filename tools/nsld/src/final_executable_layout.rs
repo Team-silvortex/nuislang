@@ -40,6 +40,70 @@ pub(crate) fn final_executable_payloads(
     payloads
 }
 
+pub(crate) fn final_executable_backend_artifact_payloads(
+    plan: &nuisc::linker::LinkPlan,
+    start_order_index: usize,
+) -> Vec<NsldFinalExecutablePayloadDiagnostic> {
+    let mut units = plan
+        .domain_units
+        .iter()
+        .filter(|unit| unit.kind == "heterogeneous")
+        .filter(|unit| {
+            unit.backend_family.is_some()
+                && unit.target_device.is_some()
+                && unit.artifact_payload_blob_path.is_some()
+                && unit.artifact_payload_format.is_some()
+                && unit.artifact_bridge_stub_path.is_some()
+        })
+        .collect::<Vec<_>>();
+    units.sort_by(|left, right| {
+        left.backend_priority
+            .unwrap_or(usize::MAX)
+            .cmp(&right.backend_priority.unwrap_or(usize::MAX))
+            .then_with(|| {
+                backend_artifact_payload_key(left).cmp(&backend_artifact_payload_key(right))
+            })
+    });
+
+    units
+        .into_iter()
+        .enumerate()
+        .map(|(index, unit)| {
+            let path = unit.artifact_payload_blob_path.clone().unwrap_or_default();
+            let present = !path.is_empty() && std::path::Path::new(&path).exists();
+            let content_hash = if present {
+                std::fs::read(&path)
+                    .map(|bytes| fnv1a64_hex(&bytes))
+                    .unwrap_or_else(|_| "missing".to_owned())
+            } else {
+                "missing".to_owned()
+            };
+            NsldFinalExecutablePayloadDiagnostic {
+                order_index: start_order_index + index,
+                payload_id: format!("payload{:04}.backend-artifact", start_order_index + index),
+                payload_kind: format!(
+                    "nustar-backend-artifact:{}",
+                    backend_artifact_payload_key(unit)
+                ),
+                lifecycle_hook: "on_backend_artifact_load".to_owned(),
+                path,
+                content_hash,
+                required: true,
+                present,
+            }
+        })
+        .collect()
+}
+
+fn backend_artifact_payload_key(unit: &nuisc::linker::LinkPlanDomainUnit) -> String {
+    format!(
+        "{}:{}:{}",
+        unit.domain_family,
+        unit.backend_family.as_deref().unwrap_or("none"),
+        unit.target_device.as_deref().unwrap_or("none")
+    )
+}
+
 pub(crate) fn final_executable_byte_map_entries(
     payloads: &[NsldFinalExecutablePayloadDiagnostic],
     alignment: usize,

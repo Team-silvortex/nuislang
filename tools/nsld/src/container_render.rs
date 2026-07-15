@@ -178,6 +178,14 @@ pub(crate) fn render_container_toml(report: &NsldContainerReport) -> String {
         escape_toml_string(&report.external_import_table_hash)
     ));
     out.push_str(&format!(
+        "backend_artifact_payload_count = {}\n",
+        report.backend_artifact_payloads.len()
+    ));
+    out.push_str(&format!(
+        "backend_artifact_payload_table_hash = \"{}\"\n",
+        escape_toml_string(&report.backend_artifact_payload_table_hash)
+    ));
+    out.push_str(&format!(
         "payload_size_bytes = {}\n",
         report.payload_size_bytes
     ));
@@ -290,6 +298,37 @@ pub(crate) fn render_container_toml(report: &NsldContainerReport) -> String {
             escape_toml_string(&external_import.provider)
         ));
         out.push_str(&format!("required = {}\n", external_import.required));
+    }
+    for payload in &report.backend_artifact_payloads {
+        out.push_str("\n[[backend_artifact_payload]]\n");
+        out.push_str(&format!(
+            "payload_id = \"{}\"\n",
+            escape_toml_string(&payload.payload_id)
+        ));
+        out.push_str(&format!(
+            "domain_family = \"{}\"\n",
+            escape_toml_string(&payload.domain_family)
+        ));
+        out.push_str(&format!(
+            "backend_family = \"{}\"\n",
+            escape_toml_string(&payload.backend_family)
+        ));
+        out.push_str(&format!(
+            "target_device = \"{}\"\n",
+            escape_toml_string(&payload.target_device)
+        ));
+        out.push_str(&format!(
+            "payload_format = \"{}\"\n",
+            escape_toml_string(&payload.payload_format)
+        ));
+        out.push_str(&format!(
+            "payload_path = \"{}\"\n",
+            escape_toml_string(&payload.payload_path)
+        ));
+        out.push_str(&format!(
+            "role_status = \"{}\"\n",
+            escape_toml_string(&payload.role_status)
+        ));
     }
     for section in &report.sections {
         out.push_str("\n[[section]]\n");

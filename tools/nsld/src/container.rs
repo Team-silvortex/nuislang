@@ -125,6 +125,40 @@ pub(crate) fn external_imports(plan: &nuisc::linker::LinkPlan) -> Vec<NsldContai
     imports
 }
 
+pub(crate) fn backend_artifact_payloads(
+    plan: &nuisc::linker::LinkPlan,
+) -> Vec<NsldContainerBackendArtifactPayload> {
+    plan.domain_units
+        .iter()
+        .filter(|unit| unit.kind == "heterogeneous")
+        .filter_map(|unit| {
+            let backend_family = unit.backend_family.clone()?;
+            let target_device = unit.target_device.clone()?;
+            let payload_path = unit.artifact_payload_blob_path.clone()?;
+            let payload_format = unit.artifact_payload_format.clone()?;
+            let role_status = if unit.selected_lowering_target.is_some()
+                && unit.artifact_bridge_stub_path.is_some()
+            {
+                "ready"
+            } else {
+                "partial"
+            };
+            Some(NsldContainerBackendArtifactPayload {
+                payload_id: format!(
+                    "backend-artifact:{}:{}:{}",
+                    unit.domain_family, backend_family, target_device
+                ),
+                domain_family: unit.domain_family.clone(),
+                backend_family,
+                target_device,
+                payload_format,
+                payload_path,
+                role_status: role_status.to_owned(),
+            })
+        })
+        .collect()
+}
+
 pub(crate) fn compatibility_domains(
     plan: &nuisc::linker::LinkPlan,
     sections: &[NsldContainerSectionEntry],
@@ -317,6 +351,7 @@ pub(crate) fn file_hash(
     relocations: &[NsldContainerRelocationEntry],
     compatibility_domains: &[NsldContainerCompatibilityDomain],
     external_imports: &[NsldContainerExternalImport],
+    backend_artifact_payloads: &[NsldContainerBackendArtifactPayload],
     loader_readiness: &str,
     loader_blockers: &[String],
     payload_size_bytes: usize,
@@ -430,6 +465,23 @@ pub(crate) fn file_hash(
         } else {
             "optional"
         });
+        material.push('\n');
+    }
+    for payload in backend_artifact_payloads {
+        material.push_str("backend_artifact_payload\t");
+        material.push_str(&payload.payload_id);
+        material.push('\t');
+        material.push_str(&payload.domain_family);
+        material.push('\t');
+        material.push_str(&payload.backend_family);
+        material.push('\t');
+        material.push_str(&payload.target_device);
+        material.push('\t');
+        material.push_str(&payload.payload_format);
+        material.push('\t');
+        material.push_str(&payload.payload_path);
+        material.push('\t');
+        material.push_str(&payload.role_status);
         material.push('\n');
     }
     for blocker in loader_blockers {

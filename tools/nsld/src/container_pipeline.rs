@@ -208,12 +208,16 @@ pub(crate) fn nsld_container_report(
     let external_imports = container::external_imports(plan);
     let external_import_table_hash =
         container::external_import_table_hash(&external_imports, fnv1a64_hex);
+    let backend_artifact_payloads = container::backend_artifact_payloads(plan);
+    let backend_artifact_payload_table_hash =
+        container::backend_artifact_payload_table_hash(&backend_artifact_payloads, fnv1a64_hex);
     let metadata_table_hash = container::metadata_table_hash(
         &container_section_table_hash,
         &loader_symbol_table_hash,
         &relocation_table_hash,
         &compatibility_domain_table_hash,
         &external_import_table_hash,
+        &backend_artifact_payload_table_hash,
         fnv1a64_hex,
     );
     let loader_blockers = container::loader_blockers(&external_imports, &container_plan.blockers);
@@ -240,6 +244,7 @@ pub(crate) fn nsld_container_report(
         &relocations,
         &compatibility_domains,
         &external_imports,
+        &backend_artifact_payloads,
         &loader_readiness,
         &loader_blockers,
         payload_size_bytes,
@@ -267,6 +272,8 @@ pub(crate) fn nsld_container_report(
         compatibility_domains,
         external_import_table_hash,
         external_imports,
+        backend_artifact_payload_table_hash,
+        backend_artifact_payloads,
         payload_size_bytes,
         payload_hash,
         payload_path: format!("{}.payload", container_plan.output_path),

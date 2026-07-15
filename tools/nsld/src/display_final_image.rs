@@ -224,6 +224,28 @@ pub(crate) fn print_nsld_final_executable_image_dry_run_report(
         optional_string_text(report.scheduler_metadata_hash.as_deref())
     );
     println!(
+        "  backend_artifact_payload_count: {}",
+        report.backend_artifact_payload_count
+    );
+    println!(
+        "  backend_artifact_payload_present_count: {}",
+        report.backend_artifact_payload_present_count
+    );
+    println!(
+        "  backend_artifact_payload_role_status: {}",
+        report.backend_artifact_payload_role_status
+    );
+    for payload_id in &report.backend_artifact_payload_ids {
+        println!("  backend_artifact_payload_id: {payload_id}");
+    }
+    for payload_kind in &report.backend_artifact_payload_kinds {
+        println!("  backend_artifact_payload_kind: {payload_kind}");
+    }
+    println!(
+        "  backend_artifact_payload_first_missing: {}",
+        optional_string_text(report.backend_artifact_payload_first_missing.as_deref())
+    );
+    println!(
         "  relocation_application_strategy: {}",
         report.relocation_application_strategy
     );

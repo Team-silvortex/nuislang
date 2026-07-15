@@ -1,6 +1,7 @@
 use super::*;
 
 mod command;
+mod command_nsld_text;
 mod compile_pipeline;
 mod frontdoor;
 mod json_bits;

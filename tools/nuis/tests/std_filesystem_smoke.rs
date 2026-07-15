@@ -651,12 +651,24 @@ fn std_path_safety_release_check_reports_nsld_drive_command_set() {
         "nsld drive until-clean did not apply the expected remaining stage count\n{nsld_until_clean_stdout}"
     );
     assert!(
-        nsld_until_clean_stdout.contains("\"stop_reason\":\"clean\""),
-        "nsld drive until-clean did not stop cleanly after materializing the current chain\n{nsld_until_clean_stdout}"
+        nsld_until_clean_stdout.contains("\"stop_reason\":\"host-finalizer-policy-required\""),
+        "nsld drive until-clean should stop at the explicit host finalizer policy boundary\n{nsld_until_clean_stdout}"
     );
     assert!(
-        nsld_until_clean_stdout.contains("\"stop_command_id\":null"),
-        "nsld drive until-clean should not repeat the host-assisted final pipeline command\n{nsld_until_clean_stdout}"
+        nsld_until_clean_stdout.contains("\"stop_command_id\":\"final-executable-output\""),
+        "nsld drive until-clean should report the final executable output boundary command\n{nsld_until_clean_stdout}"
+    );
+    assert!(
+        nsld_until_clean_stdout.contains(
+            "\"stop_source\":\"final-output-boundary\""
+        ),
+        "nsld drive until-clean should classify the stop as the final output boundary\n{nsld_until_clean_stdout}"
+    );
+    assert!(
+        nsld_until_clean_stdout
+            .contains("\"messages\":[\"applied emit-units\"")
+            && nsld_until_clean_stdout.contains("\"read-only-boundary:final-executable-output\""),
+        "nsld drive until-clean should materialize the chain before the read-only host boundary\n{nsld_until_clean_stdout}"
     );
     assert!(
         nsld_until_clean_stdout.contains("\"last_command_id\":\"emit-final-executable-pipeline\""),

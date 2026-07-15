@@ -66,6 +66,65 @@ mod cpu Main {
 }
 
 #[test]
+fn artifact_doctor_json_mirrors_nsld_backend_artifact_payload_evidence() {
+    let output_dir = temp_dir("artifact_doctor_backend_payload_evidence_outputs");
+    fs::write(
+        output_dir.join("nuis.nsld.final-executable-image-dry-run.toml"),
+        r#"
+schema = "nuis-nsld-final-executable-image-dry-run-v1"
+backend_artifact_payload_count = 1
+backend_artifact_payload_present_count = 1
+backend_artifact_payload_role_status = "ready"
+backend_artifact_payload_ids = ["payload0005.backend-artifact"]
+backend_artifact_payload_kinds = ["nustar-backend-artifact:kernel:aarch64:apple-silicon-cpu"]
+backend_artifact_payload_first_missing = ""
+"#
+        .trim_start(),
+    )
+    .expect("write image dry-run");
+
+    let json = render_artifact_doctor_json(&output_dir);
+
+    assert!(json.contains("\"nsld_backend_artifact_payload_evidence_available\":true"));
+    assert!(json.contains("\"nsld_backend_artifact_payload_evidence_path\":\""));
+    assert!(json.contains("nuis.nsld.final-executable-image-dry-run.toml"));
+    assert!(json.contains("\"nsld_backend_artifact_payload_count\":1"));
+    assert!(json.contains("\"nsld_backend_artifact_payload_present_count\":1"));
+    assert!(json.contains("\"nsld_backend_artifact_payload_role_status\":\"ready\""));
+    assert!(
+        json.contains("\"nsld_backend_artifact_payload_ids\":[\"payload0005.backend-artifact\"]")
+    );
+    assert!(json.contains(
+        "\"nsld_backend_artifact_payload_kinds\":[\"nustar-backend-artifact:kernel:aarch64:apple-silicon-cpu\"]"
+    ));
+    assert!(json.contains("\"nsld_backend_artifact_payload_first_missing\":null"));
+    assert!(json
+        .contains("\"artifact_launch_evidence_backend_artifact_payload_evidence_available\":true"));
+    assert!(json.contains("\"artifact_launch_evidence_backend_artifact_payload_count\":1"));
+    assert!(json
+        .contains("\"artifact_launch_evidence_backend_artifact_payload_role_status\":\"ready\""));
+    assert!(json.contains(
+        "\"artifact_launch_evidence_backend_artifact_payload_ids\":[\"payload0005.backend-artifact\"]"
+    ));
+    assert!(json.contains(
+        "\"artifact_launch_evidence_backend_artifact_payload_kinds\":[\"nustar-backend-artifact:kernel:aarch64:apple-silicon-cpu\"]"
+    ));
+
+    let run_json = render_run_artifact_json(&output_dir);
+    assert!(
+        run_json.contains("\"launch_evidence_backend_artifact_payload_evidence_available\":true")
+    );
+    assert!(run_json.contains("\"launch_evidence_backend_artifact_payload_count\":1"));
+    assert!(run_json.contains("\"launch_evidence_backend_artifact_payload_role_status\":\"ready\""));
+    assert!(run_json.contains(
+        "\"launch_evidence_backend_artifact_payload_ids\":[\"payload0005.backend-artifact\"]"
+    ));
+    assert!(run_json.contains(
+        "\"launch_evidence_backend_artifact_payload_kinds\":[\"nustar-backend-artifact:kernel:aarch64:apple-silicon-cpu\"]"
+    ));
+}
+
+#[test]
 fn build_output_self_check_reports_missing_binary_as_incomplete_output() {
     let project_root = write_temp_project_fixture(
         "build_output_self_check_missing_binary",

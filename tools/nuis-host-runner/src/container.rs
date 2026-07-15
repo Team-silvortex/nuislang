@@ -1,3 +1,11 @@
+use crate::{
+    container_backend_payload::{scan_backend_artifact_payloads, BackendArtifactPayloadSummary},
+    container_toml::{
+        array_table_blocks, bool_value, bool_value_from_lines, first_array_table_block,
+        string_array_value, string_value, string_value_from_lines, usize_value,
+    },
+};
+
 pub(super) const CONTAINER_SCHEMA: &str = "nuis-nsld-container-v1";
 pub(super) const CONTAINER_SCHEMA_VERSION: usize = 1;
 pub(super) const CONTAINER_KIND: &str = "deterministic-hetero-container";
@@ -74,10 +82,12 @@ pub(super) struct ContainerLoaderSummary {
     pub(super) container_section: ContainerSectionSummary,
     pub(super) compatibility_domain: CompatibilityDomainSummary,
     pub(super) external_import: ExternalImportSummary,
+    pub(super) backend_artifact_payload: BackendArtifactPayloadSummary,
     pub(super) loader_symbol_table_hash: Option<String>,
     pub(super) relocation_table_hash: Option<String>,
     pub(super) compatibility_domain_table_hash: Option<String>,
     pub(super) external_import_table_hash: Option<String>,
+    pub(super) backend_artifact_payload_table_hash: Option<String>,
     pub(super) container_payload_size_bytes: Option<usize>,
     pub(super) container_payload_hash: Option<String>,
     pub(super) container_payload_path: Option<String>,
@@ -130,10 +140,13 @@ pub(super) fn scan_container_loader(
     let container_section_count = usize_value(source, "section_count");
     let compatibility_domain_count = usize_value(source, "compatibility_domain_count");
     let external_import_count = usize_value(source, "external_import_count");
+    let backend_artifact_payload_count = usize_value(source, "backend_artifact_payload_count");
     let loader_symbol_table_hash = string_value(source, "loader_symbol_table_hash");
     let relocation_table_hash = string_value(source, "relocation_table_hash");
     let compatibility_domain_table_hash = string_value(source, "compatibility_domain_table_hash");
     let external_import_table_hash = string_value(source, "external_import_table_hash");
+    let backend_artifact_payload_table_hash =
+        string_value(source, "backend_artifact_payload_table_hash");
     let container_payload_size_bytes = usize_value(source, "payload_size_bytes");
     let container_payload_hash = string_value(source, "payload_hash");
     let container_payload_path = string_value(source, "payload_path");
@@ -153,6 +166,8 @@ pub(super) fn scan_container_loader(
     );
     let compatibility_domain = scan_compatibility_domains(source, compatibility_domain_count);
     let external_import = scan_external_imports(source, external_import_count);
+    let backend_artifact_payload =
+        scan_backend_artifact_payloads(source, backend_artifact_payload_count);
     let handoff_blockers = container_loader_handoff_blockers(
         container_schema.as_deref(),
         container_schema_version,
@@ -194,10 +209,12 @@ pub(super) fn scan_container_loader(
         container_section,
         compatibility_domain,
         external_import,
+        backend_artifact_payload,
         loader_symbol_table_hash,
         relocation_table_hash,
         compatibility_domain_table_hash,
         external_import_table_hash,
+        backend_artifact_payload_table_hash,
         container_payload_size_bytes,
         container_payload_hash,
         container_payload_path,
@@ -233,10 +250,12 @@ fn empty_container_loader(status: &str, handoff_blockers: Vec<String>) -> Contai
         container_section: ContainerSectionSummary::empty(status),
         compatibility_domain: CompatibilityDomainSummary::empty(status),
         external_import: ExternalImportSummary::empty(status),
+        backend_artifact_payload: BackendArtifactPayloadSummary::empty(status),
         loader_symbol_table_hash: None,
         relocation_table_hash: None,
         compatibility_domain_table_hash: None,
         external_import_table_hash: None,
+        backend_artifact_payload_table_hash: None,
         container_payload_size_bytes: None,
         container_payload_hash: None,
         container_payload_path: None,
@@ -652,105 +671,4 @@ fn container_loader_handoff_blockers(
         }
     }
     blockers
-}
-
-fn string_value(source: &str, key: &str) -> Option<String> {
-    let raw = raw_value(source, key)?.trim();
-    let quoted = raw.strip_prefix('"')?.strip_suffix('"')?;
-    Some(quoted.replace("\\\"", "\"").replace("\\\\", "\\"))
-}
-
-fn bool_value(source: &str, key: &str) -> Option<bool> {
-    match raw_value(source, key)?.trim() {
-        "true" => Some(true),
-        "false" => Some(false),
-        _ => None,
-    }
-}
-
-fn usize_value(source: &str, key: &str) -> Option<usize> {
-    raw_value(source, key)?.trim().parse().ok()
-}
-
-fn string_array_value(source: &str, key: &str) -> Vec<String> {
-    let Some(raw) = raw_value(source, key) else {
-        return Vec::new();
-    };
-    let Some(body) = raw
-        .trim()
-        .strip_prefix('[')
-        .and_then(|value| value.strip_suffix(']'))
-    else {
-        return Vec::new();
-    };
-    body.split(',')
-        .filter_map(|entry| {
-            let entry = entry.trim();
-            let quoted = entry.strip_prefix('"')?.strip_suffix('"')?;
-            Some(quoted.replace("\\\"", "\"").replace("\\\\", "\\"))
-        })
-        .collect()
-}
-
-fn string_value_from_lines(lines: &[&str], key: &str) -> Option<String> {
-    let raw = raw_value_from_lines(lines, key)?.trim();
-    let quoted = raw.strip_prefix('"')?.strip_suffix('"')?;
-    Some(quoted.replace("\\\"", "\"").replace("\\\\", "\\"))
-}
-
-fn bool_value_from_lines(lines: &[&str], key: &str) -> Option<bool> {
-    match raw_value_from_lines(lines, key)?.trim() {
-        "true" => Some(true),
-        "false" => Some(false),
-        _ => None,
-    }
-}
-
-fn raw_value<'a>(source: &'a str, key: &str) -> Option<&'a str> {
-    raw_value_from_lines(&source.lines().collect::<Vec<_>>(), key)
-}
-
-fn raw_value_from_lines<'a>(lines: &[&'a str], key: &str) -> Option<&'a str> {
-    lines.iter().copied().find_map(|raw| {
-        let (found_key, value) = raw.trim().split_once('=')?;
-        (found_key.trim() == key).then_some(value.trim())
-    })
-}
-
-fn first_array_table_block<'a>(source: &'a str, table: &str) -> Option<Vec<&'a str>> {
-    array_table_blocks(source, table).into_iter().next()
-}
-
-fn array_table_blocks<'a>(source: &'a str, table: &str) -> Vec<Vec<&'a str>> {
-    let header = format!("[[{table}]]");
-    let mut in_table = false;
-    let mut blocks = Vec::new();
-    let mut block = Vec::new();
-    for line in source.lines() {
-        let trimmed = line.trim();
-        if trimmed == header {
-            if in_table {
-                blocks.push(block);
-                block = Vec::new();
-            }
-            in_table = true;
-            continue;
-        }
-        if in_table && trimmed.starts_with("[[") && trimmed.ends_with("]]") {
-            blocks.push(block);
-            block = Vec::new();
-            in_table = false;
-            continue;
-        }
-        if in_table {
-            block.push(line);
-        }
-    }
-    if in_table {
-        blocks.push(block);
-    }
-    blocks
-        .into_iter()
-        .filter(|block| !block.is_empty())
-        .collect()
 }

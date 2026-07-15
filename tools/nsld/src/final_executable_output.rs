@@ -7,6 +7,10 @@ use super::{
         FINAL_EXECUTABLE_IMAGE_MAGIC_TEXT, FINAL_EXECUTABLE_IMAGE_VERSION,
     },
     final_executable_image_stage::nsld_verify_final_executable_image_dry_run_report,
+    final_executable_layout_stage::nsld_final_executable_layout_plan_report,
+    final_executable_output_backend::{
+        nsld_backend_artifact_assembly_boundary, nsld_backend_artifact_candidates,
+    },
     final_executable_paths::{
         nsld_final_executable_launcher_dry_run_path, nsld_final_executable_launcher_manifest_path,
     },
@@ -23,6 +27,7 @@ pub(crate) fn nsld_final_executable_output_report(
 ) -> NsldFinalExecutableOutputReport {
     let final_stage = nsld_verify_final_stage_plan_report(manifest, plan);
     let final_emit = nsld_verify_final_executable_emit_report(manifest, plan);
+    let final_layout = nsld_final_executable_layout_plan_report(manifest, plan);
     let image_dry_run = nsld_verify_final_executable_image_dry_run_report(manifest, plan);
     let output_path = plan.final_stage.output_path.clone();
     let host_native_output = plan.final_stage.link_mode == "host-toolchain-finalize";
@@ -205,6 +210,21 @@ pub(crate) fn nsld_final_executable_output_report(
                 .unwrap_or("missing")
         ));
     }
+    let backend_artifacts = nsld_backend_artifact_candidates(plan);
+    let backend_artifact_assembly =
+        nsld_backend_artifact_assembly_boundary(&backend_artifacts, &final_layout);
+    if !backend_artifacts.blockers.is_empty() {
+        let mut ordered_blockers = backend_artifacts.blockers.clone();
+        ordered_blockers.append(&mut blockers);
+        blockers = ordered_blockers;
+        issues.extend(backend_artifacts.issues.clone());
+    }
+    if !backend_artifact_assembly.blockers.is_empty() {
+        let mut ordered_blockers = backend_artifact_assembly.blockers.clone();
+        ordered_blockers.append(&mut blockers);
+        blockers = ordered_blockers;
+        issues.extend(backend_artifact_assembly.issues.clone());
+    }
     let dispatch_blockers = nsld_nustar_dispatch_blockers(plan);
     if !dispatch_blockers.blockers.is_empty() {
         let mut ordered_blockers = dispatch_blockers.blockers;
@@ -364,6 +384,17 @@ pub(crate) fn nsld_final_executable_output_report(
         final_executable_emitted: final_emit.actual_emitted,
         final_executable_blocker_count: final_emit.actual_blocker_count,
         runnable_candidate,
+        backend_artifact_candidate_count: backend_artifacts.candidate_count,
+        backend_artifact_ready_count: backend_artifacts.ready_count,
+        backend_artifact_selection_status: backend_artifacts.selection_status,
+        backend_artifact_ordered_candidates: backend_artifacts.ordered_candidates,
+        backend_artifact_selected_candidate: backend_artifacts.selected_candidate,
+        backend_artifact_selection_reason: backend_artifacts.selection_reason,
+        backend_artifact_first_unready: backend_artifacts.first_unready,
+        backend_artifact_assembly_status: backend_artifact_assembly.status,
+        backend_artifact_selected_payload_path: backend_artifact_assembly.selected_payload_path,
+        backend_artifact_selected_payload_consumed: backend_artifact_assembly.consumed,
+        backend_artifact_assembly_first_blocker: backend_artifact_assembly.first_blocker,
         blockers,
         issues,
     }
@@ -601,6 +632,11 @@ fn final_executable_output_contract_blocker(blockers: &[String]) -> Option<Strin
     blockers
         .iter()
         .find(|blocker| blocker.starts_with("nustar-dispatch:"))
+        .or_else(|| {
+            blockers
+                .iter()
+                .find(|blocker| blocker.starts_with("nustar-backend-artifact:"))
+        })
         .or_else(|| {
             blockers
                 .iter()

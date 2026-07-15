@@ -272,6 +272,49 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         optional_usize_text(report.final_executable_blocker_count)
     );
     println!("  runnable_candidate: {}", report.runnable_candidate);
+    println!(
+        "  backend_artifact_candidate_count: {}",
+        report.backend_artifact_candidate_count
+    );
+    println!(
+        "  backend_artifact_ready_count: {}",
+        report.backend_artifact_ready_count
+    );
+    println!(
+        "  backend_artifact_selection_status: {}",
+        report.backend_artifact_selection_status
+    );
+    println!(
+        "  backend_artifact_first_unready: {}",
+        optional_string_text(report.backend_artifact_first_unready.as_deref())
+    );
+    println!(
+        "  backend_artifact_selected_candidate: {}",
+        optional_string_text(report.backend_artifact_selected_candidate.as_deref())
+    );
+    println!(
+        "  backend_artifact_selection_reason: {}",
+        report.backend_artifact_selection_reason
+    );
+    println!(
+        "  backend_artifact_assembly_status: {}",
+        report.backend_artifact_assembly_status
+    );
+    println!(
+        "  backend_artifact_selected_payload_path: {}",
+        optional_string_text(report.backend_artifact_selected_payload_path.as_deref())
+    );
+    println!(
+        "  backend_artifact_selected_payload_consumed: {}",
+        report.backend_artifact_selected_payload_consumed
+    );
+    println!(
+        "  backend_artifact_assembly_first_blocker: {}",
+        optional_string_text(report.backend_artifact_assembly_first_blocker.as_deref())
+    );
+    for candidate in &report.backend_artifact_ordered_candidates {
+        println!("  backend_artifact_ordered_candidate: {candidate}");
+    }
     for blocker in &report.blockers {
         println!("  blocker: {blocker}");
     }

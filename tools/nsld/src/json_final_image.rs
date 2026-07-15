@@ -34,6 +34,30 @@ pub(crate) fn nsld_final_executable_image_dry_run_report_json(
             "scheduler_metadata_hash",
             report.scheduler_metadata_hash.as_deref(),
         ),
+        json_usize_field(
+            "backend_artifact_payload_count",
+            report.backend_artifact_payload_count,
+        ),
+        json_usize_field(
+            "backend_artifact_payload_present_count",
+            report.backend_artifact_payload_present_count,
+        ),
+        json_string_field(
+            "backend_artifact_payload_role_status",
+            &report.backend_artifact_payload_role_status,
+        ),
+        json_string_array_field(
+            "backend_artifact_payload_ids",
+            &report.backend_artifact_payload_ids,
+        ),
+        json_string_array_field(
+            "backend_artifact_payload_kinds",
+            &report.backend_artifact_payload_kinds,
+        ),
+        json_optional_string_field(
+            "backend_artifact_payload_first_missing",
+            report.backend_artifact_payload_first_missing.as_deref(),
+        ),
         json_string_field(
             "relocation_application_strategy",
             &report.relocation_application_strategy,

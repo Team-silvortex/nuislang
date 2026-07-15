@@ -338,6 +338,46 @@ pub(super) fn print_text_report(report: &RunnerReport) {
         joined_or_none(&report.external_import_required_imports)
     );
     println!(
+        "  backend_artifact_payload_count: {}",
+        optional_usize_text(report.backend_artifact_payload_count)
+    );
+    println!(
+        "  backend_artifact_payload_parsed_count: {}",
+        report.backend_artifact_payload_parsed_count
+    );
+    println!(
+        "  backend_artifact_payload_ready_count: {}",
+        report.backend_artifact_payload_ready_count
+    );
+    println!(
+        "  backend_artifact_payload_first_id: {}",
+        report
+            .backend_artifact_payload_first_id
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    println!(
+        "  backend_artifact_payload_first_kind: {}",
+        report
+            .backend_artifact_payload_first_kind
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    println!(
+        "  backend_artifact_payload_first_role_status: {}",
+        report
+            .backend_artifact_payload_first_role_status
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    println!(
+        "  backend_artifact_payload_table_hash: {}",
+        report
+            .backend_artifact_payload_table_hash
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    println!(
         "  container_loader_handoff_status: {}",
         report.container_loader_handoff_status
     );
@@ -365,7 +405,7 @@ pub(super) fn print_text_report(report: &RunnerReport) {
 
 pub(super) fn render_json_report(report: &RunnerReport) -> String {
     format!(
-        "{{\"kind\":\"nuis_host_runner\",\"protocol\":\"{}\",\"ready\":{},\"would_enter_lifecycle_hook\":{},\"manifest_path\":\"{}\",\"nsb_path\":{},\"nsb_readable\":{},\"nsb_hash_expected\":{},\"nsb_hash_actual\":{},\"nsb_hash_matches\":{},\"nsb_payload_offset\":{},\"nsb_payload_span\":{},\"nsb_payload_region_mapped\":{},\"nsb_payload_region_bytes\":{},\"nsb_payload_region_hash\":{},\"nsb_payload_scan_status\":\"{}\",\"nsb_payload_scan_kind\":\"{}\",\"nsb_payload_prefix_hex\":{},\"nsb_payload_prefix_text\":{},\"container_loader_status\":\"{}\",\"container_schema\":{},\"container_schema_version\":{},\"container_kind\":{},\"container_producer\":{},\"container_producer_phase\":{},\"container_ready\":{},\"container_blockers\":[{}],\"container_magic\":{},\"container_version\":{},\"container_metadata_table_hash\":{},\"container_section_table_hash\":{},\"container_hash\":{},\"container_section_count\":{},\"container_section_parsed_count\":{},\"container_first_section_id\":{},\"container_first_section_kind\":{},\"container_entry_section_found\":{},\"container_payload_size_bytes\":{},\"container_payload_hash\":{},\"container_payload_path\":{},\"container_loader_readiness\":{},\"container_loader_blockers\":[{}],\"container_loader_entry_kind\":{},\"container_loader_entry_symbol\":{},\"container_loader_entry_section_id\":{},\"container_loader_symbol_count\":{},\"loader_symbol_table_hash\":{},\"container_loader_symbol_status\":\"{}\",\"container_loader_symbol_id\":{},\"container_loader_symbol_kind\":{},\"container_loader_symbol_name\":{},\"container_loader_symbol_lifecycle_hook\":{},\"container_loader_symbol_section_id\":{},\"container_relocation_count\":{},\"relocation_table_hash\":{},\"container_relocation_parsed_count\":{},\"container_first_relocation_kind\":{},\"container_first_relocation_source_section_id\":{},\"container_first_relocation_target_symbol_id\":{},\"container_first_relocation_targets_loader_symbol\":{},\"container_first_relocation_source_matches_loader_symbol\":{},\"compatibility_domain_count\":{},\"compatibility_domain_table_hash\":{},\"compatibility_domain_parsed_count\":{},\"compatibility_domain_first_kind\":{},\"compatibility_domain_required_count\":{},\"external_import_count\":{},\"external_import_table_hash\":{},\"external_import_parsed_count\":{},\"external_import_first_kind\":{},\"external_import_first_name\":{},\"external_import_required_imports\":[{}],\"container_loader_handoff_status\":\"{}\",\"container_loader_handoff_ready\":{},\"container_loader_handoff_blockers\":[{}],\"nsb_layout_hash\":{},\"nsb_byte_map_hash\":{},\"scheduler_entry\":\"{}\",\"lifecycle_hook\":\"{}\",\"launch_steps\":[{}],\"blockers\":[{}]}}",
+        "{{\"kind\":\"nuis_host_runner\",\"protocol\":\"{}\",\"ready\":{},\"would_enter_lifecycle_hook\":{},\"manifest_path\":\"{}\",\"nsb_path\":{},\"nsb_readable\":{},\"nsb_hash_expected\":{},\"nsb_hash_actual\":{},\"nsb_hash_matches\":{},\"nsb_payload_offset\":{},\"nsb_payload_span\":{},\"nsb_payload_region_mapped\":{},\"nsb_payload_region_bytes\":{},\"nsb_payload_region_hash\":{},\"nsb_payload_scan_status\":\"{}\",\"nsb_payload_scan_kind\":\"{}\",\"nsb_payload_prefix_hex\":{},\"nsb_payload_prefix_text\":{},\"container_loader_status\":\"{}\",\"container_schema\":{},\"container_schema_version\":{},\"container_kind\":{},\"container_producer\":{},\"container_producer_phase\":{},\"container_ready\":{},\"container_blockers\":[{}],\"container_magic\":{},\"container_version\":{},\"container_metadata_table_hash\":{},\"container_section_table_hash\":{},\"container_hash\":{},\"container_section_count\":{},\"container_section_parsed_count\":{},\"container_first_section_id\":{},\"container_first_section_kind\":{},\"container_entry_section_found\":{},\"container_payload_size_bytes\":{},\"container_payload_hash\":{},\"container_payload_path\":{},\"container_loader_readiness\":{},\"container_loader_blockers\":[{}],\"container_loader_entry_kind\":{},\"container_loader_entry_symbol\":{},\"container_loader_entry_section_id\":{},\"container_loader_symbol_count\":{},\"loader_symbol_table_hash\":{},\"container_loader_symbol_status\":\"{}\",\"container_loader_symbol_id\":{},\"container_loader_symbol_kind\":{},\"container_loader_symbol_name\":{},\"container_loader_symbol_lifecycle_hook\":{},\"container_loader_symbol_section_id\":{},\"container_relocation_count\":{},\"relocation_table_hash\":{},\"container_relocation_parsed_count\":{},\"container_first_relocation_kind\":{},\"container_first_relocation_source_section_id\":{},\"container_first_relocation_target_symbol_id\":{},\"container_first_relocation_targets_loader_symbol\":{},\"container_first_relocation_source_matches_loader_symbol\":{},\"compatibility_domain_count\":{},\"compatibility_domain_table_hash\":{},\"compatibility_domain_parsed_count\":{},\"compatibility_domain_first_kind\":{},\"compatibility_domain_required_count\":{},\"external_import_count\":{},\"external_import_table_hash\":{},\"external_import_parsed_count\":{},\"external_import_first_kind\":{},\"external_import_first_name\":{},\"external_import_required_imports\":[{}],\"backend_artifact_payload_count\":{},\"backend_artifact_payload_table_hash\":{},\"backend_artifact_payload_parsed_count\":{},\"backend_artifact_payload_ready_count\":{},\"backend_artifact_payload_first_id\":{},\"backend_artifact_payload_first_kind\":{},\"backend_artifact_payload_first_role_status\":{},\"container_loader_handoff_status\":\"{}\",\"container_loader_handoff_ready\":{},\"container_loader_handoff_blockers\":[{}],\"nsb_layout_hash\":{},\"nsb_byte_map_hash\":{},\"scheduler_entry\":\"{}\",\"lifecycle_hook\":\"{}\",\"launch_steps\":[{}],\"blockers\":[{}]}}",
         json_escape(RUNNER_PROTOCOL),
         report.ready,
         report.would_enter_lifecycle_hook,
@@ -437,6 +477,13 @@ pub(super) fn render_json_report(report: &RunnerReport) -> String {
         json_optional_string(report.external_import_first_kind.as_deref()),
         json_optional_string(report.external_import_first_name.as_deref()),
         json_string_array(&report.external_import_required_imports),
+        json_optional_usize(report.backend_artifact_payload_count),
+        json_optional_string(report.backend_artifact_payload_table_hash.as_deref()),
+        report.backend_artifact_payload_parsed_count,
+        report.backend_artifact_payload_ready_count,
+        json_optional_string(report.backend_artifact_payload_first_id.as_deref()),
+        json_optional_string(report.backend_artifact_payload_first_kind.as_deref()),
+        json_optional_string(report.backend_artifact_payload_first_role_status.as_deref()),
         json_escape(&report.container_loader_handoff_status),
         report.container_loader_handoff_ready,
         json_string_array(&report.container_loader_handoff_blockers),

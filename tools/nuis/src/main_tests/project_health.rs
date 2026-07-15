@@ -124,13 +124,15 @@ mod cpu Main {
     assert!(json.contains("\"text_handle_rewrite_helper_hits\":1"));
     assert!(json.contains("\"text_handle_rewrite_local_hits\":1"));
     assert!(json.contains("\"text_handle_rewrite_total_hits\":2"));
-    assert!(json.contains("\"public_surface_modules\":10"));
+    assert!(json.contains("\"public_surface_modules\":11"));
+    assert!(json.contains("\"functions\":[\"exported\"]"));
     assert!(json.contains("\"public_functions\":"));
     assert!(json.contains("\"galaxy_lock_status\":\"missing\""));
-    assert!(json.contains("\"galaxy_surface_ids_count\":18"));
+    assert!(json.contains("\"galaxy_surface_ids_count\":19"));
     assert!(json.contains("\"surface.ns-nova.renderer.v1\""));
     assert!(json.contains("\"contract.core.prelude.primitive-values.v1\""));
     assert!(json.contains("\"surface.std.collections.v1\""));
+    assert!(json.contains("\"surface.std.cli-report-file-contracts.v1\""));
     assert!(json.contains("\"galaxy_records\":[{"));
     assert!(json.contains("\"galaxy_imports_count\":0"));
     assert!(json.contains("\"galaxy_hidden_manual_only_library_modules_count\":1"));
@@ -277,7 +279,8 @@ mod cpu Main {
     assert!(json.contains("\"galaxy_check_status\":\"skipped\""));
     assert!(json.contains("\"galaxy_lock_status\":\"missing\""));
     assert!(json.contains("\"galaxy_imports_count\":1"));
-    assert!(json.contains("\"galaxy_surface_ids_count\":18"));
+    assert!(json.contains("\"galaxy_surface_ids_count\":19"));
+    assert!(json.contains("\"surface.std.cli-report-file-contracts.v1\""));
     assert!(json.contains("\"surface.ns-nova.renderer.v1\""));
     assert!(json.contains("\"contract.core.prelude.primitive-values.v1\""));
     assert!(json.contains("\"surface.std.collections.v1\""));
@@ -362,7 +365,8 @@ mod cpu Main {
 
     let json = render_project_doctor_json(&project_root).expect("render doctor json");
 
-    assert!(json.contains("\"galaxy_surface_ids_count\":18"));
+    assert!(json.contains("\"galaxy_surface_ids_count\":19"));
+    assert!(json.contains("\"surface.std.cli-report-file-contracts.v1\""));
     assert!(json.contains("\"surface.ns-nova.renderer.v1\""));
     assert!(json.contains("\"contract.core.prelude.primitive-values.v1\""));
     assert!(json.contains("\"surface.std.collections.v1\""));
@@ -402,7 +406,8 @@ mod cpu Main {
     assert!(json.contains("\"source_kind\":\"project\""));
     assert!(json.contains("\"project\":\"imports_manual_only_hint\""));
     assert!(json.contains("\"explicit_galaxy_imports_count\":0"));
-    assert!(json.contains("\"visible_library_modules_count\":9"));
+    assert!(json.contains("\"visible_library_modules_count\":10"));
+    assert!(json.contains("\"std:lib/report_contracts.ns\""));
     assert!(json.contains("\"hidden_manual_only_library_modules_count\":1"));
     assert!(
         json.contains("\"hidden_manual_only_library_modules\":[\"ns-nova:lib/nova_contracts.ns\"]")

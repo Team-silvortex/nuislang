@@ -57,6 +57,8 @@ pub(crate) struct NsldContainerReport {
     pub(crate) compatibility_domains: Vec<NsldContainerCompatibilityDomain>,
     pub(crate) external_import_table_hash: String,
     pub(crate) external_imports: Vec<NsldContainerExternalImport>,
+    pub(crate) backend_artifact_payload_table_hash: String,
+    pub(crate) backend_artifact_payloads: Vec<NsldContainerBackendArtifactPayload>,
     pub(crate) payload_size_bytes: usize,
     pub(crate) payload_hash: String,
     pub(crate) output_path: String,
@@ -74,6 +76,17 @@ pub(crate) struct NsldContainerExternalImport {
     pub(crate) import_name: String,
     pub(crate) provider: String,
     pub(crate) required: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldContainerBackendArtifactPayload {
+    pub(crate) payload_id: String,
+    pub(crate) domain_family: String,
+    pub(crate) backend_family: String,
+    pub(crate) target_device: String,
+    pub(crate) payload_format: String,
+    pub(crate) payload_path: String,
+    pub(crate) role_status: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

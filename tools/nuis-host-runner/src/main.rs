@@ -4,6 +4,8 @@ use std::{
 };
 
 mod container;
+mod container_backend_payload;
+mod container_toml;
 mod report;
 
 use container::scan_container_loader;
@@ -134,6 +136,13 @@ struct RunnerReport {
     external_import_first_kind: Option<String>,
     external_import_first_name: Option<String>,
     external_import_required_imports: Vec<String>,
+    backend_artifact_payload_count: Option<usize>,
+    backend_artifact_payload_parsed_count: usize,
+    backend_artifact_payload_ready_count: usize,
+    backend_artifact_payload_first_id: Option<String>,
+    backend_artifact_payload_first_kind: Option<String>,
+    backend_artifact_payload_first_role_status: Option<String>,
+    backend_artifact_payload_table_hash: Option<String>,
     container_payload_path: Option<String>,
     container_loader_handoff_status: String,
     container_loader_handoff_ready: bool,
@@ -420,6 +429,21 @@ fn validate_handoff(
         external_import_first_kind: container_loader.external_import.first_import_kind,
         external_import_first_name: container_loader.external_import.first_import_name,
         external_import_required_imports: container_loader.external_import.required_imports,
+        backend_artifact_payload_count: container_loader.backend_artifact_payload.declared_count,
+        backend_artifact_payload_parsed_count: container_loader
+            .backend_artifact_payload
+            .parsed_count,
+        backend_artifact_payload_ready_count: container_loader.backend_artifact_payload.ready_count,
+        backend_artifact_payload_first_id: container_loader
+            .backend_artifact_payload
+            .first_payload_id,
+        backend_artifact_payload_first_kind: container_loader
+            .backend_artifact_payload
+            .first_payload_kind,
+        backend_artifact_payload_first_role_status: container_loader
+            .backend_artifact_payload
+            .first_role_status,
+        backend_artifact_payload_table_hash: container_loader.backend_artifact_payload_table_hash,
         container_payload_path: container_loader.container_payload_path,
         container_loader_handoff_status: container_loader.handoff_status,
         container_loader_handoff_ready: container_loader.handoff_ready,

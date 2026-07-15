@@ -1,7 +1,7 @@
 use super::*;
 
 fn nsb_payload() -> &'static [u8] {
-    b"schema = \"nuis-nsld-container-v1\"\nschema_version = 1\ncontainer_kind = \"deterministic-hetero-container\"\nproducer = \"nsld\"\nproducer_phase = \"alpha-0.10.0\"\nready = true\ncontainer_magic = \"NUISNSLD\"\ncontainer_version = 1\nmetadata_table_hash = \"0x1111111111111111\"\ncontainer_section_table_hash = \"0x2222222222222222\"\ncontainer_hash = \"0xaaaaaaaaaaaaaaaa\"\nsection_count = 1\ncompatibility_domain_count = 0\nexternal_import_count = 0\nloader_readiness = \"host-assisted\"\nloader_blockers = []\nloader_entry_kind = \"lifecycle-bootstrap\"\nloader_entry_symbol = \"main\"\nloader_entry_section_id = \"sec0000.compiled-artifact\"\nloader_symbol_count = 3\nloader_symbol_table_hash = \"0x3333333333333333\"\nrelocation_count = 1\nrelocation_table_hash = \"0x4444444444444444\"\ncompatibility_domain_table_hash = \"0x5555555555555555\"\nexternal_import_table_hash = \"0x6666666666666666\"\npayload_size_bytes = 128\npayload_hash = \"0xbbbbbbbbbbbbbbbb\"\npayload_path = \"nuis.nsld.container.payload\"\nblockers = []\n\n[[loader_symbol]]\nsymbol_id = \"sym0000.loader-entry\"\nsymbol_kind = \"lifecycle-bootstrap\"\nsymbol_name = \"main\"\nlifecycle_hook = \"on_lifecycle_bootstrap\"\nsection_id = \"sec0000.compiled-artifact\"\n\n[[relocation]]\nrelocation_id = \"rel0000.lifecycle-entry\"\nrelocation_kind = \"lifecycle-entry-binding\"\nsource_section_id = \"sec0000.compiled-artifact\"\nsource_offset = 0\ntarget_symbol_id = \"sym0000.loader-entry\"\naddend = 0\n\n[[section]]\norder_index = 0\nsection_id = \"sec0000.compiled-artifact\"\nsection_kind = \"compiled-artifact\"\nsource_path = \"main.nuis\"\nsource_hash = \"0xcccccccccccccccc\"\npayload_hash = \"0xdddddddddddddddd\"\nrequired = true\noffset = 0\nsize_bytes = 128\n"
+    b"schema = \"nuis-nsld-container-v1\"\nschema_version = 1\ncontainer_kind = \"deterministic-hetero-container\"\nproducer = \"nsld\"\nproducer_phase = \"alpha-0.10.0\"\nready = true\ncontainer_magic = \"NUISNSLD\"\ncontainer_version = 1\nmetadata_table_hash = \"0x1111111111111111\"\ncontainer_section_table_hash = \"0x2222222222222222\"\ncontainer_hash = \"0xaaaaaaaaaaaaaaaa\"\nsection_count = 1\ncompatibility_domain_count = 0\nexternal_import_count = 0\nbackend_artifact_payload_count = 1\nbackend_artifact_payload_table_hash = \"0x7777777777777777\"\nloader_readiness = \"host-assisted\"\nloader_blockers = []\nloader_entry_kind = \"lifecycle-bootstrap\"\nloader_entry_symbol = \"main\"\nloader_entry_section_id = \"sec0000.compiled-artifact\"\nloader_symbol_count = 3\nloader_symbol_table_hash = \"0x3333333333333333\"\nrelocation_count = 1\nrelocation_table_hash = \"0x4444444444444444\"\ncompatibility_domain_table_hash = \"0x5555555555555555\"\nexternal_import_table_hash = \"0x6666666666666666\"\npayload_size_bytes = 128\npayload_hash = \"0xbbbbbbbbbbbbbbbb\"\npayload_path = \"nuis.nsld.container.payload\"\nblockers = []\n\n[[backend_artifact_payload]]\npayload_id = \"backend-artifact:kernel:aarch64:apple-silicon-cpu\"\ndomain_family = \"kernel\"\nbackend_family = \"aarch64\"\ntarget_device = \"apple-silicon-cpu\"\npayload_format = \"nuis-kernel-payload-v1\"\npayload_path = \"kernel.payload.bin\"\nrole_status = \"ready\"\n\n[[loader_symbol]]\nsymbol_id = \"sym0000.loader-entry\"\nsymbol_kind = \"lifecycle-bootstrap\"\nsymbol_name = \"main\"\nlifecycle_hook = \"on_lifecycle_bootstrap\"\nsection_id = \"sec0000.compiled-artifact\"\n\n[[relocation]]\nrelocation_id = \"rel0000.lifecycle-entry\"\nrelocation_kind = \"lifecycle-entry-binding\"\nsource_section_id = \"sec0000.compiled-artifact\"\nsource_offset = 0\ntarget_symbol_id = \"sym0000.loader-entry\"\naddend = 0\n\n[[section]]\norder_index = 0\nsection_id = \"sec0000.compiled-artifact\"\nsection_kind = \"compiled-artifact\"\nsource_path = \"main.nuis\"\nsource_hash = \"0xcccccccccccccccc\"\npayload_hash = \"0xdddddddddddddddd\"\nrequired = true\noffset = 0\nsize_bytes = 128\n"
 }
 
 fn nsb_bytes() -> Vec<u8> {
@@ -197,6 +197,25 @@ fn validates_ready_launcher_handoff() {
         Some("0x6666666666666666")
     );
     assert!(report.external_import_required_imports.is_empty());
+    assert_eq!(report.backend_artifact_payload_count, Some(1));
+    assert_eq!(report.backend_artifact_payload_parsed_count, 1);
+    assert_eq!(report.backend_artifact_payload_ready_count, 1);
+    assert_eq!(
+        report.backend_artifact_payload_first_id.as_deref(),
+        Some("backend-artifact:kernel:aarch64:apple-silicon-cpu")
+    );
+    assert_eq!(
+        report.backend_artifact_payload_first_kind.as_deref(),
+        Some("nustar-backend-artifact:kernel:aarch64:apple-silicon-cpu")
+    );
+    assert_eq!(
+        report.backend_artifact_payload_first_role_status.as_deref(),
+        Some("ready")
+    );
+    assert_eq!(
+        report.backend_artifact_payload_table_hash.as_deref(),
+        Some("0x7777777777777777")
+    );
     assert_eq!(report.container_loader_handoff_status, "ready");
     assert!(report.container_loader_handoff_ready);
     assert!(report.container_loader_handoff_blockers.is_empty());

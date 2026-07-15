@@ -691,6 +691,35 @@ pub(crate) fn render_final_executable_image_dry_run(
         toml::escape_toml_string(report.scheduler_metadata_hash.as_deref().unwrap_or(""))
     ));
     out.push_str(&format!(
+        "backend_artifact_payload_count = {}\n",
+        report.backend_artifact_payload_count
+    ));
+    out.push_str(&format!(
+        "backend_artifact_payload_present_count = {}\n",
+        report.backend_artifact_payload_present_count
+    ));
+    out.push_str(&format!(
+        "backend_artifact_payload_role_status = \"{}\"\n",
+        toml::escape_toml_string(&report.backend_artifact_payload_role_status)
+    ));
+    out.push_str(&format!(
+        "backend_artifact_payload_ids = [{}]\n",
+        toml::toml_string_array_literal(&report.backend_artifact_payload_ids)
+    ));
+    out.push_str(&format!(
+        "backend_artifact_payload_kinds = [{}]\n",
+        toml::toml_string_array_literal(&report.backend_artifact_payload_kinds)
+    ));
+    out.push_str(&format!(
+        "backend_artifact_payload_first_missing = \"{}\"\n",
+        toml::escape_toml_string(
+            report
+                .backend_artifact_payload_first_missing
+                .as_deref()
+                .unwrap_or("")
+        )
+    ));
+    out.push_str(&format!(
         "relocation_application_strategy = \"{}\"\n",
         toml::escape_toml_string(&report.relocation_application_strategy)
     ));

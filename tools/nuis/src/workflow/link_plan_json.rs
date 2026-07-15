@@ -5,7 +5,7 @@ use super::link_plan_domain::{
 use super::*;
 use crate::{
     artifact_doctor::probe_artifact_doctor,
-    artifact_runtime_command::{HostRunnerJsonSurface, RunArtifactLaunchEvidence},
+    artifact_launch_evidence::{HostRunnerJsonSurface, RunArtifactLaunchEvidence},
     run_artifact::run_artifact_prelaunch_summary,
 };
 use std::path::{Path, PathBuf};

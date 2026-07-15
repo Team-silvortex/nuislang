@@ -1,7 +1,7 @@
 use crate::{
     append_json_field_strings,
     artifact_doctor::{ArtifactOutputDiagnostics, ProjectValidationSnapshot},
-    artifact_runtime_command::{HostRunnerJsonSurface, RunArtifactLaunchEvidence},
+    artifact_launch_evidence::{HostRunnerJsonSurface, RunArtifactLaunchEvidence},
     json_bool_field, json_field, json_object_array_field, json_optional_bool_field,
     json_optional_string_field, json_string_array_field, json_surface, json_usize_field,
     run_artifact::run_artifact_prelaunch_summary,
@@ -35,6 +35,10 @@ pub(crate) fn append_artifact_output_diagnostic_json_fields(
             ),
         ],
     );
+    append_backend_artifact_payload_evidence_json_fields(
+        out,
+        &diagnostics.backend_artifact_payload_evidence,
+    );
     append_project_validation_summary_json_fields(
         out,
         diagnostics.project_checks.snapshot.as_ref(),
@@ -46,6 +50,44 @@ pub(crate) fn append_artifact_output_diagnostic_json_fields(
             "project_checks_code",
             diagnostics.project_checks.code,
         )],
+    );
+}
+
+fn append_backend_artifact_payload_evidence_json_fields(
+    out: &mut String,
+    evidence: &crate::artifact_doctor::BackendArtifactPayloadEvidence,
+) {
+    append_json_field_strings(
+        out,
+        vec![
+            json_bool_field(
+                "nsld_backend_artifact_payload_evidence_available",
+                evidence.available,
+            ),
+            json_optional_string_field(
+                "nsld_backend_artifact_payload_evidence_path",
+                evidence
+                    .path
+                    .as_ref()
+                    .map(|path| path.display().to_string())
+                    .as_deref(),
+            ),
+            json_usize_field("nsld_backend_artifact_payload_count", evidence.count),
+            json_usize_field(
+                "nsld_backend_artifact_payload_present_count",
+                evidence.present_count,
+            ),
+            json_field(
+                "nsld_backend_artifact_payload_role_status",
+                &evidence.role_status,
+            ),
+            json_string_array_field("nsld_backend_artifact_payload_ids", &evidence.ids),
+            json_string_array_field("nsld_backend_artifact_payload_kinds", &evidence.kinds),
+            json_optional_string_field(
+                "nsld_backend_artifact_payload_first_missing",
+                evidence.first_missing.as_deref(),
+            ),
+        ],
     );
 }
 
@@ -121,9 +163,10 @@ pub(crate) fn render_artifact_doctor_json(input: &Path) -> String {
     let resolved_binary = report.binary_path.as_deref().filter(|path| path.exists());
     let artifact_closure =
         run_artifact_prelaunch_summary(report.output_dir.as_deref(), resolved_binary);
-    let launch_evidence = RunArtifactLaunchEvidence::from_surfaces(
+    let launch_evidence = RunArtifactLaunchEvidence::from_surfaces_with_backend_payload_evidence(
         &artifact_closure,
         &HostRunnerJsonSurface::not_invoked("artifact-doctor-mirror"),
+        &diagnostics.backend_artifact_payload_evidence,
     );
     let mut out = String::from("{");
     append_json_field_strings(
