@@ -205,6 +205,13 @@ pub(crate) fn nsld_final_executable_output_report(
                 .unwrap_or("missing")
         ));
     }
+    let dispatch_blockers = nsld_nustar_dispatch_blockers(plan);
+    if !dispatch_blockers.blockers.is_empty() {
+        let mut ordered_blockers = dispatch_blockers.blockers;
+        ordered_blockers.append(&mut blockers);
+        blockers = ordered_blockers;
+        issues.extend(dispatch_blockers.issues);
+    }
 
     let runnable_candidate = present
         && final_stage.valid
@@ -384,6 +391,68 @@ struct FinalExecutableFirstPayloadExecution {
     first_blocker: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NsldNustarDispatchBlockers {
+    blockers: Vec<String>,
+    issues: Vec<String>,
+}
+
+fn nsld_nustar_dispatch_blockers(plan: &nuisc::linker::LinkPlan) -> NsldNustarDispatchBlockers {
+    let mut blockers = Vec::new();
+    let mut issues = Vec::new();
+    for unit in plan
+        .domain_units
+        .iter()
+        .filter(|unit| unit.kind == "heterogeneous")
+    {
+        match nuisc::registry::load_manifest_for_domain(
+            Path::new("nustar-packages"),
+            &unit.domain_family,
+        ) {
+            Ok(manifest) => {
+                let dispatch = nuisc::registry::dispatch_readiness_summary(&manifest);
+                if dispatch.status != "ready" {
+                    blockers.push(format!(
+                        "nustar-dispatch:{}:{}",
+                        nsld_nustar_dispatch_unit_id(unit),
+                        dispatch.status
+                    ));
+                    issues.push(format!(
+                        "Nustar dispatch readiness blocked for {} domain {} with status {}",
+                        unit.package_id, unit.domain_family, dispatch.status
+                    ));
+                }
+                for signal in dispatch.missing_signals {
+                    blockers.push(format!(
+                        "nustar-dispatch:{}:missing:{}",
+                        nsld_nustar_dispatch_unit_id(unit),
+                        signal
+                    ));
+                }
+            }
+            Err(error) => {
+                blockers.push(format!(
+                    "nustar-dispatch:{}:registry-unavailable",
+                    nsld_nustar_dispatch_unit_id(unit)
+                ));
+                issues.push(format!(
+                    "Nustar registry manifest unavailable for {} domain {}: {error}",
+                    unit.package_id, unit.domain_family
+                ));
+            }
+        }
+    }
+    NsldNustarDispatchBlockers { blockers, issues }
+}
+
+fn nsld_nustar_dispatch_unit_id(unit: &nuisc::linker::LinkPlanDomainUnit) -> String {
+    if unit.package_id.is_empty() {
+        unit.domain_family.clone()
+    } else {
+        unit.package_id.clone()
+    }
+}
+
 fn final_executable_output_materialization_status(
     boundary_status: &str,
     host_native_output: bool,
@@ -519,20 +588,26 @@ fn final_executable_output_execution_handoff_first_blocker(
     if execution_handoff_ready {
         None
     } else if first_payload_execution.target == "container-loader" {
-        first_payload_execution.first_blocker.clone().or_else(|| {
+        first_payload_execution
+            .first_blocker
+            .clone()
+            .or_else(|| final_executable_output_contract_blocker(blockers))
+    } else {
+        final_executable_output_contract_blocker(blockers)
+    }
+}
+
+fn final_executable_output_contract_blocker(blockers: &[String]) -> Option<String> {
+    blockers
+        .iter()
+        .find(|blocker| blocker.starts_with("nustar-dispatch:"))
+        .or_else(|| {
             blockers
                 .iter()
                 .find(|blocker| blocker.starts_with("final-executable-output:"))
-                .or_else(|| blockers.first())
-                .cloned()
         })
-    } else {
-        blockers
-            .iter()
-            .find(|blocker| blocker.starts_with("final-executable-output:"))
-            .or_else(|| blockers.first())
-            .cloned()
-    }
+        .or_else(|| blockers.first())
+        .cloned()
 }
 
 fn final_executable_output_execution_handoff_decision_code(

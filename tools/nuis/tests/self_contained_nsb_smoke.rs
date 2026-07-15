@@ -177,8 +177,25 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
             && run_json_stdout.contains("\"host_runner_nsb_payload_region_mapped\":true")
             && run_json_stdout.contains("\"host_runner_nsb_payload_scan_kind\":\"nsld-container-toml\"")
             && run_json_stdout.contains("\"host_runner_container_loader_status\":\"parsed\"")
+            && run_json_stdout.contains("\"host_runner_container_loader_entry_kind\":\"lifecycle-bootstrap\"")
+            && run_json_stdout.contains("\"host_runner_container_loader_entry_symbol\":\"nuis.bootstrap.lifecycle.v1\"")
+            && run_json_stdout.contains("\"host_runner_container_loader_entry_section_id\":\"sec0000.compiled-artifact\"")
             && run_json_stdout.contains("\"host_runner_container_loader_handoff_ready\":true")
-            && run_json_stdout.contains("\"host_runner_container_loader_handoff_status\":\"ready\""),
+            && run_json_stdout.contains("\"host_runner_container_loader_handoff_status\":\"ready\"")
+            && run_json_stdout.contains("\"launch_evidence_protocol\":\"nuis-run-artifact-launch-evidence-v1\"")
+            && run_json_stdout.contains("\"launch_evidence_status\":\"ready\"")
+            && run_json_stdout.contains("\"launch_evidence_route\":\"nsld-host-entrypoint\"")
+            && run_json_stdout.contains("\"launch_evidence_debugger_contract\":\"nsdb-yir-launch-evidence-v1\"")
+            && run_json_stdout.contains("\"launch_evidence_host_runner_probe_status\":\"ready\"")
+            && run_json_stdout.contains("\"launch_evidence_host_runner_probe_ready\":true")
+            && run_json_stdout.contains("\"launch_evidence_first_payload_status\":\"ready\"")
+            && run_json_stdout.contains("\"launch_evidence_first_payload_ready\":true")
+            && run_json_stdout.contains("\"launch_evidence_first_payload_target\":\"container-loader\"")
+            && run_json_stdout.contains("\"launch_evidence_first_payload_entry_symbol\":\"nuis.bootstrap.lifecycle.v1\"")
+            && run_json_stdout.contains("\"launch_evidence_first_payload_entry_kind\":\"lifecycle-bootstrap\"")
+            && run_json_stdout.contains("\"launch_evidence_first_payload_entry_section_id\":\"sec0000.compiled-artifact\"")
+            && run_json_stdout.contains("\"launch_evidence_first_payload_first_blocker\":null")
+            && run_json_stdout.contains("\"launch_evidence_first_blocker\":null"),
         "run-artifact json should surface the host runner image and container-loader evidence for the self-contained handoff\n{run_json_stdout}"
     );
 
@@ -188,5 +205,19 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
     assert!(
         run_stdout.contains("host_runner_program:") && run_stdout.contains("host_runner_status: 0"),
         "run-artifact should invoke nuis-host-runner for the self-contained handoff\n{run_stdout}"
+    );
+    assert!(
+        run_stdout.contains("launch_evidence_status: ready")
+            && run_stdout
+                .contains("launch_evidence_debugger_contract: nsdb-yir-launch-evidence-v1")
+            && run_stdout.contains("launch_evidence_first_payload_status: ready")
+            && run_stdout.contains(
+                "launch_evidence_first_payload_entry_symbol: nuis.bootstrap.lifecycle.v1"
+            )
+            && run_stdout.contains(
+                "launch_evidence_first_payload_entry_section_id: sec0000.compiled-artifact"
+            )
+            && run_stdout.contains("launch_evidence_first_blocker: <none>"),
+        "run-artifact text should expose the launch evidence contract\n{run_stdout}"
     );
 }

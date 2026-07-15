@@ -89,6 +89,72 @@ fn final_executable_output_reports_missing_until_real_output_exists() {
 }
 
 #[test]
+fn final_executable_output_orders_nustar_dispatch_blockers_before_output_bytes() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-executable-output-nustar-dispatch-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+    plan.final_stage.output_path = dir.join("nuis-app.nsb").display().to_string();
+    plan.domain_units.push(nuisc::linker::LinkPlanDomainUnit {
+        kind: "heterogeneous".to_owned(),
+        package_id: "official.ghost".to_owned(),
+        domain_family: "ghost".to_owned(),
+        abi: None,
+        machine_arch: None,
+        machine_os: None,
+        backend_family: Some("ghost".to_owned()),
+        vendor: None,
+        device_class: None,
+        target_device: None,
+        ir_format: None,
+        dispatch_abi: None,
+        backend_priority: None,
+        verification: None,
+        selected_lowering_target: Some("ghost.backend".to_owned()),
+        contract_family: "nustar.ghost".to_owned(),
+        packaging_role: "heterogeneous-domain".to_owned(),
+        artifact_stub_path: None,
+        artifact_stub_inline: None,
+        artifact_payload_path: None,
+        artifact_bridge_stub_path: None,
+        artifact_ir_sidecar_path: None,
+        artifact_bridge_stub_inline: None,
+        artifact_payload_blob_path: None,
+        artifact_payload_blob_bytes: None,
+        artifact_payload_format: None,
+        artifact_payload_blob_inline: None,
+    });
+
+    nsld_prepare_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_stage_plan_report(Path::new("manifest.toml"), &plan).unwrap();
+    nsld_emit_final_executable_report(Path::new("manifest.toml"), &plan).unwrap();
+    let report = nsld_final_executable_output_report(Path::new("manifest.toml"), &plan);
+    let report_json = super::json::nsld_final_executable_output_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert_eq!(
+        report.blockers.first().map(String::as_str),
+        Some("nustar-dispatch:official.ghost:registry-unavailable")
+    );
+    assert_eq!(
+        report.execution_handoff_first_blocker.as_deref(),
+        Some("nustar-dispatch:official.ghost:registry-unavailable")
+    );
+    assert!(report
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "final-executable-output:missing"));
+    assert!(report_json.contains("\"nustar-dispatch:official.ghost:registry-unavailable\""));
+    assert!(report_json.contains("\"final-executable-output:missing\""));
+}
+
+#[test]
 fn final_executable_launcher_manifest_describes_runnable_nsb_entry() {
     let dir = env::temp_dir().join(format!(
         "nsld-final-executable-launcher-manifest-{}",

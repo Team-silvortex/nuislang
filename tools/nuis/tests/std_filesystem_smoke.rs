@@ -159,6 +159,10 @@ const STD_TOOLING_LIGHT_SMOKE_PROJECTS: &[(&str, &str)] = &[
         "../../examples/projects/tooling/filesystem_io_report_demo",
     ),
     (
+        "cli_report_file",
+        "../../examples/projects/tooling/cli_report_file_demo",
+    ),
+    (
         "argv_runtime",
         "../../examples/projects/tooling/argv_runtime_demo",
     ),
@@ -256,6 +260,10 @@ const STD_TOOLING_FULL_SMOKE_PROJECTS: &[(&str, &str)] = &[
     (
         "text_report_json",
         "../../examples/projects/tooling/text_report_json_demo",
+    ),
+    (
+        "cli_report_file",
+        "../../examples/projects/tooling/cli_report_file_demo",
     ),
     (
         "filesystem_io_report",
@@ -471,6 +479,41 @@ fn std_tooling_observable_cli_smoke_checks_reports_and_stdin() {
         wc_run.stderr.is_empty(),
         "cli wc should not write stderr on success\n{}",
         String::from_utf8_lossy(&wc_run.stderr)
+    );
+
+    let report_file_output_dir = temp_dir("cli_report_file_observable");
+    let report_file_output_dir_text = report_file_output_dir.display().to_string();
+    let report_file_build = run_nuis(&[
+        "build",
+        "../../examples/projects/tooling/cli_report_file_demo",
+        &report_file_output_dir_text,
+    ]);
+    assert_success(&report_file_build, "nuis build cli report file smoke");
+    assert_file_contains(
+        &report_file_output_dir.join("cli_report_file_demo.ll"),
+        "host_file_write",
+        "cli report file LLVM file writer",
+    );
+    assert_file_contains(
+        &report_file_output_dir.join("cli_report_file_demo.yir"),
+        "StdReportContracts.cli_report_file_status_total",
+        "cli report file YIR std report contract",
+    );
+    let report_output_path = report_file_output_dir.join("nuis-report.txt");
+    let report_output_text = report_output_path.display().to_string();
+    let report_file_binary = report_file_output_dir.join("cli_report_file_demo");
+    let report_file_run = run_binary_with_args(&report_file_binary, &[&report_output_text]);
+    assert_success(&report_file_run, "direct cli report file binary smoke");
+    let report_file_stdout = String::from_utf8_lossy(&report_file_run.stdout);
+    assert!(
+        report_file_stdout.contains("route: argv-file-text")
+            && report_file_stdout.contains("status: ready"),
+        "cli report file stdout did not expose expected report\n{report_file_stdout}"
+    );
+    assert_file_contains(
+        &report_output_path,
+        "output: report-file",
+        "cli report file generated report",
     );
 }
 

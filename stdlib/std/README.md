@@ -84,7 +84,11 @@ Use these as the primary cluster names when placing new work:
     direct-runs the compiled `cli_wc_demo` binary through the
     `argv -> file.read -> buffer` path with a real input file and
     checks the generated `bytes/text_len/lines/words/scan_ns` text report plus
-    argv, file-read, and word-count lowering anchors.
+    argv, file-read, and word-count lowering anchors. It also builds and
+    direct-runs `cli_report_file_demo`, proving the reusable
+    `StdReportContracts` helper can consume an argv output path, write an
+    inspectable report file, echo the same report to stdout, and preserve
+    text-stat validation through the std lane.
 * task/runtime
   - local router:
     [task/README.md](task/README.md)
@@ -165,6 +169,11 @@ First auto-injectable library module:
   heterogeneous backend ids, C FFI proxy whitelist checks, accepted/rejected
   proxy status codes, proxy manifest totals, ABI group validation summaries,
   and benchmark/test probe totals
+* [lib/report_contracts.ns](lib/report_contracts.ns)
+  exposes the initial `StdReportContracts` helper surface for reusable
+  CLI/report-file validation, including argv output-path presence, report text
+  readiness, file write coverage, console echo coverage, and process-style
+  report helper exit codes
 
 Intended scope:
 

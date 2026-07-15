@@ -14,7 +14,8 @@ surfaces = [
   "surface.std.net-session-contracts.v1",
   "surface.std.text-json-contracts.v1",
   "surface.std.time-benchmark-contracts.v1",
-  "surface.std.hetero-test-benchmark-contracts.v1"
+  "surface.std.hetero-test-benchmark-contracts.v1",
+  "surface.std.cli-report-file-contracts.v1"
 ]
 
 library_modules = [
@@ -25,7 +26,8 @@ library_modules = [
   "lib/net_contracts.ns",
   "lib/text_contracts.ns",
   "lib/time_contracts.ns",
-  "lib/hetero_contracts.ns"
+  "lib/hetero_contracts.ns",
+  "lib/report_contracts.ns"
 ]
 
 library_import_policy = "project-auto"

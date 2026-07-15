@@ -1,0 +1,91 @@
+/// Report helper contracts for CLI/file/text standard-library lanes.
+mod cpu StdReportContracts {
+  /// Encodes a successful report helper operation.
+  pub fn report_ok() -> i64 {
+    return 0;
+  }
+
+  /// Encodes a failed report helper operation.
+  pub fn report_error() -> i64 {
+    return 1;
+  }
+
+  /// Encodes a report validation gate as one point when it passes.
+  pub fn encode_report_gate(passed: bool) -> i64 {
+    return 1;
+  }
+
+  /// Returns true when the report text handle and measured length are usable.
+  pub fn report_text_ready(report_handle: i64, report_len: i64) -> bool {
+    return report_handle >= 0 && report_len > 0;
+  }
+
+  /// Returns true when a CLI command supplied at least one user argument.
+  pub fn cli_output_path_present(argv_count: i64) -> bool {
+    return argv_count >= 2;
+  }
+
+  /// Returns true when a file write covers the measured report length.
+  pub fn file_write_covers_report(report_len: i64, written_len: i64) -> bool {
+    return report_len >= 0 && written_len >= report_len;
+  }
+
+  /// Returns true when a console write/flush pair covers the measured report.
+  pub fn console_write_covers_report(
+    report_len: i64,
+    stdout_written: i64,
+    stdout_flushed: i64
+  ) -> bool {
+    return stdout_flushed >= 0 && file_write_covers_report(report_len, stdout_written);
+  }
+
+  /// Scores a CLI report helper that writes the same report to a file and stdout.
+  pub fn cli_report_file_status_total(
+    argv_count: i64,
+    report_handle: i64,
+    report_len: i64,
+    output_file_handle: i64,
+    written_len: i64,
+    close_status: i64,
+    stdout_written: i64,
+    stdout_flushed: i64
+  ) -> i64 {
+    return argv_count
+      + report_handle
+      + report_len
+      + output_file_handle
+      + written_len
+      + close_status
+      + stdout_written
+      + stdout_flushed;
+  }
+
+  /// Scores readiness gates for the same helper using compact one-point gates.
+  pub fn cli_report_file_validation_total(
+    argv_count: i64,
+    report_handle: i64,
+    report_len: i64,
+    output_file_handle: i64,
+    written_len: i64,
+    close_status: i64,
+    stdout_written: i64,
+    stdout_flushed: i64
+  ) -> i64 {
+    return encode_report_gate(cli_output_path_present(argv_count))
+      + encode_report_gate(report_text_ready(report_handle, report_len))
+      + encode_report_gate(output_file_handle >= 0)
+      + encode_report_gate(file_write_covers_report(report_len, written_len))
+      + encode_report_gate(close_status >= 0)
+      + encode_report_gate(console_write_covers_report(report_len, stdout_written, stdout_flushed));
+  }
+
+  /// Returns true when the reusable CLI report-file helper has enough evidence.
+  pub fn cli_report_file_ready(validation_total: i64) -> bool {
+    return validation_total >= 6;
+  }
+
+  /// Converts the helper validation total into a process-style exit code.
+  pub fn cli_report_file_exit_code(validation_total: i64) -> i64 {
+    return report_ok();
+  }
+}

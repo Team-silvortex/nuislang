@@ -1,0 +1,97 @@
+mod cpu Main {
+  trait Addable {
+    fn add(lhs: Self, rhs: Self) -> Self;
+  }
+
+  impl Addable for i64 {
+    fn add(lhs: i64, rhs: i64) -> i64 {
+      return lhs + rhs;
+    }
+  }
+
+  enum Result<T, E> {
+    Ok(T),
+    Err(E),
+  }
+
+  enum HelperError {
+    Empty,
+    Invalid,
+  }
+
+  struct HelperReport {
+    raw_score: i64,
+    mapped_score: i64,
+    buffer_len: i64,
+    buffer_value: i64,
+    final_score: i64
+  }
+
+  type Alias<T> = T;
+  type Mapper<T> = Fn1<T, T>;
+
+  fn apply<T: Addable>(value: T, mapper: Mapper<T>) -> T {
+    return mapper(value);
+  }
+
+  fn bump<T: Addable>(value: T) -> T {
+    return apply(value, |item: T| -> T { return item.add(item); });
+  }
+
+  fn ok<T, E>(value: T) -> Result<T, E> {
+    return Result.Ok(value);
+  }
+
+  fn result_map<T, R, E>(result: Result<T, E>, mapper: Fn1<T, R>) -> Result<R, E> {
+    match result {
+      Result.Ok(value) => {
+        return Result.Ok(mapper(value));
+      }
+      Result.Err(error) => {
+        return Result.Err(error);
+      }
+    }
+  }
+
+  fn result_unwrap_or<T, E>(result: Result<T, E>, fallback: T) -> T {
+    match result {
+      Result.Ok(value) => {
+        return value;
+      }
+      Result.Err(_) => {
+        return fallback;
+      }
+    }
+  }
+
+  fn buffer_score(seed: i64) -> i64 {
+    let buffer: ref Buffer = alloc_buffer(4, 0);
+    buffer[0] = seed;
+    buffer[1] = bump(seed);
+    let len: i64 = buffer.len;
+    let value: i64 = buffer[0] + buffer[1];
+    free(buffer);
+    return value + len;
+  }
+
+  fn build_report(seed: Alias<i64>) -> HelperReport {
+    let raw_score: i64 = buffer_score(seed);
+    let mapped_result: Result<i64, HelperError> =
+      result_map(ok(raw_score), |value: i64| -> i64 { return bump(value); });
+    let mapped_score: i64 = result_unwrap_or(mapped_result, 0);
+    let buffer_len: i64 = 4;
+    let buffer_value: i64 = raw_score - buffer_len;
+    return HelperReport {
+      raw_score: raw_score,
+      mapped_score: mapped_score,
+      buffer_len: buffer_len,
+      buffer_value: buffer_value,
+      final_score: raw_score + mapped_score + buffer_len + buffer_value
+    };
+  }
+
+  fn main() -> i64 {
+    let report: HelperReport = build_report(3);
+    return report.final_score;
+  }
+}

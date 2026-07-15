@@ -1,0 +1,87 @@
+use cpu StdReportContracts;
+use cpu StdTextContracts;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_argv_at(index: i64) -> i64;
+  extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
+  extern "c" fn host_file_close(file_handle: i64) -> i64;
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_stdout_flush() -> i64;
+  extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_len(text_handle: i64) -> i64;
+  extern "c" fn host_text_line_count(text_handle: i64) -> i64;
+  extern "c" fn host_text_word_count(text_handle: i64) -> i64;
+
+  struct CliReportFileSummary {
+    argv_count: i64,
+    output_path_handle: i64,
+    report_handle: i64,
+    report_len: i64,
+    report_lines: i64,
+    report_words: i64,
+    output_file_handle: i64,
+    written_len: i64,
+    close_status: i64,
+    stdout_written: i64,
+    stdout_flushed: i64,
+    validation_total: i64
+  }
+
+  fn text_from_literal(value: String) -> i64 {
+    return text_handle(value);
+  }
+
+  fn append_line(block_handle: i64, line_handle: i64) -> i64 {
+    return host_text_concat(host_text_concat(block_handle, line_handle), text_from_literal("\n"));
+  }
+
+  fn build_cli_report_text() -> i64 {
+    let title: i64 = text_from_literal("nuis cli report\n");
+    let route_line: i64 = text_from_literal("route: argv-file-text\n");
+    let status_line: i64 = text_from_literal("status: ready\n");
+    let output_line: i64 = text_from_literal("output: report-file\n");
+    return append_line(host_text_concat(host_text_concat(title, route_line), status_line), output_line);
+  }
+
+  fn capture_cli_report_file(argv_count: i64, output_path_handle: i64) -> CliReportFileSummary {
+    let report_handle: i64 = build_cli_report_text();
+    let report_len: i64 = host_text_len(report_handle);
+    let output_file_handle: i64 = host_file_open(output_path_handle, 1537);
+    let written_len: i64 = host_file_write(output_file_handle, report_handle);
+    let close_status: i64 = host_file_close(output_file_handle);
+    let stdout_written: i64 = host_stdout_write(report_handle);
+    let stdout_flushed: i64 = host_stdout_flush();
+    let validation_total: i64 = StdReportContracts.cli_report_file_status_total(
+      argv_count,
+      report_handle,
+      report_len,
+      output_file_handle,
+      written_len,
+      close_status,
+      stdout_written,
+      stdout_flushed
+    );
+    return CliReportFileSummary {
+      argv_count: argv_count,
+      output_path_handle: output_path_handle,
+      report_handle: report_handle,
+      report_len: report_len,
+      report_lines: host_text_line_count(report_handle),
+      report_words: host_text_word_count(report_handle),
+      output_file_handle: output_file_handle,
+      written_len: written_len,
+      close_status: close_status,
+      stdout_written: stdout_written,
+      stdout_flushed: stdout_flushed,
+      validation_total: validation_total
+    };
+  }
+
+  fn main() -> i64 {
+    let argv_count: i64 = host_argv_count();
+    let summary: CliReportFileSummary = capture_cli_report_file(argv_count, host_argv_at(1));
+    return StdReportContracts.cli_report_file_exit_code(summary.validation_total);
+  }
+}

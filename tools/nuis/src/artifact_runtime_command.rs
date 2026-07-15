@@ -101,6 +101,8 @@ pub(crate) fn render_run_artifact_json(input: &Path) -> String {
     let prelaunch =
         run_artifact_prelaunch_summary(doctor.output_dir.as_deref(), resolved_binary.as_deref());
     let host_runner_surface = run_artifact_host_runner_surface(&doctor, &prelaunch);
+    let launch_evidence =
+        RunArtifactLaunchEvidence::from_surfaces(&prelaunch, &host_runner_surface);
     let mut out = String::from("{");
     append_json_field_strings(
         &mut out,
@@ -154,6 +156,7 @@ pub(crate) fn render_run_artifact_json(input: &Path) -> String {
         ],
     );
     append_json_field_strings(&mut out, host_runner_surface.json_fields());
+    append_json_field_strings(&mut out, launch_evidence.json_fields());
     append_runtime_session_json_fields(&mut out, manifest_verify.as_ref());
     append_json_field_strings(
         &mut out,
@@ -186,6 +189,12 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
             .filter(|output_dir| self_contained_link_plan_selected(output_dir))
             .map(|_| run_nsld_host_runner(&doctor, &prelaunch))
             .transpose()?;
+        let host_runner_surface = runner_output
+            .as_ref()
+            .map(HostRunnerJsonSurface::from_output)
+            .unwrap_or_else(|| HostRunnerJsonSurface::not_invoked("not-required"));
+        let launch_evidence =
+            RunArtifactLaunchEvidence::from_surfaces(&prelaunch, &host_runner_surface);
         if success_logs_enabled() {
             println!(
                 "run-artifact: {}",
@@ -230,6 +239,7 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
                 println!("  host_runner_program: <not-required>");
                 println!("  host_runner_status: handoff-ready");
             }
+            print_launch_evidence_text(&launch_evidence);
             let link_plan = doctor
                 .output_dir
                 .as_ref()
@@ -287,6 +297,10 @@ pub(crate) fn handle_run_artifact(input: PathBuf, json: bool) -> Result<(), Stri
             optional_bool_text(prelaunch.entrypoint_protocol_valid)
         );
         println!("  prelaunch_reason: {}", prelaunch.reason);
+        let host_runner_surface = HostRunnerJsonSurface::not_invoked("not-required");
+        let launch_evidence =
+            RunArtifactLaunchEvidence::from_surfaces(&prelaunch, &host_runner_surface);
+        print_launch_evidence_text(&launch_evidence);
         print_run_artifact_link_plan_status(link_plan.as_ref());
     }
     if status.success() {
@@ -329,8 +343,132 @@ struct HostRunnerJsonSurface {
     nsb_payload_scan_kind: Option<String>,
     container_loader_status: Option<String>,
     container_ready: Option<bool>,
+    container_loader_entry_kind: Option<String>,
+    container_loader_entry_symbol: Option<String>,
+    container_loader_entry_section_id: Option<String>,
     container_loader_handoff_ready: Option<bool>,
     container_loader_handoff_status: Option<String>,
+}
+
+struct RunArtifactLaunchEvidence {
+    protocol: &'static str,
+    status: String,
+    route: String,
+    evidence_status: String,
+    debugger_contract: &'static str,
+    command: Option<String>,
+    host_runner_probe_status: String,
+    host_runner_probe_ready: Option<bool>,
+    first_payload_status: Option<String>,
+    first_payload_ready: Option<bool>,
+    first_payload_target: Option<String>,
+    first_payload_entry_symbol: Option<String>,
+    first_payload_entry_kind: Option<String>,
+    first_payload_entry_section_id: Option<String>,
+    first_payload_first_blocker: Option<String>,
+    first_blocker: Option<String>,
+    reason: String,
+}
+
+impl RunArtifactLaunchEvidence {
+    fn from_surfaces(
+        prelaunch: &crate::run_artifact::RunArtifactPrelaunchSummary,
+        host_runner: &HostRunnerJsonSurface,
+    ) -> Self {
+        let first_blocker = launch_evidence_first_blocker(prelaunch, host_runner);
+        let first_payload_ready = launch_evidence_first_payload_ready(prelaunch, host_runner);
+        Self {
+            protocol: "nuis-run-artifact-launch-evidence-v1",
+            status: if first_blocker.is_none() {
+                "ready".to_owned()
+            } else {
+                "blocked".to_owned()
+            },
+            route: prelaunch.kind.clone(),
+            evidence_status: prelaunch.evidence_status.clone(),
+            debugger_contract: "nsdb-yir-launch-evidence-v1",
+            command: prelaunch.command.clone(),
+            host_runner_probe_status: host_runner.status.clone(),
+            host_runner_probe_ready: host_runner.ready,
+            first_payload_status: launch_evidence_first_payload_status(first_payload_ready),
+            first_payload_ready,
+            first_payload_target: launch_evidence_first_payload_target(prelaunch),
+            first_payload_entry_symbol: if first_payload_ready.is_some() {
+                host_runner.container_loader_entry_symbol.clone()
+            } else {
+                None
+            },
+            first_payload_entry_kind: if first_payload_ready.is_some() {
+                host_runner.container_loader_entry_kind.clone()
+            } else {
+                None
+            },
+            first_payload_entry_section_id: if first_payload_ready.is_some() {
+                host_runner.container_loader_entry_section_id.clone()
+            } else {
+                None
+            },
+            first_payload_first_blocker: launch_evidence_first_payload_first_blocker(
+                prelaunch,
+                host_runner,
+                first_payload_ready,
+            ),
+            first_blocker,
+            reason: prelaunch.reason.clone(),
+        }
+    }
+
+    fn json_fields(&self) -> Vec<String> {
+        vec![
+            json_field("launch_evidence_protocol", self.protocol),
+            json_field("launch_evidence_status", &self.status),
+            json_field("launch_evidence_route", &self.route),
+            json_field("launch_evidence_status_code", &self.evidence_status),
+            json_field("launch_evidence_debugger_contract", self.debugger_contract),
+            json_optional_string_field("launch_evidence_command", self.command.as_deref()),
+            json_field(
+                "launch_evidence_host_runner_probe_status",
+                &self.host_runner_probe_status,
+            ),
+            json_optional_bool_field(
+                "launch_evidence_host_runner_probe_ready",
+                self.host_runner_probe_ready,
+            ),
+            json_optional_string_field(
+                "launch_evidence_first_payload_status",
+                self.first_payload_status.as_deref(),
+            ),
+            json_optional_bool_field(
+                "launch_evidence_first_payload_ready",
+                self.first_payload_ready,
+            ),
+            json_optional_string_field(
+                "launch_evidence_first_payload_target",
+                self.first_payload_target.as_deref(),
+            ),
+            json_optional_string_field(
+                "launch_evidence_first_payload_entry_symbol",
+                self.first_payload_entry_symbol.as_deref(),
+            ),
+            json_optional_string_field(
+                "launch_evidence_first_payload_entry_kind",
+                self.first_payload_entry_kind.as_deref(),
+            ),
+            json_optional_string_field(
+                "launch_evidence_first_payload_entry_section_id",
+                self.first_payload_entry_section_id.as_deref(),
+            ),
+            json_optional_string_field(
+                "launch_evidence_first_payload_first_blocker",
+                self.first_payload_first_blocker.as_deref(),
+            ),
+            json_optional_string_field(
+                "launch_evidence_first_blocker",
+                self.first_blocker.as_deref(),
+            ),
+            json_field("launch_evidence_reason", &self.reason),
+        ]
+    }
 }
 
 impl HostRunnerJsonSurface {
@@ -349,6 +487,9 @@ impl HostRunnerJsonSurface {
             nsb_payload_scan_kind: None,
             container_loader_status: None,
             container_ready: None,
+            container_loader_entry_kind: None,
+            container_loader_entry_symbol: None,
+            container_loader_entry_section_id: None,
             container_loader_handoff_ready: None,
             container_loader_handoff_status: None,
         }
@@ -369,6 +510,9 @@ impl HostRunnerJsonSurface {
             nsb_payload_scan_kind: None,
             container_loader_status: None,
             container_ready: None,
+            container_loader_entry_kind: None,
+            container_loader_entry_symbol: None,
+            container_loader_entry_section_id: None,
             container_loader_handoff_ready: None,
             container_loader_handoff_status: None,
         }
@@ -406,6 +550,18 @@ impl HostRunnerJsonSurface {
             nsb_payload_scan_kind: json_string_value(&output.stdout, "nsb_payload_scan_kind"),
             container_loader_status: json_string_value(&output.stdout, "container_loader_status"),
             container_ready: json_bool_value(&output.stdout, "container_ready"),
+            container_loader_entry_kind: json_string_value(
+                &output.stdout,
+                "container_loader_entry_kind",
+            ),
+            container_loader_entry_symbol: json_string_value(
+                &output.stdout,
+                "container_loader_entry_symbol",
+            ),
+            container_loader_entry_section_id: json_string_value(
+                &output.stdout,
+                "container_loader_entry_section_id",
+            ),
             container_loader_handoff_ready: json_bool_value(
                 &output.stdout,
                 "container_loader_handoff_ready",
@@ -444,6 +600,18 @@ impl HostRunnerJsonSurface {
                 self.container_loader_status.as_deref(),
             ),
             json_optional_bool_field("host_runner_container_ready", self.container_ready),
+            json_optional_string_field(
+                "host_runner_container_loader_entry_kind",
+                self.container_loader_entry_kind.as_deref(),
+            ),
+            json_optional_string_field(
+                "host_runner_container_loader_entry_symbol",
+                self.container_loader_entry_symbol.as_deref(),
+            ),
+            json_optional_string_field(
+                "host_runner_container_loader_entry_section_id",
+                self.container_loader_entry_section_id.as_deref(),
+            ),
             json_optional_bool_field(
                 "host_runner_container_loader_handoff_ready",
                 self.container_loader_handoff_ready,
@@ -456,6 +624,144 @@ impl HostRunnerJsonSurface {
     }
 }
 
+fn launch_evidence_first_blocker(
+    prelaunch: &crate::run_artifact::RunArtifactPrelaunchSummary,
+    host_runner: &HostRunnerJsonSurface,
+) -> Option<String> {
+    if prelaunch.status != "ready" {
+        return Some(format!("prelaunch:{}", prelaunch.evidence_status));
+    }
+    if prelaunch.nsld_runtime_handoff_ready() {
+        if host_runner.status != "ready" {
+            return Some(format!("host-runner-probe:{}", host_runner.status));
+        }
+        if host_runner.ready != Some(true) {
+            return Some("host-runner-probe:not-ready".to_owned());
+        }
+        if host_runner.container_loader_handoff_ready != Some(true) {
+            return Some("container-loader-handoff:not-ready".to_owned());
+        }
+    }
+    None
+}
+
+fn launch_evidence_first_payload_ready(
+    prelaunch: &crate::run_artifact::RunArtifactPrelaunchSummary,
+    host_runner: &HostRunnerJsonSurface,
+) -> Option<bool> {
+    if prelaunch.kind == "nsld-host-entrypoint" {
+        Some(host_runner.container_loader_handoff_ready == Some(true))
+    } else {
+        None
+    }
+}
+
+fn launch_evidence_first_payload_status(first_payload_ready: Option<bool>) -> Option<String> {
+    first_payload_ready.map(|ready| {
+        if ready {
+            "ready".to_owned()
+        } else {
+            "blocked".to_owned()
+        }
+    })
+}
+
+fn launch_evidence_first_payload_target(
+    prelaunch: &crate::run_artifact::RunArtifactPrelaunchSummary,
+) -> Option<String> {
+    if prelaunch.kind == "nsld-host-entrypoint" {
+        Some("container-loader".to_owned())
+    } else {
+        None
+    }
+}
+
+fn launch_evidence_first_payload_first_blocker(
+    prelaunch: &crate::run_artifact::RunArtifactPrelaunchSummary,
+    host_runner: &HostRunnerJsonSurface,
+    first_payload_ready: Option<bool>,
+) -> Option<String> {
+    if prelaunch.kind != "nsld-host-entrypoint" || first_payload_ready != Some(false) {
+        return None;
+    }
+    let status = host_runner
+        .container_loader_handoff_status
+        .as_deref()
+        .unwrap_or("unavailable");
+    Some(format!("container-loader-handoff:{status}"))
+}
+
+fn print_launch_evidence_text(evidence: &RunArtifactLaunchEvidence) {
+    println!("  launch_evidence_protocol: {}", evidence.protocol);
+    println!("  launch_evidence_status: {}", evidence.status);
+    println!("  launch_evidence_route: {}", evidence.route);
+    println!(
+        "  launch_evidence_status_code: {}",
+        evidence.evidence_status
+    );
+    println!(
+        "  launch_evidence_debugger_contract: {}",
+        evidence.debugger_contract
+    );
+    println!(
+        "  launch_evidence_command: {}",
+        evidence.command.as_deref().unwrap_or("<none>")
+    );
+    println!(
+        "  launch_evidence_host_runner_probe_status: {}",
+        evidence.host_runner_probe_status
+    );
+    println!(
+        "  launch_evidence_host_runner_probe_ready: {}",
+        optional_bool_text(evidence.host_runner_probe_ready)
+    );
+    println!(
+        "  launch_evidence_first_payload_status: {}",
+        evidence.first_payload_status.as_deref().unwrap_or("<none>")
+    );
+    println!(
+        "  launch_evidence_first_payload_ready: {}",
+        optional_bool_text(evidence.first_payload_ready)
+    );
+    println!(
+        "  launch_evidence_first_payload_target: {}",
+        evidence.first_payload_target.as_deref().unwrap_or("<none>")
+    );
+    println!(
+        "  launch_evidence_first_payload_entry_symbol: {}",
+        evidence
+            .first_payload_entry_symbol
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    println!(
+        "  launch_evidence_first_payload_entry_kind: {}",
+        evidence
+            .first_payload_entry_kind
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    println!(
+        "  launch_evidence_first_payload_entry_section_id: {}",
+        evidence
+            .first_payload_entry_section_id
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    println!(
+        "  launch_evidence_first_payload_first_blocker: {}",
+        evidence
+            .first_payload_first_blocker
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    println!(
+        "  launch_evidence_first_blocker: {}",
+        evidence.first_blocker.as_deref().unwrap_or("<none>")
+    );
+    println!("  launch_evidence_reason: {}", evidence.reason);
+}
+
 fn run_artifact_host_runner_surface(
     doctor: &crate::artifact_doctor::ArtifactDoctorReport,
     prelaunch: &crate::run_artifact::RunArtifactPrelaunchSummary,
@@ -463,6 +769,9 @@ fn run_artifact_host_runner_surface(
     let Some(output_dir) = doctor.output_dir.as_deref() else {
         return HostRunnerJsonSurface::not_invoked("output-dir-unavailable");
     };
+    if prelaunch.kind != "nsld-host-entrypoint" {
+        return HostRunnerJsonSurface::not_invoked("not-required");
+    }
     if !prelaunch.nsld_runtime_handoff_ready() {
         return HostRunnerJsonSurface::not_invoked("handoff-not-ready");
     }

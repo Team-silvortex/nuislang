@@ -224,12 +224,59 @@ These fields now form the current visible link summary:
   container-loader probe status for the mapped payload region
 * `host_runner_container_ready`
   container-level readiness when the payload is parseable as an Nsld container
+* `host_runner_container_loader_entry_kind`
+  first container-loader entry kind reported by the runner
+* `host_runner_container_loader_entry_symbol`
+  first container-loader entry symbol reported by the runner
+* `host_runner_container_loader_entry_section_id`
+  first container-loader entry section id reported by the runner
 * `host_runner_container_loader_handoff_ready`
   true when the parsed container/loader contract can hand off to the lifecycle
   entrypoint; currently false for opaque final-image payloads
 * `host_runner_container_loader_handoff_status`
   compact container-loader handoff status, such as `ready`, `blocked`, or
   `not-container-toml`
+* `launch_evidence_protocol`
+  stable aggregate launch evidence contract for nsdb, CI, and future debugger
+  routing; currently `nuis-run-artifact-launch-evidence-v1`
+* `launch_evidence_status`
+  `ready` when the selected launch route and required host-runner probe evidence
+  are ready; otherwise `blocked`
+* `launch_evidence_route`
+  selected launch route, matching `run_artifact_prelaunch_kind`
+* `launch_evidence_status_code`
+  compact launch evidence code, matching `run_artifact_prelaunch_evidence_status`
+* `launch_evidence_debugger_contract`
+  debugger-facing contract family; currently `nsdb-yir-launch-evidence-v1`
+* `launch_evidence_command`
+  command-like launch summary for the selected route
+* `launch_evidence_host_runner_probe_status`
+  host-runner probe status as consumed by the aggregate launch evidence layer
+* `launch_evidence_host_runner_probe_ready`
+  host-runner readiness boolean when a probe is required
+* `launch_evidence_first_payload_status`
+  normalized status for the first payload that the selected route would hand to
+  the lifecycle/loader boundary; currently `ready` or `blocked` for
+  `nsld-host-entrypoint`, otherwise `null`
+* `launch_evidence_first_payload_ready`
+  boolean readiness for that first payload when the route has one
+* `launch_evidence_first_payload_target`
+  first payload execution target, currently `container-loader` for ready Nsld
+  self-contained handoffs
+* `launch_evidence_first_payload_entry_symbol`
+  first payload entry symbol reported by the host-runner container-loader probe
+* `launch_evidence_first_payload_entry_kind`
+  first payload entry kind reported by the host-runner container-loader probe
+* `launch_evidence_first_payload_entry_section_id`
+  first payload entry section id reported by the host-runner container-loader
+  probe
+* `launch_evidence_first_payload_first_blocker`
+  first normalized payload-level blocker, or `null` when the first payload is
+  ready or the route has no payload handoff
+* `launch_evidence_first_blocker`
+  first normalized launch blocker for scripts and nsdb handoff triage
+* `launch_evidence_reason`
+  human-readable reason copied from the selected prelaunch surface
 * `artifact_closure_kind`
   `artifact-doctor --json` aggregate closure kind, currently
   `nsld-host-entrypoint`, `host-binary`, or `none`

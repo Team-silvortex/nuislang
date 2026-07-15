@@ -257,6 +257,25 @@ mod cpu Main {
     assert!(json.contains(
         "\"run_artifact_prelaunch_reason\":\"legacy host binary path is resolved and can be executed directly\""
     ));
+    assert!(json.contains("\"launch_evidence_protocol\":\"nuis-run-artifact-launch-evidence-v1\""));
+    assert!(json.contains("\"launch_evidence_status\":\"ready\""));
+    assert!(json.contains("\"launch_evidence_route\":\"host-binary\""));
+    assert!(json.contains("\"launch_evidence_status_code\":\"host-binary-ready\""));
+    assert!(json.contains("\"launch_evidence_debugger_contract\":\"nsdb-yir-launch-evidence-v1\""));
+    assert!(json.contains("\"launch_evidence_command\":\""));
+    assert!(json.contains("\"launch_evidence_host_runner_probe_status\":\"not-required\""));
+    assert!(json.contains("\"launch_evidence_host_runner_probe_ready\":null"));
+    assert!(json.contains("\"launch_evidence_first_payload_status\":null"));
+    assert!(json.contains("\"launch_evidence_first_payload_ready\":null"));
+    assert!(json.contains("\"launch_evidence_first_payload_target\":null"));
+    assert!(json.contains("\"launch_evidence_first_payload_entry_symbol\":null"));
+    assert!(json.contains("\"launch_evidence_first_payload_entry_kind\":null"));
+    assert!(json.contains("\"launch_evidence_first_payload_entry_section_id\":null"));
+    assert!(json.contains("\"launch_evidence_first_payload_first_blocker\":null"));
+    assert!(json.contains("\"launch_evidence_first_blocker\":null"));
+    assert!(json.contains(
+        "\"launch_evidence_reason\":\"legacy host binary path is resolved and can be executed directly\""
+    ));
     assert!(json.contains("\"heterogeneous_domain_count\":0"));
     assert!(json.contains("\"bridge_registry_units\":0"));
     assert!(json.contains("\"host_bridge_plan_units\":0"));

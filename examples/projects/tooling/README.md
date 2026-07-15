@@ -33,6 +33,9 @@ Current runnable CLI frontdoor:
 * `cli_wc_demo` now adds a first performance-oriented text/file stats seed over
   the same host bridge, currently anchored on byte count, text length, ASCII
   line count, ASCII word count, and scan timing
+* `cli_report_file_demo` now factors the argv/file/text report path into a
+  reusable std report-file helper contract, writes an inspectable report file,
+  and echoes the same report to stdout for CLI automation
 * `cli_session_demo` and `cli_report_session_demo` now also fit the same launch
   path, while still representing the interactive/session-oriented lane
 * `workflow_runtime_demo` now fits the same launch path as the workflow-shaped
@@ -64,6 +67,7 @@ Current split:
   `native_artifact_closure_demo`, `cli_compile_workflow_demo`,
   `cli_workflow_automation_demo`,
   `cli_build_pipeline_demo`, `cli_project_build_report_demo`,
+  `cli_report_file_demo`,
   `cli_pgm_info_demo`, `cli_pgm_invert_demo`, `cli_pgm_threshold_demo`
 * probe-style companions:
   most of the remaining entries in this folder still exist to expose one host
@@ -92,6 +96,7 @@ Current exemplars:
 * [cli_project_build_report_demo](cli_project_build_report_demo)
 * [cli_cat_demo](cli_cat_demo)
 * [cli_wc_demo](cli_wc_demo)
+* [cli_report_file_demo](cli_report_file_demo)
 * [cli_pgm_info_demo](cli_pgm_info_demo)
 * [cli_pgm_invert_demo](cli_pgm_invert_demo)
 * [cli_pgm_threshold_demo](cli_pgm_threshold_demo)
@@ -118,6 +123,7 @@ Short rule:
   [text_pipeline_demo](text_pipeline_demo),
   [text_report_builder_demo](text_report_builder_demo),
   [text_report_json_demo](text_report_json_demo),
+  [cli_report_file_demo](cli_report_file_demo),
   [time_report_demo](time_report_demo),
   [benchmark_report_demo](benchmark_report_demo),
   [benchmark_report_count_demo](benchmark_report_count_demo),

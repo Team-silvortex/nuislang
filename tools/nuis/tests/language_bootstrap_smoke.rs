@@ -217,3 +217,64 @@ fn generic_trait_and_glm_buffer_projects_anchor_language_bootstrap_smoke() {
         "GLM buffer roundtrip binary",
     );
 }
+
+#[test]
+fn generic_result_buffer_lambda_project_combines_language_bootstrap_features() {
+    let output_dir = temp_dir("generic_result_buffer_lambda_bootstrap");
+    let output_dir_text = output_dir.display().to_string();
+    let build = run_nuis(&[
+        "build",
+        "../../examples/projects/state/generic_result_buffer_lambda_helper_demo",
+        &output_dir_text,
+    ]);
+    assert_success(
+        &build,
+        "nuis build generic Result/buffer/lambda language bootstrap smoke",
+    );
+
+    assert_file_contains(
+        &output_dir.join("generic_result_buffer_lambda_helper_demo.ast.txt"),
+        "trait Addable",
+        "generic Result/buffer/lambda AST",
+    );
+    assert_file_contains(
+        &output_dir.join("generic_result_buffer_lambda_helper_demo.ast.txt"),
+        "enum Result<T, E>",
+        "generic Result/buffer/lambda AST",
+    );
+    assert_file_contains(
+        &output_dir.join("generic_result_buffer_lambda_helper_demo.nir.txt"),
+        "__hof_result_map___lambda_build_report_0__i64__i64__HelperError",
+        "generic Result/buffer/lambda NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("generic_result_buffer_lambda_helper_demo.nir.txt"),
+        "impl.Addable.for.i64.add(item, item)",
+        "generic Result/buffer/lambda NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("generic_result_buffer_lambda_helper_demo.nir.txt"),
+        "let len: i64 = buffer_len(buffer)",
+        "generic Result/buffer/lambda NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("generic_result_buffer_lambda_helper_demo.yir"),
+        "cpu.store_at",
+        "generic Result/buffer/lambda YIR",
+    );
+    assert_file_contains(
+        &output_dir.join("generic_result_buffer_lambda_helper_demo.yir"),
+        "cpu.variant_is",
+        "generic Result/buffer/lambda YIR",
+    );
+    assert_file_contains(
+        &output_dir.join("generic_result_buffer_lambda_helper_demo.yir"),
+        "HelperReport",
+        "generic Result/buffer/lambda YIR",
+    );
+    assert_binary_exit(
+        &output_dir.join("generic_result_buffer_lambda_helper_demo"),
+        52,
+        "generic Result/buffer/lambda helper binary",
+    );
+}
