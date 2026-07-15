@@ -29,6 +29,23 @@ pub(crate) struct DevTensorMilestoneCoverage {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DevTensorDerivedExpectedCoordinate {
+    pub(crate) architecture: String,
+    pub(crate) module: String,
+    pub(crate) function: String,
+    pub(crate) milestone: String,
+    pub(crate) required: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DevTensorDerivedExpectedCoordinates {
+    pub(crate) source: &'static str,
+    pub(crate) fallback_used: bool,
+    pub(crate) error: Option<String>,
+    pub(crate) coordinates: Vec<DevTensorDerivedExpectedCoordinate>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct DevTensorMilestoneManifest {
     schema: String,
     milestones: Vec<DevTensorMilestone>,
@@ -169,6 +186,45 @@ pub(crate) fn dev_tensor_milestone_coverage() -> DevTensorMilestoneCoverage {
     }
 }
 
+pub(crate) fn expected_coordinates_from_milestones() -> DevTensorDerivedExpectedCoordinates {
+    match load_milestone_manifest() {
+        Ok(manifest) => DevTensorDerivedExpectedCoordinates {
+            source: MILESTONE_MANIFEST_SOURCE,
+            fallback_used: false,
+            error: None,
+            coordinates: milestone_coordinate_records(&manifest)
+                .into_iter()
+                .filter_map(|record| {
+                    split_coordinate_key(&record.key).map(|(architecture, module, function)| {
+                        DevTensorDerivedExpectedCoordinate {
+                            architecture,
+                            module,
+                            function,
+                            milestone: record.milestone,
+                            required: record.required,
+                        }
+                    })
+                })
+                .collect(),
+        },
+        Err(error) => DevTensorDerivedExpectedCoordinates {
+            source: "DEV_TENSOR_EXPECTED_COORDINATES",
+            fallback_used: true,
+            error: Some(error),
+            coordinates: DEV_TENSOR_EXPECTED_COORDINATES
+                .iter()
+                .map(|coordinate| DevTensorDerivedExpectedCoordinate {
+                    architecture: coordinate.architecture.to_owned(),
+                    module: coordinate.module.to_owned(),
+                    function: coordinate.function.to_owned(),
+                    milestone: coordinate.milestone.to_owned(),
+                    required: coordinate.required,
+                })
+                .collect(),
+        },
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct DevTensorMilestoneCoordinate {
     milestone: String,
@@ -301,6 +357,21 @@ fn required_label(required: bool) -> &'static str {
     }
 }
 
+fn split_coordinate_key(key: &str) -> Option<(String, String, String)> {
+    let mut parts = key.split('/');
+    let architecture = parts.next()?;
+    let module = parts.next()?;
+    let function = parts.next()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    Some((
+        architecture.to_owned(),
+        module.to_owned(),
+        function.to_owned(),
+    ))
+}
+
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
@@ -328,5 +399,24 @@ mod tests {
             .iter()
             .any(|coordinate| coordinate
                 == "alpha-governance:required:developer-system/dev-tensor/architecture-module-function-progress-model"));
+    }
+
+    #[test]
+    fn milestone_manifest_is_primary_expected_coordinate_source() {
+        let derived = expected_coordinates_from_milestones();
+        assert_eq!(derived.source, MILESTONE_MANIFEST_SOURCE);
+        assert!(!derived.fallback_used);
+        assert!(derived.error.is_none());
+        assert_eq!(
+            derived.coordinates.len(),
+            DEV_TENSOR_EXPECTED_COORDINATES.len()
+        );
+        assert!(derived.coordinates.iter().any(|coordinate| {
+            coordinate.architecture == "developer-system"
+                && coordinate.module == "dev-tensor"
+                && coordinate.function == "architecture-module-function-progress-model"
+                && coordinate.milestone == "alpha-governance"
+                && coordinate.required
+        }));
     }
 }

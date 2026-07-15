@@ -153,6 +153,9 @@ mod cpu Main {
     assert!(json.contains("\"link_plan_final_driver\":\"clang\""));
     assert!(json.contains("\"link_plan_final_link_mode\":\"host-toolchain-finalize\""));
     assert!(json.contains("\"link_plan_lowering_plan_index_source\":\"compiled_artifact_section\""));
+    assert!(json.contains("\"link_plan_heterogeneous_backend_artifact_units\":0"));
+    assert!(json.contains("\"link_plan_heterogeneous_backend_artifact_ready_units\":0"));
+    assert!(json.contains("\"link_plan_heterogeneous_backend_artifact_first_unready\":null"));
     assert!(json.contains("\"nsld_prepare_command\":\"nsld prepare "));
     assert!(json.contains("\"nsld_drive_dry_run_command\":\"nsld drive "));
     assert!(json.contains("\"nsld_drive_dry_run_json_command\":\"nsld drive "));
@@ -374,6 +377,21 @@ mod cpu Main {
     ));
     assert!(json.contains(
         "\"workflow_run_artifact_prelaunch_reason\":\"nsld final executable pipeline materialized a verified host entrypoint stub\""
+    ));
+    assert!(json.contains(
+        "\"workflow_launch_evidence_protocol\":\"nuis-run-artifact-launch-evidence-v1\""
+    ));
+    assert!(json.contains("\"workflow_launch_evidence_status\":\"blocked\""));
+    assert!(json.contains("\"workflow_launch_evidence_route\":\"nsld-host-entrypoint\""));
+    assert!(json.contains("\"workflow_launch_evidence_status_code\":\"entrypoint-ready\""));
+    assert!(json.contains(
+        "\"workflow_launch_evidence_debugger_contract\":\"nsdb-yir-launch-evidence-v1\""
+    ));
+    assert!(
+        json.contains("\"workflow_launch_evidence_host_runner_probe_status\":\"workflow-mirror\"")
+    );
+    assert!(json.contains(
+        "\"workflow_launch_evidence_first_blocker\":\"host-runner-probe:workflow-mirror\""
     ));
     assert!(json.contains("\"nsld_self_owned_image_ready\":"));
     assert!(json.contains("\"nsld_self_owned_image_status\":"));

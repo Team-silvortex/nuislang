@@ -329,7 +329,7 @@ impl HostRunnerOutput {
     }
 }
 
-struct HostRunnerJsonSurface {
+pub(crate) struct HostRunnerJsonSurface {
     invoked: bool,
     status: String,
     program: Option<String>,
@@ -350,7 +350,7 @@ struct HostRunnerJsonSurface {
     container_loader_handoff_status: Option<String>,
 }
 
-struct RunArtifactLaunchEvidence {
+pub(crate) struct RunArtifactLaunchEvidence {
     protocol: &'static str,
     status: String,
     route: String,
@@ -371,7 +371,7 @@ struct RunArtifactLaunchEvidence {
 }
 
 impl RunArtifactLaunchEvidence {
-    fn from_surfaces(
+    pub(crate) fn from_surfaces(
         prelaunch: &crate::run_artifact::RunArtifactPrelaunchSummary,
         host_runner: &HostRunnerJsonSurface,
     ) -> Self {
@@ -418,61 +418,68 @@ impl RunArtifactLaunchEvidence {
         }
     }
 
-    fn json_fields(&self) -> Vec<String> {
+    pub(crate) fn json_fields(&self) -> Vec<String> {
+        self.json_fields_with_prefix("launch_evidence")
+    }
+
+    pub(crate) fn json_fields_with_prefix(&self, prefix: &str) -> Vec<String> {
         vec![
-            json_field("launch_evidence_protocol", self.protocol),
-            json_field("launch_evidence_status", &self.status),
-            json_field("launch_evidence_route", &self.route),
-            json_field("launch_evidence_status_code", &self.evidence_status),
-            json_field("launch_evidence_debugger_contract", self.debugger_contract),
-            json_optional_string_field("launch_evidence_command", self.command.as_deref()),
+            json_field(&format!("{prefix}_protocol"), self.protocol),
+            json_field(&format!("{prefix}_status"), &self.status),
+            json_field(&format!("{prefix}_route"), &self.route),
+            json_field(&format!("{prefix}_status_code"), &self.evidence_status),
             json_field(
-                "launch_evidence_host_runner_probe_status",
+                &format!("{prefix}_debugger_contract"),
+                self.debugger_contract,
+            ),
+            json_optional_string_field(&format!("{prefix}_command"), self.command.as_deref()),
+            json_field(
+                &format!("{prefix}_host_runner_probe_status"),
                 &self.host_runner_probe_status,
             ),
             json_optional_bool_field(
-                "launch_evidence_host_runner_probe_ready",
+                &format!("{prefix}_host_runner_probe_ready"),
                 self.host_runner_probe_ready,
             ),
             json_optional_string_field(
-                "launch_evidence_first_payload_status",
+                &format!("{prefix}_first_payload_status"),
                 self.first_payload_status.as_deref(),
             ),
             json_optional_bool_field(
-                "launch_evidence_first_payload_ready",
+                &format!("{prefix}_first_payload_ready"),
                 self.first_payload_ready,
             ),
             json_optional_string_field(
-                "launch_evidence_first_payload_target",
+                &format!("{prefix}_first_payload_target"),
                 self.first_payload_target.as_deref(),
             ),
             json_optional_string_field(
-                "launch_evidence_first_payload_entry_symbol",
+                &format!("{prefix}_first_payload_entry_symbol"),
                 self.first_payload_entry_symbol.as_deref(),
             ),
             json_optional_string_field(
-                "launch_evidence_first_payload_entry_kind",
+                &format!("{prefix}_first_payload_entry_kind"),
                 self.first_payload_entry_kind.as_deref(),
             ),
             json_optional_string_field(
-                "launch_evidence_first_payload_entry_section_id",
+                &format!("{prefix}_first_payload_entry_section_id"),
                 self.first_payload_entry_section_id.as_deref(),
             ),
             json_optional_string_field(
-                "launch_evidence_first_payload_first_blocker",
+                &format!("{prefix}_first_payload_first_blocker"),
                 self.first_payload_first_blocker.as_deref(),
             ),
             json_optional_string_field(
-                "launch_evidence_first_blocker",
+                &format!("{prefix}_first_blocker"),
                 self.first_blocker.as_deref(),
             ),
-            json_field("launch_evidence_reason", &self.reason),
+            json_field(&format!("{prefix}_reason"), &self.reason),
         ]
     }
 }
 
 impl HostRunnerJsonSurface {
-    fn not_invoked(status: &str) -> Self {
+    pub(crate) fn not_invoked(status: &str) -> Self {
         Self {
             invoked: false,
             status: status.to_owned(),

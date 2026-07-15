@@ -86,7 +86,35 @@ pub(crate) fn render_dev_tensor_json_impl() -> String {
                 "weakest_bootstrap_next_step",
                 summary.weakest_bootstrap_next_step,
             ),
+            json_field(
+                "weakest_bootstrap_blocker",
+                summary.weakest_bootstrap_blocker,
+            ),
+            json_field(
+                "weakest_bootstrap_next_action",
+                summary.weakest_bootstrap_next_action,
+            ),
+            json_field(
+                "weakest_bootstrap_validation_command",
+                summary.weakest_bootstrap_validation_command,
+            ),
+            json_field(
+                "weakest_bootstrap_expected_artifact",
+                summary.weakest_bootstrap_expected_artifact,
+            ),
             json_field("coverage_status", coverage.status),
+            json_field("coverage_expected_source", coverage.expected_source),
+            json_bool_field(
+                "coverage_expected_fallback_used",
+                coverage.expected_fallback_used,
+            ),
+            json_field(
+                "coverage_expected_source_error",
+                coverage
+                    .expected_source_error
+                    .as_deref()
+                    .unwrap_or("<none>"),
+            ),
             json_usize_field("coverage_expected_count", coverage.expected_count),
             json_usize_field("coverage_covered_count", coverage.covered_count),
             json_usize_field("coverage_missing_count", coverage.missing_count),
@@ -278,7 +306,35 @@ pub(crate) fn render_dev_tensor_text_impl() -> Vec<String> {
             "  weakest_bootstrap_next_step: {}",
             summary.weakest_bootstrap_next_step
         ),
+        format!(
+            "  weakest_bootstrap_blocker: {}",
+            summary.weakest_bootstrap_blocker
+        ),
+        format!(
+            "  weakest_bootstrap_next_action: {}",
+            summary.weakest_bootstrap_next_action
+        ),
+        format!(
+            "  weakest_bootstrap_validation_command: {}",
+            summary.weakest_bootstrap_validation_command
+        ),
+        format!(
+            "  weakest_bootstrap_expected_artifact: {}",
+            summary.weakest_bootstrap_expected_artifact
+        ),
         format!("  coverage_status: {}", coverage.status),
+        format!("  coverage_expected_source: {}", coverage.expected_source),
+        format!(
+            "  coverage_expected_fallback_used: {}",
+            coverage.expected_fallback_used
+        ),
+        format!(
+            "  coverage_expected_source_error: {}",
+            coverage
+                .expected_source_error
+                .as_deref()
+                .unwrap_or("<none>")
+        ),
         format!("  coverage_expected_count: {}", coverage.expected_count),
         format!("  coverage_covered_count: {}", coverage.covered_count),
         format!("  coverage_missing_count: {}", coverage.missing_count),
@@ -420,6 +476,13 @@ pub(crate) fn render_dev_tensor_text_impl() -> Vec<String> {
         ));
         lines.push(format!("    evidence: {}", cell.evidence));
         lines.push(format!("    next_step: {}", cell.next_step));
+        lines.push(format!("    blocker: {}", cell.blocker));
+        lines.push(format!("    next_action: {}", cell.next_action));
+        lines.push(format!(
+            "    validation_command: {}",
+            cell.validation_command
+        ));
+        lines.push(format!("    expected_artifact: {}", cell.expected_artifact));
     }
     lines
 }
@@ -443,6 +506,10 @@ fn dev_tensor_cell_json(cell: &DevTensorCell) -> String {
             json_field("closure_role", cell.closure_role),
             json_field("evidence", cell.evidence),
             json_field("next_step", cell.next_step),
+            json_field("blocker", cell.blocker),
+            json_field("next_action", cell.next_action),
+            json_field("validation_command", cell.validation_command),
+            json_field("expected_artifact", cell.expected_artifact),
         ]
         .join(",")
     )

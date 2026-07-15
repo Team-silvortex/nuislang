@@ -5,6 +5,12 @@ use std::collections::BTreeSet;
 pub(super) struct WorkflowDomainReadiness {
     package_id: String,
     domain_family: String,
+    backend_family: String,
+    target_device: String,
+    backend_artifact_candidate: bool,
+    backend_artifact_key: String,
+    backend_artifact_ready: bool,
+    backend_artifact_missing_signals: Vec<String>,
     ready: bool,
     selected_lowering_target_present: bool,
     payload_blob_present: bool,
@@ -24,9 +30,14 @@ pub(super) struct WorkflowDomainReadinessSummary {
     pub(super) hetero_units: usize,
     pub(super) ready_units: usize,
     pub(super) registry_dispatch_ready_units: usize,
+    pub(super) backend_artifact_units: usize,
+    pub(super) backend_artifact_ready_units: usize,
     pub(super) ready: bool,
     pub(super) domain_families: Vec<String>,
+    pub(super) backend_families: Vec<String>,
+    pub(super) target_devices: Vec<String>,
     pub(super) first_unready: Option<String>,
+    pub(super) backend_artifact_first_unready: Option<String>,
     pub(super) registry_dispatch_first_blocked: Option<String>,
     units: Vec<WorkflowDomainReadiness>,
 }
@@ -82,9 +93,29 @@ pub(super) fn workflow_domain_readiness_summary(
         .iter()
         .filter(|unit| unit.registry_dispatch_readiness_ready)
         .count();
+    let backend_artifact_units = units
+        .iter()
+        .filter(|unit| unit.backend_artifact_candidate)
+        .count();
+    let backend_artifact_ready_units = units
+        .iter()
+        .filter(|unit| unit.backend_artifact_candidate && unit.backend_artifact_ready)
+        .count();
     let domain_families = units
         .iter()
         .map(|unit| unit.domain_family.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let backend_families = units
+        .iter()
+        .map(|unit| unit.backend_family.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let target_devices = units
+        .iter()
+        .map(|unit| unit.target_device.clone())
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect::<Vec<_>>();
@@ -92,6 +123,10 @@ pub(super) fn workflow_domain_readiness_summary(
         .iter()
         .find(|unit| !unit.ready)
         .map(|unit| format!("{}[{}]", unit.package_id, unit.domain_family));
+    let backend_artifact_first_unready = units
+        .iter()
+        .find(|unit| unit.backend_artifact_candidate && !unit.backend_artifact_ready)
+        .map(|unit| unit.backend_artifact_key.clone());
     let registry_dispatch_first_blocked = units
         .iter()
         .find(|unit| !unit.registry_dispatch_readiness_ready)
@@ -100,20 +135,41 @@ pub(super) fn workflow_domain_readiness_summary(
         hetero_units,
         ready_units,
         registry_dispatch_ready_units,
+        backend_artifact_units,
+        backend_artifact_ready_units,
         ready: hetero_units == ready_units,
         domain_families,
+        backend_families,
+        target_devices,
         first_unready,
+        backend_artifact_first_unready,
         registry_dispatch_first_blocked,
         units,
     }
 }
 
 fn workflow_domain_readiness(unit: &nuisc::linker::LinkPlanDomainUnit) -> WorkflowDomainReadiness {
+    let backend_family = unit.backend_family.as_deref().unwrap_or("none").to_owned();
+    let target_device = unit.target_device.as_deref().unwrap_or("none").to_owned();
     let selected_lowering_target_present = unit.selected_lowering_target.is_some();
     let payload_blob_present = unit.artifact_payload_blob_path.is_some();
     let payload_format_present = unit.artifact_payload_format.is_some();
     let bridge_stub_present = unit.artifact_bridge_stub_path.is_some();
     let ir_sidecar_present = unit.artifact_ir_sidecar_path.is_some();
+    let backend_artifact_missing_signals = workflow_backend_artifact_missing_signals(
+        unit,
+        payload_blob_present,
+        payload_format_present,
+        bridge_stub_present,
+    );
+    let backend_artifact_candidate = unit.backend_family.is_some()
+        || unit.target_device.is_some()
+        || unit.selected_lowering_target.is_some();
+    let backend_artifact_ready = backend_artifact_missing_signals.is_empty();
+    let backend_artifact_key = format!(
+        "{}:{}:{}",
+        unit.domain_family, backend_family, target_device
+    );
     let registry_dispatch = workflow_registry_dispatch_readiness(unit);
     let mut issues = Vec::new();
     if !payload_blob_present {
@@ -131,6 +187,12 @@ fn workflow_domain_readiness(unit: &nuisc::linker::LinkPlanDomainUnit) -> Workfl
     WorkflowDomainReadiness {
         package_id: unit.package_id.clone(),
         domain_family: unit.domain_family.clone(),
+        backend_family,
+        target_device,
+        backend_artifact_candidate,
+        backend_artifact_key,
+        backend_artifact_ready,
+        backend_artifact_missing_signals,
         ready: issues.is_empty(),
         selected_lowering_target_present,
         payload_blob_present,
@@ -145,6 +207,31 @@ fn workflow_domain_readiness(unit: &nuisc::linker::LinkPlanDomainUnit) -> Workfl
             .execution_readiness_materialized,
         issues,
     }
+}
+
+fn workflow_backend_artifact_missing_signals(
+    unit: &nuisc::linker::LinkPlanDomainUnit,
+    payload_blob_present: bool,
+    payload_format_present: bool,
+    bridge_stub_present: bool,
+) -> Vec<String> {
+    let mut missing = Vec::new();
+    if unit.backend_family.is_none() {
+        missing.push("backend_family".to_owned());
+    }
+    if unit.target_device.is_none() {
+        missing.push("target_device".to_owned());
+    }
+    if !payload_blob_present {
+        missing.push("artifact_payload_blob".to_owned());
+    }
+    if !payload_format_present {
+        missing.push("artifact_payload_format".to_owned());
+    }
+    if !bridge_stub_present {
+        missing.push("artifact_bridge_stub".to_owned());
+    }
+    missing
 }
 
 struct WorkflowRegistryDispatchReadiness {
@@ -196,6 +283,18 @@ fn workflow_domain_readiness_json(unit: &WorkflowDomainReadiness) -> String {
     let fields = [
         json_field("package_id", &unit.package_id),
         json_field("domain_family", &unit.domain_family),
+        json_field("backend_family", &unit.backend_family),
+        json_field("target_device", &unit.target_device),
+        json_bool_field(
+            "backend_artifact_candidate",
+            unit.backend_artifact_candidate,
+        ),
+        json_field("backend_artifact_key", &unit.backend_artifact_key),
+        json_bool_field("backend_artifact_ready", unit.backend_artifact_ready),
+        json_string_array_field(
+            "backend_artifact_missing_signals",
+            &unit.backend_artifact_missing_signals,
+        ),
         json_bool_field("ready", unit.ready),
         json_bool_field(
             "selected_lowering_target_present",

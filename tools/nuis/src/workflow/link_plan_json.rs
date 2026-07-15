@@ -3,7 +3,11 @@ use super::link_plan_domain::{
     workflow_link_plan_domain_unit_record,
 };
 use super::*;
-use crate::{artifact_doctor::probe_artifact_doctor, run_artifact::run_artifact_prelaunch_summary};
+use crate::{
+    artifact_doctor::probe_artifact_doctor,
+    artifact_runtime_command::{HostRunnerJsonSurface, RunArtifactLaunchEvidence},
+    run_artifact::run_artifact_prelaunch_summary,
+};
 use std::path::{Path, PathBuf};
 
 fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -> Vec<String> {
@@ -43,7 +47,13 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
     let domain_readiness = link_plan.map(workflow_domain_readiness_summary);
     let workflow_prelaunch =
         link_plan.map(|plan| workflow_run_artifact_prelaunch_summary(Path::new(&plan.output_dir)));
-    vec![
+    let workflow_launch_evidence = workflow_prelaunch.as_ref().map(|prelaunch| {
+        RunArtifactLaunchEvidence::from_surfaces(
+            prelaunch,
+            &HostRunnerJsonSurface::not_invoked("workflow-mirror"),
+        )
+    });
+    let mut fields = vec![
         json_bool_field("link_plan_available", link_plan.is_some()),
         json_optional_string_field(
             "link_plan_final_stage",
@@ -124,6 +134,20 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
                 .map(|summary| summary.registry_dispatch_ready_units)
                 .unwrap_or(0),
         ),
+        json_usize_field(
+            "link_plan_heterogeneous_backend_artifact_units",
+            domain_readiness
+                .as_ref()
+                .map(|summary| summary.backend_artifact_units)
+                .unwrap_or(0),
+        ),
+        json_usize_field(
+            "link_plan_heterogeneous_backend_artifact_ready_units",
+            domain_readiness
+                .as_ref()
+                .map(|summary| summary.backend_artifact_ready_units)
+                .unwrap_or(0),
+        ),
         json_bool_field(
             "link_plan_heterogeneous_domain_readiness_ready",
             domain_readiness
@@ -138,11 +162,31 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
                 .map(|summary| summary.domain_families.clone())
                 .unwrap_or_default(),
         ),
+        json_string_array_field(
+            "link_plan_heterogeneous_backend_families",
+            &domain_readiness
+                .as_ref()
+                .map(|summary| summary.backend_families.clone())
+                .unwrap_or_default(),
+        ),
+        json_string_array_field(
+            "link_plan_heterogeneous_target_devices",
+            &domain_readiness
+                .as_ref()
+                .map(|summary| summary.target_devices.clone())
+                .unwrap_or_default(),
+        ),
         json_optional_string_field(
             "link_plan_heterogeneous_domain_first_unready",
             domain_readiness
                 .as_ref()
                 .and_then(|summary| summary.first_unready.as_deref()),
+        ),
+        json_optional_string_field(
+            "link_plan_heterogeneous_backend_artifact_first_unready",
+            domain_readiness
+                .as_ref()
+                .and_then(|summary| summary.backend_artifact_first_unready.as_deref()),
         ),
         json_optional_string_field(
             "link_plan_heterogeneous_domain_registry_dispatch_first_blocked",
@@ -679,7 +723,11 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
                 .as_ref()
                 .and_then(|summary| summary.first_blocker.as_deref()),
         ),
-    ]
+    ];
+    if let Some(evidence) = workflow_launch_evidence {
+        fields.extend(evidence.json_fields_with_prefix("workflow_launch_evidence"));
+    }
+    fields
 }
 
 fn json_optional_bool_field(name: &str, value: Option<bool>) -> String {

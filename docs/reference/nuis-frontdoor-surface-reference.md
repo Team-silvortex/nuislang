@@ -98,8 +98,38 @@ These fields now form the current visible link summary:
   command-like launch summary selected from the current workflow output
 * `workflow_run_artifact_prelaunch_reason`
   human-readable explanation for that workflow launch recommendation
+* `workflow_launch_evidence_protocol`
+  workflow-level non-executing mirror of the nsdb-facing launch evidence
+  contract; currently `nuis-run-artifact-launch-evidence-v1`
+* `workflow_launch_evidence_status`
+  aggregate mirror status derived from the workflow prelaunch surface and the
+  intentionally non-invoked host-runner probe
+* `workflow_launch_evidence_route`
+  selected launch route, matching `workflow_run_artifact_prelaunch_kind`
+* `workflow_launch_evidence_status_code`
+  compact launch evidence code, matching
+  `workflow_run_artifact_prelaunch_evidence_status`
+* `workflow_launch_evidence_debugger_contract`
+  debugger-facing contract family; currently `nsdb-yir-launch-evidence-v1`
+* `workflow_launch_evidence_host_runner_probe_status`
+  `workflow-mirror` until `run-artifact` performs a real host-runner probe
+* `workflow_launch_evidence_first_blocker`
+  first normalized blocker for workflow-level launch evidence triage
 * `link_plan_domain_units`
   the number of domain build units carried by the current build plan
+* `link_plan_heterogeneous_backend_artifact_units`
+  number of non-CPU domain units with backend/target/lowering signals that are
+  considered backend artifact candidates
+* `link_plan_heterogeneous_backend_artifact_ready_units`
+  number of backend artifact candidates with backend family, target device,
+  payload blob, payload format, and bridge stub evidence present
+* `link_plan_heterogeneous_backend_families`
+  sorted backend families derived from the current non-CPU domain units
+* `link_plan_heterogeneous_target_devices`
+  sorted target device classes derived from the current non-CPU domain units
+* `link_plan_heterogeneous_backend_artifact_first_unready`
+  first backend artifact candidate key missing minimum assembly evidence, or
+  `null` when all candidates are ready
 * `nsld_final_executable_output_ready`
   whether the visible final executable output is currently Nsld-owned and has
   no lightweight final-output boundary blockers. This is intentionally
@@ -290,6 +320,23 @@ These fields now form the current visible link summary:
   command-like launch summary for the artifact closure, or `null`
 * `artifact_closure_runner_command_present`
   true when the artifact closure carries a concrete runner command
+* `artifact_launch_evidence_protocol`
+  artifact-doctor non-executing mirror of the nsdb-facing launch evidence
+  contract; currently `nuis-run-artifact-launch-evidence-v1`
+* `artifact_launch_evidence_status`
+  aggregate mirror status derived from the artifact closure and the
+  intentionally non-invoked host-runner probe
+* `artifact_launch_evidence_route`
+  selected launch route, matching `artifact_closure_kind`
+* `artifact_launch_evidence_status_code`
+  compact launch evidence code, matching `artifact_closure_evidence_status`
+* `artifact_launch_evidence_debugger_contract`
+  debugger-facing contract family; currently `nsdb-yir-launch-evidence-v1`
+* `artifact_launch_evidence_host_runner_probe_status`
+  `artifact-doctor-mirror` until `run-artifact` performs a real host-runner
+  probe
+* `artifact_launch_evidence_first_blocker`
+  first normalized blocker for artifact-doctor launch evidence triage
 * `artifact_closure_entrypoint_path`
   resolved host entrypoint path when the artifact closure prefers the Nsld
   host-entrypoint route

@@ -1,6 +1,7 @@
 use crate::{
     append_json_field_strings,
     artifact_doctor::{ArtifactOutputDiagnostics, ProjectValidationSnapshot},
+    artifact_runtime_command::{HostRunnerJsonSurface, RunArtifactLaunchEvidence},
     json_bool_field, json_field, json_object_array_field, json_optional_bool_field,
     json_optional_string_field, json_string_array_field, json_surface, json_usize_field,
     run_artifact::run_artifact_prelaunch_summary,
@@ -120,6 +121,10 @@ pub(crate) fn render_artifact_doctor_json(input: &Path) -> String {
     let resolved_binary = report.binary_path.as_deref().filter(|path| path.exists());
     let artifact_closure =
         run_artifact_prelaunch_summary(report.output_dir.as_deref(), resolved_binary);
+    let launch_evidence = RunArtifactLaunchEvidence::from_surfaces(
+        &artifact_closure,
+        &HostRunnerJsonSurface::not_invoked("artifact-doctor-mirror"),
+    );
     let mut out = String::from("{");
     append_json_field_strings(
         &mut out,
@@ -204,6 +209,10 @@ pub(crate) fn render_artifact_doctor_json(input: &Path) -> String {
                 report.artifact_verify_error.as_deref(),
             ),
         ],
+    );
+    append_json_field_strings(
+        &mut out,
+        launch_evidence.json_fields_with_prefix("artifact_launch_evidence"),
     );
     append_artifact_output_diagnostic_json_fields(
         &mut out,

@@ -108,14 +108,26 @@ artifact-follow-up state:
 * `link_plan_domain_units`
 * `link_plan_heterogeneous_domain_units`
 * `link_plan_heterogeneous_domain_ready_units`
+* `link_plan_heterogeneous_backend_artifact_units`
+* `link_plan_heterogeneous_backend_artifact_ready_units`
 * `link_plan_heterogeneous_domain_readiness_ready`
 * `link_plan_heterogeneous_domain_families`
+* `link_plan_heterogeneous_backend_families`
+* `link_plan_heterogeneous_target_devices`
 * `link_plan_heterogeneous_domain_first_unready`
+* `link_plan_heterogeneous_backend_artifact_first_unready`
 * `workflow_run_artifact_prelaunch_kind`
 * `workflow_run_artifact_prelaunch_status`
 * `workflow_run_artifact_prelaunch_evidence_status`
 * `workflow_run_artifact_prelaunch_command`
 * `workflow_run_artifact_prelaunch_reason`
+* `workflow_launch_evidence_protocol`
+* `workflow_launch_evidence_status`
+* `workflow_launch_evidence_route`
+* `workflow_launch_evidence_status_code`
+* `workflow_launch_evidence_debugger_contract`
+* `workflow_launch_evidence_host_runner_probe_status`
+* `workflow_launch_evidence_first_blocker`
 * `nsld_final_executable_output_ready`
 * `nsld_final_executable_output_boundary_status`
 * `nsld_final_executable_output_materialization_status`
@@ -188,6 +200,13 @@ artifact-follow-up state:
 * `artifact_closure_kind`
 * `artifact_closure_status`
 * `artifact_closure_evidence_status`
+* `artifact_launch_evidence_protocol`
+* `artifact_launch_evidence_status`
+* `artifact_launch_evidence_route`
+* `artifact_launch_evidence_status_code`
+* `artifact_launch_evidence_debugger_contract`
+* `artifact_launch_evidence_host_runner_probe_status`
+* `artifact_launch_evidence_first_blocker`
 * `artifact_closure_command`
 * `artifact_closure_runner_command_present`
 * `artifact_closure_entrypoint_path`
@@ -352,14 +371,19 @@ Short reading rule:
 * `workflow` and LinkPlan JSON mirror that decision under
   `workflow_run_artifact_prelaunch_*`, so the main workflow surface can show the
   launch closure that `run-artifact` would prefer without forcing callers to run
-  a second command just to classify the final handoff
+  a second command just to classify the final handoff. It also emits
+  `workflow_launch_evidence_*` as a non-executing mirror of the same nsdb-facing
+  launch evidence contract; host-runner probe fields are intentionally marked as
+  `workflow-mirror` until `run-artifact` performs the real probe
 * `artifact-doctor --json` emits the matching `artifact_closure_*` aggregate
   fields. These describe the current runnable artifact closure before execution:
   `host-binary` for the older direct binary path, `nsld-host-entrypoint` for the
   self-contained Nsld entrypoint route, or `none` when no launch surface is
   available yet. The closure group mirrors evidence status, runner-command
   presence, entrypoint presence, expected entrypoint protocol, and protocol
-  validity
+  validity. It also emits `artifact_launch_evidence_*` as the artifact-doctor
+  mirror of the nsdb-facing evidence contract, with host-runner probe fields
+  marked as `artifact-doctor-mirror` until runtime handoff
 * heterogeneous-domain readiness fields summarize whether non-CPU domain units
   have the generic payload, lowering, sidecar, and bridge evidence needed by the
   current artifact route

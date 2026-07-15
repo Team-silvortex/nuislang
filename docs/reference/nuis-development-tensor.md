@@ -34,6 +34,15 @@ Each tensor cell carries:
   the current proof anchor, usually tests, frontdoor fields, docs, or examples
 * `next_step`
   the most useful next action for that cell
+* `blocker`
+  the current concrete blocker that makes this cell weaker than done
+* `next_action`
+  the action-oriented task-card step; this can mirror `next_step` while tools
+  migrate from narrative guidance to machine-consumable planning
+* `validation_command`
+  the narrow command that should prove the next action worked
+* `expected_artifact`
+  the concrete artifact or surfaced contract expected after the next action
 
 Short rule:
 
@@ -71,7 +80,14 @@ The JSON surface is intentionally simple:
 * `weakest_bootstrap_closure_role`
 * `weakest_bootstrap_evidence`
 * `weakest_bootstrap_next_step`
+* `weakest_bootstrap_blocker`
+* `weakest_bootstrap_next_action`
+* `weakest_bootstrap_validation_command`
+* `weakest_bootstrap_expected_artifact`
 * `coverage_status`
+* `coverage_expected_source`
+* `coverage_expected_fallback_used`
+* `coverage_expected_source_error`
 * `coverage_expected_count`
 * `coverage_covered_count`
 * `coverage_missing_count`
@@ -159,17 +175,32 @@ of the toolchain self-orientation surface, not just a separate report command.
 
 ## Coverage Manifest
 
-The tensor now has a small built-in coverage manifest. The manifest lists the
-coordinates that the alpha line expects to see in the tensor:
+The tensor now has a milestone-owned expected-coordinate source. The primary
+source is:
+
+`docs/reference/nuis-development-tensor.milestones.toml`
+
+That manifest lists the coordinates that the alpha line expects to see in the
+tensor:
 
 `expected architecture/module/function coordinates`
 
-The coverage layer compares that expected coordinate set with the actual
-`DEV_TENSOR_CELLS` entries and reports:
+The coverage layer derives expected coordinates from that manifest, falls back
+to the Rust `DEV_TENSOR_EXPECTED_COORDINATES` emergency snapshot only if the
+manifest cannot be read, compares the expected coordinate set with the actual
+`DEV_TENSOR_CELLS` entries, and reports:
 
 * `coverage_status`
   `clean` when required expected coordinates are covered and no stale/orphaned
   cells are present; otherwise `gap`
+* `coverage_expected_source`
+  the active source for expected coordinates, normally
+  `docs/reference/nuis-development-tensor.milestones.toml`
+* `coverage_expected_fallback_used`
+  true only when the Rust fallback snapshot was used because the manifest could
+  not be loaded
+* `coverage_expected_source_error`
+  the manifest load error when fallback was needed, otherwise `<none>`
 * `coverage_missing_coordinates`
   expected coordinates that do not currently have a tensor cell
 * `coverage_orphaned_coordinates`
@@ -186,8 +217,9 @@ the tensor itself still spans the expected project map`
 
 This is not yet automatic repository discovery. It is the first guardrail that
 prevents the tensor from becoming only a hand-written status list. Future
-versions can derive expected coordinates from galaxy manifests, Nustar
-registries, std module manifests, and milestone files.
+versions can derive additional coordinates from galaxy manifests, Nustar
+registries, and std module manifests, while the milestone file remains the
+human-owned alpha planning map.
 
 ## Manifest-Backed Coordinate Coverage
 
@@ -222,9 +254,9 @@ the milestone is bootstrap-required or optional, and gives the tensor a
 project-owned source of truth outside the Rust constant table.
 
 The current Rust `DEV_TENSOR_EXPECTED_COORDINATES` table still exists as a
-checked snapshot and fallback. The important change is that the tensor now
-derives a second coordinate view from the milestone manifest and compares all
-three sides:
+checked snapshot and emergency fallback. The important change is that the
+tensor now derives the primary expected-coordinate set from the milestone
+manifest and compares all three sides:
 
 * milestone manifest coordinates
 * current `DEV_TENSOR_CELLS`
@@ -251,8 +283,9 @@ Short rule:
 `milestone coverage makes the tensor less hand-written: milestones own the map,
 Rust constants must prove they still mirror it`
 
-The next step is to make `DEV_TENSOR_EXPECTED_COORDINATES` generated or cached
-from this manifest instead of treating the manifest as a parity peer.
+The next step is to surface generated cache metadata and shrink
+`DEV_TENSOR_EXPECTED_COORDINATES` down to an explicit emergency fallback rather
+than a peer source that developers are expected to edit by hand.
 
 ## Drift Checks
 
@@ -362,7 +395,12 @@ The tensor is a progress model, not a contract freeze.
 In alpha it may change cell names aggressively when the architecture changes.
 The stable part is the coordinate idea:
 
-`architecture x module x function -> status/progress/evidence/next_step`
+`architecture x module x function -> status/progress/evidence/next_step/task-card`
+
+The task-card layer is intentionally small: `blocker`, `next_action`,
+`validation_command`, and `expected_artifact`. It lets the weakest bootstrap
+coordinate become a concrete work item without turning the tensor into a full
+issue tracker.
 
 Future work should move cells from static entries toward generated readings
 from:

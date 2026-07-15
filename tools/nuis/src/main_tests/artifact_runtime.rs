@@ -510,6 +510,21 @@ mod cpu Main {
     assert!(json.contains(
         "\"artifact_closure_reason\":\"nsld final executable pipeline materialized a verified host entrypoint stub\""
     ));
+    assert!(json.contains(
+        "\"artifact_launch_evidence_protocol\":\"nuis-run-artifact-launch-evidence-v1\""
+    ));
+    assert!(json.contains("\"artifact_launch_evidence_status\":\"blocked\""));
+    assert!(json.contains("\"artifact_launch_evidence_route\":\"nsld-host-entrypoint\""));
+    assert!(json.contains("\"artifact_launch_evidence_status_code\":\"entrypoint-ready\""));
+    assert!(json.contains(
+        "\"artifact_launch_evidence_debugger_contract\":\"nsdb-yir-launch-evidence-v1\""
+    ));
+    assert!(json.contains(
+        "\"artifact_launch_evidence_host_runner_probe_status\":\"artifact-doctor-mirror\""
+    ));
+    assert!(json.contains(
+        "\"artifact_launch_evidence_first_blocker\":\"host-runner-probe:artifact-doctor-mirror\""
+    ));
     assert!(json.contains("\"nsld_final_executable_tail_ready\":true"));
 }
 
@@ -602,6 +617,13 @@ mod cpu Main {
     assert!(json.contains("\"artifact_closure_status\":\"ready\""));
     assert!(json.contains("\"artifact_closure_evidence_status\":\"entrypoint-ready\""));
     assert!(json.contains("nuis.host-entrypoint.sh"));
+    assert!(json.contains(
+        "\"artifact_launch_evidence_protocol\":\"nuis-run-artifact-launch-evidence-v1\""
+    ));
+    assert!(json.contains("\"artifact_launch_evidence_route\":\"nsld-host-entrypoint\""));
+    assert!(json.contains(
+        "\"artifact_launch_evidence_host_runner_probe_status\":\"artifact-doctor-mirror\""
+    ));
     assert!(!json.contains("\"artifact_closure_kind\":\"host-binary\""));
 }
 
@@ -807,13 +829,23 @@ fn build_report_json_exposes_bridge_bearing_exchange_summary() {
     assert!(json.contains("\"link_plan_heterogeneous_domain_units\":2"));
     assert!(json.contains("\"link_plan_heterogeneous_domain_ready_units\":2"));
     assert!(json.contains("\"link_plan_heterogeneous_domain_registry_dispatch_ready_units\":2"));
+    assert!(json.contains("\"link_plan_heterogeneous_backend_artifact_units\":1"));
+    assert!(json.contains("\"link_plan_heterogeneous_backend_artifact_ready_units\":1"));
     assert!(json.contains("\"link_plan_heterogeneous_domain_readiness_ready\":true"));
     assert!(json.contains("\"link_plan_heterogeneous_domain_families\":[\"data\",\"shader\"]"));
+    assert!(json.contains("\"link_plan_heterogeneous_backend_families\":["));
+    assert!(json.contains("\"link_plan_heterogeneous_target_devices\":["));
     assert!(json.contains("\"link_plan_heterogeneous_domain_first_unready\":null"));
+    assert!(json.contains("\"link_plan_heterogeneous_backend_artifact_first_unready\":null"));
     assert!(
         json.contains("\"link_plan_heterogeneous_domain_registry_dispatch_first_blocked\":null")
     );
     assert!(json.contains("\"link_plan_heterogeneous_domain_readiness\":[{"));
+    assert!(json.contains("\"backend_artifact_candidate\":false"));
+    assert!(json.contains("\"backend_artifact_candidate\":true"));
+    assert!(json.contains("\"backend_artifact_ready\":true"));
+    assert!(json.contains("\"backend_artifact_missing_signals\":[]"));
+    assert!(json.contains("\"backend_artifact_key\":\"shader:metal:apple-silicon-gpu\""));
     assert!(json.contains("\"registry_dispatch_readiness_status\":\"ready\""));
     assert!(json.contains("\"registry_dispatch_readiness_ready\":true"));
     assert!(json.contains("\"registry_dispatch_missing_signals\":[]"));
@@ -850,11 +882,16 @@ fn build_report_json_exposes_shader_result_enum_bundle_summary() {
     assert!(json.contains("\"link_plan_heterogeneous_domain_units\":2"));
     assert!(json.contains("\"link_plan_heterogeneous_domain_ready_units\":2"));
     assert!(json.contains("\"link_plan_heterogeneous_domain_registry_dispatch_ready_units\":2"));
+    assert!(json.contains("\"link_plan_heterogeneous_backend_artifact_units\":1"));
+    assert!(json.contains("\"link_plan_heterogeneous_backend_artifact_ready_units\":1"));
     assert!(json.contains("\"link_plan_heterogeneous_domain_readiness_ready\":true"));
     assert!(json.contains("\"link_plan_heterogeneous_domain_families\":[\"data\",\"shader\"]"));
+    assert!(json.contains("\"link_plan_heterogeneous_backend_artifact_first_unready\":null"));
     assert!(
         json.contains("\"link_plan_heterogeneous_domain_registry_dispatch_first_blocked\":null")
     );
+    assert!(json.contains("\"backend_artifact_candidate\":true"));
+    assert!(json.contains("\"backend_artifact_ready\":true"));
     assert!(json.contains("\"registry_dispatch_readiness_status\":\"ready\""));
     assert!(json.contains("\"registry_dispatch_readiness_ready\":true"));
 }

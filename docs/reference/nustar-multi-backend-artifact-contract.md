@@ -85,9 +85,14 @@ Current fields include:
 
 * `link_plan_heterogeneous_domain_units`
 * `link_plan_heterogeneous_domain_ready_units`
+* `link_plan_heterogeneous_backend_artifact_units`
+* `link_plan_heterogeneous_backend_artifact_ready_units`
 * `link_plan_heterogeneous_domain_readiness_ready`
 * `link_plan_heterogeneous_domain_families`
+* `link_plan_heterogeneous_backend_families`
+* `link_plan_heterogeneous_target_devices`
 * `link_plan_heterogeneous_domain_first_unready`
+* `link_plan_heterogeneous_backend_artifact_first_unready`
 * `link_plan_heterogeneous_domain_readiness`
 
 The current generic readiness check is intentionally about assembly evidence,
@@ -97,6 +102,24 @@ has:
 * an artifact payload blob
 * an artifact payload format
 * a bridge stub
+
+Each readiness unit also exposes a backend artifact candidate key:
+
+`domain_family:backend_family:target_device`
+
+That key is not a finite pre-computed backend matrix. It is derived from any
+registered `nustar` domain unit that carries backend, target-device, or selected
+lowering-target signals. This distinction matters because a non-CPU data-fabric
+unit can be assembly-ready without being a backend artifact candidate.
+
+For candidate units, the summary asks whether the minimum assembly evidence is
+present:
+
+* `backend_family`
+* `target_device`
+* `artifact_payload_blob`
+* `artifact_payload_format`
+* `artifact_bridge_stub`
 
 Domain-specific validation still belongs to the registered `nustar` contract.
 For example, shader and kernel domains can additionally require selected

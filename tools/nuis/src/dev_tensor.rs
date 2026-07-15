@@ -1,10 +1,13 @@
 use crate::{
-    dev_tensor_data::{DEV_TENSOR_CELLS, DEV_TENSOR_DRIFT_CHECKS, DEV_TENSOR_EXPECTED_COORDINATES},
+    dev_tensor_data::{DEV_TENSOR_CELLS, DEV_TENSOR_DRIFT_CHECKS},
     dev_tensor_drift::{
         dev_tensor_drift_summary as build_dev_tensor_drift_summary, DevTensorDriftSummary,
     },
     dev_tensor_manifest::{dev_tensor_manifest_coverage, DevTensorManifestCoverage},
-    dev_tensor_milestones::{dev_tensor_milestone_coverage, DevTensorMilestoneCoverage},
+    dev_tensor_milestones::{
+        dev_tensor_milestone_coverage, expected_coordinates_from_milestones,
+        DevTensorMilestoneCoverage,
+    },
     dev_tensor_status::dev_tensor_status_rank,
 };
 use std::collections::BTreeSet;
@@ -20,6 +23,10 @@ pub(crate) struct DevTensorCell {
     pub(crate) closure_role: &'static str,
     pub(crate) evidence: &'static str,
     pub(crate) next_step: &'static str,
+    pub(crate) blocker: &'static str,
+    pub(crate) next_action: &'static str,
+    pub(crate) validation_command: &'static str,
+    pub(crate) expected_artifact: &'static str,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,6 +40,9 @@ pub(crate) struct DevTensorExpectedCoordinate {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DevTensorCoverageSummary {
+    pub(crate) expected_source: &'static str,
+    pub(crate) expected_fallback_used: bool,
+    pub(crate) expected_source_error: Option<String>,
     pub(crate) expected_count: usize,
     pub(crate) covered_count: usize,
     pub(crate) missing_count: usize,
@@ -65,6 +75,10 @@ pub(crate) struct DevTensorSummary {
     pub(crate) weakest_bootstrap_closure_role: &'static str,
     pub(crate) weakest_bootstrap_evidence: &'static str,
     pub(crate) weakest_bootstrap_next_step: &'static str,
+    pub(crate) weakest_bootstrap_blocker: &'static str,
+    pub(crate) weakest_bootstrap_next_action: &'static str,
+    pub(crate) weakest_bootstrap_validation_command: &'static str,
+    pub(crate) weakest_bootstrap_expected_artifact: &'static str,
     pub(crate) coverage_status: &'static str,
     pub(crate) coverage_expected_count: usize,
     pub(crate) coverage_covered_count: usize,
@@ -137,6 +151,18 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
         weakest_bootstrap_next_step: weakest_bootstrap
             .map(|cell| cell.next_step)
             .unwrap_or("<none>"),
+        weakest_bootstrap_blocker: weakest_bootstrap
+            .map(|cell| cell.blocker)
+            .unwrap_or("<none>"),
+        weakest_bootstrap_next_action: weakest_bootstrap
+            .map(|cell| cell.next_action)
+            .unwrap_or("<none>"),
+        weakest_bootstrap_validation_command: weakest_bootstrap
+            .map(|cell| cell.validation_command)
+            .unwrap_or("<none>"),
+        weakest_bootstrap_expected_artifact: weakest_bootstrap
+            .map(|cell| cell.expected_artifact)
+            .unwrap_or("<none>"),
         coverage_status: coverage.status,
         coverage_expected_count: coverage.expected_count,
         coverage_covered_count: coverage.covered_count,
@@ -149,27 +175,30 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
 pub(crate) fn dev_tensor_coverage_summary() -> DevTensorCoverageSummary {
     let manifest = dev_tensor_manifest_coverage();
     let milestone = dev_tensor_milestone_coverage();
+    let expected = expected_coordinates_from_milestones();
     let cell_coordinates = DEV_TENSOR_CELLS
         .iter()
         .map(|cell| dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function))
         .collect::<BTreeSet<_>>();
-    let expected_coordinates = DEV_TENSOR_EXPECTED_COORDINATES
+    let expected_coordinates = expected
+        .coordinates
         .iter()
         .map(|coordinate| {
             dev_tensor_coordinate_key(
-                coordinate.architecture,
-                coordinate.module,
-                coordinate.function,
+                &coordinate.architecture,
+                &coordinate.module,
+                &coordinate.function,
             )
         })
         .collect::<BTreeSet<_>>();
-    let missing_coordinates = DEV_TENSOR_EXPECTED_COORDINATES
+    let missing_coordinates = expected
+        .coordinates
         .iter()
         .filter_map(|coordinate| {
             let key = dev_tensor_coordinate_key(
-                coordinate.architecture,
-                coordinate.module,
-                coordinate.function,
+                &coordinate.architecture,
+                &coordinate.module,
+                &coordinate.function,
             );
             (!cell_coordinates.contains(&key)).then(|| {
                 format!(
@@ -203,11 +232,16 @@ pub(crate) fn dev_tensor_coverage_summary() -> DevTensorCoverageSummary {
                 || cell.closure_role.is_empty()
                 || cell.evidence.is_empty()
                 || cell.next_step.is_empty()
+                || cell.blocker.is_empty()
+                || cell.next_action.is_empty()
+                || cell.validation_command.is_empty()
+                || cell.expected_artifact.is_empty()
                 || cell.progress > 100;
             stale.then(|| dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function))
         })
         .collect::<Vec<_>>();
-    let covered_count = DEV_TENSOR_EXPECTED_COORDINATES
+    let covered_count = expected
+        .coordinates
         .len()
         .saturating_sub(missing_coordinates.len());
     let status = if required_missing_count == 0
@@ -226,7 +260,10 @@ pub(crate) fn dev_tensor_coverage_summary() -> DevTensorCoverageSummary {
         .or_else(|| milestone.first_gap.as_ref())
         .cloned();
     DevTensorCoverageSummary {
-        expected_count: DEV_TENSOR_EXPECTED_COORDINATES.len(),
+        expected_source: expected.source,
+        expected_fallback_used: expected.fallback_used,
+        expected_source_error: expected.error,
+        expected_count: expected.coordinates.len(),
         covered_count,
         missing_count: missing_coordinates.len(),
         required_missing_count,
@@ -265,6 +302,7 @@ pub(crate) fn render_dev_tensor_text() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dev_tensor_data::DEV_TENSOR_EXPECTED_COORDINATES;
 
     #[test]
     fn dev_tensor_summary_reports_three_axes_and_cells() {
@@ -284,6 +322,10 @@ mod tests {
         assert_ne!(summary.weakest_bootstrap_closure_role, "<none>");
         assert_ne!(summary.weakest_bootstrap_evidence, "<none>");
         assert_ne!(summary.weakest_bootstrap_next_step, "<none>");
+        assert_ne!(summary.weakest_bootstrap_blocker, "<none>");
+        assert_ne!(summary.weakest_bootstrap_next_action, "<none>");
+        assert_ne!(summary.weakest_bootstrap_validation_command, "<none>");
+        assert_ne!(summary.weakest_bootstrap_expected_artifact, "<none>");
         assert!(summary.weakest_bootstrap_progress <= summary.bootstrap_critical_average_progress);
         let hierarchy = crate::dev_tensor_hierarchy::dev_tensor_hierarchy_summary();
         assert_eq!(hierarchy.protocol_version, "dev-tensor-status-v1");
@@ -301,6 +343,12 @@ mod tests {
         assert_eq!(summary.coverage_orphaned_count, 0);
         assert_eq!(summary.coverage_stale_count, 0);
         let coverage = dev_tensor_coverage_summary();
+        assert_eq!(
+            coverage.expected_source,
+            "docs/reference/nuis-development-tensor.milestones.toml"
+        );
+        assert!(!coverage.expected_fallback_used);
+        assert!(coverage.expected_source_error.is_none());
         assert_eq!(coverage.manifest.status, "clean");
         assert!(coverage.manifest.manifest_backed_coordinate_count >= 3);
         assert_eq!(coverage.milestone.status, "clean");
@@ -335,9 +383,22 @@ mod tests {
         assert!(json.contains("\"weakest_bootstrap_closure_role\""));
         assert!(json.contains("\"weakest_bootstrap_evidence\""));
         assert!(json.contains("\"weakest_bootstrap_next_step\""));
+        assert!(json.contains("\"weakest_bootstrap_blocker\""));
+        assert!(json.contains("\"weakest_bootstrap_next_action\""));
+        assert!(json.contains("\"weakest_bootstrap_validation_command\""));
+        assert!(json.contains("\"weakest_bootstrap_expected_artifact\""));
+        assert!(json.contains("\"blocker\""));
+        assert!(json.contains("\"next_action\""));
+        assert!(json.contains("\"validation_command\""));
+        assert!(json.contains("\"expected_artifact\""));
         assert!(json.contains("\"module\":\"nsld\""));
         assert!(json.contains("\"function\":\"final-output-boundary\""));
         assert!(json.contains("\"coverage_status\":\"clean\""));
+        assert!(json.contains(
+            "\"coverage_expected_source\":\"docs/reference/nuis-development-tensor.milestones.toml\""
+        ));
+        assert!(json.contains("\"coverage_expected_fallback_used\":false"));
+        assert!(json.contains("\"coverage_expected_source_error\":\"<none>\""));
         assert!(json.contains("\"coverage_expected_count\":"));
         assert!(json.contains("\"coverage_missing_count\":0"));
         assert!(json.contains("\"coverage_orphaned_count\":0"));
@@ -382,6 +443,11 @@ mod tests {
     fn dev_tensor_text_exposes_drift_status() {
         let text = render_dev_tensor_text().join("\n");
         assert!(text.contains("coverage_status: clean"));
+        assert!(text.contains(
+            "coverage_expected_source: docs/reference/nuis-development-tensor.milestones.toml"
+        ));
+        assert!(text.contains("coverage_expected_fallback_used: false"));
+        assert!(text.contains("coverage_expected_source_error: <none>"));
         assert!(text.contains("coverage_missing_count: 0"));
         assert!(text.contains("coverage_orphaned_count: 0"));
         assert!(text.contains("coverage_stale_count: 0"));
@@ -404,6 +470,14 @@ mod tests {
         assert!(text.contains("hierarchy_root_weakest_child_path:"));
         assert!(text.contains("weakest_bootstrap_next_step:"));
         assert!(text.contains("weakest_bootstrap_evidence:"));
+        assert!(text.contains("weakest_bootstrap_blocker:"));
+        assert!(text.contains("weakest_bootstrap_next_action:"));
+        assert!(text.contains("weakest_bootstrap_validation_command:"));
+        assert!(text.contains("weakest_bootstrap_expected_artifact:"));
+        assert!(text.contains("    blocker:"));
+        assert!(text.contains("    next_action:"));
+        assert!(text.contains("    validation_command:"));
+        assert!(text.contains("    expected_artifact:"));
         assert!(text.contains("status_protocol: status=stable rank=4"));
         assert!(text.contains("hierarchy_node: level=root path=nuislang"));
         assert!(text.contains("drift_check: id=frontdoor-final-output-boundary-status"));
@@ -415,6 +489,12 @@ mod tests {
     fn dev_tensor_coverage_manifest_matches_current_cells() {
         let coverage = dev_tensor_coverage_summary();
         assert_eq!(coverage.status, "clean");
+        assert_eq!(
+            coverage.expected_source,
+            "docs/reference/nuis-development-tensor.milestones.toml"
+        );
+        assert!(!coverage.expected_fallback_used);
+        assert!(coverage.expected_source_error.is_none());
         assert_eq!(
             coverage.expected_count,
             DEV_TENSOR_EXPECTED_COORDINATES.len()
