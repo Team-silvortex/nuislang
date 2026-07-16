@@ -123,6 +123,48 @@ pub(crate) fn nsld_final_executable_output_report_json(
             "first_payload_execution_first_blocker",
             report.first_payload_execution_first_blocker.as_deref(),
         ),
+        json_bool_field(
+            "device_provider_sample_manifest_available",
+            report.device_provider_sample_manifest_available,
+        ),
+        json_string_field(
+            "device_provider_sample_manifest_path",
+            &report.device_provider_sample_manifest_path,
+        ),
+        json_string_field(
+            "device_provider_sample_manifest_status",
+            &report.device_provider_sample_manifest_status,
+        ),
+        json_usize_field(
+            "device_provider_sample_manifest_record_count",
+            report.device_provider_sample_manifest_record_count,
+        ),
+        json_usize_field(
+            "device_provider_sample_manifest_ready_record_count",
+            report.device_provider_sample_manifest_ready_record_count,
+        ),
+        json_usize_field(
+            "device_provider_sample_manifest_pending_record_count",
+            report.device_provider_sample_manifest_pending_record_count,
+        ),
+        json_optional_string_field(
+            "device_provider_sample_manifest_first_provider_family",
+            report
+                .device_provider_sample_manifest_first_provider_family
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "device_provider_sample_manifest_first_materialization_status",
+            report
+                .device_provider_sample_manifest_first_materialization_status
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "device_provider_sample_manifest_first_blocker",
+            report
+                .device_provider_sample_manifest_first_blocker
+                .as_deref(),
+        ),
         json_string_field(
             "payload_execution_trace_protocol",
             payload_execution_trace_protocol(),

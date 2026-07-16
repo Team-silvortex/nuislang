@@ -3,8 +3,8 @@ use crate::{
         NsdbDeviceProviderSampleManifestInfo, NsdbDeviceProviderSampleRecordInfo,
         NsdbDeviceSampleHandoffRecord, NsdbDomainDebugInfo, NsdbHeteroRuntimeTraceInfo,
         NsdbHeteroRuntimeTraceRecord, NsdbInspectReport, NsdbPayloadDecoderManifestInfo,
-        NsdbPayloadExecutionEvent, NsdbPayloadExecutionEventFilter, NsdbPayloadExecutionHandoffInfo,
-        NsdbSidecarDebugInfo,
+        NsdbPayloadExecutionEvent, NsdbPayloadExecutionEventFilter,
+        NsdbPayloadExecutionHandoffInfo, NsdbSidecarDebugInfo,
     },
     replay::build_replay_plan,
 };
@@ -329,8 +329,34 @@ fn builds_replay_checkpoints_from_payload_events() {
     let output_dir = env::temp_dir().join(format!("nsdb-replay-payload-{nonce}"));
     fs::create_dir_all(&output_dir).unwrap();
     fs::write(output_dir.join("pixelmagic.metallib"), b"MTLBpayload").unwrap();
+    fs::write(
+        output_dir.join("nuis.nsdb.device-provider-samples.toml"),
+        r#"
+protocol = "nuis-device-provider-samples-v1"
+schema = "nsdb-yir-device-provider-sample-v1"
+source = "run-artifact-provider-sample-manifest"
+status = "awaiting-provider-materialization"
+record_count = 1
+ready_record_count = 0
+pending_record_count = 1
 
-    let report = NsdbInspectReport {
+[[device_provider_samples]]
+trace_id = "hetero-trace:shader:metal:apple-silicon-gpu"
+provider = "nustar-deferred-device-sample-v1"
+provider_family = "metal:apple-silicon-gpu"
+handoff_target = "metal:apple-silicon-gpu"
+sample_status = "pending-provider-execution"
+validation_status = "pending-provider-execution"
+input_evidence = "metallib:pixelmagic.metallib"
+output_evidence = "not-materialized"
+materialization_status = "provider-sample-pending"
+materialization_detail = "awaiting-provider-runtime"
+next_action = "execute-provider-sample"
+"#,
+    )
+    .unwrap();
+
+    let mut report = NsdbInspectReport {
         manifest: "manifest.toml".to_owned(),
         output_dir: output_dir.display().to_string(),
         debug_model: "yir-metadata".to_owned(),
@@ -523,6 +549,16 @@ fn builds_replay_checkpoints_from_payload_events() {
     assert!(inspect_json.contains("\"device_sample_handoffs\":[{"));
     assert!(inspect_json.contains("\"provider_family\":\"metal:apple-silicon-gpu\""));
     assert!(inspect_json.contains("\"handoff_status\":\"awaiting-provider-handoff\""));
+    assert!(inspect_json.contains("\"device_provider_sample_manifest_available\":true"));
+    assert!(inspect_json.contains(
+        "\"device_provider_sample_manifest_status\":\"awaiting-provider-materialization\""
+    ));
+    assert!(inspect_json.contains("\"device_provider_sample_manifest_record_count\":1"));
+    assert!(inspect_json.contains("\"device_provider_sample_manifest_pending_record_count\":1"));
+    assert!(inspect_json.contains(
+        "\"device_provider_sample_manifest_first_materialization_status\":\"provider-sample-pending\""
+    ));
+    assert!(inspect_json.contains("\"device_provider_sample_manifest_records\":[{"));
 
     let plan = build_replay_plan(&report);
 
@@ -556,18 +592,18 @@ fn builds_replay_checkpoints_from_payload_events() {
     );
     assert_eq!(
         plan.checkpoints[1].value_sample_resolution_status,
-        "provider-handoff-observed"
+        "provider-sample-observed"
     );
     assert!(plan.checkpoints[1]
         .value_sample_resolution_detail
-        .contains("device-sample-handoff:hetero-trace:shader:metal:apple-silicon-gpu"));
+        .contains("device-provider-sample:hetero-trace:shader:metal:apple-silicon-gpu"));
     assert_eq!(
         plan.checkpoints[1].value_sample_materialization_status,
-        "provider-handoff-pending"
+        "provider-sample-pending"
     );
     assert!(plan.checkpoints[1]
         .value_sample_materialization_detail
-        .contains("provider-handoff:metal:apple-silicon-gpu"));
+        .contains("provider-sample:metal:apple-silicon-gpu"));
     assert_eq!(plan.checkpoints[1].value_sample_payload_format, "metallib");
     assert_eq!(
         plan.checkpoints[1].value_schema_hint,
@@ -618,6 +654,34 @@ fn builds_replay_checkpoints_from_payload_events() {
         plan.first_blocker.as_deref(),
         Some("device-execution-sample-missing")
     );
+
+    let materialize_report =
+        crate::provider_sample_materialize::materialize_provider_samples(&output_dir, None)
+            .unwrap();
+    assert_eq!(
+        materialize_report.provider_families,
+        vec!["metal:apple-silicon-gpu"]
+    );
+    assert_eq!(materialize_report.matched_record_count, 1);
+    assert_eq!(materialize_report.materialized_record_count, 1);
+
+    report.device_provider_sample_manifest =
+        crate::provider_sample::read_device_provider_sample_manifest_info(&output_dir);
+
+    let ready_plan = build_replay_plan(&report);
+
+    assert_eq!(ready_plan.status, "ready");
+    assert_eq!(ready_plan.replayable_checkpoint_count, 2);
+    assert!(ready_plan.first_blocker.is_none());
+    assert_eq!(ready_plan.checkpoints[1].replay_status, "replayable");
+    assert!(ready_plan.checkpoints[1].first_blocker.is_none());
+    assert_eq!(
+        ready_plan.checkpoints[1].value_sample_materialization_status,
+        "provider-sample-materialized"
+    );
+    assert!(ready_plan.checkpoints[1]
+        .value_sample_materialization_detail
+        .contains("mock-provider-runtime-result-materialized"));
 
     fs::remove_dir_all(output_dir).unwrap();
 }

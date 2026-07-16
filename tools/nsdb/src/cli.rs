@@ -20,6 +20,11 @@ pub(crate) enum Command {
         json: bool,
         event_filter: NsdbPayloadExecutionEventFilter,
     },
+    MaterializeProviderSamples {
+        output_dir: PathBuf,
+        provider_family: Option<String>,
+        json: bool,
+    },
 }
 
 pub(crate) fn parse_args<I>(mut args: I) -> Result<Command, String>
@@ -55,6 +60,15 @@ where
                 event_filter,
             })
         }
+        "materialize-provider-samples" => {
+            let (output_dir, provider_family, json) =
+                parse_provider_materialize_args(args.by_ref())?;
+            Ok(Command::MaterializeProviderSamples {
+                output_dir,
+                provider_family,
+                json,
+            })
+        }
         "--help" | "-h" | "help" => Err(usage().to_owned()),
         other => Err(format!("unknown nsdb command `{other}`\n{}", usage())),
     }
@@ -75,7 +89,30 @@ pub(crate) fn resolve_manifest_input(input: &Path) -> Result<PathBuf, String> {
 }
 
 fn usage() -> &'static str {
-    "usage:\n  nsdb status\n  nsdb inspect <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb events <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb replay-plan <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]"
+    "usage:\n  nsdb status\n  nsdb inspect <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb events <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb replay-plan <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb materialize-provider-samples <artifact-output-dir> [--provider-family <family>] [--json]"
+}
+
+fn parse_provider_materialize_args<I>(
+    args: &mut I,
+) -> Result<(PathBuf, Option<String>, bool), String>
+where
+    I: Iterator<Item = String>,
+{
+    let mut json = false;
+    let mut input = None;
+    let mut provider_family = None;
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--json" => json = true,
+            "--provider-family" => {
+                provider_family = Some(required_value(args, "--provider-family")?)
+            }
+            _ if input.is_none() => input = Some(PathBuf::from(arg)),
+            _ => return Err(format!("unexpected argument `{arg}`")),
+        }
+    }
+    let input = input.ok_or_else(|| usage().to_owned())?;
+    Ok((input, provider_family, json))
 }
 
 fn parse_input_json_event_filter<I>(
@@ -214,6 +251,28 @@ mod tests {
                     phase: Some("container-loader-handoff".to_owned()),
                     trace_id: None,
                 },
+            })
+        );
+    }
+
+    #[test]
+    fn parses_materialize_provider_samples_command() {
+        let command = parse_args(
+            vec![
+                "materialize-provider-samples".to_owned(),
+                "out".to_owned(),
+                "--provider-family".to_owned(),
+                "metal:apple-silicon-gpu".to_owned(),
+                "--json".to_owned(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(
+            command,
+            Ok(Command::MaterializeProviderSamples {
+                output_dir: PathBuf::from("out"),
+                provider_family: Some("metal:apple-silicon-gpu".to_owned()),
+                json: true,
             })
         );
     }

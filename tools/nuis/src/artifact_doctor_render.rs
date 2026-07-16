@@ -269,6 +269,12 @@ pub(crate) fn render_artifact_doctor_json(input: &Path) -> String {
             .payload_decoder_manifest
             .json_fields_with_prefix("artifact_payload_decoder_manifest"),
     );
+    append_json_field_strings(
+        &mut out,
+        report
+            .device_provider_sample_manifest
+            .json_fields_with_prefix("artifact_device_provider_sample_manifest"),
+    );
     append_artifact_output_diagnostic_json_fields(
         &mut out,
         &diagnostics,

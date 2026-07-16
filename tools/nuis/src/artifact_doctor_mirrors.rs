@@ -112,8 +112,7 @@ pub(crate) fn collect_device_provider_sample_manifest_mirror(
             parse_usize_toml_field(&source, "pending_record_count").unwrap_or(0),
         ),
         record_count: records.len(),
-        pending_record_count: parse_usize_toml_field(&source, "pending_record_count")
-            .unwrap_or(0),
+        pending_record_count: parse_usize_toml_field(&source, "pending_record_count").unwrap_or(0),
         invalid_record_count,
         first_provider_family: records
             .first()
@@ -138,7 +137,7 @@ pub(crate) struct PayloadDecoderManifestMirror {
 }
 
 impl PayloadDecoderManifestMirror {
-    fn unavailable(path: Option<PathBuf>, _diagnostic: &str) -> Self {
+    fn unavailable(path: Option<PathBuf>, diagnostic: &str) -> Self {
         Self {
             available: false,
             path,
@@ -191,7 +190,7 @@ pub(crate) struct DeviceProviderSampleManifestMirror {
 }
 
 impl DeviceProviderSampleManifestMirror {
-    fn unavailable(path: Option<PathBuf>, diagnostic: &str) -> Self {
+    fn unavailable(path: Option<PathBuf>, _diagnostic: &str) -> Self {
         Self {
             available: false,
             path,

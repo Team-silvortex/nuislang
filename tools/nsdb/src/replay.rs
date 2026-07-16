@@ -91,15 +91,9 @@ fn replay_checkpoint_for_event(
     report: &NsdbInspectReport,
     event: &NsdbPayloadExecutionEvent,
 ) -> NsdbReplayCheckpoint {
-    let first_blocker = if event.first_blocker == "none" && event.status == "ready" {
-        None
-    } else if event.first_blocker == "none" {
-        Some(format!("payload-event-status:{}", event.status))
-    } else {
-        Some(event.first_blocker.clone())
-    };
     let checkpoint_kind = checkpoint_kind_for_phase(&event.execution_phase);
     let sample_resolution = value_sample_resolution_for_event(report, event);
+    let first_blocker = first_blocker_for_event(event, &sample_resolution);
     let slot_scope = slot_scope_for_event(event);
     let value_schema = value_schema_for_sample(&sample_resolution.payload_format);
     let value_snapshot = value_snapshot_for_schema(event, &sample_resolution, &value_schema);
@@ -155,6 +149,30 @@ fn replay_checkpoint_for_event(
         first_blocker,
         next_action: event.next_action.clone(),
     }
+}
+
+fn first_blocker_for_event(
+    event: &NsdbPayloadExecutionEvent,
+    sample: &ValueSampleResolution,
+) -> Option<String> {
+    if event.execution_phase == "device-dispatch" && provider_sample_materialized(sample) {
+        return None;
+    }
+    if event.first_blocker == "none" && event.status == "ready" {
+        None
+    } else if event.first_blocker == "none" {
+        Some(format!("payload-event-status:{}", event.status))
+    } else {
+        Some(event.first_blocker.clone())
+    }
+}
+
+fn provider_sample_materialized(sample: &ValueSampleResolution) -> bool {
+    sample.status == "provider-sample-observed"
+        && matches!(
+            sample.materialization_status.as_str(),
+            "provider-sample-materialized" | "provider-sample-ready"
+        )
 }
 
 fn checkpoint_kind_for_phase(phase: &str) -> &'static str {
@@ -218,6 +236,37 @@ fn device_sample_resolution(
     report: &NsdbInspectReport,
     event: &NsdbPayloadExecutionEvent,
 ) -> ValueSampleResolution {
+    if let Some(provider_sample) = report
+        .device_provider_sample_manifest
+        .records
+        .iter()
+        .find(|sample| device_provider_sample_matches_event(sample, event))
+    {
+        let (payload_format, payload_path) =
+            provider_sample_evidence_parts(&provider_sample.input_evidence);
+        let bridge_stub_path = report
+            .hetero_runtime_trace
+            .records
+            .iter()
+            .find(|record| record.trace_id == provider_sample.trace_id)
+            .map(|record| record.bridge_stub_path.clone())
+            .unwrap_or_else(|| "none".to_owned());
+        return ValueSampleResolution {
+            status: "provider-sample-observed".to_owned(),
+            detail: format!(
+                "device-provider-sample:{}:{}",
+                provider_sample.trace_id, provider_sample.sample_status
+            ),
+            materialization_status: provider_sample.materialization_status.clone(),
+            materialization_detail: format!(
+                "provider-sample:{}:{}",
+                provider_sample.provider_family, provider_sample.materialization_detail
+            ),
+            payload_format,
+            payload_path,
+            bridge_stub_path,
+        };
+    }
     if let Some(handoff) = report
         .hetero_runtime_trace
         .device_sample_handoffs
@@ -311,6 +360,15 @@ fn device_sample_resolution(
     }
 }
 
+fn device_provider_sample_matches_event(
+    sample: &crate::model::NsdbDeviceProviderSampleRecordInfo,
+    event: &NsdbPayloadExecutionEvent,
+) -> bool {
+    sample.trace_id.contains(&event.target)
+        || sample.provider_family.contains(&event.target)
+        || sample.handoff_target.contains(&event.target)
+}
+
 fn materialization_status_for_record(
     record: &crate::model::NsdbHeteroRuntimeTraceRecord,
 ) -> String {
@@ -331,8 +389,11 @@ fn device_handoff_matches_event(
 }
 
 fn payload_evidence_parts(handoff: &NsdbDeviceSampleHandoffRecord) -> (String, String) {
-    handoff
-        .input_evidence
+    provider_sample_evidence_parts(&handoff.input_evidence)
+}
+
+fn provider_sample_evidence_parts(input_evidence: &str) -> (String, String) {
+    input_evidence
         .split_once(':')
         .map(|(format, path)| (format.to_owned(), path.to_owned()))
         .unwrap_or_else(|| ("none".to_owned(), "none".to_owned()))

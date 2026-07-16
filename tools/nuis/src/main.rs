@@ -20,6 +20,7 @@ mod dev_tensor_drift;
 mod dev_tensor_drift_data;
 mod dev_tensor_drift_data_core;
 mod dev_tensor_drift_data_runtime;
+mod dev_tensor_drift_data_runtime_nsld;
 mod dev_tensor_hierarchy;
 mod dev_tensor_manifest;
 mod dev_tensor_milestones;

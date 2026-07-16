@@ -71,6 +71,7 @@ mod final_executable_pipeline_paths;
 mod final_executable_pipeline_render;
 mod final_executable_pipeline_snapshot;
 mod final_executable_pipeline_status;
+mod final_executable_provider_sample;
 mod final_executable_render;
 mod final_executable_render_image;
 mod final_executable_render_layout;
@@ -152,6 +153,8 @@ mod main_final_executable_layout_tests;
 mod main_final_executable_output_tests;
 #[cfg(test)]
 mod main_final_executable_pipeline_tests;
+#[cfg(test)]
+mod main_final_executable_provider_sample_tests;
 #[cfg(test)]
 mod main_final_stage_tests;
 #[cfg(test)]

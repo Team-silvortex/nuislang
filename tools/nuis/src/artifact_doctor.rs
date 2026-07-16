@@ -1,6 +1,7 @@
 use crate::{
     artifact_doctor_mirrors::{
-        collect_backend_artifact_payload_evidence, collect_payload_decoder_manifest_mirror,
+        collect_backend_artifact_payload_evidence, collect_device_provider_sample_manifest_mirror,
+        collect_payload_decoder_manifest_mirror,
     },
     resolve_frontdoor_build_manifest_path,
     run_artifact::{run_artifact_prelaunch_summary, self_contained_link_plan_selected},
@@ -11,7 +12,8 @@ use crate::{
 use std::path::{Path, PathBuf};
 
 pub(crate) use crate::artifact_doctor_mirrors::{
-    BackendArtifactPayloadEvidence, PayloadDecoderManifestMirror,
+    BackendArtifactPayloadEvidence, DeviceProviderSampleManifestMirror,
+    PayloadDecoderManifestMirror,
 };
 
 pub(crate) fn run_build_output_self_check(
@@ -320,6 +322,8 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
     let ready_to_run =
         (direct_host_binary_ready || nsld_handoff_ready) && manifest_verified && artifact_verified;
     let payload_decoder_manifest = collect_payload_decoder_manifest_mirror(output_dir.as_deref());
+    let device_provider_sample_manifest =
+        collect_device_provider_sample_manifest_mirror(output_dir.as_deref());
 
     let (recommended_next_step, recommended_command, recommended_reason) = if !manifest_exists
         && !artifact_exists
@@ -355,6 +359,15 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
                     .unwrap_or_else(|| "<nuis.compiled.artifact>".to_owned())
             ),
             "the compiled artifact exists but does not currently pass verification, so the next step is to inspect the packaged binary bundle directly".to_owned(),
+        )
+    } else if device_provider_sample_manifest.status == "awaiting-provider-materialization" {
+        (
+            "materialize_provider_samples".to_owned(),
+            output_dir
+                .as_ref()
+                .map(|path| format!("nsdb materialize-provider-samples {} --json", path.display()))
+                .unwrap_or_else(|| "nsdb materialize-provider-samples <output-dir> --json".to_owned()),
+            "device provider sample descriptors are present but still pending, so the next step is to run the provider materializer before replaying nsdb".to_owned(),
         )
     } else if ready_to_run {
         (
@@ -429,6 +442,7 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
         manifest_verify_error,
         artifact_verify_error,
         payload_decoder_manifest,
+        device_provider_sample_manifest,
         artifact_container_kind,
         artifact_container_version,
         artifact_section_count,
@@ -473,6 +487,7 @@ pub(crate) struct ArtifactDoctorReport {
     pub(crate) manifest_verify_error: Option<String>,
     pub(crate) artifact_verify_error: Option<String>,
     pub(crate) payload_decoder_manifest: PayloadDecoderManifestMirror,
+    pub(crate) device_provider_sample_manifest: DeviceProviderSampleManifestMirror,
 }
 
 pub(crate) struct ProjectValidationSnapshot {

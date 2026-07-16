@@ -156,6 +156,50 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         optional_string_text(report.first_payload_execution_first_blocker.as_deref())
     );
     println!(
+        "  device_provider_sample_manifest_available: {}",
+        report.device_provider_sample_manifest_available
+    );
+    println!(
+        "  device_provider_sample_manifest_status: {}",
+        report.device_provider_sample_manifest_status
+    );
+    println!(
+        "  device_provider_sample_manifest_record_count: {}",
+        report.device_provider_sample_manifest_record_count
+    );
+    println!(
+        "  device_provider_sample_manifest_ready_record_count: {}",
+        report.device_provider_sample_manifest_ready_record_count
+    );
+    println!(
+        "  device_provider_sample_manifest_pending_record_count: {}",
+        report.device_provider_sample_manifest_pending_record_count
+    );
+    println!(
+        "  device_provider_sample_manifest_first_provider_family: {}",
+        optional_string_text(
+            report
+                .device_provider_sample_manifest_first_provider_family
+                .as_deref()
+        )
+    );
+    println!(
+        "  device_provider_sample_manifest_first_materialization_status: {}",
+        optional_string_text(
+            report
+                .device_provider_sample_manifest_first_materialization_status
+                .as_deref()
+        )
+    );
+    println!(
+        "  device_provider_sample_manifest_first_blocker: {}",
+        optional_string_text(
+            report
+                .device_provider_sample_manifest_first_blocker
+                .as_deref()
+        )
+    );
+    println!(
         "  payload_execution_trace_protocol: {}",
         payload_execution_trace_protocol()
     );

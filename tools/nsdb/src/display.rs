@@ -207,9 +207,7 @@ pub(crate) fn print_nsdb_inspect_report(report: &NsdbInspectReport) {
     );
     println!(
         "  device_provider_sample_manifest_first_provider_family: {}",
-        report
-            .device_provider_sample_manifest
-            .first_provider_family
+        report.device_provider_sample_manifest.first_provider_family
     );
     println!(
         "  device_provider_sample_manifest_first_materialization_status: {}",

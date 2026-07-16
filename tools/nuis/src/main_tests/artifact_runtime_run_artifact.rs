@@ -551,6 +551,12 @@ fn run_artifact_json_exposes_bridge_bearing_exchange_summary() {
     assert!(provider_samples.contains("materialization_status = \"provider-sample-pending\""));
 
     let doctor_json = render_artifact_doctor_json(&output_dir);
+    assert!(doctor_json.contains("\"recommended_next_step\":\"materialize_provider_samples\""));
+    assert!(doctor_json.contains("\"recommended_command\":\"nsdb materialize-provider-samples "));
+    assert!(doctor_json.contains("--json"));
+    assert!(doctor_json.contains(
+        "\"recommended_reason\":\"device provider sample descriptors are present but still pending"
+    ));
     assert!(doctor_json.contains("\"artifact_payload_decoder_manifest_available\":true"));
     assert!(doctor_json.contains("\"artifact_payload_decoder_manifest_path\":\""));
     assert!(doctor_json.contains(
@@ -564,6 +570,20 @@ fn run_artifact_json_exposes_bridge_bearing_exchange_summary() {
     assert!(doctor_json.contains("\"artifact_payload_decoder_manifest_invalid_record_count\":0"));
     assert!(doctor_json.contains(
         "\"artifact_payload_decoder_manifest_first_diagnostic\":\"manifest-external-decoder-loaded\""
+    ));
+    assert!(doctor_json.contains("\"artifact_device_provider_sample_manifest_available\":true"));
+    assert!(doctor_json.contains(
+        "\"artifact_device_provider_sample_manifest_status\":\"awaiting-provider-materialization\""
+    ));
+    assert!(doctor_json.contains("\"artifact_device_provider_sample_manifest_record_count\":1"));
+    assert!(
+        doctor_json.contains("\"artifact_device_provider_sample_manifest_pending_record_count\":1")
+    );
+    assert!(doctor_json.contains(
+        "\"artifact_device_provider_sample_manifest_first_provider_family\":\"metal:apple-silicon-gpu\""
+    ));
+    assert!(doctor_json.contains(
+        "\"artifact_device_provider_sample_manifest_first_materialization_status\":\"provider-sample-pending\""
     ));
 }
 

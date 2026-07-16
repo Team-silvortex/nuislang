@@ -18,6 +18,7 @@ use super::{
     final_executable_paths::{
         nsld_final_executable_launcher_dry_run_path, nsld_final_executable_launcher_manifest_path,
     },
+    final_executable_provider_sample::nsld_device_provider_sample_evidence,
     final_stage::{nsld_verify_final_executable_emit_report, nsld_verify_final_stage_plan_report},
     fnv1a64_hex,
     object_output::nsld_verify_object_output_report,
@@ -231,6 +232,14 @@ pub(crate) fn nsld_final_executable_output_report(
         blockers = ordered_blockers;
         issues.extend(backend_artifact_assembly.issues.clone());
     }
+    let device_provider_sample = nsld_device_provider_sample_evidence(&plan.output_dir);
+    if let Some(blocker) = device_provider_sample.first_blocker.clone() {
+        blockers.insert(0, blocker.clone());
+        issues.push(format!(
+            "device provider sample manifest {} is {}: {}",
+            device_provider_sample.path, device_provider_sample.status, blocker
+        ));
+    }
     let dispatch_blockers = nsld_nustar_dispatch_blockers(plan);
     if !dispatch_blockers.blockers.is_empty() {
         let mut ordered_blockers = dispatch_blockers.blockers;
@@ -357,6 +366,19 @@ pub(crate) fn nsld_final_executable_output_report(
         first_payload_execution_entry_kind: first_payload_execution.entry_kind,
         first_payload_execution_entry_section_id: first_payload_execution.entry_section_id,
         first_payload_execution_first_blocker: first_payload_execution.first_blocker,
+        device_provider_sample_manifest_available: device_provider_sample.available,
+        device_provider_sample_manifest_path: device_provider_sample.path,
+        device_provider_sample_manifest_status: device_provider_sample.status,
+        device_provider_sample_manifest_record_count: device_provider_sample.record_count,
+        device_provider_sample_manifest_ready_record_count: device_provider_sample
+            .ready_record_count,
+        device_provider_sample_manifest_pending_record_count: device_provider_sample
+            .pending_record_count,
+        device_provider_sample_manifest_first_provider_family: device_provider_sample
+            .first_provider_family,
+        device_provider_sample_manifest_first_materialization_status: device_provider_sample
+            .first_materialization_status,
+        device_provider_sample_manifest_first_blocker: device_provider_sample.first_blocker,
         recommended_next_action,
         path_present,
         nsld_owned_output,

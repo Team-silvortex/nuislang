@@ -396,6 +396,12 @@ pub(crate) fn render_build_report_json(input: &Path) -> String {
             .payload_decoder_manifest
             .json_fields_with_prefix("build_report_payload_decoder_manifest"),
     );
+    append_json_field_strings(
+        &mut out,
+        doctor
+            .device_provider_sample_manifest
+            .json_fields_with_prefix("build_report_device_provider_sample_manifest"),
+    );
     if let Some(report) = manifest_verify.as_ref() {
         append_json_field_strings(
             &mut out,

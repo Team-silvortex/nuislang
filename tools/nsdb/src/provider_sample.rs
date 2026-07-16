@@ -1,9 +1,9 @@
 use crate::model::{NsdbDeviceProviderSampleManifestInfo, NsdbDeviceProviderSampleRecordInfo};
 use std::{fs, path::Path};
 
-const DEVICE_PROVIDER_SAMPLE_FILE_NAME: &str = "nuis.nsdb.device-provider-samples.toml";
-const DEVICE_PROVIDER_SAMPLE_PROTOCOL: &str = "nuis-device-provider-samples-v1";
-const DEVICE_PROVIDER_SAMPLE_SCHEMA: &str = "nsdb-yir-device-provider-sample-v1";
+pub(crate) const DEVICE_PROVIDER_SAMPLE_FILE_NAME: &str = "nuis.nsdb.device-provider-samples.toml";
+pub(crate) const DEVICE_PROVIDER_SAMPLE_PROTOCOL: &str = "nuis-device-provider-samples-v1";
+pub(crate) const DEVICE_PROVIDER_SAMPLE_SCHEMA: &str = "nsdb-yir-device-provider-sample-v1";
 
 pub(crate) fn read_device_provider_sample_manifest_info(
     output_dir: &Path,
@@ -106,8 +106,8 @@ fn provider_sample_record_summary(
     let provider = toml_string_value(record, "provider").unwrap_or_else(|| "none".to_owned());
     let provider_family =
         toml_string_value(record, "provider_family").unwrap_or_else(|| "none".to_owned());
-    let materialization_status = toml_string_value(record, "materialization_status")
-        .unwrap_or_else(|| "none".to_owned());
+    let materialization_status =
+        toml_string_value(record, "materialization_status").unwrap_or_else(|| "none".to_owned());
     let valid = trace_id != "none"
         && provider != "none"
         && provider_family != "none"
@@ -131,8 +131,7 @@ fn provider_sample_record_summary(
         materialization_status,
         materialization_detail: toml_string_value(record, "materialization_detail")
             .unwrap_or_else(|| "none".to_owned()),
-        next_action: toml_string_value(record, "next_action")
-            .unwrap_or_else(|| "none".to_owned()),
+        next_action: toml_string_value(record, "next_action").unwrap_or_else(|| "none".to_owned()),
         diagnostic: if valid {
             "provider-sample-record-loaded".to_owned()
         } else {
