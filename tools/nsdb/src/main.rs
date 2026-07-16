@@ -116,6 +116,14 @@ fn run() -> Result<(), String> {
                     "device_provider_sample_next_command: {}",
                     report.next_command
                 );
+                println!(
+                    "device_provider_sample_return_action: {}",
+                    report.return_action
+                );
+                println!(
+                    "device_provider_sample_return_command: {}",
+                    report.return_command
+                );
             }
         }
     }
@@ -126,7 +134,7 @@ fn provider_sample_materialize_json(
     report: &provider_sample_materialize::ProviderSampleMaterializeReport,
 ) -> String {
     format!(
-        "{{\"tool\":\"nsdb\",\"kind\":\"device_provider_sample_materialize\",\"status\":\"{}\",\"path\":\"{}\",\"provider_family_filter\":{},\"provider_families\":{},\"record_count\":{},\"matched_record_count\":{},\"materialized_record_count\":{},\"skipped_record_count\":{},\"first_provider_family\":\"{}\",\"first_output_evidence\":\"{}\",\"next_action\":\"{}\",\"next_command\":\"{}\"}}",
+        "{{\"tool\":\"nsdb\",\"kind\":\"device_provider_sample_materialize\",\"status\":\"{}\",\"path\":\"{}\",\"provider_family_filter\":{},\"provider_families\":{},\"record_count\":{},\"matched_record_count\":{},\"materialized_record_count\":{},\"skipped_record_count\":{},\"first_provider_family\":\"{}\",\"first_output_evidence\":\"{}\",\"next_action\":\"{}\",\"next_command\":\"{}\",\"return_action\":\"{}\",\"return_command\":\"{}\"}}",
         json_escape(&report.status),
         json_escape(&report.path),
         json_optional_string(report.provider_family_filter.as_deref()),
@@ -139,6 +147,8 @@ fn provider_sample_materialize_json(
         json_escape(&report.first_output_evidence),
         json_escape(&report.next_action),
         json_escape(&report.next_command),
+        json_escape(&report.return_action),
+        json_escape(&report.return_command),
     )
 }
 
@@ -184,6 +194,8 @@ mod tests {
             first_output_evidence: "metallib:pixelmagic.metallib".to_owned(),
             next_action: "replay-provider-sample".to_owned(),
             next_command: "nsdb replay-plan out --json".to_owned(),
+            return_action: "resume-nsld-final-output-check".to_owned(),
+            return_command: "nsld check out --json".to_owned(),
         };
 
         let json = provider_sample_materialize_json(&report);
@@ -192,5 +204,7 @@ mod tests {
         assert!(json
             .contains("\"provider_families\":[\"metal:apple-silicon-gpu\",\"spirv:vulkan-gpu\"]"));
         assert!(json.contains("\"matched_record_count\":1"));
+        assert!(json.contains("\"return_action\":\"resume-nsld-final-output-check\""));
+        assert!(json.contains("\"return_command\":\"nsld check out --json\""));
     }
 }

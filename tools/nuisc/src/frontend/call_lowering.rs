@@ -402,9 +402,7 @@ fn infer_payload_constructor_type_from_arg(
         .iter()
         .map(|param| {
             substitutions.get(&param.name).cloned().ok_or_else(|| {
-                format!(
-                    "cannot infer generic arguments for payload-style struct constructor `{callee}(...)`; add an explicit expected type"
-                )
+                payload_constructor_missing_generic_error(callee, &param.name, definition, arg_ty)
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -414,6 +412,31 @@ fn infer_payload_constructor_type_from_arg(
         is_optional: false,
         is_ref: false,
     })
+}
+
+fn payload_constructor_missing_generic_error(
+    callee: &str,
+    missing_generic: &str,
+    definition: &NirStructDef,
+    arg_ty: &NirTypeRef,
+) -> String {
+    if let Some((parent, variant)) = callee.rsplit_once('.') {
+        if parent == "Result" && matches!(variant, "Ok" | "Err") {
+            let known_payload = arg_ty.render();
+            let shape = if variant == "Ok" {
+                format!("Result<{known_payload}, {missing_generic}>")
+            } else {
+                format!("Result<{missing_generic}, {known_payload}>")
+            };
+            return format!(
+                "ambiguous Result constructor `{callee}(...)`: could not infer `{missing_generic}` for `{shape}`; add explicit type arguments or place the call in a context with expected type `Result<T, E>`"
+            );
+        }
+    }
+    format!(
+        "cannot infer generic argument `{missing_generic}` for payload-style struct constructor `{callee}(...)` with target `{}`; add an explicit expected type",
+        definition.name
+    )
 }
 
 fn unify_payload_constructor_type_pattern(

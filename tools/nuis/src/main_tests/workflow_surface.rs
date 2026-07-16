@@ -282,6 +282,9 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
     assert!(json.contains("\"nsld_final_executable_output_object_valid\":"));
     assert!(json.contains("\"nsld_final_executable_output_object_path\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_family\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_magic_status\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_magic\":"));
     assert!(json.contains("\"nsld_final_executable_output_object_expected_size_bytes\":"));
     assert!(json.contains("\"nsld_final_executable_output_object_actual_size_bytes\":"));
     assert!(json.contains("\"nsld_final_executable_output_object_expected_hash\":"));
@@ -394,6 +397,14 @@ mod cpu Main {
     assert!(json.contains(
         "\"workflow_run_artifact_prelaunch_reason\":\"nsld final executable pipeline materialized a verified host entrypoint stub\""
     ));
+    assert!(json.contains("\"closure_summary_source\":\"workflow-link-plan\""));
+    assert!(json.contains("\"closure_summary_status\":\"blocked\""));
+    assert!(json.contains("\"closure_summary_ready\":false"));
+    assert!(json.contains(
+        "\"closure_summary_primary_blocker\":\"final executable output boundary is blocked by `final-executable-output:ownership-unknown`\""
+    ));
+    assert!(json.contains("\"closure_summary_next_action\":\"inspect-final-executable-output\""));
+    assert!(json.contains("\"closure_summary_next_command\":\"nsld final-executable-output "));
     assert!(json.contains(
         "\"workflow_launch_evidence_protocol\":\"nuis-run-artifact-launch-evidence-v1\""
     ));
@@ -423,6 +434,15 @@ mod cpu Main {
     assert!(json.contains("\"workflow_nsdb_handoff_first_status\":\"ready\""));
     assert!(json
         .contains("\"workflow_nsdb_handoff_first_next_action\":\"handoff-payload-trace-to-nsdb\""));
+    assert!(json.contains(
+        "\"nsld_final_executable_output_nsdb_replay_contract\":\"nsdb-payload-execution-replay-plan-v1\""
+    ));
+    assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_ready\":true"));
+    assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_status\":\"ready\""));
+    assert!(
+        json.contains("\"nsld_final_executable_output_nsdb_replay_command\":\"nsdb replay-plan ")
+    );
+    assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_first_blocker\":null"));
     assert!(json.contains("\"nsld_self_owned_image_ready\":"));
     assert!(json.contains("\"nsld_self_owned_image_status\":"));
     assert!(json.contains("\"nsld_entrypoint_materialization_status\":"));
@@ -447,6 +467,9 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
     assert!(json.contains("\"nsld_final_executable_output_object_valid\":"));
     assert!(json.contains("\"nsld_final_executable_output_object_path\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_family\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_magic_status\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_magic\":"));
     assert!(json.contains("\"nsld_final_executable_output_object_expected_size_bytes\":"));
     assert!(json.contains("\"nsld_final_executable_output_object_actual_size_bytes\":"));
     assert!(json.contains("\"nsld_final_executable_output_object_expected_hash\":"));

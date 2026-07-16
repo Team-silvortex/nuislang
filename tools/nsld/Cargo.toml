@@ -10,3 +10,4 @@ description = "Nsld linker front-door prototype for the Nuis toolchain."
 
 [dependencies]
 nuisc = { path = "../nuisc" }
+nsdb = { path = "../nsdb" }

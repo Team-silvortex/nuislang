@@ -68,6 +68,30 @@ Short rule:
 
 `these fields answer whether the current build closure is missing, partial, inspectable, or launchable`
 
+## Frontdoor Closure Summary Fields
+
+`workflow --json`, `project-status --json`, and `project-doctor --json` also
+share one compact frontdoor closure line:
+
+* `closure_summary_source`
+  the frontdoor that derived the summary, such as `workflow-link-plan`,
+  `project-status`, or `project-doctor`
+* `closure_summary_status`
+  `ready` when the selected frontdoor closure has no immediate blocker,
+  otherwise `blocked`
+* `closure_summary_ready`
+  boolean mirror of the status for scripts that should not parse strings
+* `closure_summary_primary_blocker`
+  the first high-level blocker, or `null` when the closure is ready
+* `closure_summary_next_action`
+  the next action chosen by the frontdoor-level summary
+* `closure_summary_next_command`
+  the command for that action, or `null` when no command is required
+
+Short rule:
+
+`these fields are the first place to look when the lower-level status mirrors are too noisy`
+
 ## LinkPlan Fields
 
 These fields now form the current visible link summary:
@@ -468,6 +492,7 @@ Current purpose:
 * restate the shortest branch
 * expose default build/release output paths
 * expose current artifact-follow-up and link-plan summary when available
+* expose `closure_summary_*` as the compact link-plan closure line
 
 ### `nuis project-status`
 
@@ -476,6 +501,7 @@ Current purpose:
 * summarize project structure and public surface
 * summarize current build-follow-up state
 * expose current artifact closure and link-plan summary
+* expose `closure_summary_*` as the compact project status line
 
 ### `nuis project-doctor`
 
@@ -484,6 +510,7 @@ Current purpose:
 * summarize project health and next steps
 * expose validation/preflight status
 * expose current artifact closure and link-plan summary
+* expose `closure_summary_*` as the compact project doctor line
 
 ### `nuis artifact-doctor`
 

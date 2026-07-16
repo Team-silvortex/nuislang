@@ -156,6 +156,54 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         optional_string_text(report.first_payload_execution_first_blocker.as_deref())
     );
     println!(
+        "  final_output_nsdb_handoff_protocol: {}",
+        report.final_output_nsdb_handoff_protocol
+    );
+    println!(
+        "  final_output_nsdb_handoff_persisted: {}",
+        report.final_output_nsdb_handoff_persisted
+    );
+    println!(
+        "  final_output_nsdb_handoff_path: {}",
+        report.final_output_nsdb_handoff_path
+    );
+    println!(
+        "  final_output_nsdb_handoff_record_count: {}",
+        report.final_output_nsdb_handoff_record_count
+    );
+    println!(
+        "  final_output_nsdb_handoff_ready_record_count: {}",
+        report.final_output_nsdb_handoff_ready_record_count
+    );
+    println!(
+        "  final_output_nsdb_handoff_first_trace_id: {}",
+        optional_string_text(report.final_output_nsdb_handoff_first_trace_id.as_deref())
+    );
+    println!(
+        "  final_output_nsdb_handoff_error: {}",
+        optional_string_text(report.final_output_nsdb_handoff_error.as_deref())
+    );
+    println!(
+        "  final_output_nsdb_replay_contract: {}",
+        report.final_output_nsdb_replay_contract
+    );
+    println!(
+        "  final_output_nsdb_replay_ready: {}",
+        report.final_output_nsdb_replay_ready
+    );
+    println!(
+        "  final_output_nsdb_replay_status: {}",
+        report.final_output_nsdb_replay_status
+    );
+    println!(
+        "  final_output_nsdb_replay_command: {}",
+        optional_string_text(report.final_output_nsdb_replay_command.as_deref())
+    );
+    println!(
+        "  final_output_nsdb_replay_first_blocker: {}",
+        optional_string_text(report.final_output_nsdb_replay_first_blocker.as_deref())
+    );
+    println!(
         "  device_provider_sample_manifest_available: {}",
         report.device_provider_sample_manifest_available
     );
@@ -340,6 +388,15 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
     );
     println!("  object_output_valid: {}", report.object_output_valid);
     println!("  object_output_path: {}", report.object_output_path);
+    println!("  object_output_family: {}", report.object_output_family);
+    println!(
+        "  object_output_magic_status: {}",
+        report.object_output_magic_status
+    );
+    println!(
+        "  object_output_magic: {}",
+        optional_string_text(report.object_output_magic.as_deref())
+    );
     println!(
         "  object_output_expected_size_bytes: {}",
         optional_usize_text(report.object_output_expected_size_bytes)

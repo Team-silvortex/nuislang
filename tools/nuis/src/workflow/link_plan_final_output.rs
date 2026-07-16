@@ -1,4 +1,8 @@
-use super::link_plan::{parse_bool_field, parse_string_field, parse_usize_field};
+use super::{
+    link_plan::{parse_bool_field, parse_string_field, parse_usize_field},
+    object_identity::workflow_object_identity,
+};
+use crate::artifact_nsdb_handoff::read_persisted_nsdb_handoff;
 use std::{fs, path::Path};
 
 pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
@@ -24,11 +28,19 @@ pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) payload_execution_trace_available: bool,
     pub(crate) payload_execution_trace_record_count: usize,
     pub(crate) payload_execution_trace_ready_record_count: usize,
+    pub(crate) nsdb_replay_contract: String,
+    pub(crate) nsdb_replay_ready: bool,
+    pub(crate) nsdb_replay_status: String,
+    pub(crate) nsdb_replay_command: Option<String>,
+    pub(crate) nsdb_replay_first_blocker: Option<String>,
     pub(crate) recommended_next_action: String,
     pub(crate) path_present: bool,
     pub(crate) nsld_owned: Option<bool>,
     pub(crate) object_valid: bool,
     pub(crate) object_path: String,
+    pub(crate) object_family: String,
+    pub(crate) object_magic_status: String,
+    pub(crate) object_magic: Option<String>,
     pub(crate) object_expected_size_bytes: Option<usize>,
     pub(crate) object_actual_size_bytes: Option<usize>,
     pub(crate) object_expected_hash: Option<String>,
@@ -130,6 +142,7 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         ready,
         host_native_output,
     );
+    let nsdb_replay = nsld_final_executable_output_nsdb_replay(plan);
     let object_evidence = nsld_final_executable_output_object_evidence(plan);
 
     NsldFinalExecutableOutputBoundarySummary {
@@ -155,11 +168,19 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         payload_execution_trace_available: payload_execution_trace.available,
         payload_execution_trace_record_count: payload_execution_trace.record_count,
         payload_execution_trace_ready_record_count: payload_execution_trace.ready_record_count,
+        nsdb_replay_contract: nsdb_replay.contract,
+        nsdb_replay_ready: nsdb_replay.ready,
+        nsdb_replay_status: nsdb_replay.status,
+        nsdb_replay_command: nsdb_replay.command,
+        nsdb_replay_first_blocker: nsdb_replay.first_blocker,
         recommended_next_action,
         path_present,
         nsld_owned,
         object_valid: object_evidence.valid,
         object_path: object_evidence.object_path,
+        object_family: object_evidence.object_family,
+        object_magic_status: object_evidence.object_magic_status,
+        object_magic: object_evidence.object_magic,
         object_expected_size_bytes: object_evidence.expected_size_bytes,
         object_actual_size_bytes: object_evidence.actual_size_bytes,
         object_expected_hash: object_evidence.expected_hash,
@@ -167,6 +188,37 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         object_issues: object_evidence.issues,
         blockers,
         first_blocker,
+    }
+}
+
+struct NsldFinalExecutableOutputNsdbReplay {
+    contract: String,
+    ready: bool,
+    status: String,
+    command: Option<String>,
+    first_blocker: Option<String>,
+}
+
+fn nsld_final_executable_output_nsdb_replay(
+    plan: &nuisc::linker::LinkPlan,
+) -> NsldFinalExecutableOutputNsdbReplay {
+    let handoff = read_persisted_nsdb_handoff(Some(Path::new(&plan.output_dir)));
+    let ready = handoff.available() && handoff.ready_record_count() > 0;
+    NsldFinalExecutableOutputNsdbReplay {
+        contract: "nsdb-payload-execution-replay-plan-v1".to_owned(),
+        ready,
+        status: if ready { "ready" } else { "blocked" }.to_owned(),
+        command: ready.then(|| format!("nsdb replay-plan {} --json", plan.output_dir)),
+        first_blocker: if ready {
+            None
+        } else {
+            Some(
+                handoff
+                    .error()
+                    .unwrap_or("final-output-nsdb-handoff-not-ready")
+                    .to_owned(),
+            )
+        },
     }
 }
 
@@ -207,6 +259,9 @@ fn nsld_final_executable_output_payload_execution_trace(
 struct NsldFinalExecutableOutputObjectEvidence {
     valid: bool,
     object_path: String,
+    object_family: String,
+    object_magic_status: String,
+    object_magic: Option<String>,
     expected_size_bytes: Option<usize>,
     actual_size_bytes: Option<usize>,
     expected_hash: Option<String>,
@@ -227,6 +282,10 @@ fn nsld_final_executable_output_object_evidence(
     let actual_size_bytes = object_bytes.as_ref().ok().map(Vec::len);
     let expected_hash = image_bytes.as_ref().ok().map(|bytes| fnv1a64_hex(bytes));
     let actual_hash = object_bytes.as_ref().ok().map(|bytes| fnv1a64_hex(bytes));
+    let object_identity = workflow_object_identity(
+        &plan.cpu_target.object_format,
+        object_bytes.as_ref().ok().map(Vec::as_slice),
+    );
     let mut issues = Vec::new();
     if let Err(error) = &object_bytes {
         issues.push(format!(
@@ -254,10 +313,20 @@ fn nsld_final_executable_output_object_evidence(
             ));
         }
     }
+    if object_identity.magic_status == "invalid" {
+        issues.push(format!(
+            "object_output_magic invalid for {}: found {}",
+            object_identity.family,
+            object_identity.magic.as_deref().unwrap_or("missing")
+        ));
+    }
 
     NsldFinalExecutableOutputObjectEvidence {
         valid: issues.is_empty(),
         object_path: object_path.display().to_string(),
+        object_family: object_identity.family,
+        object_magic_status: object_identity.magic_status,
+        object_magic: object_identity.magic,
         expected_size_bytes,
         actual_size_bytes,
         expected_hash,

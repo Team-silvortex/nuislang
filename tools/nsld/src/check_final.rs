@@ -66,6 +66,12 @@ pub(crate) struct NsldCheckFinalSnapshot {
     pub(crate) final_executable_output_execution_handoff_first_blocker: Option<String>,
     pub(crate) final_executable_output_execution_handoff_decision_code: String,
     pub(crate) final_executable_output_recommended_next_action: String,
+    pub(crate) final_executable_output_device_provider_sample_manifest_available: bool,
+    pub(crate) final_executable_output_device_provider_sample_manifest_status: String,
+    pub(crate) final_executable_output_device_provider_sample_manifest_ready_record_count: usize,
+    pub(crate) final_executable_output_device_provider_sample_manifest_pending_record_count: usize,
+    pub(crate) final_executable_output_device_provider_sample_manifest_first_blocker:
+        Option<String>,
     pub(crate) final_executable_output_nsld_owned: bool,
     pub(crate) final_executable_output_present: bool,
     pub(crate) final_executable_output_size_bytes: Option<usize>,
@@ -84,6 +90,9 @@ pub(crate) struct NsldCheckFinalSnapshot {
     pub(crate) final_executable_output_runnable_candidate: Option<bool>,
     pub(crate) final_executable_output_object_valid: bool,
     pub(crate) final_executable_output_object_path: String,
+    pub(crate) final_executable_output_object_family: String,
+    pub(crate) final_executable_output_object_magic_status: String,
+    pub(crate) final_executable_output_object_magic: Option<String>,
     pub(crate) final_executable_output_object_expected_size_bytes: Option<usize>,
     pub(crate) final_executable_output_object_actual_size_bytes: Option<usize>,
     pub(crate) final_executable_output_object_expected_hash: Option<String>,
@@ -283,6 +292,20 @@ pub(crate) fn nsld_check_final_snapshot(
     let final_executable_output_recommended_next_action = final_executable_output_report
         .recommended_next_action
         .clone();
+    let final_executable_output_device_provider_sample_manifest_available =
+        final_executable_output_report.device_provider_sample_manifest_available;
+    let final_executable_output_device_provider_sample_manifest_status =
+        final_executable_output_report
+            .device_provider_sample_manifest_status
+            .clone();
+    let final_executable_output_device_provider_sample_manifest_ready_record_count =
+        final_executable_output_report.device_provider_sample_manifest_ready_record_count;
+    let final_executable_output_device_provider_sample_manifest_pending_record_count =
+        final_executable_output_report.device_provider_sample_manifest_pending_record_count;
+    let final_executable_output_device_provider_sample_manifest_first_blocker =
+        final_executable_output_report
+            .device_provider_sample_manifest_first_blocker
+            .clone();
     let final_executable_output_nsld_owned = final_executable_output_report.nsld_owned_output;
     let final_executable_output_present = final_executable_output_report.present;
     let final_executable_output_size_bytes = final_executable_output_report.size_bytes;
@@ -320,6 +343,13 @@ pub(crate) fn nsld_check_final_snapshot(
     let final_executable_output_object_valid = final_executable_output_report.object_output_valid;
     let final_executable_output_object_path =
         final_executable_output_report.object_output_path.clone();
+    let final_executable_output_object_family =
+        final_executable_output_report.object_output_family.clone();
+    let final_executable_output_object_magic_status = final_executable_output_report
+        .object_output_magic_status
+        .clone();
+    let final_executable_output_object_magic =
+        final_executable_output_report.object_output_magic.clone();
     let final_executable_output_object_expected_size_bytes =
         final_executable_output_report.object_output_expected_size_bytes;
     let final_executable_output_object_actual_size_bytes =
@@ -398,6 +428,11 @@ pub(crate) fn nsld_check_final_snapshot(
         final_executable_output_execution_handoff_first_blocker,
         final_executable_output_execution_handoff_decision_code,
         final_executable_output_recommended_next_action,
+        final_executable_output_device_provider_sample_manifest_available,
+        final_executable_output_device_provider_sample_manifest_status,
+        final_executable_output_device_provider_sample_manifest_ready_record_count,
+        final_executable_output_device_provider_sample_manifest_pending_record_count,
+        final_executable_output_device_provider_sample_manifest_first_blocker,
         final_executable_output_nsld_owned,
         final_executable_output_present,
         final_executable_output_size_bytes,
@@ -416,6 +451,9 @@ pub(crate) fn nsld_check_final_snapshot(
         final_executable_output_runnable_candidate,
         final_executable_output_object_valid,
         final_executable_output_object_path,
+        final_executable_output_object_family,
+        final_executable_output_object_magic_status,
+        final_executable_output_object_magic,
         final_executable_output_object_expected_size_bytes,
         final_executable_output_object_actual_size_bytes,
         final_executable_output_object_expected_hash,

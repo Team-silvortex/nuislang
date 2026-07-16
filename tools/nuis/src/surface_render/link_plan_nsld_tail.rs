@@ -337,6 +337,24 @@ pub(super) fn nsld_tail_json_fields(
                 .as_ref()
                 .map(|summary| summary.object_path.as_str()),
         ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_object_family",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.object_family.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_object_magic_status",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.object_magic_status.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_object_magic",
+            final_output_summary
+                .as_ref()
+                .and_then(|summary| summary.object_magic.as_deref()),
+        ),
         json_optional_usize_field(
             "nsld_final_executable_output_object_expected_size_bytes",
             final_output_summary

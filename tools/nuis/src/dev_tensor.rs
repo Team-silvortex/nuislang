@@ -59,7 +59,7 @@ pub(crate) struct DevTensorCoverageSummary {
     pub(crate) milestone: DevTensorMilestoneCoverage,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DevTensorSummary {
     pub(crate) architecture_count: usize,
     pub(crate) module_count: usize,
@@ -80,6 +80,11 @@ pub(crate) struct DevTensorSummary {
     pub(crate) weakest_bootstrap_next_action: &'static str,
     pub(crate) weakest_bootstrap_validation_command: &'static str,
     pub(crate) weakest_bootstrap_expected_artifact: &'static str,
+    pub(crate) weakest_bootstrap_task_card_coordinate: String,
+    pub(crate) weakest_bootstrap_task_card_priority_reason: String,
+    pub(crate) weakest_bootstrap_task_card_action: &'static str,
+    pub(crate) weakest_bootstrap_task_card_command: &'static str,
+    pub(crate) weakest_bootstrap_task_card_expected_artifact: &'static str,
     pub(crate) coverage_status: &'static str,
     pub(crate) coverage_expected_count: usize,
     pub(crate) coverage_covered_count: usize,
@@ -114,6 +119,17 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
         }
     }
     let cell_count = DEV_TENSOR_CELLS.len();
+    let task_card_coordinate = weakest_bootstrap
+        .map(|cell| dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function))
+        .unwrap_or_else(|| "<none>".to_owned());
+    let task_card_priority_reason = weakest_bootstrap
+        .map(|cell| {
+            format!(
+                "lowest bootstrap-critical progress: {}/100 at {}",
+                cell.progress, task_card_coordinate
+            )
+        })
+        .unwrap_or_else(|| "no bootstrap-critical tensor cell is currently registered".to_owned());
     DevTensorSummary {
         architecture_count: architectures.len(),
         module_count: modules.len(),
@@ -162,6 +178,17 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
             .map(|cell| cell.validation_command)
             .unwrap_or("<none>"),
         weakest_bootstrap_expected_artifact: weakest_bootstrap
+            .map(|cell| cell.expected_artifact)
+            .unwrap_or("<none>"),
+        weakest_bootstrap_task_card_coordinate: task_card_coordinate,
+        weakest_bootstrap_task_card_priority_reason: task_card_priority_reason,
+        weakest_bootstrap_task_card_action: weakest_bootstrap
+            .map(|cell| cell.next_action)
+            .unwrap_or("<none>"),
+        weakest_bootstrap_task_card_command: weakest_bootstrap
+            .map(|cell| cell.validation_command)
+            .unwrap_or("<none>"),
+        weakest_bootstrap_task_card_expected_artifact: weakest_bootstrap
             .map(|cell| cell.expected_artifact)
             .unwrap_or("<none>"),
         coverage_status: coverage.status,
@@ -327,6 +354,23 @@ mod tests {
         assert_ne!(summary.weakest_bootstrap_next_action, "<none>");
         assert_ne!(summary.weakest_bootstrap_validation_command, "<none>");
         assert_ne!(summary.weakest_bootstrap_expected_artifact, "<none>");
+        assert_ne!(summary.weakest_bootstrap_task_card_coordinate, "<none>");
+        assert!(summary.weakest_bootstrap_task_card_coordinate.contains('/'));
+        assert!(summary
+            .weakest_bootstrap_task_card_priority_reason
+            .contains("lowest bootstrap-critical progress"));
+        assert_eq!(
+            summary.weakest_bootstrap_task_card_action,
+            summary.weakest_bootstrap_next_action
+        );
+        assert_eq!(
+            summary.weakest_bootstrap_task_card_command,
+            summary.weakest_bootstrap_validation_command
+        );
+        assert_eq!(
+            summary.weakest_bootstrap_task_card_expected_artifact,
+            summary.weakest_bootstrap_expected_artifact
+        );
         assert!(summary.weakest_bootstrap_progress <= summary.bootstrap_critical_average_progress);
         let hierarchy = crate::dev_tensor_hierarchy::dev_tensor_hierarchy_summary();
         assert_eq!(hierarchy.protocol_version, "dev-tensor-status-v1");
@@ -353,6 +397,19 @@ mod tests {
         assert_eq!(coverage.manifest.status, "clean");
         assert!(coverage.manifest.manifest_backed_coordinate_count >= 3);
         assert_eq!(coverage.milestone.status, "clean");
+        assert_eq!(
+            coverage.milestone.derived_cache_protocol,
+            "nuis-dev-tensor-derived-coordinate-cache-v1"
+        );
+        assert_eq!(coverage.milestone.derived_cache_status, "cacheable");
+        assert!(coverage
+            .milestone
+            .derived_cache_key
+            .starts_with("nuis-dev-tensor-derived-coordinate-cache-v1:fnv64:"));
+        assert_eq!(
+            coverage.milestone.derived_cache_coordinate_count,
+            DEV_TENSOR_EXPECTED_COORDINATES.len()
+        );
         assert_eq!(
             coverage.milestone.milestone_coordinate_count,
             DEV_TENSOR_EXPECTED_COORDINATES.len()
@@ -388,6 +445,12 @@ mod tests {
         assert!(json.contains("\"weakest_bootstrap_next_action\""));
         assert!(json.contains("\"weakest_bootstrap_validation_command\""));
         assert!(json.contains("\"weakest_bootstrap_expected_artifact\""));
+        assert!(json.contains("\"weakest_bootstrap_task_card_coordinate\""));
+        assert!(json.contains("\"weakest_bootstrap_task_card_priority_reason\""));
+        assert!(json.contains("\"weakest_bootstrap_task_card_action\""));
+        assert!(json.contains("\"weakest_bootstrap_task_card_command\""));
+        assert!(json.contains("\"weakest_bootstrap_task_card_expected_artifact\""));
+        assert!(json.contains("lowest bootstrap-critical progress"));
         assert!(json.contains("\"blocker\""));
         assert!(json.contains("\"next_action\""));
         assert!(json.contains("\"validation_command\""));
@@ -413,6 +476,14 @@ mod tests {
         assert!(json.contains(
             "\"milestone_coverage_source\":\"docs/reference/nuis-development-tensor.milestones.toml\""
         ));
+        assert!(json.contains(
+            "\"milestone_derived_cache_protocol\":\"nuis-dev-tensor-derived-coordinate-cache-v1\""
+        ));
+        assert!(json.contains("\"milestone_derived_cache_status\":\"cacheable\""));
+        assert!(json.contains(
+            "\"milestone_derived_cache_key\":\"nuis-dev-tensor-derived-coordinate-cache-v1:fnv64:"
+        ));
+        assert!(json.contains("\"milestone_derived_cache_coordinate_count\":"));
         assert!(json.contains("\"milestone_constant_drift_count\":0"));
         assert!(json.contains("\"milestone_coordinates\":["));
         assert!(json.contains("\"coverage_missing_coordinates\":[]"));
@@ -461,6 +532,14 @@ mod tests {
         assert!(text.contains(
             "milestone_coverage_source: docs/reference/nuis-development-tensor.milestones.toml"
         ));
+        assert!(text.contains(
+            "milestone_derived_cache_protocol: nuis-dev-tensor-derived-coordinate-cache-v1"
+        ));
+        assert!(text.contains("milestone_derived_cache_status: cacheable"));
+        assert!(text.contains(
+            "milestone_derived_cache_key: nuis-dev-tensor-derived-coordinate-cache-v1:fnv64:"
+        ));
+        assert!(text.contains("milestone_derived_cache_coordinate_count:"));
         assert!(text.contains("milestone_constant_drift_count: 0"));
         assert!(text.contains(
             "milestone_coordinate: alpha-governance:required:developer-system/dev-tensor/architecture-module-function-progress-model"
@@ -475,6 +554,12 @@ mod tests {
         assert!(text.contains("weakest_bootstrap_next_action:"));
         assert!(text.contains("weakest_bootstrap_validation_command:"));
         assert!(text.contains("weakest_bootstrap_expected_artifact:"));
+        assert!(text.contains("weakest_bootstrap_task_card_coordinate:"));
+        assert!(text.contains("weakest_bootstrap_task_card_priority_reason:"));
+        assert!(text.contains("weakest_bootstrap_task_card_action:"));
+        assert!(text.contains("weakest_bootstrap_task_card_command:"));
+        assert!(text.contains("weakest_bootstrap_task_card_expected_artifact:"));
+        assert!(text.contains("lowest bootstrap-critical progress"));
         assert!(text.contains("    blocker:"));
         assert!(text.contains("    next_action:"));
         assert!(text.contains("    validation_command:"));

@@ -37,6 +37,12 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
         nsld_tail.as_ref(),
         nsld_final_output.as_ref(),
     );
+    let closure_summary = crate::closure_summary::FrontdoorClosureSummary::from_nsld_next_action(
+        "workflow-link-plan",
+        &nsld_next.action,
+        nsld_next.command.as_deref(),
+        &nsld_next.reason,
+    );
     let nsld_chain_next =
         nsld_artifact_chain_next_action_mirror(nsld_chain.as_ref(), nsld_tail.as_ref());
     let nsld_drive_recommendation = nsld_drive_recommendation_for_output_dir(
@@ -316,6 +322,18 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
         json_field("nsld_next_action", &nsld_next.action),
         json_optional_string_field("nsld_next_action_command", nsld_next.command.as_deref()),
         json_field("nsld_next_action_reason", &nsld_next.reason),
+        crate::json_field("closure_summary_source", closure_summary.source),
+        crate::json_field("closure_summary_status", &closure_summary.status),
+        crate::json_bool_field("closure_summary_ready", closure_summary.ready),
+        crate::json_optional_string_field(
+            "closure_summary_primary_blocker",
+            closure_summary.primary_blocker.as_deref(),
+        ),
+        crate::json_field("closure_summary_next_action", &closure_summary.next_action),
+        crate::json_optional_string_field(
+            "closure_summary_next_command",
+            closure_summary.next_command.as_deref(),
+        ),
         json_bool_field(
             "nsld_artifact_chain_next_action_available",
             nsld_chain_next.available,

@@ -331,6 +331,22 @@ pub(crate) fn nsdb_events_report_json(report: &NsdbInspectReport) -> String {
         json_string_field("tool", "nsdb"),
         json_string_field("kind", "nsdb_payload_execution_events"),
         json_string_field("manifest", &report.manifest),
+        json_string_field(
+            "payload_execution_event_query_contract",
+            "nsdb-payload-execution-event-query-v1",
+        ),
+        json_string_field(
+            "payload_execution_event_source",
+            "payload-execution-handoff-events",
+        ),
+        json_string_field(
+            "payload_execution_event_source_protocol",
+            &report.payload_execution_handoff.protocol,
+        ),
+        json_string_field(
+            "payload_execution_event_source_debugger_contract",
+            &report.payload_execution_handoff.debugger_contract,
+        ),
         json_bool_field(
             "payload_execution_event_filter_active",
             report.payload_execution_event_filter.active(),
@@ -359,6 +375,10 @@ pub(crate) fn nsdb_events_report_json(report: &NsdbInspectReport) -> String {
             "payload_execution_event_count",
             report.payload_execution_handoff.events.len(),
         ),
+        json_usize_field(
+            "payload_execution_event_query_result_count",
+            report.payload_execution_handoff.events.len(),
+        ),
         format!(
             "\"payload_execution_events\":[{}]",
             payload_execution_events_json(&report.payload_execution_handoff.events)
@@ -374,8 +394,25 @@ pub(crate) fn nsdb_replay_plan_json(report: &NsdbInspectReport) -> String {
         json_string_field("kind", "nsdb_payload_execution_replay_plan"),
         json_string_field("manifest", &report.manifest),
         json_string_field("replay_protocol", plan.protocol),
+        json_string_field(
+            "replay_event_query_contract",
+            "nsdb-payload-execution-event-query-v1",
+        ),
+        json_string_field(
+            "replay_checkpoint_source",
+            "payload-execution-handoff-events",
+        ),
+        json_string_field(
+            "replay_event_source_protocol",
+            &report.payload_execution_handoff.protocol,
+        ),
+        json_string_field(
+            "replay_event_source_debugger_contract",
+            &report.payload_execution_handoff.debugger_contract,
+        ),
         json_string_field("replay_status", &plan.status),
         json_usize_field("replay_checkpoint_count", plan.checkpoint_count),
+        json_usize_field("replay_event_query_result_count", plan.checkpoint_count),
         json_usize_field(
             "replayable_checkpoint_count",
             plan.replayable_checkpoint_count,

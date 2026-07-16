@@ -465,23 +465,12 @@ pub(crate) fn nsld_artifact_chain_report(
     );
     let final_output_boundary_ready =
         final_output.runnable_candidate && final_output.blockers.is_empty();
-    let final_output_boundary_command_id =
-        (!final_output_boundary_ready).then(|| "final-executable-output".to_owned());
-    let final_output_boundary_command = final_output_boundary_command_id
-        .as_ref()
-        .map(|command_id| format!("nsld {command_id} <input>"));
-    let final_output_boundary_command_resolved = final_output_boundary_command
-        .as_ref()
-        .map(|command| command.replace("<input>", &manifest.display().to_string()));
-    let final_output_boundary_reason = (!final_output_boundary_ready).then(|| {
-        final_output
-            .blockers
-            .iter()
-            .find(|blocker| blocker.starts_with("final-executable-output:"))
-            .or_else(|| final_output.blockers.first())
-            .map(|blocker| format!("final executable output boundary is blocked by `{blocker}`"))
-            .unwrap_or_else(|| "final executable output boundary is not ready".to_owned())
-    });
+    let final_output_boundary = final_output_boundary_action(
+        manifest,
+        plan,
+        final_output_boundary_ready,
+        &final_output.blockers,
+    );
 
     NsldArtifactChainReport {
         manifest: manifest.display().to_string(),
@@ -514,14 +503,72 @@ pub(crate) fn nsld_artifact_chain_report(
         next_action_source: action_plan.next_action_source,
         next_action_available: action_plan.next_action_available,
         final_output_boundary_ready,
-        final_output_boundary_command_id,
-        final_output_boundary_command,
-        final_output_boundary_command_resolved,
-        final_output_boundary_reason,
+        final_output_boundary_command_id: final_output_boundary.command_id,
+        final_output_boundary_command: final_output_boundary.command,
+        final_output_boundary_command_resolved: final_output_boundary.command_resolved,
+        final_output_boundary_reason: final_output_boundary.reason,
         final_output_boundary_blockers: final_output.blockers.clone(),
         stages: diagnostics,
         advisories,
         issues,
+    }
+}
+
+struct FinalOutputBoundaryAction {
+    command_id: Option<String>,
+    command: Option<String>,
+    command_resolved: Option<String>,
+    reason: Option<String>,
+}
+
+fn final_output_boundary_action(
+    manifest: &Path,
+    plan: &nuisc::linker::LinkPlan,
+    ready: bool,
+    blockers: &[String],
+) -> FinalOutputBoundaryAction {
+    if ready {
+        return FinalOutputBoundaryAction {
+            command_id: None,
+            command: None,
+            command_resolved: None,
+            reason: None,
+        };
+    }
+    if let Some(blocker) = blockers
+        .iter()
+        .find(|blocker| blocker.starts_with("device-provider-sample:"))
+    {
+        return FinalOutputBoundaryAction {
+            command_id: Some("materialize-provider-samples".to_owned()),
+            command: Some("nsdb materialize-provider-samples <artifact-output-dir> --json".to_owned()),
+            command_resolved: Some(format!(
+                "nsdb materialize-provider-samples {} --json",
+                plan.output_dir
+            )),
+            reason: Some(format!(
+                "final executable output boundary is blocked by `{blocker}`; materialize provider samples before relinking"
+            )),
+        };
+    }
+    let blocker = blockers
+        .iter()
+        .find(|blocker| blocker.starts_with("final-executable-output:"))
+        .or_else(|| blockers.first());
+    FinalOutputBoundaryAction {
+        command_id: Some("final-executable-output".to_owned()),
+        command: Some("nsld final-executable-output <input>".to_owned()),
+        command_resolved: Some(format!(
+            "nsld final-executable-output {}",
+            manifest.display()
+        )),
+        reason: Some(
+            blocker
+                .map(|blocker| {
+                    format!("final executable output boundary is blocked by `{blocker}`")
+                })
+                .unwrap_or_else(|| "final executable output boundary is not ready".to_owned()),
+        ),
     }
 }
 

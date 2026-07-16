@@ -17,6 +17,7 @@ dependencies = [
 name = "nsld"
 version = "0.1.0"
 dependencies = [
+ "nsdb",
  "nuisc",
 ]
 
@@ -24,6 +25,7 @@ dependencies = [
 name = "nuis"
 version = "0.1.0"
 dependencies = [
+ "nsdb",
  "nuis-artifact",
  "nuis-runtime",
  "nuis-semantics",

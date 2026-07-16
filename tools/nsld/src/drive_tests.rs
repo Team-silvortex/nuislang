@@ -1,6 +1,6 @@
 use super::{
-    final_output_boundary_crossing_enabled_for, nsld_drive_apply_next_action,
-    nsld_drive_apply_report_json, nsld_drive_apply_until_clean, nsld_drive_dry_run_json,
+    final_output_boundary_crossing_enabled_for, final_output_boundary_stop_reason,
+    nsld_drive_apply_next_action, nsld_drive_apply_report_json, nsld_drive_apply_until_clean,
     nsld_drive_until_clean_report_json, run_drive_command, NsldDriveUntilCleanReport,
 };
 use crate::{
@@ -12,56 +12,6 @@ use crate::{
 use nuisc::aot::{BuildManifestContext, CompileArtifacts};
 use std::path::Path;
 use std::{env, fs};
-
-#[test]
-fn drive_dry_run_json_reports_next_action_without_execution() {
-    let next_action = NsldCheckNextAction {
-        available: true,
-        source: Some("required".to_owned()),
-        command_id: Some("emit-inputs".to_owned()),
-        command: Some("nsld emit-inputs <input>".to_owned()),
-        command_resolved: Some("nsld emit-inputs manifest.toml".to_owned()),
-        reason: Some("first missing required artifact stage `link-inputs`".to_owned()),
-    };
-    let json = nsld_drive_dry_run_json(&next_action);
-
-    assert!(json.contains("\"kind\":\"nsld_drive_dry_run\""));
-    assert!(json.contains("\"would_execute\":true"));
-    assert!(json.contains("\"mutates_artifacts\":false"));
-    assert!(json.contains("\"command_resolved\":\"nsld emit-inputs manifest.toml\""));
-}
-
-#[test]
-fn drive_until_clean_json_reports_loop_shape() {
-    let report = NsldDriveUntilCleanReport {
-        completed: true,
-        applied_steps: 2,
-        capped: false,
-        stop_reason: "clean".to_owned(),
-        stop_command_id: None,
-        stop_source: None,
-        stop_command_resolved: None,
-        stop_action_reason: None,
-        last_command_id: Some("emit-inputs".to_owned()),
-        messages: vec![
-            "applied emit-inputs".to_owned(),
-            "no-next-action".to_owned(),
-        ],
-    };
-    let json = nsld_drive_until_clean_report_json(&report);
-
-    assert!(json.contains("\"kind\":\"nsld_drive_until_clean\""));
-    assert!(json.contains("\"completed\":true"));
-    assert!(json.contains("\"applied_steps\":2"));
-    assert!(json.contains("\"mutates_artifacts\":true"));
-    assert!(json.contains("\"stop_reason\":\"clean\""));
-    assert!(json.contains("\"stop_command_id\":null"));
-    assert!(json.contains("\"stop_source\":null"));
-    assert!(json.contains("\"stop_command_resolved\":null"));
-    assert!(json.contains("\"stop_action_reason\":null"));
-    assert!(json.contains("\"last_command_id\":\"emit-inputs\""));
-    assert!(json.contains("\"messages\":[\"applied emit-inputs\",\"no-next-action\"]"));
-}
 
 #[test]
 fn drive_apply_dispatches_whitelisted_emit_inputs() {
@@ -79,6 +29,10 @@ fn drive_apply_dispatches_whitelisted_emit_inputs() {
         command: Some("nsld emit-inputs <input>".to_owned()),
         command_resolved: Some("nsld emit-inputs manifest.toml".to_owned()),
         reason: Some("first missing required artifact stage `link-inputs`".to_owned()),
+        gate_action: None,
+        gate_env_assignments: Vec::new(),
+        crossing_env_assignments: Vec::new(),
+        crossing_command_resolved: None,
     };
 
     let report =
@@ -91,6 +45,8 @@ fn drive_apply_dispatches_whitelisted_emit_inputs() {
     assert!(output_present);
     assert_eq!(report.message, "applied emit-inputs");
     assert!(nsld_drive_apply_report_json(&report).contains("\"mutates_artifacts\":true"));
+    assert!(nsld_drive_apply_report_json(&report)
+        .contains("\"mutation_policy\":\"whitelisted-artifact-mutation\""));
 }
 
 #[test]
@@ -109,6 +65,10 @@ fn drive_apply_dispatches_whitelisted_emit_object() {
         command: Some("nsld emit-object <input>".to_owned()),
         command_resolved: Some("nsld emit-object manifest.toml".to_owned()),
         reason: Some("first missing required artifact stage `object-emit-blocked`".to_owned()),
+        gate_action: None,
+        gate_env_assignments: Vec::new(),
+        crossing_env_assignments: Vec::new(),
+        crossing_command_resolved: None,
     };
 
     let report =
@@ -153,6 +113,10 @@ fn drive_apply_dispatches_whitelisted_launcher_manifest_and_dry_run() {
             "nsld emit-final-executable-launcher-manifest manifest.toml".to_owned(),
         ),
         reason: Some("final executable output is ready".to_owned()),
+        gate_action: None,
+        gate_env_assignments: Vec::new(),
+        crossing_env_assignments: Vec::new(),
+        crossing_command_resolved: None,
     };
     let dry_run_action = NsldCheckNextAction {
         available: true,
@@ -163,6 +127,10 @@ fn drive_apply_dispatches_whitelisted_launcher_manifest_and_dry_run() {
             "nsld emit-final-executable-launcher-dry-run manifest.toml".to_owned(),
         ),
         reason: Some("launcher manifest is ready".to_owned()),
+        gate_action: None,
+        gate_env_assignments: Vec::new(),
+        crossing_env_assignments: Vec::new(),
+        crossing_command_resolved: None,
     };
 
     let manifest_report =
@@ -216,6 +184,10 @@ fn drive_apply_dispatches_native_object_alias() {
         command: Some("nsld emit-native-object <input>".to_owned()),
         command_resolved: Some("nsld emit-native-object manifest.toml".to_owned()),
         reason: Some("first missing required native object output".to_owned()),
+        gate_action: None,
+        gate_env_assignments: Vec::new(),
+        crossing_env_assignments: Vec::new(),
+        crossing_command_resolved: None,
     };
 
     let report =
@@ -230,36 +202,111 @@ fn drive_apply_dispatches_native_object_alias() {
     let json = nsld_drive_apply_report_json(&report);
     assert!(json.contains("\"applied\":true"));
     assert!(json.contains("\"mutates_artifacts\":true"));
+    assert!(json.contains("\"mutation_policy\":\"whitelisted-artifact-mutation\""));
 }
 
 #[test]
-fn drive_apply_treats_final_output_boundary_as_read_only() {
-    let plan = empty_link_plan();
+fn drive_apply_materializes_provider_sample_boundary_via_nsdb() {
+    let dir = env::temp_dir().join(format!("nsld-drive-provider-sample-{}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    write_device_provider_sample_manifest(&dir);
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
     let next_action = NsldCheckNextAction {
         available: true,
         source: Some("final-output-boundary".to_owned()),
-        command_id: Some("final-executable-output".to_owned()),
-        command: Some("nsld final-executable-output <input>".to_owned()),
-        command_resolved: Some("nsld final-executable-output manifest.toml".to_owned()),
+        command_id: Some("materialize-provider-samples".to_owned()),
+        command: Some("nsdb materialize-provider-samples <artifact-output-dir> --json".to_owned()),
+        command_resolved: Some(format!("nsdb materialize-provider-samples {} --json", dir.display())),
         reason: Some(
-            "final executable output boundary is blocked by `final-executable-output:not-nsld-owned`"
+            "final executable output boundary is blocked by `device-provider-sample:metal:apple-silicon-gpu:pending:1`; materialize provider samples before relinking"
                 .to_owned(),
         ),
+        gate_action: None,
+        gate_env_assignments: Vec::new(),
+        crossing_env_assignments: Vec::new(),
+        crossing_command_resolved: None,
     };
 
     let report =
         nsld_drive_apply_next_action(Path::new("manifest.toml"), &plan, &next_action).unwrap();
+    let manifest = fs::read_to_string(dir.join("nuis.nsdb.device-provider-samples.toml")).unwrap();
+    fs::remove_dir_all(dir).unwrap();
 
-    assert!(!report.applied);
+    assert!(report.applied);
     assert_eq!(
         report.command_id.as_deref(),
-        Some("final-executable-output")
+        Some("materialize-provider-samples")
     );
-    assert_eq!(report.message, "read-only-boundary:final-executable-output");
+    assert_eq!(
+        report.message,
+        "applied materialize-provider-samples:ready:1"
+    );
+    assert!(manifest.contains("materialization_status = \"provider-sample-materialized\""));
     let json = nsld_drive_apply_report_json(&report);
-    assert!(json.contains("\"applied\":false"));
-    assert!(json.contains("\"mutates_artifacts\":false"));
-    assert!(json.contains("\"command_id\":\"final-executable-output\""));
+    assert!(json.contains("\"applied\":true"));
+    assert!(json.contains("\"mutates_artifacts\":true"));
+    assert!(json.contains("\"mutation_policy\":\"whitelisted-boundary-materialization\""));
+    assert!(json.contains("\"command_id\":\"materialize-provider-samples\""));
+    assert!(json.contains("nsdb materialize-provider-samples"));
+}
+
+#[test]
+fn drive_until_clean_crosses_provider_sample_boundary_then_reports_next_blocker() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-drive-provider-sample-until-clean-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let artifact_path = dir.join("nuis.compiled.artifact");
+    fs::write(&artifact_path, b"compiled-artifact").unwrap();
+    write_device_provider_sample_manifest(&dir);
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = artifact_path.display().to_string();
+    plan.final_stage.output_path = dir.join("demo").display().to_string();
+
+    let report = nsld_drive_apply_until_clean(Path::new("manifest.toml"), &plan).unwrap();
+    let check = nsld_check_report(Path::new("manifest.toml"), &plan);
+    let manifest = fs::read_to_string(dir.join("nuis.nsdb.device-provider-samples.toml")).unwrap();
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!report.completed, "{:?}", report.messages);
+    assert!(!report.capped);
+    assert_eq!(report.stop_reason, "final-output-missing");
+    assert_eq!(
+        report.last_command_id.as_deref(),
+        Some("materialize-provider-samples")
+    );
+    assert!(report
+        .messages
+        .iter()
+        .any(|message| message == "applied materialize-provider-samples:ready:1"));
+    assert_eq!(
+        check.final_executable_output_device_provider_sample_manifest_status,
+        "ready"
+    );
+    assert_eq!(
+        check.final_executable_output_device_provider_sample_manifest_pending_record_count,
+        0
+    );
+    assert_eq!(
+        check.final_executable_output_device_provider_sample_manifest_first_blocker,
+        None
+    );
+    assert!(manifest.contains("pending_record_count = 0"));
+    assert!(manifest.contains("materialization_status = \"provider-sample-materialized\""));
+}
+
+#[test]
+fn drive_until_clean_names_provider_sample_boundary_stop_reason() {
+    let reason =
+        "final executable output boundary is blocked by `device-provider-sample:metal:apple-silicon-gpu:pending:1`; materialize provider samples before relinking";
+
+    assert_eq!(
+        final_output_boundary_stop_reason(Some(reason)),
+        "provider-sample-materialization-required"
+    );
 }
 
 #[test]
@@ -292,6 +339,10 @@ fn drive_until_clean_json_can_report_native_object_alias_step() {
         command: Some("nsld emit-native-object <input>".to_owned()),
         command_resolved: Some("nsld emit-native-object manifest.toml".to_owned()),
         reason: Some("first missing required native object output".to_owned()),
+        gate_action: None,
+        gate_env_assignments: Vec::new(),
+        crossing_env_assignments: Vec::new(),
+        crossing_command_resolved: None,
     };
     let report = NsldDriveUntilCleanReport {
         completed: true,
@@ -302,6 +353,10 @@ fn drive_until_clean_json_can_report_native_object_alias_step() {
         stop_source: None,
         stop_command_resolved: None,
         stop_action_reason: None,
+        stop_gate_action: None,
+        stop_gate_env_assignments: Vec::new(),
+        stop_crossing_env_assignments: Vec::new(),
+        stop_crossing_command_resolved: None,
         last_command_id: next_action.command_id.clone(),
         messages: vec![
             "applied emit-native-object".to_owned(),
@@ -510,7 +565,11 @@ fn drive_until_clean_command_reaches_host_assisted_pipeline_block() {
     let check = nsld_check_report(Path::new(&manifest), &plan);
     let output = nsld_final_executable_output_report(Path::new(&manifest), &plan);
     let drive_report = nsld_drive_apply_until_clean(Path::new(&manifest), &plan).unwrap();
+    let drive_json = nsld_drive_until_clean_report_json(&drive_report);
     let expected_boundary_command = format!("nsld final-executable-output {manifest}");
+    let expected_crossing_command = format!(
+        "env NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke NUIS_NSLD_ALLOW_HOST_FINALIZER=1 {expected_boundary_command}"
+    );
     let final_output_present = Path::new(&plan.final_stage.output_path).exists();
     fs::remove_dir_all(dir).unwrap();
 
@@ -524,10 +583,45 @@ fn drive_until_clean_command_reaches_host_assisted_pipeline_block() {
     assert_eq!(check.artifact_chain_next_action_source, None);
     assert!(check.next_action_available);
     assert_eq!(drive_report.stop_reason, "host-finalizer-policy-required");
+    assert!(drive_json.contains("\"mutation_policy\":\"blocked-read-only-boundary\""));
     assert_eq!(
         drive_report.stop_command_id.as_deref(),
         Some("final-executable-output")
     );
+    assert!(drive_report
+        .stop_action_reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains(
+            "next_gate_action:set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke"
+        )));
+    assert_eq!(
+        drive_report.stop_gate_action.as_deref(),
+        Some("set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke")
+    );
+    assert_eq!(
+        drive_report.stop_gate_env_assignments,
+        vec!["NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke".to_owned()]
+    );
+    assert_eq!(
+        drive_report.stop_crossing_env_assignments,
+        vec![
+            "NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke".to_owned(),
+            "NUIS_NSLD_ALLOW_HOST_FINALIZER=1".to_owned()
+        ]
+    );
+    assert_eq!(
+        drive_report.stop_crossing_command_resolved.as_deref(),
+        Some(expected_crossing_command.as_str())
+    );
+    assert!(drive_json
+        .contains("\"safe_next_action\":\"explicit-boundary-crossing-command-available\""));
+    assert!(drive_json.contains(&format!(
+        "\"safe_next_command\":\"{}\"",
+        expected_crossing_command
+    )));
+    assert!(drive_json.contains(
+        "\"safe_next_reason\":\"drive stopped at an explicit boundary; run the safe_next_command only if you accept the listed gate\""
+    ));
     assert_eq!(
         check.next_action_source.as_deref(),
         Some("final-output-boundary")
@@ -626,12 +720,17 @@ fn drive_until_clean_keeps_generic_stop_for_unknown_final_output_boundary() {
         stop_source: Some("final-output-boundary".to_owned()),
         stop_command_resolved: Some("nsld final-executable-output manifest.toml".to_owned()),
         stop_action_reason: Some("final executable output boundary is blocked".to_owned()),
+        stop_gate_action: None,
+        stop_gate_env_assignments: Vec::new(),
+        stop_crossing_env_assignments: Vec::new(),
+        stop_crossing_command_resolved: None,
         last_command_id: None,
         messages: vec!["read-only-boundary:final-executable-output".to_owned()],
     };
     let json = nsld_drive_until_clean_report_json(&report);
 
     assert!(json.contains("\"stop_reason\":\"blocked-boundary\""));
+    assert!(json.contains("\"mutation_policy\":\"blocked-boundary\""));
     assert!(json.contains("\"stop_source\":\"final-output-boundary\""));
 }
 
@@ -673,4 +772,33 @@ fn write_test_build_manifest_with_packaging_mode(dir: &Path, packaging_mode: &st
         },
     )
     .unwrap()
+}
+
+fn write_device_provider_sample_manifest(output_dir: &Path) {
+    fs::write(
+        output_dir.join("nuis.nsdb.device-provider-samples.toml"),
+        r#"
+protocol = "nuis-device-provider-samples-v1"
+schema = "nsdb-yir-device-provider-sample-v1"
+source = "run-artifact-provider-sample-manifest"
+status = "awaiting-provider-materialization"
+record_count = 1
+ready_record_count = 0
+pending_record_count = 1
+
+[[device_provider_samples]]
+trace_id = "hetero-trace:shader:metal:apple-silicon-gpu"
+provider = "nustar-deferred-device-sample-v1"
+provider_family = "metal:apple-silicon-gpu"
+handoff_target = "metal:apple-silicon-gpu"
+sample_status = "pending-provider-execution"
+validation_status = "pending-provider-execution"
+input_evidence = "metallib:pixelmagic.metallib"
+output_evidence = "not-materialized"
+materialization_status = "provider-sample-pending"
+materialization_detail = "awaiting-provider-runtime"
+next_action = "execute-provider-sample"
+"#,
+    )
+    .unwrap();
 }

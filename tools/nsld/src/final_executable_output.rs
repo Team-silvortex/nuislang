@@ -322,6 +322,31 @@ pub(crate) fn nsld_final_executable_output_report(
         &first_payload_execution,
     )
     .to_owned();
+    let nsdb_replay_ready = !host_native_output
+        && first_payload_execution.ready
+        && first_payload_execution.target == "container-loader";
+    let nsdb_replay_first_blocker = if nsdb_replay_ready {
+        None
+    } else if host_native_output {
+        Some("host-native-output-has-no-nsb-payload-handoff".to_owned())
+    } else {
+        first_payload_execution
+            .first_blocker
+            .clone()
+            .or_else(|| Some("payload-execution-handoff-not-ready".to_owned()))
+    };
+    let nsdb_replay_status = if nsdb_replay_ready {
+        "ready"
+    } else {
+        "blocked"
+    }
+    .to_owned();
+    let nsdb_replay_command = nsdb_replay_ready.then(|| {
+        format!(
+            "nsdb replay-plan {} --json",
+            shell_quote_path(Path::new(&plan.output_dir))
+        )
+    });
 
     NsldFinalExecutableOutputReport {
         manifest: manifest.display().to_string(),
@@ -366,6 +391,21 @@ pub(crate) fn nsld_final_executable_output_report(
         first_payload_execution_entry_kind: first_payload_execution.entry_kind,
         first_payload_execution_entry_section_id: first_payload_execution.entry_section_id,
         first_payload_execution_first_blocker: first_payload_execution.first_blocker,
+        final_output_nsdb_handoff_protocol: "nuis-nsdb-payload-execution-handoff-v1".to_owned(),
+        final_output_nsdb_handoff_persisted: false,
+        final_output_nsdb_handoff_path: Path::new(&plan.output_dir)
+            .join("nuis.nsdb.payload-execution-handoff.toml")
+            .display()
+            .to_string(),
+        final_output_nsdb_handoff_record_count: 0,
+        final_output_nsdb_handoff_ready_record_count: 0,
+        final_output_nsdb_handoff_first_trace_id: None,
+        final_output_nsdb_handoff_error: None,
+        final_output_nsdb_replay_contract: "nsdb-payload-execution-replay-plan-v1".to_owned(),
+        final_output_nsdb_replay_ready: nsdb_replay_ready,
+        final_output_nsdb_replay_status: nsdb_replay_status,
+        final_output_nsdb_replay_command: nsdb_replay_command,
+        final_output_nsdb_replay_first_blocker: nsdb_replay_first_blocker,
         device_provider_sample_manifest_available: device_provider_sample.available,
         device_provider_sample_manifest_path: device_provider_sample.path,
         device_provider_sample_manifest_status: device_provider_sample.status,
@@ -413,6 +453,9 @@ pub(crate) fn nsld_final_executable_output_report(
         final_executable_blocker_count: final_emit.actual_blocker_count,
         object_output_valid: object_output.valid,
         object_output_path: object_output.object_output_path,
+        object_output_family: object_output.object_family,
+        object_output_magic_status: object_output.object_magic_status,
+        object_output_magic: object_output.object_magic,
         object_output_expected_size_bytes: object_output.expected_size_bytes,
         object_output_actual_size_bytes: object_output.actual_size_bytes,
         object_output_expected_hash: object_output.expected_hash,
@@ -432,6 +475,18 @@ pub(crate) fn nsld_final_executable_output_report(
         backend_artifact_assembly_first_blocker: backend_artifact_assembly.first_blocker,
         blockers,
         issues,
+    }
+}
+
+fn shell_quote_path(path: &Path) -> String {
+    let text = path.display().to_string();
+    if text
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '_' | '-' | ':'))
+    {
+        text
+    } else {
+        format!("'{}'", text.replace('\'', "'\\''"))
     }
 }
 

@@ -14,6 +14,7 @@ mod build_report_nsld_status;
 mod build_report_render;
 mod build_report_runtime;
 mod cli;
+mod closure_summary;
 mod dev_tensor;
 mod dev_tensor_data;
 mod dev_tensor_drift;

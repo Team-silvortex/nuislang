@@ -78,6 +78,10 @@ pub(super) fn write_unavailable_nsld_final_output_text_fields<W: fmt::Write>(
     )?;
     writeln!(
         out,
+        "  nsld_final_executable_output_object_identity: family=<unavailable> magic_status=<unavailable> magic=<unavailable>"
+    )?;
+    writeln!(
+        out,
         "  nsld_final_executable_output_object_size_bytes: <unavailable>/<unavailable>"
     )?;
     writeln!(
@@ -195,6 +199,16 @@ pub(super) fn write_nsld_final_output_text_fields<W: fmt::Write>(
         out,
         "  nsld_final_executable_output_object_path: {}",
         final_output.object_path
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_object_identity: family={} magic_status={} magic={}",
+        final_output.object_family,
+        final_output.object_magic_status,
+        final_output
+            .object_magic
+            .as_deref()
+            .unwrap_or("<unavailable>")
     )?;
     writeln!(
         out,

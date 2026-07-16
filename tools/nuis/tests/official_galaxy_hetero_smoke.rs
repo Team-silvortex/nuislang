@@ -136,6 +136,47 @@ fn assert_official_galaxy_hetero_build(
             && run_json_stdout.contains("\"next_action\":\"materialize-device-execution-trace\""),
         "run-artifact json did not expose expected official galaxy hetero trace for {label}\n{run_json_stdout}"
     );
+
+    let materialized = nsdb::materialize_provider_samples(
+        &output_dir,
+        Some(&format!("{backend_family}:{target_device}")),
+    )
+    .expect("nsdb materializes official galaxy provider samples");
+    let provider_samples =
+        fs::read_to_string(output_dir.join("nuis.nsdb.device-provider-samples.toml"))
+            .expect("device provider sample manifest remains available");
+    let doctor_after = run_nuis(&["artifact-doctor", "--json", &output_dir_text]);
+    assert_success(
+        &doctor_after,
+        "nuis artifact-doctor json after official galaxy sample materialization",
+    );
+    let doctor_after_stdout = String::from_utf8_lossy(&doctor_after.stdout);
+
+    assert_eq!(materialized.status, "ready");
+    assert_eq!(materialized.matched_record_count, 1);
+    assert_eq!(materialized.materialized_record_count, 1);
+    assert_eq!(materialized.skipped_record_count, 0);
+    assert_eq!(materialized.next_action, "replay-provider-sample");
+    assert!(materialized.next_command.contains("nsdb replay-plan "));
+    assert!(materialized.return_command.contains("nsld check "));
+    assert!(provider_samples.contains("source = \"nsdb-materialize-provider-samples\""));
+    assert!(provider_samples.contains("status = \"ready\""));
+    assert!(provider_samples.contains("ready_record_count = 1"));
+    assert!(provider_samples.contains("pending_record_count = 0"));
+    assert!(provider_samples.contains("sample_status = \"provider-execution-ready\""));
+    assert!(provider_samples.contains("validation_status = \"provider-execution-validated\""));
+    assert!(provider_samples.contains("output_evidence = \""));
+    assert!(provider_samples.contains("materialization_status = \"provider-sample-materialized\""));
+    assert!(provider_samples
+        .contains("materialization_detail = \"mock-provider-runtime-result-materialized\""));
+    assert!(provider_samples.contains("next_action = \"replay-device-sample\""));
+    assert!(doctor_after_stdout
+        .contains("\"artifact_device_provider_sample_manifest_status\":\"ready\""));
+    assert!(doctor_after_stdout
+        .contains("\"artifact_device_provider_sample_manifest_pending_record_count\":0"));
+    assert!(doctor_after_stdout.contains(
+        "\"artifact_device_provider_sample_manifest_first_materialization_status\":\"provider-sample-materialized\""
+    ));
 }
 
 #[test]

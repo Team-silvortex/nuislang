@@ -84,6 +84,11 @@ The JSON surface is intentionally simple:
 * `weakest_bootstrap_next_action`
 * `weakest_bootstrap_validation_command`
 * `weakest_bootstrap_expected_artifact`
+* `weakest_bootstrap_task_card_coordinate`
+* `weakest_bootstrap_task_card_priority_reason`
+* `weakest_bootstrap_task_card_action`
+* `weakest_bootstrap_task_card_command`
+* `weakest_bootstrap_task_card_expected_artifact`
 * `coverage_status`
 * `coverage_expected_source`
 * `coverage_expected_fallback_used`
@@ -169,6 +174,10 @@ exact function cell that needs work.
 The summary also mirrors the weakest bootstrap-critical function cell as a
 small navigation bundle: status, progress, closure role, evidence, and next
 step. This is the preferred first read when choosing the next mainline task.
+The same weakest cell is also projected into a small task-card surface:
+coordinate, priority reason, action, validation command, and expected artifact.
+That gives scripts and future self-hosted tooling one stable bundle to consume
+without reassembling many `weakest_bootstrap_*` fields by hand.
 
 `nuis status` also prints the short tensor summary. That makes the model part
 of the toolchain self-orientation surface, not just a separate report command.
@@ -277,15 +286,25 @@ The milestone coverage reports:
 * `milestone_constant_drift_count`
   parity failures between the manifest-derived coordinates and the Rust
   expected-coordinate snapshot
+* `milestone_derived_cache_protocol`
+  the protocol name for the generated coordinate snapshot metadata
+* `milestone_derived_cache_status`
+  `cacheable` when the manifest-derived coordinate set has a reproducible
+  cache key; this does not imply that a cache file was written
+* `milestone_derived_cache_key`
+  a stable hash over normalized `milestone:requiredness:coordinate` records
+* `milestone_derived_cache_coordinate_count`
+  the number of coordinates covered by that generated snapshot key
 
 Short rule:
 
 `milestone coverage makes the tensor less hand-written: milestones own the map,
 Rust constants must prove they still mirror it`
 
-The next step is to surface generated cache metadata and shrink
-`DEV_TENSOR_EXPECTED_COORDINATES` down to an explicit emergency fallback rather
-than a peer source that developers are expected to edit by hand.
+The milestone-derived cache metadata is intentionally zero-write for now. It
+gives future tooling a deterministic key for generated coordinate snapshots
+without creating hidden disk usage. The Rust `DEV_TENSOR_EXPECTED_COORDINATES`
+table remains an emergency fallback mirror, not the preferred editing surface.
 
 ## Drift Checks
 

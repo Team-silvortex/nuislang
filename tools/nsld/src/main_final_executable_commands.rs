@@ -1,4 +1,13 @@
-use super::{cli::Command, context::load_link_input_context, display::*, final_stage::*, json::*};
+use super::{
+    cli::Command,
+    context::load_link_input_context,
+    display::*,
+    final_executable_output_nsdb_handoff::{
+        attach_final_output_nsdb_handoff_summary, persist_final_output_nsdb_handoff,
+    },
+    final_stage::*,
+    json::*,
+};
 
 pub(crate) fn run_final_executable_command(command: &Command) -> Result<bool, String> {
     match command {
@@ -254,7 +263,12 @@ pub(crate) fn run_final_executable_command(command: &Command) -> Result<bool, St
         }
         Command::FinalExecutableOutput { input, json } => {
             let ctx = load_link_input_context(input)?;
-            let report = nsld_final_executable_output_report(&ctx.manifest, &ctx.plan);
+            let mut report = nsld_final_executable_output_report(&ctx.manifest, &ctx.plan);
+            let summary = persist_final_output_nsdb_handoff(
+                std::path::Path::new(&ctx.plan.output_dir),
+                &report,
+            );
+            attach_final_output_nsdb_handoff_summary(&mut report, summary);
             if *json {
                 println!("{}", nsld_final_executable_output_report_json(&report));
             } else {

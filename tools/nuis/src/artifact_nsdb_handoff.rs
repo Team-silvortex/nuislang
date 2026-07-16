@@ -33,6 +33,18 @@ pub(crate) struct PersistedNsdbHandoffSummary {
 }
 
 impl PersistedNsdbHandoffSummary {
+    pub(crate) fn available(&self) -> bool {
+        self.available
+    }
+
+    pub(crate) fn ready_record_count(&self) -> usize {
+        self.ready_record_count
+    }
+
+    pub(crate) fn error(&self) -> Option<&str> {
+        self.error.as_deref()
+    }
+
     pub(crate) fn json_fields_with_prefix(&self, prefix: &str) -> Vec<String> {
         vec![
             json_bool_field(&format!("{prefix}_available"), self.available),

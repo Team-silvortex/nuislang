@@ -12,6 +12,7 @@ mod link_plan_final_output;
 mod link_plan_json;
 mod link_plan_json_nsld_output;
 mod link_plan_tail;
+mod object_identity;
 mod render;
 
 pub(crate) use command::{

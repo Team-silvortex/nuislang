@@ -101,6 +101,14 @@ mod cpu Main {
     assert!(json.contains("\"artifact_output_dir\":\""));
     assert!(json.contains("\"artifact_ready_to_run\":false"));
     assert!(json.contains("\"artifact_recommended_next_step\":\"build\""));
+    assert!(json.contains("\"closure_summary_source\":\"project-status\""));
+    assert!(json.contains("\"closure_summary_status\":\"blocked\""));
+    assert!(json.contains("\"closure_summary_ready\":false"));
+    assert!(json.contains("\"closure_summary_primary_blocker\":\"galaxy_lock_deps\""));
+    assert!(json.contains("\"closure_summary_next_action\":\"galaxy_lock_deps\""));
+    assert!(json.contains(
+        "\"closure_summary_next_command\":\"nuis galaxy lock-deps <project-dir|nuis.toml>\""
+    ));
     assert!(json.contains("\"artifact_nsld_drive_dry_run_command\":\"nsld drive "));
     assert!(json.contains("\"artifact_nsld_drive_dry_run_json_command\":\"nsld drive "));
     assert!(json.contains(" --json\""));
@@ -258,6 +266,11 @@ mod cpu Main {
     assert!(json.contains("\"lowering_checks_ok\":true"));
     assert!(json.contains("\"artifact_output_dir\":\""));
     assert!(json.contains("\"artifact_ready_to_run\":false"));
+    assert!(json.contains("\"closure_summary_source\":\"project-doctor\""));
+    assert!(json.contains("\"closure_summary_status\":\"blocked\""));
+    assert!(json.contains("\"closure_summary_ready\":false"));
+    assert!(json.contains("\"closure_summary_primary_blocker\":\"declared-tests-missing\""));
+    assert!(json.contains("\"closure_summary_next_action\":\"project_tests_missing\""));
     assert!(json.contains("\"artifact_nsld_drive_dry_run_command\":\"nsld drive "));
     assert!(json.contains("\"artifact_nsld_drive_dry_run_json_command\":\"nsld drive "));
     assert!(json.contains(" --json\""));

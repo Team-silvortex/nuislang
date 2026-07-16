@@ -254,3 +254,94 @@ fn monomorphizes_zero_arg_generic_from_match_arm_alias_payload_constructor_call_
             )
     ));
 }
+
+#[test]
+fn reports_unconstrained_result_constructor_missing_generic_evidence() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Error {
+            Invalid,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn main() -> i64 {
+            let result = Result.Ok(7);
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("ambiguous Result constructor `Result.Ok(...)`"),
+        "expected ambiguous Result constructor diagnostic, got {error}"
+    );
+    assert!(
+        error.contains("could not infer `E`"),
+        "expected missing error-type evidence diagnostic, got {error}"
+    );
+    assert!(
+        error.contains("expected type `Result<T, E>`"),
+        "expected guidance to add an expected Result type, got {error}"
+    );
+}
+
+#[test]
+fn keeps_result_constructor_inference_when_let_binding_provides_expected_type() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Error {
+            Invalid,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn main() -> i64 {
+            let result: Result<i64, Error> = Result.Ok(7);
+            match result {
+              Result.Ok(value) => {
+                return value;
+              }
+              Result.Err(_) => {
+                return 0;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.first(),
+        Some(NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::StructLiteral {
+                type_name,
+                type_args,
+                fields,
+            },
+        }) if name == "result"
+            && ty.render() == "Result<i64, Error>"
+            && type_name == "Result.Ok"
+            && type_args.iter().map(|ty| ty.render()).collect::<Vec<_>>()
+                == ["i64".to_owned(), "Error".to_owned()]
+            && matches!(fields.as_slice(), [(field, NirExpr::Int(7))] if field == "value")
+    ));
+}

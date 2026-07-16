@@ -203,6 +203,28 @@ pub(crate) fn check_report_final_fields(report: &NsldCheckReport) -> Vec<String>
             &report.final_executable_output_recommended_next_action,
         ),
         json_bool_field(
+            "final_executable_output_device_provider_sample_manifest_available",
+            report.final_executable_output_device_provider_sample_manifest_available,
+        ),
+        json_string_field(
+            "final_executable_output_device_provider_sample_manifest_status",
+            &report.final_executable_output_device_provider_sample_manifest_status,
+        ),
+        json_usize_field(
+            "final_executable_output_device_provider_sample_manifest_ready_record_count",
+            report.final_executable_output_device_provider_sample_manifest_ready_record_count,
+        ),
+        json_usize_field(
+            "final_executable_output_device_provider_sample_manifest_pending_record_count",
+            report.final_executable_output_device_provider_sample_manifest_pending_record_count,
+        ),
+        json_optional_string_field(
+            "final_executable_output_device_provider_sample_manifest_first_blocker",
+            report
+                .final_executable_output_device_provider_sample_manifest_first_blocker
+                .as_deref(),
+        ),
+        json_bool_field(
             "final_executable_output_nsld_owned",
             report.final_executable_output_nsld_owned,
         ),
@@ -283,6 +305,18 @@ pub(crate) fn check_report_final_fields(report: &NsldCheckReport) -> Vec<String>
         json_string_field(
             "final_executable_output_object_path",
             &report.final_executable_output_object_path,
+        ),
+        json_string_field(
+            "final_executable_output_object_family",
+            &report.final_executable_output_object_family,
+        ),
+        json_string_field(
+            "final_executable_output_object_magic_status",
+            &report.final_executable_output_object_magic_status,
+        ),
+        json_optional_string_field(
+            "final_executable_output_object_magic",
+            report.final_executable_output_object_magic.as_deref(),
         ),
         json_optional_usize_field(
             "final_executable_output_object_expected_size_bytes",

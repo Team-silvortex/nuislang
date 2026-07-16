@@ -62,6 +62,7 @@ mod final_executable_layout_stage;
 mod final_executable_output;
 mod final_executable_output_backend;
 mod final_executable_output_handoff;
+mod final_executable_output_nsdb_handoff;
 mod final_executable_output_summary;
 mod final_executable_paths;
 mod final_executable_pipeline;
@@ -148,7 +149,11 @@ mod main_final_executable_image_tests;
 #[cfg(test)]
 mod main_final_executable_launcher_check_tests;
 #[cfg(test)]
+mod main_final_executable_launcher_output_tests;
+#[cfg(test)]
 mod main_final_executable_layout_tests;
+#[cfg(test)]
+mod main_final_executable_output_nsdb_handoff_tests;
 #[cfg(test)]
 mod main_final_executable_output_tests;
 #[cfg(test)]
@@ -174,6 +179,7 @@ mod object_byte_layout;
 mod object_emit;
 mod object_emit_render;
 mod object_file_layout;
+mod object_identity;
 mod object_image_backend;
 mod object_image_dry_run;
 mod object_image_dry_run_paths;

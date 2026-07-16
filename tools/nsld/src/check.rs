@@ -433,6 +433,17 @@ pub(crate) fn nsld_check_report(
             .final_executable_output_execution_handoff_decision_code,
         final_executable_output_recommended_next_action: final_snapshot
             .final_executable_output_recommended_next_action,
+        final_executable_output_device_provider_sample_manifest_available: final_snapshot
+            .final_executable_output_device_provider_sample_manifest_available,
+        final_executable_output_device_provider_sample_manifest_status: final_snapshot
+            .final_executable_output_device_provider_sample_manifest_status,
+        final_executable_output_device_provider_sample_manifest_ready_record_count: final_snapshot
+            .final_executable_output_device_provider_sample_manifest_ready_record_count,
+        final_executable_output_device_provider_sample_manifest_pending_record_count:
+            final_snapshot
+                .final_executable_output_device_provider_sample_manifest_pending_record_count,
+        final_executable_output_device_provider_sample_manifest_first_blocker: final_snapshot
+            .final_executable_output_device_provider_sample_manifest_first_blocker,
         final_executable_output_nsld_owned: final_snapshot.final_executable_output_nsld_owned,
         final_executable_output_present: final_snapshot.final_executable_output_present,
         final_executable_output_size_bytes: final_snapshot.final_executable_output_size_bytes,
@@ -461,6 +472,10 @@ pub(crate) fn nsld_check_report(
             .final_executable_output_runnable_candidate,
         final_executable_output_object_valid: final_snapshot.final_executable_output_object_valid,
         final_executable_output_object_path: final_snapshot.final_executable_output_object_path,
+        final_executable_output_object_family: final_snapshot.final_executable_output_object_family,
+        final_executable_output_object_magic_status: final_snapshot
+            .final_executable_output_object_magic_status,
+        final_executable_output_object_magic: final_snapshot.final_executable_output_object_magic,
         final_executable_output_object_expected_size_bytes: final_snapshot
             .final_executable_output_object_expected_size_bytes,
         final_executable_output_object_actual_size_bytes: final_snapshot

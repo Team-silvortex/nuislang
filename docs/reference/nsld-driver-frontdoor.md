@@ -96,6 +96,31 @@ JSON output reports `mutates_artifacts` for all drive modes:
 * `--apply` reports whether one step was actually applied
 * `--apply --until-clean` reports whether at least one step was applied
 
+JSON output also reports `mutation_policy`, which is the automation-readable
+reason behind that boolean decision. Current values include
+`read-only-artifact-observe`, `read-only-boundary-observe`,
+`whitelisted-artifact-mutation`, `whitelisted-boundary-materialization`,
+`blocked-read-only-boundary`, and `blocked-unlisted-mutation`. This keeps
+normal artifact-chain mutation, final-output boundary observation, and explicit
+boundary helpers separate without asking automation to infer policy from free
+text messages.
+
+`--apply` and `--apply --until-clean` JSON also expose a small safe-next
+handoff:
+
+* `safe_next_action`
+  the next safe automation posture after the drive result
+* `safe_next_command`
+  a command to run only when the caller deliberately accepts the boundary
+  described by `safe_next_reason`; this is usually the explicit host-finalizer
+  crossing command when drive stops at a final-output boundary
+* `safe_next_reason`
+  a short explanation for why the command is safe to show but not safe for
+  drive to run implicitly
+
+This keeps `nsld drive` deterministic: it may report an explicit crossing
+command, but it still does not silently cross the host finalizer boundary.
+
 ## Command Set
 
 `nuis` workflow and artifact surfaces expose the same commands as a structured
@@ -139,6 +164,9 @@ The JSON shape for `nsld drive --apply --until-clean --json` is:
   "stop_source": null,
   "stop_command_resolved": null,
   "stop_action_reason": null,
+  "safe_next_action": "clean",
+  "safe_next_command": null,
+  "safe_next_reason": "drive reached a clean artifact chain",
   "last_command_id": "emit-native-object",
   "messages": ["applied emit-native-object", "no-next-action"]
 }

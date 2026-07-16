@@ -61,9 +61,16 @@ It reports:
 * `payload_execution_event_filter_phase`
 * `payload_execution_event_filter_trace_id`
 * `payload_execution_event_count`
+* `payload_execution_event_query_contract =
+  nsdb-payload-execution-event-query-v1` for `events`
+* `payload_execution_event_source = payload-execution-handoff-events`
+* `payload_execution_event_query_result_count`
 * `payload_execution_events`
 * `replay_protocol = nsdb-payload-execution-replay-plan-v1` for
   `replay-plan`
+* `replay_event_query_contract = nsdb-payload-execution-event-query-v1`
+* `replay_checkpoint_source = payload-execution-handoff-events`
+* `replay_event_query_result_count`
 * `replay_checkpoint_count`
 * `replayable_checkpoint_count`
 * `replay_checkpoints`
@@ -103,9 +110,10 @@ payload execution event with trace id, status, execution phase, target, entry
 symbol, entry kind, entry section id, first blocker, and next action.
 `inspect` and the event-focused `events` command can filter those events with
 `--event-status`, `--event-phase`, and `--trace-id`; filters are ANDed when
-multiple flags are present. This is still an inspect-time event view rather
-than full replay, but it proves that `run-artifact` metadata can cross into the
-debugger frontdoor without asking `nsdb` to rerun the host probe.
+multiple flags are present. `events` reports
+`nsdb-payload-execution-event-query-v1`, the handoff source protocol, the
+debugger contract, and the filtered result count so scripts can treat the event
+view as a stable query surface rather than an inspect-only printout.
 
 `replay-plan` maps the filtered payload execution events into read-only
 checkpoints. `container-loader-handoff` becomes a loader checkpoint,
@@ -113,6 +121,9 @@ checkpoints. `container-loader-handoff` becomes a loader checkpoint,
 carry their first blocker into the plan. Each checkpoint also exposes a stable
 `frame_id`, `slot_scope`, and `value_state_status` so nsdb can attach future
 YIR frame/value samples without changing the checkpoint identity. The
+top-level `replay_checkpoint_source` explicitly states that checkpoints are
+derived from `payload-execution-handoff-events`, keeping replay deterministic
+and auditable for nsld/nsdb integration.
 `value_sample_*` fields are references into later payload-execution or
 heterogeneous runtime trace records, not inline values. This keeps replay-plan
 as a deterministic debug plan while leaving actual value materialization to the

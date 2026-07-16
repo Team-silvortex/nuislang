@@ -62,6 +62,13 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
     let artifact_output_dir = crate::default_build_output_dir(input);
     let artifact_report = crate::probe_artifact_doctor(&artifact_output_dir);
     let link_plan = load_link_plan(&artifact_output_dir);
+    let closure_summary = crate::closure_summary::FrontdoorClosureSummary::from_project_surface(
+        "project-doctor",
+        artifact_report.ready_to_run,
+        missing_tests.len(),
+        &frontdoor.recommended_next_step,
+        &frontdoor.recommended_command,
+    );
     let mut next_steps = Vec::new();
     if !galaxy_manifest_exists {
         next_steps.push(
@@ -263,6 +270,7 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
             ),
         ],
     );
+    append_json_field_strings(&mut out, closure_summary.json_fields());
     crate::json_surface::append_public_surface_summary_json_fields(&mut out, &public_surface);
     crate::json_surface::append_project_plan_json_fields(&mut out, &plan);
     append_json_field_strings(

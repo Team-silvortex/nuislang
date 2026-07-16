@@ -142,6 +142,11 @@ artifact-follow-up state:
 * `nsld_final_executable_output_payload_execution_trace_available`
 * `nsld_final_executable_output_payload_execution_trace_record_count`
 * `nsld_final_executable_output_payload_execution_trace_ready_record_count`
+* `nsld_final_executable_output_nsdb_replay_contract`
+* `nsld_final_executable_output_nsdb_replay_ready`
+* `nsld_final_executable_output_nsdb_replay_status`
+* `nsld_final_executable_output_nsdb_replay_command`
+* `nsld_final_executable_output_nsdb_replay_first_blocker`
 * `nsld_final_executable_pipeline_execution_handoff_contract`
 * `nsld_final_executable_pipeline_execution_handoff_ready`
 * `nsld_final_executable_pipeline_execution_handoff_status`
@@ -251,6 +256,9 @@ Short reading rule:
 * `nsld_final_executable_output_execution_handoff_ready` is the script-friendly
   boolean mirror for whether the verified output boundary can hand off to the
   next execution owner
+* `nsld_final_executable_output_nsdb_replay_ready` says whether the persisted
+  final-output nsdb handoff can already be consumed by `nsdb replay-plan`; the
+  matching command field is the next debugger/query hop, not a runtime launch
 * `nsld_final_executable_output_execution_handoff_status` distinguishes whether
   the output can hand off directly to a runner, still needs entrypoint
   materialization, or is blocked

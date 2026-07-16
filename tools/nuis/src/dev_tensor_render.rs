@@ -102,6 +102,26 @@ pub(crate) fn render_dev_tensor_json_impl() -> String {
                 "weakest_bootstrap_expected_artifact",
                 summary.weakest_bootstrap_expected_artifact,
             ),
+            json_field(
+                "weakest_bootstrap_task_card_coordinate",
+                &summary.weakest_bootstrap_task_card_coordinate,
+            ),
+            json_field(
+                "weakest_bootstrap_task_card_priority_reason",
+                &summary.weakest_bootstrap_task_card_priority_reason,
+            ),
+            json_field(
+                "weakest_bootstrap_task_card_action",
+                summary.weakest_bootstrap_task_card_action,
+            ),
+            json_field(
+                "weakest_bootstrap_task_card_command",
+                summary.weakest_bootstrap_task_card_command,
+            ),
+            json_field(
+                "weakest_bootstrap_task_card_expected_artifact",
+                summary.weakest_bootstrap_task_card_expected_artifact,
+            ),
             json_field("coverage_status", coverage.status),
             json_field("coverage_expected_source", coverage.expected_source),
             json_bool_field(
@@ -178,6 +198,22 @@ pub(crate) fn render_dev_tensor_json_impl() -> String {
             json_field("milestone_coverage_status", coverage.milestone.status),
             json_field("milestone_coverage_source", coverage.milestone.source),
             json_field("milestone_schema", &coverage.milestone.schema),
+            json_field(
+                "milestone_derived_cache_protocol",
+                coverage.milestone.derived_cache_protocol,
+            ),
+            json_field(
+                "milestone_derived_cache_status",
+                coverage.milestone.derived_cache_status,
+            ),
+            json_field(
+                "milestone_derived_cache_key",
+                &coverage.milestone.derived_cache_key,
+            ),
+            json_usize_field(
+                "milestone_derived_cache_coordinate_count",
+                coverage.milestone.derived_cache_coordinate_count,
+            ),
             json_usize_field("milestone_count", coverage.milestone.milestone_count),
             json_usize_field(
                 "milestone_coordinate_count",
@@ -322,6 +358,26 @@ pub(crate) fn render_dev_tensor_text_impl() -> Vec<String> {
             "  weakest_bootstrap_expected_artifact: {}",
             summary.weakest_bootstrap_expected_artifact
         ),
+        format!(
+            "  weakest_bootstrap_task_card_coordinate: {}",
+            summary.weakest_bootstrap_task_card_coordinate
+        ),
+        format!(
+            "  weakest_bootstrap_task_card_priority_reason: {}",
+            summary.weakest_bootstrap_task_card_priority_reason
+        ),
+        format!(
+            "  weakest_bootstrap_task_card_action: {}",
+            summary.weakest_bootstrap_task_card_action
+        ),
+        format!(
+            "  weakest_bootstrap_task_card_command: {}",
+            summary.weakest_bootstrap_task_card_command
+        ),
+        format!(
+            "  weakest_bootstrap_task_card_expected_artifact: {}",
+            summary.weakest_bootstrap_task_card_expected_artifact
+        ),
         format!("  coverage_status: {}", coverage.status),
         format!("  coverage_expected_source: {}", coverage.expected_source),
         format!(
@@ -377,6 +433,22 @@ pub(crate) fn render_dev_tensor_text_impl() -> Vec<String> {
         format!("  milestone_coverage_status: {}", coverage.milestone.status),
         format!("  milestone_coverage_source: {}", coverage.milestone.source),
         format!("  milestone_schema: {}", coverage.milestone.schema),
+        format!(
+            "  milestone_derived_cache_protocol: {}",
+            coverage.milestone.derived_cache_protocol
+        ),
+        format!(
+            "  milestone_derived_cache_status: {}",
+            coverage.milestone.derived_cache_status
+        ),
+        format!(
+            "  milestone_derived_cache_key: {}",
+            coverage.milestone.derived_cache_key
+        ),
+        format!(
+            "  milestone_derived_cache_coordinate_count: {}",
+            coverage.milestone.derived_cache_coordinate_count
+        ),
         format!("  milestone_count: {}", coverage.milestone.milestone_count),
         format!(
             "  milestone_coordinate_count: {}",

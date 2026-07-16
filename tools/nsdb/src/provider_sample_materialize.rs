@@ -7,22 +7,24 @@ use crate::{
 };
 use std::{collections::BTreeSet, fs, path::Path};
 
-pub(crate) struct ProviderSampleMaterializeReport {
-    pub(crate) path: String,
-    pub(crate) provider_family_filter: Option<String>,
-    pub(crate) provider_families: Vec<String>,
-    pub(crate) status: String,
-    pub(crate) record_count: usize,
-    pub(crate) matched_record_count: usize,
-    pub(crate) materialized_record_count: usize,
-    pub(crate) skipped_record_count: usize,
-    pub(crate) first_provider_family: String,
-    pub(crate) first_output_evidence: String,
-    pub(crate) next_action: String,
-    pub(crate) next_command: String,
+pub struct ProviderSampleMaterializeReport {
+    pub path: String,
+    pub provider_family_filter: Option<String>,
+    pub provider_families: Vec<String>,
+    pub status: String,
+    pub record_count: usize,
+    pub matched_record_count: usize,
+    pub materialized_record_count: usize,
+    pub skipped_record_count: usize,
+    pub first_provider_family: String,
+    pub first_output_evidence: String,
+    pub next_action: String,
+    pub next_command: String,
+    pub return_action: String,
+    pub return_command: String,
 }
 
-pub(crate) fn materialize_provider_samples(
+pub fn materialize_provider_samples(
     output_dir: &Path,
     provider_family_filter: Option<&str>,
 ) -> Result<ProviderSampleMaterializeReport, String> {
@@ -64,6 +66,8 @@ pub(crate) fn materialize_provider_samples(
             path.display()
         )
     })?;
+    let return_action = nsld_return_action(output_dir);
+    let return_command = nsld_return_command(output_dir);
     Ok(ProviderSampleMaterializeReport {
         path: path.display().to_string(),
         provider_family_filter: provider_family_filter.map(str::to_owned),
@@ -83,7 +87,25 @@ pub(crate) fn materialize_provider_samples(
             .unwrap_or_else(|| "none".to_owned()),
         next_action: "replay-provider-sample".to_owned(),
         next_command: format!("nsdb replay-plan {} --json", output_dir.display()),
+        return_action,
+        return_command,
     })
+}
+
+fn nsld_return_action(output_dir: &Path) -> String {
+    if output_dir.join("nuis.build.manifest.toml").is_file() {
+        "resume-nsld-final-output-check".to_owned()
+    } else {
+        "resume-nsld-final-output-check-manifest-required".to_owned()
+    }
+}
+
+fn nsld_return_command(output_dir: &Path) -> String {
+    if output_dir.join("nuis.build.manifest.toml").is_file() {
+        format!("nsld check {} --json", output_dir.display())
+    } else {
+        "nsld check <nuis.build.manifest.toml> --json".to_owned()
+    }
 }
 
 fn provider_families(records: &[NsdbDeviceProviderSampleRecordInfo]) -> Vec<String> {
@@ -259,12 +281,71 @@ next_action = "execute-provider-sample"
         assert_eq!(report.next_action, "replay-provider-sample");
         assert!(report.next_command.contains("nsdb replay-plan "));
         assert!(report.next_command.contains("--json"));
+        assert_eq!(
+            report.return_action,
+            "resume-nsld-final-output-check-manifest-required"
+        );
+        assert_eq!(
+            report.return_command,
+            "nsld check <nuis.build.manifest.toml> --json"
+        );
         assert!(source.contains("source = \"nsdb-materialize-provider-samples\""));
         assert!(source.contains("ready_record_count = 1"));
         assert!(source.contains("pending_record_count = 0"));
         assert!(source.contains("output_evidence = \"metallib:pixelmagic.metallib\""));
         assert!(source.contains("materialization_status = \"provider-sample-materialized\""));
         assert!(source.contains("next_action = \"replay-device-sample\""));
+
+        fs::remove_dir_all(output_dir).unwrap();
+    }
+
+    #[test]
+    fn materializer_returns_concrete_nsld_check_when_manifest_is_in_output_dir() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let output_dir = env::temp_dir().join(format!("nsdb-provider-return-{nonce}"));
+        fs::create_dir_all(&output_dir).unwrap();
+        fs::write(
+            output_dir.join("nuis.build.manifest.toml"),
+            "manifest = true\n",
+        )
+        .unwrap();
+        fs::write(
+            output_dir.join("nuis.nsdb.device-provider-samples.toml"),
+            r#"
+protocol = "nuis-device-provider-samples-v1"
+schema = "nsdb-yir-device-provider-sample-v1"
+source = "run-artifact-provider-sample-manifest"
+status = "awaiting-provider-materialization"
+record_count = 1
+ready_record_count = 0
+pending_record_count = 1
+
+[[device_provider_samples]]
+trace_id = "hetero-trace:shader:metal:apple-silicon-gpu"
+provider = "nustar-deferred-device-sample-v1"
+provider_family = "metal:apple-silicon-gpu"
+handoff_target = "metal:apple-silicon-gpu"
+sample_status = "pending-provider-execution"
+validation_status = "pending-provider-execution"
+input_evidence = "metallib:pixelmagic.metallib"
+output_evidence = "not-materialized"
+materialization_status = "provider-sample-pending"
+materialization_detail = "awaiting-provider-runtime"
+next_action = "execute-provider-sample"
+"#,
+        )
+        .unwrap();
+
+        let report = materialize_provider_samples(&output_dir, None).unwrap();
+
+        assert_eq!(report.return_action, "resume-nsld-final-output-check");
+        assert_eq!(
+            report.return_command,
+            format!("nsld check {} --json", output_dir.display())
+        );
 
         fs::remove_dir_all(output_dir).unwrap();
     }

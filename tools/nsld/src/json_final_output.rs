@@ -123,6 +123,54 @@ pub(crate) fn nsld_final_executable_output_report_json(
             "first_payload_execution_first_blocker",
             report.first_payload_execution_first_blocker.as_deref(),
         ),
+        json_string_field(
+            "final_output_nsdb_handoff_protocol",
+            &report.final_output_nsdb_handoff_protocol,
+        ),
+        json_bool_field(
+            "final_output_nsdb_handoff_persisted",
+            report.final_output_nsdb_handoff_persisted,
+        ),
+        json_string_field(
+            "final_output_nsdb_handoff_path",
+            &report.final_output_nsdb_handoff_path,
+        ),
+        json_usize_field(
+            "final_output_nsdb_handoff_record_count",
+            report.final_output_nsdb_handoff_record_count,
+        ),
+        json_usize_field(
+            "final_output_nsdb_handoff_ready_record_count",
+            report.final_output_nsdb_handoff_ready_record_count,
+        ),
+        json_optional_string_field(
+            "final_output_nsdb_handoff_first_trace_id",
+            report.final_output_nsdb_handoff_first_trace_id.as_deref(),
+        ),
+        json_optional_string_field(
+            "final_output_nsdb_handoff_error",
+            report.final_output_nsdb_handoff_error.as_deref(),
+        ),
+        json_string_field(
+            "final_output_nsdb_replay_contract",
+            &report.final_output_nsdb_replay_contract,
+        ),
+        json_bool_field(
+            "final_output_nsdb_replay_ready",
+            report.final_output_nsdb_replay_ready,
+        ),
+        json_string_field(
+            "final_output_nsdb_replay_status",
+            &report.final_output_nsdb_replay_status,
+        ),
+        json_optional_string_field(
+            "final_output_nsdb_replay_command",
+            report.final_output_nsdb_replay_command.as_deref(),
+        ),
+        json_optional_string_field(
+            "final_output_nsdb_replay_first_blocker",
+            report.final_output_nsdb_replay_first_blocker.as_deref(),
+        ),
         json_bool_field(
             "device_provider_sample_manifest_available",
             report.device_provider_sample_manifest_available,
@@ -267,6 +315,12 @@ pub(crate) fn nsld_final_executable_output_report_json(
         ),
         json_bool_field("object_output_valid", report.object_output_valid),
         json_string_field("object_output_path", &report.object_output_path),
+        json_string_field("object_output_family", &report.object_output_family),
+        json_string_field(
+            "object_output_magic_status",
+            &report.object_output_magic_status,
+        ),
+        json_optional_string_field("object_output_magic", report.object_output_magic.as_deref()),
         json_optional_usize_field(
             "object_output_expected_size_bytes",
             report.object_output_expected_size_bytes,

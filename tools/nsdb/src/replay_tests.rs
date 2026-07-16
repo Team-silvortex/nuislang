@@ -560,6 +560,21 @@ next_action = "execute-provider-sample"
     ));
     assert!(inspect_json.contains("\"device_provider_sample_manifest_records\":[{"));
 
+    let events_json = crate::json::nsdb_events_report_json(&report);
+    assert!(events_json.contains(
+        "\"payload_execution_event_query_contract\":\"nsdb-payload-execution-event-query-v1\""
+    ));
+    assert!(events_json
+        .contains("\"payload_execution_event_source\":\"payload-execution-handoff-events\""));
+    assert!(events_json.contains(
+        "\"payload_execution_event_source_protocol\":\"nuis-nsdb-payload-execution-handoff-v1\""
+    ));
+    assert!(events_json.contains(
+        "\"payload_execution_event_source_debugger_contract\":\"nsdb-yir-payload-execution-trace-v1\""
+    ));
+    assert!(events_json.contains("\"payload_execution_event_query_result_count\":2"));
+    assert!(events_json.contains("\"payload_execution_events\":[{"));
+
     let plan = build_replay_plan(&report);
 
     assert_eq!(plan.protocol, "nsdb-payload-execution-replay-plan-v1");
@@ -654,6 +669,20 @@ next_action = "execute-provider-sample"
         plan.first_blocker.as_deref(),
         Some("device-execution-sample-missing")
     );
+
+    let replay_json = crate::json::nsdb_replay_plan_json(&report);
+    assert!(replay_json
+        .contains("\"replay_event_query_contract\":\"nsdb-payload-execution-event-query-v1\""));
+    assert!(
+        replay_json.contains("\"replay_checkpoint_source\":\"payload-execution-handoff-events\"")
+    );
+    assert!(replay_json
+        .contains("\"replay_event_source_protocol\":\"nuis-nsdb-payload-execution-handoff-v1\""));
+    assert!(replay_json.contains(
+        "\"replay_event_source_debugger_contract\":\"nsdb-yir-payload-execution-trace-v1\""
+    ));
+    assert!(replay_json.contains("\"replay_event_query_result_count\":2"));
+    assert!(replay_json.contains("\"replay_checkpoint_count\":2"));
 
     let materialize_report =
         crate::provider_sample_materialize::materialize_provider_samples(&output_dir, None)

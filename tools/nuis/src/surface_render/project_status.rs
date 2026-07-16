@@ -50,6 +50,13 @@ pub(crate) fn write_project_status_text_summary<W: fmt::Write>(
     let artifact_output_dir = crate::default_build_output_dir(input);
     let artifact_report = crate::probe_artifact_doctor(&artifact_output_dir);
     let link_plan = load_link_plan(&artifact_output_dir);
+    let closure_summary = crate::closure_summary::FrontdoorClosureSummary::from_project_surface(
+        "project-status",
+        artifact_report.ready_to_run,
+        missing_tests.len(),
+        &frontdoor.recommended_next_step,
+        &frontdoor.recommended_command,
+    );
     writeln!(out, "project status: {}", project.manifest.name).map_err(|e| e.to_string())?;
     writeln!(out, "  root: {}", project.root.display()).map_err(|e| e.to_string())?;
     writeln!(out, "  manifest: {}", project.manifest_path.display()).map_err(|e| e.to_string())?;
@@ -108,6 +115,23 @@ pub(crate) fn write_project_status_text_summary<W: fmt::Write>(
         out,
         "  recommended_reason: {}",
         frontdoor.recommended_reason
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(out, "  closure_summary_status: {}", closure_summary.status)
+        .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  closure_summary_primary_blocker: {}",
+        closure_summary
+            .primary_blocker
+            .as_deref()
+            .unwrap_or("<none>")
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  closure_summary_next_action: {}",
+        closure_summary.next_action
     )
     .map_err(|e| e.to_string())?;
     writeln!(
@@ -457,6 +481,13 @@ pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String>
     let artifact_output_dir = crate::default_build_output_dir(input);
     let artifact_report = crate::probe_artifact_doctor(&artifact_output_dir);
     let link_plan = load_link_plan(&artifact_output_dir);
+    let closure_summary = crate::closure_summary::FrontdoorClosureSummary::from_project_surface(
+        "project-status",
+        artifact_report.ready_to_run,
+        missing_tests.len(),
+        &frontdoor.recommended_next_step,
+        &frontdoor.recommended_command,
+    );
     let test_json = declared_tests
         .iter()
         .map(|path| {
@@ -515,6 +546,7 @@ pub(crate) fn render_project_status_json(input: &Path) -> Result<String, String>
             ),
         ],
     );
+    append_json_field_strings(&mut out, closure_summary.json_fields());
     crate::json_surface::append_public_surface_summary_json_fields(&mut out, &public_surface);
     crate::json_surface::append_project_plan_json_fields(&mut out, &plan);
     append_json_field_strings(

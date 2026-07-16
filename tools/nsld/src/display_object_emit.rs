@@ -93,6 +93,12 @@ pub(crate) fn print_nsld_object_output_verify_report(report: &NsldObjectOutputVe
     println!("  object_output_path: {}", report.object_output_path);
     println!("  image_dry_run_path: {}", report.image_dry_run_path);
     println!("  valid: {}", report.valid);
+    println!("  object_family: {}", report.object_family);
+    println!("  object_magic_status: {}", report.object_magic_status);
+    println!(
+        "  object_magic: {}",
+        report.object_magic.as_deref().unwrap_or("missing")
+    );
     println!(
         "  expected_size_bytes: {}",
         optional_usize_text(report.expected_size_bytes)

@@ -47,6 +47,16 @@ pub(crate) fn print_nsdb_inspect_report(report: &NsdbInspectReport) {
             .as_deref()
             .unwrap_or("<none>")
     );
+    println!("  payload_execution_event_query_contract: nsdb-payload-execution-event-query-v1");
+    println!("  payload_execution_event_source: payload-execution-handoff-events");
+    println!(
+        "  payload_execution_event_source_protocol: {}",
+        report.payload_execution_handoff.protocol
+    );
+    println!(
+        "  payload_execution_event_source_debugger_contract: {}",
+        report.payload_execution_handoff.debugger_contract
+    );
     println!(
         "  payload_execution_handoff_available: {}",
         report.payload_execution_handoff.available
@@ -337,6 +347,16 @@ pub(crate) fn print_nsdb_replay_plan(report: &NsdbInspectReport) {
     println!("Nsdb payload execution replay plan");
     println!("  manifest: {}", report.manifest);
     println!("  replay_protocol: {}", plan.protocol);
+    println!("  replay_event_query_contract: nsdb-payload-execution-event-query-v1");
+    println!("  replay_checkpoint_source: payload-execution-handoff-events");
+    println!(
+        "  replay_event_source_protocol: {}",
+        report.payload_execution_handoff.protocol
+    );
+    println!(
+        "  replay_event_source_debugger_contract: {}",
+        report.payload_execution_handoff.debugger_contract
+    );
     println!("  replay_status: {}", plan.status);
     println!("  replay_checkpoint_count: {}", plan.checkpoint_count);
     println!(

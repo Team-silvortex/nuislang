@@ -4,6 +4,7 @@ use super::{
         NsldArtifactStageKind,
     },
     fnv1a64_hex,
+    object_identity::nsld_object_identity,
     reports::NsldObjectOutputVerifyReport,
 };
 use std::{fs, path::Path};
@@ -24,6 +25,10 @@ pub(crate) fn nsld_verify_object_output_report(
     let actual_size_bytes = object_bytes.as_ref().ok().map(Vec::len);
     let expected_hash = image_bytes.as_ref().ok().map(|bytes| fnv1a64_hex(bytes));
     let actual_hash = object_bytes.as_ref().ok().map(|bytes| fnv1a64_hex(bytes));
+    let object_identity = nsld_object_identity(
+        &plan.cpu_target.object_format,
+        object_bytes.as_ref().ok().map(Vec::as_slice),
+    );
     let mut issues = Vec::new();
     if let Err(error) = &object_bytes {
         issues.push(format!(
@@ -51,12 +56,22 @@ pub(crate) fn nsld_verify_object_output_report(
             ));
         }
     }
+    if object_identity.magic_status == "invalid" {
+        issues.push(format!(
+            "object_output_magic invalid for {}: found {}",
+            object_identity.family,
+            object_identity.magic.as_deref().unwrap_or("missing")
+        ));
+    }
 
     NsldObjectOutputVerifyReport {
         manifest: manifest.display().to_string(),
         object_output_path: object_output_path.display().to_string(),
         image_dry_run_path: image_dry_run_path.display().to_string(),
         valid: issues.is_empty(),
+        object_family: object_identity.family,
+        object_magic_status: object_identity.magic_status,
+        object_magic: object_identity.magic,
         expected_size_bytes,
         actual_size_bytes,
         expected_hash,
@@ -99,6 +114,9 @@ mod tests {
             .ends_with("nuis.nsld.object-image-dry-run.bin"));
         assert_eq!(report.expected_size_bytes, report.actual_size_bytes);
         assert_eq!(report.expected_hash, report.actual_hash);
+        assert_eq!(report.object_family, "mach-o");
+        assert_eq!(report.object_magic_status, "valid");
+        assert_eq!(report.object_magic.as_deref(), Some("0xcffaedfe"));
         assert!(report.issues.is_empty());
     }
 
@@ -126,5 +144,57 @@ mod tests {
             .issues
             .iter()
             .any(|issue| issue.contains("object_output_hash mismatch")));
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.contains("object_output_magic invalid for mach-o")));
+    }
+
+    #[test]
+    fn verify_object_output_accepts_minimal_elf_identity() {
+        let dir = std::env::temp_dir().join(format!(
+            "nsld-object-output-verify-elf-{}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let mut plan = empty_link_plan();
+        plan.output_dir = dir.display().to_string();
+        plan.cpu_target.object_format = "elf".to_owned();
+        let bytes = b"\x7fELFminimal-nsld-object";
+        fs::write(dir.join("nuis.nsld.object-image-dry-run.bin"), bytes).unwrap();
+        fs::write(dir.join("nuis.nsld.elf"), bytes).unwrap();
+
+        let report = nsld_verify_object_output_report(Path::new("manifest.toml"), &plan);
+        fs::remove_dir_all(dir).unwrap();
+
+        assert!(report.valid, "{:?}", report.issues);
+        assert!(report.object_output_path.ends_with("nuis.nsld.elf"));
+        assert_eq!(report.object_family, "elf");
+        assert_eq!(report.object_magic_status, "valid");
+        assert_eq!(report.object_magic.as_deref(), Some("0x7f454c46"));
+    }
+
+    #[test]
+    fn verify_object_output_accepts_minimal_coff_identity() {
+        let dir = std::env::temp_dir().join(format!(
+            "nsld-object-output-verify-coff-{}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let mut plan = empty_link_plan();
+        plan.output_dir = dir.display().to_string();
+        plan.cpu_target.object_format = "pe/coff".to_owned();
+        let bytes = b"\x64\x86minimal-nsld-object";
+        fs::write(dir.join("nuis.nsld.object-image-dry-run.bin"), bytes).unwrap();
+        fs::write(dir.join("nuis.nsld.pe-coff"), bytes).unwrap();
+
+        let report = nsld_verify_object_output_report(Path::new("manifest.toml"), &plan);
+        fs::remove_dir_all(dir).unwrap();
+
+        assert!(report.valid, "{:?}", report.issues);
+        assert!(report.object_output_path.ends_with("nuis.nsld.pe-coff"));
+        assert_eq!(report.object_family, "coff");
+        assert_eq!(report.object_magic_status, "valid");
+        assert_eq!(report.object_magic.as_deref(), Some("0x6486"));
     }
 }

@@ -9,12 +9,17 @@ use std::{
 };
 
 const MILESTONE_MANIFEST_SOURCE: &str = "docs/reference/nuis-development-tensor.milestones.toml";
+const DERIVED_COORDINATE_CACHE_PROTOCOL: &str = "nuis-dev-tensor-derived-coordinate-cache-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DevTensorMilestoneCoverage {
     pub(crate) status: &'static str,
     pub(crate) source: &'static str,
     pub(crate) schema: String,
+    pub(crate) derived_cache_protocol: &'static str,
+    pub(crate) derived_cache_status: &'static str,
+    pub(crate) derived_cache_key: String,
+    pub(crate) derived_cache_coordinate_count: usize,
     pub(crate) milestone_count: usize,
     pub(crate) milestone_coordinate_count: usize,
     pub(crate) milestone_required_coordinate_count: usize,
@@ -66,6 +71,10 @@ pub(crate) fn dev_tensor_milestone_coverage() -> DevTensorMilestoneCoverage {
                 status: "gap",
                 source: MILESTONE_MANIFEST_SOURCE,
                 schema: "<unavailable>".to_owned(),
+                derived_cache_protocol: DERIVED_COORDINATE_CACHE_PROTOCOL,
+                derived_cache_status: "unavailable",
+                derived_cache_key: "<unavailable>".to_owned(),
+                derived_cache_coordinate_count: 0,
                 milestone_count: 0,
                 milestone_coordinate_count: 0,
                 milestone_required_coordinate_count: 0,
@@ -81,6 +90,7 @@ pub(crate) fn dev_tensor_milestone_coverage() -> DevTensorMilestoneCoverage {
         }
     };
     let milestone_coordinates = milestone_coordinate_records(&manifest);
+    let derived_cache_key = derived_coordinate_cache_key(&milestone_coordinates);
     let milestone_coordinate_keys = milestone_coordinates
         .iter()
         .map(|record| record.key.clone())
@@ -162,6 +172,10 @@ pub(crate) fn dev_tensor_milestone_coverage() -> DevTensorMilestoneCoverage {
         status,
         source: MILESTONE_MANIFEST_SOURCE,
         schema: manifest.schema,
+        derived_cache_protocol: DERIVED_COORDINATE_CACHE_PROTOCOL,
+        derived_cache_status: "cacheable",
+        derived_cache_key,
+        derived_cache_coordinate_count: milestone_coordinates.len(),
         milestone_count: manifest.milestones.len(),
         milestone_coordinate_count: milestone_coordinates.len(),
         milestone_required_coordinate_count,
@@ -249,6 +263,27 @@ fn milestone_coordinate_records(
                 })
         })
         .collect()
+}
+
+fn derived_coordinate_cache_key(records: &[DevTensorMilestoneCoordinate]) -> String {
+    let mut normalized = records
+        .iter()
+        .map(|record| {
+            format!(
+                "{}:{}:{}",
+                record.milestone,
+                required_label(record.required),
+                record.key
+            )
+        })
+        .collect::<Vec<_>>();
+    normalized.sort();
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in normalized.join("\n").bytes() {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("{DERIVED_COORDINATE_CACHE_PROTOCOL}:fnv64:{hash:016x}")
 }
 
 fn load_milestone_manifest() -> Result<DevTensorMilestoneManifest, String> {
@@ -386,6 +421,18 @@ mod tests {
         assert_eq!(coverage.status, "clean");
         assert_eq!(coverage.source, MILESTONE_MANIFEST_SOURCE);
         assert_eq!(coverage.schema, "nuis-dev-tensor-milestones-v1");
+        assert_eq!(
+            coverage.derived_cache_protocol,
+            DERIVED_COORDINATE_CACHE_PROTOCOL
+        );
+        assert_eq!(coverage.derived_cache_status, "cacheable");
+        assert!(coverage
+            .derived_cache_key
+            .starts_with("nuis-dev-tensor-derived-coordinate-cache-v1:fnv64:"));
+        assert_eq!(
+            coverage.derived_cache_coordinate_count,
+            DEV_TENSOR_EXPECTED_COORDINATES.len()
+        );
         assert_eq!(
             coverage.milestone_coordinate_count,
             DEV_TENSOR_EXPECTED_COORDINATES.len()
