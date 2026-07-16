@@ -103,9 +103,29 @@ pub(crate) fn print_nsdb_inspect_report(report: &NsdbInspectReport) {
         report.hetero_runtime_trace.record_count
     );
     println!(
+        "  hetero_runtime_trace_device_sample_handoff_record_count: {}",
+        report
+            .hetero_runtime_trace
+            .device_sample_handoff_record_count
+    );
+    println!(
+        "  hetero_runtime_trace_device_sample_handoff_protocol: {}",
+        report.hetero_runtime_trace.device_sample_handoff_protocol
+    );
+    println!(
         "  hetero_runtime_trace_first_trace_id: {}",
         report.hetero_runtime_trace.first_trace_id
     );
+    for handoff in &report.hetero_runtime_trace.device_sample_handoffs {
+        println!(
+            "  device_sample_handoff: index={} trace={} provider_family={} status={} next={}",
+            handoff.index,
+            handoff.trace_id,
+            handoff.provider_family,
+            handoff.handoff_status,
+            handoff.next_action
+        );
+    }
     for record in &report.hetero_runtime_trace.records {
         println!(
             "  hetero_runtime_trace_record: index={} trace={} role={} status={} domain={} backend={} target={} next={}",

@@ -60,10 +60,28 @@ pub(crate) struct NsdbHeteroRuntimeTraceInfo {
     pub(crate) record_count: usize,
     pub(crate) ready_record_count: usize,
     pub(crate) backend_execution_record_count: usize,
+    pub(crate) device_sample_handoff_record_count: usize,
+    pub(crate) device_sample_handoff_protocol: String,
     pub(crate) first_trace_id: String,
     pub(crate) first_blocker: String,
     pub(crate) next_action: String,
     pub(crate) records: Vec<NsdbHeteroRuntimeTraceRecord>,
+    pub(crate) device_sample_handoffs: Vec<NsdbDeviceSampleHandoffRecord>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsdbDeviceSampleHandoffRecord {
+    pub(crate) index: usize,
+    pub(crate) trace_id: String,
+    pub(crate) protocol: String,
+    pub(crate) provider: String,
+    pub(crate) provider_family: String,
+    pub(crate) handoff_target: String,
+    pub(crate) handoff_status: String,
+    pub(crate) validation_status: String,
+    pub(crate) input_evidence: String,
+    pub(crate) output_evidence: String,
+    pub(crate) next_action: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

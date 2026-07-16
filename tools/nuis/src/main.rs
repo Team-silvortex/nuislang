@@ -1,3 +1,4 @@
+mod artifact_device_sample;
 mod artifact_doctor;
 mod artifact_doctor_render;
 mod artifact_launch_evidence;
@@ -31,6 +32,7 @@ mod project_lock_abi_command;
 mod project_surface_command;
 mod public_surface;
 mod release_check_command;
+mod release_check_handoff;
 mod run_artifact;
 mod runtime_host_yir;
 mod scheduler_surface;

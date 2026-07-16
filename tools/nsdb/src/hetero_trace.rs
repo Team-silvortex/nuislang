@@ -1,4 +1,6 @@
-use crate::model::{NsdbHeteroRuntimeTraceInfo, NsdbHeteroRuntimeTraceRecord};
+use crate::model::{
+    NsdbDeviceSampleHandoffRecord, NsdbHeteroRuntimeTraceInfo, NsdbHeteroRuntimeTraceRecord,
+};
 use std::{fs, path::Path};
 
 const HETERO_RUNTIME_TRACE_FILE_NAME: &str = "nuis.nsdb.hetero-runtime-trace.toml";
@@ -15,10 +17,13 @@ pub(crate) fn read_hetero_runtime_trace(output_dir: &Path) -> NsdbHeteroRuntimeT
             record_count: 0,
             ready_record_count: 0,
             backend_execution_record_count: 0,
+            device_sample_handoff_record_count: 0,
+            device_sample_handoff_protocol: "none".to_owned(),
             first_trace_id: "none".to_owned(),
             first_blocker: "none".to_owned(),
             next_action: "none".to_owned(),
             records: Vec::new(),
+            device_sample_handoffs: Vec::new(),
         };
     };
     let protocol =
@@ -26,6 +31,7 @@ pub(crate) fn read_hetero_runtime_trace(output_dir: &Path) -> NsdbHeteroRuntimeT
     let debugger_contract =
         parse_string_toml_field(&source, "debugger_contract").unwrap_or_else(|| "none".to_owned());
     let records = parse_hetero_runtime_trace_records(&source);
+    let device_sample_handoffs = parse_device_sample_handoffs(&source);
     NsdbHeteroRuntimeTraceInfo {
         available: true,
         path: path.display().to_string(),
@@ -39,6 +45,16 @@ pub(crate) fn read_hetero_runtime_trace(output_dir: &Path) -> NsdbHeteroRuntimeT
             "backend_execution_record_count",
         )
         .unwrap_or(0),
+        device_sample_handoff_record_count: parse_usize_toml_field(
+            &source,
+            "device_sample_handoff_record_count",
+        )
+        .unwrap_or(device_sample_handoffs.len()),
+        device_sample_handoff_protocol: parse_string_toml_field(
+            &source,
+            "device_sample_handoff_protocol",
+        )
+        .unwrap_or_else(|| "none".to_owned()),
         first_trace_id: parse_string_toml_field(&source, "first_trace_id")
             .or_else(|| records.first().map(|record| record.trace_id.clone()))
             .unwrap_or_else(|| "none".to_owned()),
@@ -48,6 +64,7 @@ pub(crate) fn read_hetero_runtime_trace(output_dir: &Path) -> NsdbHeteroRuntimeT
         next_action: parse_string_toml_field(&source, "next_action")
             .unwrap_or_else(|| "none".to_owned()),
         records,
+        device_sample_handoffs,
     }
 }
 
@@ -86,6 +103,37 @@ fn parse_hetero_runtime_trace_records(source: &str) -> Vec<NsdbHeteroRuntimeTrac
                 .filter(|value| !value.is_empty())
                 .unwrap_or_else(|| "none".to_owned()),
             missing_signals: parse_string_array_toml_field(record, "missing_signals"),
+            next_action: parse_string_toml_field(record, "next_action")
+                .unwrap_or_else(|| "none".to_owned()),
+        })
+        .collect()
+}
+
+fn parse_device_sample_handoffs(source: &str) -> Vec<NsdbDeviceSampleHandoffRecord> {
+    source
+        .split("[[device_sample_handoffs]]")
+        .skip(1)
+        .enumerate()
+        .map(|(index, record)| NsdbDeviceSampleHandoffRecord {
+            index,
+            trace_id: parse_string_toml_field(record, "trace_id")
+                .unwrap_or_else(|| "none".to_owned()),
+            protocol: parse_string_toml_field(record, "protocol")
+                .unwrap_or_else(|| "none".to_owned()),
+            provider: parse_string_toml_field(record, "provider")
+                .unwrap_or_else(|| "none".to_owned()),
+            provider_family: parse_string_toml_field(record, "provider_family")
+                .unwrap_or_else(|| "none".to_owned()),
+            handoff_target: parse_string_toml_field(record, "handoff_target")
+                .unwrap_or_else(|| "none".to_owned()),
+            handoff_status: parse_string_toml_field(record, "handoff_status")
+                .unwrap_or_else(|| "none".to_owned()),
+            validation_status: parse_string_toml_field(record, "validation_status")
+                .unwrap_or_else(|| "none".to_owned()),
+            input_evidence: parse_string_toml_field(record, "input_evidence")
+                .unwrap_or_else(|| "none".to_owned()),
+            output_evidence: parse_string_toml_field(record, "output_evidence")
+                .unwrap_or_else(|| "none".to_owned()),
             next_action: parse_string_toml_field(record, "next_action")
                 .unwrap_or_else(|| "none".to_owned()),
         })
@@ -180,9 +228,23 @@ status = "execution-pending"
 record_count = 1
 ready_record_count = 0
 backend_execution_record_count = 1
+device_sample_handoff_record_count = 1
+device_sample_handoff_protocol = "nuis-device-sample-provider-handoff-v1"
 first_trace_id = "hetero-trace:shader:metal:apple-silicon-gpu"
 first_blocker = ""
 next_action = "materialize-device-execution-trace"
+
+[[device_sample_handoffs]]
+trace_id = "hetero-trace:shader:metal:apple-silicon-gpu"
+protocol = "nuis-device-sample-provider-handoff-v1"
+provider = "nustar-deferred-device-sample-v1"
+provider_family = "metal:apple-silicon-gpu"
+handoff_target = "metal:apple-silicon-gpu"
+handoff_status = "awaiting-provider-handoff"
+validation_status = "pending-provider-execution"
+input_evidence = "metallib:pixelmagic.metallib"
+output_evidence = "not-materialized"
+next_action = "materialize-device-execution-sample"
 
 [[records]]
 trace_id = "hetero-trace:shader:metal:apple-silicon-gpu"
@@ -209,6 +271,20 @@ next_action = "materialize-device-execution-trace"
         assert_eq!(trace.debugger_contract, "nsdb-yir-hetero-runtime-trace-v1");
         assert_eq!(trace.record_count, 1);
         assert_eq!(trace.backend_execution_record_count, 1);
+        assert_eq!(trace.device_sample_handoff_record_count, 1);
+        assert_eq!(
+            trace.device_sample_handoff_protocol,
+            "nuis-device-sample-provider-handoff-v1"
+        );
+        assert_eq!(trace.device_sample_handoffs.len(), 1);
+        assert_eq!(
+            trace.device_sample_handoffs[0].provider_family,
+            "metal:apple-silicon-gpu"
+        );
+        assert_eq!(
+            trace.device_sample_handoffs[0].handoff_status,
+            "awaiting-provider-handoff"
+        );
         assert_eq!(trace.records.len(), 1);
         assert_eq!(
             trace.records[0].trace_id,

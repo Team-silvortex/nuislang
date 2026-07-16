@@ -1,5 +1,5 @@
 use crate::{
-    model::{NsdbInspectReport, NsdbPayloadExecutionEvent},
+    model::{NsdbDeviceSampleHandoffRecord, NsdbInspectReport, NsdbPayloadExecutionEvent},
     payload_decoder::decode_payload_content,
 };
 
@@ -218,6 +218,36 @@ fn device_sample_resolution(
     report: &NsdbInspectReport,
     event: &NsdbPayloadExecutionEvent,
 ) -> ValueSampleResolution {
+    if let Some(handoff) = report
+        .hetero_runtime_trace
+        .device_sample_handoffs
+        .iter()
+        .find(|handoff| device_handoff_matches_event(handoff, event))
+    {
+        let (payload_format, payload_path) = payload_evidence_parts(handoff);
+        let bridge_stub_path = report
+            .hetero_runtime_trace
+            .records
+            .iter()
+            .find(|record| record.trace_id == handoff.trace_id)
+            .map(|record| record.bridge_stub_path.clone())
+            .unwrap_or_else(|| "none".to_owned());
+        return ValueSampleResolution {
+            status: "provider-handoff-observed".to_owned(),
+            detail: format!(
+                "device-sample-handoff:{}:{}",
+                handoff.trace_id, handoff.handoff_status
+            ),
+            materialization_status: provider_handoff_materialization_status(handoff).to_owned(),
+            materialization_detail: format!(
+                "provider-handoff:{}:{}",
+                handoff.provider_family, handoff.input_evidence
+            ),
+            payload_format,
+            payload_path,
+            bridge_stub_path,
+        };
+    }
     if let Some(record) = report.hetero_runtime_trace.records.iter().find(|record| {
         record.domain_family == event.target
             || record.backend_artifact_key.contains(&event.target)
@@ -288,6 +318,35 @@ fn materialization_status_for_record(
         "sample-descriptor-materialized".to_owned()
     } else {
         "sample-descriptor-incomplete".to_owned()
+    }
+}
+
+fn device_handoff_matches_event(
+    handoff: &NsdbDeviceSampleHandoffRecord,
+    event: &NsdbPayloadExecutionEvent,
+) -> bool {
+    handoff.trace_id.contains(&event.target)
+        || handoff.provider_family.contains(&event.target)
+        || handoff.handoff_target.contains(&event.target)
+}
+
+fn payload_evidence_parts(handoff: &NsdbDeviceSampleHandoffRecord) -> (String, String) {
+    handoff
+        .input_evidence
+        .split_once(':')
+        .map(|(format, path)| (format.to_owned(), path.to_owned()))
+        .unwrap_or_else(|| ("none".to_owned(), "none".to_owned()))
+}
+
+fn provider_handoff_materialization_status(
+    handoff: &NsdbDeviceSampleHandoffRecord,
+) -> &'static str {
+    if handoff.validation_status == "pending-provider-execution" {
+        "provider-handoff-pending"
+    } else if handoff.handoff_status == "ready-for-provider-handoff" {
+        "provider-handoff-ready"
+    } else {
+        "provider-handoff-observed"
     }
 }
 

@@ -1,12 +1,15 @@
+use crate::artifact_device_sample::{
+    device_sample_contract_for_trace, push_device_sample_handoff_queue_toml,
+    summarize_device_samples, DeviceSampleContract, DeviceSampleSummary,
+};
+use crate::artifact_doctor::BackendArtifactPayloadEvidence;
 use crate::{
-    artifact_doctor::BackendArtifactPayloadEvidence, json_bool_field, json_field,
-    json_object_array_field, json_optional_string_field, json_string_array_field, json_usize_field,
+    json_bool_field, json_field, json_object_array_field, json_optional_string_field,
+    json_string_array_field, json_usize_field,
 };
-use std::{
-    collections::BTreeSet,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::collections::BTreeSet;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 const HETERO_RUNTIME_TRACE_FILE_NAME: &str = "nuis.nsdb.hetero-runtime-trace.toml";
 const HETERO_RUNTIME_TRACE_PROTOCOL: &str = "nuis-nsdb-hetero-runtime-trace-v1";
@@ -26,6 +29,7 @@ struct HeteroRuntimeTraceRecord {
     payload_format: Option<String>,
     payload_path: Option<String>,
     bridge_stub_path: Option<String>,
+    device_sample: DeviceSampleContract,
     missing_signals: Vec<String>,
     next_action: String,
 }
@@ -40,6 +44,7 @@ pub(crate) struct HeteroRuntimeTraceSummary {
     trace_record_count: usize,
     trace_ready_record_count: usize,
     backend_execution_record_count: usize,
+    device_sample_summary: DeviceSampleSummary,
     payload_evidence_available: bool,
     payload_evidence_count: usize,
     payload_evidence_present_count: usize,
@@ -109,6 +114,8 @@ impl HeteroRuntimeTraceSummary {
             .iter()
             .filter(|record| record.trace_role == "backend-artifact")
             .count();
+        let device_sample_summary =
+            summarize_device_samples(records.iter().map(|record| &record.device_sample));
         let first_backend_blocker = backend_units.iter().find_map(|unit| {
             backend_artifact_missing_signals(unit)
                 .first()
@@ -156,6 +163,7 @@ impl HeteroRuntimeTraceSummary {
             trace_record_count,
             trace_ready_record_count,
             backend_execution_record_count,
+            device_sample_summary,
             payload_evidence_available: payload_evidence.available,
             payload_evidence_count: payload_evidence.count,
             payload_evidence_present_count: payload_evidence.present_count,
@@ -180,6 +188,7 @@ impl HeteroRuntimeTraceSummary {
             trace_record_count: 0,
             trace_ready_record_count: 0,
             backend_execution_record_count: 0,
+            device_sample_summary: summarize_device_samples(std::iter::empty()),
             payload_evidence_available: false,
             payload_evidence_count: 0,
             payload_evidence_present_count: 0,
@@ -258,6 +267,9 @@ impl HeteroRuntimeTraceSummary {
             ),
             json_field("hetero_runtime_trace_next_action", &self.next_action),
         ]
+        .into_iter()
+        .chain(self.device_sample_summary.json_fields())
+        .collect()
     }
 
     pub(crate) fn persist_nsdb_trace(
@@ -351,6 +363,7 @@ impl HeteroRuntimeTraceSummary {
             "backend_execution_record_count = {}\n",
             self.backend_execution_record_count
         ));
+        self.device_sample_summary.push_toml_fields(&mut out);
         push_toml_optional_string(
             &mut out,
             "first_trace_id",
@@ -358,6 +371,12 @@ impl HeteroRuntimeTraceSummary {
         );
         push_toml_optional_string(&mut out, "first_blocker", self.first_blocker.as_deref());
         push_toml_string(&mut out, "next_action", &self.next_action);
+        push_device_sample_handoff_queue_toml(
+            &mut out,
+            self.records
+                .iter()
+                .map(|record| (record.trace_id.as_str(), &record.device_sample)),
+        );
         for record in &self.records {
             out.push_str("\n[[records]]\n");
             record.push_toml_fields(&mut out);
@@ -566,6 +585,10 @@ impl HeteroRuntimeTraceRecord {
             json_string_array_field("missing_signals", &self.missing_signals),
             json_field("next_action", &self.next_action),
         ];
+        let fields = fields
+            .into_iter()
+            .chain(self.device_sample.json_fields())
+            .collect::<Vec<_>>();
         format!("{{{}}}", fields.join(","))
     }
 
@@ -585,6 +608,7 @@ impl HeteroRuntimeTraceRecord {
         push_toml_optional_string(out, "payload_format", self.payload_format.as_deref());
         push_toml_optional_string(out, "payload_path", self.payload_path.as_deref());
         push_toml_optional_string(out, "bridge_stub_path", self.bridge_stub_path.as_deref());
+        self.device_sample.push_toml_fields(out);
         push_toml_string_array(out, "missing_signals", &self.missing_signals);
         push_toml_string(out, "next_action", &self.next_action);
     }
@@ -616,6 +640,14 @@ fn trace_record_for_unit(
         _ => "resolve-domain-trace-blocker",
     };
     let backend_artifact_key = backend_artifact_key(unit);
+    let device_sample = device_sample_contract_for_trace(
+        trace_role,
+        status,
+        unit.backend_family.as_deref(),
+        unit.target_device.as_deref(),
+        unit.artifact_payload_format.as_deref(),
+        unit.artifact_payload_blob_path.as_deref(),
+    );
 
     HeteroRuntimeTraceRecord {
         trace_id: format!("hetero-trace:{backend_artifact_key}"),
@@ -629,6 +661,7 @@ fn trace_record_for_unit(
         payload_format: unit.artifact_payload_format.clone(),
         payload_path: unit.artifact_payload_blob_path.clone(),
         bridge_stub_path: unit.artifact_bridge_stub_path.clone(),
+        device_sample,
         missing_signals,
         next_action: next_action.to_owned(),
     }

@@ -1,7 +1,8 @@
 use crate::model::{
-    NsdbClockEdgeDebugInfo, NsdbDataSegmentDebugInfo, NsdbDomainDebugInfo,
-    NsdbHeteroRuntimeTraceRecord, NsdbInspectReport, NsdbLoweringUnitDebugInfo,
-    NsdbPayloadDecoderManifestRecordInfo, NsdbPayloadExecutionEvent, NsdbSidecarDebugInfo,
+    NsdbClockEdgeDebugInfo, NsdbDataSegmentDebugInfo, NsdbDeviceSampleHandoffRecord,
+    NsdbDomainDebugInfo, NsdbHeteroRuntimeTraceRecord, NsdbInspectReport,
+    NsdbLoweringUnitDebugInfo, NsdbPayloadDecoderManifestRecordInfo, NsdbPayloadExecutionEvent,
+    NsdbSidecarDebugInfo,
 };
 use crate::replay::{build_replay_plan, NsdbReplayCheckpoint};
 
@@ -129,6 +130,16 @@ pub(crate) fn nsdb_inspect_report_json(report: &NsdbInspectReport) -> String {
             "hetero_runtime_trace_backend_execution_record_count",
             report.hetero_runtime_trace.backend_execution_record_count,
         ),
+        json_usize_field(
+            "hetero_runtime_trace_device_sample_handoff_record_count",
+            report
+                .hetero_runtime_trace
+                .device_sample_handoff_record_count,
+        ),
+        json_string_field(
+            "hetero_runtime_trace_device_sample_handoff_protocol",
+            &report.hetero_runtime_trace.device_sample_handoff_protocol,
+        ),
         json_string_field(
             "hetero_runtime_trace_first_trace_id",
             &report.hetero_runtime_trace.first_trace_id,
@@ -144,6 +155,10 @@ pub(crate) fn nsdb_inspect_report_json(report: &NsdbInspectReport) -> String {
         format!(
             "\"hetero_runtime_trace_records\":[{}]",
             hetero_runtime_trace_records_json(&report.hetero_runtime_trace.records)
+        ),
+        format!(
+            "\"device_sample_handoffs\":[{}]",
+            device_sample_handoffs_json(&report.hetero_runtime_trace.device_sample_handoffs)
         ),
         json_bool_field(
             "payload_decoder_manifest_available",
@@ -410,6 +425,29 @@ fn payload_execution_events_json(events: &[NsdbPayloadExecutionEvent]) -> String
                 json_string_field("entry_section_id", &event.entry_section_id),
                 json_string_field("first_blocker", &event.first_blocker),
                 json_string_field("next_action", &event.next_action),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn device_sample_handoffs_json(handoffs: &[NsdbDeviceSampleHandoffRecord]) -> String {
+    handoffs
+        .iter()
+        .map(|handoff| {
+            let fields = vec![
+                json_usize_field("index", handoff.index),
+                json_string_field("trace_id", &handoff.trace_id),
+                json_string_field("protocol", &handoff.protocol),
+                json_string_field("provider", &handoff.provider),
+                json_string_field("provider_family", &handoff.provider_family),
+                json_string_field("handoff_target", &handoff.handoff_target),
+                json_string_field("handoff_status", &handoff.handoff_status),
+                json_string_field("validation_status", &handoff.validation_status),
+                json_string_field("input_evidence", &handoff.input_evidence),
+                json_string_field("output_evidence", &handoff.output_evidence),
+                json_string_field("next_action", &handoff.next_action),
             ];
             format!("{{{}}}", fields.join(","))
         })

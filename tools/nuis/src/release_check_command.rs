@@ -3,7 +3,9 @@ use std::path::PathBuf;
 use crate::{
     append_json_field_strings,
     artifact_doctor::{probe_artifact_doctor, run_build_output_self_check},
-    json_bool_field, json_field, json_optional_string_field, success_logs_enabled,
+    json_bool_field, json_field, json_optional_string_field,
+    release_check_handoff::collect_device_sample_handoff_mirror,
+    success_logs_enabled,
     workflow::{
         load_link_plan_for_output_dir, nsld_drive_command_set_for_output_dir,
         nsld_final_executable_output_boundary_summary,
@@ -17,6 +19,7 @@ pub(crate) fn handle_release_check(
     target: Option<String>,
     json: bool,
 ) -> Result<(), String> {
+    let _quiet_success_logs = QuietSuccessLogs::enable_if(json);
     let emit_logs = !json && success_logs_enabled();
     if nuisc::project::is_project_input(&input) {
         let project = nuisc::project::load_project(&input)?;
@@ -126,6 +129,38 @@ pub(crate) fn handle_release_check(
     Ok(())
 }
 
+struct QuietSuccessLogs {
+    previous: Option<std::ffi::OsString>,
+    active: bool,
+}
+
+impl QuietSuccessLogs {
+    fn enable_if(active: bool) -> Self {
+        if !active {
+            return Self {
+                previous: None,
+                active,
+            };
+        }
+        let previous = std::env::var_os("NUIS_TEST_QUIET_SUCCESS_LOGS");
+        std::env::set_var("NUIS_TEST_QUIET_SUCCESS_LOGS", "1");
+        Self { previous, active }
+    }
+}
+
+impl Drop for QuietSuccessLogs {
+    fn drop(&mut self) {
+        if !self.active {
+            return;
+        }
+        if let Some(previous) = self.previous.as_ref() {
+            std::env::set_var("NUIS_TEST_QUIET_SUCCESS_LOGS", previous);
+        } else {
+            std::env::remove_var("NUIS_TEST_QUIET_SUCCESS_LOGS");
+        }
+    }
+}
+
 pub(crate) fn render_release_check_summary_json(
     input: &std::path::Path,
     output_dir: &std::path::Path,
@@ -136,6 +171,7 @@ pub(crate) fn render_release_check_summary_json(
     let final_output = load_link_plan_for_output_dir(output_dir)
         .as_ref()
         .map(nsld_final_executable_output_boundary_summary);
+    let device_sample_handoff = collect_device_sample_handoff_mirror(output_dir);
     let mut out = String::from("{");
     append_json_field_strings(
         &mut out,
@@ -147,6 +183,13 @@ pub(crate) fn render_release_check_summary_json(
             json_bool_field("ready_to_run", doctor.ready_to_run),
             json_field("recommended_next_step", &doctor.recommended_next_step),
             json_field("recommended_command", &doctor.recommended_command),
+            json_field("runtime_materialization_policy", "explicit-run-artifact"),
+            json_bool_field("runs_run_artifact", false),
+            json_bool_field("materializes_nsdb_handoff", false),
+            json_field(
+                "recommended_run_artifact_json_command",
+                &format!("nuis run-artifact {} --json", output_dir.display()),
+            ),
             json_field("nsld_drive_protocol", &nsld_drive_commands.protocol),
             json_field(
                 "nsld_drive_recommended_first_json_command",
@@ -174,6 +217,10 @@ pub(crate) fn render_release_check_summary_json(
             .payload_decoder_manifest
             .json_fields_with_prefix("release_check_payload_decoder_manifest"),
     );
+    append_json_field_strings(
+        &mut out,
+        device_sample_handoff.json_fields_with_prefix("release_check_device_sample_handoff"),
+    );
     out.push('}');
     out
 }
@@ -181,7 +228,15 @@ pub(crate) fn render_release_check_summary_json(
 fn print_payload_decoder_manifest_status(output_dir: &std::path::Path) {
     let doctor = probe_artifact_doctor(output_dir);
     let manifest = &doctor.payload_decoder_manifest;
+    let device_sample_handoff = collect_device_sample_handoff_mirror(output_dir);
     println!("release-check: payload-decoder-manifest");
+    println!("  runtime_materialization_policy: explicit-run-artifact");
+    println!("  runs_run_artifact: false");
+    println!("  materializes_nsdb_handoff: false");
+    println!(
+        "  recommended_run_artifact_json_command: nuis run-artifact {} --json",
+        output_dir.display()
+    );
     println!("  available: {}", manifest.available);
     if let Some(path) = manifest.path.as_ref() {
         println!("  path: {}", path.display());
@@ -192,6 +247,38 @@ fn print_payload_decoder_manifest_status(output_dir: &std::path::Path) {
     println!("  record_count: {}", manifest.record_count);
     println!("  invalid_record_count: {}", manifest.invalid_record_count);
     println!("  first_diagnostic: {}", manifest.first_diagnostic);
+    println!("release-check: device-sample-handoff");
+    println!("  available: {}", device_sample_handoff.available);
+    if let Some(path) = device_sample_handoff.path.as_ref() {
+        println!("  path: {}", path.display());
+    }
+    println!("  protocol: {}", device_sample_handoff.protocol);
+    println!("  status: {}", device_sample_handoff.status);
+    println!("  record_count: {}", device_sample_handoff.record_count);
+    println!(
+        "  pending_validation_count: {}",
+        device_sample_handoff.pending_validation_count
+    );
+    println!(
+        "  first_provider_family: {}",
+        device_sample_handoff.first_provider_family
+    );
+    println!(
+        "  first_handoff_target: {}",
+        device_sample_handoff.first_handoff_target
+    );
+    println!(
+        "  first_validation_status: {}",
+        device_sample_handoff.first_validation_status
+    );
+    println!(
+        "  first_input_evidence: {}",
+        device_sample_handoff.first_input_evidence
+    );
+    println!(
+        "  first_next_action: {}",
+        device_sample_handoff.first_next_action
+    );
 }
 
 fn print_nsld_drive_status(output_dir: &std::path::Path) {

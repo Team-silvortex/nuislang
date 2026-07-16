@@ -70,7 +70,7 @@ Current reference commands:
 * `project-doctor [--json] <project-dir|nuis.toml>`
 * `project-lock-abi <project-dir|nuis.toml>`
 * `scheduler-view <input.ns|project-dir|nuis.toml>`
-* `release-check <input> <output-dir>`
+* `release-check [--json] <input> <output-dir>`
 * `check <input.ns|project-dir|nuis.toml>`
 * `test [--list] [--ignored|--include-ignored] [--exact] <input.ns|project-dir|nuis.toml> [filter]`
 * `build <input.ns|project-dir|nuis.toml> <output-dir>`
@@ -398,6 +398,9 @@ Read that as:
 * `check` / `build` / `release-check`
   all derive from one shared `ProjectCompilationPlan`, so organization,
   exchange routes, ABI resolution, and synthetic input naming stay unified
+  `release-check --json` is a pure readiness summary; it recommends
+  `run-artifact --json` for runtime/nsdb handoff materialization instead of
+  running it implicitly.
 * `scheduler-view`
   focused `placement / timing / result / summary / observer` projection;
   `--json` mirrors the same view as structured data

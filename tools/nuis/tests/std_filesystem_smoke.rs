@@ -324,140 +324,9 @@ fn assert_std_tooling_project_smoke(projects: &[(&str, &str)]) {
     }
 }
 
-fn assert_official_galaxy_hetero_build(
-    label: &str,
-    project: &str,
-    domain: &str,
-    backend_family: &str,
-    target_device: &str,
-    trace_record_count: usize,
-    expected_trace_id: &str,
-    yir_needles: &[&str],
-    sidecar_needles: &[&str],
-    payload_needles: &[&str],
-) {
-    let output_dir = temp_dir(label);
-    let output_dir_text = output_dir.display().to_string();
-
-    let build = run_nuis(&["build", project, &output_dir_text]);
-    assert_success(&build, "nuis build official galaxy hetero smoke");
-
-    let yir_path = output_dir.join(format!("{label}.yir"));
-    for needle in yir_needles {
-        assert_file_contains(&yir_path, needle, "official galaxy hetero YIR");
-    }
-
-    assert_file_contains(
-        &output_dir.join(format!("nuis.domain.{domain}.artifact.toml")),
-        "schema = \"nuis-domain-build-unit-v1\"",
-        "official galaxy hetero artifact",
-    );
-    assert_file_contains(
-        &output_dir.join(format!("nuis.domain.{domain}.payload.toml")),
-        "schema = \"nuis-domain-build-payload-v1\"",
-        "official galaxy hetero payload",
-    );
-    assert_file_contains(
-        &output_dir.join("nuis.hetero-calculate.plan.toml"),
-        "schema = \"nuis-hetero-calculate-link-plan-v1\"",
-        "official galaxy hetero plan",
-    );
-
-    let sidecar_path = output_dir.join(format!("nuis.domain.{domain}.lowering.ir.txt"));
-    for needle in sidecar_needles {
-        assert_file_contains(&sidecar_path, needle, "official galaxy hetero sidecar");
-    }
-    let payload_path = output_dir.join(format!("nuis.domain.{domain}.payload.toml"));
-    for needle in payload_needles {
-        assert_file_contains(&payload_path, needle, "official galaxy hetero payload");
-    }
-    assert_file_contains(
-        &output_dir.join("nuis.hetero-calculate.plan.toml"),
-        &format!("domain_family = \"{domain}\""),
-        "official galaxy hetero plan",
-    );
-
-    let run_json = run_nuis(&["run-artifact", &output_dir_text, "--json"]);
-    assert_success(
-        &run_json,
-        "nuis run-artifact json official galaxy hetero smoke",
-    );
-    let run_json_stdout = String::from_utf8_lossy(&run_json.stdout);
-    let trace_id = format!("\"trace_id\":\"{expected_trace_id}\"");
-    assert!(
-        run_json_stdout.contains("\"hetero_runtime_trace_available\":true")
-            && run_json_stdout.contains("\"hetero_runtime_trace_status\":\"execution-pending\"")
-            && run_json_stdout.contains("\"hetero_runtime_trace_debugger_contract\":\"nsdb-yir-hetero-runtime-trace-v1\"")
-            && run_json_stdout.contains(&format!("\"hetero_runtime_trace_record_count\":{trace_record_count}"))
-            && run_json_stdout.contains("\"hetero_runtime_trace_backend_execution_record_count\":1")
-            && run_json_stdout.contains(&format!("\"hetero_runtime_trace_backend_families\":[\"{backend_family}\"]"))
-            && run_json_stdout.contains(&format!("\"hetero_runtime_trace_target_devices\":[\"{target_device}\"]"))
-            && run_json_stdout.contains(&trace_id)
-            && run_json_stdout.contains("\"trace_role\":\"backend-artifact\"")
-            && run_json_stdout.contains("\"next_action\":\"materialize-device-execution-trace\""),
-        "run-artifact json did not expose expected official galaxy hetero trace for {label}\n{run_json_stdout}"
-    );
-}
-
 #[test]
 fn std_tooling_light_project_smokes_build_doctor_and_run() {
     assert_std_tooling_project_smoke(STD_TOOLING_LIGHT_SMOKE_PROJECTS);
-}
-
-#[test]
-fn official_galaxy_hetero_projects_emit_shader_and_kernel_artifacts() {
-    assert_official_galaxy_hetero_build(
-        "pixelmagic_pipeline_demo",
-        "../../examples/projects/domains/pixelmagic_pipeline_demo",
-        "shader",
-        "metal",
-        "apple-silicon-gpu",
-        2,
-        "hetero-trace:shader:metal:apple-silicon-gpu",
-        &[
-            "shader.begin_pass",
-            "shader.draw_instanced",
-            "shader.inline_wgsl",
-            "PixelMagicContracts.shader_pipeline_total",
-        ],
-        &[
-            "shader_stage_model = \"metal-render-pipeline\"",
-            "lowering_capabilities",
-            "pipeline_lowering = \"metal-render-pipeline-state\"",
-            "execution_route = \"unified-render-graph\"",
-        ],
-        &[
-            "backend_family = \"metal\"",
-            "target_device = \"apple-silicon-gpu\"",
-            "shader.inline_wgsl",
-        ],
-    );
-
-    assert_official_galaxy_hetero_build(
-        "witsage_kernel_demo",
-        "../../examples/projects/domains/witsage_kernel_demo",
-        "kernel",
-        "coreml",
-        "apple-ane",
-        1,
-        "hetero-trace:kernel:coreml:apple-ane",
-        &[
-            "kernel.tensor",
-            "kernel.reduce_mean_axis",
-            "kernel.topk_axis",
-            "WitSageContracts.kernel_pipeline_total",
-        ],
-        &[
-            "kernel_ir = \"coreml-program\"",
-            "kernel_entry_model = \"mlmodelc-function\"",
-            "tensor_lowering = \"ranked-tensor-graph\"",
-        ],
-        &[
-            "backend_family = \"coreml\"",
-            "target_device = \"apple-ane\"",
-            "kernel.reduce_mean_axis",
-        ],
-    );
 }
 
 #[test]
@@ -784,6 +653,37 @@ fn std_path_safety_release_check_reports_nsld_drive_command_set() {
     assert!(
         output_dir.join("nuis.build.manifest.toml").exists(),
         "expected build manifest for std path safety release-check"
+    );
+
+    let json_output_dir = temp_dir("path_safety_release_check_json");
+    let json_output_dir_text = json_output_dir.display().to_string();
+    let release_check_json = run_nuis(&[
+        "release-check",
+        "--json",
+        "../../examples/projects/tooling/path_safety_demo",
+        &json_output_dir_text,
+    ]);
+    assert_success(
+        &release_check_json,
+        "nuis release-check --json std path safety smoke",
+    );
+    let release_check_json_stdout = String::from_utf8_lossy(&release_check_json.stdout);
+    assert!(
+        release_check_json_stdout.starts_with('{')
+            && release_check_json_stdout.contains("\"kind\":\"release_check_summary\"")
+            && release_check_json_stdout.contains("\"ready_to_run\":true")
+            && release_check_json_stdout
+                .contains("\"runtime_materialization_policy\":\"explicit-run-artifact\"")
+            && release_check_json_stdout.contains("\"runs_run_artifact\":false")
+            && release_check_json_stdout.contains("\"materializes_nsdb_handoff\":false")
+            && release_check_json_stdout.contains("\"recommended_run_artifact_json_command\":\"")
+            && release_check_json_stdout
+                .contains("\"release_check_payload_decoder_manifest_available\":false"),
+        "release-check --json did not emit a clean summary object\n{release_check_json_stdout}"
+    );
+    assert!(
+        !release_check_json_stdout.contains("release-check: nsld-drive"),
+        "release-check --json should not mix text logs into stdout\n{release_check_json_stdout}"
     );
 
     let manifest_path = output_dir.join("nuis.build.manifest.toml");

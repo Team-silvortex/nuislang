@@ -153,7 +153,10 @@ build and artifact self-checks pass. It does not mutate linker artifacts on its
 own; use the reported dry-run JSON command before handing off to an applying
 `nsld drive` mode. The same block also surfaces the current final executable
 output boundary, including whether the path is present, whether Nsld ownership
-is known, and the first ownership/output blocker.
+is known, and the first ownership/output blocker. Release-check also keeps
+runtime/debugger metadata materialization explicit: it reports a
+`recommended_run_artifact_json_command`, but it does not run `run-artifact` or
+write nsdb handoff files by itself.
 
 Explicit CPU target examples:
 

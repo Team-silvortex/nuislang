@@ -112,7 +112,10 @@ mutating step, then choose `apply_next_json_command` or
 build manifest and artifact self-check pass. The release-check frontdoor does
 not apply linker actions by itself; it reports the safe dry-run command first
 and labels mutating commands explicitly so automation can make the handoff to
-`nsld drive` deliberately.
+`nsld drive` deliberately. It follows the same explicit-handoff rule for
+runtime/debugger metadata: release-check reports the recommended
+`run-artifact --json` command, but it does not run `run-artifact` or materialize
+nsdb handoff files by itself.
 
 `emit-native-object` is accepted by the CLI and driver as a protocol-facing
 alias for the deterministic object emitter. It keeps final-stage/native-object

@@ -318,6 +318,7 @@ The first std-oriented checks deliberately anchor the bootstrap-critical
 `host-io-filesystem-text` cell to:
 
 * `tools/nuis/tests/std_filesystem_smoke.rs`
+* `tools/nuis/tests/official_galaxy_hetero_smoke.rs`
 * `examples/projects/tooling/README.md`
 * `stdlib/std/README.md`
 

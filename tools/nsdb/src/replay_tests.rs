@@ -1,8 +1,9 @@
 use crate::{
     model::{
-        NsdbDomainDebugInfo, NsdbHeteroRuntimeTraceInfo, NsdbHeteroRuntimeTraceRecord,
-        NsdbInspectReport, NsdbPayloadDecoderManifestInfo, NsdbPayloadExecutionEvent,
-        NsdbPayloadExecutionEventFilter, NsdbPayloadExecutionHandoffInfo, NsdbSidecarDebugInfo,
+        NsdbDeviceSampleHandoffRecord, NsdbDomainDebugInfo, NsdbHeteroRuntimeTraceInfo,
+        NsdbHeteroRuntimeTraceRecord, NsdbInspectReport, NsdbPayloadDecoderManifestInfo,
+        NsdbPayloadExecutionEvent, NsdbPayloadExecutionEventFilter,
+        NsdbPayloadExecutionHandoffInfo, NsdbSidecarDebugInfo,
     },
     replay::build_replay_plan,
 };
@@ -335,6 +336,8 @@ fn builds_replay_checkpoints_from_payload_events() {
             record_count: 1,
             ready_record_count: 0,
             backend_execution_record_count: 1,
+            device_sample_handoff_record_count: 1,
+            device_sample_handoff_protocol: "nuis-device-sample-provider-handoff-v1".to_owned(),
             first_trace_id: "hetero-trace:shader:metal:apple-silicon-gpu".to_owned(),
             first_blocker: "none".to_owned(),
             next_action: "materialize-device-execution-trace".to_owned(),
@@ -353,6 +356,19 @@ fn builds_replay_checkpoints_from_payload_events() {
                 bridge_stub_path: "pixelmagic.bridge".to_owned(),
                 missing_signals: Vec::new(),
                 next_action: "materialize-device-execution-trace".to_owned(),
+            }],
+            device_sample_handoffs: vec![NsdbDeviceSampleHandoffRecord {
+                index: 0,
+                trace_id: "hetero-trace:shader:metal:apple-silicon-gpu".to_owned(),
+                protocol: "nuis-device-sample-provider-handoff-v1".to_owned(),
+                provider: "nustar-deferred-device-sample-v1".to_owned(),
+                provider_family: "metal:apple-silicon-gpu".to_owned(),
+                handoff_target: "metal:apple-silicon-gpu".to_owned(),
+                handoff_status: "awaiting-provider-handoff".to_owned(),
+                validation_status: "pending-provider-execution".to_owned(),
+                input_evidence: "metallib:pixelmagic.metallib".to_owned(),
+                output_evidence: "not-materialized".to_owned(),
+                next_action: "materialize-device-execution-sample".to_owned(),
             }],
         },
         payload_decoder_manifest: NsdbPayloadDecoderManifestInfo {
@@ -406,6 +422,15 @@ fn builds_replay_checkpoints_from_payload_events() {
         missing_metadata: Vec::new(),
     };
 
+    let inspect_json = crate::json::nsdb_inspect_report_json(&report);
+    assert!(inspect_json.contains("\"hetero_runtime_trace_device_sample_handoff_record_count\":1"));
+    assert!(inspect_json.contains(
+        "\"hetero_runtime_trace_device_sample_handoff_protocol\":\"nuis-device-sample-provider-handoff-v1\""
+    ));
+    assert!(inspect_json.contains("\"device_sample_handoffs\":[{"));
+    assert!(inspect_json.contains("\"provider_family\":\"metal:apple-silicon-gpu\""));
+    assert!(inspect_json.contains("\"handoff_status\":\"awaiting-provider-handoff\""));
+
     let plan = build_replay_plan(&report);
 
     assert_eq!(plan.protocol, "nsdb-payload-execution-replay-plan-v1");
@@ -436,6 +461,20 @@ fn builds_replay_checkpoints_from_payload_events() {
         plan.checkpoints[1].checkpoint_kind,
         "device-dispatch-checkpoint"
     );
+    assert_eq!(
+        plan.checkpoints[1].value_sample_resolution_status,
+        "provider-handoff-observed"
+    );
+    assert!(plan.checkpoints[1]
+        .value_sample_resolution_detail
+        .contains("device-sample-handoff:hetero-trace:shader:metal:apple-silicon-gpu"));
+    assert_eq!(
+        plan.checkpoints[1].value_sample_materialization_status,
+        "provider-handoff-pending"
+    );
+    assert!(plan.checkpoints[1]
+        .value_sample_materialization_detail
+        .contains("provider-handoff:metal:apple-silicon-gpu"));
     assert_eq!(plan.checkpoints[1].value_sample_payload_format, "metallib");
     assert_eq!(
         plan.checkpoints[1].value_schema_hint,

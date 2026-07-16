@@ -204,6 +204,8 @@ fn load_stdlib_source_modules(root: &Path, module_dir: &str) -> Vec<String> {
 mod abi_surface;
 #[path = "main_tests/artifact_runtime.rs"]
 mod artifact_runtime;
+#[path = "main_tests/artifact_runtime_release_check.rs"]
+mod artifact_runtime_release_check;
 #[path = "main_tests/artifact_runtime_run_artifact.rs"]
 mod artifact_runtime_run_artifact;
 #[path = "main_tests/language_runner.rs"]

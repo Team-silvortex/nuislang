@@ -347,3 +347,288 @@ mod cpu Main {
         "\"run_artifact_prelaunch_reason\":\"nsld final executable pipeline reports an entrypoint, but the host entrypoint stub does not declare `nuis-nsld-host-entrypoint-v1`\""
     ));
 }
+
+#[test]
+fn build_report_json_exposes_shader_result_enum_bundle_summary() {
+    let project_root = checked_in_path("../../examples/projects/domains/shader_result_enum_demo");
+    let output_dir = temp_dir("build_report_shader_result_enum_outputs");
+
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    let json = render_build_report_json(&output_dir);
+
+    assert!(json.contains("\"ready_to_run\":true"));
+    assert!(json.contains("\"binary_name\":\"shader_result_enum_demo\""));
+    assert!(json.contains("\"packaging_mode\":\"window-aot-bundle\""));
+    assert!(json.contains("\"domain_units_count\":3"));
+    assert!(json.contains("\"heterogeneous_domain_count\":2"));
+    assert!(json.contains("\"domain_family\":\"cpu\""));
+    assert!(json.contains("\"domain_family\":\"data\""));
+    assert!(json.contains("\"domain_family\":\"shader\""));
+    assert!(json.contains("\"selected_lowering_target\":\"llvm\""));
+    assert!(json.contains("\"selected_lowering_target\":\"metal.apple-silicon-gpu\""));
+    assert!(json.contains("\"bridge_registry_units\":2"));
+    assert!(json.contains("\"host_bridge_plan_units\":2"));
+    assert!(json.contains("\"runtime_payload_backed_heterogeneous_units\":2"));
+    assert!(json.contains("\"runtime_host_yir_attempted\":true"));
+    assert!(json.contains("\"runtime_host_yir_ok\":true"));
+    assert!(json.contains("\"link_plan_final_stage\":\"heterogeneous-bundle-pack\""));
+    assert!(json.contains("\"link_plan_final_driver\":\"yir-pack-aot\""));
+    assert!(json.contains("\"link_plan_domain_units\":3"));
+    assert!(json.contains("\"link_plan_heterogeneous_domain_units\":2"));
+    assert!(json.contains("\"link_plan_heterogeneous_domain_ready_units\":2"));
+    assert!(json.contains("\"link_plan_heterogeneous_domain_registry_dispatch_ready_units\":2"));
+    assert!(json.contains("\"link_plan_heterogeneous_backend_artifact_units\":1"));
+    assert!(json.contains("\"link_plan_heterogeneous_backend_artifact_ready_units\":1"));
+    assert!(json.contains("\"link_plan_heterogeneous_domain_readiness_ready\":true"));
+    assert!(json.contains("\"link_plan_heterogeneous_domain_families\":[\"data\",\"shader\"]"));
+    assert!(json.contains("\"link_plan_heterogeneous_backend_artifact_first_unready\":null"));
+    assert!(
+        json.contains("\"link_plan_heterogeneous_domain_registry_dispatch_first_blocked\":null")
+    );
+    assert!(json.contains("\"backend_artifact_candidate\":true"));
+    assert!(json.contains("\"backend_artifact_ready\":true"));
+    assert!(json.contains("\"registry_dispatch_readiness_status\":\"ready\""));
+    assert!(json.contains("\"registry_dispatch_readiness_ready\":true"));
+}
+
+#[test]
+fn run_artifact_json_exposes_bridge_bearing_exchange_summary() {
+    let project_root = checked_in_path("../../examples/projects/domains/shader_packet_bridge_demo");
+    let output_dir = temp_dir("run_artifact_shader_packet_bridge_outputs");
+
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    let json = render_run_artifact_json(&output_dir.join("nuis.build.manifest.toml"));
+
+    assert!(json.contains("\"binary_resolved\":true"));
+    assert!(json.contains("\"heterogeneous_domain_count\":2"));
+    assert!(json.contains("\"bridge_registry_units\":2"));
+    assert!(json.contains("\"host_bridge_plan_units\":2"));
+    assert!(json.contains("\"domain_payload_blobs_checked\":2"));
+    assert!(json.contains("\"domain_payload_bridge_plans_checked\":2"));
+    assert!(json.contains("\"link_plan_final_stage\":\"heterogeneous-bundle-pack\""));
+    assert!(json.contains("\"link_plan_final_driver\":\"yir-pack-aot\""));
+    assert!(json.contains("\"link_plan_domain_units\":3"));
+    assert!(json.contains("\"link_plan_heterogeneous_domain_registry_dispatch_ready_units\":2"));
+    assert!(
+        json.contains("\"link_plan_heterogeneous_domain_registry_dispatch_first_blocked\":null")
+    );
+    assert!(json.contains("\"registry_dispatch_readiness_status\":\"ready\""));
+    assert!(json.contains("\"hetero_runtime_trace_available\":true"));
+    assert!(json.contains("\"hetero_runtime_trace_status\":\"execution-pending\""));
+    assert!(json.contains(
+        "\"hetero_runtime_trace_debugger_contract\":\"nsdb-yir-hetero-runtime-trace-v1\""
+    ));
+    assert!(json.contains("\"hetero_runtime_trace_domain_count\":2"));
+    assert!(json.contains("\"hetero_runtime_trace_backend_artifact_count\":1"));
+    assert!(json.contains("\"hetero_runtime_trace_backend_artifact_ready_count\":1"));
+    assert!(json.contains("\"hetero_runtime_trace_record_count\":2"));
+    assert!(json.contains("\"hetero_runtime_trace_ready_record_count\":0"));
+    assert!(json.contains("\"hetero_runtime_trace_backend_execution_record_count\":1"));
+    assert!(json.contains("\"hetero_runtime_trace_device_sample_descriptor_count\":1"));
+    assert!(json.contains("\"hetero_runtime_trace_device_sample_ready_count\":0"));
+    assert!(json.contains("\"hetero_runtime_trace_device_sample_pending_count\":1"));
+    assert!(json.contains("\"hetero_runtime_trace_device_sample_pending_validation_count\":1"));
+    assert!(json.contains("\"hetero_runtime_trace_device_sample_handoff_record_count\":1"));
+    assert!(json.contains(
+        "\"hetero_runtime_trace_device_sample_handoff_protocol\":\"nuis-device-sample-provider-handoff-v1\""
+    ));
+    assert!(json.contains("\"hetero_runtime_trace_domain_families\":[\"data\",\"shader\"]"));
+    assert!(json.contains("\"hetero_runtime_trace_target_devices\":[\"apple-silicon-gpu\"]"));
+    assert!(json.contains(
+        "\"hetero_runtime_trace_device_sample_providers\":[\"nustar-deferred-device-sample-v1\"]"
+    ));
+    assert!(json.contains(
+        "\"hetero_runtime_trace_device_sample_provider_families\":[\"metal:apple-silicon-gpu\"]"
+    ));
+    assert!(json.contains(
+        "\"hetero_runtime_trace_device_sample_validation_statuses\":[\"pending-provider-execution\"]"
+    ));
+    assert!(json.contains(
+        "\"hetero_runtime_trace_device_sample_handoff_status\":\"provider-handoff-pending\""
+    ));
+    assert!(json.contains(
+        "\"hetero_runtime_trace_device_sample_first_pending_provider_family\":\"metal:apple-silicon-gpu\""
+    ));
+    assert!(json.contains("\"hetero_runtime_trace_records\":[{"));
+    assert!(json.contains("\"hetero_runtime_trace_persisted\":true"));
+    assert!(json.contains(
+        "\"hetero_runtime_trace_persistence_protocol\":\"nuis-nsdb-hetero-runtime-trace-v1\""
+    ));
+    assert!(json.contains("\"hetero_runtime_trace_path\":\""));
+    assert!(json.contains("\"hetero_runtime_trace_persisted_record_count\":2"));
+    assert!(json.contains("\"hetero_runtime_trace_persist_error\":null"));
+    assert!(json.contains("\"payload_decoder_manifest_persisted\":true"));
+    assert!(json.contains("\"payload_decoder_manifest_path\":\""));
+    assert!(json.contains("\"payload_decoder_manifest_persisted_record_count\":1"));
+    assert!(json.contains("\"payload_decoder_manifest_persist_error\":null"));
+    assert!(json.contains("\"trace_id\":\"hetero-trace:data:none:none\""));
+    assert!(json.contains("\"trace_role\":\"domain-metadata\""));
+    assert!(json.contains("\"status\":\"metadata-only\""));
+    assert!(json.contains("\"trace_id\":\"hetero-trace:shader:metal:apple-silicon-gpu\""));
+    assert!(json.contains("\"trace_role\":\"backend-artifact\""));
+    assert!(json.contains("\"status\":\"execution-pending\""));
+    assert!(json.contains("\"device_sample_provider\":\"nustar-deferred-device-sample-v1\""));
+    assert!(json.contains("\"device_sample_provider_family\":\"metal:apple-silicon-gpu\""));
+    assert!(json.contains("\"device_sample_kind\":\"deferred-provider-sample-descriptor\""));
+    assert!(json.contains("\"device_sample_status\":\"device-execution-pending\""));
+    assert!(json.contains("\"device_sample_schema\":\"nsdb-yir-device-execution-sample-v1\""));
+    assert!(json.contains("\"device_sample_input_evidence\":\"ndpb-v2:"));
+    assert!(json.contains("\"device_sample_output_evidence\":\"not-materialized\""));
+    assert!(json.contains("\"device_sample_validation_status\":\"pending-provider-execution\""));
+    assert!(json.contains("\"device_sample_handoff_target\":\"metal:apple-silicon-gpu\""));
+    assert!(json.contains("\"device_sample_handoff_status\":\"awaiting-provider-handoff\""));
+    assert!(json.contains("\"device_sample_next_action\":\"materialize-device-execution-sample\""));
+    assert!(json.contains("\"next_action\":\"materialize-device-execution-trace\""));
+    assert!(json.contains("\"hetero_runtime_trace_first_blocker\":null"));
+    assert!(json
+        .contains("\"hetero_runtime_trace_next_action\":\"materialize-device-execution-trace\""));
+    let persisted_trace =
+        fs::read_to_string(output_dir.join("nuis.nsdb.hetero-runtime-trace.toml"))
+            .expect("hetero runtime trace metadata is persisted");
+    assert!(persisted_trace.contains("protocol = \"nuis-nsdb-hetero-runtime-trace-v1\""));
+    assert!(persisted_trace.contains("debugger_contract = \"nsdb-yir-hetero-runtime-trace-v1\""));
+    assert!(persisted_trace.contains("device_sample_descriptor_count = 1"));
+    assert!(persisted_trace.contains("device_sample_pending_count = 1"));
+    assert!(persisted_trace.contains("device_sample_pending_validation_count = 1"));
+    assert!(persisted_trace.contains("device_sample_handoff_record_count = 1"));
+    assert!(persisted_trace
+        .contains("device_sample_handoff_protocol = \"nuis-device-sample-provider-handoff-v1\""));
+    assert!(persisted_trace
+        .contains("device_sample_providers = [\"nustar-deferred-device-sample-v1\"]"));
+    assert!(
+        persisted_trace.contains("device_sample_provider_families = [\"metal:apple-silicon-gpu\"]")
+    );
+    assert!(persisted_trace
+        .contains("device_sample_validation_statuses = [\"pending-provider-execution\"]"));
+    assert!(persisted_trace.contains("device_sample_handoff_status = \"provider-handoff-pending\""));
+    assert!(persisted_trace
+        .contains("device_sample_first_pending_provider_family = \"metal:apple-silicon-gpu\""));
+    assert!(persisted_trace.contains("[[device_sample_handoffs]]"));
+    assert!(persisted_trace.contains("protocol = \"nuis-device-sample-provider-handoff-v1\""));
+    assert!(persisted_trace.contains("provider_family = \"metal:apple-silicon-gpu\""));
+    assert!(persisted_trace.contains("handoff_status = \"awaiting-provider-handoff\""));
+    assert!(persisted_trace.contains("[[records]]"));
+    assert!(persisted_trace.contains("trace_id = \"hetero-trace:shader:metal:apple-silicon-gpu\""));
+    assert!(
+        persisted_trace.contains("device_sample_provider = \"nustar-deferred-device-sample-v1\"")
+    );
+    assert!(persisted_trace.contains("device_sample_provider_family = \"metal:apple-silicon-gpu\""));
+    assert!(
+        persisted_trace.contains("device_sample_kind = \"deferred-provider-sample-descriptor\"")
+    );
+    assert!(
+        persisted_trace.contains("device_sample_schema = \"nsdb-yir-device-execution-sample-v1\"")
+    );
+    assert!(persisted_trace.contains("device_sample_output_evidence = \"not-materialized\""));
+    assert!(persisted_trace
+        .contains("device_sample_validation_status = \"pending-provider-execution\""));
+    assert!(persisted_trace.contains("device_sample_handoff_target = \"metal:apple-silicon-gpu\""));
+    assert!(
+        persisted_trace.contains("device_sample_handoff_status = \"awaiting-provider-handoff\"")
+    );
+    assert!(persisted_trace.contains("next_action = \"materialize-device-execution-trace\""));
+    let decoder_manifest = fs::read_to_string(output_dir.join("nuis.nsdb.payload-decoders.toml"))
+        .expect("payload decoder manifest is persisted");
+    assert!(decoder_manifest.contains("protocol = \"nuis-nsdb-payload-decoders-v1\""));
+    assert!(decoder_manifest.contains("schema = \"nsdb-payload-decoder-manifest-v1\""));
+    assert!(decoder_manifest.contains("[[decoders]]"));
+    assert!(decoder_manifest.contains("payload_format = \"ndpb-v2\""));
+    assert!(decoder_manifest.contains("decoder_capability = \"opaque-file-summary\""));
+
+    let doctor_json = render_artifact_doctor_json(&output_dir);
+    assert!(doctor_json.contains("\"artifact_payload_decoder_manifest_available\":true"));
+    assert!(doctor_json.contains("\"artifact_payload_decoder_manifest_path\":\""));
+    assert!(doctor_json.contains(
+        "\"artifact_payload_decoder_manifest_protocol\":\"nuis-nsdb-payload-decoders-v1\""
+    ));
+    assert!(doctor_json.contains(
+        "\"artifact_payload_decoder_manifest_schema\":\"nsdb-payload-decoder-manifest-v1\""
+    ));
+    assert!(doctor_json.contains("\"artifact_payload_decoder_manifest_status\":\"ready\""));
+    assert!(doctor_json.contains("\"artifact_payload_decoder_manifest_record_count\":1"));
+    assert!(doctor_json.contains("\"artifact_payload_decoder_manifest_invalid_record_count\":0"));
+    assert!(doctor_json.contains(
+        "\"artifact_payload_decoder_manifest_first_diagnostic\":\"manifest-external-decoder-loaded\""
+    ));
+}
+
+#[test]
+fn unpack_artifact_support_materializes_embedded_sidecars_for_bridge_project() {
+    let project_root = checked_in_path("../../examples/projects/domains/shader_packet_bridge_demo");
+    let output_dir = temp_dir("unpack_artifact_support_bridge_build_outputs");
+    let unpack_dir = temp_dir("unpack_artifact_support_bridge_unpack_outputs");
+
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    handle_unpack_artifact_support(
+        output_dir.join("nuis.compiled.artifact"),
+        unpack_dir.clone(),
+        false,
+    )
+    .expect("unpack-artifact-support passes");
+
+    for path in [
+        unpack_dir.join("nuis.bridge.registry.toml"),
+        unpack_dir.join("nuis.host-bridge.plan-index.toml"),
+        unpack_dir.join("nuis.domain.data.artifact.toml"),
+        unpack_dir.join("nuis.domain.data.payload.toml"),
+        unpack_dir.join("nuis.domain.data.payload.bin"),
+        unpack_dir.join("nuis.domain.data.bridge.stub.txt"),
+        unpack_dir.join("nuis.domain.shader.artifact.toml"),
+        unpack_dir.join("nuis.domain.shader.payload.toml"),
+        unpack_dir.join("nuis.domain.shader.payload.bin"),
+        unpack_dir.join("nuis.domain.shader.bridge.stub.txt"),
+    ] {
+        assert!(
+            path.exists(),
+            "expected unpacked support `{}`",
+            path.display()
+        );
+    }
+}
+
+#[test]
+fn materialize_artifact_rebuilds_frontdoor_bundle_and_support_sidecars() {
+    let project_root = checked_in_path("../../examples/projects/domains/shader_packet_bridge_demo");
+    let build_output_dir = temp_dir("materialize_artifact_bridge_build_outputs");
+    let materialize_dir = temp_dir("materialize_artifact_bridge_bundle_outputs");
+
+    handle_build(
+        project_root,
+        build_output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
+    handle_materialize_artifact(
+        build_output_dir.join("nuis.build.manifest.toml"),
+        materialize_dir.clone(),
+        false,
+    )
+    .expect("materialize-artifact passes");
+
+    for path in [
+        materialize_dir.join("nuis.executable.envelope.toml"),
+        materialize_dir.join("nuis.build.manifest.toml"),
+        materialize_dir.join("nuis.compiled.artifact"),
+        materialize_dir.join("shader_packet_bridge_demo"),
+        materialize_dir.join("nuis.bridge.registry.toml"),
+        materialize_dir.join("nuis.host-bridge.plan-index.toml"),
+        materialize_dir.join("nuis.domain.data.payload.bin"),
+        materialize_dir.join("nuis.domain.shader.payload.bin"),
+    ] {
+        assert!(
+            path.exists(),
+            "expected materialized output `{}`",
+            path.display()
+        );
+    }
+
+    let report = nuisc::aot::verify_build_manifest(
+        materialize_dir.join("nuis.build.manifest.toml").as_path(),
+    )
+    .expect("materialized manifest verifies");
+    assert_eq!(report.artifact_binary_name, "shader_packet_bridge_demo");
+    assert_eq!(report.packaging_mode, "window-aot-bundle");
+}
