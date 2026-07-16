@@ -686,6 +686,8 @@ pub(crate) struct NsldFinalExecutableOutputReport {
     pub(crate) final_output_nsdb_replay_ready: bool,
     pub(crate) final_output_nsdb_replay_status: String,
     pub(crate) final_output_nsdb_replay_command: Option<String>,
+    pub(crate) final_output_nsdb_replay_checkpoint_count: usize,
+    pub(crate) final_output_nsdb_replayable_checkpoint_count: usize,
     pub(crate) final_output_nsdb_replay_first_blocker: Option<String>,
     pub(crate) device_provider_sample_manifest_available: bool,
     pub(crate) device_provider_sample_manifest_path: String,

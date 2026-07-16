@@ -21,6 +21,7 @@ mod dev_tensor_drift;
 mod dev_tensor_drift_data;
 mod dev_tensor_drift_data_core;
 mod dev_tensor_drift_data_runtime;
+mod dev_tensor_drift_data_runtime_dev;
 mod dev_tensor_drift_data_runtime_nsld;
 mod dev_tensor_hierarchy;
 mod dev_tensor_manifest;
@@ -195,6 +196,38 @@ fn run() -> Result<(), String> {
             println!(
                 "  dev_tensor_weakest_bootstrap_function: {}",
                 dev_tensor.weakest_bootstrap_function
+            );
+            println!(
+                "  dev_tensor_weakest_task_card_protocol: {}",
+                dev_tensor.weakest_bootstrap_task_card_protocol
+            );
+            println!(
+                "  dev_tensor_weakest_task_card_source: {}",
+                dev_tensor.weakest_bootstrap_task_card_source
+            );
+            println!(
+                "  dev_tensor_weakest_task_card_status: {}",
+                dev_tensor.weakest_bootstrap_task_card_status
+            );
+            println!(
+                "  dev_tensor_weakest_task_card_ready: {}",
+                dev_tensor.weakest_bootstrap_task_card_ready
+            );
+            println!(
+                "  dev_tensor_weakest_task_card_coordinate: {}",
+                dev_tensor.weakest_bootstrap_task_card_coordinate
+            );
+            println!(
+                "  dev_tensor_weakest_task_card_action: {}",
+                dev_tensor.weakest_bootstrap_task_card_action
+            );
+            println!(
+                "  dev_tensor_weakest_task_card_command: {}",
+                dev_tensor.weakest_bootstrap_task_card_command
+            );
+            println!(
+                "  dev_tensor_weakest_task_card_expected_artifact: {}",
+                dev_tensor.weakest_bootstrap_task_card_expected_artifact
             );
             println!(
                 "  dev_tensor_coverage_status: {}",

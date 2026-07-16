@@ -120,7 +120,10 @@ mod cpu Main {
     assert!(json.contains(" --apply --until-clean --json\""));
     assert!(json.contains("\"artifact_nsld_drive_command_set\":{"));
     assert!(json.contains("\"protocol\":\"nsld-drive-command-set-v1\""));
+    assert!(json.contains("\"safe_next_contract\":\"nsld-drive-safe-next-v1\""));
     assert!(json.contains("\"recommended_first_json_command\":\"nsld drive "));
+    assert!(json.contains("\"safe_next_probe_json_command\":\"nsld drive "));
+    assert!(json.contains("\"safe_next_gate_required_field\":\"safe_next_gate_required\""));
     assert!(json.contains("\"dry_run_mutates_artifacts\":false"));
     assert!(json.contains("\"apply_next_mutates_artifacts\":true"));
     assert!(json.contains("\"apply_until_clean_mutates_artifacts\":true"));
@@ -270,7 +273,10 @@ mod cpu Main {
     assert!(json.contains("\"closure_summary_status\":\"blocked\""));
     assert!(json.contains("\"closure_summary_ready\":false"));
     assert!(json.contains("\"closure_summary_primary_blocker\":\"declared-tests-missing\""));
-    assert!(json.contains("\"closure_summary_next_action\":\"project_tests_missing\""));
+    assert!(json.contains("\"closure_summary_next_action\":\"galaxy_lock_deps\""));
+    assert!(json.contains(
+        "\"closure_summary_next_command\":\"nuis galaxy lock-deps <project-dir|nuis.toml>\""
+    ));
     assert!(json.contains("\"artifact_nsld_drive_dry_run_command\":\"nsld drive "));
     assert!(json.contains("\"artifact_nsld_drive_dry_run_json_command\":\"nsld drive "));
     assert!(json.contains(" --json\""));
@@ -282,6 +288,8 @@ mod cpu Main {
     assert!(json.contains(" --apply --until-clean --json\""));
     assert!(json.contains("\"artifact_nsld_drive_command_set\":{"));
     assert!(json.contains("\"protocol\":\"nsld-drive-command-set-v1\""));
+    assert!(json.contains("\"safe_next_contract\":\"nsld-drive-safe-next-v1\""));
+    assert!(json.contains("\"safe_next_probe_json_command\":\"nsld drive "));
     assert!(json.contains("\"recommended_first_json_command\":\"nsld drive "));
     assert!(json.contains("\"dry_run_mutates_artifacts\":false"));
     assert!(json.contains("\"apply_next_mutates_artifacts\":true"));

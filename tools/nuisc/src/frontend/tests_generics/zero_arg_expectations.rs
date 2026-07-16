@@ -345,3 +345,112 @@ fn keeps_result_constructor_inference_when_let_binding_provides_expected_type() 
             && matches!(fields.as_slice(), [(field, NirExpr::Int(7))] if field == "value")
     ));
 }
+
+#[test]
+fn keeps_result_constructor_inference_through_nested_if_match_expected_type() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Error {
+            Invalid,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn main() -> i64 {
+            let flag: i64 = 1;
+            let result: Result<i64, Error> = if flag == 1 {
+              Result.Ok(7)
+            } else {
+              match flag {
+                2 => {
+                  Result.Ok(9)
+                }
+                _ => {
+                  Result.Err(Error.Invalid)
+                }
+              }
+            };
+            match result {
+              Result.Ok(value) => {
+                return value;
+              }
+              Result.Err(_) => {
+                return 0;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::If { then_body, else_body, .. })
+            if branch_binds_result_variant(then_body, "Result.Ok", ["i64", "Error"], 7)
+                && matches!(
+                    else_body.as_slice(),
+                    [NirStmt::If {
+                        then_body: match_then_body,
+                        else_body: match_else_body,
+                        ..
+                    }] if branch_binds_result_variant(match_then_body, "Result.Ok", ["i64", "Error"], 9)
+                        && branch_binds_result_variant(match_else_body, "Result.Err", ["i64", "Error"], 0)
+                )
+    ));
+}
+
+fn branch_binds_result_variant<const N: usize>(
+    body: &[NirStmt],
+    expected_variant: &str,
+    expected_type_args: [&str; N],
+    expected_int_payload: i64,
+) -> bool {
+    matches!(
+        body,
+        [NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value:
+                NirExpr::StructLiteral {
+                    type_name,
+                    type_args,
+                    fields,
+                },
+        }] if name == "result"
+            && ty.render() == "Result<i64, Error>"
+            && type_name == expected_variant
+            && type_args.iter().map(|ty| ty.render()).collect::<Vec<_>>()
+                == expected_type_args.map(str::to_owned)
+            && branch_payload_matches(fields, expected_variant, expected_int_payload)
+    )
+}
+
+fn branch_payload_matches(
+    fields: &[(String, NirExpr)],
+    expected_variant: &str,
+    expected_int_payload: i64,
+) -> bool {
+    match expected_variant {
+        "Result.Ok" => matches!(
+            fields,
+            [(field, NirExpr::Int(value))]
+                if field == "value" && *value == expected_int_payload
+        ),
+        "Result.Err" => matches!(
+            fields,
+            [(field, NirExpr::StructLiteral { type_name, .. })]
+                if field == "value" && type_name == "Error.Invalid"
+        ),
+        _ => false,
+    }
+}

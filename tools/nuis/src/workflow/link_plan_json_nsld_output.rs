@@ -111,6 +111,18 @@ pub(super) fn nsld_final_output_json_fields(
             "nsld_final_executable_output_nsdb_replay_status",
             nsld_final_output.map(|summary| summary.nsdb_replay_status.as_str()),
         ),
+        json_usize_field(
+            "nsld_final_executable_output_nsdb_replay_checkpoint_count",
+            nsld_final_output
+                .map(|summary| summary.nsdb_replay_checkpoint_count)
+                .unwrap_or(0),
+        ),
+        json_usize_field(
+            "nsld_final_executable_output_nsdb_replayable_checkpoint_count",
+            nsld_final_output
+                .map(|summary| summary.nsdb_replayable_checkpoint_count)
+                .unwrap_or(0),
+        ),
         json_optional_string_field(
             "nsld_final_executable_output_nsdb_replay_command",
             nsld_final_output.and_then(|summary| summary.nsdb_replay_command.as_deref()),

@@ -70,7 +70,13 @@ mod cpu Main {
     )));
     assert!(json.contains("\"artifact_nsld_drive_command_set\":{"));
     assert!(json.contains("\"protocol\":\"nsld-drive-command-set-v1\""));
+    assert!(json.contains("\"safe_next_contract\":\"nsld-drive-safe-next-v1\""));
     assert!(json.contains("\"recommended_first_json_command\":\"nsld drive "));
+    assert!(json.contains("\"safe_next_probe_json_command\":\"nsld drive "));
+    assert!(json.contains("\"safe_next_action_field\":\"safe_next_action\""));
+    assert!(json.contains("\"safe_next_command_field\":\"safe_next_command\""));
+    assert!(json.contains("\"safe_next_gate_required_field\":\"safe_next_gate_required\""));
+    assert!(json.contains("\"safe_next_gate_action_field\":\"safe_next_gate_action\""));
     assert!(json.contains("\"dry_run_mutates_artifacts\":false"));
     assert!(json.contains("\"apply_next_mutates_artifacts\":true"));
     assert!(json.contains("\"apply_until_clean_mutates_artifacts\":true"));
@@ -438,7 +444,10 @@ mod cpu Main {
         "\"nsld_final_executable_output_nsdb_replay_contract\":\"nsdb-payload-execution-replay-plan-v1\""
     ));
     assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_ready\":true"));
-    assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_status\":\"ready\""));
+    assert!(json
+        .contains("\"nsld_final_executable_output_nsdb_replay_status\":\"replay-evidence-ready\""));
+    assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_checkpoint_count\":1"));
+    assert!(json.contains("\"nsld_final_executable_output_nsdb_replayable_checkpoint_count\":1"));
     assert!(
         json.contains("\"nsld_final_executable_output_nsdb_replay_command\":\"nsdb replay-plan ")
     );
@@ -530,6 +539,9 @@ mod cpu Main {
     )));
     assert!(json.contains("\"artifact_nsld_drive_command_set\":{"));
     assert!(json.contains("\"protocol\":\"nsld-drive-command-set-v1\""));
+    assert!(json.contains("\"safe_next_contract\":\"nsld-drive-safe-next-v1\""));
+    assert!(json.contains("\"safe_next_probe_json_command\":\"nsld drive "));
+    assert!(json.contains("\"safe_next_gate_required_field\":\"safe_next_gate_required\""));
     assert!(json.contains("\"artifact_ready_to_run\":false"));
     assert!(json.contains("\"artifact_diagnostic_code\":\"missing_outputs\""));
     assert!(json.contains("\"artifact_self_check_ready\":false"));

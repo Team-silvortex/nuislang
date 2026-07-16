@@ -9,7 +9,9 @@ use super::blocks::{
     rewrite_generic_calls_in_block, rewrite_generic_calls_in_match_arms, GenericBlockRewriteInput,
     GenericMatchArmsRewriteInput,
 };
-use super::blocks_expected::contains_unresolved_struct_placeholder;
+use super::blocks_expected::{
+    contains_unresolved_generic_placeholder, contains_unresolved_struct_placeholder,
+};
 use super::exprs::{rewrite_generic_calls_in_expr, GenericExprRewriteInput};
 use super::GenericImplMethodTemplate;
 
@@ -99,6 +101,14 @@ pub(super) fn rewrite_generic_calls_in_stmt(
                     .is_some_and(|ty| contains_unresolved_struct_placeholder(ty, struct_table))
             {
                 inferred = None;
+            }
+            if ty.is_none()
+                && let_fallback_expected.is_some()
+                && inferred
+                    .as_ref()
+                    .is_some_and(contains_unresolved_generic_placeholder)
+            {
+                inferred = let_fallback_expected.cloned();
             }
             if let Some(inferred_ty) = &inferred {
                 env.insert(name.clone(), inferred_ty.clone());

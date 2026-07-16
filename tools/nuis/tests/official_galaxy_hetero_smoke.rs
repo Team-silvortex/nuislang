@@ -165,11 +165,32 @@ fn assert_official_galaxy_hetero_build(
     assert!(provider_samples.contains("pending_record_count = 0"));
     assert!(provider_samples.contains("sample_status = \"provider-execution-ready\""));
     assert!(provider_samples.contains("validation_status = \"provider-execution-validated\""));
-    assert!(provider_samples.contains("output_evidence = \""));
+    assert!(provider_samples.contains("output_evidence = \"nuis.nsdb.provider-sample."));
+    assert!(provider_samples.contains(":hash=0x"));
     assert!(provider_samples.contains("materialization_status = \"provider-sample-materialized\""));
+    assert!(provider_samples.contains("provider_runner_contract = \"nuis-provider-runner-v1\""));
     assert!(provider_samples
-        .contains("materialization_detail = \"mock-provider-runtime-result-materialized\""));
+        .contains("provider_runner_adapter_contract = \"nuis-provider-runner-adapter-v1\""));
+    assert!(provider_samples.contains("provider_runner_adapter_id = \""));
+    assert!(provider_samples
+        .contains("provider_runner_adapter_capability_status = \"registered-host-simulated\""));
+    assert!(
+        provider_samples.contains("provider_execution_mode = \"host-simulated-provider-runner\"")
+    );
+    assert!(provider_samples
+        .contains("materialization_detail = \"deterministic-provider-sample-artifact:"));
     assert!(provider_samples.contains("next_action = \"replay-device-sample\""));
+    assert!(
+        fs::read_dir(&output_dir)
+            .unwrap()
+            .filter_map(Result::ok)
+            .any(|entry| entry
+                .file_name()
+                .to_string_lossy()
+                .starts_with("nuis.nsdb.provider-sample.")),
+        "provider sample artifact was not materialized in {}",
+        output_dir.display()
+    );
     assert!(doctor_after_stdout
         .contains("\"artifact_device_provider_sample_manifest_status\":\"ready\""));
     assert!(doctor_after_stdout

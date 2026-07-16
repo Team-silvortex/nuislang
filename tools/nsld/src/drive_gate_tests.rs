@@ -170,6 +170,80 @@ fn drive_apply_report_json_exposes_gate_fields_when_boundary_is_read_only() {
     assert!(json.contains(
         "\"safe_next_command\":\"env NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke NUIS_NSLD_ALLOW_HOST_FINALIZER=1 nsld final-executable-output manifest.toml\""
     ));
+    assert!(json.contains("\"safe_next_contract\":\"nsld-drive-safe-next-v1\""));
+    assert!(json.contains("\"safe_next_gate_required\":true"));
+    assert!(json.contains(
+        "\"safe_next_gate_action\":\"set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke\""
+    ));
+    assert!(json.contains(
+        "\"safe_next_reason\":\"drive stopped at an explicit boundary; run the safe_next_command only if you accept the listed gate\""
+    ));
+}
+
+#[test]
+fn drive_until_clean_report_json_exposes_boundary_safe_next_contract() {
+    let report = NsldDriveUntilCleanReport {
+        completed: false,
+        applied_steps: 5,
+        capped: false,
+        stop_reason: "host-finalizer-policy-required".to_owned(),
+        stop_command_id: Some("final-executable-output".to_owned()),
+        stop_source: Some("final-output-boundary".to_owned()),
+        stop_command_resolved: Some("nsld final-executable-output manifest.toml".to_owned()),
+        stop_action_reason: Some(
+            "final executable output boundary is blocked by `final-executable-output:not-nsld-owned`; next_gate_action:set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke"
+                .to_owned(),
+        ),
+        stop_gate_action: Some(
+            "set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke".to_owned(),
+        ),
+        stop_gate_env_assignments: vec![
+            "NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke".to_owned(),
+        ],
+        stop_crossing_env_assignments: vec![
+            "NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke".to_owned(),
+            "NUIS_NSLD_ALLOW_HOST_FINALIZER=1".to_owned(),
+        ],
+        stop_crossing_command_resolved: Some(
+            "env NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke NUIS_NSLD_ALLOW_HOST_FINALIZER=1 nsld final-executable-output manifest.toml"
+                .to_owned(),
+        ),
+        last_command_id: Some("emit-final-executable-pipeline".to_owned()),
+        messages: vec![
+            "applied emit-final-executable-pipeline".to_owned(),
+            "read-only-boundary:final-executable-output".to_owned(),
+        ],
+    };
+    let json = nsld_drive_until_clean_report_json(&report);
+
+    assert!(json.contains("\"kind\":\"nsld_drive_until_clean\""));
+    assert!(json.contains("\"completed\":false"));
+    assert!(json.contains("\"mutates_artifacts\":true"));
+    assert!(json.contains("\"mutation_policy\":\"whitelisted-artifact-mutation-loop-stopped\""));
+    assert!(json.contains("\"stop_reason\":\"host-finalizer-policy-required\""));
+    assert!(json.contains("\"stop_command_id\":\"final-executable-output\""));
+    assert!(json.contains("\"stop_source\":\"final-output-boundary\""));
+    assert!(json.contains(
+        "\"stop_gate_action\":\"set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke\""
+    ));
+    assert!(json.contains(
+        "\"stop_gate_env_assignments\":[\"NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke\"]"
+    ));
+    assert!(json.contains(
+        "\"stop_crossing_env_assignments\":[\"NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke\",\"NUIS_NSLD_ALLOW_HOST_FINALIZER=1\"]"
+    ));
+    assert!(json.contains(
+        "\"stop_crossing_command_resolved\":\"env NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke NUIS_NSLD_ALLOW_HOST_FINALIZER=1 nsld final-executable-output manifest.toml\""
+    ));
+    assert!(json.contains("\"safe_next_action\":\"explicit-boundary-crossing-command-available\""));
+    assert!(json.contains(
+        "\"safe_next_command\":\"env NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke NUIS_NSLD_ALLOW_HOST_FINALIZER=1 nsld final-executable-output manifest.toml\""
+    ));
+    assert!(json.contains("\"safe_next_contract\":\"nsld-drive-safe-next-v1\""));
+    assert!(json.contains("\"safe_next_gate_required\":true"));
+    assert!(json.contains(
+        "\"safe_next_gate_action\":\"set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke\""
+    ));
     assert!(json.contains(
         "\"safe_next_reason\":\"drive stopped at an explicit boundary; run the safe_next_command only if you accept the listed gate\""
     ));

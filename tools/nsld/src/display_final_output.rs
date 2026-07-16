@@ -200,6 +200,14 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         optional_string_text(report.final_output_nsdb_replay_command.as_deref())
     );
     println!(
+        "  final_output_nsdb_replay_checkpoint_count: {}",
+        report.final_output_nsdb_replay_checkpoint_count
+    );
+    println!(
+        "  final_output_nsdb_replayable_checkpoint_count: {}",
+        report.final_output_nsdb_replayable_checkpoint_count
+    );
+    println!(
         "  final_output_nsdb_replay_first_blocker: {}",
         optional_string_text(report.final_output_nsdb_replay_first_blocker.as_deref())
     );

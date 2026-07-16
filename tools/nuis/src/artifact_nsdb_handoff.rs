@@ -37,6 +37,10 @@ impl PersistedNsdbHandoffSummary {
         self.available
     }
 
+    pub(crate) fn record_count(&self) -> usize {
+        self.record_count
+    }
+
     pub(crate) fn ready_record_count(&self) -> usize {
         self.ready_record_count
     }

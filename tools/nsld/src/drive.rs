@@ -160,6 +160,15 @@ pub(crate) fn nsld_drive_apply_report_json(report: &NsldDriveApplyReport) -> Str
             "safe_next_command",
             drive_apply_safe_next_command(report).as_deref(),
         ),
+        json_string_field("safe_next_contract", drive_safe_next_contract()),
+        json_bool_field(
+            "safe_next_gate_required",
+            drive_apply_safe_next_gate_required(report),
+        ),
+        json_optional_string_field(
+            "safe_next_gate_action",
+            drive_apply_safe_next_gate_action(report),
+        ),
         json_string_field("safe_next_reason", drive_apply_safe_next_reason(report)),
         json_string_field("message", &report.message),
     ];
@@ -203,6 +212,15 @@ pub(crate) fn nsld_drive_until_clean_report_json(report: &NsldDriveUntilCleanRep
         json_optional_string_field(
             "safe_next_command",
             drive_until_clean_safe_next_command(report).as_deref(),
+        ),
+        json_string_field("safe_next_contract", drive_safe_next_contract()),
+        json_bool_field(
+            "safe_next_gate_required",
+            drive_until_clean_safe_next_gate_required(report),
+        ),
+        json_optional_string_field(
+            "safe_next_gate_action",
+            drive_until_clean_safe_next_gate_action(report),
         ),
         json_string_field(
             "safe_next_reason",
@@ -302,6 +320,18 @@ fn drive_apply_safe_next_reason(report: &NsldDriveApplyReport) -> &str {
     }
 }
 
+fn drive_safe_next_contract() -> &'static str {
+    "nsld-drive-safe-next-v1"
+}
+
+fn drive_apply_safe_next_gate_required(report: &NsldDriveApplyReport) -> bool {
+    !report.applied && report.crossing_command_resolved.is_some()
+}
+
+fn drive_apply_safe_next_gate_action(report: &NsldDriveApplyReport) -> Option<&str> {
+    drive_apply_safe_next_gate_required(report).then_some(report.gate_action.as_deref())?
+}
+
 fn drive_until_clean_safe_next_action(report: &NsldDriveUntilCleanReport) -> &'static str {
     if report.completed {
         "clean"
@@ -312,6 +342,15 @@ fn drive_until_clean_safe_next_action(report: &NsldDriveUntilCleanReport) -> &'s
     } else {
         "no-safe-next-command"
     }
+}
+
+fn drive_until_clean_safe_next_gate_required(report: &NsldDriveUntilCleanReport) -> bool {
+    !report.completed && report.stop_crossing_command_resolved.is_some()
+}
+
+fn drive_until_clean_safe_next_gate_action(report: &NsldDriveUntilCleanReport) -> Option<&str> {
+    drive_until_clean_safe_next_gate_required(report)
+        .then_some(report.stop_gate_action.as_deref())?
 }
 
 fn drive_until_clean_safe_next_command(report: &NsldDriveUntilCleanReport) -> Option<String> {

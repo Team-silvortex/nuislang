@@ -84,6 +84,10 @@ The JSON surface is intentionally simple:
 * `weakest_bootstrap_next_action`
 * `weakest_bootstrap_validation_command`
 * `weakest_bootstrap_expected_artifact`
+* `weakest_bootstrap_task_card_protocol`
+* `weakest_bootstrap_task_card_source`
+* `weakest_bootstrap_task_card_status`
+* `weakest_bootstrap_task_card_ready`
 * `weakest_bootstrap_task_card_coordinate`
 * `weakest_bootstrap_task_card_priority_reason`
 * `weakest_bootstrap_task_card_action`
@@ -175,9 +179,14 @@ The summary also mirrors the weakest bootstrap-critical function cell as a
 small navigation bundle: status, progress, closure role, evidence, and next
 step. This is the preferred first read when choosing the next mainline task.
 The same weakest cell is also projected into a small task-card surface:
-coordinate, priority reason, action, validation command, and expected artifact.
-That gives scripts and future self-hosted tooling one stable bundle to consume
-without reassembling many `weakest_bootstrap_*` fields by hand.
+protocol, source, status, ready flag, coordinate, priority reason, action,
+validation command, and expected artifact. That gives scripts and future
+self-hosted tooling one stable bundle to consume without reassembling many
+`weakest_bootstrap_*` fields by hand.
+
+The task-card protocol is `nuis-dev-tensor-task-card-v1`. A ready task card
+means the tensor found a weakest bootstrap-critical coordinate and coordinate
+coverage is currently clean.
 
 `nuis status` also prints the short tensor summary. That makes the model part
 of the toolchain self-orientation surface, not just a separate report command.
@@ -417,10 +426,10 @@ The stable part is the coordinate idea:
 
 `architecture x module x function -> status/progress/evidence/next_step/task-card`
 
-The task-card layer is intentionally small: `blocker`, `next_action`,
-`validation_command`, and `expected_artifact`. It lets the weakest bootstrap
-coordinate become a concrete work item without turning the tensor into a full
-issue tracker.
+The task-card layer is intentionally small: protocol/source/status/ready,
+`blocker`, `next_action`, `validation_command`, and `expected_artifact`. It lets
+the weakest bootstrap coordinate become a concrete work item without turning
+the tensor into a full issue tracker.
 
 Future work should move cells from static entries toward generated readings
 from:

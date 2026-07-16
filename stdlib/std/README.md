@@ -89,6 +89,10 @@ Use these as the primary cluster names when placing new work:
     `StdReportContracts` helper can consume an argv output path, write an
     inspectable report file, echo the same report to stdout, and preserve
     text-stat validation through the std lane.
+  - hetero provider samples now surface a `nuis-provider-runner-adapter-v1`
+    adapter contract, adapter id, and adapter capability status so the current
+    host-simulated provider runner is a registered adapter rather than a
+    hard-coded backend limit.
 * task/runtime
   - local router:
     [task/README.md](task/README.md)

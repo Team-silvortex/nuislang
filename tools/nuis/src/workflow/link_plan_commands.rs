@@ -3,7 +3,13 @@ use std::path::Path;
 
 pub(crate) struct NsldDriveCommandSet {
     pub(crate) protocol: String,
+    pub(crate) safe_next_contract: String,
     pub(crate) recommended_first_json_command: String,
+    pub(crate) safe_next_probe_json_command: String,
+    pub(crate) safe_next_action_field: String,
+    pub(crate) safe_next_command_field: String,
+    pub(crate) safe_next_gate_required_field: String,
+    pub(crate) safe_next_gate_action_field: String,
     pub(crate) dry_run_command: String,
     pub(crate) dry_run_json_command: String,
     pub(crate) dry_run_mutates_artifacts: bool,
@@ -68,9 +74,17 @@ pub(crate) fn nsld_drive_apply_until_clean_json_command_for_output_dir(
 
 pub(crate) fn nsld_drive_command_set_for_output_dir(output_dir: &Path) -> NsldDriveCommandSet {
     let dry_run_json_command = nsld_drive_dry_run_json_command_for_output_dir(output_dir);
+    let apply_until_clean_json_command =
+        nsld_drive_apply_until_clean_json_command_for_output_dir(output_dir);
     NsldDriveCommandSet {
         protocol: "nsld-drive-command-set-v1".to_owned(),
+        safe_next_contract: "nsld-drive-safe-next-v1".to_owned(),
         recommended_first_json_command: dry_run_json_command.clone(),
+        safe_next_probe_json_command: apply_until_clean_json_command.clone(),
+        safe_next_action_field: "safe_next_action".to_owned(),
+        safe_next_command_field: "safe_next_command".to_owned(),
+        safe_next_gate_required_field: "safe_next_gate_required".to_owned(),
+        safe_next_gate_action_field: "safe_next_gate_action".to_owned(),
         dry_run_command: nsld_drive_dry_run_command_for_output_dir(output_dir),
         dry_run_json_command,
         dry_run_mutates_artifacts: false,
@@ -78,9 +92,7 @@ pub(crate) fn nsld_drive_command_set_for_output_dir(output_dir: &Path) -> NsldDr
         apply_next_json_command: nsld_drive_apply_next_json_command_for_output_dir(output_dir),
         apply_next_mutates_artifacts: true,
         apply_until_clean_command: nsld_drive_apply_until_clean_command_for_output_dir(output_dir),
-        apply_until_clean_json_command: nsld_drive_apply_until_clean_json_command_for_output_dir(
-            output_dir,
-        ),
+        apply_until_clean_json_command,
         apply_until_clean_mutates_artifacts: true,
     }
 }
@@ -94,9 +106,30 @@ pub(crate) fn nsld_drive_command_set_json_field(
     };
     let fields = [
         json_field("protocol", &command_set.protocol),
+        json_field("safe_next_contract", &command_set.safe_next_contract),
         json_field(
             "recommended_first_json_command",
             &command_set.recommended_first_json_command,
+        ),
+        json_field(
+            "safe_next_probe_json_command",
+            &command_set.safe_next_probe_json_command,
+        ),
+        json_field(
+            "safe_next_action_field",
+            &command_set.safe_next_action_field,
+        ),
+        json_field(
+            "safe_next_command_field",
+            &command_set.safe_next_command_field,
+        ),
+        json_field(
+            "safe_next_gate_required_field",
+            &command_set.safe_next_gate_required_field,
+        ),
+        json_field(
+            "safe_next_gate_action_field",
+            &command_set.safe_next_gate_action_field,
         ),
         json_field("dry_run_command", &command_set.dry_run_command),
         json_field("dry_run_json_command", &command_set.dry_run_json_command),

@@ -710,7 +710,7 @@ next_action = "execute-provider-sample"
     );
     assert!(ready_plan.checkpoints[1]
         .value_sample_materialization_detail
-        .contains("mock-provider-runtime-result-materialized"));
+        .contains("deterministic-provider-sample-artifact"));
 
     fs::remove_dir_all(output_dir).unwrap();
 }

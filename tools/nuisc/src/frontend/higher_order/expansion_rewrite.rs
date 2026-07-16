@@ -92,7 +92,10 @@ pub(crate) fn rewrite_higher_order_calls_in_block(
 ) -> Result<Vec<AstStmt>, String> {
     let mut env = local_types.clone();
     let mut rewritten = Vec::with_capacity(body.len());
-    for stmt in body {
+    for (index, stmt) in body.iter().enumerate() {
+        let stmt_with_tail_expected =
+            let_binding_with_following_return_expected(stmt, &body[index + 1..], tail_expected);
+        let stmt = stmt_with_tail_expected.as_ref().unwrap_or(stmt);
         let rewritten_stmt = rewrite_higher_order_calls_in_stmt(
             stmt,
             current_return_type,
@@ -153,6 +156,34 @@ pub(crate) fn rewrite_higher_order_calls_in_block(
         rewritten.push(rewritten_stmt);
     }
     Ok(rewritten)
+}
+
+fn let_binding_with_following_return_expected(
+    stmt: &AstStmt,
+    following: &[AstStmt],
+    tail_expected: Option<&AstTypeRef>,
+) -> Option<AstStmt> {
+    let expected = tail_expected?;
+    let AstStmt::Let {
+        name,
+        ty: None,
+        value,
+        mutable,
+    } = stmt
+    else {
+        return None;
+    };
+    matches!(
+        following.first(),
+        Some(AstStmt::Return(Some(nuis_semantics::model::AstExpr::Var(returned))))
+            if returned == name
+    )
+    .then(|| AstStmt::Let {
+        mutable: *mutable,
+        name: name.clone(),
+        ty: Some(expected.clone()),
+        value: value.clone(),
+    })
 }
 
 pub(crate) fn rewrite_higher_order_calls_in_stmt(

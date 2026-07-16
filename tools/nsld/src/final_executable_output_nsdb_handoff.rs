@@ -27,13 +27,15 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
     report.final_output_nsdb_handoff_ready_record_count = summary.ready_record_count;
     report.final_output_nsdb_handoff_first_trace_id = summary.first_trace_id;
     report.final_output_nsdb_handoff_error = summary.error;
-    report.final_output_nsdb_replay_ready = summary.persisted && summary.ready_record_count > 0;
-    report.final_output_nsdb_replay_status = if report.final_output_nsdb_replay_ready {
-        "ready"
-    } else {
-        "blocked"
-    }
-    .to_owned();
+    let replay_summary = nsdb::payload_execution_replay_summary(output_dir_from_handoff_path(
+        &report.final_output_nsdb_handoff_path,
+    ));
+    report.final_output_nsdb_replay_contract = replay_summary.contract.to_owned();
+    report.final_output_nsdb_replay_ready = replay_summary.status == "replay-evidence-ready";
+    report.final_output_nsdb_replay_status = replay_summary.status;
+    report.final_output_nsdb_replay_checkpoint_count = replay_summary.checkpoint_count;
+    report.final_output_nsdb_replayable_checkpoint_count =
+        replay_summary.replayable_checkpoint_count;
     report.final_output_nsdb_replay_command = report.final_output_nsdb_replay_ready.then(|| {
         format!(
             "nsdb replay-plan {} --json",
@@ -45,10 +47,10 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
     report.final_output_nsdb_replay_first_blocker = if report.final_output_nsdb_replay_ready {
         None
     } else {
-        report
-            .final_output_nsdb_handoff_error
-            .clone()
-            .or_else(|| Some("final-output-nsdb-handoff-not-ready".to_owned()))
+        replay_summary
+            .first_blocker
+            .or_else(|| report.final_output_nsdb_handoff_error.clone())
+            .or_else(|| Some("final-output-nsdb-replay-not-ready".to_owned()))
     };
 }
 

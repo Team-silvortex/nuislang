@@ -405,6 +405,8 @@ pub(crate) fn nsld_final_executable_output_report(
         final_output_nsdb_replay_ready: nsdb_replay_ready,
         final_output_nsdb_replay_status: nsdb_replay_status,
         final_output_nsdb_replay_command: nsdb_replay_command,
+        final_output_nsdb_replay_checkpoint_count: 0,
+        final_output_nsdb_replayable_checkpoint_count: 0,
         final_output_nsdb_replay_first_blocker: nsdb_replay_first_blocker,
         device_provider_sample_manifest_available: device_provider_sample.available,
         device_provider_sample_manifest_path: device_provider_sample.path,

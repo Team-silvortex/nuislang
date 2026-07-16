@@ -103,6 +103,22 @@ pub(crate) fn render_dev_tensor_json_impl() -> String {
                 summary.weakest_bootstrap_expected_artifact,
             ),
             json_field(
+                "weakest_bootstrap_task_card_protocol",
+                summary.weakest_bootstrap_task_card_protocol,
+            ),
+            json_field(
+                "weakest_bootstrap_task_card_source",
+                summary.weakest_bootstrap_task_card_source,
+            ),
+            json_field(
+                "weakest_bootstrap_task_card_status",
+                summary.weakest_bootstrap_task_card_status,
+            ),
+            json_bool_field(
+                "weakest_bootstrap_task_card_ready",
+                summary.weakest_bootstrap_task_card_ready,
+            ),
+            json_field(
                 "weakest_bootstrap_task_card_coordinate",
                 &summary.weakest_bootstrap_task_card_coordinate,
             ),
@@ -357,6 +373,22 @@ pub(crate) fn render_dev_tensor_text_impl() -> Vec<String> {
         format!(
             "  weakest_bootstrap_expected_artifact: {}",
             summary.weakest_bootstrap_expected_artifact
+        ),
+        format!(
+            "  weakest_bootstrap_task_card_protocol: {}",
+            summary.weakest_bootstrap_task_card_protocol
+        ),
+        format!(
+            "  weakest_bootstrap_task_card_source: {}",
+            summary.weakest_bootstrap_task_card_source
+        ),
+        format!(
+            "  weakest_bootstrap_task_card_status: {}",
+            summary.weakest_bootstrap_task_card_status
+        ),
+        format!(
+            "  weakest_bootstrap_task_card_ready: {}",
+            summary.weakest_bootstrap_task_card_ready
         ),
         format!(
             "  weakest_bootstrap_task_card_coordinate: {}",

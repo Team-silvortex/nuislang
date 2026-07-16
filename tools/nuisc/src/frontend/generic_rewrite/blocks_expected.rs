@@ -28,6 +28,21 @@ pub(super) fn contains_unresolved_struct_placeholder(
         .any(|arg| contains_unresolved_struct_placeholder(arg, struct_table))
 }
 
+pub(super) fn contains_unresolved_generic_placeholder(ty: &AstTypeRef) -> bool {
+    (ty.generic_args.is_empty()
+        && !ty.is_optional
+        && !ty.is_ref
+        && is_placeholder_type_name(&ty.name))
+        || ty
+            .generic_args
+            .iter()
+            .any(contains_unresolved_generic_placeholder)
+}
+
+fn is_placeholder_type_name(name: &str) -> bool {
+    matches!(name, "T" | "U" | "V" | "E" | "K" | "R")
+}
+
 fn contains_definition_placeholder(ty: &AstTypeRef, placeholder_names: &BTreeSet<String>) -> bool {
     (ty.generic_args.is_empty()
         && !ty.is_optional
@@ -143,6 +158,9 @@ fn expected_type_for_var_from_following_stmts(
                 })
             })?
         }),
+        AstStmt::Return(Some(AstExpr::Var(var_name))) if var_name == current_name => {
+            current_return_type.cloned()
+        }
         _ => None,
     }
 }

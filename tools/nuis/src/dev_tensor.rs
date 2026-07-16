@@ -13,6 +13,8 @@ use crate::{
 };
 use std::collections::BTreeSet;
 
+pub(crate) const DEV_TENSOR_TASK_CARD_PROTOCOL: &str = "nuis-dev-tensor-task-card-v1";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct DevTensorCell {
     pub(crate) architecture: &'static str,
@@ -80,6 +82,10 @@ pub(crate) struct DevTensorSummary {
     pub(crate) weakest_bootstrap_next_action: &'static str,
     pub(crate) weakest_bootstrap_validation_command: &'static str,
     pub(crate) weakest_bootstrap_expected_artifact: &'static str,
+    pub(crate) weakest_bootstrap_task_card_protocol: &'static str,
+    pub(crate) weakest_bootstrap_task_card_source: &'static str,
+    pub(crate) weakest_bootstrap_task_card_status: &'static str,
+    pub(crate) weakest_bootstrap_task_card_ready: bool,
     pub(crate) weakest_bootstrap_task_card_coordinate: String,
     pub(crate) weakest_bootstrap_task_card_priority_reason: String,
     pub(crate) weakest_bootstrap_task_card_action: &'static str,
@@ -130,6 +136,7 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
             )
         })
         .unwrap_or_else(|| "no bootstrap-critical tensor cell is currently registered".to_owned());
+    let task_card_ready = weakest_bootstrap.is_some() && coverage.status == "clean";
     DevTensorSummary {
         architecture_count: architectures.len(),
         module_count: modules.len(),
@@ -180,6 +187,10 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
         weakest_bootstrap_expected_artifact: weakest_bootstrap
             .map(|cell| cell.expected_artifact)
             .unwrap_or("<none>"),
+        weakest_bootstrap_task_card_protocol: DEV_TENSOR_TASK_CARD_PROTOCOL,
+        weakest_bootstrap_task_card_source: "weakest-bootstrap-progress",
+        weakest_bootstrap_task_card_status: if task_card_ready { "ready" } else { "blocked" },
+        weakest_bootstrap_task_card_ready: task_card_ready,
         weakest_bootstrap_task_card_coordinate: task_card_coordinate,
         weakest_bootstrap_task_card_priority_reason: task_card_priority_reason,
         weakest_bootstrap_task_card_action: weakest_bootstrap
@@ -354,6 +365,16 @@ mod tests {
         assert_ne!(summary.weakest_bootstrap_next_action, "<none>");
         assert_ne!(summary.weakest_bootstrap_validation_command, "<none>");
         assert_ne!(summary.weakest_bootstrap_expected_artifact, "<none>");
+        assert_eq!(
+            summary.weakest_bootstrap_task_card_protocol,
+            DEV_TENSOR_TASK_CARD_PROTOCOL
+        );
+        assert_eq!(
+            summary.weakest_bootstrap_task_card_source,
+            "weakest-bootstrap-progress"
+        );
+        assert_eq!(summary.weakest_bootstrap_task_card_status, "ready");
+        assert!(summary.weakest_bootstrap_task_card_ready);
         assert_ne!(summary.weakest_bootstrap_task_card_coordinate, "<none>");
         assert!(summary.weakest_bootstrap_task_card_coordinate.contains('/'));
         assert!(summary
@@ -445,6 +466,13 @@ mod tests {
         assert!(json.contains("\"weakest_bootstrap_next_action\""));
         assert!(json.contains("\"weakest_bootstrap_validation_command\""));
         assert!(json.contains("\"weakest_bootstrap_expected_artifact\""));
+        assert!(json
+            .contains("\"weakest_bootstrap_task_card_protocol\":\"nuis-dev-tensor-task-card-v1\""));
+        assert!(
+            json.contains("\"weakest_bootstrap_task_card_source\":\"weakest-bootstrap-progress\"")
+        );
+        assert!(json.contains("\"weakest_bootstrap_task_card_status\":\"ready\""));
+        assert!(json.contains("\"weakest_bootstrap_task_card_ready\":true"));
         assert!(json.contains("\"weakest_bootstrap_task_card_coordinate\""));
         assert!(json.contains("\"weakest_bootstrap_task_card_priority_reason\""));
         assert!(json.contains("\"weakest_bootstrap_task_card_action\""));
@@ -554,6 +582,10 @@ mod tests {
         assert!(text.contains("weakest_bootstrap_next_action:"));
         assert!(text.contains("weakest_bootstrap_validation_command:"));
         assert!(text.contains("weakest_bootstrap_expected_artifact:"));
+        assert!(text.contains("weakest_bootstrap_task_card_protocol: nuis-dev-tensor-task-card-v1"));
+        assert!(text.contains("weakest_bootstrap_task_card_source: weakest-bootstrap-progress"));
+        assert!(text.contains("weakest_bootstrap_task_card_status: ready"));
+        assert!(text.contains("weakest_bootstrap_task_card_ready: true"));
         assert!(text.contains("weakest_bootstrap_task_card_coordinate:"));
         assert!(text.contains("weakest_bootstrap_task_card_priority_reason:"));
         assert!(text.contains("weakest_bootstrap_task_card_action:"));

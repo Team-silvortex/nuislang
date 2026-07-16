@@ -84,6 +84,14 @@ At the current repo stage:
 * the std smoke lane also builds one PixelMagic shader pipeline demo and one
   WitSage kernel tensor demo, checking their hetero domain artifacts, payload
   metadata, and sidecar lowering IR without claiming full device execution yet
+* `nsdb materialize-provider-samples` now replaces the old mock provider result
+  string with a deterministic `nuis.nsdb.provider-sample.*.toml` artifact and
+  hash-backed `output_evidence`; this gives PixelMagic/WitSage a concrete
+  replay/debug artifact while keeping real Metal/CoreML provider runners as the
+  next step
+* provider samples now carry the `nuis-provider-runner-adapter-v1` adapter
+  contract, adapter id, and capability status; the current host-simulated
+  runner is therefore one registered adapter, not a baked-in backend limit
 
 Asset view by layer:
 

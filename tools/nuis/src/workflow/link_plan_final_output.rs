@@ -31,6 +31,8 @@ pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) nsdb_replay_contract: String,
     pub(crate) nsdb_replay_ready: bool,
     pub(crate) nsdb_replay_status: String,
+    pub(crate) nsdb_replay_checkpoint_count: usize,
+    pub(crate) nsdb_replayable_checkpoint_count: usize,
     pub(crate) nsdb_replay_command: Option<String>,
     pub(crate) nsdb_replay_first_blocker: Option<String>,
     pub(crate) recommended_next_action: String,
@@ -171,6 +173,8 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         nsdb_replay_contract: nsdb_replay.contract,
         nsdb_replay_ready: nsdb_replay.ready,
         nsdb_replay_status: nsdb_replay.status,
+        nsdb_replay_checkpoint_count: nsdb_replay.checkpoint_count,
+        nsdb_replayable_checkpoint_count: nsdb_replay.replayable_checkpoint_count,
         nsdb_replay_command: nsdb_replay.command,
         nsdb_replay_first_blocker: nsdb_replay.first_blocker,
         recommended_next_action,
@@ -195,6 +199,8 @@ struct NsldFinalExecutableOutputNsdbReplay {
     contract: String,
     ready: bool,
     status: String,
+    checkpoint_count: usize,
+    replayable_checkpoint_count: usize,
     command: Option<String>,
     first_blocker: Option<String>,
 }
@@ -203,21 +209,34 @@ fn nsld_final_executable_output_nsdb_replay(
     plan: &nuisc::linker::LinkPlan,
 ) -> NsldFinalExecutableOutputNsdbReplay {
     let handoff = read_persisted_nsdb_handoff(Some(Path::new(&plan.output_dir)));
-    let ready = handoff.available() && handoff.ready_record_count() > 0;
+    let checkpoint_count = handoff.record_count();
+    let replayable_checkpoint_count = handoff.ready_record_count();
+    let ready = handoff.available()
+        && checkpoint_count > 0
+        && checkpoint_count == replayable_checkpoint_count;
     NsldFinalExecutableOutputNsdbReplay {
         contract: "nsdb-payload-execution-replay-plan-v1".to_owned(),
         ready,
-        status: if ready { "ready" } else { "blocked" }.to_owned(),
+        status: if ready {
+            "replay-evidence-ready"
+        } else {
+            "blocked"
+        }
+        .to_owned(),
+        checkpoint_count,
+        replayable_checkpoint_count,
         command: ready.then(|| format!("nsdb replay-plan {} --json", plan.output_dir)),
         first_blocker: if ready {
             None
         } else {
-            Some(
-                handoff
-                    .error()
-                    .unwrap_or("final-output-nsdb-handoff-not-ready")
-                    .to_owned(),
-            )
+            let blocker = handoff.error().unwrap_or_else(|| {
+                if checkpoint_count == 0 {
+                    "payload-execution-replay:no-checkpoints"
+                } else {
+                    "payload-execution-replay:blocked-checkpoint"
+                }
+            });
+            Some(blocker.to_owned())
         },
     }
 }

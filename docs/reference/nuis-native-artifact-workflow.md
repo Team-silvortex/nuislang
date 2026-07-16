@@ -242,6 +242,9 @@ Short reading rule:
 * `workflow` tells you the shortest branch for the current input shape
 * `project-status` tells you the current project/build surface summary
 * `project-doctor` tells you the same route with more preflight/health detail
+* `closure_summary_*` is the canonical human closure line shared by
+  `workflow`, `project-status`, and `project-doctor`; read it before drilling
+  into the detailed Nsld, artifact, runtime, or project-health mirrors
 * `artifact-doctor` tells you whether the emitted native bundle is actually
   closed enough to run
 * final-output ownership fields tell you whether the visible host-native output

@@ -327,3 +327,105 @@ fn monomorphizes_generic_response_unwrap_through_task_join_and_branch_constructo
             if callee == "consume"
     ));
 }
+
+#[test]
+fn monomorphizes_no_annotation_try_await_result_binding_through_higher_order_mapper() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Error {
+            InvalidInput,
+          }
+
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn map_result<T, U, E>(result: Result<T, E>, mapper: Fn1<T, U>) -> Result<U, E> {
+            match result {
+              Result.Ok(value) => {
+                return Result.Ok(mapper(value));
+              }
+              Result.Err(error) => {
+                return Result.Err(error);
+              }
+            }
+          }
+
+          async fn work(seed: i64) -> i64 {
+            return seed + 1;
+          }
+
+          fn fetch(seed: i64) -> Result<Task<i64>, Error> {
+            if seed > 0 {
+              return Result.Ok(spawn(work(seed)));
+            }
+            return Result.Err(Error.InvalidInput);
+          }
+
+          async fn compute(seed: i64) -> Result<i64, Error> {
+            let mapped = map_result(
+              Result.Ok(await fetch(seed)?),
+              |value: i64| -> i64 { return value + 1; }
+            );
+            return mapped;
+          }
+
+          async fn main() -> Result<i64, Error> {
+            return await compute(3);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let compute = module
+        .functions
+        .iter()
+        .find(|function| function.name == "compute")
+        .unwrap();
+    assert!(compute
+        .body
+        .iter()
+        .any(|stmt| mapped_binding_is_concrete_result(stmt)));
+    assert!(matches!(
+        compute.body.last(),
+        Some(NirStmt::Return(Some(NirExpr::Var(name)))) if name == "mapped"
+    ));
+
+    let mapper = module
+        .functions
+        .iter()
+        .find(|function| {
+            function
+                .name
+                .starts_with("__hof_map_result___lambda_compute_0")
+                && matches!(
+                    function.return_type.as_ref().map(|ty| ty.render()),
+                    Some(rendered) if rendered == "Result<i64, Error>"
+                )
+        })
+        .unwrap();
+    assert!(mapper.generic_params.is_empty());
+    assert!(matches!(
+        mapper.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "Result<i64, Error>"
+    ));
+}
+
+fn mapped_binding_is_concrete_result(stmt: &NirStmt) -> bool {
+    match stmt {
+        NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::Call { callee, .. },
+        } => {
+            name == "mapped"
+                && ty.render() == "Result<i64, Error>"
+                && callee == "__hof_map_result___lambda_compute_0__i64__i64__Error"
+        }
+        NirStmt::If { else_body, .. } => else_body.iter().any(mapped_binding_is_concrete_result),
+        _ => false,
+    }
+}

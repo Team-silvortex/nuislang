@@ -111,6 +111,18 @@ fn run() -> Result<(), String> {
                     "device_provider_sample_materialized_record_count: {}",
                     report.materialized_record_count
                 );
+                println!(
+                    "device_provider_sample_first_runner_adapter_contract: {}",
+                    report.first_provider_runner_adapter_contract
+                );
+                println!(
+                    "device_provider_sample_first_runner_adapter_id: {}",
+                    report.first_provider_runner_adapter_id
+                );
+                println!(
+                    "device_provider_sample_first_runner_adapter_capability_status: {}",
+                    report.first_provider_runner_adapter_capability_status
+                );
                 println!("device_provider_sample_next_action: {}", report.next_action);
                 println!(
                     "device_provider_sample_next_command: {}",
@@ -134,7 +146,7 @@ fn provider_sample_materialize_json(
     report: &provider_sample_materialize::ProviderSampleMaterializeReport,
 ) -> String {
     format!(
-        "{{\"tool\":\"nsdb\",\"kind\":\"device_provider_sample_materialize\",\"status\":\"{}\",\"path\":\"{}\",\"provider_family_filter\":{},\"provider_families\":{},\"record_count\":{},\"matched_record_count\":{},\"materialized_record_count\":{},\"skipped_record_count\":{},\"first_provider_family\":\"{}\",\"first_output_evidence\":\"{}\",\"next_action\":\"{}\",\"next_command\":\"{}\",\"return_action\":\"{}\",\"return_command\":\"{}\"}}",
+        "{{\"tool\":\"nsdb\",\"kind\":\"device_provider_sample_materialize\",\"status\":\"{}\",\"path\":\"{}\",\"provider_family_filter\":{},\"provider_families\":{},\"record_count\":{},\"matched_record_count\":{},\"materialized_record_count\":{},\"skipped_record_count\":{},\"first_provider_family\":\"{}\",\"first_provider_runner_contract\":\"{}\",\"first_provider_runner_adapter_contract\":\"{}\",\"first_provider_runner_adapter_id\":\"{}\",\"first_provider_runner_adapter_capability_status\":\"{}\",\"first_provider_runner_kind\":\"{}\",\"first_provider_execution_mode\":\"{}\",\"first_output_evidence\":\"{}\",\"next_action\":\"{}\",\"next_command\":\"{}\",\"return_action\":\"{}\",\"return_command\":\"{}\"}}",
         json_escape(&report.status),
         json_escape(&report.path),
         json_optional_string(report.provider_family_filter.as_deref()),
@@ -144,6 +156,12 @@ fn provider_sample_materialize_json(
         report.materialized_record_count,
         report.skipped_record_count,
         json_escape(&report.first_provider_family),
+        json_escape(&report.first_provider_runner_contract),
+        json_escape(&report.first_provider_runner_adapter_contract),
+        json_escape(&report.first_provider_runner_adapter_id),
+        json_escape(&report.first_provider_runner_adapter_capability_status),
+        json_escape(&report.first_provider_runner_kind),
+        json_escape(&report.first_provider_execution_mode),
         json_escape(&report.first_output_evidence),
         json_escape(&report.next_action),
         json_escape(&report.next_command),
@@ -191,6 +209,12 @@ mod tests {
             materialized_record_count: 1,
             skipped_record_count: 1,
             first_provider_family: "metal:apple-silicon-gpu".to_owned(),
+            first_provider_runner_contract: "nuis-provider-runner-v1".to_owned(),
+            first_provider_runner_adapter_contract: "nuis-provider-runner-adapter-v1".to_owned(),
+            first_provider_runner_adapter_id: "metal.apple-silicon-gpu.host-simulated".to_owned(),
+            first_provider_runner_adapter_capability_status: "registered-host-simulated".to_owned(),
+            first_provider_runner_kind: "metal-host-simulated-runner".to_owned(),
+            first_provider_execution_mode: "host-simulated-provider-runner".to_owned(),
             first_output_evidence: "metallib:pixelmagic.metallib".to_owned(),
             next_action: "replay-provider-sample".to_owned(),
             next_command: "nsdb replay-plan out --json".to_owned(),
@@ -204,6 +228,20 @@ mod tests {
         assert!(json
             .contains("\"provider_families\":[\"metal:apple-silicon-gpu\",\"spirv:vulkan-gpu\"]"));
         assert!(json.contains("\"matched_record_count\":1"));
+        assert!(json.contains("\"first_provider_runner_contract\":\"nuis-provider-runner-v1\""));
+        assert!(json.contains(
+            "\"first_provider_runner_adapter_contract\":\"nuis-provider-runner-adapter-v1\""
+        ));
+        assert!(json.contains(
+            "\"first_provider_runner_adapter_id\":\"metal.apple-silicon-gpu.host-simulated\""
+        ));
+        assert!(json.contains(
+            "\"first_provider_runner_adapter_capability_status\":\"registered-host-simulated\""
+        ));
+        assert!(json.contains("\"first_provider_runner_kind\":\"metal-host-simulated-runner\""));
+        assert!(
+            json.contains("\"first_provider_execution_mode\":\"host-simulated-provider-runner\"")
+        );
         assert!(json.contains("\"return_action\":\"resume-nsld-final-output-check\""));
         assert!(json.contains("\"return_command\":\"nsld check out --json\""));
     }

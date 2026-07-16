@@ -73,6 +73,11 @@ Short rule:
 `workflow --json`, `project-status --json`, and `project-doctor --json` also
 share one compact frontdoor closure line:
 
+This group is the canonical human closure summary for frontdoor navigation. When
+the lower-level mirrors disagree in detail, read this group first, then drill
+down into the artifact, Nsld, runtime, or project-health sections named by
+`closure_summary_primary_blocker` and `closure_summary_next_action`.
+
 * `closure_summary_source`
   the frontdoor that derived the summary, such as `workflow-link-plan`,
   `project-status`, or `project-doctor`
@@ -91,6 +96,13 @@ share one compact frontdoor closure line:
 Short rule:
 
 `these fields are the first place to look when the lower-level status mirrors are too noisy`
+
+Reading order:
+
+1. `closure_summary_status`
+2. `closure_summary_primary_blocker`
+3. `closure_summary_next_action`
+4. `closure_summary_next_command`
 
 ## LinkPlan Fields
 
