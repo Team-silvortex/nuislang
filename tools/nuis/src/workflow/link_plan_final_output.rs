@@ -34,6 +34,8 @@ pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) nsdb_replay_checkpoint_count: usize,
     pub(crate) nsdb_replayable_checkpoint_count: usize,
     pub(crate) nsdb_replay_command: Option<String>,
+    pub(crate) nsdb_replay_next_action: String,
+    pub(crate) nsdb_replay_next_command: Option<String>,
     pub(crate) nsdb_replay_first_blocker: Option<String>,
     pub(crate) recommended_next_action: String,
     pub(crate) path_present: bool,
@@ -176,6 +178,8 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         nsdb_replay_checkpoint_count: nsdb_replay.checkpoint_count,
         nsdb_replayable_checkpoint_count: nsdb_replay.replayable_checkpoint_count,
         nsdb_replay_command: nsdb_replay.command,
+        nsdb_replay_next_action: nsdb_replay.next_action,
+        nsdb_replay_next_command: nsdb_replay.next_command,
         nsdb_replay_first_blocker: nsdb_replay.first_blocker,
         recommended_next_action,
         path_present,
@@ -202,6 +206,8 @@ struct NsldFinalExecutableOutputNsdbReplay {
     checkpoint_count: usize,
     replayable_checkpoint_count: usize,
     command: Option<String>,
+    next_action: String,
+    next_command: Option<String>,
     first_blocker: Option<String>,
 }
 
@@ -214,6 +220,21 @@ fn nsld_final_executable_output_nsdb_replay(
     let ready = handoff.available()
         && checkpoint_count > 0
         && checkpoint_count == replayable_checkpoint_count;
+    let command = ready.then(|| format!("nsdb replay-plan {} --json", plan.output_dir));
+    let next_action = if ready {
+        "replay-nsdb-payload-execution"
+    } else {
+        "resolve-final-output-nsdb-replay"
+    }
+    .to_owned();
+    let next_command = command.clone().or_else(|| {
+        Some(format!(
+            "nsld final-executable-output {} --json",
+            Path::new(&plan.output_dir)
+                .join("nuis.build.manifest.toml")
+                .display()
+        ))
+    });
     NsldFinalExecutableOutputNsdbReplay {
         contract: "nsdb-payload-execution-replay-plan-v1".to_owned(),
         ready,
@@ -225,7 +246,9 @@ fn nsld_final_executable_output_nsdb_replay(
         .to_owned(),
         checkpoint_count,
         replayable_checkpoint_count,
-        command: ready.then(|| format!("nsdb replay-plan {} --json", plan.output_dir)),
+        command,
+        next_action,
+        next_command,
         first_blocker: if ready {
             None
         } else {

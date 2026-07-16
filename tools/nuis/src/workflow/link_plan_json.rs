@@ -37,12 +37,6 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
         nsld_tail.as_ref(),
         nsld_final_output.as_ref(),
     );
-    let closure_summary = crate::closure_summary::FrontdoorClosureSummary::from_nsld_next_action(
-        "workflow-link-plan",
-        &nsld_next.action,
-        nsld_next.command.as_deref(),
-        &nsld_next.reason,
-    );
     let nsld_chain_next =
         nsld_artifact_chain_next_action_mirror(nsld_chain.as_ref(), nsld_tail.as_ref());
     let nsld_drive_recommendation = nsld_drive_recommendation_for_output_dir(
@@ -52,6 +46,18 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
     );
     let nsld_drive_command_set =
         link_plan.map(|plan| nsld_drive_command_set_for_output_dir(Path::new(&plan.output_dir)));
+    let closure_summary =
+        crate::closure_summary::FrontdoorClosureSummary::from_nsld_final_output_closure(
+            "workflow-link-plan",
+            &nsld_next.action,
+            nsld_next.command.as_deref(),
+            &nsld_next.reason,
+            nsld_final_output.as_ref(),
+        )
+        .with_nsld_drive_safe_next(
+            Some(&nsld_drive_recommendation),
+            nsld_drive_command_set.as_ref(),
+        );
     let domain_readiness = link_plan.map(workflow_domain_readiness_summary);
     let workflow_prelaunch =
         link_plan.map(|plan| workflow_run_artifact_prelaunch_summary(Path::new(&plan.output_dir)));

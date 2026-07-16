@@ -548,6 +548,13 @@ fn run_artifact_json_exposes_bridge_bearing_exchange_summary() {
     assert!(provider_samples.contains("[[device_provider_samples]]"));
     assert!(provider_samples.contains("trace_id = \"hetero-trace:shader:metal:apple-silicon-gpu\""));
     assert!(provider_samples.contains("provider_family = \"metal:apple-silicon-gpu\""));
+    assert!(provider_samples.contains("requested_runner_contract = \"nuis-provider-runner-v1\""));
+    assert!(provider_samples
+        .contains("requested_runner_adapter_contract = \"nuis-provider-runner-adapter-v1\""));
+    assert!(provider_samples
+        .contains("requested_runner_adapter_id = \"metal.apple-silicon-gpu.host-simulated\""));
+    assert!(provider_samples
+        .contains("requested_runner_adapter_capability_status = \"registered-host-simulated\""));
     assert!(provider_samples.contains("materialization_status = \"provider-sample-pending\""));
 
     let doctor_json = render_artifact_doctor_json(&output_dir);

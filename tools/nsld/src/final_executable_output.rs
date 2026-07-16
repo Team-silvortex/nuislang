@@ -347,6 +347,18 @@ pub(crate) fn nsld_final_executable_output_report(
             shell_quote_path(Path::new(&plan.output_dir))
         )
     });
+    let nsdb_replay_next_action = if nsdb_replay_ready {
+        "replay-nsdb-payload-execution"
+    } else {
+        "resolve-final-output-nsdb-replay"
+    }
+    .to_owned();
+    let nsdb_replay_next_command = nsdb_replay_command.clone().or_else(|| {
+        Some(format!(
+            "nsld final-executable-output {} --json",
+            shell_quote_path(manifest)
+        ))
+    });
 
     NsldFinalExecutableOutputReport {
         manifest: manifest.display().to_string(),
@@ -405,6 +417,8 @@ pub(crate) fn nsld_final_executable_output_report(
         final_output_nsdb_replay_ready: nsdb_replay_ready,
         final_output_nsdb_replay_status: nsdb_replay_status,
         final_output_nsdb_replay_command: nsdb_replay_command,
+        final_output_nsdb_replay_next_action: nsdb_replay_next_action,
+        final_output_nsdb_replay_next_command: nsdb_replay_next_command,
         final_output_nsdb_replay_checkpoint_count: 0,
         final_output_nsdb_replayable_checkpoint_count: 0,
         final_output_nsdb_replay_first_blocker: nsdb_replay_first_blocker,

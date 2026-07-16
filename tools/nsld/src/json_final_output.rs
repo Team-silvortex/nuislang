@@ -167,6 +167,14 @@ pub(crate) fn nsld_final_executable_output_report_json(
             "final_output_nsdb_replay_command",
             report.final_output_nsdb_replay_command.as_deref(),
         ),
+        json_string_field(
+            "final_output_nsdb_replay_next_action",
+            &report.final_output_nsdb_replay_next_action,
+        ),
+        json_optional_string_field(
+            "final_output_nsdb_replay_next_command",
+            report.final_output_nsdb_replay_next_command.as_deref(),
+        ),
         json_usize_field(
             "final_output_nsdb_replay_checkpoint_count",
             report.final_output_nsdb_replay_checkpoint_count,

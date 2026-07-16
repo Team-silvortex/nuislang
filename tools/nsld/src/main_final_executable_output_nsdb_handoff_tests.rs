@@ -79,6 +79,14 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
         .final_output_nsdb_replay_command
         .as_deref()
         .is_some_and(|command| command.starts_with("nsdb replay-plan ")));
+    assert_eq!(
+        output.final_output_nsdb_replay_next_action,
+        "replay-nsdb-payload-execution"
+    );
+    assert!(output
+        .final_output_nsdb_replay_next_command
+        .as_deref()
+        .is_some_and(|command| command.starts_with("nsdb replay-plan ")));
     assert!(output.final_output_nsdb_replay_first_blocker.is_none());
     assert!(output_json.contains(
         "\"final_output_nsdb_handoff_protocol\":\"nuis-nsdb-payload-execution-handoff-v1\""
@@ -96,6 +104,9 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
     assert!(output_json.contains("\"final_output_nsdb_replay_ready\":true"));
     assert!(output_json.contains("\"final_output_nsdb_replay_status\":\"replay-evidence-ready\""));
     assert!(output_json.contains("\"final_output_nsdb_replay_command\":\"nsdb replay-plan "));
+    assert!(output_json
+        .contains("\"final_output_nsdb_replay_next_action\":\"replay-nsdb-payload-execution\""));
+    assert!(output_json.contains("\"final_output_nsdb_replay_next_command\":\"nsdb replay-plan "));
     assert!(output_json.contains("\"final_output_nsdb_replay_checkpoint_count\":1"));
     assert!(output_json.contains("\"final_output_nsdb_replayable_checkpoint_count\":1"));
     assert!(output_json.contains("\"final_output_nsdb_replay_first_blocker\":null"));

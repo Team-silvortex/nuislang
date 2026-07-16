@@ -118,6 +118,20 @@ fn provider_sample_record_summary(
         trace_id,
         provider,
         provider_family,
+        requested_runner_contract: toml_string_value(record, "requested_runner_contract")
+            .unwrap_or_else(|| "none".to_owned()),
+        requested_runner_adapter_contract: toml_string_value(
+            record,
+            "requested_runner_adapter_contract",
+        )
+        .unwrap_or_else(|| "none".to_owned()),
+        requested_runner_adapter_id: toml_string_value(record, "requested_runner_adapter_id")
+            .unwrap_or_else(|| "none".to_owned()),
+        requested_runner_adapter_capability_status: toml_string_value(
+            record,
+            "requested_runner_adapter_capability_status",
+        )
+        .unwrap_or_else(|| "none".to_owned()),
         handoff_target: toml_string_value(record, "handoff_target")
             .unwrap_or_else(|| "none".to_owned()),
         sample_status: toml_string_value(record, "sample_status")

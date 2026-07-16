@@ -88,6 +88,7 @@ pub(in crate::lowering) fn lower_async_call_boundary(
 
     if state.async_helper_functions.contains(callee) {
         let call_name = next_name(state, "async_call");
+        let call_index = state.yir.nodes.len();
         let mut op_args = vec![callee.to_owned()];
         op_args.extend(lowered_args.clone());
         state.yir.nodes.push(Node {
@@ -104,9 +105,10 @@ pub(in crate::lowering) fn lower_async_call_boundary(
         }
 
         let returned = push_direct_call_node(function, &lowered_args, state)?;
+        let returned = wrap_async_value_if_needed(state, call_index, &returned);
         state.yir.edges.push(Edge {
             kind: EdgeKind::Effect,
-            from: call_name,
+            from: call_name.clone(),
             to: returned.clone(),
         });
         return Ok(returned);
@@ -118,6 +120,7 @@ pub(in crate::lowering) fn lower_async_call_boundary(
     }
 
     let call_name = next_name(state, "async_call");
+    let call_index = state.yir.nodes.len();
     let mut op_args = vec![callee.to_owned()];
     op_args.extend(lowered_args.clone());
     state.yir.nodes.push(Node {
@@ -137,12 +140,42 @@ pub(in crate::lowering) fn lower_async_call_boundary(
     let returned = lower_function_body(function, state, &mut local_bindings, false)?;
     state.call_stack.pop();
     let returned = returned.ok_or_else(|| format!("function `{callee}` did not return a value"))?;
+    let returned = wrap_async_value_if_needed(state, call_index, &returned);
     state.yir.edges.push(Edge {
         kind: EdgeKind::Effect,
-        from: call_name,
+        from: call_name.clone(),
         to: returned.clone(),
     });
     Ok(returned)
+}
+
+fn wrap_async_value_if_needed(
+    state: &mut LoweringState<'_>,
+    call_index: usize,
+    returned: &str,
+) -> String {
+    let returned_index = state
+        .yir
+        .nodes
+        .iter()
+        .position(|node| node.name == returned)
+        .unwrap_or(usize::MAX);
+    if returned_index > call_index {
+        return returned.to_owned();
+    }
+
+    let name = next_name(state, "async_value");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "async_value".to_owned(),
+            args: vec![returned.to_owned()],
+        },
+    });
+    push_dep_edges(state, returned, &name);
+    name
 }
 
 pub(in crate::lowering) fn lower_unary_cpu_expr(

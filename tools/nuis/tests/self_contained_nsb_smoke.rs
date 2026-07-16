@@ -61,14 +61,62 @@ fn ensure_host_runner_available() {
     assert_success(&output, "cargo build nuis-host-runner");
 }
 
+fn workflow_default_output_dir(input: &Path) -> PathBuf {
+    let label = input
+        .file_stem()
+        .or_else(|| input.file_name())
+        .and_then(|item| item.to_str())
+        .unwrap_or("input");
+    PathBuf::from(format!(
+        "target/nuis-build/{}",
+        sanitize_workflow_label(label)
+    ))
+}
+
+fn sanitize_workflow_label(label: &str) -> String {
+    let mut out = String::new();
+    let mut previous_was_sep = false;
+    for ch in label.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
+            previous_was_sep = false;
+        } else if !previous_was_sep {
+            out.push('-');
+            previous_was_sep = true;
+        }
+    }
+    let trimmed = out.trim_matches('-');
+    if trimmed.is_empty() {
+        "input".to_owned()
+    } else {
+        trimmed.to_owned()
+    }
+}
+
 #[test]
 fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
     let project_dir = temp_dir("self_contained_nsb_project");
-    let output_dir = temp_dir("self_contained_nsb_outputs");
+    let output_dir = std::env::current_dir()
+        .expect("current dir")
+        .join(workflow_default_output_dir(&project_dir));
+    if output_dir.exists() {
+        fs::remove_dir_all(&output_dir).unwrap_or_else(|error| {
+            panic!(
+                "failed to clear workflow default output `{}`: {error}",
+                output_dir.display()
+            )
+        });
+    }
+    fs::create_dir_all(&output_dir).unwrap();
     let source_path = project_dir.join("main.ns");
     fs::write(
         &source_path,
         "mod cpu Main { fn main() -> i64 { return 0; } }\n",
+    )
+    .unwrap();
+    fs::write(
+        project_dir.join("nuis.toml"),
+        "name = \"self_contained_nsb_smoke\"\nversion = \"0.1.0\"\nentry = \"main.ns\"\nmodules = [\"main.ns\"]\n",
     )
     .unwrap();
 
@@ -76,7 +124,7 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
         "build",
         "--packaging-mode",
         "nuis-self-contained-image",
-        &source_path.display().to_string(),
+        &project_dir.display().to_string(),
         &output_dir.display().to_string(),
     ]);
     assert_success(&build, "nuis build self-contained nsb smoke");
@@ -240,6 +288,40 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
             && nsdb_handoff.contains("entry_section_id = \"sec0000.compiled-artifact\"")
             && nsdb_handoff.contains("next_action = \"handoff-payload-trace-to-nsdb\""),
         "run-artifact should persist nsdb payload execution handoff metadata\n{nsdb_handoff}"
+    );
+
+    let workflow_json = run_nuis(&["workflow", "--json", &project_dir.display().to_string()]);
+    assert_success(
+        &workflow_json,
+        "nuis workflow json after self-contained nsld handoff",
+    );
+    let workflow_stdout = String::from_utf8_lossy(&workflow_json.stdout);
+    assert!(
+        workflow_stdout.contains("\"closure_summary_source\":\"workflow-link-plan\"")
+            && workflow_stdout.contains("\"closure_summary_status\":\"ready\"")
+            && workflow_stdout.contains("\"closure_summary_ready\":true")
+            && workflow_stdout.contains("\"closure_summary_primary_blocker\":null")
+            && workflow_stdout.contains("\"closure_summary_next_action\":\"run-artifact-or-replay-nsdb\"")
+            && workflow_stdout.contains("\"closure_summary_next_command\":\"nsdb replay-plan ")
+            && workflow_stdout
+                .contains("\"nsld_final_executable_output_nsdb_replay_ready\":true")
+            && workflow_stdout.contains(
+                "\"nsld_final_executable_output_nsdb_replay_status\":\"replay-evidence-ready\""
+            )
+            && workflow_stdout
+                .contains("\"nsld_final_executable_output_nsdb_replay_checkpoint_count\":1")
+            && workflow_stdout.contains(
+                "\"nsld_final_executable_output_nsdb_replayable_checkpoint_count\":1"
+            )
+            && workflow_stdout.contains(
+                "\"nsld_final_executable_output_nsdb_replay_next_action\":\"replay-nsdb-payload-execution\""
+            )
+            && workflow_stdout.contains(
+                "\"nsld_final_executable_output_nsdb_replay_next_command\":\"nsdb replay-plan "
+            )
+            && workflow_stdout
+                .contains("\"nsld_final_executable_output_nsdb_replay_first_blocker\":null"),
+        "workflow json should promote replay-ready self-contained final output into closure_summary ready\n{workflow_stdout}"
     );
 
     let run = run_nuis(&["run-artifact", &output_dir.display().to_string()]);

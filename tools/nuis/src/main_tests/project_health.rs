@@ -156,6 +156,51 @@ mod cpu Main {
 }
 
 #[test]
+fn project_status_json_promotes_link_plan_closure_summary_after_build() {
+    let project_root = write_temp_project_fixture(
+        "status_json_link_plan_closure",
+        r#"
+name = "status_json_link_plan_closure"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+        .trim_start(),
+        r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 7;
+  }
+}
+"#,
+    );
+    let output_dir = default_build_output_dir(&project_root);
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
+
+    let json = render_project_status_json(&project_root).expect("render status json");
+
+    assert!(json.contains("\"artifact_ready_to_run\":true"));
+    assert!(json.contains("\"link_plan_available\":true"));
+    assert!(json.contains("\"closure_summary_source\":\"project-status-link-plan\""));
+    assert!(json.contains("\"closure_summary_status\":\"blocked\""));
+    assert!(json.contains("\"closure_summary_ready\":false"));
+    assert!(json.contains(
+        "\"closure_summary_primary_blocker\":\"prepared artifact chain is missing `link-inputs`; nsld-drive-safe-next-v1 gate required before mutating artifact-chain state\""
+    ));
+    assert!(json.contains("\"closure_summary_next_action\":\"nsld-drive-safe-next\""));
+    assert!(json.contains("\"closure_summary_next_command\":\"nsld drive "));
+    assert!(json.contains(" --apply --until-clean --json\""));
+}
+
+#[test]
 fn project_status_text_summary_reports_text_handle_rewrite_hits() {
     let project_root = write_temp_project_fixture(
         "status_text_handle_summary",

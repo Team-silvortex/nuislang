@@ -341,6 +341,26 @@ fn render_materialized_manifest(records: &[NsdbDeviceProviderSampleRecordInfo]) 
         push_toml_string(&mut out, "trace_id", &record.trace_id);
         push_toml_string(&mut out, "provider", &record.provider);
         push_toml_string(&mut out, "provider_family", &record.provider_family);
+        push_toml_string(
+            &mut out,
+            "requested_runner_contract",
+            &record.requested_runner_contract,
+        );
+        push_toml_string(
+            &mut out,
+            "requested_runner_adapter_contract",
+            &record.requested_runner_adapter_contract,
+        );
+        push_toml_string(
+            &mut out,
+            "requested_runner_adapter_id",
+            &record.requested_runner_adapter_id,
+        );
+        push_toml_string(
+            &mut out,
+            "requested_runner_adapter_capability_status",
+            &record.requested_runner_adapter_capability_status,
+        );
         let runner = provider_runner_for(record);
         push_toml_string(&mut out, "provider_runner_contract", runner.contract);
         push_toml_string(

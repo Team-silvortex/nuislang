@@ -44,6 +44,19 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
             ))
         )
     });
+    report.final_output_nsdb_replay_next_action = if report.final_output_nsdb_replay_ready {
+        "replay-nsdb-payload-execution"
+    } else {
+        "resolve-final-output-nsdb-replay"
+    }
+    .to_owned();
+    report.final_output_nsdb_replay_next_command =
+        report.final_output_nsdb_replay_command.clone().or_else(|| {
+            Some(format!(
+                "nsld final-executable-output {} --json",
+                shell_quote_path(Path::new(&report.manifest))
+            ))
+        });
     report.final_output_nsdb_replay_first_blocker = if report.final_output_nsdb_replay_ready {
         None
     } else {

@@ -10,6 +10,37 @@ use super::{
 
 pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
     match node.op.instruction.as_str() {
+        "async_call" => {
+            if node.op.args[1..]
+                .iter()
+                .any(|arg| !state.registers.contains_key(arg))
+            {
+                state.body.push(format!(
+                    "  ; deferred lowering for cpu.async_call `{}` because one or more args are outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return true;
+            }
+            state
+                .registers
+                .insert(node.name.clone(), LlvmValueRef::Void);
+            true
+        }
+        "await" => {
+            let Some(value_ref) = state.registers.get(&node.op.args[0]).cloned() else {
+                state.body.push(format!(
+                    "  ; deferred lowering for cpu.await `{}` because its input is outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return true;
+            };
+            state.registers.insert(node.name.clone(), value_ref.clone());
+            if let Some(as_i64) = coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg) {
+                state.last_cpu_value = Some(as_i64);
+            }
+            propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
+            true
+        }
         "spawn_task" => {
             let Some(value_ref) = state.registers.get(&node.op.args[1]).cloned() else {
                 state.body.push(format!(

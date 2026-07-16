@@ -5,6 +5,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use nuis_semantics::model::{NirExpr, NirStmt};
+
 fn temp_dir(label: &str) -> PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -307,4 +309,96 @@ fn generic_result_buffer_lambda_project_combines_language_bootstrap_features() {
         59,
         "generic Result/buffer/lambda helper binary",
     );
+}
+
+#[test]
+fn no_annotation_try_await_result_hof_project_anchors_language_bootstrap_smoke() {
+    let output_dir = temp_dir("no_annotation_try_await_result_hof_bootstrap");
+    let output_dir_text = output_dir.display().to_string();
+    let source = fs::read_to_string(
+        "../../examples/projects/task/task_no_annotation_try_await_result_hof_demo/main.ns",
+    )
+    .expect("read no-annotation try/await Result project source");
+    assert_contains(
+        &source,
+        "let mapped = map_result",
+        "no-annotation try/await Result project source",
+    );
+    assert_contains(
+        &source,
+        "Result.Ok(await work(fetch(seed)?))",
+        "no-annotation try/await Result project source",
+    );
+    let module = nuisc::frontend::parse_nuis_module(&source)
+        .expect("parse no-annotation try/await Result project source");
+
+    let compute = module
+        .functions
+        .iter()
+        .find(|function| function.name == "compute")
+        .expect("compute function should remain present");
+    assert!(compute.is_async);
+    assert!(compute.body.iter().any(mapped_binding_is_concrete_result));
+
+    let mapper = module
+        .functions
+        .iter()
+        .find(|function| {
+            function
+                .name
+                .starts_with("__hof_map_result___lambda_compute_0")
+                && matches!(
+                    function.return_type.as_ref().map(|ty| ty.render()),
+                    Some(rendered) if rendered == "Result<i64, Error>"
+                )
+        })
+        .expect("map_result lambda should be specialized for Result<i64, Error>");
+    assert!(mapper.generic_params.is_empty());
+    assert!(matches!(
+        mapper.return_type.as_ref().map(|ty| ty.render()),
+        Some(rendered) if rendered == "Result<i64, Error>"
+    ));
+
+    let build = run_nuis(&[
+        "build",
+        "../../examples/projects/task/task_no_annotation_try_await_result_hof_demo",
+        &output_dir_text,
+    ]);
+    assert_success(
+        &build,
+        "nuis build no-annotation try/await Result HOF language bootstrap smoke",
+    );
+    assert_file_contains(
+        &output_dir.join("task_no_annotation_try_await_result_hof_demo.yir"),
+        "cpu.async_value",
+        "no-annotation try/await Result HOF YIR",
+    );
+    assert_binary_exit(
+        &output_dir.join("task_no_annotation_try_await_result_hof_demo"),
+        4,
+        "no-annotation try/await Result HOF binary",
+    );
+}
+
+fn mapped_binding_is_concrete_result(stmt: &NirStmt) -> bool {
+    match stmt {
+        NirStmt::Let {
+            name,
+            ty: Some(ty),
+            value: NirExpr::Call { callee, .. },
+        } => {
+            name == "mapped"
+                && ty.render() == "Result<i64, Error>"
+                && callee == "__hof_map_result___lambda_compute_0__i64__i64__Error"
+        }
+        NirStmt::If {
+            then_body,
+            else_body,
+            ..
+        } => {
+            then_body.iter().any(mapped_binding_is_concrete_result)
+                || else_body.iter().any(mapped_binding_is_concrete_result)
+        }
+        _ => false,
+    }
 }

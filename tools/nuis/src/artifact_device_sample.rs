@@ -297,6 +297,27 @@ pub(crate) fn render_device_provider_sample_manifest_toml<'a>(
         push_toml_string(&mut out, "trace_id", trace_id);
         push_toml_string(&mut out, "provider", &sample.provider);
         push_toml_string(&mut out, "provider_family", &sample.provider_family);
+        let requested_runner = requested_provider_runner_for(&sample.provider_family);
+        push_toml_string(
+            &mut out,
+            "requested_runner_contract",
+            requested_runner.contract,
+        );
+        push_toml_string(
+            &mut out,
+            "requested_runner_adapter_contract",
+            requested_runner.adapter_contract,
+        );
+        push_toml_string(
+            &mut out,
+            "requested_runner_adapter_id",
+            requested_runner.adapter_id,
+        );
+        push_toml_string(
+            &mut out,
+            "requested_runner_adapter_capability_status",
+            requested_runner.adapter_capability_status,
+        );
         push_toml_string(&mut out, "handoff_target", &sample.handoff_target);
         push_toml_string(&mut out, "sample_status", "pending-provider-execution");
         push_toml_string(&mut out, "validation_status", &sample.validation_status);
@@ -315,6 +336,27 @@ pub(crate) fn render_device_provider_sample_manifest_toml<'a>(
         push_toml_string(&mut out, "next_action", "execute-provider-sample");
     }
     (out, records.len())
+}
+
+struct RequestedProviderRunner {
+    contract: &'static str,
+    adapter_contract: &'static str,
+    adapter_id: &'static str,
+    adapter_capability_status: &'static str,
+}
+
+fn requested_provider_runner_for(provider_family: &str) -> RequestedProviderRunner {
+    let adapter_id = match provider_family {
+        "metal:apple-silicon-gpu" => "metal.apple-silicon-gpu.host-simulated",
+        "coreml:apple-ane" => "coreml.apple-ane.host-simulated",
+        _ => "generic.device.host-simulated",
+    };
+    RequestedProviderRunner {
+        contract: "nuis-provider-runner-v1",
+        adapter_contract: "nuis-provider-runner-adapter-v1",
+        adapter_id,
+        adapter_capability_status: "registered-host-simulated",
+    }
 }
 
 fn provider_sample_manifest_status(record_count: usize) -> &'static str {

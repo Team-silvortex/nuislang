@@ -248,6 +248,7 @@ pub(crate) fn execute_cpu_value_node(
             );
             Ok(Value::Unit)
         }
+        "async_value" => Ok(state.expect_value(&node.op.args[0])?.clone()),
         _ => return Ok(None),
     }?;
     Ok(Some(value))

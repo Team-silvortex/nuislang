@@ -185,6 +185,13 @@ mod cpu Main {
     assert!(json.contains("\"apply_until_clean_json_command\":\"nsld drive "));
     assert!(json.contains("\"nsld_drive_recommended_mode\":\"apply-next\""));
     assert!(json.contains("\"nsld_drive_recommended_mutates_artifacts\":true"));
+    assert!(json.contains("\"closure_summary_source\":\"workflow-link-plan\""));
+    assert!(json.contains("\"closure_summary_next_action\":\"nsld-drive-safe-next\""));
+    assert!(json.contains("\"closure_summary_next_command\":\"nsld drive "));
+    assert!(json.contains(" --apply --until-clean --json\""));
+    assert!(
+        json.contains("nsld-drive-safe-next-v1 gate required before mutating artifact-chain state")
+    );
     assert!(json.contains("\"nsld_prepared_artifact_chain_ready\":false"));
     assert!(json.contains("\"nsld_prepared_artifact_next_missing_stage\":\"link-inputs\""));
     assert!(json.contains(
@@ -451,6 +458,11 @@ mod cpu Main {
     assert!(
         json.contains("\"nsld_final_executable_output_nsdb_replay_command\":\"nsdb replay-plan ")
     );
+    assert!(json.contains(
+        "\"nsld_final_executable_output_nsdb_replay_next_action\":\"replay-nsdb-payload-execution\""
+    ));
+    assert!(json
+        .contains("\"nsld_final_executable_output_nsdb_replay_next_command\":\"nsdb replay-plan "));
     assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_first_blocker\":null"));
     assert!(json.contains("\"nsld_self_owned_image_ready\":"));
     assert!(json.contains("\"nsld_self_owned_image_status\":"));

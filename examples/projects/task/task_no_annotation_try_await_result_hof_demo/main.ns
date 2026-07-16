@@ -1,0 +1,52 @@
+mod cpu Main {
+  enum Error {
+    InvalidInput,
+  }
+
+  enum Result<T, E> {
+    Ok(T),
+    Err(E),
+  }
+
+  fn map_result<T, U, E>(result: Result<T, E>, mapper: Fn1<T, U>) -> Result<U, E> {
+    match result {
+      Result.Ok(value) => {
+        return Result.Ok(mapper(value));
+      }
+      Result.Err(error) => {
+        return Result.Err(error);
+      }
+    }
+  }
+
+  async fn work(seed: i64) -> i64 {
+    return seed;
+  }
+
+  fn fetch(seed: i64) -> Result<i64, Error> {
+    if seed <= 0 {
+      return Result.Err(Error.InvalidInput);
+    }
+    return Result.Ok(seed);
+  }
+
+  async fn compute(seed: i64) -> Result<i64, Error> {
+    let mapped = map_result(
+      Result.Ok(await work(fetch(seed)?)),
+      |value: i64| -> i64 { return value + 1; }
+    );
+    return mapped;
+  }
+
+  async fn main() -> i64 {
+    let result: Result<i64, Error> = await compute(3);
+    match result {
+      Result.Ok(value) => {
+        return value;
+      }
+      Result.Err(_) => {
+        return 0;
+      }
+    }
+  }
+}

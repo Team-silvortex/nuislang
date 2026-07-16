@@ -52,6 +52,14 @@ fn final_executable_output_reports_missing_until_real_output_exists() {
         report.recommended_next_action,
         "emit-final-executable-pipeline"
     );
+    assert_eq!(
+        report.final_output_nsdb_replay_next_action,
+        "resolve-final-output-nsdb-replay"
+    );
+    assert!(report
+        .final_output_nsdb_replay_next_command
+        .as_deref()
+        .is_some_and(|command| command == "nsld final-executable-output manifest.toml --json"));
     assert!(!report.runnable_candidate);
     assert!(!report.matches_expected_image);
     assert!(!report.output_image_header_valid);
@@ -77,6 +85,11 @@ fn final_executable_output_reports_missing_until_real_output_exists() {
         .contains("\"execution_handoff_first_blocker\":\"final-executable-output:missing\""));
     assert!(report_json.contains("\"execution_handoff_decision_code\":\"emit-final-executable\""));
     assert!(report_json.contains("\"recommended_next_action\":\"emit-final-executable-pipeline\""));
+    assert!(report_json
+        .contains("\"final_output_nsdb_replay_next_action\":\"resolve-final-output-nsdb-replay\""));
+    assert!(report_json.contains(
+        "\"final_output_nsdb_replay_next_command\":\"nsld final-executable-output manifest.toml --json\""
+    ));
     assert!(report_json.contains("\"present\":false"));
     assert!(report_json.contains("\"output_image_header_valid\":false"));
     assert!(report_json.contains("\"output_image_magic\":null"));

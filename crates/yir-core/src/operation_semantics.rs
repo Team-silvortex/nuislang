@@ -261,7 +261,9 @@ impl Operation {
         match self.instruction.as_str() {
             "text" | "const_bool" | "const_i32" | "const" | "const_i64" | "const_f32"
             | "const_f64" | "null" => CpuLlvmLoweringClass::Literal,
-            "struct" | "field" | "variant_is" | "variant_field" => CpuLlvmLoweringClass::Aggregate,
+            "struct" | "field" | "variant_is" | "variant_field" | "async_value" => {
+                CpuLlvmLoweringClass::Aggregate
+            }
             "borrow" | "borrow_end" | "move_ptr" => CpuLlvmLoweringClass::Pointer,
             "neg" | "add" | "add_i32" | "add_f32" | "add_f64" | "sub" | "sub_i32" | "sub_f32"
             | "sub_f64" | "mul" | "mul_i32" | "mul_f32" | "mul_f64" | "div" | "div_i32"

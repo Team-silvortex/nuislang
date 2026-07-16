@@ -40,7 +40,23 @@ pub(crate) fn ensure_acyclic(module: &YirModule) -> Result<(), String> {
     }
 
     if visited != module.nodes.len() {
-        return Err("graph contains a cycle across YIR edges".to_owned());
+        let unresolved = indegree
+            .iter()
+            .filter_map(|(name, degree)| (*degree > 0).then_some(format!("{name}:{degree}")))
+            .take(12)
+            .collect::<Vec<_>>()
+            .join(", ");
+        let incoming = module
+            .edges
+            .iter()
+            .filter(|edge| indegree.get(edge.to.as_str()).copied().unwrap_or(0) > 0)
+            .take(12)
+            .map(|edge| format!("{}->{}/{:?}", edge.from, edge.to, edge.kind))
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(format!(
+            "graph contains a cycle across YIR edges; unresolved_nodes=[{unresolved}]; incoming_edges=[{incoming}]"
+        ));
     }
 
     Ok(())
@@ -87,7 +103,23 @@ pub(crate) fn topological_order(module: &YirModule) -> Result<Vec<String>, Strin
     }
 
     if order.len() != module.nodes.len() {
-        return Err("graph contains a cycle across YIR edges".to_owned());
+        let unresolved = indegree
+            .iter()
+            .filter_map(|(name, degree)| (*degree > 0).then_some(format!("{name}:{degree}")))
+            .take(12)
+            .collect::<Vec<_>>()
+            .join(", ");
+        let incoming = module
+            .edges
+            .iter()
+            .filter(|edge| indegree.get(&edge.to).copied().unwrap_or(0) > 0)
+            .take(12)
+            .map(|edge| format!("{}->{}/{:?}", edge.from, edge.to, edge.kind))
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(format!(
+            "graph contains a cycle across YIR edges; unresolved_nodes=[{unresolved}]; incoming_edges=[{incoming}]"
+        ));
     }
 
     Ok(order)

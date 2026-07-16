@@ -481,6 +481,50 @@ fn std_tooling_observable_cli_smoke_checks_reports_and_stdin() {
         String::from_utf8_lossy(&wc_run.stderr)
     );
 
+    let pgm_output_dir = temp_dir("cli_pgm_invert_observable");
+    let pgm_output_dir_text = pgm_output_dir.display().to_string();
+    let pgm_build = run_nuis(&[
+        "build",
+        "../../examples/projects/tooling/cli_pgm_invert_demo",
+        &pgm_output_dir_text,
+    ]);
+    assert_success(&pgm_build, "nuis build cli pgm invert observable smoke");
+    assert_file_contains(
+        &pgm_output_dir.join("cli_pgm_invert_demo.ll"),
+        "host_file_read",
+        "cli pgm invert LLVM file reader",
+    );
+    assert_file_contains(
+        &pgm_output_dir.join("cli_pgm_invert_demo.ll"),
+        "host_file_write",
+        "cli pgm invert LLVM file writer",
+    );
+    assert_file_contains(
+        &pgm_output_dir.join("cli_pgm_invert_demo.yir"),
+        "StdFsContracts.close_ok",
+        "cli pgm invert YIR std fs contract",
+    );
+    let pgm_input_path = pgm_output_dir.join("input.pgm");
+    let pgm_output_path = pgm_output_dir.join("output.pgm");
+    fs::write(&pgm_input_path, b"P2\n2 2\n15\n0 4 9 8\n")
+        .unwrap_or_else(|error| panic!("failed to write {}: {error}", pgm_input_path.display()));
+    let pgm_input_text = pgm_input_path.display().to_string();
+    let pgm_output_text = pgm_output_path.display().to_string();
+    let pgm_binary = pgm_output_dir.join("cli_pgm_invert_demo");
+    let pgm_run = run_binary_with_args(&pgm_binary, &[&pgm_input_text, &pgm_output_text]);
+    assert_success(&pgm_run, "direct cli pgm invert binary smoke");
+    assert!(
+        pgm_run.stdout.is_empty() && pgm_run.stderr.is_empty(),
+        "cli pgm invert should produce only the output image file\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&pgm_run.stdout),
+        String::from_utf8_lossy(&pgm_run.stderr)
+    );
+    assert_file_contains(
+        &pgm_output_path,
+        "P2\n2 2\n15\n15 11 6 7\n",
+        "cli pgm invert generated image",
+    );
+
     let report_file_output_dir = temp_dir("cli_report_file_observable");
     let report_file_output_dir_text = report_file_output_dir.display().to_string();
     let report_file_build = run_nuis(&[

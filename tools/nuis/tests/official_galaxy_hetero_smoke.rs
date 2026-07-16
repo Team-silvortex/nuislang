@@ -168,6 +168,12 @@ fn assert_official_galaxy_hetero_build(
     assert!(provider_samples.contains("output_evidence = \"nuis.nsdb.provider-sample."));
     assert!(provider_samples.contains(":hash=0x"));
     assert!(provider_samples.contains("materialization_status = \"provider-sample-materialized\""));
+    assert!(provider_samples.contains("requested_runner_contract = \"nuis-provider-runner-v1\""));
+    assert!(provider_samples
+        .contains("requested_runner_adapter_contract = \"nuis-provider-runner-adapter-v1\""));
+    assert!(provider_samples.contains("requested_runner_adapter_id = \""));
+    assert!(provider_samples
+        .contains("requested_runner_adapter_capability_status = \"registered-host-simulated\""));
     assert!(provider_samples.contains("provider_runner_contract = \"nuis-provider-runner-v1\""));
     assert!(provider_samples
         .contains("provider_runner_adapter_contract = \"nuis-provider-runner-adapter-v1\""));

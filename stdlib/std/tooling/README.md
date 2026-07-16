@@ -231,6 +231,11 @@ Current checked-in companion exemplars:
 * [cli_pgm_invert_demo](../../../examples/projects/tooling/cli_pgm_invert_demo)
 * [cli_pgm_threshold_demo](../../../examples/projects/tooling/cli_pgm_threshold_demo)
 
+`cli_pgm_invert_demo` is now part of the observable std smoke lane: it builds a
+real host binary, reads a tiny `P2` PGM file, writes an inverted output file, and
+checks the generated image bytes. Treat it as the current bridge between
+host-backed std filesystem/text tooling and future PixelMagic image pipelines.
+
 ## Current Reading Rule
 
 If you only want one pass:

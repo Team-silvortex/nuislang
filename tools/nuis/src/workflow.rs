@@ -37,7 +37,7 @@ pub(crate) use link_plan::{
     nsld_artifact_chain_next_action_mirror, nsld_drive_recommendation_for_output_dir,
     nsld_final_executable_tail_stage_records_json, nsld_next_action_summary,
     nsld_prepared_artifact_chain_summary, nsld_prepared_artifact_stage_records_json,
-    run_artifact_command_for_output_dir,
+    run_artifact_command_for_output_dir, NsldDriveRecommendation,
 };
 pub(crate) use link_plan_commands::{
     nsld_drive_apply_next_command_for_output_dir,
@@ -46,7 +46,7 @@ pub(crate) use link_plan_commands::{
     nsld_drive_apply_until_clean_json_command_for_output_dir,
     nsld_drive_command_set_for_output_dir, nsld_drive_command_set_json_field,
     nsld_drive_dry_run_command_for_output_dir, nsld_drive_dry_run_json_command_for_output_dir,
-    nsld_prepare_command_for_output_dir,
+    nsld_prepare_command_for_output_dir, NsldDriveCommandSet,
 };
 #[cfg(test)]
 pub(crate) use link_plan_commands::{

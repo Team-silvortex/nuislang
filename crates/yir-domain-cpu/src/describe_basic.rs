@@ -181,7 +181,7 @@ pub(super) fn describe_cpu_basic_node(node: &Node) -> Result<Option<InstructionS
 
             Ok(InstructionSemantics::pure(Vec::new()))
         }
-        "borrow" | "borrow_end" | "move_ptr" | "neg" | "not" | "await" => {
+        "borrow" | "borrow_end" | "move_ptr" | "neg" | "not" | "await" | "async_value" => {
             if node.op.args.len() != 1 {
                 return Err(format!(
                     "node `{}` expects `cpu.{} <name> <resource> <input>`",

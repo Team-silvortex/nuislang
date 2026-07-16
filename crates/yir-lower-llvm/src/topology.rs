@@ -95,7 +95,15 @@ pub(crate) fn topological_order(module: &YirModule) -> Result<Vec<String>, Strin
     }
 
     if order.len() != module.nodes.len() {
-        return Err("graph contains a cycle across YIR edges".to_owned());
+        let unresolved = indegree
+            .iter()
+            .filter_map(|(name, degree)| (*degree > 0).then_some(format!("{name}:{degree}")))
+            .take(12)
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(format!(
+            "graph contains a cycle across YIR edges; unresolved_nodes=[{unresolved}]"
+        ));
     }
 
     Ok(order)
