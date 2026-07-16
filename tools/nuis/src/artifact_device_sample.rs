@@ -4,6 +4,9 @@ use std::collections::BTreeSet;
 pub(crate) const DEVICE_SAMPLE_SCHEMA: &str = "nsdb-yir-device-execution-sample-v1";
 pub(crate) const DEFERRED_DEVICE_SAMPLE_PROVIDER: &str = "nustar-deferred-device-sample-v1";
 pub(crate) const DEVICE_SAMPLE_HANDOFF_PROTOCOL: &str = "nuis-device-sample-provider-handoff-v1";
+pub(crate) const DEVICE_PROVIDER_SAMPLE_FILE_NAME: &str = "nuis.nsdb.device-provider-samples.toml";
+pub(crate) const DEVICE_PROVIDER_SAMPLE_PROTOCOL: &str = "nuis-device-provider-samples-v1";
+pub(crate) const DEVICE_PROVIDER_SAMPLE_SCHEMA: &str = "nsdb-yir-device-provider-sample-v1";
 
 pub(crate) struct DeviceSampleContract {
     pub(crate) provider: String,
@@ -268,6 +271,57 @@ pub(crate) fn push_device_sample_handoff_queue_toml<'a>(
         push_toml_string(out, "input_evidence", &sample.input_evidence);
         push_toml_string(out, "output_evidence", &sample.output_evidence);
         push_toml_string(out, "next_action", &sample.next_action);
+    }
+}
+
+pub(crate) fn render_device_provider_sample_manifest_toml<'a>(
+    samples: impl Iterator<Item = (&'a str, &'a DeviceSampleContract)>,
+) -> (String, usize) {
+    let records = samples
+        .filter(|(_, sample)| sample.is_provider_handoff_pending())
+        .collect::<Vec<_>>();
+    let mut out = String::new();
+    push_toml_string(&mut out, "protocol", DEVICE_PROVIDER_SAMPLE_PROTOCOL);
+    push_toml_string(&mut out, "schema", DEVICE_PROVIDER_SAMPLE_SCHEMA);
+    push_toml_string(&mut out, "source", "run-artifact-provider-sample-manifest");
+    push_toml_string(
+        &mut out,
+        "status",
+        provider_sample_manifest_status(records.len()),
+    );
+    out.push_str(&format!("record_count = {}\n", records.len()));
+    out.push_str("ready_record_count = 0\n");
+    out.push_str(&format!("pending_record_count = {}\n", records.len()));
+    for (trace_id, sample) in &records {
+        out.push_str("\n[[device_provider_samples]]\n");
+        push_toml_string(&mut out, "trace_id", trace_id);
+        push_toml_string(&mut out, "provider", &sample.provider);
+        push_toml_string(&mut out, "provider_family", &sample.provider_family);
+        push_toml_string(&mut out, "handoff_target", &sample.handoff_target);
+        push_toml_string(&mut out, "sample_status", "pending-provider-execution");
+        push_toml_string(&mut out, "validation_status", &sample.validation_status);
+        push_toml_string(&mut out, "input_evidence", &sample.input_evidence);
+        push_toml_string(&mut out, "output_evidence", &sample.output_evidence);
+        push_toml_string(
+            &mut out,
+            "materialization_status",
+            "provider-sample-pending",
+        );
+        push_toml_string(
+            &mut out,
+            "materialization_detail",
+            "awaiting-provider-runtime",
+        );
+        push_toml_string(&mut out, "next_action", "execute-provider-sample");
+    }
+    (out, records.len())
+}
+
+fn provider_sample_manifest_status(record_count: usize) -> &'static str {
+    if record_count == 0 {
+        "empty"
+    } else {
+        "awaiting-provider-materialization"
     }
 }
 

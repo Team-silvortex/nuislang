@@ -189,6 +189,34 @@ pub(crate) fn print_nsdb_inspect_report(report: &NsdbInspectReport) {
             record.diagnostic
         );
     }
+    println!(
+        "  device_provider_sample_manifest_available: {}",
+        report.device_provider_sample_manifest.available
+    );
+    println!(
+        "  device_provider_sample_manifest_status: {}",
+        report.device_provider_sample_manifest.status
+    );
+    println!(
+        "  device_provider_sample_manifest_record_count: {}",
+        report.device_provider_sample_manifest.record_count
+    );
+    println!(
+        "  device_provider_sample_manifest_pending_record_count: {}",
+        report.device_provider_sample_manifest.pending_record_count
+    );
+    println!(
+        "  device_provider_sample_manifest_first_provider_family: {}",
+        report
+            .device_provider_sample_manifest
+            .first_provider_family
+    );
+    println!(
+        "  device_provider_sample_manifest_first_materialization_status: {}",
+        report
+            .device_provider_sample_manifest
+            .first_materialization_status
+    );
     for domain in &report.domains {
         println!(
             "  domain: {} package={} kind={} lowering={} backend={} scope={}",

@@ -5,6 +5,7 @@ mod hetero_trace;
 mod json;
 mod model;
 mod payload_decoder;
+mod provider_sample;
 mod replay;
 #[cfg(test)]
 mod replay_tests;

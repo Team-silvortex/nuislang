@@ -1,18 +1,20 @@
 use crate::artifact_device_sample::{
     device_sample_contract_for_trace, push_device_sample_handoff_queue_toml,
-    summarize_device_samples, DeviceSampleContract, DeviceSampleSummary,
+    render_device_provider_sample_manifest_toml, summarize_device_samples, DeviceSampleContract,
+    DeviceSampleSummary, DEVICE_PROVIDER_SAMPLE_FILE_NAME,
 };
 use crate::artifact_doctor::BackendArtifactPayloadEvidence;
+use crate::artifact_runtime_persistence::HeteroRuntimeTracePersistence;
 use crate::{
     json_bool_field, json_field, json_object_array_field, json_optional_string_field,
     json_string_array_field, json_usize_field,
 };
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 const HETERO_RUNTIME_TRACE_FILE_NAME: &str = "nuis.nsdb.hetero-runtime-trace.toml";
-const HETERO_RUNTIME_TRACE_PROTOCOL: &str = "nuis-nsdb-hetero-runtime-trace-v1";
+pub(crate) const HETERO_RUNTIME_TRACE_PROTOCOL: &str = "nuis-nsdb-hetero-runtime-trace-v1";
 const PAYLOAD_DECODER_MANIFEST_FILE_NAME: &str = "nuis.nsdb.payload-decoders.toml";
 const PAYLOAD_DECODER_MANIFEST_PROTOCOL: &str = "nuis-nsdb-payload-decoders-v1";
 const PAYLOAD_DECODER_MANIFEST_SCHEMA: &str = "nsdb-payload-decoder-manifest-v1";
@@ -55,18 +57,6 @@ pub(crate) struct HeteroRuntimeTraceSummary {
     records: Vec<HeteroRuntimeTraceRecord>,
     first_blocker: Option<String>,
     next_action: String,
-}
-
-pub(crate) struct HeteroRuntimeTracePersistence {
-    persisted: bool,
-    path: Option<PathBuf>,
-    record_count: usize,
-    first_trace_id: Option<String>,
-    error: Option<String>,
-    decoder_manifest_persisted: bool,
-    decoder_manifest_path: Option<PathBuf>,
-    decoder_manifest_record_count: usize,
-    decoder_manifest_error: Option<String>,
 }
 
 impl HeteroRuntimeTraceSummary {
@@ -288,10 +278,15 @@ impl HeteroRuntimeTraceSummary {
                 decoder_manifest_path: None,
                 decoder_manifest_record_count: 0,
                 decoder_manifest_error: Some("output_dir-unavailable".to_owned()),
+                provider_sample_manifest_persisted: false,
+                provider_sample_manifest_path: None,
+                provider_sample_manifest_record_count: 0,
+                provider_sample_manifest_error: Some("output_dir-unavailable".to_owned()),
             };
         };
         let path = output_dir.join(HETERO_RUNTIME_TRACE_FILE_NAME);
         let decoder_manifest_path = output_dir.join(PAYLOAD_DECODER_MANIFEST_FILE_NAME);
+        let provider_sample_manifest_path = output_dir.join(DEVICE_PROVIDER_SAMPLE_FILE_NAME);
         if !self.available {
             return HeteroRuntimeTracePersistence {
                 persisted: false,
@@ -303,12 +298,20 @@ impl HeteroRuntimeTraceSummary {
                 decoder_manifest_path: Some(decoder_manifest_path),
                 decoder_manifest_record_count: 0,
                 decoder_manifest_error: Some("hetero-runtime-trace-unavailable".to_owned()),
+                provider_sample_manifest_persisted: false,
+                provider_sample_manifest_path: Some(provider_sample_manifest_path),
+                provider_sample_manifest_record_count: 0,
+                provider_sample_manifest_error: Some("hetero-runtime-trace-unavailable".to_owned()),
             };
         }
         match fs::write(&path, self.render_nsdb_trace_toml()) {
             Ok(()) => {
                 let decoder_manifest_source = self.render_payload_decoder_manifest_toml();
                 let decoder_manifest_record_count = payload_decoder_manifest_record_count(self);
+                let (provider_sample_source, provider_sample_record_count) =
+                    self.render_device_provider_sample_manifest_toml();
+                let provider_sample_result =
+                    fs::write(&provider_sample_manifest_path, provider_sample_source);
                 match fs::write(&decoder_manifest_path, decoder_manifest_source) {
                     Ok(()) => HeteroRuntimeTracePersistence {
                         persisted: true,
@@ -320,6 +323,12 @@ impl HeteroRuntimeTraceSummary {
                         decoder_manifest_path: Some(decoder_manifest_path),
                         decoder_manifest_record_count,
                         decoder_manifest_error: None,
+                        provider_sample_manifest_persisted: provider_sample_result.is_ok(),
+                        provider_sample_manifest_path: Some(provider_sample_manifest_path),
+                        provider_sample_manifest_record_count: provider_sample_record_count,
+                        provider_sample_manifest_error: provider_sample_result
+                            .err()
+                            .map(|error| error.to_string()),
                     },
                     Err(error) => HeteroRuntimeTracePersistence {
                         persisted: true,
@@ -331,6 +340,12 @@ impl HeteroRuntimeTraceSummary {
                         decoder_manifest_path: Some(decoder_manifest_path),
                         decoder_manifest_record_count,
                         decoder_manifest_error: Some(error.to_string()),
+                        provider_sample_manifest_persisted: provider_sample_result.is_ok(),
+                        provider_sample_manifest_path: Some(provider_sample_manifest_path),
+                        provider_sample_manifest_record_count: provider_sample_record_count,
+                        provider_sample_manifest_error: provider_sample_result
+                            .err()
+                            .map(|error| error.to_string()),
                     },
                 }
             }
@@ -344,6 +359,12 @@ impl HeteroRuntimeTraceSummary {
                 decoder_manifest_path: Some(decoder_manifest_path),
                 decoder_manifest_record_count: 0,
                 decoder_manifest_error: Some("hetero-runtime-trace-persist-failed".to_owned()),
+                provider_sample_manifest_persisted: false,
+                provider_sample_manifest_path: Some(provider_sample_manifest_path),
+                provider_sample_manifest_record_count: 0,
+                provider_sample_manifest_error: Some(
+                    "hetero-runtime-trace-persist-failed".to_owned(),
+                ),
             },
         }
     }
@@ -403,6 +424,14 @@ impl HeteroRuntimeTraceSummary {
             push_toml_string(&mut out, "decoder_detail_level", "file-header");
         }
         out
+    }
+
+    fn render_device_provider_sample_manifest_toml(&self) -> (String, usize) {
+        render_device_provider_sample_manifest_toml(
+            self.records
+                .iter()
+                .map(|record| (record.trace_id.as_str(), &record.device_sample)),
+        )
     }
 
     pub(crate) fn print_text(&self) {
@@ -472,96 +501,6 @@ impl HeteroRuntimeTraceSummary {
             self.first_blocker.as_deref().unwrap_or("<none>")
         );
         println!("  hetero_runtime_trace_next_action: {}", self.next_action);
-    }
-}
-
-impl HeteroRuntimeTracePersistence {
-    pub(crate) fn json_fields(&self) -> Vec<String> {
-        vec![
-            json_field(
-                "hetero_runtime_trace_persistence_protocol",
-                HETERO_RUNTIME_TRACE_PROTOCOL,
-            ),
-            json_bool_field("hetero_runtime_trace_persisted", self.persisted),
-            json_optional_string_field(
-                "hetero_runtime_trace_path",
-                self.path
-                    .as_ref()
-                    .map(|path| path.display().to_string())
-                    .as_deref(),
-            ),
-            json_usize_field(
-                "hetero_runtime_trace_persisted_record_count",
-                self.record_count,
-            ),
-            json_optional_string_field(
-                "hetero_runtime_trace_persisted_first_trace_id",
-                self.first_trace_id.as_deref(),
-            ),
-            json_optional_string_field("hetero_runtime_trace_persist_error", self.error.as_deref()),
-            json_bool_field(
-                "payload_decoder_manifest_persisted",
-                self.decoder_manifest_persisted,
-            ),
-            json_optional_string_field(
-                "payload_decoder_manifest_path",
-                self.decoder_manifest_path
-                    .as_ref()
-                    .map(|path| path.display().to_string())
-                    .as_deref(),
-            ),
-            json_usize_field(
-                "payload_decoder_manifest_persisted_record_count",
-                self.decoder_manifest_record_count,
-            ),
-            json_optional_string_field(
-                "payload_decoder_manifest_persist_error",
-                self.decoder_manifest_error.as_deref(),
-            ),
-        ]
-    }
-
-    pub(crate) fn print_text(&self) {
-        println!("  hetero_runtime_trace_persistence_protocol: {HETERO_RUNTIME_TRACE_PROTOCOL}");
-        println!("  hetero_runtime_trace_persisted: {}", self.persisted);
-        println!(
-            "  hetero_runtime_trace_path: {}",
-            self.path
-                .as_ref()
-                .map(|path| path.display().to_string())
-                .unwrap_or_else(|| "<none>".to_owned())
-        );
-        println!(
-            "  hetero_runtime_trace_persisted_record_count: {}",
-            self.record_count
-        );
-        println!(
-            "  hetero_runtime_trace_persisted_first_trace_id: {}",
-            self.first_trace_id.as_deref().unwrap_or("<none>")
-        );
-        println!(
-            "  hetero_runtime_trace_persist_error: {}",
-            self.error.as_deref().unwrap_or("<none>")
-        );
-        println!(
-            "  payload_decoder_manifest_persisted: {}",
-            self.decoder_manifest_persisted
-        );
-        println!(
-            "  payload_decoder_manifest_path: {}",
-            self.decoder_manifest_path
-                .as_ref()
-                .map(|path| path.display().to_string())
-                .unwrap_or_else(|| "<none>".to_owned())
-        );
-        println!(
-            "  payload_decoder_manifest_persisted_record_count: {}",
-            self.decoder_manifest_record_count
-        );
-        println!(
-            "  payload_decoder_manifest_persist_error: {}",
-            self.decoder_manifest_error.as_deref().unwrap_or("<none>")
-        );
     }
 }
 

@@ -1,10 +1,13 @@
 mod artifact_device_sample;
 mod artifact_doctor;
+mod artifact_doctor_mirrors;
 mod artifact_doctor_render;
+mod artifact_host_runner;
 mod artifact_launch_evidence;
 mod artifact_materialization;
 mod artifact_nsdb_handoff;
 mod artifact_runtime_command;
+mod artifact_runtime_persistence;
 mod artifact_runtime_trace;
 mod build_report_command;
 mod build_report_nsld_status;

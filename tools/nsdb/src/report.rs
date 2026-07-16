@@ -6,6 +6,7 @@ use crate::{
         NsdbLoweringUnitDebugInfo, NsdbPayloadExecutionEventFilter,
     },
     payload_decoder::read_payload_decoder_manifest_info,
+    provider_sample::read_device_provider_sample_manifest_info,
     sidecar::read_sidecar_debug_info,
 };
 use std::path::Path;
@@ -99,6 +100,8 @@ pub(crate) fn nsdb_inspect_report(
     let mut payload_execution_handoff = read_payload_execution_handoff(Path::new(&plan.output_dir));
     let hetero_runtime_trace = read_hetero_runtime_trace(Path::new(&plan.output_dir));
     let payload_decoder_manifest = read_payload_decoder_manifest_info(Path::new(&plan.output_dir));
+    let device_provider_sample_manifest =
+        read_device_provider_sample_manifest_info(Path::new(&plan.output_dir));
     let mut missing_metadata = Vec::new();
     if !plan.clock_protocol.validation.valid {
         missing_metadata.push("valid-clock-protocol".to_owned());
@@ -123,6 +126,16 @@ pub(crate) fn nsdb_inspect_report(
     }
     if !hetero_runtime_trace.available {
         missing_metadata.push("hetero-runtime-trace".to_owned());
+    }
+    if hetero_runtime_trace.device_sample_handoff_record_count > 0 {
+        if !device_provider_sample_manifest.available {
+            missing_metadata.push("device-provider-sample-manifest".to_owned());
+        } else if matches!(
+            device_provider_sample_manifest.status.as_str(),
+            "unsupported-protocol" | "invalid-records" | "missing-protocol"
+        ) {
+            missing_metadata.push("valid-device-provider-sample-manifest".to_owned());
+        }
     }
     if event_filter.active() {
         payload_execution_handoff
@@ -156,6 +169,7 @@ pub(crate) fn nsdb_inspect_report(
         payload_execution_handoff,
         hetero_runtime_trace,
         payload_decoder_manifest,
+        device_provider_sample_manifest,
         domains,
         clock_edges,
         data_segments,

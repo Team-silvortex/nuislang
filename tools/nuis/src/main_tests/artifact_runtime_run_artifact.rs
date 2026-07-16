@@ -461,6 +461,10 @@ fn run_artifact_json_exposes_bridge_bearing_exchange_summary() {
     assert!(json.contains("\"payload_decoder_manifest_path\":\""));
     assert!(json.contains("\"payload_decoder_manifest_persisted_record_count\":1"));
     assert!(json.contains("\"payload_decoder_manifest_persist_error\":null"));
+    assert!(json.contains("\"device_provider_sample_manifest_persisted\":true"));
+    assert!(json.contains("\"device_provider_sample_manifest_path\":\""));
+    assert!(json.contains("\"device_provider_sample_manifest_persisted_record_count\":1"));
+    assert!(json.contains("\"device_provider_sample_manifest_persist_error\":null"));
     assert!(json.contains("\"trace_id\":\"hetero-trace:data:none:none\""));
     assert!(json.contains("\"trace_role\":\"domain-metadata\""));
     assert!(json.contains("\"status\":\"metadata-only\""));
@@ -534,6 +538,17 @@ fn run_artifact_json_exposes_bridge_bearing_exchange_summary() {
     assert!(decoder_manifest.contains("[[decoders]]"));
     assert!(decoder_manifest.contains("payload_format = \"ndpb-v2\""));
     assert!(decoder_manifest.contains("decoder_capability = \"opaque-file-summary\""));
+    let provider_samples =
+        fs::read_to_string(output_dir.join("nuis.nsdb.device-provider-samples.toml"))
+            .expect("device provider sample manifest is persisted");
+    assert!(provider_samples.contains("protocol = \"nuis-device-provider-samples-v1\""));
+    assert!(provider_samples.contains("schema = \"nsdb-yir-device-provider-sample-v1\""));
+    assert!(provider_samples.contains("status = \"awaiting-provider-materialization\""));
+    assert!(provider_samples.contains("pending_record_count = 1"));
+    assert!(provider_samples.contains("[[device_provider_samples]]"));
+    assert!(provider_samples.contains("trace_id = \"hetero-trace:shader:metal:apple-silicon-gpu\""));
+    assert!(provider_samples.contains("provider_family = \"metal:apple-silicon-gpu\""));
+    assert!(provider_samples.contains("materialization_status = \"provider-sample-pending\""));
 
     let doctor_json = render_artifact_doctor_json(&output_dir);
     assert!(doctor_json.contains("\"artifact_payload_decoder_manifest_available\":true"));

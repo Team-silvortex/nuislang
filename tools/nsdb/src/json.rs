@@ -1,8 +1,8 @@
 use crate::model::{
-    NsdbClockEdgeDebugInfo, NsdbDataSegmentDebugInfo, NsdbDeviceSampleHandoffRecord,
-    NsdbDomainDebugInfo, NsdbHeteroRuntimeTraceRecord, NsdbInspectReport,
-    NsdbLoweringUnitDebugInfo, NsdbPayloadDecoderManifestRecordInfo, NsdbPayloadExecutionEvent,
-    NsdbSidecarDebugInfo,
+    NsdbClockEdgeDebugInfo, NsdbDataSegmentDebugInfo, NsdbDeviceProviderSampleRecordInfo,
+    NsdbDeviceSampleHandoffRecord, NsdbDomainDebugInfo, NsdbHeteroRuntimeTraceRecord,
+    NsdbInspectReport, NsdbLoweringUnitDebugInfo, NsdbPayloadDecoderManifestRecordInfo,
+    NsdbPayloadExecutionEvent, NsdbSidecarDebugInfo,
 };
 use crate::replay::{build_replay_plan, NsdbReplayCheckpoint};
 
@@ -208,6 +208,60 @@ pub(crate) fn nsdb_inspect_report_json(report: &NsdbInspectReport) -> String {
             "\"payload_decoder_manifest_records\":[{}]",
             payload_decoder_manifest_records_json(&report.payload_decoder_manifest.records)
         ),
+        json_bool_field(
+            "device_provider_sample_manifest_available",
+            report.device_provider_sample_manifest.available,
+        ),
+        json_string_field(
+            "device_provider_sample_manifest_path",
+            &report.device_provider_sample_manifest.path,
+        ),
+        json_string_field(
+            "device_provider_sample_manifest_protocol",
+            &report.device_provider_sample_manifest.protocol,
+        ),
+        json_string_field(
+            "device_provider_sample_manifest_schema",
+            &report.device_provider_sample_manifest.schema,
+        ),
+        json_string_field(
+            "device_provider_sample_manifest_status",
+            &report.device_provider_sample_manifest.status,
+        ),
+        json_usize_field(
+            "device_provider_sample_manifest_record_count",
+            report.device_provider_sample_manifest.record_count,
+        ),
+        json_usize_field(
+            "device_provider_sample_manifest_pending_record_count",
+            report.device_provider_sample_manifest.pending_record_count,
+        ),
+        json_usize_field(
+            "device_provider_sample_manifest_invalid_record_count",
+            report.device_provider_sample_manifest.invalid_record_count,
+        ),
+        json_string_field(
+            "device_provider_sample_manifest_first_trace_id",
+            &report.device_provider_sample_manifest.first_trace_id,
+        ),
+        json_string_field(
+            "device_provider_sample_manifest_first_provider_family",
+            &report.device_provider_sample_manifest.first_provider_family,
+        ),
+        json_string_field(
+            "device_provider_sample_manifest_first_materialization_status",
+            &report
+                .device_provider_sample_manifest
+                .first_materialization_status,
+        ),
+        json_string_field(
+            "device_provider_sample_manifest_first_diagnostic",
+            &report.device_provider_sample_manifest.first_diagnostic,
+        ),
+        format!(
+            "\"device_provider_sample_manifest_records\":[{}]",
+            device_provider_sample_records_json(&report.device_provider_sample_manifest.records)
+        ),
         format!("\"domains\":[{}]", domains_json(&report.domains)),
         format!(
             "\"clock_edges\":[{}]",
@@ -238,6 +292,32 @@ fn payload_decoder_manifest_records_json(
                 json_bool_field("valid", record.valid),
                 json_string_field("payload_format", &record.payload_format),
                 json_string_field("decoder_id", &record.decoder_id),
+                json_string_field("diagnostic", &record.diagnostic),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn device_provider_sample_records_json(records: &[NsdbDeviceProviderSampleRecordInfo]) -> String {
+    records
+        .iter()
+        .map(|record| {
+            let fields = vec![
+                json_usize_field("index", record.index),
+                json_bool_field("valid", record.valid),
+                json_string_field("trace_id", &record.trace_id),
+                json_string_field("provider", &record.provider),
+                json_string_field("provider_family", &record.provider_family),
+                json_string_field("handoff_target", &record.handoff_target),
+                json_string_field("sample_status", &record.sample_status),
+                json_string_field("validation_status", &record.validation_status),
+                json_string_field("input_evidence", &record.input_evidence),
+                json_string_field("output_evidence", &record.output_evidence),
+                json_string_field("materialization_status", &record.materialization_status),
+                json_string_field("materialization_detail", &record.materialization_detail),
+                json_string_field("next_action", &record.next_action),
                 json_string_field("diagnostic", &record.diagnostic),
             ];
             format!("{{{}}}", fields.join(","))

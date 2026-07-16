@@ -1,9 +1,10 @@
 use crate::{
     model::{
+        NsdbDeviceProviderSampleManifestInfo, NsdbDeviceProviderSampleRecordInfo,
         NsdbDeviceSampleHandoffRecord, NsdbDomainDebugInfo, NsdbHeteroRuntimeTraceInfo,
         NsdbHeteroRuntimeTraceRecord, NsdbInspectReport, NsdbPayloadDecoderManifestInfo,
-        NsdbPayloadExecutionEvent, NsdbPayloadExecutionEventFilter,
-        NsdbPayloadExecutionHandoffInfo, NsdbSidecarDebugInfo,
+        NsdbPayloadExecutionEvent, NsdbPayloadExecutionEventFilter, NsdbPayloadExecutionHandoffInfo,
+        NsdbSidecarDebugInfo,
     },
     replay::build_replay_plan,
 };
@@ -262,6 +263,64 @@ magic_ascii = "OK"
 }
 
 #[test]
+fn summarizes_device_provider_sample_manifest_for_inspect_surfaces() {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let output_dir = env::temp_dir().join(format!("nsdb-provider-sample-summary-{nonce}"));
+    fs::create_dir_all(&output_dir).unwrap();
+    fs::write(
+        output_dir.join("nuis.nsdb.device-provider-samples.toml"),
+        r#"
+protocol = "nuis-device-provider-samples-v1"
+schema = "nsdb-yir-device-provider-sample-v1"
+status = "awaiting-provider-materialization"
+record_count = 1
+ready_record_count = 0
+pending_record_count = 1
+
+[[device_provider_samples]]
+trace_id = "hetero-trace:shader:metal:apple-silicon-gpu"
+provider = "nustar-deferred-device-sample-v1"
+provider_family = "metal:apple-silicon-gpu"
+handoff_target = "metal:apple-silicon-gpu"
+sample_status = "pending-provider-execution"
+validation_status = "pending-provider-execution"
+input_evidence = "metallib:pixelmagic.metallib"
+output_evidence = "not-materialized"
+materialization_status = "provider-sample-pending"
+materialization_detail = "awaiting-provider-runtime"
+next_action = "execute-provider-sample"
+"#,
+    )
+    .unwrap();
+
+    let summary = crate::provider_sample::read_device_provider_sample_manifest_info(&output_dir);
+
+    assert!(summary.available);
+    assert_eq!(summary.protocol, "nuis-device-provider-samples-v1");
+    assert_eq!(summary.schema, "nsdb-yir-device-provider-sample-v1");
+    assert_eq!(summary.status, "awaiting-provider-materialization");
+    assert_eq!(summary.record_count, 1);
+    assert_eq!(summary.pending_record_count, 1);
+    assert_eq!(summary.invalid_record_count, 0);
+    assert_eq!(
+        summary.first_trace_id,
+        "hetero-trace:shader:metal:apple-silicon-gpu"
+    );
+    assert_eq!(summary.first_provider_family, "metal:apple-silicon-gpu");
+    assert_eq!(
+        summary.first_materialization_status,
+        "provider-sample-pending"
+    );
+    assert_eq!(summary.first_diagnostic, "provider-sample-record-loaded");
+    assert!(summary.records[0].valid);
+
+    fs::remove_dir_all(output_dir).unwrap();
+}
+
+#[test]
 fn builds_replay_checkpoints_from_payload_events() {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -387,6 +446,40 @@ fn builds_replay_checkpoints_from_payload_events() {
             first_decoder_id: "none".to_owned(),
             first_diagnostic: "manifest-not-found".to_owned(),
             records: Vec::new(),
+        },
+        device_provider_sample_manifest: NsdbDeviceProviderSampleManifestInfo {
+            available: true,
+            path: output_dir
+                .join("nuis.nsdb.device-provider-samples.toml")
+                .display()
+                .to_string(),
+            protocol: "nuis-device-provider-samples-v1".to_owned(),
+            schema: "nsdb-yir-device-provider-sample-v1".to_owned(),
+            status: "awaiting-provider-materialization".to_owned(),
+            record_count: 1,
+            ready_record_count: 0,
+            pending_record_count: 1,
+            invalid_record_count: 0,
+            first_trace_id: "hetero-trace:shader:metal:apple-silicon-gpu".to_owned(),
+            first_provider_family: "metal:apple-silicon-gpu".to_owned(),
+            first_materialization_status: "provider-sample-pending".to_owned(),
+            first_diagnostic: "provider-sample-record-loaded".to_owned(),
+            records: vec![NsdbDeviceProviderSampleRecordInfo {
+                index: 0,
+                valid: true,
+                trace_id: "hetero-trace:shader:metal:apple-silicon-gpu".to_owned(),
+                provider: "nustar-deferred-device-sample-v1".to_owned(),
+                provider_family: "metal:apple-silicon-gpu".to_owned(),
+                handoff_target: "metal:apple-silicon-gpu".to_owned(),
+                sample_status: "pending-provider-execution".to_owned(),
+                validation_status: "pending-provider-execution".to_owned(),
+                input_evidence: "metallib:pixelmagic.metallib".to_owned(),
+                output_evidence: "not-materialized".to_owned(),
+                materialization_status: "provider-sample-pending".to_owned(),
+                materialization_detail: "awaiting-provider-runtime".to_owned(),
+                next_action: "execute-provider-sample".to_owned(),
+                diagnostic: "provider-sample-record-loaded".to_owned(),
+            }],
         },
         domains: vec![NsdbDomainDebugInfo {
             domain_family: "shader".to_owned(),

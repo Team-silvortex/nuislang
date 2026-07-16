@@ -17,12 +17,49 @@ pub(crate) struct NsdbInspectReport {
     pub(crate) payload_execution_handoff: NsdbPayloadExecutionHandoffInfo,
     pub(crate) hetero_runtime_trace: NsdbHeteroRuntimeTraceInfo,
     pub(crate) payload_decoder_manifest: NsdbPayloadDecoderManifestInfo,
+    pub(crate) device_provider_sample_manifest: NsdbDeviceProviderSampleManifestInfo,
     pub(crate) domains: Vec<NsdbDomainDebugInfo>,
     pub(crate) clock_edges: Vec<NsdbClockEdgeDebugInfo>,
     pub(crate) data_segments: Vec<NsdbDataSegmentDebugInfo>,
     pub(crate) lowering_units: Vec<NsdbLoweringUnitDebugInfo>,
     pub(crate) sidecars: Vec<NsdbSidecarDebugInfo>,
     pub(crate) missing_metadata: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsdbDeviceProviderSampleManifestInfo {
+    pub(crate) available: bool,
+    pub(crate) path: String,
+    pub(crate) protocol: String,
+    pub(crate) schema: String,
+    pub(crate) status: String,
+    pub(crate) record_count: usize,
+    pub(crate) ready_record_count: usize,
+    pub(crate) pending_record_count: usize,
+    pub(crate) invalid_record_count: usize,
+    pub(crate) first_trace_id: String,
+    pub(crate) first_provider_family: String,
+    pub(crate) first_materialization_status: String,
+    pub(crate) first_diagnostic: String,
+    pub(crate) records: Vec<NsdbDeviceProviderSampleRecordInfo>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsdbDeviceProviderSampleRecordInfo {
+    pub(crate) index: usize,
+    pub(crate) valid: bool,
+    pub(crate) trace_id: String,
+    pub(crate) provider: String,
+    pub(crate) provider_family: String,
+    pub(crate) handoff_target: String,
+    pub(crate) sample_status: String,
+    pub(crate) validation_status: String,
+    pub(crate) input_evidence: String,
+    pub(crate) output_evidence: String,
+    pub(crate) materialization_status: String,
+    pub(crate) materialization_detail: String,
+    pub(crate) next_action: String,
+    pub(crate) diagnostic: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
