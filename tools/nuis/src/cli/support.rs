@@ -25,6 +25,7 @@ pub(super) struct ReleaseCheckArgs {
     pub(super) output_dir: PathBuf,
     pub(super) cpu_abi: Option<String>,
     pub(super) target: Option<String>,
+    pub(super) json: bool,
 }
 
 pub(super) struct TestArgs {
@@ -218,15 +219,18 @@ pub(super) fn parse_release_check_args<I>(args: &mut I) -> Result<ReleaseCheckAr
 where
     I: Iterator<Item = String>,
 {
-    let usage = "usage: nuis release-check [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]";
+    let usage = "usage: nuis release-check [--json] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]";
     let mut cpu_abi = None;
     let mut target = None;
+    let mut json = false;
     let mut positional = Vec::new();
     while let Some(arg) = args.next() {
         if arg == "--cpu-abi" {
             cpu_abi = Some(args.next().ok_or_else(|| usage.to_owned())?);
         } else if arg == "--target" {
             target = Some(args.next().ok_or_else(|| usage.to_owned())?);
+        } else if arg == "--json" {
+            json = true;
         } else {
             positional.push(arg);
         }
@@ -257,6 +261,7 @@ where
         output_dir,
         cpu_abi,
         target,
+        json,
     })
 }
 

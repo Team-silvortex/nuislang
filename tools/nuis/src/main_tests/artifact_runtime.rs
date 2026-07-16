@@ -904,9 +904,15 @@ fn build_report_json_exposes_bridge_bearing_exchange_summary() {
     let output_dir = temp_dir("build_report_shader_packet_bridge_outputs");
 
     handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    let run_json = render_run_artifact_json(&output_dir);
+    assert!(run_json.contains("\"payload_decoder_manifest_persisted\":true"));
     let json = render_build_report_json(&output_dir);
 
     assert!(json.contains("\"packaging_mode\":\"window-aot-bundle\""));
+    assert!(json.contains("\"build_report_payload_decoder_manifest_available\":true"));
+    assert!(json.contains("\"build_report_payload_decoder_manifest_status\":\"ready\""));
+    assert!(json.contains("\"build_report_payload_decoder_manifest_record_count\":1"));
+    assert!(json.contains("\"build_report_payload_decoder_manifest_invalid_record_count\":0"));
     assert!(json.contains("\"domain_units_count\":3"));
     assert!(json.contains("\"heterogeneous_domain_count\":2"));
     assert!(json.contains("\"domain_family\":\"data\""));
@@ -946,6 +952,33 @@ fn build_report_json_exposes_bridge_bearing_exchange_summary() {
     assert!(json.contains("\"registry_dispatch_missing_signals\":[]"));
     assert!(json.contains("\"registry_dispatch_bridge_materialized\":true"));
     assert!(json.contains("\"registry_execution_readiness_materialized\":true"));
+}
+
+#[test]
+fn release_check_summary_json_mirrors_generated_payload_decoder_manifest() {
+    let project_root = checked_in_path("../../examples/projects/domains/shader_packet_bridge_demo");
+    let output_dir = temp_dir("release_check_summary_shader_packet_bridge_outputs");
+
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
+    let run_json = render_run_artifact_json(&output_dir);
+    assert!(run_json.contains("\"payload_decoder_manifest_persisted\":true"));
+
+    let json = render_release_check_summary_json(&project_root, &output_dir);
+    assert!(json.contains("\"kind\":\"release_check_summary\""));
+    assert!(json.contains("\"ready_to_run\":true"));
+    assert!(json.contains("\"release_check_payload_decoder_manifest_available\":true"));
+    assert!(json.contains("\"release_check_payload_decoder_manifest_status\":\"ready\""));
+    assert!(json.contains("\"release_check_payload_decoder_manifest_record_count\":1"));
+    assert!(json.contains("\"release_check_payload_decoder_manifest_invalid_record_count\":0"));
+    assert!(json.contains("\"nsld_drive_protocol\":\"nsld-drive-command-set-v1\""));
 }
 
 #[test]
@@ -1034,6 +1067,10 @@ fn run_artifact_json_exposes_bridge_bearing_exchange_summary() {
     assert!(json.contains("\"hetero_runtime_trace_path\":\""));
     assert!(json.contains("\"hetero_runtime_trace_persisted_record_count\":2"));
     assert!(json.contains("\"hetero_runtime_trace_persist_error\":null"));
+    assert!(json.contains("\"payload_decoder_manifest_persisted\":true"));
+    assert!(json.contains("\"payload_decoder_manifest_path\":\""));
+    assert!(json.contains("\"payload_decoder_manifest_persisted_record_count\":1"));
+    assert!(json.contains("\"payload_decoder_manifest_persist_error\":null"));
     assert!(json.contains("\"trace_id\":\"hetero-trace:data:none:none\""));
     assert!(json.contains("\"trace_role\":\"domain-metadata\""));
     assert!(json.contains("\"status\":\"metadata-only\""));
@@ -1052,6 +1089,29 @@ fn run_artifact_json_exposes_bridge_bearing_exchange_summary() {
     assert!(persisted_trace.contains("[[records]]"));
     assert!(persisted_trace.contains("trace_id = \"hetero-trace:shader:metal:apple-silicon-gpu\""));
     assert!(persisted_trace.contains("next_action = \"materialize-device-execution-trace\""));
+    let decoder_manifest = fs::read_to_string(output_dir.join("nuis.nsdb.payload-decoders.toml"))
+        .expect("payload decoder manifest is persisted");
+    assert!(decoder_manifest.contains("protocol = \"nuis-nsdb-payload-decoders-v1\""));
+    assert!(decoder_manifest.contains("schema = \"nsdb-payload-decoder-manifest-v1\""));
+    assert!(decoder_manifest.contains("[[decoders]]"));
+    assert!(decoder_manifest.contains("payload_format = \"ndpb-v2\""));
+    assert!(decoder_manifest.contains("decoder_capability = \"opaque-file-summary\""));
+
+    let doctor_json = render_artifact_doctor_json(&output_dir);
+    assert!(doctor_json.contains("\"artifact_payload_decoder_manifest_available\":true"));
+    assert!(doctor_json.contains("\"artifact_payload_decoder_manifest_path\":\""));
+    assert!(doctor_json.contains(
+        "\"artifact_payload_decoder_manifest_protocol\":\"nuis-nsdb-payload-decoders-v1\""
+    ));
+    assert!(doctor_json.contains(
+        "\"artifact_payload_decoder_manifest_schema\":\"nsdb-payload-decoder-manifest-v1\""
+    ));
+    assert!(doctor_json.contains("\"artifact_payload_decoder_manifest_status\":\"ready\""));
+    assert!(doctor_json.contains("\"artifact_payload_decoder_manifest_record_count\":1"));
+    assert!(doctor_json.contains("\"artifact_payload_decoder_manifest_invalid_record_count\":0"));
+    assert!(doctor_json.contains(
+        "\"artifact_payload_decoder_manifest_first_diagnostic\":\"manifest-external-decoder-loaded\""
+    ));
 }
 
 #[test]

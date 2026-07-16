@@ -296,7 +296,8 @@ fn run() -> Result<(), String> {
             output_dir,
             cpu_abi,
             target,
-        } => handle_release_check(input, output_dir, cpu_abi, target)?,
+            json,
+        } => handle_release_check(input, output_dir, cpu_abi, target, json)?,
         cli::CommandKind::Check { input } => handle_check(input)?,
         cli::CommandKind::Test {
             input,
@@ -486,7 +487,7 @@ fn print_help() {
         "    nuis run-artifact [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
     );
     println!(
-        "    nuis release-check [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
+        "    nuis release-check [--json] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
     );
     println!("  general:");
     println!("    nuis status");

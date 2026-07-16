@@ -263,6 +263,12 @@ pub(crate) fn render_artifact_doctor_json(input: &Path) -> String {
         &mut out,
         persisted_nsdb_handoff.json_fields_with_prefix("artifact_nsdb_handoff"),
     );
+    append_json_field_strings(
+        &mut out,
+        report
+            .payload_decoder_manifest
+            .json_fields_with_prefix("artifact_payload_decoder_manifest"),
+    );
     append_artifact_output_diagnostic_json_fields(
         &mut out,
         &diagnostics,

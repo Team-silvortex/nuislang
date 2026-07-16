@@ -27,6 +27,7 @@ use crate::json_surface::{
     galaxy_lock_json_fields, project_check_summary_json_fields, public_surface_summary_json_fields,
     workflow_contract_json_fields,
 };
+use crate::release_check_command::render_release_check_summary_json;
 use crate::surface_render;
 use std::{
     env, fs,

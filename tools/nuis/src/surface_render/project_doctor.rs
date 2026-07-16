@@ -158,6 +158,32 @@ pub(crate) fn write_project_doctor_text_summary<W: fmt::Write>(
     .map_err(|e| e.to_string())?;
     writeln!(
         out,
+        "  artifact_payload_decoder_manifest_available: {}",
+        crate::yes_no(artifact_report.payload_decoder_manifest.available)
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  artifact_payload_decoder_manifest_status: {}",
+        artifact_report.payload_decoder_manifest.status
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  artifact_payload_decoder_manifest_record_count: {}",
+        artifact_report.payload_decoder_manifest.record_count
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  artifact_payload_decoder_manifest_invalid_record_count: {}",
+        artifact_report
+            .payload_decoder_manifest
+            .invalid_record_count
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
         "  artifact_nsld_drive_dry_run_command: {}",
         crate::workflow::nsld_drive_dry_run_command_for_output_dir(&artifact_output_dir)
     )

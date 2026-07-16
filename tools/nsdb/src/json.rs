@@ -1,7 +1,7 @@
 use crate::model::{
     NsdbClockEdgeDebugInfo, NsdbDataSegmentDebugInfo, NsdbDomainDebugInfo,
     NsdbHeteroRuntimeTraceRecord, NsdbInspectReport, NsdbLoweringUnitDebugInfo,
-    NsdbPayloadExecutionEvent, NsdbSidecarDebugInfo,
+    NsdbPayloadDecoderManifestRecordInfo, NsdbPayloadExecutionEvent, NsdbSidecarDebugInfo,
 };
 use crate::replay::{build_replay_plan, NsdbReplayCheckpoint};
 
@@ -145,6 +145,54 @@ pub(crate) fn nsdb_inspect_report_json(report: &NsdbInspectReport) -> String {
             "\"hetero_runtime_trace_records\":[{}]",
             hetero_runtime_trace_records_json(&report.hetero_runtime_trace.records)
         ),
+        json_bool_field(
+            "payload_decoder_manifest_available",
+            report.payload_decoder_manifest.available,
+        ),
+        json_string_field(
+            "payload_decoder_manifest_path",
+            &report.payload_decoder_manifest.path,
+        ),
+        json_string_field(
+            "payload_decoder_manifest_protocol",
+            &report.payload_decoder_manifest.protocol,
+        ),
+        json_string_field(
+            "payload_decoder_manifest_schema",
+            &report.payload_decoder_manifest.schema,
+        ),
+        json_string_field(
+            "payload_decoder_manifest_status",
+            &report.payload_decoder_manifest.status,
+        ),
+        json_usize_field(
+            "payload_decoder_manifest_record_count",
+            report.payload_decoder_manifest.record_count,
+        ),
+        json_usize_field(
+            "payload_decoder_manifest_valid_record_count",
+            report.payload_decoder_manifest.valid_record_count,
+        ),
+        json_usize_field(
+            "payload_decoder_manifest_invalid_record_count",
+            report.payload_decoder_manifest.invalid_record_count,
+        ),
+        json_string_field(
+            "payload_decoder_manifest_first_payload_format",
+            &report.payload_decoder_manifest.first_payload_format,
+        ),
+        json_string_field(
+            "payload_decoder_manifest_first_decoder_id",
+            &report.payload_decoder_manifest.first_decoder_id,
+        ),
+        json_string_field(
+            "payload_decoder_manifest_first_diagnostic",
+            &report.payload_decoder_manifest.first_diagnostic,
+        ),
+        format!(
+            "\"payload_decoder_manifest_records\":[{}]",
+            payload_decoder_manifest_records_json(&report.payload_decoder_manifest.records)
+        ),
         format!("\"domains\":[{}]", domains_json(&report.domains)),
         format!(
             "\"clock_edges\":[{}]",
@@ -162,6 +210,25 @@ pub(crate) fn nsdb_inspect_report_json(report: &NsdbInspectReport) -> String {
         json_string_array_field("missing_metadata", &report.missing_metadata),
     ];
     format!("{{{}}}", fields.join(","))
+}
+
+fn payload_decoder_manifest_records_json(
+    records: &[NsdbPayloadDecoderManifestRecordInfo],
+) -> String {
+    records
+        .iter()
+        .map(|record| {
+            let fields = vec![
+                json_usize_field("index", record.index),
+                json_bool_field("valid", record.valid),
+                json_string_field("payload_format", &record.payload_format),
+                json_string_field("decoder_id", &record.decoder_id),
+                json_string_field("diagnostic", &record.diagnostic),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 pub(crate) fn nsdb_events_report_json(report: &NsdbInspectReport) -> String {
@@ -291,15 +358,23 @@ fn replay_checkpoints_json(checkpoints: &[NsdbReplayCheckpoint]) -> String {
                 json_string_field("value_decoder_detail", &checkpoint.value_decoder_detail),
                 json_string_field(
                     "value_decoder_capability",
-                    checkpoint.value_decoder_capability,
+                    &checkpoint.value_decoder_capability,
                 ),
                 json_string_field(
                     "value_decoder_detail_level",
-                    checkpoint.value_decoder_detail_level,
+                    &checkpoint.value_decoder_detail_level,
                 ),
                 json_bool_field(
                     "value_decoder_reads_file_summary",
                     checkpoint.value_decoder_reads_file_summary,
+                ),
+                json_string_field(
+                    "value_decoder_manifest_status",
+                    &checkpoint.value_decoder_manifest_status,
+                ),
+                json_string_field(
+                    "value_decoder_manifest_detail",
+                    &checkpoint.value_decoder_manifest_detail,
                 ),
                 json_string_field(
                     "value_decoder_format_probe_status",

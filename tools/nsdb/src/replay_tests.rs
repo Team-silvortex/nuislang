@@ -1,8 +1,8 @@
 use crate::{
     model::{
         NsdbDomainDebugInfo, NsdbHeteroRuntimeTraceInfo, NsdbHeteroRuntimeTraceRecord,
-        NsdbInspectReport, NsdbPayloadExecutionEvent, NsdbPayloadExecutionEventFilter,
-        NsdbPayloadExecutionHandoffInfo, NsdbSidecarDebugInfo,
+        NsdbInspectReport, NsdbPayloadDecoderManifestInfo, NsdbPayloadExecutionEvent,
+        NsdbPayloadExecutionEventFilter, NsdbPayloadExecutionHandoffInfo, NsdbSidecarDebugInfo,
     },
     replay::build_replay_plan,
 };
@@ -48,9 +48,14 @@ fn loads_external_payload_decoder_manifest_specs() {
     fs::write(
         output_dir.join("nuis.nsdb.payload-decoders.toml"),
         r#"
+protocol = "nuis-nsdb-payload-decoders-v1"
+schema = "nsdb-payload-decoder-manifest-v1"
+
 [[decoders]]
 payload_format = "wgslbin"
 decoder_id = "nsdb-wgslbin-external-decoder-v1"
+decoder_capability = "shader-binary-header"
+decoder_detail_level = "container-header"
 magic_label = "WGSL"
 magic_ascii = "WGSL"
 "#,
@@ -65,6 +70,13 @@ magic_ascii = "WGSL"
 
     assert_eq!(decoded.decoder_id, "nsdb-wgslbin-external-decoder-v1");
     assert_eq!(decoded.decoder_status, "decoder-registered-external-opaque");
+    assert_eq!(decoded.decoder_capability, "shader-binary-header");
+    assert_eq!(decoded.decoder_detail_level, "container-header");
+    assert_eq!(
+        decoded.decoder_manifest_status,
+        "manifest-external-decoder-loaded"
+    );
+    assert_eq!(decoded.decoder_manifest_detail, "external-magic-ascii");
     assert_eq!(decoded.decoder_format_probe_status, "format-probe-matched");
     assert_eq!(decoded.decoder_format_probe_detail, "magic:WGSL");
 
@@ -87,6 +99,9 @@ fn loads_external_payload_decoder_hex_magic_specs() {
     fs::write(
         output_dir.join("nuis.nsdb.payload-decoders.toml"),
         r#"
+protocol = "nuis-nsdb-payload-decoders-v1"
+schema = "nsdb-payload-decoder-manifest-v1"
+
 [[decoders]]
 payload_format = "custom-spv"
 decoder_id = "nsdb-custom-spv-external-decoder-v1"
@@ -104,8 +119,143 @@ magic_hex = "03 02 23 07"
 
     assert_eq!(decoded.decoder_id, "nsdb-custom-spv-external-decoder-v1");
     assert_eq!(decoded.decoder_status, "decoder-registered-external-opaque");
+    assert_eq!(
+        decoded.decoder_manifest_status,
+        "manifest-external-decoder-loaded"
+    );
+    assert_eq!(decoded.decoder_manifest_detail, "external-magic-hex");
     assert_eq!(decoded.decoder_format_probe_status, "format-probe-matched");
     assert_eq!(decoded.decoder_format_probe_detail, "magic:SPIR-V");
+
+    fs::remove_dir_all(output_dir).unwrap();
+}
+
+#[test]
+fn reports_invalid_external_payload_decoder_magic_specs() {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let output_dir = env::temp_dir().join(format!("nsdb-replay-invalid-decoder-{nonce}"));
+    fs::create_dir_all(&output_dir).unwrap();
+    fs::write(output_dir.join("kernel.bin"), [0x03, 0x02, 0x23, 0x07]).unwrap();
+    fs::write(
+        output_dir.join("nuis.nsdb.payload-decoders.toml"),
+        r#"
+protocol = "nuis-nsdb-payload-decoders-v1"
+schema = "nsdb-payload-decoder-manifest-v1"
+
+[[decoders]]
+payload_format = "bad-spv"
+decoder_id = "nsdb-bad-spv-external-decoder-v1"
+magic_label = "BROKEN"
+magic_hex = "03 0Z"
+"#,
+    )
+    .unwrap();
+
+    let decoded = crate::payload_decoder::decode_payload_content(
+        output_dir.to_str().unwrap(),
+        "bad-spv",
+        "kernel.bin",
+    );
+
+    assert_eq!(decoded.decoder_id, "nsdb-bad-spv-external-decoder-v1");
+    assert_eq!(
+        decoded.decoder_manifest_status,
+        "manifest-external-decoder-invalid-magic"
+    );
+    assert_eq!(decoded.decoder_manifest_detail, "invalid-magic-hex");
+    assert_eq!(decoded.decoder_format_probe_status, "format-probe-generic");
+
+    fs::remove_dir_all(output_dir).unwrap();
+}
+
+#[test]
+fn summarizes_payload_decoder_manifest_for_inspect_surfaces() {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let output_dir = env::temp_dir().join(format!("nsdb-decoder-manifest-summary-{nonce}"));
+    fs::create_dir_all(&output_dir).unwrap();
+    fs::write(
+        output_dir.join("nuis.nsdb.payload-decoders.toml"),
+        r#"
+protocol = "nuis-nsdb-payload-decoders-v1"
+schema = "nsdb-payload-decoder-manifest-v1"
+
+[[decoders]]
+payload_format = "ok"
+decoder_id = "nsdb-ok-decoder-v1"
+magic_ascii = "OK"
+
+[[decoders]]
+payload_format = "broken"
+decoder_id = "nsdb-broken-decoder-v1"
+magic_hex = "0G"
+"#,
+    )
+    .unwrap();
+
+    let summary = crate::payload_decoder::read_payload_decoder_manifest_info(&output_dir);
+
+    assert!(summary.available);
+    assert_eq!(summary.protocol, "nuis-nsdb-payload-decoders-v1");
+    assert_eq!(summary.schema, "nsdb-payload-decoder-manifest-v1");
+    assert_eq!(summary.status, "invalid-records");
+    assert_eq!(summary.record_count, 2);
+    assert_eq!(summary.valid_record_count, 1);
+    assert_eq!(summary.invalid_record_count, 1);
+    assert_eq!(summary.first_payload_format, "ok");
+    assert_eq!(summary.first_decoder_id, "nsdb-ok-decoder-v1");
+    assert_eq!(summary.first_diagnostic, "manifest-external-decoder-loaded");
+    assert_eq!(summary.records.len(), 2);
+    assert!(summary.records[0].valid);
+    assert_eq!(summary.records[0].payload_format, "ok");
+    assert_eq!(
+        summary.records[0].diagnostic,
+        "manifest-external-decoder-loaded"
+    );
+    assert!(!summary.records[1].valid);
+    assert_eq!(summary.records[1].payload_format, "broken");
+    assert_eq!(
+        summary.records[1].diagnostic,
+        "manifest-external-decoder-invalid-magic"
+    );
+
+    fs::remove_dir_all(output_dir).unwrap();
+}
+
+#[test]
+fn reports_unsupported_payload_decoder_manifest_protocol() {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let output_dir = env::temp_dir().join(format!("nsdb-decoder-manifest-unsupported-{nonce}"));
+    fs::create_dir_all(&output_dir).unwrap();
+    fs::write(
+        output_dir.join("nuis.nsdb.payload-decoders.toml"),
+        r#"
+protocol = "nuis-nsdb-payload-decoders-v0"
+schema = "nsdb-payload-decoder-manifest-v1"
+
+[[decoders]]
+payload_format = "ok"
+decoder_id = "nsdb-ok-decoder-v1"
+magic_ascii = "OK"
+"#,
+    )
+    .unwrap();
+
+    let summary = crate::payload_decoder::read_payload_decoder_manifest_info(&output_dir);
+
+    assert!(summary.available);
+    assert_eq!(summary.protocol, "nuis-nsdb-payload-decoders-v0");
+    assert_eq!(summary.status, "unsupported-protocol");
+    assert_eq!(summary.record_count, 1);
+    assert_eq!(summary.valid_record_count, 1);
 
     fs::remove_dir_all(output_dir).unwrap();
 }
@@ -204,6 +354,23 @@ fn builds_replay_checkpoints_from_payload_events() {
                 missing_signals: Vec::new(),
                 next_action: "materialize-device-execution-trace".to_owned(),
             }],
+        },
+        payload_decoder_manifest: NsdbPayloadDecoderManifestInfo {
+            available: false,
+            path: output_dir
+                .join("nuis.nsdb.payload-decoders.toml")
+                .display()
+                .to_string(),
+            protocol: "none".to_owned(),
+            schema: "none".to_owned(),
+            status: "missing".to_owned(),
+            record_count: 0,
+            valid_record_count: 0,
+            invalid_record_count: 0,
+            first_payload_format: "none".to_owned(),
+            first_decoder_id: "none".to_owned(),
+            first_diagnostic: "manifest-not-found".to_owned(),
+            records: Vec::new(),
         },
         domains: vec![NsdbDomainDebugInfo {
             domain_family: "shader".to_owned(),

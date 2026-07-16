@@ -5,6 +5,7 @@ use crate::{
         NsdbClockEdgeDebugInfo, NsdbDataSegmentDebugInfo, NsdbDomainDebugInfo, NsdbInspectReport,
         NsdbLoweringUnitDebugInfo, NsdbPayloadExecutionEventFilter,
     },
+    payload_decoder::read_payload_decoder_manifest_info,
     sidecar::read_sidecar_debug_info,
 };
 use std::path::Path;
@@ -97,6 +98,7 @@ pub(crate) fn nsdb_inspect_report(
         .collect::<Vec<_>>();
     let mut payload_execution_handoff = read_payload_execution_handoff(Path::new(&plan.output_dir));
     let hetero_runtime_trace = read_hetero_runtime_trace(Path::new(&plan.output_dir));
+    let payload_decoder_manifest = read_payload_decoder_manifest_info(Path::new(&plan.output_dir));
     let mut missing_metadata = Vec::new();
     if !plan.clock_protocol.validation.valid {
         missing_metadata.push("valid-clock-protocol".to_owned());
@@ -153,6 +155,7 @@ pub(crate) fn nsdb_inspect_report(
         payload_execution_event_filter: event_filter,
         payload_execution_handoff,
         hetero_runtime_trace,
+        payload_decoder_manifest,
         domains,
         clock_edges,
         data_segments,

@@ -79,6 +79,26 @@ their decoder id, status, and optional magic probe without adding scattered
 format-specific branches.
 Artifact outputs may also provide `nuis.nsdb.payload-decoders.toml` with
 `[[decoders]]` records for experimental payload families. The first supported
-external fields are `payload_format`, `decoder_id`, `magic_label`, and
+top-level fields are `protocol = "nuis-nsdb-payload-decoders-v1"` and
+`schema = "nsdb-payload-decoder-manifest-v1"`. The first supported
+record fields are `payload_format`, `decoder_id`, `magic_label`, and
 `magic_ascii` or `magic_hex`. Hex magic accepts spaces or underscores between
 byte pairs for readability.
+External specs may also declare `decoder_capability` and `decoder_detail_level`;
+when omitted they default to `opaque-file-summary` and `file-header`.
+Nuis artifact-doctor and project-status/project-doctor surfaces mirror the
+generated manifest status, record count, and first diagnostic so broken decoder
+registries are visible before entering `nsdb`.
+Replay checkpoints include `value_decoder_manifest_*` diagnostics so malformed
+external specs, such as invalid hex magic, are visible instead of being silently
+ignored.
+`inspect` also reports a manifest-level summary with availability, record
+counts, invalid record counts, and the first diagnostic so bad decoder specs can
+be spotted before building a replay plan.
+It also lists `payload_decoder_manifest_record` entries so each external
+decoder declaration has its own validity and diagnostic status.
+Unsupported protocol/schema values are reported in inspect summaries without
+blocking built-in decoder fallback.
+`run-artifact`/artifact runtime trace persistence now emits a standard decoder
+manifest for observed backend payload formats, giving nsdb a generated external
+decoder registry before format-specific decoders exist.

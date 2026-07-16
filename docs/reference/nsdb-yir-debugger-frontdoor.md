@@ -162,6 +162,25 @@ Artifact outputs can extend that registry with
 `nuis.nsdb.payload-decoders.toml`; its initial `[[decoders]]` records support
 `payload_format`, `decoder_id`, `magic_label`, ASCII magic probes, and hex
 magic probes for binary payload headers.
+The manifest itself carries `protocol = "nuis-nsdb-payload-decoders-v1"` and
+`schema = "nsdb-payload-decoder-manifest-v1"` so nsdb can report unsupported
+future versions while still falling back to built-in decoders.
+Artifact runtime trace persistence emits a generated decoder manifest for
+observed backend payload formats, so inspect/replay can consume a produced
+registry instead of relying only on hand-authored manifests.
+Nuis artifact-doctor and project-status/project-doctor mirror that generated
+manifest summary, including status, record counts, and the first diagnostic,
+before control moves into `nsdb`.
+External decoder records may also declare `decoder_capability` and
+`decoder_detail_level`, allowing experimental payload families to advertise a
+more specific interpretation boundary while still remaining replay-safe.
+Replay checkpoints surface `value_decoder_manifest_*` diagnostics so invalid
+external specs can be inspected without changing the replay planner.
+The inspect report also includes `payload_decoder_manifest_*` summary fields to
+catch malformed decoder manifests before drilling into checkpoint replay.
+Per-record manifest diagnostics are exposed as
+`payload_decoder_manifest_records`, preserving the aggregate summary while
+making multi-decoder manifests inspectable.
 
 ## Relationship To Nsld
 

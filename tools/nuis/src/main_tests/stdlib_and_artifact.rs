@@ -268,7 +268,7 @@ mod cpu Main {
     );
     let output_dir = temp_dir("release_check_outputs");
 
-    handle_release_check(project_root, output_dir.clone(), None, None)
+    handle_release_check(project_root, output_dir.clone(), None, None, false)
         .expect("release-check passes");
 
     let manifest_path = output_dir.join("nuis.build.manifest.toml");

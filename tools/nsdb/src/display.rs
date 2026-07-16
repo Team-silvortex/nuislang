@@ -119,6 +119,56 @@ pub(crate) fn print_nsdb_inspect_report(report: &NsdbInspectReport) {
             record.next_action
         );
     }
+    println!(
+        "  payload_decoder_manifest_available: {}",
+        report.payload_decoder_manifest.available
+    );
+    println!(
+        "  payload_decoder_manifest_protocol: {}",
+        report.payload_decoder_manifest.protocol
+    );
+    println!(
+        "  payload_decoder_manifest_schema: {}",
+        report.payload_decoder_manifest.schema
+    );
+    println!(
+        "  payload_decoder_manifest_status: {}",
+        report.payload_decoder_manifest.status
+    );
+    println!(
+        "  payload_decoder_manifest_record_count: {}",
+        report.payload_decoder_manifest.record_count
+    );
+    println!(
+        "  payload_decoder_manifest_valid_record_count: {}",
+        report.payload_decoder_manifest.valid_record_count
+    );
+    println!(
+        "  payload_decoder_manifest_invalid_record_count: {}",
+        report.payload_decoder_manifest.invalid_record_count
+    );
+    println!(
+        "  payload_decoder_manifest_first_payload_format: {}",
+        report.payload_decoder_manifest.first_payload_format
+    );
+    println!(
+        "  payload_decoder_manifest_first_decoder_id: {}",
+        report.payload_decoder_manifest.first_decoder_id
+    );
+    println!(
+        "  payload_decoder_manifest_first_diagnostic: {}",
+        report.payload_decoder_manifest.first_diagnostic
+    );
+    for record in &report.payload_decoder_manifest.records {
+        println!(
+            "  payload_decoder_manifest_record: index={} valid={} payload_format={} decoder_id={} diagnostic={}",
+            record.index,
+            record.valid,
+            record.payload_format,
+            record.decoder_id,
+            record.diagnostic
+        );
+    }
     for domain in &report.domains {
         println!(
             "  domain: {} package={} kind={} lowering={} backend={} scope={}",
@@ -253,7 +303,7 @@ pub(crate) fn print_nsdb_replay_plan(report: &NsdbInspectReport) {
     );
     for checkpoint in &plan.checkpoints {
         println!(
-            "  replay_checkpoint: index={} trace={} kind={} status={} frame={} slot={} value_state={} value_sample_contract={} value_sample_ref={} value_sample_source={} value_sample_resolution={} value_sample_detail={} value_sample_materialization={} value_sample_payload={} value_sample_bridge_stub={} value_slot_id={} value_schema_status={} value_schema_hint={} value_snapshot_status={} value_snapshot_type={} value_snapshot_ref={} value_content_status={} value_content_type={} value_decoder_id={} value_decoder_status={} value_decoder_capability={} value_decoder_detail_level={} value_decoder_reads_file_summary={} value_decoder_format_probe_status={} value_decoder_format_probe_detail={} phase={} entry={} blocker={} next={}",
+            "  replay_checkpoint: index={} trace={} kind={} status={} frame={} slot={} value_state={} value_sample_contract={} value_sample_ref={} value_sample_source={} value_sample_resolution={} value_sample_detail={} value_sample_materialization={} value_sample_payload={} value_sample_bridge_stub={} value_slot_id={} value_schema_status={} value_schema_hint={} value_snapshot_status={} value_snapshot_type={} value_snapshot_ref={} value_content_status={} value_content_type={} value_decoder_id={} value_decoder_status={} value_decoder_capability={} value_decoder_detail_level={} value_decoder_reads_file_summary={} value_decoder_manifest_status={} value_decoder_manifest_detail={} value_decoder_format_probe_status={} value_decoder_format_probe_detail={} phase={} entry={} blocker={} next={}",
             checkpoint.index,
             checkpoint.trace_id,
             checkpoint.checkpoint_kind,
@@ -282,6 +332,8 @@ pub(crate) fn print_nsdb_replay_plan(report: &NsdbInspectReport) {
             checkpoint.value_decoder_capability,
             checkpoint.value_decoder_detail_level,
             checkpoint.value_decoder_reads_file_summary,
+            checkpoint.value_decoder_manifest_status,
+            checkpoint.value_decoder_manifest_detail,
             checkpoint.value_decoder_format_probe_status,
             checkpoint.value_decoder_format_probe_detail,
             checkpoint.execution_phase,

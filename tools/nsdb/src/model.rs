@@ -16,12 +16,38 @@ pub(crate) struct NsdbInspectReport {
     pub(crate) payload_execution_event_filter: NsdbPayloadExecutionEventFilter,
     pub(crate) payload_execution_handoff: NsdbPayloadExecutionHandoffInfo,
     pub(crate) hetero_runtime_trace: NsdbHeteroRuntimeTraceInfo,
+    pub(crate) payload_decoder_manifest: NsdbPayloadDecoderManifestInfo,
     pub(crate) domains: Vec<NsdbDomainDebugInfo>,
     pub(crate) clock_edges: Vec<NsdbClockEdgeDebugInfo>,
     pub(crate) data_segments: Vec<NsdbDataSegmentDebugInfo>,
     pub(crate) lowering_units: Vec<NsdbLoweringUnitDebugInfo>,
     pub(crate) sidecars: Vec<NsdbSidecarDebugInfo>,
     pub(crate) missing_metadata: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsdbPayloadDecoderManifestInfo {
+    pub(crate) available: bool,
+    pub(crate) path: String,
+    pub(crate) protocol: String,
+    pub(crate) schema: String,
+    pub(crate) status: String,
+    pub(crate) record_count: usize,
+    pub(crate) valid_record_count: usize,
+    pub(crate) invalid_record_count: usize,
+    pub(crate) first_payload_format: String,
+    pub(crate) first_decoder_id: String,
+    pub(crate) first_diagnostic: String,
+    pub(crate) records: Vec<NsdbPayloadDecoderManifestRecordInfo>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsdbPayloadDecoderManifestRecordInfo {
+    pub(crate) index: usize,
+    pub(crate) valid: bool,
+    pub(crate) payload_format: String,
+    pub(crate) decoder_id: String,
+    pub(crate) diagnostic: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

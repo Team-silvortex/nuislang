@@ -88,6 +88,7 @@ pub enum CommandKind {
         output_dir: PathBuf,
         cpu_abi: Option<String>,
         target: Option<String>,
+        json: bool,
     },
     Check {
         input: PathBuf,
@@ -307,6 +308,7 @@ where
                 output_dir: parsed.output_dir,
                 cpu_abi: parsed.cpu_abi,
                 target: parsed.target,
+                json: parsed.json,
             })
         }
         "check" => Ok(CommandKind::Check {

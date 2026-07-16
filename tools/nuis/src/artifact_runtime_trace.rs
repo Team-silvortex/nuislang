@@ -10,6 +10,9 @@ use std::{
 
 const HETERO_RUNTIME_TRACE_FILE_NAME: &str = "nuis.nsdb.hetero-runtime-trace.toml";
 const HETERO_RUNTIME_TRACE_PROTOCOL: &str = "nuis-nsdb-hetero-runtime-trace-v1";
+const PAYLOAD_DECODER_MANIFEST_FILE_NAME: &str = "nuis.nsdb.payload-decoders.toml";
+const PAYLOAD_DECODER_MANIFEST_PROTOCOL: &str = "nuis-nsdb-payload-decoders-v1";
+const PAYLOAD_DECODER_MANIFEST_SCHEMA: &str = "nsdb-payload-decoder-manifest-v1";
 
 struct HeteroRuntimeTraceRecord {
     trace_id: String,
@@ -55,6 +58,10 @@ pub(crate) struct HeteroRuntimeTracePersistence {
     record_count: usize,
     first_trace_id: Option<String>,
     error: Option<String>,
+    decoder_manifest_persisted: bool,
+    decoder_manifest_path: Option<PathBuf>,
+    decoder_manifest_record_count: usize,
+    decoder_manifest_error: Option<String>,
 }
 
 impl HeteroRuntimeTraceSummary {
@@ -265,9 +272,14 @@ impl HeteroRuntimeTraceSummary {
                 record_count: self.records.len(),
                 first_trace_id,
                 error: Some("output_dir-unavailable".to_owned()),
+                decoder_manifest_persisted: false,
+                decoder_manifest_path: None,
+                decoder_manifest_record_count: 0,
+                decoder_manifest_error: Some("output_dir-unavailable".to_owned()),
             };
         };
         let path = output_dir.join(HETERO_RUNTIME_TRACE_FILE_NAME);
+        let decoder_manifest_path = output_dir.join(PAYLOAD_DECODER_MANIFEST_FILE_NAME);
         if !self.available {
             return HeteroRuntimeTracePersistence {
                 persisted: false,
@@ -275,22 +287,51 @@ impl HeteroRuntimeTraceSummary {
                 record_count: self.records.len(),
                 first_trace_id,
                 error: Some("hetero-runtime-trace-unavailable".to_owned()),
+                decoder_manifest_persisted: false,
+                decoder_manifest_path: Some(decoder_manifest_path),
+                decoder_manifest_record_count: 0,
+                decoder_manifest_error: Some("hetero-runtime-trace-unavailable".to_owned()),
             };
         }
         match fs::write(&path, self.render_nsdb_trace_toml()) {
-            Ok(()) => HeteroRuntimeTracePersistence {
-                persisted: true,
-                path: Some(path),
-                record_count: self.records.len(),
-                first_trace_id,
-                error: None,
-            },
+            Ok(()) => {
+                let decoder_manifest_source = self.render_payload_decoder_manifest_toml();
+                let decoder_manifest_record_count = payload_decoder_manifest_record_count(self);
+                match fs::write(&decoder_manifest_path, decoder_manifest_source) {
+                    Ok(()) => HeteroRuntimeTracePersistence {
+                        persisted: true,
+                        path: Some(path),
+                        record_count: self.records.len(),
+                        first_trace_id,
+                        error: None,
+                        decoder_manifest_persisted: true,
+                        decoder_manifest_path: Some(decoder_manifest_path),
+                        decoder_manifest_record_count,
+                        decoder_manifest_error: None,
+                    },
+                    Err(error) => HeteroRuntimeTracePersistence {
+                        persisted: true,
+                        path: Some(path),
+                        record_count: self.records.len(),
+                        first_trace_id,
+                        error: None,
+                        decoder_manifest_persisted: false,
+                        decoder_manifest_path: Some(decoder_manifest_path),
+                        decoder_manifest_record_count,
+                        decoder_manifest_error: Some(error.to_string()),
+                    },
+                }
+            }
             Err(error) => HeteroRuntimeTracePersistence {
                 persisted: false,
                 path: Some(path),
                 record_count: self.records.len(),
                 first_trace_id,
                 error: Some(error.to_string()),
+                decoder_manifest_persisted: false,
+                decoder_manifest_path: Some(decoder_manifest_path),
+                decoder_manifest_record_count: 0,
+                decoder_manifest_error: Some("hetero-runtime-trace-persist-failed".to_owned()),
             },
         }
     }
@@ -320,6 +361,27 @@ impl HeteroRuntimeTraceSummary {
         for record in &self.records {
             out.push_str("\n[[records]]\n");
             record.push_toml_fields(&mut out);
+        }
+        out
+    }
+
+    fn render_payload_decoder_manifest_toml(&self) -> String {
+        let mut out = String::new();
+        push_toml_string(&mut out, "protocol", PAYLOAD_DECODER_MANIFEST_PROTOCOL);
+        push_toml_string(&mut out, "schema", PAYLOAD_DECODER_MANIFEST_SCHEMA);
+        for payload_format in payload_decoder_manifest_formats(self) {
+            out.push_str("\n[[decoders]]\n");
+            push_toml_string(&mut out, "payload_format", &payload_format);
+            push_toml_string(
+                &mut out,
+                "decoder_id",
+                &format!(
+                    "nsdb-{}-generated-opaque-decoder-v1",
+                    payload_format.replace(['.', ':', '/'], "-")
+                ),
+            );
+            push_toml_string(&mut out, "decoder_capability", "opaque-file-summary");
+            push_toml_string(&mut out, "decoder_detail_level", "file-header");
         }
         out
     }
@@ -418,6 +480,25 @@ impl HeteroRuntimeTracePersistence {
                 self.first_trace_id.as_deref(),
             ),
             json_optional_string_field("hetero_runtime_trace_persist_error", self.error.as_deref()),
+            json_bool_field(
+                "payload_decoder_manifest_persisted",
+                self.decoder_manifest_persisted,
+            ),
+            json_optional_string_field(
+                "payload_decoder_manifest_path",
+                self.decoder_manifest_path
+                    .as_ref()
+                    .map(|path| path.display().to_string())
+                    .as_deref(),
+            ),
+            json_usize_field(
+                "payload_decoder_manifest_persisted_record_count",
+                self.decoder_manifest_record_count,
+            ),
+            json_optional_string_field(
+                "payload_decoder_manifest_persist_error",
+                self.decoder_manifest_error.as_deref(),
+            ),
         ]
     }
 
@@ -442,6 +523,25 @@ impl HeteroRuntimeTracePersistence {
         println!(
             "  hetero_runtime_trace_persist_error: {}",
             self.error.as_deref().unwrap_or("<none>")
+        );
+        println!(
+            "  payload_decoder_manifest_persisted: {}",
+            self.decoder_manifest_persisted
+        );
+        println!(
+            "  payload_decoder_manifest_path: {}",
+            self.decoder_manifest_path
+                .as_ref()
+                .map(|path| path.display().to_string())
+                .unwrap_or_else(|| "<none>".to_owned())
+        );
+        println!(
+            "  payload_decoder_manifest_persisted_record_count: {}",
+            self.decoder_manifest_record_count
+        );
+        println!(
+            "  payload_decoder_manifest_persist_error: {}",
+            self.decoder_manifest_error.as_deref().unwrap_or("<none>")
         );
     }
 }
@@ -575,6 +675,21 @@ fn joined_or_none(values: &[String]) -> String {
     } else {
         values.join(", ")
     }
+}
+
+fn payload_decoder_manifest_formats(summary: &HeteroRuntimeTraceSummary) -> Vec<String> {
+    summary
+        .records
+        .iter()
+        .filter_map(|record| record.payload_format.clone())
+        .filter(|format| !format.is_empty() && format != "none")
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+fn payload_decoder_manifest_record_count(summary: &HeteroRuntimeTraceSummary) -> usize {
+    payload_decoder_manifest_formats(summary).len()
 }
 
 fn push_toml_optional_string(out: &mut String, key: &str, value: Option<&str>) {

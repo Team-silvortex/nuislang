@@ -221,6 +221,34 @@ fn parses_build_report_json_with_output_dir() {
 }
 
 #[test]
+fn parses_release_check_json_with_target_options() {
+    let command = parse_args(
+        [
+            "release-check".to_owned(),
+            "--json".to_owned(),
+            "--cpu-abi".to_owned(),
+            "cpu.arm64.apple_aapcs64".to_owned(),
+            "--target".to_owned(),
+            "aarch64-apple-darwin".to_owned(),
+            "examples/demo".to_owned(),
+            "target/release-check-demo".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .expect("release-check json parses");
+    assert_eq!(
+        command,
+        CommandKind::ReleaseCheck {
+            input: PathBuf::from("examples/demo"),
+            output_dir: PathBuf::from("target/release-check-demo"),
+            cpu_abi: Some("cpu.arm64.apple_aapcs64".to_owned()),
+            target: Some("aarch64-apple-darwin".to_owned()),
+            json: true,
+        }
+    );
+}
+
+#[test]
 fn parses_unpack_artifact_support_json_with_output_dir() {
     let command = parse_args(
         [

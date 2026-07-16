@@ -328,6 +328,65 @@ mod cpu Main {
 }
 
 #[test]
+fn project_status_and_doctor_json_mirror_generated_payload_decoder_manifest() {
+    let bridge_root = checked_in_path("../../examples/projects/domains/shader_packet_bridge_demo");
+    let project_root = write_temp_project_fixture(
+        "status_json_payload_decoder_manifest_bridge",
+        r#"
+name = "status_json_payload_decoder_manifest_bridge"
+version = "0.1.0"
+entry = "main.ns"
+modules = ["main.ns", "surface_shader.ns", "fabric_plane.ns"]
+links = [
+  "cpu.Main -> shader.SurfaceShader via data.FabricPlane"
+]
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+  "data=data.fabric.macos.arm64.v1",
+  "shader=shader.metal.msl2_4",
+]
+"#
+        .trim_start(),
+        &fs::read_to_string(bridge_root.join("main.ns")).expect("read bridge main"),
+    );
+    fs::write(
+        project_root.join("surface_shader.ns"),
+        fs::read_to_string(bridge_root.join("surface_shader.ns")).expect("read bridge shader"),
+    )
+    .expect("write bridge shader");
+    fs::write(
+        project_root.join("fabric_plane.ns"),
+        fs::read_to_string(bridge_root.join("fabric_plane.ns")).expect("read bridge fabric"),
+    )
+    .expect("write bridge fabric");
+
+    let output_dir = default_build_output_dir(&project_root);
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
+    let run_json = render_run_artifact_json(&output_dir);
+    assert!(run_json.contains("\"payload_decoder_manifest_persisted\":true"));
+
+    let status_json = render_project_status_json(&project_root).expect("render status json");
+    assert!(status_json.contains("\"artifact_payload_decoder_manifest_available\":true"));
+    assert!(status_json.contains("\"artifact_payload_decoder_manifest_status\":\"ready\""));
+    assert!(status_json.contains("\"artifact_payload_decoder_manifest_record_count\":1"));
+    assert!(status_json.contains("\"artifact_payload_decoder_manifest_invalid_record_count\":0"));
+
+    let doctor_json = render_project_doctor_json(&project_root).expect("render doctor json");
+    assert!(doctor_json.contains("\"artifact_payload_decoder_manifest_available\":true"));
+    assert!(doctor_json.contains("\"artifact_payload_decoder_manifest_status\":\"ready\""));
+    assert!(doctor_json.contains("\"artifact_payload_decoder_manifest_record_count\":1"));
+    assert!(doctor_json.contains("\"artifact_payload_decoder_manifest_invalid_record_count\":0"));
+}
+
+#[test]
 fn scheduler_view_json_reports_project_domains_and_frontdoor() {
     let project_root = write_temp_project_fixture(
         "scheduler_project_smoke",

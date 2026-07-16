@@ -325,6 +325,12 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
             ),
         ],
     );
+    append_json_field_strings(
+        &mut out,
+        artifact_report
+            .payload_decoder_manifest
+            .json_fields_with_prefix("artifact_payload_decoder_manifest"),
+    );
     append_link_plan_json_fields(&mut out, link_plan.as_ref());
     crate::append_project_workflow_json_fields(&mut out, &frontdoor, include_galaxy_flow);
     append_json_field_strings(
