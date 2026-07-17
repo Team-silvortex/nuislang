@@ -369,6 +369,15 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
                 .unwrap_or_else(|| "nsdb materialize-provider-samples <output-dir> --json".to_owned()),
             "device provider sample descriptors are present but still pending, so the next step is to run the provider materializer before replaying nsdb".to_owned(),
         )
+    } else if device_provider_sample_manifest.status == "blocked-provider-sample" {
+        (
+            "repair_provider_output_payload".to_owned(),
+            output_dir
+                .as_ref()
+                .map(|path| format!("nsdb materialize-provider-samples {} --json", path.display()))
+                .unwrap_or_else(|| "nsdb materialize-provider-samples <output-dir> --json".to_owned()),
+            "device provider sample materialization is blocked, so inspect the provider output payload diagnostics before replaying nsdb".to_owned(),
+        )
     } else if ready_to_run {
         (
             "run_artifact".to_owned(),

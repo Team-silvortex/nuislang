@@ -142,6 +142,65 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
     assert!(output_json.contains("\"final_output_nsdb_replay_first_blocker\":null"));
 }
 
+#[test]
+fn final_executable_output_replay_blocks_pending_hetero_closure() {
+    let dir = env::temp_dir().join(format!(
+        "nsld-final-output-nsdb-handoff-closure-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let manifest = write_test_build_manifest_with_packaging_mode(&dir, "nuis-self-contained-image");
+    let plan = nuisc::linker::build_link_plan_from_manifest(Path::new(&manifest)).unwrap();
+
+    nsld_prepare_report(Path::new(&manifest), &plan).unwrap();
+    nsld_emit_final_stage_plan_report(Path::new(&manifest), &plan).unwrap();
+    nsld_emit_final_executable_writer_input_report(Path::new(&manifest), &plan).unwrap();
+    nsld_emit_final_executable_layout_plan_report(Path::new(&manifest), &plan).unwrap();
+    nsld_emit_final_executable_image_dry_run_report(Path::new(&manifest), &plan).unwrap();
+    nsld_emit_final_executable_report(Path::new(&manifest), &plan).unwrap();
+
+    let mut output = nsld_final_executable_output_report(Path::new(&manifest), &plan);
+    let summary = super::final_executable_output_nsdb_handoff::persist_final_output_nsdb_handoff(
+        Path::new(&plan.output_dir),
+        &output,
+    );
+    let handoff_path = dir.join("nuis.nsdb.payload-execution-handoff.toml");
+    let handoff = fs::read_to_string(&handoff_path).unwrap();
+    fs::write(
+        &handoff_path,
+        handoff.replace(
+            "record_count = 1\n",
+            "record_count = 1\nhetero_execution_closure_protocol = \"nuis-hetero-execution-closure-v1\"\nhetero_execution_closure_status = \"host-runner-pending\"\nhetero_execution_closure_ready = \"false\"\nhetero_execution_closure_first_blocker = \"host-runner-backend-artifact-payload:not-observed\"\nhetero_execution_closure_next_action = \"run-host-runner-payload-probe\"\n",
+        ),
+    )
+    .unwrap();
+
+    super::final_executable_output_nsdb_handoff::attach_final_output_nsdb_handoff_summary(
+        &mut output,
+        summary,
+    );
+    let output_json = super::json::nsld_final_executable_output_report_json(&output);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!output.final_output_nsdb_replay_ready);
+    assert_eq!(output.final_output_nsdb_replay_status, "blocked");
+    assert_eq!(
+        output.final_output_nsdb_replay_first_blocker.as_deref(),
+        Some("hetero-execution-closure:host-runner-backend-artifact-payload:not-observed")
+    );
+    assert_eq!(
+        output.final_output_nsdb_replay_next_action,
+        "resolve-final-output-nsdb-replay"
+    );
+    assert_eq!(output.owned_package_summary_status, "replay-blocked");
+    assert!(!output.owned_package_summary_ready);
+    assert!(output_json.contains("\"final_output_nsdb_replay_ready\":false"));
+    assert!(output_json.contains("\"final_output_nsdb_replay_status\":\"blocked\""));
+    assert!(output_json.contains(
+        "\"final_output_nsdb_replay_first_blocker\":\"hetero-execution-closure:host-runner-backend-artifact-payload:not-observed\""
+    ));
+}
+
 fn write_test_build_manifest_with_packaging_mode(dir: &Path, packaging_mode: &str) -> String {
     let ast = dir.join("demo.ast.txt");
     let nir = dir.join("demo.nir.txt");

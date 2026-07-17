@@ -29,6 +29,10 @@ pub(crate) struct PersistedNsdbHandoffSummary {
     first_trace_id: Option<String>,
     first_status: Option<String>,
     first_next_action: Option<String>,
+    hetero_execution_closure_status: Option<String>,
+    hetero_execution_closure_ready: Option<String>,
+    hetero_execution_closure_first_blocker: Option<String>,
+    hetero_execution_closure_next_action: Option<String>,
     error: Option<String>,
 }
 
@@ -47,6 +51,28 @@ impl PersistedNsdbHandoffSummary {
 
     pub(crate) fn error(&self) -> Option<&str> {
         self.error.as_deref()
+    }
+
+    pub(crate) fn hetero_execution_closure_ready(&self) -> bool {
+        match (
+            self.hetero_execution_closure_status.as_deref(),
+            self.hetero_execution_closure_ready.as_deref(),
+        ) {
+            (None, _) => true,
+            (Some("closed"), Some("true")) => true,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn hetero_execution_closure_blocker(&self) -> Option<String> {
+        if self.hetero_execution_closure_ready() {
+            return None;
+        }
+        self.hetero_execution_closure_first_blocker
+            .clone()
+            .filter(|value| !value.is_empty())
+            .or_else(|| self.hetero_execution_closure_status.clone())
+            .map(|value| format!("hetero-execution-closure:{value}"))
     }
 
     pub(crate) fn json_fields_with_prefix(&self, prefix: &str) -> Vec<String> {
@@ -75,6 +101,18 @@ impl PersistedNsdbHandoffSummary {
                 &format!("{prefix}_first_next_action"),
                 self.first_next_action.as_deref(),
             ),
+            json_optional_string_field(
+                &format!("{prefix}_hetero_execution_closure_status"),
+                self.hetero_execution_closure_status.as_deref(),
+            ),
+            json_optional_string_field(
+                &format!("{prefix}_hetero_execution_closure_ready"),
+                self.hetero_execution_closure_ready.as_deref(),
+            ),
+            json_optional_string_field(
+                &format!("{prefix}_hetero_execution_closure_next_action"),
+                self.hetero_execution_closure_next_action.as_deref(),
+            ),
             json_optional_string_field(&format!("{prefix}_error"), self.error.as_deref()),
         ]
     }
@@ -94,6 +132,10 @@ pub(crate) fn read_persisted_nsdb_handoff(
             first_trace_id: None,
             first_status: None,
             first_next_action: None,
+            hetero_execution_closure_status: None,
+            hetero_execution_closure_ready: None,
+            hetero_execution_closure_first_blocker: None,
+            hetero_execution_closure_next_action: None,
             error: Some("output_dir-unavailable".to_owned()),
         };
     };
@@ -109,6 +151,10 @@ pub(crate) fn read_persisted_nsdb_handoff(
             first_trace_id: None,
             first_status: None,
             first_next_action: None,
+            hetero_execution_closure_status: None,
+            hetero_execution_closure_ready: None,
+            hetero_execution_closure_first_blocker: None,
+            hetero_execution_closure_next_action: None,
             error: Some("handoff-metadata-missing".to_owned()),
         };
     };
@@ -122,6 +168,23 @@ pub(crate) fn read_persisted_nsdb_handoff(
         first_trace_id: parse_string_toml_field(&source, "first_trace_id"),
         first_status: parse_string_toml_field(&source, "first_status"),
         first_next_action: parse_string_toml_field(&source, "first_next_action"),
+        hetero_execution_closure_status: parse_string_toml_field(
+            &source,
+            "hetero_execution_closure_status",
+        ),
+        hetero_execution_closure_ready: parse_string_toml_field(
+            &source,
+            "hetero_execution_closure_ready",
+        ),
+        hetero_execution_closure_first_blocker: parse_string_toml_field(
+            &source,
+            "hetero_execution_closure_first_blocker",
+        )
+        .filter(|value| !value.is_empty()),
+        hetero_execution_closure_next_action: parse_string_toml_field(
+            &source,
+            "hetero_execution_closure_next_action",
+        ),
         error: None,
     }
 }
@@ -259,6 +322,35 @@ fn render_launch_evidence_nsdb_handoff(evidence: &RunArtifactLaunchEvidence) -> 
     push_toml_string(&mut out, "source", "run-artifact-launch-evidence");
     out.push_str(&format!("record_count = {}\n", records.len()));
     out.push_str(&format!("ready_record_count = {ready_record_count}\n"));
+    push_toml_string(
+        &mut out,
+        "hetero_execution_closure_protocol",
+        evidence.hetero_execution_closure_protocol(),
+    );
+    push_toml_string(
+        &mut out,
+        "hetero_execution_closure_status",
+        evidence.hetero_execution_closure_status(),
+    );
+    push_toml_string(
+        &mut out,
+        "hetero_execution_closure_ready",
+        if evidence.hetero_execution_closure_ready() {
+            "true"
+        } else {
+            "false"
+        },
+    );
+    push_toml_optional_string(
+        &mut out,
+        "hetero_execution_closure_first_blocker",
+        evidence.hetero_execution_closure_first_blocker(),
+    );
+    push_toml_string(
+        &mut out,
+        "hetero_execution_closure_next_action",
+        evidence.hetero_execution_closure_next_action(),
+    );
     if let Some(first) = records.first() {
         push_toml_string(&mut out, "first_trace_id", &first.trace_id);
         push_toml_string(&mut out, "first_status", &first.status);

@@ -70,6 +70,7 @@ pub(crate) struct NsldCheckFinalSnapshot {
     pub(crate) final_executable_output_device_provider_sample_manifest_status: String,
     pub(crate) final_executable_output_device_provider_sample_manifest_ready_record_count: usize,
     pub(crate) final_executable_output_device_provider_sample_manifest_pending_record_count: usize,
+    pub(crate) final_executable_output_device_provider_sample_manifest_blocked_record_count: usize,
     pub(crate) final_executable_output_device_provider_sample_manifest_first_blocker:
         Option<String>,
     pub(crate) final_executable_output_nsld_owned: bool,
@@ -302,6 +303,8 @@ pub(crate) fn nsld_check_final_snapshot(
         final_executable_output_report.device_provider_sample_manifest_ready_record_count;
     let final_executable_output_device_provider_sample_manifest_pending_record_count =
         final_executable_output_report.device_provider_sample_manifest_pending_record_count;
+    let final_executable_output_device_provider_sample_manifest_blocked_record_count =
+        final_executable_output_report.device_provider_sample_manifest_blocked_record_count;
     let final_executable_output_device_provider_sample_manifest_first_blocker =
         final_executable_output_report
             .device_provider_sample_manifest_first_blocker
@@ -432,6 +435,7 @@ pub(crate) fn nsld_check_final_snapshot(
         final_executable_output_device_provider_sample_manifest_status,
         final_executable_output_device_provider_sample_manifest_ready_record_count,
         final_executable_output_device_provider_sample_manifest_pending_record_count,
+        final_executable_output_device_provider_sample_manifest_blocked_record_count,
         final_executable_output_device_provider_sample_manifest_first_blocker,
         final_executable_output_nsld_owned,
         final_executable_output_present,

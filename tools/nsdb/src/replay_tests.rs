@@ -384,6 +384,12 @@ next_action = "execute-provider-sample"
             first_next_action: "handoff-payload-trace-to-nsdb".to_owned(),
             first_entry_symbol: "nuis.bootstrap.lifecycle.v1".to_owned(),
             first_execution_phase: "container-loader-handoff".to_owned(),
+            hetero_execution_closure_protocol: "nuis-hetero-execution-closure-v1".to_owned(),
+            hetero_execution_closure_status: "closed".to_owned(),
+            hetero_execution_closure_ready: "true".to_owned(),
+            hetero_execution_closure_first_blocker: "none".to_owned(),
+            hetero_execution_closure_next_action: "handoff-hetero-execution-evidence-to-nsdb"
+                .to_owned(),
             events: vec![
                 NsdbPayloadExecutionEvent {
                     index: 0,
@@ -569,6 +575,9 @@ next_action = "execute-provider-sample"
         "\"device_provider_sample_manifest_first_materialization_status\":\"provider-sample-pending\""
     ));
     assert!(inspect_json.contains("\"device_provider_sample_manifest_records\":[{"));
+    assert!(inspect_json.contains("\"provider_output_payload_path\":\"none\""));
+    assert!(inspect_json.contains("\"provider_output_payload_hash\":\"none\""));
+    assert!(inspect_json.contains("\"provider_output_payload_attach_status\":\"none\""));
 
     let events_json = crate::json::nsdb_events_report_json(&report);
     assert!(events_json.contains(
@@ -680,6 +689,39 @@ next_action = "execute-provider-sample"
         Some("device-execution-sample-missing")
     );
 
+    let mut rejected_report = report.clone();
+    let rejected_sample = &mut rejected_report.device_provider_sample_manifest.records[0];
+    rejected_sample.sample_status = "provider-execution-blocked".to_owned();
+    rejected_sample.validation_status = "provider-output-payload-invalid".to_owned();
+    rejected_sample.provider_output_payload_status =
+        "real-device-output-payload-invalid".to_owned();
+    rejected_sample.provider_output_payload_detail =
+        "real-device-provider-output-payload-invalid:missing-protocol".to_owned();
+    rejected_sample.provider_output_payload_next_action =
+        "repair-provider-output-payload".to_owned();
+    rejected_sample.materialization_status = "provider-sample-blocked".to_owned();
+    rejected_sample.materialization_detail =
+        "real-device-provider-output-payload-invalid:missing-protocol".to_owned();
+    rejected_sample.next_action = "repair-provider-output-payload".to_owned();
+
+    let rejected_plan = build_replay_plan(&rejected_report);
+
+    assert_eq!(rejected_plan.status, "blocked");
+    assert_eq!(rejected_plan.replayable_checkpoint_count, 1);
+    assert_eq!(
+        rejected_plan.first_blocker.as_deref(),
+        Some("provider-output-payload-invalid")
+    );
+    assert_eq!(rejected_plan.checkpoints[1].replay_status, "blocked");
+    assert_eq!(
+        rejected_plan.checkpoints[1].first_blocker.as_deref(),
+        Some("provider-output-payload-invalid")
+    );
+    assert_eq!(
+        rejected_plan.checkpoints[1].value_sample_materialization_status,
+        "provider-sample-blocked"
+    );
+
     let replay_json = crate::json::nsdb_replay_plan_json(&report);
     assert!(replay_json
         .contains("\"replay_event_query_contract\":\"nsdb-payload-execution-event-query-v1\""));
@@ -691,6 +733,11 @@ next_action = "execute-provider-sample"
     assert!(replay_json.contains(
         "\"replay_event_source_debugger_contract\":\"nsdb-yir-payload-execution-trace-v1\""
     ));
+    assert!(replay_json.contains(
+        "\"replay_hetero_execution_closure_protocol\":\"nuis-hetero-execution-closure-v1\""
+    ));
+    assert!(replay_json.contains("\"replay_hetero_execution_closure_status\":\"closed\""));
+    assert!(replay_json.contains("\"replay_hetero_execution_closure_ready\":\"true\""));
     assert!(replay_json.contains("\"replay_event_query_result_count\":2"));
     assert!(replay_json.contains("\"replay_checkpoint_count\":2"));
 
@@ -721,6 +768,32 @@ next_action = "execute-provider-sample"
     assert!(ready_plan.checkpoints[1]
         .value_sample_materialization_detail
         .contains("deterministic-provider-sample-artifact"));
+
+    let mut pending_closure_report = report.clone();
+    pending_closure_report
+        .payload_execution_handoff
+        .hetero_execution_closure_status = "host-runner-pending".to_owned();
+    pending_closure_report
+        .payload_execution_handoff
+        .hetero_execution_closure_ready = "false".to_owned();
+    pending_closure_report
+        .payload_execution_handoff
+        .hetero_execution_closure_first_blocker =
+        "host-runner-backend-artifact-payload:not-observed".to_owned();
+    let pending_closure_plan = build_replay_plan(&pending_closure_report);
+
+    assert_eq!(pending_closure_plan.status, "blocked");
+    assert_eq!(pending_closure_plan.replayable_checkpoint_count, 2);
+    assert_eq!(
+        pending_closure_plan.first_blocker.as_deref(),
+        Some("hetero-execution-closure:host-runner-backend-artifact-payload:not-observed")
+    );
+    let pending_closure_json = crate::json::nsdb_replay_plan_json(&pending_closure_report);
+    assert!(pending_closure_json
+        .contains("\"replay_hetero_execution_closure_status\":\"host-runner-pending\""));
+    assert!(pending_closure_json.contains(
+        "\"replay_first_blocker\":\"hetero-execution-closure:host-runner-backend-artifact-payload:not-observed\""
+    ));
 
     fs::remove_dir_all(output_dir).unwrap();
 }

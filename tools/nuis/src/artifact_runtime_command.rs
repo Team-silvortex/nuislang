@@ -561,6 +561,17 @@ fn print_run_artifact_link_plan_status(link_plan: Option<&nuisc::linker::LinkPla
         println!("  nsld_final_executable_output_execution_handoff_evidence_status: <unavailable>");
         println!("  nsld_final_executable_output_execution_handoff_first_blocker: <none>");
         println!("  nsld_final_executable_output_execution_handoff_decision_code: <unavailable>");
+        for line in [
+            "  nsld_final_executable_output_nsdb_replay_contract: <unavailable>",
+            "  nsld_final_executable_output_nsdb_replay_ready: <unavailable>",
+            "  nsld_final_executable_output_nsdb_replay_status: <unavailable>",
+            "  nsld_final_executable_output_nsdb_replay_checkpoints: <unavailable>/<unavailable>",
+            "  nsld_final_executable_output_nsdb_replay_next_action: <unavailable>",
+            "  nsld_final_executable_output_nsdb_replay_next_command: <unavailable>",
+            "  nsld_final_executable_output_nsdb_replay_first_blocker: <none>",
+        ] {
+            println!("{line}");
+        }
         println!("  nsld_final_executable_output_recommended_next_action: <unavailable>");
         println!("  nsld_final_executable_output_path_present: <unavailable>");
         println!("  nsld_final_executable_output_nsld_owned: <unavailable>");

@@ -135,6 +135,8 @@ mod main_container_verify_assertions;
 mod main_container_verify_tamper;
 #[cfg(test)]
 mod main_container_verify_tests;
+#[cfg(test)]
+mod main_final_executable_backend_artifact_tests;
 mod main_final_executable_commands;
 #[cfg(test)]
 mod main_final_executable_emit_blocked_tests;
@@ -144,6 +146,8 @@ mod main_final_executable_emit_drift_tests;
 mod main_final_executable_emit_tests;
 #[cfg(test)]
 mod main_final_executable_frontdoor_tests;
+#[cfg(test)]
+mod main_final_executable_image_backend_payload_tests;
 #[cfg(test)]
 mod main_final_executable_image_tests;
 #[cfg(test)]

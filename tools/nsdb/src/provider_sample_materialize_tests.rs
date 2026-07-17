@@ -189,7 +189,15 @@ next_action = "execute-provider-sample"
     } else {
         let output_payload = fs::read_to_string(output_payload_path).unwrap();
         assert!(output_payload.contains("protocol = \"nuis-provider-output-payload-v1\""));
+        assert!(output_payload.contains("schema = \"nsdb-provider-output-payload-v1\""));
+        assert!(output_payload
+            .contains("sample_execution_contract = \"nuis-provider-sample-execution-v1\""));
+        assert!(output_payload
+            .contains("provider_runner_adapter_capability_status = \"registered-host-simulated\""));
+        assert!(output_payload.contains("provider_runner_real_device_probe_status = \""));
+        assert!(output_payload.contains("input_evidence_hash = \"0x"));
         assert!(output_payload.contains("output_payload_kind = \"host-fallback-anchor\""));
+        assert!(output_payload.contains("output_payload_status = \"host-fallback-anchor-ready\""));
         assert!(source.contains(
             "provider_output_payload_evidence = \"nuis.nsdb.provider-output.metal-apple-silicon-gpu.toml:hash=0x"
         ));
@@ -320,6 +328,17 @@ next_action = "execute-provider-sample"
     assert!(execute_report
         .first_output_payload_evidence
         .contains("nuis.nsdb.provider-output.metal-apple-silicon-gpu.toml:hash=0x"));
+    let executed_payload = fs::read_to_string(
+        output_dir.join("nuis.nsdb.provider-output.metal-apple-silicon-gpu.toml"),
+    )
+    .unwrap();
+    assert!(executed_payload.contains("schema = \"nsdb-provider-output-payload-v1\""));
+    assert!(executed_payload
+        .contains("sample_execution_contract = \"nuis-provider-sample-execution-v1\""));
+    assert!(executed_payload.contains("provider_runner_adapter_capability_status = \""));
+    assert!(executed_payload.contains("provider_runner_real_device_probe_status = \""));
+    assert!(executed_payload.contains("input_evidence_hash = \"0x"));
+    assert!(executed_payload.contains("output_payload_status = \"adapter-output-ready\""));
     let report = materialize_provider_samples(&output_dir, None).unwrap();
     let source =
         fs::read_to_string(output_dir.join("nuis.nsdb.device-provider-samples.toml")).unwrap();
@@ -327,6 +346,15 @@ next_action = "execute-provider-sample"
     assert_eq!(
         report.first_provider_output_payload_status,
         "real-device-output-payload-attached"
+    );
+    assert_eq!(
+        report.first_provider_output_payload_path,
+        "nuis.nsdb.provider-output.metal-apple-silicon-gpu.toml"
+    );
+    assert!(report.first_provider_output_payload_hash.starts_with("0x"));
+    assert_eq!(
+        report.first_provider_output_payload_attach_status,
+        "attached"
     );
     assert!(
         source.contains("provider_output_payload_status = \"real-device-output-payload-attached\"")
@@ -338,6 +366,88 @@ next_action = "execute-provider-sample"
         "provider_output_payload_evidence = \"nuis.nsdb.provider-output.metal-apple-silicon-gpu.toml:hash=0x"
     ));
     assert!(source.contains("real-device-provider-output-payload:"));
+
+    fs::remove_dir_all(output_dir).unwrap();
+}
+
+#[test]
+fn materializer_rejects_invalid_real_device_output_payload() {
+    let adapter = select_provider_runner_adapter("metal:apple-silicon-gpu");
+    if !adapter.real_device_capable {
+        return;
+    }
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let output_dir = env::temp_dir().join(format!("nsdb-provider-invalid-payload-{nonce}"));
+    fs::create_dir_all(&output_dir).unwrap();
+    fs::write(
+        output_dir.join("nuis.nsdb.device-provider-samples.toml"),
+        r#"
+protocol = "nuis-device-provider-samples-v1"
+schema = "nsdb-yir-device-provider-sample-v1"
+source = "run-artifact-provider-sample-manifest"
+status = "awaiting-provider-materialization"
+record_count = 1
+ready_record_count = 0
+pending_record_count = 1
+
+[[device_provider_samples]]
+trace_id = "hetero-trace:shader:metal:apple-silicon-gpu"
+provider = "nustar-deferred-device-sample-v1"
+provider_family = "metal:apple-silicon-gpu"
+handoff_target = "metal:apple-silicon-gpu"
+sample_status = "pending-provider-execution"
+validation_status = "pending-provider-execution"
+input_evidence = "metallib:pixelmagic.metallib"
+output_evidence = "not-materialized"
+materialization_status = "provider-sample-pending"
+materialization_detail = "awaiting-provider-runtime"
+next_action = "execute-provider-sample"
+"#,
+    )
+    .unwrap();
+    fs::write(
+        output_dir.join("nuis.nsdb.provider-output.metal-apple-silicon-gpu.toml"),
+        r#"
+protocol = "nuis-provider-output-payload-v1"
+provider_family = "metal:apple-silicon-gpu"
+"#,
+    )
+    .unwrap();
+
+    let report = materialize_provider_samples(&output_dir, None).unwrap();
+    let source =
+        fs::read_to_string(output_dir.join("nuis.nsdb.device-provider-samples.toml")).unwrap();
+
+    assert_eq!(
+        report.first_provider_output_payload_status,
+        "real-device-output-payload-invalid"
+    );
+    assert_eq!(
+        report.first_provider_output_payload_path,
+        "nuis.nsdb.provider-output.metal-apple-silicon-gpu.toml"
+    );
+    assert!(report.first_provider_output_payload_hash.starts_with("0x"));
+    assert_eq!(
+        report.first_provider_output_payload_attach_status,
+        "rejected"
+    );
+    assert_eq!(report.status, "blocked");
+    assert_eq!(report.materialized_record_count, 0);
+    assert!(source.contains("sample_status = \"provider-execution-blocked\""));
+    assert!(source.contains("validation_status = \"provider-output-payload-invalid\""));
+    assert!(source.contains("materialization_status = \"provider-sample-blocked\""));
+    assert!(source.contains("next_action = \"repair-provider-output-payload\""));
+    assert!(
+        source.contains("provider_output_payload_status = \"real-device-output-payload-invalid\"")
+    );
+    assert!(source.contains(
+        "provider_output_payload_evidence_status = \"provider-output-payload-rejected\""
+    ));
+    assert!(source.contains("real-device-provider-output-payload-invalid:"));
+    assert!(source.contains("missing-schema"));
 
     fs::remove_dir_all(output_dir).unwrap();
 }

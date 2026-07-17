@@ -155,6 +155,7 @@ pub(crate) struct NsldCheckReport {
     pub(crate) final_executable_output_device_provider_sample_manifest_status: String,
     pub(crate) final_executable_output_device_provider_sample_manifest_ready_record_count: usize,
     pub(crate) final_executable_output_device_provider_sample_manifest_pending_record_count: usize,
+    pub(crate) final_executable_output_device_provider_sample_manifest_blocked_record_count: usize,
     pub(crate) final_executable_output_device_provider_sample_manifest_first_blocker:
         Option<String>,
     pub(crate) final_executable_output_nsld_owned: bool,

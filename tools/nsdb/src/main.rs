@@ -3,6 +3,7 @@ mod display;
 mod handoff;
 mod hetero_trace;
 mod json;
+mod json_replay;
 mod model;
 mod payload_decoder;
 mod provider_runner_registry;
@@ -10,6 +11,8 @@ mod provider_sample;
 mod provider_sample_execute;
 mod provider_sample_execution;
 mod provider_sample_materialize;
+mod provider_sample_payload;
+mod provider_sample_runner;
 mod replay;
 #[cfg(test)]
 mod replay_tests;
@@ -139,6 +142,18 @@ fn run() -> Result<(), String> {
                     "device_provider_sample_first_output_payload_evidence: {}",
                     report.first_provider_output_payload_evidence
                 );
+                println!(
+                    "device_provider_sample_first_output_payload_path: {}",
+                    report.first_provider_output_payload_path
+                );
+                println!(
+                    "device_provider_sample_first_output_payload_hash: {}",
+                    report.first_provider_output_payload_hash
+                );
+                println!(
+                    "device_provider_sample_first_output_payload_attach_status: {}",
+                    report.first_provider_output_payload_attach_status
+                );
                 println!("device_provider_sample_next_action: {}", report.next_action);
                 println!(
                     "device_provider_sample_next_command: {}",
@@ -224,7 +239,7 @@ fn run() -> Result<(), String> {
 
 fn provider_sample_materialize_json(report: &ProviderSampleMaterializeReport) -> String {
     format!(
-        "{{\"tool\":\"nsdb\",\"kind\":\"device_provider_sample_materialize\",\"status\":\"{}\",\"path\":\"{}\",\"provider_family_filter\":{},\"provider_families\":{},\"record_count\":{},\"matched_record_count\":{},\"materialized_record_count\":{},\"skipped_record_count\":{},\"first_provider_family\":\"{}\",\"first_provider_runner_contract\":\"{}\",\"first_provider_runner_adapter_contract\":\"{}\",\"first_provider_runner_adapter_id\":\"{}\",\"first_provider_runner_adapter_capability_status\":\"{}\",\"first_provider_runner_registry_protocol\":\"{}\",\"first_provider_runner_registry_source\":\"{}\",\"first_provider_runner_real_device_capable\":{},\"first_provider_runner_kind\":\"{}\",\"first_provider_execution_mode\":\"{}\",\"first_provider_execution_comparison_contract\":\"{}\",\"first_provider_execution_comparison_status\":\"{}\",\"first_provider_execution_evidence_status\":\"{}\",\"first_provider_output_payload_contract\":\"{}\",\"first_provider_output_payload_status\":\"{}\",\"first_provider_output_payload_evidence_status\":\"{}\",\"first_provider_output_payload_evidence\":\"{}\",\"first_provider_output_payload_detail\":\"{}\",\"first_output_evidence\":\"{}\",\"next_action\":\"{}\",\"next_command\":\"{}\",\"return_contract\":\"{}\",\"return_action\":\"{}\",\"return_command\":\"{}\",\"final_output_replay_contract\":\"{}\"}}",
+        "{{\"tool\":\"nsdb\",\"kind\":\"device_provider_sample_materialize\",\"status\":\"{}\",\"path\":\"{}\",\"provider_family_filter\":{},\"provider_families\":{},\"record_count\":{},\"matched_record_count\":{},\"materialized_record_count\":{},\"skipped_record_count\":{},\"first_provider_family\":\"{}\",\"first_provider_runner_contract\":\"{}\",\"first_provider_runner_adapter_contract\":\"{}\",\"first_provider_runner_adapter_id\":\"{}\",\"first_provider_runner_adapter_capability_status\":\"{}\",\"first_provider_runner_registry_protocol\":\"{}\",\"first_provider_runner_registry_source\":\"{}\",\"first_provider_runner_real_device_capable\":{},\"first_provider_runner_kind\":\"{}\",\"first_provider_execution_mode\":\"{}\",\"first_provider_execution_comparison_contract\":\"{}\",\"first_provider_execution_comparison_status\":\"{}\",\"first_provider_execution_evidence_status\":\"{}\",\"first_provider_output_payload_contract\":\"{}\",\"first_provider_output_payload_status\":\"{}\",\"first_provider_output_payload_evidence_status\":\"{}\",\"first_provider_output_payload_evidence\":\"{}\",\"first_provider_output_payload_detail\":\"{}\",\"first_provider_output_payload_path\":\"{}\",\"first_provider_output_payload_hash\":\"{}\",\"first_provider_output_payload_attach_status\":\"{}\",\"first_output_evidence\":\"{}\",\"next_action\":\"{}\",\"next_command\":\"{}\",\"return_contract\":\"{}\",\"return_action\":\"{}\",\"return_command\":\"{}\",\"final_output_replay_contract\":\"{}\"}}",
         json_escape(&report.status),
         json_escape(&report.path),
         json_optional_string(report.provider_family_filter.as_deref()),
@@ -251,6 +266,9 @@ fn provider_sample_materialize_json(report: &ProviderSampleMaterializeReport) ->
         json_escape(&report.first_provider_output_payload_evidence_status),
         json_escape(&report.first_provider_output_payload_evidence),
         json_escape(&report.first_provider_output_payload_detail),
+        json_escape(&report.first_provider_output_payload_path),
+        json_escape(&report.first_provider_output_payload_hash),
+        json_escape(&report.first_provider_output_payload_attach_status),
         json_escape(&report.first_output_evidence),
         json_escape(&report.next_action),
         json_escape(&report.next_command),
@@ -350,6 +368,9 @@ mod tests {
             first_provider_output_payload_evidence: "nuis.nsdb.provider-output.metal.toml:hash=0x1:status=written".to_owned(),
             first_provider_output_payload_detail:
                 "deterministic-provider-output-payload:nuis.nsdb.provider-output.metal.toml:0x1:written".to_owned(),
+            first_provider_output_payload_path: "nuis.nsdb.provider-output.metal.toml".to_owned(),
+            first_provider_output_payload_hash: "0x1".to_owned(),
+            first_provider_output_payload_attach_status: "written".to_owned(),
             first_output_evidence: "metallib:pixelmagic.metallib".to_owned(),
             next_action: "replay-provider-sample".to_owned(),
             next_command: "nsdb replay-plan out --json".to_owned(),
@@ -402,6 +423,11 @@ mod tests {
             "\"first_provider_output_payload_status\":\"host-fallback-output-payload-ready\""
         ));
         assert!(json.contains("\"first_provider_output_payload_evidence\":\"nuis.nsdb.provider-output.metal.toml:hash=0x1:status=written\""));
+        assert!(json.contains(
+            "\"first_provider_output_payload_path\":\"nuis.nsdb.provider-output.metal.toml\""
+        ));
+        assert!(json.contains("\"first_provider_output_payload_hash\":\"0x1\""));
+        assert!(json.contains("\"first_provider_output_payload_attach_status\":\"written\""));
         assert!(json.contains("\"return_contract\":\"nsld-final-output-boundary-return-v1\""));
         assert!(json.contains("\"return_action\":\"resume-nsld-final-output-check\""));
         assert!(json.contains("\"return_command\":\"nsld check out --json\""));

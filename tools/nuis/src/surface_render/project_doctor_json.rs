@@ -62,12 +62,13 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
     let artifact_output_dir = crate::default_build_output_dir(input);
     let artifact_report = crate::probe_artifact_doctor(&artifact_output_dir);
     let link_plan = load_link_plan(&artifact_output_dir);
-    let closure_summary = crate::closure_summary::FrontdoorClosureSummary::from_project_surface(
+    let closure_summary = project_closure_summary(
         "project-doctor",
+        "project-doctor-link-plan",
         artifact_report.ready_to_run,
         missing_tests.len(),
-        &frontdoor.recommended_next_step,
-        &frontdoor.recommended_command,
+        &frontdoor,
+        link_plan.as_ref(),
     );
     let mut next_steps = Vec::new();
     if !galaxy_manifest_exists {

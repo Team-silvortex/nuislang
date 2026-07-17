@@ -392,11 +392,37 @@ fn assert_official_galaxy_hetero_build(
             "official galaxy provider output payload",
         );
     }
+    let provider_output_payload_path = output_dir.join(format!(
+        "nuis.nsdb.provider-output.{provider_family_artifact}.toml"
+    ));
+    assert_file_contains(
+        &provider_output_payload_path,
+        "schema = \"nsdb-provider-output-payload-v1\"",
+        "official galaxy provider output payload schema",
+    );
+    assert_file_contains(
+        &provider_output_payload_path,
+        "sample_execution_contract = \"nuis-provider-sample-execution-v1\"",
+        "official galaxy provider output payload execution contract",
+    );
+    assert_file_contains(
+        &provider_output_payload_path,
+        "provider_runner_adapter_capability_status = \"",
+        "official galaxy provider output payload adapter capability",
+    );
+    assert_file_contains(
+        &provider_output_payload_path,
+        "provider_runner_real_device_probe_status = \"",
+        "official galaxy provider output payload probe status",
+    );
+    assert_file_contains(
+        &provider_output_payload_path,
+        "input_evidence_hash = \"0x",
+        "official galaxy provider output payload input evidence hash",
+    );
     if expects_std_pgm_marker {
         assert_file_contains(
-            &output_dir.join(format!(
-                "nuis.nsdb.provider-output.{provider_family_artifact}.toml"
-            )),
+            &provider_output_payload_path,
             "std-preprocessed-pgm:input_bytes=20",
             "official galaxy provider output payload std image evidence",
         );

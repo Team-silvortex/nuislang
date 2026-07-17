@@ -82,6 +82,24 @@ pub(crate) fn print_nsdb_inspect_report(report: &NsdbInspectReport) {
         report.payload_execution_handoff.first_entry_symbol
     );
     println!(
+        "  payload_execution_handoff_hetero_execution_closure_status: {}",
+        report
+            .payload_execution_handoff
+            .hetero_execution_closure_status
+    );
+    println!(
+        "  payload_execution_handoff_hetero_execution_closure_ready: {}",
+        report
+            .payload_execution_handoff
+            .hetero_execution_closure_ready
+    );
+    println!(
+        "  payload_execution_handoff_hetero_execution_closure_next_action: {}",
+        report
+            .payload_execution_handoff
+            .hetero_execution_closure_next_action
+    );
+    println!(
         "  payload_execution_event_count: {}",
         report.payload_execution_handoff.events.len()
     );
@@ -356,6 +374,18 @@ pub(crate) fn print_nsdb_replay_plan(report: &NsdbInspectReport) {
     println!(
         "  replay_event_source_debugger_contract: {}",
         report.payload_execution_handoff.debugger_contract
+    );
+    println!(
+        "  replay_hetero_execution_closure_status: {}",
+        report
+            .payload_execution_handoff
+            .hetero_execution_closure_status
+    );
+    println!(
+        "  replay_hetero_execution_closure_ready: {}",
+        report
+            .payload_execution_handoff
+            .hetero_execution_closure_ready
     );
     println!("  replay_status: {}", plan.status);
     println!("  replay_checkpoint_count: {}", plan.checkpoint_count);

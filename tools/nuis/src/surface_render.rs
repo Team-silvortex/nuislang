@@ -6,6 +6,7 @@ mod link_plan_nsld_tail;
 mod link_plan_readiness;
 mod link_plan_text;
 mod link_plan_text_nsld_output;
+mod project_closure;
 mod project_doctor;
 mod project_doctor_json;
 mod project_status;
@@ -15,6 +16,7 @@ use link_plan::{
     append_json_object_strings, append_link_plan_json_fields, load_link_plan,
     write_link_plan_text_fields,
 };
+use project_closure::project_closure_summary;
 #[cfg(test)]
 pub(crate) use project_doctor::render_project_doctor_text_summary;
 pub(crate) use project_doctor::write_project_doctor_text_summary;

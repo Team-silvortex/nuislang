@@ -272,6 +272,9 @@ fn drive_until_clean_mutation_policy(report: &NsldDriveUntilCleanReport) -> &'st
             "provider-sample-materialization-required" => {
                 "whitelisted-boundary-materialization-loop"
             }
+            "provider-output-payload-repair-required" => {
+                "whitelisted-artifact-mutation-loop-diagnostic-repair"
+            }
             _ => "whitelisted-artifact-mutation-loop-stopped",
         };
     }
@@ -279,6 +282,7 @@ fn drive_until_clean_mutation_policy(report: &NsldDriveUntilCleanReport) -> &'st
         "clean" => "read-only-observe",
         "host-finalizer-policy-required" => "blocked-read-only-boundary",
         "provider-sample-materialization-required" => "blocked-boundary-materialization",
+        "provider-output-payload-repair-required" => "blocked-boundary-diagnostic-repair",
         "not-applied" => "blocked-not-applied",
         "repeated-next-action" => "blocked-repeated-next-action",
         "max-steps" => "blocked-max-steps",
@@ -699,6 +703,12 @@ fn drive_stop_action_reason(
 
 fn final_output_boundary_stop_reason(reason: Option<&str>) -> &'static str {
     match reason {
+        Some(reason)
+            if reason.contains("repair provider output payload diagnostics")
+                || reason.contains("provider-sample-blocked") =>
+        {
+            "provider-output-payload-repair-required"
+        }
         Some(reason) if reason.contains("device-provider-sample:") => {
             "provider-sample-materialization-required"
         }
@@ -760,6 +770,9 @@ fn applied_report(next_action: &NsldCheckNextAction, message: &str) -> NsldDrive
 #[cfg(test)]
 #[path = "drive_gate_tests.rs"]
 mod gate_tests;
+#[cfg(test)]
+#[path = "drive_provider_sample_tests.rs"]
+mod provider_sample_tests;
 #[cfg(test)]
 #[path = "drive_tests.rs"]
 mod tests;

@@ -58,6 +58,34 @@ pub(super) fn write_unavailable_nsld_final_output_text_fields<W: fmt::Write>(
     )?;
     writeln!(
         out,
+        "  nsld_final_executable_output_nsdb_replay_contract: <unavailable>"
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_nsdb_replay_ready: <unavailable>"
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_nsdb_replay_status: <unavailable>"
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_nsdb_replay_checkpoints: <unavailable>/<unavailable>"
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_nsdb_replay_next_action: <unavailable>"
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_nsdb_replay_next_command: <unavailable>"
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_nsdb_replay_first_blocker: <none>"
+    )?;
+    writeln!(
+        out,
         "  nsld_final_executable_output_recommended_next_action: <unavailable>"
     )?;
     writeln!(
@@ -171,6 +199,47 @@ pub(super) fn write_nsld_final_output_text_fields<W: fmt::Write>(
         out,
         "  nsld_final_executable_output_payload_execution_trace_ready_record_count: {}",
         final_output.payload_execution_trace_ready_record_count
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_nsdb_replay_contract: {}",
+        final_output.nsdb_replay_contract
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_nsdb_replay_ready: {}",
+        crate::yes_no(final_output.nsdb_replay_ready)
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_nsdb_replay_status: {}",
+        final_output.nsdb_replay_status
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_nsdb_replay_checkpoints: {}/{}",
+        final_output.nsdb_replayable_checkpoint_count, final_output.nsdb_replay_checkpoint_count
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_nsdb_replay_next_action: {}",
+        final_output.nsdb_replay_next_action
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_nsdb_replay_next_command: {}",
+        final_output
+            .nsdb_replay_next_command
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_nsdb_replay_first_blocker: {}",
+        final_output
+            .nsdb_replay_first_blocker
+            .as_deref()
+            .unwrap_or("<none>")
     )?;
     writeln!(
         out,

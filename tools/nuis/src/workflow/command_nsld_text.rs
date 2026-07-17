@@ -78,6 +78,13 @@ pub(super) fn print_nsld_unavailable_artifact_chain() {
     println!("  nsld_final_executable_output_execution_handoff_evidence_status: <unavailable>");
     println!("  nsld_final_executable_output_execution_handoff_first_blocker: <none>");
     println!("  nsld_final_executable_output_execution_handoff_decision_code: <unavailable>");
+    println!("  nsld_final_executable_output_nsdb_replay_contract: <unavailable>");
+    println!("  nsld_final_executable_output_nsdb_replay_ready: <unavailable>");
+    println!("  nsld_final_executable_output_nsdb_replay_status: <unavailable>");
+    println!("  nsld_final_executable_output_nsdb_replay_checkpoints: <unavailable>/<unavailable>");
+    println!("  nsld_final_executable_output_nsdb_replay_next_action: <unavailable>");
+    println!("  nsld_final_executable_output_nsdb_replay_next_command: <unavailable>");
+    println!("  nsld_final_executable_output_nsdb_replay_first_blocker: <none>");
     println!("  nsld_final_executable_output_recommended_next_action: <unavailable>");
     println!("  nsld_final_executable_output_path_present: <unavailable>");
     println!("  nsld_final_executable_output_nsld_owned: <unavailable>");

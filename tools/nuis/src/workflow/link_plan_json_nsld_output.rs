@@ -99,6 +99,50 @@ pub(super) fn nsld_final_output_json_fields(
                 .map(|summary| summary.payload_execution_trace_ready_record_count)
                 .unwrap_or(0),
         ),
+        json_bool_field(
+            "nsld_final_executable_output_device_provider_sample_manifest_available",
+            nsld_final_output
+                .is_some_and(|summary| summary.device_provider_sample_manifest_available),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_device_provider_sample_manifest_status",
+            nsld_final_output
+                .map(|summary| summary.device_provider_sample_manifest_status.as_str()),
+        ),
+        json_usize_field(
+            "nsld_final_executable_output_device_provider_sample_manifest_record_count",
+            nsld_final_output
+                .map(|summary| summary.device_provider_sample_manifest_record_count)
+                .unwrap_or(0),
+        ),
+        json_usize_field(
+            "nsld_final_executable_output_device_provider_sample_manifest_pending_record_count",
+            nsld_final_output
+                .map(|summary| summary.device_provider_sample_manifest_pending_record_count)
+                .unwrap_or(0),
+        ),
+        json_usize_field(
+            "nsld_final_executable_output_device_provider_sample_manifest_blocked_record_count",
+            nsld_final_output
+                .map(|summary| summary.device_provider_sample_manifest_blocked_record_count)
+                .unwrap_or(0),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_device_provider_sample_manifest_first_provider_family",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_manifest_first_provider_family
+                    .as_str()
+            }),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_device_provider_sample_manifest_first_materialization_status",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_manifest_first_materialization_status
+                    .as_str()
+            }),
+        ),
         json_optional_string_field(
             "nsld_final_executable_output_nsdb_replay_contract",
             nsld_final_output.map(|summary| summary.nsdb_replay_contract.as_str()),

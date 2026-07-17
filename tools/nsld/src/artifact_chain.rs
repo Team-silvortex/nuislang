@@ -539,6 +539,21 @@ fn final_output_boundary_action(
         .iter()
         .find(|blocker| blocker.starts_with("device-provider-sample:"))
     {
+        if blocker.contains(":blocked:") || blocker.contains("provider-sample-blocked") {
+            return FinalOutputBoundaryAction {
+                command_id: Some("repair-provider-output-payload".to_owned()),
+                command: Some(
+                    "nsdb materialize-provider-samples <artifact-output-dir> --json".to_owned(),
+                ),
+                command_resolved: Some(format!(
+                    "nsdb materialize-provider-samples {} --json",
+                    plan.output_dir
+                )),
+                reason: Some(format!(
+                    "final executable output boundary is blocked by `{blocker}`; repair provider output payload diagnostics before relinking"
+                )),
+            };
+        }
         return FinalOutputBoundaryAction {
             command_id: Some("materialize-provider-samples".to_owned()),
             command: Some("nsdb materialize-provider-samples <artifact-output-dir> --json".to_owned()),

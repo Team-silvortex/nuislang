@@ -6,6 +6,9 @@ use crate::{
         read_device_provider_sample_manifest_info, DEVICE_PROVIDER_SAMPLE_PROTOCOL,
         DEVICE_PROVIDER_SAMPLE_SCHEMA,
     },
+    provider_sample_payload::{
+        fnv1a64_hex, provider_output_payload_file_name, render_real_device_provider_output_payload,
+    },
 };
 use std::{collections::BTreeSet, fs, path::Path};
 
@@ -127,64 +130,11 @@ fn write_provider_output_payload(
     record: &crate::model::NsdbDeviceProviderSampleRecordInfo,
     adapter: &crate::provider_runner_registry::ProviderRunnerAdapter,
 ) -> Result<String, String> {
-    let file_name = format!(
-        "nuis.nsdb.provider-output.{}.toml",
-        sanitize_artifact_component(&record.provider_family)
-    );
-    let content = render_provider_output_payload(record, adapter);
+    let file_name = provider_output_payload_file_name(&record.provider_family);
+    let content = render_real_device_provider_output_payload(record, adapter);
     let hash = fnv1a64_hex(content.as_bytes());
     fs::write(output_dir.join(&file_name), content).map_err(|error| {
         format!("failed to write provider output payload `{file_name}`: {error}")
     })?;
     Ok(format!("{file_name}:hash={hash}:status=written"))
-}
-
-fn render_provider_output_payload(
-    record: &crate::model::NsdbDeviceProviderSampleRecordInfo,
-    adapter: &crate::provider_runner_registry::ProviderRunnerAdapter,
-) -> String {
-    let mut out = String::new();
-    push_toml_string(&mut out, "protocol", "nuis-provider-output-payload-v1");
-    push_toml_string(&mut out, "source", "nsdb-execute-provider-samples");
-    push_toml_string(&mut out, "trace_id", &record.trace_id);
-    push_toml_string(&mut out, "provider_family", &record.provider_family);
-    push_toml_string(&mut out, "provider_runner_adapter_id", adapter.adapter_id);
-    push_toml_string(&mut out, "provider_execution_mode", adapter.execution_mode);
-    push_toml_string(&mut out, "input_evidence", &record.input_evidence);
-    push_toml_string(
-        &mut out,
-        "output_payload_kind",
-        "real-device-adapter-output",
-    );
-    push_toml_string(&mut out, "comparison_status", "ready-for-comparison");
-    out
-}
-
-fn sanitize_artifact_component(value: &str) -> String {
-    value
-        .chars()
-        .map(|ch| {
-            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
-                ch
-            } else {
-                '-'
-            }
-        })
-        .collect()
-}
-
-fn fnv1a64_hex(bytes: &[u8]) -> String {
-    let mut hash: u64 = 0xcbf29ce484222325;
-    for byte in bytes {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x100000001b3);
-    }
-    format!("0x{hash:016x}")
-}
-
-fn push_toml_string(out: &mut String, key: &str, value: &str) {
-    out.push_str(key);
-    out.push_str(" = \"");
-    out.push_str(&value.replace('\\', "\\\\").replace('"', "\\\""));
-    out.push_str("\"\n");
 }

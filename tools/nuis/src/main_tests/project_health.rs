@@ -46,7 +46,8 @@ fn project_frontdoor_docs_define_closure_then_tensor_reading_order() {
     assert!(frontdoor_doc.contains("frontdoor_sample_tensor_handoff"));
     assert!(frontdoor_doc.contains("dev_tensor_weakest_task_card_coordinate"));
     assert!(frontdoor_doc.contains("dev_tensor_weakest_task_card_handoff_coordinate"));
-    assert!(frontdoor_doc.contains("which bootstrap coordinate should we push next"));
+    assert!(frontdoor_doc.contains("which bootstrap coordinate should we push"));
+    assert!(frontdoor_doc.contains("next after the current frontdoor closure is understood"));
 }
 
 #[test]
@@ -213,6 +214,84 @@ mod cpu Main {
     assert!(json.contains("\"closure_summary_next_action\":\"nsld-drive-safe-next\""));
     assert!(json.contains("\"closure_summary_next_command\":\"nsld drive "));
     assert!(json.contains(" --apply --until-clean --json\""));
+
+    let lines = surface_render::render_project_status_text_summary(&project_root)
+        .expect("render status text summary");
+    assert!(lines.iter().any(|line| {
+        line == "  nsld_final_executable_output_nsdb_replay_contract: nsdb-payload-execution-replay-plan-v1"
+    }));
+    assert!(lines
+        .iter()
+        .any(|line| { line.starts_with("  nsld_final_executable_output_nsdb_replay_ready: ") }));
+    assert!(lines.iter().any(|line| {
+        line.starts_with("  nsld_final_executable_output_nsdb_replay_first_blocker: ")
+    }));
+}
+
+#[test]
+fn project_doctor_json_promotes_pending_hetero_closure_from_link_plan() {
+    let project_root = write_temp_project_fixture(
+        "doctor_pending_hetero_closure",
+        r#"
+name = "doctor_pending_hetero_closure"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+        .trim_start(),
+        r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 7;
+  }
+}
+"#,
+    );
+    let output_dir = default_build_output_dir(&project_root);
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
+    write_prepared_nsld_chain_placeholders(&output_dir);
+    write_ready_nsld_final_tail_placeholders(&output_dir);
+    fs::write(
+        output_dir.join("nuis.nsld.final-executable.blocked.toml"),
+        "emitted = true\nfinal_output_present = true\nfinal_output_runnable_candidate = true\n",
+    )
+    .expect("write final output ownership evidence");
+    write_nsdb_payload_handoff_placeholder(&output_dir);
+    let handoff_path = output_dir.join("nuis.nsdb.payload-execution-handoff.toml");
+    let mut handoff = fs::read_to_string(&handoff_path).expect("read nsdb handoff");
+    handoff = handoff.replace(
+        "record_count = 1\n",
+        "record_count = 1\nhetero_execution_closure_protocol = \"nuis-hetero-execution-closure-v1\"\nhetero_execution_closure_status = \"host-runner-pending\"\nhetero_execution_closure_ready = \"false\"\nhetero_execution_closure_first_blocker = \"host-runner-backend-artifact-payload:not-observed\"\nhetero_execution_closure_next_action = \"run-host-runner-payload-probe\"\n",
+    );
+    fs::write(&handoff_path, handoff).expect("write pending nsdb handoff");
+
+    let json = render_project_doctor_json(&project_root).expect("render doctor json");
+
+    assert!(
+        json.contains("\"closure_summary_source\":\"project-doctor-link-plan\""),
+        "{json}"
+    );
+    assert!(json.contains("\"closure_summary_status\":\"blocked\""));
+    assert!(json.contains("\"closure_summary_ready\":false"));
+    assert!(json.contains(
+        "\"closure_summary_primary_blocker\":\"final executable output replay evidence is blocked by `hetero-execution-closure:host-runner-backend-artifact-payload:not-observed`\""
+    ));
+    assert!(json.contains("\"closure_summary_next_action\":\"inspect-nsdb-replay-evidence\""));
+    assert!(
+        json.contains("\"nsld_final_executable_output_nsdb_replay_ready\":false"),
+        "{json}"
+    );
+    assert!(json.contains(
+        "\"nsld_final_executable_output_nsdb_replay_first_blocker\":\"hetero-execution-closure:host-runner-backend-artifact-payload:not-observed\""
+    ));
 }
 
 #[test]

@@ -73,18 +73,42 @@ pub(crate) fn build_replay_plan(report: &NsdbInspectReport) -> NsdbReplayPlan {
     let first_blocker = checkpoints
         .iter()
         .find_map(|checkpoint| checkpoint.first_blocker.clone());
+    let closure_blocker = hetero_execution_closure_blocker(report);
+    let plan_first_blocker = closure_blocker.or(first_blocker);
     NsdbReplayPlan {
         protocol: "nsdb-payload-execution-replay-plan-v1",
-        status: if first_blocker.is_none() {
+        status: if plan_first_blocker.is_none() {
             "ready".to_owned()
         } else {
             "blocked".to_owned()
         },
         checkpoint_count: checkpoints.len(),
         replayable_checkpoint_count,
-        first_blocker,
+        first_blocker: plan_first_blocker,
         checkpoints,
     }
+}
+
+fn hetero_execution_closure_blocker(report: &NsdbInspectReport) -> Option<String> {
+    let handoff = &report.payload_execution_handoff;
+    if handoff.hetero_execution_closure_status == "none" {
+        return None;
+    }
+    if handoff.hetero_execution_closure_status == "closed"
+        && handoff.hetero_execution_closure_ready == "true"
+    {
+        return None;
+    }
+    if handoff.hetero_execution_closure_first_blocker != "none" {
+        return Some(format!(
+            "hetero-execution-closure:{}",
+            handoff.hetero_execution_closure_first_blocker
+        ));
+    }
+    Some(format!(
+        "hetero-execution-closure:{}",
+        handoff.hetero_execution_closure_status
+    ))
 }
 
 fn replay_checkpoint_for_event(
@@ -155,8 +179,13 @@ fn first_blocker_for_event(
     event: &NsdbPayloadExecutionEvent,
     sample: &ValueSampleResolution,
 ) -> Option<String> {
-    if event.execution_phase == "device-dispatch" && provider_sample_materialized(sample) {
-        return None;
+    if event.execution_phase == "device-dispatch" {
+        if provider_sample_materialized(sample) {
+            return None;
+        }
+        if let Some(blocker) = provider_sample_blocker(sample) {
+            return Some(blocker);
+        }
     }
     if event.first_blocker == "none" && event.status == "ready" {
         None
@@ -169,10 +198,27 @@ fn first_blocker_for_event(
 
 fn provider_sample_materialized(sample: &ValueSampleResolution) -> bool {
     sample.status == "provider-sample-observed"
+        && sample.provider_output_payload_status != "real-device-output-payload-invalid"
+        && sample.provider_output_payload_status != "provider-output-payload-rejected"
         && matches!(
             sample.materialization_status.as_str(),
             "provider-sample-materialized" | "provider-sample-ready"
         )
+}
+
+fn provider_sample_blocker(sample: &ValueSampleResolution) -> Option<String> {
+    if sample.status != "provider-sample-observed" {
+        return None;
+    }
+    if sample.provider_output_payload_status == "real-device-output-payload-invalid"
+        || sample.provider_output_payload_status == "provider-output-payload-rejected"
+    {
+        return Some("provider-output-payload-invalid".to_owned());
+    }
+    if sample.materialization_status == "provider-sample-blocked" {
+        return Some("provider-sample-blocked".to_owned());
+    }
+    None
 }
 
 fn checkpoint_kind_for_phase(phase: &str) -> &'static str {
@@ -188,6 +234,7 @@ struct ValueSampleResolution {
     detail: String,
     materialization_status: String,
     materialization_detail: String,
+    provider_output_payload_status: String,
     payload_format: String,
     payload_path: String,
     bridge_stub_path: String,
@@ -262,6 +309,7 @@ fn device_sample_resolution(
                 "provider-sample:{}:{}",
                 provider_sample.provider_family, provider_sample.materialization_detail
             ),
+            provider_output_payload_status: provider_sample.provider_output_payload_status.clone(),
             payload_format,
             payload_path,
             bridge_stub_path,
@@ -292,6 +340,7 @@ fn device_sample_resolution(
                 "provider-handoff:{}:{}",
                 handoff.provider_family, handoff.input_evidence
             ),
+            provider_output_payload_status: "none".to_owned(),
             payload_format,
             payload_path,
             bridge_stub_path,
@@ -314,6 +363,7 @@ fn device_sample_resolution(
                 "payload:{}:{}",
                 record.payload_format, record.payload_path
             ),
+            provider_output_payload_status: "none".to_owned(),
             payload_format: record.payload_format.clone(),
             payload_path: record.payload_path.clone(),
             bridge_stub_path: record.bridge_stub_path.clone(),
@@ -329,6 +379,7 @@ fn device_sample_resolution(
             detail: format!("sidecar:{}:{}", sidecar.domain_family, sidecar.entry_symbol),
             materialization_status: "sample-awaiting-trace-record".to_owned(),
             materialization_detail: "hetero-runtime-trace-record-missing".to_owned(),
+            provider_output_payload_status: "none".to_owned(),
             payload_format: "none".to_owned(),
             payload_path: "none".to_owned(),
             bridge_stub_path: "none".to_owned(),
@@ -344,6 +395,7 @@ fn device_sample_resolution(
             detail: format!("domain:{}", event.target),
             materialization_status: "sample-awaiting-trace-record".to_owned(),
             materialization_detail: "domain-visible-without-runtime-trace-record".to_owned(),
+            provider_output_payload_status: "none".to_owned(),
             payload_format: "none".to_owned(),
             payload_path: "none".to_owned(),
             bridge_stub_path: "none".to_owned(),
@@ -354,6 +406,7 @@ fn device_sample_resolution(
         detail: format!("target:{}", event.target),
         materialization_status: "sample-missing".to_owned(),
         materialization_detail: "no-runtime-trace-source".to_owned(),
+        provider_output_payload_status: "none".to_owned(),
         payload_format: "none".to_owned(),
         payload_path: "none".to_owned(),
         bridge_stub_path: "none".to_owned(),
@@ -426,6 +479,7 @@ fn payload_handoff_sample_resolution(
             detail: format!("payload-execution-handoff:{}", event.trace_id),
             materialization_status: "metadata-sample-materialized".to_owned(),
             materialization_detail: format!("payload-handoff:{}", event.entry_symbol),
+            provider_output_payload_status: "none".to_owned(),
             payload_format: "payload-execution-metadata".to_owned(),
             payload_path: report.payload_execution_handoff.path.clone(),
             bridge_stub_path: "none".to_owned(),
@@ -436,6 +490,7 @@ fn payload_handoff_sample_resolution(
             detail: "payload-execution-handoff".to_owned(),
             materialization_status: "sample-missing".to_owned(),
             materialization_detail: "payload-execution-handoff-missing".to_owned(),
+            provider_output_payload_status: "none".to_owned(),
             payload_format: "none".to_owned(),
             payload_path: "none".to_owned(),
             bridge_stub_path: "none".to_owned(),
@@ -449,6 +504,7 @@ fn generic_sample_resolution(event: &NsdbPayloadExecutionEvent) -> ValueSampleRe
         detail: format!("payload-execution-event:{}", event.execution_phase),
         materialization_status: "metadata-sample-pending".to_owned(),
         materialization_detail: format!("payload-execution-event:{}", event.entry_symbol),
+        provider_output_payload_status: "none".to_owned(),
         payload_format: "payload-execution-metadata".to_owned(),
         payload_path: "none".to_owned(),
         bridge_stub_path: "none".to_owned(),

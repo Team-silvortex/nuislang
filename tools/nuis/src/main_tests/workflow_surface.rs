@@ -304,6 +304,14 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_output_payload_execution_trace_record_count\":"));
     assert!(json
         .contains("\"nsld_final_executable_output_payload_execution_trace_ready_record_count\":"));
+    assert!(json
+        .contains("\"nsld_final_executable_output_device_provider_sample_manifest_available\":"));
+    assert!(
+        json.contains("\"nsld_final_executable_output_device_provider_sample_manifest_status\":")
+    );
+    assert!(json.contains(
+        "\"nsld_final_executable_output_device_provider_sample_manifest_blocked_record_count\":"
+    ));
     assert!(json.contains("\"nsld_final_executable_output_recommended_next_action\":"));
     assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
@@ -512,6 +520,58 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_output_object_issues\":["));
     assert!(json.contains("\"nsld_final_executable_output_blocker_count\":"));
     assert!(json.contains("\"nsld_final_executable_output_blockers\":["));
+}
+
+#[test]
+fn workflow_json_blocks_replay_when_hetero_closure_is_pending() {
+    let project_root = write_temp_project_fixture(
+        "workflow_json_pending_hetero_closure",
+        r#"
+name = "workflow_json_pending_hetero_closure"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+        .trim_start(),
+        r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 9;
+  }
+}
+"#,
+    );
+    let output_dir = default_build_output_dir(&project_root);
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        None,
+    )
+    .expect("build passes");
+    write_prepared_nsld_chain_placeholders(&output_dir);
+    write_ready_nsld_final_tail_placeholders(&output_dir);
+    write_nsdb_payload_handoff_placeholder(&output_dir);
+    let handoff_path = output_dir.join("nuis.nsdb.payload-execution-handoff.toml");
+    let handoff = fs::read_to_string(&handoff_path).expect("read nsdb handoff");
+    fs::write(
+        &handoff_path,
+        handoff.replace(
+            "record_count = 1\n",
+            "record_count = 1\nhetero_execution_closure_protocol = \"nuis-hetero-execution-closure-v1\"\nhetero_execution_closure_status = \"host-runner-pending\"\nhetero_execution_closure_ready = \"false\"\nhetero_execution_closure_first_blocker = \"host-runner-backend-artifact-payload:not-observed\"\nhetero_execution_closure_next_action = \"run-host-runner-payload-probe\"\n",
+        ),
+    )
+    .expect("write pending closure handoff");
+
+    let json = render_workflow_json(&project_root).expect("render workflow json");
+
+    assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_ready\":false"));
+    assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_status\":\"blocked\""));
+    assert!(json.contains(
+        "\"nsld_final_executable_output_nsdb_replay_first_blocker\":\"hetero-execution-closure:host-runner-backend-artifact-payload:not-observed\""
+    ));
 }
 
 #[test]

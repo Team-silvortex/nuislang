@@ -13,6 +13,7 @@ pub(crate) struct NsldDeviceProviderSampleEvidence {
     pub(crate) record_count: usize,
     pub(crate) ready_record_count: usize,
     pub(crate) pending_record_count: usize,
+    pub(crate) blocked_record_count: usize,
     pub(crate) first_provider_family: Option<String>,
     pub(crate) first_materialization_status: Option<String>,
     pub(crate) first_blocker: Option<String>,
@@ -31,6 +32,7 @@ pub(crate) fn nsld_device_provider_sample_evidence(
             record_count: 0,
             ready_record_count: 0,
             pending_record_count: 0,
+            blocked_record_count: 0,
             first_provider_family: None,
             first_materialization_status: None,
             first_blocker: None,
@@ -47,6 +49,7 @@ pub(crate) fn nsld_device_provider_sample_evidence(
         .unwrap_or_else(|| provider_sample_ready_count(&records));
     let pending_record_count = toml::usize_value(&source, "pending_record_count")
         .unwrap_or_else(|| provider_sample_pending_count(&records));
+    let blocked_record_count = provider_sample_blocked_count(&records);
     let first_provider_family =
         toml::first_table_string_value(&source, "device_provider_samples", "provider_family");
     let first_materialization_status = toml::first_table_string_value(
@@ -60,10 +63,12 @@ pub(crate) fn nsld_device_provider_sample_evidence(
         record_count,
         ready_record_count,
         pending_record_count,
+        blocked_record_count,
     );
     let first_blocker = provider_sample_first_blocker(
         &status,
         pending_record_count,
+        blocked_record_count,
         first_provider_family.as_deref(),
         first_materialization_status.as_deref(),
     );
@@ -75,6 +80,7 @@ pub(crate) fn nsld_device_provider_sample_evidence(
         record_count,
         ready_record_count,
         pending_record_count,
+        blocked_record_count,
         first_provider_family,
         first_materialization_status,
         first_blocker,
@@ -87,11 +93,14 @@ fn provider_sample_status(
     record_count: usize,
     ready_record_count: usize,
     pending_record_count: usize,
+    blocked_record_count: usize,
 ) -> String {
     if protocol != DEVICE_PROVIDER_SAMPLE_PROTOCOL || schema != DEVICE_PROVIDER_SAMPLE_SCHEMA {
         "unsupported-protocol"
     } else if record_count == 0 {
         "empty"
+    } else if blocked_record_count > 0 {
+        "blocked-provider-sample"
     } else if pending_record_count > 0 {
         "awaiting-provider-materialization"
     } else if ready_record_count == record_count {
@@ -105,6 +114,7 @@ fn provider_sample_status(
 fn provider_sample_first_blocker(
     status: &str,
     pending_record_count: usize,
+    blocked_record_count: usize,
     first_provider_family: Option<&str>,
     first_materialization_status: Option<&str>,
 ) -> Option<String> {
@@ -114,6 +124,12 @@ fn provider_sample_first_blocker(
             "device-provider-sample:{}:pending:{}",
             first_provider_family.unwrap_or("unknown-provider-family"),
             pending_record_count
+        )),
+        "blocked-provider-sample" => Some(format!(
+            "device-provider-sample:{}:blocked:{}:{}",
+            first_provider_family.unwrap_or("unknown-provider-family"),
+            blocked_record_count,
+            first_materialization_status.unwrap_or("provider-sample-blocked")
         )),
         _ => Some(format!(
             "device-provider-sample:{}:{}",
@@ -141,6 +157,18 @@ fn provider_sample_pending_count(records: &[&str]) -> usize {
         .filter(|record| {
             toml::string_value(record, "materialization_status").as_deref()
                 == Some("provider-sample-pending")
+        })
+        .count()
+}
+
+fn provider_sample_blocked_count(records: &[&str]) -> usize {
+    records
+        .iter()
+        .filter(|record| {
+            matches!(
+                toml::string_value(record, "materialization_status").as_deref(),
+                Some("provider-sample-blocked")
+            )
         })
         .count()
 }

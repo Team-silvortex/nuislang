@@ -99,6 +99,9 @@ pub(crate) fn collect_device_provider_sample_manifest_mirror(
         .iter()
         .filter(|record| device_provider_sample_record_invalid(record))
         .count();
+    let pending_record_count = parse_usize_toml_field(&source, "pending_record_count")
+        .unwrap_or_else(|| device_provider_sample_pending_count(&records));
+    let blocked_record_count = device_provider_sample_blocked_count(&records);
     DeviceProviderSampleManifestMirror {
         available: true,
         path: Some(path),
@@ -109,10 +112,12 @@ pub(crate) fn collect_device_provider_sample_manifest_mirror(
             &schema,
             records.is_empty(),
             invalid_record_count,
-            parse_usize_toml_field(&source, "pending_record_count").unwrap_or(0),
+            pending_record_count,
+            blocked_record_count,
         ),
         record_count: records.len(),
-        pending_record_count: parse_usize_toml_field(&source, "pending_record_count").unwrap_or(0),
+        pending_record_count,
+        blocked_record_count,
         invalid_record_count,
         first_provider_family: records
             .first()
@@ -184,6 +189,7 @@ pub(crate) struct DeviceProviderSampleManifestMirror {
     pub(crate) status: String,
     pub(crate) record_count: usize,
     pub(crate) pending_record_count: usize,
+    pub(crate) blocked_record_count: usize,
     pub(crate) invalid_record_count: usize,
     pub(crate) first_provider_family: String,
     pub(crate) first_materialization_status: String,
@@ -199,6 +205,7 @@ impl DeviceProviderSampleManifestMirror {
             status: "missing".to_owned(),
             record_count: 0,
             pending_record_count: 0,
+            blocked_record_count: 0,
             invalid_record_count: 0,
             first_provider_family: "none".to_owned(),
             first_materialization_status: "none".to_owned(),
@@ -222,6 +229,10 @@ impl DeviceProviderSampleManifestMirror {
             crate::json_usize_field(
                 &format!("{prefix}_pending_record_count"),
                 self.pending_record_count,
+            ),
+            crate::json_usize_field(
+                &format!("{prefix}_blocked_record_count"),
+                self.blocked_record_count,
             ),
             crate::json_usize_field(
                 &format!("{prefix}_invalid_record_count"),
@@ -271,6 +282,7 @@ fn device_provider_sample_manifest_status(
     empty: bool,
     invalid_record_count: usize,
     pending_record_count: usize,
+    blocked_record_count: usize,
 ) -> String {
     if protocol == "none" || schema == "none" {
         return "missing-protocol".to_owned();
@@ -282,11 +294,33 @@ fn device_provider_sample_manifest_status(
         "invalid-records".to_owned()
     } else if empty {
         "empty".to_owned()
+    } else if blocked_record_count > 0 {
+        "blocked-provider-sample".to_owned()
     } else if pending_record_count > 0 {
         "awaiting-provider-materialization".to_owned()
     } else {
         "ready".to_owned()
     }
+}
+
+fn device_provider_sample_pending_count(records: &[&str]) -> usize {
+    records
+        .iter()
+        .filter(|record| {
+            parse_string_toml_field(record, "materialization_status").as_deref()
+                == Some("provider-sample-pending")
+        })
+        .count()
+}
+
+fn device_provider_sample_blocked_count(records: &[&str]) -> usize {
+    records
+        .iter()
+        .filter(|record| {
+            parse_string_toml_field(record, "materialization_status").as_deref()
+                == Some("provider-sample-blocked")
+        })
+        .count()
 }
 
 fn device_provider_sample_record_invalid(record: &str) -> bool {
@@ -426,4 +460,34 @@ fn unescape_basic_toml_string(value: &str) -> String {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn device_provider_sample_manifest_status_reports_blocked_samples() {
+        let records = vec![
+            r#"
+trace_id = "hetero-trace:shader:metal"
+provider_family = "metal:apple-silicon-gpu"
+materialization_status = "provider-sample-blocked"
+"#,
+        ];
+
+        assert_eq!(device_provider_sample_blocked_count(&records), 1);
+        assert_eq!(device_provider_sample_pending_count(&records), 0);
+        assert_eq!(
+            device_provider_sample_manifest_status(
+                DEVICE_PROVIDER_SAMPLE_PROTOCOL,
+                DEVICE_PROVIDER_SAMPLE_SCHEMA,
+                false,
+                0,
+                0,
+                device_provider_sample_blocked_count(&records),
+            ),
+            "blocked-provider-sample"
+        );
+    }
 }

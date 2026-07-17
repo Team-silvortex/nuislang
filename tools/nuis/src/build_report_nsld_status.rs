@@ -355,6 +355,41 @@ pub(crate) fn print_nsld_artifact_chain_status(plan: &nuisc::linker::LinkPlan) {
         nsld_final_output.execution_handoff_decision_code
     );
     println!(
+        "  nsld_final_executable_output_nsdb_replay_contract: {}",
+        nsld_final_output.nsdb_replay_contract
+    );
+    println!(
+        "  nsld_final_executable_output_nsdb_replay_ready: {}",
+        nsld_final_output.nsdb_replay_ready
+    );
+    println!(
+        "  nsld_final_executable_output_nsdb_replay_status: {}",
+        nsld_final_output.nsdb_replay_status
+    );
+    println!(
+        "  nsld_final_executable_output_nsdb_replay_checkpoints: {}/{}",
+        nsld_final_output.nsdb_replayable_checkpoint_count,
+        nsld_final_output.nsdb_replay_checkpoint_count
+    );
+    println!(
+        "  nsld_final_executable_output_nsdb_replay_next_action: {}",
+        nsld_final_output.nsdb_replay_next_action
+    );
+    println!(
+        "  nsld_final_executable_output_nsdb_replay_next_command: {}",
+        nsld_final_output
+            .nsdb_replay_next_command
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    println!(
+        "  nsld_final_executable_output_nsdb_replay_first_blocker: {}",
+        nsld_final_output
+            .nsdb_replay_first_blocker
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    println!(
         "  nsld_final_executable_output_recommended_next_action: {}",
         nsld_final_output.recommended_next_action
     );

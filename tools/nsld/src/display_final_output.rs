@@ -240,6 +240,10 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         report.device_provider_sample_manifest_pending_record_count
     );
     println!(
+        "  device_provider_sample_manifest_blocked_record_count: {}",
+        report.device_provider_sample_manifest_blocked_record_count
+    );
+    println!(
         "  device_provider_sample_manifest_first_provider_family: {}",
         optional_string_text(
             report

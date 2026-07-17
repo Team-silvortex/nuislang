@@ -190,6 +190,11 @@ pub(crate) struct NsdbPayloadExecutionHandoffInfo {
     pub(crate) first_next_action: String,
     pub(crate) first_entry_symbol: String,
     pub(crate) first_execution_phase: String,
+    pub(crate) hetero_execution_closure_protocol: String,
+    pub(crate) hetero_execution_closure_status: String,
+    pub(crate) hetero_execution_closure_ready: String,
+    pub(crate) hetero_execution_closure_first_blocker: String,
+    pub(crate) hetero_execution_closure_next_action: String,
     pub(crate) events: Vec<NsdbPayloadExecutionEvent>,
 }
 

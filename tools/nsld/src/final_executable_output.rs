@@ -440,6 +440,8 @@ pub(crate) fn nsld_final_executable_output_report(
             .ready_record_count,
         device_provider_sample_manifest_pending_record_count: device_provider_sample
             .pending_record_count,
+        device_provider_sample_manifest_blocked_record_count: device_provider_sample
+            .blocked_record_count,
         device_provider_sample_manifest_first_provider_family: device_provider_sample
             .first_provider_family,
         device_provider_sample_manifest_first_materialization_status: device_provider_sample

@@ -78,6 +78,46 @@ fn final_output_accepts_ready_device_provider_sample_manifest() {
 }
 
 #[test]
+fn final_output_reports_blocked_device_provider_sample_manifest() {
+    let dir = temp_output_dir("blocked");
+    fs::create_dir_all(&dir).unwrap();
+    write_provider_sample_manifest(&dir, "provider-sample-blocked", 0, 0);
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.final_stage.output_path = dir.join("demo").display().to_string();
+
+    let report = nsld_final_executable_output_report(Path::new("manifest.toml"), &plan);
+    let report_json = json::nsld_final_executable_output_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(report.device_provider_sample_manifest_available);
+    assert_eq!(
+        report.device_provider_sample_manifest_status,
+        "blocked-provider-sample"
+    );
+    assert_eq!(
+        report
+            .device_provider_sample_manifest_first_blocker
+            .as_deref(),
+        Some("device-provider-sample:metal:apple-silicon-gpu:blocked:1:provider-sample-blocked")
+    );
+    assert_eq!(
+        report.device_provider_sample_manifest_blocked_record_count,
+        1
+    );
+    assert!(report.blockers.iter().any(|blocker| {
+        blocker
+            == "device-provider-sample:metal:apple-silicon-gpu:blocked:1:provider-sample-blocked"
+    }));
+    assert!(report_json
+        .contains("\"device_provider_sample_manifest_status\":\"blocked-provider-sample\""));
+    assert!(report_json.contains("\"device_provider_sample_manifest_blocked_record_count\":1"));
+    assert!(report_json.contains(
+        "\"device_provider_sample_manifest_first_blocker\":\"device-provider-sample:metal:apple-silicon-gpu:blocked:1:provider-sample-blocked\""
+    ));
+}
+
+#[test]
 fn check_report_exposes_device_provider_sample_manifest_summary() {
     let dir = temp_output_dir("check");
     fs::create_dir_all(&dir).unwrap();
@@ -100,6 +140,10 @@ fn check_report_exposes_device_provider_sample_manifest_summary() {
         1
     );
     assert_eq!(
+        report.final_executable_output_device_provider_sample_manifest_blocked_record_count,
+        0
+    );
+    assert_eq!(
         report
             .final_executable_output_device_provider_sample_manifest_first_blocker
             .as_deref(),
@@ -111,7 +155,36 @@ fn check_report_exposes_device_provider_sample_manifest_summary() {
         "\"final_executable_output_device_provider_sample_manifest_status\":\"awaiting-provider-materialization\""
     ));
     assert!(report_json.contains(
+        "\"final_executable_output_device_provider_sample_manifest_blocked_record_count\":0"
+    ));
+    assert!(report_json.contains(
         "\"final_executable_output_device_provider_sample_manifest_first_blocker\":\"device-provider-sample:metal:apple-silicon-gpu:pending:1\""
+    ));
+}
+
+#[test]
+fn check_report_exposes_blocked_device_provider_sample_manifest_count() {
+    let dir = temp_output_dir("check-blocked");
+    fs::create_dir_all(&dir).unwrap();
+    write_provider_sample_manifest(&dir, "provider-sample-blocked", 0, 0);
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.final_stage.output_path = dir.join("demo").display().to_string();
+
+    let report = nsld_check_report(Path::new("manifest.toml"), &plan);
+    let report_json = json::check_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert_eq!(
+        report.final_executable_output_device_provider_sample_manifest_status,
+        "blocked-provider-sample"
+    );
+    assert_eq!(
+        report.final_executable_output_device_provider_sample_manifest_blocked_record_count,
+        1
+    );
+    assert!(report_json.contains(
+        "\"final_executable_output_device_provider_sample_manifest_blocked_record_count\":1"
     ));
 }
 
@@ -162,6 +235,48 @@ fn artifact_chain_points_provider_sample_boundary_to_nsdb_materializer() {
     assert!(report_json
         .contains("\"final_output_boundary_command_id\":\"materialize-provider-samples\""));
     assert!(report_json.contains("nsdb materialize-provider-samples"));
+}
+
+#[test]
+fn artifact_chain_points_blocked_provider_sample_boundary_to_payload_repair() {
+    let dir = temp_output_dir("chain-blocked");
+    fs::create_dir_all(&dir).unwrap();
+    write_provider_sample_manifest(&dir, "provider-sample-blocked", 0, 0);
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.final_stage.output_path = dir.join("demo").display().to_string();
+
+    let report = nsld_artifact_chain_report(Path::new("manifest.toml"), &plan);
+    let check = nsld_check_report(Path::new("manifest.toml"), &plan);
+    let report_json = json::nsld_artifact_chain_report_json(&report);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(!report.final_output_boundary_ready);
+    assert_eq!(
+        report.final_output_boundary_command_id.as_deref(),
+        Some("repair-provider-output-payload")
+    );
+    assert_eq!(
+        report.final_output_boundary_command.as_deref(),
+        Some("nsdb materialize-provider-samples <artifact-output-dir> --json")
+    );
+    assert!(report
+        .final_output_boundary_reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("repair provider output payload diagnostics")));
+    assert_eq!(
+        check
+            .artifact_chain_final_output_boundary_command_id
+            .as_deref(),
+        Some("repair-provider-output-payload")
+    );
+    assert!(check
+        .artifact_chain_final_output_boundary_command_resolved
+        .as_deref()
+        .is_some_and(|command| command.contains("nsdb materialize-provider-samples")));
+    assert!(report_json
+        .contains("\"final_output_boundary_command_id\":\"repair-provider-output-payload\""));
+    assert!(report_json.contains("repair provider output payload diagnostics"));
 }
 
 fn temp_output_dir(label: &str) -> std::path::PathBuf {

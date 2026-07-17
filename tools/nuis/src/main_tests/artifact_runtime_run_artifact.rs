@@ -125,10 +125,79 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_output_execution_handoff_evidence_status\":"));
     assert!(json.contains("\"nsld_final_executable_output_execution_handoff_first_blocker\":"));
     assert!(json.contains("\"nsld_final_executable_output_execution_handoff_decision_code\":"));
+    assert!(json
+        .contains("\"nsld_final_executable_output_device_provider_sample_manifest_available\":"));
+    assert!(
+        json.contains("\"nsld_final_executable_output_device_provider_sample_manifest_status\":")
+    );
+    assert!(json.contains(
+        "\"nsld_final_executable_output_device_provider_sample_manifest_blocked_record_count\":"
+    ));
+    assert!(json.contains(
+        "\"nsld_final_executable_output_nsdb_replay_contract\":\"nsdb-payload-execution-replay-plan-v1\""
+    ));
+    assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_ready\":"));
+    assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_status\":"));
+    assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_first_blocker\":"));
     assert!(json.contains("\"nsld_final_executable_output_recommended_next_action\":"));
     assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
     assert!(json.contains("\"nsld_final_executable_output_blockers\":["));
+}
+
+#[test]
+fn run_artifact_json_blocks_missing_backend_payload_replay_gate() {
+    let project_root = write_temp_project_fixture(
+        "run_artifact_pending_hetero_closure",
+        r#"
+name = "run_artifact_pending_hetero_closure"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+        .trim_start(),
+        r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 7;
+  }
+}
+"#,
+    );
+    let output_dir = temp_dir("run_artifact_pending_hetero_closure_outputs");
+
+    handle_build(project_root, output_dir.clone(), false, None, None, None).expect("build passes");
+    write_prepared_nsld_chain_placeholders(&output_dir);
+    write_ready_nsld_final_tail_placeholders(&output_dir);
+    fs::write(
+        output_dir.join("nuis.nsld.final-executable.blocked.toml"),
+        "emitted = true\nfinal_output_present = true\nfinal_output_runnable_candidate = true\n",
+    )
+    .expect("write final output ownership evidence");
+    write_nsdb_payload_handoff_placeholder(&output_dir);
+    let handoff_path = output_dir.join("nuis.nsdb.payload-execution-handoff.toml");
+    let handoff = fs::read_to_string(&handoff_path)
+        .expect("read nsdb handoff")
+        .replace(
+            "record_count = 1\n",
+            "record_count = 1\nhetero_execution_closure_protocol = \"nuis-hetero-execution-closure-v1\"\nhetero_execution_closure_status = \"host-runner-pending\"\nhetero_execution_closure_ready = \"false\"\nhetero_execution_closure_first_blocker = \"host-runner-backend-artifact-payload:not-observed\"\nhetero_execution_closure_next_action = \"run-host-runner-payload-probe\"\n",
+        );
+    fs::write(&handoff_path, handoff).expect("write pending nsdb handoff");
+
+    let json = render_run_artifact_json(&output_dir.join("nuis.build.manifest.toml"));
+
+    assert!(json.contains("\"run_artifact_prelaunch_status\":\"ready\""));
+    assert!(
+        json.contains("\"launch_evidence_hetero_execution_closure_status\":\"payload-missing\"")
+    );
+    assert!(json
+        .contains("\"workflow_nsdb_handoff_hetero_execution_closure_status\":\"payload-missing\""));
+    assert!(json.contains("\"nsld_final_executable_output_ready\":true"));
+    assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_ready\":false"));
+    assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_status\":\"blocked\""));
+    assert!(json.contains(
+        "\"nsld_final_executable_output_nsdb_replay_first_blocker\":\"hetero-execution-closure:backend-artifact-payload:missing\""
+    ));
 }
 
 #[test]
@@ -591,6 +660,52 @@ fn run_artifact_json_exposes_bridge_bearing_exchange_summary() {
     ));
     assert!(doctor_json.contains(
         "\"artifact_device_provider_sample_manifest_first_materialization_status\":\"provider-sample-pending\""
+    ));
+
+    let blocked_provider_samples = provider_samples
+        .replace(
+            "status = \"awaiting-provider-materialization\"",
+            "status = \"blocked\"",
+        )
+        .replace("pending_record_count = 1", "pending_record_count = 0")
+        .replace(
+            "materialization_status = \"provider-sample-pending\"",
+            "materialization_status = \"provider-sample-blocked\"",
+        )
+        .replace(
+            "sample_status = \"pending-provider-execution\"",
+            "sample_status = \"provider-execution-blocked\"",
+        )
+        .replace(
+            "validation_status = \"pending-provider-execution\"",
+            "validation_status = \"provider-output-payload-invalid\"",
+        )
+        .replace(
+            "next_action = \"execute-provider-sample\"",
+            "next_action = \"repair-provider-output-payload\"",
+        );
+    fs::write(
+        output_dir.join("nuis.nsdb.device-provider-samples.toml"),
+        blocked_provider_samples,
+    )
+    .unwrap();
+
+    let blocked_doctor_json = render_artifact_doctor_json(&output_dir);
+    assert!(blocked_doctor_json
+        .contains("\"recommended_next_step\":\"repair_provider_output_payload\""));
+    assert!(blocked_doctor_json
+        .contains("\"recommended_command\":\"nsdb materialize-provider-samples "));
+    assert!(blocked_doctor_json
+        .contains("\"recommended_reason\":\"device provider sample materialization is blocked"));
+    assert!(blocked_doctor_json.contains(
+        "\"artifact_device_provider_sample_manifest_status\":\"blocked-provider-sample\""
+    ));
+    assert!(blocked_doctor_json
+        .contains("\"artifact_device_provider_sample_manifest_pending_record_count\":0"));
+    assert!(blocked_doctor_json
+        .contains("\"artifact_device_provider_sample_manifest_blocked_record_count\":1"));
+    assert!(blocked_doctor_json.contains(
+        "\"artifact_device_provider_sample_manifest_first_materialization_status\":\"provider-sample-blocked\""
     ));
 }
 

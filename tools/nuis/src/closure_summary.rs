@@ -289,6 +289,13 @@ mod tests {
             payload_execution_trace_available: true,
             payload_execution_trace_record_count: 1,
             payload_execution_trace_ready_record_count: 1,
+            device_provider_sample_manifest_available: false,
+            device_provider_sample_manifest_status: "missing".to_owned(),
+            device_provider_sample_manifest_record_count: 0,
+            device_provider_sample_manifest_pending_record_count: 0,
+            device_provider_sample_manifest_blocked_record_count: 0,
+            device_provider_sample_manifest_first_provider_family: "none".to_owned(),
+            device_provider_sample_manifest_first_materialization_status: "none".to_owned(),
             nsdb_replay_contract: "nsdb-payload-execution-replay-plan-v1".to_owned(),
             nsdb_replay_ready,
             nsdb_replay_status: if nsdb_replay_ready {

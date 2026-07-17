@@ -442,6 +442,9 @@ pub(crate) fn nsld_check_report(
         final_executable_output_device_provider_sample_manifest_pending_record_count:
             final_snapshot
                 .final_executable_output_device_provider_sample_manifest_pending_record_count,
+        final_executable_output_device_provider_sample_manifest_blocked_record_count:
+            final_snapshot
+                .final_executable_output_device_provider_sample_manifest_blocked_record_count,
         final_executable_output_device_provider_sample_manifest_first_blocker: final_snapshot
             .final_executable_output_device_provider_sample_manifest_first_blocker,
         final_executable_output_nsld_owned: final_snapshot.final_executable_output_nsld_owned,

@@ -302,11 +302,12 @@ pub(crate) fn print_check_report(report: &NsldCheckReport) {
         optional_string_text(report.final_executable_output_object_magic.as_deref())
     );
     println!(
-        "  final_executable_output_device_provider_sample_manifest: available={} status={} ready={} pending={} first_blocker={}",
+        "  final_executable_output_device_provider_sample_manifest: available={} status={} ready={} pending={} blocked={} first_blocker={}",
         report.final_executable_output_device_provider_sample_manifest_available,
         report.final_executable_output_device_provider_sample_manifest_status,
         report.final_executable_output_device_provider_sample_manifest_ready_record_count,
         report.final_executable_output_device_provider_sample_manifest_pending_record_count,
+        report.final_executable_output_device_provider_sample_manifest_blocked_record_count,
         optional_string_text(
             report
                 .final_executable_output_device_provider_sample_manifest_first_blocker

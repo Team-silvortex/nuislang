@@ -218,6 +218,10 @@ pub(crate) fn check_report_final_fields(report: &NsldCheckReport) -> Vec<String>
             "final_executable_output_device_provider_sample_manifest_pending_record_count",
             report.final_executable_output_device_provider_sample_manifest_pending_record_count,
         ),
+        json_usize_field(
+            "final_executable_output_device_provider_sample_manifest_blocked_record_count",
+            report.final_executable_output_device_provider_sample_manifest_blocked_record_count,
+        ),
         json_optional_string_field(
             "final_executable_output_device_provider_sample_manifest_first_blocker",
             report

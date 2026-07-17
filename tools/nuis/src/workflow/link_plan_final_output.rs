@@ -2,6 +2,7 @@ use super::{
     link_plan::{parse_bool_field, parse_string_field, parse_usize_field},
     object_identity::workflow_object_identity,
 };
+use crate::artifact_doctor_mirrors::collect_device_provider_sample_manifest_mirror;
 use crate::artifact_nsdb_handoff::read_persisted_nsdb_handoff;
 use std::{fs, path::Path};
 
@@ -28,6 +29,13 @@ pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) payload_execution_trace_available: bool,
     pub(crate) payload_execution_trace_record_count: usize,
     pub(crate) payload_execution_trace_ready_record_count: usize,
+    pub(crate) device_provider_sample_manifest_available: bool,
+    pub(crate) device_provider_sample_manifest_status: String,
+    pub(crate) device_provider_sample_manifest_record_count: usize,
+    pub(crate) device_provider_sample_manifest_pending_record_count: usize,
+    pub(crate) device_provider_sample_manifest_blocked_record_count: usize,
+    pub(crate) device_provider_sample_manifest_first_provider_family: String,
+    pub(crate) device_provider_sample_manifest_first_materialization_status: String,
     pub(crate) nsdb_replay_contract: String,
     pub(crate) nsdb_replay_ready: bool,
     pub(crate) nsdb_replay_status: String,
@@ -146,6 +154,8 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         ready,
         host_native_output,
     );
+    let provider_sample_manifest =
+        collect_device_provider_sample_manifest_mirror(Some(Path::new(&plan.output_dir)));
     let nsdb_replay = nsld_final_executable_output_nsdb_replay(plan);
     let object_evidence = nsld_final_executable_output_object_evidence(plan);
 
@@ -172,6 +182,17 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         payload_execution_trace_available: payload_execution_trace.available,
         payload_execution_trace_record_count: payload_execution_trace.record_count,
         payload_execution_trace_ready_record_count: payload_execution_trace.ready_record_count,
+        device_provider_sample_manifest_available: provider_sample_manifest.available,
+        device_provider_sample_manifest_status: provider_sample_manifest.status,
+        device_provider_sample_manifest_record_count: provider_sample_manifest.record_count,
+        device_provider_sample_manifest_pending_record_count: provider_sample_manifest
+            .pending_record_count,
+        device_provider_sample_manifest_blocked_record_count: provider_sample_manifest
+            .blocked_record_count,
+        device_provider_sample_manifest_first_provider_family: provider_sample_manifest
+            .first_provider_family,
+        device_provider_sample_manifest_first_materialization_status: provider_sample_manifest
+            .first_materialization_status,
         nsdb_replay_contract: nsdb_replay.contract,
         nsdb_replay_ready: nsdb_replay.ready,
         nsdb_replay_status: nsdb_replay.status,
@@ -217,9 +238,18 @@ fn nsld_final_executable_output_nsdb_replay(
     let handoff = read_persisted_nsdb_handoff(Some(Path::new(&plan.output_dir)));
     let checkpoint_count = handoff.record_count();
     let replayable_checkpoint_count = handoff.ready_record_count();
-    let ready = handoff.available()
-        && checkpoint_count > 0
-        && checkpoint_count == replayable_checkpoint_count;
+    let first_blocker = if !handoff.available() {
+        Some("payload-execution-handoff-missing".to_owned())
+    } else if !handoff.hetero_execution_closure_ready() {
+        handoff.hetero_execution_closure_blocker()
+    } else if checkpoint_count == 0 {
+        Some("payload-execution-replay:no-checkpoints".to_owned())
+    } else if checkpoint_count != replayable_checkpoint_count {
+        Some("payload-execution-replay:blocked-checkpoint".to_owned())
+    } else {
+        handoff.error().map(ToOwned::to_owned)
+    };
+    let ready = first_blocker.is_none();
     let command = ready.then(|| format!("nsdb replay-plan {} --json", plan.output_dir));
     let next_action = if ready {
         "replay-nsdb-payload-execution"
@@ -252,14 +282,7 @@ fn nsld_final_executable_output_nsdb_replay(
         first_blocker: if ready {
             None
         } else {
-            let blocker = handoff.error().unwrap_or_else(|| {
-                if checkpoint_count == 0 {
-                    "payload-execution-replay:no-checkpoints"
-                } else {
-                    "payload-execution-replay:blocked-checkpoint"
-                }
-            });
-            Some(blocker.to_owned())
+            first_blocker.or_else(|| Some("final-output-nsdb-replay-not-ready".to_owned()))
         },
     }
 }

@@ -239,6 +239,10 @@ pub(crate) fn nsld_final_executable_output_report_json(
             "device_provider_sample_manifest_pending_record_count",
             report.device_provider_sample_manifest_pending_record_count,
         ),
+        json_usize_field(
+            "device_provider_sample_manifest_blocked_record_count",
+            report.device_provider_sample_manifest_blocked_record_count,
+        ),
         json_optional_string_field(
             "device_provider_sample_manifest_first_provider_family",
             report

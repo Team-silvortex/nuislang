@@ -31,6 +31,11 @@ pub(crate) struct RunArtifactLaunchEvidence {
     backend_artifact_payload_ids: Vec<String>,
     backend_artifact_payload_kinds: Vec<String>,
     backend_artifact_payload_first_missing: Option<String>,
+    hetero_execution_closure_protocol: &'static str,
+    hetero_execution_closure_status: String,
+    hetero_execution_closure_ready: bool,
+    hetero_execution_closure_first_blocker: Option<String>,
+    hetero_execution_closure_next_action: String,
     first_blocker: Option<String>,
     reason: String,
 }
@@ -95,6 +100,8 @@ impl RunArtifactLaunchEvidence {
             first_payload_entry_section_id.clone(),
             first_payload_first_blocker.clone(),
         );
+        let hetero_execution_closure =
+            hetero_execution_closure_summary(host_runner, backend_evidence);
         Self {
             protocol: "nuis-run-artifact-launch-evidence-v1",
             status: if first_blocker.is_none() {
@@ -125,6 +132,11 @@ impl RunArtifactLaunchEvidence {
             backend_artifact_payload_ids: backend_evidence.ids.clone(),
             backend_artifact_payload_kinds: backend_evidence.kinds.clone(),
             backend_artifact_payload_first_missing: backend_evidence.first_missing.clone(),
+            hetero_execution_closure_protocol: "nuis-hetero-execution-closure-v1",
+            hetero_execution_closure_status: hetero_execution_closure.status,
+            hetero_execution_closure_ready: hetero_execution_closure.ready,
+            hetero_execution_closure_first_blocker: hetero_execution_closure.first_blocker,
+            hetero_execution_closure_next_action: hetero_execution_closure.next_action,
             first_blocker,
             reason: prelaunch.reason.clone(),
         }
@@ -140,6 +152,26 @@ impl RunArtifactLaunchEvidence {
 
     pub(crate) fn payload_execution_trace_records(&self) -> &[PayloadExecutionTraceRecord] {
         &self.payload_execution_trace_records
+    }
+
+    pub(crate) fn hetero_execution_closure_protocol(&self) -> &'static str {
+        self.hetero_execution_closure_protocol
+    }
+
+    pub(crate) fn hetero_execution_closure_status(&self) -> &str {
+        &self.hetero_execution_closure_status
+    }
+
+    pub(crate) fn hetero_execution_closure_ready(&self) -> bool {
+        self.hetero_execution_closure_ready
+    }
+
+    pub(crate) fn hetero_execution_closure_first_blocker(&self) -> Option<&str> {
+        self.hetero_execution_closure_first_blocker.as_deref()
+    }
+
+    pub(crate) fn hetero_execution_closure_next_action(&self) -> &str {
+        &self.hetero_execution_closure_next_action
     }
 
     pub(crate) fn json_fields_with_prefix(&self, prefix: &str) -> Vec<String> {
@@ -249,6 +281,26 @@ impl RunArtifactLaunchEvidence {
                 &format!("{prefix}_backend_artifact_payload_first_missing"),
                 self.backend_artifact_payload_first_missing.as_deref(),
             ),
+            json_field(
+                &format!("{prefix}_hetero_execution_closure_protocol"),
+                self.hetero_execution_closure_protocol,
+            ),
+            json_field(
+                &format!("{prefix}_hetero_execution_closure_status"),
+                &self.hetero_execution_closure_status,
+            ),
+            json_bool_field(
+                &format!("{prefix}_hetero_execution_closure_ready"),
+                self.hetero_execution_closure_ready,
+            ),
+            json_optional_string_field(
+                &format!("{prefix}_hetero_execution_closure_first_blocker"),
+                self.hetero_execution_closure_first_blocker.as_deref(),
+            ),
+            json_field(
+                &format!("{prefix}_hetero_execution_closure_next_action"),
+                &self.hetero_execution_closure_next_action,
+            ),
             json_optional_string_field(
                 &format!("{prefix}_first_blocker"),
                 self.first_blocker.as_deref(),
@@ -256,6 +308,13 @@ impl RunArtifactLaunchEvidence {
             json_field(&format!("{prefix}_reason"), &self.reason),
         ]
     }
+}
+
+struct HeteroExecutionClosureSummary {
+    status: String,
+    ready: bool,
+    first_blocker: Option<String>,
+    next_action: String,
 }
 
 impl PayloadExecutionTraceRecord {
@@ -272,6 +331,107 @@ impl PayloadExecutionTraceRecord {
             json_field("next_action", &self.next_action),
         ];
         format!("{{{}}}", fields.join(","))
+    }
+}
+
+fn hetero_execution_closure_summary(
+    host_runner: &HostRunnerJsonSurface,
+    backend_evidence: &crate::artifact_doctor::BackendArtifactPayloadEvidence,
+) -> HeteroExecutionClosureSummary {
+    if !backend_evidence.available || backend_evidence.count == 0 {
+        return hetero_execution_closure_blocked(
+            "payload-missing",
+            "backend-artifact-payload:missing",
+            "materialize-backend-artifact-payload",
+        );
+    }
+    if backend_evidence.present_count == 0 {
+        return hetero_execution_closure_blocked(
+            "payload-pending",
+            backend_evidence
+                .first_missing
+                .as_deref()
+                .unwrap_or("backend-artifact-payload:not-present"),
+            "repair-backend-artifact-payload-presence",
+        );
+    }
+    if backend_evidence.role_status != "ready" {
+        return hetero_execution_closure_blocked(
+            "payload-blocked",
+            &format!(
+                "backend-artifact-payload-role:{}",
+                backend_evidence.role_status
+            ),
+            "repair-backend-artifact-payload-role",
+        );
+    }
+    let Some(host_count) = host_runner.backend_artifact_payload_count else {
+        return hetero_execution_closure_blocked(
+            "host-runner-pending",
+            "host-runner-backend-artifact-payload:not-observed",
+            "run-host-runner-payload-probe",
+        );
+    };
+    if host_count < backend_evidence.present_count {
+        return hetero_execution_closure_blocked(
+            "host-runner-mismatch",
+            "host-runner-backend-artifact-payload-count:mismatch",
+            "repair-host-runner-backend-artifact-payload-table",
+        );
+    }
+    if host_runner
+        .backend_artifact_payload_ready_count
+        .unwrap_or(0)
+        == 0
+    {
+        return hetero_execution_closure_blocked(
+            "host-runner-pending",
+            "host-runner-backend-artifact-payload-ready-count:zero",
+            "complete-host-runner-backend-artifact-payload-ready-probe",
+        );
+    }
+    if let (Some(expected), Some(observed)) = (
+        backend_evidence.ids.first(),
+        host_runner.backend_artifact_payload_first_id.as_ref(),
+    ) {
+        if expected != observed {
+            return hetero_execution_closure_blocked(
+                "host-runner-mismatch",
+                "host-runner-backend-artifact-payload-id:mismatch",
+                "repair-host-runner-backend-artifact-payload-table",
+            );
+        }
+    }
+    if let (Some(expected), Some(observed)) = (
+        backend_evidence.kinds.first(),
+        host_runner.backend_artifact_payload_first_kind.as_ref(),
+    ) {
+        if expected != observed {
+            return hetero_execution_closure_blocked(
+                "host-runner-mismatch",
+                "host-runner-backend-artifact-payload-kind:mismatch",
+                "repair-host-runner-backend-artifact-payload-table",
+            );
+        }
+    }
+    HeteroExecutionClosureSummary {
+        status: "closed".to_owned(),
+        ready: true,
+        first_blocker: None,
+        next_action: "handoff-hetero-execution-evidence-to-nsdb".to_owned(),
+    }
+}
+
+fn hetero_execution_closure_blocked(
+    status: &str,
+    first_blocker: &str,
+    next_action: &str,
+) -> HeteroExecutionClosureSummary {
+    HeteroExecutionClosureSummary {
+        status: status.to_owned(),
+        ready: false,
+        first_blocker: Some(first_blocker.to_owned()),
+        next_action: next_action.to_owned(),
     }
 }
 
@@ -496,6 +656,29 @@ pub(crate) fn print_launch_evidence_text(evidence: &RunArtifactLaunchEvidence) {
             .unwrap_or("<none>")
     );
     println!(
+        "  launch_evidence_hetero_execution_closure_protocol: {}",
+        evidence.hetero_execution_closure_protocol
+    );
+    println!(
+        "  launch_evidence_hetero_execution_closure_status: {}",
+        evidence.hetero_execution_closure_status
+    );
+    println!(
+        "  launch_evidence_hetero_execution_closure_ready: {}",
+        evidence.hetero_execution_closure_ready
+    );
+    println!(
+        "  launch_evidence_hetero_execution_closure_first_blocker: {}",
+        evidence
+            .hetero_execution_closure_first_blocker
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    println!(
+        "  launch_evidence_hetero_execution_closure_next_action: {}",
+        evidence.hetero_execution_closure_next_action
+    );
+    println!(
         "  launch_evidence_first_blocker: {}",
         evidence.first_blocker.as_deref().unwrap_or("<none>")
     );
@@ -527,7 +710,7 @@ mod tests {
             entrypoint_protocol_valid: Some(true),
             reason: "ready".to_owned(),
         };
-        let host_runner = HostRunnerJsonSurface {
+        let mut host_runner = HostRunnerJsonSurface {
             invoked: true,
             status: "ready".to_owned(),
             program: Some("nuis-host-runner".to_owned()),
@@ -571,5 +754,40 @@ mod tests {
         assert!(json.contains("\"entry_symbol\":\"main\""));
         assert!(json.contains("\"entry_section_id\":\"sec0000.compiled-artifact\""));
         assert!(json.contains("\"next_action\":\"handoff-payload-trace-to-nsdb\""));
+        assert!(json
+            .contains("\"launch_evidence_hetero_execution_closure_status\":\"payload-missing\""));
+
+        host_runner.backend_artifact_payload_count = Some(1);
+        host_runner.backend_artifact_payload_parsed_count = Some(1);
+        host_runner.backend_artifact_payload_ready_count = Some(1);
+        host_runner.backend_artifact_payload_first_id =
+            Some("payload0005.backend-artifact".to_owned());
+        host_runner.backend_artifact_payload_first_kind =
+            Some("nustar-backend-artifact:kernel:aarch64:apple-silicon-cpu".to_owned());
+        host_runner.backend_artifact_payload_first_role_status = Some("ready".to_owned());
+        let backend_evidence = crate::artifact_doctor::BackendArtifactPayloadEvidence {
+            available: true,
+            path: None,
+            count: 1,
+            present_count: 1,
+            role_status: "ready".to_owned(),
+            ids: vec!["payload0005.backend-artifact".to_owned()],
+            kinds: vec!["nustar-backend-artifact:kernel:aarch64:apple-silicon-cpu".to_owned()],
+            first_missing: None,
+        };
+        let closed_json = RunArtifactLaunchEvidence::from_surfaces_with_backend_payload_evidence(
+            &prelaunch,
+            &host_runner,
+            &backend_evidence,
+        )
+        .json_fields()
+        .join(",");
+        assert!(
+            closed_json.contains("\"launch_evidence_hetero_execution_closure_status\":\"closed\"")
+        );
+        assert!(closed_json.contains("\"launch_evidence_hetero_execution_closure_ready\":true"));
+        assert!(closed_json.contains(
+            "\"launch_evidence_hetero_execution_closure_next_action\":\"handoff-hetero-execution-evidence-to-nsdb\""
+        ));
     }
 }

@@ -19,6 +19,11 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
             first_next_action: "none".to_owned(),
             first_entry_symbol: "none".to_owned(),
             first_execution_phase: "none".to_owned(),
+            hetero_execution_closure_protocol: "none".to_owned(),
+            hetero_execution_closure_status: "none".to_owned(),
+            hetero_execution_closure_ready: "false".to_owned(),
+            hetero_execution_closure_first_blocker: "none".to_owned(),
+            hetero_execution_closure_next_action: "none".to_owned(),
             events: Vec::new(),
         };
     };
@@ -55,6 +60,32 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
         first_execution_phase: first_event
             .map(|event| event.execution_phase.clone())
             .unwrap_or_else(|| "none".to_owned()),
+        hetero_execution_closure_protocol: parse_string_toml_field(
+            &source,
+            "hetero_execution_closure_protocol",
+        )
+        .unwrap_or_else(|| "none".to_owned()),
+        hetero_execution_closure_status: parse_string_toml_field(
+            &source,
+            "hetero_execution_closure_status",
+        )
+        .unwrap_or_else(|| "none".to_owned()),
+        hetero_execution_closure_ready: parse_string_toml_field(
+            &source,
+            "hetero_execution_closure_ready",
+        )
+        .unwrap_or_else(|| "false".to_owned()),
+        hetero_execution_closure_first_blocker: parse_string_toml_field(
+            &source,
+            "hetero_execution_closure_first_blocker",
+        )
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "none".to_owned()),
+        hetero_execution_closure_next_action: parse_string_toml_field(
+            &source,
+            "hetero_execution_closure_next_action",
+        )
+        .unwrap_or_else(|| "none".to_owned()),
         events,
     }
 }
@@ -174,6 +205,10 @@ protocol = "nuis-nsdb-payload-execution-handoff-v1"
 debugger_contract = "nsdb-yir-payload-execution-trace-v1"
 record_count = 2
 ready_record_count = 1
+hetero_execution_closure_protocol = "nuis-hetero-execution-closure-v1"
+hetero_execution_closure_status = "closed"
+hetero_execution_closure_ready = "true"
+hetero_execution_closure_next_action = "handoff-hetero-execution-evidence-to-nsdb"
 first_trace_id = "payload-trace:container-loader:nuis.bootstrap.lifecycle.v1"
 first_status = "ready"
 first_next_action = "handoff-payload-trace-to-nsdb"
@@ -219,5 +254,15 @@ next_action = "materialize-device-execution-trace"
         );
         assert_eq!(handoff.first_execution_phase, "container-loader-handoff");
         assert_eq!(handoff.first_entry_symbol, "nuis.bootstrap.lifecycle.v1");
+        assert_eq!(
+            handoff.hetero_execution_closure_protocol,
+            "nuis-hetero-execution-closure-v1"
+        );
+        assert_eq!(handoff.hetero_execution_closure_status, "closed");
+        assert_eq!(handoff.hetero_execution_closure_ready, "true");
+        assert_eq!(
+            handoff.hetero_execution_closure_next_action,
+            "handoff-hetero-execution-evidence-to-nsdb"
+        );
     }
 }

@@ -704,6 +704,7 @@ pub(crate) struct NsldFinalExecutableOutputReport {
     pub(crate) device_provider_sample_manifest_record_count: usize,
     pub(crate) device_provider_sample_manifest_ready_record_count: usize,
     pub(crate) device_provider_sample_manifest_pending_record_count: usize,
+    pub(crate) device_provider_sample_manifest_blocked_record_count: usize,
     pub(crate) device_provider_sample_manifest_first_provider_family: Option<String>,
     pub(crate) device_provider_sample_manifest_first_materialization_status: Option<String>,
     pub(crate) device_provider_sample_manifest_first_blocker: Option<String>,
