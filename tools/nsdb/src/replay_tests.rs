@@ -738,6 +738,16 @@ next_action = "execute-provider-sample"
     ));
     assert!(replay_json.contains("\"replay_hetero_execution_closure_status\":\"closed\""));
     assert!(replay_json.contains("\"replay_hetero_execution_closure_ready\":\"true\""));
+    assert!(
+        replay_json.contains("\"debugger_transcript_contract\":\"nsdb-yir-replay-transcript-v1\"")
+    );
+    assert!(replay_json.contains("\"debugger_transcript_status\":\"transcript-blocked\""));
+    assert!(replay_json.contains("\"debugger_transcript_ready\":false"));
+    assert!(replay_json.contains(
+        "\"debugger_transcript_source_contract\":\"nsdb-payload-execution-replay-plan-v1\""
+    ));
+    assert!(replay_json
+        .contains("\"debugger_transcript_next_action\":\"resolve-nsdb-yir-replay-transcript\""));
     assert!(replay_json.contains("\"replay_event_query_result_count\":2"));
     assert!(replay_json.contains("\"replay_checkpoint_count\":2"));
 
@@ -768,6 +778,12 @@ next_action = "execute-provider-sample"
     assert!(ready_plan.checkpoints[1]
         .value_sample_materialization_detail
         .contains("deterministic-provider-sample-artifact"));
+    let ready_replay_json = crate::json::nsdb_replay_plan_json(&report);
+    assert!(ready_replay_json.contains("\"debugger_transcript_status\":\"transcript-ready\""));
+    assert!(ready_replay_json.contains("\"debugger_transcript_ready\":true"));
+    assert!(ready_replay_json
+        .contains("\"debugger_transcript_next_action\":\"consume-nsdb-yir-replay-transcript\""));
+    assert!(ready_replay_json.contains("\"debugger_transcript_first_blocker\":null"));
 
     let mut pending_closure_report = report.clone();
     pending_closure_report
@@ -791,6 +807,13 @@ next_action = "execute-provider-sample"
     let pending_closure_json = crate::json::nsdb_replay_plan_json(&pending_closure_report);
     assert!(pending_closure_json
         .contains("\"replay_hetero_execution_closure_status\":\"host-runner-pending\""));
+    assert!(pending_closure_json.contains("\"debugger_transcript_status\":\"transcript-blocked\""));
+    assert!(pending_closure_json.contains("\"debugger_transcript_ready\":false"));
+    assert!(pending_closure_json
+        .contains("\"debugger_transcript_next_action\":\"resolve-nsdb-yir-replay-transcript\""));
+    assert!(pending_closure_json.contains(
+        "\"debugger_transcript_first_blocker\":\"hetero-execution-closure:host-runner-backend-artifact-payload:not-observed\""
+    ));
     assert!(pending_closure_json.contains(
         "\"replay_first_blocker\":\"hetero-execution-closure:host-runner-backend-artifact-payload:not-observed\""
     ));

@@ -45,6 +45,16 @@ pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) nsdb_replay_next_action: String,
     pub(crate) nsdb_replay_next_command: Option<String>,
     pub(crate) nsdb_replay_first_blocker: Option<String>,
+    pub(crate) object_package_summary_contract: String,
+    pub(crate) object_package_summary_ready: bool,
+    pub(crate) object_package_summary_status: String,
+    pub(crate) object_package_summary_next_action: String,
+    pub(crate) object_package_summary_next_command: Option<String>,
+    pub(crate) debugger_transcript_contract: String,
+    pub(crate) debugger_transcript_ready: bool,
+    pub(crate) debugger_transcript_status: String,
+    pub(crate) debugger_transcript_next_action: String,
+    pub(crate) debugger_transcript_first_blocker: Option<String>,
     pub(crate) recommended_next_action: String,
     pub(crate) path_present: bool,
     pub(crate) nsld_owned: Option<bool>,
@@ -158,6 +168,8 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         collect_device_provider_sample_manifest_mirror(Some(Path::new(&plan.output_dir)));
     let nsdb_replay = nsld_final_executable_output_nsdb_replay(plan);
     let object_evidence = nsld_final_executable_output_object_evidence(plan);
+    let object_package_summary = nsld_final_executable_output_object_package_summary(&nsdb_replay);
+    let debugger_transcript = nsld_final_executable_output_debugger_transcript(&nsdb_replay);
 
     NsldFinalExecutableOutputBoundarySummary {
         ready,
@@ -202,6 +214,16 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         nsdb_replay_next_action: nsdb_replay.next_action,
         nsdb_replay_next_command: nsdb_replay.next_command,
         nsdb_replay_first_blocker: nsdb_replay.first_blocker,
+        object_package_summary_contract: object_package_summary.contract,
+        object_package_summary_ready: object_package_summary.ready,
+        object_package_summary_status: object_package_summary.status,
+        object_package_summary_next_action: object_package_summary.next_action,
+        object_package_summary_next_command: object_package_summary.next_command,
+        debugger_transcript_contract: debugger_transcript.contract,
+        debugger_transcript_ready: debugger_transcript.ready,
+        debugger_transcript_status: debugger_transcript.status,
+        debugger_transcript_next_action: debugger_transcript.next_action,
+        debugger_transcript_first_blocker: debugger_transcript.first_blocker,
         recommended_next_action,
         path_present,
         nsld_owned,
@@ -217,6 +239,73 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         object_issues: object_evidence.issues,
         blockers,
         first_blocker,
+    }
+}
+
+struct NsldFinalExecutableOutputClosureMirror {
+    contract: String,
+    ready: bool,
+    status: String,
+    next_action: String,
+    next_command: Option<String>,
+    first_blocker: Option<String>,
+}
+
+fn nsld_final_executable_output_object_package_summary(
+    nsdb_replay: &NsldFinalExecutableOutputNsdbReplay,
+) -> NsldFinalExecutableOutputClosureMirror {
+    let ready = nsdb_replay.ready;
+    NsldFinalExecutableOutputClosureMirror {
+        contract: "nsld-object-package-summary-v1".to_owned(),
+        ready,
+        status: if ready {
+            "replay-ready"
+        } else {
+            "replay-blocked"
+        }
+        .to_owned(),
+        next_action: if ready {
+            "consume-object-package-summary"
+        } else {
+            "resolve-object-package-replay-evidence"
+        }
+        .to_owned(),
+        next_command: nsdb_replay.next_command.clone(),
+        first_blocker: (!ready).then(|| {
+            nsdb_replay
+                .first_blocker
+                .clone()
+                .unwrap_or_else(|| "payload-execution-replay:unknown".to_owned())
+        }),
+    }
+}
+
+fn nsld_final_executable_output_debugger_transcript(
+    nsdb_replay: &NsldFinalExecutableOutputNsdbReplay,
+) -> NsldFinalExecutableOutputClosureMirror {
+    let ready = nsdb_replay.ready;
+    NsldFinalExecutableOutputClosureMirror {
+        contract: "nsdb-yir-replay-transcript-v1".to_owned(),
+        ready,
+        status: if ready {
+            "transcript-ready"
+        } else {
+            "transcript-blocked"
+        }
+        .to_owned(),
+        next_action: if ready {
+            "consume-nsdb-yir-replay-transcript"
+        } else {
+            "resolve-nsdb-yir-replay-transcript"
+        }
+        .to_owned(),
+        next_command: nsdb_replay.next_command.clone(),
+        first_blocker: (!ready).then(|| {
+            nsdb_replay
+                .first_blocker
+                .clone()
+                .unwrap_or_else(|| "payload-execution-replay:unknown".to_owned())
+        }),
     }
 }
 

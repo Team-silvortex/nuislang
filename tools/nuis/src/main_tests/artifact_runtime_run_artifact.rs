@@ -139,6 +139,10 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_ready\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_status\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_first_blocker\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_package_contract\":"));
+    assert!(json.contains("\"nsld_final_executable_output_object_package_ready\":"));
+    assert!(json.contains("\"nsld_final_executable_output_debugger_transcript_contract\":"));
+    assert!(json.contains("\"nsld_final_executable_output_debugger_transcript_ready\":"));
     assert!(json.contains("\"nsld_final_executable_output_recommended_next_action\":"));
     assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
@@ -187,16 +191,16 @@ mod cpu Main {
     let json = render_run_artifact_json(&output_dir.join("nuis.build.manifest.toml"));
 
     assert!(json.contains("\"run_artifact_prelaunch_status\":\"ready\""));
-    assert!(
-        json.contains("\"launch_evidence_hetero_execution_closure_status\":\"payload-missing\"")
-    );
-    assert!(json
-        .contains("\"workflow_nsdb_handoff_hetero_execution_closure_status\":\"payload-missing\""));
+    assert!(json.contains("\"launch_evidence_hetero_execution_closure_status\":\"closed\""));
+    assert!(json.contains(
+        "\"workflow_launch_evidence_hetero_execution_closure_status\":\"payload-missing\""
+    ));
+    assert!(json.contains("\"workflow_nsdb_handoff_hetero_execution_closure_status\":\"closed\""));
     assert!(json.contains("\"nsld_final_executable_output_ready\":true"));
     assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_ready\":false"));
     assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_status\":\"blocked\""));
     assert!(json.contains(
-        "\"nsld_final_executable_output_nsdb_replay_first_blocker\":\"hetero-execution-closure:backend-artifact-payload:missing\""
+        "\"nsld_final_executable_output_nsdb_replay_first_blocker\":\"payload-execution-replay:blocked-checkpoint\""
     ));
 }
 

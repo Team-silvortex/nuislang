@@ -180,9 +180,10 @@ pub(super) fn build_visible_enum_defs(
 
 pub(super) fn build_impl_lookup(
     module: &AstModule,
+    local_cpu_helpers: &[&AstModule],
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
 ) -> Result<BTreeMap<(String, String), AstImplDef>, String> {
-    module
+    let mut lookup = module
         .impls
         .iter()
         .map(|definition| {
@@ -195,7 +196,25 @@ pub(super) fn build_impl_lookup(
                 definition.clone(),
             ))
         })
-        .collect::<Result<BTreeMap<_, _>, String>>()
+        .collect::<Result<BTreeMap<_, _>, String>>()?;
+    for helper in local_cpu_helpers {
+        for definition in &helper.impls {
+            let rendered_for_type =
+                lower_type_ref_with_aliases(&definition.for_type, visible_type_aliases)?.render();
+            lookup.insert(
+                (definition.trait_name.clone(), rendered_for_type.clone()),
+                definition.clone(),
+            );
+            lookup.insert(
+                (
+                    format!("{}.{}", helper.unit, definition.trait_name),
+                    rendered_for_type,
+                ),
+                definition.clone(),
+            );
+        }
+    }
+    Ok(lookup)
 }
 
 pub(super) fn lower_type_alias_items(

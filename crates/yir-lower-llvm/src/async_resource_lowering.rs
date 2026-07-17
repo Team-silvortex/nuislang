@@ -4,8 +4,8 @@ use super::{
     facts::propagate_known_facts,
     fresh_reg,
     value_ref::{coerce_to_i64, get_mutex, get_mutex_guard, get_task, get_task_result, get_thread},
-    LlvmLoweringState, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef, TaskLlvmValueRef,
-    TaskResultLlvmValueRef, ThreadLlvmValueRef,
+    LlvmLoweringState, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef, StructLlvmValueRef,
+    TaskLlvmValueRef, TaskResultLlvmValueRef, ThreadLlvmValueRef,
 };
 
 pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
@@ -39,6 +39,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 state.last_cpu_value = Some(as_i64);
             }
             propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
+            propagate_value_field_facts(&node.op.args[0], &node.name, &value_ref, &mut state.facts);
             true
         }
         "spawn_task" => {
@@ -52,10 +53,11 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
             state.registers.insert(
                 node.name.clone(),
                 LlvmValueRef::Task(TaskLlvmValueRef {
-                    value: Box::new(value_ref),
+                    value: Box::new(value_ref.clone()),
                 }),
             );
             propagate_known_facts(&node.op.args[1], &node.name, &mut state.facts);
+            propagate_value_field_facts(&node.op.args[1], &node.name, &value_ref, &mut state.facts);
             true
         }
         "spawn_thread" | "thread_spawn" => {
@@ -259,5 +261,35 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
             true
         }
         _ => false,
+    }
+}
+
+fn propagate_value_field_facts(
+    from: &str,
+    to: &str,
+    value_ref: &LlvmValueRef,
+    facts: &mut super::KnownFacts,
+) {
+    match value_ref {
+        LlvmValueRef::Struct(struct_value) => {
+            propagate_struct_field_facts(from, to, struct_value, facts);
+        }
+        LlvmValueRef::VariantUnion(union) => {
+            for struct_value in union.variants.values() {
+                propagate_struct_field_facts(from, to, struct_value, facts);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn propagate_struct_field_facts(
+    from: &str,
+    to: &str,
+    struct_value: &StructLlvmValueRef,
+    facts: &mut super::KnownFacts,
+) {
+    for (field_name, _) in &struct_value.fields {
+        facts.copy_field_facts(from, to, field_name);
     }
 }

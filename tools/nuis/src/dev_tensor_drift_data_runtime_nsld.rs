@@ -170,6 +170,10 @@ pub(crate) const DEV_TENSOR_RUNTIME_NSLD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
             "final_output_nsdb_replay_checkpoint_count",
             "final_output_nsdb_replayable_checkpoint_count",
             "handoff-payload-trace-to-nsdb",
+            "object_package_summary_contract",
+            "nsld-object-package-summary-v1",
+            "object_package_summary_status",
+            "object_package_summary_replay_status",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -227,11 +231,15 @@ pub(crate) const DEV_TENSOR_RUNTIME_NSLD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
         required_patterns: &[
             "run_artifact_json_reports_ready_after_final_pipeline_exists",
             "run_artifact_json_blocks_missing_backend_payload_replay_gate",
-            "backend-artifact-payload:missing",
+            "payload-execution-replay:blocked-checkpoint",
             "nsdb-payload-execution-replay-plan-v1",
             "nsld_final_executable_output_nsdb_replay_ready",
             "nsld_final_executable_output_nsdb_replay_status",
             "nsld_final_executable_output_nsdb_replay_first_blocker",
+            "nsld_final_executable_output_object_package_contract",
+            "nsld_final_executable_output_object_package_ready",
+            "nsld_final_executable_output_debugger_transcript_contract",
+            "nsld_final_executable_output_debugger_transcript_ready",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -242,6 +250,10 @@ pub(crate) const DEV_TENSOR_RUNTIME_NSLD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
             "nsld_final_executable_output_nsdb_replay_ready",
             "nsld_final_executable_output_nsdb_replay_status",
             "nsld_final_executable_output_nsdb_replay_first_blocker",
+            "nsld_final_executable_output_object_package_contract",
+            "nsld_final_executable_output_object_package_ready",
+            "nsld_final_executable_output_debugger_transcript_contract",
+            "nsld_final_executable_output_debugger_transcript_ready",
         ],
     },
     DevTensorDriftCheckSpec {

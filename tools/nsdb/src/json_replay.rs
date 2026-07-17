@@ -6,6 +6,18 @@ use crate::replay::{build_replay_plan, NsdbReplayCheckpoint};
 
 pub(crate) fn nsdb_replay_plan_json(report: &NsdbInspectReport) -> String {
     let plan = build_replay_plan(report);
+    let debugger_transcript_ready =
+        plan.status == "ready" && plan.replayable_checkpoint_count == plan.checkpoint_count;
+    let debugger_transcript_status = if debugger_transcript_ready {
+        "transcript-ready"
+    } else {
+        "transcript-blocked"
+    };
+    let debugger_transcript_next_action = if debugger_transcript_ready {
+        "consume-nsdb-yir-replay-transcript"
+    } else {
+        "resolve-nsdb-yir-replay-transcript"
+    };
     let fields = vec![
         json_string_field("tool", "nsdb"),
         json_string_field("kind", "nsdb_payload_execution_replay_plan"),
@@ -52,6 +64,24 @@ pub(crate) fn nsdb_replay_plan_json(report: &NsdbInspectReport) -> String {
                 .hetero_execution_closure_next_action,
         ),
         json_string_field("replay_status", &plan.status),
+        json_string_field(
+            "debugger_transcript_contract",
+            "nsdb-yir-replay-transcript-v1",
+        ),
+        json_string_field("debugger_transcript_status", debugger_transcript_status),
+        json_bool_field("debugger_transcript_ready", debugger_transcript_ready),
+        json_string_field(
+            "debugger_transcript_source_contract",
+            "nsdb-payload-execution-replay-plan-v1",
+        ),
+        json_string_field(
+            "debugger_transcript_next_action",
+            debugger_transcript_next_action,
+        ),
+        json_optional_string_field(
+            "debugger_transcript_first_blocker",
+            plan.first_blocker.as_deref(),
+        ),
         json_usize_field("replay_checkpoint_count", plan.checkpoint_count),
         json_usize_field("replay_event_query_result_count", plan.checkpoint_count),
         json_usize_field(

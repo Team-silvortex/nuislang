@@ -220,18 +220,56 @@ pub fn lower_project_ast_to_nir(
     local_modules: &[AstModule],
 ) -> Result<NirModule, String> {
     let expanded_module = expand_module_lambdas(module)?;
+    let expanded_local_modules = local_modules
+        .iter()
+        .map(expand_module_lambdas)
+        .collect::<Result<Vec<_>, _>>()?;
     let local_cpu_helpers = expanded_module
         .uses
         .iter()
         .filter(|item| item.domain == expanded_module.domain)
         .filter_map(|item| {
-            local_modules
+            expanded_local_modules
                 .iter()
                 .find(|candidate| candidate.domain == item.domain && candidate.unit == item.unit)
         })
         .collect::<Vec<_>>();
     let visible_type_aliases = build_visible_type_alias_map(&expanded_module, &local_cpu_helpers)?;
-    let expanded_module = expand_higher_order_functions(&expanded_module, &visible_type_aliases)?;
+    let mut higher_order_expansion_module = expanded_module.clone();
+    for helper in &local_cpu_helpers {
+        higher_order_expansion_module.functions.extend(
+            helper
+                .functions
+                .iter()
+                .filter(|function| is_public_visibility(function.visibility))
+                .filter(|function| {
+                    function.params.iter().any(|param| {
+                        higher_order::is_callable_type_with_aliases(
+                            &param.ty,
+                            &visible_type_aliases,
+                        )
+                        .unwrap_or(false)
+                    })
+                })
+                .cloned(),
+        );
+    }
+    let expanded_module =
+        expand_higher_order_functions(&higher_order_expansion_module, &visible_type_aliases)?;
+    let expanded_local_modules = expanded_local_modules
+        .into_iter()
+        .map(|helper| expand_higher_order_functions(&helper, &visible_type_aliases))
+        .collect::<Result<Vec<_>, _>>()?;
+    let local_cpu_helpers = expanded_module
+        .uses
+        .iter()
+        .filter(|item| item.domain == expanded_module.domain)
+        .filter_map(|item| {
+            expanded_local_modules
+                .iter()
+                .find(|candidate| candidate.domain == item.domain && candidate.unit == item.unit)
+        })
+        .collect::<Vec<_>>();
     let expanded_module = expand_effectful_match_scrutinees(&expanded_module);
     let expanded_module = rewrite_text_handle_helpers(&expanded_module);
     let module = &expanded_module;
@@ -262,7 +300,7 @@ pub fn lower_project_ast_to_nir(
     let generic_templates = initial_signatures.generic_templates;
     let concrete_module_functions = initial_signatures.concrete_module_functions;
     let module_struct_table = build_module_struct_table(module);
-    let impl_lookup = build_impl_lookup(module, &visible_type_aliases)?;
+    let impl_lookup = build_impl_lookup(module, &local_cpu_helpers, &visible_type_aliases)?;
     validate_ast_generic_constraints(
         module,
         &local_cpu_helpers,

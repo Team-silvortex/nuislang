@@ -368,6 +368,66 @@ pub(super) fn nsld_tail_json_fields(
                 .as_ref()
                 .and_then(|summary| summary.nsdb_replay_first_blocker.as_deref()),
         ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_object_package_contract",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.object_package_summary_contract.as_str()),
+        ),
+        crate::json_bool_field(
+            "nsld_final_executable_output_object_package_ready",
+            final_output_summary
+                .as_ref()
+                .is_some_and(|summary| summary.object_package_summary_ready),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_object_package_status",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.object_package_summary_status.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_object_package_next_action",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.object_package_summary_next_action.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_object_package_next_command",
+            final_output_summary
+                .as_ref()
+                .and_then(|summary| summary.object_package_summary_next_command.as_deref()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_transcript_contract",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.debugger_transcript_contract.as_str()),
+        ),
+        crate::json_bool_field(
+            "nsld_final_executable_output_debugger_transcript_ready",
+            final_output_summary
+                .as_ref()
+                .is_some_and(|summary| summary.debugger_transcript_ready),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_transcript_status",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.debugger_transcript_status.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_transcript_next_action",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.debugger_transcript_next_action.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_transcript_first_blocker",
+            final_output_summary
+                .as_ref()
+                .and_then(|summary| summary.debugger_transcript_first_blocker.as_deref()),
+        ),
         crate::json_bool_field(
             "nsld_final_executable_output_path_present",
             final_output_summary

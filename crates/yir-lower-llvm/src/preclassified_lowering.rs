@@ -156,6 +156,11 @@ pub(crate) fn lower_cpu_aggregate_node(node: &Node, state: &mut LlvmLoweringStat
                 node.name.clone(),
                 LlvmValueRef::Struct(StructLlvmValueRef { type_name, fields }),
             );
+            if variant_parent_name(&node.op.args[0]).is_some() {
+                state
+                    .facts
+                    .record_variant_type(node.name.clone(), node.op.args[0].clone());
+            }
             true
         }
         "field" => {
@@ -214,10 +219,27 @@ pub(crate) fn lower_cpu_aggregate_node(node: &Node, state: &mut LlvmLoweringStat
             if let LlvmValueRef::Bool { i64, .. } = &bool_ref {
                 state.last_cpu_value = Some(i64.clone());
             }
-            if let LlvmValueRef::Struct(struct_value) = &value_ref {
-                state
-                    .facts
-                    .record_bool(node.name.clone(), struct_value.type_name == *variant_name);
+            match &value_ref {
+                LlvmValueRef::Struct(struct_value) => {
+                    state
+                        .facts
+                        .record_bool(node.name.clone(), struct_value.type_name == *variant_name);
+                }
+                LlvmValueRef::VariantUnion(union) => {
+                    if let Ok(tag) = union.tag_i64.parse::<i64>() {
+                        state.facts.record_bool(
+                            node.name.clone(),
+                            tag == super::variant_select::variant_tag_value(variant_name),
+                        );
+                    } else if let Some(active_variant) =
+                        state.facts.get_variant_type(&node.op.args[0])
+                    {
+                        state
+                            .facts
+                            .record_bool(node.name.clone(), active_variant == variant_name);
+                    }
+                }
+                _ => {}
             }
             state.registers.insert(node.name.clone(), bool_ref);
             true

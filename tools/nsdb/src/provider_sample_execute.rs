@@ -6,8 +6,10 @@ use crate::{
         read_device_provider_sample_manifest_info, DEVICE_PROVIDER_SAMPLE_PROTOCOL,
         DEVICE_PROVIDER_SAMPLE_SCHEMA,
     },
+    provider_sample_execution::provider_execution_outcome,
     provider_sample_payload::{
-        fnv1a64_hex, provider_output_payload_file_name, render_real_device_provider_output_payload,
+        fnv1a64_hex, pixelmagic_native_output_summary, provider_output_payload_file_name,
+        render_real_device_provider_output_payload,
     },
 };
 use std::{collections::BTreeSet, fs, path::Path};
@@ -27,6 +29,14 @@ pub struct ProviderSampleExecuteReport {
     pub first_provider_runner_real_device_probe_status: String,
     pub first_provider_execution_mode: String,
     pub first_output_payload_evidence: String,
+    pub first_output_payload_comparison_contract: String,
+    pub first_output_payload_comparison_status: String,
+    pub first_output_payload_input_evidence: String,
+    pub first_output_payload_input_evidence_hash: String,
+    pub first_output_payload_native_output_kind: String,
+    pub first_output_payload_native_output_status: String,
+    pub first_output_payload_native_output_bytes: String,
+    pub first_output_payload_native_output_hash: String,
     pub next_action: String,
     pub next_command: String,
 }
@@ -68,6 +78,7 @@ pub fn execute_provider_samples(
         .first()
         .map(|record| {
             let adapter = select_provider_runner_adapter(&record.provider_family);
+            let outcome = provider_execution_outcome(&adapter);
             (
                 record.provider_family.clone(),
                 adapter.adapter_id.to_owned(),
@@ -75,6 +86,19 @@ pub fn execute_provider_samples(
                 adapter.real_device_capable,
                 provider_runner_real_device_probe_status(&record.provider_family).to_owned(),
                 adapter.execution_mode.to_owned(),
+                outcome.contract.to_owned(),
+                record.input_evidence.clone(),
+                fnv1a64_hex(record.input_evidence.as_bytes()),
+                pixelmagic_native_output_summary(&record.input_evidence, &record.provider_family)
+                    .map(|summary| (summary.kind, summary.status, summary.bytes, summary.hash))
+                    .unwrap_or_else(|| {
+                        (
+                            "none".to_owned(),
+                            "none".to_owned(),
+                            "none".to_owned(),
+                            "none".to_owned(),
+                        )
+                    }),
             )
         })
         .unwrap_or_else(|| {
@@ -85,6 +109,15 @@ pub fn execute_provider_samples(
                 false,
                 "none".to_owned(),
                 "none".to_owned(),
+                "none".to_owned(),
+                "none".to_owned(),
+                "none".to_owned(),
+                (
+                    "none".to_owned(),
+                    "none".to_owned(),
+                    "none".to_owned(),
+                    "none".to_owned(),
+                ),
             )
         });
     let mut output_payloads = Vec::new();
@@ -95,6 +128,9 @@ pub fn execute_provider_samples(
         }
         output_payloads.push(write_provider_output_payload(output_dir, record, &adapter)?);
     }
+    let first_output_payload_comparison_status =
+        output_payload_comparison_status(!output_payloads.is_empty(), &first_provider_boundary.2)
+            .to_owned();
     Ok(ProviderSampleExecuteReport {
         status: if output_payloads.is_empty() {
             "no-real-device-provider-output".to_owned()
@@ -117,12 +153,30 @@ pub fn execute_provider_samples(
             .first()
             .cloned()
             .unwrap_or_else(|| "none".to_owned()),
+        first_output_payload_comparison_contract: first_provider_boundary.6,
+        first_output_payload_comparison_status,
+        first_output_payload_input_evidence: first_provider_boundary.7,
+        first_output_payload_input_evidence_hash: first_provider_boundary.8,
+        first_output_payload_native_output_kind: first_provider_boundary.9 .0,
+        first_output_payload_native_output_status: first_provider_boundary.9 .1,
+        first_output_payload_native_output_bytes: first_provider_boundary.9 .2,
+        first_output_payload_native_output_hash: first_provider_boundary.9 .3,
         next_action: "materialize-provider-samples".to_owned(),
         next_command: format!(
             "nsdb materialize-provider-samples {} --json",
             output_dir.display()
         ),
     })
+}
+
+fn output_payload_comparison_status(payload_ready: bool, capability_status: &str) -> &'static str {
+    if payload_ready {
+        "ready-for-comparison"
+    } else if capability_status == "registered-real-device" {
+        "awaiting-provider-output-payload"
+    } else {
+        "host-fallback-output-comparison-deferred"
+    }
 }
 
 fn write_provider_output_payload(

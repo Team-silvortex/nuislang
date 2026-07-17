@@ -224,6 +224,38 @@ fn run() -> Result<(), String> {
                     report.first_output_payload_evidence
                 );
                 println!(
+                    "device_provider_sample_execute_first_output_payload_comparison_contract: {}",
+                    report.first_output_payload_comparison_contract
+                );
+                println!(
+                    "device_provider_sample_execute_first_output_payload_comparison_status: {}",
+                    report.first_output_payload_comparison_status
+                );
+                println!(
+                    "device_provider_sample_execute_first_output_payload_input_evidence: {}",
+                    report.first_output_payload_input_evidence
+                );
+                println!(
+                    "device_provider_sample_execute_first_output_payload_input_evidence_hash: {}",
+                    report.first_output_payload_input_evidence_hash
+                );
+                println!(
+                    "device_provider_sample_execute_first_output_payload_native_output_kind: {}",
+                    report.first_output_payload_native_output_kind
+                );
+                println!(
+                    "device_provider_sample_execute_first_output_payload_native_output_status: {}",
+                    report.first_output_payload_native_output_status
+                );
+                println!(
+                    "device_provider_sample_execute_first_output_payload_native_output_bytes: {}",
+                    report.first_output_payload_native_output_bytes
+                );
+                println!(
+                    "device_provider_sample_execute_first_output_payload_native_output_hash: {}",
+                    report.first_output_payload_native_output_hash
+                );
+                println!(
                     "device_provider_sample_execute_next_action: {}",
                     report.next_action
                 );
@@ -283,7 +315,7 @@ fn provider_sample_execute_json(
     report: &provider_sample_execute::ProviderSampleExecuteReport,
 ) -> String {
     format!(
-        "{{\"tool\":\"nsdb\",\"kind\":\"device_provider_sample_execute\",\"status\":\"{}\",\"provider_family_filter\":{},\"provider_families\":{},\"record_count\":{},\"matched_record_count\":{},\"executable_record_count\":{},\"output_payload_count\":{},\"first_provider_family\":\"{}\",\"first_provider_runner_adapter_id\":\"{}\",\"first_provider_runner_adapter_capability_status\":\"{}\",\"first_provider_runner_real_device_capable\":{},\"first_provider_runner_real_device_probe_status\":\"{}\",\"first_provider_execution_mode\":\"{}\",\"first_output_payload_evidence\":\"{}\",\"next_action\":\"{}\",\"next_command\":\"{}\"}}",
+        "{{\"tool\":\"nsdb\",\"kind\":\"device_provider_sample_execute\",\"status\":\"{}\",\"provider_family_filter\":{},\"provider_families\":{},\"record_count\":{},\"matched_record_count\":{},\"executable_record_count\":{},\"output_payload_count\":{},\"first_provider_family\":\"{}\",\"first_provider_runner_adapter_id\":\"{}\",\"first_provider_runner_adapter_capability_status\":\"{}\",\"first_provider_runner_real_device_capable\":{},\"first_provider_runner_real_device_probe_status\":\"{}\",\"first_provider_execution_mode\":\"{}\",\"first_output_payload_evidence\":\"{}\",\"first_output_payload_comparison_contract\":\"{}\",\"first_output_payload_comparison_status\":\"{}\",\"first_output_payload_input_evidence\":\"{}\",\"first_output_payload_input_evidence_hash\":\"{}\",\"first_output_payload_native_output_kind\":\"{}\",\"first_output_payload_native_output_status\":\"{}\",\"first_output_payload_native_output_bytes\":\"{}\",\"first_output_payload_native_output_hash\":\"{}\",\"next_action\":\"{}\",\"next_command\":\"{}\"}}",
         json_escape(&report.status),
         json_optional_string(report.provider_family_filter.as_deref()),
         json_string_array(&report.provider_families),
@@ -298,6 +330,14 @@ fn provider_sample_execute_json(
         json_escape(&report.first_provider_runner_real_device_probe_status),
         json_escape(&report.first_provider_execution_mode),
         json_escape(&report.first_output_payload_evidence),
+        json_escape(&report.first_output_payload_comparison_contract),
+        json_escape(&report.first_output_payload_comparison_status),
+        json_escape(&report.first_output_payload_input_evidence),
+        json_escape(&report.first_output_payload_input_evidence_hash),
+        json_escape(&report.first_output_payload_native_output_kind),
+        json_escape(&report.first_output_payload_native_output_status),
+        json_escape(&report.first_output_payload_native_output_bytes),
+        json_escape(&report.first_output_payload_native_output_hash),
         json_escape(&report.next_action),
         json_escape(&report.next_command),
     )
@@ -455,6 +495,15 @@ mod tests {
             first_provider_execution_mode: "real-device-provider-runner".to_owned(),
             first_output_payload_evidence:
                 "nuis.nsdb.provider-output.coreml-apple-ane.toml:hash=0x1:status=written".to_owned(),
+            first_output_payload_comparison_contract: "nuis-provider-execution-comparison-v1"
+                .to_owned(),
+            first_output_payload_comparison_status: "ready-for-comparison".to_owned(),
+            first_output_payload_input_evidence: "tensor:shape=1x4".to_owned(),
+            first_output_payload_input_evidence_hash: "0x1234".to_owned(),
+            first_output_payload_native_output_kind: "none".to_owned(),
+            first_output_payload_native_output_status: "none".to_owned(),
+            first_output_payload_native_output_bytes: "none".to_owned(),
+            first_output_payload_native_output_hash: "none".to_owned(),
             next_action: "materialize-provider-samples".to_owned(),
             next_command: "nsdb materialize-provider-samples out --json".to_owned(),
         };
@@ -474,5 +523,15 @@ mod tests {
             "\"first_provider_runner_real_device_probe_status\":\"real-device-candidate-available\""
         ));
         assert!(json.contains("\"first_provider_execution_mode\":\"real-device-provider-runner\""));
+        assert!(json.contains(
+            "\"first_output_payload_comparison_contract\":\"nuis-provider-execution-comparison-v1\""
+        ));
+        assert!(
+            json.contains("\"first_output_payload_comparison_status\":\"ready-for-comparison\"")
+        );
+        assert!(json.contains("\"first_output_payload_input_evidence\":\"tensor:shape=1x4\""));
+        assert!(json.contains("\"first_output_payload_input_evidence_hash\":\"0x1234\""));
+        assert!(json.contains("\"first_output_payload_native_output_kind\":\"none\""));
+        assert!(json.contains("\"first_output_payload_native_output_hash\":\"none\""));
     }
 }

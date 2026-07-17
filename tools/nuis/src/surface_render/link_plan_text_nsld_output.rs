@@ -243,6 +243,54 @@ pub(super) fn write_nsld_final_output_text_fields<W: fmt::Write>(
     )?;
     writeln!(
         out,
+        "  nsld_final_executable_output_object_package_contract: {}",
+        final_output.object_package_summary_contract
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_object_package_ready: {}",
+        crate::yes_no(final_output.object_package_summary_ready)
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_object_package_status: {}",
+        final_output.object_package_summary_status
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_object_package_next_action: {}",
+        final_output.object_package_summary_next_action
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_transcript_contract: {}",
+        final_output.debugger_transcript_contract
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_transcript_ready: {}",
+        crate::yes_no(final_output.debugger_transcript_ready)
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_transcript_status: {}",
+        final_output.debugger_transcript_status
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_transcript_next_action: {}",
+        final_output.debugger_transcript_next_action
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_transcript_first_blocker: {}",
+        final_output
+            .debugger_transcript_first_blocker
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
         "  nsld_final_executable_output_recommended_next_action: {}",
         final_output.recommended_next_action
     )?;

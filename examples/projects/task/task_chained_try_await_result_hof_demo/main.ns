@@ -1,0 +1,81 @@
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+
+  enum Error {
+    InvalidInput,
+  }
+
+  enum Result<T, E> {
+    Ok(T),
+    Err(E),
+  }
+
+  fn map_result<T, U, E>(result: Result<T, E>, mapper: Fn1<T, U>) -> Result<U, E> {
+    match result {
+      Result.Ok(value) => {
+        return Result.Ok(mapper(value));
+      }
+      Result.Err(error) => {
+        return Result.Err(error);
+      }
+    }
+  }
+
+  async fn work(seed: i64) -> i64 {
+    return seed;
+  }
+
+  fn fetch(seed: i64) -> Result<i64, Error> {
+    if seed <= 0 {
+      return Result.Err(Error.InvalidInput);
+    }
+    return Result.Ok(seed);
+  }
+
+  async fn normalize(seed: i64) -> Result<i64, Error> {
+    let base: i64 = fetch(seed)?;
+    return Result.Ok(await work(base + 1));
+  }
+
+  async fn decorate(seed: i64) -> Result<i64, Error> {
+    let normalized: Result<i64, Error> = await normalize(seed);
+    let mapped: Result<i64, Error> = map_result(
+      normalized,
+      |value: i64| -> i64 { return value + 2; }
+    );
+    return mapped;
+  }
+
+  async fn pipeline(seed: i64) -> Result<i64, Error> {
+    let decorated: i64 = (await decorate(seed))?;
+    let checked: i64 = fetch(decorated - 3)?;
+    let lifted: Result<i64, Error> = map_result(
+      Result.Ok(await work(checked + decorated)),
+      |value: i64| -> i64 { return value + 4; }
+    );
+    return lifted;
+  }
+
+  async fn main() -> i64 {
+    let argc: i64 = host_argv_count();
+    let ok_seed: i64 = argc + 2;
+    let err_seed: i64 = argc - 1;
+    let ok_result: Result<i64, Error> = await pipeline(ok_seed);
+    let err_result: Result<i64, Error> = await pipeline(err_seed);
+    match err_result {
+      Result.Ok(_) => {
+        return 99;
+      }
+      Result.Err(_) => {
+        match ok_result {
+          Result.Ok(value) => {
+            return value;
+          }
+          Result.Err(_) => {
+            return 0;
+          }
+        }
+      }
+    }
+  }
+}

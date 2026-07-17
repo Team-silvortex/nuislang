@@ -370,6 +370,10 @@ roadmap phrase. The current std evidence also includes the observable CLI smoke
 `run-artifact --json` prelaunch readiness, stdout/stderr report output from the
 host IO report lane, direct stdin consumption by the built binary, and
 `host_stdin_read` / `host_stdout_write` / `host_stderr_write` lowering anchors.
+The PixelMagic side of that lane now also keeps `std-preprocessed-pgm` input
+evidence visible through provider-sample materialization and
+`execute-provider-samples` comparison metadata, including the input evidence
+hash used by later shader output comparison.
 
 The language-core checks anchor the bootstrap-critical
 `language-core/nuisc/type-control-flow-generics` cell to:
@@ -378,6 +382,8 @@ The language-core checks anchor the bootstrap-critical
 * `examples/projects/task/task_result_enum_demo`
 * `examples/projects/state/generic_method_bound_guarded_nested_match_demo`
 * `examples/projects/state/glm_buffer_roundtrip_state_demo`
+* `examples/projects/state/std_style_language_bootstrap_demo`
+* `examples/projects/state/std_style_language_import_bootstrap_demo`
 
 That smoke is intentionally higher-level than an isolated parser or frontend
 unit test. It builds the project through the `nuis` CLI, checks the
@@ -389,10 +395,30 @@ It also builds and directly executes the generic trait-bound guarded nested
 match project and the GLM buffer roundtrip project. Those checks anchor
 monomorphized trait method calls (`impl.Addable.for.i64.add`), alias-expanded
 generic functions (`bump__i64`), buffer length/load/store/free lowering, and
-YIR lifetime/effect edges around `cpu.store_at` / `cpu.free`. The next gap is
-to combine these once-separate language proofs into a std-style helper workload
-that mixes `Result`, `Buffer`, lambdas, trait bounds, and pointer-heavy control
-flow in one project.
+YIR lifetime/effect edges around `cpu.store_at` / `cpu.free`. The same smoke
+now also builds and executes the chained try/await Result HOF project, which
+keeps `?` continuations alive across `normalize`, `decorate`, and `pipeline`
+helper boundaries, feeds dynamic `host_argv_count()` input into helper-side
+Result `?` continuations, asserts the produced native binary exit code, and
+checks the LLVM output contains no deferred lowering. Sequence-level early
+return folding now lifts `?` continuations to whole-Result selects instead of
+selecting between an Err struct and an Ok payload. The std-style language
+bootstrap workload now combines that dynamic Result path with Buffer
+load/store/free lowering, higher-order lambda specialization, trait-bound
+method calls, pointer borrow/free control flow, and async helper boundaries in
+one native executable, with a deterministic exit code and no LLVM deferred
+lowering. The import-boundary version now splits public helper enum/struct/type,
+generic `Result`/HOF helpers, and Buffer/pointer helpers into
+`StdStyleLanguageSupport`, consumes them through `use cpu
+StdStyleLanguageSupport`, verifies the project module/import reports, keeps
+entry-local trait-bound generic execution alive, and still produces the
+deterministic native exit code. Helper modules now participate in lambda/HOF
+expansion, helper public generic functions are visible as imported templates,
+and helper-private `__hof_` / `__lambda_` synthetic functions are retained for
+internal lowering. The next concrete gap is narrower: helper-module impl method
+emission still needs to support helper-local trait-bound method calls, and
+cross-helper expected-type inference should remove some explicit `Result.Ok` /
+`Result.Err` generic arguments.
 
 The Nustar checks anchor the bootstrap-critical
 `heterogeneous-runtime/nustar/registered-domain-contracts` cell to:
@@ -409,6 +435,19 @@ execution-readiness materialization for each heterogeneous domain. Nsld final
 output blocker ordering is still the next integration point; the current
 frontdoor deliberately exposes enough normalized facts for that step without
 hardcoding shader/kernel/network-specific logic.
+
+The native-binary checks anchor the bootstrap-critical
+`native-binary-system/nsb-nsld/self-owned-binary-assembly` cell to the shared
+Nsld final-output replay vocabulary. Nsld still owns the concrete object and
+package summaries, while Nsdb owns the YIR replay transcript contract, but Nuis
+frontdoors now mirror both as abstract readiness fields:
+`nsld_final_executable_output_object_package_*`,
+`nsld_final_executable_output_debugger_transcript_*`, and
+`closure_summary_*_debugger_transcript_*`. This keeps run-artifact, workflow,
+project-status, and release/build-report surfaces aligned without coupling the
+frontdoor to Mach-O, ELF, PE, or any one future object format. The next gap is
+to turn transcript-ready states into an actionable Nsdb replay/debugger command
+handoff rather than only exposing metadata.
 
 ## Current Role
 

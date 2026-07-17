@@ -8,7 +8,8 @@ use crate::provider_sample_payload::{
     provider_output_payload_from_record, provider_output_payload_summary,
 };
 // Replay JSON contract anchors live in json_replay.rs:
-// replay_hetero_execution_closure_status, replay_hetero_execution_closure_ready.
+// replay_hetero_execution_closure_status, replay_hetero_execution_closure_ready,
+// debugger_transcript_contract.
 pub(crate) use crate::json_replay::nsdb_replay_plan_json;
 
 pub(crate) fn nsdb_inspect_report_json(report: &NsdbInspectReport) -> String {

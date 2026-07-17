@@ -7,6 +7,10 @@ use super::{
     lower_type_ref_with_aliases,
 };
 
+fn is_helper_internal_synthetic(function: &AstFunction) -> bool {
+    function.name.starts_with("__hof_") || function.name.starts_with("__lambda_")
+}
+
 #[derive(Clone)]
 pub(super) struct FunctionSignature {
     pub(super) abi: String,
@@ -185,11 +189,9 @@ pub(super) fn build_initial_function_signatures(
     }
 
     for helper in local_cpu_helpers {
-        for function in helper
-            .functions
-            .iter()
-            .filter(|function| is_public_visibility(function.visibility))
-        {
+        for function in helper.functions.iter().filter(|function| {
+            is_public_visibility(function.visibility) || is_helper_internal_synthetic(function)
+        }) {
             let signature = FunctionSignature {
                 abi: "nuis".to_owned(),
                 interface: None,
@@ -212,6 +214,12 @@ pub(super) fn build_initial_function_signatures(
                 signature.clone(),
             );
             signatures.entry(function.name.clone()).or_insert(signature);
+            if !function.generic_params.is_empty() {
+                generic_templates.insert(function.name.clone(), function.clone());
+                let mut qualified = function.clone();
+                qualified.name = format!("{}.{}", helper.unit, function.name);
+                generic_templates.insert(qualified.name.clone(), qualified);
+            }
         }
     }
 

@@ -51,6 +51,16 @@ fn assert_file_contains(path: &Path, needle: &str, context: &str) {
     );
 }
 
+fn assert_file_not_contains(path: &Path, needle: &str, context: &str) {
+    let source = fs::read_to_string(path)
+        .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
+    assert!(
+        !source.contains(needle),
+        "expected {context} file {} not to contain `{needle}`\n{source}",
+        path.display()
+    );
+}
+
 fn assert_binary_exit(binary: &Path, expected: i32, context: &str) {
     let output = Command::new(binary)
         .output()
@@ -408,6 +418,371 @@ fn no_annotation_try_await_result_hof_project_anchors_language_bootstrap_smoke()
         &output_dir.join("task_no_annotation_try_await_result_hof_demo"),
         11,
         "no-annotation try/await Result HOF binary should execute Ok and Err paths",
+    );
+}
+
+#[test]
+fn chained_try_await_result_hof_project_anchors_language_bootstrap_smoke() {
+    let output_dir = temp_dir("chained_try_await_result_hof_bootstrap");
+    let output_dir_text = output_dir.display().to_string();
+    let source = fs::read_to_string(
+        "../../examples/projects/task/task_chained_try_await_result_hof_demo/main.ns",
+    )
+    .expect("read chained try/await Result HOF project source");
+    assert_contains(
+        &source,
+        "let ok_seed: i64 = argc + 2",
+        "chained try/await Result HOF project source",
+    );
+    assert_contains(
+        &source,
+        "let err_seed: i64 = argc - 1",
+        "chained try/await Result HOF project source",
+    );
+    assert_contains(
+        &source,
+        "let decorated: i64 = (await decorate(seed))?",
+        "chained try/await Result HOF project source",
+    );
+    assert_contains(
+        &source,
+        "let checked: i64 = fetch(decorated - 3)?",
+        "chained try/await Result HOF project source",
+    );
+    assert_contains(
+        &source,
+        "let lifted: Result<i64, Error> = map_result",
+        "chained try/await Result HOF project source",
+    );
+
+    let build = run_nuis(&[
+        "build",
+        "../../examples/projects/task/task_chained_try_await_result_hof_demo",
+        &output_dir_text,
+    ]);
+    assert_success(
+        &build,
+        "nuis build chained try/await Result HOF language bootstrap smoke",
+    );
+    assert_file_contains(
+        &output_dir.join("task_chained_try_await_result_hof_demo.nir.txt"),
+        "let ok_seed: i64 = (argc + 2)",
+        "chained try/await Result HOF NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("task_chained_try_await_result_hof_demo.nir.txt"),
+        "let err_seed: i64 = (argc - 1)",
+        "chained try/await Result HOF NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("task_chained_try_await_result_hof_demo.nir.txt"),
+        "let __nuis_try_result_1: Result<i64, Error> = await decorate(seed)",
+        "chained try/await Result HOF NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("task_chained_try_await_result_hof_demo.nir.txt"),
+        "__hof_map_result___lambda_pipeline_0__i64__i64__Error",
+        "chained try/await Result HOF NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("task_chained_try_await_result_hof_demo.yir"),
+        "host_argv_count",
+        "chained try/await Result HOF YIR",
+    );
+    assert_file_contains(
+        &output_dir.join("task_chained_try_await_result_hof_demo.yir"),
+        "cpu.async_value",
+        "chained try/await Result HOF YIR",
+    );
+    assert_file_contains(
+        &output_dir.join("task_chained_try_await_result_hof_demo.yir"),
+        "cpu.variant_is",
+        "chained try/await Result HOF YIR",
+    );
+    assert_file_not_contains(
+        &output_dir.join("task_chained_try_await_result_hof_demo.ll"),
+        "deferred lowering",
+        "chained try/await Result HOF LLVM",
+    );
+    let run_json = run_nuis(&["run-artifact", &output_dir_text, "--json"]);
+    assert_success(
+        &run_json,
+        "nuis run-artifact json chained try/await Result HOF language bootstrap smoke",
+    );
+    let run_json_stdout = String::from_utf8_lossy(&run_json.stdout);
+    assert_contains(
+        &run_json_stdout,
+        "\"run_artifact_prelaunch_status\":\"ready\"",
+        "chained try/await Result HOF run-artifact json",
+    );
+    assert_binary_exit(
+        &output_dir.join("task_chained_try_await_result_hof_demo"),
+        13,
+        "chained try/await Result HOF binary should preserve Ok and Err continuations",
+    );
+}
+
+#[test]
+fn std_style_language_project_combines_bootstrap_edges() {
+    let output_dir = temp_dir("std_style_language_bootstrap");
+    let output_dir_text = output_dir.display().to_string();
+    let source = fs::read_to_string(
+        "../../examples/projects/state/std_style_language_bootstrap_demo/main.ns",
+    )
+    .expect("read std-style language bootstrap project source");
+    assert_contains(
+        &source,
+        "type Mapper<T> = Fn1<T, T>",
+        "std-style language bootstrap source",
+    );
+    assert_contains(
+        &source,
+        "let first_value: i64 = if seed > 2",
+        "std-style language bootstrap source",
+    );
+    assert_contains(
+        &source,
+        "let head: ref Node = move(alloc_node(seed, null()))",
+        "std-style language bootstrap source",
+    );
+    assert_contains(
+        &source,
+        "let decorated: i64 = (await decorate(seed))?",
+        "std-style language bootstrap source",
+    );
+
+    let build = run_nuis(&[
+        "build",
+        "../../examples/projects/state/std_style_language_bootstrap_demo",
+        &output_dir_text,
+    ]);
+    assert_success(&build, "nuis build std-style language bootstrap smoke");
+
+    assert_file_contains(
+        &output_dir.join("std_style_language_bootstrap_demo.ast.txt"),
+        "trait Addable",
+        "std-style language bootstrap AST",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_bootstrap_demo.ast.txt"),
+        "enum Result<T, E>",
+        "std-style language bootstrap AST",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_bootstrap_demo.ast.txt"),
+        "ref Buffer",
+        "std-style language bootstrap AST",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_bootstrap_demo.ast.txt"),
+        "borrow(head)",
+        "std-style language bootstrap AST",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_bootstrap_demo.nir.txt"),
+        "let ok_seed: i64 = (argc + 2)",
+        "std-style language bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_bootstrap_demo.nir.txt"),
+        "let err_seed: i64 = (argc - 1)",
+        "std-style language bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_bootstrap_demo.nir.txt"),
+        "let __nuis_try_result_1: Result<i64, Error> = await decorate(seed)",
+        "std-style language bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_bootstrap_demo.nir.txt"),
+        "__hof_result_map___lambda_pipeline_0__i64__i64__Error",
+        "std-style language bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_bootstrap_demo.nir.txt"),
+        "impl.Addable.for.i64.add(item, item)",
+        "std-style language bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_bootstrap_demo.nir.txt"),
+        "let len: i64 = buffer_len(buffer)",
+        "std-style language bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_bootstrap_demo.yir"),
+        "host_argv_count",
+        "std-style language bootstrap YIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_bootstrap_demo.yir"),
+        "cpu.async_value",
+        "std-style language bootstrap YIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_bootstrap_demo.yir"),
+        "cpu.variant_is",
+        "std-style language bootstrap YIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_bootstrap_demo.yir"),
+        "cpu.store_at",
+        "std-style language bootstrap YIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_bootstrap_demo.yir"),
+        "cpu.load_at",
+        "std-style language bootstrap YIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_bootstrap_demo.yir"),
+        "cpu.borrow",
+        "std-style language bootstrap YIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_bootstrap_demo.yir"),
+        "edge lifetime",
+        "std-style language bootstrap YIR",
+    );
+    assert_file_not_contains(
+        &output_dir.join("std_style_language_bootstrap_demo.ll"),
+        "deferred lowering",
+        "std-style language bootstrap LLVM",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_bootstrap_demo.ll"),
+        "declare i64 @host_argv_count()",
+        "std-style language bootstrap LLVM",
+    );
+    assert_binary_exit(
+        &output_dir.join("std_style_language_bootstrap_demo"),
+        59,
+        "std-style language bootstrap binary should preserve dynamic Ok and Err paths",
+    );
+}
+
+#[test]
+fn std_style_language_import_project_crosses_module_boundary() {
+    let output_dir = temp_dir("std_style_language_import_bootstrap");
+    let output_dir_text = output_dir.display().to_string();
+    let source = fs::read_to_string(
+        "../../examples/projects/state/std_style_language_import_bootstrap_demo/main.ns",
+    )
+    .expect("read std-style language import bootstrap project source");
+    assert_contains(
+        &source,
+        "use cpu StdStyleLanguageSupport",
+        "std-style language import bootstrap source",
+    );
+    assert_contains(
+        &source,
+        "fn bump_local<T: Addable>",
+        "std-style language import bootstrap source",
+    );
+    assert_contains(
+        &source,
+        "let report: StdReport = build_report(base)",
+        "std-style language import bootstrap source",
+    );
+
+    let build = run_nuis(&[
+        "build",
+        "../../examples/projects/state/std_style_language_import_bootstrap_demo",
+        &output_dir_text,
+    ]);
+    assert_success(
+        &build,
+        "nuis build std-style language import bootstrap smoke",
+    );
+
+    assert_file_contains(
+        &output_dir.join("nuis.project.modules.txt"),
+        "support.ns\tmod cpu StdStyleLanguageSupport\tentry=false",
+        "std-style language import project modules",
+    );
+    assert_file_contains(
+        &output_dir.join("nuis.project.imports.txt"),
+        "use\tcpu.Main\tcpu.StdStyleLanguageSupport\tresolution=local-visible",
+        "std-style language import project imports",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_import_bootstrap_demo.ast.txt"),
+        "use cpu StdStyleLanguageSupport",
+        "std-style language import bootstrap AST",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_import_bootstrap_demo.nir.txt"),
+        "StdStyleLanguageSupport.fetch(seed)",
+        "std-style language import bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_import_bootstrap_demo.nir.txt"),
+        "let report: StdReport = StdStyleLanguageSupport.build_report(base)",
+        "std-style language import bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_import_bootstrap_demo.nir.txt"),
+        "__hof_result_map___lambda_pipeline_0__i64__i64__Error",
+        "std-style language import bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_import_bootstrap_demo.nir.txt"),
+        "StdStyleLanguageSupport.__hof_result_map___lambda_build_report_0__i64__i64__Error",
+        "std-style language import bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_import_bootstrap_demo.nir.txt"),
+        "ok__i64__Error(raw_score)",
+        "std-style language import bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_import_bootstrap_demo.nir.txt"),
+        "err__i64__Error(Error.InvalidInput",
+        "std-style language import bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_import_bootstrap_demo.nir.txt"),
+        "impl.Addable.for.i64.add(value, value)",
+        "std-style language import bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_import_bootstrap_demo.nir.txt"),
+        "let len: i64 = buffer_len(buffer)",
+        "std-style language import bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_import_bootstrap_demo.yir"),
+        "host_argv_count",
+        "std-style language import bootstrap YIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_import_bootstrap_demo.yir"),
+        "cpu.async_value",
+        "std-style language import bootstrap YIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_import_bootstrap_demo.yir"),
+        "cpu.store_at",
+        "std-style language import bootstrap YIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_import_bootstrap_demo.yir"),
+        "cpu.borrow",
+        "std-style language import bootstrap YIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_import_bootstrap_demo.yir"),
+        "edge lifetime",
+        "std-style language import bootstrap YIR",
+    );
+    assert_file_not_contains(
+        &output_dir.join("std_style_language_import_bootstrap_demo.ll"),
+        "deferred lowering",
+        "std-style language import bootstrap LLVM",
+    );
+    assert_binary_exit(
+        &output_dir.join("std_style_language_import_bootstrap_demo"),
+        59,
+        "std-style language import bootstrap binary should preserve imported helper semantics",
     );
 }
 

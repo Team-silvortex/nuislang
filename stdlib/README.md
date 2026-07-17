@@ -92,6 +92,11 @@ At the current repo stage:
 * provider samples now carry the `nuis-provider-runner-adapter-v1` adapter
   contract, adapter id, and capability status; the current host-simulated
   runner is therefore one registered adapter, not a baked-in backend limit
+* PixelMagic provider execution now lifts the std-preprocessed PGM marker into
+  deterministic native image output byte summaries (`native_output_bytes` and
+  `native_output_hash`) inside `execute-provider-samples` and provider output
+  payload files; this is still protocol-produced evidence, not yet a real Metal
+  kernel result
 
 Asset view by layer:
 

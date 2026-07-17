@@ -1,0 +1,180 @@
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+
+  trait Addable {
+    fn add(lhs: Self, rhs: Self) -> Self;
+  }
+
+  impl Addable for i64 {
+    fn add(lhs: i64, rhs: i64) -> i64 {
+      return lhs + rhs;
+    }
+  }
+
+  enum Error {
+    InvalidInput,
+  }
+
+  enum Result<T, E> {
+    Ok(T),
+    Err(E),
+  }
+
+  struct StdReport {
+    raw_score: i64,
+    mapped_score: i64,
+    pointer_score: i64,
+    final_score: i64
+  }
+
+  type Alias<T> = T;
+  type Mapper<T> = Fn1<T, T>;
+
+  fn apply<T: Addable>(value: T, mapper: Mapper<T>) -> T {
+    return mapper(value);
+  }
+
+  fn bump<T: Addable>(value: T) -> T {
+    return apply(value, |item: T| -> T { return item.add(item); });
+  }
+
+  fn ok<T, E>(value: T) -> Result<T, E> {
+    return Result.Ok(value);
+  }
+
+  fn err<T, E>(error: E) -> Result<T, E> {
+    return Result.Err(error);
+  }
+
+  fn result_map<T, R, E>(result: Result<T, E>, mapper: Fn1<T, R>) -> Result<R, E> {
+    match result {
+      Result.Ok(value) => {
+        return Result.Ok(mapper(value));
+      }
+      Result.Err(error) => {
+        return Result.Err(error);
+      }
+    }
+  }
+
+  fn result_unwrap_or<T, E>(result: Result<T, E>, fallback: T) -> T {
+    match result {
+      Result.Ok(value) => {
+        return value;
+      }
+      Result.Err(_) => {
+        return fallback;
+      }
+    }
+  }
+
+  fn fetch(seed: i64) -> Result<i64, Error> {
+    if seed <= 0 {
+      return Result.Err(Error.InvalidInput);
+    }
+    return Result.Ok(seed);
+  }
+
+  fn buffer_score(seed: i64) -> i64 {
+    let buffer: ref Buffer = alloc_buffer(4, 0);
+    let first_value: i64 = if seed > 2 { seed } else { 1 };
+    buffer[0] = first_value;
+    buffer[1] = bump(seed);
+    let len: i64 = buffer.len;
+    let value: i64 = buffer[0] + buffer[1];
+    free(buffer);
+    return value + len;
+  }
+
+  fn pointer_score(seed: i64) -> i64 {
+    let head: ref Node = move(alloc_node(seed, null()));
+    let observed: i64 = if seed > 2 {
+      let head_ref: ref Node = borrow(head);
+      let value: i64 = head_ref.value;
+      borrow_end(head_ref);
+      value
+    } else {
+      let head_ref: ref Node = borrow(head);
+      let value: i64 = head_ref.value + 1;
+      borrow_end(head_ref);
+      value
+    };
+    free(head);
+    return observed;
+  }
+
+  fn build_report(seed: Alias<i64>) -> StdReport {
+    let raw_score: i64 = buffer_score(seed);
+    let mapped_result: Result<i64, Error> =
+      result_map(ok(raw_score), |value: i64| -> i64 { return bump(value); });
+    let mapped_score: i64 = result_unwrap_or(mapped_result, 0);
+    let fallback_result: Result<i64, Error> =
+      result_map(err(Error.InvalidInput), |value: i64| -> i64 { return bump(value); });
+    let fallback_seed: i64 = if seed == 3 {
+      result_unwrap_or(fallback_result, 7)
+    } else {
+      let passthrough_result: Result<i64, Error> =
+        result_map(ok(seed), |value: i64| -> i64 { return value; });
+      result_unwrap_or(passthrough_result, 0)
+    };
+    let pointer_score_value: i64 = pointer_score(seed);
+    return StdReport {
+      raw_score: raw_score,
+      mapped_score: mapped_score,
+      pointer_score: pointer_score_value,
+      final_score: raw_score + mapped_score + pointer_score_value + fallback_seed
+    };
+  }
+
+  async fn work(seed: i64) -> i64 {
+    return seed;
+  }
+
+  async fn normalize(seed: i64) -> Result<i64, Error> {
+    let base: i64 = fetch(seed)?;
+    let report: StdReport = build_report(base);
+    return Result.Ok(await work(report.final_score + 1));
+  }
+
+  async fn decorate(seed: i64) -> Result<i64, Error> {
+    let normalized: Result<i64, Error> = await normalize(seed);
+    let mapped: Result<i64, Error> = result_map(
+      normalized,
+      |value: i64| -> i64 { return value + 2; }
+    );
+    return mapped;
+  }
+
+  async fn pipeline(seed: i64) -> Result<i64, Error> {
+    let decorated: i64 = (await decorate(seed))?;
+    let checked: i64 = fetch(decorated - 49)?;
+    let lifted: Result<i64, Error> = result_map(
+      Result.Ok(await work(checked + decorated)),
+      |value: i64| -> i64 { return value + 4; }
+    );
+    return lifted;
+  }
+
+  async fn main() -> i64 {
+    let argc: i64 = host_argv_count();
+    let ok_seed: i64 = argc + 2;
+    let err_seed: i64 = argc - 1;
+    let ok_result: Result<i64, Error> = await pipeline(ok_seed);
+    let err_result: Result<i64, Error> = await pipeline(err_seed);
+    match err_result {
+      Result.Ok(_) => {
+        return 99;
+      }
+      Result.Err(_) => {
+        match ok_result {
+          Result.Ok(value) => {
+            return value;
+          }
+          Result.Err(_) => {
+            return 0;
+          }
+        }
+      }
+    }
+  }
+}

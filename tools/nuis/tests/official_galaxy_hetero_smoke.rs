@@ -115,7 +115,7 @@ fn assert_official_galaxy_hetero_build(
                 "\"nsld_final_executable_output_nsdb_replay_next_command\":\"nsld final-executable-output "
             )
             && doctor_before_drive_stdout.contains(
-                "\"nsld_final_executable_output_nsdb_replay_first_blocker\":\"handoff-metadata-missing\""
+                "\"nsld_final_executable_output_nsdb_replay_first_blocker\":\"payload-execution-handoff-missing\""
             ),
         "official galaxy hetero artifact-doctor did not expose final-output replay blocked gate for {label}\n{doctor_before_drive_stdout}"
     );
@@ -274,10 +274,48 @@ fn assert_official_galaxy_hetero_build(
     assert!(executed
         .next_command
         .contains("nsdb materialize-provider-samples "));
+    assert_eq!(
+        executed.first_output_payload_comparison_contract,
+        "nuis-provider-execution-comparison-v1"
+    );
+    assert!(matches!(
+        executed.first_output_payload_comparison_status.as_str(),
+        "ready-for-comparison"
+            | "awaiting-provider-output-payload"
+            | "host-fallback-output-comparison-deferred"
+    ));
+    assert!(executed
+        .first_output_payload_input_evidence_hash
+        .starts_with("0x"));
+    if expects_std_pgm_marker {
+        assert!(
+            executed
+                .first_output_payload_input_evidence
+                .contains("std-preprocessed-pgm:input_bytes=20"),
+            "PixelMagic provider execution did not carry std input evidence\n{}",
+            executed.first_output_payload_input_evidence
+        );
+        assert_eq!(
+            executed.first_output_payload_native_output_kind,
+            "pixelmagic-image-bytes"
+        );
+        assert_eq!(
+            executed.first_output_payload_native_output_status,
+            "deterministic-provider-output-ready"
+        );
+        assert_eq!(executed.first_output_payload_native_output_bytes, "24");
+        assert!(executed
+            .first_output_payload_native_output_hash
+            .starts_with("0x"));
+    }
     if executed.output_payload_count == 0 {
         assert_eq!(executed.first_output_payload_evidence, "none");
     } else {
         assert_eq!(executed.status, "provider-output-payloads-ready");
+        assert_eq!(
+            executed.first_output_payload_comparison_status,
+            "ready-for-comparison"
+        );
         assert!(executed.first_output_payload_evidence.contains(&format!(
             "nuis.nsdb.provider-output.{provider_family_artifact}.toml:hash=0x"
         )));
@@ -425,6 +463,16 @@ fn assert_official_galaxy_hetero_build(
             &provider_output_payload_path,
             "std-preprocessed-pgm:input_bytes=20",
             "official galaxy provider output payload std image evidence",
+        );
+        assert_file_contains(
+            &provider_output_payload_path,
+            "native_output_kind = \"pixelmagic-image-bytes\"",
+            "official galaxy provider output payload native output kind",
+        );
+        assert_file_contains(
+            &provider_output_payload_path,
+            "native_output_bytes = \"24\"",
+            "official galaxy provider output payload native output bytes",
         );
     }
     assert!(provider_samples

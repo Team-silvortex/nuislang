@@ -5,6 +5,14 @@ pub(crate) struct FrontdoorClosureSummary {
     pub(crate) primary_blocker: Option<String>,
     pub(crate) next_action: String,
     pub(crate) next_command: Option<String>,
+    pub(crate) object_package_summary_contract: Option<String>,
+    pub(crate) object_package_summary_ready: Option<bool>,
+    pub(crate) object_package_summary_status: Option<String>,
+    pub(crate) debugger_transcript_contract: Option<String>,
+    pub(crate) debugger_transcript_ready: Option<bool>,
+    pub(crate) debugger_transcript_status: Option<String>,
+    pub(crate) debugger_transcript_next_action: Option<String>,
+    pub(crate) debugger_transcript_first_blocker: Option<String>,
 }
 
 impl FrontdoorClosureSummary {
@@ -38,6 +46,14 @@ impl FrontdoorClosureSummary {
             } else {
                 Some(recommended_command.to_owned())
             },
+            object_package_summary_contract: None,
+            object_package_summary_ready: None,
+            object_package_summary_status: None,
+            debugger_transcript_contract: None,
+            debugger_transcript_ready: None,
+            debugger_transcript_status: None,
+            debugger_transcript_next_action: None,
+            debugger_transcript_first_blocker: None,
         }
     }
 
@@ -55,6 +71,14 @@ impl FrontdoorClosureSummary {
             primary_blocker: if ready { None } else { Some(reason.to_owned()) },
             next_action: action.to_owned(),
             next_command: command.map(str::to_owned),
+            object_package_summary_contract: None,
+            object_package_summary_ready: None,
+            object_package_summary_status: None,
+            debugger_transcript_contract: None,
+            debugger_transcript_ready: None,
+            debugger_transcript_status: None,
+            debugger_transcript_next_action: None,
+            debugger_transcript_first_blocker: None,
         }
     }
 
@@ -76,6 +100,24 @@ impl FrontdoorClosureSummary {
                 primary_blocker: None,
                 next_action: "run-artifact-or-replay-nsdb".to_owned(),
                 next_command: final_output.nsdb_replay_next_command.clone(),
+                object_package_summary_contract: Some(
+                    final_output.object_package_summary_contract.clone(),
+                ),
+                object_package_summary_ready: Some(final_output.object_package_summary_ready),
+                object_package_summary_status: Some(
+                    final_output.object_package_summary_status.clone(),
+                ),
+                debugger_transcript_contract: Some(
+                    final_output.debugger_transcript_contract.clone(),
+                ),
+                debugger_transcript_ready: Some(final_output.debugger_transcript_ready),
+                debugger_transcript_status: Some(final_output.debugger_transcript_status.clone()),
+                debugger_transcript_next_action: Some(
+                    final_output.debugger_transcript_next_action.clone(),
+                ),
+                debugger_transcript_first_blocker: final_output
+                    .debugger_transcript_first_blocker
+                    .clone(),
             };
         }
         if final_output.ready && !final_output.nsdb_replay_ready {
@@ -95,9 +137,47 @@ impl FrontdoorClosureSummary {
                     .nsdb_replay_next_command
                     .clone()
                     .or_else(|| command.map(str::to_owned)),
+                object_package_summary_contract: Some(
+                    final_output.object_package_summary_contract.clone(),
+                ),
+                object_package_summary_ready: Some(final_output.object_package_summary_ready),
+                object_package_summary_status: Some(
+                    final_output.object_package_summary_status.clone(),
+                ),
+                debugger_transcript_contract: Some(
+                    final_output.debugger_transcript_contract.clone(),
+                ),
+                debugger_transcript_ready: Some(final_output.debugger_transcript_ready),
+                debugger_transcript_status: Some(final_output.debugger_transcript_status.clone()),
+                debugger_transcript_next_action: Some(
+                    final_output.debugger_transcript_next_action.clone(),
+                ),
+                debugger_transcript_first_blocker: final_output
+                    .debugger_transcript_first_blocker
+                    .clone(),
             };
         }
         Self::from_nsld_next_action(source, action, command, reason)
+            .with_final_output_closure_mirrors(final_output)
+    }
+
+    fn with_final_output_closure_mirrors(
+        mut self,
+        final_output: &crate::workflow::NsldFinalExecutableOutputBoundarySummary,
+    ) -> Self {
+        self.object_package_summary_contract =
+            Some(final_output.object_package_summary_contract.clone());
+        self.object_package_summary_ready = Some(final_output.object_package_summary_ready);
+        self.object_package_summary_status =
+            Some(final_output.object_package_summary_status.clone());
+        self.debugger_transcript_contract = Some(final_output.debugger_transcript_contract.clone());
+        self.debugger_transcript_ready = Some(final_output.debugger_transcript_ready);
+        self.debugger_transcript_status = Some(final_output.debugger_transcript_status.clone());
+        self.debugger_transcript_next_action =
+            Some(final_output.debugger_transcript_next_action.clone());
+        self.debugger_transcript_first_blocker =
+            final_output.debugger_transcript_first_blocker.clone();
+        self
     }
 
     pub(crate) fn with_nsld_drive_safe_next(
@@ -128,6 +208,14 @@ impl FrontdoorClosureSummary {
             )),
             next_action: "nsld-drive-safe-next".to_owned(),
             next_command: Some(command_set.safe_next_probe_json_command.clone()),
+            object_package_summary_contract: self.object_package_summary_contract,
+            object_package_summary_ready: self.object_package_summary_ready,
+            object_package_summary_status: self.object_package_summary_status,
+            debugger_transcript_contract: self.debugger_transcript_contract,
+            debugger_transcript_ready: self.debugger_transcript_ready,
+            debugger_transcript_status: self.debugger_transcript_status,
+            debugger_transcript_next_action: self.debugger_transcript_next_action,
+            debugger_transcript_first_blocker: self.debugger_transcript_first_blocker,
         }
     }
 
@@ -144,6 +232,38 @@ impl FrontdoorClosureSummary {
             crate::json_optional_string_field(
                 "closure_summary_next_command",
                 self.next_command.as_deref(),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_object_package_contract",
+                self.object_package_summary_contract.as_deref(),
+            ),
+            crate::json_optional_bool_field(
+                "closure_summary_object_package_ready",
+                self.object_package_summary_ready,
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_object_package_status",
+                self.object_package_summary_status.as_deref(),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_debugger_transcript_contract",
+                self.debugger_transcript_contract.as_deref(),
+            ),
+            crate::json_optional_bool_field(
+                "closure_summary_debugger_transcript_ready",
+                self.debugger_transcript_ready,
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_debugger_transcript_status",
+                self.debugger_transcript_status.as_deref(),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_debugger_transcript_next_action",
+                self.debugger_transcript_next_action.as_deref(),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_debugger_transcript_first_blocker",
+                self.debugger_transcript_first_blocker.as_deref(),
             ),
         ]
     }
@@ -172,6 +292,20 @@ mod tests {
         assert_eq!(
             summary.next_command.as_deref(),
             Some("nsdb replay-plan out --json")
+        );
+        assert_eq!(
+            summary.object_package_summary_contract.as_deref(),
+            Some("nsld-object-package-summary-v1")
+        );
+        assert_eq!(summary.object_package_summary_ready, Some(true));
+        assert_eq!(
+            summary.debugger_transcript_contract.as_deref(),
+            Some("nsdb-yir-replay-transcript-v1")
+        );
+        assert_eq!(summary.debugger_transcript_ready, Some(true));
+        assert_eq!(
+            summary.debugger_transcript_status.as_deref(),
+            Some("transcript-ready")
         );
     }
 
@@ -203,6 +337,15 @@ mod tests {
         assert_eq!(
             summary.next_command.as_deref(),
             Some("nsld final-executable-output out/nuis.build.manifest.toml --json")
+        );
+        assert_eq!(summary.object_package_summary_ready, Some(false));
+        assert_eq!(
+            summary.debugger_transcript_status.as_deref(),
+            Some("transcript-blocked")
+        );
+        assert_eq!(
+            summary.debugger_transcript_first_blocker.as_deref(),
+            Some("payload-execution-replay:no-checkpoints")
         );
     }
 
@@ -323,6 +466,47 @@ mod tests {
                 .to_owned(),
             ),
             nsdb_replay_first_blocker,
+            object_package_summary_contract: "nsld-object-package-summary-v1".to_owned(),
+            object_package_summary_ready: nsdb_replay_ready,
+            object_package_summary_status: if nsdb_replay_ready {
+                "replay-ready"
+            } else {
+                "replay-blocked"
+            }
+            .to_owned(),
+            object_package_summary_next_action: if nsdb_replay_ready {
+                "consume-object-package-summary"
+            } else {
+                "resolve-object-package-replay-evidence"
+            }
+            .to_owned(),
+            object_package_summary_next_command: Some(
+                if nsdb_replay_ready {
+                    "nsdb replay-plan out --json"
+                } else {
+                    "nsld final-executable-output out/nuis.build.manifest.toml --json"
+                }
+                .to_owned(),
+            ),
+            debugger_transcript_contract: "nsdb-yir-replay-transcript-v1".to_owned(),
+            debugger_transcript_ready: nsdb_replay_ready,
+            debugger_transcript_status: if nsdb_replay_ready {
+                "transcript-ready"
+            } else {
+                "transcript-blocked"
+            }
+            .to_owned(),
+            debugger_transcript_next_action: if nsdb_replay_ready {
+                "consume-nsdb-yir-replay-transcript"
+            } else {
+                "resolve-nsdb-yir-replay-transcript"
+            }
+            .to_owned(),
+            debugger_transcript_first_blocker: if nsdb_replay_ready {
+                None
+            } else {
+                Some("payload-execution-replay:no-checkpoints".to_owned())
+            },
             recommended_next_action: "run-artifact".to_owned(),
             path_present: true,
             nsld_owned: Some(true),

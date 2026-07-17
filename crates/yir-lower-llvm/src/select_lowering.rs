@@ -61,13 +61,36 @@ pub(crate) fn lower_cpu_select_node(
     let cond_bool = fresh_reg(next_reg);
     body.push(format!("  {cond_bool} = icmp ne i64 {cond}, 0"));
 
-    let Some(selected) = emit_select_value(&cond_bool, &then_value, &else_value, body, next_reg)
-    else {
-        body.push(format!(
-            "  ; deferred lowering for cpu.select `{}` because its branch values are not select-compatible in the current CPU LLVM slice",
-            node.name
-        ));
-        return Ok(true);
+    let selected = match emit_select_value(&cond_bool, &then_value, &else_value, body, next_reg) {
+        Some(selected) => selected,
+        None => {
+            if let Some(selected_name) =
+                const_select_condition(&node.op.args[0], &cond_value, facts).map(|condition| {
+                    if condition {
+                        node.op.args[1].as_str()
+                    } else {
+                        node.op.args[2].as_str()
+                    }
+                })
+            {
+                let selected = if selected_name == node.op.args[1] {
+                    then_value
+                } else {
+                    else_value
+                };
+                registers.insert(node.name.clone(), selected.clone());
+                record_known_selected_branch(node, selected_name, &selected, facts);
+                if let Some(as_i64) = coerce_to_i64(&selected, body, next_reg) {
+                    *last_cpu_value = Some(as_i64);
+                }
+                return Ok(true);
+            }
+            body.push(format!(
+                "  ; deferred lowering for cpu.select `{}` because its branch values are not select-compatible in the current CPU LLVM slice",
+                node.name
+            ));
+            return Ok(true);
+        }
     };
     registers.insert(node.name.clone(), selected.clone());
     record_known_select_value(node, &cond_value, &then_value, &else_value, facts);
@@ -139,7 +162,7 @@ fn lower_lazy_const_select(
     };
     delayed_registers.remove(unselected_name);
     registers.insert(node.name.clone(), selected.clone());
-    record_known_selected_branch(node, selected_name, facts);
+    record_known_selected_branch(node, selected_name, &selected, facts);
     if let Some(as_i64) = coerce_to_i64(&selected, body, next_reg) {
         *last_cpu_value = Some(as_i64);
     }
@@ -180,7 +203,12 @@ fn record_known_select_value(
             node.op.args[2].as_str()
         }
     }) {
-        record_known_selected_branch(node, selected_name, facts);
+        let selected_value = if selected_name == node.op.args[1] {
+            then_value
+        } else {
+            else_value
+        };
+        record_known_selected_branch(node, selected_name, selected_value, facts);
         return;
     }
 
@@ -212,12 +240,35 @@ fn record_known_select_value(
     }
 }
 
-fn record_known_selected_branch(node: &Node, selected_name: &str, facts: &mut KnownFacts) {
+fn record_known_selected_branch(
+    node: &Node,
+    selected_name: &str,
+    selected_value: &LlvmValueRef,
+    facts: &mut KnownFacts,
+) {
     if let Some(value) = facts.get_i64(selected_name) {
         facts.record_i64(node.name.clone(), value);
     }
     if let Some(value) = facts.get_bool(selected_name) {
         facts.record_bool(node.name.clone(), value);
+    }
+    if let Some(value) = facts.get_variant_type(selected_name).map(str::to_owned) {
+        facts.record_variant_type(node.name.clone(), value);
+    }
+    if let LlvmValueRef::Struct(struct_value) = selected_value {
+        for (field_name, _) in &struct_value.fields {
+            let from = KnownFacts::struct_field_key(selected_name, field_name);
+            let to = KnownFacts::struct_field_key(&node.name, field_name);
+            if let Some(value) = facts.get_i64(&from) {
+                facts.record_i64(to.clone(), value);
+            }
+            if let Some(value) = facts.get_bool(&from) {
+                facts.record_bool(to.clone(), value);
+            }
+            if let Some(value) = facts.get_variant_type(&from).map(str::to_owned) {
+                facts.record_variant_type(to.clone(), value);
+            }
+        }
     }
 }
 

@@ -77,6 +77,15 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
         owned_package_summary_next_action(report.final_output_nsdb_replay_ready).to_owned();
     report.owned_package_summary_next_command =
         report.final_output_nsdb_replay_next_command.clone();
+    report.object_package_summary_status =
+        owned_package_summary_status(report.final_output_nsdb_replay_ready).to_owned();
+    report.object_package_summary_ready = report.final_output_nsdb_replay_ready;
+    report.object_package_summary_replay_status = report.final_output_nsdb_replay_status.clone();
+    report.object_package_summary_replay_ready = report.final_output_nsdb_replay_ready;
+    report.object_package_summary_next_action =
+        owned_package_summary_next_action(report.final_output_nsdb_replay_ready).to_owned();
+    report.object_package_summary_next_command =
+        report.final_output_nsdb_replay_next_command.clone();
 }
 
 fn output_dir_from_handoff_path(path: &str) -> &Path {

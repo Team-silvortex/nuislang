@@ -379,15 +379,118 @@ pub(super) fn build_lowered_functions_and_impls(
     );
 
     for helper in local_cpu_helpers {
+        let helper_public_functions = helper
+            .functions
+            .iter()
+            .filter(|function| {
+                is_public_visibility(function.visibility) || is_helper_internal_synthetic(function)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        let helper_higher_order_templates = helper_public_functions
+            .iter()
+            .filter(|function| {
+                function.params.iter().any(|param| {
+                    is_callable_type_with_aliases(&param.ty, visible_type_aliases).unwrap_or(false)
+                })
+            })
+            .flat_map(|function| {
+                let mut qualified = function.clone();
+                qualified.name = format!("{}.{}", helper.unit, function.name);
+                [
+                    (function.name.clone(), function.clone()),
+                    (qualified.name.clone(), qualified),
+                ]
+            })
+            .collect::<BTreeMap<_, _>>();
+        let helper_function_table = helper_public_functions
+            .iter()
+            .flat_map(|function| {
+                let mut qualified = function.clone();
+                qualified.name = format!("{}.{}", helper.unit, function.name);
+                [
+                    (function.name.clone(), function.clone()),
+                    (qualified.name.clone(), qualified),
+                ]
+            })
+            .collect::<BTreeMap<_, _>>();
+        let mut helper_generic_templates = generic_templates.clone();
+        for function in helper_public_functions
+            .iter()
+            .filter(|function| !function.generic_params.is_empty())
+        {
+            helper_generic_templates.insert(function.name.clone(), function.clone());
+            let mut qualified = function.clone();
+            qualified.name = format!("{}.{}", helper.unit, function.name);
+            helper_generic_templates.insert(qualified.name.clone(), qualified);
+        }
+        let mut helper_specialized_functions = Vec::new();
+        let mut helper_specialized_signatures = Vec::new();
+        let mut helper_specialization_cache = BTreeSet::new();
+        let mut helper_rewritten_functions = Vec::new();
         for function in helper
             .functions
             .iter()
-            .filter(|function| is_public_visibility(function.visibility))
+            .filter(|function| {
+                is_public_visibility(function.visibility) || is_helper_internal_synthetic(function)
+            })
+            .filter(|function| function.generic_params.is_empty())
         {
-            let mut renamed = function.clone();
-            renamed.name = format!("{}.{}", helper.unit, function.name);
+            let rewritten = rewrite_generic_calls_in_function(GenericFunctionRewriteInput {
+                function,
+                module_const_env: &BTreeMap::new(),
+                visible_type_aliases,
+                generic_templates: &helper_generic_templates,
+                generic_impl_method_templates: &generic_impl_method_templates,
+                higher_order_templates: &helper_higher_order_templates,
+                function_table: &helper_function_table,
+                signatures,
+                impl_lookup,
+                struct_table: module_struct_table,
+                function_return_types: &inferred_function_return_types,
+                specialization_cache: &mut helper_specialization_cache,
+                specialized_functions: &mut helper_specialized_functions,
+                specialized_signatures: &mut helper_specialized_signatures,
+            })?;
+            let mut renamed = rewritten;
+            renamed.name = format!("{}.{}", helper.unit, renamed.name);
+            helper_rewritten_functions.push(renamed);
+        }
+        for (name, signature) in helper_specialized_signatures {
+            signatures.insert(name, signature);
+        }
+        lowered_functions.extend(
+            helper_rewritten_functions
+                .iter()
+                .map(|function| {
+                    lower_function(
+                        function,
+                        &module.domain,
+                        &helper.unit,
+                        helper_const_maps.get(&helper.unit).unwrap(),
+                        visible_type_aliases,
+                        signatures,
+                        struct_table,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        );
+        for mut function in helper_specialized_functions {
+            if function.return_type.is_none() {
+                if let Some(inferred_return_type) = infer_missing_function_return_type(
+                    &function,
+                    &BTreeMap::new(),
+                    impl_lookup,
+                    module_struct_table,
+                    &inferred_function_return_types,
+                )? {
+                    function.return_type = Some(inferred_return_type.clone());
+                    inferred_function_return_types
+                        .insert(function.name.clone(), Some(inferred_return_type));
+                }
+            }
             lowered_functions.push(lower_function(
-                &renamed,
+                &function,
                 &module.domain,
                 &helper.unit,
                 helper_const_maps.get(&helper.unit).unwrap(),
@@ -508,4 +611,8 @@ pub(super) fn build_lowered_functions_and_impls(
         traits: lowered_traits,
         impls: lowered_impls,
     })
+}
+
+fn is_helper_internal_synthetic(function: &AstFunction) -> bool {
+    function.name.starts_with("__hof_") || function.name.starts_with("__lambda_")
 }

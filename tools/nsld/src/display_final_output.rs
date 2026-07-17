@@ -433,6 +433,34 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         "  object_output_actual_hash: {}",
         optional_string_text(report.object_output_actual_hash.as_deref())
     );
+    println!(
+        "  object_package_summary_contract: {}",
+        report.object_package_summary_contract
+    );
+    println!(
+        "  object_package_summary_status: {}",
+        report.object_package_summary_status
+    );
+    println!(
+        "  object_package_summary_ready: {}",
+        report.object_package_summary_ready
+    );
+    println!(
+        "  object_package_summary_replay_status: {}",
+        report.object_package_summary_replay_status
+    );
+    println!(
+        "  object_package_summary_replay_ready: {}",
+        report.object_package_summary_replay_ready
+    );
+    println!(
+        "  object_package_summary_next_action: {}",
+        report.object_package_summary_next_action
+    );
+    println!(
+        "  object_package_summary_next_command: {}",
+        optional_string_text(report.object_package_summary_next_command.as_deref())
+    );
     for issue in &report.object_output_issues {
         println!("  object_output_issue: {issue}");
     }

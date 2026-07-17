@@ -338,12 +338,20 @@ fn hetero_execution_closure_summary(
     host_runner: &HostRunnerJsonSurface,
     backend_evidence: &crate::artifact_doctor::BackendArtifactPayloadEvidence,
 ) -> HeteroExecutionClosureSummary {
-    if !backend_evidence.available || backend_evidence.count == 0 {
+    if !backend_evidence.available {
         return hetero_execution_closure_blocked(
             "payload-missing",
             "backend-artifact-payload:missing",
             "materialize-backend-artifact-payload",
         );
+    }
+    if backend_evidence.count == 0 {
+        return HeteroExecutionClosureSummary {
+            status: "closed".to_owned(),
+            ready: true,
+            first_blocker: None,
+            next_action: "handoff-hetero-execution-evidence-to-nsdb".to_owned(),
+        };
     }
     if backend_evidence.present_count == 0 {
         return hetero_execution_closure_blocked(
@@ -434,7 +442,6 @@ fn hetero_execution_closure_blocked(
         next_action: next_action.to_owned(),
     }
 }
-
 fn launch_evidence_first_blocker(
     prelaunch: &crate::run_artifact::RunArtifactPrelaunchSummary,
     host_runner: &HostRunnerJsonSurface,

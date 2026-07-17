@@ -82,6 +82,10 @@ mod cpu Main {
         "\"nsld_final_executable_output_nsdb_replay_next_action\":\"replay-nsdb-payload-execution\""
     ));
     assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_first_blocker\":null"));
+    assert!(json.contains("\"nsld_final_executable_output_object_package_ready\":true"));
+    assert!(json.contains(
+        "\"nsld_final_executable_output_debugger_transcript_status\":\"transcript-ready\""
+    ));
 }
 
 #[test]

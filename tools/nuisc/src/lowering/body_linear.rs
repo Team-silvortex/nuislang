@@ -1,5 +1,7 @@
 use super::*;
 
+use crate::lowering::if_lowering::stmts_contain_conditional_effect_primitive;
+
 pub(in crate::lowering) fn lower_linear_stmts(
     stmts: &[NirStmt],
     state: &mut LoweringState<'_>,
@@ -42,7 +44,9 @@ pub(in crate::lowering) fn lower_inline_stmts(
     bindings: &mut BTreeMap<String, String>,
     const_bindings: &mut BTreeMap<String, NirExpr>,
 ) -> Result<Option<String>, String> {
-    for stmt in stmts {
+    let mut index = 0;
+    while index < stmts.len() {
+        let stmt = &stmts[index];
         match stmt {
             NirStmt::Let { name, value, .. } => {
                 let lowered = lower_expr(value, state, bindings)?;
@@ -97,6 +101,17 @@ pub(in crate::lowering) fn lower_inline_stmts(
                 then_body,
                 else_body,
             } => {
+                if let Some(returned) = lower_early_return_continuation_if(
+                    condition,
+                    then_body,
+                    else_body,
+                    &stmts[index + 1..],
+                    state,
+                    bindings,
+                    const_bindings,
+                )? {
+                    return Ok(Some(returned));
+                }
                 if let Some(returned) = lower_if_stmt(
                     condition,
                     then_body,
@@ -129,7 +144,62 @@ pub(in crate::lowering) fn lower_inline_stmts(
                 return Ok(returned);
             }
         }
+        index += 1;
     }
 
     Ok(None)
+}
+
+fn lower_early_return_continuation_if(
+    condition: &NirExpr,
+    then_body: &[NirStmt],
+    else_body: &[NirStmt],
+    tail: &[NirStmt],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+    const_bindings: &BTreeMap<String, NirExpr>,
+) -> Result<Option<String>, String> {
+    if tail.is_empty()
+        || stmts_contain_conditional_effect_primitive(else_body)
+        || stmts_contain_conditional_effect_primitive(tail)
+    {
+        return Ok(None);
+    }
+    let Some(PreparedTerminalBranch::Return(early_return)) =
+        prepare_terminal_branch(then_body, &state.pure_helpers)
+    else {
+        return Ok(None);
+    };
+    if else_body.is_empty()
+        || !else_body
+            .iter()
+            .any(|stmt| matches!(stmt, NirStmt::Let { .. } | NirStmt::Const { .. }))
+        || !else_body.iter().all(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Let { .. } | NirStmt::Const { .. } | NirStmt::Expr(_)
+            )
+        })
+    {
+        return Ok(None);
+    }
+
+    let condition_name = lower_expr(condition, state, bindings)?;
+    let early_return_name = lower_expr(&early_return, state, bindings)?;
+    let mut local_bindings = bindings.clone();
+    let Some(_) = lower_linear_stmts(else_body, state, &mut local_bindings)? else {
+        return Ok(None);
+    };
+    let mut local_const_bindings = const_bindings.clone();
+    let Some(tail_return_name) =
+        lower_inline_stmts(tail, state, &mut local_bindings, &mut local_const_bindings)?
+    else {
+        return Ok(None);
+    };
+    Ok(Some(lower_select(
+        condition_name,
+        early_return_name,
+        tail_return_name,
+        state,
+    )?))
 }

@@ -281,10 +281,7 @@ mod cpu Main {
     assert!(
         json.contains("\"nsld_final_executable_pipeline_first_missing_required_stage_path\":null")
     );
-    assert!(json.contains("\"nsld_self_owned_image_ready\":"));
     assert!(json.contains("\"nsld_self_owned_image_status\":"));
-    assert!(json.contains("\"nsld_entrypoint_materialization_status\":"));
-    assert!(json.contains("\"nsld_self_owned_image_path\":"));
     assert!(json.contains("\"nsld_final_executable_output_ready\":"));
     assert!(json.contains("\"nsld_final_executable_output_boundary_status\":"));
     assert!(json.contains("\"nsld_final_executable_output_materialization_status\":"));
@@ -313,7 +310,6 @@ mod cpu Main {
         "\"nsld_final_executable_output_device_provider_sample_manifest_blocked_record_count\":"
     ));
     assert!(json.contains("\"nsld_final_executable_output_recommended_next_action\":"));
-    assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
     assert!(json.contains("\"nsld_final_executable_output_object_valid\":"));
     assert!(json.contains("\"nsld_final_executable_output_object_path\":"));
@@ -486,6 +482,20 @@ mod cpu Main {
     assert!(json
         .contains("\"nsld_final_executable_output_nsdb_replay_next_command\":\"nsdb replay-plan "));
     assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_first_blocker\":null"));
+    for needle in [
+        "\"nsld_final_executable_output_object_package_contract\":\"nsld-object-package-summary-v1\"",
+        "\"nsld_final_executable_output_object_package_ready\":true",
+        "\"nsld_final_executable_output_object_package_status\":\"replay-ready\"",
+        "\"nsld_final_executable_output_debugger_transcript_contract\":\"nsdb-yir-replay-transcript-v1\"",
+        "\"nsld_final_executable_output_debugger_transcript_ready\":true",
+        "\"nsld_final_executable_output_debugger_transcript_status\":\"transcript-ready\"",
+        "\"closure_summary_object_package_ready\":true",
+        "\"closure_summary_debugger_transcript_contract\":\"nsdb-yir-replay-transcript-v1\"",
+        "\"closure_summary_debugger_transcript_ready\":true",
+        "\"closure_summary_debugger_transcript_status\":\"transcript-ready\"",
+    ] {
+        assert!(json.contains(needle));
+    }
     assert!(json.contains("\"nsld_self_owned_image_ready\":"));
     assert!(json.contains("\"nsld_self_owned_image_status\":"));
     assert!(json.contains("\"nsld_entrypoint_materialization_status\":"));
