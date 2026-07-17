@@ -84,7 +84,10 @@ If you only want the current task mainline, start with:
   [task_clock_observe_demo](task_clock_observe_demo),
   [task_scheduler_observe_demo](task_scheduler_observe_demo)
 * task/tooling bridge:
-  [task_cli_tooling_demo](task_cli_tooling_demo)
+  [task_cli_tooling_demo](task_cli_tooling_demo),
+  [std_language_task_cli_demo](std_language_task_cli_demo)
+  as the std-language-assisted task CLI bridge that feeds
+  `StdLanguageOps.build_report` into `StdTaskContracts` and a real stdout path
 * staged thread/lock route:
   [task_thread_mutex_demo](task_thread_mutex_demo)
   current note:

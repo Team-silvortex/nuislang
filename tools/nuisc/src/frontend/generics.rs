@@ -122,9 +122,11 @@ pub(crate) fn infer_generic_substitutions(
         ) {
             continue;
         }
+        let seeded_param_ty =
+            specialize_ast_type_ref_with_partial_substitutions(&resolved_param_ty, &substitutions);
         let pattern_arg_ty = infer_ast_expr_type_for_pattern(
             arg,
-            &resolved_param_ty,
+            &seeded_param_ty,
             &generic_names,
             env,
             impl_lookup,
@@ -175,7 +177,7 @@ pub(crate) fn infer_generic_substitutions(
             return Err(format!(
                 "generic function `{}` currently requires inferring concrete type for `{}` from direct parameter positions or explicit expected type",
                 template.name, generic.name
-            ));
+            ) + &generic_inference_context_suffix(context));
         };
         for bound in &generic.bounds {
             let concrete_ast = ast_type_from_nir(concrete);
@@ -194,7 +196,7 @@ pub(crate) fn infer_generic_substitutions(
             return Err(format!(
                 "generic function `{}` currently requires inferring concrete type for `{}` from direct parameter positions or explicit expected type",
                 template.name, predicate.param_name
-            ));
+            ) + &generic_inference_context_suffix(context));
         };
         let concrete_ast = ast_type_from_nir(concrete);
         for bound in &predicate.bounds {
@@ -209,6 +211,33 @@ pub(crate) fn infer_generic_substitutions(
         }
     }
     Ok(lowered_substitutions)
+}
+
+pub(crate) fn specialize_ast_type_ref_with_partial_substitutions(
+    ty: &AstTypeRef,
+    substitutions: &BTreeMap<String, AstTypeRef>,
+) -> AstTypeRef {
+    if ty.generic_args.is_empty() && !ty.is_optional && !ty.is_ref {
+        if let Some(concrete) = substitutions.get(&ty.name) {
+            return concrete.clone();
+        }
+    }
+    AstTypeRef {
+        name: ty.name.clone(),
+        generic_args: ty
+            .generic_args
+            .iter()
+            .map(|arg| specialize_ast_type_ref_with_partial_substitutions(arg, substitutions))
+            .collect(),
+        is_optional: ty.is_optional,
+        is_ref: ty.is_ref,
+    }
+}
+
+fn generic_inference_context_suffix(context: Option<&str>) -> String {
+    context
+        .map(|context| format!(" while specializing {context}"))
+        .unwrap_or_default()
 }
 
 pub(crate) fn infer_alias_aware_ast_expr_type(

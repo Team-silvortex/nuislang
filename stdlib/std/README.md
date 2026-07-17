@@ -98,6 +98,36 @@ Use these as the primary cluster names when placing new work:
     [task/README.md](task/README.md)
   - shortest lane route:
     `task_runtime_recipe -> task_lifecycle_recipe -> task_result_policy_recipe -> task_scheduler_recipe -> task_cli_recipe`
+* language contracts
+  - auto-injected contract modules:
+    `lib/language_core.ns -> lib/language_ops.ns`
+  - current smoke:
+    `std_language_galaxy_bootstrap_demo` consumes `StdLanguageCore` and
+    `StdLanguageOps` through `std=workspace`, proving reusable std-level
+    Result/HOF inference, helper-to-helper imports, trait-bound methods,
+    Buffer/pointer control flow, and native binary execution.
+  - current CLI-shaped consumer:
+    `std_language_cli_report_demo` combines those language contracts with
+    `StdTextContracts` and `StdIoContracts`, writes a real stdout report, and
+    keeps report/text/IO validation on the reusable std surface.
+  - current report-file consumer:
+    `std_language_report_file_demo` combines the same language contracts with
+    `StdReportContracts`, writes the report through an argv-selected output
+    file plus stdout, and validates the reusable report-file gates.
+  - current workflow consumer:
+    `std_language_workflow_demo` feeds `StdLanguageOps.build_report` into a
+    two-step host command workflow through `StdCliContracts`, proving the
+    Result/HOF/trait/memory helper surface can participate in command gates.
+  - current build-pipeline consumer:
+    `std_language_build_pipeline_demo` extends that command route into a
+    four-stage prepare/check/compile/package gate through
+    `StdCliContracts.build_pipeline_total` with no LLVM deferred lowering.
+  - current task CLI consumer:
+    `std_language_task_cli_demo` feeds the same language report into
+    `StdTaskContracts` and a task-backed stdout path; staged CPU task
+    intrinsic lowering now carries `timeout -> join_result -> task_value`
+    without LLVM deferred notes, while real scheduler/runtime semantics remain
+    the larger task/native closure gap.
 * filesystem/path/location
   - local router:
     [filesystem/README.md](filesystem/README.md)

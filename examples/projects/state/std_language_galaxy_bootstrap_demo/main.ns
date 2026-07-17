@@ -1,51 +1,29 @@
-use cpu StdStyleLanguageSupport;
+use cpu StdLanguageCore;
+use cpu StdLanguageOps;
 
 mod cpu Main {
   extern "c" fn host_argv_count() -> i64;
-
-  impl Addable for i64 {
-    fn add(lhs: i64, rhs: i64) -> i64 {
-      return lhs + rhs;
-    }
-  }
 
   async fn work(seed: i64) -> i64 {
     return seed;
   }
 
-  fn apply_local(value: i64, mapper: Fn1<i64, i64>) -> i64 {
-    return mapper(value);
-  }
-
-  fn bump_local<T: Addable>(value: T) -> T {
-    return value.add(value);
-  }
-
   async fn normalize(seed: i64) -> Result<i64, Error> {
     let base: i64 = fetch(seed)?;
-    let report: StdReport = build_report(base);
+    let report: StdLanguageReport = build_report(base);
     return Result.Ok(await work(report.final_score + 1));
   }
 
-  async fn decorate(seed: i64) -> Result<i64, Error> {
-    let normalized: Result<i64, Error> = await normalize(seed);
-    let mapped: Result<i64, Error> = result_map(
-      normalized,
-      |value: i64| -> i64 { return value + 2; }
-    );
-    return mapped;
-  }
-
   async fn pipeline(seed: i64) -> Result<i64, Error> {
-    let decorated: i64 = (await decorate(seed))?;
-    let checked: i64 = fetch(decorated - 49)?;
+    let normalized: i64 = (await normalize(seed))?;
+    let checked: i64 = fetch(normalized - 49)?;
     let lifted: Result<i64, Error> = result_map(
-      Result.Ok(await work(checked + decorated)),
-      |value: i64| -> i64 { return value + 4; }
+      ok(await work(checked + normalized)),
+      |value: i64| -> i64 { return value + bump(2); }
     );
     match lifted {
       Result.Ok(value) => {
-        return Result.Ok(value + bump_local(0));
+        return Result.Ok(value);
       }
       Result.Err(error) => {
         return Result.Err(error);

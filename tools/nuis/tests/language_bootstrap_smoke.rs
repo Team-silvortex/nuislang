@@ -668,6 +668,10 @@ fn std_style_language_import_project_crosses_module_boundary() {
         "../../examples/projects/state/std_style_language_import_bootstrap_demo/main.ns",
     )
     .expect("read std-style language import bootstrap project source");
+    let support_source = fs::read_to_string(
+        "../../examples/projects/state/std_style_language_import_bootstrap_demo/support.ns",
+    )
+    .expect("read std-style language import bootstrap support source");
     assert_contains(
         &source,
         "use cpu StdStyleLanguageSupport",
@@ -677,6 +681,18 @@ fn std_style_language_import_project_crosses_module_boundary() {
         &source,
         "fn bump_local<T: Addable>",
         "std-style language import bootstrap source",
+    );
+    assert!(
+        !source.contains("result_map<i64, i64, Error>")
+            && !support_source.contains("result_map<i64, i64, Error>"),
+        "std-style language import bootstrap should infer imported result_map generic arguments"
+    );
+    assert!(
+        !source.contains("ok<i64, Error>")
+            && !source.contains("err<i64, Error>")
+            && !support_source.contains("ok<i64, Error>")
+            && !support_source.contains("err<i64, Error>"),
+        "std-style language import bootstrap should infer imported Result helper constructor generic arguments"
     );
     assert_contains(
         &source,
@@ -731,6 +747,11 @@ fn std_style_language_import_project_crosses_module_boundary() {
     );
     assert_file_contains(
         &output_dir.join("std_style_language_import_bootstrap_demo.nir.txt"),
+        "fn StdStyleLanguageSupport.__lambda_build_report_0(value: i64) -> i64",
+        "std-style language import bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_import_bootstrap_demo.nir.txt"),
         "ok__i64__Error(raw_score)",
         "std-style language import bootstrap NIR",
     );
@@ -742,6 +763,11 @@ fn std_style_language_import_project_crosses_module_boundary() {
     assert_file_contains(
         &output_dir.join("std_style_language_import_bootstrap_demo.nir.txt"),
         "impl.Addable.for.i64.add(value, value)",
+        "std-style language import bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_import_bootstrap_demo.nir.txt"),
+        "impl.Addable.for.i64.add(item, item)",
         "std-style language import bootstrap NIR",
     );
     assert_file_contains(
@@ -783,6 +809,113 @@ fn std_style_language_import_project_crosses_module_boundary() {
         &output_dir.join("std_style_language_import_bootstrap_demo"),
         59,
         "std-style language import bootstrap binary should preserve imported helper semantics",
+    );
+}
+
+#[test]
+fn std_style_language_package_project_crosses_helper_to_helper_boundary() {
+    let output_dir = temp_dir("std_style_language_package_bootstrap");
+    let output_dir_text = output_dir.display().to_string();
+    let main_source = fs::read_to_string(
+        "../../examples/projects/state/std_style_language_package_bootstrap_demo/main.ns",
+    )
+    .expect("read std-style language package bootstrap main source");
+    let ops_source = fs::read_to_string(
+        "../../examples/projects/state/std_style_language_package_bootstrap_demo/ops.ns",
+    )
+    .expect("read std-style language package bootstrap ops source");
+    assert_contains(
+        &main_source,
+        "use cpu StdPkgCore",
+        "std-style language package bootstrap main source",
+    );
+    assert_contains(
+        &main_source,
+        "use cpu StdPkgOps",
+        "std-style language package bootstrap main source",
+    );
+    assert_contains(
+        &ops_source,
+        "use cpu StdPkgCore",
+        "std-style language package bootstrap ops source",
+    );
+    assert!(
+        !main_source.contains("result_map<i64, i64, Error>")
+            && !ops_source.contains("result_map<i64, i64, Error>")
+            && !main_source.contains("ok<i64, Error>")
+            && !ops_source.contains("ok<i64, Error>"),
+        "std-style language package bootstrap should infer helper-to-helper Result/HOF generic arguments"
+    );
+
+    let build = run_nuis(&[
+        "build",
+        "../../examples/projects/state/std_style_language_package_bootstrap_demo",
+        &output_dir_text,
+    ]);
+    assert_success(
+        &build,
+        "nuis build std-style language package bootstrap smoke",
+    );
+
+    assert_file_contains(
+        &output_dir.join("nuis.project.modules.txt"),
+        "core.ns\tmod cpu StdPkgCore\tentry=false",
+        "std-style language package project modules",
+    );
+    assert_file_contains(
+        &output_dir.join("nuis.project.modules.txt"),
+        "ops.ns\tmod cpu StdPkgOps\tentry=false",
+        "std-style language package project modules",
+    );
+    assert_file_contains(
+        &output_dir.join("nuis.project.imports.txt"),
+        "use\tcpu.StdPkgOps\tcpu.StdPkgCore\tresolution=local-visible",
+        "std-style language package project imports",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_package_bootstrap_demo.nir.txt"),
+        "StdPkgOps.__hof_result_map___lambda_build_report_0__i64__i64__Error",
+        "std-style language package bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_package_bootstrap_demo.nir.txt"),
+        "__hof_result_map___lambda_pipeline_0__i64__i64__Error",
+        "std-style language package bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_package_bootstrap_demo.nir.txt"),
+        "ok__i64__Error(raw_score)",
+        "std-style language package bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_package_bootstrap_demo.nir.txt"),
+        "err__i64__Error(Error.InvalidInput",
+        "std-style language package bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_package_bootstrap_demo.nir.txt"),
+        "impl.Addable.for.i64.add(item, item)",
+        "std-style language package bootstrap NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_package_bootstrap_demo.yir"),
+        "cpu.store_at",
+        "std-style language package bootstrap YIR",
+    );
+    assert_file_contains(
+        &output_dir.join("std_style_language_package_bootstrap_demo.yir"),
+        "edge lifetime",
+        "std-style language package bootstrap YIR",
+    );
+    assert_file_not_contains(
+        &output_dir.join("std_style_language_package_bootstrap_demo.ll"),
+        "deferred lowering",
+        "std-style language package bootstrap LLVM",
+    );
+    assert_binary_exit(
+        &output_dir.join("std_style_language_package_bootstrap_demo"),
+        55,
+        "std-style language package bootstrap binary should preserve helper-to-helper semantics",
     );
 }
 

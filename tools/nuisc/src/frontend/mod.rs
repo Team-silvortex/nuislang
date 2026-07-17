@@ -151,7 +151,6 @@ use self::function_lowering::{
 use self::generic_rewrite::{
     rewrite_generic_calls_in_function, GenericFunctionRewriteInput, GenericImplMethodTemplate,
 };
-use self::higher_order::expand_higher_order_functions;
 use self::lambda_expansion::expand_module_lambdas;
 use self::match_hoist::expand_effectful_match_scrutinees;
 use self::metadata::{helper_visible_struct_annotations, lower_ast_attributes, ModuleConstValue};
@@ -195,6 +194,28 @@ fn is_public_visibility(visibility: AstVisibility) -> bool {
     matches!(visibility, AstVisibility::Public)
 }
 
+fn collect_helper_higher_order_templates(
+    helpers: &[&AstModule],
+    visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+) -> BTreeMap<String, nuis_semantics::model::AstFunction> {
+    helpers
+        .iter()
+        .flat_map(|helper| {
+            helper
+                .functions
+                .iter()
+                .filter(|function| is_public_visibility(function.visibility))
+                .filter(|function| {
+                    function.params.iter().any(|param| {
+                        higher_order::is_callable_type_with_aliases(&param.ty, visible_type_aliases)
+                            .unwrap_or(false)
+                    })
+                })
+                .map(|function| (function.name.clone(), function.clone()))
+        })
+        .collect()
+}
+
 fn render_field_access_path(expr: &AstExpr) -> Option<String> {
     match expr {
         AstExpr::Var(name) => Some(name.clone()),
@@ -235,30 +256,28 @@ pub fn lower_project_ast_to_nir(
         })
         .collect::<Vec<_>>();
     let visible_type_aliases = build_visible_type_alias_map(&expanded_module, &local_cpu_helpers)?;
-    let mut higher_order_expansion_module = expanded_module.clone();
-    for helper in &local_cpu_helpers {
-        higher_order_expansion_module.functions.extend(
-            helper
-                .functions
-                .iter()
-                .filter(|function| is_public_visibility(function.visibility))
-                .filter(|function| {
-                    function.params.iter().any(|param| {
-                        higher_order::is_callable_type_with_aliases(
-                            &param.ty,
-                            &visible_type_aliases,
-                        )
-                        .unwrap_or(false)
-                    })
-                })
-                .cloned(),
-        );
-    }
-    let expanded_module =
-        expand_higher_order_functions(&higher_order_expansion_module, &visible_type_aliases)?;
+    let helper_higher_order_templates =
+        collect_helper_higher_order_templates(&local_cpu_helpers, &visible_type_aliases);
+    let expanded_module = higher_order::expand_higher_order_functions_with_templates(
+        &expanded_module,
+        &visible_type_aliases,
+        &helper_higher_order_templates,
+    )?;
     let expanded_local_modules = expanded_local_modules
-        .into_iter()
-        .map(|helper| expand_higher_order_functions(&helper, &visible_type_aliases))
+        .iter()
+        .map(|helper| {
+            let helper_peers = expanded_local_modules
+                .iter()
+                .filter(|candidate| candidate.unit != helper.unit)
+                .collect::<Vec<_>>();
+            let peer_higher_order_templates =
+                collect_helper_higher_order_templates(&helper_peers, &visible_type_aliases);
+            higher_order::expand_higher_order_functions_with_templates(
+                helper,
+                &visible_type_aliases,
+                &peer_higher_order_templates,
+            )
+        })
         .collect::<Result<Vec<_>, _>>()?;
     let local_cpu_helpers = expanded_module
         .uses

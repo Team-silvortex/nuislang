@@ -1,0 +1,199 @@
+use cpu StdCliContracts;
+use cpu StdLanguageCore;
+use cpu StdLanguageOps;
+
+mod cpu Main {
+  extern "c" fn host_command_spawn(program_handle: i64, argv_handle: i64) -> i64;
+  extern "c" fn host_command_status(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait_exit(command_handle: i64) -> i64;
+
+  struct CommandRequest {
+    program_handle: i64,
+    argv_handle: i64
+  }
+
+  struct CommandResult {
+    handle: i64,
+    status: i64,
+    wait_code: i64,
+    wait_exit: i64,
+    succeeded: bool
+  }
+
+  struct BuildStageReport {
+    name_handle: i64,
+    command: CommandResult,
+    executed: bool
+  }
+
+  struct StdLanguageBuildPipelineReport {
+    prepare: BuildStageReport,
+    check: BuildStageReport,
+    compile: BuildStageReport,
+    package: BuildStageReport,
+    language_score: i64,
+    first_failure_handle: i64,
+    executed_steps: i64,
+    overall_success: bool,
+    pipeline_total: i64,
+    validation_total: i64
+  }
+
+  fn build_command_request(program_handle: i64, argv_handle: i64) -> CommandRequest {
+    return CommandRequest {
+      program_handle: program_handle,
+      argv_handle: argv_handle
+    };
+  }
+
+  fn run_command(request: CommandRequest) -> CommandResult {
+    let handle: i64 = host_command_spawn(request.program_handle, request.argv_handle);
+    let wait_exit: i64 = host_command_wait_exit(handle);
+    return CommandResult {
+      handle: handle,
+      status: host_command_status(handle),
+      wait_code: host_command_wait(handle),
+      wait_exit: wait_exit,
+      succeeded: StdCliContracts.command_succeeded(handle, wait_exit)
+    };
+  }
+
+  fn run_stage(name_handle: i64, program_handle: i64, argv_handle: i64) -> BuildStageReport {
+    return BuildStageReport {
+      name_handle: name_handle,
+      command: run_command(build_command_request(program_handle, argv_handle)),
+      executed: true
+    };
+  }
+
+  fn command_total(stage: BuildStageReport) -> i64 {
+    return StdCliContracts.command_result_total(
+      stage.command.handle,
+      stage.command.status,
+      stage.command.wait_code,
+      stage.command.wait_exit,
+      stage.command.succeeded
+    );
+  }
+
+  fn stage_total(stage: BuildStageReport) -> i64 {
+    return StdCliContracts.workflow_step_total(
+      stage.name_handle,
+      command_total(stage),
+      stage.executed,
+      false
+    );
+  }
+
+  fn executed_steps(
+    prepare: BuildStageReport,
+    check: BuildStageReport,
+    compile: BuildStageReport,
+    package: BuildStageReport
+  ) -> i64 {
+    return StdCliContracts.workflow_step_executed_count(prepare.executed)
+      + StdCliContracts.workflow_step_executed_count(check.executed)
+      + StdCliContracts.workflow_step_executed_count(compile.executed)
+      + StdCliContracts.workflow_step_executed_count(package.executed);
+  }
+
+  fn all_stages_succeeded(
+    prepare: BuildStageReport,
+    check: BuildStageReport,
+    compile: BuildStageReport,
+    package: BuildStageReport
+  ) -> bool {
+    return prepare.command.succeeded
+      && check.command.succeeded
+      && compile.command.succeeded
+      && package.command.succeeded;
+  }
+
+  fn select_failure_handle(
+    overall_success: bool,
+    prepare: BuildStageReport,
+    check: BuildStageReport,
+    compile: BuildStageReport,
+    package: BuildStageReport,
+    language_score: i64
+  ) -> i64 {
+    if overall_success {
+      return 0;
+    }
+    return prepare.name_handle
+      + check.name_handle
+      + compile.name_handle
+      + package.name_handle
+      + language_score;
+  }
+
+  fn build_pipeline_report(
+    prepare: BuildStageReport,
+    check: BuildStageReport,
+    compile: BuildStageReport,
+    package: BuildStageReport
+  ) -> StdLanguageBuildPipelineReport {
+    let steps: i64 = executed_steps(prepare, check, compile, package);
+    let language_report: StdLanguageReport = build_report(steps + 7);
+    let language_gate: bool = language_report.final_score > steps;
+    let overall_success: bool =
+      all_stages_succeeded(prepare, check, compile, package) && language_gate;
+    let first_failure_handle: i64 = select_failure_handle(
+      overall_success,
+      prepare,
+      check,
+      compile,
+      package,
+      language_report.final_score
+    );
+    let pipeline_total: i64 = StdCliContracts.build_pipeline_total(
+      stage_total(prepare),
+      stage_total(check),
+      stage_total(compile),
+      stage_total(package),
+      first_failure_handle,
+      steps,
+      overall_success
+    );
+    return StdLanguageBuildPipelineReport {
+      prepare: prepare,
+      check: check,
+      compile: compile,
+      package: package,
+      language_score: language_report.final_score,
+      first_failure_handle: first_failure_handle,
+      executed_steps: steps,
+      overall_success: overall_success,
+      pipeline_total: pipeline_total,
+      validation_total: StdCliContracts.workflow_validation_total(
+        steps,
+        4,
+        first_failure_handle,
+        overall_success
+      )
+    };
+  }
+
+  fn capture_std_language_build_pipeline() -> StdLanguageBuildPipelineReport {
+    let empty_args: i64 = text_handle("");
+    let prepare: BuildStageReport =
+      run_stage(text_handle("prepare"), text_handle("/usr/bin/true"), empty_args);
+    let check: BuildStageReport =
+      run_stage(text_handle("check"), text_handle("/usr/bin/true"), empty_args);
+    let compile: BuildStageReport =
+      run_stage(text_handle("compile"), text_handle("/usr/bin/true"), empty_args);
+    let package: BuildStageReport =
+      run_stage(text_handle("package"), text_handle("/usr/bin/true"), empty_args);
+    return build_pipeline_report(prepare, check, compile, package);
+  }
+
+  fn main() -> i64 {
+    let report: StdLanguageBuildPipelineReport = capture_std_language_build_pipeline();
+    if report.validation_total < 3 {
+      let error_code: i64 = StdCliContracts.cli_error();
+      return error_code;
+    }
+    return StdCliContracts.success_exit_code(report.overall_success);
+  }
+}

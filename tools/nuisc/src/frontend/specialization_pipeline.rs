@@ -428,6 +428,85 @@ pub(super) fn build_lowered_functions_and_impls(
         let mut helper_specialized_signatures = Vec::new();
         let mut helper_specialization_cache = BTreeSet::new();
         let mut helper_rewritten_functions = Vec::new();
+        for definition in &helper.impls {
+            if !definition.generic_params.is_empty() || !definition.where_bounds.is_empty() {
+                continue;
+            }
+            let Some(trait_def) = trait_defs
+                .get(&definition.trait_name)
+                .or_else(|| trait_defs.get(&format!("{}.{}", helper.unit, definition.trait_name)))
+            else {
+                continue;
+            };
+            let lowered_for_type =
+                lower_type_ref_with_aliases(&definition.for_type, visible_type_aliases)?;
+            let mut impl_methods = definition.methods.to_vec();
+            for trait_method in &trait_def.methods {
+                if trait_method.default_body.is_none()
+                    || impl_methods
+                        .iter()
+                        .any(|method| method.name == trait_method.name)
+                {
+                    continue;
+                }
+                impl_methods.push(build_default_impl_method(definition, trait_method));
+            }
+            for method in &impl_methods {
+                if method.params.iter().any(|param| {
+                    is_callable_type_with_aliases(&param.ty, visible_type_aliases).unwrap_or(false)
+                }) {
+                    continue;
+                }
+                let symbol_name = impl_method_symbol_name(
+                    &definition.trait_name,
+                    &lowered_for_type,
+                    &method.name,
+                );
+                let signature = FunctionSignature {
+                    abi: "nuis".to_owned(),
+                    interface: None,
+                    symbol_name: symbol_name.clone(),
+                    params: method
+                        .params
+                        .iter()
+                        .map(|param| lower_type_ref_with_aliases(&param.ty, visible_type_aliases))
+                        .collect::<Result<Vec<_>, _>>()?,
+                    return_type: method
+                        .return_type
+                        .as_ref()
+                        .map(|ty| lower_type_ref_with_aliases(ty, visible_type_aliases))
+                        .transpose()?,
+                    is_extern: false,
+                    is_async: false,
+                };
+                signatures.insert(
+                    impl_method_lookup_key(&lowered_for_type, &method.name),
+                    signature.clone(),
+                );
+                signatures.insert(symbol_name.clone(), signature);
+                if definition
+                    .methods
+                    .iter()
+                    .any(|candidate| candidate.name == method.name)
+                {
+                    helper_rewritten_functions.push(build_impl_method_function(
+                        definition,
+                        method,
+                        &symbol_name,
+                    ));
+                } else if let Some(trait_method) = trait_def
+                    .methods
+                    .iter()
+                    .find(|candidate| candidate.name == method.name)
+                {
+                    helper_rewritten_functions.push(build_default_impl_method_function(
+                        definition,
+                        trait_method,
+                        &symbol_name,
+                    ));
+                }
+            }
+        }
         for function in helper
             .functions
             .iter()

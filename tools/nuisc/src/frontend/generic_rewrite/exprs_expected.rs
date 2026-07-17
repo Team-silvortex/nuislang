@@ -2,7 +2,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{AstFunction, AstStructDef, AstTypeAlias, AstTypeRef};
 
-use super::super::generics::{specialize_ast_type_ref, unify_generic_type_pattern};
+use super::super::generics::{
+    specialize_ast_type_ref, specialize_ast_type_ref_with_partial_substitutions,
+    unify_generic_type_pattern,
+};
 use super::super::types::ast_type_from_nir;
 use super::super::{
     lower_type_ref, resolve_ast_type_ref_aliases, substitute_ast_type_alias_target,
@@ -151,11 +154,10 @@ fn generic_template_arg_expected_type_from_return(
         )
         .ok()?;
     }
-    let lowered_substitutions = substitutions
-        .into_iter()
-        .map(|(name, ty)| (name, lower_type_ref(&ty)))
-        .collect::<BTreeMap<_, _>>();
-    specialize_ast_type_ref(&param.ty, &lowered_substitutions).ok()
+    Some(specialize_ast_type_ref_with_partial_substitutions(
+        &param.ty,
+        &substitutions,
+    ))
 }
 
 fn generic_signature_arg_expected_type_from_return(
@@ -198,12 +200,10 @@ fn generic_signature_arg_expected_type_from_return(
         callee,
     )
     .ok()?;
-    let lowered_substitutions = substitutions
-        .into_iter()
-        .map(|(name, ty)| (name, lower_type_ref(&ty)))
-        .collect::<BTreeMap<_, _>>();
-    let specialized = specialize_ast_type_ref(&param_ty, &lowered_substitutions).ok()?;
-    (!contains_ast_placeholder_generic_name(&specialized, &generic_names)).then_some(specialized)
+    Some(specialize_ast_type_ref_with_partial_substitutions(
+        &param_ty,
+        &substitutions,
+    ))
 }
 
 fn task_builtin_arg_expected_type(

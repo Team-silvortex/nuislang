@@ -1,0 +1,85 @@
+use cpu StdIoContracts;
+use cpu StdLanguageCore;
+use cpu StdLanguageOps;
+use cpu StdTextContracts;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_stdout_flush() -> i64;
+  extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
+  extern "c" fn host_text_len(text_handle: i64) -> i64;
+  extern "c" fn host_text_line_count(text_handle: i64) -> i64;
+  extern "c" fn host_text_word_count(text_handle: i64) -> i64;
+
+  struct StdLanguageCliReport {
+    report_handle: i64,
+    report_len: i64,
+    report_lines: i64,
+    report_words: i64,
+    stdout_written: i64,
+    stdout_flushed: i64,
+    validation_total: i64
+  }
+
+  fn text_from_literal(value: String) -> i64 {
+    return text_handle(value);
+  }
+
+  fn append_line(block_handle: i64, line_handle: i64) -> i64 {
+    return host_text_concat(host_text_concat(block_handle, line_handle), text_from_literal("\n"));
+  }
+
+  fn build_report_text(argc: i64, report: StdLanguageReport) -> i64 {
+    let title: i64 = text_from_literal("nuis std language report\n");
+    let route_line: i64 = text_from_literal("route: std-language-cli\n");
+    let status_line: i64 = if report.final_score > argc {
+      text_from_literal("status: ready\n")
+    } else {
+      text_from_literal("status: fallback\n")
+    };
+    let score_line: i64 = text_from_literal("score: stable\n");
+    return append_line(host_text_concat(host_text_concat(title, route_line), status_line), score_line);
+  }
+
+  fn capture_std_language_cli_report(argc: i64) -> StdLanguageCliReport {
+    let seed: i64 = argc + 2;
+    let report: StdLanguageReport = build_report(seed);
+    let report_handle: i64 = build_report_text(argc, report);
+    let report_len: i64 = host_text_len(report_handle);
+    let stdout_written: i64 = host_stdout_write(report_handle);
+    let stdout_flushed: i64 = host_stdout_flush();
+    let validation_total: i64 = StdTextContracts.report_validation_total(
+      report_handle,
+      report_len
+    ) + StdIoContracts.output_report_validation_total(
+      report_len,
+      stdout_written,
+      stdout_flushed
+    );
+    return StdLanguageCliReport {
+      report_handle: report_handle,
+      report_len: report_len,
+      report_lines: host_text_line_count(report_handle),
+      report_words: host_text_word_count(report_handle),
+      stdout_written: stdout_written,
+      stdout_flushed: stdout_flushed,
+      validation_total: validation_total
+    };
+  }
+
+  fn main() -> i64 {
+    let summary: StdLanguageCliReport = capture_std_language_cli_report(host_argv_count());
+    if summary.validation_total < 4 {
+      return StdIoContracts.io_error();
+    }
+    if !StdTextContracts.text_stats_ready(
+      summary.report_len,
+      summary.report_lines,
+      summary.report_words
+    ) {
+      return StdIoContracts.io_error();
+    }
+    return StdIoContracts.write_flush_exit_code(summary.stdout_written, summary.stdout_flushed);
+  }
+}

@@ -1,0 +1,87 @@
+use cpu StdLanguageCore;
+use cpu StdLanguageOps;
+use cpu StdTaskContracts;
+
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+  extern "c" fn host_monotonic_time_ns() -> i64;
+
+  struct StdLanguageTaskCliSummary {
+    message_handle: i64,
+    task_value: i64,
+    language_score: i64,
+    output_code: i64,
+    total: i64
+  }
+
+  async fn ping(seed: i64) -> i64 {
+    return seed + 9;
+  }
+
+  fn completed_message_handle() -> i64 {
+    return text_handle("std language task completed\n");
+  }
+
+  fn emit_completed_cli(
+    result: TaskResult<i64>,
+    language_report: StdLanguageReport
+  ) -> StdLanguageTaskCliSummary {
+    let task_value: i64 = StdTaskContracts.selected_task_value(result);
+    let output_code: i64 = host_stdout_write(completed_message_handle());
+    let total: i64 = task_value + language_report.final_score + output_code;
+    return StdLanguageTaskCliSummary {
+      message_handle: completed_message_handle(),
+      task_value: task_value,
+      language_score: language_report.final_score,
+      output_code: output_code,
+      total: total
+    };
+  }
+
+  fn timeout_cli_summary(
+    language_report: StdLanguageReport
+  ) -> StdLanguageTaskCliSummary {
+    let total: i64 = language_report.pointer_score;
+    return StdLanguageTaskCliSummary {
+      message_handle: 0,
+      task_value: 0,
+      language_score: language_report.pointer_score,
+      output_code: 0,
+      total: total
+    };
+  }
+
+  fn language_task_gate(
+    result: TaskResult<i64>,
+    completed: StdLanguageTaskCliSummary,
+    language_report: StdLanguageReport
+  ) -> bool {
+    return StdTaskContracts.encode_completed(result) == 1
+      && completed.task_value > 0
+      && completed.language_score == language_report.final_score
+      && completed.total > completed.task_value;
+  }
+
+  fn main() -> i64 {
+    let argv_count: i64 = host_argv_count();
+    let tick_ns: i64 = host_monotonic_time_ns();
+    let task: Task<i64> = timeout(spawn(ping(argv_count + 1)), 0);
+    let result: TaskResult<i64> = join_result(task);
+    let language_report: StdLanguageReport =
+      build_report(StdTaskContracts.selected_task_value(result) + argv_count + 2);
+    let completed: StdLanguageTaskCliSummary = emit_completed_cli(result, language_report);
+    if language_task_gate(result, completed, language_report) {
+      return StdTaskContracts.add_bias(0, 0);
+    }
+    let timeout_summary: StdLanguageTaskCliSummary = timeout_cli_summary(language_report);
+    let task_cli_total: i64 = StdTaskContracts.cli_total(
+      result,
+      argv_count,
+      tick_ns,
+      completed.total,
+      timeout_summary.total
+    );
+    return task_cli_total + timeout_summary.total;
+  }
+}

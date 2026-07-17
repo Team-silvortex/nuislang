@@ -1,0 +1,4 @@
+name = "std_style_language_package_bootstrap_demo"
+version = "0.1.0"
+entry = "main.ns"
+modules = ["main.ns", "core.ns", "ops.ns"]

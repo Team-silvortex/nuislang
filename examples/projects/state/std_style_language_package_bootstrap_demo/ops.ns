@@ -1,32 +1,12 @@
-mod cpu StdStyleLanguageSupport {
-  pub trait Addable {
-    fn add(lhs: Self, rhs: Self) -> Self;
-  }
+use cpu StdPkgCore;
 
-  impl Addable for i64 {
-    fn add(lhs: i64, rhs: i64) -> i64 {
-      return lhs + rhs;
-    }
-  }
-
-  pub enum Error {
-    InvalidInput,
-  }
-
-  pub enum Result<T, E> {
-    Ok(T),
-    Err(E),
-  }
-
-  pub struct StdReport {
+mod cpu StdPkgOps {
+  pub struct StdPackageReport {
     pub raw_score: i64,
     pub mapped_score: i64,
     pub pointer_score: i64,
     pub final_score: i64
   }
-
-  pub type Alias<T> = T;
-  pub type Mapper<T> = Fn1<T, T>;
 
   pub fn apply<T: Addable>(value: T, mapper: Mapper<T>) -> T {
     return mapper(value);
@@ -34,43 +14,6 @@ mod cpu StdStyleLanguageSupport {
 
   pub fn bump<T: Addable>(value: T) -> T {
     return apply(value, |item: T| -> T { return item.add(item); });
-  }
-
-  pub fn ok<T, E>(value: T) -> Result<T, E> {
-    return Result.Ok(value);
-  }
-
-  pub fn err<T, E>(error: E) -> Result<T, E> {
-    return Result.Err(error);
-  }
-
-  pub fn result_map<T, R, E>(result: Result<T, E>, mapper: Fn1<T, R>) -> Result<R, E> {
-    match result {
-      Result.Ok(value) => {
-        return Result.Ok(mapper(value));
-      }
-      Result.Err(error) => {
-        return Result.Err(error);
-      }
-    }
-  }
-
-  pub fn result_unwrap_or<T, E>(result: Result<T, E>, fallback: T) -> T {
-    match result {
-      Result.Ok(value) => {
-        return value;
-      }
-      Result.Err(_) => {
-        return fallback;
-      }
-    }
-  }
-
-  pub fn fetch(seed: i64) -> Result<i64, Error> {
-    if seed <= 0 {
-      return Result.Err(Error.InvalidInput);
-    }
-    return Result.Ok(seed);
   }
 
   pub fn buffer_score(seed: i64) -> i64 {
@@ -101,7 +44,7 @@ mod cpu StdStyleLanguageSupport {
     return observed;
   }
 
-  pub fn build_report(seed: Alias<i64>) -> StdReport {
+  pub fn build_report(seed: Alias<i64>) -> StdPackageReport {
     let raw_score: i64 = buffer_score(seed);
     let mapped_result: Result<i64, Error> =
       result_map(ok(raw_score), |value: i64| -> i64 { return bump(value); });
@@ -116,7 +59,7 @@ mod cpu StdStyleLanguageSupport {
       result_unwrap_or(passthrough_result, 0)
     };
     let pointer_score_value: i64 = pointer_score(seed);
-    return StdReport {
+    return StdPackageReport {
       raw_score: raw_score,
       mapped_score: mapped_score,
       pointer_score: pointer_score_value,

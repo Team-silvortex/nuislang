@@ -77,6 +77,30 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
             propagate_known_facts(&node.op.args[1], &node.name, &mut state.facts);
             true
         }
+        "timeout" => {
+            let Some(task) = get_task(&state.registers, &node.op.args[0]).cloned() else {
+                state.body.push(format!(
+                    "  ; deferred lowering for cpu.timeout `{}` because its task is outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return true;
+            };
+            let Some(_) = state.registers.get(&node.op.args[1]) else {
+                state.body.push(format!(
+                    "  ; deferred lowering for cpu.timeout `{}` because its duration is outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return true;
+            };
+            state.registers.insert(
+                node.name.clone(),
+                LlvmValueRef::Task(TaskLlvmValueRef {
+                    value: task.value.clone(),
+                }),
+            );
+            propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
+            true
+        }
         "join_result" => {
             let Some(task) = get_task(&state.registers, &node.op.args[0]).cloned() else {
                 state.body.push(format!(

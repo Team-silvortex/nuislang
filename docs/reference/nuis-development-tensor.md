@@ -415,10 +415,41 @@ entry-local trait-bound generic execution alive, and still produces the
 deterministic native exit code. Helper modules now participate in lambda/HOF
 expansion, helper public generic functions are visible as imported templates,
 and helper-private `__hof_` / `__lambda_` synthetic functions are retained for
-internal lowering. The next concrete gap is narrower: helper-module impl method
-emission still needs to support helper-local trait-bound method calls, and
-cross-helper expected-type inference should remove some explicit `Result.Ok` /
-`Result.Err` generic arguments.
+internal lowering. Helper-module impl method emission now also keeps
+support-side trait-bound calls such as `bump<T: Addable>` executable through
+the imported helper workload. The same workload now leaves imported
+`result_map(...)` calls and Result helper constructors unannotated, proving that
+cross-helper expected-type inference can carry generic arguments through the
+std-shaped HOF boundary. A second package-shaped workload now splits the same
+surface across `StdPkgCore`, `StdPkgOps`, and `Main`, including helper-to-helper
+imports, imported aliases, Result/HOF inference, trait-bound methods,
+Buffer/pointer control flow, and a deterministic native exit code. That path is
+backed by partial expected-type propagation, so a helper HOF argument can retain
+known generic slots such as `Result<T, Error>` while payload constructors infer
+the remaining `T`. That surface has now started moving into the real std
+galaxy as auto-injected `lib/language_core.ns` and `lib/language_ops.ns`; the
+`std_language_galaxy_bootstrap_demo` consumes them via `std=workspace`, verifies
+std galaxy module/import reports, and runs the same helper-to-helper
+Result/HOF/trait/memory path as a native binary. The
+`std_language_cli_report_demo` now extends that surface into a CLI-shaped std
+consumer by combining language contracts with `StdTextContracts` and
+`StdIoContracts`, writing a real stdout report, and validating the text/IO
+gates through native execution. `std_language_report_file_demo` then pushes the
+same language surface through `StdReportContracts`, writes an argv-selected
+report file plus stdout, and validates the reusable report-file gates. The next
+step, `std_language_workflow_demo`, feeds `StdLanguageOps.build_report` into a
+two-step host command workflow through `StdCliContracts`, proving the same
+Result/HOF/trait/memory surface can participate in command gates rather than
+only report output. `std_language_build_pipeline_demo` extends that route into
+a four-stage prepare/check/compile/package gate through
+`StdCliContracts.build_pipeline_total` with no LLVM deferred-lowering notes.
+`std_language_task_cli_demo` then carries the same surface into a task-backed
+CLI path through `StdTaskContracts` and real stdout output; its staged CPU
+task intrinsic lowering now carries `timeout -> join_result -> task_value`
+without LLVM deferred-lowering notes. The remaining task/native closure gap is
+real scheduler/runtime semantics beyond this synchronous AOT bridge, plus
+folding the language build-pipeline gate back into the larger build-pipeline
+companion.
 
 The Nustar checks anchor the bootstrap-critical
 `heterogeneous-runtime/nustar/registered-domain-contracts` cell to:

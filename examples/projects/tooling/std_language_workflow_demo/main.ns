@@ -1,0 +1,196 @@
+use cpu StdCliContracts;
+use cpu StdLanguageCore;
+use cpu StdLanguageOps;
+
+mod cpu Main {
+  extern "c" fn host_command_spawn(program_handle: i64, argv_handle: i64) -> i64;
+  extern "c" fn host_command_status(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait(command_handle: i64) -> i64;
+  extern "c" fn host_command_wait_exit(command_handle: i64) -> i64;
+
+  struct CommandRequest {
+    program_handle: i64,
+    argv_handle: i64
+  }
+
+  struct CommandResult {
+    handle: i64,
+    status: i64,
+    wait_code: i64,
+    wait_exit: i64,
+    succeeded: bool
+  }
+
+  struct WorkflowStep {
+    name_handle: i64,
+    request: CommandRequest,
+    fail_fast: bool
+  }
+
+  struct WorkflowStepReport {
+    name_handle: i64,
+    result: CommandResult,
+    executed: bool
+  }
+
+  struct StdLanguageWorkflowReport {
+    first: WorkflowStepReport,
+    second: WorkflowStepReport,
+    language_score: i64,
+    first_failure_handle: i64,
+    overall_success: bool,
+    executed_steps: i64,
+    validation_total: i64
+  }
+
+  fn build_command_request(program_handle: i64, argv_handle: i64) -> CommandRequest {
+    return CommandRequest {
+      program_handle: program_handle,
+      argv_handle: argv_handle
+    };
+  }
+
+  fn run_command(request: CommandRequest) -> CommandResult {
+    let handle: i64 = host_command_spawn(request.program_handle, request.argv_handle);
+    let wait_exit: i64 = host_command_wait_exit(handle);
+    return CommandResult {
+      handle: handle,
+      status: host_command_status(handle),
+      wait_code: host_command_wait(handle),
+      wait_exit: wait_exit,
+      succeeded: StdCliContracts.command_succeeded(handle, wait_exit)
+    };
+  }
+
+  fn build_workflow_step(
+    name_handle: i64,
+    program_handle: i64,
+    argv_handle: i64,
+    fail_fast: bool
+  ) -> WorkflowStep {
+    return WorkflowStep {
+      name_handle: name_handle,
+      request: build_command_request(program_handle, argv_handle),
+      fail_fast: fail_fast
+    };
+  }
+
+  fn run_workflow_step(step: WorkflowStep) -> WorkflowStepReport {
+    return WorkflowStepReport {
+      name_handle: step.name_handle,
+      result: run_command(step.request),
+      executed: true
+    };
+  }
+
+  fn skipped_workflow_step(step: WorkflowStep) -> WorkflowStepReport {
+    return WorkflowStepReport {
+      name_handle: step.name_handle,
+      result: CommandResult {
+        handle: 0,
+        status: 0,
+        wait_code: 0,
+        wait_exit: 1,
+        succeeded: false
+      },
+      executed: false
+    };
+  }
+
+  fn workflow_executed_steps(first: WorkflowStepReport, second: WorkflowStepReport) -> i64 {
+    return StdCliContracts.workflow_step_executed_count(first.executed)
+      + StdCliContracts.workflow_step_executed_count(second.executed);
+  }
+
+  fn workflow_language_seed(stopped: bool, executed_steps: i64) -> i64 {
+    if stopped {
+      return 0;
+    }
+    return executed_steps + 5;
+  }
+
+  fn command_total(report: WorkflowStepReport) -> i64 {
+    return StdCliContracts.command_result_total(
+      report.result.handle,
+      report.result.status,
+      report.result.wait_code,
+      report.result.wait_exit,
+      report.result.succeeded
+    );
+  }
+
+  fn build_language_workflow_report(
+    first: WorkflowStepReport,
+    second: WorkflowStepReport,
+    language_score: i64
+  ) -> StdLanguageWorkflowReport {
+    let first_total: i64 = command_total(first);
+    let second_total: i64 = command_total(second);
+    let executed_steps: i64 = workflow_executed_steps(first, second);
+    let command_gate: bool = first_total > 0 && second_total > 0;
+    let language_gate: bool = language_score > executed_steps;
+    let overall_success: bool = command_gate && language_gate
+      && first.result.succeeded
+      && second.result.succeeded;
+    let first_failure_handle: i64 =
+      select_failure_handle(overall_success, first.name_handle, second.name_handle, language_score);
+    return StdLanguageWorkflowReport {
+      first: first,
+      second: second,
+      language_score: language_score,
+      first_failure_handle: first_failure_handle,
+      overall_success: overall_success,
+      executed_steps: executed_steps,
+      validation_total: StdCliContracts.workflow_validation_total(
+        executed_steps,
+        2,
+        first_failure_handle,
+        overall_success
+      )
+    };
+  }
+
+  fn select_failure_handle(
+    overall_success: bool,
+    first_name_handle: i64,
+    second_name_handle: i64,
+    language_score: i64
+  ) -> i64 {
+    if overall_success {
+      return 0;
+    }
+    return first_name_handle + second_name_handle + language_score;
+  }
+
+  fn capture_std_language_workflow() -> StdLanguageWorkflowReport {
+    let empty_args: i64 = text_handle("");
+    let first_step: WorkflowStep =
+      build_workflow_step(text_handle("language-first"), text_handle("/usr/bin/true"), empty_args, true);
+    let second_step: WorkflowStep =
+      build_workflow_step(text_handle("language-second"), text_handle("/usr/bin/true"), empty_args, false);
+    let first_report: WorkflowStepReport = run_workflow_step(first_step);
+    let stopped: bool = StdCliContracts.workflow_should_stop(
+      first_step.fail_fast,
+      first_report.executed,
+      first_report.result.succeeded
+    );
+    let second_report: WorkflowStepReport = run_workflow_step(second_step);
+    let language_report: StdLanguageReport =
+      build_report(workflow_language_seed(stopped, workflow_executed_steps(first_report, second_report)));
+    return build_language_workflow_report(
+      first_report,
+      second_report,
+      language_report.final_score
+    );
+  }
+
+  fn main() -> i64 {
+    let report: StdLanguageWorkflowReport = capture_std_language_workflow();
+    if report.validation_total < 3 {
+      let error_code: i64 = StdCliContracts.cli_error();
+      return error_code;
+    }
+    let exit_code: i64 = StdCliContracts.success_exit_code(report.overall_success);
+    return exit_code;
+  }
+}

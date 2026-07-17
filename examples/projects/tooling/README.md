@@ -36,6 +36,15 @@ Current runnable CLI frontdoor:
 * `cli_report_file_demo` now factors the argv/file/text report path into a
   reusable std report-file helper contract, writes an inspectable report file,
   and echoes the same report to stdout for CLI automation
+* `std_language_report_file_demo` routes the reusable std language contracts
+  through that report-file helper shape, proving Result/HOF/trait/memory
+  helpers can feed an argv-selected report file plus stdout
+* `std_language_workflow_demo` routes the same language contracts into a
+  two-step host command workflow, proving they can participate in
+  `StdCliContracts` command/workflow gates rather than only report output
+* `std_language_build_pipeline_demo` extends that route into a four-stage
+  prepare/check/compile/package build-pipeline gate through
+  `StdCliContracts.build_pipeline_total`
 * `cli_session_demo` and `cli_report_session_demo` now also fit the same launch
   path, while still representing the interactive/session-oriented lane
 * `workflow_runtime_demo` now fits the same launch path as the workflow-shaped
@@ -68,7 +77,8 @@ Current split:
   `native_artifact_closure_demo`, `cli_compile_workflow_demo`,
   `cli_workflow_automation_demo`,
   `cli_build_pipeline_demo`, `cli_project_build_report_demo`,
-  `cli_report_file_demo`,
+  `cli_report_file_demo`, `std_language_report_file_demo`,
+  `std_language_workflow_demo`, `std_language_build_pipeline_demo`,
   `cli_pgm_info_demo`, `cli_pgm_invert_demo`, `cli_pgm_threshold_demo`
 * probe-style companions:
   most of the remaining entries in this folder still exist to expose one host
@@ -98,6 +108,9 @@ Current exemplars:
 * [cli_cat_demo](cli_cat_demo)
 * [cli_wc_demo](cli_wc_demo)
 * [cli_report_file_demo](cli_report_file_demo)
+* [std_language_report_file_demo](std_language_report_file_demo)
+* [std_language_workflow_demo](std_language_workflow_demo)
+* [std_language_build_pipeline_demo](std_language_build_pipeline_demo)
 * [cli_pgm_info_demo](cli_pgm_info_demo)
 * [cli_pgm_invert_demo](cli_pgm_invert_demo)
 * [cli_pgm_threshold_demo](cli_pgm_threshold_demo)
@@ -119,12 +132,16 @@ Short rule:
   [command_runtime_demo](command_runtime_demo),
   [subprocess_runtime_demo](subprocess_runtime_demo),
   [native_artifact_closure_demo](native_artifact_closure_demo)
+* language-assisted workflow:
+  [std_language_workflow_demo](std_language_workflow_demo),
+  [std_language_build_pipeline_demo](std_language_build_pipeline_demo)
 * text, json, diagnostics:
   [host_text_runtime_demo](host_text_runtime_demo),
   [text_pipeline_demo](text_pipeline_demo),
   [text_report_builder_demo](text_report_builder_demo),
   [text_report_json_demo](text_report_json_demo),
   [cli_report_file_demo](cli_report_file_demo),
+  [std_language_report_file_demo](std_language_report_file_demo),
   [time_report_demo](time_report_demo),
   [benchmark_report_demo](benchmark_report_demo),
   [benchmark_report_count_demo](benchmark_report_count_demo),

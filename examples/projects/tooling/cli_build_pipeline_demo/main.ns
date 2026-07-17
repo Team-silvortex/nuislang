@@ -1,4 +1,6 @@
 use cpu StdCliContracts;
+use cpu StdLanguageCore;
+use cpu StdLanguageOps;
 
 mod cpu Main {
   extern "c" fn host_argv_count() -> i64;
@@ -508,6 +510,15 @@ mod cpu Main {
     return host_diag_emit(label_handle, span_handle, severity);
   }
 
+  fn language_pipeline_gate(
+    cli: PipelineCliSummary,
+    pipeline: BuildPipelineReport
+  ) -> bool {
+    let language_report: StdLanguageReport =
+      build_report(cli.argv_count + cli.line_len + pipeline.executed_steps);
+    return language_report.final_score > cli.line_len;
+  }
+
   fn build_success_summary(
     seed: BuildPipelineSeed,
     cli: PipelineCliSummary,
@@ -575,13 +586,14 @@ mod cpu Main {
 
   fn main() -> i64 {
     let summary: BuildPipelineSummary = capture_summary(build_seed());
+    let language_gate: bool = language_pipeline_gate(summary.cli, summary.pipeline);
     let validation_total: i64 = StdCliContracts.workflow_validation_total(
       summary.pipeline.executed_steps,
       4,
       summary.pipeline.first_failure_handle,
       summary.pipeline.overall_success
     );
-    if validation_total < 3 {
+    if language_gate == false || validation_total < 3 {
       return 1;
     }
     return summary_exit_code(summary);

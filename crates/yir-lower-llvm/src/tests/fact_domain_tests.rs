@@ -200,6 +200,56 @@ fn folds_known_task_value_for_lazy_const_select() {
 }
 
 #[test]
+fn folds_known_timeout_task_value_for_lazy_const_select() {
+    let mut module = module_with_cpu0();
+    push_cpu_const_i64(&mut module, "task_payload", "11");
+    push_cpu_const_i64(&mut module, "timeout_ns", "0");
+    push_cpu_node(
+        &mut module,
+        "task",
+        "cpu.spawn_task",
+        vec!["task_handle", "task_payload"],
+    );
+    push_cpu_node(
+        &mut module,
+        "bounded_task",
+        "cpu.timeout",
+        vec!["task", "timeout_ns"],
+    );
+    push_cpu_node(
+        &mut module,
+        "task_result",
+        "cpu.join_result",
+        vec!["bounded_task"],
+    );
+    push_cpu_node(&mut module, "actual", "cpu.task_value", vec!["task_result"]);
+    push_cpu_const_i64(&mut module, "expected", "11");
+    push_cpu_node(&mut module, "enabled", "cpu.eq", vec!["actual", "expected"]);
+    push_wrong_variant_payload_select_fixture(&mut module, "enabled", "fallback", "bad_result");
+    push_deps(
+        &mut module,
+        &[
+            ("task_payload", "task"),
+            ("task", "bounded_task"),
+            ("timeout_ns", "bounded_task"),
+            ("bounded_task", "task_result"),
+            ("task_result", "actual"),
+            ("actual", "enabled"),
+            ("expected", "enabled"),
+        ],
+    );
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("icmp eq i64"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.timeout `bounded_task`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.join_result `task_result`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.task_value `actual`"));
+    assert!(!llvm_ir.contains("select i1"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.select `selected`"));
+    assert_wrong_variant_chain_not_deferred(&llvm_ir);
+}
+
+#[test]
 fn folds_known_mutex_value_for_lazy_const_select() {
     let mut module = module_with_cpu0();
     push_cpu_const_i64(&mut module, "shared_payload", "17");

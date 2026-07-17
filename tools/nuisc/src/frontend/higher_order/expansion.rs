@@ -75,9 +75,10 @@ pub(super) fn parse_bound_callable_expr(
     }
 }
 
-pub(crate) fn expand_higher_order_functions(
+pub(crate) fn expand_higher_order_functions_with_templates(
     module: &AstModule,
     visible_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    extra_templates: &BTreeMap<String, AstFunction>,
 ) -> Result<AstModule, String> {
     let visible_structs = module
         .structs
@@ -94,6 +95,7 @@ pub(crate) fn expand_higher_order_functions(
         })
         .map(|function| (function.name.clone(), function.clone()))
         .collect::<BTreeMap<_, _>>();
+    templates.extend(extra_templates.clone());
     let mut method_template_lookup = BTreeMap::<(String, String), String>::new();
     for definition in &module.impls {
         let lowered_for_type =

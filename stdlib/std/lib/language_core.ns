@@ -1,0 +1,70 @@
+/// Generic language-level Result and trait helpers exposed by std.
+mod cpu StdLanguageCore {
+  pub trait Addable {
+    fn add(lhs: Self, rhs: Self) -> Self;
+  }
+
+  impl Addable for i64 {
+    fn add(lhs: i64, rhs: i64) -> i64 {
+      return lhs + rhs;
+    }
+  }
+
+  pub enum Error {
+    InvalidInput,
+  }
+
+  pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+  }
+
+  pub type Alias<T> = T;
+
+  pub type Mapper<T> = Fn1<T, T>;
+
+  /// Builds an Ok result while preserving expected-type inference.
+  pub fn ok<T, E>(value: T) -> Result<T, E> {
+    return Result.Ok(value);
+  }
+
+  /// Builds an Err result while preserving expected-type inference.
+  pub fn err<T, E>(error: E) -> Result<T, E> {
+    return Result.Err(error);
+  }
+
+  /// Maps an Ok payload and preserves Err values.
+  pub fn result_map<T, R, E>(
+    result: Result<T, E>,
+    mapper: Fn1<T, R>
+  ) -> Result<R, E> {
+    match result {
+      Result.Ok(value) => {
+        return Result.Ok(mapper(value));
+      }
+      Result.Err(error) => {
+        return Result.Err(error);
+      }
+    }
+  }
+
+  /// Extracts an Ok payload or returns the fallback.
+  pub fn result_unwrap_or<T, E>(result: Result<T, E>, fallback: T) -> T {
+    match result {
+      Result.Ok(value) => {
+        return value;
+      }
+      Result.Err(_) => {
+        return fallback;
+      }
+    }
+  }
+
+  /// Validates a positive seed through the std language Result surface.
+  pub fn fetch(seed: i64) -> Result<i64, Error> {
+    if seed <= 0 {
+      return Result.Err(Error.InvalidInput);
+    }
+    return Result.Ok(seed);
+  }
+}
