@@ -77,7 +77,7 @@ pub(crate) fn device_sample_contract_for_trace(
         sample_kind: "deferred-provider-sample-descriptor".to_owned(),
         status: sample_status.to_owned(),
         schema: DEVICE_SAMPLE_SCHEMA.to_owned(),
-        input_evidence: input_evidence(payload_format, payload_path),
+        input_evidence: input_evidence(backend_family, target_device, payload_format, payload_path),
         output_evidence: "not-materialized".to_owned(),
         validation_status: validation_status(sample_status),
         handoff_target: provider_family(backend_family, target_device),
@@ -375,12 +375,22 @@ fn provider_family(backend_family: Option<&str>, target_device: Option<&str>) ->
     )
 }
 
-fn input_evidence(payload_format: Option<&str>, payload_path: Option<&str>) -> String {
-    match (payload_format, payload_path) {
+fn input_evidence(
+    backend_family: Option<&str>,
+    target_device: Option<&str>,
+    payload_format: Option<&str>,
+    payload_path: Option<&str>,
+) -> String {
+    let base = match (payload_format, payload_path) {
         (Some(format), Some(path)) => format!("{format}:{path}"),
         (Some(format), None) => format!("{format}:payload-path-missing"),
         (None, Some(path)) => format!("payload-format-missing:{path}"),
         (None, None) => "payload-evidence-missing".to_owned(),
+    };
+    if backend_family == Some("metal") && target_device == Some("apple-silicon-gpu") {
+        format!("{base};std-preprocessed-pgm:input_bytes=20")
+    } else {
+        base
     }
 }
 

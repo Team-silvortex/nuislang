@@ -31,6 +31,13 @@ pub(crate) struct WorkflowFrontdoorSurface {
     pub(crate) recommended_reason: &'static str,
 }
 
+pub(crate) const FRONTDOOR_READING_ORDER: &str =
+    "closure_summary -> dev_tensor_weakest_task_card_handoff";
+pub(crate) const FRONTDOOR_SAMPLE_CLOSURE_SUMMARY: &str =
+    "closure_summary_status -> closure_summary_next_action -> closure_summary_next_command";
+pub(crate) const FRONTDOOR_SAMPLE_TENSOR_HANDOFF: &str =
+    "dev_tensor_weakest_task_card_coordinate -> dev_tensor_weakest_task_card_handoff_coordinate -> dev_tensor_weakest_task_card_handoff_command";
+
 pub(crate) fn build_workflow_frontdoor_surface(
     profile: WorkflowSourceProfile,
     recommendation: WorkflowRecommendation,

@@ -138,6 +138,30 @@ pub(crate) fn render_dev_tensor_json_impl() -> String {
                 "weakest_bootstrap_task_card_expected_artifact",
                 summary.weakest_bootstrap_task_card_expected_artifact,
             ),
+            json_field(
+                "weakest_bootstrap_task_card_handoff_mode",
+                summary.weakest_bootstrap_task_card_handoff_mode,
+            ),
+            json_field(
+                "weakest_bootstrap_task_card_handoff_coordinate",
+                &summary.weakest_bootstrap_task_card_handoff_coordinate,
+            ),
+            json_field(
+                "weakest_bootstrap_task_card_handoff_reason",
+                &summary.weakest_bootstrap_task_card_handoff_reason,
+            ),
+            json_field(
+                "weakest_bootstrap_task_card_handoff_action",
+                summary.weakest_bootstrap_task_card_handoff_action,
+            ),
+            json_field(
+                "weakest_bootstrap_task_card_handoff_command",
+                summary.weakest_bootstrap_task_card_handoff_command,
+            ),
+            json_field(
+                "weakest_bootstrap_task_card_handoff_expected_artifact",
+                summary.weakest_bootstrap_task_card_handoff_expected_artifact,
+            ),
             json_field("coverage_status", coverage.status),
             json_field("coverage_expected_source", coverage.expected_source),
             json_bool_field(
@@ -409,6 +433,30 @@ pub(crate) fn render_dev_tensor_text_impl() -> Vec<String> {
         format!(
             "  weakest_bootstrap_task_card_expected_artifact: {}",
             summary.weakest_bootstrap_task_card_expected_artifact
+        ),
+        format!(
+            "  weakest_bootstrap_task_card_handoff_mode: {}",
+            summary.weakest_bootstrap_task_card_handoff_mode
+        ),
+        format!(
+            "  weakest_bootstrap_task_card_handoff_coordinate: {}",
+            summary.weakest_bootstrap_task_card_handoff_coordinate
+        ),
+        format!(
+            "  weakest_bootstrap_task_card_handoff_reason: {}",
+            summary.weakest_bootstrap_task_card_handoff_reason
+        ),
+        format!(
+            "  weakest_bootstrap_task_card_handoff_action: {}",
+            summary.weakest_bootstrap_task_card_handoff_action
+        ),
+        format!(
+            "  weakest_bootstrap_task_card_handoff_command: {}",
+            summary.weakest_bootstrap_task_card_handoff_command
+        ),
+        format!(
+            "  weakest_bootstrap_task_card_handoff_expected_artifact: {}",
+            summary.weakest_bootstrap_task_card_handoff_expected_artifact
         ),
         format!("  coverage_status: {}", coverage.status),
         format!("  coverage_expected_source: {}", coverage.expected_source),

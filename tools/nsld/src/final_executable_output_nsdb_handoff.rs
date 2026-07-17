@@ -1,4 +1,7 @@
-use super::reports::NsldFinalExecutableOutputReport;
+use super::{
+    final_executable_output::{owned_package_summary_next_action, owned_package_summary_status},
+    reports::NsldFinalExecutableOutputReport,
+};
 use std::{fs, path::Path};
 
 const NSDB_HANDOFF_PROTOCOL: &str = "nuis-nsdb-payload-execution-handoff-v1";
@@ -65,6 +68,15 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
             .or_else(|| report.final_output_nsdb_handoff_error.clone())
             .or_else(|| Some("final-output-nsdb-replay-not-ready".to_owned()))
     };
+    report.owned_package_summary_status =
+        owned_package_summary_status(report.final_output_nsdb_replay_ready).to_owned();
+    report.owned_package_summary_ready = report.final_output_nsdb_replay_ready;
+    report.owned_package_summary_replay_status = report.final_output_nsdb_replay_status.clone();
+    report.owned_package_summary_replay_ready = report.final_output_nsdb_replay_ready;
+    report.owned_package_summary_next_action =
+        owned_package_summary_next_action(report.final_output_nsdb_replay_ready).to_owned();
+    report.owned_package_summary_next_command =
+        report.final_output_nsdb_replay_next_command.clone();
 }
 
 fn output_dir_from_handoff_path(path: &str) -> &Path {

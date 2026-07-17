@@ -249,6 +249,13 @@ fn drive_apply_materializes_provider_sample_boundary_via_nsdb() {
     assert!(json.contains("\"mutation_policy\":\"whitelisted-boundary-materialization\""));
     assert!(json.contains("\"command_id\":\"materialize-provider-samples\""));
     assert!(json.contains("nsdb materialize-provider-samples"));
+    assert!(json.contains("\"safe_next_contract\":\"nsld-drive-safe-next-v1\""));
+    assert!(json.contains("\"safe_next_action\":\"rerun-drive-to-refresh-next-action\""));
+    assert!(json.contains("\"safe_next_command\":null"));
+    assert!(json.contains("\"safe_next_gate_required\":false"));
+    assert!(json.contains(
+        "\"safe_next_reason\":\"drive applied one mutation; rerun drive to observe the next deterministic action\""
+    ));
 }
 
 #[test]
@@ -282,6 +289,17 @@ fn drive_until_clean_crosses_provider_sample_boundary_then_reports_next_blocker(
         .messages
         .iter()
         .any(|message| message == "applied materialize-provider-samples:ready:1"));
+    let json = nsld_drive_until_clean_report_json(&report);
+    assert!(json.contains("\"safe_next_contract\":\"nsld-drive-safe-next-v1\""));
+    assert!(json.contains("\"safe_next_action\":\"explicit-boundary-crossing-command-available\""));
+    assert!(json.contains("\"safe_next_command\":\""));
+    assert!(json.contains("\"safe_next_gate_required\":true"));
+    assert!(json.contains(
+        "\"safe_next_gate_action\":\"set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke\""
+    ));
+    assert!(json.contains(
+        "\"safe_next_reason\":\"drive stopped at an explicit boundary; run the safe_next_command only if you accept the listed gate\""
+    ));
     assert_eq!(
         check.final_executable_output_device_provider_sample_manifest_status,
         "ready"

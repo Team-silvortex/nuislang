@@ -4,6 +4,7 @@ use crate::{
         read_device_provider_sample_manifest_info, DEVICE_PROVIDER_SAMPLE_FILE_NAME,
         DEVICE_PROVIDER_SAMPLE_PROTOCOL, DEVICE_PROVIDER_SAMPLE_SCHEMA,
     },
+    provider_sample_execution::provider_execution_outcome,
 };
 use std::{collections::BTreeSet, fs, path::Path};
 
@@ -21,13 +22,26 @@ pub struct ProviderSampleMaterializeReport {
     pub first_provider_runner_adapter_contract: String,
     pub first_provider_runner_adapter_id: String,
     pub first_provider_runner_adapter_capability_status: String,
+    pub first_provider_runner_registry_protocol: String,
+    pub first_provider_runner_registry_source: String,
+    pub first_provider_runner_real_device_capable: bool,
     pub first_provider_runner_kind: String,
     pub first_provider_execution_mode: String,
+    pub first_provider_execution_comparison_contract: String,
+    pub first_provider_execution_comparison_status: String,
+    pub first_provider_execution_evidence_status: String,
+    pub first_provider_output_payload_contract: String,
+    pub first_provider_output_payload_status: String,
+    pub first_provider_output_payload_evidence_status: String,
+    pub first_provider_output_payload_evidence: String,
+    pub first_provider_output_payload_detail: String,
     pub first_output_evidence: String,
     pub next_action: String,
     pub next_command: String,
+    pub return_contract: String,
     pub return_action: String,
     pub return_command: String,
+    pub final_output_replay_contract: String,
 }
 
 pub fn materialize_provider_samples(
@@ -107,6 +121,17 @@ pub fn materialize_provider_samples(
                     .to_owned()
             })
             .unwrap_or_else(|| "none".to_owned()),
+        first_provider_runner_registry_protocol: records
+            .first()
+            .map(|record| provider_runner_for(record).registry_protocol.to_owned())
+            .unwrap_or_else(|| "none".to_owned()),
+        first_provider_runner_registry_source: records
+            .first()
+            .map(|record| provider_runner_for(record).registry_source.to_owned())
+            .unwrap_or_else(|| "none".to_owned()),
+        first_provider_runner_real_device_capable: records
+            .first()
+            .is_some_and(|record| provider_runner_for(record).real_device_capable),
         first_provider_runner_kind: records
             .first()
             .map(|record| provider_runner_for(record).kind.to_owned())
@@ -115,14 +140,48 @@ pub fn materialize_provider_samples(
             .first()
             .map(|record| provider_runner_for(record).execution_mode.to_owned())
             .unwrap_or_else(|| "none".to_owned()),
+        first_provider_execution_comparison_contract: records
+            .first()
+            .map(|record| provider_execution_for(record).contract.to_owned())
+            .unwrap_or_else(|| "none".to_owned()),
+        first_provider_execution_comparison_status: records
+            .first()
+            .map(|record| provider_execution_for(record).comparison_status.to_owned())
+            .unwrap_or_else(|| "none".to_owned()),
+        first_provider_execution_evidence_status: records
+            .first()
+            .map(|record| provider_execution_for(record).evidence_status.to_owned())
+            .unwrap_or_else(|| "none".to_owned()),
+        first_provider_output_payload_contract: records
+            .first()
+            .map(|record| record.provider_output_payload_contract.clone())
+            .unwrap_or_else(|| "none".to_owned()),
+        first_provider_output_payload_status: records
+            .first()
+            .map(|record| record.provider_output_payload_status.clone())
+            .unwrap_or_else(|| "none".to_owned()),
+        first_provider_output_payload_evidence_status: records
+            .first()
+            .map(|record| record.provider_output_payload_evidence_status.clone())
+            .unwrap_or_else(|| "none".to_owned()),
+        first_provider_output_payload_evidence: records
+            .first()
+            .map(|record| record.provider_output_payload_evidence.clone())
+            .unwrap_or_else(|| "none".to_owned()),
+        first_provider_output_payload_detail: records
+            .first()
+            .map(|record| record.provider_output_payload_detail.clone())
+            .unwrap_or_else(|| "none".to_owned()),
         first_output_evidence: records
             .first()
             .map(|record| record.output_evidence.clone())
             .unwrap_or_else(|| "none".to_owned()),
         next_action: "replay-provider-sample".to_owned(),
         next_command: format!("nsdb replay-plan {} --json", output_dir.display()),
+        return_contract: "nsld-final-output-boundary-return-v1".to_owned(),
         return_action,
         return_command,
+        final_output_replay_contract: "nsdb-payload-execution-replay-plan-v1".to_owned(),
     })
 }
 
@@ -178,9 +237,17 @@ fn materialized_record(
     let mut record = record.clone();
     let runner = provider_runner_for(&record);
     let artifact = provider_sample_artifact(output_dir, &record, &runner);
+    let outcome = provider_execution_outcome_for_runner(&runner);
     record.sample_status = "provider-execution-ready".to_owned();
     record.validation_status = "provider-execution-validated".to_owned();
     record.output_evidence = artifact.evidence;
+    record.provider_output_payload_contract = outcome.output_payload_contract.to_owned();
+    record.provider_output_payload_status = artifact.output_payload.status.clone();
+    record.provider_output_payload_evidence_status =
+        artifact.output_payload.evidence_status.clone();
+    record.provider_output_payload_evidence = artifact.output_payload.evidence.clone();
+    record.provider_output_payload_detail = artifact.output_payload.detail.clone();
+    record.provider_output_payload_next_action = outcome.output_payload_next_action.to_owned();
     record.materialization_status = "provider-sample-materialized".to_owned();
     record.materialization_detail = artifact.detail;
     record.next_action = "replay-device-sample".to_owned();
@@ -192,6 +259,9 @@ struct ProviderSampleRunner {
     adapter_contract: &'static str,
     adapter_id: &'static str,
     adapter_capability_status: &'static str,
+    registry_protocol: &'static str,
+    registry_source: &'static str,
+    real_device_capable: bool,
     kind: &'static str,
     execution_mode: &'static str,
     backend: &'static str,
@@ -199,43 +269,70 @@ struct ProviderSampleRunner {
 }
 
 fn provider_runner_for(record: &NsdbDeviceProviderSampleRecordInfo) -> ProviderSampleRunner {
+    let adapter =
+        crate::provider_runner_registry::select_provider_runner_adapter(&record.provider_family);
     match record.provider_family.as_str() {
         "metal:apple-silicon-gpu" => ProviderSampleRunner {
             contract: "nuis-provider-runner-v1",
             adapter_contract: "nuis-provider-runner-adapter-v1",
-            adapter_id: "metal.apple-silicon-gpu.host-simulated",
-            adapter_capability_status: "registered-host-simulated",
-            kind: "metal-host-simulated-runner",
-            execution_mode: "host-simulated-provider-runner",
+            adapter_id: adapter.adapter_id,
+            adapter_capability_status: adapter.capability_status,
+            registry_protocol: "nuis-provider-runner-registry-v1",
+            registry_source: "builtin-nustar-provider-runner-registry",
+            real_device_capable: adapter.real_device_capable,
+            kind: adapter.kind,
+            execution_mode: adapter.execution_mode,
             backend: "metal",
             device: "apple-silicon-gpu",
         },
         "coreml:apple-ane" => ProviderSampleRunner {
             contract: "nuis-provider-runner-v1",
             adapter_contract: "nuis-provider-runner-adapter-v1",
-            adapter_id: "coreml.apple-ane.host-simulated",
-            adapter_capability_status: "registered-host-simulated",
-            kind: "coreml-host-simulated-runner",
-            execution_mode: "host-simulated-provider-runner",
+            adapter_id: adapter.adapter_id,
+            adapter_capability_status: adapter.capability_status,
+            registry_protocol: "nuis-provider-runner-registry-v1",
+            registry_source: "builtin-nustar-provider-runner-registry",
+            real_device_capable: adapter.real_device_capable,
+            kind: adapter.kind,
+            execution_mode: adapter.execution_mode,
             backend: "coreml",
             device: "apple-ane",
         },
         _ => ProviderSampleRunner {
             contract: "nuis-provider-runner-v1",
             adapter_contract: "nuis-provider-runner-adapter-v1",
-            adapter_id: "generic.device.host-simulated",
-            adapter_capability_status: "registered-host-simulated",
-            kind: "generic-host-simulated-runner",
-            execution_mode: "host-simulated-provider-runner",
+            adapter_id: adapter.adapter_id,
+            adapter_capability_status: adapter.capability_status,
+            registry_protocol: "nuis-provider-runner-registry-v1",
+            registry_source: "builtin-nustar-provider-runner-registry",
+            real_device_capable: adapter.real_device_capable,
+            kind: adapter.kind,
+            execution_mode: adapter.execution_mode,
             backend: "generic",
             device: "generic-device",
         },
     }
 }
 
+fn provider_execution_for(
+    record: &NsdbDeviceProviderSampleRecordInfo,
+) -> crate::provider_sample_execution::ProviderExecutionOutcome {
+    let adapter =
+        crate::provider_runner_registry::select_provider_runner_adapter(&record.provider_family);
+    provider_execution_outcome(&adapter)
+}
+
 struct ProviderSampleArtifact {
     evidence: String,
     detail: String,
+    output_payload: ProviderOutputPayload,
+}
+
+struct ProviderOutputPayload {
+    evidence: String,
+    detail: String,
+    status: String,
+    evidence_status: String,
 }
 
 fn provider_sample_artifact(
@@ -247,8 +344,9 @@ fn provider_sample_artifact(
         "nuis.nsdb.provider-sample.{}.toml",
         sanitize_artifact_component(&record.provider_family)
     );
+    let output_payload = provider_output_payload(output_dir, record, runner);
     let path = output_dir.join(&file_name);
-    let content = render_provider_sample_artifact(record, runner);
+    let content = render_provider_sample_artifact(record, runner, &output_payload);
     let hash = fnv1a64_hex(content.as_bytes());
     let write_status = match fs::write(&path, content) {
         Ok(()) => "written",
@@ -257,12 +355,91 @@ fn provider_sample_artifact(
     ProviderSampleArtifact {
         evidence: format!("{file_name}:hash={hash}:status={write_status}"),
         detail: format!("deterministic-provider-sample-artifact:{file_name}:{hash}:{write_status}"),
+        output_payload,
     }
+}
+
+fn provider_output_payload(
+    output_dir: &Path,
+    record: &NsdbDeviceProviderSampleRecordInfo,
+    runner: &ProviderSampleRunner,
+) -> ProviderOutputPayload {
+    let outcome = provider_execution_outcome_for_runner(runner);
+    if runner.real_device_capable {
+        if let Some(payload) = existing_provider_output_payload(output_dir, record, runner) {
+            return payload;
+        }
+        return ProviderOutputPayload {
+            evidence: "not-materialized".to_owned(),
+            detail: outcome.detail.to_owned(),
+            status: outcome.output_payload_status.to_owned(),
+            evidence_status: outcome.output_payload_evidence_status.to_owned(),
+        };
+    }
+    let file_name = provider_output_payload_file_name(&record.provider_family);
+    let path = output_dir.join(&file_name);
+    let content = render_provider_output_payload(record, runner);
+    let hash = fnv1a64_hex(content.as_bytes());
+    let write_status = match fs::write(&path, content) {
+        Ok(()) => "written",
+        Err(_) => "write-failed",
+    };
+    ProviderOutputPayload {
+        evidence: format!("{file_name}:hash={hash}:status={write_status}"),
+        detail: format!("deterministic-provider-output-payload:{file_name}:{hash}:{write_status}"),
+        status: "host-fallback-output-payload-ready".to_owned(),
+        evidence_status: "deterministic-provider-output-anchor".to_owned(),
+    }
+}
+
+fn existing_provider_output_payload(
+    output_dir: &Path,
+    record: &NsdbDeviceProviderSampleRecordInfo,
+    runner: &ProviderSampleRunner,
+) -> Option<ProviderOutputPayload> {
+    let file_name = provider_output_payload_file_name(&record.provider_family);
+    let path = output_dir.join(&file_name);
+    let content = fs::read(&path).ok()?;
+    let hash = fnv1a64_hex(&content);
+    Some(ProviderOutputPayload {
+        evidence: format!("{file_name}:hash={hash}:status=attached"),
+        detail: format!(
+            "real-device-provider-output-payload:{file_name}:{hash}:attached:{}",
+            runner.adapter_id
+        ),
+        status: "real-device-output-payload-attached".to_owned(),
+        evidence_status: "provider-output-payload-attached".to_owned(),
+    })
+}
+
+fn provider_output_payload_file_name(provider_family: &str) -> String {
+    format!(
+        "nuis.nsdb.provider-output.{}.toml",
+        sanitize_artifact_component(provider_family)
+    )
+}
+
+fn render_provider_output_payload(
+    record: &NsdbDeviceProviderSampleRecordInfo,
+    runner: &ProviderSampleRunner,
+) -> String {
+    let mut out = String::new();
+    push_toml_string(&mut out, "protocol", "nuis-provider-output-payload-v1");
+    push_toml_string(&mut out, "source", "nsdb-materialize-provider-samples");
+    push_toml_string(&mut out, "trace_id", &record.trace_id);
+    push_toml_string(&mut out, "provider_family", &record.provider_family);
+    push_toml_string(&mut out, "provider_runner_adapter_id", runner.adapter_id);
+    push_toml_string(&mut out, "provider_execution_mode", runner.execution_mode);
+    push_toml_string(&mut out, "input_evidence", &record.input_evidence);
+    push_toml_string(&mut out, "output_payload_kind", "host-fallback-anchor");
+    push_toml_string(&mut out, "comparison_status", "ready-for-comparison");
+    out
 }
 
 fn render_provider_sample_artifact(
     record: &NsdbDeviceProviderSampleRecordInfo,
     runner: &ProviderSampleRunner,
+    output_payload: &ProviderOutputPayload,
 ) -> String {
     let mut out = String::new();
     push_toml_string(
@@ -287,10 +464,33 @@ fn render_provider_sample_artifact(
         "provider_runner_adapter_capability_status",
         runner.adapter_capability_status,
     );
+    push_toml_string(
+        &mut out,
+        "provider_runner_registry_protocol",
+        runner.registry_protocol,
+    );
+    push_toml_string(
+        &mut out,
+        "provider_runner_registry_source",
+        runner.registry_source,
+    );
+    out.push_str(&format!(
+        "provider_runner_real_device_capable = {}\n",
+        runner.real_device_capable
+    ));
+    push_toml_string(
+        &mut out,
+        "provider_runner_real_device_probe_status",
+        crate::provider_runner_registry::provider_runner_real_device_probe_status(
+            &record.provider_family,
+        ),
+    );
     push_toml_string(&mut out, "provider_runner_kind", runner.kind);
     push_toml_string(&mut out, "provider_execution_mode", runner.execution_mode);
     push_toml_string(&mut out, "provider_backend", runner.backend);
     push_toml_string(&mut out, "provider_device", runner.device);
+    let outcome = provider_execution_outcome_for_runner(runner);
+    push_provider_execution_outcome(&mut out, &outcome, Some(output_payload));
     push_toml_string(&mut out, "handoff_target", &record.handoff_target);
     push_toml_string(&mut out, "input_evidence", &record.input_evidence);
     push_toml_string(&mut out, "sample_status", "provider-execution-ready");
@@ -301,6 +501,81 @@ fn render_provider_sample_artifact(
     );
     push_toml_string(&mut out, "materialization_mode", runner.execution_mode);
     out
+}
+
+fn provider_execution_outcome_for_runner(
+    runner: &ProviderSampleRunner,
+) -> crate::provider_sample_execution::ProviderExecutionOutcome {
+    provider_execution_outcome(&crate::provider_runner_registry::ProviderRunnerAdapter {
+        adapter_id: runner.adapter_id,
+        capability_status: runner.adapter_capability_status,
+        real_device_capable: runner.real_device_capable,
+        kind: runner.kind,
+        execution_mode: runner.execution_mode,
+    })
+}
+
+fn push_provider_execution_outcome(
+    out: &mut String,
+    outcome: &crate::provider_sample_execution::ProviderExecutionOutcome,
+    payload: Option<&ProviderOutputPayload>,
+) {
+    push_toml_string(
+        out,
+        "provider_execution_comparison_contract",
+        outcome.contract,
+    );
+    push_toml_string(out, "provider_execution_status", outcome.status);
+    push_toml_string(
+        out,
+        "provider_execution_comparison_status",
+        outcome.comparison_status,
+    );
+    push_toml_string(
+        out,
+        "provider_execution_evidence_status",
+        outcome.evidence_status,
+    );
+    push_toml_string(
+        out,
+        "provider_output_payload_contract",
+        outcome.output_payload_contract,
+    );
+    push_toml_string(
+        out,
+        "provider_output_payload_status",
+        payload
+            .map(|payload| payload.status.as_str())
+            .unwrap_or(outcome.output_payload_status),
+    );
+    push_toml_string(
+        out,
+        "provider_output_payload_evidence_status",
+        payload
+            .map(|payload| payload.evidence_status.as_str())
+            .unwrap_or(outcome.output_payload_evidence_status),
+    );
+    push_toml_string(
+        out,
+        "provider_output_payload_evidence",
+        payload
+            .map(|payload| payload.evidence.as_str())
+            .unwrap_or(outcome.output_payload_file_name),
+    );
+    push_toml_string(
+        out,
+        "provider_output_payload_detail",
+        payload
+            .map(|payload| payload.detail.as_str())
+            .unwrap_or(outcome.detail),
+    );
+    push_toml_string(
+        out,
+        "provider_output_payload_next_action",
+        outcome.output_payload_next_action,
+    );
+    push_toml_string(out, "provider_execution_next_action", outcome.next_action);
+    push_toml_string(out, "provider_execution_detail", outcome.detail);
 }
 
 fn sanitize_artifact_component(value: &str) -> String {
@@ -374,8 +649,32 @@ fn render_materialized_manifest(records: &[NsdbDeviceProviderSampleRecordInfo]) 
             "provider_runner_adapter_capability_status",
             runner.adapter_capability_status,
         );
+        push_toml_string(
+            &mut out,
+            "provider_runner_registry_protocol",
+            runner.registry_protocol,
+        );
+        push_toml_string(
+            &mut out,
+            "provider_runner_registry_source",
+            runner.registry_source,
+        );
+        out.push_str(&format!(
+            "provider_runner_real_device_capable = {}\n",
+            runner.real_device_capable
+        ));
+        push_toml_string(
+            &mut out,
+            "provider_runner_real_device_probe_status",
+            crate::provider_runner_registry::provider_runner_real_device_probe_status(
+                &record.provider_family,
+            ),
+        );
         push_toml_string(&mut out, "provider_runner_kind", runner.kind);
         push_toml_string(&mut out, "provider_execution_mode", runner.execution_mode);
+        let outcome = provider_execution_outcome_for_runner(&runner);
+        let output_payload = provider_output_payload_from_record(record);
+        push_provider_execution_outcome(&mut out, &outcome, output_payload.as_ref());
         push_toml_string(&mut out, "handoff_target", &record.handoff_target);
         push_toml_string(&mut out, "sample_status", &record.sample_status);
         push_toml_string(&mut out, "validation_status", &record.validation_status);
@@ -394,6 +693,17 @@ fn render_materialized_manifest(records: &[NsdbDeviceProviderSampleRecordInfo]) 
         push_toml_string(&mut out, "next_action", &record.next_action);
     }
     out
+}
+
+fn provider_output_payload_from_record(
+    record: &NsdbDeviceProviderSampleRecordInfo,
+) -> Option<ProviderOutputPayload> {
+    (record.provider_output_payload_evidence != "none").then(|| ProviderOutputPayload {
+        evidence: record.provider_output_payload_evidence.clone(),
+        detail: record.provider_output_payload_detail.clone(),
+        status: record.provider_output_payload_status.clone(),
+        evidence_status: record.provider_output_payload_evidence_status.clone(),
+    })
 }
 
 fn materialized_manifest_status(records: &[NsdbDeviceProviderSampleRecordInfo]) -> String {
@@ -431,266 +741,4 @@ fn push_toml_string(out: &mut String, key: &str, value: &str) {
     out.push_str(" = \"");
     out.push_str(&value.replace('\\', "\\\\").replace('"', "\\\""));
     out.push_str("\"\n");
-}
-
-#[cfg(test)]
-mod tests {
-    use super::materialize_provider_samples;
-    use std::{
-        env, fs,
-        time::{SystemTime, UNIX_EPOCH},
-    };
-
-    #[test]
-    fn materializes_pending_provider_sample_manifest() {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let output_dir = env::temp_dir().join(format!("nsdb-provider-materialize-{nonce}"));
-        fs::create_dir_all(&output_dir).unwrap();
-        fs::write(
-            output_dir.join("nuis.nsdb.device-provider-samples.toml"),
-            r#"
-protocol = "nuis-device-provider-samples-v1"
-schema = "nsdb-yir-device-provider-sample-v1"
-source = "run-artifact-provider-sample-manifest"
-status = "awaiting-provider-materialization"
-record_count = 1
-ready_record_count = 0
-pending_record_count = 1
-
-[[device_provider_samples]]
-trace_id = "hetero-trace:shader:metal:apple-silicon-gpu"
-provider = "nustar-deferred-device-sample-v1"
-provider_family = "metal:apple-silicon-gpu"
-handoff_target = "metal:apple-silicon-gpu"
-sample_status = "pending-provider-execution"
-validation_status = "pending-provider-execution"
-input_evidence = "metallib:pixelmagic.metallib"
-output_evidence = "not-materialized"
-materialization_status = "provider-sample-pending"
-materialization_detail = "awaiting-provider-runtime"
-next_action = "execute-provider-sample"
-"#,
-        )
-        .unwrap();
-
-        let report = materialize_provider_samples(&output_dir, None).unwrap();
-        let source =
-            fs::read_to_string(output_dir.join("nuis.nsdb.device-provider-samples.toml")).unwrap();
-
-        assert_eq!(report.status, "ready");
-        assert_eq!(
-            report.provider_families,
-            vec!["metal:apple-silicon-gpu".to_owned()]
-        );
-        assert_eq!(report.matched_record_count, 1);
-        assert_eq!(report.materialized_record_count, 1);
-        assert_eq!(report.skipped_record_count, 0);
-        assert_eq!(
-            report.first_provider_runner_contract,
-            "nuis-provider-runner-v1"
-        );
-        assert_eq!(
-            report.first_provider_runner_adapter_contract,
-            "nuis-provider-runner-adapter-v1"
-        );
-        assert_eq!(
-            report.first_provider_runner_adapter_id,
-            "metal.apple-silicon-gpu.host-simulated"
-        );
-        assert_eq!(
-            report.first_provider_runner_adapter_capability_status,
-            "registered-host-simulated"
-        );
-        assert_eq!(
-            report.first_provider_runner_kind,
-            "metal-host-simulated-runner"
-        );
-        assert_eq!(
-            report.first_provider_execution_mode,
-            "host-simulated-provider-runner"
-        );
-        assert_eq!(report.next_action, "replay-provider-sample");
-        assert!(report.next_command.contains("nsdb replay-plan "));
-        assert!(report.next_command.contains("--json"));
-        assert_eq!(
-            report.return_action,
-            "resume-nsld-final-output-check-manifest-required"
-        );
-        assert_eq!(
-            report.return_command,
-            "nsld check <nuis.build.manifest.toml> --json"
-        );
-        assert!(source.contains("source = \"nsdb-materialize-provider-samples\""));
-        assert!(source.contains("ready_record_count = 1"));
-        assert!(source.contains("pending_record_count = 0"));
-        assert!(source.contains(
-            "output_evidence = \"nuis.nsdb.provider-sample.metal-apple-silicon-gpu.toml:hash=0x"
-        ));
-        assert!(source.contains("materialization_status = \"provider-sample-materialized\""));
-        assert!(source.contains("provider_runner_contract = \"nuis-provider-runner-v1\""));
-        assert!(source
-            .contains("provider_runner_adapter_contract = \"nuis-provider-runner-adapter-v1\""));
-        assert!(source
-            .contains("provider_runner_adapter_id = \"metal.apple-silicon-gpu.host-simulated\""));
-        assert!(source
-            .contains("provider_runner_adapter_capability_status = \"registered-host-simulated\""));
-        assert!(source.contains("provider_runner_kind = \"metal-host-simulated-runner\""));
-        assert!(source.contains("provider_execution_mode = \"host-simulated-provider-runner\""));
-        assert!(source.contains(
-            "materialization_detail = \"deterministic-provider-sample-artifact:nuis.nsdb.provider-sample.metal-apple-silicon-gpu.toml:0x"
-        ));
-        assert!(source.contains("next_action = \"replay-device-sample\""));
-        let artifact = fs::read_to_string(
-            output_dir.join("nuis.nsdb.provider-sample.metal-apple-silicon-gpu.toml"),
-        )
-        .unwrap();
-        assert!(artifact.contains("protocol = \"nuis-nsdb-provider-sample-artifact-v1\""));
-        assert!(artifact.contains("schema = \"nsdb-yir-provider-sample-artifact-v1\""));
-        assert!(artifact.contains("provider_runner_contract = \"nuis-provider-runner-v1\""));
-        assert!(artifact
-            .contains("provider_runner_adapter_contract = \"nuis-provider-runner-adapter-v1\""));
-        assert!(artifact
-            .contains("provider_runner_adapter_id = \"metal.apple-silicon-gpu.host-simulated\""));
-        assert!(artifact
-            .contains("provider_runner_adapter_capability_status = \"registered-host-simulated\""));
-        assert!(artifact.contains("provider_runner_kind = \"metal-host-simulated-runner\""));
-        assert!(artifact.contains("provider_backend = \"metal\""));
-        assert!(artifact.contains("provider_device = \"apple-silicon-gpu\""));
-        assert!(artifact.contains("materialization_mode = \"host-simulated-provider-runner\""));
-
-        fs::remove_dir_all(output_dir).unwrap();
-    }
-
-    #[test]
-    fn materializer_returns_concrete_nsld_check_when_manifest_is_in_output_dir() {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let output_dir = env::temp_dir().join(format!("nsdb-provider-return-{nonce}"));
-        fs::create_dir_all(&output_dir).unwrap();
-        fs::write(
-            output_dir.join("nuis.build.manifest.toml"),
-            "manifest = true\n",
-        )
-        .unwrap();
-        fs::write(
-            output_dir.join("nuis.nsdb.device-provider-samples.toml"),
-            r#"
-protocol = "nuis-device-provider-samples-v1"
-schema = "nsdb-yir-device-provider-sample-v1"
-source = "run-artifact-provider-sample-manifest"
-status = "awaiting-provider-materialization"
-record_count = 1
-ready_record_count = 0
-pending_record_count = 1
-
-[[device_provider_samples]]
-trace_id = "hetero-trace:shader:metal:apple-silicon-gpu"
-provider = "nustar-deferred-device-sample-v1"
-provider_family = "metal:apple-silicon-gpu"
-handoff_target = "metal:apple-silicon-gpu"
-sample_status = "pending-provider-execution"
-validation_status = "pending-provider-execution"
-input_evidence = "metallib:pixelmagic.metallib"
-output_evidence = "not-materialized"
-materialization_status = "provider-sample-pending"
-materialization_detail = "awaiting-provider-runtime"
-next_action = "execute-provider-sample"
-"#,
-        )
-        .unwrap();
-
-        let report = materialize_provider_samples(&output_dir, None).unwrap();
-
-        assert_eq!(report.return_action, "resume-nsld-final-output-check");
-        assert_eq!(
-            report.return_command,
-            format!("nsld check {} --json", output_dir.display())
-        );
-
-        fs::remove_dir_all(output_dir).unwrap();
-    }
-
-    #[test]
-    fn materializes_only_matching_provider_family() {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let output_dir = env::temp_dir().join(format!("nsdb-provider-filter-{nonce}"));
-        fs::create_dir_all(&output_dir).unwrap();
-        fs::write(
-            output_dir.join("nuis.nsdb.device-provider-samples.toml"),
-            r#"
-protocol = "nuis-device-provider-samples-v1"
-schema = "nsdb-yir-device-provider-sample-v1"
-source = "run-artifact-provider-sample-manifest"
-status = "awaiting-provider-materialization"
-record_count = 2
-ready_record_count = 0
-pending_record_count = 2
-
-[[device_provider_samples]]
-trace_id = "hetero-trace:shader:metal:apple-silicon-gpu"
-provider = "nustar-deferred-device-sample-v1"
-provider_family = "metal:apple-silicon-gpu"
-handoff_target = "metal:apple-silicon-gpu"
-sample_status = "pending-provider-execution"
-validation_status = "pending-provider-execution"
-input_evidence = "metallib:pixelmagic.metallib"
-output_evidence = "not-materialized"
-materialization_status = "provider-sample-pending"
-materialization_detail = "awaiting-provider-runtime"
-next_action = "execute-provider-sample"
-
-[[device_provider_samples]]
-trace_id = "hetero-trace:shader:spirv:vulkan-gpu"
-provider = "nustar-deferred-device-sample-v1"
-provider_family = "spirv:vulkan-gpu"
-handoff_target = "spirv:vulkan-gpu"
-sample_status = "pending-provider-execution"
-validation_status = "pending-provider-execution"
-input_evidence = "spv:pixelmagic.spv"
-output_evidence = "not-materialized"
-materialization_status = "provider-sample-pending"
-materialization_detail = "awaiting-provider-runtime"
-next_action = "execute-provider-sample"
-"#,
-        )
-        .unwrap();
-
-        let report =
-            materialize_provider_samples(&output_dir, Some("metal:apple-silicon-gpu")).unwrap();
-        let source =
-            fs::read_to_string(output_dir.join("nuis.nsdb.device-provider-samples.toml")).unwrap();
-
-        assert_eq!(
-            report.provider_family_filter.as_deref(),
-            Some("metal:apple-silicon-gpu")
-        );
-        assert_eq!(
-            report.provider_families,
-            vec![
-                "metal:apple-silicon-gpu".to_owned(),
-                "spirv:vulkan-gpu".to_owned()
-            ]
-        );
-        assert_eq!(report.status, "awaiting-provider-materialization");
-        assert_eq!(report.matched_record_count, 1);
-        assert_eq!(report.materialized_record_count, 1);
-        assert_eq!(report.skipped_record_count, 1);
-        assert!(source.contains("ready_record_count = 1"));
-        assert!(source.contains("pending_record_count = 1"));
-        assert!(source.contains(
-            "output_evidence = \"nuis.nsdb.provider-sample.metal-apple-silicon-gpu.toml:hash=0x"
-        ));
-        assert!(source.contains("output_evidence = \"not-materialized\""));
-        assert!(source.contains("provider_family = \"spirv:vulkan-gpu\""));
-
-        fs::remove_dir_all(output_dir).unwrap();
-    }
 }

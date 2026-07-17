@@ -25,6 +25,11 @@ pub(crate) enum Command {
         provider_family: Option<String>,
         json: bool,
     },
+    ExecuteProviderSamples {
+        output_dir: PathBuf,
+        provider_family: Option<String>,
+        json: bool,
+    },
 }
 
 pub(crate) fn parse_args<I>(mut args: I) -> Result<Command, String>
@@ -69,6 +74,15 @@ where
                 json,
             })
         }
+        "execute-provider-samples" => {
+            let (output_dir, provider_family, json) =
+                parse_provider_materialize_args(args.by_ref())?;
+            Ok(Command::ExecuteProviderSamples {
+                output_dir,
+                provider_family,
+                json,
+            })
+        }
         "--help" | "-h" | "help" => Err(usage().to_owned()),
         other => Err(format!("unknown nsdb command `{other}`\n{}", usage())),
     }
@@ -89,7 +103,7 @@ pub(crate) fn resolve_manifest_input(input: &Path) -> Result<PathBuf, String> {
 }
 
 fn usage() -> &'static str {
-    "usage:\n  nsdb status\n  nsdb inspect <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb events <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb replay-plan <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb materialize-provider-samples <artifact-output-dir> [--provider-family <family>] [--json]"
+    "usage:\n  nsdb status\n  nsdb inspect <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb events <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb replay-plan <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb materialize-provider-samples <artifact-output-dir> [--provider-family <family>] [--json]\n  nsdb execute-provider-samples <artifact-output-dir> [--provider-family <family>] [--json]"
 }
 
 fn parse_provider_materialize_args<I>(
@@ -270,6 +284,28 @@ mod tests {
         assert_eq!(
             command,
             Ok(Command::MaterializeProviderSamples {
+                output_dir: PathBuf::from("out"),
+                provider_family: Some("metal:apple-silicon-gpu".to_owned()),
+                json: true,
+            })
+        );
+    }
+
+    #[test]
+    fn parses_execute_provider_samples_command() {
+        let command = parse_args(
+            vec![
+                "execute-provider-samples".to_owned(),
+                "out".to_owned(),
+                "--provider-family".to_owned(),
+                "metal:apple-silicon-gpu".to_owned(),
+                "--json".to_owned(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(
+            command,
+            Ok(Command::ExecuteProviderSamples {
                 output_dir: PathBuf::from("out"),
                 provider_family: Some("metal:apple-silicon-gpu".to_owned()),
                 json: true,

@@ -187,6 +187,34 @@ pub(crate) fn nsld_final_executable_output_report_json(
             "final_output_nsdb_replay_first_blocker",
             report.final_output_nsdb_replay_first_blocker.as_deref(),
         ),
+        json_string_field(
+            "owned_package_summary_contract",
+            &report.owned_package_summary_contract,
+        ),
+        json_string_field(
+            "owned_package_summary_status",
+            &report.owned_package_summary_status,
+        ),
+        json_bool_field(
+            "owned_package_summary_ready",
+            report.owned_package_summary_ready,
+        ),
+        json_string_field(
+            "owned_package_summary_replay_status",
+            &report.owned_package_summary_replay_status,
+        ),
+        json_bool_field(
+            "owned_package_summary_replay_ready",
+            report.owned_package_summary_replay_ready,
+        ),
+        json_string_field(
+            "owned_package_summary_next_action",
+            &report.owned_package_summary_next_action,
+        ),
+        json_optional_string_field(
+            "owned_package_summary_next_command",
+            report.owned_package_summary_next_command.as_deref(),
+        ),
         json_bool_field(
             "device_provider_sample_manifest_available",
             report.device_provider_sample_manifest_available,

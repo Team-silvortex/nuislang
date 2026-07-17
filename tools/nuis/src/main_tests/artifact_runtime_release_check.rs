@@ -36,3 +36,50 @@ fn release_check_summary_json_mirrors_generated_payload_decoder_manifest() {
     ));
     assert!(json.contains("\"nsld_drive_protocol\":\"nsld-drive-command-set-v1\""));
 }
+
+#[test]
+fn release_check_summary_json_mirrors_replay_ready_self_contained_closure() {
+    let project_root = write_temp_project_fixture(
+        "release_check_self_contained_replay_ready",
+        r#"
+name = "release_check_self_contained_replay_ready"
+entry = "main.ns"
+modules = ["main.ns"]
+abi = ["cpu=cpu.arm64.apple_aapcs64"]
+"#
+        .trim_start(),
+        r#"
+mod cpu Main {
+  fn main() -> i64 {
+    return 0;
+  }
+}
+"#,
+    );
+    let output_dir = temp_dir("release_check_self_contained_replay_ready_outputs");
+
+    handle_build(
+        project_root.clone(),
+        output_dir.clone(),
+        false,
+        None,
+        None,
+        Some("nuis-self-contained-image".to_owned()),
+    )
+    .expect("build passes");
+    write_prepared_nsld_chain_placeholders(&output_dir);
+    write_ready_nsld_final_tail_placeholders(&output_dir);
+    write_nsdb_payload_handoff_placeholder(&output_dir);
+
+    let json = render_release_check_summary_json(&project_root, &output_dir);
+    assert!(json.contains("\"kind\":\"release_check_summary\""));
+    assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_ready\":true"));
+    assert!(json
+        .contains("\"nsld_final_executable_output_nsdb_replay_status\":\"replay-evidence-ready\""));
+    assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_checkpoint_count\":1"));
+    assert!(json.contains("\"nsld_final_executable_output_nsdb_replayable_checkpoint_count\":1"));
+    assert!(json.contains(
+        "\"nsld_final_executable_output_nsdb_replay_next_action\":\"replay-nsdb-payload-execution\""
+    ));
+    assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_first_blocker\":null"));
+}

@@ -35,6 +35,21 @@ fn project_check_summary_json_fields_report_all_green() {
 }
 
 #[test]
+fn project_frontdoor_docs_define_closure_then_tensor_reading_order() {
+    let frontdoor_doc =
+        include_str!("../../../../docs/reference/nuis-frontdoor-surface-reference.md");
+    assert!(frontdoor_doc.contains("closure_summary_status"));
+    assert!(frontdoor_doc.contains(
+        "frontdoor_reading_order: closure_summary -> dev_tensor_weakest_task_card_handoff"
+    ));
+    assert!(frontdoor_doc.contains("frontdoor_sample_closure_summary"));
+    assert!(frontdoor_doc.contains("frontdoor_sample_tensor_handoff"));
+    assert!(frontdoor_doc.contains("dev_tensor_weakest_task_card_coordinate"));
+    assert!(frontdoor_doc.contains("dev_tensor_weakest_task_card_handoff_coordinate"));
+    assert!(frontdoor_doc.contains("which bootstrap coordinate should we push next"));
+}
+
+#[test]
 fn project_status_json_reports_frontdoor_and_surface_fields() {
     let project_root = write_temp_project_fixture(
         "status_json_smoke",

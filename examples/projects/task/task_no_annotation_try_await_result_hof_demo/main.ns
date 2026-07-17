@@ -38,14 +38,39 @@ mod cpu Main {
     return mapped;
   }
 
+  async fn compute_err_hof(seed: i64) -> Result<i64, Error> {
+    let waited: i64 = await work(seed);
+    let mapped: Result<i64, Error> = map_result(
+      fetch(0),
+      |value: i64| -> i64 { return value + waited; }
+    );
+    return mapped;
+  }
+
   async fn main() -> i64 {
-    let result: Result<i64, Error> = await compute(3);
-    match result {
-      Result.Ok(value) => {
-        return value;
+    let ok_result: Result<i64, Error> = await compute(3);
+    let err_result: Result<i64, Error> = await compute_err_hof(5);
+    let try_err_result: Result<i64, Error> = await compute(0);
+    match err_result {
+      Result.Ok(_) => {
+        return 99;
       }
       Result.Err(_) => {
-        return 0;
+        match try_err_result {
+          Result.Ok(_) => {
+            return 98;
+          }
+          Result.Err(_) => {
+            match ok_result {
+              Result.Ok(value) => {
+                return value + 7;
+              }
+              Result.Err(_) => {
+                return 0;
+              }
+            }
+          }
+        }
       }
     }
   }

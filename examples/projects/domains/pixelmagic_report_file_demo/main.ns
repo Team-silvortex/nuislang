@@ -5,12 +5,23 @@ mod cpu Main {
   extern "c" fn host_argv_count() -> i64;
   extern "c" fn host_argv_at(index: i64) -> i64;
   extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
+  extern "c" fn host_file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
   extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
   extern "c" fn host_file_close(file_handle: i64) -> i64;
   extern "c" fn host_stdout_write(text_handle: i64) -> i64;
   extern "c" fn host_stdout_flush() -> i64;
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_text_len(text_handle: i64) -> i64;
+  extern "c" fn host_serialize_i64_into(
+    value: i64,
+    buffer_handle: i64,
+    offset: i64
+  ) -> i64;
+  extern "c" fn host_deserialize_text_from(
+    buffer_handle: i64,
+    offset: i64,
+    len: i64
+  ) -> i64;
 
   struct PixelMagicReportSummary {
     argv_count: i64,
@@ -30,15 +41,38 @@ mod cpu Main {
     return text_handle(value);
   }
 
-  fn build_pixelmagic_report_text() -> i64 {
+  fn text_i64(value: i64) -> i64 {
+    let buffer: ref Buffer = alloc_buffer(32, 0);
+    let len: i64 = serialize_i64_into(value, buffer, 0);
+    return deserialize_text_from(buffer, 0, len);
+  }
+
+  fn optional_preprocessed_image_line(argv_count: i64, input_path_handle: i64) -> i64 {
+    let read_len: i64 = 256;
+    let buffer: ref Buffer = alloc_buffer(read_len, 0);
+    let input_file_handle: i64 = host_file_open(input_path_handle, 0);
+    let bytes_read: i64 =
+      host_file_read(input_file_handle, host_buffer_handle(buffer), read_len);
+    let close_status: i64 = host_file_close(input_file_handle);
+    return host_text_concat(
+      host_text_concat(
+        text_from_literal("input: std-preprocessed-pgm\ninput_bytes: "),
+        text_i64(bytes_read)
+      ),
+      text_from_literal("\n")
+    );
+  }
+
+  fn build_pixelmagic_report_text(argv_count: i64, input_path_handle: i64) -> i64 {
     let title: i64 = text_from_literal("pixelmagic report\n");
     let package_line: i64 = text_from_literal("package: pixelmagic\n");
     let route_line: i64 = text_from_literal("route: std-report-file\n");
     let workload_line: i64 = text_from_literal("workload: image-analysis\n");
     let status_line: i64 = text_from_literal("status: ready\n");
+    let input_line: i64 = optional_preprocessed_image_line(argv_count, input_path_handle);
     return host_text_concat(
       host_text_concat(host_text_concat(title, package_line), route_line),
-      host_text_concat(workload_line, status_line)
+      host_text_concat(host_text_concat(workload_line, input_line), status_line)
     );
   }
 
@@ -55,7 +89,8 @@ mod cpu Main {
   }
 
   fn capture_pixelmagic_report(argv_count: i64, output_path_handle: i64) -> PixelMagicReportSummary {
-    let report_handle: i64 = build_pixelmagic_report_text();
+    let input_path_handle: i64 = host_argv_at(2);
+    let report_handle: i64 = build_pixelmagic_report_text(argv_count, input_path_handle);
     let report_len: i64 = host_text_len(report_handle);
     let output_file_handle: i64 = host_file_open(output_path_handle, 1537);
     let written_len: i64 = host_file_write(output_file_handle, report_handle);

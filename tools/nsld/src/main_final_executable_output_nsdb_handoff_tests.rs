@@ -83,8 +83,27 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
         output.final_output_nsdb_replay_next_action,
         "replay-nsdb-payload-execution"
     );
+    assert_eq!(
+        output.owned_package_summary_contract,
+        "nsld-owned-package-summary-v1"
+    );
+    assert_eq!(output.owned_package_summary_status, "replay-ready");
+    assert!(output.owned_package_summary_ready);
+    assert_eq!(
+        output.owned_package_summary_replay_status,
+        "replay-evidence-ready"
+    );
+    assert!(output.owned_package_summary_replay_ready);
+    assert_eq!(
+        output.owned_package_summary_next_action,
+        "replay-nsdb-payload-execution"
+    );
     assert!(output
         .final_output_nsdb_replay_next_command
+        .as_deref()
+        .is_some_and(|command| command.starts_with("nsdb replay-plan ")));
+    assert!(output
+        .owned_package_summary_next_command
         .as_deref()
         .is_some_and(|command| command.starts_with("nsdb replay-plan ")));
     assert!(output.final_output_nsdb_replay_first_blocker.is_none());
@@ -107,6 +126,17 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
     assert!(output_json
         .contains("\"final_output_nsdb_replay_next_action\":\"replay-nsdb-payload-execution\""));
     assert!(output_json.contains("\"final_output_nsdb_replay_next_command\":\"nsdb replay-plan "));
+    assert!(output_json
+        .contains("\"owned_package_summary_contract\":\"nsld-owned-package-summary-v1\""));
+    assert!(output_json.contains("\"owned_package_summary_status\":\"replay-ready\""));
+    assert!(output_json.contains("\"owned_package_summary_ready\":true"));
+    assert!(
+        output_json.contains("\"owned_package_summary_replay_status\":\"replay-evidence-ready\"")
+    );
+    assert!(output_json.contains("\"owned_package_summary_replay_ready\":true"));
+    assert!(output_json
+        .contains("\"owned_package_summary_next_action\":\"replay-nsdb-payload-execution\""));
+    assert!(output_json.contains("\"owned_package_summary_next_command\":\"nsdb replay-plan "));
     assert!(output_json.contains("\"final_output_nsdb_replay_checkpoint_count\":1"));
     assert!(output_json.contains("\"final_output_nsdb_replayable_checkpoint_count\":1"));
     assert!(output_json.contains("\"final_output_nsdb_replay_first_blocker\":null"));

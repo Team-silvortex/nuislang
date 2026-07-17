@@ -91,6 +91,12 @@ pub(crate) struct DevTensorSummary {
     pub(crate) weakest_bootstrap_task_card_action: &'static str,
     pub(crate) weakest_bootstrap_task_card_command: &'static str,
     pub(crate) weakest_bootstrap_task_card_expected_artifact: &'static str,
+    pub(crate) weakest_bootstrap_task_card_handoff_mode: &'static str,
+    pub(crate) weakest_bootstrap_task_card_handoff_coordinate: String,
+    pub(crate) weakest_bootstrap_task_card_handoff_reason: String,
+    pub(crate) weakest_bootstrap_task_card_handoff_action: &'static str,
+    pub(crate) weakest_bootstrap_task_card_handoff_command: &'static str,
+    pub(crate) weakest_bootstrap_task_card_handoff_expected_artifact: &'static str,
     pub(crate) coverage_status: &'static str,
     pub(crate) coverage_expected_count: usize,
     pub(crate) coverage_covered_count: usize,
@@ -137,6 +143,29 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
         })
         .unwrap_or_else(|| "no bootstrap-critical tensor cell is currently registered".to_owned());
     let task_card_ready = weakest_bootstrap.is_some() && coverage.status == "clean";
+    let handoff_bootstrap =
+        weakest_bootstrap.and_then(|weakest| dev_tensor_handoff_bootstrap_cell(weakest));
+    let handoff_coordinate = handoff_bootstrap
+        .map(|cell| dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function))
+        .unwrap_or_else(|| task_card_coordinate.clone());
+    let handoff_mode = if handoff_bootstrap.is_some() {
+        "self-maintenance-handoff"
+    } else {
+        "direct"
+    };
+    let handoff_reason = handoff_bootstrap
+        .map(|cell| {
+            format!(
+                "weakest coordinate is the dev tensor itself; after refreshing the tensor, continue at {} with {}/100 progress",
+                handoff_coordinate, cell.progress
+            )
+        })
+        .unwrap_or_else(|| {
+            format!(
+                "weakest bootstrap task card is directly actionable at {}",
+                task_card_coordinate
+            )
+        });
     DevTensorSummary {
         architecture_count: architectures.len(),
         module_count: modules.len(),
@@ -202,6 +231,21 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
         weakest_bootstrap_task_card_expected_artifact: weakest_bootstrap
             .map(|cell| cell.expected_artifact)
             .unwrap_or("<none>"),
+        weakest_bootstrap_task_card_handoff_mode: handoff_mode,
+        weakest_bootstrap_task_card_handoff_coordinate: handoff_coordinate,
+        weakest_bootstrap_task_card_handoff_reason: handoff_reason,
+        weakest_bootstrap_task_card_handoff_action: handoff_bootstrap
+            .or(weakest_bootstrap)
+            .map(|cell| cell.next_action)
+            .unwrap_or("<none>"),
+        weakest_bootstrap_task_card_handoff_command: handoff_bootstrap
+            .or(weakest_bootstrap)
+            .map(|cell| cell.validation_command)
+            .unwrap_or("<none>"),
+        weakest_bootstrap_task_card_handoff_expected_artifact: handoff_bootstrap
+            .or(weakest_bootstrap)
+            .map(|cell| cell.expected_artifact)
+            .unwrap_or("<none>"),
         coverage_status: coverage.status,
         coverage_expected_count: coverage.expected_count,
         coverage_covered_count: coverage.covered_count,
@@ -209,6 +253,22 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
         coverage_orphaned_count: coverage.orphaned_count,
         coverage_stale_count: coverage.stale_count,
     }
+}
+
+fn dev_tensor_handoff_bootstrap_cell(weakest: &DevTensorCell) -> Option<&'static DevTensorCell> {
+    if dev_tensor_coordinate_key(weakest.architecture, weakest.module, weakest.function)
+        != "developer-system/dev-tensor/architecture-module-function-progress-model"
+    {
+        return None;
+    }
+    DEV_TENSOR_CELLS
+        .iter()
+        .filter(|cell| cell.bootstrap_critical)
+        .filter(|cell| {
+            dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function)
+                != "developer-system/dev-tensor/architecture-module-function-progress-model"
+        })
+        .min_by_key(|cell| cell.progress)
 }
 
 pub(crate) fn dev_tensor_coverage_summary() -> DevTensorCoverageSummary {
@@ -392,6 +452,26 @@ mod tests {
             summary.weakest_bootstrap_task_card_expected_artifact,
             summary.weakest_bootstrap_expected_artifact
         );
+        assert_ne!(
+            summary.weakest_bootstrap_task_card_handoff_coordinate,
+            "<none>"
+        );
+        assert!(summary
+            .weakest_bootstrap_task_card_handoff_coordinate
+            .contains('/'));
+        assert_ne!(summary.weakest_bootstrap_task_card_handoff_mode, "<none>");
+        assert!(summary
+            .weakest_bootstrap_task_card_handoff_reason
+            .contains("weakest"));
+        assert_ne!(summary.weakest_bootstrap_task_card_handoff_action, "<none>");
+        assert_ne!(
+            summary.weakest_bootstrap_task_card_handoff_command,
+            "<none>"
+        );
+        assert_ne!(
+            summary.weakest_bootstrap_task_card_handoff_expected_artifact,
+            "<none>"
+        );
         assert!(summary.weakest_bootstrap_progress <= summary.bootstrap_critical_average_progress);
         let hierarchy = crate::dev_tensor_hierarchy::dev_tensor_hierarchy_summary();
         assert_eq!(hierarchy.protocol_version, "dev-tensor-status-v1");
@@ -478,6 +558,12 @@ mod tests {
         assert!(json.contains("\"weakest_bootstrap_task_card_action\""));
         assert!(json.contains("\"weakest_bootstrap_task_card_command\""));
         assert!(json.contains("\"weakest_bootstrap_task_card_expected_artifact\""));
+        assert!(json.contains("\"weakest_bootstrap_task_card_handoff_mode\""));
+        assert!(json.contains("\"weakest_bootstrap_task_card_handoff_coordinate\""));
+        assert!(json.contains("\"weakest_bootstrap_task_card_handoff_reason\""));
+        assert!(json.contains("\"weakest_bootstrap_task_card_handoff_action\""));
+        assert!(json.contains("\"weakest_bootstrap_task_card_handoff_command\""));
+        assert!(json.contains("\"weakest_bootstrap_task_card_handoff_expected_artifact\""));
         assert!(json.contains("lowest bootstrap-critical progress"));
         assert!(json.contains("\"blocker\""));
         assert!(json.contains("\"next_action\""));
@@ -591,6 +677,12 @@ mod tests {
         assert!(text.contains("weakest_bootstrap_task_card_action:"));
         assert!(text.contains("weakest_bootstrap_task_card_command:"));
         assert!(text.contains("weakest_bootstrap_task_card_expected_artifact:"));
+        assert!(text.contains("weakest_bootstrap_task_card_handoff_mode:"));
+        assert!(text.contains("weakest_bootstrap_task_card_handoff_coordinate:"));
+        assert!(text.contains("weakest_bootstrap_task_card_handoff_reason:"));
+        assert!(text.contains("weakest_bootstrap_task_card_handoff_action:"));
+        assert!(text.contains("weakest_bootstrap_task_card_handoff_command:"));
+        assert!(text.contains("weakest_bootstrap_task_card_handoff_expected_artifact:"));
         assert!(text.contains("lowest bootstrap-critical progress"));
         assert!(text.contains("    blocker:"));
         assert!(text.contains("    next_action:"));

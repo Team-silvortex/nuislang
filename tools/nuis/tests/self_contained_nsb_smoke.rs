@@ -166,8 +166,13 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
     assert!(
         drive_stdout.contains("\"completed\":true")
             && drive_stdout.contains("\"stop_reason\":\"clean\"")
-            && drive_stdout.contains("\"last_command_id\":\"emit-final-executable-pipeline\""),
-        "nsld drive should materialize the self-contained pipeline cleanly\n{drive_stdout}"
+            && drive_stdout.contains("\"last_command_id\":\"emit-final-executable-pipeline\"")
+            && drive_stdout.contains("\"safe_next_contract\":\"nsld-drive-safe-next-v1\"")
+            && drive_stdout.contains("\"safe_next_action\":\"clean\"")
+            && drive_stdout.contains("\"safe_next_command\":null")
+            && drive_stdout.contains("\"safe_next_gate_required\":false")
+            && drive_stdout.contains("\"safe_next_reason\":\"drive reached a clean artifact chain\""),
+        "nsld drive should materialize the self-contained pipeline cleanly with a safe-next gate\n{drive_stdout}"
     );
 
     let after_doctor = run_nuis(&[
@@ -308,6 +313,11 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
             && workflow_stdout.contains(
                 "\"nsld_final_executable_output_nsdb_replay_status\":\"replay-evidence-ready\""
             )
+            && workflow_stdout.contains(
+                "\"nsld_final_executable_output_nsdb_replay_contract\":\"nsdb-payload-execution-replay-plan-v1\""
+            )
+            && workflow_stdout
+                .contains("\"nsld_final_executable_output_nsdb_replay_command\":\"nsdb replay-plan ")
             && workflow_stdout
                 .contains("\"nsld_final_executable_output_nsdb_replay_checkpoint_count\":1")
             && workflow_stdout.contains(
@@ -322,6 +332,31 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
             && workflow_stdout
                 .contains("\"nsld_final_executable_output_nsdb_replay_first_blocker\":null"),
         "workflow json should promote replay-ready self-contained final output into closure_summary ready\n{workflow_stdout}"
+    );
+
+    let build_report_json =
+        run_nuis(&["build-report", "--json", &output_dir.display().to_string()]);
+    assert_success(
+        &build_report_json,
+        "nuis build-report json after self-contained nsld handoff",
+    );
+    let build_report_stdout = String::from_utf8_lossy(&build_report_json.stdout);
+    assert!(
+        build_report_stdout.contains("\"kind\":\"build_report\"")
+            && build_report_stdout
+                .contains("\"nsld_final_executable_output_nsdb_replay_ready\":true")
+            && build_report_stdout.contains(
+                "\"nsld_final_executable_output_nsdb_replay_status\":\"replay-evidence-ready\""
+            )
+            && build_report_stdout
+                .contains("\"nsld_final_executable_output_nsdb_replay_checkpoint_count\":1")
+            && build_report_stdout.contains(
+                "\"nsld_final_executable_output_nsdb_replayable_checkpoint_count\":1"
+            )
+            && build_report_stdout.contains(
+                "\"nsld_final_executable_output_nsdb_replay_next_action\":\"replay-nsdb-payload-execution\""
+            ),
+        "build-report json should mirror replay-ready self-contained closure evidence\n{build_report_stdout}"
     );
 
     let run = run_nuis(&["run-artifact", &output_dir.display().to_string()]);

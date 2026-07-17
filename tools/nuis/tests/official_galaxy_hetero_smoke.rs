@@ -22,6 +22,27 @@ fn run_nuis(args: &[&str]) -> std::process::Output {
         .unwrap_or_else(|error| panic!("failed to run nuis {:?}: {error}", args))
 }
 
+fn run_nsld(args: &[&str]) -> std::process::Output {
+    if let Some(path) = std::env::var_os("CARGO_BIN_EXE_nsld").map(PathBuf::from) {
+        return Command::new(path)
+            .args(args)
+            .output()
+            .unwrap_or_else(|error| panic!("failed to run nsld {:?}: {error}", args));
+    }
+    let fallback = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/debug/nsld");
+    if fallback.exists() {
+        return Command::new(fallback)
+            .args(args)
+            .output()
+            .unwrap_or_else(|error| panic!("failed to run nsld {:?}: {error}", args));
+    }
+    Command::new("cargo")
+        .args(["run", "-q", "-p", "nsld", "--"])
+        .args(args)
+        .output()
+        .unwrap_or_else(|error| panic!("failed to run nsld through cargo {:?}: {error}", args))
+}
+
 fn assert_success(output: &std::process::Output, context: &str) {
     assert!(
         output.status.success(),
@@ -42,6 +63,19 @@ fn assert_file_contains(path: &Path, needle: &str, context: &str) {
     );
 }
 
+fn provider_family_artifact_component(provider_family: &str) -> String {
+    provider_family
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+                ch
+            } else {
+                '-'
+            }
+        })
+        .collect()
+}
+
 fn assert_official_galaxy_hetero_build(
     label: &str,
     project: &str,
@@ -59,6 +93,55 @@ fn assert_official_galaxy_hetero_build(
 
     let build = run_nuis(&["build", project, &output_dir_text]);
     assert_success(&build, "nuis build official galaxy hetero smoke");
+
+    let doctor_before_drive = run_nuis(&["artifact-doctor", "--json", &output_dir_text]);
+    assert_success(
+        &doctor_before_drive,
+        "nuis artifact-doctor json before official galaxy nsld drive",
+    );
+    let doctor_before_drive_stdout = String::from_utf8_lossy(&doctor_before_drive.stdout);
+    assert!(
+        doctor_before_drive_stdout.contains(
+            "\"nsld_final_executable_output_nsdb_replay_contract\":\"nsdb-payload-execution-replay-plan-v1\""
+        )
+            && doctor_before_drive_stdout
+                .contains("\"nsld_final_executable_output_nsdb_replay_ready\":false")
+            && doctor_before_drive_stdout
+                .contains("\"nsld_final_executable_output_nsdb_replay_status\":\"blocked\"")
+            && doctor_before_drive_stdout.contains(
+                "\"nsld_final_executable_output_nsdb_replay_next_action\":\"resolve-final-output-nsdb-replay\""
+            )
+            && doctor_before_drive_stdout.contains(
+                "\"nsld_final_executable_output_nsdb_replay_next_command\":\"nsld final-executable-output "
+            )
+            && doctor_before_drive_stdout.contains(
+                "\"nsld_final_executable_output_nsdb_replay_first_blocker\":\"handoff-metadata-missing\""
+            ),
+        "official galaxy hetero artifact-doctor did not expose final-output replay blocked gate for {label}\n{doctor_before_drive_stdout}"
+    );
+
+    let drive_apply = run_nsld(&["drive", &output_dir_text, "--apply", "--json"]);
+    assert_success(
+        &drive_apply,
+        "nsld drive apply official galaxy hetero smoke",
+    );
+    let drive_apply_stdout = String::from_utf8_lossy(&drive_apply.stdout);
+    assert!(
+        drive_apply_stdout.contains("\"kind\":\"nsld_drive_apply\"")
+            && drive_apply_stdout.contains("\"applied\":true")
+            && drive_apply_stdout.contains("\"mutates_artifacts\":true")
+            && drive_apply_stdout.contains("\"mutation_policy\":\"whitelisted-artifact-mutation\"")
+            && drive_apply_stdout.contains("\"command_id\":\"emit-inputs\"")
+            && drive_apply_stdout.contains("\"safe_next_contract\":\"nsld-drive-safe-next-v1\"")
+            && drive_apply_stdout
+                .contains("\"safe_next_action\":\"rerun-drive-to-refresh-next-action\"")
+            && drive_apply_stdout.contains("\"safe_next_command\":null")
+            && drive_apply_stdout.contains("\"safe_next_gate_required\":false")
+            && drive_apply_stdout.contains(
+                "\"safe_next_reason\":\"drive applied one mutation; rerun drive to observe the next deterministic action\""
+            ),
+        "official galaxy hetero nsld drive did not expose safe-next mutation guidance for {label}\n{drive_apply_stdout}"
+    );
 
     let yir_path = output_dir.join(format!("{label}.yir"));
     for needle in yir_needles {
@@ -102,6 +185,7 @@ fn assert_official_galaxy_hetero_build(
     );
     let run_json_stdout = String::from_utf8_lossy(&run_json.stdout);
     let trace_id = format!("\"trace_id\":\"{expected_trace_id}\"");
+    let expects_std_pgm_marker = backend_family == "metal" && target_device == "apple-silicon-gpu";
     assert!(
         run_json_stdout.contains("\"hetero_runtime_trace_available\":true")
             && run_json_stdout.contains("\"hetero_runtime_trace_status\":\"execution-pending\"")
@@ -136,12 +220,71 @@ fn assert_official_galaxy_hetero_build(
             && run_json_stdout.contains("\"next_action\":\"materialize-device-execution-trace\""),
         "run-artifact json did not expose expected official galaxy hetero trace for {label}\n{run_json_stdout}"
     );
+    if expects_std_pgm_marker {
+        assert!(
+            run_json_stdout.contains("std-preprocessed-pgm:input_bytes=20"),
+            "PixelMagic shader trace did not carry std-preprocessed PGM evidence\n{run_json_stdout}"
+        );
+    }
 
-    let materialized = nsdb::materialize_provider_samples(
-        &output_dir,
-        Some(&format!("{backend_family}:{target_device}")),
-    )
-    .expect("nsdb materializes official galaxy provider samples");
+    let provider_family = format!("{backend_family}:{target_device}");
+    let provider_family_artifact = provider_family_artifact_component(&provider_family);
+    let executed = nsdb::execute_provider_samples(&output_dir, Some(&provider_family))
+        .expect("nsdb executes official galaxy provider samples");
+    assert_eq!(
+        executed.provider_family_filter.as_deref(),
+        Some(provider_family.as_str())
+    );
+    assert_eq!(executed.record_count, 1);
+    assert_eq!(executed.matched_record_count, 1);
+    assert!(executed.provider_families.contains(&provider_family));
+    assert_eq!(executed.first_provider_family, provider_family);
+    assert!(executed
+        .first_provider_runner_adapter_id
+        .contains(&format!("{backend_family}.{target_device}")));
+    assert!(matches!(
+        executed
+            .first_provider_runner_adapter_capability_status
+            .as_str(),
+        "registered-real-device" | "registered-host-simulated"
+    ));
+    assert_eq!(
+        executed.first_provider_runner_real_device_capable,
+        executed.first_provider_runner_adapter_capability_status == "registered-real-device"
+    );
+    assert!(matches!(
+        executed
+            .first_provider_runner_real_device_probe_status
+            .as_str(),
+        "real-device-candidate-available" | "real-device-candidate-unavailable"
+    ));
+    assert!(matches!(
+        executed.first_provider_execution_mode.as_str(),
+        "real-device-provider-runner" | "host-simulated-provider-runner"
+    ));
+    assert!(matches!(
+        executed.status.as_str(),
+        "provider-output-payloads-ready" | "no-real-device-provider-output"
+    ));
+    assert_eq!(
+        executed.executable_record_count,
+        executed.output_payload_count
+    );
+    assert_eq!(executed.next_action, "materialize-provider-samples");
+    assert!(executed
+        .next_command
+        .contains("nsdb materialize-provider-samples "));
+    if executed.output_payload_count == 0 {
+        assert_eq!(executed.first_output_payload_evidence, "none");
+    } else {
+        assert_eq!(executed.status, "provider-output-payloads-ready");
+        assert!(executed.first_output_payload_evidence.contains(&format!(
+            "nuis.nsdb.provider-output.{provider_family_artifact}.toml:hash=0x"
+        )));
+    }
+
+    let materialized = nsdb::materialize_provider_samples(&output_dir, Some(&provider_family))
+        .expect("nsdb materializes official galaxy provider samples");
     let provider_samples =
         fs::read_to_string(output_dir.join("nuis.nsdb.device-provider-samples.toml"))
             .expect("device provider sample manifest remains available");
@@ -158,13 +301,46 @@ fn assert_official_galaxy_hetero_build(
     assert_eq!(materialized.skipped_record_count, 0);
     assert_eq!(materialized.next_action, "replay-provider-sample");
     assert!(materialized.next_command.contains("nsdb replay-plan "));
+    assert_eq!(
+        materialized.return_contract,
+        "nsld-final-output-boundary-return-v1"
+    );
+    assert_eq!(
+        materialized.final_output_replay_contract,
+        "nsdb-payload-execution-replay-plan-v1"
+    );
     assert!(materialized.return_command.contains("nsld check "));
+    assert_eq!(
+        materialized.first_provider_runner_registry_protocol,
+        "nuis-provider-runner-registry-v1"
+    );
+    assert_eq!(
+        materialized.first_provider_runner_registry_source,
+        "builtin-nustar-provider-runner-registry"
+    );
+    assert!(matches!(
+        materialized
+            .first_provider_runner_adapter_capability_status
+            .as_str(),
+        "registered-real-device" | "registered-host-simulated"
+    ));
+    assert_eq!(
+        materialized.first_provider_runner_real_device_capable,
+        materialized.first_provider_runner_adapter_capability_status == "registered-real-device"
+    );
+    assert!(matches!(
+        materialized.first_provider_execution_mode.as_str(),
+        "real-device-provider-runner" | "host-simulated-provider-runner"
+    ));
     assert!(provider_samples.contains("source = \"nsdb-materialize-provider-samples\""));
     assert!(provider_samples.contains("status = \"ready\""));
     assert!(provider_samples.contains("ready_record_count = 1"));
     assert!(provider_samples.contains("pending_record_count = 0"));
     assert!(provider_samples.contains("sample_status = \"provider-execution-ready\""));
     assert!(provider_samples.contains("validation_status = \"provider-execution-validated\""));
+    if expects_std_pgm_marker {
+        assert!(provider_samples.contains("std-preprocessed-pgm:input_bytes=20"));
+    }
     assert!(provider_samples.contains("output_evidence = \"nuis.nsdb.provider-sample."));
     assert!(provider_samples.contains(":hash=0x"));
     assert!(provider_samples.contains("materialization_status = \"provider-sample-materialized\""));
@@ -178,14 +354,70 @@ fn assert_official_galaxy_hetero_build(
     assert!(provider_samples
         .contains("provider_runner_adapter_contract = \"nuis-provider-runner-adapter-v1\""));
     assert!(provider_samples.contains("provider_runner_adapter_id = \""));
-    assert!(provider_samples
-        .contains("provider_runner_adapter_capability_status = \"registered-host-simulated\""));
     assert!(
-        provider_samples.contains("provider_execution_mode = \"host-simulated-provider-runner\"")
+        provider_samples
+            .contains("provider_runner_adapter_capability_status = \"registered-real-device\"")
+            || provider_samples.contains(
+                "provider_runner_adapter_capability_status = \"registered-host-simulated\""
+            )
     );
+    assert!(provider_samples
+        .contains("provider_runner_registry_protocol = \"nuis-provider-runner-registry-v1\""));
+    assert!(provider_samples
+        .contains("provider_runner_registry_source = \"builtin-nustar-provider-runner-registry\""));
+    assert!(
+        provider_samples.contains("provider_runner_real_device_capable = true")
+            || provider_samples.contains("provider_runner_real_device_capable = false")
+    );
+    assert!(provider_samples.contains("provider_runner_real_device_probe_status = \""));
+    assert!(
+        provider_samples.contains("provider_execution_mode = \"real-device-provider-runner\"")
+            || provider_samples
+                .contains("provider_execution_mode = \"host-simulated-provider-runner\"")
+    );
+    if executed.output_payload_count == 0 {
+        assert!(provider_samples
+            .contains("provider_output_payload_status = \"host-fallback-output-payload-ready\""));
+    } else {
+        assert!(provider_samples
+            .contains("provider_output_payload_status = \"real-device-output-payload-attached\""));
+        assert!(provider_samples.contains(&format!(
+            "provider_output_payload_evidence = \"nuis.nsdb.provider-output.{provider_family_artifact}.toml:hash=0x"
+        )));
+        assert_file_contains(
+            &output_dir.join(format!(
+                "nuis.nsdb.provider-output.{provider_family_artifact}.toml"
+            )),
+            "output_payload_kind = \"real-device-adapter-output\"",
+            "official galaxy provider output payload",
+        );
+    }
+    if expects_std_pgm_marker {
+        assert_file_contains(
+            &output_dir.join(format!(
+                "nuis.nsdb.provider-output.{provider_family_artifact}.toml"
+            )),
+            "std-preprocessed-pgm:input_bytes=20",
+            "official galaxy provider output payload std image evidence",
+        );
+    }
     assert!(provider_samples
         .contains("materialization_detail = \"deterministic-provider-sample-artifact:"));
     assert!(provider_samples.contains("next_action = \"replay-device-sample\""));
+    if expects_std_pgm_marker {
+        let provider_sample_artifact = fs::read_dir(&output_dir)
+            .unwrap()
+            .filter_map(Result::ok)
+            .find(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with("nuis.nsdb.provider-sample.")
+            })
+            .map(|entry| fs::read_to_string(entry.path()).expect("read provider sample artifact"))
+            .expect("provider sample artifact should be materialized");
+        assert!(provider_sample_artifact.contains("std-preprocessed-pgm:input_bytes=20"));
+    }
     assert!(
         fs::read_dir(&output_dir)
             .unwrap()

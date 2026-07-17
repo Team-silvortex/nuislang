@@ -85,6 +85,8 @@ legacy host binary. After the drive step, they should report
 If you want the CLI to classify the route before you build, use:
 
 ```bash
+cargo run -p nuis -- status
+
 cargo run -p nuis -- workflow \
   examples/projects/tooling/native_artifact_closure_demo
 
@@ -94,6 +96,20 @@ cargo run -p nuis -- project-status \
 cargo run -p nuis -- project-doctor \
   examples/projects/tooling/native_artifact_closure_demo
 ```
+
+Read `status` as the stable top-level transcript sample:
+
+```text
+frontdoor_reading_order: closure_summary -> dev_tensor_weakest_task_card_handoff
+frontdoor_sample_closure_summary: closure_summary_status -> closure_summary_next_action -> closure_summary_next_command
+frontdoor_sample_tensor_handoff: dev_tensor_weakest_task_card_coordinate -> dev_tensor_weakest_task_card_handoff_coordinate -> dev_tensor_weakest_task_card_handoff_command
+```
+
+That order keeps artifact closure work and tensor-driven mainline planning from
+fighting each other: first close the current `closure_summary_*` blocker, then
+use `dev_tensor_weakest_task_card_*` and
+`dev_tensor_weakest_task_card_handoff_*` to choose the next bootstrap
+coordinate.
 
 After a successful build, those frontdoors now also expose the current
 artifact-follow-up state:
@@ -245,6 +261,10 @@ Short reading rule:
 * `closure_summary_*` is the canonical human closure line shared by
   `workflow`, `project-status`, and `project-doctor`; read it before drilling
   into the detailed Nsld, artifact, runtime, or project-health mirrors
+* after the closure summary is understood, `dev_tensor_weakest_task_card_*`
+  and `dev_tensor_weakest_task_card_handoff_*` identify the next bootstrap
+  coordinate to push; this keeps artifact closure work and tensor-driven
+  planning on one reading path
 * `artifact-doctor` tells you whether the emitted native bundle is actually
   closed enough to run
 * final-output ownership fields tell you whether the visible host-native output

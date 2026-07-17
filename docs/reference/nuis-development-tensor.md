@@ -93,6 +93,12 @@ The JSON surface is intentionally simple:
 * `weakest_bootstrap_task_card_action`
 * `weakest_bootstrap_task_card_command`
 * `weakest_bootstrap_task_card_expected_artifact`
+* `weakest_bootstrap_task_card_handoff_mode`
+* `weakest_bootstrap_task_card_handoff_coordinate`
+* `weakest_bootstrap_task_card_handoff_reason`
+* `weakest_bootstrap_task_card_handoff_action`
+* `weakest_bootstrap_task_card_handoff_command`
+* `weakest_bootstrap_task_card_handoff_expected_artifact`
 * `coverage_status`
 * `coverage_expected_source`
 * `coverage_expected_fallback_used`
@@ -187,6 +193,13 @@ self-hosted tooling one stable bundle to consume without reassembling many
 The task-card protocol is `nuis-dev-tensor-task-card-v1`. A ready task card
 means the tensor found a weakest bootstrap-critical coordinate and coordinate
 coverage is currently clean.
+
+The task-card also exposes a handoff bundle. When the weakest coordinate is the
+tensor itself, `weakest_bootstrap_task_card_handoff_mode` becomes
+`self-maintenance-handoff` and the handoff coordinate names the next weakest
+bootstrap-critical non-tensor cell to continue after refreshing the model.
+Otherwise the handoff mode is `direct` and mirrors the current task-card
+coordinate.
 
 `nuis status` also prints the short tensor summary. That makes the model part
 of the toolchain self-orientation surface, not just a separate report command.
@@ -427,9 +440,9 @@ The stable part is the coordinate idea:
 `architecture x module x function -> status/progress/evidence/next_step/task-card`
 
 The task-card layer is intentionally small: protocol/source/status/ready,
-`blocker`, `next_action`, `validation_command`, and `expected_artifact`. It lets
-the weakest bootstrap coordinate become a concrete work item without turning
-the tensor into a full issue tracker.
+handoff metadata, `blocker`, `next_action`, `validation_command`, and
+`expected_artifact`. It lets the weakest bootstrap coordinate become a concrete
+work item without turning the tensor into a full issue tracker.
 
 Future work should move cells from static entries toward generated readings
 from:

@@ -160,6 +160,18 @@ fn run() -> Result<(), String> {
             println!("nuis toolchain frontdoor");
             print_workflow_frontdoor_surface(&frontdoor);
             println!(
+                "  frontdoor_reading_order: {}",
+                workflow::FRONTDOOR_READING_ORDER
+            );
+            println!(
+                "  frontdoor_sample_closure_summary: {}",
+                workflow::FRONTDOOR_SAMPLE_CLOSURE_SUMMARY
+            );
+            println!(
+                "  frontdoor_sample_tensor_handoff: {}",
+                workflow::FRONTDOOR_SAMPLE_TENSOR_HANDOFF
+            );
+            println!(
                 "  recommended_next_step: {}",
                 frontdoor.recommended_next_step
             );
@@ -228,6 +240,22 @@ fn run() -> Result<(), String> {
             println!(
                 "  dev_tensor_weakest_task_card_expected_artifact: {}",
                 dev_tensor.weakest_bootstrap_task_card_expected_artifact
+            );
+            println!(
+                "  dev_tensor_weakest_task_card_handoff_mode: {}",
+                dev_tensor.weakest_bootstrap_task_card_handoff_mode
+            );
+            println!(
+                "  dev_tensor_weakest_task_card_handoff_coordinate: {}",
+                dev_tensor.weakest_bootstrap_task_card_handoff_coordinate
+            );
+            println!(
+                "  dev_tensor_weakest_task_card_handoff_action: {}",
+                dev_tensor.weakest_bootstrap_task_card_handoff_action
+            );
+            println!(
+                "  dev_tensor_weakest_task_card_handoff_command: {}",
+                dev_tensor.weakest_bootstrap_task_card_handoff_command
             );
             println!(
                 "  dev_tensor_coverage_status: {}",

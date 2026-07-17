@@ -7,8 +7,8 @@ use crate::{
     release_check_handoff::collect_device_sample_handoff_mirror,
     success_logs_enabled,
     workflow::{
-        load_link_plan_for_output_dir, nsld_drive_command_set_for_output_dir,
-        nsld_final_executable_output_boundary_summary,
+        append_workflow_link_plan_json_fields, load_link_plan_for_output_dir,
+        nsld_drive_command_set_for_output_dir, nsld_final_executable_output_boundary_summary,
     },
 };
 
@@ -220,6 +220,10 @@ pub(crate) fn render_release_check_summary_json(
     append_json_field_strings(
         &mut out,
         device_sample_handoff.json_fields_with_prefix("release_check_device_sample_handoff"),
+    );
+    append_workflow_link_plan_json_fields(
+        &mut out,
+        load_link_plan_for_output_dir(output_dir).as_ref(),
     );
     out.push('}');
     out

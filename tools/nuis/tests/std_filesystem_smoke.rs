@@ -575,13 +575,21 @@ fn std_tooling_observable_cli_smoke_checks_reports_and_stdin() {
     );
     assert_file_contains(
         &pixelmagic_output_dir.join("pixelmagic_report_file_demo.yir"),
+        "host_file_read",
+        "pixelmagic report file YIR std preprocessed image input",
+    );
+    assert_file_contains(
+        &pixelmagic_output_dir.join("pixelmagic_report_file_demo.yir"),
         "PixelMagicContracts.filter_chain_total",
         "pixelmagic report file YIR package contract",
     );
     let pixelmagic_report_path = pixelmagic_output_dir.join("pixelmagic-report.txt");
     let pixelmagic_report_text = pixelmagic_report_path.display().to_string();
     let pixelmagic_binary = pixelmagic_output_dir.join("pixelmagic_report_file_demo");
-    let pixelmagic_run = run_binary_with_args(&pixelmagic_binary, &[&pixelmagic_report_text]);
+    let pixelmagic_run = run_binary_with_args(
+        &pixelmagic_binary,
+        &[&pixelmagic_report_text, &pgm_output_text],
+    );
     assert_success(
         &pixelmagic_run,
         "direct pixelmagic report file binary smoke",
@@ -590,12 +598,14 @@ fn std_tooling_observable_cli_smoke_checks_reports_and_stdin() {
     assert!(
         pixelmagic_stdout.contains("package: pixelmagic")
             && pixelmagic_stdout.contains("route: std-report-file")
-            && pixelmagic_stdout.contains("workload: image-analysis"),
+            && pixelmagic_stdout.contains("workload: image-analysis")
+            && pixelmagic_stdout.contains("input: std-preprocessed-pgm")
+            && pixelmagic_stdout.contains("input_bytes: 20"),
         "pixelmagic report stdout did not expose expected report\n{pixelmagic_stdout}"
     );
     assert_file_contains(
         &pixelmagic_report_path,
-        "status: ready",
+        "input: std-preprocessed-pgm\ninput_bytes: 20",
         "pixelmagic generated report",
     );
 

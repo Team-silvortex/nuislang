@@ -538,7 +538,6 @@ fn lower_guard_return_with_surviving_binding(
         return Ok(None);
     }
     let returned_name = lower_expr(&returned, state, bindings)?;
-    lower_guard_return(condition_name.to_owned(), returned_name, state);
     let mut local_bindings = bindings.clone();
     let Some(surviving_name) =
         super::body_lowering::lower_linear_stmts(else_body, state, &mut local_bindings)?
@@ -550,8 +549,14 @@ fn lower_guard_return_with_surviving_binding(
             "minimal nuisc lowering expected surviving branch binding `{surviving_name}` after guarded return"
         ));
     };
+    let selected_value = lower_select(
+        condition_name.to_owned(),
+        returned_name,
+        surviving_value,
+        state,
+    )?;
     Ok(Some(LoweredIfOutcome::Bind {
         name: surviving_name,
-        value: surviving_value,
+        value: selected_value,
     }))
 }

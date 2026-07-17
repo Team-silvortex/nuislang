@@ -2,9 +2,15 @@
 
 mod handoff;
 mod model;
+mod provider_runner_registry;
 mod provider_sample;
+mod provider_sample_execute;
+mod provider_sample_execution;
 mod provider_sample_materialize;
+#[cfg(test)]
+mod provider_sample_materialize_tests;
 
+pub use provider_sample_execute::{execute_provider_samples, ProviderSampleExecuteReport};
 pub use provider_sample_materialize::{
     materialize_provider_samples, ProviderSampleMaterializeReport,
 };

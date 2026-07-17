@@ -108,6 +108,11 @@ fn lowers_try_result_variant_payload_guard_return_survivor() {
         .iter()
         .filter(|node| node.op.module == "cpu" && node.op.instruction == "guard_return")
         .count();
+    let selects = yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "select")
+        .count();
     let variant_fields = yir
         .nodes
         .iter()
@@ -115,8 +120,12 @@ fn lowers_try_result_variant_payload_guard_return_survivor() {
         .count();
 
     assert!(
-        guard_returns >= 2,
-        "expected both `?` error paths to stay guarded"
+        selects >= 2,
+        "expected both `?` error paths to select between Err return and Ok survivor"
+    );
+    assert!(
+        guard_returns <= 1,
+        "expected pure Result `?` survivor paths to avoid whole-lane guard_return nodes"
     );
     assert!(
         variant_fields >= 2,

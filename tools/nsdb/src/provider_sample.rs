@@ -142,6 +142,30 @@ fn provider_sample_record_summary(
             .unwrap_or_else(|| "none".to_owned()),
         output_evidence: toml_string_value(record, "output_evidence")
             .unwrap_or_else(|| "none".to_owned()),
+        provider_output_payload_contract: toml_string_value(
+            record,
+            "provider_output_payload_contract",
+        )
+        .unwrap_or_else(|| "none".to_owned()),
+        provider_output_payload_status: toml_string_value(record, "provider_output_payload_status")
+            .unwrap_or_else(|| "none".to_owned()),
+        provider_output_payload_evidence_status: toml_string_value(
+            record,
+            "provider_output_payload_evidence_status",
+        )
+        .unwrap_or_else(|| "none".to_owned()),
+        provider_output_payload_evidence: toml_string_value(
+            record,
+            "provider_output_payload_evidence",
+        )
+        .unwrap_or_else(|| "none".to_owned()),
+        provider_output_payload_detail: toml_string_value(record, "provider_output_payload_detail")
+            .unwrap_or_else(|| "none".to_owned()),
+        provider_output_payload_next_action: toml_string_value(
+            record,
+            "provider_output_payload_next_action",
+        )
+        .unwrap_or_else(|| "none".to_owned()),
         materialization_status,
         materialization_detail: toml_string_value(record, "materialization_detail")
             .unwrap_or_else(|| "none".to_owned()),

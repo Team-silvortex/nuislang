@@ -1,6 +1,20 @@
 use super::*;
 
 #[test]
+fn workflow_docs_define_closure_then_tensor_reading_order() {
+    let workflow_doc = include_str!("../../../../docs/reference/nuis-native-artifact-workflow.md");
+    assert!(workflow_doc.contains("`closure_summary_*` is the canonical human closure line"));
+    assert!(workflow_doc.contains(
+        "frontdoor_reading_order: closure_summary -> dev_tensor_weakest_task_card_handoff"
+    ));
+    assert!(workflow_doc.contains("frontdoor_sample_closure_summary"));
+    assert!(workflow_doc.contains("frontdoor_sample_tensor_handoff"));
+    assert!(workflow_doc.contains("dev_tensor_weakest_task_card_*"));
+    assert!(workflow_doc.contains("dev_tensor_weakest_task_card_handoff_*"));
+    assert!(workflow_doc.contains("artifact closure work and tensor-driven"));
+}
+
+#[test]
 fn workflow_json_reports_frontdoor_and_artifact_fields_for_project() {
     let project_root = write_temp_project_fixture(
         "workflow_json_smoke",

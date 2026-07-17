@@ -104,6 +104,31 @@ Reading order:
 3. `closure_summary_next_action`
 4. `closure_summary_next_command`
 
+When the closure summary is blocked, stay on the surfaced action until the
+frontdoor closure changes. When it is ready, use the development tensor task
+card to choose the next mainline coordinate:
+
+1. `dev_tensor_weakest_task_card_coordinate`
+2. `dev_tensor_weakest_task_card_handoff_mode`
+3. `dev_tensor_weakest_task_card_handoff_coordinate`
+4. `dev_tensor_weakest_task_card_handoff_action`
+5. `dev_tensor_weakest_task_card_handoff_command`
+
+Short rule:
+
+`closure_summary_*` answers "what is blocking this artifact now"; the
+development tensor task card answers "which bootstrap coordinate should we push
+next after the current frontdoor closure is understood"
+
+The top-level `nuis status` frontdoor prints the same order as a stable
+transcript sample:
+
+```text
+frontdoor_reading_order: closure_summary -> dev_tensor_weakest_task_card_handoff
+frontdoor_sample_closure_summary: closure_summary_status -> closure_summary_next_action -> closure_summary_next_command
+frontdoor_sample_tensor_handoff: dev_tensor_weakest_task_card_coordinate -> dev_tensor_weakest_task_card_handoff_coordinate -> dev_tensor_weakest_task_card_handoff_command
+```
+
 ## LinkPlan Fields
 
 These fields now form the current visible link summary:

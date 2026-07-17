@@ -56,8 +56,24 @@ fn final_executable_output_reports_missing_until_real_output_exists() {
         report.final_output_nsdb_replay_next_action,
         "resolve-final-output-nsdb-replay"
     );
+    assert_eq!(
+        report.owned_package_summary_contract,
+        "nsld-owned-package-summary-v1"
+    );
+    assert_eq!(report.owned_package_summary_status, "replay-blocked");
+    assert!(!report.owned_package_summary_ready);
+    assert_eq!(report.owned_package_summary_replay_status, "blocked");
+    assert!(!report.owned_package_summary_replay_ready);
+    assert_eq!(
+        report.owned_package_summary_next_action,
+        "resolve-final-output-nsdb-replay"
+    );
     assert!(report
         .final_output_nsdb_replay_next_command
+        .as_deref()
+        .is_some_and(|command| command == "nsld final-executable-output manifest.toml --json"));
+    assert!(report
+        .owned_package_summary_next_command
         .as_deref()
         .is_some_and(|command| command == "nsld final-executable-output manifest.toml --json"));
     assert!(!report.runnable_candidate);
@@ -89,6 +105,17 @@ fn final_executable_output_reports_missing_until_real_output_exists() {
         .contains("\"final_output_nsdb_replay_next_action\":\"resolve-final-output-nsdb-replay\""));
     assert!(report_json.contains(
         "\"final_output_nsdb_replay_next_command\":\"nsld final-executable-output manifest.toml --json\""
+    ));
+    assert!(report_json
+        .contains("\"owned_package_summary_contract\":\"nsld-owned-package-summary-v1\""));
+    assert!(report_json.contains("\"owned_package_summary_status\":\"replay-blocked\""));
+    assert!(report_json.contains("\"owned_package_summary_ready\":false"));
+    assert!(report_json.contains("\"owned_package_summary_replay_status\":\"blocked\""));
+    assert!(report_json.contains("\"owned_package_summary_replay_ready\":false"));
+    assert!(report_json
+        .contains("\"owned_package_summary_next_action\":\"resolve-final-output-nsdb-replay\""));
+    assert!(report_json.contains(
+        "\"owned_package_summary_next_command\":\"nsld final-executable-output manifest.toml --json\""
     ));
     assert!(report_json.contains("\"present\":false"));
     assert!(report_json.contains("\"output_image_header_valid\":false"));

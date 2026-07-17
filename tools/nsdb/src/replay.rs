@@ -395,7 +395,12 @@ fn payload_evidence_parts(handoff: &NsdbDeviceSampleHandoffRecord) -> (String, S
 fn provider_sample_evidence_parts(input_evidence: &str) -> (String, String) {
     input_evidence
         .split_once(':')
-        .map(|(format, path)| (format.to_owned(), path.to_owned()))
+        .map(|(format, path)| {
+            (
+                format.to_owned(),
+                path.split(';').next().unwrap_or(path).to_owned(),
+            )
+        })
         .unwrap_or_else(|| ("none".to_owned(), "none".to_owned()))
 }
 

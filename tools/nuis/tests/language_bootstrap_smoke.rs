@@ -329,6 +329,16 @@ fn no_annotation_try_await_result_hof_project_anchors_language_bootstrap_smoke()
         "Result.Ok(await work(fetch(seed)?))",
         "no-annotation try/await Result project source",
     );
+    assert_contains(
+        &source,
+        "let err_result: Result<i64, Error> = await compute_err_hof(5)",
+        "no-annotation try/await Result project source",
+    );
+    assert_contains(
+        &source,
+        "let try_err_result: Result<i64, Error> = await compute(0)",
+        "no-annotation try/await Result project source",
+    );
     let module = nuisc::frontend::parse_nuis_module(&source)
         .expect("parse no-annotation try/await Result project source");
 
@@ -373,10 +383,31 @@ fn no_annotation_try_await_result_hof_project_anchors_language_bootstrap_smoke()
         "cpu.async_value",
         "no-annotation try/await Result HOF YIR",
     );
+    assert_file_contains(
+        &output_dir.join("task_no_annotation_try_await_result_hof_demo.yir"),
+        "cpu.variant_is",
+        "no-annotation try/await Result HOF YIR",
+    );
+    let run_json = run_nuis(&["run-artifact", &output_dir_text, "--json"]);
+    assert_success(
+        &run_json,
+        "nuis run-artifact json no-annotation try/await Result HOF language bootstrap smoke",
+    );
+    let run_json_stdout = String::from_utf8_lossy(&run_json.stdout);
+    assert_contains(
+        &run_json_stdout,
+        "\"run_artifact_prelaunch_status\":\"ready\"",
+        "no-annotation try/await Result HOF run-artifact json",
+    );
+    assert_contains(
+        &run_json_stdout,
+        "\"link_plan_final_stage\":\"host-native-link\"",
+        "no-annotation try/await Result HOF run-artifact json",
+    );
     assert_binary_exit(
         &output_dir.join("task_no_annotation_try_await_result_hof_demo"),
-        4,
-        "no-annotation try/await Result HOF binary",
+        11,
+        "no-annotation try/await Result HOF binary should execute Ok and Err paths",
     );
 }
 

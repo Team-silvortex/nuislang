@@ -54,7 +54,8 @@ Current runnable CLI frontdoor:
   narrow file-backed image probe without adding a new runtime bridge
 * `cli_pgm_invert_demo` now extends that image-shaped lane into a real
   file-to-file transform companion, which is the current CPU-side stepping
-  stone before shader-backed image examples
+  stone before shader-backed image examples; the generated PGM is now consumed
+  by `pixelmagic_report_file_demo` as a std-preprocessed PixelMagic input
 * `cli_pgm_threshold_demo` now extends that same lane into a mask-style image
   prepass companion, which is closer to the kind of CPU-side preprocessing we
   can feed into later shader-oriented examples
@@ -189,6 +190,8 @@ Validation commands:
   [cli_pgm_info_demo](cli_pgm_info_demo)
 * file-backed image transform:
   [cli_pgm_invert_demo](cli_pgm_invert_demo)
+* PixelMagic std-preprocessed image input:
+  [pixelmagic_report_file_demo](../domains/pixelmagic_report_file_demo)
 * file-backed image mask prepass:
   [cli_pgm_threshold_demo](cli_pgm_threshold_demo)
 * time and clock:
