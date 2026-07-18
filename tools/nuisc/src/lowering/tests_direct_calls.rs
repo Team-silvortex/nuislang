@@ -580,18 +580,28 @@ fn lowers_ordinary_self_recursive_function_into_helper_lane_and_call_f64() {
 }
 
 #[test]
-fn lowers_spawned_flat_struct_async_helper_into_owned_call_lane() {
+fn lowers_spawned_nested_struct_async_helper_into_owned_call_lane() {
     let module = parse_nuis_module(
         r#"
         mod cpu Main {
+          struct Metrics {
+            weight: f32,
+            score: i64,
+            label: String
+          }
+
           struct Packet {
             code: i64,
             ready: bool,
-            weight: f32
+            metrics: Metrics
           }
 
           async fn make_packet(code: i64, ready: bool) -> Packet {
-            return Packet { code: code, ready: ready, weight: 2.5 };
+            return Packet {
+              code: code,
+              ready: ready,
+              metrics: Metrics { weight: 2.5, score: 7, label: "packet" }
+            };
           }
 
           fn main() -> i64 {
@@ -608,14 +618,17 @@ fn lowers_spawned_flat_struct_async_helper_into_owned_call_lane() {
         .nodes
         .iter()
         .find(|node| node.op.instruction == "call_owned_struct")
-        .expect("spawned flat struct helper should retain an owned call node");
+        .expect("spawned nested struct helper should retain an owned call node");
     assert_eq!(call.op.args[0], "make_packet");
-    assert_eq!(call.op.args[1], "Packet|code:i64,ready:bool,weight:f32");
+    assert_eq!(
+        call.op.args[1],
+        "Packet{code:i64;ready:bool;metrics:Metrics{weight:f32;score:i64;label:String}}"
+    );
     let returned = yir
         .nodes
         .iter()
         .find(|node| node.op.instruction == "return_owned_struct")
-        .expect("flat struct helper should retain an owned return node");
+        .expect("nested struct helper should retain an owned return node");
     assert_eq!(
         yir.node_lanes.get(&returned.name).map(String::as_str),
         Some("fn:make_packet")

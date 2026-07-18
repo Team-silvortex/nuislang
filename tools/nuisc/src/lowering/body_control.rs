@@ -251,6 +251,7 @@ pub(in crate::lowering) fn expr_contains_async_loop_primitive(expr: &NirExpr) ->
         | NirExpr::CpuTaskCompleted(_)
         | NirExpr::CpuTaskTimedOut(_)
         | NirExpr::CpuTaskCancelled(_)
+        | NirExpr::CpuTaskFailed(_)
         | NirExpr::CpuTaskValue(_)
         | NirExpr::CpuMutexNew(_)
         | NirExpr::CpuMutexLock(_)

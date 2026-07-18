@@ -78,7 +78,8 @@ pub(crate) fn infer_nir_expr_type(
         }
         NirExpr::CpuTaskCompleted(_)
         | NirExpr::CpuTaskTimedOut(_)
-        | NirExpr::CpuTaskCancelled(_) => Some(bool_type()),
+        | NirExpr::CpuTaskCancelled(_)
+        | NirExpr::CpuTaskFailed(_) => Some(bool_type()),
         NirExpr::CpuTaskValue(result) => {
             result_payload_type(result, bindings, signatures, struct_table)
         }

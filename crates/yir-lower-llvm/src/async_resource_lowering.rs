@@ -4,7 +4,7 @@ use super::{
     facts::propagate_known_facts,
     fresh_reg,
     task_owned_payload::{
-        emit_flat_struct_invoker_spawn, emit_flat_struct_spawn, emit_flat_struct_take,
+        emit_owned_struct_invoker_spawn, emit_owned_struct_spawn, emit_owned_struct_take,
     },
     value_ref::{coerce_to_i64, get_mutex, get_mutex_guard, get_task, get_task_result, get_thread},
     CpuCallScalarKind, LlvmLoweringState, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef,
@@ -71,9 +71,9 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                     template,
                 } => {
                     let context = emit_scalar_task_context(arguments, state);
-                    emit_flat_struct_invoker_spawn(callee, &context, template, state)
+                    emit_owned_struct_invoker_spawn(callee, &context, template, state)
                 }
-                LlvmValueRef::Struct(struct_value) => emit_flat_struct_spawn(struct_value, state),
+                LlvmValueRef::Struct(struct_value) => emit_owned_struct_spawn(struct_value, state),
                 _ => {
                     coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg).map(|payload| {
                         let handle = fresh_reg(&mut state.next_reg);
@@ -268,9 +268,8 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
             };
             let mut value_ref = (*task.value).clone();
             if let Some(handle) = task.runtime_handle.as_ref() {
-                let runtime_state = fresh_reg(&mut state.next_reg);
                 state.body.push(format!(
-                    "  {runtime_state} = call i64 @nuis_scheduler_task_join_state_v1(i64 {handle})"
+                    "  call void @nuis_scheduler_task_require_completed_v1(i64 {handle})"
                 ));
                 match &value_ref {
                     LlvmValueRef::DeferredTaskThunkScalar { return_kind, .. } => {
@@ -288,12 +287,12 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                         value_ref = LlvmValueRef::I64(payload);
                     }
                     LlvmValueRef::DeferredTaskThunkOwnedStruct { template, .. } => {
-                        if let Some(value) = emit_flat_struct_take(handle, template, state) {
+                        if let Some(value) = emit_owned_struct_take(handle, template, state) {
                             value_ref = LlvmValueRef::Struct(value);
                         }
                     }
                     LlvmValueRef::Struct(template) => {
-                        if let Some(value) = emit_flat_struct_take(handle, template, state) {
+                        if let Some(value) = emit_owned_struct_take(handle, template, state) {
                             value_ref = LlvmValueRef::Struct(value);
                         }
                     }
@@ -323,7 +322,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
             propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
             true
         }
-        "task_completed" | "task_timed_out" | "task_cancelled" => {
+        "task_completed" | "task_timed_out" | "task_cancelled" | "task_failed" => {
             let Some(result) = get_task_result(&state.registers, &node.op.args[0]).cloned() else {
                 state.body.push(format!(
                     "  ; deferred lowering for cpu.{} `{}` because its result is outside the current CPU LLVM slice",
@@ -335,6 +334,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 "task_completed" => 1,
                 "task_timed_out" => 2,
                 "task_cancelled" => 3,
+                "task_failed" => 4,
                 _ => unreachable!(),
             };
             let (i1, known) = if let Some(runtime_state) = result.runtime_state {
@@ -348,6 +348,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                     "task_completed" if result.state == "completed" => true,
                     "task_timed_out" if result.state == "timed_out" => true,
                     "task_cancelled" if result.state == "cancelled" => true,
+                    "task_failed" if result.state == "failed" => true,
                     _ => false,
                 };
                 (value.to_string(), Some(value))
@@ -398,7 +399,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 LlvmValueRef::DeferredTaskThunkOwnedStruct { template, .. },
             ) = (runtime_handle.as_ref(), &value_ref)
             {
-                if let Some(value) = emit_flat_struct_take(handle, template, state) {
+                if let Some(value) = emit_owned_struct_take(handle, template, state) {
                     value_ref = LlvmValueRef::Struct(value);
                 }
             } else if let (Some(handle), LlvmValueRef::I64(_)) =
@@ -412,7 +413,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
             } else if let (Some(handle), LlvmValueRef::Struct(template)) =
                 (runtime_handle.as_ref(), &value_ref)
             {
-                if let Some(value) = emit_flat_struct_take(handle, template, state) {
+                if let Some(value) = emit_owned_struct_take(handle, template, state) {
                     value_ref = LlvmValueRef::Struct(value);
                 }
             }

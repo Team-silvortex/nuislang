@@ -276,8 +276,8 @@ pub(super) fn infer_ast_call_type(input: AstCallInferenceInput<'_>) -> Option<As
                 None
             }
         }
-        "task_completed" | "task_timed_out" | "task_cancelled" | "data_ready" | "data_moved"
-        | "data_windowed" => Some(ast_named_type("bool")),
+        "task_completed" | "task_timed_out" | "task_cancelled" | "task_failed" | "data_ready"
+        | "data_moved" | "data_windowed" => Some(ast_named_type("bool")),
         "task_value" => {
             let [result] = args else {
                 return None;

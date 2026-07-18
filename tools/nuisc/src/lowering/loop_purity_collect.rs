@@ -328,6 +328,7 @@ fn is_pure_helper_expr(
         NirExpr::CpuTaskCompleted(inner)
         | NirExpr::CpuTaskTimedOut(inner)
         | NirExpr::CpuTaskCancelled(inner)
+        | NirExpr::CpuTaskFailed(inner)
         | NirExpr::CpuTaskValue(inner)
         | NirExpr::CpuMutexValue(inner) => is_pure_helper_expr(inner, function_map, memo, visiting),
         NirExpr::StructLiteral { fields, .. } => fields

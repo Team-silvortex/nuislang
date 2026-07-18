@@ -6,6 +6,7 @@ fn is_branch_local_runtime_observer(expr: &NirExpr) -> bool {
         NirExpr::CpuTaskCompleted(_)
             | NirExpr::CpuTaskTimedOut(_)
             | NirExpr::CpuTaskCancelled(_)
+            | NirExpr::CpuTaskFailed(_)
             | NirExpr::CpuTaskValue(_)
             | NirExpr::CpuMutexValue(_)
     )

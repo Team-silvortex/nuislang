@@ -1,6 +1,212 @@
 use super::*;
 
 #[test]
+fn owned_invoker_null_payload_reaches_failed_terminal_state() {
+    let dir = temp_dir("owned_invoker_failed_state");
+    let source_path = dir.join("owned_invoker_failed_state.c");
+    let binary_path = dir.join("owned_invoker_failed_state");
+    let mut source = String::new();
+    crate::aot_c_shim_runtime::append_c_shim_prelude(&mut source, "0", "0", 0);
+    crate::aot_c_shim_runtime::append_c_shim_lifecycle_runtime(&mut source);
+    crate::aot_c_shim_text_runtime::append_c_shim_text_runtime(&mut source);
+    source.push_str(
+        r#"
+static int64_t fail_owned_invoker(void* context) {
+    (void)context;
+    return 0;
+}
+
+static void drop_owned_payload(void* payload) {
+    free(payload);
+}
+
+int64_t nuis_yir_entry(void) {
+    void* context = malloc(1);
+    int64_t task = nuis_scheduler_task_spawn_owned_invoker_v1(
+        fail_owned_invoker, context, 8, 8, 17, drop_owned_payload
+    );
+    if (task == 0) return 10;
+    (void)nuis_lifecycle_tick_once_v1();
+    return nuis_scheduler_task_join_state_v1(task) == 4 ? 0 : 11;
+}
+"#,
+    );
+    crate::aot_c_shim_runtime::append_c_shim_main(&mut source);
+    fs::write(&source_path, source).expect("write owned invoker failure harness");
+
+    let compile = Command::new("clang")
+        .arg(&source_path)
+        .arg("-o")
+        .arg(&binary_path)
+        .output()
+        .expect("compile owned invoker failure harness");
+    assert!(
+        compile.status.success(),
+        "clang failed: {}",
+        String::from_utf8_lossy(&compile.stderr)
+    );
+    let run = Command::new(&binary_path)
+        .output()
+        .expect("run owned invoker failure harness");
+    assert_eq!(run.status.code(), Some(0));
+}
+
+#[test]
+fn owned_blob_crosses_scheduler_with_glm_token_and_deep_copy() {
+    let dir = temp_dir("owned_blob_scheduler_roundtrip");
+    let source_path = dir.join("owned_blob_scheduler_roundtrip.c");
+    let binary_path = dir.join("owned_blob_scheduler_roundtrip");
+    let mut source = String::new();
+    crate::aot_c_shim_runtime::append_c_shim_prelude(&mut source, "0", "0", 0);
+    crate::aot_c_shim_runtime::append_c_shim_lifecycle_runtime(&mut source);
+    crate::aot_c_shim_text_runtime::append_c_shim_text_runtime(&mut source);
+    crate::aot_c_shim_owned_blob_runtime::append_c_shim_owned_blob_runtime(&mut source);
+    source.push_str(
+        r#"
+int64_t nuis_yir_entry(void) {
+    unsigned char source_bytes[4] = {3, 5, 8, 13};
+    void* blob = nuis_scheduler_owned_blob_copy_v1(source_bytes, 4, 41);
+    if (blob == NULL) return 10;
+    if (nuis_scheduler_owned_blob_copy_v1(source_bytes, 4, 0) != NULL) return 11;
+    NuisSchedulerOwnedPayloadV1 payload = {
+        .data = blob,
+        .size = (int64_t)(sizeof(NuisSchedulerOwnedBlobV1) + 4),
+        .alignment = 8,
+        .type_id = 91,
+        .move_hook = nuis_scheduler_owned_blob_move_v1,
+        .drop_hook = nuis_scheduler_owned_blob_drop_v1,
+    };
+    int64_t task = nuis_scheduler_task_spawn_owned_v1(&payload);
+    if (task == 0) return 12;
+    source_bytes[0] = 99;
+    if (nuis_scheduler_task_join_state_v1(task) != 1) return 13;
+    NuisSchedulerOwnedPayloadV1 taken = {0};
+    if (nuis_scheduler_task_take_owned_v1(task, &taken) != 1) return 14;
+    if (nuis_scheduler_owned_blob_len_v1(taken.data) != 4) return 15;
+    if (nuis_scheduler_owned_blob_glm_token_v1(taken.data) != 41) return 16;
+    const unsigned char* bytes =
+        (const unsigned char*)nuis_scheduler_owned_blob_data_v1(taken.data);
+    if (bytes == NULL || bytes[0] != 3 || bytes[3] != 13) return 17;
+    nuis_scheduler_owned_payload_drop_v1(&taken);
+
+    int64_t text_handle = nuis_host_text_lift("aggregate-text");
+    void* poisoned_blob = nuis_scheduler_owned_blob_copy_text_v1(text_handle, 42);
+    void* poisoned = nuis_scheduler_owned_aggregate_alloc_v1(2);
+    if (!nuis_scheduler_owned_aggregate_set_blob_v1(poisoned, 0, poisoned_blob)) return 18;
+    if (nuis_scheduler_owned_aggregate_set_scalar_v1(poisoned, 0, 99)) return 19;
+    if (nuis_scheduler_owned_aggregate_finish_v1(poisoned) != NULL) return 20;
+    if (nuis_scheduler_owned_blob_live_count_get_v1() != 0) return 21;
+
+    void* cancelled_blob = nuis_scheduler_owned_blob_copy_text_v1(text_handle, 42);
+    void* aggregate = nuis_scheduler_owned_aggregate_alloc_v1(2);
+    if (aggregate == NULL) return 22;
+    if (!nuis_scheduler_owned_aggregate_set_scalar_v1(aggregate, 0, 144)) return 23;
+    if (!nuis_scheduler_owned_aggregate_set_blob_v1(aggregate, 1, cancelled_blob)) return 24;
+    aggregate = nuis_scheduler_owned_aggregate_finish_v1(aggregate);
+    if (aggregate == NULL) return 25;
+    NuisSchedulerOwnedPayloadV1 cancelled_payload = {
+        .data = aggregate,
+        .size = (int64_t)(sizeof(NuisSchedulerOwnedAggregateV1)
+            + 2 * sizeof(NuisSchedulerOwnedAggregateSlotV1)),
+        .alignment = 8,
+        .type_id = 92,
+        .move_hook = NULL,
+        .drop_hook = nuis_scheduler_owned_aggregate_drop_v1,
+    };
+    int64_t cancelled = nuis_scheduler_task_spawn_owned_v1(&cancelled_payload);
+    if (cancelled == 0) return 26;
+    nuis_scheduler_task_cancel_v1(cancelled);
+    if (nuis_scheduler_task_join_state_v1(cancelled) != 3) return 27;
+    if (nuis_scheduler_owned_blob_live_count_get_v1() != 0) return 28;
+
+    unsigned char valid_utf8[7] = {0xe4, 0xbd, 0xa0, 0xe5, 0xa5, 0xbd, 0};
+    void* valid_text_blob = nuis_scheduler_owned_blob_copy_v1(valid_utf8, 7, 43);
+    int64_t valid_text = nuis_scheduler_owned_blob_text_lift_v1(valid_text_blob);
+    if (valid_text == 0 || nuis_host_text_lookup_len(valid_text) != 6) return 29;
+    nuis_scheduler_owned_blob_drop_v1(valid_text_blob);
+
+    unsigned char overlong_utf8[3] = {0xc0, 0xaf, 0};
+    unsigned char surrogate_utf8[4] = {0xed, 0xa0, 0x80, 0};
+    unsigned char truncated_utf8[3] = {0xe2, 0x82, 0};
+    unsigned char out_of_range_utf8[5] = {0xf4, 0x90, 0x80, 0x80, 0};
+    const unsigned char* invalid_utf8[] = {
+        overlong_utf8, surrogate_utf8, truncated_utf8, out_of_range_utf8
+    };
+    const int64_t invalid_lens[] = {3, 4, 3, 5};
+    for (int index = 0; index < 4; index += 1) {
+        void* invalid_blob = nuis_scheduler_owned_blob_copy_v1(
+            invalid_utf8[index], invalid_lens[index], (uint64_t)(44 + index)
+        );
+        if (invalid_blob == NULL) return 30 + index;
+        if (nuis_scheduler_owned_blob_text_lift_v1(invalid_blob) != 0) return 34 + index;
+        nuis_scheduler_owned_blob_drop_v1(invalid_blob);
+    }
+    return nuis_scheduler_owned_blob_live_count_get_v1() == 0 ? 0 : 38;
+}
+"#,
+    );
+    crate::aot_c_shim_runtime::append_c_shim_main(&mut source);
+    fs::write(&source_path, source).expect("write owned blob scheduler harness");
+
+    let compile = Command::new("clang")
+        .arg(&source_path)
+        .arg("-o")
+        .arg(&binary_path)
+        .output()
+        .expect("compile owned blob scheduler harness");
+    assert!(
+        compile.status.success(),
+        "clang failed: {}",
+        String::from_utf8_lossy(&compile.stderr)
+    );
+    let run = Command::new(&binary_path)
+        .output()
+        .expect("run owned blob scheduler harness");
+    assert_eq!(run.status.code(), Some(0));
+}
+
+#[test]
+fn lifecycle_shutdown_releases_text_intern_pool() {
+    let dir = temp_dir("shutdown_text_pool");
+    let source_path = dir.join("shutdown_text_pool.c");
+    let binary_path = dir.join("shutdown_text_pool");
+    let mut source = String::new();
+    crate::aot_c_shim_runtime::append_c_shim_prelude(&mut source, "0", "0", 0);
+    crate::aot_c_shim_runtime::append_c_shim_lifecycle_runtime(&mut source);
+    crate::aot_c_shim_text_runtime::append_c_shim_text_runtime(&mut source);
+    source.push_str(
+        r#"
+int64_t nuis_yir_entry(void) {
+    if (nuis_host_text_lift("shutdown-owned-text") == 0) return 10;
+    if (nuis_host_text_len != 1) return 11;
+    if (nuis_lifecycle_shutdown_v1(0) != 0) return 12;
+    if (nuis_host_text_len != 0) return 13;
+    if (nuis_host_text_slots[0] != NULL) return 14;
+    return 0;
+}
+"#,
+    );
+    crate::aot_c_shim_runtime::append_c_shim_main(&mut source);
+    fs::write(&source_path, source).expect("write shutdown text pool harness");
+
+    let compile = Command::new("clang")
+        .arg(&source_path)
+        .arg("-o")
+        .arg(&binary_path)
+        .output()
+        .expect("compile shutdown text pool harness");
+    assert!(
+        compile.status.success(),
+        "clang failed: {}",
+        String::from_utf8_lossy(&compile.stderr)
+    );
+    let run = Command::new(&binary_path)
+        .output()
+        .expect("run shutdown text pool harness");
+    assert_eq!(run.status.code(), Some(0));
+}
+
+#[test]
 fn lifecycle_contract_expands_export_surface_for_network_and_hetero_domains() {
     let envelope = NuisExecutableEnvelope {
         schema: "nuis-executable-envelope-v1".to_owned(),

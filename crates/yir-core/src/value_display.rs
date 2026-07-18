@@ -82,6 +82,7 @@ impl fmt::Display for TaskLifecycleState {
             Self::Completed => f.write_str("completed"),
             Self::TimedOut => f.write_str("timed_out"),
             Self::Cancelled => f.write_str("cancelled"),
+            Self::Failed => f.write_str("failed"),
         }
     }
 }

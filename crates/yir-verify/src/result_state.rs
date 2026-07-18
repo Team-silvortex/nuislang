@@ -278,6 +278,7 @@ fn semantic_op_name(op: SemanticOp) -> &'static str {
         SemanticOp::CpuTaskCompleted => "cpu.task_completed",
         SemanticOp::CpuTaskTimedOut => "cpu.task_timed_out",
         SemanticOp::CpuTaskCancelled => "cpu.task_cancelled",
+        SemanticOp::CpuTaskFailed => "cpu.task_failed",
         SemanticOp::CpuTaskValue => "cpu.task_value",
         SemanticOp::DataObserve => "data.observe",
         SemanticOp::DataIsReady => "data.is_ready",

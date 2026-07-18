@@ -747,7 +747,7 @@ fn task_context_preserves_f32_and_f64_bits() {
 }
 
 #[test]
-fn task_flat_struct_payload_crosses_owned_scheduler_boundary() {
+fn task_recursive_struct_payload_crosses_owned_scheduler_boundary() {
     let output_dir = temp_dir("task_flat_struct_payload");
     let output_dir_text = output_dir.display().to_string();
     let build = run_nuis(&[
@@ -765,8 +765,8 @@ fn task_flat_struct_payload_crosses_owned_scheduler_boundary() {
     );
     assert_file_contains(
         &yir,
-        "Packet|code:i64,ready:bool,narrow:f32,wide:f64",
-        "owned struct helper layout contract",
+        "Packet{code:i64;ready:bool;metrics:Metrics{narrow:f32;wide:f64;label:String}}",
+        "recursive owned struct helper layout contract",
     );
     assert_file_contains(
         &yir,
@@ -789,6 +789,21 @@ fn task_flat_struct_payload_crosses_owned_scheduler_boundary() {
         "inttoptr i64",
         "immediate awaited owned struct unpack",
     );
+    assert_file_contains(
+        &llvm,
+        "call ptr @nuis_scheduler_owned_blob_copy_text_v1(i64",
+        "recursive String leaf owned copy",
+    );
+    assert_file_contains(
+        &llvm,
+        "call void @nuis_scheduler_owned_aggregate_require_v1(ptr",
+        "immediate recursive aggregate construction guard",
+    );
+    assert_file_contains(
+        &llvm,
+        "call i64 @nuis_scheduler_owned_blob_text_lift_v1(ptr",
+        "recursive String leaf restoration",
+    );
     assert_llvm_entry_occurrences(
         &llvm,
         "call i64 @nuis_fn_make_packet(",
@@ -802,19 +817,39 @@ fn task_flat_struct_payload_crosses_owned_scheduler_boundary() {
     );
     assert_file_contains(
         &llvm,
+        "call void @nuis_scheduler_task_require_completed_v1(i64",
+        "direct owned struct join terminal-state guard",
+    );
+    assert_file_contains(
+        &llvm,
         "call void @nuis_scheduler_owned_payload_drop_v1(ptr",
         "owned struct payload drop",
     );
     assert_file_contains(
         &llvm,
-        "@nuis_scheduler_payload_free_v1",
-        "owned struct data drop hook",
+        "@nuis_scheduler_owned_aggregate_drop_v1",
+        "owned struct recursive data drop hook",
+    );
+    assert_file_contains(
+        &llvm,
+        "icmp eq i64",
+        "owned struct task result state probes",
+    );
+    assert_file_contains(&llvm, ", 4", "owned struct failed state code");
+    assert_llvm_entry_not_contains(
+        &llvm,
+        "call i64 @nuis_fn_should_not_run(",
+        "cancelled or timed-out owned helper must stay deferred",
     );
 
     let binary = Command::new(output_dir.join("task_flat_struct_payload_demo"))
         .output()
         .expect("run task flat struct payload binary");
     assert_eq!(binary.status.code(), Some(37));
+    assert!(
+        binary.stdout.is_empty(),
+        "terminal task helpers must not run"
+    );
 }
 
 #[test]

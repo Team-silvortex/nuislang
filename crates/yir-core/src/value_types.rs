@@ -315,4 +315,5 @@ pub enum TaskLifecycleState {
     Completed,
     TimedOut,
     Cancelled,
+    Failed,
 }

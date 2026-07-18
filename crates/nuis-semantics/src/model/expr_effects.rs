@@ -154,6 +154,7 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::CpuTaskCompleted(_)
         | NirExpr::CpuTaskTimedOut(_)
         | NirExpr::CpuTaskCancelled(_)
+        | NirExpr::CpuTaskFailed(_)
         | NirExpr::CpuTaskValue(_)
         | NirExpr::CpuMutexNew(_)
         | NirExpr::CpuMutexLock(_)

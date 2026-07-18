@@ -67,6 +67,7 @@ impl Operation {
             (OperationDomainFamily::Cpu, "task_completed") => SemanticOp::CpuTaskCompleted,
             (OperationDomainFamily::Cpu, "task_timed_out") => SemanticOp::CpuTaskTimedOut,
             (OperationDomainFamily::Cpu, "task_cancelled") => SemanticOp::CpuTaskCancelled,
+            (OperationDomainFamily::Cpu, "task_failed") => SemanticOp::CpuTaskFailed,
             (OperationDomainFamily::Cpu, "task_value") => SemanticOp::CpuTaskValue,
             (OperationDomainFamily::Data, "move") => SemanticOp::DataMove,
             (OperationDomainFamily::Data, "copy_window") => SemanticOp::DataCopyWindow,
@@ -180,6 +181,7 @@ impl Operation {
             SemanticOp::CpuTaskCompleted => Some(AsyncCoreOp::ProbeTaskCompleted),
             SemanticOp::CpuTaskTimedOut => Some(AsyncCoreOp::ProbeTaskTimedOut),
             SemanticOp::CpuTaskCancelled => Some(AsyncCoreOp::ProbeTaskCancelled),
+            SemanticOp::CpuTaskFailed => Some(AsyncCoreOp::ProbeTaskFailed),
             SemanticOp::CpuTaskValue => Some(AsyncCoreOp::ExtractTaskValue),
             _ if self.domain_family() == OperationDomainFamily::Cpu => {
                 match self.instruction.as_str() {
@@ -204,6 +206,7 @@ impl Operation {
                 AsyncCoreOp::ProbeTaskCompleted
                     | AsyncCoreOp::ProbeTaskTimedOut
                     | AsyncCoreOp::ProbeTaskCancelled
+                    | AsyncCoreOp::ProbeTaskFailed
                     | AsyncCoreOp::ExtractTaskValue
             )
         )
@@ -216,6 +219,7 @@ impl Operation {
             SemanticOp::CpuTaskCompleted => "cpu.task_completed",
             SemanticOp::CpuTaskTimedOut => "cpu.task_timed_out",
             SemanticOp::CpuTaskCancelled => "cpu.task_cancelled",
+            SemanticOp::CpuTaskFailed => "cpu.task_failed",
             SemanticOp::CpuTaskValue => "cpu.task_value",
             SemanticOp::DataObserve => "data.observe",
             SemanticOp::DataIsReady => "data.is_ready",

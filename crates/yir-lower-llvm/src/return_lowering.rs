@@ -4,7 +4,7 @@ use yir_core::Node;
 
 use super::{
     fresh_reg,
-    task_owned_payload::emit_flat_struct_data,
+    task_owned_payload::emit_owned_struct_data,
     value_ref::{coerce_to_i64, get_bool, get_f32, get_f64, get_i32, get_i64},
     LlvmValueRef,
 };
@@ -101,7 +101,7 @@ pub(crate) fn lower_cpu_return_node(
         "return_owned_struct" => {
             let Some(LlvmValueRef::Struct(value)) = registers.get(&node.op.args[0]) else {
                 body.push(format!(
-                    "  ; deferred lowering for cpu.return_owned_struct `{}` because its input is not a flat struct",
+                    "  ; deferred lowering for cpu.return_owned_struct `{}` because its input is not a recursively owned scalar struct",
                     node.name
                 ));
                 return Ok(ReturnLoweringOutcome::Deferred);
@@ -119,7 +119,7 @@ pub(crate) fn lower_cpu_return_node(
                 last_cpu_value: None,
                 ends_with_terminal_return: false,
             };
-            let Some(data) = emit_flat_struct_data(value, &mut state) else {
+            let Some(data) = emit_owned_struct_data(value, &mut state) else {
                 *body = state.body;
                 return Ok(ReturnLoweringOutcome::Deferred);
             };

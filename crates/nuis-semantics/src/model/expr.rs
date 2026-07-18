@@ -105,6 +105,7 @@ pub enum NirExpr {
     CpuTaskCompleted(Box<NirExpr>),
     CpuTaskTimedOut(Box<NirExpr>),
     CpuTaskCancelled(Box<NirExpr>),
+    CpuTaskFailed(Box<NirExpr>),
     CpuTaskValue(Box<NirExpr>),
     CpuThreadSpawn {
         callee: String,

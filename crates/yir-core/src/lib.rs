@@ -59,6 +59,7 @@ pub enum SemanticOp {
     CpuTaskCompleted,
     CpuTaskTimedOut,
     CpuTaskCancelled,
+    CpuTaskFailed,
     CpuTaskValue,
     DataMove,
     DataCopyWindow,
@@ -139,6 +140,7 @@ pub enum AsyncCoreOp {
     ProbeTaskCompleted,
     ProbeTaskTimedOut,
     ProbeTaskCancelled,
+    ProbeTaskFailed,
     ExtractTaskValue,
 }
 

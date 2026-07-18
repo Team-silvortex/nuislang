@@ -469,15 +469,35 @@ both completion-before-deadline and timeout-before-readiness behavior. The
 same smoke matrix also covers mixed `bool`/`i32` arguments, signed `i32`
 returns, and `bool` returns through the normalized eight-byte slot ABI. The
 same packed ABI now carries `f32` and `f64` by bit pattern rather than numeric
-conversion, with native exact-value smoke coverage. Flat non-empty source
-structs containing only scalar fields now materialize as stable eight-byte
-slots and consume the native `NuisSchedulerOwnedPayloadV1` ABI with
-deterministic type identity, one-shot take, and drop-hook cleanup. Native mixed
-`bool`/integer/float field coverage returns through reconstructed field SSA.
+conversion, with native exact-value smoke coverage. Non-empty recursive source
+structs with scalar leaves now encode their complete type tree while
+materializing declaration-ordered leaves as tagged scalar/blob slots in one
+native `NuisSchedulerOwnedPayloadV1` allocation. Type identity covers the
+recursive shape, and one-shot take reconstructs nested field SSA before
+drop-hook cleanup. Native mixed `bool`/integer/float/`String` nested field
+coverage returns through await, direct join, and TaskResult paths. Text leaves
+copy UTF-8 bytes into GLM-tokened task-owned blobs, re-intern on take, and are
+released by the common self-describing aggregate drop hook. The shared native
+text registration boundary now validates UTF-8 with Rust-compatible strictness;
+compiled coverage accepts multibyte Chinese text and rejects overlong,
+surrogate, truncated, and out-of-range encodings without leaking blobs.
 The aggregate helper now remains a YIR `call_owned_struct` lane and executes
 from the lifecycle poll through an owned invoker, rather than being evaluated
-at submission. The remaining scheduler payload gap is explicit materialization
-failure state plus layouts for nested or ownership-bearing fields.
+at submission. A null owned-invoker result now enters the explicit `Failed`
+terminal state, is observable through `task_failed(...)`, and is covered by a
+compiled C runtime harness. Native timeout and cancellation probes also prove
+that deferred aggregate helpers do not execute before context cleanup. The
+remaining scheduler payload gap is explicit Buffer conversion plus enum and
+pointer leaf policies.
+The runtime now defines `NuisSchedulerOwnedBlobV1` as the first GLM-tokened
+dynamic leaf primitive. It deep-copies borrowed bytes and has scheduler-native
+move/drop hooks; a compiled harness covers take and cancellation. Recursive
+String lowering now consumes it through self-describing aggregate slots, while
+borrowed Buffer remains deliberately unavailable without an explicit copy.
+Aggregate construction now has a transactional `finish` boundary: unset,
+duplicate, or invalid slots poison the build and release already attached
+blobs. Deferred helpers surface null as `Failed`, while immediate awaits reject
+partial aggregates deterministically.
 Direct floating literals inside
 spawned calls still need stronger callee-parameter expected-type propagation;
 explicitly typed bindings currently preserve the intended `f32` boundary.

@@ -338,6 +338,18 @@ pub(super) fn lower_task_builtin_call(
             family: NirResultFamily::Task,
             build: |expr| NirExpr::CpuTaskCancelled(Box::new(expr)),
         })?,
+        "task_failed" => lower_result_observer_call_with_consts(ResultObserverCallInput {
+            name: "task_failed",
+            args,
+            current_domain,
+            current_function_is_async,
+            bindings,
+            module_consts,
+            signatures,
+            struct_table,
+            family: NirResultFamily::Task,
+            build: |expr| NirExpr::CpuTaskFailed(Box::new(expr)),
+        })?,
         "task_value" => lower_result_observer_call_with_consts(ResultObserverCallInput {
             name: "task_value",
             args,

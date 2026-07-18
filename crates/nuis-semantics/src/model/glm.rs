@@ -49,6 +49,7 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         NirExpr::CpuTaskCompleted(_)
         | NirExpr::CpuTaskTimedOut(_)
         | NirExpr::CpuTaskCancelled(_)
+        | NirExpr::CpuTaskFailed(_)
         | NirExpr::CpuTaskValue(_)
         | NirExpr::CpuMutexValue(_) => Some(NirGlmProfile {
             result_class: NirGlmValueClass::Val,

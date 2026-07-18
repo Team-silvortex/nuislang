@@ -7,6 +7,7 @@ pub(super) enum TaskResultStateFact {
     Completed,
     TimedOut,
     Cancelled,
+    Failed,
     NotCompleted,
 }
 
@@ -39,6 +40,7 @@ fn task_result_condition_fact(expr: &NirExpr) -> Option<(String, TaskResultState
         NirExpr::CpuTaskCompleted(inner) => (inner.as_ref(), TaskResultStateFact::Completed),
         NirExpr::CpuTaskTimedOut(inner) => (inner.as_ref(), TaskResultStateFact::TimedOut),
         NirExpr::CpuTaskCancelled(inner) => (inner.as_ref(), TaskResultStateFact::Cancelled),
+        NirExpr::CpuTaskFailed(inner) => (inner.as_ref(), TaskResultStateFact::Failed),
         _ => return None,
     };
     super::expr_resource_key(inner).map(|name| (name, fact))
@@ -67,6 +69,7 @@ fn apply_direct_false_fact(
             }
             TaskResultStateFact::TimedOut
             | TaskResultStateFact::Cancelled
+            | TaskResultStateFact::Failed
             | TaskResultStateFact::NotCompleted => {}
         }
         true

@@ -34,7 +34,7 @@ pub(super) fn collect_scheduler_async_thunk_functions(module: &NirModule) -> BTr
             let struct_return = function
                 .return_type
                 .as_ref()
-                .and_then(|ty| scheduler_flat_struct(module, ty))
+                .and_then(|ty| module_owned_struct_layout(module, ty))
                 .is_some();
             params_supported && (scalar_return || struct_return)
         })
@@ -109,6 +109,7 @@ fn collect_scheduler_spawned_functions_in_expr(
         | NirExpr::CpuTaskCompleted(value)
         | NirExpr::CpuTaskTimedOut(value)
         | NirExpr::CpuTaskCancelled(value)
+        | NirExpr::CpuTaskFailed(value)
         | NirExpr::CpuTaskValue(value) => {
             collect_scheduler_spawned_functions_in_expr(value, eligible, spawned);
         }
@@ -273,54 +274,6 @@ fn is_scheduler_scalar_kind(kind: DirectCallScalarKind) -> bool {
     )
 }
 
-fn scheduler_flat_struct<'a>(
-    module: &'a NirModule,
-    ty: &nuis_semantics::model::NirTypeRef,
-) -> Option<&'a NirStructDef> {
-    if ty.is_ref || ty.is_optional || !ty.generic_args.is_empty() {
-        return None;
-    }
-    let definition = module
-        .structs
-        .iter()
-        .find(|definition| definition.name == ty.name)?;
-    (!definition.fields.is_empty()
-        && definition.generic_params.is_empty()
-        && definition
-            .fields
-            .iter()
-            .all(|field| direct_call_scalar_kind(&field.ty).is_some()))
-    .then_some(definition)
-}
-
-fn state_flat_struct_return<'a>(
-    function: &NirFunction,
-    state: &'a LoweringState<'_>,
-) -> Option<&'a NirStructDef> {
-    let ty = function.return_type.as_ref()?;
-    if ty.is_ref || ty.is_optional || !ty.generic_args.is_empty() {
-        return None;
-    }
-    let definition = state.struct_defs.get(ty.name.as_str()).copied()?;
-    (!definition.fields.is_empty()
-        && definition.generic_params.is_empty()
-        && definition
-            .fields
-            .iter()
-            .all(|field| direct_call_scalar_kind(&field.ty).is_some()))
-    .then_some(definition)
-}
-
-fn encode_scheduler_struct_layout(definition: &NirStructDef) -> String {
-    let fields = definition
-        .fields
-        .iter()
-        .map(|field| format!("{}:{}", field.name, field.ty.name))
-        .collect::<Vec<_>>()
-        .join(",");
-    format!("{}|{fields}", definition.name)
-}
-
 fn direct_call_signature_kind(function: &NirFunction) -> Option<DirectCallScalarKind> {
     let return_kind = direct_call_scalar_kind(function.return_type.as_ref()?)?;
     for param in &function.params {
@@ -425,6 +378,7 @@ fn expr_collect_called_functions(
         | NirExpr::CpuTaskCompleted(value)
         | NirExpr::CpuTaskTimedOut(value)
         | NirExpr::CpuTaskCancelled(value)
+        | NirExpr::CpuTaskFailed(value)
         | NirExpr::CpuTaskValue(value)
         | NirExpr::CpuMutexNew(value)
         | NirExpr::CpuMutexLock(value)
@@ -684,12 +638,12 @@ pub(super) fn lower_direct_call_helper_function(
         .ok_or_else(|| format!("function `{}` did not return a value", function.name))?;
     state.last_effect_anchor = saved_effect_anchor;
     let return_name = format!("__fn_{}_return", function.name);
-    let return_instruction = if state_flat_struct_return(function, state).is_some() {
+    let return_instruction = if function_owned_struct_layout(function, state).is_some() {
         "return_owned_struct"
     } else {
         match direct_call_signature_kind(function).ok_or_else(|| {
             format!(
-                "ordinary direct-call lowering only supports scalar or scheduler-owned flat struct return type in `{}`",
+                "ordinary direct-call lowering only supports scalar or scheduler-owned recursive scalar struct return type in `{}`",
                 function.name
             )
         })? {
@@ -727,14 +681,13 @@ pub(super) fn push_direct_call_node(
     state: &mut LoweringState<'_>,
 ) -> Result<String, String> {
     let name = next_name(state, "cpu_call");
-    let struct_layout =
-        state_flat_struct_return(function, state).map(encode_scheduler_struct_layout);
+    let struct_layout = function_owned_struct_layout(function, state);
     let instruction = if struct_layout.is_some() {
         "call_owned_struct"
     } else {
         match direct_call_signature_kind(function).ok_or_else(|| {
             format!(
-                "ordinary direct-call lowering only supports scalar or scheduler-owned flat struct return type in `{}`",
+                "ordinary direct-call lowering only supports scalar or scheduler-owned recursive scalar struct return type in `{}`",
                 function.name
             )
         })? {

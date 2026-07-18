@@ -54,6 +54,7 @@ pub(in crate::project) fn expr_walk_any(
         | NirExpr::CpuTaskCompleted(inner)
         | NirExpr::CpuTaskTimedOut(inner)
         | NirExpr::CpuTaskCancelled(inner)
+        | NirExpr::CpuTaskFailed(inner)
         | NirExpr::CpuTaskValue(inner)
         | NirExpr::CpuMutexNew(inner)
         | NirExpr::CpuMutexLock(inner)

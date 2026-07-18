@@ -858,18 +858,18 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
             ],
         },
         DevTensorDriftCheckSpec {
-            id: "scheduler-flat-struct-owned-payload-lowering",
+            id: "scheduler-recursive-struct-owned-payload-lowering",
             path: "crates/yir-lower-llvm/src/task_owned_payload.rs",
             required_patterns: &[
-                "emit_flat_struct_spawn",
-                "emit_flat_struct_invoker_spawn",
-                "emit_flat_struct_take",
+                "emit_owned_struct_spawn",
+                "emit_owned_struct_invoker_spawn",
+                "emit_owned_struct_take",
                 "stable_struct_type_id",
                 "@nuis_scheduler_task_spawn_owned_v1",
                 "@nuis_scheduler_task_spawn_owned_invoker_v1",
                 "@nuis_scheduler_task_take_owned_v1",
                 "@nuis_scheduler_owned_payload_drop_v1",
-                "@nuis_scheduler_payload_free_v1",
+                "@nuis_scheduler_owned_aggregate_drop_v1",
             ],
         },
     DevTensorDriftCheckSpec {

@@ -44,6 +44,7 @@ pub(super) fn validate_network_owned_handle_provenance_in_expr(
         | NirExpr::CpuTaskCompleted(inner)
         | NirExpr::CpuTaskTimedOut(inner)
         | NirExpr::CpuTaskCancelled(inner)
+        | NirExpr::CpuTaskFailed(inner)
         | NirExpr::CpuTaskValue(inner)
         | NirExpr::DataReady(inner)
         | NirExpr::DataMoved(inner)

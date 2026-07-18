@@ -30,6 +30,7 @@ pub(in crate::lowering) fn is_terminal_branch_pure_expr(
         NirExpr::CpuTaskCompleted(inner)
         | NirExpr::CpuTaskTimedOut(inner)
         | NirExpr::CpuTaskCancelled(inner)
+        | NirExpr::CpuTaskFailed(inner)
         | NirExpr::CpuTaskValue(inner)
         | NirExpr::CpuMutexValue(inner)
         | NirExpr::NetworkConfigReady(inner)

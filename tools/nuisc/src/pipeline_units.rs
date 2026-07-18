@@ -255,6 +255,7 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::CpuTaskCompleted(inner)
         | NirExpr::CpuTaskTimedOut(inner)
         | NirExpr::CpuTaskCancelled(inner)
+        | NirExpr::CpuTaskFailed(inner)
         | NirExpr::CpuTaskValue(inner)
         | NirExpr::CpuMutexNew(inner)
         | NirExpr::CpuMutexLock(inner)

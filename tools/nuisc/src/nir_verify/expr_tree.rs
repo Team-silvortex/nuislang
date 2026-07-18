@@ -160,6 +160,7 @@ pub(super) fn verify_expr_tree(
         | NirExpr::CpuTaskCompleted(inner)
         | NirExpr::CpuTaskTimedOut(inner)
         | NirExpr::CpuTaskCancelled(inner)
+        | NirExpr::CpuTaskFailed(inner)
         | NirExpr::CpuTaskValue(inner)
         | NirExpr::CpuMutexNew(inner)
         | NirExpr::CpuMutexLock(inner)

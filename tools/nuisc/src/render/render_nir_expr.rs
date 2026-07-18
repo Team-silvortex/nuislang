@@ -165,6 +165,7 @@ pub(super) fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::CpuTaskCancelled(result) => {
             format!("task_cancelled({})", render_nir_expr(result))
         }
+        NirExpr::CpuTaskFailed(result) => format!("task_failed({})", render_nir_expr(result)),
         NirExpr::CpuTaskValue(result) => format!("task_value({})", render_nir_expr(result)),
         NirExpr::CpuMutexNew(value) => format!("mutex_new({})", render_nir_expr(value)),
         NirExpr::CpuMutexLock(mutex) => format!("mutex_lock({})", render_nir_expr(mutex)),

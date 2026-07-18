@@ -1,17 +1,40 @@
 mod cpu Main {
+  extern "c" fn host_text_len(text_handle: i64) -> i64;
+
+  struct Metrics {
+    narrow: f32,
+    wide: f64,
+    label: String
+  }
+
   struct Packet {
     code: i64,
     ready: bool,
-    narrow: f32,
-    wide: f64
+    metrics: Metrics
   }
 
   async fn make_packet(code: i64, ready: bool) -> Packet {
     return Packet {
       code: code,
       ready: ready,
-      narrow: 2.5,
-      wide: 6.25
+      metrics: Metrics {
+        narrow: 2.5,
+        wide: 6.25,
+        label: "payload"
+      }
+    };
+  }
+
+  async fn should_not_run() -> Packet {
+    print(99);
+    return Packet {
+      code: 99,
+      ready: true,
+      metrics: Metrics {
+        narrow: 9.0,
+        wide: 9.0,
+        label: "forbidden"
+      }
     };
   }
 
@@ -26,6 +49,9 @@ mod cpu Main {
     if task_completed(result) == false {
       return 1;
     }
+    if task_failed(result) {
+      return 9;
+    }
     let packet: Packet = task_value(result);
     if packet.code != 31 {
       return 2;
@@ -33,11 +59,32 @@ mod cpu Main {
     if packet.ready == false {
       return 3;
     }
-    if packet.narrow != 2.5 {
+    if packet.metrics.narrow != 2.5 {
       return 4;
     }
-    if packet.wide != 6.25 {
+    if packet.metrics.wide != 6.25 {
       return 5;
+    }
+    if host_text_len(text_handle(packet.metrics.label)) != 7 {
+      return 14;
+    }
+
+    let timed: Task<Packet> = timeout(spawn(should_not_run()), 0);
+    let timed_result: TaskResult<Packet> = join_result(timed);
+    if task_timed_out(timed_result) == false {
+      return 10;
+    }
+    if task_failed(timed_result) {
+      return 11;
+    }
+
+    let cancelled: Task<Packet> = cancel(spawn(should_not_run()));
+    let cancelled_result: TaskResult<Packet> = join_result(cancelled);
+    if task_cancelled(cancelled_result) == false {
+      return 12;
+    }
+    if task_failed(cancelled_result) {
+      return 13;
     }
 
     let direct: Packet = join(spawn(make_packet(11, false)));

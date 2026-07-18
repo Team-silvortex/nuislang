@@ -97,6 +97,7 @@ pub(super) fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Resu
         | NirExpr::CpuTaskCompleted(inner)
         | NirExpr::CpuTaskTimedOut(inner)
         | NirExpr::CpuTaskCancelled(inner)
+        | NirExpr::CpuTaskFailed(inner)
         | NirExpr::CpuTaskValue(inner)
         | NirExpr::CpuMutexNew(inner)
         | NirExpr::CpuMutexLock(inner)

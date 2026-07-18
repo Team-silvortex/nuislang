@@ -53,6 +53,9 @@ pub(crate) fn execute_cpu_task_node(
             if lifecycle == TaskLifecycleState::TimedOut {
                 return Err(format!("task `{label}` timed out before join"));
             }
+            if lifecycle == TaskLifecycleState::Failed {
+                return Err(format!("task `{label}` failed before join"));
+            }
             state.push_resource_event(
                 resource,
                 format!(
@@ -72,6 +75,9 @@ pub(crate) fn execute_cpu_task_node(
             }
             if lifecycle == TaskLifecycleState::TimedOut {
                 return Err(format!("thread `{label}` timed out before join"));
+            }
+            if lifecycle == TaskLifecycleState::Failed {
+                return Err(format!("thread `{label}` failed before join"));
             }
             state.push_resource_event(
                 resource,
@@ -158,6 +164,10 @@ pub(crate) fn execute_cpu_task_node(
         "task_cancelled" => {
             let result = state.expect_task_result(&node.op.args[0])?;
             Ok(Value::Bool(result.state == TaskLifecycleState::Cancelled))
+        }
+        "task_failed" => {
+            let result = state.expect_task_result(&node.op.args[0])?;
+            Ok(Value::Bool(result.state == TaskLifecycleState::Failed))
         }
         "task_value" => {
             let result = state.expect_task_result(&node.op.args[0])?;

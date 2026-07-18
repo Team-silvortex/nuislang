@@ -11,6 +11,62 @@ static uint64_t nuis_host_text_hash_bytes(const char* text, size_t len) {
     return hash;
 }
 
+static int nuis_host_text_is_utf8_continuation(unsigned char byte) {
+    return byte >= 0x80 && byte <= 0xbf;
+}
+
+static int nuis_host_text_is_valid_utf8(const char* text, size_t len) {
+    if (text == NULL) return 0;
+    size_t index = 0;
+    while (index < len) {
+        unsigned char first = (unsigned char)text[index];
+        if (first <= 0x7f) {
+            index += 1;
+            continue;
+        }
+        if (first >= 0xc2 && first <= 0xdf) {
+            if (index + 1 >= len
+                || !nuis_host_text_is_utf8_continuation((unsigned char)text[index + 1])) {
+                return 0;
+            }
+            index += 2;
+            continue;
+        }
+        if (first >= 0xe0 && first <= 0xef) {
+            if (index + 2 >= len) return 0;
+            unsigned char second = (unsigned char)text[index + 1];
+            unsigned char third = (unsigned char)text[index + 2];
+            if (!nuis_host_text_is_utf8_continuation(third)
+                || (first == 0xe0 && (second < 0xa0 || second > 0xbf))
+                || (first == 0xed && (second < 0x80 || second > 0x9f))
+                || ((first != 0xe0 && first != 0xed)
+                    && !nuis_host_text_is_utf8_continuation(second))) {
+                return 0;
+            }
+            index += 3;
+            continue;
+        }
+        if (first >= 0xf0 && first <= 0xf4) {
+            if (index + 3 >= len) return 0;
+            unsigned char second = (unsigned char)text[index + 1];
+            unsigned char third = (unsigned char)text[index + 2];
+            unsigned char fourth = (unsigned char)text[index + 3];
+            if (!nuis_host_text_is_utf8_continuation(third)
+                || !nuis_host_text_is_utf8_continuation(fourth)
+                || (first == 0xf0 && (second < 0x90 || second > 0xbf))
+                || (first == 0xf4 && (second < 0x80 || second > 0x8f))
+                || ((first != 0xf0 && first != 0xf4)
+                    && !nuis_host_text_is_utf8_continuation(second))) {
+                return 0;
+            }
+            index += 4;
+            continue;
+        }
+        return 0;
+    }
+    return 1;
+}
+
 static int64_t nuis_host_text_find_interned(const char* text, size_t len, uint64_t hash) {
     if (text == NULL) return 0;
     size_t mask = (sizeof(nuis_host_text_intern_table) / sizeof(nuis_host_text_intern_table[0])) - 1;
@@ -44,7 +100,8 @@ static void nuis_host_text_intern_insert(int64_t handle, uint64_t hash) {
 }
 
 static int64_t nuis_host_text_register_sized(const char* text, size_t len) {
-    if (text == NULL) return 0;
+    if (text == NULL || len == SIZE_MAX || text[len] != '\0') return 0;
+    if (!nuis_host_text_is_valid_utf8(text, len)) return 0;
     if (nuis_host_text_len >= 4096) return 0;
     uint64_t hash = nuis_host_text_hash_bytes(text, len);
     int64_t interned = nuis_host_text_find_interned(text, len, hash);
@@ -68,6 +125,10 @@ static int64_t nuis_host_text_register(const char* text) {
 
 static int64_t nuis_host_text_register_owned_sized(char* text, size_t len) {
     if (text == NULL) return 0;
+    if (len == SIZE_MAX || text[len] != '\0' || !nuis_host_text_is_valid_utf8(text, len)) {
+        free(text);
+        return 0;
+    }
     uint64_t hash = nuis_host_text_hash_bytes(text, len);
     int64_t interned = nuis_host_text_find_interned(text, len, hash);
     if (interned != 0) {
@@ -89,6 +150,17 @@ static int64_t nuis_host_text_register_owned_sized(char* text, size_t len) {
 static int64_t nuis_host_text_register_owned(char* text) {
     if (text == NULL) return 0;
     return nuis_host_text_register_owned_sized(text, strlen(text));
+}
+
+static void nuis_host_text_release_all_v1(void) {
+    for (int64_t index = 0; index < nuis_host_text_len; index += 1) {
+        free(nuis_host_text_slots[index]);
+        nuis_host_text_slots[index] = NULL;
+        nuis_host_text_slot_lens[index] = 0;
+        nuis_host_text_slot_hashes[index] = 0;
+    }
+    memset(nuis_host_text_intern_table, 0, sizeof(nuis_host_text_intern_table));
+    nuis_host_text_len = 0;
 }
 
 int64_t nuis_host_text_lift(const char* text) {

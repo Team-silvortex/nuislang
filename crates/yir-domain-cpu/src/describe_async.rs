@@ -23,8 +23,8 @@ pub(super) fn describe_cpu_async_node(node: &Node) -> Result<Option<InstructionS
             Ok(InstructionSemantics::effect(vec![node.op.args[1].clone()]))
         }
         "join" | "cancel" | "join_result" | "thread_join" | "thread_join_result"
-        | "task_completed" | "task_timed_out" | "task_cancelled" | "task_value" | "mutex_lock"
-        | "mutex_unlock" | "mutex_value" => {
+        | "task_completed" | "task_timed_out" | "task_cancelled" | "task_failed" | "task_value"
+        | "mutex_lock" | "mutex_unlock" | "mutex_value" => {
             if node.op.args.len() != 1 {
                 return Err(format!(
                     "node `{}` expects `cpu.{} <name> <resource> <input>`",

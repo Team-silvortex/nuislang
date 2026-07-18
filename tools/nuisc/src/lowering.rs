@@ -56,6 +56,8 @@ mod loop_purity;
 mod loop_types;
 #[path = "lowering/network_exprs.rs"]
 mod network_exprs;
+#[path = "lowering/owned_struct_layout.rs"]
+mod owned_struct_layout;
 #[path = "lowering/result_nodes.rs"]
 mod result_nodes;
 #[path = "lowering/scheduler_contracts.rs"]
@@ -116,6 +118,7 @@ use loop_purity::{
 };
 use loop_types::*;
 use network_exprs::lower_network_expr;
+use owned_struct_layout::{function_owned_struct_layout, module_owned_struct_layout};
 use result_nodes::{
     lower_result_observe_node, lower_result_unary_value_effect, lower_task_result_entry_node,
     lower_task_result_observer_node, push_await_node,
@@ -243,6 +246,7 @@ fn lower_expr(
         | NirExpr::CpuTaskCompleted(_)
         | NirExpr::CpuTaskTimedOut(_)
         | NirExpr::CpuTaskCancelled(_)
+        | NirExpr::CpuTaskFailed(_)
         | NirExpr::CpuTaskValue(_)
         | NirExpr::CpuMutexNew(_)
         | NirExpr::CpuMutexLock(_)

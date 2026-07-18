@@ -23,6 +23,7 @@ pub(in crate::lowering) fn expr_references_names(expr: &NirExpr, names: &BTreeSe
         | NirExpr::CpuTaskCompleted(inner)
         | NirExpr::CpuTaskTimedOut(inner)
         | NirExpr::CpuTaskCancelled(inner)
+        | NirExpr::CpuTaskFailed(inner)
         | NirExpr::CpuTaskValue(inner)
         | NirExpr::CpuThreadJoin(inner)
         | NirExpr::CpuThreadJoinResult(inner)

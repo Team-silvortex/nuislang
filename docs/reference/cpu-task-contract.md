@@ -190,6 +190,11 @@ Today the repository also still has one important runtime boundary:
 * cancellation transitions a pending native slot directly to `Cancelled`;
   later joins observe state code `3`, and completed/timeout terminal states are
   not overwritten
+* an owned invoker that cannot materialize a non-null payload transitions to
+  `Failed`; `join_result(...)` preserves runtime state code `4`, and
+  `task_failed(...)` observes it without exposing an invalid payload
+* direct `join(...)` requires state code `1` before extracting any scalar or
+  owned payload and terminates deterministically on every other terminal state
 * thunk storage is normalized as one `NuisSchedulerTaskThunkPacket` per slot,
   carrying a common invoker and opaque context; completion, timeout,
   cancellation, startup failure, reset, and shutdown release owned contexts
@@ -199,10 +204,11 @@ Today the repository also still has one important runtime boundary:
 * positive deadline ordering completes when `ready_delay <= timeout_limit` and
   times out when readiness is later; non-positive timeout limits remain
   immediate timeouts
-* flat non-empty structs containing only `bool`, `i32`, `i64`, `f32`, and
-  `f64` fields are materialized into stable eight-byte slots and cross the
-  scheduler through the owned payload ABI; floating fields retain their bits,
-  and aggregate-producing helpers execute from the lifecycle poll invoker
+* recursive non-empty structs containing `bool`, `i32`, `i64`, `f32`, `f64`,
+  and `String` use self-describing aggregate slots and cross the scheduler
+  through the owned payload ABI; floating fields retain their bits, text bytes
+  are copied into GLM-tokened blobs, and aggregate-producing helpers execute
+  from the lifecycle poll invoker
 
 The native shim now defines the first owned aggregate payload boundary through
 `NuisSchedulerOwnedPayloadV1`:
@@ -217,16 +223,44 @@ The native shim now defines the first owned aggregate payload boundary through
   an out-parameter; it is not a borrowed view
 * timeout, cancellation, lifecycle reset, and shutdown drop an untaken payload
   exactly through the slot's registered hook
+* timeout and cancellation release a deferred owned-invoker context before its
+  helper executes; native coverage uses a visibly printing helper and requires
+  empty stdout on both terminal paths
 * completed but untaken payloads remain owned by the scheduler until take or
   shutdown
+* `NuisSchedulerOwnedBlobV1` is the first GLM-bearing dynamic leaf protocol:
+  it deep-copies borrowed bytes, rejects a zero GLM token, validates identity
+  moves, and exposes one drop hook compatible with the scheduler descriptor
+* `NuisSchedulerOwnedAggregateV1` tags each flattened slot as scalar or blob;
+  its common drop hook walks every slot before freeing the aggregate
+* aggregate construction is transactional: every slot starts unset and must be
+  written exactly once; duplicate, invalid, or incomplete construction poisons
+  the aggregate, while `finish` drops all attached blobs and returns null
+* a null finalized pointer makes a deferred owned invoker enter `Failed`; the
+  immediate await lane requires a finalized aggregate and exits with status 71
+  instead of exposing partially initialized fields
+* compiled C coverage moves one blob through join/take, verifies that mutating
+  the borrowed source cannot affect owned bytes, and proves cancellation drops
+  an aggregate containing both scalar and text-blob slots
 
-Source `Task<Struct>` lowering is enabled for flat scalar-only structs. LLVM
-materializes one eight-byte slot per field, derives a deterministic non-zero
-type identity from the struct/field layout, and reconstructs virtual field SSA
-only after the one-shot take. Both direct `join` and
-`join_result`/`task_value` consume that runtime-owned payload. Empty, nested,
-pointer-bearing, text, enum, and buffer aggregates remain outside this first
-layout contract.
+Source `Task<Struct>` lowering is enabled for non-empty recursive structs whose
+leaves are `bool`, `i32`, `i64`, `f32`, `f64`, or `String`. The protocol encodes
+the full tree as `Type{field:kind;nested:Nested{...}}`, while LLVM flattens its
+leaves in declaration order into one self-describing slot allocation.
+Type identity hashes the complete nested shape, and unpacking reconstructs
+virtual nested field SSA only after the one-shot take. A `String` leaf copies
+its UTF-8 bytes into a task-owned blob with a shape-derived GLM token; unpacking
+re-interns those bytes before the aggregate drop hook releases the blob. Text
+registration uses strict Rust-compatible UTF-8 validation, so malformed,
+overlong, surrogate, truncated, and out-of-range sequences cannot become a
+Nuis `String`; arbitrary bytes remain valid only as binary blobs. Both
+direct `join` and
+`join_result`/`task_value` consume the runtime-owned aggregate payload.
+Recursive type cycles, empty structs, enums, pointers, buffers, and other
+task-owned dynamic resources remain outside this layout contract.
+The blob protocol is not yet a source-level `Buffer` promise. Borrowed buffers
+still require an explicit copy conversion before they can safely occupy dynamic
+leaf slots.
 
 Today `nuis` does **not** yet have:
 
@@ -234,8 +268,6 @@ Today `nuis` does **not** yet have:
 * a stable worker-pool or lane scheduler contract for tasks
 * a queue-backed timer wheel or mature delayed-work executor beyond the
   current deterministic task ready-tick model
-* an explicit failed terminal state when an owned helper cannot materialize a
-  non-null payload (for example after allocation failure)
 * shared-state synchronization primitives
 * a finalized concurrent memory model
 
@@ -251,6 +283,8 @@ If you want code that fits the current system well:
 * use `spawn(...)` only with explicit `async fn`
 * use `timeout(...)` when you want lifecycle to influence later control flow
 * use `join_result(...)` when you need to inspect outcome
+* use `task_failed(...)` to distinguish owned helper materialization failure
+  from timeout and cancellation
 * treat `task_value(...)` as valid only after a completed result path
 * do not assume real parallel execution just because task syntax exists
 * treat `task_*` helpers as observation-only APIs, not as alternate

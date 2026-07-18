@@ -59,6 +59,13 @@ pub(super) fn lower_cpu_expr(
             YirResultRole::StateProbe,
             Some(YirResultState::Task(TaskLifecycleState::Cancelled)),
         )),
+        NirExpr::CpuTaskFailed(result) => Some(lower_task_result_observer_node(
+            state,
+            bindings,
+            result,
+            YirResultRole::StateProbe,
+            Some(YirResultState::Task(TaskLifecycleState::Failed)),
+        )),
         NirExpr::CpuTaskValue(result) => Some(lower_task_result_observer_node(
             state,
             bindings,

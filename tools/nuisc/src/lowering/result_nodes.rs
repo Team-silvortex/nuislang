@@ -109,6 +109,9 @@ pub(super) fn lower_task_result_observer_node(
         (YirResultRole::StateProbe, Some(YirResultState::Task(TaskLifecycleState::Cancelled))) => {
             ("cpu_task_cancelled", "task_cancelled")
         }
+        (YirResultRole::StateProbe, Some(YirResultState::Task(TaskLifecycleState::Failed))) => {
+            ("cpu_task_failed", "task_failed")
+        }
         (YirResultRole::PayloadExtractor, None) => ("cpu_task_value", "task_value"),
         (YirResultRole::Entry, _) => {
             return Err(

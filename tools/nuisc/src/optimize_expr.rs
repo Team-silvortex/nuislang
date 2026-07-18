@@ -159,6 +159,10 @@ pub(super) fn simplify_expr(
             let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
             (NirExpr::CpuTaskCancelled(Box::new(inner)), changed)
         }
+        NirExpr::CpuTaskFailed(inner) => {
+            let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
+            (NirExpr::CpuTaskFailed(Box::new(inner)), changed)
+        }
         NirExpr::CpuTaskValue(inner) => {
             let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
             (NirExpr::CpuTaskValue(Box::new(inner)), changed)

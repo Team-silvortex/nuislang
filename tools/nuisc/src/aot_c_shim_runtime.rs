@@ -25,6 +25,7 @@ pub(crate) fn append_c_shim_prelude(
 #include <sys/wait.h>
 
 extern int64_t nuis_yir_entry(void);
+static void nuis_host_text_release_all_v1(void);
 
 static int nuis_argc = 0;
 static char** nuis_argv = NULL;
@@ -158,6 +159,7 @@ static void nuis_lifecycle_state_reset(void) {
         nuis_scheduler_task_release_context_v1(index);
         nuis_scheduler_task_release_owned_payload_v1(index);
     }
+    nuis_host_text_release_all_v1();
     nuis_lifecycle_state.phase = 0;
     nuis_lifecycle_state.tick_count = 0;
     nuis_lifecycle_state.task_poll_count = 0;
@@ -198,6 +200,10 @@ static int64_t nuis_scheduler_task_execute_thunk_v1(int64_t index) {
         nuis_scheduler_task_payload_kinds[index] = 1;
         return 0;
     }
+    if (kind == 2) {
+        nuis_scheduler_task_states[index] = 4;
+        return 0;
+    }
     return result;
 }
 
@@ -208,7 +214,9 @@ static int64_t nuis_lifecycle_on_task_poll_v1(void) {
             && nuis_scheduler_task_ready_ticks[index] <= nuis_lifecycle_state.tick_count) {
             nuis_scheduler_task_payloads[index] =
                 nuis_scheduler_task_execute_thunk_v1(index);
-            nuis_scheduler_task_states[index] = 1;
+            if (nuis_scheduler_task_states[index] == 0) {
+                nuis_scheduler_task_states[index] = 1;
+            }
         } else if (nuis_scheduler_task_states[index] == 0
             && nuis_scheduler_task_deadline_ticks[index] >= 0
             && nuis_scheduler_task_deadline_ticks[index] <= nuis_lifecycle_state.tick_count) {
@@ -444,6 +452,13 @@ int64_t nuis_scheduler_task_join_state_v1(int64_t task_handle) {
     return nuis_scheduler_task_states[index];
 }
 
+void nuis_scheduler_task_require_completed_v1(int64_t task_handle) {
+    int64_t state = nuis_scheduler_task_join_state_v1(task_handle);
+    if (state == 1) return;
+    fprintf(stderr, "nuis: direct task join reached terminal state %lld\n", (long long)state);
+    exit(70);
+}
+
 int64_t nuis_scheduler_task_value_i64_v1(int64_t task_handle) {
     if (task_handle <= 0 || task_handle > nuis_scheduler_task_len) return 0;
     int64_t index = task_handle - 1;
@@ -475,6 +490,7 @@ static int64_t nuis_lifecycle_shutdown_v1(int64_t status) {
         nuis_scheduler_task_release_context_v1(index);
         nuis_scheduler_task_release_owned_payload_v1(index);
     }
+    nuis_host_text_release_all_v1();
     nuis_lifecycle_state.phase = 3;
     nuis_lifecycle_state.last_status = status;
     return status;

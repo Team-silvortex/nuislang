@@ -7,6 +7,7 @@ impl Operation {
             | SemanticOp::CpuTaskCompleted
             | SemanticOp::CpuTaskTimedOut
             | SemanticOp::CpuTaskCancelled
+            | SemanticOp::CpuTaskFailed
             | SemanticOp::CpuTaskValue => Some(YirResultFamily::Task),
             SemanticOp::DataObserve
             | SemanticOp::DataIsReady
@@ -46,6 +47,7 @@ impl Operation {
             SemanticOp::CpuTaskCompleted
             | SemanticOp::CpuTaskTimedOut
             | SemanticOp::CpuTaskCancelled
+            | SemanticOp::CpuTaskFailed
             | SemanticOp::DataIsReady
             | SemanticOp::DataIsMoved
             | SemanticOp::DataIsWindowed
@@ -70,6 +72,7 @@ impl Operation {
             SemanticOp::CpuTaskCompleted
             | SemanticOp::CpuTaskTimedOut
             | SemanticOp::CpuTaskCancelled
+            | SemanticOp::CpuTaskFailed
             | SemanticOp::CpuTaskValue => Some(SemanticOp::CpuJoinResult),
             SemanticOp::DataIsReady
             | SemanticOp::DataIsMoved
@@ -101,6 +104,7 @@ impl Operation {
             SemanticOp::CpuTaskCancelled => {
                 Some(YirResultState::Task(TaskLifecycleState::Cancelled))
             }
+            SemanticOp::CpuTaskFailed => Some(YirResultState::Task(TaskLifecycleState::Failed)),
             SemanticOp::DataIsReady => Some(YirResultState::Data(DataFlowState::Ready)),
             SemanticOp::DataIsMoved => Some(YirResultState::Data(DataFlowState::Moved)),
             SemanticOp::DataIsWindowed => Some(YirResultState::Data(DataFlowState::Windowed)),
@@ -232,6 +236,7 @@ fn semantic_op_display_name(op: SemanticOp) -> &'static str {
         SemanticOp::CpuTaskCompleted => ("cpu", "task_completed"),
         SemanticOp::CpuTaskTimedOut => ("cpu", "task_timed_out"),
         SemanticOp::CpuTaskCancelled => ("cpu", "task_cancelled"),
+        SemanticOp::CpuTaskFailed => ("cpu", "task_failed"),
         SemanticOp::CpuTaskValue => ("cpu", "task_value"),
         SemanticOp::DataObserve => ("data", "observe"),
         SemanticOp::DataIsReady => ("data", "is_ready"),

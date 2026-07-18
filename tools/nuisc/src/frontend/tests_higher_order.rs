@@ -70,6 +70,7 @@ where
         | NirExpr::CpuTaskCompleted(base)
         | NirExpr::CpuTaskTimedOut(base)
         | NirExpr::CpuTaskCancelled(base)
+        | NirExpr::CpuTaskFailed(base)
         | NirExpr::CpuTaskValue(base)
         | NirExpr::CpuMutexNew(base)
         | NirExpr::CpuMutexLock(base)

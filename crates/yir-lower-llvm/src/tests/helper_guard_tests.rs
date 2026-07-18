@@ -557,12 +557,18 @@ fn emits_i32_helper_returns_with_i32_ret_in_recursive_helpers() {
 }
 
 #[test]
-fn lowers_flat_scalar_struct_tasks_through_owned_payload_abi() {
+fn lowers_nested_scalar_struct_tasks_through_owned_payload_abi() {
     let mut module = module_with_cpu0();
     push_cpu_const_i64(&mut module, "packet_code", "31");
     push_cpu_node(&mut module, "ready", "cpu.const_bool", vec!["true"]);
     push_cpu_node(&mut module, "narrow", "cpu.const_f32", vec!["2.5"]);
     push_cpu_node(&mut module, "wide", "cpu.const_f64", vec!["6.25"]);
+    push_cpu_node(
+        &mut module,
+        "metrics",
+        "cpu.struct",
+        vec!["Metrics", "narrow=narrow", "wide=wide"],
+    );
     push_cpu_node(
         &mut module,
         "packet",
@@ -571,8 +577,7 @@ fn lowers_flat_scalar_struct_tasks_through_owned_payload_abi() {
             "Packet",
             "code=packet_code",
             "ready=ready",
-            "narrow=narrow",
-            "wide=wide",
+            "metrics=metrics",
         ],
     );
     push_cpu_node(
@@ -589,8 +594,9 @@ fn lowers_flat_scalar_struct_tasks_through_owned_payload_abi() {
         &[
             ("packet_code", "packet"),
             ("ready", "packet"),
-            ("narrow", "packet"),
-            ("wide", "packet"),
+            ("wide", "metrics"),
+            ("narrow", "metrics"),
+            ("metrics", "packet"),
             ("packet", "task"),
             ("task", "result"),
             ("result", "value"),
@@ -598,11 +604,14 @@ fn lowers_flat_scalar_struct_tasks_through_owned_payload_abi() {
         ],
     );
 
-    let llvm_ir = emit_module(&module).expect("flat struct task lowering should succeed");
+    let llvm_ir = emit_module(&module).expect("nested struct task lowering should succeed");
     assert!(llvm_ir.contains("call i64 @nuis_scheduler_task_spawn_owned_v1(ptr"));
     assert!(llvm_ir.contains("call i64 @nuis_scheduler_task_take_owned_v1(i64"));
     assert!(llvm_ir.contains("call void @nuis_scheduler_owned_payload_drop_v1(ptr"));
-    assert!(llvm_ir.contains("store ptr @nuis_scheduler_payload_free_v1"));
+    assert!(llvm_ir.contains("store ptr @nuis_scheduler_owned_aggregate_drop_v1"));
     assert!(llvm_ir.contains("bitcast float "));
     assert!(llvm_ir.contains("bitcast double "));
+    assert!(llvm_ir.contains("call ptr @nuis_scheduler_owned_aggregate_alloc_v1(i64 4)"));
+    assert!(llvm_ir.contains("call i64 @nuis_scheduler_owned_aggregate_set_scalar_v1"));
+    assert!(llvm_ir.contains("call ptr @nuis_scheduler_owned_aggregate_finish_v1(ptr"));
 }
