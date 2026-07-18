@@ -83,6 +83,7 @@ If you only want the current task mainline, start with:
   [task_completed_observe_demo](task_completed_observe_demo),
   [task_context_arity_demo](task_context_arity_demo),
   [task_scalar_context_demo](task_scalar_context_demo),
+  [task_float_context_demo](task_float_context_demo),
   [task_compare_observe_demo](task_compare_observe_demo),
   [task_clock_observe_demo](task_clock_observe_demo),
   [task_scheduler_observe_demo](task_scheduler_observe_demo)

@@ -61,12 +61,20 @@ pub(crate) fn lower_cpu_call_node(
     if deferred_task_calls.contains(&node.name)
         && matches!(
             signature.ret,
-            CpuCallScalarKind::Bool | CpuCallScalarKind::I32 | CpuCallScalarKind::I64
+            CpuCallScalarKind::Bool
+                | CpuCallScalarKind::I32
+                | CpuCallScalarKind::I64
+                | CpuCallScalarKind::F32
+                | CpuCallScalarKind::F64
         )
         && signature.params.iter().all(|kind| {
             matches!(
                 kind,
-                CpuCallScalarKind::Bool | CpuCallScalarKind::I32 | CpuCallScalarKind::I64
+                CpuCallScalarKind::Bool
+                    | CpuCallScalarKind::I32
+                    | CpuCallScalarKind::I64
+                    | CpuCallScalarKind::F32
+                    | CpuCallScalarKind::F64
             )
         })
     {

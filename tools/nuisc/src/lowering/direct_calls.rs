@@ -258,7 +258,11 @@ fn direct_call_scalar_kind(ty: &nuis_semantics::model::NirTypeRef) -> Option<Dir
 fn is_scheduler_scalar_kind(kind: DirectCallScalarKind) -> bool {
     matches!(
         kind,
-        DirectCallScalarKind::Bool | DirectCallScalarKind::I32 | DirectCallScalarKind::I64
+        DirectCallScalarKind::Bool
+            | DirectCallScalarKind::I32
+            | DirectCallScalarKind::I64
+            | DirectCallScalarKind::F32
+            | DirectCallScalarKind::F64
     )
 }
 

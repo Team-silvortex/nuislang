@@ -34,6 +34,15 @@ fn c_shim_source_includes_native_cli_runtime_hooks() {
     assert!(shim.contains("nuis_scheduler_task_release_context_v1(index);"));
     assert!(shim.contains("int64_t nuis_scheduler_task_join_state_v1(int64_t task_handle)"));
     assert!(shim.contains("int64_t nuis_scheduler_task_value_i64_v1(int64_t task_handle)"));
+    assert!(shim.contains("typedef struct {\n    void* data;\n    int64_t size;"));
+    assert!(shim.contains("NuisSchedulerPayloadMoveV1 move_hook;"));
+    assert!(shim.contains("NuisSchedulerPayloadDropV1 drop_hook;"));
+    assert!(shim.contains("static int nuis_scheduler_owned_payload_valid_v1("));
+    assert!(shim.contains("int64_t nuis_scheduler_task_spawn_owned_v1("));
+    assert!(shim.contains("int64_t nuis_scheduler_task_take_owned_v1("));
+    assert!(shim.contains("payload->drop_hook(payload->data);"));
+    assert!(shim.contains("nuis_scheduler_task_release_owned_payload_v1(index);"));
+    assert!(shim.contains("nuis_scheduler_task_payload_kinds[index] = 0;"));
     assert!(shim.contains("(void)nuis_lifecycle_tick_once_v1();"));
     assert!(shim.contains("static int64_t nuis_lifecycle_on_result_commit_v1(int64_t status)"));
     assert!(shim.contains("static int64_t nuis_lifecycle_on_summary_flush_v1(void)"));

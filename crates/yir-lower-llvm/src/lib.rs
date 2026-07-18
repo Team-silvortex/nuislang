@@ -326,7 +326,18 @@ fn render_scalar_task_invoker(
                 argument
             }
             CpuCallScalarKind::I64 => packed,
-            CpuCallScalarKind::F32 | CpuCallScalarKind::F64 => unreachable!(),
+            CpuCallScalarKind::F32 => {
+                let bits = format!("%task_arg{index}_bits");
+                body.push(format!("  {bits} = trunc i64 {packed} to i32"));
+                let argument = format!("%task_arg{index}");
+                body.push(format!("  {argument} = bitcast i32 {bits} to float"));
+                argument
+            }
+            CpuCallScalarKind::F64 => {
+                let argument = format!("%task_arg{index}");
+                body.push(format!("  {argument} = bitcast i64 {packed} to double"));
+                argument
+            }
         };
         call_args.push(format!("{} {argument}", cpu_scalar_kind_llvm_type(kind)));
     }
@@ -345,7 +356,15 @@ fn render_scalar_task_invoker(
             body.push("  ret i64 %task_result_packed".to_owned());
         }
         CpuCallScalarKind::I64 => body.push("  ret i64 %task_result".to_owned()),
-        CpuCallScalarKind::F32 | CpuCallScalarKind::F64 => unreachable!(),
+        CpuCallScalarKind::F32 => {
+            body.push("  %task_result_bits = bitcast float %task_result to i32".to_owned());
+            body.push("  %task_result_packed = zext i32 %task_result_bits to i64".to_owned());
+            body.push("  ret i64 %task_result_packed".to_owned());
+        }
+        CpuCallScalarKind::F64 => {
+            body.push("  %task_result_packed = bitcast double %task_result to i64".to_owned());
+            body.push("  ret i64 %task_result_packed".to_owned());
+        }
     }
     Some(format!(
         "define i64 @nuis_task_invoker_{function_name}(ptr %context) {{\n{}\n}}\n",
@@ -356,7 +375,11 @@ fn render_scalar_task_invoker(
 fn is_normalized_task_scalar(kind: CpuCallScalarKind) -> bool {
     matches!(
         kind,
-        CpuCallScalarKind::Bool | CpuCallScalarKind::I32 | CpuCallScalarKind::I64
+        CpuCallScalarKind::Bool
+            | CpuCallScalarKind::I32
+            | CpuCallScalarKind::I64
+            | CpuCallScalarKind::F32
+            | CpuCallScalarKind::F64
     )
 }
 

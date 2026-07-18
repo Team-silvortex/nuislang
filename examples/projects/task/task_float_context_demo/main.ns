@@ -1,0 +1,32 @@
+mod cpu Main {
+  async fn identity_f32(value: f32) -> f32 {
+    return value;
+  }
+
+  async fn pick_f64(enabled: bool, scale: f32, value: f64) -> f64 {
+    return value;
+  }
+
+  fn main() -> i64 {
+    let narrow_value: f32 = 2.5;
+    let narrow_task: Task<f32> = spawn(identity_f32(narrow_value));
+    let narrow_result: TaskResult<f32> = join_result(narrow_task);
+    if task_completed(narrow_result) == false {
+      return 1;
+    }
+    if task_value(narrow_result) != 2.5 {
+      return 2;
+    }
+
+    let scale: f32 = 2.0;
+    let wide_task: Task<f64> = spawn(pick_f64(true, scale, 6.25));
+    let wide_result: TaskResult<f64> = join_result(wide_task);
+    if task_completed(wide_result) == false {
+      return 3;
+    }
+    if task_value(wide_result) == 6.25 {
+      return 29;
+    }
+    return 4;
+  }
+}

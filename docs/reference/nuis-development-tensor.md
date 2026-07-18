@@ -458,8 +458,8 @@ state before join. Runtime slot storage is now one normalized thunk packet with
 a common invoker and opaque context. All terminal paths and shutdown release
 owned contexts. The larger `cli_build_pipeline_demo` also retains its
 auto-injected language gate through native LLVM execution. The remaining
-task/native closure gap is floating-point scalar signatures, aggregate payloads,
-and a mature worker executor.
+task/native closure gap is aggregate payload ownership and a mature worker
+executor.
 
 The source frontend now recognizes `ready_after(task, ticks)`, carries it
 through every NIR visitor to `cpu.ready_after`, stores overflow-safe ready ticks
@@ -468,8 +468,15 @@ consistently with the built-in CPU interpreter. Native smoke coverage locks
 both completion-before-deadline and timeout-before-readiness behavior. The
 same smoke matrix also covers mixed `bool`/`i32` arguments, signed `i32`
 returns, and `bool` returns through the normalized eight-byte slot ABI. The
-remaining scheduler payload gap is `f32`/`f64` bit-preserving packing and
-aggregate payload ownership.
+same packed ABI now carries `f32` and `f64` by bit pattern rather than numeric
+conversion, with native exact-value smoke coverage. The remaining scheduler
+payload gap is aggregate layout materialization. The native shim now owns an
+explicit `NuisSchedulerOwnedPayloadV1` descriptor with size/alignment/type-id,
+move/drop hooks, one-shot take semantics, and terminal-path cleanup, but source
+structs remain virtual field SSA and therefore do not consume this ABI yet.
+Direct floating literals inside
+spawned calls still need stronger callee-parameter expected-type propagation;
+explicitly typed bindings currently preserve the intended `f32` boundary.
 
 The Nustar checks anchor the bootstrap-critical
 `heterogeneous-runtime/nustar/registered-domain-contracts` cell to:

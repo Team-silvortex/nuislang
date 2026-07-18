@@ -264,6 +264,35 @@ fn normalizes_spawned_bool_result_through_i64_slot() {
 }
 
 #[test]
+fn renders_bit_preserving_f32_and_f64_task_invokers() {
+    use super::super::{render_scalar_task_invoker, CpuHelperSignature};
+
+    let f32_invoker = render_scalar_task_invoker(
+        "identity_f32",
+        &CpuHelperSignature {
+            params: vec![CpuCallScalarKind::F32],
+            ret: CpuCallScalarKind::F32,
+        },
+    )
+    .expect("f32 task invoker");
+    assert!(f32_invoker.contains("trunc i64 %task_arg0_packed to i32"));
+    assert!(f32_invoker.contains("bitcast i32 %task_arg0_bits to float"));
+    assert!(f32_invoker.contains("bitcast float %task_result to i32"));
+    assert!(f32_invoker.contains("zext i32 %task_result_bits to i64"));
+
+    let f64_invoker = render_scalar_task_invoker(
+        "pick_f64",
+        &CpuHelperSignature {
+            params: vec![CpuCallScalarKind::Bool, CpuCallScalarKind::F64],
+            ret: CpuCallScalarKind::F64,
+        },
+    )
+    .expect("f64 task invoker");
+    assert!(f64_invoker.contains("bitcast i64 %task_arg1_packed to double"));
+    assert!(f64_invoker.contains("bitcast double %task_result to i64"));
+}
+
+#[test]
 fn emits_guard_return_as_real_branch() {
     let mut module = YirModule::new("0.1");
     module.resources.push(Resource {

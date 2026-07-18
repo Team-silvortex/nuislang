@@ -470,8 +470,25 @@ fn emit_scalar_task_context(
                 packed
             }
             CpuCallScalarKind::I64 => argument.value.clone(),
-            CpuCallScalarKind::F32 | CpuCallScalarKind::F64 => {
-                unreachable!("floating-point task arguments are not normalized yet")
+            CpuCallScalarKind::F32 => {
+                let bits = fresh_reg(&mut state.next_reg);
+                state.body.push(format!(
+                    "  {bits} = bitcast float {} to i32",
+                    argument.value
+                ));
+                let packed = fresh_reg(&mut state.next_reg);
+                state
+                    .body
+                    .push(format!("  {packed} = zext i32 {bits} to i64"));
+                packed
+            }
+            CpuCallScalarKind::F64 => {
+                let packed = fresh_reg(&mut state.next_reg);
+                state.body.push(format!(
+                    "  {packed} = bitcast double {} to i64",
+                    argument.value
+                ));
+                packed
             }
         };
         state
@@ -502,8 +519,23 @@ fn unpack_task_payload(
             LlvmValueRef::I32(i32)
         }
         CpuCallScalarKind::I64 => LlvmValueRef::I64(payload),
-        CpuCallScalarKind::F32 | CpuCallScalarKind::F64 => {
-            unreachable!("floating-point task payloads are not normalized yet")
+        CpuCallScalarKind::F32 => {
+            let bits = fresh_reg(&mut state.next_reg);
+            state
+                .body
+                .push(format!("  {bits} = trunc i64 {payload} to i32"));
+            let value = fresh_reg(&mut state.next_reg);
+            state
+                .body
+                .push(format!("  {value} = bitcast i32 {bits} to float"));
+            LlvmValueRef::F32(value)
+        }
+        CpuCallScalarKind::F64 => {
+            let value = fresh_reg(&mut state.next_reg);
+            state
+                .body
+                .push(format!("  {value} = bitcast i64 {payload} to double"));
+            LlvmValueRef::F64(value)
         }
     }
 }

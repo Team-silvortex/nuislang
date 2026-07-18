@@ -683,6 +683,55 @@ fn task_context_normalizes_bool_and_i32_scalars() {
 }
 
 #[test]
+fn task_context_preserves_f32_and_f64_bits() {
+    let output_dir = temp_dir("task_float_context");
+    let output_dir_text = output_dir.display().to_string();
+    let build = run_nuis(&[
+        "build",
+        "../../examples/projects/task/task_float_context_demo",
+        &output_dir_text,
+    ]);
+    assert_success(&build, "nuis build task float context");
+
+    let llvm = output_dir.join("task_float_context_demo.ll");
+    assert_file_contains(
+        &llvm,
+        "bitcast float %task_result to i32",
+        "f32 task result bits",
+    );
+    assert_file_contains(
+        &llvm,
+        "bitcast double %task_result to i64",
+        "f64 task result bits",
+    );
+    assert_file_contains(
+        &llvm,
+        "bitcast i32 %task_arg0_bits to float",
+        "f32 task argument unpack",
+    );
+    assert_file_contains(
+        &llvm,
+        "bitcast i64 %task_arg2_packed to double",
+        "f64 task argument unpack",
+    );
+    assert_llvm_entry_not_contains(
+        &llvm,
+        "call float @nuis_fn_identity_f32(",
+        "eager f32 task helper",
+    );
+    assert_llvm_entry_not_contains(
+        &llvm,
+        "call double @nuis_fn_pick_f64(",
+        "eager f64 task helper",
+    );
+
+    let binary = Command::new(output_dir.join("task_float_context_demo"))
+        .output()
+        .expect("run task float context binary");
+    assert_eq!(binary.status.code(), Some(29));
+}
+
+#[test]
 fn std_language_galaxy_build_pipeline_runs_through_cli_contracts() {
     let output_dir = temp_dir("std_language_build_pipeline");
     let output_dir_text = output_dir.display().to_string();
