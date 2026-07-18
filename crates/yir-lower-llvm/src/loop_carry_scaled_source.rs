@@ -117,7 +117,7 @@ pub(crate) fn try_resolve_loop_carry_scaled_source(
             next_reg,
             loop_scalar_kind,
             terms_part,
-            has_invariant.then_some(1),
+            None,
             carry_kind,
             payloads,
             current,
@@ -127,7 +127,7 @@ pub(crate) fn try_resolve_loop_carry_scaled_source(
             node_name,
             loop_instruction,
         )?;
-        let source = emit_mul(
+        let mut source = emit_mul(
             body,
             next_reg,
             loop_scalar_kind,
@@ -136,6 +136,18 @@ pub(crate) fn try_resolve_loop_carry_scaled_source(
             node_name,
             loop_instruction,
         )?;
+        if has_invariant {
+            let offset = expect_payload(payloads, 1, carry_kind, node_name, loop_instruction)?;
+            source = emit_add(
+                body,
+                next_reg,
+                loop_scalar_kind,
+                &source,
+                offset,
+                node_name,
+                loop_instruction,
+            )?;
+        }
         return Ok(Some((source, "mul")));
     }
 
@@ -305,4 +317,34 @@ fn emit_mul(
     emit_loop_numeric_op(body, next_reg, loop_scalar_kind, "mul", lhs, rhs).map_err(|error| {
         format!("cpu.{loop_instruction} `{node_name}` {error} during LLVM lowering")
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn state_scaled_source_uses_earlier_same_edge_carry_value() {
+        let mut body = Vec::new();
+        let mut next_reg = 0;
+        let resolved = try_resolve_loop_carry_scaled_source(
+            &mut body,
+            &mut next_reg,
+            CpuLoopScalarKind::I64,
+            "mul_scaled_by_carry0_current_plus_invariant",
+            &["%offset".to_owned()],
+            "%current",
+            "%next_current",
+            &["%old_score".to_owned()],
+            &["%new_score".to_owned()],
+            "loop_node",
+            "loop_while_i64_effect_flow",
+        )
+        .expect("scaled source should lower")
+        .expect("scaled source should be recognized");
+
+        assert_eq!(resolved.1, "mul");
+        assert!(body.iter().any(|line| line.contains("%new_score")));
+        assert!(!body.iter().any(|line| line.contains("%old_score")));
+    }
 }

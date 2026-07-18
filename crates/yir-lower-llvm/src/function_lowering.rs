@@ -30,6 +30,7 @@ pub(super) fn emit_cpu_function(
     resources: &BTreeMap<String, &Resource>,
     ordered_node_names: &[String],
     param_bindings: &BTreeMap<String, LlvmValueRef>,
+    param_buffer_lengths: &BTreeMap<String, String>,
     helper_signatures: &BTreeMap<String, CpuHelperSignature>,
     function_return_kind: CpuCallScalarKind,
     global_counter: &mut usize,
@@ -71,6 +72,7 @@ pub(super) fn emit_cpu_function(
         last_cpu_value: None,
         ends_with_terminal_return: false,
     };
+    state.buffer_lengths.extend(param_buffer_lengths.clone());
 
     for (node_name, value) in param_bindings {
         state.registers.insert(node_name.clone(), value.clone());
@@ -174,6 +176,7 @@ pub(super) fn emit_cpu_function(
             buffer_lengths,
             &mut state.facts,
             &mut next_reg,
+            &mut next_block,
             last_cpu_value,
         )? {
             continue;
@@ -206,6 +209,7 @@ pub(super) fn emit_cpu_function(
             body,
             registers,
             helper_signatures,
+            &state.buffer_lengths,
             &deferred_task_calls,
             &mut next_reg,
             last_cpu_value,
@@ -302,10 +306,25 @@ pub(super) fn emit_cpu_function(
             }
         }
 
+        if lower_cpu_effect_flow_loop_node(
+            node,
+            body,
+            registers,
+            &state.buffer_lengths,
+            helper_signatures,
+            &mut next_reg,
+            &mut next_block,
+            last_cpu_value,
+        )? {
+            continue;
+        }
+
         if lower_cpu_simple_loop_node(
             node,
             body,
             registers,
+            &state.buffer_lengths,
+            helper_signatures,
             &mut next_reg,
             &mut next_block,
             last_cpu_value,

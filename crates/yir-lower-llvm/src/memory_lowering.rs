@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use yir_core::Node;
 
 use super::{
-    fresh_reg, lower_buffer_fill,
+    fresh_block, fresh_reg, lower_buffer_fill,
     value_ref::{get_i64, get_ptr},
     KnownFacts, LlvmValueRef,
 };
@@ -15,6 +15,7 @@ pub(crate) fn lower_cpu_memory_node(
     buffer_lengths: &mut BTreeMap<String, String>,
     facts: &mut KnownFacts,
     next_reg: &mut usize,
+    next_block: &mut usize,
     last_cpu_value: &mut Option<String>,
 ) -> Result<bool, String> {
     if node.op.module != "cpu" {
@@ -172,6 +173,43 @@ pub(crate) fn lower_cpu_memory_node(
             body.push(format!(
                 "  call void @nuis_scheduler_owned_blob_drop_v1(ptr {blob})"
             ));
+            registers.insert(node.name.clone(), LlvmValueRef::Void);
+        }
+        "loop_owned_bytes_copy_drop_break" => {
+            let (Some(condition), Some(ptr), Some(len)) = (
+                get_i64(registers, &node.op.args[0]),
+                get_ptr(registers, &node.op.args[1]),
+                buffer_lengths.get(&node.op.args[1]),
+            ) else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.loop_owned_bytes_copy_drop_break `{}` because its condition or buffer facts are unavailable",
+                    node.name
+                ));
+                return Ok(true);
+            };
+            let condition = condition.to_owned();
+            let ptr = ptr.to_owned();
+            let len = len.to_owned();
+            let condition_bool = fresh_reg(next_reg);
+            body.push(format!("  {condition_bool} = icmp ne i64 {condition}, 0"));
+            let body_label = fresh_block(next_block, "loop_owned_bytes_body");
+            let exit_label = fresh_block(next_block, "loop_owned_bytes_exit");
+            body.push(format!(
+                "  br i1 {condition_bool}, label %{body_label}, label %{exit_label}"
+            ));
+            body.push(format!("{body_label}:"));
+            let byte_len = fresh_reg(next_reg);
+            body.push(format!("  {byte_len} = mul i64 {len}, 8"));
+            let blob = fresh_reg(next_reg);
+            body.push(format!(
+                "  {blob} = call ptr @nuis_scheduler_owned_blob_copy_v1(ptr {ptr}, i64 {byte_len}, i64 {})",
+                stable_glm_token(&node.name)
+            ));
+            body.push(format!(
+                "  call void @nuis_scheduler_owned_blob_drop_v1(ptr {blob})"
+            ));
+            body.push(format!("  br label %{exit_label}"));
+            body.push(format!("{exit_label}:"));
             registers.insert(node.name.clone(), LlvmValueRef::Void);
         }
         "load_at" => {

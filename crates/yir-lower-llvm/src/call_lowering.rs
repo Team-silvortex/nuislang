@@ -5,7 +5,7 @@ use yir_core::Node;
 use super::{
     call_return::cpu_scalar_kind_llvm_type,
     fresh_reg,
-    value_ref::{get_bool, get_f32, get_f64, get_i32, get_i64},
+    value_ref::{get_bool, get_f32, get_f64, get_i32, get_i64, get_ptr},
     CpuCallScalarKind, CpuHelperSignature, LlvmValueRef, TaskThunkArgument,
 };
 
@@ -14,6 +14,7 @@ pub(crate) fn lower_cpu_call_node(
     body: &mut Vec<String>,
     registers: &mut BTreeMap<String, LlvmValueRef>,
     helper_signatures: &BTreeMap<String, CpuHelperSignature>,
+    buffer_lengths: &BTreeMap<String, String>,
     deferred_task_calls: &BTreeSet<String>,
     next_reg: &mut usize,
     last_cpu_value: &mut Option<String>,
@@ -42,15 +43,27 @@ pub(crate) fn lower_cpu_call_node(
         .iter()
         .zip(signature.params.iter())
         .map(|(arg, kind)| match kind {
-            CpuCallScalarKind::Bool => get_bool(registers, arg).map(|value| format!("i1 {value}")),
-            CpuCallScalarKind::I32 => get_i32(registers, arg).map(|value| format!("i32 {value}")),
-            CpuCallScalarKind::I64 => get_i64(registers, arg).map(|value| format!("i64 {value}")),
-            CpuCallScalarKind::F32 => get_f32(registers, arg).map(|value| format!("float {value}")),
-            CpuCallScalarKind::F64 => {
-                get_f64(registers, arg).map(|value| format!("double {value}"))
+            CpuCallScalarKind::Bool => {
+                get_bool(registers, arg).map(|value| vec![format!("i1 {value}")])
             }
+            CpuCallScalarKind::I32 => {
+                get_i32(registers, arg).map(|value| vec![format!("i32 {value}")])
+            }
+            CpuCallScalarKind::I64 => {
+                get_i64(registers, arg).map(|value| vec![format!("i64 {value}")])
+            }
+            CpuCallScalarKind::F32 => {
+                get_f32(registers, arg).map(|value| vec![format!("float {value}")])
+            }
+            CpuCallScalarKind::F64 => {
+                get_f64(registers, arg).map(|value| vec![format!("double {value}")])
+            }
+            CpuCallScalarKind::BorrowedBuffer => get_ptr(registers, arg)
+                .zip(buffer_lengths.get(arg))
+                .map(|(ptr, len)| vec![format!("ptr {ptr}"), format!("i64 {len}")]),
         })
-        .collect::<Option<Vec<_>>>();
+        .collect::<Option<Vec<_>>>()
+        .map(|args| args.into_iter().flatten().collect::<Vec<_>>());
     let Some(lowered_args) = lowered_args else {
         body.push(format!(
             "  ; deferred lowering for cpu.{} `{}` because one or more inputs are outside the current CPU LLVM slice",
@@ -203,6 +216,7 @@ pub(crate) fn lower_cpu_call_node(
             body.push(format!("  {as_i64} = fptosi double {reg} to i64"));
             *last_cpu_value = Some(as_i64);
         }
+        CpuCallScalarKind::BorrowedBuffer => unreachable!("borrowed refs cannot return"),
     }
 
     Ok(true)

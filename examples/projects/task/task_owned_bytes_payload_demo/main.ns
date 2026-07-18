@@ -2,25 +2,67 @@ mod cpu Main {
   extern "c" fn host_argv_count() -> i64;
 
   struct Packet {
-    bytes: Bytes
+    bytes: Bytes,
+    iterations: i64,
+    score: i64,
+    weighted: i64,
+    scaled: i64,
+    grouped: i64
   }
 
   async fn make_packet() -> Packet {
     let buffer: ref Buffer = alloc_buffer(3, 17);
     let bytes: Bytes = copy_bytes(buffer);
+    let copies: i64 = 0;
+    while copies < 4 {
+      let iteration: Bytes = copy_bytes(buffer);
+      let copies: i64 = copies + 1;
+      if copies >= 2 {
+        break;
+      }
+    }
+    let value: i64 = 0;
+    let score: i64 = 0;
+    let weighted: i64 = 0;
+    let scaled: i64 = 1;
+    let grouped: i64 = 0;
+    while value < 5 {
+      let iteration: Bytes = copy_bytes(buffer);
+      let value: i64 = value + 1;
+      if value > 4 {
+        break;
+      } else {
+        if value < 3 {
+          continue;
+        }
+      }
+      let score: i64 = score + value;
+      let weighted: i64 = weighted + (value + score);
+      let scaled: i64 = scaled * ((value + 1) * 2);
+      let grouped: i64 = grouped + ((value + score) * ((value + -3) * (score + -2)));
+    }
     free(buffer);
-    return Packet { bytes: bytes };
+    return Packet { bytes: bytes, iterations: copies, score: score, weighted: weighted, scaled: scaled, grouped: grouped };
   }
 
   async fn main() -> i64 {
     let task: Task<Packet> = spawn(make_packet());
     let packet: Packet = join(task);
     let bytes: Bytes = packet.bytes;
+    let iterations: i64 = packet.iterations;
+    let score: i64 = packet.score;
+    let weighted: i64 = packet.weighted;
+    let scaled: i64 = packet.scaled;
+    let grouped: i64 = packet.grouped;
     let len: i64 = bytes_len(bytes);
     let argc: i64 = host_argv_count();
     if argc > 0 {
-      return len;
+      return len + iterations + score + weighted + scaled + grouped;
     }
-    return len + 1;
+    let spin: i64 = 0;
+    while spin < 0 {
+      let spin: i64 = spin + 1;
+    }
+    return len + iterations + score + weighted + scaled + grouped + 1;
   }
 }

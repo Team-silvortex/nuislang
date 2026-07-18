@@ -76,7 +76,10 @@ pub(super) fn lower_nir_to_yir_builtin_cpu_with_target(
 
     let rewritten_module = rewrite_self_tail_recursive_functions(module);
     let module = &rewritten_module;
-    let direct_call_functions = collect_recursive_direct_call_functions(module);
+    let direct_call_functions = collect_recursive_direct_call_functions(module)
+        .union(&super::scoped_loop_lowering::collect_scoped_loop_helper_functions(module))
+        .cloned()
+        .collect::<BTreeSet<_>>();
     let async_helper_functions = collect_recursive_async_helper_functions(module);
     let async_loop_step_functions = collect_async_loop_step_functions(module);
     let scheduler_async_thunk_functions = collect_scheduler_async_thunk_functions(module);

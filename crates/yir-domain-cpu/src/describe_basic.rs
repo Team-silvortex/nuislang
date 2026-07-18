@@ -190,7 +190,8 @@ pub(super) fn describe_cpu_basic_node(node: &Node) -> Result<Option<InstructionS
             }
             Ok(InstructionSemantics::pure(node.op.args.clone()))
         }
-        "param_bool" | "param_i32" | "param_i64" | "param_f32" | "param_f64" => {
+        "param_bool" | "param_i32" | "param_i64" | "param_f32" | "param_f64"
+        | "param_buffer_ref" => {
             if node.op.args.len() != 1 {
                 return Err(format!(
                     "node `{}` expects `cpu.{} <name> <resource> <index>`",

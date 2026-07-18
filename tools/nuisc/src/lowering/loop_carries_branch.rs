@@ -75,6 +75,34 @@ pub(in crate::lowering) fn parse_loop_carry_linear(
                     .or_else(|| {
                         parse_prepared_dynamic_read_carry_source(rhs, binding_name, carries)
                     })
+                    .or_else(|| {
+                        if matches!(
+                            rhs,
+                            NirExpr::Binary {
+                                op: NirBinaryOp::Mul,
+                                ..
+                            }
+                        ) {
+                            crate::lowering::loop_preparation::parse_loop_carry_delta_branch_source(
+                                op,
+                                rhs,
+                                binding_name,
+                                carries,
+                                inlineable_pure_helpers,
+                            )
+                            .and_then(|source| {
+                                match source.value_kind() {
+                                    PreparedCarryBranchValueKind::LinearSource {
+                                        source, ..
+                                    } => Some(*source),
+                                    PreparedCarryBranchValueKind::KeepCurrentValue
+                                    | PreparedCarryBranchValueKind::KeepPreviousValue => None,
+                                }
+                            })
+                        } else {
+                            parse_additive_carry_source(rhs, binding_name, carries)
+                        }
+                    })
                     .map(|source| (op, source))
             }
         },

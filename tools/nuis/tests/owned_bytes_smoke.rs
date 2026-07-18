@@ -48,7 +48,14 @@ fn task_owned_bytes_payload_runs_and_drops_native_blob() {
         "cpu.owned_bytes_len",
         "cpu.drop_owned_bytes",
         "cpu.guard_drop_owned_bytes_return",
-        "Packet{bytes:Bytes}",
+        "cpu.loop_while_i64_effect_flow",
+        "flow_break",
+        "flow_continue",
+        "add_current_plus_carry0",
+        "mul_scaled_current_plus_invariant",
+        "add_scaled_by_current_plus_factor_invariant_times_factor_group_carry0_plus_factor_invariant_times_terms_current_plus_carry0",
+        "owned_bytes_copy_drop",
+        "Packet{bytes:Bytes;iterations:i64;score:i64;weighted:i64;scaled:i64;grouped:i64}",
     ] {
         assert_file_contains(&yir, instruction);
     }
@@ -60,6 +67,13 @@ fn task_owned_bytes_payload_runs_and_drops_native_blob() {
         "call void @nuis_scheduler_owned_blob_drop_v1(ptr",
         "guard_drop_bytes_return_then.",
         "guard_drop_bytes_return_cont.",
+        "loop_effect_flow_cond.",
+        "loop_effect_flow_body.",
+        "loop_effect_flow_action.",
+        "loop_effect_flow_rhs.",
+        "loop_effect_flow_update.",
+        "loop_effect_flow_exit.",
+        " = mul i64 ",
     ] {
         assert_file_contains(&llvm, instruction);
     }
@@ -67,5 +81,5 @@ fn task_owned_bytes_payload_runs_and_drops_native_blob() {
     let binary = Command::new(output_dir.join("task_owned_bytes_payload_demo"))
         .output()
         .expect("run task owned Bytes payload binary");
-    assert_eq!(binary.status.code(), Some(24));
+    assert_eq!(binary.status.code(), Some(185));
 }

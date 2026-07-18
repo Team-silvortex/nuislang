@@ -101,6 +101,14 @@ pub(in crate::lowering) fn lower_while_stmt(
     bindings: &mut BTreeMap<String, String>,
     _const_bindings: &mut BTreeMap<String, NirExpr>,
 ) -> Result<Option<String>, String> {
+    if super::scoped_loop_lowering::lower_scoped_call_while(condition, body, state, bindings)? {
+        return Ok(None);
+    }
+
+    if super::owned_loop_lowering::lower_owned_bytes_while(condition, body, state, bindings)? {
+        return Ok(None);
+    }
+
     if let Some(prepared) = prepare_post_flow_while(
         condition,
         body,

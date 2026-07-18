@@ -15,6 +15,7 @@ mod bitwise_lowering;
 mod call_lowering;
 mod call_return;
 mod cast_lowering;
+mod effect_flow_loop_lowering;
 mod emit_utils;
 mod extern_abi;
 mod extern_call_lowering;
@@ -29,6 +30,7 @@ mod loop_carry_read_source;
 mod loop_carry_scaled_source;
 mod loop_carry_source;
 mod loop_chain_result;
+mod loop_effect_action;
 mod loop_expr;
 mod loop_flow_control_lowering;
 mod loop_scalar;
@@ -57,6 +59,7 @@ use call_return::{
     emit_typed_return_from_last_value,
 };
 use cast_lowering::lower_cpu_cast_node;
+use effect_flow_loop_lowering::lower_cpu_effect_flow_loop_node;
 use emit_utils::{fresh_block, fresh_global, fresh_reg, llvm_c_string_bytes, lower_buffer_fill};
 use extern_abi::render_dynamic_extern_decls;
 use extern_call_lowering::lower_cpu_extern_call_node;
@@ -202,12 +205,18 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
             .iter()
             .map(|(index, name, kind)| (name.clone(), cpu_param_binding(*kind, *index)))
             .collect::<BTreeMap<_, _>>();
+        let param_buffer_lengths = params
+            .iter()
+            .filter(|(_, _, kind)| *kind == CpuCallScalarKind::BorrowedBuffer)
+            .map(|(index, name, _)| (name.clone(), format!("%arg{index}_len")))
+            .collect::<BTreeMap<_, _>>();
         let function_name = lane.trim_start_matches("fn:");
         let emitted = emit_cpu_function(
             module,
             &resources,
             &lane_nodes,
             &param_bindings,
+            &param_buffer_lengths,
             &helper_signatures,
             helper_signatures
                 .get(function_name)
@@ -218,7 +227,13 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
         globals.extend(emitted.globals);
         let args_sig = params
             .iter()
-            .map(|(index, _, kind)| format!("{} %arg{index}", cpu_scalar_kind_llvm_type(*kind)))
+            .map(|(index, _, kind)| {
+                if *kind == CpuCallScalarKind::BorrowedBuffer {
+                    format!("ptr %arg{index}, i64 %arg{index}_len")
+                } else {
+                    format!("{} %arg{index}", cpu_scalar_kind_llvm_type(*kind))
+                }
+            })
             .collect::<Vec<_>>()
             .join(", ");
         let ret_sig = cpu_scalar_kind_llvm_type(
@@ -255,6 +270,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
         module,
         &resources,
         &entry_nodes,
+        &BTreeMap::new(),
         &BTreeMap::new(),
         &helper_signatures,
         CpuCallScalarKind::I64,
@@ -348,6 +364,9 @@ fn render_scalar_task_invoker(
                 body.push(format!("  {argument} = bitcast i64 {packed} to double"));
                 argument
             }
+            CpuCallScalarKind::BorrowedBuffer => {
+                unreachable!("borrowed buffers do not have task invokers")
+            }
         };
         call_args.push(format!("{} {argument}", cpu_scalar_kind_llvm_type(kind)));
     }
@@ -374,6 +393,9 @@ fn render_scalar_task_invoker(
         CpuCallScalarKind::F64 => {
             body.push("  %task_result_packed = bitcast double %task_result to i64".to_owned());
             body.push("  ret i64 %task_result_packed".to_owned());
+        }
+        CpuCallScalarKind::BorrowedBuffer => {
+            unreachable!("borrowed buffers cannot return from task invokers")
         }
     }
     Some(format!(

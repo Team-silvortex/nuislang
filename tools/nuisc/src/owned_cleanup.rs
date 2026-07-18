@@ -2,6 +2,10 @@ use std::collections::BTreeSet;
 
 use nuis_semantics::model::{NirExpr, NirFunction, NirModule, NirStmt, NirTypeRef};
 
+#[path = "owned_cleanup_loop.rs"]
+mod owned_cleanup_loop;
+use owned_cleanup_loop::rewrite_direct_loop_control_if;
+
 pub(crate) fn insert_owned_bytes_cleanup(module: &mut NirModule) -> bool {
     module
         .functions
@@ -12,9 +16,7 @@ pub(crate) fn insert_owned_bytes_cleanup(module: &mut NirModule) -> bool {
 }
 
 fn insert_function_cleanup(function: &mut NirFunction) -> bool {
-    if contains_while(&function.body)
-        || function.return_type.is_none() && contains_value_return(&function.body)
-    {
+    if function.return_type.is_none() && contains_value_return(&function.body) {
         return false;
     }
 
@@ -62,9 +64,9 @@ fn insert_function_cleanup(function: &mut NirFunction) -> bool {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct CleanupState {
-    live: BTreeSet<String>,
-    declaration_order: Vec<String>,
+pub(super) struct CleanupState {
+    pub(super) live: BTreeSet<String>,
+    pub(super) declaration_order: Vec<String>,
 }
 
 enum CleanupFlow {
@@ -72,11 +74,11 @@ enum CleanupFlow {
     Terminates,
 }
 
-struct CleanupContext<'a> {
-    return_type: Option<&'a NirTypeRef>,
-    used_names: BTreeSet<String>,
-    return_index: usize,
-    changed: bool,
+pub(super) struct CleanupContext<'a> {
+    pub(super) return_type: Option<&'a NirTypeRef>,
+    pub(super) used_names: BTreeSet<String>,
+    pub(super) return_index: usize,
+    pub(super) changed: bool,
 }
 
 fn rewrite_block(
@@ -121,6 +123,9 @@ fn rewrite_block(
                 then_body,
                 else_body,
             } => {
+                if expr_changes_owned_state(&condition, &None, &state.live) {
+                    return Err(());
+                }
                 let scope_start = state.declaration_order.len();
                 let (then_body, then_flow) =
                     rewrite_branch(then_body, state.clone(), scope_start, context)?;
@@ -138,6 +143,15 @@ fn rewrite_block(
                         return Ok((rewritten, CleanupFlow::Terminates));
                     }
                 }
+            }
+            NirStmt::While { condition, body } => {
+                if expr_changes_owned_state(&condition, &None, &state.live) {
+                    return Err(());
+                }
+                rewritten.push(NirStmt::While {
+                    condition,
+                    body: rewrite_linear_loop_body(body, state.clone(), context)?,
+                });
             }
             other => rewritten.push(other),
         }
@@ -210,18 +224,6 @@ fn merge_branch_flows(then_flow: CleanupFlow, else_flow: CleanupFlow) -> Result<
     }
 }
 
-fn contains_while(stmts: &[NirStmt]) -> bool {
-    stmts.iter().any(|stmt| match stmt {
-        NirStmt::While { .. } => true,
-        NirStmt::If {
-            then_body,
-            else_body,
-            ..
-        } => contains_while(then_body) || contains_while(else_body),
-        _ => false,
-    })
-}
-
 fn contains_value_return(stmts: &[NirStmt]) -> bool {
     stmts.iter().any(|stmt| match stmt {
         NirStmt::Return(Some(_)) => true,
@@ -233,6 +235,156 @@ fn contains_value_return(stmts: &[NirStmt]) -> bool {
         NirStmt::While { body, .. } => contains_value_return(body),
         _ => false,
     })
+}
+
+fn rewrite_linear_loop_body(
+    stmts: Vec<NirStmt>,
+    entry: CleanupState,
+    context: &mut CleanupContext<'_>,
+) -> Result<Vec<NirStmt>, ()> {
+    let scope_start = entry.declaration_order.len();
+    let mut state = entry.clone();
+    let mut rewritten = Vec::with_capacity(stmts.len());
+    let mut remaining = stmts.into_iter();
+
+    while let Some(stmt) = remaining.next() {
+        match stmt {
+            NirStmt::Let { name, ty, value } => {
+                let transfers_bytes =
+                    direct_binding_name(&value).is_some_and(|source| state.live.contains(source));
+                consume_for_binding(&value, &ty, &mut state.live);
+                if transfers_bytes {
+                    consume_direct(&value, &mut state.live);
+                }
+                let owns_bytes = is_bytes_type(ty.as_ref())
+                    || matches!(value, NirExpr::CopyBufferOwned(_))
+                    || transfers_bytes;
+                if owns_bytes {
+                    state.live.insert(name.clone());
+                    state.declaration_order.push(name.clone());
+                }
+                rewritten.push(NirStmt::Let { name, ty, value });
+            }
+            NirStmt::Expr(NirExpr::DropBytes(inner)) => {
+                if let Some(name) = direct_binding_name(&inner) {
+                    state.live.remove(name);
+                }
+                rewritten.push(NirStmt::Expr(NirExpr::DropBytes(inner)));
+            }
+            NirStmt::Break | NirStmt::Continue => {
+                finish_loop_edge(&mut rewritten, &mut state, &entry, scope_start, context)?;
+                rewritten.push(stmt);
+                rewritten.extend(remaining);
+                return Ok(rewritten);
+            }
+            NirStmt::Return(value) => {
+                rewrite_return(value, &mut rewritten, &mut state, context);
+                rewritten.extend(remaining);
+                return Ok(rewritten);
+            }
+            NirStmt::If {
+                condition,
+                then_body,
+                else_body,
+            } => {
+                if expr_changes_owned_state(&condition, &None, &state.live) {
+                    return Err(());
+                }
+                let Some((then_body, else_body)) = rewrite_direct_loop_control_if(
+                    then_body,
+                    else_body,
+                    &state,
+                    &entry,
+                    scope_start,
+                    context,
+                )?
+                else {
+                    return Err(());
+                };
+                rewritten.push(NirStmt::If {
+                    condition,
+                    then_body,
+                    else_body,
+                });
+            }
+            NirStmt::While { condition, body } => {
+                if expr_changes_owned_state(&condition, &None, &state.live) {
+                    return Err(());
+                }
+                let body = rewrite_linear_loop_body(body, state.clone(), context)?;
+                rewritten.push(NirStmt::While { condition, body });
+            }
+            other @ (NirStmt::Const { .. }
+            | NirStmt::Print(_)
+            | NirStmt::Await(_)
+            | NirStmt::Expr(_)) => {
+                let value = match &other {
+                    NirStmt::Const { value, .. }
+                    | NirStmt::Print(value)
+                    | NirStmt::Await(value)
+                    | NirStmt::Expr(value) => value,
+                    _ => unreachable!(),
+                };
+                if expr_changes_owned_state(value, &None, &state.live) {
+                    return Err(());
+                }
+                rewritten.push(other);
+            }
+        }
+    }
+
+    finish_loop_edge(&mut rewritten, &mut state, &entry, scope_start, context)?;
+    Ok(rewritten)
+}
+
+pub(super) fn finish_loop_edge(
+    out: &mut Vec<NirStmt>,
+    state: &mut CleanupState,
+    entry: &CleanupState,
+    scope_start: usize,
+    context: &mut CleanupContext<'_>,
+) -> Result<(), ()> {
+    let iteration_locals = state.declaration_order[scope_start..].to_vec();
+    if iteration_locals
+        .iter()
+        .any(|name| state.live.contains(name))
+    {
+        append_drops(out, &iteration_locals, &mut state.live);
+        context.changed = true;
+    }
+    state.declaration_order.truncate(scope_start);
+    if state == entry {
+        Ok(())
+    } else {
+        Err(())
+    }
+}
+
+fn expr_changes_owned_state(
+    expr: &NirExpr,
+    target_type: &Option<NirTypeRef>,
+    live: &BTreeSet<String>,
+) -> bool {
+    if expr_creates_owned_bytes(expr) {
+        return true;
+    }
+    let mut remaining = live.clone();
+    consume_for_binding(expr, target_type, &mut remaining);
+    if direct_binding_name(expr).is_some_and(|name| live.contains(name)) {
+        consume_direct(expr, &mut remaining);
+    }
+    remaining != *live
+}
+
+fn expr_creates_owned_bytes(expr: &NirExpr) -> bool {
+    if matches!(expr, NirExpr::CopyBufferOwned(_)) {
+        return true;
+    }
+    let mut creates = false;
+    crate::nir_walk::walk_child_exprs(expr, &mut |child| {
+        creates |= expr_creates_owned_bytes(child);
+    });
+    creates
 }
 
 fn collect_binding_names(stmts: &[NirStmt], names: &mut BTreeSet<String>) {
@@ -372,6 +524,24 @@ mod tests {
         }
     }
 
+    fn module(function: NirFunction) -> NirModule {
+        NirModule {
+            annotations: Vec::new(),
+            uses: Vec::new(),
+            domain: "cpu".into(),
+            unit: "Main".into(),
+            externs: Vec::new(),
+            extern_interfaces: Vec::new(),
+            consts: Vec::new(),
+            type_aliases: Vec::new(),
+            structs: Vec::new(),
+            enums: Vec::new(),
+            traits: Vec::new(),
+            impls: Vec::new(),
+            functions: vec![function],
+        }
+    }
+
     fn bytes_let(name: &str) -> NirStmt {
         NirStmt::Let {
             name: name.into(),
@@ -466,7 +636,7 @@ mod tests {
     }
 
     #[test]
-    fn leaves_loops_for_cfg_cleanup() {
+    fn carries_outer_owner_through_ownership_neutral_loop() {
         let mut function = function(
             vec![
                 bytes_let("bytes"),
@@ -477,8 +647,69 @@ mod tests {
             ],
             None,
         );
-        assert!(!insert_function_cleanup(&mut function));
-        assert_eq!(function.body.len(), 2);
+        assert!(insert_function_cleanup(&mut function));
+        assert_eq!(function.body.last().and_then(drop_name), Some("bytes"));
+    }
+
+    #[test]
+    fn cleans_loop_local_owned_bytes_on_iteration_fallthrough() {
+        let mut function = function(
+            vec![NirStmt::While {
+                condition: NirExpr::Bool(true),
+                body: vec![bytes_let("iteration")],
+            }],
+            None,
+        );
+        assert!(insert_function_cleanup(&mut function));
+        let NirStmt::While { body, .. } = &function.body[0] else {
+            panic!("expected while");
+        };
+        assert_eq!(body.last().and_then(drop_name), Some("iteration"));
+    }
+
+    #[test]
+    fn cleans_loop_local_owned_bytes_before_break() {
+        let mut function = function(
+            vec![NirStmt::While {
+                condition: NirExpr::Bool(true),
+                body: vec![bytes_let("iteration"), NirStmt::Break],
+            }],
+            None,
+        );
+        assert!(insert_function_cleanup(&mut function));
+        let NirStmt::While { body, .. } = &function.body[0] else {
+            panic!("expected while");
+        };
+        assert_eq!(body.get(1).and_then(drop_name), Some("iteration"));
+        assert!(matches!(body.get(2), Some(NirStmt::Break)));
+    }
+
+    #[test]
+    fn generated_loop_edge_cleanup_passes_glm_verification() {
+        let mut buffer_type = ty("Buffer");
+        buffer_type.is_ref = true;
+        let function = function(
+            vec![
+                NirStmt::Let {
+                    name: "buffer".into(),
+                    ty: Some(buffer_type),
+                    value: NirExpr::AllocBuffer {
+                        len: Box::new(NirExpr::Int(1)),
+                        fill: Box::new(NirExpr::Int(7)),
+                    },
+                },
+                NirStmt::While {
+                    condition: NirExpr::Bool(true),
+                    body: vec![bytes_let("iteration"), NirStmt::Break],
+                },
+                NirStmt::Expr(NirExpr::Free(Box::new(NirExpr::Var("buffer".into())))),
+            ],
+            None,
+        );
+        let mut module = module(function);
+        assert!(insert_owned_bytes_cleanup(&mut module));
+        crate::nir_verify::verify_nir_module(&module)
+            .expect("compiler-generated loop cleanup should satisfy GLM");
     }
 
     #[test]

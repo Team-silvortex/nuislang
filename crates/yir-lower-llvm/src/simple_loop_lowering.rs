@@ -2,12 +2,19 @@ use std::collections::BTreeMap;
 
 use yir_core::Node;
 
-use super::{fresh_block, fresh_reg, value_ref::coerce_to_i64, LlvmValueRef};
+use super::{
+    fresh_block, fresh_reg,
+    loop_effect_action::{begin_loop_effect_action, finish_loop_effect_action},
+    value_ref::coerce_to_i64,
+    CpuHelperSignature, LlvmValueRef,
+};
 
 pub(crate) fn lower_cpu_simple_loop_node(
     node: &Node,
     body: &mut Vec<String>,
     registers: &mut BTreeMap<String, LlvmValueRef>,
+    buffer_lengths: &BTreeMap<String, String>,
+    helper_signatures: &BTreeMap<String, CpuHelperSignature>,
     next_reg: &mut usize,
     next_block: &mut usize,
     last_cpu_value: &mut Option<String>,
@@ -17,7 +24,7 @@ pub(crate) fn lower_cpu_simple_loop_node(
     }
 
     match node.op.instruction.as_str() {
-        "loop_while_i64" => {
+        "loop_while_i64" | "loop_while_i64_effect" => {
             let initial_value = registers.get(&node.op.args[0]).cloned();
             let limit_value = registers.get(&node.op.args[1]).cloned();
             let step_value = registers.get(&node.op.args[2]).cloned();
@@ -83,6 +90,20 @@ pub(crate) fn lower_cpu_simple_loop_node(
                 "  br i1 {cmp}, label %{loop_body}, label %{loop_exit}"
             ));
             body.push(format!("{loop_body}:"));
+            let effect_cleanup = (node.op.instruction == "loop_while_i64_effect")
+                .then(|| {
+                    begin_loop_effect_action(
+                        node,
+                        5,
+                        body,
+                        registers,
+                        buffer_lengths,
+                        helper_signatures,
+                        &current,
+                        next_reg,
+                    )
+                })
+                .transpose()?;
             let next_value = match step_kind {
                 "add" => {
                     let reg = fresh_reg(next_reg);
@@ -102,6 +123,9 @@ pub(crate) fn lower_cpu_simple_loop_node(
                 }
             };
             body.push(format!("  store i64 {next_value}, ptr {loop_slot}"));
+            if let Some(cleanup) = effect_cleanup {
+                finish_loop_effect_action(&cleanup, body);
+            }
             body.push(format!("  br label %{loop_cond}"));
             body.push(format!("{loop_exit}:"));
             registers.insert(node.name.clone(), LlvmValueRef::I64(current.clone()));

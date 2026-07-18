@@ -7,6 +7,7 @@ pub(crate) fn cpu_call_scalar_kind_for_instruction(instruction: &str) -> Option<
         "param_i64" | "call_i64" | "return_i64" => Some(CpuCallScalarKind::I64),
         "param_f32" | "call_f32" | "return_f32" => Some(CpuCallScalarKind::F32),
         "param_f64" | "call_f64" | "return_f64" => Some(CpuCallScalarKind::F64),
+        "param_buffer_ref" => Some(CpuCallScalarKind::BorrowedBuffer),
         _ => None,
     }
 }
@@ -18,6 +19,7 @@ pub(crate) fn cpu_scalar_kind_llvm_type(kind: CpuCallScalarKind) -> &'static str
         CpuCallScalarKind::I64 => "i64",
         CpuCallScalarKind::F32 => "float",
         CpuCallScalarKind::F64 => "double",
+        CpuCallScalarKind::BorrowedBuffer => "ptr",
     }
 }
 
@@ -35,6 +37,7 @@ pub(crate) fn cpu_param_binding(kind: CpuCallScalarKind, index: usize) -> LlvmVa
         CpuCallScalarKind::I64 => LlvmValueRef::I64(arg),
         CpuCallScalarKind::F32 => LlvmValueRef::F32(arg),
         CpuCallScalarKind::F64 => LlvmValueRef::F64(arg),
+        CpuCallScalarKind::BorrowedBuffer => LlvmValueRef::Ptr(arg),
     }
 }
 
@@ -145,6 +148,7 @@ pub(crate) fn emit_typed_return_from_value(
             }
             _ => false,
         },
+        CpuCallScalarKind::BorrowedBuffer => false,
     }
 }
 
@@ -187,6 +191,7 @@ pub(crate) fn can_emit_typed_return_from_value(
                 | LlvmValueRef::I32(_)
                 | LlvmValueRef::Bool { .. }
         ),
+        CpuCallScalarKind::BorrowedBuffer => false,
     }
 }
 
@@ -219,6 +224,9 @@ pub(crate) fn emit_typed_return_from_last_value(
             let as_f64 = fresh_reg(next_reg);
             body.push(format!("  {as_f64} = sitofp i64 {last_value} to double"));
             body.push(format!("  ret double {as_f64}"));
+        }
+        CpuCallScalarKind::BorrowedBuffer => {
+            unreachable!("borrowed buffers cannot be function return values")
         }
     }
 }

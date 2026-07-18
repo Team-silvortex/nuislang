@@ -7,6 +7,7 @@ enum DirectCallScalarKind {
     I64,
     F32,
     F64,
+    BorrowedBuffer,
 }
 
 pub(super) fn collect_recursive_direct_call_functions(module: &NirModule) -> BTreeSet<String> {
@@ -245,8 +246,11 @@ fn collect_async_loop_step_function_in_while(
 }
 
 fn direct_call_scalar_kind(ty: &nuis_semantics::model::NirTypeRef) -> Option<DirectCallScalarKind> {
-    if ty.is_ref || ty.is_optional || !ty.generic_args.is_empty() {
+    if ty.is_optional || !ty.generic_args.is_empty() {
         return None;
+    }
+    if ty.is_ref {
+        return (ty.name == "Buffer").then_some(DirectCallScalarKind::BorrowedBuffer);
     }
     if ty.is_bool_scalar() {
         Some(DirectCallScalarKind::Bool)
@@ -274,8 +278,15 @@ fn is_scheduler_scalar_kind(kind: DirectCallScalarKind) -> bool {
     )
 }
 
+pub(super) fn supports_direct_call_signature(function: &NirFunction) -> bool {
+    direct_call_signature_kind(function).is_some()
+}
+
 fn direct_call_signature_kind(function: &NirFunction) -> Option<DirectCallScalarKind> {
     let return_kind = direct_call_scalar_kind(function.return_type.as_ref()?)?;
+    if return_kind == DirectCallScalarKind::BorrowedBuffer {
+        return None;
+    }
     for param in &function.params {
         direct_call_scalar_kind(&param.ty)?;
     }
@@ -621,6 +632,7 @@ pub(super) fn lower_direct_call_helper_function(
             DirectCallScalarKind::I64 => "param_i64",
             DirectCallScalarKind::F32 => "param_f32",
             DirectCallScalarKind::F64 => "param_f64",
+            DirectCallScalarKind::BorrowedBuffer => "param_buffer_ref",
         };
         state.yir.nodes.push(Node {
             name: node_name.clone(),
@@ -652,6 +664,7 @@ pub(super) fn lower_direct_call_helper_function(
             DirectCallScalarKind::I64 => "return_i64",
             DirectCallScalarKind::F32 => "return_f32",
             DirectCallScalarKind::F64 => "return_f64",
+            DirectCallScalarKind::BorrowedBuffer => unreachable!("borrowed refs cannot return"),
         }
     };
     state.yir.nodes.push(Node {
@@ -696,6 +709,7 @@ pub(super) fn push_direct_call_node(
             DirectCallScalarKind::I64 => "call_i64",
             DirectCallScalarKind::F32 => "call_f32",
             DirectCallScalarKind::F64 => "call_f64",
+            DirectCallScalarKind::BorrowedBuffer => unreachable!("borrowed refs cannot return"),
         }
     };
     let mut op_args = vec![function.name.clone()];

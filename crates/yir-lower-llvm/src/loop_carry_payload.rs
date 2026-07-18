@@ -1,4 +1,8 @@
 pub(crate) fn loop_carry_payload_len(kind: &str) -> usize {
+    if kind.starts_with("add_scaled_") {
+        return super::loop_async_post_flow_payload::async_post_flow_carry_source_payload_len(kind)
+            .unwrap_or(0);
+    }
     let carry_state_fragment_is_valid = |fragment: &str| -> bool {
         fragment == "current"
             || fragment == "prev_current"

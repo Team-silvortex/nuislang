@@ -310,6 +310,16 @@ pub(super) fn describe_cpu_post_control_node(
 
             Ok(InstructionSemantics::effect(node.op.args.clone()))
         }
+        "loop_owned_bytes_copy_drop_break" => {
+            if node.op.args.len() != 2 {
+                return Err(format!(
+                    "node `{}` expects `cpu.loop_owned_bytes_copy_drop_break <name> <resource> <condition> <buffer>`",
+                    node.name
+                ));
+            }
+
+            Ok(InstructionSemantics::effect(node.op.args.clone()))
+        }
         "guard_print_return" => {
             if node.op.args.len() != 3 {
                 return Err(format!(

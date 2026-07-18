@@ -151,6 +151,7 @@ pub(crate) fn execute_cpu_value_node(
         "param_i64" => Ok(Value::Int(0)),
         "param_f32" => Ok(Value::F32(0.0)),
         "param_f64" => Ok(Value::F64(0.0)),
+        "param_buffer_ref" => Ok(Value::Pointer(None)),
         "call_bool" | "call_i32" | "call_i64" | "call_f32" | "call_f64" => {
             let callee = &node.op.args[0];
             let args = node.op.args[1..]

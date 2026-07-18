@@ -275,7 +275,75 @@ duplicated. Path-sensitive `if` cleanup now releases branch-local values before
 merge, accepts only equal live-owner state across two continuing paths, and
 handles early returns through conditional YIR guard/branch drop-return
 operations whose LLVM drops execute inside the selected basic block. `while`
-backedges and loop-control exits remain on the explicit-drop contract.
+functions are no longer rejected wholesale: ownership-neutral conditions and
+bodies may carry outer `Bytes` unchanged across every backedge, after which
+normal function cleanup releases them. Per-iteration owned locals are supported
+for the first linear counted-loop shape. At NIR level, linear loop bodies
+synthesize reverse-order
+cleanup for per-iteration locals before fallthrough, direct `break`, and direct
+`continue`, while requiring the surviving owner set to equal loop entry. The
+generated edge cleanup passes GLM verification; resource-aware structured-loop
+YIR/LLVM lowering now covers the first direct-break form through
+`cpu.loop_owned_bytes_copy_drop_break`. LLVM evaluates the condition, copies the
+source Buffer into a GLM-tokened blob inside the selected loop body, drops it,
+and reaches the break exit. Iterative fallthrough and tail `continue` use the
+extensible `cpu.loop_while_i64_effect` contract. Its action descriptor carries
+module, instruction, arity, and operands; `cpu.owned_bytes_copy_drop` is the
+first registered action. The generic counted-loop backend owns induction update,
+condition re-evaluation, and the backedge, while the action backend owns only
+per-iteration resource work. Native task coverage executes two iterations before
+transferring the outer payload. A direct guarded `break` now uses
+`cpu.loop_while_i64_effect_flow`: NIR duplicates cleanup onto the selected break
+edge and natural backedge, YIR records the scalar control predicate separately
+from the registered resource action, and LLVM stores the updated induction value
+before cleanup and branch selection. The task returns that final value through
+its owned aggregate, so native exit 26 proves the break occurs after iteration
+two. The effect-flow payload now carries an explicit scalar-carry list. A
+mid-body guarded `continue` stores the updated current value, releases the
+iteration blob, and jumps directly to condition re-evaluation; the normal edge
+applies `add_current` carries before releasing the same blob. Rebinding a fresh
+same-name local also clears the prior GLM moved identity. Native payload fields
+observe break iteration 2 and post-continue carry score 7. Multiple ordered
+linear carries are also supported: `add_carryN` may reference an earlier carry's
+new value from the same update edge, while forward references are rejected by
+both compiler encoding and YIR validation. Native `weighted += score` therefore
+produces 10 and raises the observable exit to 43. Effect-flow control metadata is
+now length-delimited and accepts the shared recursive `and`/`or` condition tree
+when every terminal selects the same action. LLVM evaluates that tree after the
+induction update while retaining one registered cleanup on each final action or
+update edge; the native exit 43 path now exercises a compound continue guard.
+Effect-flow carry records now advance by the shared carry-kind payload arity
+instead of a fixed pair width. `mul_current_plus_invariant` now composes the
+updated induction value with its payload before multiplying the carry. The two
+normal update edges use factors 4 and 5, produce 20, and raise the aggregate
+native exit to 63; guarded continue still bypasses the carry update. Grouped
+multi-state sources now use the shared `current/prev_current/carryN/prev_carryN`
+resolver. `weighted += current + carry0` consumes the earlier same-edge score,
+reaches 17, and raises native exit to 70. Scaled records now reuse the canonical
+factor/source resolver. `scaled *= (current + 1) * 2` emits
+`mul_scaled_current_plus_invariant` and reaches 80. The invariant-factor record
+stores an already-scaled additive offset, so lowering must calculate
+`terms * factor + scaled_offset`, not `(terms + scaled_offset) * factor`; the
+native aggregate exit 130 locks that ABI boundary. State-factor carries are
+additionally accepted as ordered edge dependencies: a source-to-YIR test
+emits `mul_scaled_by_carry0_current_plus_invariant`, and LLVM resolves `carry0`
+from the earlier same-edge new carry rather than its previous iteration value.
+Multi-state factor groups are now shared with the async-post-flow carry grammar
+instead of being copied into effect-flow lowering. The native grouped delta uses
+two affine state groups,
+reads the earlier same-edge score, contributes 55, and raises aggregate exit to
+185. Mixed-action resource control trees now carry terminal-local actions and
+lower through ordered short-circuit blocks; recursive cleanup rewriting emits
+one drop on each break, continue, or normal update edge. Cleanup now also treats
+nested loops as ownership scopes: inner edges release inner locals while outer
+owners remain live. Registered `cpu.scoped_call` loop actions now outline a
+scalar helper into a static function lane, pass the current iteration through
+`$current`, and let that helper own and lower another resource loop without a
+fixed rank-two opcode. A `ref Buffer` capture is one logical YIR parameter with
+an explicit Lifetime edge and expands to LLVM `(ptr, len)`, so the helper can
+perform length-aware Bytes copies while async task invokers remain closed to the
+borrowed kind. Owned Bytes copy/move capture and ownership return across this
+helper boundary remain future work.
 
 Today `nuis` does **not** yet have:
 

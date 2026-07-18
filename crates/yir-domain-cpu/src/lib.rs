@@ -561,6 +561,86 @@ impl RegisteredMod for CpuMod {
                 );
                 Ok(Value::Unit)
             }
+            "loop_owned_bytes_copy_drop_break" => {
+                let condition = state.expect_value(&node.op.args[0])?.clone();
+                let buffer = state.expect_value(&node.op.args[1])?.clone();
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.loop_owned_bytes_copy_drop_break @{} [{}]: while {} copy/drop {} then break",
+                        node.resource, resource.kind.raw, condition, buffer
+                    ),
+                );
+                Ok(Value::Unit)
+            }
+            "loop_while_i64_effect" => {
+                let initial = state.expect_value(&node.op.args[0])?.clone();
+                let limit = state.expect_value(&node.op.args[1])?.clone();
+                let step = state.expect_value(&node.op.args[2])?.clone();
+                let action_args = node.op.args[8..]
+                    .iter()
+                    .map(|name| state.expect_value(name).cloned())
+                    .collect::<Result<Vec<_>, _>>()?;
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.loop_while_i64_effect @{} [{}]: {} {} {}, step {} {}, action {}.{}({:?})",
+                        node.resource,
+                        resource.kind.raw,
+                        initial,
+                        node.op.args[3],
+                        limit,
+                        node.op.args[4],
+                        step,
+                        node.op.args[5],
+                        node.op.args[6],
+                        action_args
+                    ),
+                );
+                Ok(Value::Unit)
+            }
+            "loop_while_i64_effect_flow" => {
+                let initial = state.expect_value(&node.op.args[0])?.clone();
+                let limit = state.expect_value(&node.op.args[1])?.clone();
+                let step = state.expect_value(&node.op.args[2])?.clone();
+                let control_count = node.op.args[5]
+                    .parse::<usize>()
+                    .map_err(|_| format!("node `{}` has invalid control count", node.name))?;
+                let control_end = 6 + control_count;
+                let control = node.op.args[6..control_end].join(" ");
+                let carry_count = node.op.args[control_end]
+                    .parse::<usize>()
+                    .map_err(|_| format!("node `{}` has invalid carry count", node.name))?;
+                let mut action_offset = control_end + 1;
+                let mut carries = Vec::with_capacity(carry_count);
+                for _ in 0..carry_count {
+                    carries.push(state.expect_value(&node.op.args[action_offset])?.clone());
+                    let kind = &node.op.args[action_offset + 1];
+                    action_offset += 2 + carry_source_payload_len(kind).ok_or_else(|| {
+                        format!("node `{}` has invalid carry kind `{kind}`", node.name)
+                    })?;
+                }
+                let buffer = state
+                    .expect_value(&node.op.args[action_offset + 3])?
+                    .clone();
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.loop_while_i64_effect_flow @{} [{}]: {} {} {}, then {} {}, control [{}], carries {:?}, action cpu.owned_bytes_copy_drop({})",
+                        node.resource,
+                        resource.kind.raw,
+                        initial,
+                        node.op.args[3],
+                        limit,
+                        node.op.args[4],
+                        step,
+                        control,
+                        carries,
+                        buffer
+                    ),
+                );
+                Ok(Value::Unit)
+            }
             "guard_print_return" => {
                 let condition = state.expect_value(&node.op.args[0])?.clone();
                 let printed = state.expect_value(&node.op.args[1])?.clone();

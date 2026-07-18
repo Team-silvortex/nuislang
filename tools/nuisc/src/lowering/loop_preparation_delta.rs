@@ -1,6 +1,6 @@
 use super::*;
 
-fn parse_loop_carry_delta_branch_source(
+pub(in crate::lowering) fn parse_loop_carry_delta_branch_source(
     op: PreparedCarryLinearOp,
     expr: &NirExpr,
     binding_name: &str,

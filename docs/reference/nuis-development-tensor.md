@@ -497,8 +497,64 @@ returns while preserving return-value evaluation and recognizing explicit drops
 plus aggregate ownership transfer. Path-sensitive `if` cleanup now handles
 branch-local scope exits, equal ownership-state merges, one-sided early returns,
 and two-way terminal returns. Conditional YIR drop-return operations lower to
-real LLVM basic blocks, so only the selected path releases the blob. The
-remaining gap is loop-backedge cleanup plus enum and pointer leaf policies.
+real LLVM basic blocks, so only the selected path releases the blob.
+Ownership-neutral `while` loops may now carry outer bytes unchanged across
+backedges and reach normal post-loop cleanup; conditions and nested loop-body
+expressions are checked for hidden owned-byte creation or transfer. The
+NIR cleanup pass now also releases per-iteration locals before linear-body
+fallthrough, direct `break`, and direct `continue`, and GLM verifies the
+generated edge cleanup with the outer Buffer lifetime. The backend now covers
+both the first resource-aware direct-break loop and iterative counted loops.
+`cpu.loop_owned_bytes_copy_drop_break` handles the selected break path, while
+extensible `cpu.loop_while_i64_effect` metadata registers
+`cpu.owned_bytes_copy_drop` without coupling the generic induction/backedge
+skeleton to `Bytes`. Native coverage re-evaluates a changing condition across
+two copy/drop iterations; tail `continue` lowers to the same deterministic
+copy, update, cleanup, and backedge sequence. Direct guarded `break` now lowers
+through `cpu.loop_while_i64_effect_flow`; the selected exit and natural backedge
+both cross cleanup, and native aggregate return observes final induction value 2
+through exit 26. Effect-flow metadata now also carries linear scalar state:
+guarded `continue` skips `add_current`, while the normal update edge applies the
+carry before both edges perform registered cleanup. GLM now treats a same-name
+`let` after move/drop as a fresh identity. Native payload observation combines
+break iteration 2 and carry score 7. Ordered multiple carries now accept
+`add_carryN` dependencies on earlier same-edge results and reject forward
+references; native `weighted += score` observes 10, producing exit 43 with the
+24-byte blob. Uniform-action compound `and`/`or` guards now reuse the recursive
+flow condition vocabulary through a length-delimited effect-flow payload; LLVM
+evaluates the full tree after the induction update and still releases the blob
+exactly once on either selected action or normal update. Carry records are now
+arity-driven rather than fixed pairs. The affine multiplicative recurrence
+`scaled *= current + 1` composes updated induction state with its invariant
+payload only on the two normal update edges, producing factors 4 and 5. Native
+multi-state resolution now also shares the common term vocabulary: grouped
+`weighted += current + carry0` consumes the earlier same-edge score and reaches
+17. Scaled recurrence records now reuse the canonical scaled-source resolver:
+`scaled *= (current + 1) * 2` emits `mul_scaled_current_plus_invariant` and
+reaches 80. Its invariant-factor ABI stores the additive offset after scaling,
+so LLVM resolves it as `terms * factor + scaled_offset`; a native regression
+locks this ordering against double scaling. The exit-130 baseline therefore covers compound
+continue, multi-state addition, affine multiplication, and scaled multiplication
+together. State-driven scaling is also encoded through
+`mul_scaled_by_carry0_current_plus_invariant`; its LLVM regression proves that a
+later carry reads the earlier carry's new value on the same edge. Remaining gaps
+no longer include factor groups: linear effect-flow carries now reuse the
+async-post-flow factor-group payload grammar, and
+`grouped += (current + carry0) * ((current + -3) * (carry0 + -2))`
+reaches 55 in the native aggregate. Exit 185 covers that path together with the
+24-byte owned payload. Mixed-action resource controls now use terminal-local
+`flow_break`/`flow_continue` tokens and ordered LLVM leaf blocks; recursive
+cleanup rewriting releases the iteration blob once on either action or the
+normal update path. Nested ownership scopes now recurse safely in NIR cleanup:
+inner continue/break edges drop only inner iteration owners and preserve the
+outer owner until its own edge. Registered `cpu.scoped_call` actions now
+materialize scalar helpers as static function lanes, pass the current iteration
+through `$current`, and lower an outer loop whose helper owns an inner Bytes loop
+through LLVM without a fixed nested-loop opcode. Scoped helpers now also borrow
+an outer `ref Buffer` through one logical YIR parameter expanded to LLVM
+`(ptr, len)`; a Lifetime edge spans the loop, and task invokers reject the
+borrowed ABI kind. The remaining scoped-loop gap is owned Bytes copy/move
+capture and ownership return, plus enum and pointer leaf policies.
 The runtime now defines `NuisSchedulerOwnedBlobV1` as the first GLM-tokened
 dynamic leaf primitive. It deep-copies borrowed bytes and has scheduler-native
 move/drop hooks; a compiled harness covers take and cancellation. Recursive
@@ -510,7 +566,14 @@ independent after source mutation. LLVM now emits the byte copy, recursive task
 packing, and ownership-taking unpack path. Source-level observation and explicit
 destruction now reach the same runtime. Straight-line exits and path-sensitive
 `if` exits synthesize cleanup through that runtime, including real conditional
-LLVM drop-return blocks; loop exits remain the next CFG-aware closure step.
+LLVM drop-return blocks. Ownership-neutral loops preserve outer owners across
+backedges and reach post-loop cleanup. Linear per-iteration ownership cleanup is
+synthesized and GLM-verified; direct-break and iterative counted copy/drop forms
+now reach native LLVM, including changing-condition fallthrough and tail
+`continue`. Conditional resource flow is covered, and nested resource loops
+compose through static scoped helpers. Borrowed Buffer capture preserves
+pointer, length, and lifetime metadata; owned resource transfer across that
+boundary remains open.
 Aggregate construction now has a transactional `finish` boundary: unset,
 duplicate, or invalid slots poison the build and release already attached
 blobs. Deferred helpers surface null as `Failed`, while immediate awaits reject

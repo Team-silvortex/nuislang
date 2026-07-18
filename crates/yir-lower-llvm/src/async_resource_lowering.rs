@@ -550,6 +550,9 @@ fn emit_scalar_task_context(
                 ));
                 packed
             }
+            CpuCallScalarKind::BorrowedBuffer => {
+                unreachable!("borrowed buffers cannot enter async task payloads")
+            }
         };
         state
             .body
@@ -596,6 +599,9 @@ fn unpack_task_payload(
                 .body
                 .push(format!("  {value} = bitcast i64 {payload} to double"));
             LlvmValueRef::F64(value)
+        }
+        CpuCallScalarKind::BorrowedBuffer => {
+            unreachable!("borrowed buffers cannot return from async tasks")
         }
     }
 }

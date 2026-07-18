@@ -42,6 +42,7 @@ use loop_preparation_carry_updates::{
 #[path = "loop_preparation_delta.rs"]
 mod loop_preparation_delta;
 use loop_preparation_delta::parse_conditional_temp_driven_loop_carry_update;
+pub(in crate::lowering) use loop_preparation_delta::parse_loop_carry_delta_branch_source;
 
 #[path = "loop_preparation_temps.rs"]
 mod loop_preparation_temps;

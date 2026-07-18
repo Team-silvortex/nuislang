@@ -60,7 +60,7 @@ fn encode_mixed_loop_flow_control_args(
     }
 }
 
-fn encode_loop_flow_control_args(
+pub(super) fn encode_loop_flow_control_args(
     control: &PreparedLoopFlowControl,
     state: &mut LoweringState<'_>,
     bindings: &mut BTreeMap<String, String>,

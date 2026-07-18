@@ -285,16 +285,18 @@ impl Operation {
             | "load_at" | "store_value" | "store_next" | "store_at" | "is_null" | "free" => {
                 CpuLlvmLoweringClass::Memory
             }
+            "loop_owned_bytes_copy_drop_break" => CpuLlvmLoweringClass::Memory,
             "input_i64" | "extern_call_i64" | "extern_call_i32" | "param_bool" | "param_i32"
-            | "param_i64" | "call_bool" | "call_i32" | "call_i64" | "call_owned_struct" => {
-                CpuLlvmLoweringClass::Runtime
-            }
+            | "param_i64" | "param_buffer_ref" | "call_bool" | "call_i32" | "call_i64"
+            | "call_owned_struct" => CpuLlvmLoweringClass::Runtime,
             "print"
             | "return_bool"
             | "return_i32"
             | "return_i64"
             | "return_owned_struct"
             | "loop_while_i64"
+            | "loop_while_i64_effect"
+            | "loop_while_i64_effect_flow"
             | "loop_while_i64_chain"
             | "loop_while_scalar_chain"
             | "loop_while_i64_async_chain"

@@ -450,3 +450,66 @@ pub(crate) fn resolve_source_for_async_post_flow(
     }
     Err(format!("cpu.{loop_instruction} `{node_name}` has unsupported carry kind `{kind}` during LLVM lowering"))
 }
+
+pub(crate) fn try_resolve_loop_carry_add_scaled_source(
+    kind: &str,
+    payloads: &[String],
+    current: &str,
+    next_current: &str,
+    current_carries: &[String],
+    next_carries: &[String],
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+    node_name: &str,
+    loop_instruction: &str,
+) -> Result<Option<String>, String> {
+    if !kind.starts_with("add_scaled_") {
+        return Ok(None);
+    }
+    let source_spec = std::iter::once(kind.to_owned())
+        .chain(payloads.iter().cloned())
+        .collect::<Vec<_>>();
+    resolve_source_for_async_post_flow(
+        &source_spec,
+        current,
+        next_current,
+        current_carries,
+        next_carries,
+        body,
+        next_reg,
+        node_name,
+        loop_instruction,
+    )
+    .map(Some)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn factor_group_source_uses_ordered_carry_and_payloads() {
+        let mut body = Vec::new();
+        let mut next_reg = 0;
+        let source = try_resolve_loop_carry_add_scaled_source(
+            "add_scaled_by_current_plus_factor_invariant_times_factor_group_carry0_plus_factor_invariant_times_terms_current_plus_carry0",
+            &["%lhs_offset".to_owned(), "%rhs_offset".to_owned()],
+            "%current",
+            "%next_current",
+            &["%old_score".to_owned()],
+            &["%new_score".to_owned()],
+            &mut body,
+            &mut next_reg,
+            "loop_node",
+            "loop_while_i64_effect_flow",
+        )
+        .expect("factor-group source should lower")
+        .expect("factor-group source should be recognized");
+
+        assert!(source.starts_with('%'));
+        assert!(body.iter().any(|line| line.contains("%lhs_offset")));
+        assert!(body.iter().any(|line| line.contains("%rhs_offset")));
+        assert!(body.iter().any(|line| line.contains("%new_score")));
+        assert!(!body.iter().any(|line| line.contains("%old_score")));
+    }
+}

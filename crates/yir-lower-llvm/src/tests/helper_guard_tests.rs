@@ -646,6 +646,7 @@ fn emits_i32_helper_returns_with_i32_ret_in_recursive_helpers() {
         &ordered_node_names,
         &param_bindings,
         &BTreeMap::new(),
+        &BTreeMap::new(),
         CpuCallScalarKind::I32,
         &mut global_counter,
     )

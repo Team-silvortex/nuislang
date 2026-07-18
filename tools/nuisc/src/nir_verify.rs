@@ -217,6 +217,7 @@ fn verify_stmt(
             borrow_bindings.remove(name);
             data_bindings.remove(name);
             task_result_facts.remove(name);
+            moved.remove(name);
             note_binding_effects(value, name, moved, borrows, borrow_bindings);
             data_bindings.insert(
                 name.clone(),
@@ -238,6 +239,7 @@ fn verify_stmt(
             borrow_bindings.remove(name);
             data_bindings.remove(name);
             task_result_facts.remove(name);
+            moved.remove(name);
             note_binding_effects(value, name, moved, borrows, borrow_bindings);
             data_bindings.insert(
                 name.clone(),
@@ -439,3 +441,6 @@ fn stmt_always_terminates(stmt: &NirStmt) -> bool {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+#[path = "nir_verify/tests_rebinding.rs"]
+mod tests_rebinding;

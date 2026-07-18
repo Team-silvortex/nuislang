@@ -56,12 +56,16 @@ mod loop_purity;
 mod loop_types;
 #[path = "lowering/network_exprs.rs"]
 mod network_exprs;
+#[path = "lowering/owned_loop_lowering.rs"]
+mod owned_loop_lowering;
 #[path = "lowering/owned_struct_layout.rs"]
 mod owned_struct_layout;
 #[path = "lowering/result_nodes.rs"]
 mod result_nodes;
 #[path = "lowering/scheduler_contracts.rs"]
 mod scheduler_contracts;
+#[path = "lowering/scoped_loop_lowering.rs"]
+mod scoped_loop_lowering;
 #[path = "lowering/shader_exprs.rs"]
 mod shader_exprs;
 #[path = "lowering/shader_packets.rs"]
@@ -103,7 +107,8 @@ use loop_carries::{
 };
 use loop_execution::{lower_prepared_loop_body, prepare_guarded_loop_body};
 use loop_flow_nodes::{
-    lower_async_flow_while, lower_async_post_flow_while, lower_flow_while, lower_post_flow_while,
+    encode_loop_flow_control_args, lower_async_flow_while, lower_async_post_flow_while,
+    lower_flow_while, lower_post_flow_while,
 };
 use loop_nodes::{lower_async_chained_while, lower_chained_while, lower_counted_while};
 use loop_preparation::{
@@ -462,6 +467,9 @@ mod tests_loop_post_flow;
 #[cfg(test)]
 #[path = "lowering/tests_loops_basic.rs"]
 mod tests_loops_basic;
+#[cfg(test)]
+#[path = "lowering/tests_loops_owned.rs"]
+mod tests_loops_owned;
 #[cfg(test)]
 #[path = "lowering/tests_recursion.rs"]
 mod tests_recursion;
