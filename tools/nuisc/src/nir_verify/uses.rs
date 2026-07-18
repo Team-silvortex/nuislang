@@ -318,6 +318,9 @@ pub(super) fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Resu
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
+        | NirExpr::CopyBufferOwned(inner)
+        | NirExpr::BytesLen(inner)
+        | NirExpr::DropBytes(inner)
         | NirExpr::Free(inner)
         | NirExpr::IsNull(inner) => verify_expr_uses(inner, moved)?,
         NirExpr::AllocNode { value, next } => {

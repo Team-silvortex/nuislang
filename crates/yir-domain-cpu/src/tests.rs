@@ -21,6 +21,55 @@ fn cpu_node(name: &str, instruction: &str, args: Vec<&str>) -> Node {
 }
 
 #[test]
+fn copy_buffer_owned_is_independent_from_source_mutation() {
+    let cpu = CpuMod;
+    let resource = cpu_resource();
+    let mut state = ExecutionState::default();
+    state.values.insert("len".to_owned(), Value::Int(3));
+    state.values.insert("fill".to_owned(), Value::Int(7));
+
+    let buffer = cpu
+        .execute(
+            &cpu_node("buffer", "cpu.alloc_buffer", vec!["len", "fill"]),
+            &resource,
+            &mut state,
+        )
+        .expect("buffer allocation");
+    state.values.insert("buffer".to_owned(), buffer);
+    let bytes = cpu
+        .execute(
+            &cpu_node("bytes", "cpu.copy_buffer_owned", vec!["buffer"]),
+            &resource,
+            &mut state,
+        )
+        .expect("owned Buffer copy");
+
+    let pointer = state.expect_pointer("buffer").expect("buffer pointer");
+    state
+        .write_heap_buffer_at(pointer, 1, 99)
+        .expect("mutate source buffer");
+    assert_eq!(bytes, Value::OwnedBytes(vec![7, 7, 7]));
+
+    state.values.insert("bytes".to_owned(), bytes);
+    let byte_len = cpu
+        .execute(
+            &cpu_node("byte_len", "cpu.owned_bytes_len", vec!["bytes"]),
+            &resource,
+            &mut state,
+        )
+        .expect("owned bytes length");
+    assert_eq!(byte_len, Value::Int(24));
+    let dropped = cpu
+        .execute(
+            &cpu_node("dropped", "cpu.drop_owned_bytes", vec!["bytes"]),
+            &resource,
+            &mut state,
+        )
+        .expect("owned bytes drop");
+    assert_eq!(dropped, Value::Unit);
+}
+
+#[test]
 fn execute_variant_is_and_variant_field_on_enum_structs() {
     let cpu = CpuMod;
     let resource = cpu_resource();

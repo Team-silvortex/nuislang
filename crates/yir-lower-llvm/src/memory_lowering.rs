@@ -122,6 +122,58 @@ pub(crate) fn lower_cpu_memory_node(
             }
             *last_cpu_value = Some(len);
         }
+        "copy_buffer_owned" => {
+            let Some(ptr) = get_ptr(registers, &node.op.args[0]) else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.copy_buffer_owned `{}` because its input buffer is outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return Ok(true);
+            };
+            let Some(len) = buffer_lengths.get(&node.op.args[0]).cloned() else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.copy_buffer_owned `{}` because its input buffer length is outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return Ok(true);
+            };
+            let byte_len = fresh_reg(next_reg);
+            body.push(format!("  {byte_len} = mul i64 {len}, 8"));
+            let blob = fresh_reg(next_reg);
+            body.push(format!(
+                "  {blob} = call ptr @nuis_scheduler_owned_blob_copy_v1(ptr {ptr}, i64 {byte_len}, i64 {})",
+                stable_glm_token(&node.name)
+            ));
+            registers.insert(node.name.clone(), LlvmValueRef::OwnedBytes { blob });
+        }
+        "owned_bytes_len" => {
+            let Some(LlvmValueRef::OwnedBytes { blob }) = registers.get(&node.op.args[0]) else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.owned_bytes_len `{}` because its input is outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return Ok(true);
+            };
+            let len = fresh_reg(next_reg);
+            body.push(format!(
+                "  {len} = call i64 @nuis_scheduler_owned_blob_len_v1(ptr {blob})"
+            ));
+            registers.insert(node.name.clone(), LlvmValueRef::I64(len.clone()));
+            *last_cpu_value = Some(len);
+        }
+        "drop_owned_bytes" => {
+            let Some(LlvmValueRef::OwnedBytes { blob }) = registers.get(&node.op.args[0]) else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.drop_owned_bytes `{}` because its input is outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return Ok(true);
+            };
+            body.push(format!(
+                "  call void @nuis_scheduler_owned_blob_drop_v1(ptr {blob})"
+            ));
+            registers.insert(node.name.clone(), LlvmValueRef::Void);
+        }
         "load_at" => {
             let (Some(ptr), Some(index)) = (
                 get_ptr(registers, &node.op.args[0]),
@@ -231,4 +283,13 @@ pub(crate) fn lower_cpu_memory_node(
         _ => return Ok(false),
     }
     Ok(true)
+}
+
+fn stable_glm_token(name: &str) -> u64 {
+    let mut hash = 0xcbf29ce484222325_u64;
+    for byte in name.bytes() {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    (hash & i64::MAX as u64).max(1)
 }

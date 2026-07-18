@@ -244,7 +244,7 @@ The native shim now defines the first owned aggregate payload boundary through
   an aggregate containing both scalar and text-blob slots
 
 Source `Task<Struct>` lowering is enabled for non-empty recursive structs whose
-leaves are `bool`, `i32`, `i64`, `f32`, `f64`, or `String`. The protocol encodes
+leaves are `bool`, `i32`, `i64`, `f32`, `f64`, `String`, or `Bytes`. The protocol encodes
 the full tree as `Type{field:kind;nested:Nested{...}}`, while LLVM flattens its
 leaves in declaration order into one self-describing slot allocation.
 Type identity hashes the complete nested shape, and unpacking reconstructs
@@ -256,11 +256,26 @@ overlong, surrogate, truncated, and out-of-range sequences cannot become a
 Nuis `String`; arbitrary bytes remain valid only as binary blobs. Both
 direct `join` and
 `join_result`/`task_value` consume the runtime-owned aggregate payload.
-Recursive type cycles, empty structs, enums, pointers, buffers, and other
-task-owned dynamic resources remain outside this layout contract.
-The blob protocol is not yet a source-level `Buffer` promise. Borrowed buffers
-still require an explicit copy conversion before they can safely occupy dynamic
-leaf slots.
+Recursive type cycles, empty structs, enums, pointers, and other task-owned
+dynamic resources remain outside this layout contract. Source Nuis now exposes
+`copy_bytes(ref Buffer) -> Bytes`; NIR/YIR lower it to
+`cpu.copy_buffer_owned`, and interpreted execution proves the value remains
+independent after source mutation or release. LLVM copies the buffer into a
+GLM-tokened blob, transfers that blob into the aggregate slot, and takes it back
+out before aggregate destruction. The remaining native closure is a typed
+source operation for observing and deterministically dropping the extracted
+`Bytes` value, followed by a runnable source-level task smoke. That explicit
+closure now exists as `bytes_len(Bytes) -> i64` and `drop_bytes(Bytes)`; GLM
+rejects use after drop, and the native recursive task smoke returns 24 after
+copying three `i64` Buffer elements. Straight-line functions now synthesize
+reverse-declaration-order cleanup at explicit returns and normal fallthrough,
+after preserving return-expression evaluation in a compiler-owned temporary.
+Explicit drops and ownership transfer through returned aggregates are not
+duplicated. Path-sensitive `if` cleanup now releases branch-local values before
+merge, accepts only equal live-owner state across two continuing paths, and
+handles early returns through conditional YIR guard/branch drop-return
+operations whose LLVM drops execute inside the selected basic block. `while`
+backedges and loop-control exits remain on the explicit-drop contract.
 
 Today `nuis` does **not** yet have:
 

@@ -1,0 +1,26 @@
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+
+  struct Packet {
+    bytes: Bytes
+  }
+
+  async fn make_packet() -> Packet {
+    let buffer: ref Buffer = alloc_buffer(3, 17);
+    let bytes: Bytes = copy_bytes(buffer);
+    free(buffer);
+    return Packet { bytes: bytes };
+  }
+
+  async fn main() -> i64 {
+    let task: Task<Packet> = spawn(make_packet());
+    let packet: Packet = join(task);
+    let bytes: Bytes = packet.bytes;
+    let len: i64 = bytes_len(bytes);
+    let argc: i64 = host_argv_count();
+    if argc > 0 {
+      return len;
+    }
+    return len + 1;
+  }
+}

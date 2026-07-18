@@ -119,6 +119,22 @@ int64_t nuis_yir_entry(void) {
     if (nuis_scheduler_task_join_state_v1(cancelled) != 3) return 27;
     if (nuis_scheduler_owned_blob_live_count_get_v1() != 0) return 28;
 
+    unsigned char moved_bytes[3] = {21, 34, 55};
+    void* moved_blob = nuis_scheduler_owned_blob_copy_v1(moved_bytes, 3, 93);
+    void* moved_aggregate = nuis_scheduler_owned_aggregate_alloc_v1(1);
+    if (!nuis_scheduler_owned_aggregate_set_blob_v1(moved_aggregate, 0, moved_blob)) return 39;
+    moved_aggregate = nuis_scheduler_owned_aggregate_finish_v1(moved_aggregate);
+    if (moved_aggregate == NULL) return 40;
+    void* taken_blob = nuis_scheduler_owned_aggregate_take_blob_v1(moved_aggregate, 0);
+    if (taken_blob == NULL) return 41;
+    nuis_scheduler_owned_aggregate_drop_v1(moved_aggregate);
+    if (nuis_scheduler_owned_blob_live_count_get_v1() != 1) return 42;
+    const unsigned char* taken_bytes =
+        (const unsigned char*)nuis_scheduler_owned_blob_data_v1(taken_blob);
+    if (taken_bytes == NULL || taken_bytes[0] != 21 || taken_bytes[2] != 55) return 43;
+    nuis_scheduler_owned_blob_drop_v1(taken_blob);
+    if (nuis_scheduler_owned_blob_live_count_get_v1() != 0) return 44;
+
     unsigned char valid_utf8[7] = {0xe4, 0xbd, 0xa0, 0xe5, 0xa5, 0xbd, 0};
     void* valid_text_blob = nuis_scheduler_owned_blob_copy_v1(valid_utf8, 7, 43);
     int64_t valid_text = nuis_scheduler_owned_blob_text_lift_v1(valid_text_blob);

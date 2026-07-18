@@ -184,6 +184,11 @@ pub(super) fn lower_if_pair(
                         let lowered = lower_expr(&value, state, bindings)?;
                         lower_guard_return(condition_name, lowered, state);
                     }
+                    PreparedTerminalBranch::DropOwnedBytesReturn { bytes, returned } => {
+                        let bytes = lower_expr(&bytes, state, bindings)?;
+                        let returned = lower_expr(&returned, state, bindings)?;
+                        lower_guard_drop_owned_bytes_return(condition_name, bytes, returned, state);
+                    }
                     PreparedTerminalBranch::PrintReturn { print, returned } => {
                         let print_name = lower_expr(&print, state, bindings)?;
                         let return_name = lower_expr(&returned, state, bindings)?;
@@ -232,6 +237,30 @@ pub(super) fn lower_if_pair(
                     let rhs_name = lower_expr(&rhs, state, bindings)?;
                     let selected = lower_select(condition_name, lhs_name, rhs_name, state)?;
                     return Ok(LoweredIfOutcome::Returned(selected));
+                }
+                (
+                    PreparedTerminalBranch::DropOwnedBytesReturn {
+                        bytes: then_bytes,
+                        returned: then_returned,
+                    },
+                    PreparedTerminalBranch::DropOwnedBytesReturn {
+                        bytes: else_bytes,
+                        returned: else_returned,
+                    },
+                ) => {
+                    let then_bytes = lower_expr(&then_bytes, state, bindings)?;
+                    let then_returned = lower_expr(&then_returned, state, bindings)?;
+                    let else_bytes = lower_expr(&else_bytes, state, bindings)?;
+                    let else_returned = lower_expr(&else_returned, state, bindings)?;
+                    lower_branch_drop_owned_bytes_return(
+                        condition_name,
+                        then_bytes,
+                        then_returned,
+                        else_bytes,
+                        else_returned,
+                        state,
+                    );
+                    return Ok(LoweredIfOutcome::Continued);
                 }
                 (
                     PreparedTerminalBranch::HostCallReturn {

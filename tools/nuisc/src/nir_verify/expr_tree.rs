@@ -372,6 +372,9 @@ pub(super) fn verify_expr_tree(
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
+        | NirExpr::CopyBufferOwned(inner)
+        | NirExpr::BytesLen(inner)
+        | NirExpr::DropBytes(inner)
         | NirExpr::Free(inner)
         | NirExpr::IsNull(inner) => verify_expr(
             inner,

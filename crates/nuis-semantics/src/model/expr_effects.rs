@@ -29,6 +29,7 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::LoadValue(_)
         | NirExpr::LoadNext(_)
         | NirExpr::BufferLen(_)
+        | NirExpr::BytesLen(_)
         | NirExpr::LoadAt { .. } => NirExprEffectClass::LocalReadOnly,
         NirExpr::Await(_) => NirExprEffectClass::AsyncOpaque,
         NirExpr::Call { .. } | NirExpr::MethodCall { .. } => NirExprEffectClass::CallOpaque,
@@ -175,6 +176,8 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         NirExpr::Move(_)
         | NirExpr::AllocNode { .. }
         | NirExpr::AllocBuffer { .. }
+        | NirExpr::CopyBufferOwned(_)
+        | NirExpr::DropBytes(_)
         | NirExpr::StoreValue { .. }
         | NirExpr::StoreNext { .. }
         | NirExpr::StoreAt { .. }

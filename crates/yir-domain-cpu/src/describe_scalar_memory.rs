@@ -64,11 +64,11 @@ pub(super) fn describe_cpu_scalar_memory_node(
             }
             Ok(InstructionSemantics::effect(node.op.args.clone()))
         }
-        "buffer_len" => {
+        "buffer_len" | "copy_buffer_owned" | "owned_bytes_len" | "drop_owned_bytes" => {
             if node.op.args.len() != 1 {
                 return Err(format!(
-                    "node `{}` expects `cpu.buffer_len <name> <resource> <buffer_ptr>`",
-                    node.name
+                    "node `{}` expects `cpu.{} <name> <resource> <buffer_ptr>`",
+                    node.name, node.op.instruction
                 ));
             }
             Ok(InstructionSemantics::effect(node.op.args.clone()))

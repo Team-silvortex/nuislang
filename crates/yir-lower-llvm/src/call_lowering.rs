@@ -260,6 +260,14 @@ fn unpack_immediate_scalar(
     body: &mut Vec<String>,
     next_reg: &mut usize,
 ) -> LlvmValueRef {
+    if matches!(template, LlvmValueRef::OwnedBytes { .. }) {
+        let blob = fresh_reg(next_reg);
+        body.push(format!(
+            "  {blob} = call ptr @nuis_scheduler_owned_aggregate_take_blob_v1(ptr {data}, i64 {leaf_index})"
+        ));
+        *leaf_index += 1;
+        return LlvmValueRef::OwnedBytes { blob };
+    }
     let packed = fresh_reg(next_reg);
     body.push(format!(
         "  {packed} = call i64 @nuis_scheduler_owned_aggregate_get_v1(ptr {data}, i64 {leaf_index})"
@@ -410,6 +418,9 @@ fn scalar_template(kind: &str) -> Option<LlvmValueRef> {
         "String" => Some(LlvmValueRef::TextHandle {
             ptr: "null".to_owned(),
             handle: "0".to_owned(),
+        }),
+        "Bytes" => Some(LlvmValueRef::OwnedBytes {
+            blob: "null".to_owned(),
         }),
         _ => None,
     }

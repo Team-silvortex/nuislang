@@ -147,6 +147,14 @@ fn pack_value(
     state: &mut LlvmLoweringState,
 ) -> Option<()> {
     if is_scalar(value) {
+        if let LlvmValueRef::OwnedBytes { blob } = value {
+            let stored = fresh_reg(&mut state.next_reg);
+            state.body.push(format!(
+                "  {stored} = call i64 @nuis_scheduler_owned_aggregate_set_blob_v1(ptr {data}, i64 {leaf_index}, ptr {blob})"
+            ));
+            *leaf_index += 1;
+            return Some(());
+        }
         let packed = pack_scalar(value, state)?;
         if matches!(value, LlvmValueRef::TextHandle { .. }) {
             let blob = fresh_reg(&mut state.next_reg);
@@ -183,6 +191,14 @@ fn unpack_value(
     state: &mut LlvmLoweringState,
 ) -> Option<LlvmValueRef> {
     if is_scalar(template) {
+        if matches!(template, LlvmValueRef::OwnedBytes { .. }) {
+            let blob = fresh_reg(&mut state.next_reg);
+            state.body.push(format!(
+                "  {blob} = call ptr @nuis_scheduler_owned_aggregate_take_blob_v1(ptr {data}, i64 {leaf_index})"
+            ));
+            *leaf_index += 1;
+            return Some(LlvmValueRef::OwnedBytes { blob });
+        }
         let packed = fresh_reg(&mut state.next_reg);
         state.body.push(format!(
             "  {packed} = call i64 @nuis_scheduler_owned_aggregate_get_v1(ptr {data}, i64 {leaf_index})"
@@ -213,6 +229,7 @@ fn is_scalar(value: &LlvmValueRef) -> bool {
             | LlvmValueRef::F32(_)
             | LlvmValueRef::F64(_)
             | LlvmValueRef::TextHandle { .. }
+            | LlvmValueRef::OwnedBytes { .. }
     )
 }
 
@@ -370,6 +387,7 @@ fn scalar_tag(value: &LlvmValueRef) -> u8 {
         LlvmValueRef::F32(_) => 4,
         LlvmValueRef::F64(_) => 5,
         LlvmValueRef::TextHandle { .. } => 6,
+        LlvmValueRef::OwnedBytes { .. } => 7,
         _ => 0,
     }
 }

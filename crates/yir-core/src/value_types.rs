@@ -10,6 +10,7 @@ pub enum Value {
     Symbol(String),
     Tensor(TensorValue),
     Pointer(Option<usize>),
+    OwnedBytes(Vec<i64>),
     Tuple(Vec<Value>),
     Struct(StructValue),
     VariantUnion(VariantUnionValue),

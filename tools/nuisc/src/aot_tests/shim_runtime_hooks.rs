@@ -53,6 +53,7 @@ fn c_shim_source_includes_native_cli_runtime_hooks() {
     assert!(shim.contains("uint64_t nuis_scheduler_owned_blob_glm_token_v1("));
     assert!(shim.contains("void* nuis_scheduler_owned_aggregate_alloc_v1(int64_t slot_count)"));
     assert!(shim.contains("int64_t nuis_scheduler_owned_aggregate_set_blob_v1("));
+    assert!(shim.contains("void* nuis_scheduler_owned_aggregate_take_blob_v1("));
     assert!(shim.contains("void* nuis_scheduler_owned_aggregate_finish_v1(void* data)"));
     assert!(shim.contains("void nuis_scheduler_owned_aggregate_require_v1(const void* data)"));
     assert!(shim.contains("void nuis_scheduler_owned_aggregate_drop_v1(void* data)"));

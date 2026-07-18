@@ -35,6 +35,9 @@ pub(crate) enum LlvmValueRef {
         ptr: String,
         handle: String,
     },
+    OwnedBytes {
+        blob: String,
+    },
     Void,
 }
 #[derive(Clone)]

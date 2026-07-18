@@ -91,9 +91,9 @@ use edge_helpers::{
     ensure_shader_resource, push_dep_edges, push_lifetime_edge, push_xfer_edge,
 };
 use guard_ops::{
-    lower_branch_host_call_return, lower_branch_print_return, lower_guard_host_call_return,
-    lower_guard_print, lower_guard_print_return, lower_guard_return, lower_select,
-    PreparedHostCallReturnSpec,
+    lower_branch_drop_owned_bytes_return, lower_branch_host_call_return, lower_branch_print_return,
+    lower_guard_drop_owned_bytes_return, lower_guard_host_call_return, lower_guard_print,
+    lower_guard_print_return, lower_guard_return, lower_select, PreparedHostCallReturnSpec,
 };
 use if_lowering::lower_if_pair;
 use kernel_exprs::lower_kernel_expr;
@@ -396,6 +396,9 @@ fn lower_expr(
         | NirExpr::LoadValue(_)
         | NirExpr::LoadNext(_)
         | NirExpr::BufferLen(_)
+        | NirExpr::CopyBufferOwned(_)
+        | NirExpr::BytesLen(_)
+        | NirExpr::DropBytes(_)
         | NirExpr::IsNull(_)
         | NirExpr::LoadAt { .. }
         | NirExpr::StoreValue { .. }

@@ -331,6 +331,9 @@ pub(super) fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::LoadValue(value) => format!("load_value({})", render_nir_expr(value)),
         NirExpr::LoadNext(value) => format!("load_next({})", render_nir_expr(value)),
         NirExpr::BufferLen(value) => format!("buffer_len({})", render_nir_expr(value)),
+        NirExpr::CopyBufferOwned(value) => format!("copy_bytes({})", render_nir_expr(value)),
+        NirExpr::BytesLen(value) => format!("bytes_len({})", render_nir_expr(value)),
+        NirExpr::DropBytes(value) => format!("drop_bytes({})", render_nir_expr(value)),
         NirExpr::LoadAt { buffer, index } => {
             format!(
                 "load_at({}, {})",

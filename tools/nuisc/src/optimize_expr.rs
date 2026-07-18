@@ -77,6 +77,18 @@ pub(super) fn simplify_expr(
             let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
             (NirExpr::BufferLen(Box::new(inner)), changed)
         }
+        NirExpr::CopyBufferOwned(inner) => {
+            let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
+            (NirExpr::CopyBufferOwned(Box::new(inner)), changed)
+        }
+        NirExpr::BytesLen(inner) => {
+            let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
+            (NirExpr::BytesLen(Box::new(inner)), changed)
+        }
+        NirExpr::DropBytes(inner) => {
+            let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
+            (NirExpr::DropBytes(Box::new(inner)), changed)
+        }
         NirExpr::LoadAt { buffer, index } => {
             let (buffer, left) = simplify_expr(*buffer, env, inline_templates, active_inline);
             let (index, right) = simplify_expr(*index, env, inline_templates, active_inline);

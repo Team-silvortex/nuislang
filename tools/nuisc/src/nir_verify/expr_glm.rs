@@ -17,6 +17,7 @@ pub(super) fn verify_glm_expr_access(
             match expr {
                 NirExpr::Move(inner)
                 | NirExpr::Free(inner)
+                | NirExpr::DropBytes(inner)
                 | NirExpr::CpuJoin(inner)
                 | NirExpr::CpuThreadJoin(inner)
                 | NirExpr::CpuCancel(inner)
@@ -27,6 +28,7 @@ pub(super) fn verify_glm_expr_access(
                     if let Some(operation) = match expr {
                         NirExpr::Move(_) => Some("move(...)"),
                         NirExpr::Free(_) => Some("free(...)"),
+                        NirExpr::DropBytes(_) => Some("drop_bytes(...)"),
                         _ => None,
                     } {
                         if expr_is_borrowed_pointer(inner, borrow_bindings) {

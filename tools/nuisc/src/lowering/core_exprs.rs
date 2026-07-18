@@ -52,6 +52,24 @@ pub(super) fn lower_core_expr(
         NirExpr::BufferLen(value) => {
             Some(lower_unary_cpu_expr("buffer_len", value, state, bindings))
         }
+        NirExpr::CopyBufferOwned(value) => Some(lower_unary_cpu_expr(
+            "copy_buffer_owned",
+            value,
+            state,
+            bindings,
+        )),
+        NirExpr::BytesLen(value) => Some(lower_unary_cpu_expr(
+            "owned_bytes_len",
+            value,
+            state,
+            bindings,
+        )),
+        NirExpr::DropBytes(value) => Some(lower_unary_cpu_expr(
+            "drop_owned_bytes",
+            value,
+            state,
+            bindings,
+        )),
         NirExpr::IsNull(value) => Some(lower_unary_cpu_expr("is_null", value, state, bindings)),
         NirExpr::LoadAt { buffer, index } => Some(lower_load_at(buffer, index, state, bindings)),
         NirExpr::StoreValue { target, value } => {

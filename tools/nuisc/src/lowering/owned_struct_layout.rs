@@ -68,5 +68,8 @@ fn is_plain_type(ty: &NirTypeRef) -> bool {
 }
 
 fn is_scheduler_scalar(name: &str) -> bool {
-    matches!(name, "bool" | "i32" | "i64" | "f32" | "f64" | "String")
+    matches!(
+        name,
+        "bool" | "i32" | "i64" | "f32" | "f64" | "String" | "Bytes"
+    )
 }

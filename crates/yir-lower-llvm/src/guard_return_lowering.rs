@@ -30,6 +30,132 @@ pub(crate) fn lower_cpu_guard_return_node(
     }
 
     match node.op.instruction.as_str() {
+        "branch_drop_owned_bytes_return" => {
+            if node.op.args.len() != 5 {
+                return Err(format!(
+                    "cpu.branch_drop_owned_bytes_return `{}` expects condition and two bytes/return pairs",
+                    node.name
+                ));
+            }
+            let values = node
+                .op
+                .args
+                .iter()
+                .map(|arg| registers.get(arg).cloned())
+                .collect::<Option<Vec<_>>>();
+            let Some(values) = values else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.branch_drop_owned_bytes_return `{}` because one or more inputs are outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return Ok(GuardReturnLoweringOutcome::Continue);
+            };
+            let Some(cond) = coerce_to_i64(&values[0], body, next_reg) else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.branch_drop_owned_bytes_return `{}` because its condition is not coercible to i64",
+                    node.name
+                ));
+                return Ok(GuardReturnLoweringOutcome::Continue);
+            };
+            let (
+                LlvmValueRef::OwnedBytes { blob: then_blob },
+                LlvmValueRef::OwnedBytes { blob: else_blob },
+            ) = (&values[1], &values[3])
+            else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.branch_drop_owned_bytes_return `{}` because an owned bytes input is unavailable",
+                    node.name
+                ));
+                return Ok(GuardReturnLoweringOutcome::Continue);
+            };
+            if !can_emit_typed_return_from_value(function_return_kind, &values[2])
+                || !can_emit_typed_return_from_value(function_return_kind, &values[4])
+            {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.branch_drop_owned_bytes_return `{}` because a return value is not coercible to {}",
+                    node.name,
+                    cpu_scalar_kind_llvm_type(function_return_kind)
+                ));
+                return Ok(GuardReturnLoweringOutcome::Continue);
+            }
+
+            let cond_bool = fresh_reg(next_reg);
+            body.push(format!("  {cond_bool} = icmp ne i64 {cond}, 0"));
+            let then_label = fresh_block(next_block, "branch_drop_bytes_return_then");
+            let else_label = fresh_block(next_block, "branch_drop_bytes_return_else");
+            body.push(format!(
+                "  br i1 {cond_bool}, label %{then_label}, label %{else_label}"
+            ));
+            body.push(format!("{then_label}:"));
+            body.push(format!(
+                "  call void @nuis_scheduler_owned_blob_drop_v1(ptr {then_blob})"
+            ));
+            emit_typed_return_from_value(body, next_reg, function_return_kind, &values[2]);
+            body.push(format!("{else_label}:"));
+            body.push(format!(
+                "  call void @nuis_scheduler_owned_blob_drop_v1(ptr {else_blob})"
+            ));
+            emit_typed_return_from_value(body, next_reg, function_return_kind, &values[4]);
+            return Ok(GuardReturnLoweringOutcome::TerminalReturn);
+        }
+        "guard_drop_owned_bytes_return" => {
+            if node.op.args.len() != 3 {
+                return Err(format!(
+                    "cpu.guard_drop_owned_bytes_return `{}` expects condition, bytes, and return inputs",
+                    node.name
+                ));
+            }
+            let cond_value = registers.get(&node.op.args[0]).cloned();
+            let bytes_value = registers.get(&node.op.args[1]).cloned();
+            let return_value = registers.get(&node.op.args[2]).cloned();
+            let (Some(cond_value), Some(bytes_value), Some(return_value)) =
+                (cond_value, bytes_value, return_value)
+            else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.guard_drop_owned_bytes_return `{}` because one or more inputs are outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return Ok(GuardReturnLoweringOutcome::Continue);
+            };
+            let Some(cond) = coerce_to_i64(&cond_value, body, next_reg) else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.guard_drop_owned_bytes_return `{}` because its condition is not coercible to i64",
+                    node.name
+                ));
+                return Ok(GuardReturnLoweringOutcome::Continue);
+            };
+            let LlvmValueRef::OwnedBytes { blob } = bytes_value else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.guard_drop_owned_bytes_return `{}` because its owned bytes input is unavailable",
+                    node.name
+                ));
+                return Ok(GuardReturnLoweringOutcome::Continue);
+            };
+            if !can_emit_typed_return_from_value(function_return_kind, &return_value) {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.guard_drop_owned_bytes_return `{}` because its return value is not coercible to {}",
+                    node.name,
+                    cpu_scalar_kind_llvm_type(function_return_kind)
+                ));
+                return Ok(GuardReturnLoweringOutcome::Continue);
+            }
+
+            let cond_bool = fresh_reg(next_reg);
+            body.push(format!("  {cond_bool} = icmp ne i64 {cond}, 0"));
+            let then_label = fresh_block(next_block, "guard_drop_bytes_return_then");
+            let cont_label = fresh_block(next_block, "guard_drop_bytes_return_cont");
+            body.push(format!(
+                "  br i1 {cond_bool}, label %{then_label}, label %{cont_label}"
+            ));
+            body.push(format!("{then_label}:"));
+            body.push(format!(
+                "  call void @nuis_scheduler_owned_blob_drop_v1(ptr {blob})"
+            ));
+            if !emit_typed_return_from_value(body, next_reg, function_return_kind, &return_value) {
+                unreachable!("return compatibility checked before branch emission");
+            }
+            body.push(format!("{cont_label}:"));
+        }
         "guard_return" => {
             let cond_value = registers.get(&node.op.args[0]).cloned();
             let return_value = registers.get(&node.op.args[1]).cloned();

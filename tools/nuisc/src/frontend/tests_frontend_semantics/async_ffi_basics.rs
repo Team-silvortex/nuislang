@@ -81,6 +81,99 @@ fn rejects_spawn_of_ref_typed_input() {
 }
 
 #[test]
+fn accepts_explicit_buffer_copy_as_owned_async_input() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn consume(bytes: Bytes) -> i64 {
+            return 7;
+          }
+
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(4, 9);
+            let bytes: Bytes = copy_bytes(buffer);
+            let task: Task<i64> = spawn(consume(bytes));
+            free(buffer);
+            return join(task);
+          }
+        }
+        "#,
+    )
+    .expect("explicit Buffer copy should produce an async-boundary-safe Bytes value");
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("main function");
+    assert!(main.body.iter().any(|stmt| matches!(
+        stmt,
+        NirStmt::Let {
+            ty: Some(ty),
+            value: NirExpr::CopyBufferOwned(_),
+            ..
+        } if ty.render() == "Bytes"
+    )));
+}
+
+#[test]
+fn accepts_owned_bytes_observation_and_deterministic_drop() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(3, 9);
+            let bytes: Bytes = copy_bytes(buffer);
+            let len: i64 = bytes_len(bytes);
+            drop_bytes(bytes);
+            free(buffer);
+            return len;
+          }
+        }
+        "#,
+    )
+    .expect("owned Bytes should expose typed length and drop operations");
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("main function");
+    assert!(main.body.iter().any(|stmt| matches!(
+        stmt,
+        NirStmt::Let {
+            value: NirExpr::BytesLen(_),
+            ..
+        }
+    )));
+    assert!(main
+        .body
+        .iter()
+        .any(|stmt| matches!(stmt, NirStmt::Expr(NirExpr::DropBytes(_)))));
+}
+
+#[test]
+fn rejects_owned_bytes_use_after_drop() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(2, 4);
+            let bytes: Bytes = copy_bytes(buffer);
+            drop_bytes(bytes);
+            return bytes_len(bytes);
+          }
+        }
+        "#,
+    )
+    .expect("source should parse before GLM verification");
+    let error = crate::nir_verify::verify_nir_module(&module)
+        .expect_err("drop_bytes must end the Bytes lifetime");
+
+    assert!(error.contains("use of moved value `bytes`"));
+}
+
+#[test]
 fn rejects_async_function_ref_parameter_boundary() {
     let error = parse_nuis_module(
         r#"

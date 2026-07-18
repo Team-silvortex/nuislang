@@ -290,6 +290,26 @@ pub(super) fn describe_cpu_post_control_node(
 
             Ok(InstructionSemantics::effect(node.op.args.clone()))
         }
+        "guard_drop_owned_bytes_return" => {
+            if node.op.args.len() != 3 {
+                return Err(format!(
+                    "node `{}` expects `cpu.guard_drop_owned_bytes_return <name> <resource> <condition> <bytes> <return>`",
+                    node.name
+                ));
+            }
+
+            Ok(InstructionSemantics::effect(node.op.args.clone()))
+        }
+        "branch_drop_owned_bytes_return" => {
+            if node.op.args.len() != 5 {
+                return Err(format!(
+                    "node `{}` expects `cpu.branch_drop_owned_bytes_return <name> <resource> <condition> <then-bytes> <then-return> <else-bytes> <else-return>`",
+                    node.name
+                ));
+            }
+
+            Ok(InstructionSemantics::effect(node.op.args.clone()))
+        }
         "guard_print_return" => {
             if node.op.args.len() != 3 {
                 return Err(format!(

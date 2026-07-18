@@ -157,6 +157,19 @@ pub(in crate::lowering) fn substitute_branch_binding(
             binding_name,
             binding_value,
         ))),
+        NirExpr::CopyBufferOwned(inner) => NirExpr::CopyBufferOwned(Box::new(
+            substitute_branch_binding(inner, binding_name, binding_value),
+        )),
+        NirExpr::BytesLen(inner) => NirExpr::BytesLen(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
+        NirExpr::DropBytes(inner) => NirExpr::DropBytes(Box::new(substitute_branch_binding(
+            inner,
+            binding_name,
+            binding_value,
+        ))),
         NirExpr::LoadAt { buffer, index } => NirExpr::LoadAt {
             buffer: Box::new(substitute_branch_binding(
                 buffer,
@@ -356,6 +369,12 @@ pub(in crate::lowering) fn substitute_prepared_terminal_branch(
         PreparedTerminalBranch::Return(returned) => PreparedTerminalBranch::Return(
             substitute_branch_binding(&returned, binding_name, binding_value),
         ),
+        PreparedTerminalBranch::DropOwnedBytesReturn { bytes, returned } => {
+            PreparedTerminalBranch::DropOwnedBytesReturn {
+                bytes: substitute_branch_binding(&bytes, binding_name, binding_value),
+                returned: substitute_branch_binding(&returned, binding_name, binding_value),
+            }
+        }
         PreparedTerminalBranch::PrintReturn { print, returned } => {
             PreparedTerminalBranch::PrintReturn {
                 print: substitute_branch_binding(&print, binding_name, binding_value),
@@ -502,6 +521,15 @@ pub(in crate::lowering) fn prepare_terminal_branch(
                 return None;
             }
             Some(PreparedTerminalBranch::Return(value.clone()))
+        }
+        [NirStmt::Expr(NirExpr::DropBytes(bytes)), NirStmt::Return(Some(returned))] => {
+            if !is_terminal_branch_pure_expr(returned, pure_helpers) {
+                return None;
+            }
+            Some(PreparedTerminalBranch::DropOwnedBytesReturn {
+                bytes: bytes.as_ref().clone(),
+                returned: returned.clone(),
+            })
         }
         [NirStmt::Print(print), NirStmt::Return(Some(returned))]
         | [NirStmt::Print(print), NirStmt::Expr(returned)] => {

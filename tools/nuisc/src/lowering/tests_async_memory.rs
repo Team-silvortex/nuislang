@@ -21,6 +21,36 @@ fn path_exists(yir: &yir_core::YirModule, from: &str, to: &str) -> bool {
 }
 
 #[test]
+fn lowers_explicit_buffer_copy_to_owned_bytes_yir() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(3, 7);
+            let bytes: Bytes = copy_bytes(buffer);
+            free(buffer);
+            return 0;
+          }
+        }
+        "#,
+    )
+    .expect("parse explicit owned Buffer copy");
+    let yir = lower_nir_to_yir_builtin_cpu(&module).expect("lower owned Buffer copy");
+
+    let copy = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "copy_buffer_owned")
+        .expect("cpu.copy_buffer_owned node");
+    let free = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "cpu" && node.op.instruction == "free")
+        .expect("source Buffer free node");
+    assert!(path_exists(&yir, &copy.name, &free.name));
+}
+
+#[test]
 fn sequences_memory_lifecycle_around_task_result_observation() {
     let module = parse_nuis_module(
         r#"

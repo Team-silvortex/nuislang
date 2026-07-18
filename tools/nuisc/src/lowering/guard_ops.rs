@@ -29,6 +29,71 @@ pub(super) fn lower_guard_return(
     });
 }
 
+pub(super) fn lower_guard_drop_owned_bytes_return(
+    condition_name: String,
+    bytes_name: String,
+    return_name: String,
+    state: &mut LoweringState<'_>,
+) {
+    let name = next_name(state, "guard_drop_owned_bytes_return");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "guard_drop_owned_bytes_return".to_owned(),
+            args: vec![
+                condition_name.clone(),
+                bytes_name.clone(),
+                return_name.clone(),
+            ],
+        },
+    });
+    for input in [condition_name, bytes_name, return_name] {
+        push_dep_edges(state, &input, &name);
+        state.yir.edges.push(Edge {
+            kind: EdgeKind::Effect,
+            from: input,
+            to: name.clone(),
+        });
+    }
+}
+
+pub(super) fn lower_branch_drop_owned_bytes_return(
+    condition_name: String,
+    then_bytes_name: String,
+    then_return_name: String,
+    else_bytes_name: String,
+    else_return_name: String,
+    state: &mut LoweringState<'_>,
+) {
+    let name = next_name(state, "branch_drop_owned_bytes_return");
+    let inputs = vec![
+        condition_name,
+        then_bytes_name,
+        then_return_name,
+        else_bytes_name,
+        else_return_name,
+    ];
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "branch_drop_owned_bytes_return".to_owned(),
+            args: inputs.clone(),
+        },
+    });
+    for input in inputs {
+        push_dep_edges(state, &input, &name);
+        state.yir.edges.push(Edge {
+            kind: EdgeKind::Effect,
+            from: input,
+            to: name.clone(),
+        });
+    }
+}
+
 pub(super) fn lower_guard_print(
     condition_name: String,
     print_name: String,

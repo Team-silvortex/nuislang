@@ -376,6 +376,7 @@ where
     ) -> Result<(), String>,
 {
     crate::optimize::simplify_nir_module(&mut nir);
+    crate::owned_cleanup::insert_owned_bytes_cleanup(&mut nir);
     crate::nir_verify::verify_nir_module(&nir)?;
     let lowering_manifest =
         crate::registry::load_manifest_for_domain(Path::new(NUSTAR_REGISTRY_ROOT), &nir.domain)?;

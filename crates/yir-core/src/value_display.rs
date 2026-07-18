@@ -16,6 +16,7 @@ impl fmt::Display for Value {
                 Some(address) => write!(f, "&{address}"),
                 None => write!(f, "null"),
             },
+            Self::OwnedBytes(bytes) => write!(f, "bytes[len={}]", bytes.len()),
             Self::Tuple(values) => {
                 write!(f, "(")?;
                 for (index, value) in values.iter().enumerate() {

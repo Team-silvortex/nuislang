@@ -126,6 +126,22 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
             }],
             effect: NirGlmEffect::None,
         }),
+        NirExpr::CopyBufferOwned(_) => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Res,
+            accesses: vec![NirGlmAccess {
+                class: NirGlmValueClass::Res,
+                mode: NirGlmUseMode::Read,
+            }],
+            effect: NirGlmEffect::DomainMove,
+        }),
+        NirExpr::BytesLen(_) => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Val,
+            accesses: vec![NirGlmAccess {
+                class: NirGlmValueClass::Res,
+                mode: NirGlmUseMode::Read,
+            }],
+            effect: NirGlmEffect::None,
+        }),
         NirExpr::DataBindCore(_)
         | NirExpr::DataMarker(_)
         | NirExpr::DataHandleTable(_)
@@ -327,7 +343,7 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
                 effect: NirGlmEffect::None,
             })
         }
-        NirExpr::Free(_) => Some(NirGlmProfile {
+        NirExpr::Free(_) | NirExpr::DropBytes(_) => Some(NirGlmProfile {
             result_class: NirGlmValueClass::Val,
             accesses: vec![NirGlmAccess {
                 class: NirGlmValueClass::Res,

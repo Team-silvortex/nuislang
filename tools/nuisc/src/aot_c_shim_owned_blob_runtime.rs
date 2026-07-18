@@ -205,6 +205,21 @@ int64_t nuis_scheduler_owned_aggregate_get_v1(const void* data, int64_t index) {
     return aggregate->slots[index].value;
 }
 
+void* nuis_scheduler_owned_aggregate_take_blob_v1(void* data, int64_t index) {
+    NuisSchedulerOwnedAggregateV1* aggregate =
+        (NuisSchedulerOwnedAggregateV1*)data;
+    if (!nuis_scheduler_owned_aggregate_valid_v1(aggregate)
+        || aggregate->state != NUIS_SCHEDULER_OWNED_AGGREGATE_FINALIZED_V1
+        || index < 0 || index >= aggregate->slot_count
+        || aggregate->slots[index].kind != NUIS_SCHEDULER_OWNED_SLOT_BLOB_V1) {
+        return NULL;
+    }
+    void* blob = (void*)(intptr_t)aggregate->slots[index].value;
+    aggregate->slots[index].kind = NUIS_SCHEDULER_OWNED_SLOT_SCALAR_V1;
+    aggregate->slots[index].value = 0;
+    return nuis_scheduler_owned_blob_move_v1(blob);
+}
+
 void* nuis_scheduler_owned_aggregate_finish_v1(void* data) {
     NuisSchedulerOwnedAggregateV1* aggregate =
         (NuisSchedulerOwnedAggregateV1*)data;

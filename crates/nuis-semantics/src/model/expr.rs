@@ -28,6 +28,9 @@ pub enum NirExpr {
     LoadValue(Box<NirExpr>),
     LoadNext(Box<NirExpr>),
     BufferLen(Box<NirExpr>),
+    CopyBufferOwned(Box<NirExpr>),
+    BytesLen(Box<NirExpr>),
+    DropBytes(Box<NirExpr>),
     LoadAt {
         buffer: Box<NirExpr>,
         index: Box<NirExpr>,

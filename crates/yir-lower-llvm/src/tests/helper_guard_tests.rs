@@ -341,6 +341,106 @@ fn emits_guard_return_as_real_branch() {
 }
 
 #[test]
+fn emits_guard_owned_bytes_drop_inside_returning_branch() {
+    let mut module = module_with_cpu0();
+    push_cpu_node(&mut module, "cond", "cpu.const_bool", vec!["true"]);
+    push_cpu_const_i64(&mut module, "len", "1");
+    push_cpu_const_i64(&mut module, "fill", "7");
+    push_cpu_node(
+        &mut module,
+        "buffer",
+        "cpu.alloc_buffer",
+        vec!["len", "fill"],
+    );
+    push_cpu_node(
+        &mut module,
+        "bytes",
+        "cpu.copy_buffer_owned",
+        vec!["buffer"],
+    );
+    push_cpu_const_i64(&mut module, "early", "24");
+    push_cpu_node(
+        &mut module,
+        "guard",
+        "cpu.guard_drop_owned_bytes_return",
+        vec!["cond", "bytes", "early"],
+    );
+    push_cpu_const_i64(&mut module, "later", "25");
+    push_deps(
+        &mut module,
+        &[
+            ("len", "buffer"),
+            ("fill", "buffer"),
+            ("buffer", "bytes"),
+            ("cond", "guard"),
+            ("bytes", "guard"),
+            ("early", "guard"),
+        ],
+    );
+
+    let llvm_ir = emit_module(&module).expect("guarded Bytes cleanup should lower");
+    assert!(llvm_ir.contains("guard_drop_bytes_return_then."));
+    assert!(llvm_ir.contains("guard_drop_bytes_return_cont."));
+    assert_eq!(
+        llvm_ir
+            .matches("call void @nuis_scheduler_owned_blob_drop_v1(ptr")
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn emits_two_way_owned_bytes_drop_before_each_terminal_return() {
+    let mut module = module_with_cpu0();
+    push_cpu_node(&mut module, "cond", "cpu.const_bool", vec!["true"]);
+    push_cpu_const_i64(&mut module, "len", "1");
+    push_cpu_const_i64(&mut module, "fill", "7");
+    push_cpu_node(
+        &mut module,
+        "buffer",
+        "cpu.alloc_buffer",
+        vec!["len", "fill"],
+    );
+    push_cpu_node(
+        &mut module,
+        "bytes",
+        "cpu.copy_buffer_owned",
+        vec!["buffer"],
+    );
+    push_cpu_const_i64(&mut module, "then_value", "24");
+    push_cpu_const_i64(&mut module, "else_value", "25");
+    push_cpu_node(
+        &mut module,
+        "branch",
+        "cpu.branch_drop_owned_bytes_return",
+        vec!["cond", "bytes", "then_value", "bytes", "else_value"],
+    );
+    push_deps(
+        &mut module,
+        &[
+            ("len", "buffer"),
+            ("fill", "buffer"),
+            ("buffer", "bytes"),
+            ("cond", "branch"),
+            ("bytes", "branch"),
+            ("then_value", "branch"),
+            ("else_value", "branch"),
+        ],
+    );
+
+    let llvm_ir = emit_module(&module).expect("two-way Bytes cleanup should lower");
+    assert!(llvm_ir.contains("branch_drop_bytes_return_then."));
+    assert!(llvm_ir.contains("branch_drop_bytes_return_else."));
+    assert_eq!(
+        llvm_ir
+            .matches("call void @nuis_scheduler_owned_blob_drop_v1(ptr")
+            .count(),
+        2
+    );
+    assert_eq!(llvm_ir.matches("ret i64 ").count(), 2);
+}
+
+#[test]
 fn resolves_structural_guard_return_through_fieldwise_selection() {
     let mut module = module_with_cpu0();
     push_cpu_node(&mut module, "cond", "cpu.const_bool", vec!["true"]);
@@ -614,4 +714,74 @@ fn lowers_nested_scalar_struct_tasks_through_owned_payload_abi() {
     assert!(llvm_ir.contains("call ptr @nuis_scheduler_owned_aggregate_alloc_v1(i64 4)"));
     assert!(llvm_ir.contains("call i64 @nuis_scheduler_owned_aggregate_set_scalar_v1"));
     assert!(llvm_ir.contains("call ptr @nuis_scheduler_owned_aggregate_finish_v1(ptr"));
+}
+
+#[test]
+fn lowers_owned_bytes_through_struct_task_payload() {
+    let mut module = module_with_cpu0();
+    push_cpu_const_i64(&mut module, "len", "2");
+    push_cpu_const_i64(&mut module, "fill", "17");
+    push_cpu_node(
+        &mut module,
+        "buffer",
+        "cpu.alloc_buffer",
+        vec!["len", "fill"],
+    );
+    push_cpu_node(
+        &mut module,
+        "bytes",
+        "cpu.copy_buffer_owned",
+        vec!["buffer"],
+    );
+    push_cpu_node(
+        &mut module,
+        "packet",
+        "cpu.struct",
+        vec!["Packet", "bytes=bytes"],
+    );
+    push_cpu_node(
+        &mut module,
+        "task",
+        "cpu.spawn_task",
+        vec!["make_packet", "packet"],
+    );
+    push_cpu_node(&mut module, "result", "cpu.join_result", vec!["task"]);
+    push_cpu_node(&mut module, "value", "cpu.task_value", vec!["result"]);
+    push_cpu_node(
+        &mut module,
+        "taken_bytes",
+        "cpu.field",
+        vec!["value", "bytes"],
+    );
+    push_cpu_node(&mut module, "release", "cpu.free", vec!["buffer"]);
+    push_cpu_const_i64(&mut module, "status", "0");
+    push_deps(
+        &mut module,
+        &[
+            ("len", "buffer"),
+            ("fill", "buffer"),
+            ("buffer", "bytes"),
+            ("bytes", "packet"),
+            ("packet", "task"),
+            ("task", "result"),
+            ("result", "value"),
+            ("value", "taken_bytes"),
+            ("bytes", "taken_bytes"),
+            ("buffer", "release"),
+            ("bytes", "release"),
+            ("taken_bytes", "status"),
+            ("release", "status"),
+        ],
+    );
+    module.edges.push(Edge {
+        kind: EdgeKind::Lifetime,
+        from: "buffer".to_owned(),
+        to: "release".to_owned(),
+    });
+
+    let llvm_ir = emit_module(&module).expect("owned bytes task lowering should succeed");
+    assert!(llvm_ir.contains("call ptr @nuis_scheduler_owned_blob_copy_v1(ptr"));
+    assert!(llvm_ir.contains("call i64 @nuis_scheduler_owned_aggregate_set_blob_v1"));
+    assert!(llvm_ir.contains("call ptr @nuis_scheduler_owned_aggregate_take_blob_v1"));
+    assert!(llvm_ir.contains("call void @nuis_scheduler_owned_payload_drop_v1"));
 }

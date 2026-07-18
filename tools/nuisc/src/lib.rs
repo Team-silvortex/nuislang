@@ -92,6 +92,7 @@ pub mod nir_verify;
 mod nir_walk;
 pub mod nustar_binary;
 pub mod optimize;
+mod owned_cleanup;
 pub mod pipeline;
 pub mod project;
 mod project_metadata_report;

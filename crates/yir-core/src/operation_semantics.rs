@@ -321,6 +321,8 @@ impl Operation {
             | "loop_while_scalar_async_post_flow_cond_chain"
             | "guard_print"
             | "guard_return"
+            | "guard_drop_owned_bytes_return"
+            | "branch_drop_owned_bytes_return"
             | "guard_host_call_return"
             | "guard_print_return"
             | "branch_print_return"

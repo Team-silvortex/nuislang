@@ -487,13 +487,30 @@ at submission. A null owned-invoker result now enters the explicit `Failed`
 terminal state, is observable through `task_failed(...)`, and is covered by a
 compiled C runtime harness. Native timeout and cancellation probes also prove
 that deferred aggregate helpers do not execute before context cleanup. The
-remaining scheduler payload gap is explicit Buffer conversion plus enum and
-pointer leaf policies.
+explicit Buffer conversion now materializes through LLVM as a GLM-tokened blob,
+transfers through recursive task aggregates, and is detached with `take_blob`
+before aggregate cleanup. Source Nuis now exposes typed `bytes_len` and
+`drop_bytes` operations; GLM rejects reuse after drop, and a native recursive
+task smoke returns the expected 24-byte length. The compiler now synthesizes
+reverse-declaration-order cleanup for straight-line fallthrough and explicit
+returns while preserving return-value evaluation and recognizing explicit drops
+plus aggregate ownership transfer. Path-sensitive `if` cleanup now handles
+branch-local scope exits, equal ownership-state merges, one-sided early returns,
+and two-way terminal returns. Conditional YIR drop-return operations lower to
+real LLVM basic blocks, so only the selected path releases the blob. The
+remaining gap is loop-backedge cleanup plus enum and pointer leaf policies.
 The runtime now defines `NuisSchedulerOwnedBlobV1` as the first GLM-tokened
 dynamic leaf primitive. It deep-copies borrowed bytes and has scheduler-native
 move/drop hooks; a compiled harness covers take and cancellation. Recursive
 String lowering now consumes it through self-describing aggregate slots, while
-borrowed Buffer remains deliberately unavailable without an explicit copy.
+borrowed Buffer remains deliberately unavailable as a task input. The new
+source-level `copy_bytes(ref Buffer) -> Bytes` conversion now reaches
+`cpu.copy_buffer_owned`; interpreted YIR deep-copies the elements and remains
+independent after source mutation. LLVM now emits the byte copy, recursive task
+packing, and ownership-taking unpack path. Source-level observation and explicit
+destruction now reach the same runtime. Straight-line exits and path-sensitive
+`if` exits synthesize cleanup through that runtime, including real conditional
+LLVM drop-return blocks; loop exits remain the next CFG-aware closure step.
 Aggregate construction now has a transactional `finish` boundary: unset,
 duplicate, or invalid slots poison the build and release already attached
 blobs. Deferred helpers surface null as `Failed`, while immediate awaits reject

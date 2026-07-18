@@ -92,6 +92,47 @@ pub(crate) fn execute_cpu_memory_node(
             );
             Ok(Value::Int(len))
         }
+        "copy_buffer_owned" => {
+            let pointer = state.expect_pointer(&node.op.args[0])?;
+            let elements = state.read_heap_buffer(pointer)?.elements.clone();
+            state.push_resource_event(
+                resource,
+                format!(
+                    "effect cpu.copy_buffer_owned @{} [{}] ptr={} len={}",
+                    node.resource,
+                    resource.kind.raw,
+                    pointer
+                        .map(|ptr| format!("&{ptr}"))
+                        .unwrap_or_else(|| "null".to_owned()),
+                    elements.len()
+                ),
+            );
+            Ok(Value::OwnedBytes(elements))
+        }
+        "owned_bytes_len" => {
+            let Value::OwnedBytes(bytes) = state.expect_value(&node.op.args[0])? else {
+                return Err(format!("node `{}` expects owned bytes", node.name));
+            };
+            let byte_len = bytes
+                .len()
+                .checked_mul(std::mem::size_of::<i64>())
+                .and_then(|len| i64::try_from(len).ok())
+                .ok_or_else(|| format!("node `{}` owned byte length overflows i64", node.name))?;
+            Ok(Value::Int(byte_len))
+        }
+        "drop_owned_bytes" => {
+            if !matches!(state.expect_value(&node.op.args[0])?, Value::OwnedBytes(_)) {
+                return Err(format!("node `{}` expects owned bytes", node.name));
+            }
+            state.push_resource_event(
+                resource,
+                format!(
+                    "effect cpu.drop_owned_bytes @{} [{}]",
+                    node.resource, resource.kind.raw
+                ),
+            );
+            Ok(Value::Unit)
+        }
         "load_at" => {
             let pointer = state.expect_pointer(&node.op.args[0])?;
             let index = state.expect_int(&node.op.args[1])?;

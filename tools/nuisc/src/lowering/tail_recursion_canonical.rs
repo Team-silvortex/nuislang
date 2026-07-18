@@ -238,6 +238,36 @@ pub(super) fn canonicalize_tail_recursive_loop_arg(
                 next_current_expr,
             )))
         }
+        NirExpr::CopyBufferOwned(inner) => {
+            NirExpr::CopyBufferOwned(Box::new(canonicalize_tail_recursive_loop_arg(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+                target_carry_name,
+                next_current_expr,
+            )))
+        }
+        NirExpr::BytesLen(inner) => {
+            NirExpr::BytesLen(Box::new(canonicalize_tail_recursive_loop_arg(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+                target_carry_name,
+                next_current_expr,
+            )))
+        }
+        NirExpr::DropBytes(inner) => {
+            NirExpr::DropBytes(Box::new(canonicalize_tail_recursive_loop_arg(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+                target_carry_name,
+                next_current_expr,
+            )))
+        }
         NirExpr::LoadAt { buffer, index } => NirExpr::LoadAt {
             buffer: Box::new(canonicalize_tail_recursive_loop_arg(
                 buffer,
@@ -474,6 +504,30 @@ pub(super) fn canonicalize_tail_recursive_condition_expr(
         }
         NirExpr::BufferLen(inner) => {
             NirExpr::BufferLen(Box::new(canonicalize_tail_recursive_condition_expr(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+            )))
+        }
+        NirExpr::CopyBufferOwned(inner) => {
+            NirExpr::CopyBufferOwned(Box::new(canonicalize_tail_recursive_condition_expr(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+            )))
+        }
+        NirExpr::BytesLen(inner) => {
+            NirExpr::BytesLen(Box::new(canonicalize_tail_recursive_condition_expr(
+                inner,
+                current_name,
+                non_current_param_names,
+                invariant_param_names,
+            )))
+        }
+        NirExpr::DropBytes(inner) => {
+            NirExpr::DropBytes(Box::new(canonicalize_tail_recursive_condition_expr(
                 inner,
                 current_name,
                 non_current_param_names,

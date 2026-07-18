@@ -64,6 +64,10 @@ pub(in crate::lowering) type PreparedScaledFactorGroupProductView<'a> = (
 
 pub(super) enum PreparedTerminalBranch {
     Return(NirExpr),
+    DropOwnedBytesReturn {
+        bytes: NirExpr,
+        returned: NirExpr,
+    },
     PrintReturn {
         print: NirExpr,
         returned: NirExpr,

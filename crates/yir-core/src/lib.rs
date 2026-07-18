@@ -210,6 +210,7 @@ impl ExecutionState {
             Some(Value::Symbol(_)) => Err(format!("`{name}` is symbol, expected int")),
             Some(Value::Tensor(_)) => Err(format!("`{name}` is tensor, expected int")),
             Some(Value::Pointer(_)) => Err(format!("`{name}` is pointer, expected int")),
+            Some(Value::OwnedBytes(_)) => Err(format!("`{name}` is bytes, expected int")),
             Some(Value::Tuple(_)) => Err(format!("`{name}` is tuple, expected int")),
             Some(Value::Struct(_)) => Err(format!("`{name}` is struct, expected int")),
             Some(Value::VariantUnion(_)) => Err(format!("`{name}` is variant-union, expected int")),

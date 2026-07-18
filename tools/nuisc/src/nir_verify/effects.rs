@@ -97,6 +97,7 @@ pub(super) fn note_binding_effects(
     match expr {
         NirExpr::Move(inner)
         | NirExpr::Free(inner)
+        | NirExpr::DropBytes(inner)
         | NirExpr::CpuJoin(inner)
         | NirExpr::CpuThreadJoin(inner)
         | NirExpr::CpuCancel(inner)
@@ -194,6 +195,9 @@ fn note_nested_expr_effects(
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
+        | NirExpr::CopyBufferOwned(inner)
+        | NirExpr::BytesLen(inner)
+        | NirExpr::DropBytes(inner)
         | NirExpr::Free(inner)
         | NirExpr::IsNull(inner) => {
             note_binding_effects(inner, "_", moved, borrows, borrow_bindings)

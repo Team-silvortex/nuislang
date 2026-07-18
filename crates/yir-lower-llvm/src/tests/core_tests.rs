@@ -1,6 +1,70 @@
 use super::support::*;
 
 #[test]
+fn lowers_buffer_copy_to_glm_owned_blob() {
+    let mut module = module_with_cpu0();
+    push_cpu_const_i64(&mut module, "len", "3");
+    push_cpu_const_i64(&mut module, "fill", "7");
+    push_cpu_node(
+        &mut module,
+        "buffer",
+        "cpu.alloc_buffer",
+        vec!["len", "fill"],
+    );
+    push_cpu_node(
+        &mut module,
+        "bytes",
+        "cpu.copy_buffer_owned",
+        vec!["buffer"],
+    );
+    push_cpu_node(
+        &mut module,
+        "byte_len",
+        "cpu.owned_bytes_len",
+        vec!["bytes"],
+    );
+    push_cpu_node(
+        &mut module,
+        "drop_bytes",
+        "cpu.drop_owned_bytes",
+        vec!["bytes"],
+    );
+    push_cpu_node(&mut module, "release", "cpu.free", vec!["buffer"]);
+    push_cpu_const_i64(&mut module, "status", "0");
+    push_deps(
+        &mut module,
+        &[
+            ("len", "buffer"),
+            ("fill", "buffer"),
+            ("buffer", "bytes"),
+            ("bytes", "byte_len"),
+            ("bytes", "drop_bytes"),
+            ("byte_len", "drop_bytes"),
+            ("buffer", "release"),
+            ("drop_bytes", "release"),
+            ("release", "status"),
+        ],
+    );
+    module.edges.push(Edge {
+        kind: EdgeKind::Lifetime,
+        from: "buffer".to_owned(),
+        to: "release".to_owned(),
+    });
+    module.edges.push(Edge {
+        kind: EdgeKind::Lifetime,
+        from: "bytes".to_owned(),
+        to: "drop_bytes".to_owned(),
+    });
+
+    let llvm_ir = emit_module(&module).expect("owned buffer copy lowering should succeed");
+    assert!(llvm_ir.contains("mul i64 3, 8"));
+    assert!(llvm_ir.contains("call ptr @nuis_scheduler_owned_blob_copy_v1(ptr"));
+    assert!(llvm_ir.contains("call i64 @nuis_scheduler_owned_blob_len_v1(ptr"));
+    assert!(llvm_ir.contains("call void @nuis_scheduler_owned_blob_drop_v1(ptr"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.copy_buffer_owned `bytes`"));
+}
+
+#[test]
 fn lowers_cpu_select_between_structs_then_field_access() {
     let mut module = YirModule::new("0.1");
     module.resources.push(Resource {

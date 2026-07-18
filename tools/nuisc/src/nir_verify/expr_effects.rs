@@ -56,6 +56,9 @@ pub(in crate::nir_verify) fn apply_guaranteed_expr_effects(
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
+        | NirExpr::CopyBufferOwned(inner)
+        | NirExpr::BytesLen(inner)
+        | NirExpr::DropBytes(inner)
         | NirExpr::Free(inner)
         | NirExpr::IsNull(inner) => apply_guaranteed_expr_effects(
             inner,
@@ -208,6 +211,7 @@ pub(in crate::nir_verify) fn apply_guaranteed_expr_effects(
     match expr {
         NirExpr::Move(_)
         | NirExpr::Free(_)
+        | NirExpr::DropBytes(_)
         | NirExpr::CpuJoin(_)
         | NirExpr::CpuThreadJoin(_)
         | NirExpr::CpuCancel(_)
