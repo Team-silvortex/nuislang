@@ -222,6 +222,10 @@ pub(super) fn nsld_final_output_json_fields(
             nsld_final_output.map(|summary| summary.debugger_transcript_next_action.as_str()),
         ),
         json_optional_string_field(
+            "nsld_final_executable_output_debugger_transcript_next_command",
+            nsld_final_output.and_then(|summary| summary.nsdb_replay_next_command.as_deref()),
+        ),
+        json_optional_string_field(
             "nsld_final_executable_output_debugger_transcript_first_blocker",
             nsld_final_output.and_then(|summary| {
                 summary.debugger_transcript_first_blocker.as_deref()

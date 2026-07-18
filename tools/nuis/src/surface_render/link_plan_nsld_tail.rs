@@ -423,6 +423,12 @@ pub(super) fn nsld_tail_json_fields(
                 .map(|summary| summary.debugger_transcript_next_action.as_str()),
         ),
         crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_transcript_next_command",
+            final_output_summary
+                .as_ref()
+                .and_then(|summary| summary.nsdb_replay_next_command.as_deref()),
+        ),
+        crate::json_optional_string_field(
             "nsld_final_executable_output_debugger_transcript_first_blocker",
             final_output_summary
                 .as_ref()

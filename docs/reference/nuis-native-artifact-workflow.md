@@ -280,8 +280,9 @@ Short reading rule:
   boolean mirror for whether the verified output boundary can hand off to the
   next execution owner
 * `nsld_final_executable_output_nsdb_replay_ready` says whether the persisted
-  final-output nsdb handoff can already be consumed by `nsdb replay-plan`; the
-  matching command field is the next debugger/query hop, not a runtime launch
+  final-output nsdb handoff has passed `nsdb replay-plan` and can be consumed by
+  `nsdb replay`; the matching command enters deterministic YIR transcript
+  consumption, not native instruction execution
 * `nsld_final_executable_output_execution_handoff_status` distinguishes whether
   the output can hand off directly to a runner, still needs entrypoint
   materialization, or is blocked

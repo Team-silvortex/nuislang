@@ -162,17 +162,24 @@ Today `nuis` has:
 
 Today the repository also still has one important runtime boundary:
 
-* native LLVM/AOT lowering for CPU task primitives is not yet a full live task
-  executor
-* project/examples can already validate task semantics through
-  `.ns -> NIR -> YIR -> LLVM`
-* but that should not yet be read as proof that `spawn/join/timeout/cancel`
-  already execute as a complete native task runtime
+* scalar `i64` task payloads now cross a native scheduler ABI:
+  * `nuis_scheduler_task_spawn_i64_v1`
+  * `nuis_scheduler_task_join_state_v1`
+  * `nuis_scheduler_task_value_i64_v1`
+* the AOT shim registers a pending task, advances the lifecycle clock while
+  joining, commits the completed state from task polling, and reads the payload
+  through the runtime task handle
+* unary `async fn(i64) -> i64` calls consumed by `spawn_task` are emitted as
+  deferred helper thunks; task polling invokes the helper through a function
+  pointer before committing the completed state
+* other scalar signatures and aggregate payloads retain the eager/staged
+  lowering fallback while their scheduler ABI representation is being designed
 
 Today `nuis` does **not** yet have:
 
 * a mature parallel executor
 * a stable worker-pool or lane scheduler contract for tasks
+* runtime timeout/cancellation transitions for the new scalar scheduler ABI
 * shared-state synchronization primitives
 * a finalized concurrent memory model
 

@@ -17,6 +17,118 @@ pub(super) fn collect_recursive_async_helper_functions(module: &NirModule) -> BT
     collect_recursive_helper_functions(module, true)
 }
 
+pub(super) fn collect_scheduler_async_thunk_functions(module: &NirModule) -> BTreeSet<String> {
+    let eligible = module
+        .functions
+        .iter()
+        .filter(|function| function.is_async)
+        .filter(|function| {
+            function.params.len() == 1
+                && direct_call_scalar_kind(&function.params[0].ty)
+                    == Some(DirectCallScalarKind::I64)
+                && function
+                    .return_type
+                    .as_ref()
+                    .and_then(direct_call_scalar_kind)
+                    == Some(DirectCallScalarKind::I64)
+        })
+        .map(|function| function.name.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut spawned = BTreeSet::new();
+    for function in &module.functions {
+        collect_scheduler_spawned_functions_in_stmts(&function.body, &eligible, &mut spawned);
+    }
+    spawned
+}
+
+fn collect_scheduler_spawned_functions_in_stmts(
+    body: &[NirStmt],
+    eligible: &BTreeSet<&str>,
+    spawned: &mut BTreeSet<String>,
+) {
+    for stmt in body {
+        match stmt {
+            NirStmt::Let { value, .. }
+            | NirStmt::Const { value, .. }
+            | NirStmt::Print(value)
+            | NirStmt::Expr(value)
+            | NirStmt::Await(value)
+            | NirStmt::Return(Some(value)) => {
+                collect_scheduler_spawned_functions_in_expr(value, eligible, spawned);
+            }
+            NirStmt::If {
+                condition,
+                then_body,
+                else_body,
+            } => {
+                collect_scheduler_spawned_functions_in_expr(condition, eligible, spawned);
+                collect_scheduler_spawned_functions_in_stmts(then_body, eligible, spawned);
+                collect_scheduler_spawned_functions_in_stmts(else_body, eligible, spawned);
+            }
+            NirStmt::While { condition, body } => {
+                collect_scheduler_spawned_functions_in_expr(condition, eligible, spawned);
+                collect_scheduler_spawned_functions_in_stmts(body, eligible, spawned);
+            }
+            NirStmt::Return(None) | NirStmt::Break | NirStmt::Continue => {}
+        }
+    }
+}
+
+fn collect_scheduler_spawned_functions_in_expr(
+    expr: &NirExpr,
+    eligible: &BTreeSet<&str>,
+    spawned: &mut BTreeSet<String>,
+) {
+    match expr {
+        NirExpr::CpuSpawn { callee, args } => {
+            if eligible.contains(callee.as_str()) {
+                spawned.insert(callee.clone());
+            }
+            for arg in args {
+                collect_scheduler_spawned_functions_in_expr(arg, eligible, spawned);
+            }
+        }
+        NirExpr::CpuTimeout { task, limit } => {
+            collect_scheduler_spawned_functions_in_expr(task, eligible, spawned);
+            collect_scheduler_spawned_functions_in_expr(limit, eligible, spawned);
+        }
+        NirExpr::Await(value)
+        | NirExpr::CpuJoin(value)
+        | NirExpr::CpuCancel(value)
+        | NirExpr::CpuJoinResult(value)
+        | NirExpr::CpuTaskCompleted(value)
+        | NirExpr::CpuTaskTimedOut(value)
+        | NirExpr::CpuTaskCancelled(value)
+        | NirExpr::CpuTaskValue(value) => {
+            collect_scheduler_spawned_functions_in_expr(value, eligible, spawned);
+        }
+        NirExpr::Call { args, .. } => {
+            for arg in args {
+                collect_scheduler_spawned_functions_in_expr(arg, eligible, spawned);
+            }
+        }
+        NirExpr::MethodCall { receiver, args, .. } => {
+            collect_scheduler_spawned_functions_in_expr(receiver, eligible, spawned);
+            for arg in args {
+                collect_scheduler_spawned_functions_in_expr(arg, eligible, spawned);
+            }
+        }
+        NirExpr::Binary { lhs, rhs, .. } => {
+            collect_scheduler_spawned_functions_in_expr(lhs, eligible, spawned);
+            collect_scheduler_spawned_functions_in_expr(rhs, eligible, spawned);
+        }
+        NirExpr::FieldAccess { base, .. } => {
+            collect_scheduler_spawned_functions_in_expr(base, eligible, spawned);
+        }
+        NirExpr::StructLiteral { fields, .. } => {
+            for (_, value) in fields {
+                collect_scheduler_spawned_functions_in_expr(value, eligible, spawned);
+            }
+        }
+        _ => {}
+    }
+}
+
 pub(super) fn collect_async_loop_step_functions(module: &NirModule) -> BTreeSet<String> {
     let eligible = module
         .functions

@@ -133,7 +133,7 @@ fn folds_known_network_state_for_lazy_const_select() {
 }
 
 #[test]
-fn folds_known_task_result_state_for_lazy_const_select() {
+fn lowers_task_result_state_through_scheduler_runtime() {
     let mut module = module_with_cpu0();
     push_cpu_const_i64(&mut module, "task_payload", "11");
     push_cpu_node(
@@ -149,7 +149,6 @@ fn folds_known_task_result_state_for_lazy_const_select() {
         "cpu.task_completed",
         vec!["task_result"],
     );
-    push_wrong_variant_payload_select_fixture(&mut module, "enabled", "fallback", "bad_result");
     push_deps(
         &mut module,
         &[
@@ -160,10 +159,12 @@ fn folds_known_task_result_state_for_lazy_const_select() {
     );
 
     let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
-    assert!(llvm_ir.contains("zext i1 true to i64"));
-    assert!(!llvm_ir.contains("select i1"));
-    assert!(!llvm_ir.contains("deferred lowering for cpu.select `selected`"));
-    assert_wrong_variant_chain_not_deferred(&llvm_ir);
+    assert!(llvm_ir.contains("call i64 @nuis_scheduler_task_spawn_i64_v1"));
+    assert!(llvm_ir.contains("call i64 @nuis_scheduler_task_join_state_v1"));
+    assert!(llvm_ir.contains("icmp eq i64"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.spawn_task `task`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.join_result `task_result`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.task_completed `enabled`"));
 }
 
 #[test]

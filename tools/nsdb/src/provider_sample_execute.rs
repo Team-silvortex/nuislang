@@ -8,8 +8,9 @@ use crate::{
     },
     provider_sample_execution::provider_execution_outcome,
     provider_sample_payload::{
-        fnv1a64_hex, pixelmagic_native_output_summary, provider_output_payload_file_name,
-        render_real_device_provider_output_payload,
+        fnv1a64_hex, pixelmagic_metal_output_summary, pixelmagic_native_output_summary,
+        provider_output_payload_file_name, render_real_device_provider_output_payload,
+        std_preprocessed_pgm_input_bytes, PixelMagicNativeOutputSummary,
     },
 };
 use std::{collections::BTreeSet, fs, path::Path};
@@ -37,6 +38,9 @@ pub struct ProviderSampleExecuteReport {
     pub first_output_payload_native_output_status: String,
     pub first_output_payload_native_output_bytes: String,
     pub first_output_payload_native_output_hash: String,
+    pub first_output_payload_native_execution_contract: String,
+    pub first_output_payload_native_execution_status: String,
+    pub first_output_payload_native_device: String,
     pub next_action: String,
     pub next_command: String,
 }
@@ -89,16 +93,6 @@ pub fn execute_provider_samples(
                 outcome.contract.to_owned(),
                 record.input_evidence.clone(),
                 fnv1a64_hex(record.input_evidence.as_bytes()),
-                pixelmagic_native_output_summary(&record.input_evidence, &record.provider_family)
-                    .map(|summary| (summary.kind, summary.status, summary.bytes, summary.hash))
-                    .unwrap_or_else(|| {
-                        (
-                            "none".to_owned(),
-                            "none".to_owned(),
-                            "none".to_owned(),
-                            "none".to_owned(),
-                        )
-                    }),
             )
         })
         .unwrap_or_else(|| {
@@ -112,12 +106,6 @@ pub fn execute_provider_samples(
                 "none".to_owned(),
                 "none".to_owned(),
                 "none".to_owned(),
-                (
-                    "none".to_owned(),
-                    "none".to_owned(),
-                    "none".to_owned(),
-                    "none".to_owned(),
-                ),
             )
         });
     let mut output_payloads = Vec::new();
@@ -128,6 +116,47 @@ pub fn execute_provider_samples(
         }
         output_payloads.push(write_provider_output_payload(output_dir, record, &adapter)?);
     }
+    let first_native_output = output_payloads
+        .first()
+        .and_then(|payload| payload.native_output.as_ref())
+        .map(|summary| {
+            (
+                summary.kind.clone(),
+                summary.status.clone(),
+                summary.bytes.clone(),
+                summary.hash.clone(),
+                summary.execution_contract.clone(),
+                summary.execution_status.clone(),
+                summary.device.clone(),
+            )
+        })
+        .or_else(|| {
+            matched_records.first().and_then(|record| {
+                pixelmagic_native_output_summary(&record.input_evidence, &record.provider_family)
+                    .map(|summary| {
+                        (
+                            summary.kind,
+                            summary.status,
+                            summary.bytes,
+                            summary.hash,
+                            summary.execution_contract,
+                            summary.execution_status,
+                            summary.device,
+                        )
+                    })
+            })
+        })
+        .unwrap_or_else(|| {
+            (
+                "none".to_owned(),
+                "none".to_owned(),
+                "none".to_owned(),
+                "none".to_owned(),
+                "none".to_owned(),
+                "none".to_owned(),
+                "none".to_owned(),
+            )
+        });
     let first_output_payload_comparison_status =
         output_payload_comparison_status(!output_payloads.is_empty(), &first_provider_boundary.2)
             .to_owned();
@@ -151,16 +180,19 @@ pub fn execute_provider_samples(
         first_provider_execution_mode: first_provider_boundary.5,
         first_output_payload_evidence: output_payloads
             .first()
-            .cloned()
+            .map(|payload| payload.evidence.clone())
             .unwrap_or_else(|| "none".to_owned()),
         first_output_payload_comparison_contract: first_provider_boundary.6,
         first_output_payload_comparison_status,
         first_output_payload_input_evidence: first_provider_boundary.7,
         first_output_payload_input_evidence_hash: first_provider_boundary.8,
-        first_output_payload_native_output_kind: first_provider_boundary.9 .0,
-        first_output_payload_native_output_status: first_provider_boundary.9 .1,
-        first_output_payload_native_output_bytes: first_provider_boundary.9 .2,
-        first_output_payload_native_output_hash: first_provider_boundary.9 .3,
+        first_output_payload_native_output_kind: first_native_output.0,
+        first_output_payload_native_output_status: first_native_output.1,
+        first_output_payload_native_output_bytes: first_native_output.2,
+        first_output_payload_native_output_hash: first_native_output.3,
+        first_output_payload_native_execution_contract: first_native_output.4,
+        first_output_payload_native_execution_status: first_native_output.5,
+        first_output_payload_native_device: first_native_output.6,
         next_action: "materialize-provider-samples".to_owned(),
         next_command: format!(
             "nsdb materialize-provider-samples {} --json",
@@ -179,16 +211,45 @@ fn output_payload_comparison_status(payload_ready: bool, capability_status: &str
     }
 }
 
+struct WrittenProviderOutput {
+    evidence: String,
+    native_output: Option<PixelMagicNativeOutputSummary>,
+}
+
 fn write_provider_output_payload(
     output_dir: &Path,
     record: &crate::model::NsdbDeviceProviderSampleRecordInfo,
     adapter: &crate::provider_runner_registry::ProviderRunnerAdapter,
-) -> Result<String, String> {
+) -> Result<WrittenProviderOutput, String> {
     let file_name = provider_output_payload_file_name(&record.provider_family);
-    let content = render_real_device_provider_output_payload(record, adapter);
+    let native_output = execute_native_provider_output(record, adapter)?;
+    let content =
+        render_real_device_provider_output_payload(record, adapter, native_output.as_ref());
     let hash = fnv1a64_hex(content.as_bytes());
     fs::write(output_dir.join(&file_name), content).map_err(|error| {
         format!("failed to write provider output payload `{file_name}`: {error}")
     })?;
-    Ok(format!("{file_name}:hash={hash}:status=written"))
+    Ok(WrittenProviderOutput {
+        evidence: format!("{file_name}:hash={hash}:status=written"),
+        native_output,
+    })
+}
+
+fn execute_native_provider_output(
+    record: &crate::model::NsdbDeviceProviderSampleRecordInfo,
+    adapter: &crate::provider_runner_registry::ProviderRunnerAdapter,
+) -> Result<Option<PixelMagicNativeOutputSummary>, String> {
+    if adapter.kind != "metal-real-device-runner" {
+        return Ok(None);
+    }
+    let Some(input_bytes) = std_preprocessed_pgm_input_bytes(&record.input_evidence) else {
+        return Ok(None);
+    };
+    let input = u32::try_from(input_bytes)
+        .map_err(|_| "PixelMagic Metal sample input exceeds u32 range".to_owned())?;
+    let execution = crate::provider_runner_metal::execute_u32_add(input, 4)?;
+    Ok(Some(pixelmagic_metal_output_summary(
+        &record.input_evidence,
+        &execution,
+    )))
 }

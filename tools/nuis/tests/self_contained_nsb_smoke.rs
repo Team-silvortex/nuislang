@@ -43,6 +43,27 @@ fn run_nsld(args: &[&str]) -> std::process::Output {
         .unwrap_or_else(|error| panic!("failed to run nsld through cargo {:?}: {error}", args))
 }
 
+fn run_nsdb(args: &[&str]) -> std::process::Output {
+    if let Some(path) = std::env::var_os("CARGO_BIN_EXE_nsdb").map(PathBuf::from) {
+        return Command::new(path)
+            .args(args)
+            .output()
+            .unwrap_or_else(|error| panic!("failed to run nsdb {:?}: {error}", args));
+    }
+    let fallback = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/debug/nsdb");
+    if fallback.exists() {
+        return Command::new(fallback)
+            .args(args)
+            .output()
+            .unwrap_or_else(|error| panic!("failed to run nsdb {:?}: {error}", args));
+    }
+    Command::new("cargo")
+        .args(["run", "-q", "-p", "nsdb", "--"])
+        .args(args)
+        .output()
+        .unwrap_or_else(|error| panic!("failed to run nsdb through cargo {:?}: {error}", args))
+}
+
 fn assert_success(output: &std::process::Output, context: &str) {
     assert!(
         output.status.success(),
@@ -307,7 +328,7 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
             && workflow_stdout.contains("\"closure_summary_ready\":true")
             && workflow_stdout.contains("\"closure_summary_primary_blocker\":null")
             && workflow_stdout.contains("\"closure_summary_next_action\":\"run-artifact-or-replay-nsdb\"")
-            && workflow_stdout.contains("\"closure_summary_next_command\":\"nsdb replay-plan ")
+            && workflow_stdout.contains("\"closure_summary_next_command\":\"nsdb replay ")
             && workflow_stdout
                 .contains("\"nsld_final_executable_output_nsdb_replay_ready\":true")
             && workflow_stdout.contains(
@@ -317,7 +338,7 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
                 "\"nsld_final_executable_output_nsdb_replay_contract\":\"nsdb-payload-execution-replay-plan-v1\""
             )
             && workflow_stdout
-                .contains("\"nsld_final_executable_output_nsdb_replay_command\":\"nsdb replay-plan ")
+                .contains("\"nsld_final_executable_output_nsdb_replay_command\":\"nsdb replay ")
             && workflow_stdout
                 .contains("\"nsld_final_executable_output_nsdb_replay_checkpoint_count\":1")
             && workflow_stdout.contains(
@@ -327,11 +348,26 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
                 "\"nsld_final_executable_output_nsdb_replay_next_action\":\"replay-nsdb-payload-execution\""
             )
             && workflow_stdout.contains(
-                "\"nsld_final_executable_output_nsdb_replay_next_command\":\"nsdb replay-plan "
+                "\"nsld_final_executable_output_nsdb_replay_next_command\":\"nsdb replay "
             )
             && workflow_stdout
                 .contains("\"nsld_final_executable_output_nsdb_replay_first_blocker\":null"),
         "workflow json should promote replay-ready self-contained final output into closure_summary ready\n{workflow_stdout}"
+    );
+
+    let replay = run_nsdb(&["replay", &output_dir.display().to_string(), "--json"]);
+    assert_success(&replay, "nsdb replay self-contained nsb handoff");
+    let replay_stdout = String::from_utf8_lossy(&replay.stdout);
+    assert!(
+        replay_stdout.contains("\"kind\":\"nsdb_yir_replay_transcript\"")
+            && replay_stdout
+                .contains("\"debugger_transcript_contract\":\"nsdb-yir-replay-transcript-v1\"")
+            && replay_stdout.contains("\"debugger_transcript_status\":\"transcript-consumed\"")
+            && replay_stdout.contains("\"debugger_transcript_ready\":true")
+            && replay_stdout.contains("\"debugger_transcript_checkpoint_count\":1")
+            && replay_stdout.contains("\"debugger_transcript_replayed_checkpoint_count\":1")
+            && replay_stdout.contains("\"consumed\":true"),
+        "nsdb replay should consume the replay-ready YIR checkpoint set\n{replay_stdout}"
     );
 
     let build_report_json =

@@ -12,6 +12,7 @@ pub(crate) struct FrontdoorClosureSummary {
     pub(crate) debugger_transcript_ready: Option<bool>,
     pub(crate) debugger_transcript_status: Option<String>,
     pub(crate) debugger_transcript_next_action: Option<String>,
+    pub(crate) debugger_transcript_next_command: Option<String>,
     pub(crate) debugger_transcript_first_blocker: Option<String>,
 }
 
@@ -53,6 +54,7 @@ impl FrontdoorClosureSummary {
             debugger_transcript_ready: None,
             debugger_transcript_status: None,
             debugger_transcript_next_action: None,
+            debugger_transcript_next_command: None,
             debugger_transcript_first_blocker: None,
         }
     }
@@ -78,6 +80,7 @@ impl FrontdoorClosureSummary {
             debugger_transcript_ready: None,
             debugger_transcript_status: None,
             debugger_transcript_next_action: None,
+            debugger_transcript_next_command: None,
             debugger_transcript_first_blocker: None,
         }
     }
@@ -115,6 +118,7 @@ impl FrontdoorClosureSummary {
                 debugger_transcript_next_action: Some(
                     final_output.debugger_transcript_next_action.clone(),
                 ),
+                debugger_transcript_next_command: final_output.nsdb_replay_next_command.clone(),
                 debugger_transcript_first_blocker: final_output
                     .debugger_transcript_first_blocker
                     .clone(),
@@ -152,6 +156,7 @@ impl FrontdoorClosureSummary {
                 debugger_transcript_next_action: Some(
                     final_output.debugger_transcript_next_action.clone(),
                 ),
+                debugger_transcript_next_command: final_output.nsdb_replay_next_command.clone(),
                 debugger_transcript_first_blocker: final_output
                     .debugger_transcript_first_blocker
                     .clone(),
@@ -175,6 +180,7 @@ impl FrontdoorClosureSummary {
         self.debugger_transcript_status = Some(final_output.debugger_transcript_status.clone());
         self.debugger_transcript_next_action =
             Some(final_output.debugger_transcript_next_action.clone());
+        self.debugger_transcript_next_command = final_output.nsdb_replay_next_command.clone();
         self.debugger_transcript_first_blocker =
             final_output.debugger_transcript_first_blocker.clone();
         self
@@ -215,6 +221,7 @@ impl FrontdoorClosureSummary {
             debugger_transcript_ready: self.debugger_transcript_ready,
             debugger_transcript_status: self.debugger_transcript_status,
             debugger_transcript_next_action: self.debugger_transcript_next_action,
+            debugger_transcript_next_command: self.debugger_transcript_next_command,
             debugger_transcript_first_blocker: self.debugger_transcript_first_blocker,
         }
     }
@@ -262,6 +269,10 @@ impl FrontdoorClosureSummary {
                 self.debugger_transcript_next_action.as_deref(),
             ),
             crate::json_optional_string_field(
+                "closure_summary_debugger_transcript_next_command",
+                self.debugger_transcript_next_command.as_deref(),
+            ),
+            crate::json_optional_string_field(
                 "closure_summary_debugger_transcript_first_blocker",
                 self.debugger_transcript_first_blocker.as_deref(),
             ),
@@ -291,7 +302,7 @@ mod tests {
         assert_eq!(summary.next_action, "run-artifact-or-replay-nsdb");
         assert_eq!(
             summary.next_command.as_deref(),
-            Some("nsdb replay-plan out --json")
+            Some("nsdb replay out --json")
         );
         assert_eq!(
             summary.object_package_summary_contract.as_deref(),
@@ -306,6 +317,10 @@ mod tests {
         assert_eq!(
             summary.debugger_transcript_status.as_deref(),
             Some("transcript-ready")
+        );
+        assert_eq!(
+            summary.debugger_transcript_next_command.as_deref(),
+            Some("nsdb replay out --json")
         );
     }
 
@@ -449,8 +464,7 @@ mod tests {
             .to_owned(),
             nsdb_replay_checkpoint_count: usize::from(nsdb_replay_ready),
             nsdb_replayable_checkpoint_count: usize::from(nsdb_replay_ready),
-            nsdb_replay_command: nsdb_replay_ready
-                .then(|| "nsdb replay-plan out --json".to_owned()),
+            nsdb_replay_command: nsdb_replay_ready.then(|| "nsdb replay out --json".to_owned()),
             nsdb_replay_next_action: if nsdb_replay_ready {
                 "replay-nsdb-payload-execution"
             } else {
@@ -459,7 +473,7 @@ mod tests {
             .to_owned(),
             nsdb_replay_next_command: Some(
                 if nsdb_replay_ready {
-                    "nsdb replay-plan out --json"
+                    "nsdb replay out --json"
                 } else {
                     "nsld final-executable-output out/nuis.build.manifest.toml --json"
                 }
@@ -482,7 +496,7 @@ mod tests {
             .to_owned(),
             object_package_summary_next_command: Some(
                 if nsdb_replay_ready {
-                    "nsdb replay-plan out --json"
+                    "nsdb replay out --json"
                 } else {
                     "nsld final-executable-output out/nuis.build.manifest.toml --json"
                 }

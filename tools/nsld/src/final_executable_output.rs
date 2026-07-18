@@ -343,7 +343,7 @@ pub(crate) fn nsld_final_executable_output_report(
     .to_owned();
     let nsdb_replay_command = nsdb_replay_ready.then(|| {
         format!(
-            "nsdb replay-plan {} --json",
+            "nsdb replay {} --json",
             shell_quote_path(Path::new(&plan.output_dir))
         )
     });

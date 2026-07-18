@@ -74,6 +74,60 @@ fn emits_helper_function_lanes_and_cpu_call_i64() {
 }
 
 #[test]
+fn defers_spawned_i64_helper_call_until_scheduler_poll() {
+    let mut module = module_with_cpu0();
+    push_cpu_const_i64(&mut module, "seed", "6");
+    push_cpu_node(
+        &mut module,
+        "schedule",
+        "cpu.async_call",
+        vec!["inc", "seed"],
+    );
+    push_cpu_node(&mut module, "invoke", "cpu.call_i64", vec!["inc", "seed"]);
+    push_cpu_node(&mut module, "task", "cpu.spawn_task", vec!["inc", "invoke"]);
+    push_cpu_node(&mut module, "result", "cpu.join_result", vec!["task"]);
+    push_cpu_node(&mut module, "value", "cpu.task_value", vec!["result"]);
+    push_cpu_node(&mut module, "inc_param_0", "cpu.param_i64", vec!["0"]);
+    push_cpu_const_i64(&mut module, "inc_one", "1");
+    push_cpu_node(
+        &mut module,
+        "inc_sum",
+        "cpu.add",
+        vec!["inc_param_0", "inc_one"],
+    );
+    push_cpu_node(&mut module, "inc_ret", "cpu.return_i64", vec!["inc_sum"]);
+    push_deps(
+        &mut module,
+        &[
+            ("seed", "schedule"),
+            ("seed", "invoke"),
+            ("invoke", "task"),
+            ("task", "result"),
+            ("result", "value"),
+            ("inc_param_0", "inc_sum"),
+            ("inc_one", "inc_sum"),
+            ("inc_sum", "inc_ret"),
+        ],
+    );
+    module.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: "schedule".to_owned(),
+        to: "invoke".to_owned(),
+    });
+    for name in ["inc_param_0", "inc_one", "inc_sum", "inc_ret"] {
+        module
+            .node_lanes
+            .insert(name.to_owned(), "fn:inc".to_owned());
+    }
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("define i64 @nuis_fn_inc(i64 %arg0)"));
+    assert!(llvm_ir.contains("call i64 @nuis_scheduler_task_spawn_thunk_i64_v1(ptr @nuis_fn_inc"));
+    assert!(!llvm_ir.contains("call i64 @nuis_fn_inc(i64"));
+    assert!(llvm_ir.contains("call i64 @nuis_scheduler_task_value_i64_v1"));
+}
+
+#[test]
 fn emits_guard_return_as_real_branch() {
     let mut module = YirModule::new("0.1");
     module.resources.push(Resource {
@@ -119,6 +173,39 @@ fn emits_guard_return_as_real_branch() {
     assert!(llvm_ir.contains("guard_return_cont."));
     assert_eq!(llvm_ir.matches("ret i64 ").count(), 2);
     assert!(llvm_ir.find("guard_return_cont.").unwrap() < llvm_ir.find("= add i64 0, 7").unwrap());
+}
+
+#[test]
+fn resolves_structural_guard_return_through_fieldwise_selection() {
+    let mut module = module_with_cpu0();
+    push_cpu_node(&mut module, "cond", "cpu.const_bool", vec!["true"]);
+    push_cpu_const_i64(&mut module, "score", "64");
+    push_cpu_node(
+        &mut module,
+        "summary",
+        "cpu.struct",
+        vec!["Summary", "score=score"],
+    );
+    push_cpu_node(
+        &mut module,
+        "guard",
+        "cpu.guard_return",
+        vec!["cond", "summary"],
+    );
+    push_cpu_const_i64(&mut module, "later", "7");
+    push_deps(
+        &mut module,
+        &[
+            ("score", "summary"),
+            ("cond", "guard"),
+            ("summary", "guard"),
+        ],
+    );
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("structural cpu.guard_return `guard`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.guard_return `guard`"));
+    assert!(llvm_ir.contains("= add i64 0, 7"));
 }
 
 #[test]

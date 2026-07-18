@@ -10,6 +10,7 @@ run() {
   (cd "$ROOT_DIR" && "$@")
 }
 
+run python3 scripts/check-text-encoding.py
 run cargo test -q -p nuisc tests_control_flow
 run cargo test -q -p nuisc tests_loop_flow
 run cargo test -q -p nuisc tests_loop_post_flow

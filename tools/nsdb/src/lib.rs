@@ -2,6 +2,7 @@
 
 mod handoff;
 mod model;
+mod provider_runner_metal;
 mod provider_runner_registry;
 mod provider_sample;
 mod provider_sample_execute;

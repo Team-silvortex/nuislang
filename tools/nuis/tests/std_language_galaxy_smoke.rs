@@ -382,6 +382,26 @@ fn std_language_galaxy_task_cli_runs_through_task_contracts() {
         "deferred lowering for cpu.task_value",
         "std language task cli LLVM",
     );
+    assert_file_contains(
+        &output_dir.join("std_language_task_cli_demo.ll"),
+        "call i64 @nuis_scheduler_task_spawn_thunk_i64_v1(ptr @nuis_fn_ping",
+        "std language task cli scheduler thunk spawn ABI",
+    );
+    assert_file_not_contains(
+        &output_dir.join("std_language_task_cli_demo.ll"),
+        "call i64 @nuis_fn_ping(",
+        "std language task cli eager async helper call",
+    );
+    assert_file_contains(
+        &output_dir.join("std_language_task_cli_demo.ll"),
+        "call i64 @nuis_scheduler_task_join_state_v1",
+        "std language task cli scheduler join ABI",
+    );
+    assert_file_contains(
+        &output_dir.join("std_language_task_cli_demo.ll"),
+        "call i64 @nuis_scheduler_task_value_i64_v1",
+        "std language task cli scheduler value ABI",
+    );
 
     let binary = Command::new(output_dir.join("std_language_task_cli_demo"))
         .output()
@@ -448,5 +468,51 @@ fn std_language_galaxy_build_pipeline_runs_through_cli_contracts() {
     let binary = Command::new(output_dir.join("std_language_build_pipeline_demo"))
         .output()
         .expect("run std language build pipeline binary");
+    assert_eq!(binary.status.code(), Some(0));
+}
+
+#[test]
+fn cli_build_pipeline_keeps_std_language_gate_native() {
+    let output_dir = temp_dir("cli_build_pipeline_language_gate");
+    let output_dir_text = output_dir.display().to_string();
+    let source =
+        fs::read_to_string("../../examples/projects/tooling/cli_build_pipeline_demo/main.ns")
+            .expect("read cli build pipeline source");
+    assert!(source.contains("use cpu StdLanguageCore"));
+    assert!(source.contains("use cpu StdLanguageOps"));
+    assert!(source.contains("language_pipeline_gate"));
+    assert!(source.contains("build_report"));
+
+    let build = run_nuis(&[
+        "build",
+        "../../examples/projects/tooling/cli_build_pipeline_demo",
+        &output_dir_text,
+    ]);
+    assert_success(&build, "nuis build cli build pipeline language gate");
+
+    assert_file_contains(
+        &output_dir.join("nuis.project.imports.txt"),
+        "use\tcpu.StdLanguageOps\tcpu.StdLanguageCore\tresolution=local-visible:galaxy-auto-inject",
+        "cli build pipeline language imports",
+    );
+    assert_file_contains(
+        &output_dir.join("cli_build_pipeline_demo.nir.txt"),
+        "StdLanguageOps.build_report",
+        "cli build pipeline language NIR",
+    );
+    assert_file_contains(
+        &output_dir.join("cli_build_pipeline_demo.yir"),
+        "StdLanguageOps.build_report",
+        "cli build pipeline language YIR",
+    );
+    assert_file_not_contains(
+        &output_dir.join("cli_build_pipeline_demo.ll"),
+        "deferred lowering",
+        "cli build pipeline LLVM",
+    );
+
+    let binary = Command::new(output_dir.join("cli_build_pipeline_demo"))
+        .output()
+        .expect("run cli build pipeline binary");
     assert_eq!(binary.status.code(), Some(0));
 }

@@ -283,6 +283,14 @@ pub(super) fn write_nsld_final_output_text_fields<W: fmt::Write>(
     )?;
     writeln!(
         out,
+        "  nsld_final_executable_output_debugger_transcript_next_command: {}",
+        final_output
+            .nsdb_replay_next_command
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
         "  nsld_final_executable_output_debugger_transcript_first_blocker: {}",
         final_output
             .debugger_transcript_first_blocker

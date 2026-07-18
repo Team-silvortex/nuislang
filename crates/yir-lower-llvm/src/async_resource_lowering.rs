@@ -50,9 +50,28 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 ));
                 return true;
             };
+            let runtime_handle = match &value_ref {
+                LlvmValueRef::DeferredTaskThunkI64 { callee, argument } => {
+                    let handle = fresh_reg(&mut state.next_reg);
+                    state.body.push(format!(
+                        "  {handle} = call i64 @nuis_scheduler_task_spawn_thunk_i64_v1(ptr @nuis_fn_{callee}, i64 {argument})"
+                    ));
+                    Some(handle)
+                }
+                _ => {
+                    coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg).map(|payload| {
+                        let handle = fresh_reg(&mut state.next_reg);
+                        state.body.push(format!(
+                            "  {handle} = call i64 @nuis_scheduler_task_spawn_i64_v1(i64 {payload})"
+                        ));
+                        handle
+                    })
+                }
+            };
             state.registers.insert(
                 node.name.clone(),
                 LlvmValueRef::Task(TaskLlvmValueRef {
+                    runtime_handle,
                     value: Box::new(value_ref.clone()),
                 }),
             );
@@ -95,6 +114,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
             state.registers.insert(
                 node.name.clone(),
                 LlvmValueRef::Task(TaskLlvmValueRef {
+                    runtime_handle: task.runtime_handle,
                     value: task.value.clone(),
                 }),
             );
@@ -109,10 +129,19 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 ));
                 return true;
             };
+            let runtime_state = task.runtime_handle.as_ref().map(|handle| {
+                let result_state = fresh_reg(&mut state.next_reg);
+                state.body.push(format!(
+                    "  {result_state} = call i64 @nuis_scheduler_task_join_state_v1(i64 {handle})"
+                ));
+                result_state
+            });
             state.registers.insert(
                 node.name.clone(),
                 LlvmValueRef::TaskResult(TaskResultLlvmValueRef {
                     state: "completed".to_owned(),
+                    runtime_state,
+                    runtime_handle: task.runtime_handle,
                     value: Some(task.value),
                 }),
             );
@@ -131,6 +160,8 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 node.name.clone(),
                 LlvmValueRef::TaskResult(TaskResultLlvmValueRef {
                     state: "completed".to_owned(),
+                    runtime_state: None,
+                    runtime_handle: None,
                     value: Some(thread.value),
                 }),
             );
@@ -177,13 +208,27 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 ));
                 return true;
             };
-            let i1 = match node.op.instruction.as_str() {
-                "task_completed" if result.state == "completed" => "true",
-                "task_timed_out" if result.state == "timed_out" => "true",
-                "task_cancelled" if result.state == "cancelled" => "true",
-                _ => "false",
-            }
-            .to_owned();
+            let wanted_state = match node.op.instruction.as_str() {
+                "task_completed" => 1,
+                "task_timed_out" => 2,
+                "task_cancelled" => 3,
+                _ => unreachable!(),
+            };
+            let (i1, known) = if let Some(runtime_state) = result.runtime_state {
+                let compared = fresh_reg(&mut state.next_reg);
+                state.body.push(format!(
+                    "  {compared} = icmp eq i64 {runtime_state}, {wanted_state}"
+                ));
+                (compared, None)
+            } else {
+                let value = match node.op.instruction.as_str() {
+                    "task_completed" if result.state == "completed" => true,
+                    "task_timed_out" if result.state == "timed_out" => true,
+                    "task_cancelled" if result.state == "cancelled" => true,
+                    _ => false,
+                };
+                (value.to_string(), Some(value))
+            };
             let widened = fresh_reg(&mut state.next_reg);
             state
                 .body
@@ -195,7 +240,9 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                     i64: widened.clone(),
                 },
             );
-            state.facts.record_bool(node.name.clone(), i1 == "true");
+            if let Some(known) = known {
+                state.facts.record_bool(node.name.clone(), known);
+            }
             state.last_cpu_value = Some(widened);
             true
         }
@@ -207,13 +254,24 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 ));
                 return true;
             };
-            let Some(value_ref) = result.value.map(|value| *value) else {
+            let Some(mut value_ref) = result.value.map(|value| *value) else {
                 state.body.push(format!(
                     "  ; deferred lowering for cpu.task_value `{}` because its result carries no payload",
                     node.name
                 ));
                 return true;
             };
+            if let (
+                Some(handle),
+                LlvmValueRef::I64(_) | LlvmValueRef::DeferredTaskThunkI64 { .. },
+            ) = (result.runtime_handle, &value_ref)
+            {
+                let payload = fresh_reg(&mut state.next_reg);
+                state.body.push(format!(
+                    "  {payload} = call i64 @nuis_scheduler_task_value_i64_v1(i64 {handle})"
+                ));
+                value_ref = LlvmValueRef::I64(payload);
+            }
             state.registers.insert(node.name.clone(), value_ref.clone());
             if let Some(as_i64) = coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg) {
                 state.last_cpu_value = Some(as_i64);

@@ -41,7 +41,7 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
         replay_summary.replayable_checkpoint_count;
     report.final_output_nsdb_replay_command = report.final_output_nsdb_replay_ready.then(|| {
         format!(
-            "nsdb replay-plan {} --json",
+            "nsdb replay {} --json",
             shell_quote_path(output_dir_from_handoff_path(
                 &report.final_output_nsdb_handoff_path
             ))

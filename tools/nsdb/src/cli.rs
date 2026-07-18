@@ -20,6 +20,11 @@ pub(crate) enum Command {
         json: bool,
         event_filter: NsdbPayloadExecutionEventFilter,
     },
+    Replay {
+        input: PathBuf,
+        json: bool,
+        event_filter: NsdbPayloadExecutionEventFilter,
+    },
     MaterializeProviderSamples {
         output_dir: PathBuf,
         provider_family: Option<String>,
@@ -65,6 +70,14 @@ where
                 event_filter,
             })
         }
+        "replay" => {
+            let (input, json, event_filter) = parse_input_json_event_filter(args.by_ref())?;
+            Ok(Command::Replay {
+                input,
+                json,
+                event_filter,
+            })
+        }
         "materialize-provider-samples" => {
             let (output_dir, provider_family, json) =
                 parse_provider_materialize_args(args.by_ref())?;
@@ -103,7 +116,7 @@ pub(crate) fn resolve_manifest_input(input: &Path) -> Result<PathBuf, String> {
 }
 
 fn usage() -> &'static str {
-    "usage:\n  nsdb status\n  nsdb inspect <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb events <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb replay-plan <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb materialize-provider-samples <artifact-output-dir> [--provider-family <family>] [--json]\n  nsdb execute-provider-samples <artifact-output-dir> [--provider-family <family>] [--json]"
+    "usage:\n  nsdb status\n  nsdb inspect <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb events <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb replay-plan <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb replay <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb materialize-provider-samples <artifact-output-dir> [--provider-family <family>] [--json]\n  nsdb execute-provider-samples <artifact-output-dir> [--provider-family <family>] [--json]"
 }
 
 fn parse_provider_materialize_args<I>(
@@ -264,6 +277,32 @@ mod tests {
                     status: None,
                     phase: Some("container-loader-handoff".to_owned()),
                     trace_id: None,
+                },
+            })
+        );
+    }
+
+    #[test]
+    fn parses_replay_command_with_filters() {
+        let command = parse_args(
+            vec![
+                "replay".to_owned(),
+                "out".to_owned(),
+                "--json".to_owned(),
+                "--trace-id".to_owned(),
+                "trace-1".to_owned(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(
+            command,
+            Ok(Command::Replay {
+                input: PathBuf::from("out"),
+                json: true,
+                event_filter: NsdbPayloadExecutionEventFilter {
+                    status: None,
+                    phase: None,
+                    trace_id: Some("trace-1".to_owned()),
                 },
             })
         );

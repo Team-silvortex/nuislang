@@ -18,6 +18,8 @@ pub(crate) fn nsdb_replay_plan_json(report: &NsdbInspectReport) -> String {
     } else {
         "resolve-nsdb-yir-replay-transcript"
     };
+    let debugger_transcript_next_command = debugger_transcript_ready
+        .then(|| format!("nsdb replay {} --json", shell_quote(&report.manifest)));
     let fields = vec![
         json_string_field("tool", "nsdb"),
         json_string_field("kind", "nsdb_payload_execution_replay_plan"),
@@ -79,6 +81,10 @@ pub(crate) fn nsdb_replay_plan_json(report: &NsdbInspectReport) -> String {
             debugger_transcript_next_action,
         ),
         json_optional_string_field(
+            "debugger_transcript_next_command",
+            debugger_transcript_next_command.as_deref(),
+        ),
+        json_optional_string_field(
             "debugger_transcript_first_blocker",
             plan.first_blocker.as_deref(),
         ),
@@ -95,6 +101,16 @@ pub(crate) fn nsdb_replay_plan_json(report: &NsdbInspectReport) -> String {
         ),
     ];
     format!("{{{}}}", fields.join(","))
+}
+
+fn shell_quote(path: &str) -> String {
+    if path.chars().all(|character| {
+        character.is_ascii_alphanumeric() || matches!(character, '/' | '.' | '_' | '-' | ':')
+    }) {
+        path.to_owned()
+    } else {
+        format!("'{}'", path.replace('\'', "'\\''"))
+    }
 }
 
 fn replay_checkpoints_json(checkpoints: &[NsdbReplayCheckpoint]) -> String {

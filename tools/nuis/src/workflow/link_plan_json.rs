@@ -369,6 +369,10 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
             closure_summary.debugger_transcript_next_action.as_deref(),
         ),
         crate::json_optional_string_field(
+            "closure_summary_debugger_transcript_next_command",
+            closure_summary.debugger_transcript_next_command.as_deref(),
+        ),
+        crate::json_optional_string_field(
             "closure_summary_debugger_transcript_first_blocker",
             closure_summary.debugger_transcript_first_blocker.as_deref(),
         ),

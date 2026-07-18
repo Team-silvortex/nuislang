@@ -770,7 +770,7 @@ galaxy = ["pixelmagic=workspace"]
     assert!(json.contains("\"kind\":\"nuis_project_metadata\""));
     assert!(json.contains("\"source_kind\":\"project-source\""));
     assert!(json.contains("\"project_name\":\"inspect_project_metadata_source_json\""));
-    assert!(json.contains("\"imports_library_count\":15"));
+    assert!(json.contains("\"imports_library_count\":18"));
     assert!(json.contains("\"galaxy_count\":3"));
     assert!(json.contains("\"host_ffi_symbol_count\":0"));
     assert!(json.contains("\"host_ffi_policy_count\":0"));

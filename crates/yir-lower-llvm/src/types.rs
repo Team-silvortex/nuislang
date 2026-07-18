@@ -9,6 +9,7 @@ pub(crate) enum LlvmValueRef {
     I64(String),
     F32(String),
     F64(String),
+    DeferredTaskThunkI64 { callee: String, argument: String },
     Task(TaskLlvmValueRef),
     Thread(ThreadLlvmValueRef),
     TaskResult(TaskResultLlvmValueRef),
@@ -39,6 +40,7 @@ pub(crate) struct NetworkResultLlvmValueRef {
 }
 #[derive(Clone)]
 pub(crate) struct TaskLlvmValueRef {
+    pub(crate) runtime_handle: Option<String>,
     pub(crate) value: Box<LlvmValueRef>,
 }
 #[derive(Clone)]
@@ -48,6 +50,8 @@ pub(crate) struct ThreadLlvmValueRef {
 #[derive(Clone)]
 pub(crate) struct TaskResultLlvmValueRef {
     pub(crate) state: String,
+    pub(crate) runtime_state: Option<String>,
+    pub(crate) runtime_handle: Option<String>,
     pub(crate) value: Option<Box<LlvmValueRef>>,
 }
 #[derive(Clone)]

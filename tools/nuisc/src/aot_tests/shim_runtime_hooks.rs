@@ -16,6 +16,15 @@ fn c_shim_source_includes_native_cli_runtime_hooks() {
     assert!(shim.contains("static int64_t nuis_lifecycle_on_bridge_bind_v1(void)"));
     assert!(shim.contains("static int64_t nuis_lifecycle_on_scheduler_tick_v1(int64_t tick)"));
     assert!(shim.contains("static int64_t nuis_lifecycle_on_task_poll_v1(void)"));
+    assert!(shim.contains("static int64_t nuis_scheduler_task_states[256];"));
+    assert!(shim.contains("static NuisSchedulerTaskThunkI64 nuis_scheduler_task_thunks_i64[256];"));
+    assert!(shim.contains("nuis_scheduler_task_states[index] = 1;"));
+    assert!(shim.contains("int64_t nuis_scheduler_task_spawn_i64_v1(int64_t payload)"));
+    assert!(shim.contains("int64_t nuis_scheduler_task_spawn_thunk_i64_v1("));
+    assert!(shim.contains("nuis_scheduler_task_thunks_i64[index]("));
+    assert!(shim.contains("int64_t nuis_scheduler_task_join_state_v1(int64_t task_handle)"));
+    assert!(shim.contains("int64_t nuis_scheduler_task_value_i64_v1(int64_t task_handle)"));
+    assert!(shim.contains("(void)nuis_lifecycle_tick_once_v1();"));
     assert!(shim.contains("static int64_t nuis_lifecycle_on_result_commit_v1(int64_t status)"));
     assert!(shim.contains("static int64_t nuis_lifecycle_on_summary_flush_v1(void)"));
     assert!(shim.contains("static int64_t nuis_lifecycle_sample_network_bridge_progress_v1(void)"));

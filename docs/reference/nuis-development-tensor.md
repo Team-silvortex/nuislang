@@ -444,12 +444,15 @@ only report output. `std_language_build_pipeline_demo` extends that route into
 a four-stage prepare/check/compile/package gate through
 `StdCliContracts.build_pipeline_total` with no LLVM deferred-lowering notes.
 `std_language_task_cli_demo` then carries the same surface into a task-backed
-CLI path through `StdTaskContracts` and real stdout output; its staged CPU
-task intrinsic lowering now carries `timeout -> join_result -> task_value`
-without LLVM deferred-lowering notes. The remaining task/native closure gap is
-real scheduler/runtime semantics beyond this synchronous AOT bridge, plus
-folding the language build-pipeline gate back into the larger build-pipeline
-companion.
+CLI path through `StdTaskContracts` and real stdout output. Scalar task payloads
+now cross the native scheduler ABI as pending handles. Unary
+`async fn(i64) -> i64` bodies are emitted as deferred helper thunks, invoked by
+task polling on the next lifecycle tick, committed as completed, and read
+through the runtime handle without LLVM deferred-lowering notes. The larger
+`cli_build_pipeline_demo` also retains its auto-injected language gate through
+native LLVM execution. The remaining task/native closure gap is runtime timeout
+and cancellation transitions plus scheduler thunk ABIs for additional scalar
+signatures and aggregate payloads.
 
 The Nustar checks anchor the bootstrap-critical
 `heterogeneous-runtime/nustar/registered-domain-contracts` cell to:

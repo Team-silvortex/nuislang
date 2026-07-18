@@ -11,7 +11,6 @@ fn workflow_docs_define_closure_then_tensor_reading_order() {
     assert!(workflow_doc.contains("frontdoor_sample_tensor_handoff"));
     assert!(workflow_doc.contains("dev_tensor_weakest_task_card_*"));
     assert!(workflow_doc.contains("dev_tensor_weakest_task_card_handoff_*"));
-    assert!(workflow_doc.contains("artifact closure work and tensor-driven"));
 }
 
 #[test]
@@ -473,14 +472,13 @@ mod cpu Main {
         .contains("\"nsld_final_executable_output_nsdb_replay_status\":\"replay-evidence-ready\""));
     assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_checkpoint_count\":1"));
     assert!(json.contains("\"nsld_final_executable_output_nsdb_replayable_checkpoint_count\":1"));
-    assert!(
-        json.contains("\"nsld_final_executable_output_nsdb_replay_command\":\"nsdb replay-plan ")
-    );
+    assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_command\":\"nsdb replay "));
     assert!(json.contains(
         "\"nsld_final_executable_output_nsdb_replay_next_action\":\"replay-nsdb-payload-execution\""
     ));
-    assert!(json
-        .contains("\"nsld_final_executable_output_nsdb_replay_next_command\":\"nsdb replay-plan "));
+    assert!(
+        json.contains("\"nsld_final_executable_output_nsdb_replay_next_command\":\"nsdb replay ")
+    );
     assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_first_blocker\":null"));
     for needle in [
         "\"nsld_final_executable_output_object_package_contract\":\"nsld-object-package-summary-v1\"",
@@ -489,10 +487,12 @@ mod cpu Main {
         "\"nsld_final_executable_output_debugger_transcript_contract\":\"nsdb-yir-replay-transcript-v1\"",
         "\"nsld_final_executable_output_debugger_transcript_ready\":true",
         "\"nsld_final_executable_output_debugger_transcript_status\":\"transcript-ready\"",
+        "\"nsld_final_executable_output_debugger_transcript_next_command\":\"nsdb replay ",
         "\"closure_summary_object_package_ready\":true",
         "\"closure_summary_debugger_transcript_contract\":\"nsdb-yir-replay-transcript-v1\"",
         "\"closure_summary_debugger_transcript_ready\":true",
         "\"closure_summary_debugger_transcript_status\":\"transcript-ready\"",
+        "\"closure_summary_debugger_transcript_next_command\":\"nsdb replay ",
     ] {
         assert!(json.contains(needle));
     }

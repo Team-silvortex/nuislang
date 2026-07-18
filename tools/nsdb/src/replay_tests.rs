@@ -721,6 +721,14 @@ next_action = "execute-provider-sample"
         rejected_plan.checkpoints[1].value_sample_materialization_status,
         "provider-sample-blocked"
     );
+    let rejected_transcript = crate::transcript::build_replay_transcript(&rejected_report);
+    assert_eq!(rejected_transcript.status, "transcript-blocked");
+    assert!(!rejected_transcript.ready);
+    assert_eq!(rejected_transcript.replayed_checkpoint_count, 0);
+    assert!(rejected_transcript
+        .frames
+        .iter()
+        .all(|frame| !frame.consumed));
 
     let replay_json = crate::json::nsdb_replay_plan_json(&report);
     assert!(replay_json
@@ -778,11 +786,28 @@ next_action = "execute-provider-sample"
     assert!(ready_plan.checkpoints[1]
         .value_sample_materialization_detail
         .contains("deterministic-provider-sample-artifact"));
+    let ready_transcript = crate::transcript::build_replay_transcript(&report);
+    assert_eq!(ready_transcript.status, "transcript-consumed");
+    assert!(ready_transcript.ready);
+    assert_eq!(ready_transcript.checkpoint_count, 2);
+    assert_eq!(ready_transcript.replayed_checkpoint_count, 2);
+    assert!(ready_transcript.frames.iter().all(|frame| frame.consumed));
+    let ready_transcript_json = crate::json_transcript::nsdb_replay_transcript_json(&report);
+    assert!(ready_transcript_json.contains("\"kind\":\"nsdb_yir_replay_transcript\""));
+    assert!(ready_transcript_json
+        .contains("\"debugger_transcript_contract\":\"nsdb-yir-replay-transcript-v1\""));
+    assert!(
+        ready_transcript_json.contains("\"debugger_transcript_status\":\"transcript-consumed\"")
+    );
+    assert!(ready_transcript_json.contains("\"debugger_transcript_ready\":true"));
+    assert!(ready_transcript_json.contains("\"debugger_transcript_replayed_checkpoint_count\":2"));
+    assert!(ready_transcript_json.contains("\"consumed\":true"));
     let ready_replay_json = crate::json::nsdb_replay_plan_json(&report);
     assert!(ready_replay_json.contains("\"debugger_transcript_status\":\"transcript-ready\""));
     assert!(ready_replay_json.contains("\"debugger_transcript_ready\":true"));
     assert!(ready_replay_json
         .contains("\"debugger_transcript_next_action\":\"consume-nsdb-yir-replay-transcript\""));
+    assert!(ready_replay_json.contains("\"debugger_transcript_next_command\":\"nsdb replay "));
     assert!(ready_replay_json.contains("\"debugger_transcript_first_blocker\":null"));
 
     let mut pending_closure_report = report.clone();

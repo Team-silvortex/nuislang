@@ -34,6 +34,22 @@ pub(super) fn emit_cpu_function(
     function_return_kind: CpuCallScalarKind,
     global_counter: &mut usize,
 ) -> Result<EmittedCpuFunction, String> {
+    let ordered_names = ordered_node_names.iter().collect::<BTreeSet<_>>();
+    let deferred_task_calls = ordered_node_names
+        .iter()
+        .filter_map(|node_name| module.nodes.iter().find(|node| &node.name == node_name))
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "spawn_task")
+        .filter_map(|node| node.op.args.get(1))
+        .filter(|call_name| ordered_names.contains(call_name))
+        .filter(|call_name| {
+            module.nodes.iter().any(|candidate| {
+                &candidate.name == *call_name
+                    && candidate.op.module == "cpu"
+                    && candidate.op.instruction == "call_i64"
+            })
+        })
+        .cloned()
+        .collect::<BTreeSet<_>>();
     let mut state = LlvmLoweringState {
         body: Vec::new(),
         globals: Vec::new(),
@@ -182,6 +198,7 @@ pub(super) fn emit_cpu_function(
             body,
             registers,
             helper_signatures,
+            &deferred_task_calls,
             &mut next_reg,
             last_cpu_value,
         )? {

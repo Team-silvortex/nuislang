@@ -47,6 +47,16 @@ pub(crate) fn lower_cpu_guard_return_node(
                     ));
                 return Ok(GuardReturnLoweringOutcome::Continue);
             };
+            if matches!(
+                return_value,
+                LlvmValueRef::Struct(_) | LlvmValueRef::VariantUnion(_)
+            ) {
+                body.push(format!(
+                    "  ; structural cpu.guard_return `{}` is resolved by downstream fieldwise selection",
+                    node.name
+                ));
+                return Ok(GuardReturnLoweringOutcome::Continue);
+            }
             let Some(returned) = coerce_to_i64(&return_value, body, next_reg) else {
                 body.push(format!(
                         "  ; deferred lowering for cpu.guard_return `{}` because its return value is not coercible to i64",

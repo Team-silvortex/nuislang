@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use yir_core::Node;
 
@@ -14,6 +14,7 @@ pub(crate) fn lower_cpu_call_node(
     body: &mut Vec<String>,
     registers: &mut BTreeMap<String, LlvmValueRef>,
     helper_signatures: &BTreeMap<String, CpuHelperSignature>,
+    deferred_task_calls: &BTreeSet<String>,
     next_reg: &mut usize,
     last_cpu_value: &mut Option<String>,
 ) -> Result<bool, String> {
@@ -56,6 +57,25 @@ pub(crate) fn lower_cpu_call_node(
         ));
         return Ok(true);
     };
+
+    if deferred_task_calls.contains(&node.name)
+        && node.op.instruction == "call_i64"
+        && signature.ret == CpuCallScalarKind::I64
+        && signature.params.as_slice() == [CpuCallScalarKind::I64]
+    {
+        let argument = lowered_args[0]
+            .strip_prefix("i64 ")
+            .expect("i64 helper argument should carry its LLVM ABI type")
+            .to_owned();
+        registers.insert(
+            node.name.clone(),
+            LlvmValueRef::DeferredTaskThunkI64 {
+                callee: callee.clone(),
+                argument,
+            },
+        );
+        return Ok(true);
+    }
 
     let reg = fresh_reg(next_reg);
     let symbol = format!("nuis_fn_{callee}");

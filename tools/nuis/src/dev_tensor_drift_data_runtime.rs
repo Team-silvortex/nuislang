@@ -350,6 +350,26 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
             ],
         },
     DevTensorDriftCheckSpec {
+            id: "nsdb-yir-replay-transcript-consumer",
+            path: "tools/nsdb/src/transcript.rs",
+            required_patterns: &[
+                "nsdb-yir-replay-transcript-v1",
+                "transcript-consumed",
+                "transcript-blocked",
+                "replayed_checkpoint_count",
+                "build_replay_transcript",
+            ],
+        },
+    DevTensorDriftCheckSpec {
+            id: "frontdoor-debugger-transcript-command-handoff",
+            path: "tools/nuis/src/closure_summary.rs",
+            required_patterns: &[
+                "debugger_transcript_next_command",
+                "closure_summary_debugger_transcript_next_command",
+                "nsdb_replay_next_command",
+            ],
+        },
+    DevTensorDriftCheckSpec {
             id: "nsdb-provider-sample-materializer",
             path: "tools/nsdb/src/provider_sample_materialize.rs",
             required_patterns: &[
@@ -688,7 +708,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
                 "host_stderr_write",
             ],
         },
-        DevTensorDriftCheckSpec {
+    DevTensorDriftCheckSpec {
             id: "official-galaxy-hetero-smoke",
             path: "tools/nuis/tests/official_galaxy_hetero_smoke.rs",
             required_patterns: &[
@@ -721,6 +741,17 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
             ],
         },
     DevTensorDriftCheckSpec {
+            id: "nsdb-metal-provider-runner",
+            path: "tools/nsdb/src/provider_runner_metal.rs",
+            required_patterns: &[
+                "nuis-metal-provider-runner-v1",
+                "metal-command-buffer-completed",
+                "execute_u32_add",
+                "Metal provider runner",
+                "remove_file",
+            ],
+        },
+    DevTensorDriftCheckSpec {
             id: "std-tooling-doc-smoke-chain",
             path: "examples/projects/tooling/README.md",
             required_patterns: &[
@@ -749,6 +780,32 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
                 "cli_report_file_demo",
                 "StdReportContracts",
                 "argv -> file.read -> buffer",
+            ],
+        },
+    DevTensorDriftCheckSpec {
+            id: "scheduler-backed-task-result-lowering",
+            path: "crates/yir-lower-llvm/src/async_resource_lowering.rs",
+            required_patterns: &[
+                "@nuis_scheduler_task_spawn_i64_v1",
+                "@nuis_scheduler_task_spawn_thunk_i64_v1",
+                "@nuis_scheduler_task_join_state_v1",
+                "@nuis_scheduler_task_value_i64_v1",
+                "DeferredTaskThunkI64",
+                "runtime_state",
+                "runtime_handle",
+            ],
+        },
+    DevTensorDriftCheckSpec {
+            id: "scheduler-backed-task-result-runtime",
+            path: "tools/nuisc/src/aot_c_shim_runtime.rs",
+            required_patterns: &[
+                "nuis_scheduler_task_states[256]",
+                "nuis_scheduler_task_spawn_i64_v1",
+                "nuis_scheduler_task_spawn_thunk_i64_v1",
+                "nuis_scheduler_task_join_state_v1",
+                "nuis_scheduler_task_value_i64_v1",
+                "NuisSchedulerTaskThunkI64",
+                "nuis_lifecycle_tick_once_v1",
             ],
         },
     DevTensorDriftCheckSpec {

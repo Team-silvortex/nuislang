@@ -104,6 +104,12 @@ At the current repository stage, `PixelMagic` already has:
 * an explicit shared image-op contract in stdlib form
 * a checked-in project-shaped domain pipeline
 * shader/data/cpu cooperation through the current packet/resource/render route
+* a registered Metal provider runner that submits a real compute command buffer
+  on macOS and records the Metal device plus output evidence
+
+The current native sample deliberately proves the backend boundary with a
+scalar image-byte-count operation. It is real Metal execution, but it is not
+yet a full PGM pixel-buffer upload, filter dispatch, and readback pipeline.
 
 ## What Is Not Done Yet
 
@@ -114,6 +120,7 @@ At the current repository stage, `PixelMagic` already has:
 * a real import-based package workflow
 * a finished public filter family API
 * a backend-complete texture upload/runtime contract
+* full image-buffer execution through the current Metal provider runner
 
 ## Reading Order
 

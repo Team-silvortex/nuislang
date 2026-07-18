@@ -339,7 +339,7 @@ fn nsld_final_executable_output_nsdb_replay(
         handoff.error().map(ToOwned::to_owned)
     };
     let ready = first_blocker.is_none();
-    let command = ready.then(|| format!("nsdb replay-plan {} --json", plan.output_dir));
+    let command = ready.then(|| format!("nsdb replay {} --json", plan.output_dir));
     let next_action = if ready {
         "replay-nsdb-payload-execution"
     } else {

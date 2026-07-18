@@ -299,10 +299,30 @@ fn assert_official_galaxy_hetero_build(
             executed.first_output_payload_native_output_kind,
             "pixelmagic-image-bytes"
         );
-        assert_eq!(
-            executed.first_output_payload_native_output_status,
-            "deterministic-provider-output-ready"
-        );
+        if executed.first_provider_execution_mode == "real-device-provider-runner" {
+            assert_eq!(
+                executed.first_output_payload_native_output_status,
+                "metal-api-output-ready"
+            );
+            assert_eq!(
+                executed.first_output_payload_native_execution_contract,
+                "nuis-metal-provider-runner-v1"
+            );
+            assert_eq!(
+                executed.first_output_payload_native_execution_status,
+                "metal-command-buffer-completed"
+            );
+            assert_ne!(executed.first_output_payload_native_device, "none");
+        } else {
+            assert_eq!(
+                executed.first_output_payload_native_output_status,
+                "deterministic-provider-output-ready"
+            );
+            assert_eq!(
+                executed.first_output_payload_native_execution_contract,
+                "nuis-deterministic-provider-output-v1"
+            );
+        }
         assert_eq!(executed.first_output_payload_native_output_bytes, "24");
         assert!(executed
             .first_output_payload_native_output_hash
@@ -422,11 +442,18 @@ fn assert_official_galaxy_hetero_build(
         assert!(provider_samples.contains(&format!(
             "provider_output_payload_evidence = \"nuis.nsdb.provider-output.{provider_family_artifact}.toml:hash=0x"
         )));
+        let expected_payload_kind = if expects_std_pgm_marker
+            && executed.first_output_payload_native_output_status == "metal-api-output-ready"
+        {
+            "output_payload_kind = \"real-device-api-output\""
+        } else {
+            "output_payload_kind = \"real-device-adapter-output\""
+        };
         assert_file_contains(
             &output_dir.join(format!(
                 "nuis.nsdb.provider-output.{provider_family_artifact}.toml"
             )),
-            "output_payload_kind = \"real-device-adapter-output\"",
+            expected_payload_kind,
             "official galaxy provider output payload",
         );
     }
@@ -473,6 +500,16 @@ fn assert_official_galaxy_hetero_build(
             &provider_output_payload_path,
             "native_output_bytes = \"24\"",
             "official galaxy provider output payload native output bytes",
+        );
+        assert_file_contains(
+            &provider_output_payload_path,
+            "native_output_execution_contract = \"",
+            "official galaxy provider output payload native execution contract",
+        );
+        assert_file_contains(
+            &provider_output_payload_path,
+            "native_output_device = \"",
+            "official galaxy provider output payload native device",
         );
     }
     assert!(provider_samples

@@ -439,3 +439,45 @@ pub(crate) fn print_nsdb_replay_plan(report: &NsdbInspectReport) {
         );
     }
 }
+
+pub(crate) fn print_nsdb_replay_transcript(report: &NsdbInspectReport) {
+    let transcript = crate::transcript::build_replay_transcript(report);
+    println!("Nsdb YIR replay transcript");
+    println!("  manifest: {}", report.manifest);
+    println!("  debugger_transcript_contract: {}", transcript.protocol);
+    println!(
+        "  debugger_transcript_source_contract: {}",
+        transcript.source_contract
+    );
+    println!("  debugger_transcript_status: {}", transcript.status);
+    println!("  debugger_transcript_ready: {}", transcript.ready);
+    println!(
+        "  debugger_transcript_checkpoint_count: {}",
+        transcript.checkpoint_count
+    );
+    println!(
+        "  debugger_transcript_replayed_checkpoint_count: {}",
+        transcript.replayed_checkpoint_count
+    );
+    println!(
+        "  debugger_transcript_first_blocker: {}",
+        transcript.first_blocker.as_deref().unwrap_or("<none>")
+    );
+    for frame in transcript.frames {
+        println!(
+            "  debugger_transcript_frame: index={} trace={} frame={} kind={} phase={} entry={} replay={} consumed={} slot={} snapshot={} value={} next={}",
+            frame.index,
+            frame.trace_id,
+            frame.frame_id,
+            frame.checkpoint_kind,
+            frame.execution_phase,
+            frame.entry_symbol,
+            frame.replay_status,
+            frame.consumed,
+            frame.value_slot_id,
+            frame.value_snapshot_status,
+            frame.value_content_status,
+            frame.next_action
+        );
+    }
+}

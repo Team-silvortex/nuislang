@@ -4,8 +4,10 @@ mod handoff;
 mod hetero_trace;
 mod json;
 mod json_replay;
+mod json_transcript;
 mod model;
 mod payload_decoder;
+mod provider_runner_metal;
 mod provider_runner_registry;
 mod provider_sample;
 mod provider_sample_execute;
@@ -18,11 +20,16 @@ mod replay;
 mod replay_tests;
 mod report;
 mod sidecar;
+mod transcript;
 
 use crate::{
     cli::{parse_args, resolve_manifest_input, Command},
-    display::{print_nsdb_events_report, print_nsdb_inspect_report, print_nsdb_replay_plan},
+    display::{
+        print_nsdb_events_report, print_nsdb_inspect_report, print_nsdb_replay_plan,
+        print_nsdb_replay_transcript,
+    },
     json::{nsdb_events_report_json, nsdb_inspect_report_json, nsdb_replay_plan_json},
+    json_transcript::nsdb_replay_transcript_json,
     provider_sample_execute::execute_provider_samples,
     provider_sample_materialize::{materialize_provider_samples, ProviderSampleMaterializeReport},
     report::nsdb_inspect_report,
@@ -86,6 +93,20 @@ fn run() -> Result<(), String> {
                 println!("{}", nsdb_replay_plan_json(&report));
             } else {
                 print_nsdb_replay_plan(&report);
+            }
+        }
+        Command::Replay {
+            input,
+            json,
+            event_filter,
+        } => {
+            let manifest = resolve_manifest_input(&input)?;
+            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
+            let report = nsdb_inspect_report(&manifest, &plan, event_filter);
+            if json {
+                println!("{}", nsdb_replay_transcript_json(&report));
+            } else {
+                print_nsdb_replay_transcript(&report);
             }
         }
         Command::MaterializeProviderSamples {
@@ -256,6 +277,18 @@ fn run() -> Result<(), String> {
                     report.first_output_payload_native_output_hash
                 );
                 println!(
+                    "device_provider_sample_execute_first_output_payload_native_execution_contract: {}",
+                    report.first_output_payload_native_execution_contract
+                );
+                println!(
+                    "device_provider_sample_execute_first_output_payload_native_execution_status: {}",
+                    report.first_output_payload_native_execution_status
+                );
+                println!(
+                    "device_provider_sample_execute_first_output_payload_native_device: {}",
+                    report.first_output_payload_native_device
+                );
+                println!(
                     "device_provider_sample_execute_next_action: {}",
                     report.next_action
                 );
@@ -315,7 +348,7 @@ fn provider_sample_execute_json(
     report: &provider_sample_execute::ProviderSampleExecuteReport,
 ) -> String {
     format!(
-        "{{\"tool\":\"nsdb\",\"kind\":\"device_provider_sample_execute\",\"status\":\"{}\",\"provider_family_filter\":{},\"provider_families\":{},\"record_count\":{},\"matched_record_count\":{},\"executable_record_count\":{},\"output_payload_count\":{},\"first_provider_family\":\"{}\",\"first_provider_runner_adapter_id\":\"{}\",\"first_provider_runner_adapter_capability_status\":\"{}\",\"first_provider_runner_real_device_capable\":{},\"first_provider_runner_real_device_probe_status\":\"{}\",\"first_provider_execution_mode\":\"{}\",\"first_output_payload_evidence\":\"{}\",\"first_output_payload_comparison_contract\":\"{}\",\"first_output_payload_comparison_status\":\"{}\",\"first_output_payload_input_evidence\":\"{}\",\"first_output_payload_input_evidence_hash\":\"{}\",\"first_output_payload_native_output_kind\":\"{}\",\"first_output_payload_native_output_status\":\"{}\",\"first_output_payload_native_output_bytes\":\"{}\",\"first_output_payload_native_output_hash\":\"{}\",\"next_action\":\"{}\",\"next_command\":\"{}\"}}",
+        "{{\"tool\":\"nsdb\",\"kind\":\"device_provider_sample_execute\",\"status\":\"{}\",\"provider_family_filter\":{},\"provider_families\":{},\"record_count\":{},\"matched_record_count\":{},\"executable_record_count\":{},\"output_payload_count\":{},\"first_provider_family\":\"{}\",\"first_provider_runner_adapter_id\":\"{}\",\"first_provider_runner_adapter_capability_status\":\"{}\",\"first_provider_runner_real_device_capable\":{},\"first_provider_runner_real_device_probe_status\":\"{}\",\"first_provider_execution_mode\":\"{}\",\"first_output_payload_evidence\":\"{}\",\"first_output_payload_comparison_contract\":\"{}\",\"first_output_payload_comparison_status\":\"{}\",\"first_output_payload_input_evidence\":\"{}\",\"first_output_payload_input_evidence_hash\":\"{}\",\"first_output_payload_native_output_kind\":\"{}\",\"first_output_payload_native_output_status\":\"{}\",\"first_output_payload_native_output_bytes\":\"{}\",\"first_output_payload_native_output_hash\":\"{}\",\"first_output_payload_native_execution_contract\":\"{}\",\"first_output_payload_native_execution_status\":\"{}\",\"first_output_payload_native_device\":\"{}\",\"next_action\":\"{}\",\"next_command\":\"{}\"}}",
         json_escape(&report.status),
         json_optional_string(report.provider_family_filter.as_deref()),
         json_string_array(&report.provider_families),
@@ -338,6 +371,9 @@ fn provider_sample_execute_json(
         json_escape(&report.first_output_payload_native_output_status),
         json_escape(&report.first_output_payload_native_output_bytes),
         json_escape(&report.first_output_payload_native_output_hash),
+        json_escape(&report.first_output_payload_native_execution_contract),
+        json_escape(&report.first_output_payload_native_execution_status),
+        json_escape(&report.first_output_payload_native_device),
         json_escape(&report.next_action),
         json_escape(&report.next_command),
     )
@@ -504,6 +540,9 @@ mod tests {
             first_output_payload_native_output_status: "none".to_owned(),
             first_output_payload_native_output_bytes: "none".to_owned(),
             first_output_payload_native_output_hash: "none".to_owned(),
+            first_output_payload_native_execution_contract: "none".to_owned(),
+            first_output_payload_native_execution_status: "none".to_owned(),
+            first_output_payload_native_device: "none".to_owned(),
             next_action: "materialize-provider-samples".to_owned(),
             next_command: "nsdb materialize-provider-samples out --json".to_owned(),
         };
@@ -533,5 +572,8 @@ mod tests {
         assert!(json.contains("\"first_output_payload_input_evidence_hash\":\"0x1234\""));
         assert!(json.contains("\"first_output_payload_native_output_kind\":\"none\""));
         assert!(json.contains("\"first_output_payload_native_output_hash\":\"none\""));
+        assert!(json.contains("\"first_output_payload_native_execution_contract\":\"none\""));
+        assert!(json.contains("\"first_output_payload_native_execution_status\":\"none\""));
+        assert!(json.contains("\"first_output_payload_native_device\":\"none\""));
     }
 }

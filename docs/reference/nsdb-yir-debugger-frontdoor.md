@@ -31,6 +31,8 @@ cargo run -p nsdb -- events <artifact-output-dir>
 cargo run -p nsdb -- events <artifact-output-dir> --json --event-status ready
 cargo run -p nsdb -- replay-plan <artifact-output-dir>
 cargo run -p nsdb -- replay-plan <artifact-output-dir> --json --event-status blocked
+cargo run -p nsdb -- replay <artifact-output-dir>
+cargo run -p nsdb -- replay <artifact-output-dir> --json
 ```
 
 When given an output directory, `Nsdb` resolves
@@ -38,8 +40,8 @@ When given an output directory, `Nsdb` resolves
 
 ## Current Debug Model
 
-Current `Nsdb` output is an inspectable metadata view, not an interactive
-debugger yet.
+Current `Nsdb` output is an inspectable metadata and deterministic replay
+transcript view, not an interactive debugger yet.
 
 It reports:
 
@@ -74,6 +76,11 @@ It reports:
 * `replay_checkpoint_count`
 * `replayable_checkpoint_count`
 * `replay_checkpoints`
+* `debugger_transcript_contract = nsdb-yir-replay-transcript-v1` for `replay`
+* `debugger_transcript_status`
+* `debugger_transcript_checkpoint_count`
+* `debugger_transcript_replayed_checkpoint_count`
+* `debugger_transcript_frames`
 * `frame_id`, `slot_scope`, and `value_state_status` inside each replay
   checkpoint
 * `value_sample_contract`, `value_sample_ref`, and `value_sample_source` inside
@@ -132,6 +139,15 @@ current nsdb metadata can resolve that reference through payload handoff
 metadata, a visible domain, or a readable sidecar. This is not execution or
 time-travel debugging yet; it is the stable checkpoint skeleton that later YIR
 frame/value state can attach to.
+
+`replay` is the first consumer of that skeleton. It emits
+`nsdb-yir-replay-transcript-v1` only after the complete filtered checkpoint set
+is replayable and the heterogeneous execution closure is ready. Consumption is
+all-or-nothing: a blocked checkpoint produces `transcript-blocked` and zero
+consumed frames instead of a misleading partial replay. A ready transcript
+preserves checkpoint order and exposes each consumed YIR frame, value slot,
+snapshot summary, and next action. It is deterministic transcript consumption,
+not native instruction execution, breakpoints, or interactive stepping.
 
 `run-artifact` persists the device/runtime sample source as
 `nuis.nsdb.hetero-runtime-trace.toml` using

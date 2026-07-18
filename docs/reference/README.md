@@ -28,6 +28,7 @@ Start in this order:
 
 * `YIR` foundation
   - [nuis-development-tensor.md](nuis-development-tensor.md)
+  - [source-text-encoding-contract.md](source-text-encoding-contract.md)
   - [yir-reference.md](yir-reference.md)
   - [yir-langref.md](yir-langref.md)
   - [yir-tools-reference.md](yir-tools-reference.md)

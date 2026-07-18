@@ -22,6 +22,9 @@ pub(crate) struct PixelMagicNativeOutputSummary {
     pub(crate) status: String,
     pub(crate) bytes: String,
     pub(crate) hash: String,
+    pub(crate) execution_contract: String,
+    pub(crate) execution_status: String,
+    pub(crate) device: String,
 }
 
 const PROVIDER_OUTPUT_PAYLOAD_PROTOCOL: &str = "nuis-provider-output-payload-v1";
@@ -207,6 +210,7 @@ fn validate_provider_output_payload(
 pub(crate) fn render_real_device_provider_output_payload(
     record: &NsdbDeviceProviderSampleRecordInfo,
     adapter: &crate::provider_runner_registry::ProviderRunnerAdapter,
+    native_output: Option<&PixelMagicNativeOutputSummary>,
 ) -> String {
     let mut out = render_provider_output_payload_header(
         record,
@@ -218,11 +222,27 @@ pub(crate) fn render_real_device_provider_output_payload(
     push_toml_string(
         &mut out,
         "output_payload_kind",
-        "real-device-adapter-output",
+        if native_output.is_some() {
+            "real-device-api-output"
+        } else {
+            "real-device-adapter-output"
+        },
     );
-    push_toml_string(&mut out, "output_payload_status", "adapter-output-ready");
+    push_toml_string(
+        &mut out,
+        "output_payload_status",
+        if native_output.is_some() {
+            "native-api-output-ready"
+        } else {
+            "adapter-output-ready"
+        },
+    );
     push_toml_string(&mut out, "comparison_status", "ready-for-comparison");
-    push_pixelmagic_image_output_summary(&mut out, record);
+    if let Some(summary) = native_output {
+        push_pixelmagic_native_output_summary(&mut out, summary);
+    } else {
+        push_pixelmagic_image_output_summary(&mut out, record);
+    }
     out
 }
 
@@ -259,7 +279,32 @@ pub(crate) fn pixelmagic_native_output_summary(
         status: "deterministic-provider-output-ready".to_owned(),
         bytes: output_bytes.to_string(),
         hash: fnv1a64_hex(format!("{input_evidence}:{output_bytes}").as_bytes()),
+        execution_contract: "nuis-deterministic-provider-output-v1".to_owned(),
+        execution_status: "host-deterministic-output-ready".to_owned(),
+        device: "host-deterministic-fallback".to_owned(),
     })
+}
+
+pub(crate) fn pixelmagic_metal_output_summary(
+    input_evidence: &str,
+    execution: &crate::provider_runner_metal::MetalProviderExecution,
+) -> PixelMagicNativeOutputSummary {
+    let bytes = execution.output.to_string();
+    PixelMagicNativeOutputSummary {
+        kind: "pixelmagic-image-bytes".to_owned(),
+        status: "metal-api-output-ready".to_owned(),
+        hash: fnv1a64_hex(
+            format!(
+                "{input_evidence}:{}:{}:{bytes}",
+                execution.contract, execution.device
+            )
+            .as_bytes(),
+        ),
+        bytes,
+        execution_contract: execution.contract.to_owned(),
+        execution_status: execution.status.to_owned(),
+        device: execution.device.clone(),
+    }
 }
 
 fn push_pixelmagic_image_output_summary(
@@ -272,13 +317,31 @@ fn push_pixelmagic_image_output_summary(
         return;
     };
     push_toml_string(out, "comparison_input_kind", "std-preprocessed-pgm");
+    push_pixelmagic_native_output_summary(out, &summary);
+}
+
+fn push_pixelmagic_native_output_summary(
+    out: &mut String,
+    summary: &PixelMagicNativeOutputSummary,
+) {
     push_toml_string(out, "native_output_kind", &summary.kind);
     push_toml_string(out, "native_output_status", &summary.status);
     push_toml_string(out, "native_output_bytes", &summary.bytes);
     push_toml_string(out, "native_output_hash", &summary.hash);
+    push_toml_string(
+        out,
+        "native_output_execution_contract",
+        &summary.execution_contract,
+    );
+    push_toml_string(
+        out,
+        "native_output_execution_status",
+        &summary.execution_status,
+    );
+    push_toml_string(out, "native_output_device", &summary.device);
 }
 
-fn std_preprocessed_pgm_input_bytes(input_evidence: &str) -> Option<usize> {
+pub(crate) fn std_preprocessed_pgm_input_bytes(input_evidence: &str) -> Option<usize> {
     let marker = "std-preprocessed-pgm:input_bytes=";
     let start = input_evidence.find(marker)? + marker.len();
     let digits = input_evidence[start..]
@@ -433,7 +496,7 @@ mod tests {
             execution_mode: "real-device-provider-runner",
         };
 
-        let payload = render_real_device_provider_output_payload(&record, &adapter);
+        let payload = render_real_device_provider_output_payload(&record, &adapter, None);
 
         assert!(payload.contains("comparison_input_kind = \"std-preprocessed-pgm\""));
         assert!(payload.contains("native_output_kind = \"pixelmagic-image-bytes\""));
