@@ -5,7 +5,7 @@ use std::{
 
 use nuis_semantics::model::{
     nir_expr_effect_class, NirBinaryOp, NirExpr, NirExprEffectClass, NirFunction, NirKernelMapOp,
-    NirModule, NirStmt,
+    NirModule, NirStmt, NirStructDef,
 };
 use yir_core::{
     Edge, EdgeKind, Node, Operation, Resource, ResourceKind, SemanticOp, TaskLifecycleState,

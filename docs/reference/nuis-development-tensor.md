@@ -469,11 +469,15 @@ both completion-before-deadline and timeout-before-readiness behavior. The
 same smoke matrix also covers mixed `bool`/`i32` arguments, signed `i32`
 returns, and `bool` returns through the normalized eight-byte slot ABI. The
 same packed ABI now carries `f32` and `f64` by bit pattern rather than numeric
-conversion, with native exact-value smoke coverage. The remaining scheduler
-payload gap is aggregate layout materialization. The native shim now owns an
-explicit `NuisSchedulerOwnedPayloadV1` descriptor with size/alignment/type-id,
-move/drop hooks, one-shot take semantics, and terminal-path cleanup, but source
-structs remain virtual field SSA and therefore do not consume this ABI yet.
+conversion, with native exact-value smoke coverage. Flat non-empty source
+structs containing only scalar fields now materialize as stable eight-byte
+slots and consume the native `NuisSchedulerOwnedPayloadV1` ABI with
+deterministic type identity, one-shot take, and drop-hook cleanup. Native mixed
+`bool`/integer/float field coverage returns through reconstructed field SSA.
+The aggregate helper now remains a YIR `call_owned_struct` lane and executes
+from the lifecycle poll through an owned invoker, rather than being evaluated
+at submission. The remaining scheduler payload gap is explicit materialization
+failure state plus layouts for nested or ownership-bearing fields.
 Direct floating literals inside
 spawned calls still need stronger callee-parameter expected-type propagation;
 explicitly typed bindings currently preserve the intended `f32` boundary.

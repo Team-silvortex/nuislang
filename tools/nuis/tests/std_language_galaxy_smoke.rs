@@ -66,6 +66,21 @@ fn assert_llvm_entry_not_contains(path: &Path, needle: &str, context: &str) {
     );
 }
 
+fn assert_llvm_entry_occurrences(path: &Path, needle: &str, expected: usize, context: &str) {
+    let source = fs::read_to_string(path)
+        .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
+    let entry = source
+        .split("define i64 @nuis_yir_entry()")
+        .nth(1)
+        .unwrap_or_else(|| panic!("expected LLVM entry in {}", path.display()));
+    assert_eq!(
+        entry.matches(needle).count(),
+        expected,
+        "unexpected {context} count in LLVM entry {}",
+        path.display()
+    );
+}
+
 #[test]
 fn std_language_galaxy_project_runs_std_result_hof_surface() {
     let output_dir = temp_dir("std_language_galaxy_bootstrap");
@@ -729,6 +744,77 @@ fn task_context_preserves_f32_and_f64_bits() {
         .output()
         .expect("run task float context binary");
     assert_eq!(binary.status.code(), Some(29));
+}
+
+#[test]
+fn task_flat_struct_payload_crosses_owned_scheduler_boundary() {
+    let output_dir = temp_dir("task_flat_struct_payload");
+    let output_dir_text = output_dir.display().to_string();
+    let build = run_nuis(&[
+        "build",
+        "../../examples/projects/task/task_flat_struct_payload_demo",
+        &output_dir_text,
+    ]);
+    assert_success(&build, "nuis build task flat struct payload");
+
+    let yir = output_dir.join("task_flat_struct_payload_demo.yir");
+    assert_file_contains(
+        &yir,
+        "cpu.call_owned_struct",
+        "owned struct helper call contract",
+    );
+    assert_file_contains(
+        &yir,
+        "Packet|code:i64,ready:bool,narrow:f32,wide:f64",
+        "owned struct helper layout contract",
+    );
+    assert_file_contains(
+        &yir,
+        "cpu.return_owned_struct",
+        "owned struct helper return contract",
+    );
+    let llvm = output_dir.join("task_flat_struct_payload_demo.ll");
+    assert_file_contains(
+        &llvm,
+        "call i64 @nuis_scheduler_task_spawn_owned_invoker_v1(ptr @nuis_task_invoker_make_packet",
+        "deferred owned struct task spawn",
+    );
+    assert_file_contains(
+        &llvm,
+        "define i64 @nuis_task_invoker_make_packet(ptr %context)",
+        "owned struct task invoker",
+    );
+    assert_file_contains(
+        &llvm,
+        "inttoptr i64",
+        "immediate awaited owned struct unpack",
+    );
+    assert_llvm_entry_occurrences(
+        &llvm,
+        "call i64 @nuis_fn_make_packet(",
+        1,
+        "awaited versus spawned owned struct helper calls",
+    );
+    assert_file_contains(
+        &llvm,
+        "call i64 @nuis_scheduler_task_take_owned_v1(i64",
+        "owned struct task take",
+    );
+    assert_file_contains(
+        &llvm,
+        "call void @nuis_scheduler_owned_payload_drop_v1(ptr",
+        "owned struct payload drop",
+    );
+    assert_file_contains(
+        &llvm,
+        "@nuis_scheduler_payload_free_v1",
+        "owned struct data drop hook",
+    );
+
+    let binary = Command::new(output_dir.join("task_flat_struct_payload_demo"))
+        .output()
+        .expect("run task flat struct payload binary");
+    assert_eq!(binary.status.code(), Some(37));
 }
 
 #[test]

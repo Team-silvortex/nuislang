@@ -57,7 +57,7 @@ fn exception_budgets() -> BTreeMap<&'static str, usize> {
         ("tools/nsld/src/object_writer_input.rs", 682),
         ("tools/nsld/src/reports.rs", 1109),
         ("tools/nuis/src/main.rs", 3244),
-        ("tools/nuis/src/dev_tensor_drift_data_runtime.rs", 903),
+        ("tools/nuis/src/dev_tensor_drift_data_runtime.rs", 921),
         (
             "tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs",
             815,

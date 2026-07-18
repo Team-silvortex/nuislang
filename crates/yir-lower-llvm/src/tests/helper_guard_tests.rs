@@ -555,3 +555,54 @@ fn emits_i32_helper_returns_with_i32_ret_in_recursive_helpers() {
     assert!(emitted.body.contains("ret i32 "));
     assert!(!emitted.body.contains("ret i64 %"));
 }
+
+#[test]
+fn lowers_flat_scalar_struct_tasks_through_owned_payload_abi() {
+    let mut module = module_with_cpu0();
+    push_cpu_const_i64(&mut module, "packet_code", "31");
+    push_cpu_node(&mut module, "ready", "cpu.const_bool", vec!["true"]);
+    push_cpu_node(&mut module, "narrow", "cpu.const_f32", vec!["2.5"]);
+    push_cpu_node(&mut module, "wide", "cpu.const_f64", vec!["6.25"]);
+    push_cpu_node(
+        &mut module,
+        "packet",
+        "cpu.struct",
+        vec![
+            "Packet",
+            "code=packet_code",
+            "ready=ready",
+            "narrow=narrow",
+            "wide=wide",
+        ],
+    );
+    push_cpu_node(
+        &mut module,
+        "task",
+        "cpu.spawn_task",
+        vec!["make_packet", "packet"],
+    );
+    push_cpu_node(&mut module, "result", "cpu.join_result", vec!["task"]);
+    push_cpu_node(&mut module, "value", "cpu.task_value", vec!["result"]);
+    push_cpu_node(&mut module, "field", "cpu.field", vec!["value", "code"]);
+    push_deps(
+        &mut module,
+        &[
+            ("packet_code", "packet"),
+            ("ready", "packet"),
+            ("narrow", "packet"),
+            ("wide", "packet"),
+            ("packet", "task"),
+            ("task", "result"),
+            ("result", "value"),
+            ("value", "field"),
+        ],
+    );
+
+    let llvm_ir = emit_module(&module).expect("flat struct task lowering should succeed");
+    assert!(llvm_ir.contains("call i64 @nuis_scheduler_task_spawn_owned_v1(ptr"));
+    assert!(llvm_ir.contains("call i64 @nuis_scheduler_task_take_owned_v1(i64"));
+    assert!(llvm_ir.contains("call void @nuis_scheduler_owned_payload_drop_v1(ptr"));
+    assert!(llvm_ir.contains("store ptr @nuis_scheduler_payload_free_v1"));
+    assert!(llvm_ir.contains("bitcast float "));
+    assert!(llvm_ir.contains("bitcast double "));
+}

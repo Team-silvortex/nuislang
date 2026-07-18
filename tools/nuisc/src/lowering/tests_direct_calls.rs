@@ -578,3 +578,46 @@ fn lowers_ordinary_self_recursive_function_into_helper_lane_and_call_f64() {
         .any(|node| node.op.module == "cpu" && node.op.instruction == "return_f64"));
     assert!(yir.node_lanes.values().any(|lane| lane == "fn:decay"));
 }
+
+#[test]
+fn lowers_spawned_flat_struct_async_helper_into_owned_call_lane() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          struct Packet {
+            code: i64,
+            ready: bool,
+            weight: f32
+          }
+
+          async fn make_packet(code: i64, ready: bool) -> Packet {
+            return Packet { code: code, ready: ready, weight: 2.5 };
+          }
+
+          fn main() -> i64 {
+            let packet: Packet = join(spawn(make_packet(31, true)));
+            return packet.code;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let call = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.instruction == "call_owned_struct")
+        .expect("spawned flat struct helper should retain an owned call node");
+    assert_eq!(call.op.args[0], "make_packet");
+    assert_eq!(call.op.args[1], "Packet|code:i64,ready:bool,weight:f32");
+    let returned = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.instruction == "return_owned_struct")
+        .expect("flat struct helper should retain an owned return node");
+    assert_eq!(
+        yir.node_lanes.get(&returned.name).map(String::as_str),
+        Some("fn:make_packet")
+    );
+}

@@ -70,6 +70,7 @@ typedef struct {
     int64_t kind;
     NuisSchedulerTaskInvokerI64 invoker;
     void* context;
+    NuisSchedulerOwnedPayloadV1 owned_template;
 } NuisSchedulerTaskThunkPacket;
 static NuisSchedulerTaskThunkPacket nuis_scheduler_task_thunk_packets[256];
 static NuisSchedulerOwnedPayloadV1 nuis_scheduler_task_owned_payloads[256];
@@ -120,15 +121,26 @@ static int nuis_scheduler_owned_payload_valid_v1(
     return 1;
 }
 
-static void nuis_scheduler_task_release_owned_payload_v1(int64_t index) {
-    if (index < 0 || index >= 256) return;
-    NuisSchedulerOwnedPayloadV1* payload = &nuis_scheduler_task_owned_payloads[index];
-    if (nuis_scheduler_task_payload_kinds[index] == 1
-        && payload->data != NULL
-        && payload->drop_hook != NULL) {
+void nuis_scheduler_payload_free_v1(void* data) {
+    free(data);
+}
+
+void nuis_scheduler_owned_payload_drop_v1(NuisSchedulerOwnedPayloadV1* payload) {
+    if (payload == NULL) return;
+    if (payload->data != NULL && payload->drop_hook != NULL) {
         payload->drop_hook(payload->data);
     }
     *payload = nuis_scheduler_empty_owned_payload_v1();
+}
+
+static void nuis_scheduler_task_release_owned_payload_v1(int64_t index) {
+    if (index < 0 || index >= 256) return;
+    NuisSchedulerOwnedPayloadV1* payload = &nuis_scheduler_task_owned_payloads[index];
+    if (nuis_scheduler_task_payload_kinds[index] == 1) {
+        nuis_scheduler_owned_payload_drop_v1(payload);
+    } else {
+        *payload = nuis_scheduler_empty_owned_payload_v1();
+    }
     nuis_scheduler_task_payload_kinds[index] = 0;
 }
 
@@ -138,6 +150,7 @@ static void nuis_scheduler_task_release_context_v1(int64_t index) {
     packet->kind = 0;
     packet->invoker = NULL;
     packet->context = NULL;
+    packet->owned_template = nuis_scheduler_empty_owned_payload_v1();
 }
 
 static void nuis_lifecycle_state_reset(void) {
@@ -166,16 +179,25 @@ static int64_t nuis_lifecycle_on_scheduler_tick_v1(int64_t tick) {
 
 static int64_t nuis_scheduler_task_execute_thunk_v1(int64_t index) {
     NuisSchedulerTaskThunkPacket* packet = &nuis_scheduler_task_thunk_packets[index];
-    if (packet->kind != 1 || packet->invoker == NULL) {
+    if ((packet->kind != 1 && packet->kind != 2) || packet->invoker == NULL) {
         return nuis_scheduler_task_payloads[index];
     }
+    int64_t kind = packet->kind;
     NuisSchedulerTaskInvokerI64 invoker = packet->invoker;
     void* context = packet->context;
+    NuisSchedulerOwnedPayloadV1 owned_template = packet->owned_template;
     packet->kind = 0;
     packet->invoker = NULL;
     packet->context = NULL;
+    packet->owned_template = nuis_scheduler_empty_owned_payload_v1();
     int64_t result = invoker(context);
     free(context);
+    if (kind == 2 && result != 0) {
+        owned_template.data = (void*)(uintptr_t)result;
+        nuis_scheduler_task_owned_payloads[index] = owned_template;
+        nuis_scheduler_task_payload_kinds[index] = 1;
+        return 0;
+    }
     return result;
 }
 
@@ -278,14 +300,21 @@ int64_t nuis_scheduler_task_spawn_i64_v1(int64_t payload) {
     nuis_scheduler_task_thunk_packets[index].kind = 0;
     nuis_scheduler_task_thunk_packets[index].invoker = NULL;
     nuis_scheduler_task_thunk_packets[index].context = NULL;
+    nuis_scheduler_task_thunk_packets[index].owned_template = nuis_scheduler_empty_owned_payload_v1();
     nuis_scheduler_task_owned_payloads[index] = nuis_scheduler_empty_owned_payload_v1();
     nuis_scheduler_task_payload_kinds[index] = 0;
     return index + 1;
 }
 
-int64_t nuis_scheduler_task_spawn_owned_v1(NuisSchedulerOwnedPayloadV1 payload) {
-    if (!nuis_scheduler_owned_payload_valid_v1(&payload)
-        || nuis_scheduler_task_len >= 256) return 0;
+int64_t nuis_scheduler_task_spawn_owned_v1(
+    const NuisSchedulerOwnedPayloadV1* payload_ref
+) {
+    if (!nuis_scheduler_owned_payload_valid_v1(payload_ref)) return 0;
+    NuisSchedulerOwnedPayloadV1 payload = *payload_ref;
+    if (nuis_scheduler_task_len >= 256) {
+        nuis_scheduler_owned_payload_drop_v1(&payload);
+        return 0;
+    }
     void* owned_data = payload.data;
     if (payload.move_hook != NULL) {
         owned_data = payload.move_hook(payload.data);
@@ -301,6 +330,7 @@ int64_t nuis_scheduler_task_spawn_owned_v1(NuisSchedulerOwnedPayloadV1 payload) 
     nuis_scheduler_task_thunk_packets[index].kind = 0;
     nuis_scheduler_task_thunk_packets[index].invoker = NULL;
     nuis_scheduler_task_thunk_packets[index].context = NULL;
+    nuis_scheduler_task_thunk_packets[index].owned_template = nuis_scheduler_empty_owned_payload_v1();
     nuis_scheduler_task_owned_payloads[index] = payload;
     nuis_scheduler_task_payload_kinds[index] = 1;
     return index + 1;
@@ -323,6 +353,44 @@ int64_t nuis_scheduler_task_spawn_invoker_i64_v1(
     nuis_scheduler_task_thunk_packets[index].kind = 1;
     nuis_scheduler_task_thunk_packets[index].invoker = invoker;
     nuis_scheduler_task_thunk_packets[index].context = context;
+    nuis_scheduler_task_thunk_packets[index].owned_template = nuis_scheduler_empty_owned_payload_v1();
+    nuis_scheduler_task_owned_payloads[index] = nuis_scheduler_empty_owned_payload_v1();
+    nuis_scheduler_task_payload_kinds[index] = 0;
+    return index + 1;
+}
+
+int64_t nuis_scheduler_task_spawn_owned_invoker_v1(
+    NuisSchedulerTaskInvokerI64 invoker,
+    void* context,
+    int64_t size,
+    int64_t alignment,
+    uint64_t type_id,
+    NuisSchedulerPayloadDropV1 drop_hook
+) {
+    if (invoker == NULL || size <= 0 || alignment <= 0
+        || (alignment & (alignment - 1)) != 0
+        || type_id == 0 || drop_hook == NULL
+        || nuis_scheduler_task_len >= 256) {
+        free(context);
+        return 0;
+    }
+    int64_t index = nuis_scheduler_task_len;
+    nuis_scheduler_task_len += 1;
+    nuis_scheduler_task_payloads[index] = 0;
+    nuis_scheduler_task_states[index] = 0;
+    nuis_scheduler_task_ready_ticks[index] = nuis_lifecycle_state.tick_count + 1;
+    nuis_scheduler_task_deadline_ticks[index] = -1;
+    nuis_scheduler_task_thunk_packets[index].kind = 2;
+    nuis_scheduler_task_thunk_packets[index].invoker = invoker;
+    nuis_scheduler_task_thunk_packets[index].context = context;
+    nuis_scheduler_task_thunk_packets[index].owned_template = (NuisSchedulerOwnedPayloadV1) {
+        .data = NULL,
+        .size = size,
+        .alignment = alignment,
+        .type_id = type_id,
+        .move_hook = NULL,
+        .drop_hook = drop_hook,
+    };
     nuis_scheduler_task_owned_payloads[index] = nuis_scheduler_empty_owned_payload_v1();
     nuis_scheduler_task_payload_kinds[index] = 0;
     return index + 1;

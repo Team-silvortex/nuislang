@@ -112,6 +112,11 @@ pub(super) fn lower_nir_to_yir_builtin_cpu_with_target(
     let mut state = LoweringState {
         yir: &mut yir,
         function_map,
+        struct_defs: module
+            .structs
+            .iter()
+            .map(|definition| (definition.name.as_str(), definition))
+            .collect(),
         direct_call_functions: direct_call_functions.clone(),
         async_helper_functions: all_async_helper_functions.clone(),
         pure_helpers: collect_pure_helper_functions(module),

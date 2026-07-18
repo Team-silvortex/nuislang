@@ -4,6 +4,7 @@ use yir_core::Node;
 
 use super::{
     fresh_reg,
+    task_owned_payload::emit_flat_struct_data,
     value_ref::{coerce_to_i64, get_bool, get_f32, get_f64, get_i32, get_i64},
     LlvmValueRef,
 };
@@ -96,6 +97,40 @@ pub(crate) fn lower_cpu_return_node(
             body.push(format!("  {as_i64} = fptosi double {input} to i64"));
             *last_cpu_value = Some(as_i64);
             body.push(format!("  ret double {input}"));
+        }
+        "return_owned_struct" => {
+            let Some(LlvmValueRef::Struct(value)) = registers.get(&node.op.args[0]) else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.return_owned_struct `{}` because its input is not a flat struct",
+                    node.name
+                ));
+                return Ok(ReturnLoweringOutcome::Deferred);
+            };
+            let mut state = super::LlvmLoweringState {
+                body: std::mem::take(body),
+                globals: Vec::new(),
+                registers: BTreeMap::new(),
+                delayed_registers: BTreeMap::new(),
+                facts: super::KnownFacts::new(),
+                buffer_lengths: BTreeMap::new(),
+                next_reg: *next_reg,
+                next_global: 0,
+                next_block: 0,
+                last_cpu_value: None,
+                ends_with_terminal_return: false,
+            };
+            let Some(data) = emit_flat_struct_data(value, &mut state) else {
+                *body = state.body;
+                return Ok(ReturnLoweringOutcome::Deferred);
+            };
+            let pointer_bits = fresh_reg(&mut state.next_reg);
+            state
+                .body
+                .push(format!("  {pointer_bits} = ptrtoint ptr {data} to i64"));
+            state.body.push(format!("  ret i64 {pointer_bits}"));
+            *body = state.body;
+            *next_reg = state.next_reg;
+            *last_cpu_value = Some(pointer_bits);
         }
         _ => return Ok(ReturnLoweringOutcome::NotReturn),
     }

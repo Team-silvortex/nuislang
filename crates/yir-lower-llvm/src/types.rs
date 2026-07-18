@@ -17,6 +17,11 @@ pub(crate) enum LlvmValueRef {
         arguments: Vec<TaskThunkArgument>,
         return_kind: CpuCallScalarKind,
     },
+    DeferredTaskThunkOwnedStruct {
+        callee: String,
+        arguments: Vec<TaskThunkArgument>,
+        template: StructLlvmValueRef,
+    },
     Task(TaskLlvmValueRef),
     Thread(ThreadLlvmValueRef),
     TaskResult(TaskResultLlvmValueRef),

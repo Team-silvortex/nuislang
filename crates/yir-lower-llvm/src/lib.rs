@@ -43,6 +43,7 @@ mod scalar_order_lowering;
 mod select_lowering;
 mod simple_loop_lowering;
 mod static_lowering;
+mod task_owned_payload;
 mod topology;
 mod types;
 mod value_ref;
@@ -150,6 +151,9 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
             .iter()
             .filter(|node| module.node_lanes.get(&node.name) == Some(lane))
             .find_map(|node| {
+                if node.op.instruction == "return_owned_struct" {
+                    return Some(CpuCallScalarKind::I64);
+                }
                 let kind = cpu_call_scalar_kind_for_instruction(&node.op.instruction)?;
                 node.op.instruction.starts_with("return_").then_some(kind)
             })
@@ -268,6 +272,8 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
 declare ptr @malloc(i64)\ndeclare void @free(ptr)\ndeclare i32 @puts(ptr)\ndeclare i64 @nuis_host_text_lift(ptr)\ndeclare ptr @nuis_host_text_ptr(i64)\n\
 declare void @nuis_debug_print_bool(i32)\ndeclare void @nuis_debug_print_i32(i32)\ndeclare void @nuis_debug_print_i64(i64)\ndeclare void @nuis_debug_print_f32(float)\ndeclare void @nuis_debug_print_f64(double)\n\n\
 declare i64 @nuis_scheduler_task_spawn_i64_v1(i64)\ndeclare i64 @nuis_scheduler_task_spawn_invoker_i64_v1(ptr, ptr)\ndeclare void @nuis_scheduler_task_timeout_v1(i64, i64)\ndeclare void @nuis_scheduler_task_ready_after_v1(i64, i64)\ndeclare void @nuis_scheduler_task_cancel_v1(i64)\ndeclare i64 @nuis_scheduler_task_join_state_v1(i64)\ndeclare i64 @nuis_scheduler_task_value_i64_v1(i64)\n\
+declare i64 @nuis_scheduler_task_spawn_owned_v1(ptr)\ndeclare i64 @nuis_scheduler_task_take_owned_v1(i64, ptr)\ndeclare void @nuis_scheduler_owned_payload_drop_v1(ptr)\ndeclare void @nuis_scheduler_payload_free_v1(ptr)\n\
+declare i64 @nuis_scheduler_task_spawn_owned_invoker_v1(ptr, ptr, i64, i64, i64, ptr)\n\
 declare i64 @host_color_bias(i64)\ndeclare i64 @host_speed_curve(i64)\ndeclare i64 @host_radius_curve(i64)\ndeclare i64 @host_mix_tick(i64, i64)\ndeclare i64 @host_text_handle(i64)\ndeclare i64 @host_text_len(i64)\ndeclare i64 @host_text_line_count(i64)\ndeclare i64 @host_text_word_count(i64)\ndeclare i64 @host_text_concat(i64, i64)\n\
 declare i64 @host_argv_count()\ndeclare i64 @host_argv_at(i64)\ndeclare i64 @host_env_has(i64)\ndeclare i64 @host_env_get(i64)\ndeclare i64 @host_file_open(i64, i64)\ndeclare i64 @host_file_read(i64, i64, i64)\ndeclare i64 @host_file_write(i64, i64)\ndeclare i64 @host_file_close(i64)\n\
 declare i64 @host_stdout_write(i64)\ndeclare i64 @host_stdout_flush()\ndeclare i64 @host_stderr_write(i64)\ndeclare i64 @host_stderr_flush()\ndeclare i64 @host_serialize_i64_into(i64, i64, i64)\ndeclare i64 @host_serialize_text_into(i64, i64, i64)\ndeclare i64 @host_deserialize_text_from(i64, i64, i64)\ndeclare i64 @host_monotonic_time_ns()\n\

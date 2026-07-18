@@ -47,7 +47,12 @@ pub(super) fn emit_cpu_function(
                     && candidate.op.module == "cpu"
                     && matches!(
                         candidate.op.instruction.as_str(),
-                        "call_bool" | "call_i32" | "call_i64" | "call_f32" | "call_f64"
+                        "call_bool"
+                            | "call_i32"
+                            | "call_i64"
+                            | "call_f32"
+                            | "call_f64"
+                            | "call_owned_struct"
                     )
             })
         })

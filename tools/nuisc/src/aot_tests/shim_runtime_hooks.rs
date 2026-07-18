@@ -39,7 +39,13 @@ fn c_shim_source_includes_native_cli_runtime_hooks() {
     assert!(shim.contains("NuisSchedulerPayloadDropV1 drop_hook;"));
     assert!(shim.contains("static int nuis_scheduler_owned_payload_valid_v1("));
     assert!(shim.contains("int64_t nuis_scheduler_task_spawn_owned_v1("));
+    assert!(shim.contains("int64_t nuis_scheduler_task_spawn_owned_invoker_v1("));
+    assert!(shim.contains("nuis_scheduler_task_thunk_packets[index].kind = 2;"));
+    assert!(shim.contains("owned_template.data = (void*)(uintptr_t)result;"));
+    assert!(shim.contains("const NuisSchedulerOwnedPayloadV1* payload_ref"));
     assert!(shim.contains("int64_t nuis_scheduler_task_take_owned_v1("));
+    assert!(shim.contains("void nuis_scheduler_owned_payload_drop_v1("));
+    assert!(shim.contains("void nuis_scheduler_payload_free_v1(void* data)"));
     assert!(shim.contains("payload->drop_hook(payload->data);"));
     assert!(shim.contains("nuis_scheduler_task_release_owned_payload_v1(index);"));
     assert!(shim.contains("nuis_scheduler_task_payload_kinds[index] = 0;"));

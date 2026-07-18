@@ -199,16 +199,20 @@ Today the repository also still has one important runtime boundary:
 * positive deadline ordering completes when `ready_delay <= timeout_limit` and
   times out when readiness is later; non-positive timeout limits remain
   immediate timeouts
-* aggregate payloads retain the eager/staged lowering fallback while their
-  ownership-aware scheduler ABI representation is being designed
+* flat non-empty structs containing only `bool`, `i32`, `i64`, `f32`, and
+  `f64` fields are materialized into stable eight-byte slots and cross the
+  scheduler through the owned payload ABI; floating fields retain their bits,
+  and aggregate-producing helpers execute from the lifecycle poll invoker
 
 The native shim now defines the first owned aggregate payload boundary through
 `NuisSchedulerOwnedPayloadV1`:
 
 * descriptors carry `data`, byte `size`, power-of-two `alignment`, a non-zero
   `type_id`, and optional move plus mandatory drop hooks
-* `nuis_scheduler_task_spawn_owned_v1` transfers the descriptor into one task
-  slot, applying the move hook first when one is present
+* `nuis_scheduler_task_spawn_owned_v1` accepts a descriptor pointer and
+  transfers a valid descriptor into one task slot, applying the move hook first
+  when one is present; a full task table consumes the valid payload through its
+  drop hook rather than leaking it
 * `nuis_scheduler_task_take_owned_v1` is a one-shot ownership transfer through
   an out-parameter; it is not a borrowed view
 * timeout, cancellation, lifecycle reset, and shutdown drop an untaken payload
@@ -216,9 +220,13 @@ The native shim now defines the first owned aggregate payload boundary through
 * completed but untaken payloads remain owned by the scheduler until take or
   shutdown
 
-Source `Task<Struct>` lowering is intentionally not enabled yet. NIR/YIR must
-first materialize a stable aggregate layout and matching type identity rather
-than exposing the current virtual field-SSA representation as an ABI.
+Source `Task<Struct>` lowering is enabled for flat scalar-only structs. LLVM
+materializes one eight-byte slot per field, derives a deterministic non-zero
+type identity from the struct/field layout, and reconstructs virtual field SSA
+only after the one-shot take. Both direct `join` and
+`join_result`/`task_value` consume that runtime-owned payload. Empty, nested,
+pointer-bearing, text, enum, and buffer aggregates remain outside this first
+layout contract.
 
 Today `nuis` does **not** yet have:
 
@@ -226,7 +234,8 @@ Today `nuis` does **not** yet have:
 * a stable worker-pool or lane scheduler contract for tasks
 * a queue-backed timer wheel or mature delayed-work executor beyond the
   current deterministic task ready-tick model
-* scheduler thunks for aggregate payloads
+* an explicit failed terminal state when an owned helper cannot materialize a
+  non-null payload (for example after allocation failure)
 * shared-state synchronization primitives
 * a finalized concurrent memory model
 

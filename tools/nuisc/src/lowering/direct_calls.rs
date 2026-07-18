@@ -23,13 +23,20 @@ pub(super) fn collect_scheduler_async_thunk_functions(module: &NirModule) -> BTr
         .iter()
         .filter(|function| function.is_async)
         .filter(|function| {
-            function.params.iter().all(|param| {
+            let params_supported = function.params.iter().all(|param| {
                 direct_call_scalar_kind(&param.ty).is_some_and(is_scheduler_scalar_kind)
-            }) && function
+            });
+            let scalar_return = function
                 .return_type
                 .as_ref()
                 .and_then(direct_call_scalar_kind)
-                .is_some_and(is_scheduler_scalar_kind)
+                .is_some_and(is_scheduler_scalar_kind);
+            let struct_return = function
+                .return_type
+                .as_ref()
+                .and_then(|ty| scheduler_flat_struct(module, ty))
+                .is_some();
+            params_supported && (scalar_return || struct_return)
         })
         .map(|function| function.name.as_str())
         .collect::<BTreeSet<_>>();
@@ -264,6 +271,54 @@ fn is_scheduler_scalar_kind(kind: DirectCallScalarKind) -> bool {
             | DirectCallScalarKind::F32
             | DirectCallScalarKind::F64
     )
+}
+
+fn scheduler_flat_struct<'a>(
+    module: &'a NirModule,
+    ty: &nuis_semantics::model::NirTypeRef,
+) -> Option<&'a NirStructDef> {
+    if ty.is_ref || ty.is_optional || !ty.generic_args.is_empty() {
+        return None;
+    }
+    let definition = module
+        .structs
+        .iter()
+        .find(|definition| definition.name == ty.name)?;
+    (!definition.fields.is_empty()
+        && definition.generic_params.is_empty()
+        && definition
+            .fields
+            .iter()
+            .all(|field| direct_call_scalar_kind(&field.ty).is_some()))
+    .then_some(definition)
+}
+
+fn state_flat_struct_return<'a>(
+    function: &NirFunction,
+    state: &'a LoweringState<'_>,
+) -> Option<&'a NirStructDef> {
+    let ty = function.return_type.as_ref()?;
+    if ty.is_ref || ty.is_optional || !ty.generic_args.is_empty() {
+        return None;
+    }
+    let definition = state.struct_defs.get(ty.name.as_str()).copied()?;
+    (!definition.fields.is_empty()
+        && definition.generic_params.is_empty()
+        && definition
+            .fields
+            .iter()
+            .all(|field| direct_call_scalar_kind(&field.ty).is_some()))
+    .then_some(definition)
+}
+
+fn encode_scheduler_struct_layout(definition: &NirStructDef) -> String {
+    let fields = definition
+        .fields
+        .iter()
+        .map(|field| format!("{}:{}", field.name, field.ty.name))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("{}|{fields}", definition.name)
 }
 
 fn direct_call_signature_kind(function: &NirFunction) -> Option<DirectCallScalarKind> {
@@ -629,17 +684,21 @@ pub(super) fn lower_direct_call_helper_function(
         .ok_or_else(|| format!("function `{}` did not return a value", function.name))?;
     state.last_effect_anchor = saved_effect_anchor;
     let return_name = format!("__fn_{}_return", function.name);
-    let return_instruction = match direct_call_signature_kind(function).ok_or_else(|| {
-        format!(
-            "ordinary direct-call lowering only supports bool/i32/i64/f32/f64 return type in `{}`",
-            function.name
-        )
-    })? {
-        DirectCallScalarKind::Bool => "return_bool",
-        DirectCallScalarKind::I32 => "return_i32",
-        DirectCallScalarKind::I64 => "return_i64",
-        DirectCallScalarKind::F32 => "return_f32",
-        DirectCallScalarKind::F64 => "return_f64",
+    let return_instruction = if state_flat_struct_return(function, state).is_some() {
+        "return_owned_struct"
+    } else {
+        match direct_call_signature_kind(function).ok_or_else(|| {
+            format!(
+                "ordinary direct-call lowering only supports scalar or scheduler-owned flat struct return type in `{}`",
+                function.name
+            )
+        })? {
+            DirectCallScalarKind::Bool => "return_bool",
+            DirectCallScalarKind::I32 => "return_i32",
+            DirectCallScalarKind::I64 => "return_i64",
+            DirectCallScalarKind::F32 => "return_f32",
+            DirectCallScalarKind::F64 => "return_f64",
+        }
     };
     state.yir.nodes.push(Node {
         name: return_name.clone(),
@@ -668,19 +727,28 @@ pub(super) fn push_direct_call_node(
     state: &mut LoweringState<'_>,
 ) -> Result<String, String> {
     let name = next_name(state, "cpu_call");
-    let instruction = match direct_call_signature_kind(function).ok_or_else(|| {
-        format!(
-            "ordinary direct-call lowering only supports bool/i32/i64/f32/f64 return type in `{}`",
-            function.name
-        )
-    })? {
-        DirectCallScalarKind::Bool => "call_bool",
-        DirectCallScalarKind::I32 => "call_i32",
-        DirectCallScalarKind::I64 => "call_i64",
-        DirectCallScalarKind::F32 => "call_f32",
-        DirectCallScalarKind::F64 => "call_f64",
+    let struct_layout =
+        state_flat_struct_return(function, state).map(encode_scheduler_struct_layout);
+    let instruction = if struct_layout.is_some() {
+        "call_owned_struct"
+    } else {
+        match direct_call_signature_kind(function).ok_or_else(|| {
+            format!(
+                "ordinary direct-call lowering only supports scalar or scheduler-owned flat struct return type in `{}`",
+                function.name
+            )
+        })? {
+            DirectCallScalarKind::Bool => "call_bool",
+            DirectCallScalarKind::I32 => "call_i32",
+            DirectCallScalarKind::I64 => "call_i64",
+            DirectCallScalarKind::F32 => "call_f32",
+            DirectCallScalarKind::F64 => "call_f64",
+        }
     };
     let mut op_args = vec![function.name.clone()];
+    if let Some(layout) = struct_layout {
+        op_args.push(layout);
+    }
     op_args.extend(args.iter().cloned());
     state.yir.nodes.push(Node {
         name: name.clone(),

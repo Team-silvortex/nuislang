@@ -205,18 +205,24 @@ pub(super) fn describe_cpu_basic_node(node: &Node) -> Result<Option<InstructionS
             })?;
             Ok(InstructionSemantics::pure(Vec::new()))
         }
-        "call_bool" | "call_i32" | "call_i64" | "call_f32" | "call_f64" => {
+        "call_bool" | "call_i32" | "call_i64" | "call_f32" | "call_f64" | "call_owned_struct" => {
             if node.op.args.is_empty() {
                 return Err(format!(
                     "node `{}` expects `cpu.{} <name> <resource> <callee> [arg...]`",
                     node.name, node.op.instruction
                 ));
             }
+            let argument_offset = usize::from(node.op.instruction == "call_owned_struct") + 1;
             Ok(InstructionSemantics::pure(
-                node.op.args.iter().skip(1).cloned().collect(),
+                node.op.args.iter().skip(argument_offset).cloned().collect(),
             ))
         }
-        "return_bool" | "return_i32" | "return_i64" | "return_f32" | "return_f64" => {
+        "return_bool"
+        | "return_i32"
+        | "return_i64"
+        | "return_f32"
+        | "return_f64"
+        | "return_owned_struct" => {
             if node.op.args.len() != 1 {
                 return Err(format!(
                     "node `{}` expects `cpu.{} <name> <resource> <value>`",

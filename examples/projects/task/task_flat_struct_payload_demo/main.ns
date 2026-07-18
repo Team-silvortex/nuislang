@@ -1,0 +1,52 @@
+mod cpu Main {
+  struct Packet {
+    code: i64,
+    ready: bool,
+    narrow: f32,
+    wide: f64
+  }
+
+  async fn make_packet(code: i64, ready: bool) -> Packet {
+    return Packet {
+      code: code,
+      ready: ready,
+      narrow: 2.5,
+      wide: 6.25
+    };
+  }
+
+  async fn main() -> i64 {
+    let awaited: Packet = await make_packet(19, true);
+    if awaited.code != 19 {
+      return 8;
+    }
+
+    let task: Task<Packet> = spawn(make_packet(31, true));
+    let result: TaskResult<Packet> = join_result(task);
+    if task_completed(result) == false {
+      return 1;
+    }
+    let packet: Packet = task_value(result);
+    if packet.code != 31 {
+      return 2;
+    }
+    if packet.ready == false {
+      return 3;
+    }
+    if packet.narrow != 2.5 {
+      return 4;
+    }
+    if packet.wide != 6.25 {
+      return 5;
+    }
+
+    let direct: Packet = join(spawn(make_packet(11, false)));
+    if direct.code != 11 {
+      return 6;
+    }
+    if direct.ready == false {
+      return 37;
+    }
+    return 7;
+  }
+}

@@ -175,6 +175,40 @@ pub(crate) fn execute_cpu_value_node(
                 _ => Ok(Value::Int(0)),
             }
         }
+        "call_owned_struct" => {
+            let (type_name, fields_source) = node.op.args[1]
+                .split_once('|')
+                .ok_or_else(|| format!("node `{}` has invalid owned struct layout", node.name))?;
+            let fields = fields_source
+                .split(',')
+                .map(|field| {
+                    let (name, kind) = field.split_once(':').ok_or_else(|| {
+                        format!(
+                            "node `{}` has invalid owned struct field `{field}`",
+                            node.name
+                        )
+                    })?;
+                    let value = match kind {
+                        "bool" => Value::Bool(false),
+                        "i32" => Value::I32(0),
+                        "i64" => Value::Int(0),
+                        "f32" => Value::F32(0.0),
+                        "f64" => Value::F64(0.0),
+                        _ => {
+                            return Err(format!(
+                                "node `{}` has unsupported owned struct field kind `{kind}`",
+                                node.name
+                            ))
+                        }
+                    };
+                    Ok((name.to_owned(), value))
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            Ok(Value::Struct(StructValue {
+                type_name: type_name.to_owned(),
+                fields,
+            }))
+        }
         "return_bool" => {
             let value = state.expect_bool(&node.op.args[0])?;
             state.push_resource_event(
@@ -196,6 +230,17 @@ pub(crate) fn execute_cpu_value_node(
                 ),
             );
             Ok(Value::I32(value))
+        }
+        "return_owned_struct" => {
+            let value = state.expect_struct(&node.op.args[0])?.clone();
+            state.push_resource_event(
+                resource,
+                format!(
+                    "effect cpu.return_owned_struct @{} [{}] {}",
+                    node.resource, resource.kind.raw, value.type_name
+                ),
+            );
+            Ok(Value::Struct(value))
         }
         "return_i64" => {
             let value = state.expect_int(&node.op.args[0])?;

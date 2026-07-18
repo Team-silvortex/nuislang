@@ -23,7 +23,7 @@ pub(crate) fn lower_cpu_call_node(
     }
     if !matches!(
         node.op.instruction.as_str(),
-        "call_bool" | "call_i32" | "call_i64" | "call_f32" | "call_f64"
+        "call_bool" | "call_i32" | "call_i64" | "call_f32" | "call_f64" | "call_owned_struct"
     ) {
         return Ok(false);
     }
@@ -37,7 +37,8 @@ pub(crate) fn lower_cpu_call_node(
         return Ok(true);
     };
 
-    let lowered_args = node.op.args[1..]
+    let argument_offset = usize::from(node.op.instruction == "call_owned_struct") + 1;
+    let lowered_args = node.op.args[argument_offset..]
         .iter()
         .zip(signature.params.iter())
         .map(|(arg, kind)| match kind {
@@ -57,6 +58,31 @@ pub(crate) fn lower_cpu_call_node(
         ));
         return Ok(true);
     };
+
+    if node.op.instruction == "call_owned_struct" && deferred_task_calls.contains(&node.name) {
+        let template = parse_owned_struct_layout(&node.op.args[1])?;
+        let arguments = lowered_args
+            .iter()
+            .zip(signature.params.iter().copied())
+            .map(|(argument, kind)| TaskThunkArgument {
+                kind,
+                value: argument
+                    .strip_prefix(cpu_scalar_kind_llvm_type(kind))
+                    .and_then(|value| value.strip_prefix(' '))
+                    .expect("owned struct helper argument should carry its LLVM ABI type")
+                    .to_owned(),
+            })
+            .collect();
+        registers.insert(
+            node.name.clone(),
+            LlvmValueRef::DeferredTaskThunkOwnedStruct {
+                callee: callee.clone(),
+                arguments,
+                template,
+            },
+        );
+        return Ok(true);
+    }
 
     if deferred_task_calls.contains(&node.name)
         && matches!(
@@ -133,6 +159,13 @@ pub(crate) fn lower_cpu_call_node(
     };
     body.push(format!("  {reg} = {call}"));
 
+    if node.op.instruction == "call_owned_struct" {
+        let template = parse_owned_struct_layout(&node.op.args[1])?;
+        let value = unpack_immediate_owned_struct(&reg, &template, body, next_reg);
+        registers.insert(node.name.clone(), LlvmValueRef::Struct(value));
+        return Ok(true);
+    }
+
     match signature.ret {
         CpuCallScalarKind::Bool => {
             let widened = fresh_reg(next_reg);
@@ -173,4 +206,94 @@ pub(crate) fn lower_cpu_call_node(
     }
 
     Ok(true)
+}
+
+fn unpack_immediate_owned_struct(
+    pointer_bits: &str,
+    template: &super::StructLlvmValueRef,
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+) -> super::StructLlvmValueRef {
+    let data = fresh_reg(next_reg);
+    body.push(format!("  {data} = inttoptr i64 {pointer_bits} to ptr"));
+    let mut fields = Vec::with_capacity(template.fields.len());
+    for (index, (name, kind)) in template.fields.iter().enumerate() {
+        let slot = if index == 0 {
+            data.clone()
+        } else {
+            let slot = fresh_reg(next_reg);
+            body.push(format!(
+                "  {slot} = getelementptr i8, ptr {data}, i64 {}",
+                index * 8
+            ));
+            slot
+        };
+        let packed = fresh_reg(next_reg);
+        body.push(format!("  {packed} = load i64, ptr {slot}, align 8"));
+        let value = match kind {
+            LlvmValueRef::Bool { .. } => {
+                let i1 = fresh_reg(next_reg);
+                body.push(format!("  {i1} = trunc i64 {packed} to i1"));
+                LlvmValueRef::Bool { i1, i64: packed }
+            }
+            LlvmValueRef::I32(_) => {
+                let value = fresh_reg(next_reg);
+                body.push(format!("  {value} = trunc i64 {packed} to i32"));
+                LlvmValueRef::I32(value)
+            }
+            LlvmValueRef::I64(_) => LlvmValueRef::I64(packed),
+            LlvmValueRef::F32(_) => {
+                let bits = fresh_reg(next_reg);
+                body.push(format!("  {bits} = trunc i64 {packed} to i32"));
+                let value = fresh_reg(next_reg);
+                body.push(format!("  {value} = bitcast i32 {bits} to float"));
+                LlvmValueRef::F32(value)
+            }
+            LlvmValueRef::F64(_) => {
+                let value = fresh_reg(next_reg);
+                body.push(format!("  {value} = bitcast i64 {packed} to double"));
+                LlvmValueRef::F64(value)
+            }
+            _ => unreachable!("owned struct layout parser only admits scalar fields"),
+        };
+        fields.push((name.clone(), value));
+    }
+    body.push(format!("  call void @free(ptr {data})"));
+    super::StructLlvmValueRef {
+        type_name: template.type_name.clone(),
+        fields,
+    }
+}
+
+fn parse_owned_struct_layout(layout: &str) -> Result<super::StructLlvmValueRef, String> {
+    let (type_name, fields_source) = layout
+        .split_once('|')
+        .ok_or_else(|| format!("invalid owned struct layout `{layout}`"))?;
+    let fields = fields_source
+        .split(',')
+        .map(|field| {
+            let (name, kind) = field
+                .split_once(':')
+                .ok_or_else(|| format!("invalid owned struct field layout `{field}`"))?;
+            let value = match kind {
+                "bool" => LlvmValueRef::Bool {
+                    i1: "false".to_owned(),
+                    i64: "0".to_owned(),
+                },
+                "i32" => LlvmValueRef::I32("0".to_owned()),
+                "i64" => LlvmValueRef::I64("0".to_owned()),
+                "f32" => LlvmValueRef::F32("0.0".to_owned()),
+                "f64" => LlvmValueRef::F64("0.0".to_owned()),
+                _ => return Err(format!("unsupported owned struct field kind `{kind}`")),
+            };
+            Ok((name.to_owned(), value))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    if type_name.is_empty() || fields.is_empty() {
+        return Err(format!("owned struct layout `{layout}` cannot be empty"));
+    }
+    Ok(super::StructLlvmValueRef {
+        type_name: type_name.to_owned(),
+        fields,
+    })
 }

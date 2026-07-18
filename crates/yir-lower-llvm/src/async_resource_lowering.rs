@@ -3,6 +3,9 @@ use yir_core::Node;
 use super::{
     facts::propagate_known_facts,
     fresh_reg,
+    task_owned_payload::{
+        emit_flat_struct_invoker_spawn, emit_flat_struct_spawn, emit_flat_struct_take,
+    },
     value_ref::{coerce_to_i64, get_mutex, get_mutex_guard, get_task, get_task_result, get_thread},
     CpuCallScalarKind, LlvmLoweringState, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef,
     StructLlvmValueRef, TaskLlvmValueRef, TaskResultLlvmValueRef, TaskThunkArgument,
@@ -62,6 +65,15 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                     ));
                     Some(handle)
                 }
+                LlvmValueRef::DeferredTaskThunkOwnedStruct {
+                    callee,
+                    arguments,
+                    template,
+                } => {
+                    let context = emit_scalar_task_context(arguments, state);
+                    emit_flat_struct_invoker_spawn(callee, &context, template, state)
+                }
+                LlvmValueRef::Struct(struct_value) => emit_flat_struct_spawn(struct_value, state),
                 _ => {
                     coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg).map(|payload| {
                         let handle = fresh_reg(&mut state.next_reg);
@@ -254,7 +266,40 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 ));
                 return true;
             };
-            let value_ref = (*task.value).clone();
+            let mut value_ref = (*task.value).clone();
+            if let Some(handle) = task.runtime_handle.as_ref() {
+                let runtime_state = fresh_reg(&mut state.next_reg);
+                state.body.push(format!(
+                    "  {runtime_state} = call i64 @nuis_scheduler_task_join_state_v1(i64 {handle})"
+                ));
+                match &value_ref {
+                    LlvmValueRef::DeferredTaskThunkScalar { return_kind, .. } => {
+                        let payload = fresh_reg(&mut state.next_reg);
+                        state.body.push(format!(
+                            "  {payload} = call i64 @nuis_scheduler_task_value_i64_v1(i64 {handle})"
+                        ));
+                        value_ref = unpack_task_payload(payload, *return_kind, state);
+                    }
+                    LlvmValueRef::I64(_) => {
+                        let payload = fresh_reg(&mut state.next_reg);
+                        state.body.push(format!(
+                            "  {payload} = call i64 @nuis_scheduler_task_value_i64_v1(i64 {handle})"
+                        ));
+                        value_ref = LlvmValueRef::I64(payload);
+                    }
+                    LlvmValueRef::DeferredTaskThunkOwnedStruct { template, .. } => {
+                        if let Some(value) = emit_flat_struct_take(handle, template, state) {
+                            value_ref = LlvmValueRef::Struct(value);
+                        }
+                    }
+                    LlvmValueRef::Struct(template) => {
+                        if let Some(value) = emit_flat_struct_take(handle, template, state) {
+                            value_ref = LlvmValueRef::Struct(value);
+                        }
+                    }
+                    _ => {}
+                }
+            }
             state.registers.insert(node.name.clone(), value_ref.clone());
             if let Some(as_i64) = coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg) {
                 state.last_cpu_value = Some(as_i64);
@@ -348,6 +393,14 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                     "  {payload} = call i64 @nuis_scheduler_task_value_i64_v1(i64 {handle})"
                 ));
                 value_ref = unpack_task_payload(payload, *return_kind, state);
+            } else if let (
+                Some(handle),
+                LlvmValueRef::DeferredTaskThunkOwnedStruct { template, .. },
+            ) = (runtime_handle.as_ref(), &value_ref)
+            {
+                if let Some(value) = emit_flat_struct_take(handle, template, state) {
+                    value_ref = LlvmValueRef::Struct(value);
+                }
             } else if let (Some(handle), LlvmValueRef::I64(_)) =
                 (runtime_handle.as_ref(), &value_ref)
             {
@@ -356,6 +409,12 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                     "  {payload} = call i64 @nuis_scheduler_task_value_i64_v1(i64 {handle})"
                 ));
                 value_ref = LlvmValueRef::I64(payload);
+            } else if let (Some(handle), LlvmValueRef::Struct(template)) =
+                (runtime_handle.as_ref(), &value_ref)
+            {
+                if let Some(value) = emit_flat_struct_take(handle, template, state) {
+                    value_ref = LlvmValueRef::Struct(value);
+                }
             }
             state.registers.insert(node.name.clone(), value_ref.clone());
             if let Some(as_i64) = coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg) {
