@@ -1,0 +1,33 @@
+mod cpu Main {
+  async fn pick_i32(flag: bool, value: i32) -> i32 {
+    if flag {
+      return value;
+    }
+    return i32_from_i64(0);
+  }
+
+  async fn identity_bool(value: bool) -> bool {
+    return value;
+  }
+
+  fn main() -> i64 {
+    let number_task: Task<i32> = spawn(pick_i32(true, i32_from_i64(-7)));
+    let number_result: TaskResult<i32> = join_result(number_task);
+    if task_completed(number_result) == false {
+      return 1;
+    }
+    if task_value(number_result) != i32_from_i64(-7) {
+      return 2;
+    }
+
+    let bool_task: Task<bool> = spawn(identity_bool(true));
+    let bool_result: TaskResult<bool> = join_result(bool_task);
+    if task_completed(bool_result) == false {
+      return 3;
+    }
+    if task_value(bool_result) {
+      return 23;
+    }
+    return 4;
+  }
+}

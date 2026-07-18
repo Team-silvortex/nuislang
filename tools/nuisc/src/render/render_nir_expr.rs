@@ -175,6 +175,11 @@ pub(super) fn render_nir_expr(value: &NirExpr) -> String {
             render_nir_expr(task),
             render_nir_expr(limit)
         ),
+        NirExpr::CpuReadyAfter { task, delay } => format!(
+            "ready_after({}, {})",
+            render_nir_expr(task),
+            render_nir_expr(delay)
+        ),
         NirExpr::CpuPresentFrame(value) => {
             format!("cpu_present_frame({})", render_nir_expr(value))
         }

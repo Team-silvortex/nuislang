@@ -1,0 +1,14 @@
+mod cpu Main {
+  async fn sum_four(first: i64, second: i64, third: i64, fourth: i64) -> i64 {
+    return first + second + third + fourth;
+  }
+
+  fn main() -> i64 {
+    let task: Task<i64> = spawn(sum_four(1, 2, 3, 4));
+    let result: TaskResult<i64> = join_result(task);
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+}

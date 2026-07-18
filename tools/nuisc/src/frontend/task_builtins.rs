@@ -375,6 +375,41 @@ pub(super) fn lower_task_builtin_call(
                 limit: Box::new(lowered_limit),
             }
         }
+        "ready_after" => {
+            if current_domain != "cpu" {
+                return Err(
+                    "ready_after(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                );
+            }
+            let [task, delay] = args else {
+                return Err(
+                    "ready_after(...) expects exactly two arguments: task and delay".to_owned(),
+                );
+            };
+            let lowered_task = lower_task_expr!(task, None)?;
+            ensure_task_like(
+                "ready_after",
+                &lowered_task,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let lowered_delay = lower_task_expr!(delay, Some(&i64_type()))?;
+            let delay_ty = infer_nir_expr_type(&lowered_delay, bindings, signatures, struct_table)
+                .ok_or_else(|| {
+                    "ready_after(...) delay requires an explicit integer type".to_owned()
+                })?;
+            if !delay_ty.is_integer_scalar() {
+                return Err(format!(
+                    "ready_after(...) expects integer delay, found `{}`",
+                    delay_ty.render()
+                ));
+            }
+            NirExpr::CpuReadyAfter {
+                task: Box::new(lowered_task),
+                delay: Box::new(lowered_delay),
+            }
+        }
         _ => return Ok(None),
     };
     Ok(Some(expr))

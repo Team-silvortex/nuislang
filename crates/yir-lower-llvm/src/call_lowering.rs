@@ -6,7 +6,7 @@ use super::{
     call_return::cpu_scalar_kind_llvm_type,
     fresh_reg,
     value_ref::{get_bool, get_f32, get_f64, get_i32, get_i64},
-    CpuCallScalarKind, CpuHelperSignature, LlvmValueRef,
+    CpuCallScalarKind, CpuHelperSignature, LlvmValueRef, TaskThunkArgument,
 };
 
 pub(crate) fn lower_cpu_call_node(
@@ -59,19 +59,35 @@ pub(crate) fn lower_cpu_call_node(
     };
 
     if deferred_task_calls.contains(&node.name)
-        && node.op.instruction == "call_i64"
-        && signature.ret == CpuCallScalarKind::I64
-        && signature.params.as_slice() == [CpuCallScalarKind::I64]
+        && matches!(
+            signature.ret,
+            CpuCallScalarKind::Bool | CpuCallScalarKind::I32 | CpuCallScalarKind::I64
+        )
+        && signature.params.iter().all(|kind| {
+            matches!(
+                kind,
+                CpuCallScalarKind::Bool | CpuCallScalarKind::I32 | CpuCallScalarKind::I64
+            )
+        })
     {
-        let argument = lowered_args[0]
-            .strip_prefix("i64 ")
-            .expect("i64 helper argument should carry its LLVM ABI type")
-            .to_owned();
+        let arguments = lowered_args
+            .iter()
+            .zip(signature.params.iter().copied())
+            .map(|(argument, kind)| TaskThunkArgument {
+                kind,
+                value: argument
+                    .strip_prefix(cpu_scalar_kind_llvm_type(kind))
+                    .and_then(|value| value.strip_prefix(' '))
+                    .expect("scalar helper argument should carry its LLVM ABI type")
+                    .to_owned(),
+            })
+            .collect();
         registers.insert(
             node.name.clone(),
-            LlvmValueRef::DeferredTaskThunkI64 {
+            LlvmValueRef::DeferredTaskThunkScalar {
                 callee: callee.clone(),
-                argument,
+                arguments,
+                return_kind: signature.ret,
             },
         );
         return Ok(true);

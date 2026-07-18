@@ -393,6 +393,10 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
             collect_used_vars_expr(task, out);
             collect_used_vars_expr(limit, out);
         }
+        NirExpr::CpuReadyAfter { task, delay } => {
+            collect_used_vars_expr(task, out);
+            collect_used_vars_expr(delay, out);
+        }
         NirExpr::ShaderProfileColorSeed { base, delta, .. }
         | NirExpr::ShaderProfileRadiusSeed { base, delta, .. } => {
             collect_used_vars_expr(base, out);

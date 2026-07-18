@@ -119,6 +119,7 @@ pub(in crate::project) fn expr_walk_any(
         | NirExpr::CpuExternCall { args, .. }
         | NirExpr::Call { args, .. } => args.iter().any(predicate),
         NirExpr::CpuTimeout { task, limit } => predicate(task) || predicate(limit),
+        NirExpr::CpuReadyAfter { task, delay } => predicate(task) || predicate(delay),
         NirExpr::MethodCall { receiver, args, .. } => {
             predicate(receiver) || args.iter().any(predicate)
         }

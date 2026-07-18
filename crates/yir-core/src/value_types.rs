@@ -279,6 +279,7 @@ pub struct TaskHandle {
     pub label: String,
     pub result: Box<Value>,
     pub limit: Option<i64>,
+    pub ready_delay: i64,
     pub state: TaskLifecycleState,
 }
 

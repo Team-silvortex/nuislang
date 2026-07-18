@@ -309,6 +309,34 @@ pub(super) fn verify_expr_tree(
                 task_result_facts,
             )?;
         }
+        NirExpr::CpuReadyAfter { task, delay } => {
+            verify_expr(
+                task,
+                moved,
+                borrows,
+                borrow_bindings,
+                data_bindings,
+                task_result_facts,
+            )?;
+            let mut next_moved = moved.clone();
+            let mut next_borrows = borrows.clone();
+            let mut next_borrow_bindings = borrow_bindings.clone();
+            apply_guaranteed_expr_effects(
+                task,
+                &mut next_moved,
+                &mut next_borrows,
+                &mut next_borrow_bindings,
+                true,
+            );
+            verify_expr(
+                delay,
+                &next_moved,
+                &next_borrows,
+                &next_borrow_bindings,
+                data_bindings,
+                task_result_facts,
+            )?;
+        }
         NirExpr::DataOutputPipe(inner) | NirExpr::DataInputPipe(inner) => verify_expr(
             inner,
             moved,

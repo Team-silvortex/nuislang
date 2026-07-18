@@ -35,13 +35,16 @@ In the current frontend:
 * `spawn(...)` is only allowed inside `mod cpu <Unit>`
 * `spawn(...)` expects exactly one async function call
 * the callee passed to `spawn(...)` must already be known as `async fn`
-* `join(...)`, `cancel(...)`, `timeout(...)`, and `join_result(...)` are only
-  allowed inside `mod cpu <Unit>`
+* `join(...)`, `cancel(...)`, `timeout(...)`, `ready_after(...)`, and
+  `join_result(...)` are only allowed inside `mod cpu <Unit>`
 * `join(...)`, `cancel(...)`, and `join_result(...)` each expect exactly one
   `Task<...>`-like argument
 * `timeout(...)` expects exactly two arguments:
   * a `Task<...>`
   * an explicit integer timeout limit
+* `ready_after(...)` expects exactly two arguments:
+  * a `Task<...>`
+  * an explicit integer delay in scheduler ticks
 
 If the frontend cannot prove a task-like input, it rejects the expression
 rather than guessing.
@@ -52,6 +55,7 @@ Today the CPU task line has these conceptual types:
 
 * `spawn(async_fn(...)) -> Task<T>`
 * `timeout(Task<T>, i64) -> Task<T>`
+* `ready_after(Task<T>, i64) -> Task<T>`
 * `cancel(Task<T>) -> Task<T>`
 * `join(Task<T>) -> T`
 * `join_result(Task<T>) -> TaskResult<T>`
@@ -162,24 +166,48 @@ Today `nuis` has:
 
 Today the repository also still has one important runtime boundary:
 
-* scalar `i64` task payloads now cross a native scheduler ABI:
+* integer scalar `bool`, `i32`, and `i64` task payloads now cross one packed
+  native scheduler ABI:
   * `nuis_scheduler_task_spawn_i64_v1`
+  * `nuis_scheduler_task_spawn_invoker_i64_v1`
+  * `nuis_scheduler_task_timeout_v1`
+  * `nuis_scheduler_task_cancel_v1`
   * `nuis_scheduler_task_join_state_v1`
   * `nuis_scheduler_task_value_i64_v1`
 * the AOT shim registers a pending task, advances the lifecycle clock while
   joining, commits the completed state from task polling, and reads the payload
   through the runtime task handle
-* unary `async fn(i64) -> i64` calls consumed by `spawn_task` are emitted as
-  deferred helper thunks; task polling invokes the helper through a function
-  pointer before committing the completed state
-* other scalar signatures and aggregate payloads retain the eager/staged
+* arbitrary-arity `bool`/`i32`/`i64` async calls consumed by `spawn_task` are
+  emitted as deferred helper thunks; LLVM-generated `i64(ptr context)` wrappers
+  decode contiguous eight-byte slots into typed arguments and normalize typed
+  returns back into the shared payload slot
+* timeout limits are stored on the native task slot; `limit <= 0` transitions
+  the pending slot directly to `TimedOut`, while positive deadlines continue
+  through lifecycle polling and preserve completed thunk execution
+* `task_timed_out(...)` therefore observes a runtime-produced terminal state
+  in native binaries rather than a lowering-time approximation
+* cancellation transitions a pending native slot directly to `Cancelled`;
+  later joins observe state code `3`, and completed/timeout terminal states are
+  not overwritten
+* thunk storage is normalized as one `NuisSchedulerTaskThunkPacket` per slot,
+  carrying a common invoker and opaque context; completion, timeout,
+  cancellation, startup failure, reset, and shutdown release owned contexts
+* source `ready_after(task, ticks)` lowers through `NIR` to `cpu.ready_after`
+  and updates the pending slot's ready tick through
+  `nuis_scheduler_task_ready_after_v1`
+* positive deadline ordering completes when `ready_delay <= timeout_limit` and
+  times out when readiness is later; non-positive timeout limits remain
+  immediate timeouts
+* floating-point signatures and aggregate payloads retain the eager/staged
   lowering fallback while their scheduler ABI representation is being designed
 
 Today `nuis` does **not** yet have:
 
 * a mature parallel executor
 * a stable worker-pool or lane scheduler contract for tasks
-* runtime timeout/cancellation transitions for the new scalar scheduler ABI
+* a queue-backed timer wheel or mature delayed-work executor beyond the
+  current deterministic task ready-tick model
+* scheduler thunks for floating-point signatures and aggregate payloads
 * shared-state synchronization primitives
 * a finalized concurrent memory model
 

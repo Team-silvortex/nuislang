@@ -82,7 +82,7 @@ pub(crate) fn infer_nir_expr_type(
         NirExpr::CpuTaskValue(result) => {
             result_payload_type(result, bindings, signatures, struct_table)
         }
-        NirExpr::CpuTimeout { task, .. } => {
+        NirExpr::CpuTimeout { task, .. } | NirExpr::CpuReadyAfter { task, .. } => {
             infer_nir_expr_type(task, bindings, signatures, struct_table)
         }
         NirExpr::CpuPresentFrame(_) => Some(unit_type()),

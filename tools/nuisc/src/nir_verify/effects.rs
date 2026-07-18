@@ -106,7 +106,7 @@ pub(super) fn note_binding_effects(
                 borrows.remove(&source);
             }
         }
-        NirExpr::CpuTimeout { task, .. } => {
+        NirExpr::CpuTimeout { task, .. } | NirExpr::CpuReadyAfter { task, .. } => {
             if let Some(source) = expr_resource_key(task) {
                 moved.insert(source.clone());
                 borrows.remove(&source);

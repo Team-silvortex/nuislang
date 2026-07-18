@@ -122,9 +122,145 @@ fn defers_spawned_i64_helper_call_until_scheduler_poll() {
 
     let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
     assert!(llvm_ir.contains("define i64 @nuis_fn_inc(i64 %arg0)"));
-    assert!(llvm_ir.contains("call i64 @nuis_scheduler_task_spawn_thunk_i64_v1(ptr @nuis_fn_inc"));
-    assert!(!llvm_ir.contains("call i64 @nuis_fn_inc(i64"));
+    assert!(llvm_ir
+        .contains("call i64 @nuis_scheduler_task_spawn_invoker_i64_v1(ptr @nuis_task_invoker_inc"));
+    assert!(llvm_ir.contains("define i64 @nuis_task_invoker_inc(ptr %context)"));
+    assert!(llvm_ir.contains("%task_result = call i64 @nuis_fn_inc(i64 %task_arg0)"));
+    let entry = llvm_ir
+        .split("define i64 @nuis_yir_entry()")
+        .nth(1)
+        .expect("scheduler thunk LLVM entry");
+    assert!(!entry.contains("call i64 @nuis_fn_inc(i64"));
     assert!(llvm_ir.contains("call i64 @nuis_scheduler_task_value_i64_v1"));
+}
+
+#[test]
+fn normalizes_spawned_bool_and_i32_helper_scalars_through_i64_slots() {
+    let mut module = module_with_cpu0();
+    push_cpu_node(&mut module, "flag", "cpu.const_bool", vec!["true"]);
+    push_cpu_node(&mut module, "seed", "cpu.const_i32", vec!["-7"]);
+    push_cpu_node(
+        &mut module,
+        "schedule",
+        "cpu.async_call",
+        vec!["pick", "flag", "seed"],
+    );
+    push_cpu_node(
+        &mut module,
+        "invoke",
+        "cpu.call_i32",
+        vec!["pick", "flag", "seed"],
+    );
+    push_cpu_node(
+        &mut module,
+        "task",
+        "cpu.spawn_task",
+        vec!["pick", "invoke"],
+    );
+    push_cpu_node(&mut module, "result", "cpu.join_result", vec!["task"]);
+    push_cpu_node(&mut module, "value", "cpu.task_value", vec!["result"]);
+    push_cpu_node(&mut module, "pick_flag", "cpu.param_bool", vec!["0"]);
+    push_cpu_node(&mut module, "pick_seed", "cpu.param_i32", vec!["1"]);
+    push_cpu_node(&mut module, "pick_ret", "cpu.return_i32", vec!["pick_seed"]);
+    push_deps(
+        &mut module,
+        &[
+            ("flag", "schedule"),
+            ("seed", "schedule"),
+            ("flag", "invoke"),
+            ("seed", "invoke"),
+            ("invoke", "task"),
+            ("task", "result"),
+            ("result", "value"),
+            ("pick_flag", "pick_ret"),
+            ("pick_seed", "pick_ret"),
+        ],
+    );
+    module.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: "schedule".to_owned(),
+        to: "invoke".to_owned(),
+    });
+    for name in ["pick_flag", "pick_seed", "pick_ret"] {
+        module
+            .node_lanes
+            .insert(name.to_owned(), "fn:pick".to_owned());
+    }
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("define i32 @nuis_fn_pick(i1 %arg0, i32 %arg1)"));
+    assert!(llvm_ir.contains("%task_arg0 = trunc i64 %task_arg0_packed to i1"));
+    assert!(llvm_ir.contains("%task_arg1 = trunc i64 %task_arg1_packed to i32"));
+    assert!(
+        llvm_ir.contains("%task_result = call i32 @nuis_fn_pick(i1 %task_arg0, i32 %task_arg1)")
+    );
+    assert!(llvm_ir.contains("%task_result_packed = sext i32 %task_result to i64"));
+    assert!(llvm_ir.contains("call i64 @nuis_scheduler_task_value_i64_v1"));
+    assert!(llvm_ir.matches("trunc i64").count() >= 3, "{llvm_ir}");
+    let entry = llvm_ir
+        .split("define i64 @nuis_yir_entry()")
+        .nth(1)
+        .expect("scheduler scalar thunk LLVM entry");
+    assert!(!entry.contains("call i32 @nuis_fn_pick("));
+}
+
+#[test]
+fn normalizes_spawned_bool_result_through_i64_slot() {
+    let mut module = module_with_cpu0();
+    push_cpu_node(&mut module, "flag", "cpu.const_bool", vec!["true"]);
+    push_cpu_node(
+        &mut module,
+        "schedule",
+        "cpu.async_call",
+        vec!["identity", "flag"],
+    );
+    push_cpu_node(
+        &mut module,
+        "invoke",
+        "cpu.call_bool",
+        vec!["identity", "flag"],
+    );
+    push_cpu_node(
+        &mut module,
+        "task",
+        "cpu.spawn_task",
+        vec!["identity", "invoke"],
+    );
+    push_cpu_node(&mut module, "result", "cpu.join_result", vec!["task"]);
+    push_cpu_node(&mut module, "value", "cpu.task_value", vec!["result"]);
+    push_cpu_node(&mut module, "identity_flag", "cpu.param_bool", vec!["0"]);
+    push_cpu_node(
+        &mut module,
+        "identity_ret",
+        "cpu.return_bool",
+        vec!["identity_flag"],
+    );
+    push_deps(
+        &mut module,
+        &[
+            ("flag", "schedule"),
+            ("flag", "invoke"),
+            ("invoke", "task"),
+            ("task", "result"),
+            ("result", "value"),
+            ("identity_flag", "identity_ret"),
+        ],
+    );
+    module.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: "schedule".to_owned(),
+        to: "invoke".to_owned(),
+    });
+    for name in ["identity_flag", "identity_ret"] {
+        module
+            .node_lanes
+            .insert(name.to_owned(), "fn:identity".to_owned());
+    }
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("define i1 @nuis_fn_identity(i1 %arg0)"));
+    assert!(llvm_ir.contains("%task_result_packed = zext i1 %task_result to i64"));
+    assert!(llvm_ir.matches("trunc i64").count() >= 2, "{llvm_ir}");
 }
 
 #[test]

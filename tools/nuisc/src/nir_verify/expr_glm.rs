@@ -44,7 +44,7 @@ pub(super) fn verify_glm_expr_access(
                         }
                     }
                 }
-                NirExpr::CpuTimeout { task, .. } => {
+                NirExpr::CpuTimeout { task, .. } | NirExpr::CpuReadyAfter { task, .. } => {
                     if let Some(source) = expr_resource_key(task) {
                         if borrows.get(&source).copied().unwrap_or(0) > 0 {
                             return Err(format!(

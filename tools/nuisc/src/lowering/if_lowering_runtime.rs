@@ -213,7 +213,10 @@ fn lower_selected_cpu_binary_runtime_effect(
         return Ok(None);
     }
 
-    let selected_lhs = if lhs.op == SelectableCpuBinaryRuntimeOp::Timeout {
+    let selected_lhs = if matches!(
+        lhs.op,
+        SelectableCpuBinaryRuntimeOp::Timeout | SelectableCpuBinaryRuntimeOp::ReadyAfter
+    ) {
         if let Some(lowered) = lower_selected_cpu_unary_runtime_effect(
             condition_name.clone(),
             lhs.lhs,

@@ -34,6 +34,39 @@ fn lowers_explicit_timeout_on_task_handle() {
 }
 
 #[test]
+fn lowers_explicit_ready_delay_on_task_handle() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn ping() -> i64 {
+            return 7;
+          }
+
+          fn main() -> i64 {
+            let task: Task<i64> = ready_after(spawn(ping()), 4);
+            return join(task);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        function.body.first(),
+        Some(NirStmt::Let {
+            ty: Some(ty),
+            value: NirExpr::CpuReadyAfter { .. },
+            ..
+        }) if ty.render() == "Task<i64>"
+    ));
+}
+
+#[test]
 fn lowers_explicit_join_result_and_task_state_helpers() {
     let module = parse_nuis_module(
         r#"
@@ -299,4 +332,25 @@ fn rejects_timeout_with_non_integer_limit() {
     .unwrap_err();
 
     assert!(error.contains("expects integer limit"));
+}
+
+#[test]
+fn rejects_ready_after_with_non_integer_delay() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn ping() -> i64 {
+            return 7;
+          }
+
+          fn main() -> i64 {
+            let task: Task<i64> = ready_after(spawn(ping()), "slow");
+            return join(task);
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("expects integer delay"));
 }

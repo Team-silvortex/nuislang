@@ -411,6 +411,24 @@ pub(super) fn validate_network_owned_handle_provenance_in_expr(
                 function_return_kinds,
             )?;
         }
+        NirExpr::CpuReadyAfter { task, delay } => {
+            validate_network_owned_handle_provenance_in_expr(
+                task,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+            validate_network_owned_handle_provenance_in_expr(
+                delay,
+                from,
+                to,
+                bindings,
+                function_requirements,
+                function_return_kinds,
+            )?;
+        }
         NirExpr::MethodCall { receiver, args, .. } => {
             validate_network_owned_handle_provenance_in_expr(
                 receiver,

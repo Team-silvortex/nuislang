@@ -347,6 +347,10 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
             collect_instantiated_units_expr(task, units);
             collect_instantiated_units_expr(limit, units);
         }
+        NirExpr::CpuReadyAfter { task, delay } => {
+            collect_instantiated_units_expr(task, units);
+            collect_instantiated_units_expr(delay, units);
+        }
         NirExpr::ShaderBeginPass {
             target,
             pipeline,

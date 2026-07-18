@@ -249,6 +249,7 @@ fn lower_expr(
         | NirExpr::CpuMutexUnlock(_)
         | NirExpr::CpuMutexValue(_)
         | NirExpr::CpuTimeout { .. }
+        | NirExpr::CpuReadyAfter { .. }
         | NirExpr::CpuPresentFrame(_)
         | NirExpr::CpuExternCall { .. }
         | NirExpr::CpuExternCallI32 { .. } => lower_cpu_expr(expr, state, bindings)

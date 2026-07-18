@@ -54,9 +54,14 @@ static int64_t nuis_host_subprocess_len = 0;
 static int64_t nuis_scheduler_task_payloads[256];
 static int64_t nuis_scheduler_task_states[256];
 static int64_t nuis_scheduler_task_ready_ticks[256];
-typedef int64_t (*NuisSchedulerTaskThunkI64)(int64_t);
-static NuisSchedulerTaskThunkI64 nuis_scheduler_task_thunks_i64[256];
-static int64_t nuis_scheduler_task_thunk_args_i64[256];
+static int64_t nuis_scheduler_task_deadline_ticks[256];
+typedef int64_t (*NuisSchedulerTaskInvokerI64)(void*);
+typedef struct {
+    int64_t kind;
+    NuisSchedulerTaskInvokerI64 invoker;
+    void* context;
+} NuisSchedulerTaskThunkPacket;
+static NuisSchedulerTaskThunkPacket nuis_scheduler_task_thunk_packets[256];
 static int64_t nuis_scheduler_task_len = 0;
 "#,
     );
@@ -88,7 +93,18 @@ typedef struct {
 
 static NuisLifecycleState nuis_lifecycle_state = {0, 0, 0, 0, 0, 0, 0, 1};
 
+static void nuis_scheduler_task_release_context_v1(int64_t index) {
+    NuisSchedulerTaskThunkPacket* packet = &nuis_scheduler_task_thunk_packets[index];
+    free(packet->context);
+    packet->kind = 0;
+    packet->invoker = NULL;
+    packet->context = NULL;
+}
+
 static void nuis_lifecycle_state_reset(void) {
+    for (int64_t index = 0; index < nuis_scheduler_task_len; index += 1) {
+        nuis_scheduler_task_release_context_v1(index);
+    }
     nuis_lifecycle_state.phase = 0;
     nuis_lifecycle_state.tick_count = 0;
     nuis_lifecycle_state.task_poll_count = 0;
@@ -108,16 +124,34 @@ static int64_t nuis_lifecycle_on_scheduler_tick_v1(int64_t tick) {
     return tick;
 }
 
+static int64_t nuis_scheduler_task_execute_thunk_v1(int64_t index) {
+    NuisSchedulerTaskThunkPacket* packet = &nuis_scheduler_task_thunk_packets[index];
+    if (packet->kind != 1 || packet->invoker == NULL) {
+        return nuis_scheduler_task_payloads[index];
+    }
+    NuisSchedulerTaskInvokerI64 invoker = packet->invoker;
+    void* context = packet->context;
+    packet->kind = 0;
+    packet->invoker = NULL;
+    packet->context = NULL;
+    int64_t result = invoker(context);
+    free(context);
+    return result;
+}
+
 static int64_t nuis_lifecycle_on_task_poll_v1(void) {
     nuis_lifecycle_state.task_poll_count += 1;
     for (int64_t index = 0; index < nuis_scheduler_task_len; index += 1) {
         if (nuis_scheduler_task_states[index] == 0
             && nuis_scheduler_task_ready_ticks[index] <= nuis_lifecycle_state.tick_count) {
-            if (nuis_scheduler_task_thunks_i64[index] != NULL) {
-                nuis_scheduler_task_payloads[index] =
-                    nuis_scheduler_task_thunks_i64[index](nuis_scheduler_task_thunk_args_i64[index]);
-            }
+            nuis_scheduler_task_payloads[index] =
+                nuis_scheduler_task_execute_thunk_v1(index);
             nuis_scheduler_task_states[index] = 1;
+        } else if (nuis_scheduler_task_states[index] == 0
+            && nuis_scheduler_task_deadline_ticks[index] >= 0
+            && nuis_scheduler_task_deadline_ticks[index] <= nuis_lifecycle_state.tick_count) {
+            nuis_scheduler_task_release_context_v1(index);
+            nuis_scheduler_task_states[index] = 2;
         }
     }
     return nuis_lifecycle_state.task_poll_count;
@@ -199,24 +233,68 @@ int64_t nuis_scheduler_task_spawn_i64_v1(int64_t payload) {
     nuis_scheduler_task_payloads[index] = payload;
     nuis_scheduler_task_states[index] = 0;
     nuis_scheduler_task_ready_ticks[index] = nuis_lifecycle_state.tick_count + 1;
-    nuis_scheduler_task_thunks_i64[index] = NULL;
-    nuis_scheduler_task_thunk_args_i64[index] = 0;
+    nuis_scheduler_task_deadline_ticks[index] = -1;
+    nuis_scheduler_task_thunk_packets[index].kind = 0;
+    nuis_scheduler_task_thunk_packets[index].invoker = NULL;
+    nuis_scheduler_task_thunk_packets[index].context = NULL;
     return index + 1;
 }
 
-int64_t nuis_scheduler_task_spawn_thunk_i64_v1(
-    NuisSchedulerTaskThunkI64 thunk,
-    int64_t argument
+int64_t nuis_scheduler_task_spawn_invoker_i64_v1(
+    NuisSchedulerTaskInvokerI64 invoker,
+    void* context
 ) {
-    if (thunk == NULL || nuis_scheduler_task_len >= 256) return 0;
+    if (invoker == NULL || nuis_scheduler_task_len >= 256) {
+        free(context);
+        return 0;
+    }
     int64_t index = nuis_scheduler_task_len;
     nuis_scheduler_task_len += 1;
     nuis_scheduler_task_payloads[index] = 0;
     nuis_scheduler_task_states[index] = 0;
     nuis_scheduler_task_ready_ticks[index] = nuis_lifecycle_state.tick_count + 1;
-    nuis_scheduler_task_thunks_i64[index] = thunk;
-    nuis_scheduler_task_thunk_args_i64[index] = argument;
+    nuis_scheduler_task_deadline_ticks[index] = -1;
+    nuis_scheduler_task_thunk_packets[index].kind = 1;
+    nuis_scheduler_task_thunk_packets[index].invoker = invoker;
+    nuis_scheduler_task_thunk_packets[index].context = context;
     return index + 1;
+}
+
+void nuis_scheduler_task_ready_after_v1(int64_t task_handle, int64_t delay) {
+    if (task_handle <= 0 || task_handle > nuis_scheduler_task_len) return;
+    int64_t index = task_handle - 1;
+    if (nuis_scheduler_task_states[index] != 0) return;
+    if (delay < 0) delay = 0;
+    if (delay > INT64_MAX - nuis_lifecycle_state.tick_count) {
+        nuis_scheduler_task_ready_ticks[index] = INT64_MAX;
+    } else {
+        nuis_scheduler_task_ready_ticks[index] = nuis_lifecycle_state.tick_count + delay;
+    }
+}
+
+void nuis_scheduler_task_timeout_v1(int64_t task_handle, int64_t limit) {
+    if (task_handle <= 0 || task_handle > nuis_scheduler_task_len) return;
+    int64_t index = task_handle - 1;
+    if (nuis_scheduler_task_states[index] != 0) return;
+    if (limit <= 0) {
+        nuis_scheduler_task_release_context_v1(index);
+        nuis_scheduler_task_states[index] = 2;
+        return;
+    }
+    if (limit > INT64_MAX - nuis_lifecycle_state.tick_count) {
+        nuis_scheduler_task_deadline_ticks[index] = INT64_MAX;
+    } else {
+        nuis_scheduler_task_deadline_ticks[index] = nuis_lifecycle_state.tick_count + limit;
+    }
+}
+
+void nuis_scheduler_task_cancel_v1(int64_t task_handle) {
+    if (task_handle <= 0 || task_handle > nuis_scheduler_task_len) return;
+    int64_t index = task_handle - 1;
+    if (nuis_scheduler_task_states[index] == 0) {
+        nuis_scheduler_task_release_context_v1(index);
+        nuis_scheduler_task_states[index] = 3;
+    }
 }
 
 int64_t nuis_scheduler_task_join_state_v1(int64_t task_handle) {
@@ -239,6 +317,9 @@ static int64_t nuis_lifecycle_shutdown_v1(int64_t status) {
     (void)nuis_lifecycle_on_result_commit_v1(status);
     (void)nuis_lifecycle_on_summary_flush_v1();
     (void)nuis_lifecycle_on_shutdown_prepare_v1(status);
+    for (int64_t index = 0; index < nuis_scheduler_task_len; index += 1) {
+        nuis_scheduler_task_release_context_v1(index);
+    }
     nuis_lifecycle_state.phase = 3;
     nuis_lifecycle_state.last_status = status;
     return status;

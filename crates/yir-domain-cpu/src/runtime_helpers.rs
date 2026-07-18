@@ -19,10 +19,43 @@ pub(crate) fn task_lifecycle_state(task: &yir_core::TaskHandle) -> TaskLifecycle
         TaskLifecycleState::Pending => {
             if matches!(task.limit, Some(limit) if limit <= 0) {
                 TaskLifecycleState::TimedOut
+            } else if matches!(task.limit, Some(limit) if task.ready_delay > limit) {
+                TaskLifecycleState::TimedOut
             } else {
                 TaskLifecycleState::Completed
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn pending_task(ready_delay: i64, limit: i64) -> yir_core::TaskHandle {
+        yir_core::TaskHandle {
+            label: "ordering".to_owned(),
+            result: Box::new(Value::Int(7)),
+            limit: Some(limit),
+            ready_delay,
+            state: TaskLifecycleState::Pending,
+        }
+    }
+
+    #[test]
+    fn task_deadline_ordering_prefers_completion_at_equal_positive_tick() {
+        assert_eq!(
+            task_lifecycle_state(&pending_task(3, 3)),
+            TaskLifecycleState::Completed
+        );
+        assert_eq!(
+            task_lifecycle_state(&pending_task(4, 3)),
+            TaskLifecycleState::TimedOut
+        );
+        assert_eq!(
+            task_lifecycle_state(&pending_task(0, 0)),
+            TaskLifecycleState::TimedOut
+        );
     }
 }
 

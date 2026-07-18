@@ -42,11 +42,11 @@ pub(super) fn describe_cpu_async_node(node: &Node) -> Result<Option<InstructionS
             }
             Ok(InstructionSemantics::effect(node.op.args.clone()))
         }
-        "timeout" => {
+        "timeout" | "ready_after" => {
             if node.op.args.len() != 2 {
                 return Err(format!(
-                    "node `{}` expects `cpu.timeout <name> <resource> <task> <limit>`",
-                    node.name
+                    "node `{}` expects `cpu.{} <name> <resource> <task> <ticks>`",
+                    node.name, node.op.instruction
                 ));
             }
             Ok(InstructionSemantics::effect(node.op.args.clone()))

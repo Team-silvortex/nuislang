@@ -1,0 +1,25 @@
+mod cpu Main {
+  async fn ping(value: i64) -> i64 {
+    return value;
+  }
+
+  fn completed_score(result: TaskResult<i64>) -> i64 {
+    if task_completed(result) {
+      return task_value(result);
+    }
+    return 0;
+  }
+
+  fn timeout_score(result: TaskResult<i64>) -> i64 {
+    if task_timed_out(result) {
+      return 11;
+    }
+    return 0;
+  }
+
+  fn main() -> i64 {
+    let completed: Task<i64> = timeout(ready_after(spawn(ping(7)), 2), 3);
+    let timed_out: Task<i64> = timeout(ready_after(spawn(ping(9)), 4), 3);
+    return completed_score(join_result(completed)) + timeout_score(join_result(timed_out));
+  }
+}

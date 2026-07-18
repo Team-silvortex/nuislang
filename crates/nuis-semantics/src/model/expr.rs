@@ -120,6 +120,10 @@ pub enum NirExpr {
         task: Box<NirExpr>,
         limit: Box<NirExpr>,
     },
+    CpuReadyAfter {
+        task: Box<NirExpr>,
+        delay: Box<NirExpr>,
+    },
     CpuPresentFrame(Box<NirExpr>),
     ShaderProfileTargetRef {
         unit: String,

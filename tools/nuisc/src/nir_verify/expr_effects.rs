@@ -214,6 +214,7 @@ pub(in crate::nir_verify) fn apply_guaranteed_expr_effects(
         | NirExpr::CpuJoinResult(_)
         | NirExpr::CpuThreadJoinResult(_)
         | NirExpr::CpuTimeout { .. }
+        | NirExpr::CpuReadyAfter { .. }
         | NirExpr::CpuMutexLock(_)
         | NirExpr::CpuMutexUnlock(_)
         | NirExpr::BorrowEnd(_) => note_binding_effects(expr, "_", moved, borrows, borrow_bindings),

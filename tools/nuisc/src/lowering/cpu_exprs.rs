@@ -69,6 +69,9 @@ pub(super) fn lower_cpu_expr(
         NirExpr::CpuTimeout { task, limit } => {
             Some(lower_cpu_timeout(task, limit, state, bindings))
         }
+        NirExpr::CpuReadyAfter { task, delay } => {
+            Some(lower_cpu_ready_after(task, delay, state, bindings))
+        }
         NirExpr::CpuPresentFrame(frame) => Some(lower_cpu_present_frame(frame, state, bindings)),
         NirExpr::CpuExternCall {
             abi,
@@ -390,6 +393,39 @@ fn lower_cpu_timeout(
     state.yir.edges.push(Edge {
         kind: EdgeKind::Effect,
         from: limit_name,
+        to: name.clone(),
+    });
+    Ok(name)
+}
+
+fn lower_cpu_ready_after(
+    task: &NirExpr,
+    delay: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    let task_name = lower_expr(task, state, bindings)?;
+    let delay_name = lower_expr(delay, state, bindings)?;
+    let name = next_name(state, "cpu_ready_after");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "ready_after".to_owned(),
+            args: vec![task_name.clone(), delay_name.clone()],
+        },
+    });
+    push_dep_edges(state, &task_name, &name);
+    push_dep_edges(state, &delay_name, &name);
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: task_name,
+        to: name.clone(),
+    });
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: delay_name,
         to: name.clone(),
     });
     Ok(name)

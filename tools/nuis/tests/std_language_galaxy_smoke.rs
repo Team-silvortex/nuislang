@@ -52,6 +52,20 @@ fn assert_file_not_contains(path: &Path, needle: &str, context: &str) {
     );
 }
 
+fn assert_llvm_entry_not_contains(path: &Path, needle: &str, context: &str) {
+    let source = fs::read_to_string(path)
+        .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
+    let entry = source
+        .split("define i64 @nuis_yir_entry()")
+        .nth(1)
+        .unwrap_or_else(|| panic!("expected LLVM entry in {}", path.display()));
+    assert!(
+        !entry.contains(needle),
+        "expected {context} LLVM entry {} not to contain `{needle}`\n{entry}",
+        path.display()
+    );
+}
+
 #[test]
 fn std_language_galaxy_project_runs_std_result_hof_surface() {
     let output_dir = temp_dir("std_language_galaxy_bootstrap");
@@ -384,10 +398,10 @@ fn std_language_galaxy_task_cli_runs_through_task_contracts() {
     );
     assert_file_contains(
         &output_dir.join("std_language_task_cli_demo.ll"),
-        "call i64 @nuis_scheduler_task_spawn_thunk_i64_v1(ptr @nuis_fn_ping",
+        "call i64 @nuis_scheduler_task_spawn_invoker_i64_v1(ptr @nuis_task_invoker_ping",
         "std language task cli scheduler thunk spawn ABI",
     );
-    assert_file_not_contains(
+    assert_llvm_entry_not_contains(
         &output_dir.join("std_language_task_cli_demo.ll"),
         "call i64 @nuis_fn_ping(",
         "std language task cli eager async helper call",
@@ -411,6 +425,261 @@ fn std_language_galaxy_task_cli_runs_through_task_contracts() {
     let stderr = String::from_utf8_lossy(&binary.stderr);
     assert!(stdout.contains("std language task completed"));
     assert!(!stderr.contains("std language task timed out"));
+}
+
+#[test]
+fn task_timeout_reaches_native_scheduler_terminal_state() {
+    let output_dir = temp_dir("task_timeout_runtime");
+    let output_dir_text = output_dir.display().to_string();
+    let build = run_nuis(&[
+        "build",
+        "../../examples/projects/task/task_lifecycle_branch_demo",
+        &output_dir_text,
+    ]);
+    assert_success(&build, "nuis build task timeout runtime");
+
+    let llvm = output_dir.join("task_lifecycle_branch_demo.ll");
+    assert_file_contains(
+        &llvm,
+        "call void @nuis_scheduler_task_timeout_v1",
+        "task timeout scheduler ABI",
+    );
+    assert_file_contains(&llvm, "icmp eq i64", "task timeout runtime state branch");
+
+    let binary = Command::new(output_dir.join("task_lifecycle_branch_demo"))
+        .output()
+        .expect("run task timeout runtime binary");
+    assert_eq!(binary.status.code(), Some(74));
+    assert!(
+        String::from_utf8_lossy(&binary.stdout).contains("task_lifecycle_branch_demo: timed out")
+    );
+}
+
+#[test]
+fn task_ready_delay_orders_completion_against_timeout() {
+    let output_dir = temp_dir("task_ready_delay_ordering");
+    let output_dir_text = output_dir.display().to_string();
+    let build = run_nuis(&[
+        "build",
+        "../../examples/projects/task/task_ready_delay_ordering_demo",
+        &output_dir_text,
+    ]);
+    assert_success(&build, "nuis build task ready delay ordering");
+
+    let llvm = output_dir.join("task_ready_delay_ordering_demo.ll");
+    assert_file_contains(
+        &llvm,
+        "call void @nuis_scheduler_task_ready_after_v1",
+        "task ready delay scheduler ABI",
+    );
+    assert_file_contains(
+        &llvm,
+        "call void @nuis_scheduler_task_timeout_v1",
+        "task timeout scheduler ABI",
+    );
+    assert_file_not_contains(
+        &llvm,
+        "deferred lowering for cpu.ready_after",
+        "task ready delay lowering",
+    );
+
+    let binary = Command::new(output_dir.join("task_ready_delay_ordering_demo"))
+        .output()
+        .expect("run task ready delay ordering binary");
+    assert_eq!(binary.status.code(), Some(18));
+}
+
+#[test]
+fn task_cancel_reaches_native_scheduler_terminal_state() {
+    let output_dir = temp_dir("task_cancel_runtime");
+    let output_dir_text = output_dir.display().to_string();
+    let build = run_nuis(&[
+        "build",
+        "../../examples/projects/task/task_cancel_branch_demo",
+        &output_dir_text,
+    ]);
+    assert_success(&build, "nuis build task cancel runtime");
+
+    let llvm = output_dir.join("task_cancel_branch_demo.ll");
+    assert_file_contains(
+        &llvm,
+        "call i64 @nuis_scheduler_task_spawn_invoker_i64_v1(ptr @nuis_task_invoker_ping, ptr null)",
+        "task cancel deferred zero-argument thunk",
+    );
+    assert_file_contains(
+        &llvm,
+        "call void @nuis_scheduler_task_cancel_v1",
+        "task cancel scheduler ABI",
+    );
+    assert_file_contains(&llvm, "icmp eq i64", "task cancel runtime state branch");
+    assert_llvm_entry_not_contains(
+        &llvm,
+        "call i64 @nuis_fn_ping(",
+        "cancelled eager task thunk",
+    );
+
+    let binary = Command::new(output_dir.join("task_cancel_branch_demo"))
+        .output()
+        .expect("run task cancel runtime binary");
+    assert_eq!(binary.status.code(), Some(71));
+    assert!(String::from_utf8_lossy(&binary.stdout).contains("task_cancel_branch_demo: cancelled"));
+}
+
+#[test]
+fn zero_argument_task_thunk_completes_from_scheduler_poll() {
+    let output_dir = temp_dir("task_zero_argument_thunk");
+    let output_dir_text = output_dir.display().to_string();
+    let build = run_nuis(&[
+        "build",
+        "../../examples/projects/task/task_completed_observe_demo",
+        &output_dir_text,
+    ]);
+    assert_success(&build, "nuis build zero-argument task thunk");
+
+    let llvm = output_dir.join("task_completed_observe_demo.ll");
+    assert_file_contains(
+        &llvm,
+        "call i64 @nuis_scheduler_task_spawn_invoker_i64_v1(ptr @nuis_task_invoker_ping, ptr null)",
+        "zero-argument scheduler thunk ABI",
+    );
+    assert_llvm_entry_not_contains(
+        &llvm,
+        "call i64 @nuis_fn_ping()",
+        "eager zero-argument task thunk",
+    );
+    assert_file_contains(
+        &llvm,
+        "call i64 @nuis_scheduler_task_value_i64_v1",
+        "zero-argument scheduler task payload",
+    );
+
+    let binary = Command::new(output_dir.join("task_completed_observe_demo"))
+        .output()
+        .expect("run zero-argument task thunk binary");
+    assert_eq!(binary.status.code(), Some(7));
+}
+
+#[test]
+fn binary_task_thunk_preserves_recursive_result_family() {
+    let output_dir = temp_dir("task_binary_thunk");
+    let output_dir_text = output_dir.display().to_string();
+    let build = run_nuis(&[
+        "build",
+        "../../examples/projects/task/task_recursive_async_result_family_demo",
+        &output_dir_text,
+    ]);
+    assert_success(&build, "nuis build binary task thunk");
+
+    let llvm_path = output_dir.join("task_recursive_async_result_family_demo.ll");
+    let llvm = fs::read_to_string(&llvm_path).expect("read binary task thunk LLVM");
+    assert_eq!(
+        llvm.matches("call i64 @nuis_scheduler_task_spawn_invoker_i64_v1")
+            .count(),
+        3
+    );
+    let entry = llvm
+        .split("define i64 @nuis_yir_entry()")
+        .nth(1)
+        .expect("binary task thunk LLVM entry");
+    assert!(!entry.contains("call i64 @nuis_fn_sum_down("));
+
+    let binary = Command::new(output_dir.join("task_recursive_async_result_family_demo"))
+        .output()
+        .expect("run binary task thunk result family");
+    assert_eq!(binary.status.code(), Some(14));
+}
+
+#[test]
+fn task_context_supports_more_than_direct_call_arity() {
+    let output_dir = temp_dir("task_context_arity");
+    let output_dir_text = output_dir.display().to_string();
+    let build = run_nuis(&[
+        "build",
+        "../../examples/projects/task/task_context_arity_demo",
+        &output_dir_text,
+    ]);
+    assert_success(&build, "nuis build task context arity");
+
+    let llvm = output_dir.join("task_context_arity_demo.ll");
+    assert_file_contains(
+        &llvm,
+        "call ptr @malloc(i64 32)",
+        "four-argument task context",
+    );
+    assert_file_contains(
+        &llvm,
+        "%task_arg3_ptr = getelementptr i8, ptr %context, i64 24",
+        "fourth task context argument",
+    );
+    assert_file_contains(
+        &llvm,
+        "call i64 @nuis_scheduler_task_spawn_invoker_i64_v1(ptr @nuis_task_invoker_sum_four",
+        "common task context spawn ABI",
+    );
+    assert_llvm_entry_not_contains(
+        &llvm,
+        "call i64 @nuis_fn_sum_four(",
+        "eager four-argument task",
+    );
+
+    let binary = Command::new(output_dir.join("task_context_arity_demo"))
+        .output()
+        .expect("run task context arity binary");
+    assert_eq!(binary.status.code(), Some(10));
+}
+
+#[test]
+fn task_context_normalizes_bool_and_i32_scalars() {
+    let output_dir = temp_dir("task_scalar_context");
+    let output_dir_text = output_dir.display().to_string();
+    let build = run_nuis(&[
+        "build",
+        "../../examples/projects/task/task_scalar_context_demo",
+        &output_dir_text,
+    ]);
+    assert_success(&build, "nuis build task scalar context");
+
+    let llvm = output_dir.join("task_scalar_context_demo.ll");
+    assert_file_contains(
+        &llvm,
+        "define i64 @nuis_task_invoker_pick_i32(ptr %context)",
+        "i32 task invoker",
+    );
+    assert_file_contains(
+        &llvm,
+        "trunc i64 %task_arg0_packed to i1",
+        "bool task argument unpack",
+    );
+    assert_file_contains(
+        &llvm,
+        "trunc i64 %task_arg1_packed to i32",
+        "i32 task argument unpack",
+    );
+    assert_file_contains(
+        &llvm,
+        "sext i32 %task_result to i64",
+        "i32 task result pack",
+    );
+    assert_file_contains(
+        &llvm,
+        "zext i1 %task_result to i64",
+        "bool task result pack",
+    );
+    assert_llvm_entry_not_contains(
+        &llvm,
+        "call i32 @nuis_fn_pick_i32(",
+        "eager i32 task helper",
+    );
+    assert_llvm_entry_not_contains(
+        &llvm,
+        "call i1 @nuis_fn_identity_bool(",
+        "eager bool task helper",
+    );
+
+    let binary = Command::new(output_dir.join("task_scalar_context_demo"))
+        .output()
+        .expect("run task scalar context binary");
+    assert_eq!(binary.status.code(), Some(23));
 }
 
 #[test]

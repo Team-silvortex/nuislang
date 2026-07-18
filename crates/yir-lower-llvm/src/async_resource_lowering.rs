@@ -4,8 +4,9 @@ use super::{
     facts::propagate_known_facts,
     fresh_reg,
     value_ref::{coerce_to_i64, get_mutex, get_mutex_guard, get_task, get_task_result, get_thread},
-    LlvmLoweringState, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef, StructLlvmValueRef,
-    TaskLlvmValueRef, TaskResultLlvmValueRef, ThreadLlvmValueRef,
+    CpuCallScalarKind, LlvmLoweringState, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef,
+    StructLlvmValueRef, TaskLlvmValueRef, TaskResultLlvmValueRef, TaskThunkArgument,
+    ThreadLlvmValueRef,
 };
 
 pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
@@ -51,10 +52,13 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 return true;
             };
             let runtime_handle = match &value_ref {
-                LlvmValueRef::DeferredTaskThunkI64 { callee, argument } => {
+                LlvmValueRef::DeferredTaskThunkScalar {
+                    callee, arguments, ..
+                } => {
+                    let context = emit_scalar_task_context(arguments, state);
                     let handle = fresh_reg(&mut state.next_reg);
                     state.body.push(format!(
-                        "  {handle} = call i64 @nuis_scheduler_task_spawn_thunk_i64_v1(ptr @nuis_fn_{callee}, i64 {argument})"
+                        "  {handle} = call i64 @nuis_scheduler_task_spawn_invoker_i64_v1(ptr @nuis_task_invoker_{callee}, ptr {context})"
                     ));
                     Some(handle)
                 }
@@ -96,6 +100,29 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
             propagate_known_facts(&node.op.args[1], &node.name, &mut state.facts);
             true
         }
+        "cancel" => {
+            let Some(task) = get_task(&state.registers, &node.op.args[0]).cloned() else {
+                state.body.push(format!(
+                    "  ; deferred lowering for cpu.cancel `{}` because its task is outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return true;
+            };
+            if let Some(handle) = task.runtime_handle.as_ref() {
+                state.body.push(format!(
+                    "  call void @nuis_scheduler_task_cancel_v1(i64 {handle})"
+                ));
+            }
+            state.registers.insert(
+                node.name.clone(),
+                LlvmValueRef::Task(TaskLlvmValueRef {
+                    runtime_handle: task.runtime_handle,
+                    value: task.value,
+                }),
+            );
+            propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
+            true
+        }
         "timeout" => {
             let Some(task) = get_task(&state.registers, &node.op.args[0]).cloned() else {
                 state.body.push(format!(
@@ -104,18 +131,69 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 ));
                 return true;
             };
-            let Some(_) = state.registers.get(&node.op.args[1]) else {
+            let Some(duration_ref) = state.registers.get(&node.op.args[1]).cloned() else {
                 state.body.push(format!(
                     "  ; deferred lowering for cpu.timeout `{}` because its duration is outside the current CPU LLVM slice",
                     node.name
                 ));
                 return true;
             };
+            let Some(duration) = coerce_to_i64(&duration_ref, &mut state.body, &mut state.next_reg)
+            else {
+                state.body.push(format!(
+                    "  ; deferred lowering for cpu.timeout `{}` because its duration is not i64-compatible",
+                    node.name
+                ));
+                return true;
+            };
+            if let Some(handle) = task.runtime_handle.as_ref() {
+                state.body.push(format!(
+                    "  call void @nuis_scheduler_task_timeout_v1(i64 {handle}, i64 {duration})"
+                ));
+            }
             state.registers.insert(
                 node.name.clone(),
                 LlvmValueRef::Task(TaskLlvmValueRef {
                     runtime_handle: task.runtime_handle,
                     value: task.value.clone(),
+                }),
+            );
+            propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
+            true
+        }
+        "ready_after" => {
+            let Some(task) = get_task(&state.registers, &node.op.args[0]).cloned() else {
+                state.body.push(format!(
+                    "  ; deferred lowering for cpu.ready_after `{}` because its task is outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return true;
+            };
+            let Some(delay_ref) = state.registers.get(&node.op.args[1]).cloned() else {
+                state.body.push(format!(
+                    "  ; deferred lowering for cpu.ready_after `{}` because its delay is outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return true;
+            };
+            let Some(delay) = coerce_to_i64(&delay_ref, &mut state.body, &mut state.next_reg)
+            else {
+                state.body.push(format!(
+                    "  ; deferred lowering for cpu.ready_after `{}` because its delay is not i64-compatible",
+                    node.name
+                ));
+                return true;
+            };
+            if let Some(handle) = task.runtime_handle.as_ref() {
+                state.body.push(format!(
+                    "  call void @nuis_scheduler_task_ready_after_v1(i64 {handle}, i64 {delay})"
+                ));
+            }
+            state.registers.insert(
+                node.name.clone(),
+                LlvmValueRef::Task(TaskLlvmValueRef {
+                    runtime_handle: task.runtime_handle,
+                    value: task.value,
                 }),
             );
             propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
@@ -254,6 +332,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 ));
                 return true;
             };
+            let runtime_handle = result.runtime_handle;
             let Some(mut value_ref) = result.value.map(|value| *value) else {
                 state.body.push(format!(
                     "  ; deferred lowering for cpu.task_value `{}` because its result carries no payload",
@@ -261,10 +340,16 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 ));
                 return true;
             };
-            if let (
-                Some(handle),
-                LlvmValueRef::I64(_) | LlvmValueRef::DeferredTaskThunkI64 { .. },
-            ) = (result.runtime_handle, &value_ref)
+            if let (Some(handle), LlvmValueRef::DeferredTaskThunkScalar { return_kind, .. }) =
+                (runtime_handle.as_ref(), &value_ref)
+            {
+                let payload = fresh_reg(&mut state.next_reg);
+                state.body.push(format!(
+                    "  {payload} = call i64 @nuis_scheduler_task_value_i64_v1(i64 {handle})"
+                ));
+                value_ref = unpack_task_payload(payload, *return_kind, state);
+            } else if let (Some(handle), LlvmValueRef::I64(_)) =
+                (runtime_handle.as_ref(), &value_ref)
             {
                 let payload = fresh_reg(&mut state.next_reg);
                 state.body.push(format!(
@@ -343,6 +428,83 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
             true
         }
         _ => false,
+    }
+}
+
+fn emit_scalar_task_context(
+    arguments: &[TaskThunkArgument],
+    state: &mut LlvmLoweringState,
+) -> String {
+    if arguments.is_empty() {
+        return "null".to_owned();
+    }
+    let context = fresh_reg(&mut state.next_reg);
+    state.body.push(format!(
+        "  {context} = call ptr @malloc(i64 {})",
+        arguments.len() * 8
+    ));
+    for (index, argument) in arguments.iter().enumerate() {
+        let pointer = if index == 0 {
+            context.clone()
+        } else {
+            let pointer = fresh_reg(&mut state.next_reg);
+            state.body.push(format!(
+                "  {pointer} = getelementptr i8, ptr {context}, i64 {}",
+                index * 8
+            ));
+            pointer
+        };
+        let packed = match argument.kind {
+            CpuCallScalarKind::Bool => {
+                let packed = fresh_reg(&mut state.next_reg);
+                state
+                    .body
+                    .push(format!("  {packed} = zext i1 {} to i64", argument.value));
+                packed
+            }
+            CpuCallScalarKind::I32 => {
+                let packed = fresh_reg(&mut state.next_reg);
+                state
+                    .body
+                    .push(format!("  {packed} = sext i32 {} to i64", argument.value));
+                packed
+            }
+            CpuCallScalarKind::I64 => argument.value.clone(),
+            CpuCallScalarKind::F32 | CpuCallScalarKind::F64 => {
+                unreachable!("floating-point task arguments are not normalized yet")
+            }
+        };
+        state
+            .body
+            .push(format!("  store i64 {packed}, ptr {pointer}, align 8"));
+    }
+    context
+}
+
+fn unpack_task_payload(
+    payload: String,
+    return_kind: CpuCallScalarKind,
+    state: &mut LlvmLoweringState,
+) -> LlvmValueRef {
+    match return_kind {
+        CpuCallScalarKind::Bool => {
+            let i1 = fresh_reg(&mut state.next_reg);
+            state
+                .body
+                .push(format!("  {i1} = trunc i64 {payload} to i1"));
+            LlvmValueRef::Bool { i1, i64: payload }
+        }
+        CpuCallScalarKind::I32 => {
+            let i32 = fresh_reg(&mut state.next_reg);
+            state
+                .body
+                .push(format!("  {i32} = trunc i64 {payload} to i32"));
+            LlvmValueRef::I32(i32)
+        }
+        CpuCallScalarKind::I64 => LlvmValueRef::I64(payload),
+        CpuCallScalarKind::F32 | CpuCallScalarKind::F64 => {
+            unreachable!("floating-point task payloads are not normalized yet")
+        }
     }
 }
 

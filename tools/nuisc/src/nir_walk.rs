@@ -145,6 +145,10 @@ pub(crate) fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
             f(task);
             f(limit);
         }
+        NirExpr::CpuReadyAfter { task, delay } => {
+            f(task);
+            f(delay);
+        }
         NirExpr::MethodCall { receiver, args, .. } => {
             f(receiver);
             for arg in args {

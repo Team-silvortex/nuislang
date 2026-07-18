@@ -65,18 +65,21 @@ impl SelectableCpuCallRuntimeOp {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum SelectableCpuBinaryRuntimeOp {
     Timeout,
+    ReadyAfter,
 }
 
 impl SelectableCpuBinaryRuntimeOp {
     pub(super) fn prefix(self) -> &'static str {
         match self {
             Self::Timeout => "cpu_timeout",
+            Self::ReadyAfter => "cpu_ready_after",
         }
     }
 
     pub(super) fn instruction(self) -> &'static str {
         match self {
             Self::Timeout => "timeout",
+            Self::ReadyAfter => "ready_after",
         }
     }
 }
@@ -123,6 +126,9 @@ pub(super) fn extract_selectable_cpu_binary_runtime_expr(
     match expr {
         NirExpr::CpuTimeout { task, limit } => {
             Some((SelectableCpuBinaryRuntimeOp::Timeout, task, limit))
+        }
+        NirExpr::CpuReadyAfter { task, delay } => {
+            Some((SelectableCpuBinaryRuntimeOp::ReadyAfter, task, delay))
         }
         _ => None,
     }

@@ -444,15 +444,32 @@ only report output. `std_language_build_pipeline_demo` extends that route into
 a four-stage prepare/check/compile/package gate through
 `StdCliContracts.build_pipeline_total` with no LLVM deferred-lowering notes.
 `std_language_task_cli_demo` then carries the same surface into a task-backed
-CLI path through `StdTaskContracts` and real stdout output. Scalar task payloads
-now cross the native scheduler ABI as pending handles. Unary
-`async fn(i64) -> i64` bodies are emitted as deferred helper thunks, invoked by
-task polling on the next lifecycle tick, committed as completed, and read
-through the runtime handle without LLVM deferred-lowering notes. The larger
-`cli_build_pipeline_demo` also retains its auto-injected language gate through
-native LLVM execution. The remaining task/native closure gap is runtime timeout
-and cancellation transitions plus scheduler thunk ABIs for additional scalar
-signatures and aggregate payloads.
+CLI path through `StdTaskContracts` and real stdout output. Integer scalar task
+payloads now cross the native scheduler ABI as pending handles. Arbitrary-arity
+`bool`/`i32`/`i64` async bodies are emitted as deferred helper thunks, then
+normalized through LLVM-generated `i64(ptr context)` wrappers and one runtime
+spawn ABI. Task polling invokes the wrapper on the next lifecycle tick, commits
+completion, and reads through the runtime handle without LLVM deferred-lowering
+notes. Timeout limits
+now bind to the same scheduler slot: a zero limit produces a native `TimedOut`
+terminal state and a positive limit preserves completed thunk execution.
+Cancellation now transitions a pending slot to the native `Cancelled` terminal
+state before join. Runtime slot storage is now one normalized thunk packet with
+a common invoker and opaque context. All terminal paths and shutdown release
+owned contexts. The larger `cli_build_pipeline_demo` also retains its
+auto-injected language gate through native LLVM execution. The remaining
+task/native closure gap is floating-point scalar signatures, aggregate payloads,
+and a mature worker executor.
+
+The source frontend now recognizes `ready_after(task, ticks)`, carries it
+through every NIR visitor to `cpu.ready_after`, stores overflow-safe ready ticks
+in native task slots, and applies completion-at-equal-positive-tick ordering
+consistently with the built-in CPU interpreter. Native smoke coverage locks
+both completion-before-deadline and timeout-before-readiness behavior. The
+same smoke matrix also covers mixed `bool`/`i32` arguments, signed `i32`
+returns, and `bool` returns through the normalized eight-byte slot ABI. The
+remaining scheduler payload gap is `f32`/`f64` bit-preserving packing and
+aggregate payload ownership.
 
 The Nustar checks anchor the bootstrap-critical
 `heterogeneous-runtime/nustar/registered-domain-contracts` cell to:

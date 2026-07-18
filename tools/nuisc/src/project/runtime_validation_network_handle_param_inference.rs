@@ -413,6 +413,20 @@ fn infer_network_param_requirements_in_expr(
                 bindings,
             )?;
         }
+        NirExpr::CpuReadyAfter { task, delay } => {
+            infer_network_param_requirements_in_expr(
+                task,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+            infer_network_param_requirements_in_expr(
+                delay,
+                requirements,
+                function_requirements,
+                bindings,
+            )?;
+        }
         NirExpr::MethodCall { receiver, args, .. } => {
             infer_network_param_requirements_in_expr(
                 receiver,

@@ -63,6 +63,7 @@ If you only want the current task mainline, start with:
   [task_result_windowed_batch_branch_demo](task_result_windowed_batch_branch_demo)
 * timeout, fallback, lifecycle:
   [task_lifecycle_branch_demo](task_lifecycle_branch_demo),
+  [task_ready_delay_ordering_demo](task_ready_delay_ordering_demo),
   [task_cancel_branch_demo](task_cancel_branch_demo),
   [task_fallback_branch_demo](task_fallback_branch_demo),
   [task_policy_branch_demo](task_policy_branch_demo)
@@ -80,6 +81,8 @@ If you only want the current task mainline, start with:
 * observe/clock routes:
   [task_status_observe_demo](task_status_observe_demo),
   [task_completed_observe_demo](task_completed_observe_demo),
+  [task_context_arity_demo](task_context_arity_demo),
+  [task_scalar_context_demo](task_scalar_context_demo),
   [task_compare_observe_demo](task_compare_observe_demo),
   [task_clock_observe_demo](task_clock_observe_demo),
   [task_scheduler_observe_demo](task_scheduler_observe_demo)

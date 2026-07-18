@@ -66,7 +66,7 @@ mod cpu Main {
   fn main() -> i64 {
     let argv_count: i64 = host_argv_count();
     let tick_ns: i64 = host_monotonic_time_ns();
-    let task: Task<i64> = timeout(spawn(ping(argv_count + 1)), 0);
+    let task: Task<i64> = timeout(spawn(ping(argv_count + 1)), 16);
     let result: TaskResult<i64> = join_result(task);
     let language_report: StdLanguageReport =
       build_report(StdTaskContracts.selected_task_value(result) + argv_count + 2);

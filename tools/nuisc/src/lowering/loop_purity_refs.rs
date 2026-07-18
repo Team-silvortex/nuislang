@@ -107,6 +107,10 @@ pub(in crate::lowering) fn expr_references_names(expr: &NirExpr, names: &BTreeSe
             task: lhs,
             limit: rhs,
         }
+        | NirExpr::CpuReadyAfter {
+            task: lhs,
+            delay: rhs,
+        }
         | NirExpr::KernelElementAt {
             input: lhs,
             row: rhs,

@@ -23,14 +23,13 @@ pub(super) fn collect_scheduler_async_thunk_functions(module: &NirModule) -> BTr
         .iter()
         .filter(|function| function.is_async)
         .filter(|function| {
-            function.params.len() == 1
-                && direct_call_scalar_kind(&function.params[0].ty)
-                    == Some(DirectCallScalarKind::I64)
-                && function
-                    .return_type
-                    .as_ref()
-                    .and_then(direct_call_scalar_kind)
-                    == Some(DirectCallScalarKind::I64)
+            function.params.iter().all(|param| {
+                direct_call_scalar_kind(&param.ty).is_some_and(is_scheduler_scalar_kind)
+            }) && function
+                .return_type
+                .as_ref()
+                .and_then(direct_call_scalar_kind)
+                .is_some_and(is_scheduler_scalar_kind)
         })
         .map(|function| function.name.as_str())
         .collect::<BTreeSet<_>>();
@@ -91,6 +90,10 @@ fn collect_scheduler_spawned_functions_in_expr(
         NirExpr::CpuTimeout { task, limit } => {
             collect_scheduler_spawned_functions_in_expr(task, eligible, spawned);
             collect_scheduler_spawned_functions_in_expr(limit, eligible, spawned);
+        }
+        NirExpr::CpuReadyAfter { task, delay } => {
+            collect_scheduler_spawned_functions_in_expr(task, eligible, spawned);
+            collect_scheduler_spawned_functions_in_expr(delay, eligible, spawned);
         }
         NirExpr::Await(value)
         | NirExpr::CpuJoin(value)
@@ -250,6 +253,13 @@ fn direct_call_scalar_kind(ty: &nuis_semantics::model::NirTypeRef) -> Option<Dir
     } else {
         None
     }
+}
+
+fn is_scheduler_scalar_kind(kind: DirectCallScalarKind) -> bool {
+    matches!(
+        kind,
+        DirectCallScalarKind::Bool | DirectCallScalarKind::I32 | DirectCallScalarKind::I64
+    )
 }
 
 fn direct_call_signature_kind(function: &NirFunction) -> Option<DirectCallScalarKind> {
@@ -475,6 +485,10 @@ fn expr_collect_called_functions(
         NirExpr::CpuTimeout { task, limit } => {
             expr_collect_called_functions(task, eligible_names, called);
             expr_collect_called_functions(limit, eligible_names, called);
+        }
+        NirExpr::CpuReadyAfter { task, delay } => {
+            expr_collect_called_functions(task, eligible_names, called);
+            expr_collect_called_functions(delay, eligible_names, called);
         }
         NirExpr::CpuExternCall { args, .. } => {
             for arg in args {

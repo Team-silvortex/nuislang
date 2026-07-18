@@ -4,12 +4,19 @@ use super::KnownFacts;
 
 #[derive(Clone)]
 pub(crate) enum LlvmValueRef {
-    Bool { i1: String, i64: String },
+    Bool {
+        i1: String,
+        i64: String,
+    },
     I32(String),
     I64(String),
     F32(String),
     F64(String),
-    DeferredTaskThunkI64 { callee: String, argument: String },
+    DeferredTaskThunkScalar {
+        callee: String,
+        arguments: Vec<TaskThunkArgument>,
+        return_kind: CpuCallScalarKind,
+    },
     Task(TaskLlvmValueRef),
     Thread(ThreadLlvmValueRef),
     TaskResult(TaskResultLlvmValueRef),
@@ -19,7 +26,10 @@ pub(crate) enum LlvmValueRef {
     Struct(StructLlvmValueRef),
     VariantUnion(VariantUnionLlvmValueRef),
     Ptr(String),
-    TextHandle { ptr: String, handle: String },
+    TextHandle {
+        ptr: String,
+        handle: String,
+    },
     Void,
 }
 #[derive(Clone)]
@@ -86,6 +96,11 @@ pub(crate) enum CpuCallScalarKind {
     I64,
     F32,
     F64,
+}
+#[derive(Clone)]
+pub(crate) struct TaskThunkArgument {
+    pub(crate) kind: CpuCallScalarKind,
+    pub(crate) value: String,
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CpuLoopScalarKind {

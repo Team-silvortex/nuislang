@@ -201,10 +201,10 @@ fn folds_known_task_value_for_lazy_const_select() {
 }
 
 #[test]
-fn folds_known_timeout_task_value_for_lazy_const_select() {
+fn lowers_positive_timeout_task_value_for_lazy_const_select() {
     let mut module = module_with_cpu0();
     push_cpu_const_i64(&mut module, "task_payload", "11");
-    push_cpu_const_i64(&mut module, "timeout_ns", "0");
+    push_cpu_const_i64(&mut module, "timeout_ns", "16");
     push_cpu_node(
         &mut module,
         "task",
@@ -243,11 +243,115 @@ fn folds_known_timeout_task_value_for_lazy_const_select() {
     let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
     assert!(llvm_ir.contains("icmp eq i64"));
     assert!(!llvm_ir.contains("deferred lowering for cpu.timeout `bounded_task`"));
+    assert!(llvm_ir.contains("call void @nuis_scheduler_task_timeout_v1"));
     assert!(!llvm_ir.contains("deferred lowering for cpu.join_result `task_result`"));
     assert!(!llvm_ir.contains("deferred lowering for cpu.task_value `actual`"));
     assert!(!llvm_ir.contains("select i1"));
     assert!(!llvm_ir.contains("deferred lowering for cpu.select `selected`"));
     assert_wrong_variant_chain_not_deferred(&llvm_ir);
+}
+
+#[test]
+fn lowers_cancelled_task_state_through_scheduler_abi() {
+    let mut module = module_with_cpu0();
+    push_cpu_const_i64(&mut module, "task_payload", "11");
+    push_cpu_node(
+        &mut module,
+        "task",
+        "cpu.spawn_task",
+        vec!["task_handle", "task_payload"],
+    );
+    push_cpu_node(&mut module, "cancelled_task", "cpu.cancel", vec!["task"]);
+    push_cpu_node(
+        &mut module,
+        "task_result",
+        "cpu.join_result",
+        vec!["cancelled_task"],
+    );
+    push_cpu_node(
+        &mut module,
+        "cancelled",
+        "cpu.task_cancelled",
+        vec!["task_result"],
+    );
+    push_deps(
+        &mut module,
+        &[
+            ("task_payload", "task"),
+            ("task", "cancelled_task"),
+            ("cancelled_task", "task_result"),
+            ("task_result", "cancelled"),
+        ],
+    );
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("call void @nuis_scheduler_task_cancel_v1"));
+    assert!(llvm_ir.contains("call i64 @nuis_scheduler_task_join_state_v1"));
+    assert!(llvm_ir.contains("icmp eq i64"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.cancel `cancelled_task`"));
+}
+
+#[test]
+fn lowers_ready_delay_before_timeout_and_join() {
+    let mut module = module_with_cpu0();
+    push_cpu_const_i64(&mut module, "task_payload", "11");
+    push_cpu_const_i64(&mut module, "ready_delay", "4");
+    push_cpu_const_i64(&mut module, "timeout_limit", "3");
+    push_cpu_node(
+        &mut module,
+        "task",
+        "cpu.spawn_task",
+        vec!["task_handle", "task_payload"],
+    );
+    push_cpu_node(
+        &mut module,
+        "delayed_task",
+        "cpu.ready_after",
+        vec!["task", "ready_delay"],
+    );
+    push_cpu_node(
+        &mut module,
+        "bounded_task",
+        "cpu.timeout",
+        vec!["delayed_task", "timeout_limit"],
+    );
+    push_cpu_node(
+        &mut module,
+        "task_result",
+        "cpu.join_result",
+        vec!["bounded_task"],
+    );
+    push_cpu_node(
+        &mut module,
+        "timed_out",
+        "cpu.task_timed_out",
+        vec!["task_result"],
+    );
+    push_deps(
+        &mut module,
+        &[
+            ("task_payload", "task"),
+            ("task", "delayed_task"),
+            ("ready_delay", "delayed_task"),
+            ("delayed_task", "bounded_task"),
+            ("timeout_limit", "bounded_task"),
+            ("bounded_task", "task_result"),
+            ("task_result", "timed_out"),
+        ],
+    );
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    let ready = llvm_ir
+        .find("call void @nuis_scheduler_task_ready_after_v1")
+        .expect("ready-delay ABI call");
+    let timeout = llvm_ir
+        .find("call void @nuis_scheduler_task_timeout_v1")
+        .expect("timeout ABI call");
+    let join = llvm_ir
+        .find("call i64 @nuis_scheduler_task_join_state_v1")
+        .expect("join ABI call");
+    assert!(ready < timeout && timeout < join);
+    assert!(!llvm_ir.contains("deferred lowering for cpu.ready_after `delayed_task`"));
 }
 
 #[test]

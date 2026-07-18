@@ -256,7 +256,8 @@ pub(in crate::lowering) fn expr_contains_async_loop_primitive(expr: &NirExpr) ->
         | NirExpr::CpuMutexLock(_)
         | NirExpr::CpuMutexUnlock(_)
         | NirExpr::CpuMutexValue(_)
-        | NirExpr::CpuTimeout { .. } => true,
+        | NirExpr::CpuTimeout { .. }
+        | NirExpr::CpuReadyAfter { .. } => true,
         NirExpr::Borrow(inner)
         | NirExpr::BorrowEnd(inner)
         | NirExpr::Move(inner)

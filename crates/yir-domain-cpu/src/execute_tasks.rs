@@ -22,6 +22,7 @@ pub(crate) fn execute_cpu_task_node(
                 label: format!("{callee}@{}", node.name),
                 result: Box::new(result),
                 limit: None,
+                ready_delay: 1,
                 state: TaskLifecycleState::Pending,
             }))
         }
@@ -86,6 +87,7 @@ pub(crate) fn execute_cpu_task_node(
             let label = task.label.clone();
             let result = (*task.result).clone();
             let limit = task.limit;
+            let ready_delay = task.ready_delay;
             state.push_resource_event(
                 resource,
                 format!(
@@ -97,6 +99,7 @@ pub(crate) fn execute_cpu_task_node(
                 label,
                 result: Box::new(result),
                 limit,
+                ready_delay,
                 state: TaskLifecycleState::Cancelled,
             }))
         }
@@ -170,7 +173,8 @@ pub(crate) fn execute_cpu_task_node(
             let label = task.label.clone();
             let result = (*task.result).clone();
             let limit = state.expect_int(&node.op.args[1])?;
-            let lifecycle = task_lifecycle_state(task);
+            let ready_delay = task.ready_delay;
+            let lifecycle = task.state;
             state.push_resource_event(
                 resource,
                 format!(
@@ -182,6 +186,29 @@ pub(crate) fn execute_cpu_task_node(
                 label,
                 result: Box::new(result),
                 limit: Some(limit),
+                ready_delay,
+                state: lifecycle,
+            }))
+        }
+        "ready_after" => {
+            let task = state.expect_task(&node.op.args[0])?;
+            let label = task.label.clone();
+            let result = (*task.result).clone();
+            let limit = task.limit;
+            let lifecycle = task.state;
+            let ready_delay = state.expect_int(&node.op.args[1])?.max(0);
+            state.push_resource_event(
+                resource,
+                format!(
+                    "effect cpu.ready_after @{} [{}]: {} <= {}",
+                    node.resource, resource.kind.raw, label, ready_delay
+                ),
+            );
+            Ok(Value::Task(yir_core::TaskHandle {
+                label,
+                result: Box::new(result),
+                limit,
+                ready_delay,
                 state: lifecycle,
             }))
         }

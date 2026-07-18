@@ -26,6 +26,7 @@ fn is_branch_local_runtime_consumer(expr: &NirExpr) -> bool {
             | NirExpr::CpuMutexLock(_)
             | NirExpr::CpuMutexUnlock(_)
             | NirExpr::CpuTimeout { .. }
+            | NirExpr::CpuReadyAfter { .. }
     )
 }
 

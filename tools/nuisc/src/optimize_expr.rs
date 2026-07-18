@@ -190,6 +190,17 @@ pub(super) fn simplify_expr(
                 left || right,
             )
         }
+        NirExpr::CpuReadyAfter { task, delay } => {
+            let (task, left) = simplify_expr(*task, env, inline_templates, active_inline);
+            let (delay, right) = simplify_expr(*delay, env, inline_templates, active_inline);
+            (
+                NirExpr::CpuReadyAfter {
+                    task: Box::new(task),
+                    delay: Box::new(delay),
+                },
+                left || right,
+            )
+        }
         NirExpr::CpuPresentFrame(inner) => {
             let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
             (NirExpr::CpuPresentFrame(Box::new(inner)), changed)

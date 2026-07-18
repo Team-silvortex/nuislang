@@ -61,6 +61,7 @@ impl Operation {
             }
             (OperationDomainFamily::Cpu, "cancel") => SemanticOp::CpuCancel,
             (OperationDomainFamily::Cpu, "timeout") => SemanticOp::CpuTimeout,
+            (OperationDomainFamily::Cpu, "ready_after") => SemanticOp::CpuReadyAfter,
             (OperationDomainFamily::Cpu, "join_result")
             | (OperationDomainFamily::Cpu, "thread_join_result") => SemanticOp::CpuJoinResult,
             (OperationDomainFamily::Cpu, "task_completed") => SemanticOp::CpuTaskCompleted,
@@ -174,6 +175,7 @@ impl Operation {
             SemanticOp::CpuJoin => Some(AsyncCoreOp::JoinTask),
             SemanticOp::CpuCancel => Some(AsyncCoreOp::CancelTask),
             SemanticOp::CpuTimeout => Some(AsyncCoreOp::TimeoutTask),
+            SemanticOp::CpuReadyAfter => Some(AsyncCoreOp::DelayTask),
             SemanticOp::CpuJoinResult => Some(AsyncCoreOp::ObserveTaskResult),
             SemanticOp::CpuTaskCompleted => Some(AsyncCoreOp::ProbeTaskCompleted),
             SemanticOp::CpuTaskTimedOut => Some(AsyncCoreOp::ProbeTaskTimedOut),

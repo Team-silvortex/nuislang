@@ -151,6 +151,10 @@ pub(super) fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Resu
             verify_expr_uses(task, moved)?;
             verify_expr_uses(limit, moved)?;
         }
+        NirExpr::CpuReadyAfter { task, delay } => {
+            verify_expr_uses(task, moved)?;
+            verify_expr_uses(delay, moved)?;
+        }
         NirExpr::ShaderBeginPass {
             target,
             pipeline,

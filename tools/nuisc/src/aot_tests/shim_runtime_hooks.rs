@@ -17,11 +17,21 @@ fn c_shim_source_includes_native_cli_runtime_hooks() {
     assert!(shim.contains("static int64_t nuis_lifecycle_on_scheduler_tick_v1(int64_t tick)"));
     assert!(shim.contains("static int64_t nuis_lifecycle_on_task_poll_v1(void)"));
     assert!(shim.contains("static int64_t nuis_scheduler_task_states[256];"));
-    assert!(shim.contains("static NuisSchedulerTaskThunkI64 nuis_scheduler_task_thunks_i64[256];"));
+    assert!(shim.contains("typedef struct {\n    int64_t kind;"));
+    assert!(shim
+        .contains("static NuisSchedulerTaskThunkPacket nuis_scheduler_task_thunk_packets[256];"));
+    assert!(shim.contains("static int64_t nuis_scheduler_task_execute_thunk_v1(int64_t index)"));
+    assert!(!shim.contains("nuis_scheduler_task_thunks_zero_i64[256]"));
+    assert!(!shim.contains("nuis_scheduler_task_thunks_binary_i64[256]"));
     assert!(shim.contains("nuis_scheduler_task_states[index] = 1;"));
     assert!(shim.contains("int64_t nuis_scheduler_task_spawn_i64_v1(int64_t payload)"));
-    assert!(shim.contains("int64_t nuis_scheduler_task_spawn_thunk_i64_v1("));
-    assert!(shim.contains("nuis_scheduler_task_thunks_i64[index]("));
+    assert!(shim.contains("int64_t nuis_scheduler_task_spawn_invoker_i64_v1("));
+    assert!(shim.contains("void nuis_scheduler_task_ready_after_v1("));
+    assert!(shim.contains(
+        "nuis_scheduler_task_ready_ticks[index] = nuis_lifecycle_state.tick_count + delay;"
+    ));
+    assert!(shim.contains("int64_t result = invoker(context);"));
+    assert!(shim.contains("nuis_scheduler_task_release_context_v1(index);"));
     assert!(shim.contains("int64_t nuis_scheduler_task_join_state_v1(int64_t task_handle)"));
     assert!(shim.contains("int64_t nuis_scheduler_task_value_i64_v1(int64_t task_handle)"));
     assert!(shim.contains("(void)nuis_lifecycle_tick_once_v1();"));

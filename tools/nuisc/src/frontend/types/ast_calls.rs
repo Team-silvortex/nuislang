@@ -111,7 +111,7 @@ pub(super) fn infer_ast_call_type(input: AstCallInferenceInput<'_>) -> Option<As
                 .flatten()?;
             Some(ast_generic_named_type("Thread", vec![payload]))
         }
-        "timeout" => {
+        "timeout" | "ready_after" => {
             let [task, _] = args else {
                 return None;
             };

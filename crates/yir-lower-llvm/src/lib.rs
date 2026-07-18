@@ -97,7 +97,7 @@ pub(crate) use types::{
     CpuCallScalarKind, CpuHelperSignature, CpuLoopScalarKind, EmittedCpuFunction,
     LlvmLoweringState, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef,
     NetworkResultLlvmValueRef, StructLlvmValueRef, TaskLlvmValueRef, TaskResultLlvmValueRef,
-    ThreadLlvmValueRef, VariantUnionLlvmValueRef,
+    TaskThunkArgument, ThreadLlvmValueRef, VariantUnionLlvmValueRef,
 };
 use value_ref::coerce_to_i64;
 pub fn emit_module(module: &YirModule) -> Result<String, String> {
@@ -227,6 +227,14 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
             "define {ret_sig} @nuis_fn_{function_name}({args_sig}) {{\n{}\n}}\n",
             emitted.body
         ));
+        if let Some(invoker) = render_scalar_task_invoker(
+            function_name,
+            helper_signatures
+                .get(function_name)
+                .expect("helper signature should exist"),
+        ) {
+            helper_defs.push(invoker);
+        }
     }
 
     let entry_nodes = order
@@ -259,7 +267,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
 %cpu.node = type {{ i64, ptr }}\n\
 declare ptr @malloc(i64)\ndeclare void @free(ptr)\ndeclare i32 @puts(ptr)\ndeclare i64 @nuis_host_text_lift(ptr)\ndeclare ptr @nuis_host_text_ptr(i64)\n\
 declare void @nuis_debug_print_bool(i32)\ndeclare void @nuis_debug_print_i32(i32)\ndeclare void @nuis_debug_print_i64(i64)\ndeclare void @nuis_debug_print_f32(float)\ndeclare void @nuis_debug_print_f64(double)\n\n\
-declare i64 @nuis_scheduler_task_spawn_i64_v1(i64)\ndeclare i64 @nuis_scheduler_task_spawn_thunk_i64_v1(ptr, i64)\ndeclare i64 @nuis_scheduler_task_join_state_v1(i64)\ndeclare i64 @nuis_scheduler_task_value_i64_v1(i64)\n\
+declare i64 @nuis_scheduler_task_spawn_i64_v1(i64)\ndeclare i64 @nuis_scheduler_task_spawn_invoker_i64_v1(ptr, ptr)\ndeclare void @nuis_scheduler_task_timeout_v1(i64, i64)\ndeclare void @nuis_scheduler_task_ready_after_v1(i64, i64)\ndeclare void @nuis_scheduler_task_cancel_v1(i64)\ndeclare i64 @nuis_scheduler_task_join_state_v1(i64)\ndeclare i64 @nuis_scheduler_task_value_i64_v1(i64)\n\
 declare i64 @host_color_bias(i64)\ndeclare i64 @host_speed_curve(i64)\ndeclare i64 @host_radius_curve(i64)\ndeclare i64 @host_mix_tick(i64, i64)\ndeclare i64 @host_text_handle(i64)\ndeclare i64 @host_text_len(i64)\ndeclare i64 @host_text_line_count(i64)\ndeclare i64 @host_text_word_count(i64)\ndeclare i64 @host_text_concat(i64, i64)\n\
 declare i64 @host_argv_count()\ndeclare i64 @host_argv_at(i64)\ndeclare i64 @host_env_has(i64)\ndeclare i64 @host_env_get(i64)\ndeclare i64 @host_file_open(i64, i64)\ndeclare i64 @host_file_read(i64, i64, i64)\ndeclare i64 @host_file_write(i64, i64)\ndeclare i64 @host_file_close(i64)\n\
 declare i64 @host_stdout_write(i64)\ndeclare i64 @host_stdout_flush()\ndeclare i64 @host_stderr_write(i64)\ndeclare i64 @host_stderr_flush()\ndeclare i64 @host_serialize_i64_into(i64, i64, i64)\ndeclare i64 @host_serialize_text_into(i64, i64, i64)\ndeclare i64 @host_deserialize_text_from(i64, i64, i64)\ndeclare i64 @host_monotonic_time_ns()\n\
@@ -273,6 +281,83 @@ define i64 @nuis_yir_entry() {{\n{}\n}}\n",
         helper_defs.join("\n"),
         entry_emitted.body
     ))
+}
+
+fn render_scalar_task_invoker(
+    function_name: &str,
+    signature: &CpuHelperSignature,
+) -> Option<String> {
+    if !is_normalized_task_scalar(signature.ret)
+        || signature
+            .params
+            .iter()
+            .any(|kind| !is_normalized_task_scalar(*kind))
+    {
+        return None;
+    }
+    let mut body = Vec::new();
+    let mut call_args = Vec::new();
+    for (index, kind) in signature.params.iter().copied().enumerate() {
+        let pointer = if index == 0 {
+            "%context".to_owned()
+        } else {
+            let pointer = format!("%task_arg{index}_ptr");
+            body.push(format!(
+                "  {pointer} = getelementptr i8, ptr %context, i64 {}",
+                index * 8
+            ));
+            pointer
+        };
+        let packed = if kind == CpuCallScalarKind::I64 {
+            format!("%task_arg{index}")
+        } else {
+            format!("%task_arg{index}_packed")
+        };
+        body.push(format!("  {packed} = load i64, ptr {pointer}, align 8"));
+        let argument = match kind {
+            CpuCallScalarKind::Bool => {
+                let argument = format!("%task_arg{index}");
+                body.push(format!("  {argument} = trunc i64 {packed} to i1"));
+                argument
+            }
+            CpuCallScalarKind::I32 => {
+                let argument = format!("%task_arg{index}");
+                body.push(format!("  {argument} = trunc i64 {packed} to i32"));
+                argument
+            }
+            CpuCallScalarKind::I64 => packed,
+            CpuCallScalarKind::F32 | CpuCallScalarKind::F64 => unreachable!(),
+        };
+        call_args.push(format!("{} {argument}", cpu_scalar_kind_llvm_type(kind)));
+    }
+    let return_ty = cpu_scalar_kind_llvm_type(signature.ret);
+    body.push(format!(
+        "  %task_result = call {return_ty} @nuis_fn_{function_name}({})",
+        call_args.join(", ")
+    ));
+    match signature.ret {
+        CpuCallScalarKind::Bool => {
+            body.push("  %task_result_packed = zext i1 %task_result to i64".to_owned());
+            body.push("  ret i64 %task_result_packed".to_owned());
+        }
+        CpuCallScalarKind::I32 => {
+            body.push("  %task_result_packed = sext i32 %task_result to i64".to_owned());
+            body.push("  ret i64 %task_result_packed".to_owned());
+        }
+        CpuCallScalarKind::I64 => body.push("  ret i64 %task_result".to_owned()),
+        CpuCallScalarKind::F32 | CpuCallScalarKind::F64 => unreachable!(),
+    }
+    Some(format!(
+        "define i64 @nuis_task_invoker_{function_name}(ptr %context) {{\n{}\n}}\n",
+        body.join("\n")
+    ))
+}
+
+fn is_normalized_task_scalar(kind: CpuCallScalarKind) -> bool {
+    matches!(
+        kind,
+        CpuCallScalarKind::Bool | CpuCallScalarKind::I32 | CpuCallScalarKind::I64
+    )
 }
 
 #[cfg(test)]

@@ -45,7 +45,10 @@ pub(super) fn emit_cpu_function(
             module.nodes.iter().any(|candidate| {
                 &candidate.name == *call_name
                     && candidate.op.module == "cpu"
-                    && candidate.op.instruction == "call_i64"
+                    && matches!(
+                        candidate.op.instruction.as_str(),
+                        "call_bool" | "call_i32" | "call_i64"
+                    )
             })
         })
         .cloned()
