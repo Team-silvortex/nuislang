@@ -342,8 +342,51 @@ scalar helper into a static function lane, pass the current iteration through
 fixed rank-two opcode. A `ref Buffer` capture is one logical YIR parameter with
 an explicit Lifetime edge and expands to LLVM `(ptr, len)`, so the helper can
 perform length-aware Bytes copies while async task invokers remain closed to the
-borrowed kind. Owned Bytes copy/move capture and ownership return across this
-helper boundary remain future work.
+borrowed kind. Explicit `copy_bytes(buffer)` arguments now use a
+`copy_owned:<buffer>` action operand with Dep and Lifetime edges. LLVM creates a
+fresh scheduler-owned blob on every iteration, passes it through
+`cpu.param_owned_bytes`, and helper cleanup releases it exactly once. Direct
+existing-`Bytes` operands remain rejected instead of implying clone semantics.
+The general source `move(Bytes)` operation lowers to `cpu.move_owned_bytes`,
+which preserves blob identity in interpreted and LLVM execution rather than
+allocating another copy. A scoped `move(bytes)` operand becomes
+`move_owned:<bytes>` only when nuisc can prove the counted loop executes exactly
+once. LLVM passes the existing blob; zero-trip, repeating, non-constant, and
+unnamed-owner moves fail before code generation. Direct and recursive helpers
+return the unique blob through `cpu.return_owned_bytes` / `cpu.call_owned_bytes`
+and the LLVM `ptr` ABI, so the caller can resume ownership without copying.
+Repeating scoped helpers use `scoped_call_owned_return`: LLVM carries the unique
+blob through a `ptr` state slot, stores each helper return on the backedge, and
+exposes the final owner through `cpu.loop_owned_result`. Same-name typed Bytes
+rebinding is therefore safe without repeated copies. Dynamic `if` returns may
+now converge that same explicitly moved owner through
+`cpu.select_owned_bytes`, which lowers to an LLVM pointer select and retains
+one-copy/one-drop accounting. Distinct candidates lower through
+`cpu.select_owned_bytes_drop_unselected`; GLM consumes both owners, LLVM drops
+the unselected blob in mutually exclusive branch blocks, and a `phi ptr`
+transfers the selected blob to the caller for its final drop. Conditional unary
+`Bytes -> Bytes` helper returns now lower through
+`cpu.branch_call_owned_bytes`; both helpers are static lanes, while LLVM uses
+real then/else call blocks and a `phi ptr`, so only the selected helper runs.
+Its counted segmented argument ABI carries branch-specific pure
+`bool/i32/i64/f32/f64` SSA values after the shared owner; calls, I/O, async, and
+stateful expressions remain rejected so unselected effects cannot run eagerly.
+Exact-one scoped-loop moves now use the lowering constant environment rather
+than requiring literal YIR nodes: cycle-safe local bindings, integer arithmetic,
+comparisons, and casts may prove initial/limit/step facts. The first condition
+must hold and the checked first update must make it false; zero-trip, repeated,
+overflowing, and unresolved loops remain rejected. Nested conditional survivor
+states now use `cpu.select_owned_bytes_tree`. Its YIR-core prefix-tree protocol
+stores each unique owner once even when several leaves return it; GLM therefore
+records one `Own` per resource. LLVM emits nested branch blocks, drops every
+unselected unique owner at the selected leaf, and merges all survivors through
+one multi-entry `phi ptr`. Tree leaves may either return an owner directly or
+invoke a registered static `(Bytes, scalar...) -> Bytes` helper with pure
+`bool/i32/i64/f32/f64` arguments. LLVM places the call inside the selected leaf
+after cleaning up other owners, while GLM still consumes each unique owner only
+once. Nested conditions are restricted to pure expressions so lowering cannot
+eagerly execute branch-local effects. Normalized `match`, enum, and pointer
+leaf policies remain future work.
 
 Today `nuis` does **not** yet have:
 

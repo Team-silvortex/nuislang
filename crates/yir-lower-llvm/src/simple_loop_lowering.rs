@@ -4,7 +4,7 @@ use yir_core::Node;
 
 use super::{
     fresh_block, fresh_reg,
-    loop_effect_action::{begin_loop_effect_action, finish_loop_effect_action},
+    loop_effect_action::{begin_loop_effect_action, finish_loop_effect_action, LoopEffectCleanup},
     value_ref::coerce_to_i64,
     CpuHelperSignature, LlvmValueRef,
 };
@@ -60,9 +60,44 @@ pub(crate) fn lower_cpu_simple_loop_node(
             };
             let cmp_kind = node.op.args[3].as_str();
             let step_kind = node.op.args[4].as_str();
+            let owned_return = if node.op.instruction == "loop_while_i64_effect"
+                && node.op.args.get(6).map(String::as_str) == Some("scoped_call_owned_return")
+            {
+                let result_name = node.op.args.get(9).cloned().ok_or_else(|| {
+                    format!(
+                        "cpu.loop_while_i64_effect `{}` has no owned result projection",
+                        node.name
+                    )
+                })?;
+                let source_name = node.op.args[10..]
+                    .iter()
+                    .find_map(|arg| arg.strip_prefix("move_owned:"))
+                    .ok_or_else(|| {
+                        format!(
+                            "cpu.loop_while_i64_effect `{}` owned return has no moved owner",
+                            node.name
+                        )
+                    })?
+                    .to_owned();
+                let Some(LlvmValueRef::OwnedBytes { blob }) = registers.get(&source_name) else {
+                    return Err(format!(
+                        "cpu.loop_while_i64_effect `{}` cannot resolve moved owner `{source_name}`",
+                        node.name
+                    ));
+                };
+                Some((result_name, source_name, blob.clone()))
+            } else {
+                None
+            };
             let loop_slot = fresh_reg(next_reg);
             body.push(format!("  {loop_slot} = alloca i64"));
             body.push(format!("  store i64 {initial}, ptr {loop_slot}"));
+            let owned_slot = owned_return.as_ref().map(|(_, _, blob)| {
+                let slot = fresh_reg(next_reg);
+                body.push(format!("  {slot} = alloca ptr"));
+                body.push(format!("  store ptr {blob}, ptr {slot}"));
+                slot
+            });
             let loop_cond = fresh_block(next_block, "loop_while_i64_cond");
             let loop_body = fresh_block(next_block, "loop_while_i64_body");
             let loop_exit = fresh_block(next_block, "loop_while_i64_exit");
@@ -90,6 +125,12 @@ pub(crate) fn lower_cpu_simple_loop_node(
                 "  br i1 {cmp}, label %{loop_body}, label %{loop_exit}"
             ));
             body.push(format!("{loop_body}:"));
+            let mut owned_move_overrides = BTreeMap::new();
+            if let (Some((_, source, _)), Some(slot)) = (&owned_return, &owned_slot) {
+                let blob = fresh_reg(next_reg);
+                body.push(format!("  {blob} = load ptr, ptr {slot}"));
+                owned_move_overrides.insert(source.clone(), blob);
+            }
             let effect_cleanup = (node.op.instruction == "loop_while_i64_effect")
                 .then(|| {
                     begin_loop_effect_action(
@@ -99,6 +140,7 @@ pub(crate) fn lower_cpu_simple_loop_node(
                         registers,
                         buffer_lengths,
                         helper_signatures,
+                        &owned_move_overrides,
                         &current,
                         next_reg,
                     )
@@ -124,11 +166,20 @@ pub(crate) fn lower_cpu_simple_loop_node(
             };
             body.push(format!("  store i64 {next_value}, ptr {loop_slot}"));
             if let Some(cleanup) = effect_cleanup {
+                if let (LoopEffectCleanup::OwnedResult(blob), Some(slot)) = (&cleanup, &owned_slot)
+                {
+                    body.push(format!("  store ptr {blob}, ptr {slot}"));
+                }
                 finish_loop_effect_action(&cleanup, body);
             }
             body.push(format!("  br label %{loop_cond}"));
             body.push(format!("{loop_exit}:"));
             registers.insert(node.name.clone(), LlvmValueRef::I64(current.clone()));
+            if let (Some((result, _, _)), Some(slot)) = (owned_return, owned_slot) {
+                let blob = fresh_reg(next_reg);
+                body.push(format!("  {blob} = load ptr, ptr {slot}"));
+                registers.insert(result, LlvmValueRef::OwnedBytes { blob });
+            }
             *last_cpu_value = Some(current);
         }
         _ => return Ok(false),

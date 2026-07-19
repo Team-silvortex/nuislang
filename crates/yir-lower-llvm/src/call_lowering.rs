@@ -1,13 +1,176 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use yir_core::Node;
+use yir_core::{parse_branch_owned_call_args, Node};
 
 use super::{
     call_return::cpu_scalar_kind_llvm_type,
-    fresh_reg,
-    value_ref::{get_bool, get_f32, get_f64, get_i32, get_i64, get_ptr},
+    fresh_block, fresh_reg,
+    value_ref::{coerce_to_i64, get_bool, get_f32, get_f64, get_i32, get_i64, get_ptr},
     CpuCallScalarKind, CpuHelperSignature, LlvmValueRef, TaskThunkArgument,
 };
+
+pub(crate) fn lower_cpu_branch_owned_call_node(
+    node: &Node,
+    body: &mut Vec<String>,
+    registers: &mut BTreeMap<String, LlvmValueRef>,
+    helper_signatures: &BTreeMap<String, CpuHelperSignature>,
+    next_reg: &mut usize,
+    next_block: &mut usize,
+) -> Result<bool, String> {
+    if node.op.module != "cpu" || node.op.instruction != "branch_call_owned_bytes" {
+        return Ok(false);
+    }
+    let Some(args) = parse_branch_owned_call_args(&node.op.args) else {
+        return Err(format!(
+            "cpu.branch_call_owned_bytes `{}` has invalid scalar argument segments",
+            node.name
+        ));
+    };
+    let then_callee = args.then_callee;
+    let else_callee = args.else_callee;
+    let then_signature = branch_owned_helper_signature(
+        node,
+        then_callee,
+        args.then_scalar_args.len(),
+        helper_signatures,
+    )?;
+    let else_signature = branch_owned_helper_signature(
+        node,
+        else_callee,
+        args.else_scalar_args.len(),
+        helper_signatures,
+    )?;
+    let Some(condition) = registers.get(args.condition) else {
+        body.push(format!(
+            "  ; deferred lowering for cpu.branch_call_owned_bytes `{}` because its condition is outside the current CPU LLVM slice",
+            node.name
+        ));
+        return Ok(true);
+    };
+    let Some(condition) = coerce_to_i64(condition, body, next_reg) else {
+        body.push(format!(
+            "  ; deferred lowering for cpu.branch_call_owned_bytes `{}` because its condition is not coercible to i64",
+            node.name
+        ));
+        return Ok(true);
+    };
+    let Some(LlvmValueRef::OwnedBytes { blob: owner }) = registers.get(args.owner) else {
+        body.push(format!(
+            "  ; deferred lowering for cpu.branch_call_owned_bytes `{}` because its owner is outside the current CPU LLVM slice",
+            node.name
+        ));
+        return Ok(true);
+    };
+    let owner = owner.clone();
+    let Some(then_scalar_args) = lower_branch_scalar_args(
+        registers,
+        args.then_scalar_args,
+        &then_signature.params[1..],
+    ) else {
+        body.push(format!(
+            "  ; deferred lowering for cpu.branch_call_owned_bytes `{}` because one or more then scalar inputs are outside the current CPU LLVM slice",
+            node.name
+        ));
+        return Ok(true);
+    };
+    let Some(else_scalar_args) = lower_branch_scalar_args(
+        registers,
+        args.else_scalar_args,
+        &else_signature.params[1..],
+    ) else {
+        body.push(format!(
+            "  ; deferred lowering for cpu.branch_call_owned_bytes `{}` because one or more else scalar inputs are outside the current CPU LLVM slice",
+            node.name
+        ));
+        return Ok(true);
+    };
+    let then_call_args = std::iter::once(format!("ptr {owner}"))
+        .chain(then_scalar_args)
+        .collect::<Vec<_>>()
+        .join(", ");
+    let else_call_args = std::iter::once(format!("ptr {owner}"))
+        .chain(else_scalar_args)
+        .collect::<Vec<_>>()
+        .join(", ");
+    let condition_i1 = fresh_reg(next_reg);
+    let then_result = fresh_reg(next_reg);
+    let else_result = fresh_reg(next_reg);
+    let result = fresh_reg(next_reg);
+    let then_label = fresh_block(next_block, "branch_owned_call_then");
+    let else_label = fresh_block(next_block, "branch_owned_call_else");
+    let merge_label = fresh_block(next_block, "branch_owned_call_merge");
+    body.push(format!("  {condition_i1} = icmp ne i64 {condition}, 0"));
+    body.push(format!(
+        "  br i1 {condition_i1}, label %{then_label}, label %{else_label}"
+    ));
+    body.push(format!("{then_label}:"));
+    body.push(format!(
+        "  {then_result} = call ptr @nuis_fn_{then_callee}({then_call_args})"
+    ));
+    body.push(format!("  br label %{merge_label}"));
+    body.push(format!("{else_label}:"));
+    body.push(format!(
+        "  {else_result} = call ptr @nuis_fn_{else_callee}({else_call_args})"
+    ));
+    body.push(format!("  br label %{merge_label}"));
+    body.push(format!("{merge_label}:"));
+    body.push(format!(
+        "  {result} = phi ptr [ {then_result}, %{then_label} ], [ {else_result}, %{else_label} ]"
+    ));
+    registers.insert(node.name.clone(), LlvmValueRef::OwnedBytes { blob: result });
+    Ok(true)
+}
+
+pub(crate) fn branch_owned_helper_signature<'a>(
+    node: &Node,
+    callee: &str,
+    scalar_count: usize,
+    helper_signatures: &'a BTreeMap<String, CpuHelperSignature>,
+) -> Result<&'a CpuHelperSignature, String> {
+    let signature = helper_signatures.get(callee).ok_or_else(|| {
+        format!(
+            "{} `{}` references unavailable owned helper `{callee}`",
+            node.op.full_name(),
+            node.name
+        )
+    })?;
+    if signature.ret != CpuCallScalarKind::OwnedBytes
+        || signature.params.first() != Some(&CpuCallScalarKind::OwnedBytes)
+        || signature.params.len() != scalar_count + 1
+        || signature.params[1..].iter().any(|kind| {
+            matches!(
+                kind,
+                CpuCallScalarKind::BorrowedBuffer | CpuCallScalarKind::OwnedBytes
+            )
+        })
+    {
+        return Err(format!(
+            "{} `{}` requires `{callee}` to have signature (Bytes, scalar...) -> Bytes matching its encoded arguments",
+            node.op.full_name(), node.name
+        ));
+    }
+    Ok(signature)
+}
+
+pub(crate) fn lower_branch_scalar_args(
+    registers: &BTreeMap<String, LlvmValueRef>,
+    args: &[String],
+    kinds: &[CpuCallScalarKind],
+) -> Option<Vec<String>> {
+    args.iter()
+        .zip(kinds)
+        .map(|(arg, kind)| match kind {
+            CpuCallScalarKind::Bool => get_bool(registers, arg).map(|value| format!("i1 {value}")),
+            CpuCallScalarKind::I32 => get_i32(registers, arg).map(|value| format!("i32 {value}")),
+            CpuCallScalarKind::I64 => get_i64(registers, arg).map(|value| format!("i64 {value}")),
+            CpuCallScalarKind::F32 => get_f32(registers, arg).map(|value| format!("float {value}")),
+            CpuCallScalarKind::F64 => {
+                get_f64(registers, arg).map(|value| format!("double {value}"))
+            }
+            CpuCallScalarKind::BorrowedBuffer | CpuCallScalarKind::OwnedBytes => None,
+        })
+        .collect()
+}
 
 pub(crate) fn lower_cpu_call_node(
     node: &Node,
@@ -24,7 +187,13 @@ pub(crate) fn lower_cpu_call_node(
     }
     if !matches!(
         node.op.instruction.as_str(),
-        "call_bool" | "call_i32" | "call_i64" | "call_f32" | "call_f64" | "call_owned_struct"
+        "call_bool"
+            | "call_i32"
+            | "call_i64"
+            | "call_f32"
+            | "call_f64"
+            | "call_owned_bytes"
+            | "call_owned_struct"
     ) {
         return Ok(false);
     }
@@ -61,6 +230,10 @@ pub(crate) fn lower_cpu_call_node(
             CpuCallScalarKind::BorrowedBuffer => get_ptr(registers, arg)
                 .zip(buffer_lengths.get(arg))
                 .map(|(ptr, len)| vec![format!("ptr {ptr}"), format!("i64 {len}")]),
+            CpuCallScalarKind::OwnedBytes => match registers.get(arg) {
+                Some(LlvmValueRef::OwnedBytes { blob }) => Some(vec![format!("ptr {blob}")]),
+                _ => None,
+            },
         })
         .collect::<Option<Vec<_>>>()
         .map(|args| args.into_iter().flatten().collect::<Vec<_>>());
@@ -217,6 +390,9 @@ pub(crate) fn lower_cpu_call_node(
             *last_cpu_value = Some(as_i64);
         }
         CpuCallScalarKind::BorrowedBuffer => unreachable!("borrowed refs cannot return"),
+        CpuCallScalarKind::OwnedBytes => {
+            registers.insert(node.name.clone(), LlvmValueRef::OwnedBytes { blob: reg });
+        }
     }
 
     Ok(true)

@@ -553,6 +553,9 @@ fn emit_scalar_task_context(
             CpuCallScalarKind::BorrowedBuffer => {
                 unreachable!("borrowed buffers cannot enter async task payloads")
             }
+            CpuCallScalarKind::OwnedBytes => {
+                unreachable!("direct owned Bytes params cannot enter scalar task payloads")
+            }
         };
         state
             .body
@@ -602,6 +605,9 @@ fn unpack_task_payload(
         }
         CpuCallScalarKind::BorrowedBuffer => {
             unreachable!("borrowed buffers cannot return from async tasks")
+        }
+        CpuCallScalarKind::OwnedBytes => {
+            unreachable!("direct owned Bytes params cannot return from scalar tasks")
         }
     }
 }

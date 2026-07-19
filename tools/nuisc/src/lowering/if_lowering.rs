@@ -62,6 +62,68 @@ fn describe_if_stmt_shape(stmt: &NirStmt) -> &'static str {
     }
 }
 
+fn owned_bytes_move_source(
+    expr: &NirExpr,
+    state: &LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Option<String> {
+    let NirExpr::Move(value) = expr else {
+        return None;
+    };
+    let NirExpr::Var(binding) = value.as_ref() else {
+        return None;
+    };
+    let source = bindings.get(binding)?;
+    state
+        .yir
+        .nodes
+        .iter()
+        .find(|node| node.name == *source)
+        .filter(|node| {
+            matches!(
+                node.op.instruction.as_str(),
+                "copy_buffer_owned"
+                    | "move_owned_bytes"
+                    | "param_owned_bytes"
+                    | "call_owned_bytes"
+                    | "loop_owned_result"
+                    | "select_owned_bytes"
+                    | "select_owned_bytes_drop_unselected"
+                    | "branch_call_owned_bytes"
+            )
+        })
+        .map(|_| source.clone())
+}
+
+fn lower_owned_bytes_return_select(
+    condition_name: String,
+    then_expr: &NirExpr,
+    else_expr: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<Option<String>, String> {
+    let Some(then_name) = owned_bytes_move_source(then_expr, state, bindings) else {
+        return Ok(None);
+    };
+    let Some(else_name) = owned_bytes_move_source(else_expr, state, bindings) else {
+        return Ok(None);
+    };
+    if then_name != else_name {
+        return Ok(Some(lower_select_owned_bytes_drop_unselected(
+            condition_name,
+            then_name,
+            else_name,
+            state,
+        )));
+    }
+    Ok(Some(lower_select_owned_bytes(
+        condition_name,
+        then_name,
+        else_name,
+        state,
+    )))
+}
+
 fn lower_prepared_host_call_return(
     calls: &[PreparedHostCall],
     returned: &PreparedHostCallReturn,
@@ -163,10 +225,44 @@ pub(super) fn lower_if_pair(
         return Ok(lowered);
     }
 
+    if let Some(returned) = lower_conditional_owned_return_call(
+        condition_name.clone(),
+        then_body,
+        else_body,
+        state,
+        bindings,
+    )? {
+        return Ok(LoweredIfOutcome::Returned(returned));
+    }
+
+    if let Some(returned) = lower_nested_owned_return_tree(
+        condition_name.clone(),
+        then_body,
+        else_body,
+        state,
+        bindings,
+    )? {
+        return Ok(LoweredIfOutcome::Returned(returned));
+    }
+
     if let Some(lowered) =
         lower_matching_call_return(&condition_name, then_body, else_body, state, bindings)?
     {
         return Ok(lowered);
+    }
+
+    if let ([NirStmt::Return(Some(then_expr))], [NirStmt::Return(Some(else_expr))]) =
+        (then_body, else_body)
+    {
+        if let Some(selected) = lower_owned_bytes_return_select(
+            condition_name.clone(),
+            then_expr,
+            else_expr,
+            state,
+            bindings,
+        )? {
+            return Ok(LoweredIfOutcome::Returned(selected));
+        }
     }
 
     if else_body.is_empty() {
@@ -233,6 +329,15 @@ pub(super) fn lower_if_pair(
                     return Ok(LoweredIfOutcome::Continued);
                 }
                 (PreparedTerminalBranch::Return(lhs), PreparedTerminalBranch::Return(rhs)) => {
+                    if let Some(selected) = lower_owned_bytes_return_select(
+                        condition_name.clone(),
+                        &lhs,
+                        &rhs,
+                        state,
+                        bindings,
+                    )? {
+                        return Ok(LoweredIfOutcome::Returned(selected));
+                    }
                     let lhs_name = lower_expr(&lhs, state, bindings)?;
                     let rhs_name = lower_expr(&rhs, state, bindings)?;
                     let selected = lower_select(condition_name, lhs_name, rhs_name, state)?;

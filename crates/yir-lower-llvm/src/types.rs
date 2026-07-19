@@ -105,6 +105,7 @@ pub(crate) enum CpuCallScalarKind {
     F32,
     F64,
     BorrowedBuffer,
+    OwnedBytes,
 }
 #[derive(Clone)]
 pub(crate) struct TaskThunkArgument {

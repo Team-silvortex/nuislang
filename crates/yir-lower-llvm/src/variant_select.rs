@@ -165,6 +165,16 @@ pub(crate) fn emit_select_value(
             Some(LlvmValueRef::Ptr(reg))
         }
         (
+            LlvmValueRef::OwnedBytes { blob: then_blob },
+            LlvmValueRef::OwnedBytes { blob: else_blob },
+        ) => {
+            let blob = fresh_reg(next_reg);
+            body.push(format!(
+                "  {blob} = select i1 {cond_bool}, ptr {then_blob}, ptr {else_blob}"
+            ));
+            Some(LlvmValueRef::OwnedBytes { blob })
+        }
+        (
             LlvmValueRef::TextHandle {
                 ptr: then_ptr,
                 handle: then_handle,

@@ -51,9 +51,27 @@ fn copy_buffer_owned_is_independent_from_source_mutation() {
     assert_eq!(bytes, Value::OwnedBytes(vec![7, 7, 7]));
 
     state.values.insert("bytes".to_owned(), bytes);
+    let moved = cpu
+        .execute(
+            &cpu_node("moved", "cpu.move_owned_bytes", vec!["bytes"]),
+            &resource,
+            &mut state,
+        )
+        .expect("owned bytes move");
+    assert_eq!(moved, Value::OwnedBytes(vec![7, 7, 7]));
+    state.values.insert("moved".to_owned(), moved);
+    let returned = cpu
+        .execute(
+            &cpu_node("returned", "cpu.return_owned_bytes", vec!["moved"]),
+            &resource,
+            &mut state,
+        )
+        .expect("owned bytes return");
+    assert_eq!(returned, Value::OwnedBytes(vec![7, 7, 7]));
+    state.values.insert("returned".to_owned(), returned);
     let byte_len = cpu
         .execute(
-            &cpu_node("byte_len", "cpu.owned_bytes_len", vec!["bytes"]),
+            &cpu_node("byte_len", "cpu.owned_bytes_len", vec!["returned"]),
             &resource,
             &mut state,
         )
@@ -61,12 +79,171 @@ fn copy_buffer_owned_is_independent_from_source_mutation() {
     assert_eq!(byte_len, Value::Int(24));
     let dropped = cpu
         .execute(
-            &cpu_node("dropped", "cpu.drop_owned_bytes", vec!["bytes"]),
+            &cpu_node("dropped", "cpu.drop_owned_bytes", vec!["returned"]),
             &resource,
             &mut state,
         )
         .expect("owned bytes drop");
     assert_eq!(dropped, Value::Unit);
+}
+
+#[test]
+fn select_owned_bytes_executes_as_a_typed_resource_choice() {
+    let cpu = CpuMod;
+    let resource = cpu_resource();
+    let mut state = ExecutionState::default();
+    state.values.insert("cond".to_owned(), Value::Bool(false));
+    state
+        .values
+        .insert("then_bytes".to_owned(), Value::OwnedBytes(vec![1, 2]));
+    state
+        .values
+        .insert("else_bytes".to_owned(), Value::OwnedBytes(vec![7, 8, 9]));
+
+    let selected = cpu
+        .execute(
+            &cpu_node(
+                "selected",
+                "cpu.select_owned_bytes",
+                vec!["cond", "then_bytes", "else_bytes"],
+            ),
+            &resource,
+            &mut state,
+        )
+        .expect("owned bytes select should execute");
+    assert_eq!(selected, Value::OwnedBytes(vec![7, 8, 9]));
+
+    state.values.insert("not_bytes".to_owned(), Value::Int(1));
+    let error = cpu
+        .execute(
+            &cpu_node(
+                "invalid",
+                "cpu.select_owned_bytes",
+                vec!["cond", "then_bytes", "not_bytes"],
+            ),
+            &resource,
+            &mut state,
+        )
+        .expect_err("owned bytes select must reject scalar candidates");
+    assert!(error.contains("expects owned bytes in both select branches"));
+}
+
+#[test]
+fn distinct_owned_bytes_select_executes_as_a_typed_resource_choice() {
+    let cpu = CpuMod;
+    let resource = cpu_resource();
+    let mut state = ExecutionState::default();
+    state.values.insert("cond".to_owned(), Value::Bool(true));
+    state
+        .values
+        .insert("left".to_owned(), Value::OwnedBytes(vec![1, 2]));
+    state
+        .values
+        .insert("right".to_owned(), Value::OwnedBytes(vec![7, 8, 9]));
+
+    let selected = cpu
+        .execute(
+            &cpu_node(
+                "selected",
+                "cpu.select_owned_bytes_drop_unselected",
+                vec!["cond", "left", "right"],
+            ),
+            &resource,
+            &mut state,
+        )
+        .expect("owned bytes cleanup select should execute");
+    assert_eq!(selected, Value::OwnedBytes(vec![1, 2]));
+}
+
+#[test]
+fn nested_owned_select_tree_interpreter_chooses_runtime_leaf() {
+    let cpu = CpuMod;
+    let resource = cpu_resource();
+    let mut state = ExecutionState::default();
+    state.values.insert("outer".to_owned(), Value::Bool(true));
+    state.values.insert("inner".to_owned(), Value::Bool(false));
+    state
+        .values
+        .insert("left".to_owned(), Value::OwnedBytes(vec![1]));
+    state
+        .values
+        .insert("right".to_owned(), Value::OwnedBytes(vec![7, 8]));
+
+    let selected = cpu
+        .execute(
+            &cpu_node(
+                "selected",
+                "cpu.select_owned_bytes_tree",
+                vec![
+                    "2", "left", "right", "if", "outer", "if", "inner", "owner", "0", "owner", "1",
+                    "owner", "0",
+                ],
+            ),
+            &resource,
+            &mut state,
+        )
+        .expect("nested owned select tree should execute");
+    assert_eq!(selected, Value::OwnedBytes(vec![7, 8]));
+}
+
+#[test]
+fn nested_owned_select_tree_interpreter_accepts_static_call_leaf() {
+    let cpu = CpuMod;
+    let resource = cpu_resource();
+    let mut state = ExecutionState::default();
+    state.values.insert("outer".to_owned(), Value::Bool(false));
+    state.values.insert("delta".to_owned(), Value::Int(3));
+    state
+        .values
+        .insert("left".to_owned(), Value::OwnedBytes(vec![1, 2]));
+    state
+        .values
+        .insert("right".to_owned(), Value::OwnedBytes(vec![7]));
+
+    let selected = cpu
+        .execute(
+            &cpu_node(
+                "selected",
+                "cpu.select_owned_bytes_tree",
+                vec![
+                    "2", "left", "right", "if", "outer", "owner", "1", "call", "keep", "0", "1",
+                    "delta",
+                ],
+            ),
+            &resource,
+            &mut state,
+        )
+        .expect("tree call leaf should execute");
+    assert_eq!(selected, Value::OwnedBytes(vec![1, 2]));
+}
+
+#[test]
+fn branch_owned_call_interpreter_selects_one_static_helper() {
+    let cpu = CpuMod;
+    let resource = cpu_resource();
+    let mut state = ExecutionState::default();
+    state.values.insert("cond".to_owned(), Value::Bool(true));
+    state
+        .values
+        .insert("bytes".to_owned(), Value::OwnedBytes(vec![4, 5, 6]));
+
+    let selected = cpu
+        .execute(
+            &cpu_node(
+                "selected",
+                "cpu.branch_call_owned_bytes",
+                vec!["cond", "left", "right", "bytes", "0", "0"],
+            ),
+            &resource,
+            &mut state,
+        )
+        .expect("branch owned call should execute");
+    assert_eq!(selected, Value::OwnedBytes(vec![4, 5, 6]));
+    assert!(state
+        .events
+        .iter()
+        .any(|event| event.contains("cpu.branch_call_owned_bytes") && event.contains("left")));
+    assert!(!state.events.iter().any(|event| event.contains("right")));
 }
 
 #[test]

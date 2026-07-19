@@ -23,6 +23,17 @@ pub(crate) fn lower_cpu_memory_node(
     }
 
     match node.op.instruction.as_str() {
+        "loop_owned_result" => {
+            if !matches!(
+                registers.get(&node.name),
+                Some(LlvmValueRef::OwnedBytes { .. })
+            ) {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.loop_owned_result `{}` because its loop result is unavailable",
+                    node.name
+                ));
+            }
+        }
         "alloc_node" => {
             let (Some(value), Some(next_ptr)) = (
                 get_i64(registers, &node.op.args[0]),
@@ -146,6 +157,19 @@ pub(crate) fn lower_cpu_memory_node(
                 stable_glm_token(&node.name)
             ));
             registers.insert(node.name.clone(), LlvmValueRef::OwnedBytes { blob });
+        }
+        "move_owned_bytes" => {
+            let Some(LlvmValueRef::OwnedBytes { blob }) = registers.get(&node.op.args[0]) else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.move_owned_bytes `{}` because its input is outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return Ok(true);
+            };
+            registers.insert(
+                node.name.clone(),
+                LlvmValueRef::OwnedBytes { blob: blob.clone() },
+            );
         }
         "owned_bytes_len" => {
             let Some(LlvmValueRef::OwnedBytes { blob }) = registers.get(&node.op.args[0]) else {

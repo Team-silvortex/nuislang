@@ -8,6 +8,7 @@ enum DirectCallScalarKind {
     F32,
     F64,
     BorrowedBuffer,
+    OwnedBytes,
 }
 
 pub(super) fn collect_recursive_direct_call_functions(module: &NirModule) -> BTreeSet<String> {
@@ -251,6 +252,9 @@ fn direct_call_scalar_kind(ty: &nuis_semantics::model::NirTypeRef) -> Option<Dir
     }
     if ty.is_ref {
         return (ty.name == "Buffer").then_some(DirectCallScalarKind::BorrowedBuffer);
+    }
+    if ty.name == "Bytes" {
+        return Some(DirectCallScalarKind::OwnedBytes);
     }
     if ty.is_bool_scalar() {
         Some(DirectCallScalarKind::Bool)
@@ -633,6 +637,7 @@ pub(super) fn lower_direct_call_helper_function(
             DirectCallScalarKind::F32 => "param_f32",
             DirectCallScalarKind::F64 => "param_f64",
             DirectCallScalarKind::BorrowedBuffer => "param_buffer_ref",
+            DirectCallScalarKind::OwnedBytes => "param_owned_bytes",
         };
         state.yir.nodes.push(Node {
             name: node_name.clone(),
@@ -665,6 +670,7 @@ pub(super) fn lower_direct_call_helper_function(
             DirectCallScalarKind::F32 => "return_f32",
             DirectCallScalarKind::F64 => "return_f64",
             DirectCallScalarKind::BorrowedBuffer => unreachable!("borrowed refs cannot return"),
+            DirectCallScalarKind::OwnedBytes => "return_owned_bytes",
         }
     };
     state.yir.nodes.push(Node {
@@ -710,6 +716,7 @@ pub(super) fn push_direct_call_node(
             DirectCallScalarKind::F32 => "call_f32",
             DirectCallScalarKind::F64 => "call_f64",
             DirectCallScalarKind::BorrowedBuffer => unreachable!("borrowed refs cannot return"),
+            DirectCallScalarKind::OwnedBytes => "call_owned_bytes",
         }
     };
     let mut op_args = vec![function.name.clone()];

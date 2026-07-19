@@ -1,6 +1,9 @@
 use std::fmt;
 
-use crate::{Operation, SemanticOp};
+use crate::{
+    owned_select_tree_conditions, owned_select_tree_scalar_args, parse_branch_owned_call_args,
+    parse_owned_select_tree_args, Operation, SemanticOp,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GlmValueClass {
@@ -201,6 +204,88 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
             }],
             effect: GlmEffect::None,
         },
+        _ if op.module == "cpu" && op.instruction == "loop_while_i64_effect" => {
+            cpu_effect_loop_profile(op)
+        }
+        _ if op.module == "cpu" && op.instruction == "select_owned_bytes" => GlmNodeProfile {
+            result_class: GlmValueClass::Res,
+            accesses: vec![
+                value_read(&op.args[0]),
+                GlmAccess {
+                    input: op.args[1].clone(),
+                    class: GlmValueClass::Res,
+                    mode: GlmUseMode::Own,
+                },
+                GlmAccess {
+                    input: op.args[2].clone(),
+                    class: GlmValueClass::Res,
+                    mode: GlmUseMode::Own,
+                },
+            ],
+            effect: GlmEffect::None,
+        },
+        _ if op.module == "cpu" && op.instruction == "select_owned_bytes_drop_unselected" => {
+            GlmNodeProfile {
+                result_class: GlmValueClass::Res,
+                accesses: vec![
+                    value_read(&op.args[0]),
+                    GlmAccess {
+                        input: op.args[1].clone(),
+                        class: GlmValueClass::Res,
+                        mode: GlmUseMode::Own,
+                    },
+                    GlmAccess {
+                        input: op.args[2].clone(),
+                        class: GlmValueClass::Res,
+                        mode: GlmUseMode::Own,
+                    },
+                ],
+                effect: GlmEffect::DomainMove,
+            }
+        }
+        _ if op.module == "cpu" && op.instruction == "branch_call_owned_bytes" => GlmNodeProfile {
+            result_class: GlmValueClass::Res,
+            accesses: {
+                let mut accesses = Vec::new();
+                if let Some(args) = parse_branch_owned_call_args(&op.args) {
+                    accesses.push(value_read_str(args.condition));
+                    accesses.push(GlmAccess {
+                        input: args.owner.to_owned(),
+                        class: GlmValueClass::Res,
+                        mode: GlmUseMode::Own,
+                    });
+                    accesses.extend(
+                        args.then_scalar_args
+                            .iter()
+                            .chain(args.else_scalar_args)
+                            .map(value_read),
+                    );
+                }
+                accesses
+            },
+            effect: GlmEffect::DomainMove,
+        },
+        _ if op.module == "cpu" && op.instruction == "select_owned_bytes_tree" => {
+            let mut accesses = Vec::new();
+            if let Some(args) = parse_owned_select_tree_args(&op.args) {
+                let mut conditions = Vec::new();
+                owned_select_tree_conditions(&args.tree, &mut conditions);
+                accesses.extend(conditions.into_iter().map(value_read_str));
+                let mut scalar_args = Vec::new();
+                owned_select_tree_scalar_args(&args.tree, &mut scalar_args);
+                accesses.extend(scalar_args.into_iter().map(value_read_str));
+                accesses.extend(args.owners.iter().map(|owner| GlmAccess {
+                    input: owner.clone(),
+                    class: GlmValueClass::Res,
+                    mode: GlmUseMode::Own,
+                }));
+            }
+            GlmNodeProfile {
+                result_class: GlmValueClass::Res,
+                accesses,
+                effect: GlmEffect::DomainMove,
+            }
+        }
         _ if op.is_async_core_op() => GlmNodeProfile {
             result_class: GlmValueClass::Val,
             accesses: op
@@ -227,5 +312,59 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
                 .collect(),
             effect: GlmEffect::None,
         },
+    }
+}
+
+fn cpu_effect_loop_profile(op: &Operation) -> GlmNodeProfile {
+    let mut accesses = op.args.iter().take(3).map(value_read).collect::<Vec<_>>();
+    let operand_start = match op.args.get(6).map(String::as_str) {
+        Some("owned_bytes_copy_drop") => 8,
+        Some("scoped_call") => 9,
+        Some("scoped_call_owned_return") => 10,
+        _ => op.args.len(),
+    };
+    let mut moves_owned = false;
+    for operand in op.args.iter().skip(operand_start) {
+        if operand == "$current" {
+            continue;
+        }
+        let (input, class, mode) = if let Some(input) = operand.strip_prefix("copy_owned:") {
+            (input, GlmValueClass::Res, GlmUseMode::Read)
+        } else if let Some(input) = operand.strip_prefix("move_owned:") {
+            moves_owned = true;
+            (input, GlmValueClass::Res, GlmUseMode::Own)
+        } else {
+            (operand.as_str(), GlmValueClass::Val, GlmUseMode::Read)
+        };
+        accesses.push(GlmAccess {
+            input: input.to_owned(),
+            class,
+            mode,
+        });
+    }
+    GlmNodeProfile {
+        result_class: GlmValueClass::Val,
+        accesses,
+        effect: if moves_owned {
+            GlmEffect::DomainMove
+        } else {
+            GlmEffect::None
+        },
+    }
+}
+
+fn value_read(input: &String) -> GlmAccess {
+    GlmAccess {
+        input: input.clone(),
+        class: GlmValueClass::Val,
+        mode: GlmUseMode::Read,
+    }
+}
+
+fn value_read_str(input: &str) -> GlmAccess {
+    GlmAccess {
+        input: input.to_owned(),
+        class: GlmValueClass::Val,
+        mode: GlmUseMode::Read,
     }
 }

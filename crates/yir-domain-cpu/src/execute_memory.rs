@@ -109,6 +109,12 @@ pub(crate) fn execute_cpu_memory_node(
             );
             Ok(Value::OwnedBytes(elements))
         }
+        "move_owned_bytes" => {
+            let Value::OwnedBytes(bytes) = state.expect_value(&node.op.args[0])? else {
+                return Err(format!("node `{}` expects owned bytes", node.name));
+            };
+            Ok(Value::OwnedBytes(bytes.clone()))
+        }
         "owned_bytes_len" => {
             let Value::OwnedBytes(bytes) = state.expect_value(&node.op.args[0])? else {
                 return Err(format!("node `{}` expects owned bytes", node.name));

@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+mod branch_call_args;
 mod data_mod;
 mod data_mod_describe;
 pub mod ffi;
@@ -6,13 +7,16 @@ mod glm;
 mod module_graph;
 mod operation_results;
 mod operation_semantics;
+mod owned_select_tree;
 mod registry;
 mod value_display;
 mod value_types;
 
+pub use branch_call_args::*;
 pub use data_mod::{DataMod, LegacyFabricMod};
 pub use glm::*;
 pub use module_graph::*;
+pub use owned_select_tree::*;
 pub use registry::*;
 pub use value_types::*;
 

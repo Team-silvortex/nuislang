@@ -23,6 +23,142 @@ fn glm_profile_uses_semantic_op_classification() {
 }
 
 #[test]
+fn glm_profiles_owned_bytes_select_as_conditional_ownership_transfer() {
+    let op = Operation::parse(
+        "cpu.select_owned_bytes",
+        vec![
+            "condition".to_owned(),
+            "bytes".to_owned(),
+            "bytes".to_owned(),
+        ],
+    )
+    .unwrap();
+    let profile = crate::glm_profile_for_operation(&op);
+
+    assert_eq!(profile.result_class, GlmValueClass::Res);
+    assert_eq!(profile.accesses[0].class, GlmValueClass::Val);
+    assert_eq!(profile.accesses[0].mode, GlmUseMode::Read);
+    assert!(profile.accesses[1..]
+        .iter()
+        .all(|access| access.class == GlmValueClass::Res && access.mode == GlmUseMode::Own));
+}
+
+#[test]
+fn glm_profiles_distinct_owned_bytes_select_as_cleanup_move() {
+    let op = Operation::parse(
+        "cpu.select_owned_bytes_drop_unselected",
+        vec![
+            "condition".to_owned(),
+            "left".to_owned(),
+            "right".to_owned(),
+        ],
+    )
+    .unwrap();
+    let profile = crate::glm_profile_for_operation(&op);
+
+    assert_eq!(profile.result_class, GlmValueClass::Res);
+    assert_eq!(profile.effect, GlmEffect::DomainMove);
+    assert_eq!(profile.accesses[0].mode, GlmUseMode::Read);
+    assert!(profile.accesses[1..]
+        .iter()
+        .all(|access| access.class == GlmValueClass::Res && access.mode == GlmUseMode::Own));
+}
+
+#[test]
+fn glm_profiles_branch_owned_call_as_one_owner_move() {
+    let op = Operation::parse(
+        "cpu.branch_call_owned_bytes",
+        vec![
+            "condition".to_owned(),
+            "left".to_owned(),
+            "right".to_owned(),
+            "bytes".to_owned(),
+            "0".to_owned(),
+            "0".to_owned(),
+        ],
+    )
+    .unwrap();
+    let profile = crate::glm_profile_for_operation(&op);
+
+    assert_eq!(profile.result_class, GlmValueClass::Res);
+    assert_eq!(profile.accesses.len(), 2);
+    assert_eq!(profile.accesses[1].input, "bytes");
+    assert_eq!(profile.accesses[1].class, GlmValueClass::Res);
+    assert_eq!(profile.accesses[1].mode, GlmUseMode::Own);
+    assert_eq!(profile.effect, GlmEffect::DomainMove);
+}
+
+#[test]
+fn branch_owned_call_argument_segments_are_protocol_checked() {
+    let args = vec![
+        "condition".to_owned(),
+        "left".to_owned(),
+        "right".to_owned(),
+        "bytes".to_owned(),
+        "1".to_owned(),
+        "left_delta".to_owned(),
+        "2".to_owned(),
+        "right_factor".to_owned(),
+        "right_enabled".to_owned(),
+    ];
+    let parsed = crate::parse_branch_owned_call_args(&args).expect("valid segmented arguments");
+    assert_eq!(parsed.owner, "bytes");
+    assert_eq!(parsed.then_scalar_args, ["left_delta"]);
+    assert_eq!(parsed.else_scalar_args, ["right_factor", "right_enabled"]);
+
+    let mut trailing = args;
+    trailing.push("unclaimed".to_owned());
+    assert!(crate::parse_branch_owned_call_args(&trailing).is_none());
+}
+
+#[test]
+fn owned_select_tree_protocol_rejects_invalid_owner_paths() {
+    let valid = vec![
+        "2".to_owned(),
+        "left".to_owned(),
+        "right".to_owned(),
+        "if".to_owned(),
+        "outer".to_owned(),
+        "owner".to_owned(),
+        "0".to_owned(),
+        "owner".to_owned(),
+        "1".to_owned(),
+    ];
+    let parsed = crate::parse_owned_select_tree_args(&valid).expect("valid owned select tree");
+    assert_eq!(parsed.owners, ["left", "right"]);
+
+    let mut out_of_range = valid.clone();
+    *out_of_range.last_mut().unwrap() = "2".to_owned();
+    assert!(crate::parse_owned_select_tree_args(&out_of_range).is_none());
+    let mut trailing = valid;
+    trailing.push("owner".to_owned());
+    assert!(crate::parse_owned_select_tree_args(&trailing).is_none());
+
+    let call = vec![
+        "1".to_owned(),
+        "bytes".to_owned(),
+        "call".to_owned(),
+        "transform".to_owned(),
+        "0".to_owned(),
+        "2".to_owned(),
+        "delta".to_owned(),
+        "enabled".to_owned(),
+    ];
+    let parsed = crate::parse_owned_select_tree_args(&call).expect("valid call leaf");
+    let crate::OwnedSelectTree::Call {
+        callee,
+        owner,
+        scalar_args,
+    } = parsed.tree
+    else {
+        panic!("expected call leaf");
+    };
+    assert_eq!(callee, "transform");
+    assert_eq!(owner, 0);
+    assert_eq!(scalar_args, ["delta", "enabled"]);
+}
+
+#[test]
 fn exposes_bridge_object_sketch_names_without_changing_live_glm_classes() {
     assert_eq!(GlmSketchValueClass::Bridge.to_string(), "bridge");
     assert_eq!(

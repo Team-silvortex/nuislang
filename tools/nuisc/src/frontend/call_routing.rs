@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use super::call_helpers::ensure_ref_like;
+use super::call_helpers::{ensure_move_like, ensure_ref_like};
 use super::data_builtins::{lower_data_builtin_call, DataBuiltinInput};
 use super::data_profile_builtins::{lower_data_profile_builtin_call, DataProfileBuiltinInput};
 use super::expr_lowering::lower_expr;
@@ -219,7 +219,7 @@ pub(super) fn lower_routed_call_or_core_builtin(
                 struct_table,
                 None,
             )?;
-            ensure_ref_like("move", &lowered, bindings, signatures, struct_table)?;
+            ensure_move_like(&lowered, bindings, signatures, struct_table)?;
             NirExpr::Move(Box::new(lowered))
         }
         "alloc_node" => {

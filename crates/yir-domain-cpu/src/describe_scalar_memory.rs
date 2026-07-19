@@ -1,4 +1,5 @@
 use super::*;
+use yir_core::{owned_select_tree_conditions, parse_owned_select_tree_args};
 
 pub(super) fn describe_cpu_scalar_memory_node(
     node: &Node,
@@ -27,15 +28,41 @@ pub(super) fn describe_cpu_scalar_memory_node(
             }
             Ok(InstructionSemantics::pure(node.op.args.clone()))
         }
-        "select" => {
+        "select" | "select_owned_bytes" => {
             if node.op.args.len() != 3 {
                 return Err(format!(
-                    "node `{}` expects `cpu.select <name> <resource> <cond> <then> <else>`",
-                    node.name
+                    "node `{}` expects `cpu.{} <name> <resource> <cond> <then> <else>`",
+                    node.name, node.op.instruction
                 ));
             }
 
             Ok(InstructionSemantics::pure(node.op.args.clone()))
+        }
+        "select_owned_bytes_drop_unselected" => {
+            if node.op.args.len() != 3 {
+                return Err(format!(
+                    "node `{}` expects `cpu.{} <name> <resource> <cond> <then> <else>`",
+                    node.name, node.op.instruction
+                ));
+            }
+
+            Ok(InstructionSemantics::effect(node.op.args.clone()))
+        }
+        "select_owned_bytes_tree" => {
+            let args = parse_owned_select_tree_args(&node.op.args).ok_or_else(|| {
+                format!(
+                    "node `{}` has invalid owned select tree arguments",
+                    node.name
+                )
+            })?;
+            let mut conditions = Vec::new();
+            owned_select_tree_conditions(&args.tree, &mut conditions);
+            let mut deps = args.owners.to_vec();
+            deps.extend(conditions.into_iter().map(str::to_owned));
+            let mut scalar_args = Vec::new();
+            yir_core::owned_select_tree_scalar_args(&args.tree, &mut scalar_args);
+            deps.extend(scalar_args.into_iter().map(str::to_owned));
+            Ok(InstructionSemantics::effect(deps))
         }
         "alloc_node" => {
             if node.op.args.len() != 2 {
@@ -64,7 +91,8 @@ pub(super) fn describe_cpu_scalar_memory_node(
             }
             Ok(InstructionSemantics::effect(node.op.args.clone()))
         }
-        "buffer_len" | "copy_buffer_owned" | "owned_bytes_len" | "drop_owned_bytes" => {
+        "buffer_len" | "copy_buffer_owned" | "move_owned_bytes" | "owned_bytes_len"
+        | "drop_owned_bytes" => {
             if node.op.args.len() != 1 {
                 return Err(format!(
                     "node `{}` expects `cpu.{} <name> <resource> <buffer_ptr>`",

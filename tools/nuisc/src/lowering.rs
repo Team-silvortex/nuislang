@@ -22,6 +22,8 @@ mod bootstrap;
 mod bridge_helpers;
 #[path = "lowering/call_exprs.rs"]
 mod call_exprs;
+#[path = "lowering/conditional_owned_calls.rs"]
+mod conditional_owned_calls;
 #[path = "lowering/core_exprs.rs"]
 mod core_exprs;
 #[path = "lowering/cpu_exprs.rs"]
@@ -54,6 +56,8 @@ mod loop_preparation;
 mod loop_purity;
 #[path = "lowering/loop_types.rs"]
 mod loop_types;
+#[path = "lowering/nested_owned_returns.rs"]
+mod nested_owned_returns;
 #[path = "lowering/network_exprs.rs"]
 mod network_exprs;
 #[path = "lowering/owned_loop_lowering.rs"]
@@ -85,6 +89,9 @@ use bootstrap::lower_nir_to_yir_builtin_cpu;
 use bootstrap::lower_nir_to_yir_builtin_cpu_with_target;
 use bridge_helpers::{lower_data_profile_send, lower_project_profile_ref};
 use call_exprs::lower_call_family_expr;
+use conditional_owned_calls::{
+    collect_conditional_owned_return_helpers, lower_conditional_owned_return_call,
+};
 use core_exprs::lower_core_expr;
 use cpu_exprs::lower_cpu_expr;
 use data_cpu_exprs::lower_data_cpu_expr;
@@ -95,9 +102,11 @@ use edge_helpers::{
     ensure_shader_resource, push_dep_edges, push_lifetime_edge, push_xfer_edge,
 };
 use guard_ops::{
-    lower_branch_drop_owned_bytes_return, lower_branch_host_call_return, lower_branch_print_return,
-    lower_guard_drop_owned_bytes_return, lower_guard_host_call_return, lower_guard_print,
-    lower_guard_print_return, lower_guard_return, lower_select, PreparedHostCallReturnSpec,
+    lower_branch_call_owned_bytes, lower_branch_drop_owned_bytes_return,
+    lower_branch_host_call_return, lower_branch_print_return, lower_guard_drop_owned_bytes_return,
+    lower_guard_host_call_return, lower_guard_print, lower_guard_print_return, lower_guard_return,
+    lower_select, lower_select_owned_bytes, lower_select_owned_bytes_drop_unselected,
+    lower_select_owned_bytes_tree, PreparedHostCallReturnSpec,
 };
 use if_lowering::lower_if_pair;
 use kernel_exprs::lower_kernel_expr;
@@ -122,6 +131,7 @@ use loop_purity::{
     is_terminal_branch_pure_expr, prepare_terminal_branch, substitute_prepared_loop_body,
 };
 use loop_types::*;
+use nested_owned_returns::lower_nested_owned_return_tree;
 use network_exprs::lower_network_expr;
 use owned_struct_layout::{function_owned_struct_layout, module_owned_struct_layout};
 use result_nodes::{
@@ -470,6 +480,9 @@ mod tests_loops_basic;
 #[cfg(test)]
 #[path = "lowering/tests_loops_owned.rs"]
 mod tests_loops_owned;
+#[cfg(test)]
+#[path = "lowering/tests_nested_owned.rs"]
+mod tests_nested_owned;
 #[cfg(test)]
 #[path = "lowering/tests_recursion.rs"]
 mod tests_recursion;

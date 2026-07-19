@@ -349,7 +349,7 @@ pub(crate) fn execute_cpu_scalar_node(
             state.expect_int(&node.op.args[0])? * state.expect_int(&node.op.args[1])?
                 + state.expect_int(&node.op.args[2])?,
         )),
-        "select" => {
+        "select" | "select_owned_bytes" | "select_owned_bytes_drop_unselected" => {
             let cond = match state.expect_value(&node.op.args[0])? {
                 Value::Bool(value) => *value,
                 Value::Int(value) => *value != 0,
@@ -362,6 +362,15 @@ pub(crate) fn execute_cpu_scalar_node(
             };
             let then_value = state.expect_value(&node.op.args[1])?;
             let else_value = state.expect_value(&node.op.args[2])?;
+            if node.op.instruction != "select"
+                && (!matches!(then_value, Value::OwnedBytes(_))
+                    || !matches!(else_value, Value::OwnedBytes(_)))
+            {
+                return Err(format!(
+                    "node `{}` expects owned bytes in both select branches",
+                    node.name
+                ));
+            }
             if let Some(union) = select_variant_union(cond, then_value, else_value) {
                 return Ok(Some(Value::VariantUnion(union)));
             }
@@ -370,6 +379,40 @@ pub(crate) fn execute_cpu_scalar_node(
             } else {
                 else_value.clone()
             })
+        }
+        "select_owned_bytes_tree" => {
+            let args = yir_core::parse_owned_select_tree_args(&node.op.args).ok_or_else(|| {
+                format!(
+                    "node `{}` has invalid owned select tree arguments",
+                    node.name
+                )
+            })?;
+            let selected = select_owned_tree_leaf(&args.tree, state, &node.name)?;
+            let owner_index = match selected {
+                yir_core::OwnedSelectTree::Owner(index) => *index,
+                yir_core::OwnedSelectTree::Call {
+                    scalar_args, owner, ..
+                } => {
+                    for arg in *scalar_args {
+                        state.expect_value(arg)?;
+                    }
+                    *owner
+                }
+                yir_core::OwnedSelectTree::If { .. } => unreachable!(),
+            };
+            let owner = args.owners.get(owner_index).ok_or_else(|| {
+                format!(
+                    "node `{}` selects unknown owner index {owner_index}",
+                    node.name
+                )
+            })?;
+            let Value::OwnedBytes(bytes) = state.expect_value(owner)? else {
+                return Err(format!(
+                    "node `{}` expects owned bytes for tree owner `{owner}`",
+                    node.name
+                ));
+            };
+            Ok(Value::OwnedBytes(bytes.clone()))
         }
         "cast_bool_to_i64" => Ok(Value::Int(if state.expect_bool(&node.op.args[0])? {
             1
@@ -387,4 +430,34 @@ pub(crate) fn execute_cpu_scalar_node(
         _ => return Ok(None),
     };
     value.map(Some)
+}
+
+fn select_owned_tree_leaf<'a>(
+    tree: &'a yir_core::OwnedSelectTree<'a>,
+    state: &ExecutionState,
+    node_name: &str,
+) -> Result<&'a yir_core::OwnedSelectTree<'a>, String> {
+    match tree {
+        yir_core::OwnedSelectTree::Owner(_) | yir_core::OwnedSelectTree::Call { .. } => Ok(tree),
+        yir_core::OwnedSelectTree::If {
+            condition,
+            then_tree,
+            else_tree,
+        } => {
+            let condition = match state.expect_value(condition)? {
+                Value::Bool(value) => *value,
+                Value::Int(value) => *value != 0,
+                other => {
+                    return Err(format!(
+                        "node `{node_name}` expects bool or i64 tree condition, got {other}"
+                    ))
+                }
+            };
+            select_owned_tree_leaf(
+                if condition { then_tree } else { else_tree },
+                state,
+                node_name,
+            )
+        }
+    }
 }

@@ -219,6 +219,9 @@ fn verify_stmt(
             task_result_facts.remove(name);
             moved.remove(name);
             note_binding_effects(value, name, moved, borrows, borrow_bindings);
+            if ty.as_ref().is_some_and(is_owned_bytes_type) {
+                moved.remove(name);
+            }
             data_bindings.insert(
                 name.clone(),
                 infer_data_kind(value, data_bindings)
@@ -241,6 +244,9 @@ fn verify_stmt(
             task_result_facts.remove(name);
             moved.remove(name);
             note_binding_effects(value, name, moved, borrows, borrow_bindings);
+            if is_owned_bytes_type(ty) {
+                moved.remove(name);
+            }
             data_bindings.insert(
                 name.clone(),
                 infer_data_kind(value, data_bindings)
@@ -421,6 +427,10 @@ fn verify_stmt(
         }
     }
     Ok(())
+}
+
+fn is_owned_bytes_type(ty: &nuis_semantics::model::NirTypeRef) -> bool {
+    ty.name == "Bytes" && !ty.is_ref && ty.generic_args.is_empty()
 }
 
 fn block_always_terminates(body: &[NirStmt]) -> bool {

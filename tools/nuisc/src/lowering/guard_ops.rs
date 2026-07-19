@@ -361,3 +361,131 @@ pub(super) fn lower_select(
     push_dep_edges(state, &else_name, &name);
     Ok(name)
 }
+
+pub(super) fn lower_select_owned_bytes(
+    condition_name: String,
+    then_name: String,
+    else_name: String,
+    state: &mut LoweringState<'_>,
+) -> String {
+    let name = next_name(state, "select_owned_bytes");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "select_owned_bytes".to_owned(),
+            args: vec![condition_name.clone(), then_name.clone(), else_name.clone()],
+        },
+    });
+    push_dep_edges(state, &condition_name, &name);
+    push_dep_edges(state, &then_name, &name);
+    push_dep_edges(state, &else_name, &name);
+    push_lifetime_edge(state, &then_name, &name);
+    if then_name != else_name {
+        push_lifetime_edge(state, &else_name, &name);
+    }
+    name
+}
+
+pub(super) fn lower_select_owned_bytes_drop_unselected(
+    condition_name: String,
+    then_name: String,
+    else_name: String,
+    state: &mut LoweringState<'_>,
+) -> String {
+    let name = next_name(state, "select_owned_bytes_drop_unselected");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "select_owned_bytes_drop_unselected".to_owned(),
+            args: vec![condition_name.clone(), then_name.clone(), else_name.clone()],
+        },
+    });
+    push_dep_edges(state, &condition_name, &name);
+    push_dep_edges(state, &then_name, &name);
+    push_dep_edges(state, &else_name, &name);
+    push_lifetime_edge(state, &then_name, &name);
+    push_lifetime_edge(state, &else_name, &name);
+    name
+}
+
+pub(super) fn lower_select_owned_bytes_tree(
+    owners: Vec<String>,
+    tree_tokens: Vec<String>,
+    conditions: &[String],
+    state: &mut LoweringState<'_>,
+) -> String {
+    let name = next_name(state, "select_owned_bytes_tree");
+    let mut args = vec![owners.len().to_string()];
+    args.extend(owners.iter().cloned());
+    args.extend(tree_tokens);
+    let mut scalar_dependencies = Vec::new();
+    let parsed = yir_core::parse_owned_select_tree_args(&args)
+        .expect("owned select tree builder must encode a valid protocol");
+    yir_core::owned_select_tree_scalar_args(&parsed.tree, &mut scalar_dependencies);
+    let scalar_dependencies = scalar_dependencies
+        .into_iter()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "select_owned_bytes_tree".to_owned(),
+            args,
+        },
+    });
+    for condition in conditions {
+        push_dep_edges(state, condition, &name);
+    }
+    for scalar in &scalar_dependencies {
+        push_dep_edges(state, scalar, &name);
+    }
+    for owner in &owners {
+        push_dep_edges(state, owner, &name);
+        push_lifetime_edge(state, owner, &name);
+    }
+    name
+}
+
+pub(super) fn lower_branch_call_owned_bytes(
+    condition_name: String,
+    then_callee: String,
+    else_callee: String,
+    owner_name: String,
+    then_scalar_args: Vec<String>,
+    else_scalar_args: Vec<String>,
+    state: &mut LoweringState<'_>,
+) -> String {
+    let name = next_name(state, "branch_call_owned_bytes");
+    let mut args = vec![
+        condition_name.clone(),
+        then_callee,
+        else_callee,
+        owner_name.clone(),
+        then_scalar_args.len().to_string(),
+    ];
+    args.extend(then_scalar_args.iter().cloned());
+    args.push(else_scalar_args.len().to_string());
+    args.extend(else_scalar_args.iter().cloned());
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "branch_call_owned_bytes".to_owned(),
+            args,
+        },
+    });
+    push_dep_edges(state, &condition_name, &name);
+    push_dep_edges(state, &owner_name, &name);
+    for arg in then_scalar_args.iter().chain(&else_scalar_args) {
+        push_dep_edges(state, arg, &name);
+    }
+    push_lifetime_edge(state, &owner_name, &name);
+    name
+}

@@ -53,7 +53,7 @@ mod variant_select;
 
 use async_resource_lowering::lower_cpu_async_resource_node;
 use bitwise_lowering::lower_cpu_bitwise_node;
-use call_lowering::lower_cpu_call_node;
+use call_lowering::{lower_cpu_branch_owned_call_node, lower_cpu_call_node};
 use call_return::{
     cpu_call_scalar_kind_for_instruction, cpu_param_binding, cpu_scalar_kind_llvm_type,
     emit_typed_return_from_last_value,
@@ -367,6 +367,9 @@ fn render_scalar_task_invoker(
             CpuCallScalarKind::BorrowedBuffer => {
                 unreachable!("borrowed buffers do not have task invokers")
             }
+            CpuCallScalarKind::OwnedBytes => {
+                unreachable!("direct owned Bytes params do not have scalar task invokers")
+            }
         };
         call_args.push(format!("{} {argument}", cpu_scalar_kind_llvm_type(kind)));
     }
@@ -396,6 +399,9 @@ fn render_scalar_task_invoker(
         }
         CpuCallScalarKind::BorrowedBuffer => {
             unreachable!("borrowed buffers cannot return from task invokers")
+        }
+        CpuCallScalarKind::OwnedBytes => {
+            unreachable!("owned Bytes cannot return from scalar task invokers")
         }
     }
     Some(format!(

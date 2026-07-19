@@ -99,9 +99,15 @@ pub(in crate::lowering) fn lower_while_stmt(
     body: &[NirStmt],
     state: &mut LoweringState<'_>,
     bindings: &mut BTreeMap<String, String>,
-    _const_bindings: &mut BTreeMap<String, NirExpr>,
+    const_bindings: &mut BTreeMap<String, NirExpr>,
 ) -> Result<Option<String>, String> {
-    if super::scoped_loop_lowering::lower_scoped_call_while(condition, body, state, bindings)? {
+    if super::scoped_loop_lowering::lower_scoped_call_while(
+        condition,
+        body,
+        state,
+        bindings,
+        const_bindings,
+    )? {
         return Ok(None);
     }
 

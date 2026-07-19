@@ -58,8 +58,25 @@ pub(super) fn describe_cpu_loops_control_node(
                 ("cpu", "owned_bytes_copy_drop", 1) => node.op.args[8..].to_vec(),
                 ("cpu", "scoped_call", arity) if arity >= 1 => node.op.args[9..]
                     .iter()
-                    .filter(|arg| arg.as_str() != "$current")
-                    .cloned()
+                    .filter_map(|arg| {
+                        (arg != "$current").then(|| {
+                            arg.strip_prefix("copy_owned:")
+                                .or_else(|| arg.strip_prefix("move_owned:"))
+                                .unwrap_or(arg)
+                                .to_owned()
+                        })
+                    })
+                    .collect(),
+                ("cpu", "scoped_call_owned_return", arity) if arity >= 2 => node.op.args[10..]
+                    .iter()
+                    .filter_map(|arg| {
+                        (arg != "$current").then(|| {
+                            arg.strip_prefix("copy_owned:")
+                                .or_else(|| arg.strip_prefix("move_owned:"))
+                                .unwrap_or(arg)
+                                .to_owned()
+                        })
+                    })
                     .collect(),
                 (module, instruction, _) => {
                     return Err(format!(

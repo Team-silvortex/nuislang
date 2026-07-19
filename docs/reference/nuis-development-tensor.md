@@ -553,8 +553,44 @@ through `$current`, and lower an outer loop whose helper owns an inner Bytes loo
 through LLVM without a fixed nested-loop opcode. Scoped helpers now also borrow
 an outer `ref Buffer` through one logical YIR parameter expanded to LLVM
 `(ptr, len)`; a Lifetime edge spans the loop, and task invokers reject the
-borrowed ABI kind. The remaining scoped-loop gap is owned Bytes copy/move
-capture and ownership return, plus enum and pointer leaf policies.
+borrowed ABI kind. An explicit `copy_bytes(buffer)` scoped argument now becomes
+the `copy_owned:<buffer>` descriptor, carries Dep and Lifetime edges, performs a
+scheduler-owned deep copy on each iteration, and enters the helper through
+`cpu.param_owned_bytes`. Compiler cleanup drops that helper-owned payload
+exactly once. Passing an existing `Bytes` value directly is rejected rather
+than becoming an implicit clone. Outside scoped loops, `move(Bytes)` lowers
+through the general `cpu.move_owned_bytes` operation; interpreted and LLVM
+paths preserve the existing blob identity without copying. A scoped
+`move(bytes)` becomes `move_owned:<bytes>` only when constant loop facts prove
+exactly one execution. Zero-trip, repeating, non-constant, and unnamed-owner
+moves are rejected. Direct and recursive helpers now transfer return ownership
+through `cpu.return_owned_bytes` / `cpu.call_owned_bytes` and the LLVM `ptr`
+ABI; the caller becomes the unique owner without another copy. The remaining
+scoped-loop gap no longer includes outer rebinding: `scoped_call_owned_return`
+keeps the blob in an LLVM `ptr` backedge slot and `cpu.loop_owned_result`
+projects the final owner into the outer binding. GLM treats that projection name
+as an output and the moved descriptor as a resource-own access. Dynamic `if`
+branches can now converge the same explicit `move(Bytes)` owner through
+`cpu.select_owned_bytes`; GLM records resource ownership on the branch inputs
+and LLVM emits a native pointer select without copying. Conditional unary
+`Bytes -> Bytes` helper returns now use `cpu.branch_call_owned_bytes`: the
+helpers are statically outlined, LLVM emits mutually exclusive call blocks,
+and a `phi ptr` carries the selected owner forward. A counted segmented YIR ABI
+also carries branch-specific pure `bool/i32/i64/f32/f64` arguments without
+duplicating the owner or eagerly executing opaque effects. Distinct owners lower
+through `cpu.select_owned_bytes_drop_unselected`: GLM owns both candidates,
+LLVM drops only the unselected branch value, and a `phi ptr` carries the
+survivor. Exact-one scoped-loop moves can now be proved from cycle-safe local
+constant chains, integer arithmetic, comparisons, and casts instead of only
+literal YIR nodes; unresolved, zero-trip, repeated, and overflowing cases still
+fail closed. Nested move-return `if` trees now carry survivor proofs through
+`cpu.select_owned_bytes_tree`: a deduplicated owner table
+and prefix decision tree let GLM consume aliases once, while LLVM performs
+leaf-local cleanup and a multi-entry pointer merge. Leaves now also encode
+registered static `(Bytes, scalar...) -> Bytes` helpers with pure scalar
+arguments; their scalar dependencies remain explicit and LLVM invokes only the
+selected leaf after dropping other owners. The remaining gaps are normalized
+`match` decision trees, enum leaves, and pointer leaf policies.
 The runtime now defines `NuisSchedulerOwnedBlobV1` as the first GLM-tokened
 dynamic leaf primitive. It deep-copies borrowed bytes and has scheduler-native
 move/drop hooks; a compiled harness covers take and cancellation. Recursive

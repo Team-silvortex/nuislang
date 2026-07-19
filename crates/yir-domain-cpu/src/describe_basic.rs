@@ -1,4 +1,5 @@
 use super::*;
+use yir_core::parse_branch_owned_call_args;
 
 pub(super) fn describe_cpu_basic_node(node: &Node) -> Result<Option<InstructionSemantics>, String> {
     let semantics = match node.op.instruction.as_str() {
@@ -190,8 +191,17 @@ pub(super) fn describe_cpu_basic_node(node: &Node) -> Result<Option<InstructionS
             }
             Ok(InstructionSemantics::pure(node.op.args.clone()))
         }
+        "loop_owned_result" => {
+            if node.op.args.len() != 1 {
+                return Err(format!(
+                    "node `{}` expects `cpu.loop_owned_result <name> <resource> <loop>`",
+                    node.name
+                ));
+            }
+            Ok(InstructionSemantics::pure(node.op.args.clone()))
+        }
         "param_bool" | "param_i32" | "param_i64" | "param_f32" | "param_f64"
-        | "param_buffer_ref" => {
+        | "param_buffer_ref" | "param_owned_bytes" => {
             if node.op.args.len() != 1 {
                 return Err(format!(
                     "node `{}` expects `cpu.{} <name> <resource> <index>`",
@@ -206,7 +216,8 @@ pub(super) fn describe_cpu_basic_node(node: &Node) -> Result<Option<InstructionS
             })?;
             Ok(InstructionSemantics::pure(Vec::new()))
         }
-        "call_bool" | "call_i32" | "call_i64" | "call_f32" | "call_f64" | "call_owned_struct" => {
+        "call_bool" | "call_i32" | "call_i64" | "call_f32" | "call_f64" | "call_owned_bytes"
+        | "call_owned_struct" => {
             if node.op.args.is_empty() {
                 return Err(format!(
                     "node `{}` expects `cpu.{} <name> <resource> <callee> [arg...]`",
@@ -218,11 +229,24 @@ pub(super) fn describe_cpu_basic_node(node: &Node) -> Result<Option<InstructionS
                 node.op.args.iter().skip(argument_offset).cloned().collect(),
             ))
         }
+        "branch_call_owned_bytes" => {
+            let Some(args) = parse_branch_owned_call_args(&node.op.args) else {
+                return Err(format!(
+                    "node `{}` expects `cpu.branch_call_owned_bytes <name> <resource> <cond> <then_callee> <else_callee> <owner> <then_count> [then_arg...] <else_count> [else_arg...]`",
+                    node.name
+                ));
+            };
+            let mut deps = vec![args.condition.to_owned(), args.owner.to_owned()];
+            deps.extend(args.then_scalar_args.iter().cloned());
+            deps.extend(args.else_scalar_args.iter().cloned());
+            Ok(InstructionSemantics::effect(deps))
+        }
         "return_bool"
         | "return_i32"
         | "return_i64"
         | "return_f32"
         | "return_f64"
+        | "return_owned_bytes"
         | "return_owned_struct" => {
             if node.op.args.len() != 1 {
                 return Err(format!(

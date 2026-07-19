@@ -98,6 +98,16 @@ pub(crate) fn lower_cpu_return_node(
             *last_cpu_value = Some(as_i64);
             body.push(format!("  ret double {input}"));
         }
+        "return_owned_bytes" => {
+            let Some(LlvmValueRef::OwnedBytes { blob }) = registers.get(&node.op.args[0]) else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.return_owned_bytes `{}` because its input is not an owned blob",
+                    node.name
+                ));
+                return Ok(ReturnLoweringOutcome::Deferred);
+            };
+            body.push(format!("  ret ptr {blob}"));
+        }
         "return_owned_struct" => {
             let Some(LlvmValueRef::Struct(value)) = registers.get(&node.op.args[0]) else {
                 body.push(format!(

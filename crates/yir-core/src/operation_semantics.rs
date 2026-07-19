@@ -274,6 +274,9 @@ impl Operation {
             "neg" | "add" | "add_i32" | "add_f32" | "add_f64" | "sub" | "sub_i32" | "sub_f32"
             | "sub_f64" | "mul" | "mul_i32" | "mul_f32" | "mul_f64" | "div" | "div_i32"
             | "div_f32" | "div_f64" | "rem" | "madd" | "select" => CpuLlvmLoweringClass::Arithmetic,
+            "select_owned_bytes"
+            | "select_owned_bytes_drop_unselected"
+            | "select_owned_bytes_tree" => CpuLlvmLoweringClass::Aggregate,
             "eq" | "eq_i32" | "eq_f32" | "eq_f64" | "ne" | "lt" | "lt_i32" | "lt_f32"
             | "lt_f64" | "gt" | "gt_i32" | "gt_f32" | "gt_f64" | "le" | "ge" => {
                 CpuLlvmLoweringClass::Compare
@@ -285,14 +288,28 @@ impl Operation {
             | "load_at" | "store_value" | "store_next" | "store_at" | "is_null" | "free" => {
                 CpuLlvmLoweringClass::Memory
             }
-            "loop_owned_bytes_copy_drop_break" => CpuLlvmLoweringClass::Memory,
-            "input_i64" | "extern_call_i64" | "extern_call_i32" | "param_bool" | "param_i32"
-            | "param_i64" | "param_buffer_ref" | "call_bool" | "call_i32" | "call_i64"
+            "move_owned_bytes" | "loop_owned_result" | "loop_owned_bytes_copy_drop_break" => {
+                CpuLlvmLoweringClass::Memory
+            }
+            "input_i64"
+            | "extern_call_i64"
+            | "extern_call_i32"
+            | "param_bool"
+            | "param_i32"
+            | "param_i64"
+            | "param_buffer_ref"
+            | "param_owned_bytes"
+            | "call_bool"
+            | "call_i32"
+            | "call_i64"
+            | "call_owned_bytes"
+            | "branch_call_owned_bytes"
             | "call_owned_struct" => CpuLlvmLoweringClass::Runtime,
             "print"
             | "return_bool"
             | "return_i32"
             | "return_i64"
+            | "return_owned_bytes"
             | "return_owned_struct"
             | "loop_while_i64"
             | "loop_while_i64_effect"

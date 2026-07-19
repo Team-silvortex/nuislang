@@ -125,7 +125,15 @@ pub(super) fn emit_cpu_function(
             continue;
         }
 
-        if node.op.module != "cpu" || node.op.instruction != "select" {
+        if node.op.module != "cpu"
+            || !matches!(
+                node.op.instruction.as_str(),
+                "select"
+                    | "select_owned_bytes"
+                    | "select_owned_bytes_drop_unselected"
+                    | "select_owned_bytes_tree"
+            )
+        {
             if let Some((input, reason)) =
                 first_delayed_input(&node.op.args, &state.delayed_registers)
             {
@@ -204,6 +212,17 @@ pub(super) fn emit_cpu_function(
             continue;
         }
 
+        if lower_cpu_branch_owned_call_node(
+            node,
+            body,
+            registers,
+            helper_signatures,
+            &mut next_reg,
+            &mut next_block,
+        )? {
+            continue;
+        }
+
         if lower_cpu_call_node(
             node,
             body,
@@ -249,9 +268,11 @@ pub(super) fn emit_cpu_function(
             node,
             body,
             registers,
+            helper_signatures,
             &mut state.delayed_registers,
             &mut state.facts,
             &mut next_reg,
+            &mut next_block,
             last_cpu_value,
         )? {
             continue;

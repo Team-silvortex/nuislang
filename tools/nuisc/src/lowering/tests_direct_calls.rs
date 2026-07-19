@@ -634,3 +634,303 @@ fn lowers_spawned_nested_struct_async_helper_into_owned_call_lane() {
         Some("fn:make_packet")
     );
 }
+
+#[test]
+fn lowers_owned_bytes_move_through_direct_helper_without_copying() {
+    let mut module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn consume(bytes: Bytes, seed: i64) -> i64 {
+            let len: i64 = bytes_len(bytes);
+            drop_bytes(bytes);
+            return seed + len;
+          }
+
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(2, 7);
+            let bytes: Bytes = copy_bytes(buffer);
+            let result: i64 = consume(move(bytes), 3);
+            free(buffer);
+            return result;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    crate::optimize::simplify_nir_module(&mut module);
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.instruction == "move_owned_bytes"));
+    let llvm_ir = yir_lower_llvm::emit_module(&yir).expect("owned move direct call should lower");
+    assert_eq!(
+        llvm_ir
+            .matches("call ptr @nuis_scheduler_owned_blob_copy_v1")
+            .count(),
+        1,
+        "moving an owned blob must not allocate another copy"
+    );
+    assert_eq!(
+        llvm_ir
+            .matches("call void @nuis_scheduler_owned_blob_drop_v1")
+            .count(),
+        1
+    );
+    assert!(!llvm_ir.contains("deferred lowering for cpu.move_owned_bytes"));
+}
+
+#[test]
+fn returns_owned_bytes_from_direct_helper_to_new_owner() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn relay(bytes: Bytes) -> Bytes {
+            return relay(move(bytes));
+          }
+
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(2, 7);
+            let bytes: Bytes = copy_bytes(buffer);
+            let returned: Bytes = relay(move(bytes));
+            let len: i64 = bytes_len(returned);
+            drop_bytes(returned);
+            free(buffer);
+            return len;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.instruction == "return_owned_bytes"));
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.instruction == "call_owned_bytes"));
+
+    let llvm_ir = yir_lower_llvm::emit_module(&yir).expect("owned Bytes return should lower");
+    assert!(llvm_ir.contains("define ptr @nuis_fn_relay(ptr %arg0)"));
+    assert!(llvm_ir.contains("call ptr @nuis_fn_relay(ptr %"));
+    assert_eq!(
+        llvm_ir
+            .matches("call ptr @nuis_scheduler_owned_blob_copy_v1")
+            .count(),
+        1
+    );
+    assert_eq!(
+        llvm_ir
+            .matches("call void @nuis_scheduler_owned_blob_drop_v1")
+            .count(),
+        1
+    );
+    assert!(!llvm_ir.contains("deferred lowering for cpu.call_owned_bytes"));
+}
+
+#[test]
+fn returns_same_owned_bytes_owner_through_dynamic_if() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn choose(bytes: Bytes, enabled: bool) -> Bytes {
+            if enabled {
+              return move(bytes);
+            } else {
+              return move(bytes);
+            }
+          }
+
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(3, 7);
+            let bytes: Bytes = copy_bytes(buffer);
+            let choice: i64 = cpu_input_i64("choice", 1, 0, 1, 1);
+            let returned: Bytes = choose(move(bytes), choice == 1);
+            let len: i64 = bytes_len(returned);
+            drop_bytes(returned);
+            free(buffer);
+            return len;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let selected = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.instruction == "select_owned_bytes")
+        .expect("conditional owned return should use the owned select contract");
+    assert_eq!(selected.op.args[1], selected.op.args[2]);
+
+    let llvm_ir = yir_lower_llvm::emit_module(&yir).expect("owned select should lower");
+    assert!(llvm_ir.contains("select i1"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.select_owned_bytes"));
+    assert_eq!(
+        llvm_ir
+            .matches("call ptr @nuis_scheduler_owned_blob_copy_v1")
+            .count(),
+        1
+    );
+    assert_eq!(
+        llvm_ir
+            .matches("call void @nuis_scheduler_owned_blob_drop_v1")
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn lowers_dynamic_if_selecting_distinct_owned_bytes_with_branch_cleanup() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn choose(lhs: Bytes, rhs: Bytes, enabled: bool) -> Bytes {
+            if enabled {
+              return move(lhs);
+            } else {
+              return move(rhs);
+            }
+          }
+
+          fn main() -> i64 {
+            let lhs_buffer: ref Buffer = alloc_buffer(1, 3);
+            let rhs_buffer: ref Buffer = alloc_buffer(1, 7);
+            let lhs: Bytes = copy_bytes(lhs_buffer);
+            let rhs: Bytes = copy_bytes(rhs_buffer);
+            let choice: i64 = cpu_input_i64("choice", 1, 0, 1, 1);
+            let returned: Bytes = choose(move(lhs), move(rhs), choice == 1);
+            let len: i64 = bytes_len(returned);
+            drop_bytes(returned);
+            free(rhs_buffer);
+            free(lhs_buffer);
+            return len;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let select = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.instruction == "select_owned_bytes_drop_unselected")
+        .expect("distinct owned select node");
+    assert_ne!(select.op.args[1], select.op.args[2]);
+
+    let llvm_ir = yir_lower_llvm::emit_module(&yir).expect("distinct owned select should lower");
+    assert!(llvm_ir.contains("select_owned_cleanup_then"));
+    assert!(llvm_ir.contains("select_owned_cleanup_else"));
+    assert!(llvm_ir.contains("select_owned_cleanup_merge"));
+    assert!(llvm_ir.contains(" = phi ptr [ "));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.select_owned_bytes_drop_unselected"));
+    assert_eq!(
+        llvm_ir
+            .matches("call ptr @nuis_scheduler_owned_blob_copy_v1")
+            .count(),
+        2
+    );
+    assert_eq!(
+        llvm_ir
+            .matches("call void @nuis_scheduler_owned_blob_drop_v1")
+            .count(),
+        3
+    );
+}
+
+#[test]
+fn lowers_branch_local_owned_helpers_into_real_llvm_call_blocks() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn keep_left(bytes: Bytes, delta: i64) -> Bytes {
+            return move(bytes);
+          }
+
+          fn keep_right(bytes: Bytes, factor: i64) -> Bytes {
+            return move(bytes);
+          }
+
+          fn choose(bytes: Bytes, enabled: bool) -> Bytes {
+            if enabled {
+              return keep_left(move(bytes), 3);
+            } else {
+              return keep_right(move(bytes), 7);
+            }
+          }
+
+          fn main() -> i64 {
+            let buffer: ref Buffer = alloc_buffer(4, 9);
+            let bytes: Bytes = copy_bytes(buffer);
+            let choice: i64 = cpu_input_i64("choice", 1, 0, 1, 1);
+            let returned: Bytes = choose(move(bytes), choice == 1);
+            let len: i64 = bytes_len(returned);
+            drop_bytes(returned);
+            free(buffer);
+            return len;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let branch_call = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.instruction == "branch_call_owned_bytes")
+        .expect("conditional owned helper calls should retain one branch call node");
+    assert_eq!(branch_call.op.args[1], "keep_left");
+    assert_eq!(branch_call.op.args[2], "keep_right");
+    assert_eq!(branch_call.op.args[4], "1");
+    assert_eq!(branch_call.op.args[6], "1");
+    let then_scalar = yir
+        .nodes
+        .iter()
+        .find(|node| node.name == branch_call.op.args[5])
+        .expect("then scalar argument source");
+    let else_scalar = yir
+        .nodes
+        .iter()
+        .find(|node| node.name == branch_call.op.args[7])
+        .expect("else scalar argument source");
+    assert_eq!(then_scalar.op.args, ["3"]);
+    assert_eq!(else_scalar.op.args, ["7"]);
+    assert!(yir.node_lanes.values().any(|lane| lane == "fn:keep_left"));
+    assert!(yir.node_lanes.values().any(|lane| lane == "fn:keep_right"));
+
+    let llvm_ir = yir_lower_llvm::emit_module(&yir).expect("branch-local owned calls should lower");
+    assert!(llvm_ir.contains("branch_owned_call_then"));
+    assert!(llvm_ir.contains("branch_owned_call_else"));
+    assert!(llvm_ir.contains("branch_owned_call_merge"));
+    let then_call = llvm_ir
+        .lines()
+        .find(|line| line.contains("call ptr @nuis_fn_keep_left(ptr"))
+        .expect("then branch helper call");
+    let else_call = llvm_ir
+        .lines()
+        .find(|line| line.contains("call ptr @nuis_fn_keep_right(ptr"))
+        .expect("else branch helper call");
+    assert!(then_call.contains(", i64 "));
+    assert!(else_call.contains(", i64 "));
+    assert!(llvm_ir.contains(" = phi ptr ["));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.branch_call_owned_bytes"));
+    assert_eq!(
+        llvm_ir
+            .matches("call ptr @nuis_scheduler_owned_blob_copy_v1")
+            .count(),
+        1
+    );
+    assert_eq!(
+        llvm_ir
+            .matches("call void @nuis_scheduler_owned_blob_drop_v1")
+            .count(),
+        1
+    );
+}

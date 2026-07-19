@@ -28,6 +28,22 @@ pub(super) fn ensure_ref_like(
     }
 }
 
+pub(super) fn ensure_move_like(
+    expr: &NirExpr,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<(), String> {
+    match infer_nir_expr_type(expr, bindings, signatures, struct_table) {
+        Some(ty) if ty.is_ref || (ty.name == "Bytes" && ty.generic_args.is_empty()) => Ok(()),
+        Some(ty) => Err(format!(
+            "move(...) expects an owned resource, found `{}`",
+            render_type_name(&ty)
+        )),
+        None => Ok(()),
+    }
+}
+
 pub(super) fn ensure_task_like(
     name: &str,
     expr: &NirExpr,

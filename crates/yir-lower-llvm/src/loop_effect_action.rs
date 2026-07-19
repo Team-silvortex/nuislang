@@ -13,6 +13,7 @@ use super::{
 pub(crate) enum LoopEffectCleanup {
     None,
     OwnedBlob(String),
+    OwnedResult(String),
 }
 
 pub(crate) fn begin_loop_effect_action(
@@ -22,6 +23,7 @@ pub(crate) fn begin_loop_effect_action(
     registers: &BTreeMap<String, LlvmValueRef>,
     buffer_lengths: &BTreeMap<String, String>,
     helper_signatures: &BTreeMap<String, CpuHelperSignature>,
+    owned_move_overrides: &BTreeMap<String, String>,
     current: &str,
     next_reg: &mut usize,
 ) -> Result<LoopEffectCleanup, String> {
@@ -66,19 +68,36 @@ pub(crate) fn begin_loop_effect_action(
             ));
             Ok(LoopEffectCleanup::OwnedBlob(blob))
         }
-        ("cpu", "scoped_call") => {
-            let (callee, operands) = action_args.split_first().ok_or_else(|| {
+        ("cpu", "scoped_call" | "scoped_call_owned_return") => {
+            let (callee, action_tail) = action_args.split_first().ok_or_else(|| {
                 format!(
                     "cpu.loop_while_i64_effect `{}` has a scoped call without a callee",
                     node.name
                 )
             })?;
+            let returns_owned = action_instruction == "scoped_call_owned_return";
+            let operands = if returns_owned {
+                action_tail.get(1..).ok_or_else(|| {
+                    format!(
+                        "cpu.loop_while_i64_effect `{}` has an owned scoped call without a result projection",
+                        node.name
+                    )
+                })?
+            } else {
+                action_tail
+            };
             let signature = helper_signatures.get(callee).ok_or_else(|| {
                 format!(
                     "cpu.loop_while_i64_effect `{}` cannot resolve scoped helper `{callee}`",
                     node.name
                 )
             })?;
+            if (signature.ret == CpuCallScalarKind::OwnedBytes) != returns_owned {
+                return Err(format!(
+                    "cpu.loop_while_i64_effect `{}` scoped helper `{callee}` has mismatched owned return action",
+                    node.name
+                ));
+            }
             if signature.params.len() != operands.len() {
                 return Err(format!(
                     "cpu.loop_while_i64_effect `{}` scoped helper `{callee}` expects {} args, found {}",
@@ -91,18 +110,36 @@ pub(crate) fn begin_loop_effect_action(
                 .iter()
                 .zip(signature.params.iter().copied())
                 .map(|(operand, kind)| {
-                    lower_scoped_operand(operand, kind, current, registers, buffer_lengths)
+                    lower_scoped_operand(
+                        operand,
+                        kind,
+                        current,
+                        registers,
+                        buffer_lengths,
+                        owned_move_overrides,
+                        body,
+                        next_reg,
+                    )
                 })
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()
                 .flatten()
                 .collect::<Vec<_>>();
-            body.push(format!(
-                "  call {} @nuis_fn_{callee}({})",
-                cpu_scalar_kind_llvm_type(signature.ret),
-                lowered.join(", ")
-            ));
-            Ok(LoopEffectCleanup::None)
+            if returns_owned {
+                let result = fresh_reg(next_reg);
+                body.push(format!(
+                    "  {result} = call ptr @nuis_fn_{callee}({})",
+                    lowered.join(", ")
+                ));
+                Ok(LoopEffectCleanup::OwnedResult(result))
+            } else {
+                body.push(format!(
+                    "  call {} @nuis_fn_{callee}({})",
+                    cpu_scalar_kind_llvm_type(signature.ret),
+                    lowered.join(", ")
+                ));
+                Ok(LoopEffectCleanup::None)
+            }
         }
         (module, instruction) => {
             Err(format!(
@@ -119,6 +156,7 @@ pub(crate) fn finish_loop_effect_action(cleanup: &LoopEffectCleanup, body: &mut 
         LoopEffectCleanup::OwnedBlob(blob) => body.push(format!(
             "  call void @nuis_scheduler_owned_blob_drop_v1(ptr {blob})"
         )),
+        LoopEffectCleanup::OwnedResult(_) => {}
     }
 }
 
@@ -128,6 +166,9 @@ fn lower_scoped_operand(
     current: &str,
     registers: &BTreeMap<String, LlvmValueRef>,
     buffer_lengths: &BTreeMap<String, String>,
+    owned_move_overrides: &BTreeMap<String, String>,
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
 ) -> Result<Vec<String>, String> {
     if kind == CpuCallScalarKind::BorrowedBuffer {
         let ptr = get_ptr(registers, operand)
@@ -136,6 +177,33 @@ fn lower_scoped_operand(
             .get(operand)
             .ok_or_else(|| format!("cannot lower scoped buffer length `{operand}`"))?;
         return Ok(vec![format!("ptr {ptr}"), format!("i64 {len}")]);
+    }
+    if kind == CpuCallScalarKind::OwnedBytes {
+        if let Some(source) = operand.strip_prefix("move_owned:") {
+            if let Some(blob) = owned_move_overrides.get(source) {
+                return Ok(vec![format!("ptr {blob}")]);
+            }
+            let Some(LlvmValueRef::OwnedBytes { blob }) = registers.get(source) else {
+                return Err(format!("cannot lower scoped moved Bytes source `{source}`"));
+            };
+            return Ok(vec![format!("ptr {blob}")]);
+        }
+        let source = operand.strip_prefix("copy_owned:").ok_or_else(|| {
+            format!("scoped owned Bytes operand `{operand}` requires explicit copy or move capture")
+        })?;
+        let ptr = get_ptr(registers, source)
+            .ok_or_else(|| format!("cannot lower scoped Bytes source `{source}`"))?;
+        let len = buffer_lengths
+            .get(source)
+            .ok_or_else(|| format!("cannot lower scoped Bytes source length `{source}`"))?;
+        let byte_len = fresh_reg(next_reg);
+        body.push(format!("  {byte_len} = mul i64 {len}, 8"));
+        let blob = fresh_reg(next_reg);
+        body.push(format!(
+            "  {blob} = call ptr @nuis_scheduler_owned_blob_copy_v1(ptr {ptr}, i64 {byte_len}, i64 {})",
+            stable_glm_token(operand)
+        ));
+        return Ok(vec![format!("ptr {blob}")]);
     }
     let value = if operand == "$current" {
         (kind == CpuCallScalarKind::I64).then_some(current)
@@ -147,6 +215,7 @@ fn lower_scoped_operand(
             CpuCallScalarKind::F32 => get_f32(registers, operand),
             CpuCallScalarKind::F64 => get_f64(registers, operand),
             CpuCallScalarKind::BorrowedBuffer => get_ptr(registers, operand),
+            CpuCallScalarKind::OwnedBytes => None,
         }
     }
     .ok_or_else(|| format!("cannot lower scoped call operand `{operand}`"))?;

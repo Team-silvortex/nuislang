@@ -1,4 +1,4 @@
-use yir_core::{ExecutionState, Node, Resource, StructValue, Value};
+use yir_core::{parse_branch_owned_call_args, ExecutionState, Node, Resource, StructValue, Value};
 
 use crate::runtime_helpers::resolve_project_profile_ref;
 
@@ -152,7 +152,9 @@ pub(crate) fn execute_cpu_value_node(
         "param_f32" => Ok(Value::F32(0.0)),
         "param_f64" => Ok(Value::F64(0.0)),
         "param_buffer_ref" => Ok(Value::Pointer(None)),
-        "call_bool" | "call_i32" | "call_i64" | "call_f32" | "call_f64" => {
+        "param_owned_bytes" => Ok(Value::OwnedBytes(Vec::new())),
+        "loop_owned_result" => Ok(Value::OwnedBytes(Vec::new())),
+        "call_bool" | "call_i32" | "call_i64" | "call_f32" | "call_f64" | "call_owned_bytes" => {
             let callee = &node.op.args[0];
             let args = node.op.args[1..]
                 .iter()
@@ -173,8 +175,40 @@ pub(crate) fn execute_cpu_value_node(
                 "call_i32" => Ok(Value::I32(0)),
                 "call_f32" => Ok(Value::F32(0.0)),
                 "call_f64" => Ok(Value::F64(0.0)),
+                "call_owned_bytes" => Ok(Value::OwnedBytes(Vec::new())),
                 _ => Ok(Value::Int(0)),
             }
+        }
+        "branch_call_owned_bytes" => {
+            let args = parse_branch_owned_call_args(&node.op.args).ok_or_else(|| {
+                format!(
+                    "node `{}` has invalid branch scalar argument segments",
+                    node.name
+                )
+            })?;
+            let selected_callee = if state.expect_bool(args.condition)? {
+                (args.then_callee, args.then_scalar_args)
+            } else {
+                (args.else_callee, args.else_scalar_args)
+            };
+            let Value::OwnedBytes(bytes) = state.expect_value(args.owner)? else {
+                return Err(format!("node `{}` expects an owned bytes input", node.name));
+            };
+            let bytes = bytes.clone();
+            for arg in selected_callee.1 {
+                state.expect_value(arg)?;
+            }
+            state.push_resource_event(
+                resource,
+                format!(
+                    "effect cpu.branch_call_owned_bytes @{} [{}] {}({})",
+                    node.resource,
+                    resource.kind.raw,
+                    selected_callee.0,
+                    selected_callee.1.join(", ")
+                ),
+            );
+            Ok(Value::OwnedBytes(bytes))
         }
         "call_owned_struct" => {
             let (type_name, fields_source) = node.op.args[1]
@@ -242,6 +276,12 @@ pub(crate) fn execute_cpu_value_node(
                 ),
             );
             Ok(Value::Struct(value))
+        }
+        "return_owned_bytes" => {
+            let Value::OwnedBytes(bytes) = state.expect_value(&node.op.args[0])? else {
+                return Err(format!("node `{}` expects owned bytes", node.name));
+            };
+            Ok(Value::OwnedBytes(bytes.clone()))
         }
         "return_i64" => {
             let value = state.expect_int(&node.op.args[0])?;

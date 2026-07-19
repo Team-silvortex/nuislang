@@ -114,19 +114,31 @@ fn lower_move(
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
 ) -> Result<String, String> {
-    let ptr = lower_expr(value, state, bindings)?;
+    let input = lower_expr(value, state, bindings)?;
+    let moves_owned_bytes = state.yir.nodes.iter().any(|node| {
+        node.name == input
+            && matches!(
+                node.op.instruction.as_str(),
+                "copy_buffer_owned" | "move_owned_bytes" | "param_owned_bytes"
+            )
+    });
     let name = next_name(state, "move");
     state.yir.nodes.push(Node {
         name: name.clone(),
         resource: "cpu0".to_owned(),
         op: Operation {
             module: "cpu".to_owned(),
-            instruction: "move_ptr".to_owned(),
-            args: vec![ptr.clone()],
+            instruction: if moves_owned_bytes {
+                "move_owned_bytes"
+            } else {
+                "move_ptr"
+            }
+            .to_owned(),
+            args: vec![input.clone()],
         },
     });
-    push_dep_edges(state, &ptr, &name);
-    push_lifetime_edge(state, &ptr, &name);
+    push_dep_edges(state, &input, &name);
+    push_lifetime_edge(state, &input, &name);
     Ok(name)
 }
 
