@@ -327,6 +327,68 @@ pub(super) fn write_nsld_final_output_text_fields<W: fmt::Write>(
     )?;
     writeln!(
         out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_contract: {}",
+        final_output.debugger_cursor_lineage_contract
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_source_protocol: {}",
+        final_output.debugger_cursor_lineage_source_protocol
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_path: {}",
+        final_output.debugger_cursor_lineage_path
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_ready: {}",
+        crate::yes_no(final_output.debugger_cursor_lineage_ready)
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_status: {}",
+        final_output.debugger_cursor_lineage_status
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_entry_count: {}",
+        final_output.debugger_cursor_lineage_entry_count
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_latest_hash: {}",
+        final_output
+            .debugger_cursor_lineage_latest_hash
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_first_blocker: {}",
+        final_output
+            .debugger_cursor_lineage_first_blocker
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_next_action: {}",
+        final_output
+            .debugger_cursor_lineage_next_action
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_next_command: {}",
+        final_output
+            .debugger_cursor_lineage_next_command
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
         "  nsld_final_executable_output_recommended_next_action: {}",
         final_output.recommended_next_action
     )?;

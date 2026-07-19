@@ -19,6 +19,40 @@ pub(crate) struct FrontdoorClosureSummary {
     pub(crate) debugger_cursor_ready: Option<bool>,
     pub(crate) debugger_cursor_status: Option<String>,
     pub(crate) debugger_cursor_next_command: Option<String>,
+    pub(crate) debugger_cursor_lineage: Option<DebuggerCursorLineageClosureMirror>,
+}
+
+#[derive(Clone)]
+pub(crate) struct DebuggerCursorLineageClosureMirror {
+    pub(crate) contract: String,
+    pub(crate) source_protocol: String,
+    pub(crate) path: String,
+    pub(crate) ready: bool,
+    pub(crate) status: String,
+    pub(crate) entry_count: usize,
+    pub(crate) latest_hash: Option<String>,
+    pub(crate) first_blocker: Option<String>,
+    pub(crate) next_action: Option<String>,
+    pub(crate) next_command: Option<String>,
+}
+
+impl DebuggerCursorLineageClosureMirror {
+    fn from_final_output(
+        final_output: &crate::workflow::NsldFinalExecutableOutputBoundarySummary,
+    ) -> Self {
+        Self {
+            contract: final_output.debugger_cursor_lineage_contract.clone(),
+            source_protocol: final_output.debugger_cursor_lineage_source_protocol.clone(),
+            path: final_output.debugger_cursor_lineage_path.clone(),
+            ready: final_output.debugger_cursor_lineage_ready,
+            status: final_output.debugger_cursor_lineage_status.clone(),
+            entry_count: final_output.debugger_cursor_lineage_entry_count,
+            latest_hash: final_output.debugger_cursor_lineage_latest_hash.clone(),
+            first_blocker: final_output.debugger_cursor_lineage_first_blocker.clone(),
+            next_action: final_output.debugger_cursor_lineage_next_action.clone(),
+            next_command: final_output.debugger_cursor_lineage_next_command.clone(),
+        }
+    }
 }
 
 impl FrontdoorClosureSummary {
@@ -66,6 +100,7 @@ impl FrontdoorClosureSummary {
             debugger_cursor_ready: None,
             debugger_cursor_status: None,
             debugger_cursor_next_command: None,
+            debugger_cursor_lineage: None,
         }
     }
 
@@ -97,6 +132,7 @@ impl FrontdoorClosureSummary {
             debugger_cursor_ready: None,
             debugger_cursor_status: None,
             debugger_cursor_next_command: None,
+            debugger_cursor_lineage: None,
         }
     }
 
@@ -144,6 +180,9 @@ impl FrontdoorClosureSummary {
                 debugger_cursor_ready: Some(final_output.debugger_cursor_ready),
                 debugger_cursor_status: Some(final_output.debugger_cursor_status.clone()),
                 debugger_cursor_next_command: final_output.debugger_cursor_next_command.clone(),
+                debugger_cursor_lineage: Some(
+                    DebuggerCursorLineageClosureMirror::from_final_output(final_output),
+                ),
             };
         }
         if final_output.ready && !final_output.nsdb_replay_ready {
@@ -189,6 +228,9 @@ impl FrontdoorClosureSummary {
                 debugger_cursor_ready: Some(final_output.debugger_cursor_ready),
                 debugger_cursor_status: Some(final_output.debugger_cursor_status.clone()),
                 debugger_cursor_next_command: final_output.debugger_cursor_next_command.clone(),
+                debugger_cursor_lineage: Some(
+                    DebuggerCursorLineageClosureMirror::from_final_output(final_output),
+                ),
             };
         }
         Self::from_nsld_next_action(source, action, command, reason)
@@ -218,6 +260,9 @@ impl FrontdoorClosureSummary {
         self.debugger_cursor_ready = Some(final_output.debugger_cursor_ready);
         self.debugger_cursor_status = Some(final_output.debugger_cursor_status.clone());
         self.debugger_cursor_next_command = final_output.debugger_cursor_next_command.clone();
+        self.debugger_cursor_lineage = Some(DebuggerCursorLineageClosureMirror::from_final_output(
+            final_output,
+        ));
         self
     }
 
@@ -263,6 +308,7 @@ impl FrontdoorClosureSummary {
             debugger_cursor_ready: self.debugger_cursor_ready,
             debugger_cursor_status: self.debugger_cursor_status,
             debugger_cursor_next_command: self.debugger_cursor_next_command,
+            debugger_cursor_lineage: self.debugger_cursor_lineage,
         }
     }
 
@@ -336,7 +382,74 @@ impl FrontdoorClosureSummary {
                 "closure_summary_debugger_cursor_next_command",
                 self.debugger_cursor_next_command.as_deref(),
             ),
+            crate::json_optional_string_field(
+                "closure_summary_debugger_cursor_lineage_contract",
+                self.debugger_cursor_lineage
+                    .as_ref()
+                    .map(|mirror| mirror.contract.as_str()),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_debugger_cursor_lineage_source_protocol",
+                self.debugger_cursor_lineage
+                    .as_ref()
+                    .map(|mirror| mirror.source_protocol.as_str()),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_debugger_cursor_lineage_path",
+                self.debugger_cursor_lineage
+                    .as_ref()
+                    .map(|mirror| mirror.path.as_str()),
+            ),
+            crate::json_optional_bool_field(
+                "closure_summary_debugger_cursor_lineage_ready",
+                self.debugger_cursor_lineage
+                    .as_ref()
+                    .map(|mirror| mirror.ready),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_debugger_cursor_lineage_status",
+                self.debugger_cursor_lineage
+                    .as_ref()
+                    .map(|mirror| mirror.status.as_str()),
+            ),
+            json_optional_usize_field(
+                "closure_summary_debugger_cursor_lineage_entry_count",
+                self.debugger_cursor_lineage
+                    .as_ref()
+                    .map(|mirror| mirror.entry_count),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_debugger_cursor_lineage_latest_hash",
+                self.debugger_cursor_lineage
+                    .as_ref()
+                    .and_then(|mirror| mirror.latest_hash.as_deref()),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_debugger_cursor_lineage_first_blocker",
+                self.debugger_cursor_lineage
+                    .as_ref()
+                    .and_then(|mirror| mirror.first_blocker.as_deref()),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_debugger_cursor_lineage_next_action",
+                self.debugger_cursor_lineage
+                    .as_ref()
+                    .and_then(|mirror| mirror.next_action.as_deref()),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_debugger_cursor_lineage_next_command",
+                self.debugger_cursor_lineage
+                    .as_ref()
+                    .and_then(|mirror| mirror.next_command.as_deref()),
+            ),
         ]
+    }
+}
+
+fn json_optional_usize_field(name: &str, value: Option<usize>) -> String {
+    match value {
+        Some(value) => format!("\"{name}\":{value}"),
+        None => format!("\"{name}\":null"),
     }
 }
 
@@ -586,6 +699,16 @@ mod tests {
             debugger_cursor_ready: false,
             debugger_cursor_status: "cursor-unavailable".to_owned(),
             debugger_cursor_next_command: None,
+            debugger_cursor_lineage_contract: "nuis-debugger-cursor-lineage-mirror-v1".to_owned(),
+            debugger_cursor_lineage_source_protocol: "nsdb-yir-replay-cursor-lineage-v1".to_owned(),
+            debugger_cursor_lineage_path: "out/nuis.nsdb.replay-cursor.lineage.toml".to_owned(),
+            debugger_cursor_lineage_ready: false,
+            debugger_cursor_lineage_status: "lineage-unavailable".to_owned(),
+            debugger_cursor_lineage_entry_count: 0,
+            debugger_cursor_lineage_latest_hash: None,
+            debugger_cursor_lineage_first_blocker: None,
+            debugger_cursor_lineage_next_action: None,
+            debugger_cursor_lineage_next_command: None,
             recommended_next_action: "run-artifact".to_owned(),
             path_present: true,
             nsld_owned: Some(true),

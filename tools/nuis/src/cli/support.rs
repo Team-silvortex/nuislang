@@ -54,6 +54,53 @@ pub(super) struct BuildArgs {
     pub(super) packaging_mode: Option<String>,
 }
 
+pub(super) struct DebugResumeArgs {
+    pub(super) input: PathBuf,
+    pub(super) json: bool,
+    pub(super) breakpoint: Option<String>,
+    pub(super) breakpoint_phase: Option<String>,
+    pub(super) breakpoint_entry: Option<String>,
+    pub(super) cursor_output: Option<PathBuf>,
+}
+
+pub(super) fn parse_debug_resume_args<I>(args: &mut I) -> Result<DebugResumeArgs, String>
+where
+    I: Iterator<Item = String>,
+{
+    const USAGE: &str = "usage: nuis debug-resume [--json] [--break-at <index|frame-id> | [--break-phase <phase>] [--break-entry <symbol>]] [--save-cursor <path>] <artifact-output-dir|nuis.build.manifest.toml>";
+    let mut parsed = DebugResumeArgs {
+        input: PathBuf::new(),
+        json: false,
+        breakpoint: None,
+        breakpoint_phase: None,
+        breakpoint_entry: None,
+        cursor_output: None,
+    };
+    let mut input = None;
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--json" => parsed.json = true,
+            "--break-at" => parsed.breakpoint = Some(args.next().ok_or(USAGE)?),
+            "--break-phase" => parsed.breakpoint_phase = Some(args.next().ok_or(USAGE)?),
+            "--break-entry" => parsed.breakpoint_entry = Some(args.next().ok_or(USAGE)?),
+            "--save-cursor" => {
+                parsed.cursor_output = Some(PathBuf::from(args.next().ok_or(USAGE)?))
+            }
+            _ if input.is_none() => input = Some(PathBuf::from(arg)),
+            _ => return Err(USAGE.to_owned()),
+        }
+    }
+    if parsed.breakpoint.is_some()
+        && (parsed.breakpoint_phase.is_some() || parsed.breakpoint_entry.is_some())
+    {
+        return Err(
+            "debug-resume exact and typed breakpoint controls are mutually exclusive".to_owned(),
+        );
+    }
+    parsed.input = input.ok_or_else(|| USAGE.to_owned())?;
+    Ok(parsed)
+}
+
 pub(super) fn parse_required_json_input<I>(
     args: &mut I,
     usage: &'static str,

@@ -1,10 +1,11 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::data_markers::{directional_bridge_marker_tag, DATA_BRIDGE_HETERO_DOMAINS};
 use yir_core::{EdgeKind, OperationDomainFamily, SemanticOp, YirModule};
 
 use super::data_bridge_directions::{data_bridge_directions, DataBridgeDirection};
 use super::profile_refs::{push_edge_if_missing, push_project_dependency_edge_if_missing};
+use super::profile_targets::resolve_project_profile_target_name;
 
 pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
     let resource_families = module
@@ -23,79 +24,68 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
         .filter(|node| node.op.semantic_op() == SemanticOp::DataHandleTable)
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
-    let directional_markers = DATA_BRIDGE_HETERO_DOMAINS
-        .iter()
-        .filter_map(|domain| {
-            let uplink_tag = directional_bridge_marker_tag("cpu", domain)?;
-            let downlink_tag = directional_bridge_marker_tag(domain, "cpu")?;
-            let uplink_markers = collect_data_marker_nodes(module, &uplink_tag);
-            let downlink_markers = collect_data_marker_nodes(module, &downlink_tag);
-            Some(((*domain).to_owned(), uplink_markers, downlink_markers))
-        })
-        .collect::<Vec<_>>();
     let cpu_nodes = module
         .nodes
         .iter()
         .filter(|node| node.op.is_domain_family(OperationDomainFamily::Cpu))
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
-    let data_pipe_nodes = module
-        .nodes
+    for handle in handle_tables {
+        let Some(unit) = data_unit_from_handle_table(&handle) else {
+            continue;
+        };
+        stitch_data_unit_profile_edges(
+            module,
+            &resource_families,
+            &node_resources,
+            &cpu_nodes,
+            &unit,
+            &handle,
+        );
+    }
+}
+
+fn stitch_data_unit_profile_edges(
+    module: &mut YirModule,
+    resource_families: &BTreeMap<String, String>,
+    node_resources: &BTreeMap<String, String>,
+    cpu_nodes: &[String],
+    unit: &str,
+    handle: &str,
+) {
+    let unit_fragment = format!("_data_{unit}_");
+    let directional_markers = DATA_BRIDGE_HETERO_DOMAINS
         .iter()
-        .filter(|node| node.op.is_data_pipe_semantic_op())
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    let uplink_windows = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_data_window_semantic_op() && node.name.contains("_uplink_window"))
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    let downlink_windows = module
-        .nodes
-        .iter()
-        .filter(|node| {
-            node.op.is_data_window_semantic_op() && node.name.contains("_downlink_window")
+        .filter_map(|domain| {
+            let uplink_tag = directional_bridge_marker_tag("cpu", domain)?;
+            let downlink_tag = directional_bridge_marker_tag(domain, "cpu")?;
+            Some((
+                (*domain).to_owned(),
+                collect_unit_data_marker_nodes(module, &uplink_tag, &unit_fragment),
+                collect_unit_data_marker_nodes(module, &downlink_tag, &unit_fragment),
+            ))
         })
-        .map(|node| node.name.clone())
         .collect::<Vec<_>>();
-    let window_offset = module
-        .nodes
-        .iter()
-        .find(|node| node.name.contains("_window_offset"))
-        .map(|node| node.name.clone());
-    let uplink_len = module
-        .nodes
-        .iter()
-        .find(|node| node.name.contains("_uplink_len"))
-        .map(|node| node.name.clone());
-    let downlink_len = module
-        .nodes
-        .iter()
-        .find(|node| node.name.contains("_downlink_len"))
-        .map(|node| node.name.clone());
+    let uplink_windows = collect_unit_profile_windows(module, &unit_fragment, "_uplink_window");
+    let downlink_windows = collect_unit_profile_windows(module, &unit_fragment, "_downlink_window");
     let plane_directions = [
         DataPlaneDirectionContext {
             direction: data_bridge_directions()[0],
-            pipe_targets: data_pipe_nodes.iter().take(2).cloned().collect::<Vec<_>>(),
-            windows: uplink_windows.clone(),
-            len: uplink_len.clone(),
+            pipe_targets: data_pipe_nodes_for_unit(module, unit, true),
+            windows: uplink_windows,
+            len: find_unit_profile_node(module, &unit_fragment, "_uplink_len"),
         },
         DataPlaneDirectionContext {
             direction: data_bridge_directions()[1],
-            pipe_targets: data_pipe_nodes
-                .iter()
-                .skip(2)
-                .take(2)
-                .cloned()
-                .collect::<Vec<_>>(),
-            windows: downlink_windows.clone(),
-            len: downlink_len.clone(),
+            pipe_targets: data_pipe_nodes_for_unit(module, unit, false),
+            windows: downlink_windows,
+            len: find_unit_profile_node(module, &unit_fragment, "_downlink_len"),
         },
     ];
+    let window_offset = find_unit_profile_node(module, &unit_fragment, "_window_offset");
 
-    for handle in &handle_tables {
-        for pipe in &data_pipe_nodes {
+    for context in &plane_directions {
+        for pipe in &context.pipe_targets {
             push_edge_if_missing(module, EdgeKind::Dep, handle, pipe);
         }
     }
@@ -112,25 +102,22 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
         );
     }
     for context in &plane_directions {
-        let pipe_markers = collect_data_marker_nodes(module, context.direction.pipe_marker);
-        let pipe_class_markers =
-            collect_data_marker_nodes(module, context.direction.pipe_class_marker);
-        let payload_class_markers = collect_data_marker_nodes(
-            module,
+        let marker = |tag: &str| collect_unit_data_marker_nodes(module, tag, &unit_fragment);
+        let pipe_markers = marker(context.direction.pipe_marker);
+        let pipe_class_markers = marker(context.direction.pipe_class_marker);
+        let payload_class_markers = marker(
             context
                 .direction
                 .payload_class_marker
                 .trim_start_matches("marker:"),
         );
-        let payload_shape_markers = collect_data_marker_nodes(
-            module,
+        let payload_shape_markers = marker(
             context
                 .direction
                 .payload_shape_marker
                 .trim_start_matches("marker:"),
         );
-        let window_policy_markers = collect_data_marker_nodes(
-            module,
+        let window_policy_markers = marker(
             context
                 .direction
                 .window_policy_marker
@@ -145,8 +132,8 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
         }
         stitch_window_binding_edges(
             module,
-            &resource_families,
-            &node_resources,
+            resource_families,
+            node_resources,
             WindowBindingEdges {
                 windows: &context.windows,
                 pipes: &context.pipe_targets,
@@ -158,18 +145,18 @@ pub(super) fn stitch_data_profile_edges(module: &mut YirModule) {
     }
     stitch_missing_window_fallback_edges(
         module,
-        &resource_families,
-        &node_resources,
+        resource_families,
+        node_resources,
         &plane_directions,
         window_offset.as_ref(),
     );
     stitch_domain_bridge_edges(
         module,
-        &resource_families,
-        &node_resources,
+        resource_families,
+        node_resources,
         &directional_markers,
         &plane_directions,
-        &cpu_nodes,
+        cpu_nodes,
     );
 }
 
@@ -179,6 +166,102 @@ struct DataPlaneDirectionContext {
     pipe_targets: Vec<String>,
     windows: Vec<String>,
     len: Option<String>,
+}
+
+pub(super) fn data_pipe_nodes_for_unit(
+    module: &YirModule,
+    unit: &str,
+    is_uplink: bool,
+) -> Vec<String> {
+    let handle = resolve_project_profile_target_name("data", unit, "handle_table");
+    let expected_window = if is_uplink {
+        SemanticOp::DataImmutableWindow
+    } else {
+        SemanticOp::DataCopyWindow
+    };
+    module
+        .nodes
+        .iter()
+        .filter(|node| node.op.is_data_pipe_semantic_op())
+        .filter(|node| {
+            module
+                .edges
+                .iter()
+                .any(|edge| edge.from == handle && edge.to == node.name)
+        })
+        .filter(|node| node_has_semantic_ancestor(module, &node.name, expected_window))
+        .map(|node| node.name.clone())
+        .collect()
+}
+
+fn node_has_semantic_ancestor(module: &YirModule, node_name: &str, expected: SemanticOp) -> bool {
+    fn visit(
+        module: &YirModule,
+        node_name: &str,
+        expected: SemanticOp,
+        visited: &mut BTreeSet<String>,
+    ) -> bool {
+        if !visited.insert(node_name.to_owned()) {
+            return false;
+        }
+        let Some(node) = module.nodes.iter().find(|node| node.name == node_name) else {
+            return false;
+        };
+        if node.op.semantic_op() == expected {
+            return true;
+        }
+        node.op
+            .args
+            .iter()
+            .any(|arg| visit(module, arg, expected, visited))
+    }
+    visit(module, node_name, expected, &mut BTreeSet::new())
+}
+
+fn data_unit_from_handle_table(name: &str) -> Option<String> {
+    name.strip_prefix("project_profile_data_")
+        .and_then(|name| name.strip_suffix("_profile_handles"))
+        .map(str::to_owned)
+}
+
+fn collect_unit_profile_windows(
+    module: &YirModule,
+    unit_fragment: &str,
+    direction_fragment: &str,
+) -> Vec<String> {
+    module
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.is_data_window_semantic_op()
+                && node.name.contains(unit_fragment)
+                && node.name.contains(direction_fragment)
+        })
+        .map(|node| node.name.clone())
+        .collect()
+}
+
+fn find_unit_profile_node(
+    module: &YirModule,
+    unit_fragment: &str,
+    slot_fragment: &str,
+) -> Option<String> {
+    module
+        .nodes
+        .iter()
+        .find(|node| node.name.contains(unit_fragment) && node.name.ends_with(slot_fragment))
+        .map(|node| node.name.clone())
+}
+
+fn collect_unit_data_marker_nodes(
+    module: &YirModule,
+    tag: &str,
+    unit_fragment: &str,
+) -> Vec<String> {
+    collect_data_marker_nodes(module, tag)
+        .into_iter()
+        .filter(|name| name.contains(unit_fragment))
+        .collect()
 }
 
 fn stitch_missing_window_fallback_edges(

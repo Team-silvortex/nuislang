@@ -29,6 +29,10 @@ pub(crate) enum Command {
         cursor_input: Option<PathBuf>,
         cursor_output: Option<PathBuf>,
     },
+    CursorLineageRepair {
+        input: PathBuf,
+        json: bool,
+    },
     MaterializeProviderSamples {
         output_dir: PathBuf,
         provider_family: Option<String>,
@@ -86,6 +90,10 @@ where
                 cursor_output,
             })
         }
+        "cursor-lineage-repair" => {
+            let (input, json) = parse_required_input_json(args.by_ref())?;
+            Ok(Command::CursorLineageRepair { input, json })
+        }
         "materialize-provider-samples" => {
             let (output_dir, provider_family, json) =
                 parse_provider_materialize_args(args.by_ref())?;
@@ -124,7 +132,23 @@ pub(crate) fn resolve_manifest_input(input: &Path) -> Result<PathBuf, String> {
 }
 
 fn usage() -> &'static str {
-    "usage:\n  nsdb status\n  nsdb inspect <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb events <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb replay-plan <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb replay <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>] [--frame <index|frame-id> | --break-at <index|frame-id> | [--break-phase <phase>] [--break-entry <symbol>]] [--resume-after <frame-id> --resume-next <frame-id> | --resume-cursor <path>] [--save-cursor <path>]\n  nsdb materialize-provider-samples <artifact-output-dir> [--provider-family <family>] [--json]\n  nsdb execute-provider-samples <artifact-output-dir> [--provider-family <family>] [--json]"
+    "usage:\n  nsdb status\n  nsdb inspect <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb events <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb replay-plan <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb replay <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>] [--frame <index|frame-id> | --break-at <index|frame-id> | [--break-phase <phase>] [--break-entry <symbol>]] [--resume-after <frame-id> --resume-next <frame-id> | --resume-cursor <path>] [--save-cursor <path>]\n  nsdb cursor-lineage-repair <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsdb materialize-provider-samples <artifact-output-dir> [--provider-family <family>] [--json]\n  nsdb execute-provider-samples <artifact-output-dir> [--provider-family <family>] [--json]"
+}
+
+fn parse_required_input_json<I>(args: &mut I) -> Result<(PathBuf, bool), String>
+where
+    I: Iterator<Item = String>,
+{
+    let mut input = None;
+    let mut json = false;
+    for arg in args {
+        match arg.as_str() {
+            "--json" => json = true,
+            _ if input.is_none() => input = Some(PathBuf::from(arg)),
+            _ => return Err(format!("unexpected argument `{arg}`")),
+        }
+    }
+    Ok((input.ok_or_else(|| usage().to_owned())?, json))
 }
 
 fn parse_replay_args<I>(
@@ -288,6 +312,24 @@ mod tests {
         assert_eq!(
             parse_args(Vec::<String>::new().into_iter()),
             Ok(Command::Status)
+        );
+    }
+
+    #[test]
+    fn parses_cursor_lineage_repair() {
+        assert_eq!(
+            parse_args(
+                vec![
+                    "cursor-lineage-repair".to_owned(),
+                    "out".to_owned(),
+                    "--json".to_owned(),
+                ]
+                .into_iter(),
+            ),
+            Ok(Command::CursorLineageRepair {
+                input: PathBuf::from("out"),
+                json: true,
+            })
         );
     }
 

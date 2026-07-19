@@ -31,6 +31,6 @@ capability_tags = ["fabric-plane", "packet-layout", "cross-domain-marker", "wind
 default_lanes = ["data.bind_core=control", "data.handle_table=control", "data.marker=control", "data.immutable_window=uplink", "data.output_pipe=uplink", "data.copy_window=downlink", "data.input_pipe=downlink", "data.move=fabric"]
 profiles = ["aot"]
 resource_families = ["cpu", "shader", "kernel", "network", "npu", "data"]
-unit_types = ["FabricPlane", "PipePlane", "DataWorker"]
+unit_types = ["FabricPlane", "StagingPlane", "PipePlane", "DataWorker"]
 lowering_targets = ["fabric-abi"]
 ops = ["data.move", "data.bind_core", "data.handle_table", "data.output_pipe", "data.input_pipe", "data.marker", "data.copy_window", "data.immutable_window"]

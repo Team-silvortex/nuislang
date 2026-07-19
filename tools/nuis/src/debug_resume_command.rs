@@ -4,7 +4,14 @@ use std::{
     process::Command,
 };
 
-pub(crate) fn handle_debug_resume(input: PathBuf, json: bool) -> Result<(), String> {
+pub(crate) fn handle_debug_resume(
+    input: PathBuf,
+    json: bool,
+    breakpoint: Option<String>,
+    breakpoint_phase: Option<String>,
+    breakpoint_entry: Option<String>,
+    cursor_output: Option<PathBuf>,
+) -> Result<(), String> {
     let (output_dir, manifest) = resolve_debug_resume_input(&input)?;
     let cursor = read_debugger_cursor_handoff(&output_dir, &manifest);
     if !cursor.ready {
@@ -22,6 +29,18 @@ pub(crate) fn handle_debug_resume(input: PathBuf, json: bool) -> Result<(), Stri
         .arg(&output_dir)
         .arg("--resume-cursor")
         .arg(&cursor.path);
+    if let Some(selector) = breakpoint {
+        command.arg("--break-at").arg(selector);
+    }
+    if let Some(phase) = breakpoint_phase {
+        command.arg("--break-phase").arg(phase);
+    }
+    if let Some(entry) = breakpoint_entry {
+        command.arg("--break-entry").arg(entry);
+    }
+    if let Some(output) = cursor_output {
+        command.arg("--save-cursor").arg(output);
+    }
     if json {
         command.arg("--json");
     }

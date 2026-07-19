@@ -7,8 +7,9 @@ use galaxy::parse_galaxy_args;
 pub use galaxy::GalaxyCommand;
 use support::{
     parse_bench_args, parse_build_args, parse_cache_status_args, parse_clean_cache_args,
-    parse_optional_json_input, parse_prune_cache_args, parse_release_check_args,
-    parse_required_json_input, parse_required_json_input_output, parse_test_args,
+    parse_debug_resume_args, parse_optional_json_input, parse_prune_cache_args,
+    parse_release_check_args, parse_required_json_input, parse_required_json_input_output,
+    parse_test_args,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -123,6 +124,10 @@ pub enum CommandKind {
     DebugResume {
         input: PathBuf,
         json: bool,
+        breakpoint: Option<String>,
+        breakpoint_phase: Option<String>,
+        breakpoint_entry: Option<String>,
+        cursor_output: Option<PathBuf>,
     },
     DumpAst {
         input: PathBuf,
@@ -358,11 +363,15 @@ where
             Ok(CommandKind::RunArtifact { input, json })
         }
         "debug-resume" => {
-            let (input, json) = parse_required_json_input(
-                &mut args,
-                "usage: nuis debug-resume [--json] <artifact-output-dir|nuis.build.manifest.toml>",
-            )?;
-            Ok(CommandKind::DebugResume { input, json })
+            let parsed = parse_debug_resume_args(&mut args)?;
+            Ok(CommandKind::DebugResume {
+                input: parsed.input,
+                json: parsed.json,
+                breakpoint: parsed.breakpoint,
+                breakpoint_phase: parsed.breakpoint_phase,
+                breakpoint_entry: parsed.breakpoint_entry,
+                cursor_output: parsed.cursor_output,
+            })
         }
         "dump-ast" => Ok(CommandKind::DumpAst {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),

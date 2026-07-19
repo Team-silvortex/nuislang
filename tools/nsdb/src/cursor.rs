@@ -1,10 +1,17 @@
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{
+    collections::BTreeMap,
+    fs::{self, File, OpenOptions},
+    io::Write,
+    path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use crate::transcript::{NsdbReplayControl, NsdbReplayTranscript};
 
 const CURSOR_PROTOCOL: &str = "nsdb-yir-replay-cursor-record-v1";
 const TRANSCRIPT_PROTOCOL: &str = "nsdb-yir-replay-transcript-v1";
 const SOURCE_CONTRACT: &str = "nsdb-payload-execution-replay-plan-v1";
+static CURSOR_TEMP_ID: AtomicU64 = AtomicU64::new(0);
 
 pub(crate) fn persist_replay_cursor(
     output: &Path,
@@ -44,12 +51,114 @@ pub(crate) fn persist_replay_cursor(
         next_index,
         escape_toml(next),
     );
-    fs::write(output, content).map_err(|error| {
-        format!(
-            "failed to persist replay cursor `{}`: {error}",
-            output.display()
-        )
+    let previous = fs::read_to_string(output).ok();
+    persist_cursor_content_atomically(output, manifest, &content)?;
+    let _ = crate::cursor_lineage::record_cursor_lineage(
+        output,
+        previous.as_deref(),
+        &content,
+        after,
+        next,
+    );
+    Ok(())
+}
+
+fn persist_cursor_content_atomically(
+    output: &Path,
+    manifest: &Path,
+    content: &str,
+) -> Result<(), String> {
+    persist_validated_content_atomically(output, content, |temporary| {
+        load_replay_cursor(temporary, manifest).map(|_| ())
     })
+}
+
+pub(super) fn persist_validated_content_atomically(
+    output: &Path,
+    content: &str,
+    validate: impl FnOnce(&Path) -> Result<(), String>,
+) -> Result<(), String> {
+    let parent = output.parent().unwrap_or_else(|| Path::new("."));
+    let file_name = output
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| format!("replay cursor path `{}` has no file name", output.display()))?;
+    let (temporary, mut file) = create_cursor_temp_file(parent, file_name)?;
+    let result = (|| {
+        file.write_all(content.as_bytes()).map_err(|error| {
+            format!(
+                "failed to write replay cursor `{}`: {error}",
+                temporary.display()
+            )
+        })?;
+        file.sync_all().map_err(|error| {
+            format!(
+                "failed to sync replay cursor `{}`: {error}",
+                temporary.display()
+            )
+        })?;
+        drop(file);
+        validate(&temporary).map_err(|error| {
+            format!(
+                "refusing to install invalid replay cursor `{}`: {error}",
+                temporary.display()
+            )
+        })?;
+        fs::rename(&temporary, output).map_err(|error| {
+            format!(
+                "failed to atomically replace replay cursor `{}`: {error}",
+                output.display()
+            )
+        })?;
+        sync_cursor_directory(parent)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result
+}
+
+fn create_cursor_temp_file(parent: &Path, file_name: &str) -> Result<(PathBuf, File), String> {
+    for _ in 0..16 {
+        let id = CURSOR_TEMP_ID.fetch_add(1, Ordering::Relaxed);
+        let temporary = parent.join(format!(".{file_name}.tmp-{}-{id}", std::process::id()));
+        match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)
+        {
+            Ok(file) => return Ok((temporary, file)),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => {
+                return Err(format!(
+                    "failed to create replay cursor temporary file `{}`: {error}",
+                    temporary.display()
+                ));
+            }
+        }
+    }
+    Err(format!(
+        "failed to reserve a temporary file for replay cursor `{file_name}`"
+    ))
+}
+
+fn sync_cursor_directory(parent: &Path) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        File::open(parent)
+            .and_then(|directory| directory.sync_all())
+            .map_err(|error| {
+                format!(
+                    "failed to sync replay cursor directory `{}`: {error}",
+                    parent.display()
+                )
+            })
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = parent;
+        Ok(())
+    }
 }
 
 pub(crate) fn load_replay_cursor(
@@ -181,7 +290,7 @@ fn escape_toml(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::load_replay_cursor;
+    use super::{load_replay_cursor, persist_cursor_content_atomically};
     use std::{
         fs,
         path::{Path, PathBuf},
@@ -240,5 +349,59 @@ mod tests {
         let error = load_replay_cursor(&cursor, &manifest).unwrap_err();
         assert!(error.contains("unknown replay cursor field"));
         fs::remove_dir_all(root).expect("remove cursor test directory");
+    }
+
+    #[test]
+    fn atomically_replaces_a_valid_cursor_without_temp_files() {
+        let root = temp_dir("atomic-replace");
+        let manifest = root.join("manifest.toml");
+        let cursor = root.join("cursor.toml");
+        fs::write(&manifest, "manifest = true\n").expect("write manifest");
+        fs::write(&cursor, cursor_source(&manifest, "")).expect("write old cursor");
+        let replacement = cursor_source(&manifest, "")
+            .replace(
+                "after_frame_id = \"frame-0\"",
+                "after_frame_id = \"frame-1\"",
+            )
+            .replace("next_frame_id = \"frame-1\"", "next_frame_id = \"frame-2\"");
+
+        persist_cursor_content_atomically(&cursor, &manifest, &replacement)
+            .expect("replace cursor atomically");
+
+        let loaded = load_replay_cursor(&cursor, &manifest).expect("load replaced cursor");
+        assert_eq!(loaded.resume_after_frame_id.as_deref(), Some("frame-1"));
+        assert_eq!(loaded.resume_next_frame_id.as_deref(), Some("frame-2"));
+        assert!(!directory_contains_cursor_temp(&root));
+        fs::remove_dir_all(root).expect("remove cursor test directory");
+    }
+
+    #[test]
+    fn invalid_replacement_preserves_the_previous_cursor() {
+        let root = temp_dir("atomic-invalid");
+        let manifest = root.join("manifest.toml");
+        let cursor = root.join("cursor.toml");
+        fs::write(&manifest, "manifest = true\n").expect("write manifest");
+        let original = cursor_source(&manifest, "");
+        fs::write(&cursor, &original).expect("write old cursor");
+
+        let error = persist_cursor_content_atomically(&cursor, &manifest, "protocol = \"bad\"\n")
+            .unwrap_err();
+
+        assert!(error.contains("refusing to install invalid replay cursor"));
+        assert_eq!(fs::read_to_string(&cursor).unwrap(), original);
+        assert!(!directory_contains_cursor_temp(&root));
+        fs::remove_dir_all(root).expect("remove cursor test directory");
+    }
+
+    fn directory_contains_cursor_temp(root: &Path) -> bool {
+        fs::read_dir(root)
+            .unwrap()
+            .filter_map(Result::ok)
+            .any(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .contains("cursor.toml.tmp-")
+            })
     }
 }

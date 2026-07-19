@@ -464,6 +464,66 @@ pub(super) fn nsld_tail_json_fields(
                 .as_ref()
                 .and_then(|summary| summary.debugger_cursor_next_command.as_deref()),
         ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_contract",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.debugger_cursor_lineage_contract.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_source_protocol",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.debugger_cursor_lineage_source_protocol.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_path",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.debugger_cursor_lineage_path.as_str()),
+        ),
+        crate::json_bool_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_ready",
+            final_output_summary
+                .as_ref()
+                .is_some_and(|summary| summary.debugger_cursor_lineage_ready),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_status",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.debugger_cursor_lineage_status.as_str()),
+        ),
+        json_optional_usize_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_entry_count",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.debugger_cursor_lineage_entry_count),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_latest_hash",
+            final_output_summary
+                .as_ref()
+                .and_then(|summary| summary.debugger_cursor_lineage_latest_hash.as_deref()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_first_blocker",
+            final_output_summary
+                .as_ref()
+                .and_then(|summary| summary.debugger_cursor_lineage_first_blocker.as_deref()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_next_action",
+            final_output_summary
+                .as_ref()
+                .and_then(|summary| summary.debugger_cursor_lineage_next_action.as_deref()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_next_command",
+            final_output_summary
+                .as_ref()
+                .and_then(|summary| summary.debugger_cursor_lineage_next_command.as_deref()),
+        ),
         crate::json_bool_field(
             "nsld_final_executable_output_path_present",
             final_output_summary

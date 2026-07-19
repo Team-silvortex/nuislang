@@ -1,10 +1,14 @@
 use cpu PixelMagicContracts;
 use data FabricPlane;
+use data StagingPlane;
+use kernel KernelUnit;
 use shader PixelMagicPipelineSurface;
 
 mod cpu Main {
   type FabricBindings = HandleTable<FabricPlaneBindings>;
+  type StagingBindings = HandleTable<StagingPlaneBindings>;
   type ShaderPacketWindow = Window<PixelMagicPipelineSurfacePacket>;
+  type StagingFrameWindow = Window<Frame>;
   type HostFrameWindow = Window<Frame>;
   type FrameStatus = ShaderResult<Frame>;
 
@@ -52,6 +56,8 @@ mod cpu Main {
     let output_kind: i64 = PixelMagicContracts.sample_output_kind_color();
     let image_packet_total: i64 =
       PixelMagicContracts.grayscale_packet_total(source_handle, width, height);
+    let image_shape = kernel_tensor(1, 3, "160,120,1");
+    let preprocessed_shape_total: i64 = kernel_reduce_sum(image_shape);
     let shader_pipeline_total: i64 = PixelMagicContracts.shader_pipeline_total(
       source_handle,
       width,
@@ -67,6 +73,8 @@ mod cpu Main {
       nova_resource_set_packet(1, 1, 1, image_packet_total);
     let resource_state: NovaResourceSetState = nova_resource_set_state(resource_set);
 
+    data_profile_bind_core("StagingPlane");
+    let staging_handles: StagingBindings = data_profile_handle_table("StagingPlane");
     data_profile_bind_core("FabricPlane");
     let fabric_handles: FabricBindings = data_profile_handle_table("FabricPlane");
     let lowered: PixelMagicPipelineSurfacePacket =
@@ -80,16 +88,21 @@ mod cpu Main {
         edge_policy,
         uv_mode
       );
-    let gpu_packet: ShaderPacketWindow =
+    let fabric_gpu_packet: ShaderPacketWindow =
       data_profile_send_uplink("FabricPlane", lowered);
+    let gpu_packet: ShaderPacketWindow =
+      data_profile_send_uplink("StagingPlane", lowered);
     let render_result: FrameStatus =
       shader_result(shader_profile_render("PixelMagicPipelineSurface", gpu_packet));
     let render_ready: bool = shader_frame_ready(render_result);
+    let staging_frame: StagingFrameWindow =
+      data_profile_send_downlink("StagingPlane", shader_value(render_result));
     let host_frame: HostFrameWindow =
       data_profile_send_downlink("FabricPlane", shader_value(render_result));
 
     print(
       image_packet_total +
+      preprocessed_shape_total +
       shader_pipeline_total +
       nova_resource_set_state_residency(resource_state) +
       shader_profile_packet_tag("PixelMagicPipelineSurface")

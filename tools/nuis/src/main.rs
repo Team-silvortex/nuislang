@@ -7,6 +7,7 @@ mod artifact_launch_evidence;
 mod artifact_materialization;
 mod artifact_nsdb_handoff;
 mod artifact_nsdb_replay_cursor;
+mod artifact_nsdb_replay_cursor_lineage;
 mod artifact_runtime_command;
 mod artifact_runtime_persistence;
 mod artifact_runtime_trace;
@@ -400,9 +401,21 @@ fn run() -> Result<(), String> {
             packaging_mode,
         )?,
         cli::CommandKind::RunArtifact { input, json } => handle_run_artifact(input, json)?,
-        cli::CommandKind::DebugResume { input, json } => {
-            debug_resume_command::handle_debug_resume(input, json)?
-        }
+        cli::CommandKind::DebugResume {
+            input,
+            json,
+            breakpoint,
+            breakpoint_phase,
+            breakpoint_entry,
+            cursor_output,
+        } => debug_resume_command::handle_debug_resume(
+            input,
+            json,
+            breakpoint,
+            breakpoint_phase,
+            breakpoint_entry,
+            cursor_output,
+        )?,
         cli::CommandKind::DumpAst { input } => handle_dump_ast(input)?,
         cli::CommandKind::DumpNir { input } => handle_dump_nir(input)?,
         cli::CommandKind::DumpYir { input } => handle_dump_yir(input)?,
@@ -559,7 +572,9 @@ fn print_help() {
     println!(
         "    nuis run-artifact [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
     );
-    println!("    nuis debug-resume [--json] <artifact-output-dir|nuis.build.manifest.toml>");
+    println!(
+        "    nuis debug-resume [--json] [--break-at TARGET | --break-phase PHASE --break-entry SYMBOL] [--save-cursor PATH] <artifact-output-dir|nuis.build.manifest.toml>"
+    );
     println!(
         "    nuis release-check [--json] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
     );

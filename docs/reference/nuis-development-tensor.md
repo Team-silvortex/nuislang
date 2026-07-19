@@ -751,9 +751,26 @@ was a cursor-specific resume command handoff; ready mirrors now publish that
 command through final-output and closure summaries, while unavailable/invalid
 mirrors publish none. Nuis now owns a first-class `debug-resume` route that
 validates the abstract handoff before dispatching Nsdb with structured argv;
-unavailable/invalid cursors fail before dispatch. The next gap is forwarding
-typed stop/save controls through that route. Native execution remains outside
-this metadata-level debugger control.
+unavailable/invalid cursors fail before dispatch. Exact and typed breakpoint
+controls plus optional cursor persistence now flow through that route. The
+PixelMagic proof now uses real data, kernel, and shader records to save at the
+first checkpoint, replace the cursor at the second, and resume to the third.
+That work also removed the compiler's global first-two/next-two data-pipe
+assumption: registered data units are stitched and validated through their own
+handle-table and window ancestry. Cursor replacement now uses a synced,
+same-directory temporary file, validates it through the normal loader, then
+atomically renames it; invalid replacements preserve the previous cursor.
+An optional sibling lineage sidecar retains the latest eight replacements as a
+monotonic FNV-1a hash chain over public cursor identities. A damaged sidecar is
+preserved without invalidating the authoritative cursor. Nuis does not import
+Nsdb types: its artifact adapter mirrors lineage protocol, path,
+readiness, status, bounded depth, and latest hash through final-output and
+closure summaries. The latest hash must match the authoritative cursor bytes.
+Invalid lineage now carries a stable blocker, repair action, and executable
+Nsdb command. Repair validates the authoritative cursor, archives the damaged
+sidecar under a content hash, atomically rebuilds one current entry, and is
+idempotent once healthy. Nuis does not yet own a first-class repair command;
+native execution remains outside this metadata-level debugger control.
 
 ## Current Role
 

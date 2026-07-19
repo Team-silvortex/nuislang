@@ -5,6 +5,7 @@ use super::{
 use crate::artifact_doctor_mirrors::collect_device_provider_sample_manifest_mirror;
 use crate::artifact_nsdb_handoff::read_persisted_nsdb_handoff;
 use crate::artifact_nsdb_replay_cursor::read_debugger_cursor_handoff;
+use crate::artifact_nsdb_replay_cursor_lineage::read_debugger_cursor_lineage;
 use std::{fs, path::Path};
 
 pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
@@ -61,6 +62,16 @@ pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) debugger_cursor_ready: bool,
     pub(crate) debugger_cursor_status: String,
     pub(crate) debugger_cursor_next_command: Option<String>,
+    pub(crate) debugger_cursor_lineage_contract: String,
+    pub(crate) debugger_cursor_lineage_source_protocol: String,
+    pub(crate) debugger_cursor_lineage_path: String,
+    pub(crate) debugger_cursor_lineage_ready: bool,
+    pub(crate) debugger_cursor_lineage_status: String,
+    pub(crate) debugger_cursor_lineage_entry_count: usize,
+    pub(crate) debugger_cursor_lineage_latest_hash: Option<String>,
+    pub(crate) debugger_cursor_lineage_first_blocker: Option<String>,
+    pub(crate) debugger_cursor_lineage_next_action: Option<String>,
+    pub(crate) debugger_cursor_lineage_next_command: Option<String>,
     pub(crate) recommended_next_action: String,
     pub(crate) path_present: bool,
     pub(crate) nsld_owned: Option<bool>,
@@ -180,6 +191,7 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         Path::new(&plan.output_dir),
         &Path::new(&plan.output_dir).join("nuis.build.manifest.toml"),
     );
+    let debugger_cursor_lineage = read_debugger_cursor_lineage(Path::new(&plan.output_dir));
 
     NsldFinalExecutableOutputBoundarySummary {
         ready,
@@ -239,6 +251,18 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         debugger_cursor_ready: debugger_cursor.ready,
         debugger_cursor_status: debugger_cursor.status.to_owned(),
         debugger_cursor_next_command: debugger_cursor.next_command,
+        debugger_cursor_lineage_contract: debugger_cursor_lineage.contract.to_owned(),
+        debugger_cursor_lineage_source_protocol: debugger_cursor_lineage.source_protocol.to_owned(),
+        debugger_cursor_lineage_path: debugger_cursor_lineage.path,
+        debugger_cursor_lineage_ready: debugger_cursor_lineage.ready,
+        debugger_cursor_lineage_status: debugger_cursor_lineage.status.to_owned(),
+        debugger_cursor_lineage_entry_count: debugger_cursor_lineage.entry_count,
+        debugger_cursor_lineage_latest_hash: debugger_cursor_lineage.latest_hash,
+        debugger_cursor_lineage_first_blocker: debugger_cursor_lineage
+            .first_blocker
+            .map(str::to_owned),
+        debugger_cursor_lineage_next_action: debugger_cursor_lineage.next_action.map(str::to_owned),
+        debugger_cursor_lineage_next_command: debugger_cursor_lineage.next_command,
         recommended_next_action,
         path_present,
         nsld_owned,

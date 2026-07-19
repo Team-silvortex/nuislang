@@ -4,14 +4,15 @@ use nuis_semantics::model::{NirDataFlowState, NirResultStage};
 use yir_core::YirModule;
 
 use super::data_bridge_directions::data_bridge_directions;
+use super::profile_refs_data::data_pipe_nodes_for_unit;
 use super::support_contracts::{require_declared_support_surface, support_surface_for_domain};
 use super::{
     build_project_link_bridge_contract, data_profile_required_slots_for_link,
     find_profile_call_declared_type, has_edge_to, payload_class_marker_name,
     payload_shape_marker_name, require_declared_profile_slot, require_marker_semantic_payload_name,
     require_profile_semantic_type, required_project_link_stage_contract,
-    resolve_project_profile_target_name, split_domain_unit, support_profile_slots_for_domain,
-    LoadedProject,
+    resolve_project_profile_target_name, sanitize_ident, split_domain_unit,
+    support_profile_slots_for_domain, LoadedProject,
 };
 
 pub(super) fn validate_data_profile_for_link(
@@ -51,32 +52,26 @@ pub(super) fn validate_data_profile_for_link(
         }
     }
 
-    let uplink_nodes = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_data_pipe_semantic_op())
-        .take(2)
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
-    let downlink_nodes = module
-        .nodes
-        .iter()
-        .filter(|node| node.op.is_data_pipe_semantic_op())
-        .skip(2)
-        .take(2)
-        .map(|node| node.name.clone())
-        .collect::<Vec<_>>();
+    let uplink_nodes = data_pipe_nodes_for_unit(module, &unit, true);
+    let downlink_nodes = data_pipe_nodes_for_unit(module, &unit, false);
+    let unit_fragment = format!("_data_{}_", sanitize_ident(&unit));
     let uplink_windows = module
         .nodes
         .iter()
-        .filter(|node| node.op.is_data_window_semantic_op() && node.name.contains("_uplink_window"))
+        .filter(|node| {
+            node.op.is_data_window_semantic_op()
+                && node.name.contains(&unit_fragment)
+                && node.name.contains("_uplink_window")
+        })
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();
     let downlink_windows = module
         .nodes
         .iter()
         .filter(|node| {
-            node.op.is_data_window_semantic_op() && node.name.contains("_downlink_window")
+            node.op.is_data_window_semantic_op()
+                && node.name.contains(&unit_fragment)
+                && node.name.contains("_downlink_window")
         })
         .map(|node| node.name.clone())
         .collect::<Vec<_>>();

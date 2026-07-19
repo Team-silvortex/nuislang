@@ -204,19 +204,24 @@ fn assert_official_galaxy_hetero_build(
     let run_json_stdout = String::from_utf8_lossy(&run_json.stdout);
     let trace_id = format!("\"trace_id\":\"{expected_trace_id}\"");
     let expects_std_pgm_marker = backend_family == "metal" && target_device == "apple-silicon-gpu";
+    let provider_record_count = if label == "pixelmagic_pipeline_demo" {
+        2
+    } else {
+        1
+    };
     assert!(
         run_json_stdout.contains("\"hetero_runtime_trace_available\":true")
             && run_json_stdout.contains("\"hetero_runtime_trace_status\":\"execution-pending\"")
             && run_json_stdout.contains("\"hetero_runtime_trace_debugger_contract\":\"nsdb-yir-hetero-runtime-trace-v1\"")
             && run_json_stdout.contains(&format!("\"hetero_runtime_trace_record_count\":{trace_record_count}"))
-            && run_json_stdout.contains("\"hetero_runtime_trace_backend_execution_record_count\":1")
-            && run_json_stdout.contains("\"hetero_runtime_trace_device_sample_descriptor_count\":1")
-            && run_json_stdout.contains("\"hetero_runtime_trace_device_sample_pending_count\":1")
-            && run_json_stdout.contains("\"hetero_runtime_trace_device_sample_pending_validation_count\":1")
+            && run_json_stdout.contains(&format!("\"hetero_runtime_trace_backend_execution_record_count\":{provider_record_count}"))
+            && run_json_stdout.contains(&format!("\"hetero_runtime_trace_device_sample_descriptor_count\":{provider_record_count}"))
+            && run_json_stdout.contains(&format!("\"hetero_runtime_trace_device_sample_pending_count\":{provider_record_count}"))
+            && run_json_stdout.contains(&format!("\"hetero_runtime_trace_device_sample_pending_validation_count\":{provider_record_count}"))
             && run_json_stdout.contains("\"hetero_runtime_trace_device_sample_providers\":[\"nustar-deferred-device-sample-v1\"]")
-            && run_json_stdout.contains(&format!("\"hetero_runtime_trace_device_sample_provider_families\":[\"{backend_family}:{target_device}\"]"))
-            && run_json_stdout.contains(&format!("\"hetero_runtime_trace_backend_families\":[\"{backend_family}\"]"))
-            && run_json_stdout.contains(&format!("\"hetero_runtime_trace_target_devices\":[\"{target_device}\"]"))
+            && run_json_stdout.contains(&format!("{backend_family}:{target_device}"))
+            && run_json_stdout.contains(&format!("\"{backend_family}\""))
+            && run_json_stdout.contains(&format!("\"{target_device}\""))
             && run_json_stdout.contains(&trace_id)
             && run_json_stdout.contains("\"trace_role\":\"backend-artifact\"")
             && run_json_stdout
@@ -253,7 +258,7 @@ fn assert_official_galaxy_hetero_build(
         executed.provider_family_filter.as_deref(),
         Some(provider_family.as_str())
     );
-    assert_eq!(executed.record_count, 1);
+    assert_eq!(executed.record_count, provider_record_count);
     assert_eq!(executed.matched_record_count, 1);
     assert!(executed.provider_families.contains(&provider_family));
     assert_eq!(executed.first_provider_family, provider_family);
@@ -359,7 +364,8 @@ fn assert_official_galaxy_hetero_build(
         )));
     }
 
-    let materialized = nsdb::materialize_provider_samples(&output_dir, Some(&provider_family))
+    let materialize_filter = (provider_record_count == 1).then_some(provider_family.as_str());
+    let materialized = nsdb::materialize_provider_samples(&output_dir, materialize_filter)
         .expect("nsdb materializes official galaxy provider samples");
     let provider_samples =
         fs::read_to_string(output_dir.join("nuis.nsdb.device-provider-samples.toml"))
@@ -372,8 +378,11 @@ fn assert_official_galaxy_hetero_build(
     let doctor_after_stdout = String::from_utf8_lossy(&doctor_after.stdout);
 
     assert_eq!(materialized.status, "ready");
-    assert_eq!(materialized.matched_record_count, 1);
-    assert_eq!(materialized.materialized_record_count, 1);
+    assert_eq!(materialized.matched_record_count, provider_record_count);
+    assert_eq!(
+        materialized.materialized_record_count,
+        provider_record_count
+    );
     assert_eq!(materialized.skipped_record_count, 0);
     assert_eq!(materialized.next_action, "replay-provider-sample");
     assert!(materialized.next_command.contains("nsdb replay-plan "));
@@ -410,7 +419,7 @@ fn assert_official_galaxy_hetero_build(
     ));
     assert!(provider_samples.contains("source = \"nsdb-materialize-provider-samples\""));
     assert!(provider_samples.contains("status = \"ready\""));
-    assert!(provider_samples.contains("ready_record_count = 1"));
+    assert!(provider_samples.contains(&format!("ready_record_count = {provider_record_count}")));
     assert!(provider_samples.contains("pending_record_count = 0"));
     assert!(provider_samples.contains("sample_status = \"provider-execution-ready\""));
     assert!(provider_samples.contains("validation_status = \"provider-execution-validated\""));
@@ -586,11 +595,12 @@ fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
     let replay_stdout = String::from_utf8_lossy(&replay.stdout);
     let frame_ids = json_string_values(&replay_stdout, "frame_id");
     assert!(
-        frame_ids.len() >= 2,
-        "official hetero replay should expose multiple YIR frames\n{replay_stdout}"
+        frame_ids.len() >= 3,
+        "official hetero replay should expose at least three YIR frames\n{replay_stdout}"
     );
     let first = &frame_ids[0];
     let second = &frame_ids[1];
+    let third = &frame_ids[2];
     let cursor_path = output_dir.join("nuis.nsdb.replay-cursor.toml");
     let cursor_path_text = cursor_path.display().to_string();
 
@@ -647,16 +657,171 @@ fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
         "Nuis frontdoors should mirror the persisted debugger cursor without Nsdb type coupling\n{report_stdout}"
     );
 
-    let resumed = run_nuis(&["debug-resume", "--json", &output_dir_text]);
+    let resumed = run_nuis(&[
+        "debug-resume",
+        "--json",
+        "--break-at",
+        second,
+        "--save-cursor",
+        &cursor_path_text,
+        &output_dir_text,
+    ]);
     assert_success(&resumed, "nuis first-class heterogeneous debug resume");
     let resumed_stdout = String::from_utf8_lossy(&resumed.stdout);
     assert!(
         resumed_stdout.contains("\"debugger_transcript_resume_input_status\":\"cursor-accepted\"")
-            && resumed_stdout
-                .contains("\"debugger_transcript_control_status\":\"resume-consumed\"")
-            && resumed_stdout.contains("\"debugger_transcript_status\":\"transcript-resumed\"")
-            && !resumed_stdout.contains("\"debugger_transcript_replayed_checkpoint_count\":0"),
-        "Nuis debug-resume should validate and consume the persisted heterogeneous suffix\n{resumed_stdout}"
+            && resumed_stdout.contains("\"debugger_transcript_control_status\":\"breakpoint-hit\"")
+            && resumed_stdout.contains(&format!(
+                "\"debugger_transcript_selected_frame_id\":\"{second}\""
+            ))
+            && resumed_stdout.contains("\"debugger_transcript_replayed_checkpoint_count\":1"),
+        "Nuis debug-resume should validate, resume, and stop at the selected heterogeneous frame\n{resumed_stdout}"
+    );
+    assert_file_contains(
+        &cursor_path,
+        &format!("after_frame_id = \"{second}\""),
+        "replaced replay cursor stopped frame",
+    );
+    assert_file_contains(
+        &cursor_path,
+        &format!("next_frame_id = \"{third}\""),
+        "replaced replay cursor next frame",
+    );
+    let lineage_path = output_dir.join("nuis.nsdb.replay-cursor.lineage.toml");
+    assert_file_contains(
+        &lineage_path,
+        "protocol = \"nsdb-yir-replay-cursor-lineage-v1\"",
+        "replay cursor lineage protocol",
+    );
+    assert_file_contains(
+        &lineage_path,
+        "entry_count = 2",
+        "replay cursor lineage entry count",
+    );
+    assert_file_contains(
+        &lineage_path,
+        "sequence = 0",
+        "initial replay cursor lineage sequence",
+    );
+    assert_file_contains(
+        &lineage_path,
+        "sequence = 1",
+        "replacement replay cursor lineage sequence",
+    );
+    assert_file_contains(
+        &lineage_path,
+        "current_hash = \"0x",
+        "replay cursor lineage content hash",
+    );
+    let lineage_source = fs::read_to_string(&lineage_path).expect("read replay cursor lineage");
+    let latest_hash = lineage_source
+        .lines()
+        .filter_map(|line| {
+            line.trim()
+                .strip_prefix("current_hash = \"")
+                .and_then(|value| value.strip_suffix('"'))
+        })
+        .last()
+        .expect("replay cursor lineage latest hash");
+    let lineage_report = run_nuis(&["build-report", "--json", &output_dir_text]);
+    assert_success(&lineage_report, "nuis mirror debugger cursor lineage");
+    let lineage_report_stdout = String::from_utf8_lossy(&lineage_report.stdout);
+    assert!(
+        lineage_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_contract\":\"nuis-debugger-cursor-lineage-mirror-v1\""
+        ) && lineage_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_source_protocol\":\"nsdb-yir-replay-cursor-lineage-v1\""
+        ) && lineage_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_ready\":true"
+        ) && lineage_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_status\":\"lineage-ready\""
+        ) && lineage_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_entry_count\":2"
+        ) && lineage_report_stdout.contains(&format!(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_latest_hash\":\"{latest_hash}\""
+        )) && lineage_report_stdout.contains(
+            "\"closure_summary_debugger_cursor_lineage_ready\":true"
+        ) && lineage_report_stdout.contains(
+            "\"closure_summary_debugger_cursor_lineage_entry_count\":2"
+        ) && lineage_report_stdout.contains(&format!(
+            "\"closure_summary_debugger_cursor_lineage_latest_hash\":\"{latest_hash}\""
+        )),
+        "Nuis final-output and closure summaries should mirror the hash-checked debugger cursor lineage\n{lineage_report_stdout}"
+    );
+    fs::write(
+        &lineage_path,
+        lineage_source.replacen(latest_hash, "0x0000000000000000", 1),
+    )
+    .expect("damage replay cursor lineage latest hash");
+    let invalid_report = run_nuis(&["build-report", "--json", &output_dir_text]);
+    assert_success(
+        &invalid_report,
+        "nuis diagnose invalid debugger cursor lineage",
+    );
+    let invalid_report_stdout = String::from_utf8_lossy(&invalid_report.stdout);
+    assert!(
+        invalid_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_status\":\"lineage-invalid\""
+        ) && invalid_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_first_blocker\":\"lineage-latest-hash-mismatch\""
+        ) && invalid_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_next_action\":\"repair-cursor-lineage\""
+        ) && invalid_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_next_command\":\"nsdb cursor-lineage-repair "
+        ) && invalid_report_stdout.contains(
+            "\"closure_summary_debugger_cursor_lineage_first_blocker\":\"lineage-latest-hash-mismatch\""
+        ),
+        "Nuis should expose an actionable stable blocker for stale cursor lineage\n{invalid_report_stdout}"
+    );
+    let repaired = run_nsdb(&["cursor-lineage-repair", &output_dir_text, "--json"]);
+    assert_success(&repaired, "nsdb repair debugger cursor lineage");
+    let repaired_stdout = String::from_utf8_lossy(&repaired.stdout);
+    assert!(
+        repaired_stdout.contains("\"contract\":\"nsdb-yir-replay-cursor-lineage-repair-v1\"")
+            && repaired_stdout.contains("\"status\":\"lineage-rebuilt\"")
+            && repaired_stdout.contains("\"mutated\":true")
+            && repaired_stdout.contains("\"archived_path\":\"")
+            && repaired_stdout.contains("\"entry_count\":1")
+            && repaired_stdout.contains("\"latest_hash\":\"0x"),
+        "Nsdb should archive and rebuild invalid cursor lineage\n{repaired_stdout}"
+    );
+    let repaired_report = run_nuis(&["build-report", "--json", &output_dir_text]);
+    assert_success(
+        &repaired_report,
+        "nuis mirror repaired debugger cursor lineage",
+    );
+    let repaired_report_stdout = String::from_utf8_lossy(&repaired_report.stdout);
+    assert!(
+        repaired_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_status\":\"lineage-ready\""
+        ) && repaired_report_stdout
+            .contains("\"nsld_final_executable_output_debugger_cursor_lineage_entry_count\":1")
+            && repaired_report_stdout.contains(
+                "\"nsld_final_executable_output_debugger_cursor_lineage_first_blocker\":null"
+            ),
+        "Nuis should report repaired cursor lineage as ready\n{repaired_report_stdout}"
+    );
+
+    let resumed_again = run_nuis(&[
+        "debug-resume",
+        "--json",
+        "--break-at",
+        third,
+        &output_dir_text,
+    ]);
+    assert_success(&resumed_again, "nuis chained heterogeneous debug resume");
+    let resumed_again_stdout = String::from_utf8_lossy(&resumed_again.stdout);
+    assert!(
+        resumed_again_stdout
+            .contains("\"debugger_transcript_resume_input_status\":\"cursor-accepted\"")
+            && resumed_again_stdout
+                .contains("\"debugger_transcript_control_status\":\"breakpoint-hit\"")
+            && resumed_again_stdout.contains(&format!(
+                "\"debugger_transcript_selected_frame_id\":\"{third}\""
+            ))
+            && resumed_again_stdout
+                .contains("\"debugger_transcript_replayed_checkpoint_count\":1"),
+        "Nuis debug-resume should consume the replaced cursor and stop at the third heterogeneous frame\n{resumed_again_stdout}"
     );
 }
 
@@ -668,7 +833,7 @@ fn official_galaxy_hetero_projects_emit_shader_and_kernel_artifacts() {
         "shader",
         "metal",
         "apple-silicon-gpu",
-        2,
+        3,
         "hetero-trace:shader:metal:apple-silicon-gpu",
         &[
             "shader.begin_pass",

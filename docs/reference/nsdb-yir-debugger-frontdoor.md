@@ -222,7 +222,39 @@ publishes a cursor-specific `next_command` through final-output and closure
 summaries; unavailable or invalid mirrors publish no continuation command.
 That command targets `nuis debug-resume`, whose frontdoor validates the handoff
 again before launching Nsdb with structured arguments. The initial route
-continues through the remaining suffix; typed stop/save forwarding follows.
+may continue through the remaining suffix or forward exact/typed breakpoint
+controls and an optional cursor output. The official PixelMagic path now emits
+data, kernel, and shader checkpoints: it stops and saves at the first frame,
+resumes and replaces the cursor at the second, then consumes that replacement
+and stops at the third exclusively through the Nuis frontdoor. Cursor-file
+replacement now writes and syncs a same-directory temporary file, reloads it
+through the public cursor validator, atomically renames it into place, and syncs
+the containing directory on Unix. Validation failures preserve the previous
+cursor and remove the temporary file. Each successful save also best-effort
+updates the sibling
+`nuis.nsdb.replay-cursor.lineage.toml` sidecar under
+`nsdb-yir-replay-cursor-lineage-v1`. It retains at most eight entries containing
+only a monotonic sequence, previous/current FNV-1a content hashes, and public
+after/next frame ids. Existing lineage must parse, match the cursor path, and
+continue the hash chain before replacement; a damaged sidecar is preserved and
+does not invalidate the already-installed authoritative cursor.
+
+Nuis consumes that sidecar through its own
+`nuis-debugger-cursor-lineage-mirror-v1` artifact adapter rather than importing
+Nsdb types. Final-output and closure summaries expose the source protocol,
+path, readiness, status, bounded entry count, and latest cursor hash. Readiness
+also requires the latest lineage hash to match the authoritative cursor bytes.
+Missing lineage remains optional; stale or malformed lineage is reported as
+`lineage-invalid` without blocking cursor continuation.
+
+Invalid mirrors also expose a stable first-blocker code plus
+`repair-cursor-lineage` and a concrete `nsdb cursor-lineage-repair ... --json`
+command. The repair command first validates the authoritative cursor. Healthy
+lineage returns `already-ready` without mutation; invalid lineage is renamed to
+a content-hash-qualified `.invalid-<hash>.toml` archive before a one-entry
+lineage is rebuilt atomically from the current cursor. Repeating repair is
+idempotent. The official three-domain smoke covers stale-hash diagnosis,
+archive/rebuild, restored Nuis readiness, and continued cursor resume.
 
 Replay source selection remains deterministic. Payload-execution handoff
 events are preferred whenever present. When that list is empty, Nsdb projects

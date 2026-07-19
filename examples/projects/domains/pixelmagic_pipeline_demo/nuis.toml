@@ -1,14 +1,17 @@
 name = "pixelmagic_pipeline_demo"
 version = "0.1.0"
 entry = "main.ns"
-modules = ["main.ns", "fabric_plane.ns"]
+modules = ["main.ns", "kernel_unit.ns", "staging_plane.ns", "fabric_plane.ns"]
 galaxy = ["pixelmagic=workspace"]
 links = [
+  "cpu.Main -> shader.PixelMagicPipelineSurface via data.StagingPlane",
+  "shader.PixelMagicPipelineSurface -> cpu.Main via data.StagingPlane",
   "cpu.Main -> shader.PixelMagicPipelineSurface via data.FabricPlane",
   "shader.PixelMagicPipelineSurface -> cpu.Main via data.FabricPlane"
 ]
 abi = [
   "cpu=cpu.arm64.apple_aapcs64",
   "data=data.fabric.macos.arm64.v1",
+  "kernel=kernel.apple_ane.coreml.v1",
   "shader=shader.metal.msl2_4",
 ]

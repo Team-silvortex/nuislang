@@ -1,5 +1,6 @@
 mod cli;
 mod cursor;
+mod cursor_lineage;
 mod display;
 mod handoff;
 mod hetero_trace;
@@ -130,6 +131,45 @@ fn run() -> Result<(), String> {
                 print_nsdb_replay_transcript(&report);
             } else {
                 print_nsdb_replay_transcript_with_control(&report, &replay_control);
+            }
+        }
+        Command::CursorLineageRepair { input, json } => {
+            let manifest = resolve_manifest_input(&input)?;
+            let output_dir = manifest.parent().ok_or_else(|| {
+                format!("manifest `{}` has no output directory", manifest.display())
+            })?;
+            let report = crate::cursor_lineage::repair_cursor_lineage(output_dir, &manifest)?;
+            if json {
+                println!(
+                    "{{\"tool\":\"nsdb\",\"kind\":\"cursor_lineage_repair\",\"contract\":\"{}\",\"status\":\"{}\",\"mutated\":{},\"cursor_path\":\"{}\",\"lineage_path\":\"{}\",\"archived_path\":{},\"entry_count\":{},\"latest_hash\":\"{}\"}}",
+                    report.contract,
+                    report.status,
+                    report.mutated,
+                    json_escape(&report.cursor_path),
+                    json_escape(&report.lineage_path),
+                    report
+                        .archived_path
+                        .as_deref()
+                        .map(|path| format!("\"{}\"", json_escape(path)))
+                        .unwrap_or_else(|| "null".to_owned()),
+                    report.entry_count,
+                    report.latest_hash,
+                );
+            } else {
+                println!("cursor_lineage_repair_contract: {}", report.contract);
+                println!("cursor_lineage_repair_status: {}", report.status);
+                println!("cursor_lineage_repair_mutated: {}", report.mutated);
+                println!("cursor_lineage_repair_cursor_path: {}", report.cursor_path);
+                println!(
+                    "cursor_lineage_repair_lineage_path: {}",
+                    report.lineage_path
+                );
+                println!(
+                    "cursor_lineage_repair_archived_path: {}",
+                    report.archived_path.as_deref().unwrap_or("<none>")
+                );
+                println!("cursor_lineage_repair_entry_count: {}", report.entry_count);
+                println!("cursor_lineage_repair_latest_hash: {}", report.latest_hash);
             }
         }
         Command::MaterializeProviderSamples {

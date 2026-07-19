@@ -1,4 +1,5 @@
 use data FabricPlane;
+use data StagingPlane;
 
 /// Shader-side pipeline surface profile for PixelMagic render assembly demos.
 mod shader PixelMagicPipelineSurface {

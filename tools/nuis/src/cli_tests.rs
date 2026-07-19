@@ -196,8 +196,55 @@ fn parses_debug_resume_json_with_manifest_input() {
         CommandKind::DebugResume {
             input: PathBuf::from("target/demo/nuis.build.manifest.toml"),
             json: true,
+            breakpoint: None,
+            breakpoint_phase: None,
+            breakpoint_entry: None,
+            cursor_output: None,
         }
     );
+}
+
+#[test]
+fn parses_debug_resume_typed_stop_and_cursor_output() {
+    let command = parse_args(
+        [
+            "debug-resume".to_owned(),
+            "target/demo".to_owned(),
+            "--break-phase".to_owned(),
+            "device-dispatch".to_owned(),
+            "--break-entry".to_owned(),
+            "pixelmagic.blur".to_owned(),
+            "--save-cursor".to_owned(),
+            "next.toml".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .expect("debug-resume typed stop parses");
+    assert_eq!(
+        command,
+        CommandKind::DebugResume {
+            input: PathBuf::from("target/demo"),
+            json: false,
+            breakpoint: None,
+            breakpoint_phase: Some("device-dispatch".to_owned()),
+            breakpoint_entry: Some("pixelmagic.blur".to_owned()),
+            cursor_output: Some(PathBuf::from("next.toml")),
+        }
+    );
+
+    let error = parse_args(
+        [
+            "debug-resume".to_owned(),
+            "target/demo".to_owned(),
+            "--break-at".to_owned(),
+            "1".to_owned(),
+            "--break-phase".to_owned(),
+            "device-dispatch".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .unwrap_err();
+    assert!(error.contains("mutually exclusive"));
 }
 
 #[test]
