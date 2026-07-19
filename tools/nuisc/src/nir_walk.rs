@@ -2,6 +2,15 @@ use nuis_semantics::model::NirExpr;
 
 pub(crate) fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
     match expr {
+        NirExpr::SelectOwnedPointer {
+            condition,
+            then_owner,
+            else_owner,
+        } => {
+            f(condition);
+            f(then_owner);
+            f(else_owner);
+        }
         NirExpr::Await(inner)
         | NirExpr::Borrow(inner)
         | NirExpr::BorrowEnd(inner)

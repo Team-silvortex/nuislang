@@ -15,6 +15,7 @@ use super::{
 pub enum BranchEffectLlvmValue {
     Unit,
     I64(String),
+    OwnedPointer(String),
 }
 
 pub struct BranchEffectLlvmEmitContext<'a> {
@@ -99,6 +100,7 @@ pub fn default_branch_effect_llvm_emitters() -> BranchEffectLlvmEmitterRegistry 
 pub fn register_cpu_branch_effect_llvm_emitters(registry: &mut BranchEffectLlvmEmitterRegistry) {
     registry.register("cpu", "load_value", emit_cpu_load_value);
     registry.register("cpu", "free", emit_cpu_free);
+    registry.register("cpu", "take_ptr_drop_other", emit_cpu_take_ptr_drop_other);
 }
 
 pub(crate) fn lower_cpu_branch_effect_node(
@@ -170,6 +172,17 @@ pub(crate) fn lower_cpu_branch_effect_node(
             ));
             LlvmValueRef::I64(merged)
         }
+        (
+            BranchEffectResult::OwnedPointer,
+            BranchEffectLlvmValue::OwnedPointer(then_value),
+            BranchEffectLlvmValue::OwnedPointer(else_value),
+        ) => {
+            let merged = fresh_reg(next_reg);
+            body.push(format!(
+                "  {merged} = phi ptr [{then_value}, %{then_label}], [{else_value}, %{else_label}]"
+            ));
+            LlvmValueRef::Ptr(merged)
+        }
         (result, _, _) => {
             return Err(format!(
                 "cpu.branch_effect `{}` emitter results do not satisfy {result:?} merge",
@@ -240,4 +253,27 @@ fn emit_cpu_free(
     let pointer = context.pointer_operand(action, 0)?;
     context.push(format!("  call void @free(ptr {pointer})"));
     Ok(BranchEffectLlvmValue::Unit)
+}
+
+fn emit_cpu_take_ptr_drop_other(
+    action: &BranchEffectAction<'_>,
+    _node: &Node,
+    context: &mut BranchEffectLlvmEmitContext<'_>,
+) -> Result<BranchEffectLlvmValue, String> {
+    if action.result != BranchEffectResult::OwnedPointer
+        || !matches!(
+            action.operands.as_slice(),
+            [selected, discarded]
+                if selected.access == BranchEffectAccess::ResourceOwn
+                    && discarded.access == BranchEffectAccess::ResourceOwn
+        )
+    {
+        return Err(
+            "cpu.take_ptr_drop_other branch action has an incompatible contract".to_owned(),
+        );
+    }
+    let selected = context.pointer_operand(action, 0)?;
+    let discarded = context.pointer_operand(action, 1)?;
+    context.push(format!("  call void @free(ptr {discarded})"));
+    Ok(BranchEffectLlvmValue::OwnedPointer(selected))
 }

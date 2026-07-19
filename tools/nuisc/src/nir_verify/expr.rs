@@ -154,6 +154,26 @@ pub(super) fn verify_expr(
     data_bindings: &BTreeMap<String, NirDataKind>,
     task_result_facts: &BTreeMap<String, TaskResultStateFact>,
 ) -> Result<(), String> {
+    if let NirExpr::SelectOwnedPointer {
+        then_owner,
+        else_owner,
+        ..
+    } = expr
+    {
+        let then_key = match then_owner.as_ref() {
+            NirExpr::Move(inner) => expr_resource_key(inner),
+            other => expr_resource_key(other),
+        };
+        let else_key = match else_owner.as_ref() {
+            NirExpr::Move(inner) => expr_resource_key(inner),
+            other => expr_resource_key(other),
+        };
+        if then_key.is_some() && then_key == else_key {
+            return Err(
+                "nir verify: select_owned_ptr(...) candidates must be distinct owners".to_owned(),
+            );
+        }
+    }
     verify_expr_uses(expr, moved)?;
 
     if expr_is_fixed_readable_carry_source(expr) {

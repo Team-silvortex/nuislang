@@ -229,3 +229,102 @@ fn branch_effect_rejects_missing_declared_merge_result() {
         .unwrap_err()
         .contains("do not produce the declared I64 merge result"));
 }
+
+#[test]
+fn branch_effect_returns_one_owner_and_drops_the_other() {
+    let registry = branch_registry();
+    let resource = cpu_resource();
+    let node = cpu_node(
+        "selected_ptr",
+        "cpu.branch_effect",
+        vec![
+            "choose_then",
+            "owned_ptr",
+            "1",
+            "cpu",
+            "take_ptr_drop_other",
+            "owned_ptr",
+            "2",
+            "resource_own",
+            "left",
+            "resource_own",
+            "right",
+            "1",
+            "cpu",
+            "take_ptr_drop_other",
+            "owned_ptr",
+            "2",
+            "resource_own",
+            "right",
+            "resource_own",
+            "left",
+        ],
+    );
+    let mut state = ExecutionState::default();
+    let left = state.alloc_heap_node(41, None);
+    let right = state.alloc_heap_node(73, None);
+    state
+        .values
+        .insert("left".to_owned(), Value::Pointer(Some(left)));
+    state
+        .values
+        .insert("right".to_owned(), Value::Pointer(Some(right)));
+    state
+        .values
+        .insert("choose_then".to_owned(), Value::Bool(false));
+
+    let selected = registry
+        .execute_branch_effect_node(&node, &resource, &mut state)
+        .unwrap()
+        .unwrap();
+    assert_eq!(selected, Value::Pointer(Some(right)));
+    assert!(state.heap.contains_key(&right));
+    assert!(!state.heap.contains_key(&left));
+}
+
+#[test]
+fn owned_pointer_branch_rejects_aliased_candidates() {
+    let registry = branch_registry();
+    let resource = cpu_resource();
+    let node = cpu_node(
+        "selected_ptr",
+        "cpu.branch_effect",
+        vec![
+            "choose_then",
+            "owned_ptr",
+            "1",
+            "cpu",
+            "take_ptr_drop_other",
+            "owned_ptr",
+            "2",
+            "resource_own",
+            "left",
+            "resource_own",
+            "right",
+            "1",
+            "cpu",
+            "take_ptr_drop_other",
+            "owned_ptr",
+            "2",
+            "resource_own",
+            "right",
+            "resource_own",
+            "left",
+        ],
+    );
+    let mut state = ExecutionState::default();
+    let pointer = state.alloc_heap_node(41, None);
+    state
+        .values
+        .insert("left".to_owned(), Value::Pointer(Some(pointer)));
+    state
+        .values
+        .insert("right".to_owned(), Value::Pointer(Some(pointer)));
+    state
+        .values
+        .insert("choose_then".to_owned(), Value::Bool(true));
+    assert!(registry
+        .execute_branch_effect_node(&node, &resource, &mut state)
+        .unwrap_err()
+        .contains("cannot select and discard the same pointer"));
+}

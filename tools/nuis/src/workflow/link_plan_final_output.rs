@@ -4,6 +4,7 @@ use super::{
 };
 use crate::artifact_doctor_mirrors::collect_device_provider_sample_manifest_mirror;
 use crate::artifact_nsdb_handoff::read_persisted_nsdb_handoff;
+use crate::artifact_nsdb_replay_cursor::read_debugger_cursor_handoff;
 use std::{fs, path::Path};
 
 pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
@@ -55,6 +56,11 @@ pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) debugger_transcript_status: String,
     pub(crate) debugger_transcript_next_action: String,
     pub(crate) debugger_transcript_first_blocker: Option<String>,
+    pub(crate) debugger_cursor_handoff_contract: String,
+    pub(crate) debugger_cursor_path: String,
+    pub(crate) debugger_cursor_ready: bool,
+    pub(crate) debugger_cursor_status: String,
+    pub(crate) debugger_cursor_next_command: Option<String>,
     pub(crate) recommended_next_action: String,
     pub(crate) path_present: bool,
     pub(crate) nsld_owned: Option<bool>,
@@ -170,6 +176,10 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
     let object_evidence = nsld_final_executable_output_object_evidence(plan);
     let object_package_summary = nsld_final_executable_output_object_package_summary(&nsdb_replay);
     let debugger_transcript = nsld_final_executable_output_debugger_transcript(&nsdb_replay);
+    let debugger_cursor = read_debugger_cursor_handoff(
+        Path::new(&plan.output_dir),
+        &Path::new(&plan.output_dir).join("nuis.build.manifest.toml"),
+    );
 
     NsldFinalExecutableOutputBoundarySummary {
         ready,
@@ -224,6 +234,11 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         debugger_transcript_status: debugger_transcript.status,
         debugger_transcript_next_action: debugger_transcript.next_action,
         debugger_transcript_first_blocker: debugger_transcript.first_blocker,
+        debugger_cursor_handoff_contract: debugger_cursor.contract.to_owned(),
+        debugger_cursor_path: debugger_cursor.path,
+        debugger_cursor_ready: debugger_cursor.ready,
+        debugger_cursor_status: debugger_cursor.status.to_owned(),
+        debugger_cursor_next_command: debugger_cursor.next_command,
         recommended_next_action,
         path_present,
         nsld_owned,

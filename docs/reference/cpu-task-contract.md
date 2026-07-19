@@ -446,15 +446,28 @@ static codegen providers by `yir_lowering_entry`, and passes the assembled
 emitter registry through both source and project AOT paths. CPU and AArch64 CPU
 providers are catalogued by the LLVM backend and install the same branch-action
 emitters without giving `nuisc` pipeline instruction- or domain-specific
-logic. The paired YIR semantic registry is still the all-Nustar default rather
-than an exact projection of the loaded manifests. A branch-level
+logic. The paired YIR semantic registry is assembled from the same loaded
+manifests through the verifier's static provider catalog; unloaded domains are
+absent, every indexed official manifest has coverage, and an unknown semantic
+provider fails during assembly. A branch-level
 `merge_result` may be `i64` when both action lists
 end in an `i64` action; CPU returns the selected value and LLVM exposes it
-through a `phi i64`. One native smoke executes both merge leaves in the same
+through a `phi i64`. The first resource result is `owned_ptr`, produced by
+`cpu.take_ptr_drop_other(selected, discarded)`. Both paths must consume the
+same two distinct, live, unborrowed owners in opposite roles. CPU frees only
+the discarded object and returns the selected pointer; GLM classifies the
+merge as `Res`, the heap verifier marks both input names moved, and LLVM emits
+the path-local `free` plus `phi ptr`. Source code constructs this result with
+`select_owned_ptr(condition, move(left), move(right))`. The two named
+candidates must be distinct and have the same owned address type. NIR ownership
+verification consumes both regardless of the selected path, rejects aliases
+and later reuse, and cleanup synthesis does not free either stale input. The
+native owned-pointer-selection smoke selects, loads, and finally frees the
+surviving pointer with exit `73`. One native `i64` smoke executes both merge leaves in the same
 binary and returns their sum, while the owned-transfer smoke observes distinct
 helper output while retaining one Node allocation in LLVM. Duplicate,
-asymmetric, projected, null, returned, task-carried, or non-`i64` merge-visible
-action results remain rejected.
+asymmetric, projected, nullable, borrowed, returned, task-carried, or
+otherwise unsupported merge-visible action results remain rejected.
 
 Today `nuis` does **not** yet have:
 

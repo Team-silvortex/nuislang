@@ -181,6 +181,26 @@ fn parses_run_artifact_json_with_manifest_input() {
 }
 
 #[test]
+fn parses_debug_resume_json_with_manifest_input() {
+    let command = parse_args(
+        [
+            "debug-resume".to_owned(),
+            "--json".to_owned(),
+            "target/demo/nuis.build.manifest.toml".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .expect("debug-resume json parses");
+    assert_eq!(
+        command,
+        CommandKind::DebugResume {
+            input: PathBuf::from("target/demo/nuis.build.manifest.toml"),
+            json: true,
+        }
+    );
+}
+
+#[test]
 fn parses_artifact_doctor_json_with_output_dir() {
     let command = parse_args(
         [

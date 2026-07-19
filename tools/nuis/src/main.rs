@@ -6,6 +6,7 @@ mod artifact_host_runner;
 mod artifact_launch_evidence;
 mod artifact_materialization;
 mod artifact_nsdb_handoff;
+mod artifact_nsdb_replay_cursor;
 mod artifact_runtime_command;
 mod artifact_runtime_persistence;
 mod artifact_runtime_trace;
@@ -15,6 +16,7 @@ mod build_report_render;
 mod build_report_runtime;
 mod cli;
 mod closure_summary;
+mod debug_resume_command;
 mod dev_tensor;
 mod dev_tensor_data;
 mod dev_tensor_drift;
@@ -398,6 +400,9 @@ fn run() -> Result<(), String> {
             packaging_mode,
         )?,
         cli::CommandKind::RunArtifact { input, json } => handle_run_artifact(input, json)?,
+        cli::CommandKind::DebugResume { input, json } => {
+            debug_resume_command::handle_debug_resume(input, json)?
+        }
         cli::CommandKind::DumpAst { input } => handle_dump_ast(input)?,
         cli::CommandKind::DumpNir { input } => handle_dump_nir(input)?,
         cli::CommandKind::DumpYir { input } => handle_dump_yir(input)?,
@@ -554,6 +559,7 @@ fn print_help() {
     println!(
         "    nuis run-artifact [--json] <output-dir|binary-path|nuis.compiled.artifact|nuis.build.manifest.toml>"
     );
+    println!("    nuis debug-resume [--json] <artifact-output-dir|nuis.build.manifest.toml>");
     println!(
         "    nuis release-check [--json] [--cpu-abi ABI] [--target TRIPLE] [input.ns|project-dir|nuis.toml] [output-dir]"
     );

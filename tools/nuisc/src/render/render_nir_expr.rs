@@ -36,6 +36,16 @@ pub(super) fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::Borrow(value) => format!("borrow({})", render_nir_expr(value)),
         NirExpr::BorrowEnd(value) => format!("borrow_end({})", render_nir_expr(value)),
         NirExpr::Move(value) => format!("move({})", render_nir_expr(value)),
+        NirExpr::SelectOwnedPointer {
+            condition,
+            then_owner,
+            else_owner,
+        } => format!(
+            "select_owned_ptr({}, {}, {})",
+            render_nir_expr(condition),
+            render_nir_expr(then_owner),
+            render_nir_expr(else_owner)
+        ),
         NirExpr::HostBufferHandle(value) => {
             format!("host_buffer_handle({})", render_nir_expr(value))
         }

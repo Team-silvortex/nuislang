@@ -40,6 +40,33 @@ pub(in crate::nir_verify) fn apply_guaranteed_expr_effects(
                 );
             }
         },
+        NirExpr::SelectOwnedPointer {
+            condition,
+            then_owner,
+            else_owner,
+        } => {
+            apply_guaranteed_expr_effects(
+                condition,
+                moved,
+                borrows,
+                borrow_bindings,
+                include_temporary_borrows,
+            );
+            apply_guaranteed_expr_effects(
+                then_owner,
+                moved,
+                borrows,
+                borrow_bindings,
+                include_temporary_borrows,
+            );
+            apply_guaranteed_expr_effects(
+                else_owner,
+                moved,
+                borrows,
+                borrow_bindings,
+                include_temporary_borrows,
+            );
+        }
         NirExpr::Await(inner)
         | NirExpr::Borrow(inner)
         | NirExpr::BorrowEnd(inner)
@@ -210,6 +237,7 @@ pub(in crate::nir_verify) fn apply_guaranteed_expr_effects(
 
     match expr {
         NirExpr::Move(_)
+        | NirExpr::SelectOwnedPointer { .. }
         | NirExpr::Free(_)
         | NirExpr::DropBytes(_)
         | NirExpr::CpuJoin(_)

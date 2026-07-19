@@ -43,6 +43,17 @@ pub(super) fn lower_core_expr(
         }
         NirExpr::HostBufferHandle(value) => Some(lower_expr(value, state, bindings)),
         NirExpr::Move(value) => Some(lower_move(value, state, bindings)),
+        NirExpr::SelectOwnedPointer {
+            condition,
+            then_owner,
+            else_owner,
+        } => Some(super::branch_effect_lowering::lower_owned_pointer_select(
+            condition,
+            then_owner,
+            else_owner,
+            state,
+            bindings,
+        )),
         NirExpr::AllocNode { value, next } => Some(lower_alloc_node(value, next, state, bindings)),
         NirExpr::AllocBuffer { len, fill } => Some(lower_alloc_buffer(len, fill, state, bindings)),
         NirExpr::LoadValue(value) => {

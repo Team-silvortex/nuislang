@@ -174,6 +174,7 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::ShaderSampleUv { .. }
         | NirExpr::ShaderBindSet { .. } => NirExprEffectClass::DomainReadOnly,
         NirExpr::Move(_)
+        | NirExpr::SelectOwnedPointer { .. }
         | NirExpr::AllocNode { .. }
         | NirExpr::AllocBuffer { .. }
         | NirExpr::CopyBufferOwned(_)

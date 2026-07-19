@@ -435,6 +435,46 @@ fn parses_open_branch_effect_action_sequences_and_profiles_registered_operands()
 }
 
 #[test]
+fn owned_pointer_branch_result_is_a_glm_resource() {
+    let encoded = vec![
+        "choose_left".to_owned(),
+        "owned_ptr".to_owned(),
+        "1".to_owned(),
+        "cpu".to_owned(),
+        "take_ptr_drop_other".to_owned(),
+        "owned_ptr".to_owned(),
+        "2".to_owned(),
+        "resource_own".to_owned(),
+        "left".to_owned(),
+        "resource_own".to_owned(),
+        "right".to_owned(),
+        "1".to_owned(),
+        "cpu".to_owned(),
+        "take_ptr_drop_other".to_owned(),
+        "owned_ptr".to_owned(),
+        "2".to_owned(),
+        "resource_own".to_owned(),
+        "right".to_owned(),
+        "resource_own".to_owned(),
+        "left".to_owned(),
+    ];
+    let parsed = crate::parse_branch_effect_args(&encoded).unwrap();
+    assert_eq!(parsed.merge_result, crate::BranchEffectResult::OwnedPointer);
+    assert!(crate::branch_effect_merge_is_valid(&parsed));
+    let profile =
+        crate::glm_profile_for_operation(&Operation::parse("cpu.branch_effect", encoded).unwrap());
+    assert_eq!(profile.result_class, crate::GlmValueClass::Res);
+    assert_eq!(
+        profile
+            .accesses
+            .iter()
+            .filter(|access| access.mode == GlmUseMode::Own)
+            .count(),
+        2
+    );
+}
+
+#[test]
 fn classifies_async_primitives_as_yir_core_ops() {
     let async_call = Operation::parse("cpu.async_call", vec!["ping".to_owned()]).unwrap();
     let spawn = Operation::parse(

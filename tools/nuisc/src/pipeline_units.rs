@@ -106,6 +106,15 @@ fn collect_instantiated_units_stmt(stmt: &NirStmt, units: &mut Vec<(String, Stri
 fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, String)>) {
     match expr {
         NirExpr::Instantiate { domain, unit } => units.push((domain.clone(), unit.clone())),
+        NirExpr::SelectOwnedPointer {
+            condition,
+            then_owner,
+            else_owner,
+        } => {
+            collect_instantiated_units_expr(condition, units);
+            collect_instantiated_units_expr(then_owner, units);
+            collect_instantiated_units_expr(else_owner, units);
+        }
         NirExpr::CpuBindCore(_)
         | NirExpr::CpuWindow { .. }
         | NirExpr::CpuInputI64 { .. }

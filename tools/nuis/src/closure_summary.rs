@@ -14,6 +14,11 @@ pub(crate) struct FrontdoorClosureSummary {
     pub(crate) debugger_transcript_next_action: Option<String>,
     pub(crate) debugger_transcript_next_command: Option<String>,
     pub(crate) debugger_transcript_first_blocker: Option<String>,
+    pub(crate) debugger_cursor_handoff_contract: Option<String>,
+    pub(crate) debugger_cursor_path: Option<String>,
+    pub(crate) debugger_cursor_ready: Option<bool>,
+    pub(crate) debugger_cursor_status: Option<String>,
+    pub(crate) debugger_cursor_next_command: Option<String>,
 }
 
 impl FrontdoorClosureSummary {
@@ -56,6 +61,11 @@ impl FrontdoorClosureSummary {
             debugger_transcript_next_action: None,
             debugger_transcript_next_command: None,
             debugger_transcript_first_blocker: None,
+            debugger_cursor_handoff_contract: None,
+            debugger_cursor_path: None,
+            debugger_cursor_ready: None,
+            debugger_cursor_status: None,
+            debugger_cursor_next_command: None,
         }
     }
 
@@ -82,6 +92,11 @@ impl FrontdoorClosureSummary {
             debugger_transcript_next_action: None,
             debugger_transcript_next_command: None,
             debugger_transcript_first_blocker: None,
+            debugger_cursor_handoff_contract: None,
+            debugger_cursor_path: None,
+            debugger_cursor_ready: None,
+            debugger_cursor_status: None,
+            debugger_cursor_next_command: None,
         }
     }
 
@@ -122,6 +137,13 @@ impl FrontdoorClosureSummary {
                 debugger_transcript_first_blocker: final_output
                     .debugger_transcript_first_blocker
                     .clone(),
+                debugger_cursor_handoff_contract: Some(
+                    final_output.debugger_cursor_handoff_contract.clone(),
+                ),
+                debugger_cursor_path: Some(final_output.debugger_cursor_path.clone()),
+                debugger_cursor_ready: Some(final_output.debugger_cursor_ready),
+                debugger_cursor_status: Some(final_output.debugger_cursor_status.clone()),
+                debugger_cursor_next_command: final_output.debugger_cursor_next_command.clone(),
             };
         }
         if final_output.ready && !final_output.nsdb_replay_ready {
@@ -160,6 +182,13 @@ impl FrontdoorClosureSummary {
                 debugger_transcript_first_blocker: final_output
                     .debugger_transcript_first_blocker
                     .clone(),
+                debugger_cursor_handoff_contract: Some(
+                    final_output.debugger_cursor_handoff_contract.clone(),
+                ),
+                debugger_cursor_path: Some(final_output.debugger_cursor_path.clone()),
+                debugger_cursor_ready: Some(final_output.debugger_cursor_ready),
+                debugger_cursor_status: Some(final_output.debugger_cursor_status.clone()),
+                debugger_cursor_next_command: final_output.debugger_cursor_next_command.clone(),
             };
         }
         Self::from_nsld_next_action(source, action, command, reason)
@@ -183,6 +212,12 @@ impl FrontdoorClosureSummary {
         self.debugger_transcript_next_command = final_output.nsdb_replay_next_command.clone();
         self.debugger_transcript_first_blocker =
             final_output.debugger_transcript_first_blocker.clone();
+        self.debugger_cursor_handoff_contract =
+            Some(final_output.debugger_cursor_handoff_contract.clone());
+        self.debugger_cursor_path = Some(final_output.debugger_cursor_path.clone());
+        self.debugger_cursor_ready = Some(final_output.debugger_cursor_ready);
+        self.debugger_cursor_status = Some(final_output.debugger_cursor_status.clone());
+        self.debugger_cursor_next_command = final_output.debugger_cursor_next_command.clone();
         self
     }
 
@@ -223,6 +258,11 @@ impl FrontdoorClosureSummary {
             debugger_transcript_next_action: self.debugger_transcript_next_action,
             debugger_transcript_next_command: self.debugger_transcript_next_command,
             debugger_transcript_first_blocker: self.debugger_transcript_first_blocker,
+            debugger_cursor_handoff_contract: self.debugger_cursor_handoff_contract,
+            debugger_cursor_path: self.debugger_cursor_path,
+            debugger_cursor_ready: self.debugger_cursor_ready,
+            debugger_cursor_status: self.debugger_cursor_status,
+            debugger_cursor_next_command: self.debugger_cursor_next_command,
         }
     }
 
@@ -275,6 +315,26 @@ impl FrontdoorClosureSummary {
             crate::json_optional_string_field(
                 "closure_summary_debugger_transcript_first_blocker",
                 self.debugger_transcript_first_blocker.as_deref(),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_debugger_cursor_handoff_contract",
+                self.debugger_cursor_handoff_contract.as_deref(),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_debugger_cursor_path",
+                self.debugger_cursor_path.as_deref(),
+            ),
+            crate::json_optional_bool_field(
+                "closure_summary_debugger_cursor_ready",
+                self.debugger_cursor_ready,
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_debugger_cursor_status",
+                self.debugger_cursor_status.as_deref(),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_debugger_cursor_next_command",
+                self.debugger_cursor_next_command.as_deref(),
             ),
         ]
     }
@@ -521,6 +581,11 @@ mod tests {
             } else {
                 Some("payload-execution-replay:no-checkpoints".to_owned())
             },
+            debugger_cursor_handoff_contract: "nuis-debugger-cursor-handoff-v1".to_owned(),
+            debugger_cursor_path: "out/nuis.nsdb.replay-cursor.toml".to_owned(),
+            debugger_cursor_ready: false,
+            debugger_cursor_status: "cursor-unavailable".to_owned(),
+            debugger_cursor_next_command: None,
             recommended_next_action: "run-artifact".to_owned(),
             path_present: true,
             nsld_owned: Some(true),

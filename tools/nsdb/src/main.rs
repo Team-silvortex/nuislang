@@ -1,4 +1,5 @@
 mod cli;
+mod cursor;
 mod display;
 mod handoff;
 mod hetero_trace;
@@ -26,10 +27,10 @@ use crate::{
     cli::{parse_args, resolve_manifest_input, Command},
     display::{
         print_nsdb_events_report, print_nsdb_inspect_report, print_nsdb_replay_plan,
-        print_nsdb_replay_transcript,
+        print_nsdb_replay_transcript, print_nsdb_replay_transcript_with_control,
     },
     json::{nsdb_events_report_json, nsdb_inspect_report_json, nsdb_replay_plan_json},
-    json_transcript::nsdb_replay_transcript_json,
+    json_transcript::{nsdb_replay_transcript_json, nsdb_replay_transcript_json_with_control},
     provider_sample_execute::execute_provider_samples,
     provider_sample_materialize::{materialize_provider_samples, ProviderSampleMaterializeReport},
     report::nsdb_inspect_report,
@@ -99,14 +100,36 @@ fn run() -> Result<(), String> {
             input,
             json,
             event_filter,
+            mut replay_control,
+            cursor_input,
+            cursor_output,
         } => {
             let manifest = resolve_manifest_input(&input)?;
+            if let Some(path) = cursor_input.as_deref() {
+                let loaded = crate::cursor::load_replay_cursor(path, &manifest)?;
+                replay_control.resume_after_frame_id = loaded.resume_after_frame_id;
+                replay_control.resume_next_frame_id = loaded.resume_next_frame_id;
+            }
             let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
             let report = nsdb_inspect_report(&manifest, &plan, event_filter);
+            if let Some(path) = cursor_output.as_deref() {
+                let transcript = crate::transcript::build_replay_transcript_with_control(
+                    &report,
+                    &replay_control,
+                );
+                crate::cursor::persist_replay_cursor(path, &manifest, &transcript)?;
+            }
             if json {
-                println!("{}", nsdb_replay_transcript_json(&report));
-            } else {
+                let output = if replay_control == Default::default() {
+                    nsdb_replay_transcript_json(&report)
+                } else {
+                    nsdb_replay_transcript_json_with_control(&report, &replay_control)
+                };
+                println!("{output}");
+            } else if replay_control == Default::default() {
                 print_nsdb_replay_transcript(&report);
+            } else {
+                print_nsdb_replay_transcript_with_control(&report, &replay_control);
             }
         }
         Command::MaterializeProviderSamples {

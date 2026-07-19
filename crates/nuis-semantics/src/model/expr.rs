@@ -17,6 +17,11 @@ pub enum NirExpr {
     Borrow(Box<NirExpr>),
     BorrowEnd(Box<NirExpr>),
     Move(Box<NirExpr>),
+    SelectOwnedPointer {
+        condition: Box<NirExpr>,
+        then_owner: Box<NirExpr>,
+        else_owner: Box<NirExpr>,
+    },
     AllocNode {
         value: Box<NirExpr>,
         next: Box<NirExpr>,

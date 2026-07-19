@@ -451,6 +451,14 @@ fn consume_owned_aggregate(expr: &NirExpr, live: &mut BTreeSet<String>) {
                 consume_owned_aggregate(arg, live);
             }
         }
+        NirExpr::SelectOwnedPointer {
+            then_owner,
+            else_owner,
+            ..
+        } => {
+            consume_direct(then_owner, live);
+            consume_direct(else_owner, live);
+        }
         NirExpr::Move(inner) | NirExpr::DropBytes(inner) => consume_direct(inner, live),
         _ => {}
     }

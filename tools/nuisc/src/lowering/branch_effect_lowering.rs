@@ -5,6 +5,69 @@ struct EncodedBranchAction {
     binding: Option<String>,
 }
 
+pub(super) fn lower_owned_pointer_select(
+    condition: &NirExpr,
+    then_owner: &NirExpr,
+    else_owner: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    let condition = lower_expr(condition, state, bindings)?;
+    let then_owner = moved_binding(then_owner, bindings)?;
+    let else_owner = moved_binding(else_owner, bindings)?;
+    if then_owner == else_owner {
+        return Err("select_owned_ptr(...) candidates must be distinct owners".to_owned());
+    }
+    let then_action = state.branch_action_registry.plan_branch_effect_action(
+        "cpu",
+        "take_ptr_drop_other",
+        vec![then_owner.clone(), else_owner.clone()],
+    )?;
+    let else_action = state.branch_action_registry.plan_branch_effect_action(
+        "cpu",
+        "take_ptr_drop_other",
+        vec![else_owner.clone(), then_owner.clone()],
+    )?;
+    let name = next_name(state, "select_owned_ptr");
+    let mut args = vec![
+        condition.clone(),
+        yir_core::BranchEffectResult::OwnedPointer
+            .as_str()
+            .to_owned(),
+    ];
+    encode_planned_actions(std::slice::from_ref(&then_action), &mut args);
+    encode_planned_actions(std::slice::from_ref(&else_action), &mut args);
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "branch_effect".to_owned(),
+            args,
+        },
+    });
+    push_dep_edges(state, &condition, &name);
+    for owner in [&then_owner, &else_owner] {
+        push_dep_edges(state, owner, &name);
+        push_lifetime_edge(state, owner, &name);
+    }
+    chain_statement_effect(state, &name);
+    Ok(name)
+}
+
+fn moved_binding(expr: &NirExpr, bindings: &BTreeMap<String, String>) -> Result<String, String> {
+    let NirExpr::Move(inner) = expr else {
+        return Err("select_owned_ptr(...) requires move(...) candidates".to_owned());
+    };
+    let NirExpr::Var(name) = inner.as_ref() else {
+        return Err("select_owned_ptr(...) currently requires named owners".to_owned());
+    };
+    bindings
+        .get(name)
+        .cloned()
+        .ok_or_else(|| format!("select_owned_ptr(...) found unbound owner `{name}`"))
+}
+
 pub(super) fn lower_branch_effect(
     condition: String,
     then_body: &[NirStmt],
@@ -129,6 +192,22 @@ fn encode_actions(actions: &[EncodedBranchAction], out: &mut Vec<String>) {
             action.plan.operands.len().to_string(),
         ]);
         for operand in &action.plan.operands {
+            out.push(operand.access.as_str().to_owned());
+            out.push(operand.value.clone());
+        }
+    }
+}
+
+fn encode_planned_actions(actions: &[yir_core::PlannedBranchEffectAction], out: &mut Vec<String>) {
+    out.push(actions.len().to_string());
+    for action in actions {
+        out.extend([
+            action.module.clone(),
+            action.instruction.clone(),
+            action.result.as_str().to_owned(),
+            action.operands.len().to_string(),
+        ]);
+        for operand in &action.operands {
             out.push(operand.access.as_str().to_owned());
             out.push(operand.value.clone());
         }

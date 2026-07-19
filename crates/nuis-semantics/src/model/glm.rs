@@ -118,6 +118,24 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
             }],
             effect: NirGlmEffect::DomainMove,
         }),
+        NirExpr::SelectOwnedPointer { .. } => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Res,
+            accesses: vec![
+                NirGlmAccess {
+                    class: NirGlmValueClass::Val,
+                    mode: NirGlmUseMode::Read,
+                },
+                NirGlmAccess {
+                    class: NirGlmValueClass::Res,
+                    mode: NirGlmUseMode::Own,
+                },
+                NirGlmAccess {
+                    class: NirGlmValueClass::Res,
+                    mode: NirGlmUseMode::Own,
+                },
+            ],
+            effect: NirGlmEffect::DomainMove,
+        }),
         NirExpr::AllocNode { .. } | NirExpr::AllocBuffer { .. } => Some(NirGlmProfile {
             result_class: NirGlmValueClass::Res,
             accesses: vec![NirGlmAccess {

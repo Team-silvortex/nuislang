@@ -660,8 +660,20 @@ manifests named by `loaded_nustar`, resolve static providers by
 CPU and AArch64 CPU install their emitters through this path. Provider
 descriptors now live in the LLVM backend's static Nustar catalog, so `nuisc`
 contains no CPU entry names or emitter functions. The paired YIR semantic
-registry is still the all-Nustar default rather than an exact projection of
-the loaded manifests.
+registry is now assembled from the same manifests through a verifier-owned
+provider catalog. Unloaded domains remain absent, unknown providers fail during
+assembly, and a catalog-coverage test locks every indexed official manifest.
+Branch composition also has its first ownership-carrying result:
+`owned_ptr` requires both paths to consume the same two live, distinct,
+unborrowed owners through `cpu.take_ptr_drop_other`. Interpretation frees only
+the discarded object, GLM returns `Res`, heap verification moves both source
+names, and LLVM emits path-local frees plus `phi ptr`. Typed source lowering is
+now exposed as `select_owned_ptr(condition, move(left), move(right))`. Both
+candidates must be same-typed, named, distinct owners; NIR verification rejects
+aliasing and any later reuse, while cleanup synthesis removes both consumed
+inputs. `owned_pointer_select_demo` proves the selected pointer reaches
+`load_value` and one final `free` in a native binary with exit `73`. Nullable,
+projected, task-carried, and non-Node registered address results remain closed.
 The runtime now defines `NuisSchedulerOwnedBlobV1` as the first GLM-tokened
 dynamic leaf primitive. It deep-copies borrowed bytes and has scheduler-native
 move/drop hooks; a compiled harness covers take and cancellation. Recursive
@@ -714,9 +726,34 @@ frontdoors now mirror both as abstract readiness fields:
 `nsld_final_executable_output_debugger_transcript_*`, and
 `closure_summary_*_debugger_transcript_*`. This keeps run-artifact, workflow,
 project-status, and release/build-report surfaces aligned without coupling the
-frontdoor to Mach-O, ELF, PE, or any one future object format. The next gap is
-to turn transcript-ready states into an actionable Nsdb replay/debugger command
-handoff rather than only exposing metadata.
+frontdoor to Mach-O, ELF, PE, or any one future object format. Nsdb now layers
+`nsdb-yir-replay-control-v1` over that transcript: `--frame` consumes one exact
+index or frame id, while `--break-at` consumes the ordered prefix through an
+exact frame and reports `breakpoint-hit`. Missing or ambiguous targets fail
+closed. Typed `execution_phase` and `entry_symbol` predicates now stop at the
+first ordered AND-match through `nsdb-yir-breakpoint-predicate-v1`. Every
+successful stop emits `nsdb-yir-replay-resume-cursor-v1` with the stopped frame
+and deterministic next frame, or an explicit terminal status.
+`nsdb-yir-replay-resume-input-v1` now consumes a stopped/next frame pair only
+when both resolve as immediate neighbors, then replays the suffix from the next
+frame; stale, mismatched, incomplete, and terminal cursors consume nothing. The
+PixelMagic smoke now proves a real multi-checkpoint stop-resume-stop command
+chain against heterogeneous trace records: Nsdb falls back from absent
+payload-handoff events to ordered metadata/device-dispatch trace frames, persists
+`nsdb-yir-replay-cursor-record-v1`, resumes exactly at the advertised successor,
+and stops again through `--resume-cursor`. Cursor loading validates the record,
+transcript/source contracts, and manifest before applying the exact successor.
+Nuis adapts that file through `nuis-debugger-cursor-handoff-v1`, mirroring its
+expected path, readiness, and status through final-output and closure summaries
+without importing Nsdb types. Missing cursors remain optional/unavailable while
+malformed, stale-contract, and wrong-manifest records are invalid. The next gap
+was a cursor-specific resume command handoff; ready mirrors now publish that
+command through final-output and closure summaries, while unavailable/invalid
+mirrors publish none. Nuis now owns a first-class `debug-resume` route that
+validates the abstract handoff before dispatching Nsdb with structured argv;
+unavailable/invalid cursors fail before dispatch. The next gap is forwarding
+typed stop/save controls through that route. Native execution remains outside
+this metadata-level debugger control.
 
 ## Current Role
 

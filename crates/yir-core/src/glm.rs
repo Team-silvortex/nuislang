@@ -301,7 +301,16 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
         }
         _ if op.module == "cpu" && op.instruction == "branch_effect" => {
             let mut accesses = Vec::new();
-            if let Some(args) = parse_branch_effect_args(&op.args) {
+            let args = parse_branch_effect_args(&op.args);
+            let result_class = if args
+                .as_ref()
+                .is_some_and(|args| args.merge_result == crate::BranchEffectResult::OwnedPointer)
+            {
+                GlmValueClass::Res
+            } else {
+                GlmValueClass::Val
+            };
+            if let Some(args) = &args {
                 accesses.push(value_read_str(args.condition));
                 for action in args.then_actions.iter().chain(&args.else_actions) {
                     for operand in &action.operands {
@@ -329,7 +338,7 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
                 }
             }
             GlmNodeProfile {
-                result_class: GlmValueClass::Val,
+                result_class,
                 accesses,
                 effect: GlmEffect::DomainMove,
             }

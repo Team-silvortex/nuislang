@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use yir_core::YirModule;
+use yir_core::{parse_branch_effect_args, BranchEffectAccess, BranchEffectResult, Node, YirModule};
 
 use crate::cpu_heap_checks::{
     ensure_buffer_index_in_bounds, ensure_buffer_readable, ensure_buffer_writable,
@@ -147,6 +147,15 @@ pub(crate) fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String>
                     }
                 }
             }
+            "branch_effect" => {
+                verify_owned_pointer_branch_merge(
+                    node,
+                    &mut values,
+                    &heap,
+                    &borrow_counts,
+                    &mut moved_names,
+                )?;
+            }
             "load_value" => {
                 ensure_node_readable(pointer_arg(&values, &node.op.args[0]), &heap, node)?;
             }
@@ -266,5 +275,73 @@ pub(crate) fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String>
         );
     }
 
+    Ok(())
+}
+
+fn verify_owned_pointer_branch_merge(
+    node: &Node,
+    values: &mut BTreeMap<String, PointerState>,
+    heap: &BTreeMap<usize, HeapBinding>,
+    borrow_counts: &BTreeMap<usize, usize>,
+    moved_names: &mut BTreeSet<String>,
+) -> Result<(), String> {
+    let Some(args) = parse_branch_effect_args(&node.op.args) else {
+        return Ok(());
+    };
+    if args.merge_result != BranchEffectResult::OwnedPointer {
+        return Ok(());
+    }
+    let owned_inputs = |actions: &[yir_core::BranchEffectAction<'_>]| {
+        actions
+            .iter()
+            .flat_map(|action| &action.operands)
+            .filter(|operand| operand.access == BranchEffectAccess::ResourceOwn)
+            .map(|operand| operand.value.to_owned())
+            .collect::<BTreeSet<_>>()
+    };
+    let then_owned = owned_inputs(&args.then_actions);
+    let else_owned = owned_inputs(&args.else_actions);
+    if then_owned != else_owned || then_owned.len() != 2 {
+        return Err(format!(
+            "node `{}` owned pointer branch must consume the same two owners on both paths",
+            node.name
+        ));
+    }
+
+    let mut heap_ids = BTreeSet::new();
+    for source_name in then_owned {
+        match pointer_arg(values, &source_name) {
+            PointerState::Owned(id) => {
+                ensure_live_heap(heap, id, node)?;
+                ensure_no_active_borrows(borrow_counts, id, node, "branch pointer merge")?;
+                if !heap_ids.insert(id) {
+                    return Err(format!(
+                        "node `{}` owned pointer branch aliases owner `{source_name}`",
+                        node.name
+                    ));
+                }
+                moved_names.insert(source_name);
+            }
+            PointerState::Borrowed(_) => {
+                return Err(format!(
+                    "node `{}` cannot merge borrowed pointer `{source_name}` as an owner",
+                    node.name
+                ));
+            }
+            PointerState::Null => {
+                return Err(format!(
+                    "node `{}` cannot merge null pointer `{source_name}` as an owner",
+                    node.name
+                ));
+            }
+            PointerState::Unknown => {
+                return Err(format!(
+                    "node `{}` cannot prove ownership of branch pointer `{source_name}`",
+                    node.name
+                ));
+            }
+        }
+    }
+    values.insert(node.name.clone(), PointerState::Unknown);
     Ok(())
 }

@@ -50,13 +50,6 @@ fn run_nsdb(args: &[&str]) -> std::process::Output {
             .output()
             .unwrap_or_else(|error| panic!("failed to run nsdb {:?}: {error}", args));
     }
-    let fallback = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/debug/nsdb");
-    if fallback.exists() {
-        return Command::new(fallback)
-            .args(args)
-            .output()
-            .unwrap_or_else(|error| panic!("failed to run nsdb {:?}: {error}", args));
-    }
     Command::new("cargo")
         .args(["run", "-q", "-p", "nsdb", "--"])
         .args(args)
@@ -368,6 +361,109 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
             && replay_stdout.contains("\"debugger_transcript_replayed_checkpoint_count\":1")
             && replay_stdout.contains("\"consumed\":true"),
         "nsdb replay should consume the replay-ready YIR checkpoint set\n{replay_stdout}"
+    );
+
+    let selected_replay = run_nsdb(&[
+        "replay",
+        &output_dir.display().to_string(),
+        "--frame",
+        "0",
+        "--json",
+    ]);
+    assert_success(&selected_replay, "nsdb select one YIR replay frame");
+    let selected_stdout = String::from_utf8_lossy(&selected_replay.stdout);
+    assert!(
+        selected_stdout
+            .contains("\"debugger_transcript_control_contract\":\"nsdb-yir-replay-control-v1\"")
+            && selected_stdout.contains("\"debugger_transcript_control_mode\":\"frame\"")
+            && selected_stdout
+                .contains("\"debugger_transcript_control_status\":\"frame-selected\"")
+            && selected_stdout.contains("\"debugger_transcript_selected_frame_index\":0")
+            && selected_stdout.contains("\"debugger_transcript_status\":\"transcript-stopped\"")
+            && selected_stdout.contains("\"debugger_transcript_stop_reason\":\"frame-selected\""),
+        "nsdb replay --frame should select one deterministic YIR frame\n{selected_stdout}"
+    );
+
+    let breakpoint_replay = run_nsdb(&[
+        "replay",
+        &output_dir.display().to_string(),
+        "--break-at",
+        "0",
+        "--json",
+    ]);
+    assert_success(&breakpoint_replay, "nsdb stop at YIR replay breakpoint");
+    let breakpoint_stdout = String::from_utf8_lossy(&breakpoint_replay.stdout);
+    assert!(
+        breakpoint_stdout.contains("\"debugger_transcript_control_mode\":\"breakpoint\"")
+            && breakpoint_stdout
+                .contains("\"debugger_transcript_control_status\":\"breakpoint-hit\"")
+            && breakpoint_stdout.contains("\"debugger_transcript_selected_frame_index\":0")
+            && breakpoint_stdout.contains("\"debugger_transcript_stop_reason\":\"breakpoint-hit\""),
+        "nsdb replay --break-at should stop at one deterministic YIR frame\n{breakpoint_stdout}"
+    );
+
+    let predicate_replay = run_nsdb(&[
+        "replay",
+        &output_dir.display().to_string(),
+        "--break-phase",
+        "container-loader-handoff",
+        "--break-entry",
+        "nuis.bootstrap.lifecycle.v1",
+        "--json",
+    ]);
+    assert_success(
+        &predicate_replay,
+        "nsdb stop at typed YIR replay breakpoint",
+    );
+    let predicate_stdout = String::from_utf8_lossy(&predicate_replay.stdout);
+    assert!(
+        predicate_stdout.contains(
+            "\"debugger_transcript_breakpoint_predicate_contract\":\"nsdb-yir-breakpoint-predicate-v1\""
+        ) && predicate_stdout.contains("\"debugger_transcript_control_mode\":\"predicate\"")
+            && predicate_stdout.contains(
+                "\"debugger_transcript_control_status\":\"breakpoint-predicate-hit\""
+            )
+            && predicate_stdout.contains(
+                "\"debugger_transcript_breakpoint_phase\":\"container-loader-handoff\""
+            )
+            && predicate_stdout.contains(
+                "\"debugger_transcript_breakpoint_entry\":\"nuis.bootstrap.lifecycle.v1\""
+            )
+            && predicate_stdout.contains(
+                "\"debugger_transcript_resume_cursor_contract\":\"nsdb-yir-replay-resume-cursor-v1\""
+            )
+            && predicate_stdout
+                .contains("\"debugger_transcript_resume_cursor_status\":\"end-of-transcript\"")
+            && predicate_stdout.contains("\"debugger_transcript_resume_cursor_ready\":false"),
+        "typed breakpoint should stop at the matching terminal YIR frame\n{predicate_stdout}"
+    );
+
+    let rejected_resume = run_nsdb(&[
+        "replay",
+        &output_dir.display().to_string(),
+        "--resume-after",
+        "frame:payload:0:loader",
+        "--resume-next",
+        "frame:payload:1:missing",
+        "--json",
+    ]);
+    assert_success(
+        &rejected_resume,
+        "nsdb reject terminal YIR replay resume cursor",
+    );
+    let rejected_resume_stdout = String::from_utf8_lossy(&rejected_resume.stdout);
+    assert!(
+        rejected_resume_stdout.contains(
+            "\"debugger_transcript_resume_input_contract\":\"nsdb-yir-replay-resume-input-v1\""
+        ) && rejected_resume_stdout
+            .contains("\"debugger_transcript_resume_input_status\":\"cursor-rejected\"")
+            && rejected_resume_stdout
+                .contains("\"debugger_transcript_control_status\":\"resume-cursor-rejected\"")
+            && rejected_resume_stdout.contains("\"debugger_transcript_replayed_checkpoint_count\":0")
+            && rejected_resume_stdout.contains(
+                "\"debugger_transcript_first_blocker\":\"replay-resume:after-frame-terminal:frame:payload:0:loader\""
+            ),
+        "terminal resume cursor must fail closed without consuming a YIR frame\n{rejected_resume_stdout}"
     );
 
     let build_report_json =

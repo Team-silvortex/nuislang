@@ -147,7 +147,90 @@ all-or-nothing: a blocked checkpoint produces `transcript-blocked` and zero
 consumed frames instead of a misleading partial replay. A ready transcript
 preserves checkpoint order and exposes each consumed YIR frame, value slot,
 snapshot summary, and next action. It is deterministic transcript consumption,
-not native instruction execution, breakpoints, or interactive stepping.
+not native instruction execution or interactive stepping.
+
+The first deterministic replay-control layer is
+`nsdb-yir-replay-control-v1`:
+
+```bash
+nsdb replay <artifact-output-dir> --frame <index|frame-id> --json
+nsdb replay <artifact-output-dir> --break-at <index|frame-id> --json
+nsdb replay <artifact-output-dir> --break-phase <phase> --break-entry <symbol> --json
+```
+
+`--frame` consumes exactly the selected replayable YIR frame and reports
+`frame-selected`. `--break-at` consumes the ordered prefix through the selected
+frame and reports `breakpoint-hit`. The selectors are mutually exclusive and
+match either the numeric checkpoint index or the exact stable `frame_id`.
+Missing or ambiguous targets fail closed with zero consumed frames and an
+explicit `replay-control:*` blocker. These are transcript-level breakpoint
+semantics; they do not yet pause native execution or provide interactive
+continue/step commands.
+
+Typed predicates use `nsdb-yir-breakpoint-predicate-v1`. `--break-phase` and
+`--break-entry` may be supplied independently or together; together they match
+with AND semantics and stop at the first ordered frame satisfying both fields.
+They are mutually exclusive with exact `--frame` and `--break-at` controls.
+Every successful stop also emits `nsdb-yir-replay-resume-cursor-v1`. A cursor
+records the stopped `after_frame_id` and, when another frame exists, its stable
+`next_frame_id` and numeric index with `resume-ready`. A terminal stop reports
+`end-of-transcript` and `resume_cursor_ready = false`. The cursor is currently
+consumed by replay through a strict pair:
+
+```bash
+nsdb replay <artifact-output-dir> \
+  --resume-after <stopped-frame-id> \
+  --resume-next <next-frame-id> \
+  --json
+```
+
+This input uses `nsdb-yir-replay-resume-input-v1`. Nsdb resolves the stopped
+frame, verifies that the supplied next frame is its immediate ordered
+successor, and only then consumes the suffix beginning at that next frame. A
+missing half of the pair, unknown stopped frame, terminal stopped frame, or
+mismatched next frame returns `cursor-rejected`, zero consumed frames, and an
+explicit `replay-resume:*` blocker. Resume may be combined with an exact or
+typed breakpoint to stop again later; `--frame` remains mutually exclusive
+because single-frame inspection is not continuation.
+
+A non-terminal stop may persist the validated cursor directly and load it in a
+later invocation:
+
+```bash
+nsdb replay <artifact-output-dir> \
+  --break-at <frame-id> \
+  --save-cursor <cursor.toml> \
+  --json
+
+nsdb replay <artifact-output-dir> \
+  --resume-cursor <cursor.toml> \
+  --break-at <later-frame-id> \
+  --json
+```
+
+The file uses `nsdb-yir-replay-cursor-record-v1` and records the transcript and
+replay-source contracts, manifest, stopped frame, immediate next frame index,
+and next frame id. Nsdb refuses to persist blocked or terminal cursors. Loading
+fails closed on malformed or unknown fields, incompatible contracts, non-ready
+status, or a different manifest. `--resume-cursor` is mutually exclusive with
+manual resume fields and `--frame`, but may be combined with a later breakpoint.
+Nuis mirrors this public artifact through `nuis-debugger-cursor-handoff-v1` as
+path/readiness/status metadata in final-output and closure summaries. This is an
+adapter boundary: Nuis does not import Nsdb implementation types, and absence
+of an optional cursor does not block binary readiness. A ready mirror also
+publishes a cursor-specific `next_command` through final-output and closure
+summaries; unavailable or invalid mirrors publish no continuation command.
+That command targets `nuis debug-resume`, whose frontdoor validates the handoff
+again before launching Nsdb with structured arguments. The initial route
+continues through the remaining suffix; typed stop/save forwarding follows.
+
+Replay source selection remains deterministic. Payload-execution handoff
+events are preferred whenever present. When that list is empty, Nsdb projects
+`hetero_runtime_trace.records` into ordered metadata/device-dispatch events.
+`metadata-only` and `trace-ready` records become debugger checkpoints, while
+device-dispatch replayability still depends on provider-sample validation.
+This gives pre-final-output heterogeneous artifacts a real replay route without
+inventing a fake native payload handoff.
 
 `run-artifact` persists the device/runtime sample source as
 `nuis.nsdb.hetero-runtime-trace.toml` using

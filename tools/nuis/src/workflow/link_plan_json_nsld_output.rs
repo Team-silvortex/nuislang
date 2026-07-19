@@ -232,6 +232,26 @@ pub(super) fn nsld_final_output_json_fields(
             }),
         ),
         json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_handoff_contract",
+            nsld_final_output.map(|summary| summary.debugger_cursor_handoff_contract.as_str()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_path",
+            nsld_final_output.map(|summary| summary.debugger_cursor_path.as_str()),
+        ),
+        json_bool_field(
+            "nsld_final_executable_output_debugger_cursor_ready",
+            nsld_final_output.is_some_and(|summary| summary.debugger_cursor_ready),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_status",
+            nsld_final_output.map(|summary| summary.debugger_cursor_status.as_str()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_next_command",
+            nsld_final_output.and_then(|summary| summary.debugger_cursor_next_command.as_deref()),
+        ),
+        json_optional_string_field(
             "nsld_final_executable_output_recommended_next_action",
             nsld_final_output.map(|summary| summary.recommended_next_action.as_str()),
         ),

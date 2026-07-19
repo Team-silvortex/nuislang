@@ -441,7 +441,17 @@ pub(crate) fn print_nsdb_replay_plan(report: &NsdbInspectReport) {
 }
 
 pub(crate) fn print_nsdb_replay_transcript(report: &NsdbInspectReport) {
-    let transcript = crate::transcript::build_replay_transcript(report);
+    print_nsdb_replay_transcript_with_control(
+        report,
+        &crate::transcript::NsdbReplayControl::default(),
+    );
+}
+
+pub(crate) fn print_nsdb_replay_transcript_with_control(
+    report: &NsdbInspectReport,
+    control: &crate::transcript::NsdbReplayControl,
+) {
+    let transcript = crate::transcript::build_replay_transcript_with_control(report, control);
     println!("Nsdb YIR replay transcript");
     println!("  manifest: {}", report.manifest);
     println!("  debugger_transcript_contract: {}", transcript.protocol);
@@ -451,6 +461,102 @@ pub(crate) fn print_nsdb_replay_transcript(report: &NsdbInspectReport) {
     );
     println!("  debugger_transcript_status: {}", transcript.status);
     println!("  debugger_transcript_ready: {}", transcript.ready);
+    println!(
+        "  debugger_transcript_control_contract: {}",
+        transcript.control_protocol
+    );
+    println!(
+        "  debugger_transcript_control_mode: {}",
+        transcript.control_mode
+    );
+    println!(
+        "  debugger_transcript_control_selector: {}",
+        transcript.control_selector.as_deref().unwrap_or("<none>")
+    );
+    println!(
+        "  debugger_transcript_control_status: {}",
+        transcript.control_status
+    );
+    println!(
+        "  debugger_transcript_breakpoint_predicate_contract: {}",
+        transcript.breakpoint_predicate_protocol
+    );
+    println!(
+        "  debugger_transcript_breakpoint_phase: {}",
+        transcript.breakpoint_phase.as_deref().unwrap_or("<none>")
+    );
+    println!(
+        "  debugger_transcript_breakpoint_entry: {}",
+        transcript.breakpoint_entry.as_deref().unwrap_or("<none>")
+    );
+    println!(
+        "  debugger_transcript_resume_input_contract: {}",
+        transcript.resume_input_protocol
+    );
+    println!(
+        "  debugger_transcript_resume_input_status: {}",
+        transcript.resume_input_status
+    );
+    println!(
+        "  debugger_transcript_resume_input_after_frame_id: {}",
+        transcript
+            .resume_input_after_frame_id
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    println!(
+        "  debugger_transcript_resume_input_next_frame_id: {}",
+        transcript
+            .resume_input_next_frame_id
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    println!(
+        "  debugger_transcript_selected_frame_index: {}",
+        transcript
+            .selected_frame_index
+            .map_or_else(|| "<none>".to_owned(), |index| index.to_string())
+    );
+    println!(
+        "  debugger_transcript_selected_frame_id: {}",
+        transcript.selected_frame_id.as_deref().unwrap_or("<none>")
+    );
+    println!(
+        "  debugger_transcript_stop_reason: {}",
+        transcript.stop_reason
+    );
+    println!(
+        "  debugger_transcript_resume_cursor_contract: {}",
+        transcript.resume_cursor_protocol
+    );
+    println!(
+        "  debugger_transcript_resume_cursor_status: {}",
+        transcript.resume_cursor_status
+    );
+    println!(
+        "  debugger_transcript_resume_cursor_ready: {}",
+        transcript.resume_cursor_ready
+    );
+    println!(
+        "  debugger_transcript_resume_after_frame_id: {}",
+        transcript
+            .resume_after_frame_id
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    println!(
+        "  debugger_transcript_resume_next_frame_index: {}",
+        transcript
+            .resume_next_frame_index
+            .map_or_else(|| "<none>".to_owned(), |index| index.to_string())
+    );
+    println!(
+        "  debugger_transcript_resume_next_frame_id: {}",
+        transcript
+            .resume_next_frame_id
+            .as_deref()
+            .unwrap_or("<none>")
+    );
     println!(
         "  debugger_transcript_checkpoint_count: {}",
         transcript.checkpoint_count

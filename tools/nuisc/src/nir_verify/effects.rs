@@ -179,6 +179,15 @@ fn note_nested_expr_effects(
             note_binding_effects(lhs, "_", moved, borrows, borrow_bindings);
             note_binding_effects(rhs, "_", moved, borrows, borrow_bindings);
         }
+        NirExpr::SelectOwnedPointer {
+            condition,
+            then_owner,
+            else_owner,
+        } => {
+            note_binding_effects(condition, "_", moved, borrows, borrow_bindings);
+            note_binding_effects(then_owner, "_", moved, borrows, borrow_bindings);
+            note_binding_effects(else_owner, "_", moved, borrows, borrow_bindings);
+        }
         NirExpr::Await(inner)
         | NirExpr::Borrow(inner)
         | NirExpr::BorrowEnd(inner)

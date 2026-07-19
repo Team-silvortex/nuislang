@@ -1,0 +1,10 @@
+mod cpu Main {
+  fn main() -> i64 {
+    let left: ref Node = alloc_node(41, null());
+    let right: ref Node = alloc_node(73, null());
+    let selected: ref Node = select_owned_ptr(false, move(left), move(right));
+    let value: i64 = load_value(selected);
+    free(selected);
+    return value;
+  }
+}

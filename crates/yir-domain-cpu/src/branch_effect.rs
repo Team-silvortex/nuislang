@@ -5,6 +5,10 @@ use yir_core::{
 
 const POINTER_READ: &[BranchEffectAccess] = &[BranchEffectAccess::ResourceRead];
 const POINTER_OWN: &[BranchEffectAccess] = &[BranchEffectAccess::ResourceOwn];
+const POINTER_SELECT_OWN: &[BranchEffectAccess] = &[
+    BranchEffectAccess::ResourceOwn,
+    BranchEffectAccess::ResourceOwn,
+];
 
 pub(super) const CPU_BRANCH_EFFECT_ACTIONS: &[BranchEffectActionCapability] = &[
     BranchEffectActionCapability {
@@ -18,6 +22,12 @@ pub(super) const CPU_BRANCH_EFFECT_ACTIONS: &[BranchEffectActionCapability] = &[
         instruction: "free",
         result: BranchEffectResult::Unit,
         operand_accesses: POINTER_OWN,
+    },
+    BranchEffectActionCapability {
+        module: "cpu",
+        instruction: "take_ptr_drop_other",
+        result: BranchEffectResult::OwnedPointer,
+        operand_accesses: POINTER_SELECT_OWN,
     },
 ];
 
@@ -44,6 +54,24 @@ pub(super) fn execute_cpu_branch_effect_action(
                 format!("effect {} free {pointer:?}", parent.op.full_name()),
             );
             Ok(Value::Unit)
+        }
+        "take_ptr_drop_other" => {
+            let discarded = state.expect_pointer(action.operands[1].value)?;
+            if pointer == discarded {
+                return Err(format!(
+                    "{} cannot select and discard the same pointer",
+                    parent.op.full_name()
+                ));
+            }
+            state.free_heap_node(discarded)?;
+            state.push_resource_event(
+                resource,
+                format!(
+                    "effect {} take_ptr_drop_other selected={pointer:?} discarded={discarded:?}",
+                    parent.op.full_name()
+                ),
+            );
+            Ok(Value::Pointer(pointer))
         }
         instruction => Err(format!(
             "CpuMod does not implement registered branch action `{instruction}`"

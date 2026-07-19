@@ -412,6 +412,7 @@ fn lower_expr(
         | NirExpr::Borrow(_)
         | NirExpr::BorrowEnd(_)
         | NirExpr::Move(_)
+        | NirExpr::SelectOwnedPointer { .. }
         | NirExpr::AllocNode { .. }
         | NirExpr::AllocBuffer { .. }
         | NirExpr::LoadValue(_)
@@ -489,6 +490,9 @@ mod tests_loops_owned;
 #[cfg(test)]
 #[path = "lowering/tests_nested_owned.rs"]
 mod tests_nested_owned;
+#[cfg(test)]
+#[path = "lowering/tests_owned_pointer_select.rs"]
+mod tests_owned_pointer_select;
 #[cfg(test)]
 #[path = "lowering/tests_owned_pointer_transfer.rs"]
 mod tests_owned_pointer_transfer;

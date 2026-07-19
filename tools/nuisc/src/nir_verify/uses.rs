@@ -19,6 +19,15 @@ pub(super) fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Resu
             }
             verify_expr_uses(base, moved)?;
         }
+        NirExpr::SelectOwnedPointer {
+            condition,
+            then_owner,
+            else_owner,
+        } => {
+            verify_expr_uses(condition, moved)?;
+            verify_expr_uses(then_owner, moved)?;
+            verify_expr_uses(else_owner, moved)?;
+        }
         NirExpr::Instantiate { .. } => {}
         NirExpr::CastI64ToI32(inner)
         | NirExpr::CastI32ToI64(inner)

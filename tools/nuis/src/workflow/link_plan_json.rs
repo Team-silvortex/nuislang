@@ -376,6 +376,26 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
             "closure_summary_debugger_transcript_first_blocker",
             closure_summary.debugger_transcript_first_blocker.as_deref(),
         ),
+        crate::json_optional_string_field(
+            "closure_summary_debugger_cursor_handoff_contract",
+            closure_summary.debugger_cursor_handoff_contract.as_deref(),
+        ),
+        crate::json_optional_string_field(
+            "closure_summary_debugger_cursor_path",
+            closure_summary.debugger_cursor_path.as_deref(),
+        ),
+        crate::json_optional_bool_field(
+            "closure_summary_debugger_cursor_ready",
+            closure_summary.debugger_cursor_ready,
+        ),
+        crate::json_optional_string_field(
+            "closure_summary_debugger_cursor_status",
+            closure_summary.debugger_cursor_status.as_deref(),
+        ),
+        crate::json_optional_string_field(
+            "closure_summary_debugger_cursor_next_command",
+            closure_summary.debugger_cursor_next_command.as_deref(),
+        ),
         json_bool_field(
             "nsld_artifact_chain_next_action_available",
             nsld_chain_next.available,

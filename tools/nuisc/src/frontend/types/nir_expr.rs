@@ -28,6 +28,15 @@ pub(crate) fn infer_nir_expr_type(
         NirExpr::Borrow(value) | NirExpr::Move(value) => {
             infer_nir_expr_type(value, bindings, signatures, struct_table)
         }
+        NirExpr::SelectOwnedPointer {
+            then_owner,
+            else_owner,
+            ..
+        } => {
+            let then_type = infer_nir_expr_type(then_owner, bindings, signatures, struct_table)?;
+            let else_type = infer_nir_expr_type(else_owner, bindings, signatures, struct_table)?;
+            (then_type == else_type && then_type.is_ref).then_some(then_type)
+        }
         NirExpr::BorrowEnd(_) => Some(unit_type()),
         NirExpr::HostBufferHandle(_) => Some(i64_type()),
         NirExpr::AllocNode { .. } => Some(ref_type("Node")),

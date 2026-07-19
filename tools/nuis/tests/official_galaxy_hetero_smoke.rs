@@ -43,6 +43,24 @@ fn run_nsld(args: &[&str]) -> std::process::Output {
         .unwrap_or_else(|error| panic!("failed to run nsld through cargo {:?}: {error}", args))
 }
 
+fn run_nsdb(args: &[&str]) -> std::process::Output {
+    Command::new("cargo")
+        .args(["run", "-q", "-p", "nsdb", "--"])
+        .args(args)
+        .output()
+        .unwrap_or_else(|error| panic!("failed to run nsdb through cargo {:?}: {error}", args))
+}
+
+fn json_string_values(source: &str, key: &str) -> Vec<String> {
+    let needle = format!("\"{key}\":\"");
+    source
+        .split(&needle)
+        .skip(1)
+        .filter_map(|tail| tail.split('"').next())
+        .map(str::to_owned)
+        .collect()
+}
+
 fn assert_success(output: &std::process::Output, context: &str) {
     assert!(
         output.status.success(),
@@ -547,6 +565,99 @@ fn assert_official_galaxy_hetero_build(
     assert!(doctor_after_stdout.contains(
         "\"artifact_device_provider_sample_manifest_first_materialization_status\":\"provider-sample-materialized\""
     ));
+
+    if label == "pixelmagic_pipeline_demo" {
+        assert_multi_checkpoint_replay_resume(&output_dir);
+    }
+}
+
+fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
+    let output_dir_text = output_dir.display().to_string();
+    let unavailable = run_nuis(&["debug-resume", "--json", &output_dir_text]);
+    assert!(
+        !unavailable.status.success()
+            && String::from_utf8_lossy(&unavailable.stderr).contains("cursor-unavailable"),
+        "Nuis debug-resume must reject an unavailable cursor before dispatch\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&unavailable.stdout),
+        String::from_utf8_lossy(&unavailable.stderr)
+    );
+    let replay = run_nsdb(&["replay", &output_dir_text, "--json"]);
+    assert_success(&replay, "nsdb replay official multi-checkpoint artifact");
+    let replay_stdout = String::from_utf8_lossy(&replay.stdout);
+    let frame_ids = json_string_values(&replay_stdout, "frame_id");
+    assert!(
+        frame_ids.len() >= 2,
+        "official hetero replay should expose multiple YIR frames\n{replay_stdout}"
+    );
+    let first = &frame_ids[0];
+    let second = &frame_ids[1];
+    let cursor_path = output_dir.join("nuis.nsdb.replay-cursor.toml");
+    let cursor_path_text = cursor_path.display().to_string();
+
+    let stopped = run_nsdb(&[
+        "replay",
+        &output_dir_text,
+        "--break-at",
+        first,
+        "--save-cursor",
+        &cursor_path_text,
+        "--json",
+    ]);
+    assert_success(&stopped, "nsdb persist first hetero replay cursor");
+    assert_file_contains(
+        &cursor_path,
+        "protocol = \"nsdb-yir-replay-cursor-record-v1\"",
+        "persisted replay cursor protocol",
+    );
+    assert_file_contains(
+        &cursor_path,
+        &format!("after_frame_id = \"{first}\""),
+        "persisted replay cursor stopped frame",
+    );
+    assert_file_contains(
+        &cursor_path,
+        &format!("next_frame_id = \"{second}\""),
+        "persisted replay cursor next frame",
+    );
+
+    let report = run_nuis(&["build-report", "--json", &output_dir_text]);
+    assert_success(&report, "nuis mirror persisted debugger cursor");
+    let report_stdout = String::from_utf8_lossy(&report.stdout);
+    assert!(
+        report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_handoff_contract\":\"nuis-debugger-cursor-handoff-v1\""
+        ) && report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_ready\":true"
+        ) && report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_status\":\"cursor-resume-ready\""
+        ) && report_stdout.contains(
+            "\"closure_summary_debugger_cursor_handoff_contract\":\"nuis-debugger-cursor-handoff-v1\""
+        ) && report_stdout.contains("\"closure_summary_debugger_cursor_ready\":true")
+            && report_stdout.contains(
+                "\"closure_summary_debugger_cursor_status\":\"cursor-resume-ready\""
+            )
+            && report_stdout.contains(
+                "\"nsld_final_executable_output_debugger_cursor_next_command\":\"nuis debug-resume "
+            )
+            && report_stdout.contains(
+                "\"closure_summary_debugger_cursor_next_command\":\"nuis debug-resume "
+            )
+            && report_stdout.contains("--json")
+            && report_stdout.contains("nuis.nsdb.replay-cursor.toml"),
+        "Nuis frontdoors should mirror the persisted debugger cursor without Nsdb type coupling\n{report_stdout}"
+    );
+
+    let resumed = run_nuis(&["debug-resume", "--json", &output_dir_text]);
+    assert_success(&resumed, "nuis first-class heterogeneous debug resume");
+    let resumed_stdout = String::from_utf8_lossy(&resumed.stdout);
+    assert!(
+        resumed_stdout.contains("\"debugger_transcript_resume_input_status\":\"cursor-accepted\"")
+            && resumed_stdout
+                .contains("\"debugger_transcript_control_status\":\"resume-consumed\"")
+            && resumed_stdout.contains("\"debugger_transcript_status\":\"transcript-resumed\"")
+            && !resumed_stdout.contains("\"debugger_transcript_replayed_checkpoint_count\":0"),
+        "Nuis debug-resume should validate and consume the persisted heterogeneous suffix\n{resumed_stdout}"
+    );
 }
 
 #[test]

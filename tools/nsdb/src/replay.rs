@@ -60,9 +60,8 @@ pub(crate) struct NsdbReplayCheckpoint {
 }
 
 pub(crate) fn build_replay_plan(report: &NsdbInspectReport) -> NsdbReplayPlan {
-    let checkpoints = report
-        .payload_execution_handoff
-        .events
+    let replay_events = replay_source_events(report);
+    let checkpoints = replay_events
         .iter()
         .map(|event| replay_checkpoint_for_event(report, event))
         .collect::<Vec<_>>();
@@ -87,6 +86,50 @@ pub(crate) fn build_replay_plan(report: &NsdbInspectReport) -> NsdbReplayPlan {
         first_blocker: plan_first_blocker,
         checkpoints,
     }
+}
+
+fn replay_source_events(report: &NsdbInspectReport) -> Vec<NsdbPayloadExecutionEvent> {
+    if !report.payload_execution_handoff.events.is_empty() {
+        return report.payload_execution_handoff.events.clone();
+    }
+    report
+        .hetero_runtime_trace
+        .records
+        .iter()
+        .map(|record| NsdbPayloadExecutionEvent {
+            index: record.index,
+            trace_id: record.trace_id.clone(),
+            status: if matches!(record.status.as_str(), "metadata-only" | "trace-ready") {
+                "ready".to_owned()
+            } else {
+                record.status.clone()
+            },
+            execution_phase: if record.trace_role == "backend-artifact" {
+                "device-dispatch".to_owned()
+            } else {
+                "domain-metadata".to_owned()
+            },
+            target: if record.target_device == "none" {
+                record.domain_family.clone()
+            } else {
+                record.target_device.clone()
+            },
+            entry_symbol: record.backend_artifact_key.clone(),
+            entry_kind: record.trace_role.clone(),
+            entry_section_id: record.selected_lowering_target.clone(),
+            first_blocker: if matches!(record.status.as_str(), "metadata-only" | "trace-ready") {
+                "none".to_owned()
+            } else {
+                record
+                    .missing_signals
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| record.status.clone())
+            },
+            next_action: record.next_action.clone(),
+        })
+        .filter(|event| report.payload_execution_event_filter.matches(event))
+        .collect()
 }
 
 fn hetero_execution_closure_blocker(report: &NsdbInspectReport) -> Option<String> {

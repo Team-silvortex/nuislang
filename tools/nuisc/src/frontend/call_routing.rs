@@ -222,6 +222,66 @@ pub(super) fn lower_routed_call_or_core_builtin(
             ensure_move_like(&lowered, bindings, signatures, struct_table)?;
             NirExpr::Move(Box::new(lowered))
         }
+        "select_owned_ptr" => {
+            let [condition, then_owner, else_owner] = args else {
+                return Err("select_owned_ptr(...) expects 3 args".to_owned());
+            };
+            let condition = lower_expr(
+                condition,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            if !matches!(infer_nir_expr_type(&condition, bindings, signatures, struct_table), Some(ty) if ty.name == "bool" && !ty.is_ref)
+            {
+                return Err("select_owned_ptr(...) expects a bool condition".to_owned());
+            }
+            let then_owner = lower_expr(
+                then_owner,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                expected,
+            )?;
+            let else_owner = lower_expr(
+                else_owner,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                expected,
+            )?;
+            if !matches!(then_owner, NirExpr::Move(_)) || !matches!(else_owner, NirExpr::Move(_)) {
+                return Err(
+                    "select_owned_ptr(...) requires move(...) for both owned candidates".to_owned(),
+                );
+            }
+            let then_type = infer_nir_expr_type(&then_owner, bindings, signatures, struct_table)
+                .filter(|ty| ty.is_ref)
+                .ok_or_else(|| {
+                    "select_owned_ptr(...) then candidate must be an owned address".to_owned()
+                })?;
+            let else_type = infer_nir_expr_type(&else_owner, bindings, signatures, struct_table)
+                .filter(|ty| ty.is_ref)
+                .ok_or_else(|| {
+                    "select_owned_ptr(...) else candidate must be an owned address".to_owned()
+                })?;
+            if then_type != else_type {
+                return Err(format!(
+                    "select_owned_ptr(...) candidate types differ: `{}` versus `{}`",
+                    then_type.render(),
+                    else_type.render()
+                ));
+            }
+            NirExpr::SelectOwnedPointer {
+                condition: Box::new(condition),
+                then_owner: Box::new(then_owner),
+                else_owner: Box::new(else_owner),
+            }
+        }
         "alloc_node" => {
             let [value, next] = args else {
                 return Err("alloc_node(...) expects 2 args".to_owned());

@@ -28,6 +28,7 @@ impl BranchEffectAccess {
 pub enum BranchEffectResult {
     Unit,
     I64,
+    OwnedPointer,
 }
 
 impl BranchEffectResult {
@@ -35,6 +36,7 @@ impl BranchEffectResult {
         Some(match value {
             "unit" => Self::Unit,
             "i64" => Self::I64,
+            "owned_ptr" => Self::OwnedPointer,
             _ => return None,
         })
     }
@@ -43,6 +45,7 @@ impl BranchEffectResult {
         match self {
             Self::Unit => "unit",
             Self::I64 => "i64",
+            Self::OwnedPointer => "owned_ptr",
         }
     }
 }
@@ -237,6 +240,11 @@ impl crate::ModRegistry {
         match args.merge_result {
             BranchEffectResult::Unit => Ok(Some(crate::Value::Unit)),
             BranchEffectResult::I64 if matches!(selected_result, crate::Value::Int(_)) => {
+                Ok(Some(selected_result))
+            }
+            BranchEffectResult::OwnedPointer
+                if matches!(selected_result, crate::Value::Pointer(_)) =>
+            {
                 Ok(Some(selected_result))
             }
             result => Err(format!(

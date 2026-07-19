@@ -9,6 +9,7 @@ mod cpu_heap;
 mod cpu_heap_checks;
 mod cpu_heap_state;
 mod graph;
+mod nustar_provider;
 mod project_abi_contracts;
 mod project_contracts;
 mod project_target_contracts;
@@ -22,6 +23,11 @@ use graph::{ensure_acyclic, path_exists, topological_order};
 use project_contracts::{verify_lowering_contract_nodes, verify_project_type_contract_nodes};
 use result_state::verify_result_state_nodes;
 use scheduler_contracts::verify_scheduler_contract_nodes;
+
+pub use nustar_provider::{
+    register_static_nustar_semantics, static_nustar_semantic_providers,
+    StaticNustarSemanticProvider,
+};
 
 pub fn default_registry() -> ModRegistry {
     let mut registry = ModRegistry::new();

@@ -299,6 +299,34 @@ pub(super) fn write_nsld_final_output_text_fields<W: fmt::Write>(
     )?;
     writeln!(
         out,
+        "  nsld_final_executable_output_debugger_cursor_handoff_contract: {}",
+        final_output.debugger_cursor_handoff_contract
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_path: {}",
+        final_output.debugger_cursor_path
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_ready: {}",
+        crate::yes_no(final_output.debugger_cursor_ready)
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_status: {}",
+        final_output.debugger_cursor_status
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_next_command: {}",
+        final_output
+            .debugger_cursor_next_command
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
         "  nsld_final_executable_output_recommended_next_action: {}",
         final_output.recommended_next_action
     )?;

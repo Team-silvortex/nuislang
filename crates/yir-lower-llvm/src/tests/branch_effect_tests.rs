@@ -102,3 +102,80 @@ fn registered_non_cpu_action_emitters_join_branch_composition() {
     .unwrap_err();
     assert!(error.contains("no LLVM emitter for `probe.left`"));
 }
+
+#[test]
+fn owned_pointer_actions_drop_the_unselected_owner_and_merge_with_phi() {
+    let mut module = module_with_cpu0();
+    push_cpu_node(&mut module, "choose", "cpu.const_bool", vec!["false"]);
+    push_cpu_const_i64(&mut module, "left_value", "41");
+    push_cpu_const_i64(&mut module, "right_value", "73");
+    push_cpu_node(&mut module, "nil", "cpu.null", vec![]);
+    push_cpu_node(
+        &mut module,
+        "left",
+        "cpu.alloc_node",
+        vec!["left_value", "nil"],
+    );
+    push_cpu_node(
+        &mut module,
+        "right",
+        "cpu.alloc_node",
+        vec!["right_value", "nil"],
+    );
+    push_cpu_node(
+        &mut module,
+        "selected",
+        "cpu.branch_effect",
+        vec![
+            "choose",
+            "owned_ptr",
+            "1",
+            "cpu",
+            "take_ptr_drop_other",
+            "owned_ptr",
+            "2",
+            "resource_own",
+            "left",
+            "resource_own",
+            "right",
+            "1",
+            "cpu",
+            "take_ptr_drop_other",
+            "owned_ptr",
+            "2",
+            "resource_own",
+            "right",
+            "resource_own",
+            "left",
+        ],
+    );
+    push_cpu_node(&mut module, "drop_selected", "cpu.free", vec!["selected"]);
+    push_deps(
+        &mut module,
+        &[
+            ("left_value", "left"),
+            ("nil", "left"),
+            ("right_value", "right"),
+            ("nil", "right"),
+            ("choose", "selected"),
+            ("left", "selected"),
+            ("right", "selected"),
+            ("selected", "drop_selected"),
+        ],
+    );
+    for (from, to) in [
+        ("left", "selected"),
+        ("right", "selected"),
+        ("selected", "drop_selected"),
+    ] {
+        module.edges.push(Edge {
+            kind: EdgeKind::Lifetime,
+            from: from.to_owned(),
+            to: to.to_owned(),
+        });
+    }
+
+    let llvm = emit_module(&module).expect("owned pointer branch should lower");
+    assert!(llvm.contains("phi ptr"));
+    assert_eq!(llvm.matches("call void @free(ptr").count(), 3);
+}
