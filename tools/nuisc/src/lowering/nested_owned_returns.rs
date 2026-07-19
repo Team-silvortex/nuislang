@@ -38,6 +38,74 @@ enum OwnedReturnScalarArg<'a> {
     TraversalBorrow {
         value: Box<OwnedReturnScalarArg<'a>>,
     },
+    OwnedTransfer {
+        value: &'a NirExpr,
+    },
+}
+
+pub(super) fn validate_selected_owned_pointer_transfers(module: &NirModule) -> Result<(), String> {
+    let functions = module
+        .functions
+        .iter()
+        .map(|function| (function.name.as_str(), function))
+        .collect::<BTreeMap<_, _>>();
+    for function in &module.functions {
+        validate_transfer_stmts(&function.body, &functions)?;
+    }
+    Ok(())
+}
+
+fn validate_transfer_stmts(
+    stmts: &[NirStmt],
+    functions: &BTreeMap<&str, &NirFunction>,
+) -> Result<(), String> {
+    for stmt in stmts {
+        match stmt {
+            NirStmt::If {
+                condition,
+                then_body,
+                else_body,
+            } => {
+                let then_proofs = branch_non_null_proofs(&[], condition, true);
+                let else_proofs = branch_non_null_proofs(&[], condition, false);
+                if let (Some(then_branch), Some(else_branch)) = (
+                    parse_owned_return_branch(then_body, functions, &then_proofs),
+                    parse_owned_return_branch(else_body, functions, &else_proofs),
+                ) {
+                    validate_transfer_pair(&then_branch, &else_branch, functions)?;
+                }
+                validate_transfer_stmts(then_body, functions)?;
+                validate_transfer_stmts(else_body, functions)?;
+            }
+            NirStmt::While { body, .. } => validate_transfer_stmts(body, functions)?,
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+fn validate_transfer_pair(
+    then_branch: &OwnedReturnBranch<'_>,
+    else_branch: &OwnedReturnBranch<'_>,
+    functions: &BTreeMap<&str, &NirFunction>,
+) -> Result<(), String> {
+    let then_transfers = owned_transfer_sources(then_branch).ok_or_else(|| {
+        "selected owned pointer transfer must move each named Node exactly once per leaf".to_owned()
+    })?;
+    let else_transfers = owned_transfer_sources(else_branch).ok_or_else(|| {
+        "selected owned pointer transfer must move each named Node exactly once per leaf".to_owned()
+    })?;
+    if then_transfers != else_transfers {
+        return Err(
+            "selected owned pointer transfer requires the same moved Node set on every reachable leaf"
+                .to_owned(),
+        );
+    }
+    if !then_transfers.is_empty() {
+        validate_owned_transfer_consumers(then_branch, functions)?;
+        validate_owned_transfer_consumers(else_branch, functions)?;
+    }
+    Ok(())
 }
 
 pub(super) fn collect_owned_return_tree_helpers(
@@ -205,6 +273,7 @@ fn selected_leaf_scalar_arg<'a>(
         NirExpr::Borrow(value) => Some(OwnedReturnScalarArg::TraversalBorrow {
             value: Box::new(selected_leaf_scalar_arg(value, projections, depth + 1)?),
         }),
+        NirExpr::Move(value) => Some(OwnedReturnScalarArg::OwnedTransfer { value }),
         NirExpr::CastI64ToI32(value) => selected_leaf_cast(
             yir_core::OwnedSelectScalarCast::I64ToI32,
             value,
@@ -423,6 +492,124 @@ fn encode_owned_return_branch(
     Ok(())
 }
 
+fn owned_transfer_sources<'a>(branch: &'a OwnedReturnBranch<'a>) -> Option<BTreeSet<&'a str>> {
+    match branch {
+        OwnedReturnBranch::Owner(_) => Some(BTreeSet::new()),
+        OwnedReturnBranch::Call { scalar_args, .. } => {
+            let mut transfers = BTreeSet::new();
+            for arg in scalar_args {
+                if let OwnedReturnScalarArg::OwnedTransfer {
+                    value: NirExpr::Var(name),
+                } = arg
+                {
+                    if !transfers.insert(name.as_str()) {
+                        return None;
+                    }
+                } else if matches!(arg, OwnedReturnScalarArg::OwnedTransfer { .. }) {
+                    return None;
+                }
+            }
+            Some(transfers)
+        }
+        OwnedReturnBranch::If {
+            then_branch,
+            else_branch,
+            ..
+        } => {
+            let then_transfers = owned_transfer_sources(then_branch)?;
+            let else_transfers = owned_transfer_sources(else_branch)?;
+            (then_transfers == else_transfers).then_some(then_transfers)
+        }
+    }
+}
+
+fn validate_owned_transfer_consumers(
+    branch: &OwnedReturnBranch<'_>,
+    functions: &BTreeMap<&str, &NirFunction>,
+) -> Result<(), String> {
+    match branch {
+        OwnedReturnBranch::Owner(_) => Ok(()),
+        OwnedReturnBranch::Call {
+            callee,
+            scalar_args,
+            ..
+        } => {
+            let function = functions
+                .get(callee)
+                .ok_or_else(|| format!("unknown selected helper `{callee}`"))?;
+            for (param, arg) in function.params.iter().skip(1).zip(scalar_args) {
+                if matches!(arg, OwnedReturnScalarArg::OwnedTransfer { .. })
+                    && !helper_consumes_node_param_on_every_path(function, &param.name)
+                {
+                    return Err(format!(
+                        "selected helper `{callee}` must consume transferred Node parameter `{}` with exactly one free(...) on every exit path",
+                        param.name
+                    ));
+                }
+            }
+            Ok(())
+        }
+        OwnedReturnBranch::If {
+            then_branch,
+            else_branch,
+            ..
+        } => {
+            validate_owned_transfer_consumers(then_branch, functions)?;
+            validate_owned_transfer_consumers(else_branch, functions)
+        }
+    }
+}
+
+struct NodeConsumeFlow {
+    continuing: Vec<u8>,
+    exited: Vec<u8>,
+}
+
+fn helper_consumes_node_param_on_every_path(function: &NirFunction, param: &str) -> bool {
+    let Some(flow) = node_consume_flow(&function.body, vec![0], param) else {
+        return false;
+    };
+    let mut exits = flow.exited;
+    exits.extend(flow.continuing);
+    !exits.is_empty() && exits.into_iter().all(|count| count == 1)
+}
+
+fn node_consume_flow(stmts: &[NirStmt], incoming: Vec<u8>, param: &str) -> Option<NodeConsumeFlow> {
+    let mut continuing = incoming;
+    let mut exited = Vec::new();
+    for stmt in stmts {
+        if continuing.is_empty() {
+            break;
+        }
+        match stmt {
+            NirStmt::Expr(NirExpr::Free(value)) if matches!(value.as_ref(), NirExpr::Var(name) if name == param) => {
+                for count in &mut continuing {
+                    *count = count.checked_add(1)?;
+                    if *count > 1 {
+                        return None;
+                    }
+                }
+            }
+            NirStmt::If {
+                then_body,
+                else_body,
+                ..
+            } => {
+                let then_flow = node_consume_flow(then_body, continuing.clone(), param)?;
+                let else_flow = node_consume_flow(else_body, continuing, param)?;
+                continuing = then_flow.continuing;
+                continuing.extend(else_flow.continuing);
+                exited.extend(then_flow.exited);
+                exited.extend(else_flow.exited);
+            }
+            NirStmt::Return(_) => exited.append(&mut continuing),
+            NirStmt::While { .. } | NirStmt::Break | NirStmt::Continue => return None,
+            _ => {}
+        }
+    }
+    Some(NodeConsumeFlow { continuing, exited })
+}
+
 fn encode_owned_scalar_arg(
     arg: &OwnedReturnScalarArg<'_>,
     state: &mut LoweringState<'_>,
@@ -466,6 +653,19 @@ fn encode_owned_scalar_arg(
             tokens.push("traversal_borrow".to_owned());
             encode_owned_scalar_arg(value, state, bindings, tokens)?;
         }
+        OwnedReturnScalarArg::OwnedTransfer { value } => {
+            let NirExpr::Var(name) = value else {
+                return Err(
+                    "selected owned pointer transfer requires `move(<named Node binding>)`"
+                        .to_owned(),
+                );
+            };
+            let source = bindings
+                .get(name)
+                .cloned()
+                .ok_or_else(|| format!("unknown owned pointer transfer binding `{name}`"))?;
+            tokens.extend(["owned_transfer".to_owned(), source]);
+        }
     }
     Ok(())
 }
@@ -488,6 +688,7 @@ pub(super) fn lower_nested_owned_return_tree(
     else {
         return Ok(None);
     };
+    validate_transfer_pair(&then_branch, &else_branch, &state.function_map)?;
     if matches!(&then_branch, OwnedReturnBranch::Owner(_))
         && matches!(&else_branch, OwnedReturnBranch::Owner(_))
     {

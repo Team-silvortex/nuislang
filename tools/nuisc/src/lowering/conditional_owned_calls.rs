@@ -183,7 +183,7 @@ fn leaf_argument_allowed(ty: &nuis_semantics::model::NirTypeRef, arg: &NirExpr) 
                 arg,
                 NirExpr::Var(_) | NirExpr::FieldAccess { .. } | NirExpr::VariantFieldAccess { .. }
             ))
-        || (is_traversal_pointer_type(ty) && matches!(arg, NirExpr::Borrow(_)))
+        || (is_traversal_pointer_type(ty) && matches!(arg, NirExpr::Borrow(_) | NirExpr::Move(_)))
 }
 
 fn is_borrowed_buffer_type(ty: &nuis_semantics::model::NirTypeRef) -> bool {
@@ -255,6 +255,13 @@ pub(super) fn lower_conditional_owned_return_call(
     else {
         return Ok(None);
     };
+    if then_scalar_args
+        .iter()
+        .chain(else_scalar_args)
+        .any(|arg| matches!(arg, NirExpr::Move(_)))
+    {
+        return Ok(None);
+    }
     if !state.direct_call_functions.contains(then_callee)
         || !state.direct_call_functions.contains(else_callee)
     {

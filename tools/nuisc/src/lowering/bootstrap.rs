@@ -76,6 +76,7 @@ pub(super) fn lower_nir_to_yir_builtin_cpu_with_target(
 
     let rewritten_module = rewrite_self_tail_recursive_functions(module);
     let module = &rewritten_module;
+    super::nested_owned_returns::validate_selected_owned_pointer_transfers(module)?;
     let direct_call_functions = collect_recursive_direct_call_functions(module)
         .union(&super::scoped_loop_lowering::collect_scoped_loop_helper_functions(module))
         .cloned()

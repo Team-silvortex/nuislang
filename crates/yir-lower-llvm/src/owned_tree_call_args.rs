@@ -53,6 +53,12 @@ fn owned_tree_scalar_value(
             };
             Some(LlvmValueRef::Ptr(ptr))
         }
+        OwnedSelectScalarArg::OwnedTransfer { value } => {
+            let LlvmValueRef::Ptr(ptr) = registers.get(*value)?.clone() else {
+                return None;
+            };
+            Some(LlvmValueRef::Ptr(ptr))
+        }
     }
 }
 

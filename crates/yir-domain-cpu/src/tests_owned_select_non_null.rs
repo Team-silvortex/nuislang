@@ -117,3 +117,40 @@ fn owned_select_tree_checks_traversal_borrow_only_on_selected_call_leaf() {
         Value::OwnedBytes(vec![7])
     );
 }
+
+#[test]
+fn owned_select_tree_validates_selected_exact_one_pointer_transfer() {
+    let cpu = CpuMod;
+    let resource = cpu_resource();
+    let node = cpu_node(
+        "selected",
+        "cpu.select_owned_bytes_tree",
+        vec![
+            "1",
+            "bytes",
+            "call",
+            "consume",
+            "0",
+            "1",
+            "owned_transfer",
+            "head",
+        ],
+    );
+    let mut state = ExecutionState::default();
+    state
+        .values
+        .insert("bytes".to_owned(), Value::OwnedBytes(vec![1, 2]));
+    state
+        .values
+        .insert("head".to_owned(), Value::Pointer(Some(17)));
+    assert_eq!(
+        cpu.execute(&node, &resource, &mut state).unwrap(),
+        Value::OwnedBytes(vec![1, 2])
+    );
+
+    state.values.insert("head".to_owned(), Value::Pointer(None));
+    assert!(cpu
+        .execute(&node, &resource, &mut state)
+        .unwrap_err()
+        .contains("null owned pointer transfer"));
+}

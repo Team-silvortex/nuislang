@@ -1,0 +1,37 @@
+mod cpu Main {
+  extern "c" fn host_argv_count() -> i64;
+
+  fn consume_left(bytes: Bytes, head: ref Node) -> Bytes {
+    let observed: i64 = load_value(head);
+    print(21);
+    free(head);
+    return move(bytes);
+  }
+
+  fn consume_right(bytes: Bytes, head: ref Node) -> Bytes {
+    let observed: i64 = load_value(head);
+    print(22);
+    free(head);
+    return move(bytes);
+  }
+
+  fn choose(bytes: Bytes, choose_left: bool) -> Bytes {
+    let head: ref Node = alloc_node(17, null());
+    if choose_left {
+      return consume_left(move(bytes), move(head));
+    } else {
+      return consume_right(move(bytes), move(head));
+    }
+  }
+
+  fn main() -> i64 {
+    let buffer: ref Buffer = alloc_buffer(2, 3);
+    let bytes: Bytes = copy_bytes(buffer);
+    let choose_left: bool = host_argv_count() > 1;
+    let selected: Bytes = choose(move(bytes), choose_left);
+    let len: i64 = bytes_len(selected);
+    drop_bytes(selected);
+    free(buffer);
+    return len;
+  }
+}

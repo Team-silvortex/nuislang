@@ -418,6 +418,7 @@ fn consume_for_binding(
 ) {
     if is_bytes_type(target_type.as_ref()) {
         consume_direct(value, live);
+        consume_owned_aggregate(value, live);
     } else {
         consume_owned_aggregate(value, live);
     }

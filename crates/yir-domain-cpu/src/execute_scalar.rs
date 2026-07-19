@@ -515,6 +515,18 @@ fn expect_owned_tree_scalar_arg(
                 )),
             }
         }
+        yir_core::OwnedSelectScalarArg::OwnedTransfer { value } => {
+            let value = state.expect_value(value)?.clone();
+            match value {
+                Value::Pointer(Some(_)) => Ok(value),
+                Value::Pointer(None) => Err(format!(
+                    "node `{node_name}` selected a null owned pointer transfer"
+                )),
+                other => Err(format!(
+                    "node `{node_name}` cannot transfer owned pointer from {other}"
+                )),
+            }
+        }
     }
 }
 

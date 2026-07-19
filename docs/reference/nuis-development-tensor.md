@@ -616,7 +616,18 @@ must cross every call boundary through explicit `borrow(...)`, the tree records
 a single-pointer ABI. The selected leaf rejects a null traversal pointer, while
 unselected leaves do not inspect it; ownership and final cleanup remain with the
 caller. Traversal pointers cannot be returned or placed in task payloads, and
-owned pointer transfer remains closed pending an exact-one transfer contract.
+owned pointer transfer now has a deliberately narrow exact-one contract for
+selected helper trees. Every reachable leaf must contain exactly one
+`move(<named Node>)` for the same transfer set, encoded as `owned_transfer`;
+GLM marks each root as `Own` and requires its lifetime edge. The receiving
+helper must contain exactly one `free(...)` on every exit path; verification is
+path-sensitive across `if` and early return, while loops remain fail-closed.
+Matching conditional effects can be merged before LLVM emission. The native
+selected-transfer smoke runs both leaves of one binary, observes distinct helper
+output, and confirms a single Node allocation with no deferred tree lowering.
+Asymmetric paths, duplicate moves, null selected transfers, non-consuming
+helpers, projected transfers, differing branch-local effects, and task or
+return transport remain closed.
 The runtime now defines `NuisSchedulerOwnedBlobV1` as the first GLM-tokened
 dynamic leaf primitive. It deep-copies borrowed bytes and has scheduler-native
 move/drop hooks; a compiled harness covers take and cancellation. Recursive

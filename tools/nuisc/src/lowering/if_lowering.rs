@@ -216,6 +216,13 @@ pub(super) fn lower_if_pair(
         return Ok(LoweredIfOutcome::Continued);
     }
 
+    if then_body == else_body {
+        if let [NirStmt::Expr(effect)] = then_body {
+            lower_expr(effect, state, bindings)?;
+            return Ok(LoweredIfOutcome::Continued);
+        }
+    }
+
     if let Some(lowered) = lower_guard_return_with_surviving_binding(
         &condition_name,
         then_body,

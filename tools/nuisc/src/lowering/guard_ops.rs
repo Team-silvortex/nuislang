@@ -426,6 +426,12 @@ pub(super) fn lower_select_owned_bytes_tree(
     let parsed = yir_core::parse_owned_select_tree_args(&args)
         .expect("owned select tree builder must encode a valid protocol");
     yir_core::owned_select_tree_scalar_args(&parsed.tree, &mut scalar_dependencies);
+    let mut pointer_transfers = Vec::new();
+    yir_core::owned_select_tree_transfers(&parsed.tree, &mut pointer_transfers);
+    let pointer_transfers = pointer_transfers
+        .into_iter()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
     let scalar_dependencies = scalar_dependencies
         .into_iter()
         .map(str::to_owned)
@@ -444,6 +450,9 @@ pub(super) fn lower_select_owned_bytes_tree(
     }
     for scalar in &scalar_dependencies {
         push_dep_edges(state, scalar, &name);
+    }
+    for transfer in &pointer_transfers {
+        push_lifetime_edge(state, transfer, &name);
     }
     for owner in &owners {
         push_dep_edges(state, owner, &name);

@@ -1,8 +1,8 @@
 use std::fmt;
 
 use crate::{
-    owned_select_tree_conditions, owned_select_tree_scalar_args, parse_branch_owned_call_args,
-    parse_owned_select_tree_args, Operation, SemanticOp,
+    owned_select_tree_conditions, owned_select_tree_scalar_args, owned_select_tree_transfers,
+    parse_branch_owned_call_args, parse_owned_select_tree_args, Operation, SemanticOp,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -271,9 +271,21 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
                 let mut conditions = Vec::new();
                 owned_select_tree_conditions(&args.tree, &mut conditions);
                 accesses.extend(conditions.into_iter().map(value_read_str));
+                let mut transfers = Vec::new();
+                owned_select_tree_transfers(&args.tree, &mut transfers);
                 let mut scalar_args = Vec::new();
                 owned_select_tree_scalar_args(&args.tree, &mut scalar_args);
-                accesses.extend(scalar_args.into_iter().map(value_read_str));
+                accesses.extend(
+                    scalar_args
+                        .into_iter()
+                        .filter(|arg| !transfers.contains(arg))
+                        .map(value_read_str),
+                );
+                accesses.extend(transfers.into_iter().map(|input| GlmAccess {
+                    input: input.to_owned(),
+                    class: GlmValueClass::Res,
+                    mode: GlmUseMode::Own,
+                }));
                 accesses.extend(args.owners.iter().map(|owner| GlmAccess {
                     input: owner.clone(),
                     class: GlmValueClass::Res,

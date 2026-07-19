@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OwnedSelectScalarCast {
     I64ToI32,
@@ -61,6 +63,9 @@ pub enum OwnedSelectScalarArg<'a> {
     TraversalBorrow {
         value: Box<OwnedSelectScalarArg<'a>>,
     },
+    OwnedTransfer {
+        value: &'a str,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -93,7 +98,10 @@ pub fn parse_owned_select_tree_args(args: &[String]) -> Option<OwnedSelectTreeAr
     }
     let mut cursor = owner_end;
     let tree = parse_tree(args, &mut cursor, owners.len())?;
-    (cursor == args.len()).then_some(OwnedSelectTreeArgs { owners, tree })
+    if cursor != args.len() || owned_transfer_set(&tree).is_none() {
+        return None;
+    }
+    Some(OwnedSelectTreeArgs { owners, tree })
 }
 
 fn parse_tree<'a>(
@@ -192,6 +200,11 @@ fn parse_scalar_arg<'a>(
                 value: Box::new(value),
             })
         }
+        "owned_transfer" => {
+            let value = args.get(*cursor)?;
+            *cursor += 1;
+            Some(OwnedSelectScalarArg::OwnedTransfer { value })
+        }
         _ => None,
     }
 }
@@ -226,6 +239,39 @@ fn owned_select_scalar_arg_inputs<'a>(arg: &'a OwnedSelectScalarArg<'a>, out: &m
         OwnedSelectScalarArg::NonNull { value } => owned_select_scalar_arg_inputs(value, out),
         OwnedSelectScalarArg::TraversalBorrow { value } => {
             owned_select_scalar_arg_inputs(value, out)
+        }
+        OwnedSelectScalarArg::OwnedTransfer { value } => out.push(value),
+    }
+}
+
+pub fn owned_select_tree_transfers<'a>(tree: &'a OwnedSelectTree<'a>, out: &mut Vec<&'a str>) {
+    if let Some(transfers) = owned_transfer_set(tree) {
+        out.extend(transfers);
+    }
+}
+
+fn owned_transfer_set<'a>(tree: &'a OwnedSelectTree<'a>) -> Option<BTreeSet<&'a str>> {
+    match tree {
+        OwnedSelectTree::Owner(_) => Some(BTreeSet::new()),
+        OwnedSelectTree::Call { scalar_args, .. } => {
+            let mut transfers = BTreeSet::new();
+            for arg in scalar_args {
+                if let OwnedSelectScalarArg::OwnedTransfer { value } = arg {
+                    if !transfers.insert(*value) {
+                        return None;
+                    }
+                }
+            }
+            Some(transfers)
+        }
+        OwnedSelectTree::If {
+            then_tree,
+            else_tree,
+            ..
+        } => {
+            let then_transfers = owned_transfer_set(then_tree)?;
+            let else_transfers = owned_transfer_set(else_tree)?;
+            (then_transfers == else_transfers).then_some(then_transfers)
         }
     }
 }

@@ -415,8 +415,17 @@ nullable values fail closed. Read-only traversal pointers use a distinct
 non-optional `ref Node` arguments require explicit `borrow(...)` at both normal
 and selected calls; GLM records a root `Read`, the selected leaf rejects null,
 and the caller retains ownership and cleanup. They cannot be returned or enter
-task payloads. Owned pointer transfer remains closed until its move and cleanup
-contract is independently specified.
+task payloads. Owned pointer transfer has its first independent move-and-cleanup
+contract only inside selected owned-return trees: `owned_transfer <value>` accepts a
+named Node moved exactly once on every reachable leaf, requires the same
+transfer set across all leaves, contributes a GLM `Own` plus lifetime edge, and
+requires the receiving helper to perform exactly one `free(...)` on every exit
+path. The checker tracks `if` and early-return paths, rejects loops, and permits
+matching conditional effects to merge into one emitted free. A native smoke
+executes both mutually exclusive helpers from the same binary and observes
+their distinct output while retaining one Node allocation in LLVM. Duplicate,
+asymmetric, projected, null, returned, task-carried, or differently effected
+conditional transfers remain rejected.
 
 Today `nuis` does **not** yet have:
 

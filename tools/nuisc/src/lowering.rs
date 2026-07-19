@@ -484,6 +484,9 @@ mod tests_loops_owned;
 #[path = "lowering/tests_nested_owned.rs"]
 mod tests_nested_owned;
 #[cfg(test)]
+#[path = "lowering/tests_owned_pointer_transfer.rs"]
+mod tests_owned_pointer_transfer;
+#[cfg(test)]
 #[path = "lowering/tests_recursion.rs"]
 mod tests_recursion;
 #[cfg(test)]

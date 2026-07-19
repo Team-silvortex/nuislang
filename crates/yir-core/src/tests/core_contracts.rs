@@ -313,6 +313,52 @@ fn owned_select_tree_protocol_rejects_invalid_owner_paths() {
     let mut inputs = Vec::new();
     crate::owned_select_tree_scalar_args(&parsed.tree, &mut inputs);
     assert_eq!(inputs, ["head"]);
+
+    let owned_transfer = vec![
+        "1".to_owned(),
+        "bytes".to_owned(),
+        "if".to_owned(),
+        "choose".to_owned(),
+        "call".to_owned(),
+        "consume_left".to_owned(),
+        "0".to_owned(),
+        "1".to_owned(),
+        "owned_transfer".to_owned(),
+        "head".to_owned(),
+        "call".to_owned(),
+        "consume_right".to_owned(),
+        "0".to_owned(),
+        "1".to_owned(),
+        "owned_transfer".to_owned(),
+        "head".to_owned(),
+    ];
+    let parsed =
+        crate::parse_owned_select_tree_args(&owned_transfer).expect("exact-one pointer transfer");
+    let mut transfers = Vec::new();
+    crate::owned_select_tree_transfers(&parsed.tree, &mut transfers);
+    assert_eq!(transfers, ["head"]);
+    let profile = crate::glm_profile_for_operation(
+        &Operation::parse("cpu.select_owned_bytes_tree", owned_transfer.clone()).unwrap(),
+    );
+    assert!(profile.accesses.iter().any(|access| {
+        access.input == "head"
+            && access.class == GlmValueClass::Res
+            && access.mode == GlmUseMode::Own
+    }));
+    assert!(!profile
+        .accesses
+        .iter()
+        .any(|access| access.input == "head" && access.mode == GlmUseMode::Read));
+
+    let mut asymmetric = owned_transfer.clone();
+    asymmetric.truncate(asymmetric.len() - 2);
+    asymmetric.extend(["owner".to_owned(), "0".to_owned()]);
+    assert!(crate::parse_owned_select_tree_args(&asymmetric).is_none());
+
+    let mut duplicate = owned_transfer;
+    duplicate[7] = "2".to_owned();
+    duplicate.splice(10..10, ["owned_transfer".to_owned(), "head".to_owned()]);
+    assert!(crate::parse_owned_select_tree_args(&duplicate).is_none());
 }
 
 #[test]
