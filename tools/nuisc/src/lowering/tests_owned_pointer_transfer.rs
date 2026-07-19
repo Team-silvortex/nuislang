@@ -1,4 +1,4 @@
-use super::lower_nir_to_yir_builtin_cpu;
+use super::{lower_nir_to_yir_builtin_cpu, lower_nir_to_yir_builtin_cpu_with_registry};
 use crate::frontend::parse_nuis_module;
 
 #[test]
@@ -170,6 +170,7 @@ fn accepts_branch_complete_owned_pointer_consumption_in_selected_helper() {
             if release_left {
               free(head);
             } else {
+              let observed: i64 = load_value(head);
               free(head);
             }
             return move(bytes);
@@ -199,7 +200,84 @@ fn accepts_branch_complete_owned_pointer_consumption_in_selected_helper() {
 
     let yir = lower_nir_to_yir_builtin_cpu(&module)
         .expect("branch-complete owned pointer consumption should lower");
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.instruction == "branch_effect"));
     let llvm_ir = yir_lower_llvm::emit_module(&yir).expect("branch consumer LLVM lowering");
     assert!(llvm_ir.contains("define ptr @nuis_fn_consume(ptr %arg0, ptr %arg1, i1 %arg2)"));
+    assert!(llvm_ir.contains("branch_effect_then."));
+    assert!(llvm_ir.contains("branch_effect_else."));
+    assert!(llvm_ir.contains("branch_effect_merge."));
     assert!(!llvm_ir.contains("deferred lowering for cpu.select_owned_bytes_tree"));
+}
+
+#[test]
+fn merges_branch_local_load_results_for_continuation_use() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn choose_value(left: ref Node, right: ref Node, choose_left: bool) -> i64 {
+            let observed: i64 = if choose_left {
+              load_value(left)
+            } else {
+              load_value(right)
+            };
+            return observed;
+          }
+
+          fn main() -> i64 {
+            let left: ref Node = alloc_node(41, null());
+            let right: ref Node = alloc_node(73, null());
+            let observed: i64 = choose_value(borrow(left), borrow(right), false);
+            free(left);
+            free(right);
+            return observed;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module)
+        .expect("branch-local load result should merge into the continuation");
+    let branch = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.instruction == "branch_effect")
+        .expect("result-carrying branch effect");
+    assert_eq!(branch.op.args.get(1).map(String::as_str), Some("i64"));
+
+    let llvm_ir = yir_lower_llvm::emit_module(&yir).expect("branch result LLVM lowering");
+    assert!(llvm_ir.contains("phi i64"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.branch_effect"));
+}
+
+#[test]
+fn branch_action_lowering_requires_an_active_registered_capability() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let head: ref Node = alloc_node(41, null());
+            let selector: i64 = cpu_input_i64("selector", 1, 0, 1, 1);
+            if selector > 0 {
+              let observed: i64 = load_value(head);
+            } else {
+              free(head);
+            }
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let error =
+        lower_nir_to_yir_builtin_cpu_with_registry(&module, None, &yir_core::ModRegistry::new())
+            .unwrap_err();
+    assert!(
+        error.contains("unregistered branch action `cpu.load_value`"),
+        "unexpected diagnostic: {error}"
+    );
 }

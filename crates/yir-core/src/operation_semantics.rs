@@ -288,6 +288,7 @@ impl Operation {
             | "load_at" | "store_value" | "store_next" | "store_at" | "is_null" | "free" => {
                 CpuLlvmLoweringClass::Memory
             }
+            "branch_effect" => CpuLlvmLoweringClass::Memory,
             "move_owned_bytes" | "loop_owned_result" | "loop_owned_bytes_copy_drop_break" => {
                 CpuLlvmLoweringClass::Memory
             }

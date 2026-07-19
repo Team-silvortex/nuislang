@@ -67,6 +67,7 @@ dependencies = [
  "nuis-semantics",
  "yir-core",
  "yir-lower-llvm",
+ "yir-verify",
 ]
 
 [[package]]

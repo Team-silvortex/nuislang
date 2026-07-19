@@ -108,7 +108,10 @@ pub fn verify_module_with_registry(
             )
         })?;
 
-        let semantics = module_impl.describe(node, resource)?;
+        let semantics = match registry.describe_branch_effect_node(node)? {
+            Some(semantics) => semantics,
+            None => module_impl.describe(node, resource)?,
+        };
 
         for dependency in semantics.dependencies {
             if dependency == node.name {

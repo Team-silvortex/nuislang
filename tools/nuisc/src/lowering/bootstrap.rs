@@ -67,6 +67,15 @@ pub(super) fn lower_nir_to_yir_builtin_cpu_with_target(
     module: &NirModule,
     target_config: Option<&LoweringTargetConfig>,
 ) -> Result<YirModule, String> {
+    let branch_action_registry = yir_verify::default_registry();
+    lower_nir_to_yir_builtin_cpu_with_registry(module, target_config, &branch_action_registry)
+}
+
+pub(super) fn lower_nir_to_yir_builtin_cpu_with_registry(
+    module: &NirModule,
+    target_config: Option<&LoweringTargetConfig>,
+    branch_action_registry: &ModRegistry,
+) -> Result<YirModule, String> {
     if module.domain != "cpu" {
         return Err(format!(
             "minimal nuisc lowering currently only supports `mod cpu`, found `{}`",
@@ -115,9 +124,9 @@ pub(super) fn lower_nir_to_yir_builtin_cpu_with_target(
         name: "cpu0".to_owned(),
         kind: ResourceKind::parse(&cpu_resource_kind),
     });
-
     let mut state = LoweringState {
         yir: &mut yir,
+        branch_action_registry,
         function_map,
         struct_defs: module
             .structs

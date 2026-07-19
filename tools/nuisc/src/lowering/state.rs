@@ -39,6 +39,7 @@ impl ResultLoweringDomain {
 
 pub(super) struct LoweringState<'a> {
     pub(super) yir: &'a mut YirModule,
+    pub(super) branch_action_registry: &'a ModRegistry,
     pub(super) function_map: BTreeMap<&'a str, &'a NirFunction>,
     pub(super) struct_defs: BTreeMap<&'a str, &'a NirStructDef>,
     pub(super) direct_call_functions: BTreeSet<String>,

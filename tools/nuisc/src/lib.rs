@@ -91,6 +91,7 @@ pub mod lowering;
 pub mod nir_verify;
 mod nir_walk;
 pub mod nustar_binary;
+mod nustar_codegen_registry;
 pub mod optimize;
 mod owned_cleanup;
 pub mod pipeline;

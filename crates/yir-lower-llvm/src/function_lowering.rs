@@ -32,6 +32,7 @@ pub(super) fn emit_cpu_function(
     param_bindings: &BTreeMap<String, LlvmValueRef>,
     param_buffer_lengths: &BTreeMap<String, String>,
     helper_signatures: &BTreeMap<String, CpuHelperSignature>,
+    branch_effect_emitters: &BranchEffectLlvmEmitterRegistry,
     function_return_kind: CpuCallScalarKind,
     global_counter: &mut usize,
 ) -> Result<EmittedCpuFunction, String> {
@@ -172,6 +173,17 @@ pub(super) fn emit_cpu_function(
         let mut next_block = &mut state.next_block;
         let _next_global = &mut state.next_global;
         let last_cpu_value = &mut state.last_cpu_value;
+
+        if lower_cpu_branch_effect_node(
+            node,
+            body,
+            registers,
+            &mut next_reg,
+            &mut next_block,
+            branch_effect_emitters,
+        )? {
+            continue;
+        }
 
         if lower_cpu_extern_call_node(node, body, registers, &mut next_reg, last_cpu_value)? {
             continue;

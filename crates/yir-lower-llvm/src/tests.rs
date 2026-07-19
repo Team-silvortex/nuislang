@@ -1,3 +1,4 @@
+mod branch_effect_tests;
 mod core_runtime_tests;
 mod core_tests;
 mod extern_tests;

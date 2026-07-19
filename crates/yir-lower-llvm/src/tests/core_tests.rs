@@ -1,6 +1,72 @@
 use super::support::*;
 
 #[test]
+fn lowers_branch_action_i64_result_through_phi() {
+    let mut module = module_with_cpu0();
+    push_cpu_const_i64(&mut module, "choose", "1");
+    push_cpu_const_i64(&mut module, "left_value", "41");
+    push_cpu_const_i64(&mut module, "right_value", "73");
+    push_cpu_node(&mut module, "null", "cpu.null", vec![]);
+    push_cpu_node(
+        &mut module,
+        "left",
+        "cpu.alloc_node",
+        vec!["left_value", "null"],
+    );
+    push_cpu_node(
+        &mut module,
+        "right",
+        "cpu.alloc_node",
+        vec!["right_value", "null"],
+    );
+    push_cpu_node(
+        &mut module,
+        "selected",
+        "cpu.branch_effect",
+        vec![
+            "choose",
+            "i64",
+            "1",
+            "cpu",
+            "load_value",
+            "i64",
+            "1",
+            "resource_read",
+            "left",
+            "1",
+            "cpu",
+            "load_value",
+            "i64",
+            "1",
+            "resource_read",
+            "right",
+        ],
+    );
+    push_cpu_const_i64(&mut module, "one", "1");
+    push_cpu_node(&mut module, "sum", "cpu.add", vec!["selected", "one"]);
+    push_deps(
+        &mut module,
+        &[
+            ("left_value", "left"),
+            ("null", "left"),
+            ("right_value", "right"),
+            ("null", "right"),
+            ("choose", "selected"),
+            ("left", "selected"),
+            ("right", "selected"),
+            ("selected", "sum"),
+            ("one", "sum"),
+        ],
+    );
+
+    let llvm_ir = emit_module(&module).expect("branch action result lowering should succeed");
+    assert!(llvm_ir.contains("phi i64"));
+    assert!(llvm_ir.contains("branch_effect_then"));
+    assert!(llvm_ir.contains("branch_effect_else"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.branch_effect"));
+}
+
+#[test]
 fn lowers_buffer_copy_to_glm_owned_blob() {
     let mut module = module_with_cpu0();
     push_cpu_const_i64(&mut module, "len", "3");

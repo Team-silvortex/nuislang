@@ -44,6 +44,9 @@ fn selected_owned_pointer_transfer_runs_both_native_leaf_paths() {
     assert_eq!(llvm.matches("call ptr @malloc(i64 16)").count(), 1);
     assert!(llvm.contains("call ptr @nuis_fn_consume_left(ptr"));
     assert!(llvm.contains("call ptr @nuis_fn_consume_right(ptr"));
+    assert!(llvm.contains("branch_effect_then."));
+    assert!(llvm.contains("branch_effect_else."));
+    assert!(llvm.contains("branch_effect_merge."));
     assert!(!llvm.contains("deferred lowering for cpu.select_owned_bytes_tree"));
 
     let binary = output_dir.join("selected_owned_pointer_transfer_demo");

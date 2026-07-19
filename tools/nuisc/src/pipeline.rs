@@ -206,8 +206,11 @@ pub fn compile_project_plan_with_options(
     crate::project::validate_project_links_against_yir(project, &artifacts.yir)?;
     crate::project::validate_project_abi_against_yir(project, &artifacts.yir)?;
     crate::project::prune_project_topology_for_codegen(project, &mut artifacts.yir)?;
-    artifacts.llvm_ir = yir_lower_llvm::emit_module(&artifacts.yir)?;
     refresh_loaded_nustar(&mut artifacts)?;
+    artifacts.llvm_ir = crate::nustar_codegen_registry::emit_module_with_loaded_nustar(
+        &artifacts.yir,
+        &artifacts.loaded_nustar,
+    )?;
     Ok(artifacts)
 }
 
@@ -405,9 +408,10 @@ fn lower_prepared_pipeline(
         &prepared.lowering_manifest,
         lowering_target.as_ref(),
     )?;
-    let llvm_ir = yir_lower_llvm::emit_module(&yir)?;
     let loaded_nustar =
         collect_loaded_nustar(&prepared.nir, &yir, &prepared.lowering_manifest.package_id)?;
+    let llvm_ir =
+        crate::nustar_codegen_registry::emit_module_with_loaded_nustar(&yir, &loaded_nustar)?;
     Ok(PipelineArtifacts {
         ast: prepared.ast,
         nir: prepared.nir,

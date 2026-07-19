@@ -2,7 +2,8 @@ use std::fmt;
 
 use crate::{
     owned_select_tree_conditions, owned_select_tree_scalar_args, owned_select_tree_transfers,
-    parse_branch_owned_call_args, parse_owned_select_tree_args, Operation, SemanticOp,
+    parse_branch_effect_args, parse_branch_owned_call_args, parse_owned_select_tree_args,
+    Operation, SemanticOp,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -294,6 +295,41 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
             }
             GlmNodeProfile {
                 result_class: GlmValueClass::Res,
+                accesses,
+                effect: GlmEffect::DomainMove,
+            }
+        }
+        _ if op.module == "cpu" && op.instruction == "branch_effect" => {
+            let mut accesses = Vec::new();
+            if let Some(args) = parse_branch_effect_args(&op.args) {
+                accesses.push(value_read_str(args.condition));
+                for action in args.then_actions.iter().chain(&args.else_actions) {
+                    for operand in &action.operands {
+                        let access = match operand.access {
+                            crate::BranchEffectAccess::ValueRead => value_read_str(operand.value),
+                            crate::BranchEffectAccess::ResourceRead => GlmAccess {
+                                input: operand.value.to_owned(),
+                                class: GlmValueClass::Res,
+                                mode: GlmUseMode::Read,
+                            },
+                            crate::BranchEffectAccess::ResourceOwn => GlmAccess {
+                                input: operand.value.to_owned(),
+                                class: GlmValueClass::Res,
+                                mode: GlmUseMode::Own,
+                            },
+                        };
+                        if !accesses.iter().any(|known| {
+                            known.input == access.input
+                                && known.class == access.class
+                                && known.mode == access.mode
+                        }) {
+                            accesses.push(access);
+                        }
+                    }
+                }
+            }
+            GlmNodeProfile {
+                result_class: GlmValueClass::Val,
                 accesses,
                 effect: GlmEffect::DomainMove,
             }

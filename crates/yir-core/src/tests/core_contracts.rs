@@ -371,6 +371,70 @@ fn exposes_bridge_object_sketch_names_without_changing_live_glm_classes() {
 }
 
 #[test]
+fn parses_open_branch_effect_action_sequences_and_profiles_registered_operands() {
+    let encoded = vec![
+        "choose_left".to_owned(),
+        "unit".to_owned(),
+        "1".to_owned(),
+        "cpu".to_owned(),
+        "free".to_owned(),
+        "unit".to_owned(),
+        "1".to_owned(),
+        "resource_own".to_owned(),
+        "head".to_owned(),
+        "2".to_owned(),
+        "cpu".to_owned(),
+        "load_value".to_owned(),
+        "i64".to_owned(),
+        "1".to_owned(),
+        "resource_read".to_owned(),
+        "head".to_owned(),
+        "cpu".to_owned(),
+        "free".to_owned(),
+        "unit".to_owned(),
+        "1".to_owned(),
+        "resource_own".to_owned(),
+        "head".to_owned(),
+    ];
+    let parsed = crate::parse_branch_effect_args(&encoded).expect("branch effect protocol");
+    assert_eq!(parsed.then_actions.len(), 1);
+    assert_eq!(parsed.else_actions.len(), 2);
+    assert_eq!(parsed.else_actions[0].instruction, "load_value");
+    assert_eq!(
+        parsed.else_actions[0].result,
+        crate::BranchEffectResult::I64
+    );
+    assert_eq!(
+        parsed.else_actions[0].operands[0].access,
+        crate::BranchEffectAccess::ResourceRead
+    );
+    assert_eq!(
+        crate::branch_effect_inputs(&parsed),
+        ["choose_left", "head", "head", "head"]
+    );
+
+    let profile = crate::glm_profile_for_operation(
+        &Operation::parse("cpu.branch_effect", encoded.clone()).unwrap(),
+    );
+    assert!(profile
+        .accesses
+        .iter()
+        .any(|access| access.input == "head" && access.mode == GlmUseMode::Read));
+    assert_eq!(
+        profile
+            .accesses
+            .iter()
+            .filter(|access| access.input == "head" && access.mode == GlmUseMode::Own)
+            .count(),
+        1
+    );
+
+    let mut truncated = encoded;
+    truncated.pop();
+    assert!(crate::parse_branch_effect_args(&truncated).is_none());
+}
+
+#[test]
 fn classifies_async_primitives_as_yir_core_ops() {
     let async_call = Operation::parse("cpu.async_call", vec!["ping".to_owned()]).unwrap();
     let spawn = Operation::parse(

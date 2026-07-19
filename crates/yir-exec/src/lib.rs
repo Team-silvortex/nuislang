@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use yir_core::{ExecutionState, Node, Resource, Value, YirModule};
+use yir_core::{ExecutionState, ModRegistry, Node, Resource, Value, YirModule};
 use yir_verify::{default_registry, verify_module_with_registry};
 
 #[derive(Debug, Default)]
@@ -13,7 +13,14 @@ pub struct ExecutionTrace {
 
 pub fn execute_module(module: &YirModule) -> Result<ExecutionTrace, String> {
     let registry = default_registry();
-    verify_module_with_registry(module, &registry)?;
+    execute_module_with_registry(module, &registry)
+}
+
+pub fn execute_module_with_registry(
+    module: &YirModule,
+    registry: &ModRegistry,
+) -> Result<ExecutionTrace, String> {
+    verify_module_with_registry(module, registry)?;
 
     let resources = module
         .resources
@@ -82,7 +89,11 @@ pub fn execute_module(module: &YirModule) -> Result<ExecutionTrace, String> {
             );
             continue;
         }
-        match module_impl.execute(node, resource, &mut state) {
+        let executed = match registry.execute_branch_effect_node(node, resource, &mut state)? {
+            Some(value) => Ok(value),
+            None => module_impl.execute(node, resource, &mut state),
+        };
+        match executed {
             Ok(value) => {
                 state.values.insert(node.name.clone(), value);
             }
@@ -246,7 +257,68 @@ fn topological_order(module: &YirModule) -> Result<Vec<String>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use yir_core::{Edge, EdgeKind, Operation, ResourceKind};
+    use yir_core::{
+        BranchEffectAction, BranchEffectActionCapability, BranchEffectResult, Edge, EdgeKind,
+        InstructionSemantics, Operation, RegisteredMod, ResourceKind,
+    };
+
+    const PROBE_ACTIONS: &[BranchEffectActionCapability] = &[
+        BranchEffectActionCapability {
+            module: "probe",
+            instruction: "left",
+            result: BranchEffectResult::I64,
+            operand_accesses: &[],
+        },
+        BranchEffectActionCapability {
+            module: "probe",
+            instruction: "right",
+            result: BranchEffectResult::I64,
+            operand_accesses: &[],
+        },
+    ];
+
+    struct ProbeMod;
+
+    impl RegisteredMod for ProbeMod {
+        fn module_name(&self) -> &'static str {
+            "probe"
+        }
+
+        fn branch_effect_action_capabilities(&self) -> &'static [BranchEffectActionCapability] {
+            PROBE_ACTIONS
+        }
+
+        fn describe(
+            &self,
+            node: &Node,
+            _resource: &Resource,
+        ) -> Result<InstructionSemantics, String> {
+            Err(format!("unexpected standalone probe node `{}`", node.name))
+        }
+
+        fn execute(
+            &self,
+            node: &Node,
+            _resource: &Resource,
+            _state: &mut ExecutionState,
+        ) -> Result<Value, String> {
+            Err(format!("unexpected standalone probe node `{}`", node.name))
+        }
+
+        fn execute_branch_effect_action(
+            &self,
+            action: &BranchEffectAction<'_>,
+            _parent: &Node,
+            _resource: &Resource,
+            _state: &mut ExecutionState,
+        ) -> Result<Value, String> {
+            match action.instruction {
+                "left" => Ok(Value::Int(41)),
+                "right" => Ok(Value::Int(73)),
+                other => Err(format!("unknown probe action `{other}`")),
+            }
+        }
+    }
 
     fn cpu_resource() -> Resource {
         Resource {
@@ -307,6 +379,30 @@ mod tests {
         assert_eq!(trace.values.get("selected"), Some(&Value::Int(7)));
         assert!(!trace.values.contains_key("wrong_payload"));
         assert!(!trace.values.contains_key("bad_sum"));
+    }
+
+    #[test]
+    fn injected_registry_executes_cross_mod_branch_action() {
+        let mut module = YirModule::new("0.1");
+        module.resources.push(cpu_resource());
+        module.nodes.extend([
+            cpu_node("choose", "const_bool", &["false"]),
+            cpu_node(
+                "selected",
+                "branch_effect",
+                &[
+                    "choose", "i64", "1", "probe", "left", "i64", "0", "1", "probe", "right",
+                    "i64", "0",
+                ],
+            ),
+        ]);
+        module.edges.push(dep("choose", "selected"));
+
+        let mut registry = default_registry();
+        registry.register(ProbeMod);
+        let trace = execute_module_with_registry(&module, &registry)
+            .expect("registered probe action should execute through composition");
+        assert_eq!(trace.values.get("selected"), Some(&Value::Int(73)));
     }
 
     #[test]

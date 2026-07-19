@@ -14,3 +14,4 @@ nuis-runtime = { path = "../../crates/nuis-runtime" }
 nuis-semantics = { path = "../../crates/nuis-semantics" }
 yir-core = { path = "../../crates/yir-core" }
 yir-lower-llvm = { path = "../../crates/yir-lower-llvm" }
+yir-verify = { path = "../../crates/yir-verify" }

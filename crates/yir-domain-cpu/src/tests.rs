@@ -297,6 +297,8 @@ fn owned_select_tree_projects_variant_field_only_on_selected_call_leaf() {
     );
 }
 
+#[path = "tests_branch_effect.rs"]
+mod tests_branch_effect;
 #[path = "tests_owned_select_non_null.rs"]
 mod tests_owned_select_non_null;
 

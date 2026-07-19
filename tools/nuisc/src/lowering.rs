@@ -8,8 +8,8 @@ use nuis_semantics::model::{
     NirModule, NirStmt, NirStructDef,
 };
 use yir_core::{
-    Edge, EdgeKind, Node, Operation, Resource, ResourceKind, SemanticOp, TaskLifecycleState,
-    YirModule, YirResultRole, YirResultState,
+    Edge, EdgeKind, ModRegistry, Node, Operation, Resource, ResourceKind, SemanticOp,
+    TaskLifecycleState, YirModule, YirResultRole, YirResultState,
 };
 
 use crate::registry::NustarPackageManifest;
@@ -18,6 +18,8 @@ use crate::registry::NustarPackageManifest;
 mod body_lowering;
 #[path = "lowering/bootstrap.rs"]
 mod bootstrap;
+#[path = "lowering/branch_effect_lowering.rs"]
+mod branch_effect_lowering;
 #[path = "lowering/bridge_helpers.rs"]
 mod bridge_helpers;
 #[path = "lowering/call_exprs.rs"]
@@ -80,13 +82,17 @@ mod state;
 mod tail_recursion;
 
 use body_lowering::{
-    lower_async_call_boundary, lower_call_expr, lower_function_body, lower_unary_cpu_expr,
+    chain_statement_effect, lower_async_call_boundary, lower_call_expr, lower_function_body,
+    lower_unary_cpu_expr,
 };
 use bootstrap::dispatch_nustar_lowering;
 #[cfg(test)]
 use bootstrap::lower_nir_to_yir_builtin_cpu;
 #[cfg(test)]
+use bootstrap::lower_nir_to_yir_builtin_cpu_with_registry;
+#[cfg(test)]
 use bootstrap::lower_nir_to_yir_builtin_cpu_with_target;
+use branch_effect_lowering::lower_branch_effect;
 use bridge_helpers::{lower_data_profile_send, lower_project_profile_ref};
 use call_exprs::lower_call_family_expr;
 use conditional_owned_calls::{

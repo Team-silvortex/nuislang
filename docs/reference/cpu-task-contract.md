@@ -421,11 +421,40 @@ named Node moved exactly once on every reachable leaf, requires the same
 transfer set across all leaves, contributes a GLM `Own` plus lifetime edge, and
 requires the receiving helper to perform exactly one `free(...)` on every exit
 path. The checker tracks `if` and early-return paths, rejects loops, and permits
-matching conditional effects to merge into one emitted free. A native smoke
-executes both mutually exclusive helpers from the same binary and observes
-their distinct output while retaining one Node allocation in LLVM. Duplicate,
-asymmetric, projected, null, returned, task-carried, or differently effected
-conditional transfers remain rejected.
+matching conditional effects to merge into one emitted free. Non-identical
+effect-only branches use `cpu.branch_effect`, whose two ordered action lists are
+encoded independently of their composition. Each action carries its result kind
+and an access kind beside every operand. `RegisteredMod` publishes declarative
+branch-action capabilities, and `CpuMod` currently registers `cpu.load_value`
+as `i64(resource_read)` and `cpu.free` as `unit(resource_own)`. GLM derives
+`Read`/`Own` generically from those encoded accesses, while CPU rejects action
+metadata that does not match the registered descriptor. The NIR semantics layer
+exposes only an action's registration key and operands; nuisc asks the active
+static `ModRegistry` to construct the result/access plan. An empty injected
+registry therefore rejects the same source before YIR encoding. CPU evaluates
+only its owned leaf actions. YIR core validates the complete composition against
+`ModRegistry`, selects one list, and delegates each action to its owning
+`RegisteredMod`; `execute_module_with_registry` supports statically injected
+Nustars. A cross-mod execution contract selects a `probe.right` action under a
+`cpu.branch_effect` parent and returns its `i64` result. LLVM emits explicit
+then/else/merge blocks through `BranchEffectLlvmEmitterRegistry`.
+`emit_module_with_registries` accepts matching YIR and LLVM registries; a
+non-CPU probe emitter contributes both branch values without changing the
+composition loop, while a missing emitter fails closed. The ordinary compiler
+pipeline now loads the manifests named by `loaded_nustar`, resolves their
+static codegen providers by `yir_lowering_entry`, and passes the assembled
+emitter registry through both source and project AOT paths. CPU and AArch64 CPU
+providers are catalogued by the LLVM backend and install the same branch-action
+emitters without giving `nuisc` pipeline instruction- or domain-specific
+logic. The paired YIR semantic registry is still the all-Nustar default rather
+than an exact projection of the loaded manifests. A branch-level
+`merge_result` may be `i64` when both action lists
+end in an `i64` action; CPU returns the selected value and LLVM exposes it
+through a `phi i64`. One native smoke executes both merge leaves in the same
+binary and returns their sum, while the owned-transfer smoke observes distinct
+helper output while retaining one Node allocation in LLVM. Duplicate,
+asymmetric, projected, null, returned, task-carried, or non-`i64` merge-visible
+action results remain rejected.
 
 Today `nuis` does **not** yet have:
 

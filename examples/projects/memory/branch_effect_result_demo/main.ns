@@ -1,0 +1,20 @@
+mod cpu Main {
+  fn choose_value(choose_left: bool) -> i64 {
+    let left: ref Node = alloc_node(41, null());
+    let right: ref Node = alloc_node(73, null());
+    let observed: i64 = if choose_left {
+      load_value(left)
+    } else {
+      load_value(right)
+    };
+    free(left);
+    free(right);
+    return observed;
+  }
+
+  fn main() -> i64 {
+    let left: i64 = choose_value(true);
+    let right: i64 = choose_value(false);
+    return left + right;
+  }
+}

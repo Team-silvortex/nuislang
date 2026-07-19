@@ -8,10 +8,11 @@
     clippy::obfuscated_if_else
 )]
 use std::collections::{BTreeMap, BTreeSet};
-use yir_core::{CpuLlvmLoweringClass, Resource, YirModule};
-use yir_verify::verify_module;
+use yir_core::{CpuLlvmLoweringClass, ModRegistry, Resource, YirModule};
+use yir_verify::{default_registry, verify_module_with_registry};
 mod async_resource_lowering;
 mod bitwise_lowering;
+mod branch_effect_lowering;
 mod call_lowering;
 mod call_return;
 mod cast_lowering;
@@ -35,6 +36,7 @@ mod loop_expr;
 mod loop_flow_control_lowering;
 mod loop_scalar;
 mod memory_lowering;
+mod nustar_provider;
 mod owned_tree_call_args;
 mod param_lowering;
 mod preclassified_lowering;
@@ -54,6 +56,12 @@ mod variant_select;
 
 use async_resource_lowering::lower_cpu_async_resource_node;
 use bitwise_lowering::lower_cpu_bitwise_node;
+use branch_effect_lowering::lower_cpu_branch_effect_node;
+pub use branch_effect_lowering::{
+    default_branch_effect_llvm_emitters, register_cpu_branch_effect_llvm_emitters,
+    BranchEffectLlvmEmitContext, BranchEffectLlvmEmitter, BranchEffectLlvmEmitterRegistry,
+    BranchEffectLlvmValue,
+};
 use call_lowering::{lower_cpu_branch_owned_call_node, lower_cpu_call_node};
 use call_return::{
     cpu_call_scalar_kind_for_instruction, cpu_param_binding, cpu_scalar_kind_llvm_type,
@@ -84,6 +92,10 @@ use loop_scalar::{
     loop_scalar_llvm_type, loop_scalar_value_ref,
 };
 use memory_lowering::lower_cpu_memory_node;
+pub use nustar_provider::{
+    register_static_nustar_branch_effect_emitters, static_nustar_llvm_emitter_providers,
+    StaticNustarLlvmEmitterProvider,
+};
 use param_lowering::lower_cpu_param_node;
 use preclassified_lowering::{
     lower_cpu_aggregate_node, lower_cpu_literal_node, lower_cpu_pointer_node,
@@ -106,7 +118,17 @@ pub(crate) use types::{
 };
 use value_ref::coerce_to_i64;
 pub fn emit_module(module: &YirModule) -> Result<String, String> {
-    verify_module(module)?;
+    let yir_registry = default_registry();
+    let emitter_registry = default_branch_effect_llvm_emitters();
+    emit_module_with_registries(module, &yir_registry, &emitter_registry)
+}
+
+pub fn emit_module_with_registries(
+    module: &YirModule,
+    yir_registry: &ModRegistry,
+    emitter_registry: &BranchEffectLlvmEmitterRegistry,
+) -> Result<String, String> {
+    verify_module_with_registry(module, yir_registry)?;
 
     let resources = module
         .resources
@@ -219,6 +241,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
             &param_bindings,
             &param_buffer_lengths,
             &helper_signatures,
+            emitter_registry,
             helper_signatures
                 .get(function_name)
                 .expect("helper signature should exist")
@@ -274,6 +297,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
         &BTreeMap::new(),
         &BTreeMap::new(),
         &helper_signatures,
+        emitter_registry,
         CpuCallScalarKind::I64,
         &mut global_counter,
     )?;

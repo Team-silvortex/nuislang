@@ -1,4 +1,5 @@
 mod ast;
+mod branch_action;
 mod expr;
 mod expr_effects;
 mod glm;
@@ -6,6 +7,7 @@ mod result_stage;
 mod type_ref_methods;
 
 pub use ast::*;
+pub use branch_action::*;
 pub use expr::*;
 pub use expr_effects::{nir_expr_effect_class, nir_host_read_surface, nir_host_scheduler_bridge};
 pub use glm::nir_glm_profile;

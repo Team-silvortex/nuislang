@@ -223,6 +223,16 @@ pub(super) fn lower_if_pair(
         }
     }
 
+    if let Some(lowered) = lower_branch_effect(
+        condition_name.clone(),
+        then_body,
+        else_body,
+        state,
+        bindings,
+    )? {
+        return Ok(lowered);
+    }
+
     if let Some(lowered) = lower_guard_return_with_surviving_binding(
         &condition_name,
         then_body,

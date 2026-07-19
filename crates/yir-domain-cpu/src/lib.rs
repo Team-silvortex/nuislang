@@ -1,5 +1,9 @@
-use yir_core::{ExecutionState, InstructionSemantics, Node, RegisteredMod, Resource, Value};
+use yir_core::{
+    BranchEffectAction, BranchEffectActionCapability, ExecutionState, InstructionSemantics, Node,
+    RegisteredMod, Resource, Value,
+};
 
+mod branch_effect;
 mod carry_payload;
 mod describe;
 mod describe_async;
@@ -16,6 +20,7 @@ mod execute_values;
 mod loop_metadata;
 mod runtime_helpers;
 
+use branch_effect::{execute_cpu_branch_effect_action, CPU_BRANCH_EFFECT_ACTIONS};
 use carry_payload::*;
 use describe::describe_cpu_node;
 use execute_host::execute_cpu_host_node;
@@ -30,6 +35,9 @@ pub struct CpuMod;
 impl RegisteredMod for CpuMod {
     fn module_name(&self) -> &'static str {
         "cpu"
+    }
+    fn branch_effect_action_capabilities(&self) -> &'static [BranchEffectActionCapability] {
+        CPU_BRANCH_EFFECT_ACTIONS
     }
     fn describe(&self, node: &Node, resource: &Resource) -> Result<InstructionSemantics, String> {
         describe_cpu_node(node, resource)
@@ -686,6 +694,16 @@ impl RegisteredMod for CpuMod {
             }
             other => Err(format!("unknown cpu instruction `{other}`")),
         }
+    }
+
+    fn execute_branch_effect_action(
+        &self,
+        action: &BranchEffectAction<'_>,
+        parent: &Node,
+        resource: &Resource,
+        state: &mut ExecutionState,
+    ) -> Result<Value, String> {
+        execute_cpu_branch_effect_action(action, parent, resource, state)
     }
 }
 

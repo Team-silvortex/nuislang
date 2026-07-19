@@ -8,8 +8,11 @@ mod cpu Main {
     return move(bytes);
   }
 
-  fn consume_right(bytes: Bytes, head: ref Node) -> Bytes {
-    let observed: i64 = load_value(head);
+  fn consume_right(bytes: Bytes, head: ref Node, inspect_first: bool) -> Bytes {
+    if inspect_first {
+      let observed: i64 = load_value(head);
+    } else {
+    }
     print(22);
     free(head);
     return move(bytes);
@@ -20,7 +23,7 @@ mod cpu Main {
     if choose_left {
       return consume_left(move(bytes), move(head));
     } else {
-      return consume_right(move(bytes), move(head));
+      return consume_right(move(bytes), move(head), true);
     }
   }
 

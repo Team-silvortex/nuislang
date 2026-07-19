@@ -639,6 +639,7 @@ fn emits_i32_helper_returns_with_i32_ret_in_recursive_helpers() {
         .map(|resource| (resource.name.clone(), resource))
         .collect::<BTreeMap<_, _>>();
     let mut global_counter = 0;
+    let branch_effect_emitters = crate::default_branch_effect_llvm_emitters();
 
     let emitted = emit_cpu_function(
         &module,
@@ -647,6 +648,7 @@ fn emits_i32_helper_returns_with_i32_ret_in_recursive_helpers() {
         &param_bindings,
         &BTreeMap::new(),
         &BTreeMap::new(),
+        &branch_effect_emitters,
         CpuCallScalarKind::I32,
         &mut global_counter,
     )

@@ -622,12 +622,46 @@ selected helper trees. Every reachable leaf must contain exactly one
 GLM marks each root as `Own` and requires its lifetime edge. The receiving
 helper must contain exactly one `free(...)` on every exit path; verification is
 path-sensitive across `if` and early return, while loops remain fail-closed.
-Matching conditional effects can be merged before LLVM emission. The native
-selected-transfer smoke runs both leaves of one binary, observes distinct helper
-output, and confirms a single Node allocation with no deferred tree lowering.
+Matching conditional effects can be merged before LLVM emission. Differing
+effect-only branches now lower through the composition-independent
+`cpu.branch_effect` protocol: each leaf carries an ordered list of
+`module/instruction/result/arity/(access, operand)` actions. Nustars expose
+their supported leaf signatures through the declarative
+`BranchEffectActionCapability` registry contract. CPU currently registers
+`load_value` as `i64(resource_read)` and `free` as `unit(resource_own)`; GLM
+derives `Read` versus `Own` from operand metadata without an instruction-name
+white list. NIR semantics exposes registration keys and operands without
+lowering metadata, while nuisc obtains result/access plans from the active
+static all-Nustar `ModRegistry`; an injected empty registry test proves the
+source path fails closed before encoding. The interpreter rejects forged
+contracts and evaluates only the selected list, and LLVM emits explicit
+then/else/merge blocks plus a
+continuation effect edge. Matching terminal `i64` actions can now declare an
+`i64` branch-level merge result: CPU returns the selected heap value, LLVM emits
+`phi i64`, and an `if` expression retains the merged binding. A native result
+smoke executes both leaves in one binary and returns their `41 + 73` sum. The
+native selected-transfer smoke runs
+both leaves of one binary, observes distinct helper output, exercises a
+branch-local load, and confirms a single Node allocation with no deferred tree
+lowering.
 Asymmetric paths, duplicate moves, null selected transfers, non-consuming
-helpers, projected transfers, differing branch-local effects, and task or
-return transport remain closed.
+helpers, projected transfers, non-`i64` merge-visible branch-action results,
+and task or return transport remain closed. Branch composition execution is
+now hosted by YIR core rather than `CpuMod`: registry validation covers every
+leaf, selected execution delegates to the owning `RegisteredMod`, and
+`execute_module_with_registry` proves an injected `probe` Nustar can return the
+selected `i64` value under a CPU composition parent. LLVM action emission uses
+`BranchEffectLlvmEmitterRegistry`; `emit_module_with_registries` proves an
+injected probe emitter can generate both values and the common `phi` without
+changing the composition loop. Registered YIR actions with no matching LLVM
+emitter fail closed. The ordinary source and project AOT paths now load the
+manifests named by `loaded_nustar`, resolve static providers by
+`yir_lowering_entry`, and pass the assembled YIR/emitter registries into LLVM.
+CPU and AArch64 CPU install their emitters through this path. Provider
+descriptors now live in the LLVM backend's static Nustar catalog, so `nuisc`
+contains no CPU entry names or emitter functions. The paired YIR semantic
+registry is still the all-Nustar default rather than an exact projection of
+the loaded manifests.
 The runtime now defines `NuisSchedulerOwnedBlobV1` as the first GLM-tokened
 dynamic leaf primitive. It deep-copies borrowed bytes and has scheduler-native
 move/drop hooks; a compiled harness covers take and cancellation. Recursive

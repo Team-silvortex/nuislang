@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 mod branch_call_args;
+mod branch_effect;
 mod data_mod;
 mod data_mod_describe;
 pub mod ffi;
@@ -13,6 +14,7 @@ mod value_display;
 mod value_types;
 
 pub use branch_call_args::*;
+pub use branch_effect::*;
 pub use data_mod::{DataMod, LegacyFabricMod};
 pub use glm::*;
 pub use module_graph::*;
