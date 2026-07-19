@@ -298,6 +298,7 @@ impl Operation {
             | "param_i32"
             | "param_i64"
             | "param_buffer_ref"
+            | "param_node_ref"
             | "param_owned_bytes"
             | "call_bool"
             | "call_i32"

@@ -286,7 +286,7 @@ pub fn emit_module(module: &YirModule) -> Result<String, String> {
         "; yir version: {}\n\
 {}\n\
 %cpu.node = type {{ i64, ptr }}\n\
-declare ptr @malloc(i64)\ndeclare void @free(ptr)\ndeclare i32 @puts(ptr)\ndeclare i64 @nuis_host_text_lift(ptr)\ndeclare ptr @nuis_host_text_ptr(i64)\n\
+declare ptr @malloc(i64)\ndeclare void @free(ptr)\ndeclare void @llvm.assume(i1)\ndeclare i32 @puts(ptr)\ndeclare i64 @nuis_host_text_lift(ptr)\ndeclare ptr @nuis_host_text_ptr(i64)\n\
 declare void @nuis_debug_print_bool(i32)\ndeclare void @nuis_debug_print_i32(i32)\ndeclare void @nuis_debug_print_i64(i64)\ndeclare void @nuis_debug_print_f32(float)\ndeclare void @nuis_debug_print_f64(double)\n\n\
 declare i64 @nuis_scheduler_task_spawn_i64_v1(i64)\ndeclare i64 @nuis_scheduler_task_spawn_invoker_i64_v1(ptr, ptr)\ndeclare void @nuis_scheduler_task_timeout_v1(i64, i64)\ndeclare void @nuis_scheduler_task_ready_after_v1(i64, i64)\ndeclare void @nuis_scheduler_task_cancel_v1(i64)\ndeclare i64 @nuis_scheduler_task_join_state_v1(i64)\ndeclare void @nuis_scheduler_task_require_completed_v1(i64)\ndeclare i64 @nuis_scheduler_task_value_i64_v1(i64)\n\
 declare i64 @nuis_scheduler_task_spawn_owned_v1(ptr)\ndeclare i64 @nuis_scheduler_task_take_owned_v1(i64, ptr)\ndeclare void @nuis_scheduler_owned_payload_drop_v1(ptr)\ndeclare void @nuis_scheduler_payload_free_v1(ptr)\n\
@@ -368,6 +368,9 @@ fn render_scalar_task_invoker(
             CpuCallScalarKind::BorrowedBuffer => {
                 unreachable!("borrowed buffers do not have task invokers")
             }
+            CpuCallScalarKind::TraversalPointer => {
+                unreachable!("traversal pointers do not have task invokers")
+            }
             CpuCallScalarKind::OwnedBytes => {
                 unreachable!("direct owned Bytes params do not have scalar task invokers")
             }
@@ -400,6 +403,9 @@ fn render_scalar_task_invoker(
         }
         CpuCallScalarKind::BorrowedBuffer => {
             unreachable!("borrowed buffers cannot return from task invokers")
+        }
+        CpuCallScalarKind::TraversalPointer => {
+            unreachable!("traversal pointers cannot return from task invokers")
         }
         CpuCallScalarKind::OwnedBytes => {
             unreachable!("owned Bytes cannot return from scalar task invokers")

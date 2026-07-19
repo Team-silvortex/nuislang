@@ -8,6 +8,7 @@ pub(crate) fn cpu_call_scalar_kind_for_instruction(instruction: &str) -> Option<
         "param_f32" | "call_f32" | "return_f32" => Some(CpuCallScalarKind::F32),
         "param_f64" | "call_f64" | "return_f64" => Some(CpuCallScalarKind::F64),
         "param_buffer_ref" => Some(CpuCallScalarKind::BorrowedBuffer),
+        "param_node_ref" => Some(CpuCallScalarKind::TraversalPointer),
         "param_owned_bytes" | "call_owned_bytes" | "return_owned_bytes" => {
             Some(CpuCallScalarKind::OwnedBytes)
         }
@@ -23,6 +24,7 @@ pub(crate) fn cpu_scalar_kind_llvm_type(kind: CpuCallScalarKind) -> &'static str
         CpuCallScalarKind::F32 => "float",
         CpuCallScalarKind::F64 => "double",
         CpuCallScalarKind::BorrowedBuffer => "ptr",
+        CpuCallScalarKind::TraversalPointer => "ptr",
         CpuCallScalarKind::OwnedBytes => "ptr",
     }
 }
@@ -41,7 +43,11 @@ pub(crate) fn cpu_param_binding(kind: CpuCallScalarKind, index: usize) -> LlvmVa
         CpuCallScalarKind::I64 => LlvmValueRef::I64(arg),
         CpuCallScalarKind::F32 => LlvmValueRef::F32(arg),
         CpuCallScalarKind::F64 => LlvmValueRef::F64(arg),
-        CpuCallScalarKind::BorrowedBuffer => LlvmValueRef::Ptr(arg),
+        CpuCallScalarKind::BorrowedBuffer => LlvmValueRef::BorrowedBuffer {
+            ptr: arg,
+            len: format!("%arg{index}_len"),
+        },
+        CpuCallScalarKind::TraversalPointer => LlvmValueRef::Ptr(arg),
         CpuCallScalarKind::OwnedBytes => LlvmValueRef::OwnedBytes { blob: arg },
     }
 }
@@ -153,7 +159,7 @@ pub(crate) fn emit_typed_return_from_value(
             }
             _ => false,
         },
-        CpuCallScalarKind::BorrowedBuffer => false,
+        CpuCallScalarKind::BorrowedBuffer | CpuCallScalarKind::TraversalPointer => false,
         CpuCallScalarKind::OwnedBytes => match return_value {
             LlvmValueRef::OwnedBytes { blob } => {
                 body.push(format!("  ret ptr {blob}"));
@@ -203,7 +209,7 @@ pub(crate) fn can_emit_typed_return_from_value(
                 | LlvmValueRef::I32(_)
                 | LlvmValueRef::Bool { .. }
         ),
-        CpuCallScalarKind::BorrowedBuffer => false,
+        CpuCallScalarKind::BorrowedBuffer | CpuCallScalarKind::TraversalPointer => false,
         CpuCallScalarKind::OwnedBytes => matches!(return_value, LlvmValueRef::OwnedBytes { .. }),
     }
 }
@@ -240,6 +246,9 @@ pub(crate) fn emit_typed_return_from_last_value(
         }
         CpuCallScalarKind::BorrowedBuffer => {
             unreachable!("borrowed buffers cannot be function return values")
+        }
+        CpuCallScalarKind::TraversalPointer => {
+            unreachable!("traversal pointers cannot be function return values")
         }
         CpuCallScalarKind::OwnedBytes => unreachable!("owned Bytes returns require a blob value"),
     }

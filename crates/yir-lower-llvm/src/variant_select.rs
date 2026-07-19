@@ -165,6 +165,32 @@ pub(crate) fn emit_select_value(
             Some(LlvmValueRef::Ptr(reg))
         }
         (
+            LlvmValueRef::BorrowedBuffer {
+                ptr: then_ptr,
+                len: then_len,
+            },
+            LlvmValueRef::BorrowedBuffer {
+                ptr: else_ptr,
+                len: else_len,
+            },
+        ) => {
+            let ptr = fresh_reg(next_reg);
+            body.push(format!(
+                "  {ptr} = select i1 {cond_bool}, ptr {then_ptr}, ptr {else_ptr}"
+            ));
+            let len = fresh_reg(next_reg);
+            body.push(format!(
+                "  {len} = select i1 {cond_bool}, i64 {then_len}, i64 {else_len}"
+            ));
+            Some(LlvmValueRef::BorrowedBuffer { ptr, len })
+        }
+        (LlvmValueRef::BorrowedBuffer { ptr, len }, LlvmValueRef::Ptr(null)) if null == "null" => {
+            select_nullable_buffer(cond_bool, ptr, len, null, "0", body, next_reg)
+        }
+        (LlvmValueRef::Ptr(null), LlvmValueRef::BorrowedBuffer { ptr, len }) if null == "null" => {
+            select_nullable_buffer(cond_bool, null, "0", ptr, len, body, next_reg)
+        }
+        (
             LlvmValueRef::OwnedBytes { blob: then_blob },
             LlvmValueRef::OwnedBytes { blob: else_blob },
         ) => {
@@ -280,6 +306,26 @@ pub(crate) fn emit_select_value(
         }
         _ => None,
     }
+}
+
+fn select_nullable_buffer(
+    condition: &str,
+    then_ptr: &str,
+    then_len: &str,
+    else_ptr: &str,
+    else_len: &str,
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+) -> Option<LlvmValueRef> {
+    let ptr = fresh_reg(next_reg);
+    body.push(format!(
+        "  {ptr} = select i1 {condition}, ptr {then_ptr}, ptr {else_ptr}"
+    ));
+    let len = fresh_reg(next_reg);
+    body.push(format!(
+        "  {len} = select i1 {condition}, i64 {then_len}, i64 {else_len}"
+    ));
+    Some(LlvmValueRef::BorrowedBuffer { ptr, len })
 }
 
 fn coerce_to_i1_for_select(

@@ -21,9 +21,9 @@ fn collect_from_stmts<'a>(
     for stmt in stmts {
         match stmt {
             NirStmt::If {
+                condition,
                 then_body,
                 else_body,
-                ..
             } => {
                 if let (Some((then_callee, _, _)), Some((else_callee, _, _))) = (
                     owned_return_call(then_body, functions),
@@ -50,6 +50,13 @@ fn collect_from_stmts<'a>(
                 ) {
                     helpers.extend(then_helpers);
                     helpers.extend(else_helpers);
+                }
+                if let Some(tree_helpers) =
+                    super::nested_owned_returns::collect_owned_return_if_helpers(
+                        condition, then_body, else_body, functions,
+                    )
+                {
+                    helpers.extend(tree_helpers);
                 }
             }
             NirStmt::While { body, .. } => collect_from_stmts(body, functions, helpers),
@@ -108,20 +115,83 @@ pub(super) fn owned_return_call<'a>(
         return None;
     };
     let function = functions.get(callee.as_str())?;
-    owned_bytes_scalar_signature(function, args.len()).then_some((callee, owner, scalar_args))
+    owned_bytes_leaf_signature(function, args).then_some((callee, owner, scalar_args))
 }
 
-fn owned_bytes_scalar_signature(function: &NirFunction, arg_count: usize) -> bool {
-    function.params.len() == arg_count
+pub(super) fn owned_return_call_with_non_null_proofs<'a>(
+    stmts: &'a [NirStmt],
+    functions: &BTreeMap<&str, &NirFunction>,
+    non_null_proofs: &[&NirExpr],
+) -> Option<(&'a str, &'a NirExpr, &'a [NirExpr])> {
+    let [NirStmt::Return(Some(NirExpr::Call { callee, args }))] = stmts else {
+        return None;
+    };
+    let (owner @ NirExpr::Move(_), scalar_args) = args.split_first()? else {
+        return None;
+    };
+    let function = functions.get(callee.as_str())?;
+    owned_bytes_leaf_signature_with(function, args, |ty, arg| {
+        leaf_argument_allowed(ty, arg) || non_null_leaf_argument(ty, arg, non_null_proofs)
+    })
+    .then_some((callee, owner, scalar_args))
+}
+
+fn owned_bytes_leaf_signature(function: &NirFunction, args: &[NirExpr]) -> bool {
+    owned_bytes_leaf_signature_with(function, args, leaf_argument_allowed)
+}
+
+fn owned_bytes_leaf_signature_with(
+    function: &NirFunction,
+    args: &[NirExpr],
+    mut argument_allowed: impl FnMut(&nuis_semantics::model::NirTypeRef, &NirExpr) -> bool,
+) -> bool {
+    function.params.len() == args.len()
         && !function.params.is_empty()
         && is_owned_bytes_type(&function.params[0].ty)
         && function.params[1..]
             .iter()
-            .all(|param| is_plain_scalar_type(&param.ty))
+            .zip(&args[1..])
+            .all(|(param, arg)| argument_allowed(&param.ty, arg))
         && function
             .return_type
             .as_ref()
             .is_some_and(is_owned_bytes_type)
+}
+
+fn non_null_leaf_argument(
+    ty: &nuis_semantics::model::NirTypeRef,
+    arg: &NirExpr,
+    non_null_proofs: &[&NirExpr],
+) -> bool {
+    if !is_borrowed_buffer_type(ty) {
+        return false;
+    }
+    let NirExpr::Call { callee, args } = arg else {
+        return false;
+    };
+    let [source] = args.as_slice() else {
+        return false;
+    };
+    callee == "__nuis_require_non_null_buffer"
+        && non_null_proofs.iter().any(|proven| *proven == source)
+}
+
+fn leaf_argument_allowed(ty: &nuis_semantics::model::NirTypeRef, arg: &NirExpr) -> bool {
+    is_plain_scalar_type(ty)
+        || (is_borrowed_buffer_type(ty)
+            && matches!(
+                arg,
+                NirExpr::Var(_) | NirExpr::FieldAccess { .. } | NirExpr::VariantFieldAccess { .. }
+            ))
+        || (is_traversal_pointer_type(ty) && matches!(arg, NirExpr::Borrow(_)))
+}
+
+fn is_borrowed_buffer_type(ty: &nuis_semantics::model::NirTypeRef) -> bool {
+    ty.is_ref && !ty.is_optional && ty.generic_args.is_empty() && ty.name == "Buffer"
+}
+
+fn is_traversal_pointer_type(ty: &nuis_semantics::model::NirTypeRef) -> bool {
+    ty.is_ref && !ty.is_optional && ty.generic_args.is_empty() && ty.name == "Node"
 }
 
 fn is_plain_scalar_type(ty: &nuis_semantics::model::NirTypeRef) -> bool {
@@ -228,7 +298,7 @@ pub(super) fn lower_pure_scalar_args(
         .map(|arg| {
             if nir_expr_effect_class(arg) != NirExprEffectClass::Pure {
                 return Err(format!(
-                    "conditional owned helper {branch} scalar arguments must be pure"
+                    "conditional owned helper {branch} leaf arguments must be pure"
                 ));
             }
             lower_expr(arg, state, bindings)

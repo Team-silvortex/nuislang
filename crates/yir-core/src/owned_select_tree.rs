@@ -55,6 +55,12 @@ pub enum OwnedSelectScalarArg<'a> {
         kind: OwnedSelectScalarCast,
         value: Box<OwnedSelectScalarArg<'a>>,
     },
+    NonNull {
+        value: Box<OwnedSelectScalarArg<'a>>,
+    },
+    TraversalBorrow {
+        value: Box<OwnedSelectScalarArg<'a>>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -174,6 +180,18 @@ fn parse_scalar_arg<'a>(
                 value: Box::new(value),
             })
         }
+        "non_null" => {
+            let value = parse_scalar_arg(args, cursor)?;
+            Some(OwnedSelectScalarArg::NonNull {
+                value: Box::new(value),
+            })
+        }
+        "traversal_borrow" => {
+            let value = parse_scalar_arg(args, cursor)?;
+            Some(OwnedSelectScalarArg::TraversalBorrow {
+                value: Box::new(value),
+            })
+        }
         _ => None,
     }
 }
@@ -205,6 +223,10 @@ fn owned_select_scalar_arg_inputs<'a>(arg: &'a OwnedSelectScalarArg<'a>, out: &m
             owned_select_scalar_arg_inputs(base, out);
         }
         OwnedSelectScalarArg::Cast { value, .. } => owned_select_scalar_arg_inputs(value, out),
+        OwnedSelectScalarArg::NonNull { value } => owned_select_scalar_arg_inputs(value, out),
+        OwnedSelectScalarArg::TraversalBorrow { value } => {
+            owned_select_scalar_arg_inputs(value, out)
+        }
     }
 }
 

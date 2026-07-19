@@ -9,12 +9,31 @@ pub(in crate::lowering) fn lower_call_expr(
     if callee == "print" {
         return Err("`print(...)` is only valid as a statement".to_owned());
     }
+    if callee == "__nuis_require_non_null_buffer" {
+        return Err(
+            "require_non_null(...) is valid only in a selected owned-helper leaf dominated by the matching non-null branch"
+                .to_owned(),
+        );
+    }
 
     let function = state
         .function_map
         .get(callee)
         .copied()
         .ok_or_else(|| format!("unknown function `{callee}`"))?;
+
+    for (param, arg) in function.params.iter().zip(args) {
+        if param.ty.is_ref
+            && !param.ty.is_optional
+            && param.ty.name == "Node"
+            && !matches!(arg, NirExpr::Borrow(_))
+        {
+            return Err(format!(
+                "traversal pointer argument `{}` for `{callee}` requires explicit borrow(...) capability",
+                param.name
+            ));
+        }
+    }
 
     if state.direct_call_functions.contains(callee) {
         let lowered_args = args

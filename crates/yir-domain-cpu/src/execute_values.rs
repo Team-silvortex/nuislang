@@ -151,7 +151,7 @@ pub(crate) fn execute_cpu_value_node(
         "param_i64" => Ok(Value::Int(0)),
         "param_f32" => Ok(Value::F32(0.0)),
         "param_f64" => Ok(Value::F64(0.0)),
-        "param_buffer_ref" => Ok(Value::Pointer(None)),
+        "param_buffer_ref" | "param_node_ref" => Ok(Value::Pointer(None)),
         "param_owned_bytes" => Ok(Value::OwnedBytes(Vec::new())),
         "loop_owned_result" => Ok(Value::OwnedBytes(Vec::new())),
         "call_bool" | "call_i32" | "call_i64" | "call_f32" | "call_f64" | "call_owned_bytes" => {

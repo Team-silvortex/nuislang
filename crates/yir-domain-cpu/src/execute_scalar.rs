@@ -491,6 +491,30 @@ fn expect_owned_tree_scalar_arg(
                 kind.as_str()
             )
         }),
+        yir_core::OwnedSelectScalarArg::NonNull { value } => {
+            let value = expect_owned_tree_scalar_arg(state, value, node_name)?;
+            match value {
+                Value::Pointer(Some(_)) => Ok(value),
+                Value::Pointer(None) => Err(format!(
+                    "node `{node_name}` selected a failed non-null Buffer proof"
+                )),
+                other => Err(format!(
+                    "node `{node_name}` cannot apply a non-null Buffer proof to {other}"
+                )),
+            }
+        }
+        yir_core::OwnedSelectScalarArg::TraversalBorrow { value } => {
+            let value = expect_owned_tree_scalar_arg(state, value, node_name)?;
+            match value {
+                Value::Pointer(Some(_)) => Ok(value),
+                Value::Pointer(None) => Err(format!(
+                    "node `{node_name}` selected a null traversal pointer borrow"
+                )),
+                other => Err(format!(
+                    "node `{node_name}` cannot borrow traversal pointer from {other}"
+                )),
+            }
+        }
     }
 }
 

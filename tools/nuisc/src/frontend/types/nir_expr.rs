@@ -395,6 +395,9 @@ pub(crate) fn infer_nir_expr_type(
         | NirExpr::StoreNext { .. }
         | NirExpr::StoreAt { .. }
         | NirExpr::Free(_) => Some(unit_type()),
+        NirExpr::Call { callee, .. } if callee == "__nuis_require_non_null_buffer" => {
+            Some(ref_type("Buffer"))
+        }
         NirExpr::Call { callee, .. } => signatures
             .get(callee)
             .and_then(|sig| sig.return_type.clone()),

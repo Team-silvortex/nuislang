@@ -257,6 +257,9 @@ pub(crate) fn lower_cpu_guard_return_node(
                 CpuCallScalarKind::BorrowedBuffer => {
                     unreachable!("borrowed buffers cannot be guard return values")
                 }
+                CpuCallScalarKind::TraversalPointer => {
+                    unreachable!("traversal pointers cannot be guard return values")
+                }
                 CpuCallScalarKind::OwnedBytes => {
                     unreachable!("owned Bytes cannot be guard return values")
                 }

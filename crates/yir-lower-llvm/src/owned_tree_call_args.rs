@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use yir_core::{OwnedSelectScalarArg, OwnedSelectScalarCast};
 
 use super::{
-    call_lowering::lower_scalar_value_arg, variant_select::variant_field_value, CpuCallScalarKind,
-    LlvmValueRef,
+    call_lowering::lower_scalar_value_arg, value_ref::borrowed_buffer_parts,
+    variant_select::variant_field_value, CpuCallScalarKind, LlvmValueRef,
 };
 
 fn owned_tree_scalar_value(
@@ -35,6 +35,23 @@ fn owned_tree_scalar_value(
         OwnedSelectScalarArg::Cast { kind, value } => {
             let value = owned_tree_scalar_value(registers, value, body, next_reg)?;
             lower_owned_tree_cast(*kind, value, body, next_reg)
+        }
+        OwnedSelectScalarArg::NonNull { value } => {
+            let value = owned_tree_scalar_value(registers, value, body, next_reg)?;
+            let LlvmValueRef::BorrowedBuffer { ptr, len } = value else {
+                return None;
+            };
+            let proof = super::fresh_reg(next_reg);
+            body.push(format!("  {proof} = icmp ne ptr {ptr}, null"));
+            body.push(format!("  call void @llvm.assume(i1 {proof})"));
+            Some(LlvmValueRef::BorrowedBuffer { ptr, len })
+        }
+        OwnedSelectScalarArg::TraversalBorrow { value } => {
+            let value = owned_tree_scalar_value(registers, value, body, next_reg)?;
+            let LlvmValueRef::Ptr(ptr) = value else {
+                return None;
+            };
+            Some(LlvmValueRef::Ptr(ptr))
         }
     }
 }
@@ -88,16 +105,26 @@ fn lower_owned_tree_cast(
 
 pub(crate) fn owned_tree_scalar_args_ready(
     registers: &BTreeMap<String, LlvmValueRef>,
+    buffer_lengths: &BTreeMap<String, String>,
     args: &[OwnedSelectScalarArg<'_>],
     kinds: &[CpuCallScalarKind],
 ) -> bool {
     let mut body = Vec::new();
     let mut next_reg = 0;
-    lower_owned_tree_scalar_args(registers, args, kinds, &mut body, &mut next_reg).is_some()
+    lower_owned_tree_scalar_args(
+        registers,
+        buffer_lengths,
+        args,
+        kinds,
+        &mut body,
+        &mut next_reg,
+    )
+    .is_some()
 }
 
 pub(crate) fn lower_owned_tree_scalar_args(
     registers: &BTreeMap<String, LlvmValueRef>,
+    buffer_lengths: &BTreeMap<String, String>,
     args: &[OwnedSelectScalarArg<'_>],
     kinds: &[CpuCallScalarKind],
     body: &mut Vec<String>,
@@ -106,6 +133,27 @@ pub(crate) fn lower_owned_tree_scalar_args(
     args.iter()
         .zip(kinds)
         .map(|(arg, kind)| {
+            if *kind == CpuCallScalarKind::BorrowedBuffer {
+                let parts = match arg {
+                    OwnedSelectScalarArg::Value(name) => {
+                        borrowed_buffer_parts(registers, buffer_lengths, name)
+                    }
+                    _ => match owned_tree_scalar_value(registers, arg, body, next_reg)? {
+                        LlvmValueRef::BorrowedBuffer { ptr, len } => Some((ptr, len)),
+                        _ => None,
+                    },
+                };
+                let (pointer, len) = parts?;
+                return Some(format!("ptr {pointer}, i64 {len}"));
+            }
+            if *kind == CpuCallScalarKind::TraversalPointer {
+                let LlvmValueRef::Ptr(pointer) =
+                    owned_tree_scalar_value(registers, arg, body, next_reg)?
+                else {
+                    return None;
+                };
+                return Some(format!("ptr {pointer}"));
+            }
             let value = owned_tree_scalar_value(registers, arg, body, next_reg)?;
             lower_scalar_value_arg(&value, kind)
         })

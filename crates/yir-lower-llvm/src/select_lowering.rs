@@ -15,6 +15,7 @@ pub(crate) fn lower_cpu_select_node(
     node: &Node,
     body: &mut Vec<String>,
     registers: &mut BTreeMap<String, LlvmValueRef>,
+    buffer_lengths: &BTreeMap<String, String>,
     helper_signatures: &BTreeMap<String, CpuHelperSignature>,
     delayed_registers: &mut BTreeMap<String, String>,
     facts: &mut KnownFacts,
@@ -38,6 +39,7 @@ pub(crate) fn lower_cpu_select_node(
             node,
             body,
             registers,
+            buffer_lengths,
             helper_signatures,
             next_reg,
             next_block,
@@ -138,6 +140,7 @@ fn lower_owned_bytes_select_tree(
     node: &Node,
     body: &mut Vec<String>,
     registers: &mut BTreeMap<String, LlvmValueRef>,
+    buffer_lengths: &BTreeMap<String, String>,
     helper_signatures: &BTreeMap<String, CpuHelperSignature>,
     next_reg: &mut usize,
     next_block: &mut usize,
@@ -188,9 +191,15 @@ fn lower_owned_bytes_select_tree(
         body.push(format!("  {condition_i1} = icmp ne i64 {condition}, 0"));
         condition_values.insert(condition_name.to_owned(), condition_i1);
     }
-    if !owned_select_tree_calls_ready(&args.tree, node, registers, helper_signatures)? {
+    if !owned_select_tree_calls_ready(
+        &args.tree,
+        node,
+        registers,
+        buffer_lengths,
+        helper_signatures,
+    )? {
         body.push(format!(
-            "  ; deferred lowering for cpu.select_owned_bytes_tree `{}` because one or more call-leaf scalar inputs are outside the current CPU LLVM slice",
+            "  ; deferred lowering for cpu.select_owned_bytes_tree `{}` because one or more call-leaf inputs are outside the current CPU LLVM slice",
             node.name
         ));
         return Ok(true);
@@ -217,6 +226,7 @@ fn lower_owned_bytes_select_tree(
             branch_owned_helper_signature(node, callee, scalar_args.len(), helper_signatures)?;
         let scalar_args = lower_owned_tree_scalar_args(
             registers,
+            buffer_lengths,
             scalar_args,
             &signature.params[1..],
             body,
@@ -243,6 +253,7 @@ fn lower_owned_bytes_select_tree(
         &condition_values,
         &owner_blobs,
         registers,
+        buffer_lengths,
         helper_signatures,
         node,
         next_reg,
@@ -270,6 +281,7 @@ fn emit_owned_select_tree(
     conditions: &BTreeMap<String, String>,
     owner_blobs: &[String],
     registers: &BTreeMap<String, LlvmValueRef>,
+    buffer_lengths: &BTreeMap<String, String>,
     helper_signatures: &BTreeMap<String, CpuHelperSignature>,
     node: &Node,
     next_reg: &mut usize,
@@ -298,6 +310,7 @@ fn emit_owned_select_tree(
                     .expect("owned tree helper signature was prevalidated");
             let scalar_args = lower_owned_tree_scalar_args(
                 registers,
+                buffer_lengths,
                 scalar_args,
                 &signature.params[1..],
                 body,
@@ -338,6 +351,7 @@ fn emit_owned_select_tree(
                 conditions,
                 owner_blobs,
                 registers,
+                buffer_lengths,
                 helper_signatures,
                 node,
                 next_reg,
@@ -353,6 +367,7 @@ fn emit_owned_select_tree(
                 conditions,
                 owner_blobs,
                 registers,
+                buffer_lengths,
                 helper_signatures,
                 node,
                 next_reg,
@@ -379,6 +394,7 @@ fn owned_select_tree_calls_ready(
     tree: &OwnedSelectTree<'_>,
     node: &Node,
     registers: &BTreeMap<String, LlvmValueRef>,
+    buffer_lengths: &BTreeMap<String, String>,
     helper_signatures: &BTreeMap<String, CpuHelperSignature>,
 ) -> Result<bool, String> {
     match tree {
@@ -392,6 +408,7 @@ fn owned_select_tree_calls_ready(
                 branch_owned_helper_signature(node, callee, scalar_args.len(), helper_signatures)?;
             Ok(owned_tree_scalar_args_ready(
                 registers,
+                buffer_lengths,
                 scalar_args,
                 &signature.params[1..],
             ))
@@ -400,10 +417,19 @@ fn owned_select_tree_calls_ready(
             then_tree,
             else_tree,
             ..
-        } => Ok(
-            owned_select_tree_calls_ready(then_tree, node, registers, helper_signatures)?
-                && owned_select_tree_calls_ready(else_tree, node, registers, helper_signatures)?,
-        ),
+        } => Ok(owned_select_tree_calls_ready(
+            then_tree,
+            node,
+            registers,
+            buffer_lengths,
+            helper_signatures,
+        )? && owned_select_tree_calls_ready(
+            else_tree,
+            node,
+            registers,
+            buffer_lengths,
+            helper_signatures,
+        )?),
     }
 }
 

@@ -77,11 +77,17 @@ pub(crate) fn lower_cpu_memory_node(
             let raw = fresh_reg(next_reg);
             body.push(format!("  {raw} = call ptr @malloc(i64 {bytes})"));
             lower_buffer_fill(body, next_reg, raw.as_str(), len.as_str(), fill.as_str())?;
-            registers.insert(node.name.clone(), LlvmValueRef::Ptr(raw.clone()));
             let known_len = facts
                 .get_i64(&node.op.args[0])
                 .map(|value| value.to_string())
                 .unwrap_or(len);
+            registers.insert(
+                node.name.clone(),
+                LlvmValueRef::BorrowedBuffer {
+                    ptr: raw.clone(),
+                    len: known_len.clone(),
+                },
+            );
             buffer_lengths.insert(node.name.clone(), known_len);
         }
         "load_value" => {

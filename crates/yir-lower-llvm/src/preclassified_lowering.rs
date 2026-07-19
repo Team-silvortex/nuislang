@@ -3,7 +3,7 @@ use yir_core::Node;
 use super::{
     facts::propagate_known_facts,
     fresh_global, fresh_reg, llvm_c_string_bytes,
-    value_ref::{coerce_to_i64, get_network_result, get_ptr, get_struct},
+    value_ref::{coerce_to_i64, get_network_result, get_struct},
     variant_select::{emit_variant_is_value, variant_field_value, variant_parent_name},
     KnownFacts, LlvmLoweringState, LlvmValueRef, NetworkResultLlvmValueRef, StructLlvmValueRef,
 };
@@ -317,7 +317,7 @@ fn is_wrong_concrete_variant_access(value_ref: &LlvmValueRef, variant_name: &str
 pub(crate) fn lower_cpu_pointer_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
     match node.op.instruction.as_str() {
         "borrow" | "move_ptr" => {
-            let Some(ptr) = get_ptr(&state.registers, &node.op.args[0]) else {
+            let Some(value) = state.registers.get(&node.op.args[0]).cloned() else {
                 state.body.push(format!(
                     "  ; deferred lowering for {} `{}` because its input is outside the current CPU LLVM slice",
                     node.op.full_name(),
@@ -325,9 +325,18 @@ pub(crate) fn lower_cpu_pointer_node(node: &Node, state: &mut LlvmLoweringState)
                 ));
                 return true;
             };
-            state
-                .registers
-                .insert(node.name.clone(), LlvmValueRef::Ptr(ptr.to_owned()));
+            let value = match value {
+                value @ LlvmValueRef::Ptr(_) | value @ LlvmValueRef::BorrowedBuffer { .. } => value,
+                _ => {
+                    state.body.push(format!(
+                        "  ; deferred lowering for {} `{}` because its input is not pointer-shaped",
+                        node.op.full_name(),
+                        node.name
+                    ));
+                    return true;
+                }
+            };
+            state.registers.insert(node.name.clone(), value);
             if let Some(len) = state.buffer_lengths.get(&node.op.args[0]).cloned() {
                 state.buffer_lengths.insert(node.name.clone(), len);
             }

@@ -217,6 +217,7 @@ pub(super) fn emit_cpu_function(
             body,
             registers,
             helper_signatures,
+            &state.buffer_lengths,
             &mut next_reg,
             &mut next_block,
         )? {
@@ -268,6 +269,7 @@ pub(super) fn emit_cpu_function(
             node,
             body,
             registers,
+            &state.buffer_lengths,
             helper_signatures,
             &mut state.delayed_registers,
             &mut state.facts,

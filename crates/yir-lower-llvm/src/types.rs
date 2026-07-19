@@ -31,6 +31,10 @@ pub(crate) enum LlvmValueRef {
     Struct(StructLlvmValueRef),
     VariantUnion(VariantUnionLlvmValueRef),
     Ptr(String),
+    BorrowedBuffer {
+        ptr: String,
+        len: String,
+    },
     TextHandle {
         ptr: String,
         handle: String,
@@ -105,6 +109,7 @@ pub(crate) enum CpuCallScalarKind {
     F32,
     F64,
     BorrowedBuffer,
+    TraversalPointer,
     OwnedBytes,
 }
 #[derive(Clone)]

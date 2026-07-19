@@ -55,9 +55,9 @@ pub(crate) fn lower_dynamic_extern_arg(
     next_reg: &mut usize,
 ) -> Option<String> {
     match value {
-        LlvmValueRef::Ptr(value) | LlvmValueRef::TextHandle { ptr: value, .. } => {
-            Some(format!("ptr {value}"))
-        }
+        LlvmValueRef::Ptr(value)
+        | LlvmValueRef::BorrowedBuffer { ptr: value, .. }
+        | LlvmValueRef::TextHandle { ptr: value, .. } => Some(format!("ptr {value}")),
         LlvmValueRef::I32(_) => {
             coerce_to_i32(value, body, next_reg).map(|value| format!("i32 {value}"))
         }

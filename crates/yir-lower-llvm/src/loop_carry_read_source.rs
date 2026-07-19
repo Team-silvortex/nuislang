@@ -237,7 +237,9 @@ fn expect_ptr_payload(
     loop_instruction: &str,
 ) -> Result<String, String> {
     match raw_payloads.first() {
-        Some(LlvmValueRef::Ptr(ptr)) => Ok(ptr.clone()),
+        Some(LlvmValueRef::Ptr(ptr)) | Some(LlvmValueRef::BorrowedBuffer { ptr, .. }) => {
+            Ok(ptr.clone())
+        }
         _ => Err(format!(
             "cpu.{loop_instruction} `{node_name}` is missing {label} payload for `{carry_kind}` during LLVM lowering",
         )),

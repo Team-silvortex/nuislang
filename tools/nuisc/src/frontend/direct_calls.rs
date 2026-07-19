@@ -6,8 +6,8 @@ use super::call_helpers::{
     ensure_call_arg_matches_param, lower_extern_call_arg_for_param, CallArgParamCheck,
 };
 use super::{
-    ensure_ref_like, i32_type, lower_expr, lower_nested_expr_with_async, FunctionSignature,
-    ModuleConstValue,
+    ensure_ref_like, i32_type, infer_nir_expr_type, lower_expr, lower_nested_expr_with_async,
+    FunctionSignature, ModuleConstValue,
 };
 
 #[path = "direct_calls_buffer.rs"]
@@ -115,6 +115,32 @@ pub(super) fn lower_direct_call_builtin_or_named_call(
             )?;
             ensure_ref_like("is_null", &lowered, bindings, signatures, struct_table)?;
             Ok(Some(NirExpr::IsNull(Box::new(lowered))))
+        }
+        "require_non_null" => {
+            let [value] = args else {
+                return Err("require_non_null(...) expects 1 arg".to_owned());
+            };
+            let lowered = lower_expr(
+                value,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                None,
+            )?;
+            let Some(ty) = infer_nir_expr_type(&lowered, bindings, signatures, struct_table) else {
+                return Err("cannot infer require_non_null(...) input type".to_owned());
+            };
+            if !ty.is_ref || !ty.is_optional || ty.name != "Buffer" || !ty.generic_args.is_empty() {
+                return Err(format!(
+                    "require_non_null(...) expects `ref Buffer?`, found `{}`",
+                    ty.render()
+                ));
+            }
+            Ok(Some(NirExpr::Call {
+                callee: "__nuis_require_non_null_buffer".to_owned(),
+                args: vec![lowered],
+            }))
         }
         _ => lower_named_call(NamedCallLoweringInput {
             callee,

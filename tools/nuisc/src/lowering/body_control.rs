@@ -74,15 +74,22 @@ pub(in crate::lowering) fn lower_if_stmt(
         }
     }
     let condition_name = lower_expr(condition, state, bindings)?;
-    let lowered =
-        lower_if_pair(condition_name, then_body, else_body, state, bindings).map_err(|error| {
-            let function_name = state
-                .call_stack
-                .last()
-                .cloned()
-                .unwrap_or_else(|| "<top-level>".to_owned());
-            format!("in function `{function_name}` while lowering `if`: {error}")
-        })?;
+    let lowered = lower_if_pair(
+        condition_name,
+        condition,
+        then_body,
+        else_body,
+        state,
+        bindings,
+    )
+    .map_err(|error| {
+        let function_name = state
+            .call_stack
+            .last()
+            .cloned()
+            .unwrap_or_else(|| "<top-level>".to_owned());
+        format!("in function `{function_name}` while lowering `if`: {error}")
+    })?;
     match lowered {
         LoweredIfOutcome::Continued => Ok(None),
         LoweredIfOutcome::Bind { name, value } => {

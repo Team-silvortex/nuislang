@@ -178,6 +178,11 @@ fn lower_scoped_operand(
             .ok_or_else(|| format!("cannot lower scoped buffer length `{operand}`"))?;
         return Ok(vec![format!("ptr {ptr}"), format!("i64 {len}")]);
     }
+    if kind == CpuCallScalarKind::TraversalPointer {
+        let ptr = get_ptr(registers, operand)
+            .ok_or_else(|| format!("cannot lower traversal pointer `{operand}`"))?;
+        return Ok(vec![format!("ptr {ptr}")]);
+    }
     if kind == CpuCallScalarKind::OwnedBytes {
         if let Some(source) = operand.strip_prefix("move_owned:") {
             if let Some(blob) = owned_move_overrides.get(source) {
@@ -215,6 +220,7 @@ fn lower_scoped_operand(
             CpuCallScalarKind::F32 => get_f32(registers, operand),
             CpuCallScalarKind::F64 => get_f64(registers, operand),
             CpuCallScalarKind::BorrowedBuffer => get_ptr(registers, operand),
+            CpuCallScalarKind::TraversalPointer => get_ptr(registers, operand),
             CpuCallScalarKind::OwnedBytes => None,
         }
     }

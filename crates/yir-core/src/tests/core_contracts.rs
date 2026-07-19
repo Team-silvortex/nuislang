@@ -264,6 +264,55 @@ fn owned_select_tree_protocol_rejects_invalid_owner_paths() {
     let mut invalid_cast = cast;
     invalid_cast[7] = "i32_to_ptr".to_owned();
     assert!(crate::parse_owned_select_tree_args(&invalid_cast).is_none());
+
+    let non_null = vec![
+        "1".to_owned(),
+        "bytes".to_owned(),
+        "call".to_owned(),
+        "retain".to_owned(),
+        "0".to_owned(),
+        "1".to_owned(),
+        "non_null".to_owned(),
+        "value".to_owned(),
+        "scratch".to_owned(),
+    ];
+    let parsed = crate::parse_owned_select_tree_args(&non_null).expect("non-null leaf proof");
+    let crate::OwnedSelectTree::Call { scalar_args, .. } = &parsed.tree else {
+        panic!("expected non-null call leaf");
+    };
+    assert!(matches!(
+        &scalar_args[0],
+        crate::OwnedSelectScalarArg::NonNull { value }
+            if matches!(value.as_ref(), crate::OwnedSelectScalarArg::Value("scratch"))
+    ));
+    let mut inputs = Vec::new();
+    crate::owned_select_tree_scalar_args(&parsed.tree, &mut inputs);
+    assert_eq!(inputs, ["scratch"]);
+
+    let traversal_borrow = vec![
+        "1".to_owned(),
+        "bytes".to_owned(),
+        "call".to_owned(),
+        "retain".to_owned(),
+        "0".to_owned(),
+        "1".to_owned(),
+        "traversal_borrow".to_owned(),
+        "value".to_owned(),
+        "head".to_owned(),
+    ];
+    let parsed =
+        crate::parse_owned_select_tree_args(&traversal_borrow).expect("traversal borrow leaf");
+    let crate::OwnedSelectTree::Call { scalar_args, .. } = &parsed.tree else {
+        panic!("expected traversal borrow call leaf");
+    };
+    assert!(matches!(
+        &scalar_args[0],
+        crate::OwnedSelectScalarArg::TraversalBorrow { value }
+            if matches!(value.as_ref(), crate::OwnedSelectScalarArg::Value("head"))
+    ));
+    let mut inputs = Vec::new();
+    crate::owned_select_tree_scalar_args(&parsed.tree, &mut inputs);
+    assert_eq!(inputs, ["head"]);
 }
 
 #[test]

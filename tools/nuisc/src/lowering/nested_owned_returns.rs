@@ -1,5 +1,5 @@
 use super::conditional_owned_calls::{
-    lower_pure_scalar_args, moved_owned_source, owned_return_call,
+    lower_pure_scalar_args, moved_owned_source, owned_return_call_with_non_null_proofs,
 };
 use super::*;
 
@@ -32,15 +32,37 @@ enum OwnedReturnScalarArg<'a> {
         kind: yir_core::OwnedSelectScalarCast,
         value: Box<OwnedReturnScalarArg<'a>>,
     },
+    NonNull {
+        value: Box<OwnedReturnScalarArg<'a>>,
+    },
+    TraversalBorrow {
+        value: Box<OwnedReturnScalarArg<'a>>,
+    },
 }
 
 pub(super) fn collect_owned_return_tree_helpers(
     stmts: &[NirStmt],
     functions: &BTreeMap<&str, &NirFunction>,
 ) -> Option<BTreeSet<String>> {
-    let branch = parse_owned_return_branch(stmts, functions)?;
+    let branch = parse_owned_return_branch(stmts, functions, &[])?;
     let mut helpers = BTreeSet::new();
     collect_branch_helpers(&branch, &mut helpers);
+    Some(helpers)
+}
+
+pub(super) fn collect_owned_return_if_helpers(
+    condition: &NirExpr,
+    then_body: &[NirStmt],
+    else_body: &[NirStmt],
+    functions: &BTreeMap<&str, &NirFunction>,
+) -> Option<BTreeSet<String>> {
+    let then_proofs = branch_non_null_proofs(&[], condition, true);
+    let else_proofs = branch_non_null_proofs(&[], condition, false);
+    let then_branch = parse_owned_return_branch(then_body, functions, &then_proofs)?;
+    let else_branch = parse_owned_return_branch(else_body, functions, &else_proofs)?;
+    let mut helpers = BTreeSet::new();
+    collect_branch_helpers(&then_branch, &mut helpers);
+    collect_branch_helpers(&else_branch, &mut helpers);
     Some(helpers)
 }
 
@@ -64,10 +86,12 @@ fn collect_branch_helpers(branch: &OwnedReturnBranch<'_>, helpers: &mut BTreeSet
 fn parse_owned_return_branch<'a>(
     stmts: &'a [NirStmt],
     functions: &BTreeMap<&str, &'a NirFunction>,
+    non_null_proofs: &[&'a NirExpr],
 ) -> Option<OwnedReturnBranch<'a>> {
     let (projections, tail) = split_variant_field_prelude(stmts);
     if let [NirStmt::Return(Some(NirExpr::Call { .. }))] = tail {
-        let (callee, owner, scalar_args) = owned_return_call(tail, functions)?;
+        let (callee, owner, scalar_args) =
+            owned_return_call_with_non_null_proofs(tail, functions, non_null_proofs)?;
         let scalar_args = scalar_args
             .iter()
             .map(|arg| selected_leaf_scalar_arg(arg, &projections, 0))
@@ -89,11 +113,59 @@ fn parse_owned_return_branch<'a>(
             condition,
             then_body,
             else_body,
-        }] => Some(OwnedReturnBranch::If {
-            condition,
-            then_branch: Box::new(parse_owned_return_branch(then_body, functions)?),
-            else_branch: Box::new(parse_owned_return_branch(else_body, functions)?),
-        }),
+        }] => {
+            let then_proofs = branch_non_null_proofs(non_null_proofs, condition, true);
+            let else_proofs = branch_non_null_proofs(non_null_proofs, condition, false);
+            Some(OwnedReturnBranch::If {
+                condition,
+                then_branch: Box::new(parse_owned_return_branch(
+                    then_body,
+                    functions,
+                    &then_proofs,
+                )?),
+                else_branch: Box::new(parse_owned_return_branch(
+                    else_body,
+                    functions,
+                    &else_proofs,
+                )?),
+            })
+        }
+        _ => None,
+    }
+}
+
+fn branch_non_null_proofs<'a>(
+    inherited: &[&'a NirExpr],
+    condition: &'a NirExpr,
+    branch_value: bool,
+) -> Vec<&'a NirExpr> {
+    let mut proofs = inherited.to_vec();
+    let Some((source, condition_means_null)) = null_test_source(condition) else {
+        return proofs;
+    };
+    if branch_value != condition_means_null && !proofs.contains(&source) {
+        proofs.push(source);
+    }
+    proofs
+}
+
+fn null_test_source(expr: &NirExpr) -> Option<(&NirExpr, bool)> {
+    match expr {
+        NirExpr::IsNull(source) => Some((source, true)),
+        NirExpr::Binary { op, lhs, rhs } => {
+            let (source, expected) = match (lhs.as_ref(), rhs.as_ref()) {
+                (NirExpr::IsNull(source), NirExpr::Bool(expected))
+                | (NirExpr::Bool(expected), NirExpr::IsNull(source)) => {
+                    (source.as_ref(), *expected)
+                }
+                _ => return None,
+            };
+            match op {
+                NirBinaryOp::Eq => Some((source, expected)),
+                NirBinaryOp::Ne => Some((source, !expected)),
+                _ => None,
+            }
+        }
         _ => None,
     }
 }
@@ -122,6 +194,16 @@ fn selected_leaf_scalar_arg<'a>(
         NirExpr::FieldAccess { base, field } => Some(OwnedReturnScalarArg::StructField {
             field,
             base: Box::new(selected_leaf_scalar_arg(base, projections, depth + 1)?),
+        }),
+        NirExpr::Call { callee, args }
+            if callee == "__nuis_require_non_null_buffer" && args.len() == 1 =>
+        {
+            Some(OwnedReturnScalarArg::NonNull {
+                value: Box::new(selected_leaf_scalar_arg(&args[0], projections, depth + 1)?),
+            })
+        }
+        NirExpr::Borrow(value) => Some(OwnedReturnScalarArg::TraversalBorrow {
+            value: Box::new(selected_leaf_scalar_arg(value, projections, depth + 1)?),
         }),
         NirExpr::CastI64ToI32(value) => selected_leaf_cast(
             yir_core::OwnedSelectScalarCast::I64ToI32,
@@ -376,21 +458,34 @@ fn encode_owned_scalar_arg(
             tokens.extend(["cast".to_owned(), kind.as_str().to_owned()]);
             encode_owned_scalar_arg(value, state, bindings, tokens)?;
         }
+        OwnedReturnScalarArg::NonNull { value } => {
+            tokens.push("non_null".to_owned());
+            encode_owned_scalar_arg(value, state, bindings, tokens)?;
+        }
+        OwnedReturnScalarArg::TraversalBorrow { value } => {
+            tokens.push("traversal_borrow".to_owned());
+            encode_owned_scalar_arg(value, state, bindings, tokens)?;
+        }
     }
     Ok(())
 }
 
 pub(super) fn lower_nested_owned_return_tree(
     root_condition: String,
+    root_condition_expr: &NirExpr,
     then_body: &[NirStmt],
     else_body: &[NirStmt],
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
 ) -> Result<Option<String>, String> {
-    let Some(then_branch) = parse_owned_return_branch(then_body, &state.function_map) else {
+    let then_proofs = branch_non_null_proofs(&[], root_condition_expr, true);
+    let else_proofs = branch_non_null_proofs(&[], root_condition_expr, false);
+    let Some(then_branch) = parse_owned_return_branch(then_body, &state.function_map, &then_proofs)
+    else {
         return Ok(None);
     };
-    let Some(else_branch) = parse_owned_return_branch(else_body, &state.function_map) else {
+    let Some(else_branch) = parse_owned_return_branch(else_body, &state.function_map, &else_proofs)
+    else {
         return Ok(None);
     };
     if matches!(&then_branch, OwnedReturnBranch::Owner(_))

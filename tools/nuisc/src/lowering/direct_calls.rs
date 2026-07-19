@@ -8,6 +8,7 @@ enum DirectCallScalarKind {
     F32,
     F64,
     BorrowedBuffer,
+    TraversalPointer,
     OwnedBytes,
 }
 
@@ -251,7 +252,11 @@ fn direct_call_scalar_kind(ty: &nuis_semantics::model::NirTypeRef) -> Option<Dir
         return None;
     }
     if ty.is_ref {
-        return (ty.name == "Buffer").then_some(DirectCallScalarKind::BorrowedBuffer);
+        return match ty.name.as_str() {
+            "Buffer" => Some(DirectCallScalarKind::BorrowedBuffer),
+            "Node" => Some(DirectCallScalarKind::TraversalPointer),
+            _ => None,
+        };
     }
     if ty.name == "Bytes" {
         return Some(DirectCallScalarKind::OwnedBytes);
@@ -288,7 +293,10 @@ pub(super) fn supports_direct_call_signature(function: &NirFunction) -> bool {
 
 fn direct_call_signature_kind(function: &NirFunction) -> Option<DirectCallScalarKind> {
     let return_kind = direct_call_scalar_kind(function.return_type.as_ref()?)?;
-    if return_kind == DirectCallScalarKind::BorrowedBuffer {
+    if matches!(
+        return_kind,
+        DirectCallScalarKind::BorrowedBuffer | DirectCallScalarKind::TraversalPointer
+    ) {
         return None;
     }
     for param in &function.params {
@@ -637,6 +645,7 @@ pub(super) fn lower_direct_call_helper_function(
             DirectCallScalarKind::F32 => "param_f32",
             DirectCallScalarKind::F64 => "param_f64",
             DirectCallScalarKind::BorrowedBuffer => "param_buffer_ref",
+            DirectCallScalarKind::TraversalPointer => "param_node_ref",
             DirectCallScalarKind::OwnedBytes => "param_owned_bytes",
         };
         state.yir.nodes.push(Node {
@@ -670,6 +679,9 @@ pub(super) fn lower_direct_call_helper_function(
             DirectCallScalarKind::F32 => "return_f32",
             DirectCallScalarKind::F64 => "return_f64",
             DirectCallScalarKind::BorrowedBuffer => unreachable!("borrowed refs cannot return"),
+            DirectCallScalarKind::TraversalPointer => {
+                unreachable!("traversal refs cannot return")
+            }
             DirectCallScalarKind::OwnedBytes => "return_owned_bytes",
         }
     };
@@ -716,6 +728,9 @@ pub(super) fn push_direct_call_node(
             DirectCallScalarKind::F32 => "call_f32",
             DirectCallScalarKind::F64 => "call_f64",
             DirectCallScalarKind::BorrowedBuffer => unreachable!("borrowed refs cannot return"),
+            DirectCallScalarKind::TraversalPointer => {
+                unreachable!("traversal refs cannot return")
+            }
             DirectCallScalarKind::OwnedBytes => "call_owned_bytes",
         }
     };

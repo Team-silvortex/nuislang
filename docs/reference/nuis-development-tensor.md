@@ -600,7 +600,23 @@ leaf. Wrong variants or missing nested fields in unselected leaves therefore
 remain unevaluated. A closed `cast` descriptor now composes all eight existing
 NIR scalar conversions with those paths; unknown casts are protocol errors and
 LLVM emits conversion instructions only inside the selected leaf. Pointer leaf
-policies remain open.
+policies now admit non-optional `ref Buffer` arguments through direct values and
+recursive structure/enum field projections. LLVM represents these borrows as
+provenance-carrying `ptr + len` values, so aggregate assembly, variant selection,
+and leaf-local projection retain the complete Buffer ABI without relying on a
+projected SSA name. They remain read-only GLM dependencies owned and cleaned up
+by the caller. Nullable Buffer fields may cross the same leaf ABI only through
+`require_non_null(...)` under a matching branch-local null proof. The frontend
+encodes a recursive `non_null` descriptor only when the exact source expression
+is dominated by the non-null branch; the CPU interpreter rechecks it and LLVM
+emits a leaf-local `llvm.assume`. Unproven uses fail closed. Read-only traversal
+pointers are now a separate selected-leaf capability: a non-optional `ref Node`
+must cross every call boundary through explicit `borrow(...)`, the tree records
+`traversal_borrow <descriptor>`, GLM retains a `Read` on the root, and LLVM uses
+a single-pointer ABI. The selected leaf rejects a null traversal pointer, while
+unselected leaves do not inspect it; ownership and final cleanup remain with the
+caller. Traversal pointers cannot be returned or placed in task payloads, and
+owned pointer transfer remains closed pending an exact-one transfer contract.
 The runtime now defines `NuisSchedulerOwnedBlobV1` as the first GLM-tokened
 dynamic leaf primitive. It deep-copies borrowed bytes and has scheduler-native
 move/drop hooks; a compiled harness covers take and cancellation. Recursive

@@ -297,6 +297,9 @@ fn owned_select_tree_projects_variant_field_only_on_selected_call_leaf() {
     );
 }
 
+#[path = "tests_owned_select_non_null.rs"]
+mod tests_owned_select_non_null;
+
 #[test]
 fn owned_select_tree_recursively_projects_struct_field_on_selected_leaf() {
     let cpu = CpuMod;

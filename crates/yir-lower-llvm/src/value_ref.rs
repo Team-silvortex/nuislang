@@ -140,6 +140,11 @@ pub(crate) fn coerce_to_i64(
             body.push(format!("  {reg} = ptrtoint ptr {value} to i64"));
             Some(reg)
         }
+        LlvmValueRef::BorrowedBuffer { ptr, .. } => {
+            let reg = fresh_reg(next_reg);
+            body.push(format!("  {reg} = ptrtoint ptr {ptr} to i64"));
+            Some(reg)
+        }
         LlvmValueRef::I32(value) => {
             let reg = fresh_reg(next_reg);
             body.push(format!("  {reg} = sext i32 {value} to i64"));
@@ -208,6 +213,19 @@ pub(crate) fn get_ptr<'a>(
 ) -> Option<&'a str> {
     match registers.get(name) {
         Some(LlvmValueRef::Ptr(value)) => Some(value.as_str()),
+        Some(LlvmValueRef::BorrowedBuffer { ptr, .. }) => Some(ptr.as_str()),
+        _ => None,
+    }
+}
+
+pub(crate) fn borrowed_buffer_parts(
+    registers: &BTreeMap<String, LlvmValueRef>,
+    buffer_lengths: &BTreeMap<String, String>,
+    name: &str,
+) -> Option<(String, String)> {
+    match registers.get(name)? {
+        LlvmValueRef::BorrowedBuffer { ptr, len } => Some((ptr.clone(), len.clone())),
+        LlvmValueRef::Ptr(ptr) => Some((ptr.clone(), buffer_lengths.get(name)?.clone())),
         _ => None,
     }
 }

@@ -397,7 +397,26 @@ variants and missing nested fields in unselected arms therefore remain
 unevaluated. The recursive descriptor also accepts a closed set of eight
 `cast <kind> <value-descriptor>` forms matching existing NIR scalar casts.
 Unknown kinds fail protocol parsing, and both interpreter and LLVM apply the
-conversion only in the selected leaf. Pointer leaf policies remain open.
+conversion only in the selected leaf. The first pointer policy admits
+non-optional `ref Buffer` values, including recursive `struct_field` and
+`variant_field -> struct_field` projections. LLVM carries each borrowed Buffer
+as a first-class pointer-and-length pair through aggregate assembly and variant
+selection, then expands that value to the helper's `ptr, i64 len` ABI only
+inside the selected leaf. GLM reads the root descriptor base, and selection does
+not move or drop the buffer, so the caller retains cleanup responsibility.
+Nullable Buffer values use the explicit
+`non_null <value-descriptor>` wrapper produced by `require_non_null(...)`. The
+wrapper is admitted only when the exact direct or projected source is dominated
+by the non-null side of `is_null(source)` (or its normalized Boolean forms).
+The interpreter rejects a failed proof, LLVM emits the check and `llvm.assume`
+inside the selected leaf, and unselected leaves do not evaluate it. Unproven
+nullable values fail closed. Read-only traversal pointers use a distinct
+`traversal_borrow <value-descriptor>` wrapper and single-`ptr` ABI. Source-level
+non-optional `ref Node` arguments require explicit `borrow(...)` at both normal
+and selected calls; GLM records a root `Read`, the selected leaf rejects null,
+and the caller retains ownership and cleanup. They cannot be returned or enter
+task payloads. Owned pointer transfer remains closed until its move and cleanup
+contract is independently specified.
 
 Today `nuis` does **not** yet have:
 

@@ -105,6 +105,10 @@ pub(super) fn lower_core_expr(
         } => Some(lower_variant_field_access(
             base, variant, field, state, bindings,
         )),
+        NirExpr::Call { callee, .. } if callee == "__nuis_require_non_null_buffer" => Some(Err(
+            "require_non_null(...) is valid only in a selected owned-helper leaf dominated by the matching non-null branch"
+                .to_owned(),
+        )),
         _ => None,
     }
 }

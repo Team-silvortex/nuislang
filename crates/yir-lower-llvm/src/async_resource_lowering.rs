@@ -553,6 +553,9 @@ fn emit_scalar_task_context(
             CpuCallScalarKind::BorrowedBuffer => {
                 unreachable!("borrowed buffers cannot enter async task payloads")
             }
+            CpuCallScalarKind::TraversalPointer => {
+                unreachable!("traversal pointers cannot enter async task payloads")
+            }
             CpuCallScalarKind::OwnedBytes => {
                 unreachable!("direct owned Bytes params cannot enter scalar task payloads")
             }
@@ -605,6 +608,9 @@ fn unpack_task_payload(
         }
         CpuCallScalarKind::BorrowedBuffer => {
             unreachable!("borrowed buffers cannot return from async tasks")
+        }
+        CpuCallScalarKind::TraversalPointer => {
+            unreachable!("traversal pointers cannot return from async tasks")
         }
         CpuCallScalarKind::OwnedBytes => {
             unreachable!("direct owned Bytes params cannot return from scalar tasks")

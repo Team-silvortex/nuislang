@@ -206,6 +206,7 @@ fn lower_matching_call_return(
 
 pub(super) fn lower_if_pair(
     condition_name: String,
+    condition_expr: &NirExpr,
     then_body: &[NirStmt],
     else_body: &[NirStmt],
     state: &mut LoweringState<'_>,
@@ -237,6 +238,7 @@ pub(super) fn lower_if_pair(
 
     if let Some(returned) = lower_nested_owned_return_tree(
         condition_name.clone(),
+        condition_expr,
         then_body,
         else_body,
         state,

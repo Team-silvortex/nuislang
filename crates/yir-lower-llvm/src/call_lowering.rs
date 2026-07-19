@@ -5,7 +5,9 @@ use yir_core::{parse_branch_owned_call_args, Node};
 use super::{
     call_return::cpu_scalar_kind_llvm_type,
     fresh_block, fresh_reg,
-    value_ref::{coerce_to_i64, get_bool, get_f32, get_f64, get_i32, get_i64, get_ptr},
+    value_ref::{
+        borrowed_buffer_parts, coerce_to_i64, get_bool, get_f32, get_f64, get_i32, get_i64, get_ptr,
+    },
     CpuCallScalarKind, CpuHelperSignature, LlvmValueRef, TaskThunkArgument,
 };
 
@@ -14,6 +16,7 @@ pub(crate) fn lower_cpu_branch_owned_call_node(
     body: &mut Vec<String>,
     registers: &mut BTreeMap<String, LlvmValueRef>,
     helper_signatures: &BTreeMap<String, CpuHelperSignature>,
+    buffer_lengths: &BTreeMap<String, String>,
     next_reg: &mut usize,
     next_block: &mut usize,
 ) -> Result<bool, String> {
@@ -64,6 +67,7 @@ pub(crate) fn lower_cpu_branch_owned_call_node(
     let owner = owner.clone();
     let Some(then_scalar_args) = lower_branch_scalar_args(
         registers,
+        buffer_lengths,
         args.then_scalar_args,
         &then_signature.params[1..],
     ) else {
@@ -75,6 +79,7 @@ pub(crate) fn lower_cpu_branch_owned_call_node(
     };
     let Some(else_scalar_args) = lower_branch_scalar_args(
         registers,
+        buffer_lengths,
         args.else_scalar_args,
         &else_signature.params[1..],
     ) else {
@@ -137,15 +142,10 @@ pub(crate) fn branch_owned_helper_signature<'a>(
     if signature.ret != CpuCallScalarKind::OwnedBytes
         || signature.params.first() != Some(&CpuCallScalarKind::OwnedBytes)
         || signature.params.len() != scalar_count + 1
-        || signature.params[1..].iter().any(|kind| {
-            matches!(
-                kind,
-                CpuCallScalarKind::BorrowedBuffer | CpuCallScalarKind::OwnedBytes
-            )
-        })
+        || signature.params[1..].contains(&CpuCallScalarKind::OwnedBytes)
     {
         return Err(format!(
-            "{} `{}` requires `{callee}` to have signature (Bytes, scalar...) -> Bytes matching its encoded arguments",
+            "{} `{}` requires `{callee}` to have signature (Bytes, scalar-or-borrowed-buffer...) -> Bytes matching its encoded arguments",
             node.op.full_name(), node.name
         ));
     }
@@ -154,13 +154,24 @@ pub(crate) fn branch_owned_helper_signature<'a>(
 
 pub(crate) fn lower_branch_scalar_args(
     registers: &BTreeMap<String, LlvmValueRef>,
+    buffer_lengths: &BTreeMap<String, String>,
     args: &[String],
     kinds: &[CpuCallScalarKind],
 ) -> Option<Vec<String>> {
     args.iter()
         .zip(kinds)
-        .map(|(arg, kind)| lower_scalar_value_arg(registers.get(arg)?, kind))
-        .collect()
+        .map(|(arg, kind)| match kind {
+            CpuCallScalarKind::BorrowedBuffer => {
+                let (pointer, len) = borrowed_buffer_parts(registers, buffer_lengths, arg)?;
+                Some(vec![format!("ptr {pointer}"), format!("i64 {len}")])
+            }
+            CpuCallScalarKind::TraversalPointer => {
+                get_ptr(registers, arg).map(|ptr| vec![format!("ptr {ptr}")])
+            }
+            _ => Some(vec![lower_scalar_value_arg(registers.get(arg)?, kind)?]),
+        })
+        .collect::<Option<Vec<_>>>()
+        .map(|args| args.into_iter().flatten().collect())
 }
 
 pub(crate) fn lower_scalar_value_arg(
@@ -232,9 +243,13 @@ pub(crate) fn lower_cpu_call_node(
             CpuCallScalarKind::F64 => {
                 get_f64(registers, arg).map(|value| vec![format!("double {value}")])
             }
-            CpuCallScalarKind::BorrowedBuffer => get_ptr(registers, arg)
-                .zip(buffer_lengths.get(arg))
-                .map(|(ptr, len)| vec![format!("ptr {ptr}"), format!("i64 {len}")]),
+            CpuCallScalarKind::BorrowedBuffer => {
+                borrowed_buffer_parts(registers, buffer_lengths, arg)
+                    .map(|(ptr, len)| vec![format!("ptr {ptr}"), format!("i64 {len}")])
+            }
+            CpuCallScalarKind::TraversalPointer => {
+                get_ptr(registers, arg).map(|ptr| vec![format!("ptr {ptr}")])
+            }
             CpuCallScalarKind::OwnedBytes => match registers.get(arg) {
                 Some(LlvmValueRef::OwnedBytes { blob }) => Some(vec![format!("ptr {blob}")]),
                 _ => None,
@@ -395,6 +410,7 @@ pub(crate) fn lower_cpu_call_node(
             *last_cpu_value = Some(as_i64);
         }
         CpuCallScalarKind::BorrowedBuffer => unreachable!("borrowed refs cannot return"),
+        CpuCallScalarKind::TraversalPointer => unreachable!("traversal refs cannot return"),
         CpuCallScalarKind::OwnedBytes => {
             registers.insert(node.name.clone(), LlvmValueRef::OwnedBytes { blob: reg });
         }

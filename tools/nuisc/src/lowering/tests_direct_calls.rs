@@ -849,19 +849,19 @@ fn lowers_branch_local_owned_helpers_into_real_llvm_call_blocks() {
     let module = parse_nuis_module(
         r#"
         mod cpu Main {
-          fn keep_left(bytes: Bytes, delta: i64) -> Bytes {
+          fn keep_left(bytes: Bytes, scratch: ref Buffer, delta: i64) -> Bytes {
             return move(bytes);
           }
 
-          fn keep_right(bytes: Bytes, factor: i64) -> Bytes {
+          fn keep_right(bytes: Bytes, scratch: ref Buffer, factor: i64) -> Bytes {
             return move(bytes);
           }
 
-          fn choose(bytes: Bytes, enabled: bool) -> Bytes {
+          fn choose(bytes: Bytes, scratch: ref Buffer, enabled: bool) -> Bytes {
             if enabled {
-              return keep_left(move(bytes), 3);
+              return keep_left(move(bytes), scratch, 3);
             } else {
-              return keep_right(move(bytes), 7);
+              return keep_right(move(bytes), scratch, 7);
             }
           }
 
@@ -869,7 +869,7 @@ fn lowers_branch_local_owned_helpers_into_real_llvm_call_blocks() {
             let buffer: ref Buffer = alloc_buffer(4, 9);
             let bytes: Bytes = copy_bytes(buffer);
             let choice: i64 = cpu_input_i64("choice", 1, 0, 1, 1);
-            let returned: Bytes = choose(move(bytes), choice == 1);
+            let returned: Bytes = choose(move(bytes), buffer, choice == 1);
             let len: i64 = bytes_len(returned);
             drop_bytes(returned);
             free(buffer);
@@ -888,17 +888,19 @@ fn lowers_branch_local_owned_helpers_into_real_llvm_call_blocks() {
         .expect("conditional owned helper calls should retain one branch call node");
     assert_eq!(branch_call.op.args[1], "keep_left");
     assert_eq!(branch_call.op.args[2], "keep_right");
-    assert_eq!(branch_call.op.args[4], "1");
-    assert_eq!(branch_call.op.args[6], "1");
+    let args = yir_core::parse_branch_owned_call_args(&branch_call.op.args).unwrap();
+    assert_eq!(args.then_scalar_args.len(), 2);
+    assert_eq!(args.else_scalar_args.len(), 2);
+    assert_eq!(args.then_scalar_args[0], args.else_scalar_args[0]);
     let then_scalar = yir
         .nodes
         .iter()
-        .find(|node| node.name == branch_call.op.args[5])
+        .find(|node| node.name == args.then_scalar_args[1])
         .expect("then scalar argument source");
     let else_scalar = yir
         .nodes
         .iter()
-        .find(|node| node.name == branch_call.op.args[7])
+        .find(|node| node.name == args.else_scalar_args[1])
         .expect("else scalar argument source");
     assert_eq!(then_scalar.op.args, ["3"]);
     assert_eq!(else_scalar.op.args, ["7"]);
@@ -917,8 +919,8 @@ fn lowers_branch_local_owned_helpers_into_real_llvm_call_blocks() {
         .lines()
         .find(|line| line.contains("call ptr @nuis_fn_keep_right(ptr"))
         .expect("else branch helper call");
-    assert!(then_call.contains(", i64 "));
-    assert!(else_call.contains(", i64 "));
+    assert!(then_call.contains(", ptr ") && then_call.matches(", i64 ").count() == 2);
+    assert!(else_call.contains(", ptr ") && else_call.matches(", i64 ").count() == 2);
     assert!(llvm_ir.contains(" = phi ptr ["));
     assert!(!llvm_ir.contains("deferred lowering for cpu.branch_call_owned_bytes"));
     assert_eq!(
