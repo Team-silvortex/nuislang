@@ -589,8 +589,18 @@ and prefix decision tree let GLM consume aliases once, while LLVM performs
 leaf-local cleanup and a multi-entry pointer merge. Leaves now also encode
 registered static `(Bytes, scalar...) -> Bytes` helpers with pure scalar
 arguments; their scalar dependencies remain explicit and LLVM invokes only the
-selected leaf after dropping other owners. The remaining gaps are normalized
-`match` decision trees, enum leaves, and pointer leaf policies.
+selected leaf after dropping other owners. Three-arm scalar matches now reuse
+the same prefix tree directly, and enum payload matches may
+discard pure arm-leading bindings only when the remainder never references
+them. Tagged `value`, `variant_field`, and recursively nested `struct_field`
+scalar descriptors now provide the selected-leaf projection action required by
+payload-using helpers. GLM depends only on the root projection base, while CPU
+interpretation and LLVM resolve the complete field path only in the selected
+leaf. Wrong variants or missing nested fields in unselected leaves therefore
+remain unevaluated. A closed `cast` descriptor now composes all eight existing
+NIR scalar conversions with those paths; unknown casts are protocol errors and
+LLVM emits conversion instructions only inside the selected leaf. Pointer leaf
+policies remain open.
 The runtime now defines `NuisSchedulerOwnedBlobV1` as the first GLM-tokened
 dynamic leaf primitive. It deep-copies borrowed bytes and has scheduler-native
 move/drop hooks; a compiled harness covers take and cancellation. Recursive

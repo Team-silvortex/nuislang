@@ -159,17 +159,22 @@ pub(crate) fn lower_branch_scalar_args(
 ) -> Option<Vec<String>> {
     args.iter()
         .zip(kinds)
-        .map(|(arg, kind)| match kind {
-            CpuCallScalarKind::Bool => get_bool(registers, arg).map(|value| format!("i1 {value}")),
-            CpuCallScalarKind::I32 => get_i32(registers, arg).map(|value| format!("i32 {value}")),
-            CpuCallScalarKind::I64 => get_i64(registers, arg).map(|value| format!("i64 {value}")),
-            CpuCallScalarKind::F32 => get_f32(registers, arg).map(|value| format!("float {value}")),
-            CpuCallScalarKind::F64 => {
-                get_f64(registers, arg).map(|value| format!("double {value}"))
-            }
-            CpuCallScalarKind::BorrowedBuffer | CpuCallScalarKind::OwnedBytes => None,
-        })
+        .map(|(arg, kind)| lower_scalar_value_arg(registers.get(arg)?, kind))
         .collect()
+}
+
+pub(crate) fn lower_scalar_value_arg(
+    value: &LlvmValueRef,
+    kind: &CpuCallScalarKind,
+) -> Option<String> {
+    match (kind, value) {
+        (CpuCallScalarKind::Bool, LlvmValueRef::Bool { i1, .. }) => Some(format!("i1 {i1}")),
+        (CpuCallScalarKind::I32, LlvmValueRef::I32(value)) => Some(format!("i32 {value}")),
+        (CpuCallScalarKind::I64, LlvmValueRef::I64(value)) => Some(format!("i64 {value}")),
+        (CpuCallScalarKind::F32, LlvmValueRef::F32(value)) => Some(format!("float {value}")),
+        (CpuCallScalarKind::F64, LlvmValueRef::F64(value)) => Some(format!("double {value}")),
+        _ => None,
+    }
 }
 
 pub(crate) fn lower_cpu_call_node(

@@ -8,7 +8,7 @@ enum OwnedReturnBranch<'a> {
     Call {
         callee: &'a str,
         owner: &'a NirExpr,
-        scalar_args: &'a [NirExpr],
+        scalar_args: Vec<OwnedReturnScalarArg<'a>>,
     },
     If {
         condition: &'a NirExpr,
@@ -17,20 +17,74 @@ enum OwnedReturnBranch<'a> {
     },
 }
 
+enum OwnedReturnScalarArg<'a> {
+    Value(&'a NirExpr),
+    VariantField {
+        base: &'a NirExpr,
+        variant: &'a str,
+        field: &'a str,
+    },
+    StructField {
+        field: &'a str,
+        base: Box<OwnedReturnScalarArg<'a>>,
+    },
+    Cast {
+        kind: yir_core::OwnedSelectScalarCast,
+        value: Box<OwnedReturnScalarArg<'a>>,
+    },
+}
+
+pub(super) fn collect_owned_return_tree_helpers(
+    stmts: &[NirStmt],
+    functions: &BTreeMap<&str, &NirFunction>,
+) -> Option<BTreeSet<String>> {
+    let branch = parse_owned_return_branch(stmts, functions)?;
+    let mut helpers = BTreeSet::new();
+    collect_branch_helpers(&branch, &mut helpers);
+    Some(helpers)
+}
+
+fn collect_branch_helpers(branch: &OwnedReturnBranch<'_>, helpers: &mut BTreeSet<String>) {
+    match branch {
+        OwnedReturnBranch::Owner(_) => {}
+        OwnedReturnBranch::Call { callee, .. } => {
+            helpers.insert((*callee).to_owned());
+        }
+        OwnedReturnBranch::If {
+            then_branch,
+            else_branch,
+            ..
+        } => {
+            collect_branch_helpers(then_branch, helpers);
+            collect_branch_helpers(else_branch, helpers);
+        }
+    }
+}
+
 fn parse_owned_return_branch<'a>(
     stmts: &'a [NirStmt],
     functions: &BTreeMap<&str, &'a NirFunction>,
 ) -> Option<OwnedReturnBranch<'a>> {
+    let (projections, tail) = split_variant_field_prelude(stmts);
+    if let [NirStmt::Return(Some(NirExpr::Call { .. }))] = tail {
+        let (callee, owner, scalar_args) = owned_return_call(tail, functions)?;
+        let scalar_args = scalar_args
+            .iter()
+            .map(|arg| selected_leaf_scalar_arg(arg, &projections, 0))
+            .collect::<Option<Vec<_>>>()?;
+        return Some(OwnedReturnBranch::Call {
+            callee,
+            owner,
+            scalar_args,
+        });
+    }
+    let names = projections.keys().copied().collect::<BTreeSet<_>>();
+    if !names.is_empty() && stmts_reference_any_binding(tail, &names) {
+        return None;
+    }
+    let stmts = tail;
     match stmts {
         [NirStmt::Return(Some(expr @ NirExpr::Move(_)))] => Some(OwnedReturnBranch::Owner(expr)),
-        [NirStmt::Return(Some(NirExpr::Call { .. }))] => {
-            let (callee, owner, scalar_args) = owned_return_call(stmts, functions)?;
-            Some(OwnedReturnBranch::Call {
-                callee,
-                owner,
-                scalar_args,
-            })
-        }
         [NirStmt::If {
             condition,
             then_body,
@@ -42,6 +96,175 @@ fn parse_owned_return_branch<'a>(
         }),
         _ => None,
     }
+}
+
+fn selected_leaf_scalar_arg<'a>(
+    expr: &'a NirExpr,
+    projections: &BTreeMap<&'a str, &'a NirExpr>,
+    depth: usize,
+) -> Option<OwnedReturnScalarArg<'a>> {
+    if depth >= 64 {
+        return None;
+    }
+    match expr {
+        NirExpr::Var(name) if projections.contains_key(name.as_str()) => {
+            selected_leaf_scalar_arg(projections[name.as_str()], projections, depth + 1)
+        }
+        NirExpr::VariantFieldAccess {
+            base,
+            variant,
+            field,
+        } => Some(OwnedReturnScalarArg::VariantField {
+            base,
+            variant,
+            field,
+        }),
+        NirExpr::FieldAccess { base, field } => Some(OwnedReturnScalarArg::StructField {
+            field,
+            base: Box::new(selected_leaf_scalar_arg(base, projections, depth + 1)?),
+        }),
+        NirExpr::CastI64ToI32(value) => selected_leaf_cast(
+            yir_core::OwnedSelectScalarCast::I64ToI32,
+            value,
+            projections,
+            depth,
+        ),
+        NirExpr::CastI32ToI64(value) => selected_leaf_cast(
+            yir_core::OwnedSelectScalarCast::I32ToI64,
+            value,
+            projections,
+            depth,
+        ),
+        NirExpr::CastI64ToBool(value) => selected_leaf_cast(
+            yir_core::OwnedSelectScalarCast::I64ToBool,
+            value,
+            projections,
+            depth,
+        ),
+        NirExpr::CastBoolToI64(value) => selected_leaf_cast(
+            yir_core::OwnedSelectScalarCast::BoolToI64,
+            value,
+            projections,
+            depth,
+        ),
+        NirExpr::CastI64ToF32(value) => selected_leaf_cast(
+            yir_core::OwnedSelectScalarCast::I64ToF32,
+            value,
+            projections,
+            depth,
+        ),
+        NirExpr::CastF32ToI64(value) => selected_leaf_cast(
+            yir_core::OwnedSelectScalarCast::F32ToI64,
+            value,
+            projections,
+            depth,
+        ),
+        NirExpr::CastI64ToF64(value) => selected_leaf_cast(
+            yir_core::OwnedSelectScalarCast::I64ToF64,
+            value,
+            projections,
+            depth,
+        ),
+        NirExpr::CastF64ToI64(value) => selected_leaf_cast(
+            yir_core::OwnedSelectScalarCast::F64ToI64,
+            value,
+            projections,
+            depth,
+        ),
+        _ if expr_references_any_binding(expr, &projections.keys().copied().collect()) => None,
+        _ => Some(OwnedReturnScalarArg::Value(expr)),
+    }
+}
+
+fn selected_leaf_cast<'a>(
+    kind: yir_core::OwnedSelectScalarCast,
+    value: &'a NirExpr,
+    projections: &BTreeMap<&'a str, &'a NirExpr>,
+    depth: usize,
+) -> Option<OwnedReturnScalarArg<'a>> {
+    Some(OwnedReturnScalarArg::Cast {
+        kind,
+        value: Box::new(selected_leaf_scalar_arg(value, projections, depth + 1)?),
+    })
+}
+
+fn split_variant_field_prelude<'a>(
+    stmts: &'a [NirStmt],
+) -> (BTreeMap<&'a str, &'a NirExpr>, &'a [NirStmt]) {
+    let mut projections = BTreeMap::new();
+    let mut prefix_len = 0;
+    for stmt in stmts {
+        let NirStmt::Let { name, value, .. } = stmt else {
+            break;
+        };
+        if !matches!(value, NirExpr::VariantFieldAccess { .. }) {
+            break;
+        }
+        projections.insert(name.as_str(), value);
+        prefix_len += 1;
+    }
+    (projections, &stmts[prefix_len..])
+}
+
+pub(super) fn strip_unused_pure_leaf_prelude(stmts: &[NirStmt]) -> Option<&[NirStmt]> {
+    let prefix_len = stmts
+        .iter()
+        .take_while(|stmt| {
+            matches!(
+                stmt,
+                NirStmt::Let { value, .. }
+                    if nir_expr_effect_class(value) == NirExprEffectClass::Pure
+            )
+        })
+        .count();
+    if prefix_len == 0 {
+        return Some(stmts);
+    }
+    let names = stmts[..prefix_len]
+        .iter()
+        .filter_map(|stmt| match stmt {
+            NirStmt::Let { name, .. } => Some(name.as_str()),
+            _ => None,
+        })
+        .collect::<BTreeSet<_>>();
+    let tail = &stmts[prefix_len..];
+    (!stmts_reference_any_binding(tail, &names)).then_some(tail)
+}
+
+fn stmts_reference_any_binding(stmts: &[NirStmt], names: &BTreeSet<&str>) -> bool {
+    stmts.iter().any(|stmt| match stmt {
+        NirStmt::Let { value, .. }
+        | NirStmt::Const { value, .. }
+        | NirStmt::Print(value)
+        | NirStmt::Await(value)
+        | NirStmt::Expr(value)
+        | NirStmt::Return(Some(value)) => expr_references_any_binding(value, names),
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            expr_references_any_binding(condition, names)
+                || stmts_reference_any_binding(then_body, names)
+                || stmts_reference_any_binding(else_body, names)
+        }
+        NirStmt::While { condition, body } => {
+            expr_references_any_binding(condition, names)
+                || stmts_reference_any_binding(body, names)
+        }
+        NirStmt::Break | NirStmt::Continue | NirStmt::Return(None) => false,
+    })
+}
+
+fn expr_references_any_binding(expr: &NirExpr, names: &BTreeSet<&str>) -> bool {
+    if matches!(expr, NirExpr::Var(name) if names.contains(name.as_str())) {
+        return true;
+    }
+    let mut found = false;
+    crate::nir_walk::walk_child_exprs(expr, &mut |child| {
+        found |= expr_references_any_binding(child, names);
+    });
+    found
 }
 
 fn encode_owned_return_branch(
@@ -87,14 +310,15 @@ fn encode_owned_return_branch(
                     owners.push(owner);
                     owners.len() - 1
                 });
-            let scalar_args = lower_pure_scalar_args(scalar_args, state, bindings, "tree leaf")?;
             tokens.extend([
                 "call".to_owned(),
                 (*callee).to_owned(),
                 index.to_string(),
                 scalar_args.len().to_string(),
             ]);
-            tokens.extend(scalar_args);
+            for arg in scalar_args {
+                encode_owned_scalar_arg(arg, state, bindings, tokens)?;
+            }
         }
         OwnedReturnBranch::If {
             condition,
@@ -112,6 +336,45 @@ fn encode_owned_return_branch(
             tokens.extend(["if".to_owned(), condition]);
             encode_owned_return_branch(then_branch, state, bindings, owners, conditions, tokens)?;
             encode_owned_return_branch(else_branch, state, bindings, owners, conditions, tokens)?;
+        }
+    }
+    Ok(())
+}
+
+fn encode_owned_scalar_arg(
+    arg: &OwnedReturnScalarArg<'_>,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+    tokens: &mut Vec<String>,
+) -> Result<(), String> {
+    match arg {
+        OwnedReturnScalarArg::Value(arg) => {
+            let [arg] =
+                lower_pure_scalar_args(std::slice::from_ref(arg), state, bindings, "tree leaf")?
+                    .try_into()
+                    .expect("one scalar argument");
+            tokens.extend(["value".to_owned(), arg]);
+        }
+        OwnedReturnScalarArg::VariantField {
+            base,
+            variant,
+            field,
+        } => {
+            let base = lower_expr(base, state, bindings)?;
+            tokens.extend([
+                "variant_field".to_owned(),
+                base,
+                (*variant).to_owned(),
+                (*field).to_owned(),
+            ]);
+        }
+        OwnedReturnScalarArg::StructField { field, base } => {
+            tokens.extend(["struct_field".to_owned(), (*field).to_owned()]);
+            encode_owned_scalar_arg(base, state, bindings, tokens)?;
+        }
+        OwnedReturnScalarArg::Cast { kind, value } => {
+            tokens.extend(["cast".to_owned(), kind.as_str().to_owned()]);
+            encode_owned_scalar_arg(value, state, bindings, tokens)?;
         }
     }
     Ok(())

@@ -3,8 +3,9 @@ use std::collections::BTreeMap;
 use yir_core::{owned_select_tree_conditions, parse_owned_select_tree_args, Node, OwnedSelectTree};
 
 use super::{
-    call_lowering::{branch_owned_helper_signature, lower_branch_scalar_args},
+    call_lowering::branch_owned_helper_signature,
     fresh_block, fresh_reg,
+    owned_tree_call_args::{lower_owned_tree_scalar_args, owned_tree_scalar_args_ready},
     value_ref::coerce_to_i64,
     variant_select::emit_select_value,
     CpuHelperSignature, KnownFacts, LlvmValueRef,
@@ -214,8 +215,14 @@ fn lower_owned_bytes_select_tree(
         emit_unselected_owner_drops(*owner, &owner_blobs, body);
         let signature =
             branch_owned_helper_signature(node, callee, scalar_args.len(), helper_signatures)?;
-        let scalar_args = lower_branch_scalar_args(registers, scalar_args, &signature.params[1..])
-            .expect("owned tree call inputs were prevalidated");
+        let scalar_args = lower_owned_tree_scalar_args(
+            registers,
+            scalar_args,
+            &signature.params[1..],
+            body,
+            next_reg,
+        )
+        .expect("owned tree call inputs were prevalidated");
         let call_args = std::iter::once(format!("ptr {}", owner_blobs[*owner]))
             .chain(scalar_args)
             .collect::<Vec<_>>()
@@ -289,9 +296,14 @@ fn emit_owned_select_tree(
             let signature =
                 branch_owned_helper_signature(node, callee, scalar_args.len(), helper_signatures)
                     .expect("owned tree helper signature was prevalidated");
-            let scalar_args =
-                lower_branch_scalar_args(registers, scalar_args, &signature.params[1..])
-                    .expect("owned tree call inputs were prevalidated");
+            let scalar_args = lower_owned_tree_scalar_args(
+                registers,
+                scalar_args,
+                &signature.params[1..],
+                body,
+                next_reg,
+            )
+            .expect("owned tree call inputs were prevalidated");
             let call_args = std::iter::once(format!("ptr {}", owner_blobs[*owner]))
                 .chain(scalar_args)
                 .collect::<Vec<_>>()
@@ -378,7 +390,11 @@ fn owned_select_tree_calls_ready(
         } => {
             let signature =
                 branch_owned_helper_signature(node, callee, scalar_args.len(), helper_signatures)?;
-            Ok(lower_branch_scalar_args(registers, scalar_args, &signature.params[1..]).is_some())
+            Ok(owned_tree_scalar_args_ready(
+                registers,
+                scalar_args,
+                &signature.params[1..],
+            ))
         }
         OwnedSelectTree::If {
             then_tree,

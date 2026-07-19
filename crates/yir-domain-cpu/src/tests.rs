@@ -1,5 +1,5 @@
 use super::*;
-use yir_core::{Operation, ResourceKind, StructValue};
+use yir_core::{Operation, ResourceKind, StructValue, VariantUnionValue};
 
 fn cpu_resource() -> Resource {
     Resource {
@@ -207,7 +207,7 @@ fn nested_owned_select_tree_interpreter_accepts_static_call_leaf() {
                 "cpu.select_owned_bytes_tree",
                 vec![
                     "2", "left", "right", "if", "outer", "owner", "1", "call", "keep", "0", "1",
-                    "delta",
+                    "value", "delta",
                 ],
             ),
             &resource,
@@ -215,6 +215,233 @@ fn nested_owned_select_tree_interpreter_accepts_static_call_leaf() {
         )
         .expect("tree call leaf should execute");
     assert_eq!(selected, Value::OwnedBytes(vec![1, 2]));
+}
+
+#[test]
+fn owned_select_tree_projects_variant_field_only_on_selected_call_leaf() {
+    use std::collections::BTreeMap;
+
+    let cpu = CpuMod;
+    let resource = cpu_resource();
+    let node = cpu_node(
+        "selected",
+        "cpu.select_owned_bytes_tree",
+        vec![
+            "2",
+            "left",
+            "right",
+            "if",
+            "choose_call",
+            "call",
+            "retain",
+            "0",
+            "1",
+            "variant_field",
+            "route",
+            "Route.Left",
+            "value",
+            "owner",
+            "1",
+        ],
+    );
+
+    let left_variant = StructValue {
+        type_name: "Route.Left".to_owned(),
+        fields: vec![("value".to_owned(), Value::Int(9))],
+    };
+    let mut variants = BTreeMap::new();
+    variants.insert("Route.Left".to_owned(), left_variant.clone());
+    let mut selected_state = ExecutionState::default();
+    selected_state
+        .values
+        .insert("choose_call".to_owned(), Value::Bool(true));
+    selected_state
+        .values
+        .insert("left".to_owned(), Value::OwnedBytes(vec![1, 2]));
+    selected_state
+        .values
+        .insert("right".to_owned(), Value::OwnedBytes(vec![7]));
+    selected_state.values.insert(
+        "route".to_owned(),
+        Value::VariantUnion(VariantUnionValue {
+            parent_type_name: "Route".to_owned(),
+            active_variant: "Route.Left".to_owned(),
+            variants,
+        }),
+    );
+    assert_eq!(
+        cpu.execute(&node, &resource, &mut selected_state).unwrap(),
+        Value::OwnedBytes(vec![1, 2])
+    );
+
+    let mut skipped_state = ExecutionState::default();
+    skipped_state
+        .values
+        .insert("choose_call".to_owned(), Value::Bool(false));
+    skipped_state
+        .values
+        .insert("left".to_owned(), Value::OwnedBytes(vec![1, 2]));
+    skipped_state
+        .values
+        .insert("right".to_owned(), Value::OwnedBytes(vec![7]));
+    skipped_state.values.insert(
+        "route".to_owned(),
+        Value::Struct(StructValue {
+            type_name: "Route.Right".to_owned(),
+            fields: vec![("value".to_owned(), Value::Int(4))],
+        }),
+    );
+    assert_eq!(
+        cpu.execute(&node, &resource, &mut skipped_state).unwrap(),
+        Value::OwnedBytes(vec![7])
+    );
+}
+
+#[test]
+fn owned_select_tree_recursively_projects_struct_field_on_selected_leaf() {
+    let cpu = CpuMod;
+    let resource = cpu_resource();
+    let node = cpu_node(
+        "selected",
+        "cpu.select_owned_bytes_tree",
+        vec![
+            "2",
+            "left",
+            "right",
+            "if",
+            "choose_call",
+            "call",
+            "retain",
+            "0",
+            "1",
+            "struct_field",
+            "score",
+            "variant_field",
+            "route",
+            "Route.Left",
+            "value",
+            "owner",
+            "1",
+        ],
+    );
+    let payload = Value::Struct(StructValue {
+        type_name: "Payload".to_owned(),
+        fields: vec![("score".to_owned(), Value::Int(9))],
+    });
+    let route = Value::Struct(StructValue {
+        type_name: "Route.Left".to_owned(),
+        fields: vec![("value".to_owned(), payload)],
+    });
+    let mut state = ExecutionState::default();
+    state
+        .values
+        .insert("choose_call".to_owned(), Value::Bool(true));
+    state
+        .values
+        .insert("left".to_owned(), Value::OwnedBytes(vec![1, 2]));
+    state
+        .values
+        .insert("right".to_owned(), Value::OwnedBytes(vec![7]));
+    state.values.insert("route".to_owned(), route);
+
+    assert_eq!(
+        cpu.execute(&node, &resource, &mut state).unwrap(),
+        Value::OwnedBytes(vec![1, 2])
+    );
+
+    let mut skipped = ExecutionState::default();
+    skipped
+        .values
+        .insert("choose_call".to_owned(), Value::Bool(false));
+    skipped
+        .values
+        .insert("left".to_owned(), Value::OwnedBytes(vec![1, 2]));
+    skipped
+        .values
+        .insert("right".to_owned(), Value::OwnedBytes(vec![7]));
+    skipped.values.insert(
+        "route".to_owned(),
+        Value::Struct(StructValue {
+            type_name: "Route.Right".to_owned(),
+            fields: Vec::new(),
+        }),
+    );
+    assert_eq!(
+        cpu.execute(&node, &resource, &mut skipped).unwrap(),
+        Value::OwnedBytes(vec![7])
+    );
+}
+
+#[test]
+fn owned_select_tree_casts_recursive_projection_only_on_selected_leaf() {
+    let cpu = CpuMod;
+    let resource = cpu_resource();
+    let node = cpu_node(
+        "selected",
+        "cpu.select_owned_bytes_tree",
+        vec![
+            "2",
+            "left",
+            "right",
+            "if",
+            "choose_call",
+            "call",
+            "retain",
+            "0",
+            "1",
+            "cast",
+            "i32_to_i64",
+            "struct_field",
+            "score",
+            "variant_field",
+            "route",
+            "Route.Left",
+            "value",
+            "owner",
+            "1",
+        ],
+    );
+    let payload = Value::Struct(StructValue {
+        type_name: "Payload".to_owned(),
+        fields: vec![("score".to_owned(), Value::I32(9))],
+    });
+    let mut selected = ExecutionState::default();
+    selected
+        .values
+        .insert("choose_call".to_owned(), Value::Bool(true));
+    selected
+        .values
+        .insert("left".to_owned(), Value::OwnedBytes(vec![1, 2]));
+    selected
+        .values
+        .insert("right".to_owned(), Value::OwnedBytes(vec![7]));
+    selected.values.insert(
+        "route".to_owned(),
+        Value::Struct(StructValue {
+            type_name: "Route.Left".to_owned(),
+            fields: vec![("value".to_owned(), payload)],
+        }),
+    );
+    assert_eq!(
+        cpu.execute(&node, &resource, &mut selected).unwrap(),
+        Value::OwnedBytes(vec![1, 2])
+    );
+
+    let mut skipped = ExecutionState::default();
+    skipped
+        .values
+        .insert("choose_call".to_owned(), Value::Bool(false));
+    skipped
+        .values
+        .insert("left".to_owned(), Value::OwnedBytes(vec![1, 2]));
+    skipped
+        .values
+        .insert("right".to_owned(), Value::OwnedBytes(vec![7]));
+    skipped.values.insert("route".to_owned(), Value::Int(99));
+    assert_eq!(
+        cpu.execute(&node, &resource, &mut skipped).unwrap(),
+        Value::OwnedBytes(vec![7])
+    );
 }
 
 #[test]

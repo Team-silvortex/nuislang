@@ -393,8 +393,8 @@ pub(crate) fn execute_cpu_scalar_node(
                 yir_core::OwnedSelectTree::Call {
                     scalar_args, owner, ..
                 } => {
-                    for arg in *scalar_args {
-                        state.expect_value(arg)?;
+                    for arg in scalar_args {
+                        expect_owned_tree_scalar_arg(state, arg, &node.name)?;
                     }
                     *owner
                 }
@@ -426,10 +426,87 @@ pub(crate) fn execute_cpu_scalar_node(
         "cast_i32_to_f64" => Ok(Value::F64(state.expect_i32(&node.op.args[0])? as f64)),
         "cast_f32_to_f64" => Ok(Value::F64(state.expect_f32(&node.op.args[0])? as f64)),
         "cast_f64_to_f32" => Ok(Value::F32(state.expect_f64(&node.op.args[0])? as f32)),
+        "cast_i64_to_f32" => Ok(Value::F32(state.expect_int(&node.op.args[0])? as f32)),
+        "cast_f32_to_i64" => Ok(Value::Int(state.expect_f32(&node.op.args[0])? as i64)),
+        "cast_i64_to_f64" => Ok(Value::F64(state.expect_int(&node.op.args[0])? as f64)),
+        "cast_f64_to_i64" => Ok(Value::Int(state.expect_f64(&node.op.args[0])? as i64)),
 
         _ => return Ok(None),
     };
     value.map(Some)
+}
+
+fn expect_owned_tree_scalar_arg(
+    state: &ExecutionState,
+    arg: &yir_core::OwnedSelectScalarArg<'_>,
+    node_name: &str,
+) -> Result<Value, String> {
+    match arg {
+        yir_core::OwnedSelectScalarArg::Value(value) => state.expect_value(value).cloned(),
+        yir_core::OwnedSelectScalarArg::VariantField {
+            base,
+            variant,
+            field,
+        } => {
+            let struct_value = match state.expect_value(base)? {
+                Value::Struct(value) if value.type_name == *variant => value,
+                Value::VariantUnion(union) if union.active_variant == *variant => union
+                    .variants
+                    .get(*variant)
+                    .ok_or_else(|| format!("node `{node_name}` has no payload for `{variant}`"))?,
+                other => {
+                    return Err(format!(
+                        "node `{node_name}` cannot project `{variant}.{field}` from {other}"
+                    ))
+                }
+            };
+            struct_value
+                .fields
+                .iter()
+                .find(|(name, _)| name == *field)
+                .map(|(_, value)| value.clone())
+                .ok_or_else(|| format!("node `{node_name}` has no field `{variant}.{field}`"))
+        }
+        yir_core::OwnedSelectScalarArg::StructField { field, base } => {
+            let value = expect_owned_tree_scalar_arg(state, base, node_name)?;
+            let Value::Struct(value) = value else {
+                return Err(format!(
+                    "node `{node_name}` cannot project struct field `{field}` from {value}"
+                ));
+            };
+            value
+                .fields
+                .iter()
+                .find(|(name, _)| name == *field)
+                .map(|(_, value)| value.clone())
+                .ok_or_else(|| format!("node `{node_name}` has no struct field `{field}`"))
+        }
+        yir_core::OwnedSelectScalarArg::Cast { kind, value } => cast_owned_tree_scalar(
+            *kind,
+            expect_owned_tree_scalar_arg(state, value, node_name)?,
+        )
+        .ok_or_else(|| {
+            format!(
+                "node `{node_name}` cannot apply leaf cast `{}`",
+                kind.as_str()
+            )
+        }),
+    }
+}
+
+fn cast_owned_tree_scalar(kind: yir_core::OwnedSelectScalarCast, value: Value) -> Option<Value> {
+    use yir_core::OwnedSelectScalarCast as Cast;
+    Some(match (kind, value) {
+        (Cast::I64ToI32, Value::Int(value)) => Value::I32(value as i32),
+        (Cast::I32ToI64, Value::I32(value)) => Value::Int(i64::from(value)),
+        (Cast::I64ToBool, Value::Int(value)) => Value::Bool(value != 0),
+        (Cast::BoolToI64, Value::Bool(value)) => Value::Int(i64::from(value)),
+        (Cast::I64ToF32, Value::Int(value)) => Value::F32(value as f32),
+        (Cast::F32ToI64, Value::F32(value)) => Value::Int(value as i64),
+        (Cast::I64ToF64, Value::Int(value)) => Value::F64(value as f64),
+        (Cast::F64ToI64, Value::F64(value)) => Value::Int(value as i64),
+        _ => return None,
+    })
 }
 
 fn select_owned_tree_leaf<'a>(

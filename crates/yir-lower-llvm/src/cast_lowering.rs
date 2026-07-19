@@ -176,6 +176,62 @@ pub(crate) fn lower_cpu_cast_node(
             }
             *last_cpu_value = Some(widened);
         }
+        "cast_i64_to_f32" => {
+            let Some(input) = get_i64(registers, &node.op.args[0]) else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.cast_i64_to_f32 `{}` because its input is outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return Ok(true);
+            };
+            let reg = fresh_reg(next_reg);
+            body.push(format!("  {reg} = sitofp i64 {input} to float"));
+            registers.insert(node.name.clone(), LlvmValueRef::F32(reg.clone()));
+            let widened = fresh_reg(next_reg);
+            body.push(format!("  {widened} = fptosi float {reg} to i64"));
+            *last_cpu_value = Some(widened);
+        }
+        "cast_f32_to_i64" => {
+            let Some(input) = get_f32(registers, &node.op.args[0]) else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.cast_f32_to_i64 `{}` because its input is outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return Ok(true);
+            };
+            let reg = fresh_reg(next_reg);
+            body.push(format!("  {reg} = fptosi float {input} to i64"));
+            registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+            *last_cpu_value = Some(reg);
+        }
+        "cast_i64_to_f64" => {
+            let Some(input) = get_i64(registers, &node.op.args[0]) else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.cast_i64_to_f64 `{}` because its input is outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return Ok(true);
+            };
+            let reg = fresh_reg(next_reg);
+            body.push(format!("  {reg} = sitofp i64 {input} to double"));
+            registers.insert(node.name.clone(), LlvmValueRef::F64(reg.clone()));
+            let widened = fresh_reg(next_reg);
+            body.push(format!("  {widened} = fptosi double {reg} to i64"));
+            *last_cpu_value = Some(widened);
+        }
+        "cast_f64_to_i64" => {
+            let Some(input) = get_f64(registers, &node.op.args[0]) else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.cast_f64_to_i64 `{}` because its input is outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return Ok(true);
+            };
+            let reg = fresh_reg(next_reg);
+            body.push(format!("  {reg} = fptosi double {input} to i64"));
+            registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+            *last_cpu_value = Some(reg);
+        }
         _ => return Ok(false),
     }
 

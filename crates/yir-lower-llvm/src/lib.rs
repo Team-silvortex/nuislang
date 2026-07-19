@@ -35,6 +35,7 @@ mod loop_expr;
 mod loop_flow_control_lowering;
 mod loop_scalar;
 mod memory_lowering;
+mod owned_tree_call_args;
 mod param_lowering;
 mod preclassified_lowering;
 mod print_lowering;

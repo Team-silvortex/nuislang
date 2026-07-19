@@ -1,10 +1,69 @@
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OwnedSelectScalarCast {
+    I64ToI32,
+    I32ToI64,
+    I64ToBool,
+    BoolToI64,
+    I64ToF32,
+    F32ToI64,
+    I64ToF64,
+    F64ToI64,
+}
+
+impl OwnedSelectScalarCast {
+    pub fn parse(value: &str) -> Option<Self> {
+        Some(match value {
+            "i64_to_i32" => Self::I64ToI32,
+            "i32_to_i64" => Self::I32ToI64,
+            "i64_to_bool" => Self::I64ToBool,
+            "bool_to_i64" => Self::BoolToI64,
+            "i64_to_f32" => Self::I64ToF32,
+            "f32_to_i64" => Self::F32ToI64,
+            "i64_to_f64" => Self::I64ToF64,
+            "f64_to_i64" => Self::F64ToI64,
+            _ => return None,
+        })
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::I64ToI32 => "i64_to_i32",
+            Self::I32ToI64 => "i32_to_i64",
+            Self::I64ToBool => "i64_to_bool",
+            Self::BoolToI64 => "bool_to_i64",
+            Self::I64ToF32 => "i64_to_f32",
+            Self::F32ToI64 => "f32_to_i64",
+            Self::I64ToF64 => "i64_to_f64",
+            Self::F64ToI64 => "f64_to_i64",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OwnedSelectScalarArg<'a> {
+    Value(&'a str),
+    VariantField {
+        base: &'a str,
+        variant: &'a str,
+        field: &'a str,
+    },
+    StructField {
+        field: &'a str,
+        base: Box<OwnedSelectScalarArg<'a>>,
+    },
+    Cast {
+        kind: OwnedSelectScalarCast,
+        value: Box<OwnedSelectScalarArg<'a>>,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OwnedSelectTree<'a> {
     Owner(usize),
     Call {
         callee: &'a str,
         owner: usize,
-        scalar_args: &'a [String],
+        scalar_args: Vec<OwnedSelectScalarArg<'a>>,
     },
     If {
         condition: &'a str,
@@ -49,9 +108,10 @@ fn parse_tree<'a>(
             let owner = args.get(cursor.checked_add(1)?)?.parse::<usize>().ok()?;
             let scalar_count = args.get(cursor.checked_add(2)?)?.parse::<usize>().ok()?;
             *cursor = cursor.checked_add(3)?;
-            let scalar_end = cursor.checked_add(scalar_count)?;
-            let scalar_args = args.get(*cursor..scalar_end)?;
-            *cursor = scalar_end;
+            let mut scalar_args = Vec::with_capacity(scalar_count);
+            for _ in 0..scalar_count {
+                scalar_args.push(parse_scalar_arg(args, cursor)?);
+            }
             (owner < owner_count).then_some(OwnedSelectTree::Call {
                 callee,
                 owner,
@@ -73,11 +133,58 @@ fn parse_tree<'a>(
     }
 }
 
+fn parse_scalar_arg<'a>(
+    args: &'a [String],
+    cursor: &mut usize,
+) -> Option<OwnedSelectScalarArg<'a>> {
+    let tag = args.get(*cursor)?;
+    *cursor += 1;
+    match tag.as_str() {
+        "value" => {
+            let value = args.get(*cursor)?;
+            *cursor += 1;
+            Some(OwnedSelectScalarArg::Value(value))
+        }
+        "variant_field" => {
+            let base = args.get(*cursor)?;
+            let variant = args.get(cursor.checked_add(1)?)?;
+            let field = args.get(cursor.checked_add(2)?)?;
+            *cursor = cursor.checked_add(3)?;
+            Some(OwnedSelectScalarArg::VariantField {
+                base,
+                variant,
+                field,
+            })
+        }
+        "struct_field" => {
+            let field = args.get(*cursor)?;
+            *cursor += 1;
+            let base = parse_scalar_arg(args, cursor)?;
+            Some(OwnedSelectScalarArg::StructField {
+                field,
+                base: Box::new(base),
+            })
+        }
+        "cast" => {
+            let kind = OwnedSelectScalarCast::parse(args.get(*cursor)?)?;
+            *cursor += 1;
+            let value = parse_scalar_arg(args, cursor)?;
+            Some(OwnedSelectScalarArg::Cast {
+                kind,
+                value: Box::new(value),
+            })
+        }
+        _ => None,
+    }
+}
+
 pub fn owned_select_tree_scalar_args<'a>(tree: &'a OwnedSelectTree<'a>, out: &mut Vec<&'a str>) {
     match tree {
         OwnedSelectTree::Owner(_) => {}
         OwnedSelectTree::Call { scalar_args, .. } => {
-            out.extend(scalar_args.iter().map(String::as_str));
+            for arg in scalar_args {
+                owned_select_scalar_arg_inputs(arg, out);
+            }
         }
         OwnedSelectTree::If {
             then_tree,
@@ -87,6 +194,17 @@ pub fn owned_select_tree_scalar_args<'a>(tree: &'a OwnedSelectTree<'a>, out: &mu
             owned_select_tree_scalar_args(then_tree, out);
             owned_select_tree_scalar_args(else_tree, out);
         }
+    }
+}
+
+fn owned_select_scalar_arg_inputs<'a>(arg: &'a OwnedSelectScalarArg<'a>, out: &mut Vec<&'a str>) {
+    match arg {
+        OwnedSelectScalarArg::Value(value) => out.push(value),
+        OwnedSelectScalarArg::VariantField { base, .. } => out.push(base),
+        OwnedSelectScalarArg::StructField { base, .. } => {
+            owned_select_scalar_arg_inputs(base, out);
+        }
+        OwnedSelectScalarArg::Cast { value, .. } => owned_select_scalar_arg_inputs(value, out),
     }
 }
 

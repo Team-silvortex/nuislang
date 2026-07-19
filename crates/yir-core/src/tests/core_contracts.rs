@@ -141,7 +141,9 @@ fn owned_select_tree_protocol_rejects_invalid_owner_paths() {
         "transform".to_owned(),
         "0".to_owned(),
         "2".to_owned(),
+        "value".to_owned(),
         "delta".to_owned(),
+        "value".to_owned(),
         "enabled".to_owned(),
     ];
     let parsed = crate::parse_owned_select_tree_args(&call).expect("valid call leaf");
@@ -155,7 +157,113 @@ fn owned_select_tree_protocol_rejects_invalid_owner_paths() {
     };
     assert_eq!(callee, "transform");
     assert_eq!(owner, 0);
-    assert_eq!(scalar_args, ["delta", "enabled"]);
+    assert_eq!(
+        scalar_args,
+        [
+            crate::OwnedSelectScalarArg::Value("delta"),
+            crate::OwnedSelectScalarArg::Value("enabled")
+        ]
+    );
+
+    let projected = vec![
+        "1".to_owned(),
+        "bytes".to_owned(),
+        "call".to_owned(),
+        "transform".to_owned(),
+        "0".to_owned(),
+        "1".to_owned(),
+        "variant_field".to_owned(),
+        "route".to_owned(),
+        "Route.Left".to_owned(),
+        "value".to_owned(),
+    ];
+    let parsed = crate::parse_owned_select_tree_args(&projected).expect("projected call leaf");
+    let crate::OwnedSelectTree::Call { scalar_args, .. } = &parsed.tree else {
+        panic!("expected projected call leaf");
+    };
+    assert_eq!(
+        scalar_args,
+        &[crate::OwnedSelectScalarArg::VariantField {
+            base: "route",
+            variant: "Route.Left",
+            field: "value",
+        }]
+    );
+    let profile = crate::glm_profile_for_operation(
+        &Operation::parse("cpu.select_owned_bytes_tree", projected).unwrap(),
+    );
+    assert!(profile
+        .accesses
+        .iter()
+        .any(|access| access.input == "route" && access.mode == GlmUseMode::Read));
+    assert!(profile
+        .accesses
+        .iter()
+        .any(|access| access.input == "bytes" && access.mode == GlmUseMode::Own));
+
+    let nested = vec![
+        "1".to_owned(),
+        "bytes".to_owned(),
+        "call".to_owned(),
+        "transform".to_owned(),
+        "0".to_owned(),
+        "1".to_owned(),
+        "struct_field".to_owned(),
+        "score".to_owned(),
+        "variant_field".to_owned(),
+        "route".to_owned(),
+        "Route.Left".to_owned(),
+        "value".to_owned(),
+    ];
+    let parsed = crate::parse_owned_select_tree_args(&nested).expect("nested projected leaf");
+    let crate::OwnedSelectTree::Call { scalar_args, .. } = &parsed.tree else {
+        panic!("expected nested projected call leaf");
+    };
+    assert_eq!(
+        scalar_args,
+        &[crate::OwnedSelectScalarArg::StructField {
+            field: "score",
+            base: Box::new(crate::OwnedSelectScalarArg::VariantField {
+                base: "route",
+                variant: "Route.Left",
+                field: "value",
+            }),
+        }]
+    );
+    let mut inputs = Vec::new();
+    crate::owned_select_tree_scalar_args(&parsed.tree, &mut inputs);
+    assert_eq!(inputs, ["route"]);
+
+    let cast = vec![
+        "1".to_owned(),
+        "bytes".to_owned(),
+        "call".to_owned(),
+        "transform".to_owned(),
+        "0".to_owned(),
+        "1".to_owned(),
+        "cast".to_owned(),
+        "i32_to_i64".to_owned(),
+        "struct_field".to_owned(),
+        "score".to_owned(),
+        "variant_field".to_owned(),
+        "route".to_owned(),
+        "Route.Left".to_owned(),
+        "value".to_owned(),
+    ];
+    let parsed = crate::parse_owned_select_tree_args(&cast).expect("cast projected leaf");
+    let crate::OwnedSelectTree::Call { scalar_args, .. } = &parsed.tree else {
+        panic!("expected cast projected call leaf");
+    };
+    assert!(matches!(
+        &scalar_args[0],
+        crate::OwnedSelectScalarArg::Cast {
+            kind: crate::OwnedSelectScalarCast::I32ToI64,
+            ..
+        }
+    ));
+    let mut invalid_cast = cast;
+    invalid_cast[7] = "i32_to_ptr".to_owned();
+    assert!(crate::parse_owned_select_tree_args(&invalid_cast).is_none());
 }
 
 #[test]

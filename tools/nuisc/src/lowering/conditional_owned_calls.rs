@@ -40,6 +40,17 @@ fn collect_from_stmts<'a>(
                     collect_owned_return_tree_helpers(then_body, functions, helpers);
                     collect_owned_return_tree_helpers(else_body, functions, helpers);
                 }
+                if let (Some(then_helpers), Some(else_helpers)) = (
+                    super::nested_owned_returns::collect_owned_return_tree_helpers(
+                        then_body, functions,
+                    ),
+                    super::nested_owned_returns::collect_owned_return_tree_helpers(
+                        else_body, functions,
+                    ),
+                ) {
+                    helpers.extend(then_helpers);
+                    helpers.extend(else_helpers);
+                }
             }
             NirStmt::While { body, .. } => collect_from_stmts(body, functions, helpers),
             _ => {}
@@ -48,6 +59,9 @@ fn collect_from_stmts<'a>(
 }
 
 fn owned_return_tree(stmts: &[NirStmt], functions: &BTreeMap<&str, &NirFunction>) -> bool {
+    let Some(stmts) = super::nested_owned_returns::strip_unused_pure_leaf_prelude(stmts) else {
+        return false;
+    };
     match stmts {
         [NirStmt::Return(Some(NirExpr::Move(_)))] => true,
         [NirStmt::Return(Some(NirExpr::Call { .. }))] => {
@@ -67,6 +81,9 @@ fn collect_owned_return_tree_helpers<'a>(
     functions: &BTreeMap<&str, &'a NirFunction>,
     helpers: &mut BTreeSet<String>,
 ) {
+    let Some(stmts) = super::nested_owned_returns::strip_unused_pure_leaf_prelude(stmts) else {
+        return;
+    };
     if let Some((callee, _, _)) = owned_return_call(stmts, functions) {
         helpers.insert(callee.to_owned());
     } else if let [NirStmt::If {

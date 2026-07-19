@@ -385,8 +385,19 @@ invoke a registered static `(Bytes, scalar...) -> Bytes` helper with pure
 `bool/i32/i64/f32/f64` arguments. LLVM places the call inside the selected leaf
 after cleaning up other owners, while GLM still consumes each unique owner only
 once. Nested conditions are restricted to pure expressions so lowering cannot
-eagerly execute branch-local effects. Normalized `match`, enum, and pointer
-leaf policies remain future work.
+eagerly execute branch-local effects. Frontend-lowered scalar and unit-pattern
+`match` decision chains already reuse this tree without a match-specific YIR
+operation. Pure leading payload bindings may be removed only when no remaining
+condition, return, or helper argument references them. Used payloads use tagged
+`variant_field` call-argument descriptors, optionally wrapped in recursive
+`struct_field <field> <base-descriptor>` paths. GLM records only the root enum
+or SSA base as a read, the interpreter resolves the path only after selecting
+the leaf, and LLVM reuses the existing aggregate ABI inside that leaf. Wrong
+variants and missing nested fields in unselected arms therefore remain
+unevaluated. The recursive descriptor also accepts a closed set of eight
+`cast <kind> <value-descriptor>` forms matching existing NIR scalar casts.
+Unknown kinds fail protocol parsing, and both interpreter and LLVM apply the
+conversion only in the selected leaf. Pointer leaf policies remain open.
 
 Today `nuis` does **not** yet have:
 

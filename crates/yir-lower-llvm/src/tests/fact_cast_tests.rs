@@ -216,3 +216,48 @@ fn folds_safe_known_f64_to_f32_cast_for_lazy_const_select() {
     assert!(!llvm_ir.contains("deferred lowering for cpu.select `selected`"));
     assert_wrong_variant_chain_not_deferred(&llvm_ir);
 }
+
+#[test]
+fn lowers_i64_float_roundtrip_cast_instructions() {
+    let mut module = module_with_cpu0();
+    push_cpu_const_i64(&mut module, "integer", "21");
+    push_cpu_node(
+        &mut module,
+        "float32",
+        "cpu.cast_i64_to_f32",
+        vec!["integer"],
+    );
+    push_cpu_node(
+        &mut module,
+        "from_float32",
+        "cpu.cast_f32_to_i64",
+        vec!["float32"],
+    );
+    push_cpu_node(
+        &mut module,
+        "float64",
+        "cpu.cast_i64_to_f64",
+        vec!["from_float32"],
+    );
+    push_cpu_node(
+        &mut module,
+        "from_float64",
+        "cpu.cast_f64_to_i64",
+        vec!["float64"],
+    );
+    push_deps(
+        &mut module,
+        &[
+            ("integer", "float32"),
+            ("float32", "from_float32"),
+            ("from_float32", "float64"),
+            ("float64", "from_float64"),
+        ],
+    );
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("sitofp i64"));
+    assert!(llvm_ir.contains("fptosi float"));
+    assert!(llvm_ir.contains("fptosi double"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.cast_"));
+}
