@@ -183,6 +183,49 @@ pub(crate) fn nsld_final_executable_output_report_json(
             "final_output_nsdb_replayable_checkpoint_count",
             report.final_output_nsdb_replayable_checkpoint_count,
         ),
+        json_usize_field(
+            "final_output_nsdb_provider_completion_count",
+            report.final_output_nsdb_provider_completion_count,
+        ),
+        json_optional_string_field(
+            "final_output_nsdb_first_provider_family",
+            report.final_output_nsdb_first_provider_family.as_deref(),
+        ),
+        json_optional_string_field(
+            "final_output_nsdb_first_provider_output_contract",
+            report
+                .final_output_nsdb_first_provider_output_contract
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "final_output_nsdb_first_provider_output_evidence",
+            report
+                .final_output_nsdb_first_provider_output_evidence
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "final_output_nsdb_provider_completion_digest_contract",
+            report
+                .final_output_nsdb_provider_completion_digest_contract
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "final_output_nsdb_provider_completion_set_hash_claim",
+            report
+                .final_output_nsdb_provider_completion_set_hash_claim
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "final_output_nsdb_provider_completion_set_hash",
+            report
+                .final_output_nsdb_provider_completion_set_hash
+                .as_deref(),
+        ),
+        json_string_field(
+            "final_output_nsdb_provider_completion_set_hash_validation_status",
+            &report.final_output_nsdb_provider_completion_set_hash_validation_status,
+        ),
+        provider_completion_records_json(report),
         json_optional_string_field(
             "final_output_nsdb_replay_first_blocker",
             report.final_output_nsdb_replay_first_blocker.as_deref(),
@@ -463,6 +506,25 @@ pub(crate) fn nsld_final_executable_output_report_json(
         json_string_array_field("issues", &report.issues),
     ];
     format!("{{{}}}", fields.join(","))
+}
+
+fn provider_completion_records_json(report: &NsldFinalExecutableOutputReport) -> String {
+    let records = report
+        .final_output_nsdb_provider_completions
+        .iter()
+        .map(|completion| {
+            format!(
+                "{{{},{},{},{},{}}}",
+                json_string_field("trace_id", &completion.trace_id),
+                json_string_field("provider_family", &completion.provider_family),
+                json_string_field("output_contract", &completion.output_contract),
+                json_string_field("output_evidence", &completion.output_evidence),
+                json_string_field("record_hash", &completion.record_hash),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("\"final_output_nsdb_provider_completions\":[{records}]")
 }
 
 fn payload_execution_trace_protocol() -> &'static str {

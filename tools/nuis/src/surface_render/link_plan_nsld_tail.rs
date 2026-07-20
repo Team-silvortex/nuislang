@@ -1,3 +1,5 @@
+use crate::json_optional_bool_field;
+
 pub(super) fn nsld_tail_json_fields(
     final_tail_summary: Option<&crate::workflow::NsldFinalExecutableTailSummary>,
     final_tail_stage_records: &[String],
@@ -343,6 +345,31 @@ pub(super) fn nsld_tail_json_fields(
                 .as_ref()
                 .map(|summary| summary.nsdb_replayable_checkpoint_count)
                 .unwrap_or(0),
+        ),
+        crate::json_usize_field(
+            "nsld_final_executable_output_nsdb_provider_completion_count",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.nsdb_provider_completion_count)
+                .unwrap_or(0),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_nsdb_first_provider_family",
+            final_output_summary
+                .as_ref()
+                .and_then(|summary| summary.nsdb_first_provider_family.as_deref()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_nsdb_first_provider_output_contract",
+            final_output_summary.as_ref().and_then(|summary| {
+                summary.nsdb_first_provider_output_contract.as_deref()
+            }),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_nsdb_first_provider_output_evidence",
+            final_output_summary.as_ref().and_then(|summary| {
+                summary.nsdb_first_provider_output_evidence.as_deref()
+            }),
         ),
         crate::json_optional_string_field(
             "nsld_final_executable_output_nsdb_replay_command",
@@ -752,13 +779,6 @@ pub(super) fn nsld_tail_json_fields(
                 .and_then(|summary| summary.first_blocker.as_deref()),
         ),
     ]
-}
-
-fn json_optional_bool_field(name: &str, value: Option<bool>) -> String {
-    match value {
-        Some(value) => crate::json_bool_field(name, value),
-        None => format!("\"{name}\":null"),
-    }
 }
 
 fn json_optional_usize_field(name: &str, value: Option<usize>) -> String {

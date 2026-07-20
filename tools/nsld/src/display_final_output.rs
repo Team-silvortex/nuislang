@@ -216,6 +216,68 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         report.final_output_nsdb_replayable_checkpoint_count
     );
     println!(
+        "  final_output_nsdb_provider_completion_count: {}",
+        report.final_output_nsdb_provider_completion_count
+    );
+    println!(
+        "  final_output_nsdb_first_provider_family: {}",
+        optional_string_text(report.final_output_nsdb_first_provider_family.as_deref())
+    );
+    println!(
+        "  final_output_nsdb_first_provider_output_contract: {}",
+        optional_string_text(
+            report
+                .final_output_nsdb_first_provider_output_contract
+                .as_deref()
+        )
+    );
+    println!(
+        "  final_output_nsdb_first_provider_output_evidence: {}",
+        optional_string_text(
+            report
+                .final_output_nsdb_first_provider_output_evidence
+                .as_deref()
+        )
+    );
+    println!(
+        "  final_output_nsdb_provider_completion_digest_contract: {}",
+        optional_string_text(
+            report
+                .final_output_nsdb_provider_completion_digest_contract
+                .as_deref()
+        )
+    );
+    println!(
+        "  final_output_nsdb_provider_completion_set_hash_claim: {}",
+        optional_string_text(
+            report
+                .final_output_nsdb_provider_completion_set_hash_claim
+                .as_deref()
+        )
+    );
+    println!(
+        "  final_output_nsdb_provider_completion_set_hash: {}",
+        optional_string_text(
+            report
+                .final_output_nsdb_provider_completion_set_hash
+                .as_deref()
+        )
+    );
+    println!(
+        "  final_output_nsdb_provider_completion_set_hash_validation_status: {}",
+        report.final_output_nsdb_provider_completion_set_hash_validation_status
+    );
+    for completion in &report.final_output_nsdb_provider_completions {
+        println!(
+            "  final_output_nsdb_provider_completion: {} {} {} {} {}",
+            completion.trace_id,
+            completion.provider_family,
+            completion.output_contract,
+            completion.output_evidence,
+            completion.record_hash
+        );
+    }
+    println!(
         "  final_output_nsdb_replay_first_blocker: {}",
         optional_string_text(report.final_output_nsdb_replay_first_blocker.as_deref())
     );

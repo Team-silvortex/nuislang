@@ -2,6 +2,7 @@ mod cli;
 mod cursor;
 mod cursor_lineage;
 mod cursor_lineage_repair_journal;
+mod digest_sha256;
 mod display;
 mod handoff;
 mod hetero_trace;

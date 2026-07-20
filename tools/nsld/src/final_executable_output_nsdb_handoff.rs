@@ -1,11 +1,10 @@
 use super::{
     final_executable_output::{owned_package_summary_next_action, owned_package_summary_status},
-    reports::NsldFinalExecutableOutputReport,
+    reports::{NsldFinalExecutableOutputReport, NsldProviderCompletionSummary},
 };
-use std::{fs, path::Path};
+use std::path::Path;
 
 const NSDB_HANDOFF_PROTOCOL: &str = "nuis-nsdb-payload-execution-handoff-v1";
-const NSDB_DEBUGGER_CONTRACT: &str = "nsdb-yir-payload-execution-trace-v1";
 const NSDB_HANDOFF_FILE_NAME: &str = "nuis.nsdb.payload-execution-handoff.toml";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,6 +38,31 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
     report.final_output_nsdb_replay_checkpoint_count = replay_summary.checkpoint_count;
     report.final_output_nsdb_replayable_checkpoint_count =
         replay_summary.replayable_checkpoint_count;
+    report.final_output_nsdb_provider_completion_count = replay_summary.provider_completion_count;
+    report.final_output_nsdb_first_provider_family = replay_summary.first_provider_family;
+    report.final_output_nsdb_first_provider_output_contract =
+        replay_summary.first_provider_output_contract;
+    report.final_output_nsdb_first_provider_output_evidence =
+        replay_summary.first_provider_output_evidence;
+    report.final_output_nsdb_provider_completion_digest_contract =
+        replay_summary.provider_completion_digest_contract;
+    report.final_output_nsdb_provider_completion_set_hash_claim =
+        replay_summary.provider_completion_set_hash_claim;
+    report.final_output_nsdb_provider_completion_set_hash =
+        replay_summary.provider_completion_set_hash;
+    report.final_output_nsdb_provider_completion_set_hash_validation_status =
+        replay_summary.provider_completion_set_hash_validation_status;
+    report.final_output_nsdb_provider_completions = replay_summary
+        .provider_completions
+        .into_iter()
+        .map(|completion| NsldProviderCompletionSummary {
+            trace_id: completion.trace_id,
+            provider_family: completion.provider_family,
+            output_contract: completion.output_contract,
+            output_evidence: completion.output_evidence,
+            record_hash: completion.record_hash,
+        })
+        .collect();
     report.final_output_nsdb_replay_command = report.final_output_nsdb_replay_ready.then(|| {
         format!(
             "nsdb replay {} --json",
@@ -121,15 +145,32 @@ pub(crate) fn persist_final_output_nsdb_handoff(
             error: Some("payload-execution-trace-unavailable".to_owned()),
         };
     };
-    let content = render_final_output_nsdb_handoff(&record);
-    match fs::write(&path, content) {
-        Ok(()) => NsldFinalOutputNsdbHandoffSummary {
+    let handoff_record = nsdb::PayloadExecutionHandoffRecord {
+        trace_id: record.trace_id.clone(),
+        status: record.status.clone(),
+        execution_phase: "container-loader-handoff".to_owned(),
+        target: record.target.clone(),
+        entry_symbol: record.entry_symbol.clone().unwrap_or_default(),
+        entry_kind: record.entry_kind.clone().unwrap_or_default(),
+        entry_section_id: record.entry_section_id.clone().unwrap_or_default(),
+        provider_family: String::new(),
+        output_contract: String::new(),
+        output_evidence: String::new(),
+        first_blocker: record.first_blocker.clone().unwrap_or_default(),
+        next_action: record.next_action.clone(),
+    };
+    match nsdb::persist_payload_execution_handoff_record(
+        output_dir,
+        "nsld-final-executable-output",
+        handoff_record,
+    ) {
+        Ok(summary) => NsldFinalOutputNsdbHandoffSummary {
             protocol: NSDB_HANDOFF_PROTOCOL,
             persisted: true,
             path: path_text,
-            record_count: 1,
-            ready_record_count: usize::from(record.status == "ready"),
-            first_trace_id: Some(record.trace_id),
+            record_count: summary.record_count,
+            ready_record_count: summary.ready_record_count,
+            first_trace_id: summary.first_trace_id,
             error: None,
         },
         Err(error) => NsldFinalOutputNsdbHandoffSummary {
@@ -139,7 +180,7 @@ pub(crate) fn persist_final_output_nsdb_handoff(
             record_count: 1,
             ready_record_count: usize::from(record.status == "ready"),
             first_trace_id: Some(record.trace_id),
-            error: Some(error.to_string()),
+            error: Some(error),
         },
     }
 }
@@ -182,50 +223,4 @@ fn final_output_payload_trace_record(
             "resolve-payload-execution-blocker".to_owned()
         },
     })
-}
-
-fn render_final_output_nsdb_handoff(record: &FinalOutputPayloadTraceRecord) -> String {
-    let ready_record_count = usize::from(record.status == "ready");
-    let mut out = String::new();
-    push_toml_string(&mut out, "protocol", NSDB_HANDOFF_PROTOCOL);
-    push_toml_string(&mut out, "debugger_contract", NSDB_DEBUGGER_CONTRACT);
-    push_toml_string(&mut out, "source", "nsld-final-executable-output");
-    out.push_str("record_count = 1\n");
-    out.push_str(&format!("ready_record_count = {ready_record_count}\n"));
-    push_toml_string(&mut out, "first_trace_id", &record.trace_id);
-    push_toml_string(&mut out, "first_status", &record.status);
-    push_toml_string(&mut out, "first_next_action", &record.next_action);
-    out.push_str("\n[[records]]\n");
-    push_toml_string(&mut out, "trace_id", &record.trace_id);
-    push_toml_string(&mut out, "status", &record.status);
-    push_toml_string(&mut out, "execution_phase", "container-loader-handoff");
-    push_toml_string(&mut out, "target", &record.target);
-    push_toml_optional_string(&mut out, "entry_symbol", record.entry_symbol.as_deref());
-    push_toml_optional_string(&mut out, "entry_kind", record.entry_kind.as_deref());
-    push_toml_optional_string(
-        &mut out,
-        "entry_section_id",
-        record.entry_section_id.as_deref(),
-    );
-    push_toml_optional_string(&mut out, "first_blocker", record.first_blocker.as_deref());
-    push_toml_string(&mut out, "next_action", &record.next_action);
-    out
-}
-
-fn push_toml_optional_string(out: &mut String, key: &str, value: Option<&str>) {
-    push_toml_string(out, key, value.unwrap_or(""));
-}
-
-fn push_toml_string(out: &mut String, key: &str, value: &str) {
-    out.push_str(key);
-    out.push_str(" = \"");
-    out.push_str(&toml_escape(value));
-    out.push_str("\"\n");
-}
-
-fn toml_escape(value: &str) -> String {
-    value
-        .replace('\\', "\\\\")
-        .replace('"', "\\\"")
-        .replace('\n', "\\n")
 }

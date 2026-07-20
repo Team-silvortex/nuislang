@@ -33,6 +33,7 @@ mod dev_tensor_manifest;
 mod dev_tensor_milestones;
 mod dev_tensor_render;
 mod dev_tensor_status;
+mod digest_sha256;
 mod galaxy;
 mod galaxy_command;
 mod json_helpers;

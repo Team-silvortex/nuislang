@@ -307,13 +307,54 @@ If that journal fails validation, final-output and closure summaries expose
 concrete `nuis debug-lineage-repair ... --json` command. The command can then
 perform journal-only recovery without changing healthy lineage.
 
-Replay source selection remains deterministic. Payload-execution handoff
-events are preferred whenever present. When that list is empty, Nsdb projects
+Replay source selection remains deterministic. A complete payload-execution
+handoff is preferred whenever present. When the handoff is empty, Nsdb projects
 `hetero_runtime_trace.records` into ordered metadata/device-dispatch events.
+An early handoff containing only `provider-device-completion` records is treated
+as a partial materialization layer: each completion replaces the projected
+event with the same trace id while unrelated runtime frames remain ordered.
 `metadata-only` and `trace-ready` records become debugger checkpoints, while
 device-dispatch replayability still depends on provider-sample validation.
 This gives pre-final-output heterogeneous artifacts a real replay route without
 inventing a fake native payload handoff.
+
+Provider sample materialization now appends a real
+`provider-device-completion` event to the same
+`nuis.nsdb.payload-execution-handoff.toml` stream. The event keeps the
+registered provider family in `target`, the provider identity in
+`entry_symbol`, the output payload contract in `entry_kind`, and the validated
+output payload evidence in `entry_section_id`. The same values are now carried
+without overloading as `provider_family`, `output_contract`, and
+`output_evidence`; old records default these fields to `none`. Nsdb replay
+summary, Nsld final-output, Nuis workflow output, and Nuis closure JSON expose
+the first structured completion plus the total completion count. They also
+expose the complete ordered completion set. Each record receives a canonical
+FNV-1a hash over trace id, provider family, output contract, and output
+evidence; `provider_completion_set_hash` binds those record hashes in replay
+order. Nuis independently recomputes both levels while parsing the persisted
+handoff before mirroring the set into closure JSON. New handoffs persist that
+set hash as a producer claim. Matching claims are `verified`; historical
+handoffs without a claim remain readable as `legacy-unclaimed`, while old
+claims without a digest contract are independently checked as
+`legacy-verified`. New handoffs declare
+`nuis-provider-completion-digest-sha256-v1`; both record hashes and the set-v3
+claim use SHA-256. Its canonical set material binds the handoff protocol,
+declared total record count, provider completion count, and ordered record
+hashes. The earlier `nuis-provider-completion-digest-fnv1a64-v1` contract
+remains independently readable with set-v2 material, while no-contract claims
+retain set-v1 legacy verification. Mismatches and unsupported digest contracts
+block Nsdb replay, Nuis closure readiness, and subsequent handoff updates so a
+write cannot silently normalize tampered evidence. Nsld and closure JSON expose
+the digest contract, claim, independently computed value, and validation
+status. SHA-256 provides collision-resistant content integrity, but the claim
+is not yet authenticated to a producer identity.
+The write path is generic and idempotent by `(trace_id, execution_phase)`: it
+preserves unrelated host and device records instead of rebuilding a fixed
+backend combination. Nsld uses
+the same Nsdb-owned upsert contract for `container-loader-handoff`, so rerunning
+final-output inspection cannot erase a previously materialized non-CPU
+completion. Nsdb replay consequently consumes host and provider checkpoints
+from one ordered handoff stream.
 
 `run-artifact` persists the device/runtime sample source as
 `nuis.nsdb.hetero-runtime-trace.toml` using

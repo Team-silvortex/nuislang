@@ -1,4 +1,5 @@
 use crate::{
+    handoff::read_payload_execution_handoff,
     provider_runner_registry::{select_provider_runner_adapter, ProviderRunnerAdapter},
     provider_sample_execute::execute_provider_samples,
     provider_sample_materialize::materialize_provider_samples,
@@ -102,6 +103,31 @@ next_action = "execute-provider-sample"
 "#,
     )
     .unwrap();
+    fs::write(
+        output_dir.join("nuis.nsdb.payload-execution-handoff.toml"),
+        r#"
+protocol = "nuis-nsdb-payload-execution-handoff-v1"
+debugger_contract = "nsdb-yir-payload-execution-trace-v1"
+source = "nsld-final-output-boundary"
+record_count = 1
+ready_record_count = 1
+first_trace_id = "payload-trace:container-loader:nuis.bootstrap.lifecycle.v1"
+first_status = "ready"
+first_next_action = "handoff-payload-trace-to-nsdb"
+
+[[records]]
+trace_id = "payload-trace:container-loader:nuis.bootstrap.lifecycle.v1"
+status = "ready"
+execution_phase = "container-loader-handoff"
+target = "host"
+entry_symbol = "nuis.bootstrap.lifecycle.v1"
+entry_kind = "lifecycle-entry"
+entry_section_id = "sec0001.host"
+first_blocker = ""
+next_action = "handoff-payload-trace-to-nsdb"
+"#,
+    )
+    .unwrap();
 
     let report = materialize_provider_samples(&output_dir, None).unwrap();
     let source =
@@ -174,6 +200,58 @@ next_action = "execute-provider-sample"
         "materialization_detail = \"deterministic-provider-sample-artifact:nuis.nsdb.provider-sample.metal-apple-silicon-gpu.toml:0x"
     ));
     assert!(source.contains("next_action = \"replay-device-sample\""));
+    let handoff = read_payload_execution_handoff(&output_dir);
+    assert_eq!(handoff.status, "ready");
+    assert_eq!(handoff.record_count, 2);
+    assert_eq!(handoff.ready_record_count, 2);
+    assert_eq!(
+        handoff.events[0].execution_phase,
+        "container-loader-handoff"
+    );
+    let completion = handoff
+        .events
+        .iter()
+        .find(|event| event.execution_phase == "provider-device-completion")
+        .unwrap();
+    assert_eq!(completion.target, "metal:apple-silicon-gpu");
+    assert_eq!(completion.status, "ready");
+    let replay = crate::payload_execution_replay_summary(&output_dir);
+    assert_eq!(replay.status, "replay-evidence-ready");
+    assert_eq!(replay.checkpoint_count, 2);
+    assert_eq!(replay.replayable_checkpoint_count, 2);
+    assert_eq!(replay.provider_completion_count, 1);
+    assert_eq!(
+        replay.first_provider_family.as_deref(),
+        Some("metal:apple-silicon-gpu")
+    );
+    assert_eq!(
+        replay.first_provider_output_contract.as_deref(),
+        Some("nuis-provider-output-payload-handoff-v1")
+    );
+    assert!(replay
+        .first_provider_output_evidence
+        .as_deref()
+        .is_some_and(|evidence| evidence != "none" && evidence.contains("hash=0x")));
+    assert!(replay
+        .provider_completion_set_hash
+        .as_deref()
+        .is_some_and(|hash| hash.len() == 64 && hash.bytes().all(|byte| byte.is_ascii_hexdigit())));
+    assert_eq!(
+        replay.provider_completion_digest_contract.as_deref(),
+        Some("nuis-provider-completion-digest-sha256-v1")
+    );
+    assert_eq!(replay.provider_completions.len(), 1);
+    assert_eq!(
+        replay.provider_completions[0].provider_family,
+        "metal:apple-silicon-gpu"
+    );
+    assert_eq!(replay.provider_completions[0].record_hash.len(), 64);
+    materialize_provider_samples(&output_dir, None).unwrap();
+    assert_eq!(
+        read_payload_execution_handoff(&output_dir).events.len(),
+        2,
+        "provider completion persistence must be idempotent"
+    );
     let artifact = fs::read_to_string(
         output_dir.join("nuis.nsdb.provider-sample.metal-apple-silicon-gpu.toml"),
     )
@@ -366,6 +444,17 @@ next_action = "execute-provider-sample"
         "provider_output_payload_evidence = \"nuis.nsdb.provider-output.metal-apple-silicon-gpu.toml:hash=0x"
     ));
     assert!(source.contains("real-device-provider-output-payload:"));
+    let handoff = read_payload_execution_handoff(&output_dir);
+    let completion = handoff
+        .events
+        .iter()
+        .find(|event| event.execution_phase == "provider-device-completion")
+        .unwrap();
+    assert_eq!(completion.target, "metal:apple-silicon-gpu");
+    assert_eq!(completion.status, "ready");
+    assert!(completion
+        .entry_section_id
+        .contains("nuis.nsdb.provider-output.metal-apple-silicon-gpu.toml:hash=0x"));
 
     fs::remove_dir_all(output_dir).unwrap();
 }

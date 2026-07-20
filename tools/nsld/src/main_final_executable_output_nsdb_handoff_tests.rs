@@ -41,6 +41,37 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
         summary,
     );
     let output_json = super::json::nsld_final_executable_output_report_json(&output);
+    nsdb::persist_payload_execution_handoff_record(
+        &dir,
+        "nsdb-provider-sample-materialization",
+        nsdb::PayloadExecutionHandoffRecord {
+            trace_id: "hetero-trace:shader:metal:apple-silicon-gpu".to_owned(),
+            status: "ready".to_owned(),
+            execution_phase: "provider-device-completion".to_owned(),
+            target: "metal:apple-silicon-gpu".to_owned(),
+            entry_symbol: "nustar-deferred-device-sample-v1".to_owned(),
+            entry_kind: "nuis-provider-output-payload-handoff-v1".to_owned(),
+            entry_section_id: "provider-output.toml:hash=0x1234".to_owned(),
+            provider_family: "metal:apple-silicon-gpu".to_owned(),
+            output_contract: "nuis-provider-output-payload-handoff-v1".to_owned(),
+            output_evidence: "provider-output.toml:hash=0x1234".to_owned(),
+            first_blocker: String::new(),
+            next_action: "replay-provider-completion".to_owned(),
+        },
+    )
+    .unwrap();
+    let mut merged_output = nsld_final_executable_output_report(Path::new(&manifest), &plan);
+    let merged_summary =
+        super::final_executable_output_nsdb_handoff::persist_final_output_nsdb_handoff(
+            Path::new(&plan.output_dir),
+            &merged_output,
+        );
+    super::final_executable_output_nsdb_handoff::attach_final_output_nsdb_handoff_summary(
+        &mut merged_output,
+        merged_summary,
+    );
+    let merged_handoff = fs::read_to_string(&handoff_path).unwrap();
+    let merged_output_json = super::json::nsld_final_executable_output_report_json(&merged_output);
     fs::remove_dir_all(dir).unwrap();
 
     assert!(handoff.contains("protocol = \"nuis-nsdb-payload-execution-handoff-v1\""));
@@ -75,6 +106,86 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
     );
     assert_eq!(output.final_output_nsdb_replay_checkpoint_count, 1);
     assert_eq!(output.final_output_nsdb_replayable_checkpoint_count, 1);
+    assert_eq!(merged_output.final_output_nsdb_handoff_record_count, 2);
+    assert_eq!(
+        merged_output.final_output_nsdb_handoff_ready_record_count,
+        2
+    );
+    assert_eq!(
+        merged_output
+            .final_output_nsdb_handoff_first_trace_id
+            .as_deref(),
+        Some("payload-trace:container-loader:nuis.bootstrap.lifecycle.v1")
+    );
+    assert_eq!(merged_output.final_output_nsdb_replay_checkpoint_count, 2);
+    assert_eq!(
+        merged_output.final_output_nsdb_replayable_checkpoint_count,
+        2
+    );
+    assert!(merged_handoff.contains("execution_phase = \"container-loader-handoff\""));
+    assert!(merged_handoff.contains("execution_phase = \"provider-device-completion\""));
+    assert!(merged_handoff.contains("target = \"metal:apple-silicon-gpu\""));
+    assert_eq!(merged_output.final_output_nsdb_provider_completion_count, 1);
+    assert_eq!(
+        merged_output
+            .final_output_nsdb_first_provider_family
+            .as_deref(),
+        Some("metal:apple-silicon-gpu")
+    );
+    assert_eq!(
+        merged_output
+            .final_output_nsdb_first_provider_output_contract
+            .as_deref(),
+        Some("nuis-provider-output-payload-handoff-v1")
+    );
+    assert_eq!(
+        merged_output
+            .final_output_nsdb_first_provider_output_evidence
+            .as_deref(),
+        Some("provider-output.toml:hash=0x1234")
+    );
+    assert!(merged_output
+        .final_output_nsdb_provider_completion_set_hash
+        .as_deref()
+        .is_some_and(|hash| hash.len() == 64 && hash.bytes().all(|byte| byte.is_ascii_hexdigit())));
+    assert_eq!(
+        merged_output
+            .final_output_nsdb_provider_completion_digest_contract
+            .as_deref(),
+        Some("nuis-provider-completion-digest-sha256-v1")
+    );
+    assert_eq!(
+        merged_output.final_output_nsdb_provider_completion_set_hash_claim,
+        merged_output.final_output_nsdb_provider_completion_set_hash
+    );
+    assert_eq!(
+        merged_output.final_output_nsdb_provider_completion_set_hash_validation_status,
+        "verified"
+    );
+    assert_eq!(
+        merged_output.final_output_nsdb_provider_completions.len(),
+        1
+    );
+    assert_eq!(
+        merged_output.final_output_nsdb_provider_completions[0].provider_family,
+        "metal:apple-silicon-gpu"
+    );
+    assert_eq!(
+        merged_output.final_output_nsdb_provider_completions[0]
+            .record_hash
+            .len(),
+        64
+    );
+    assert!(merged_output_json.contains("\"final_output_nsdb_provider_completion_count\":1"));
+    assert!(merged_output_json
+        .contains("\"final_output_nsdb_first_provider_family\":\"metal:apple-silicon-gpu\""));
+    assert!(merged_output_json.contains("\"final_output_nsdb_provider_completions\":[{"));
+    assert!(merged_output_json.contains(
+        "\"final_output_nsdb_provider_completion_digest_contract\":\"nuis-provider-completion-digest-sha256-v1\""
+    ));
+    assert!(merged_output_json.contains(
+        "\"final_output_nsdb_provider_completion_set_hash_validation_status\":\"verified\""
+    ));
     assert!(output
         .final_output_nsdb_replay_command
         .as_deref()

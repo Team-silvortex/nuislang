@@ -222,6 +222,27 @@ pub(super) fn write_nsld_final_output_text_fields<W: fmt::Write>(
     )?;
     writeln!(
         out,
+        "  nsld_final_executable_output_nsdb_provider_completions: {}",
+        final_output.nsdb_provider_completion_count
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_nsdb_first_provider: {} / {} / {}",
+        final_output
+            .nsdb_first_provider_family
+            .as_deref()
+            .unwrap_or("<none>"),
+        final_output
+            .nsdb_first_provider_output_contract
+            .as_deref()
+            .unwrap_or("<none>"),
+        final_output
+            .nsdb_first_provider_output_evidence
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
         "  nsld_final_executable_output_nsdb_replay_next_action: {}",
         final_output.nsdb_replay_next_action
     )?;

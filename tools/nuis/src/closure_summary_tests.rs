@@ -7,6 +7,33 @@ fn final_output_closure_becomes_ready_when_replay_evidence_is_ready() {
     final_output.debugger_cursor_lineage_repair_evicted_prefix_hash =
         Some("0x0123456789abcdef".to_owned());
     final_output.debugger_cursor_lineage_repair_window_hash = Some("0xfedcba9876543210".to_owned());
+    final_output.nsdb_provider_completion_count = 2;
+    final_output.nsdb_first_provider_family = Some("metal:apple-silicon-gpu".to_owned());
+    final_output.nsdb_first_provider_output_contract =
+        Some("nuis-provider-output-payload-handoff-v1".to_owned());
+    final_output.nsdb_first_provider_output_evidence =
+        Some("provider-output.toml:hash=0x1234".to_owned());
+    final_output.nsdb_provider_completion_digest_contract =
+        Some("nuis-provider-completion-digest-fnv1a64-v1".to_owned());
+    final_output.nsdb_provider_completion_set_hash_claim = Some("0xset1234".to_owned());
+    final_output.nsdb_provider_completion_set_hash = Some("0xset1234".to_owned());
+    final_output.nsdb_provider_completion_set_hash_validation_status = "verified".to_owned();
+    final_output.nsdb_provider_completions = vec![
+        crate::workflow::ProviderCompletionBoundarySummary {
+            trace_id: "hetero-trace:shader:metal:apple-silicon-gpu".to_owned(),
+            provider_family: "metal:apple-silicon-gpu".to_owned(),
+            output_contract: "nuis-provider-output-payload-handoff-v1".to_owned(),
+            output_evidence: "provider-output.toml:hash=0x1234".to_owned(),
+            record_hash: "0xrecord1234".to_owned(),
+        },
+        crate::workflow::ProviderCompletionBoundarySummary {
+            trace_id: "hetero-trace:kernel:coreml:apple-ane".to_owned(),
+            provider_family: "coreml:apple-ane".to_owned(),
+            output_contract: "nuis-provider-output-payload-handoff-v1".to_owned(),
+            output_evidence: "coreml-output.toml:hash=0x5678".to_owned(),
+            record_hash: "0xrecord5678".to_owned(),
+        },
+    ];
 
     let summary = FrontdoorClosureSummary::from_nsld_final_output_closure(
         "workflow-link-plan",
@@ -15,7 +42,6 @@ fn final_output_closure_becomes_ready_when_replay_evidence_is_ready() {
         "fallback reason",
         Some(&final_output),
     );
-
     assert_eq!(summary.status, "ready");
     assert!(summary.ready);
     assert_eq!(summary.primary_blocker, None);
@@ -34,6 +60,27 @@ fn final_output_closure_becomes_ready_when_replay_evidence_is_ready() {
         Some("nsdb-yir-replay-transcript-v1")
     );
     assert_eq!(summary.debugger_transcript_ready, Some(true));
+    let provider = summary.provider_completion.as_ref().unwrap();
+    assert_eq!(
+        provider.digest_contract.as_deref(),
+        Some("nuis-provider-completion-digest-fnv1a64-v1")
+    );
+    assert_eq!(provider.count, 2);
+    assert_eq!(provider.family.as_deref(), Some("metal:apple-silicon-gpu"));
+    assert_eq!(
+        provider.output_contract.as_deref(),
+        Some("nuis-provider-output-payload-handoff-v1")
+    );
+    assert_eq!(
+        provider.output_evidence.as_deref(),
+        Some("provider-output.toml:hash=0x1234")
+    );
+    assert_eq!(provider.set_hash_claim.as_deref(), Some("0xset1234"));
+    assert_eq!(provider.set_hash.as_deref(), Some("0xset1234"));
+    assert_eq!(provider.set_hash_validation_status, "verified");
+    assert_eq!(provider.records.len(), 2);
+    assert_eq!(provider.records[0].record_hash, "0xrecord1234");
+    assert_eq!(provider.records[1].provider_family, "coreml:apple-ane");
     let lineage = summary.debugger_cursor_lineage.as_ref().unwrap();
     assert_eq!(lineage.repair_rotation_generation, Some(4));
     assert_eq!(
@@ -53,6 +100,25 @@ fn final_output_closure_becomes_ready_when_replay_evidence_is_ready() {
         &"\"closure_summary_debugger_cursor_lineage_repair_window_hash\":\"0xfedcba9876543210\""
             .to_owned()
     ));
+    assert!(fields.contains(&"\"closure_summary_provider_completion_count\":2".to_owned()));
+    assert!(fields.contains(
+        &"\"closure_summary_first_provider_family\":\"metal:apple-silicon-gpu\"".to_owned()
+    ));
+    assert!(fields
+        .contains(&"\"closure_summary_provider_completion_set_hash\":\"0xset1234\"".to_owned()));
+    assert!(fields.contains(
+        &"\"closure_summary_provider_completion_digest_contract\":\"nuis-provider-completion-digest-fnv1a64-v1\"".to_owned()
+    ));
+    assert!(fields.contains(
+        &"\"closure_summary_provider_completion_set_hash_claim\":\"0xset1234\"".to_owned()
+    ));
+    assert!(fields.contains(
+        &"\"closure_summary_provider_completion_set_hash_validation_status\":\"verified\""
+            .to_owned()
+    ));
+    assert!(fields
+        .iter()
+        .any(|field| field.starts_with("\"closure_summary_provider_completions\":[{")));
     assert_eq!(
         summary.debugger_transcript_status.as_deref(),
         Some("transcript-ready")
@@ -202,6 +268,15 @@ fn final_output_summary(
         .to_owned(),
         nsdb_replay_checkpoint_count: usize::from(nsdb_replay_ready),
         nsdb_replayable_checkpoint_count: usize::from(nsdb_replay_ready),
+        nsdb_provider_completion_count: 0,
+        nsdb_first_provider_family: None,
+        nsdb_first_provider_output_contract: None,
+        nsdb_first_provider_output_evidence: None,
+        nsdb_provider_completion_digest_contract: None,
+        nsdb_provider_completion_set_hash_claim: None,
+        nsdb_provider_completion_set_hash: None,
+        nsdb_provider_completion_set_hash_validation_status: "not-applicable".to_owned(),
+        nsdb_provider_completions: Vec::new(),
         nsdb_replay_command: nsdb_replay_ready.then(|| "nsdb replay out --json".to_owned()),
         nsdb_replay_next_action: if nsdb_replay_ready {
             "replay-nsdb-payload-execution"

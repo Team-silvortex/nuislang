@@ -384,6 +384,10 @@ next_action = "execute-provider-sample"
             first_next_action: "handoff-payload-trace-to-nsdb".to_owned(),
             first_entry_symbol: "nuis.bootstrap.lifecycle.v1".to_owned(),
             first_execution_phase: "container-loader-handoff".to_owned(),
+            provider_completion_digest_contract: "none".to_owned(),
+            provider_completion_set_hash_claim: "none".to_owned(),
+            provider_completion_set_hash_actual: "none".to_owned(),
+            provider_completion_set_hash_validation_status: "not-applicable".to_owned(),
             hetero_execution_closure_protocol: "nuis-hetero-execution-closure-v1".to_owned(),
             hetero_execution_closure_status: "closed".to_owned(),
             hetero_execution_closure_ready: "true".to_owned(),
@@ -401,6 +405,9 @@ next_action = "execute-provider-sample"
                     entry_symbol: "nuis.bootstrap.lifecycle.v1".to_owned(),
                     entry_kind: "lifecycle-bootstrap".to_owned(),
                     entry_section_id: "sec0000.compiled-artifact".to_owned(),
+                    provider_family: "none".to_owned(),
+                    output_contract: "none".to_owned(),
+                    output_evidence: "none".to_owned(),
                     first_blocker: "none".to_owned(),
                     next_action: "handoff-payload-trace-to-nsdb".to_owned(),
                 },
@@ -413,6 +420,9 @@ next_action = "execute-provider-sample"
                     entry_symbol: "pixelmagic.blur".to_owned(),
                     entry_kind: "shader-kernel".to_owned(),
                     entry_section_id: "sec0002.shader".to_owned(),
+                    provider_family: "none".to_owned(),
+                    output_contract: "none".to_owned(),
+                    output_evidence: "none".to_owned(),
                     first_blocker: "device-execution-sample-missing".to_owned(),
                     next_action: "materialize-device-execution-trace".to_owned(),
                 },
@@ -786,6 +796,33 @@ next_action = "execute-provider-sample"
     assert!(ready_plan.checkpoints[1]
         .value_sample_materialization_detail
         .contains("deterministic-provider-sample-artifact"));
+    let mut provider_only_report = report.clone();
+    provider_only_report.payload_execution_handoff.events = vec![NsdbPayloadExecutionEvent {
+        index: 0,
+        trace_id: "hetero-trace:shader:metal:apple-silicon-gpu".to_owned(),
+        status: "ready".to_owned(),
+        execution_phase: "provider-device-completion".to_owned(),
+        target: "metal:apple-silicon-gpu".to_owned(),
+        entry_symbol: "nustar-deferred-device-sample-v1".to_owned(),
+        entry_kind: "nuis-provider-output-payload-handoff-v1".to_owned(),
+        entry_section_id: "provider-output.toml:hash=0x1234".to_owned(),
+        provider_family: "metal:apple-silicon-gpu".to_owned(),
+        output_contract: "nuis-provider-output-payload-handoff-v1".to_owned(),
+        output_evidence: "provider-output.toml:hash=0x1234".to_owned(),
+        first_blocker: "none".to_owned(),
+        next_action: "replay-provider-completion".to_owned(),
+    }];
+    let provider_only_plan = build_replay_plan(&provider_only_report);
+    assert_eq!(provider_only_plan.checkpoint_count, 1);
+    assert_eq!(provider_only_plan.replayable_checkpoint_count, 1);
+    assert_eq!(
+        provider_only_plan.checkpoints[0].execution_phase,
+        "provider-device-completion"
+    );
+    assert_eq!(
+        provider_only_plan.checkpoints[0].trace_id,
+        "hetero-trace:shader:metal:apple-silicon-gpu"
+    );
     let ready_transcript = crate::transcript::build_replay_transcript(&report);
     assert_eq!(ready_transcript.status, "transcript-consumed");
     assert!(ready_transcript.ready);

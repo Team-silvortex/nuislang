@@ -61,6 +61,8 @@ pub(crate) use link_plan_commands::{
 };
 pub(crate) use link_plan_final_output::nsld_final_executable_output_boundary_summary;
 pub(crate) use link_plan_final_output_summary::NsldFinalExecutableOutputBoundarySummary;
+#[cfg(test)]
+pub(crate) use link_plan_final_output_summary::ProviderCompletionBoundarySummary;
 pub(crate) use link_plan_json::append_workflow_link_plan_json_fields;
 pub(crate) use link_plan_tail::{
     nsld_final_executable_tail_summary, NsldFinalExecutableTailSummary,

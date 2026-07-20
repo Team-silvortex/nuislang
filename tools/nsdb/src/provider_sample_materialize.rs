@@ -1,4 +1,5 @@
 use crate::{
+    handoff::persist_provider_completion_handoff,
     model::NsdbDeviceProviderSampleRecordInfo,
     provider_sample::{
         read_device_provider_sample_manifest_info, DEVICE_PROVIDER_SAMPLE_FILE_NAME,
@@ -101,6 +102,7 @@ pub fn materialize_provider_samples(
             path.display()
         )
     })?;
+    persist_provider_completion_handoff(output_dir, &records)?;
     let return_action = nsld_return_action(output_dir);
     let return_command = nsld_return_command(output_dir);
     let first_payload_summary = provider_output_payload_summary(

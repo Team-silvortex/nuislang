@@ -1,4 +1,13 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldProviderCompletionSummary {
+    pub(crate) trace_id: String,
+    pub(crate) provider_family: String,
+    pub(crate) output_contract: String,
+    pub(crate) output_evidence: String,
+    pub(crate) record_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldFinalStagePlanReport {
     pub(crate) manifest: String,
     pub(crate) ready: bool,
@@ -690,6 +699,15 @@ pub(crate) struct NsldFinalExecutableOutputReport {
     pub(crate) final_output_nsdb_replay_next_command: Option<String>,
     pub(crate) final_output_nsdb_replay_checkpoint_count: usize,
     pub(crate) final_output_nsdb_replayable_checkpoint_count: usize,
+    pub(crate) final_output_nsdb_provider_completion_count: usize,
+    pub(crate) final_output_nsdb_first_provider_family: Option<String>,
+    pub(crate) final_output_nsdb_first_provider_output_contract: Option<String>,
+    pub(crate) final_output_nsdb_first_provider_output_evidence: Option<String>,
+    pub(crate) final_output_nsdb_provider_completion_digest_contract: Option<String>,
+    pub(crate) final_output_nsdb_provider_completion_set_hash_claim: Option<String>,
+    pub(crate) final_output_nsdb_provider_completion_set_hash: Option<String>,
+    pub(crate) final_output_nsdb_provider_completion_set_hash_validation_status: String,
+    pub(crate) final_output_nsdb_provider_completions: Vec<NsldProviderCompletionSummary>,
     pub(crate) final_output_nsdb_replay_first_blocker: Option<String>,
     pub(crate) owned_package_summary_contract: String,
     pub(crate) owned_package_summary_status: String,

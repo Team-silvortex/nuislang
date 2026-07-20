@@ -153,6 +153,16 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         nsdb_replay_status: nsdb_replay.status,
         nsdb_replay_checkpoint_count: nsdb_replay.checkpoint_count,
         nsdb_replayable_checkpoint_count: nsdb_replay.replayable_checkpoint_count,
+        nsdb_provider_completion_count: nsdb_replay.provider_completion_count,
+        nsdb_first_provider_family: nsdb_replay.first_provider_family,
+        nsdb_first_provider_output_contract: nsdb_replay.first_provider_output_contract,
+        nsdb_first_provider_output_evidence: nsdb_replay.first_provider_output_evidence,
+        nsdb_provider_completion_digest_contract: nsdb_replay.provider_completion_digest_contract,
+        nsdb_provider_completion_set_hash_claim: nsdb_replay.provider_completion_set_hash_claim,
+        nsdb_provider_completion_set_hash: nsdb_replay.provider_completion_set_hash,
+        nsdb_provider_completion_set_hash_validation_status: nsdb_replay
+            .provider_completion_set_hash_validation_status,
+        nsdb_provider_completions: nsdb_replay.provider_completions,
         nsdb_replay_command: nsdb_replay.command,
         nsdb_replay_next_action: nsdb_replay.next_action,
         nsdb_replay_next_command: nsdb_replay.next_command,
@@ -303,6 +313,16 @@ struct NsldFinalExecutableOutputNsdbReplay {
     status: String,
     checkpoint_count: usize,
     replayable_checkpoint_count: usize,
+    provider_completion_count: usize,
+    first_provider_family: Option<String>,
+    first_provider_output_contract: Option<String>,
+    first_provider_output_evidence: Option<String>,
+    provider_completion_digest_contract: Option<String>,
+    provider_completion_set_hash_claim: Option<String>,
+    provider_completion_set_hash: Option<String>,
+    provider_completion_set_hash_validation_status: String,
+    provider_completions:
+        Vec<super::link_plan_final_output_summary::ProviderCompletionBoundarySummary>,
     command: Option<String>,
     next_action: String,
     next_command: Option<String>,
@@ -353,6 +373,33 @@ fn nsld_final_executable_output_nsdb_replay(
         .to_owned(),
         checkpoint_count,
         replayable_checkpoint_count,
+        provider_completion_count: handoff.provider_completion_count(),
+        first_provider_family: handoff.first_provider_family().map(str::to_owned),
+        first_provider_output_contract: handoff.first_provider_output_contract().map(str::to_owned),
+        first_provider_output_evidence: handoff.first_provider_output_evidence().map(str::to_owned),
+        provider_completion_digest_contract: handoff
+            .provider_completion_digest_contract()
+            .map(str::to_owned),
+        provider_completion_set_hash_claim: handoff
+            .provider_completion_set_hash_claim()
+            .map(str::to_owned),
+        provider_completion_set_hash: handoff.provider_completion_set_hash().map(str::to_owned),
+        provider_completion_set_hash_validation_status: handoff
+            .provider_completion_set_hash_validation_status()
+            .to_owned(),
+        provider_completions: handoff
+            .provider_completions()
+            .iter()
+            .map(|completion| {
+                super::link_plan_final_output_summary::ProviderCompletionBoundarySummary {
+                    trace_id: completion.trace_id.clone(),
+                    provider_family: completion.provider_family.clone(),
+                    output_contract: completion.output_contract.clone(),
+                    output_evidence: completion.output_evidence.clone(),
+                    record_hash: completion.record_hash.clone(),
+                }
+            })
+            .collect(),
         command,
         next_action,
         next_command,

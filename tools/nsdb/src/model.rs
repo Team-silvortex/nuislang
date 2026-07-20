@@ -1,4 +1,37 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PayloadExecutionHandoffRecord {
+    pub trace_id: String,
+    pub status: String,
+    pub execution_phase: String,
+    pub target: String,
+    pub entry_symbol: String,
+    pub entry_kind: String,
+    pub entry_section_id: String,
+    pub provider_family: String,
+    pub output_contract: String,
+    pub output_evidence: String,
+    pub first_blocker: String,
+    pub next_action: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PayloadExecutionHandoffPersistSummary {
+    pub record_count: usize,
+    pub ready_record_count: usize,
+    pub first_trace_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
+pub struct PayloadExecutionProviderCompletion {
+    pub trace_id: String,
+    pub provider_family: String,
+    pub output_contract: String,
+    pub output_evidence: String,
+    pub record_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsdbInspectReport {
     pub(crate) manifest: String,
     pub(crate) output_dir: String,
@@ -190,6 +223,10 @@ pub(crate) struct NsdbPayloadExecutionHandoffInfo {
     pub(crate) first_next_action: String,
     pub(crate) first_entry_symbol: String,
     pub(crate) first_execution_phase: String,
+    pub(crate) provider_completion_digest_contract: String,
+    pub(crate) provider_completion_set_hash_claim: String,
+    pub(crate) provider_completion_set_hash_actual: String,
+    pub(crate) provider_completion_set_hash_validation_status: String,
     pub(crate) hetero_execution_closure_protocol: String,
     pub(crate) hetero_execution_closure_status: String,
     pub(crate) hetero_execution_closure_ready: String,
@@ -208,6 +245,9 @@ pub(crate) struct NsdbPayloadExecutionEvent {
     pub(crate) entry_symbol: String,
     pub(crate) entry_kind: String,
     pub(crate) entry_section_id: String,
+    pub(crate) provider_family: String,
+    pub(crate) output_contract: String,
+    pub(crate) output_evidence: String,
     pub(crate) first_blocker: String,
     pub(crate) next_action: String,
 }
@@ -291,6 +331,9 @@ mod tests {
             entry_symbol: "pixelmagic.blur".to_owned(),
             entry_kind: "shader-kernel".to_owned(),
             entry_section_id: "sec0002.shader".to_owned(),
+            provider_family: "none".to_owned(),
+            output_contract: "none".to_owned(),
+            output_evidence: "none".to_owned(),
             first_blocker: "device-execution-sample-missing".to_owned(),
             next_action: "materialize-device-execution-trace".to_owned(),
         };

@@ -89,9 +89,32 @@ pub(crate) fn build_replay_plan(report: &NsdbInspectReport) -> NsdbReplayPlan {
 }
 
 fn replay_source_events(report: &NsdbInspectReport) -> Vec<NsdbPayloadExecutionEvent> {
-    if !report.payload_execution_handoff.events.is_empty() {
+    let handoff_events = &report.payload_execution_handoff.events;
+    if !handoff_events.is_empty()
+        && !handoff_events
+            .iter()
+            .all(|event| event.execution_phase == "provider-device-completion")
+    {
         return report.payload_execution_handoff.events.clone();
     }
+    let mut events = projected_hetero_runtime_events(report);
+    for completion in handoff_events {
+        if let Some(index) = events
+            .iter()
+            .position(|event| event.trace_id == completion.trace_id)
+        {
+            events[index] = completion.clone();
+        } else {
+            events.push(completion.clone());
+        }
+    }
+    for (index, event) in events.iter_mut().enumerate() {
+        event.index = index;
+    }
+    events
+}
+
+fn projected_hetero_runtime_events(report: &NsdbInspectReport) -> Vec<NsdbPayloadExecutionEvent> {
     report
         .hetero_runtime_trace
         .records
@@ -117,6 +140,9 @@ fn replay_source_events(report: &NsdbInspectReport) -> Vec<NsdbPayloadExecutionE
             entry_symbol: record.backend_artifact_key.clone(),
             entry_kind: record.trace_role.clone(),
             entry_section_id: record.selected_lowering_target.clone(),
+            provider_family: "none".to_owned(),
+            output_contract: "none".to_owned(),
+            output_evidence: "none".to_owned(),
             first_blocker: if matches!(record.status.as_str(), "metadata-only" | "trace-ready") {
                 "none".to_owned()
             } else {

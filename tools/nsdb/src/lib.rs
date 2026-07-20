@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+mod digest_sha256;
 mod handoff;
 mod model;
 mod provider_runner_metal;
@@ -13,10 +14,22 @@ mod provider_sample_materialize_tests;
 mod provider_sample_payload;
 mod provider_sample_runner;
 
+pub use model::{
+    PayloadExecutionHandoffPersistSummary, PayloadExecutionHandoffRecord,
+    PayloadExecutionProviderCompletion,
+};
 pub use provider_sample_execute::{execute_provider_samples, ProviderSampleExecuteReport};
 pub use provider_sample_materialize::{
     materialize_provider_samples, ProviderSampleMaterializeReport,
 };
+
+pub fn persist_payload_execution_handoff_record(
+    output_dir: &std::path::Path,
+    source: &str,
+    record: PayloadExecutionHandoffRecord,
+) -> Result<PayloadExecutionHandoffPersistSummary, String> {
+    handoff::persist_payload_execution_handoff_record(output_dir, source, record)
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PayloadExecutionReplaySummary {
@@ -24,6 +37,15 @@ pub struct PayloadExecutionReplaySummary {
     pub status: String,
     pub checkpoint_count: usize,
     pub replayable_checkpoint_count: usize,
+    pub provider_completion_count: usize,
+    pub first_provider_family: Option<String>,
+    pub first_provider_output_contract: Option<String>,
+    pub first_provider_output_evidence: Option<String>,
+    pub provider_completion_digest_contract: Option<String>,
+    pub provider_completion_set_hash_claim: Option<String>,
+    pub provider_completion_set_hash: Option<String>,
+    pub provider_completion_set_hash_validation_status: String,
+    pub provider_completions: Vec<PayloadExecutionProviderCompletion>,
     pub first_blocker: Option<String>,
 }
 
@@ -37,6 +59,29 @@ pub fn payload_execution_replay_summary(
         .iter()
         .filter(|event| event.status == "ready")
         .count();
+    let provider_completions = handoff
+        .events
+        .iter()
+        .filter(|event| event.execution_phase == "provider-device-completion")
+        .map(|event| PayloadExecutionProviderCompletion {
+            trace_id: event.trace_id.clone(),
+            provider_family: event.provider_family.clone(),
+            output_contract: event.output_contract.clone(),
+            output_evidence: event.output_evidence.clone(),
+            record_hash: handoff::provider_completion_record_hash(
+                event,
+                if handoff.provider_completion_digest_contract == "none" {
+                    "nuis-provider-completion-digest-fnv1a64-v1"
+                } else {
+                    &handoff.provider_completion_digest_contract
+                },
+            )
+            .unwrap_or_else(|| "none".to_owned()),
+        })
+        .collect::<Vec<_>>();
+    let first_provider_completion = provider_completions.first();
+    let provider_completion_set_hash = (handoff.provider_completion_set_hash_actual != "none")
+        .then(|| handoff.provider_completion_set_hash_actual.clone());
     let first_blocker = if !handoff.available {
         Some("payload-execution-handoff-missing".to_owned())
     } else if handoff.status != "ready" {
@@ -74,13 +119,35 @@ pub fn payload_execution_replay_summary(
         },
         checkpoint_count,
         replayable_checkpoint_count,
+        provider_completion_count: provider_completions.len(),
+        first_provider_family: first_provider_completion
+            .map(|completion| completion.provider_family.clone())
+            .filter(|value| value != "none" && !value.is_empty()),
+        first_provider_output_contract: first_provider_completion
+            .map(|completion| completion.output_contract.clone())
+            .filter(|value| value != "none" && !value.is_empty()),
+        first_provider_output_evidence: first_provider_completion
+            .map(|completion| completion.output_evidence.clone())
+            .filter(|value| value != "none" && !value.is_empty()),
+        provider_completion_digest_contract: (handoff.provider_completion_digest_contract
+            != "none")
+            .then(|| handoff.provider_completion_digest_contract.clone()),
+        provider_completion_set_hash_claim: (handoff.provider_completion_set_hash_claim != "none")
+            .then(|| handoff.provider_completion_set_hash_claim.clone()),
+        provider_completion_set_hash,
+        provider_completion_set_hash_validation_status: handoff
+            .provider_completion_set_hash_validation_status,
+        provider_completions,
         first_blocker,
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::payload_execution_replay_summary;
+    use super::{
+        payload_execution_replay_summary, persist_payload_execution_handoff_record,
+        PayloadExecutionHandoffRecord,
+    };
     use std::{fs, path::Path};
 
     #[test]
@@ -163,6 +230,130 @@ next_action = "handoff-payload-trace-to-nsdb"
         assert_eq!(
             summary.first_blocker.as_deref(),
             Some("hetero-execution-closure:host-runner-backend-artifact-payload:not-observed")
+        );
+    }
+
+    #[test]
+    fn provider_completion_collection_preserves_order_and_hashes_records() {
+        let dir = std::env::temp_dir().join(format!(
+            "nsdb-provider-completion-set-{}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        for (trace_id, family, evidence) in [
+            (
+                "hetero-trace:shader:metal:apple-silicon-gpu",
+                "metal:apple-silicon-gpu",
+                "metal-output:hash=0x1234",
+            ),
+            (
+                "hetero-trace:kernel:coreml:apple-ane",
+                "coreml:apple-ane",
+                "coreml-output:hash=0x5678",
+            ),
+        ] {
+            persist_payload_execution_handoff_record(
+                &dir,
+                "provider-set-test",
+                PayloadExecutionHandoffRecord {
+                    trace_id: trace_id.to_owned(),
+                    status: "ready".to_owned(),
+                    execution_phase: "provider-device-completion".to_owned(),
+                    target: family.to_owned(),
+                    entry_symbol: "registered-provider".to_owned(),
+                    entry_kind: "nuis-provider-output-payload-handoff-v1".to_owned(),
+                    entry_section_id: evidence.to_owned(),
+                    provider_family: family.to_owned(),
+                    output_contract: "nuis-provider-output-payload-handoff-v1".to_owned(),
+                    output_evidence: evidence.to_owned(),
+                    first_blocker: String::new(),
+                    next_action: "replay-provider-completion".to_owned(),
+                },
+            )
+            .unwrap();
+        }
+
+        let summary = payload_execution_replay_summary(&dir);
+
+        assert_eq!(summary.provider_completion_count, 2);
+        assert_eq!(summary.provider_completions.len(), 2);
+        assert_eq!(
+            summary.provider_completions[0].provider_family,
+            "metal:apple-silicon-gpu"
+        );
+        assert_eq!(
+            summary.provider_completions[1].provider_family,
+            "coreml:apple-ane"
+        );
+        assert_ne!(
+            summary.provider_completions[0].record_hash,
+            summary.provider_completions[1].record_hash
+        );
+        assert!(summary
+            .provider_completion_set_hash
+            .as_deref()
+            .is_some_and(
+                |hash| hash.len() == 64 && hash.bytes().all(|byte| byte.is_ascii_hexdigit())
+            ));
+        assert_eq!(
+            summary.provider_completion_digest_contract.as_deref(),
+            Some("nuis-provider-completion-digest-sha256-v1")
+        );
+        let path = dir.join("nuis.nsdb.payload-execution-handoff.toml");
+        let source = fs::read_to_string(&path).unwrap();
+        assert!(source.contains(
+            "provider_completion_digest_contract = \"nuis-provider-completion-digest-sha256-v1\""
+        ));
+        let claim = summary.provider_completion_set_hash.as_deref().unwrap();
+        assert!(source.contains(&format!("provider_completion_set_hash = \"{claim}\"")));
+        fs::write(
+            &path,
+            source.replacen("record_count = 2", "record_count = 3", 1),
+        )
+        .unwrap();
+        let count_rejected = payload_execution_replay_summary(&dir);
+        assert_eq!(
+            count_rejected.provider_completion_set_hash_validation_status,
+            "mismatch"
+        );
+        assert_eq!(
+            count_rejected.first_blocker.as_deref(),
+            Some("payload-execution-handoff:provider-completion-set-hash-mismatch")
+        );
+        fs::write(
+            &path,
+            source.replace("coreml-output:hash=0x5678", "coreml-output:hash=0xtampered"),
+        )
+        .unwrap();
+        let rejected = payload_execution_replay_summary(&dir);
+        let rewrite = persist_payload_execution_handoff_record(
+            &dir,
+            "provider-set-test",
+            PayloadExecutionHandoffRecord {
+                trace_id: "hetero-trace:kernel:coreml:apple-ane".to_owned(),
+                status: "ready".to_owned(),
+                execution_phase: "provider-device-completion".to_owned(),
+                target: "coreml:apple-ane".to_owned(),
+                entry_symbol: "registered-provider".to_owned(),
+                entry_kind: "nuis-provider-output-payload-handoff-v1".to_owned(),
+                entry_section_id: "coreml-output:hash=0x5678".to_owned(),
+                provider_family: "coreml:apple-ane".to_owned(),
+                output_contract: "nuis-provider-output-payload-handoff-v1".to_owned(),
+                output_evidence: "coreml-output:hash=0x5678".to_owned(),
+                first_blocker: String::new(),
+                next_action: "replay-provider-completion".to_owned(),
+            },
+        );
+        fs::remove_dir_all(dir).unwrap();
+
+        assert_eq!(rejected.status, "blocked");
+        assert_eq!(
+            rejected.first_blocker.as_deref(),
+            Some("payload-execution-handoff:provider-completion-set-hash-mismatch")
+        );
+        assert_eq!(
+            rewrite.unwrap_err(),
+            "provider completion digest validation failed in existing handoff: mismatch"
         );
     }
 }

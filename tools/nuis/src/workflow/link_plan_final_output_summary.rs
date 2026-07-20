@@ -1,5 +1,14 @@
 use crate::artifact_nsdb_replay_cursor_lineage::DebuggerCursorLineageRepairAction;
 
+#[derive(Clone)]
+pub(crate) struct ProviderCompletionBoundarySummary {
+    pub(crate) trace_id: String,
+    pub(crate) provider_family: String,
+    pub(crate) output_contract: String,
+    pub(crate) output_evidence: String,
+    pub(crate) record_hash: String,
+}
+
 pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) ready: bool,
     pub(crate) boundary_status: String,
@@ -35,6 +44,15 @@ pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) nsdb_replay_status: String,
     pub(crate) nsdb_replay_checkpoint_count: usize,
     pub(crate) nsdb_replayable_checkpoint_count: usize,
+    pub(crate) nsdb_provider_completion_count: usize,
+    pub(crate) nsdb_first_provider_family: Option<String>,
+    pub(crate) nsdb_first_provider_output_contract: Option<String>,
+    pub(crate) nsdb_first_provider_output_evidence: Option<String>,
+    pub(crate) nsdb_provider_completion_digest_contract: Option<String>,
+    pub(crate) nsdb_provider_completion_set_hash_claim: Option<String>,
+    pub(crate) nsdb_provider_completion_set_hash: Option<String>,
+    pub(crate) nsdb_provider_completion_set_hash_validation_status: String,
+    pub(crate) nsdb_provider_completions: Vec<ProviderCompletionBoundarySummary>,
     pub(crate) nsdb_replay_command: Option<String>,
     pub(crate) nsdb_replay_next_action: String,
     pub(crate) nsdb_replay_next_command: Option<String>,

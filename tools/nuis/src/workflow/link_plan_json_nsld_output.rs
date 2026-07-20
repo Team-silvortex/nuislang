@@ -167,6 +167,26 @@ pub(super) fn nsld_final_output_json_fields(
                 .map(|summary| summary.nsdb_replayable_checkpoint_count)
                 .unwrap_or(0),
         ),
+        json_usize_field(
+            "nsld_final_executable_output_nsdb_provider_completion_count",
+            nsld_final_output
+                .map(|summary| summary.nsdb_provider_completion_count)
+                .unwrap_or(0),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_nsdb_first_provider_family",
+            nsld_final_output.and_then(|summary| summary.nsdb_first_provider_family.as_deref()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_nsdb_first_provider_output_contract",
+            nsld_final_output
+                .and_then(|summary| summary.nsdb_first_provider_output_contract.as_deref()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_nsdb_first_provider_output_evidence",
+            nsld_final_output
+                .and_then(|summary| summary.nsdb_first_provider_output_evidence.as_deref()),
+        ),
         json_optional_string_field(
             "nsld_final_executable_output_nsdb_replay_command",
             nsld_final_output.and_then(|summary| summary.nsdb_replay_command.as_deref()),

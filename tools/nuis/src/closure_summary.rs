@@ -20,6 +20,61 @@ pub(crate) struct FrontdoorClosureSummary {
     pub(crate) debugger_cursor_status: Option<String>,
     pub(crate) debugger_cursor_next_command: Option<String>,
     pub(crate) debugger_cursor_lineage: Option<DebuggerCursorLineageClosureMirror>,
+    pub(crate) provider_completion: Option<ProviderCompletionClosureMirror>,
+}
+
+#[derive(Clone)]
+pub(crate) struct ProviderCompletionClosureMirror {
+    pub(crate) count: usize,
+    pub(crate) family: Option<String>,
+    pub(crate) output_contract: Option<String>,
+    pub(crate) output_evidence: Option<String>,
+    pub(crate) digest_contract: Option<String>,
+    pub(crate) set_hash_claim: Option<String>,
+    pub(crate) set_hash: Option<String>,
+    pub(crate) set_hash_validation_status: String,
+    pub(crate) records: Vec<ProviderCompletionRecordClosureMirror>,
+}
+
+#[derive(Clone)]
+pub(crate) struct ProviderCompletionRecordClosureMirror {
+    pub(crate) trace_id: String,
+    pub(crate) provider_family: String,
+    pub(crate) output_contract: String,
+    pub(crate) output_evidence: String,
+    pub(crate) record_hash: String,
+}
+
+impl ProviderCompletionClosureMirror {
+    fn from_final_output(
+        final_output: &crate::workflow::NsldFinalExecutableOutputBoundarySummary,
+    ) -> Option<Self> {
+        (final_output.nsdb_provider_completion_count > 0).then(|| Self {
+            count: final_output.nsdb_provider_completion_count,
+            family: final_output.nsdb_first_provider_family.clone(),
+            output_contract: final_output.nsdb_first_provider_output_contract.clone(),
+            output_evidence: final_output.nsdb_first_provider_output_evidence.clone(),
+            digest_contract: final_output
+                .nsdb_provider_completion_digest_contract
+                .clone(),
+            set_hash_claim: final_output.nsdb_provider_completion_set_hash_claim.clone(),
+            set_hash: final_output.nsdb_provider_completion_set_hash.clone(),
+            set_hash_validation_status: final_output
+                .nsdb_provider_completion_set_hash_validation_status
+                .clone(),
+            records: final_output
+                .nsdb_provider_completions
+                .iter()
+                .map(|completion| ProviderCompletionRecordClosureMirror {
+                    trace_id: completion.trace_id.clone(),
+                    provider_family: completion.provider_family.clone(),
+                    output_contract: completion.output_contract.clone(),
+                    output_evidence: completion.output_evidence.clone(),
+                    record_hash: completion.record_hash.clone(),
+                })
+                .collect(),
+        })
+    }
 }
 
 #[derive(Clone)]
@@ -155,6 +210,7 @@ impl FrontdoorClosureSummary {
             debugger_cursor_status: None,
             debugger_cursor_next_command: None,
             debugger_cursor_lineage: None,
+            provider_completion: None,
         }
     }
 
@@ -187,6 +243,7 @@ impl FrontdoorClosureSummary {
             debugger_cursor_status: None,
             debugger_cursor_next_command: None,
             debugger_cursor_lineage: None,
+            provider_completion: None,
         }
     }
 
@@ -237,6 +294,9 @@ impl FrontdoorClosureSummary {
                 debugger_cursor_lineage: Some(
                     DebuggerCursorLineageClosureMirror::from_final_output(final_output),
                 ),
+                provider_completion: ProviderCompletionClosureMirror::from_final_output(
+                    final_output,
+                ),
             };
         }
         if final_output.ready && !final_output.nsdb_replay_ready {
@@ -285,6 +345,9 @@ impl FrontdoorClosureSummary {
                 debugger_cursor_lineage: Some(
                     DebuggerCursorLineageClosureMirror::from_final_output(final_output),
                 ),
+                provider_completion: ProviderCompletionClosureMirror::from_final_output(
+                    final_output,
+                ),
             };
         }
         Self::from_nsld_next_action(source, action, command, reason)
@@ -317,6 +380,7 @@ impl FrontdoorClosureSummary {
         self.debugger_cursor_lineage = Some(DebuggerCursorLineageClosureMirror::from_final_output(
             final_output,
         ));
+        self.provider_completion = ProviderCompletionClosureMirror::from_final_output(final_output);
         self
     }
 
@@ -363,6 +427,7 @@ impl FrontdoorClosureSummary {
             debugger_cursor_status: self.debugger_cursor_status,
             debugger_cursor_next_command: self.debugger_cursor_next_command,
             debugger_cursor_lineage: self.debugger_cursor_lineage,
+            provider_completion: self.provider_completion,
         }
     }
 
@@ -415,6 +480,52 @@ impl FrontdoorClosureSummary {
             crate::json_optional_string_field(
                 "closure_summary_debugger_transcript_first_blocker",
                 self.debugger_transcript_first_blocker.as_deref(),
+            ),
+            json_optional_usize_field(
+                "closure_summary_provider_completion_count",
+                self.provider_completion.as_ref().map(|mirror| mirror.count),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_first_provider_family",
+                self.provider_completion
+                    .as_ref()
+                    .and_then(|mirror| mirror.family.as_deref()),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_first_provider_output_contract",
+                self.provider_completion
+                    .as_ref()
+                    .and_then(|mirror| mirror.output_contract.as_deref()),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_first_provider_output_evidence",
+                self.provider_completion
+                    .as_ref()
+                    .and_then(|mirror| mirror.output_evidence.as_deref()),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_provider_completion_digest_contract",
+                self.provider_completion
+                    .as_ref()
+                    .and_then(|mirror| mirror.digest_contract.as_deref()),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_provider_completion_set_hash_claim",
+                self.provider_completion
+                    .as_ref()
+                    .and_then(|mirror| mirror.set_hash_claim.as_deref()),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_provider_completion_set_hash",
+                self.provider_completion
+                    .as_ref()
+                    .and_then(|mirror| mirror.set_hash.as_deref()),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_provider_completion_set_hash_validation_status",
+                self.provider_completion
+                    .as_ref()
+                    .map(|mirror| mirror.set_hash_validation_status.as_str()),
             ),
             crate::json_optional_string_field(
                 "closure_summary_debugger_cursor_handoff_contract",
@@ -497,6 +608,30 @@ impl FrontdoorClosureSummary {
                     .and_then(|mirror| mirror.next_command.as_deref()),
             ),
         ];
+        let provider_records = self
+            .provider_completion
+            .as_ref()
+            .map(|mirror| {
+                mirror
+                    .records
+                    .iter()
+                    .map(|record| {
+                        format!(
+                            "{{{},{},{},{},{}}}",
+                            crate::json_field("trace_id", &record.trace_id),
+                            crate::json_field("provider_family", &record.provider_family),
+                            crate::json_field("output_contract", &record.output_contract),
+                            crate::json_field("output_evidence", &record.output_evidence),
+                            crate::json_field("record_hash", &record.record_hash),
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        fields.push(crate::json_object_array_field(
+            "closure_summary_provider_completions",
+            &provider_records,
+        ));
         fields.extend(
             crate::closure_summary_lineage_repair_json::lineage_repair_json_fields(
                 self.debugger_cursor_lineage.as_ref(),
