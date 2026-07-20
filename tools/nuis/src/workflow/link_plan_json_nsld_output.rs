@@ -316,10 +316,51 @@ pub(super) fn nsld_final_output_json_fields(
             nsld_final_output
                 .map(|summary| summary.debugger_cursor_lineage_repair_entry_count),
         ),
+        json_optional_u64_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_rotation_generation",
+            nsld_final_output
+                .and_then(|summary| summary.debugger_cursor_lineage_repair_rotation_generation),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_evicted_prefix_hash",
+            nsld_final_output.and_then(|summary| {
+                summary
+                    .debugger_cursor_lineage_repair_evicted_prefix_hash
+                    .as_deref()
+            }),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_window_hash",
+            nsld_final_output.and_then(|summary| {
+                summary
+                    .debugger_cursor_lineage_repair_window_hash
+                    .as_deref()
+            }),
+        ),
         json_optional_bool_field(
             "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_mutated",
             nsld_final_output
                 .and_then(|summary| summary.debugger_cursor_lineage_repair_latest_mutated),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_event_status",
+            nsld_final_output.and_then(|summary| {
+                summary
+                    .debugger_cursor_lineage_repair_latest_event_status
+                    .as_deref()
+            }),
+        ),
+        json_optional_bool_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_lineage_mutated",
+            nsld_final_output.and_then(|summary| {
+                summary.debugger_cursor_lineage_repair_latest_lineage_mutated
+            }),
+        ),
+        json_optional_bool_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_journal_mutated",
+            nsld_final_output.and_then(|summary| {
+                summary.debugger_cursor_lineage_repair_latest_journal_mutated
+            }),
         ),
         json_optional_string_field(
             "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_archived_path",
@@ -338,10 +379,46 @@ pub(super) fn nsld_final_output_json_fields(
             }),
         ),
         json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_archived_journal_path",
+            nsld_final_output.and_then(|summary| {
+                summary
+                    .debugger_cursor_lineage_repair_latest_archived_journal_path
+                    .as_deref()
+            }),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_archived_journal_hash",
+            nsld_final_output.and_then(|summary| {
+                summary
+                    .debugger_cursor_lineage_repair_latest_archived_journal_hash
+                    .as_deref()
+            }),
+        ),
+        json_optional_string_field(
             "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_rebuilt_hash",
             nsld_final_output.and_then(|summary| {
                 summary
                     .debugger_cursor_lineage_repair_latest_rebuilt_hash
+                    .as_deref()
+            }),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_first_blocker",
+            nsld_final_output.and_then(|summary| {
+                summary.debugger_cursor_lineage_repair_action.first_blocker
+            }),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_next_action",
+            nsld_final_output
+                .and_then(|summary| summary.debugger_cursor_lineage_repair_action.next_action),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_next_command",
+            nsld_final_output.and_then(|summary| {
+                summary
+                    .debugger_cursor_lineage_repair_action
+                    .next_command
                     .as_deref()
             }),
         ),
@@ -430,4 +507,11 @@ fn json_optional_usize_field(name: &str, value: Option<usize>) -> String {
         Some(value) => json_usize_field(name, value),
         None => format!("\"{name}\":null"),
     }
+}
+
+fn json_optional_u64_field(name: &str, value: Option<u64>) -> String {
+    value.map_or_else(
+        || format!("\"{name}\":null"),
+        |value| format!("\"{name}\":{value}"),
+    )
 }

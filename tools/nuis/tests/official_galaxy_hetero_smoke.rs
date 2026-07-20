@@ -817,6 +817,8 @@ fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
         ) && repaired_report_stdout.contains(
             "\"nsld_final_executable_output_debugger_cursor_lineage_repair_entry_count\":1"
         ) && repaired_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_repair_rotation_generation\":0"
+        ) && repaired_report_stdout.contains(
             "\"nsld_final_executable_output_debugger_cursor_lineage_repair_latest_mutated\":true"
         ) && repaired_report_stdout.contains(
             "\"nsld_final_executable_output_debugger_cursor_lineage_repair_latest_archived_path\":\""
@@ -828,6 +830,8 @@ fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
             "\"closure_summary_debugger_cursor_lineage_repair_status\":\"repair-history-ready\""
         ) && repaired_report_stdout.contains(
             "\"closure_summary_debugger_cursor_lineage_repair_entry_count\":1"
+        ) && repaired_report_stdout.contains(
+            "\"closure_summary_debugger_cursor_lineage_repair_rotation_generation\":0"
         ) && repaired_report_stdout.contains(&format!(
             "\"closure_summary_debugger_cursor_lineage_repair_latest_rebuilt_hash\":\"{latest_hash}\""
         )),
@@ -866,6 +870,16 @@ fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
         fs::read(&lineage_path).expect("read healthy lineage before journal-only recovery smoke");
     fs::write(&repair_journal_path, "protocol = \"journal-only-damage\"\n")
         .expect("damage only cursor lineage repair journal");
+    let invalid_history = run_nuis(&["build-report", "--json", &output_dir_text]);
+    assert_success(&invalid_history, "nuis diagnose invalid repair history");
+    let invalid_history_stdout = String::from_utf8_lossy(&invalid_history.stdout);
+    assert!(
+        invalid_history_stdout.contains("\"nsld_final_executable_output_debugger_cursor_lineage_repair_first_blocker\":\"repair-history-contract-invalid\"")
+            && invalid_history_stdout.contains("\"nsld_final_executable_output_debugger_cursor_lineage_repair_next_action\":\"repair-cursor-lineage-history\"")
+            && invalid_history_stdout.contains("\"nsld_final_executable_output_debugger_cursor_lineage_repair_next_command\":\"nuis debug-lineage-repair ")
+            && invalid_history_stdout.contains("\"closure_summary_debugger_cursor_lineage_repair_first_blocker\":\"repair-history-contract-invalid\""),
+        "Nuis should expose an actionable invalid repair-history diagnosis\n{invalid_history_stdout}"
+    );
     let journal_only = run_nuis(&["debug-lineage-repair", &output_dir_text, "--json"]);
     assert_success(
         &journal_only,
@@ -888,10 +902,16 @@ fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
     );
     let journal_only_report = run_nuis(&["build-report", "--json", &output_dir_text]);
     assert_success(&journal_only_report, "nuis mirror journal-only recovery");
+    let journal_only_report_stdout = String::from_utf8_lossy(&journal_only_report.stdout);
     assert!(
-        String::from_utf8_lossy(&journal_only_report.stdout).contains(
-            "\"nsld_final_executable_output_debugger_cursor_lineage_repair_status\":\"repair-history-ready\""
-        ),
+        journal_only_report_stdout.contains("\"nsld_final_executable_output_debugger_cursor_lineage_repair_latest_event_status\":\"repair-history-recovered\"")
+            && journal_only_report_stdout.contains("\"nsld_final_executable_output_debugger_cursor_lineage_repair_latest_lineage_mutated\":false")
+            && journal_only_report_stdout.contains("\"nsld_final_executable_output_debugger_cursor_lineage_repair_latest_journal_mutated\":true")
+            && journal_only_report_stdout.contains("\"nsld_final_executable_output_debugger_cursor_lineage_repair_latest_archived_journal_path\":\"")
+            && journal_only_report_stdout.contains("\"nsld_final_executable_output_debugger_cursor_lineage_repair_latest_archived_journal_hash\":\"0x")
+            && journal_only_report_stdout.contains("\"closure_summary_debugger_cursor_lineage_repair_latest_event_status\":\"repair-history-recovered\"")
+            && journal_only_report_stdout.contains("\"closure_summary_debugger_cursor_lineage_repair_latest_lineage_mutated\":false")
+            && journal_only_report_stdout.contains("\"closure_summary_debugger_cursor_lineage_repair_latest_journal_mutated\":true"),
         "Nuis should return journal-only recovery to repair-history-ready"
     );
 

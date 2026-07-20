@@ -548,11 +548,53 @@ pub(super) fn nsld_tail_json_fields(
                 .as_ref()
                 .map(|summary| summary.debugger_cursor_lineage_repair_entry_count),
         ),
+        json_optional_u64_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_rotation_generation",
+            final_output_summary.as_ref().and_then(|summary| {
+                summary.debugger_cursor_lineage_repair_rotation_generation
+            }),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_evicted_prefix_hash",
+            final_output_summary.as_ref().and_then(|summary| {
+                summary
+                    .debugger_cursor_lineage_repair_evicted_prefix_hash
+                    .as_deref()
+            }),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_window_hash",
+            final_output_summary.as_ref().and_then(|summary| {
+                summary
+                    .debugger_cursor_lineage_repair_window_hash
+                    .as_deref()
+            }),
+        ),
         crate::json_optional_bool_field(
             "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_mutated",
             final_output_summary
                 .as_ref()
                 .and_then(|summary| summary.debugger_cursor_lineage_repair_latest_mutated),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_event_status",
+            final_output_summary.as_ref().and_then(|summary| {
+                summary
+                    .debugger_cursor_lineage_repair_latest_event_status
+                    .as_deref()
+            }),
+        ),
+        crate::json_optional_bool_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_lineage_mutated",
+            final_output_summary.as_ref().and_then(|summary| {
+                summary.debugger_cursor_lineage_repair_latest_lineage_mutated
+            }),
+        ),
+        crate::json_optional_bool_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_journal_mutated",
+            final_output_summary.as_ref().and_then(|summary| {
+                summary.debugger_cursor_lineage_repair_latest_journal_mutated
+            }),
         ),
         crate::json_optional_string_field(
             "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_archived_path",
@@ -571,10 +613,47 @@ pub(super) fn nsld_tail_json_fields(
             }),
         ),
         crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_archived_journal_path",
+            final_output_summary.as_ref().and_then(|summary| {
+                summary
+                    .debugger_cursor_lineage_repair_latest_archived_journal_path
+                    .as_deref()
+            }),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_archived_journal_hash",
+            final_output_summary.as_ref().and_then(|summary| {
+                summary
+                    .debugger_cursor_lineage_repair_latest_archived_journal_hash
+                    .as_deref()
+            }),
+        ),
+        crate::json_optional_string_field(
             "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_rebuilt_hash",
             final_output_summary.as_ref().and_then(|summary| {
                 summary
                     .debugger_cursor_lineage_repair_latest_rebuilt_hash
+                    .as_deref()
+            }),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_first_blocker",
+            final_output_summary.as_ref().and_then(|summary| {
+                summary.debugger_cursor_lineage_repair_action.first_blocker
+            }),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_next_action",
+            final_output_summary
+                .as_ref()
+                .and_then(|summary| summary.debugger_cursor_lineage_repair_action.next_action),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_next_command",
+            final_output_summary.as_ref().and_then(|summary| {
+                summary
+                    .debugger_cursor_lineage_repair_action
+                    .next_command
                     .as_deref()
             }),
         ),
@@ -687,4 +766,11 @@ fn json_optional_usize_field(name: &str, value: Option<usize>) -> String {
         Some(value) => crate::json_usize_field(name, value),
         None => format!("\"{name}\":null"),
     }
+}
+
+fn json_optional_u64_field(name: &str, value: Option<u64>) -> String {
+    value.map_or_else(
+        || format!("\"{name}\":null"),
+        |value| format!("\"{name}\":{value}"),
+    )
 }

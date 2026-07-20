@@ -409,9 +409,58 @@ pub(super) fn write_nsld_final_output_text_fields<W: fmt::Write>(
     )?;
     writeln!(
         out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_repair_rotation_generation: {}",
+        final_output
+            .debugger_cursor_lineage_repair_rotation_generation
+            .map(|value| value.to_string())
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_repair_evicted_prefix_hash: {}",
+        final_output
+            .debugger_cursor_lineage_repair_evicted_prefix_hash
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_repair_window_hash: {}",
+        final_output
+            .debugger_cursor_lineage_repair_window_hash
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
         "  nsld_final_executable_output_debugger_cursor_lineage_repair_latest_mutated: {}",
         final_output
             .debugger_cursor_lineage_repair_latest_mutated
+            .map(crate::yes_no)
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_repair_latest_event_status: {}",
+        final_output
+            .debugger_cursor_lineage_repair_latest_event_status
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_repair_latest_lineage_mutated: {}",
+        final_output
+            .debugger_cursor_lineage_repair_latest_lineage_mutated
+            .map(crate::yes_no)
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_repair_latest_journal_mutated: {}",
+        final_output
+            .debugger_cursor_lineage_repair_latest_journal_mutated
             .map(crate::yes_no)
             .unwrap_or("<none>")
     )?;
@@ -433,9 +482,50 @@ pub(super) fn write_nsld_final_output_text_fields<W: fmt::Write>(
     )?;
     writeln!(
         out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_repair_latest_archived_journal_path: {}",
+        final_output
+            .debugger_cursor_lineage_repair_latest_archived_journal_path
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_repair_latest_archived_journal_hash: {}",
+        final_output
+            .debugger_cursor_lineage_repair_latest_archived_journal_hash
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
         "  nsld_final_executable_output_debugger_cursor_lineage_repair_latest_rebuilt_hash: {}",
         final_output
             .debugger_cursor_lineage_repair_latest_rebuilt_hash
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_repair_first_blocker: {}",
+        final_output
+            .debugger_cursor_lineage_repair_action
+            .first_blocker
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_repair_next_action: {}",
+        final_output
+            .debugger_cursor_lineage_repair_action
+            .next_action
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_repair_next_command: {}",
+        final_output
+            .debugger_cursor_lineage_repair_action
+            .next_command
             .as_deref()
             .unwrap_or("<none>")
     )?;

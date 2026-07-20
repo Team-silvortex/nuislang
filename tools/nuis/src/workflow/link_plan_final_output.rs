@@ -1,5 +1,6 @@
 use super::{
     link_plan::{parse_bool_field, parse_string_field, parse_usize_field},
+    link_plan_final_output_summary::NsldFinalExecutableOutputBoundarySummary,
     object_identity::workflow_object_identity,
 };
 use crate::artifact_doctor_mirrors::collect_device_provider_sample_manifest_mirror;
@@ -7,95 +8,6 @@ use crate::artifact_nsdb_handoff::read_persisted_nsdb_handoff;
 use crate::artifact_nsdb_replay_cursor::read_debugger_cursor_handoff;
 use crate::artifact_nsdb_replay_cursor_lineage::read_debugger_cursor_lineage;
 use std::{fs, path::Path};
-
-pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
-    pub(crate) ready: bool,
-    pub(crate) boundary_status: String,
-    pub(crate) materialization_status: String,
-    pub(crate) execution_handoff_contract: String,
-    pub(crate) execution_handoff_ready: bool,
-    pub(crate) execution_handoff_status: String,
-    pub(crate) execution_handoff_target: String,
-    pub(crate) execution_handoff_evidence_status: String,
-    pub(crate) execution_handoff_first_blocker: Option<String>,
-    pub(crate) execution_handoff_decision_code: String,
-    pub(crate) entrypoint_materialization_evidence_status: String,
-    pub(crate) launcher_manifest_present: bool,
-    pub(crate) launcher_manifest_ready: Option<bool>,
-    pub(crate) launcher_manifest_blocker_count: Option<usize>,
-    pub(crate) launcher_dry_run_present: bool,
-    pub(crate) launcher_dry_run_ready: Option<bool>,
-    pub(crate) launcher_dry_run_would_enter_lifecycle_hook: Option<bool>,
-    pub(crate) launcher_dry_run_blocker_count: Option<usize>,
-    pub(crate) payload_execution_trace_protocol: String,
-    pub(crate) payload_execution_trace_available: bool,
-    pub(crate) payload_execution_trace_record_count: usize,
-    pub(crate) payload_execution_trace_ready_record_count: usize,
-    pub(crate) device_provider_sample_manifest_available: bool,
-    pub(crate) device_provider_sample_manifest_status: String,
-    pub(crate) device_provider_sample_manifest_record_count: usize,
-    pub(crate) device_provider_sample_manifest_pending_record_count: usize,
-    pub(crate) device_provider_sample_manifest_blocked_record_count: usize,
-    pub(crate) device_provider_sample_manifest_first_provider_family: String,
-    pub(crate) device_provider_sample_manifest_first_materialization_status: String,
-    pub(crate) nsdb_replay_contract: String,
-    pub(crate) nsdb_replay_ready: bool,
-    pub(crate) nsdb_replay_status: String,
-    pub(crate) nsdb_replay_checkpoint_count: usize,
-    pub(crate) nsdb_replayable_checkpoint_count: usize,
-    pub(crate) nsdb_replay_command: Option<String>,
-    pub(crate) nsdb_replay_next_action: String,
-    pub(crate) nsdb_replay_next_command: Option<String>,
-    pub(crate) nsdb_replay_first_blocker: Option<String>,
-    pub(crate) object_package_summary_contract: String,
-    pub(crate) object_package_summary_ready: bool,
-    pub(crate) object_package_summary_status: String,
-    pub(crate) object_package_summary_next_action: String,
-    pub(crate) object_package_summary_next_command: Option<String>,
-    pub(crate) debugger_transcript_contract: String,
-    pub(crate) debugger_transcript_ready: bool,
-    pub(crate) debugger_transcript_status: String,
-    pub(crate) debugger_transcript_next_action: String,
-    pub(crate) debugger_transcript_first_blocker: Option<String>,
-    pub(crate) debugger_cursor_handoff_contract: String,
-    pub(crate) debugger_cursor_path: String,
-    pub(crate) debugger_cursor_ready: bool,
-    pub(crate) debugger_cursor_status: String,
-    pub(crate) debugger_cursor_next_command: Option<String>,
-    pub(crate) debugger_cursor_lineage_contract: String,
-    pub(crate) debugger_cursor_lineage_source_protocol: String,
-    pub(crate) debugger_cursor_lineage_path: String,
-    pub(crate) debugger_cursor_lineage_ready: bool,
-    pub(crate) debugger_cursor_lineage_status: String,
-    pub(crate) debugger_cursor_lineage_entry_count: usize,
-    pub(crate) debugger_cursor_lineage_latest_hash: Option<String>,
-    pub(crate) debugger_cursor_lineage_first_blocker: Option<String>,
-    pub(crate) debugger_cursor_lineage_next_action: Option<String>,
-    pub(crate) debugger_cursor_lineage_next_command: Option<String>,
-    pub(crate) debugger_cursor_lineage_repair_contract: String,
-    pub(crate) debugger_cursor_lineage_repair_path: String,
-    pub(crate) debugger_cursor_lineage_repair_status: String,
-    pub(crate) debugger_cursor_lineage_repair_entry_count: usize,
-    pub(crate) debugger_cursor_lineage_repair_latest_mutated: Option<bool>,
-    pub(crate) debugger_cursor_lineage_repair_latest_archived_path: Option<String>,
-    pub(crate) debugger_cursor_lineage_repair_latest_archived_hash: Option<String>,
-    pub(crate) debugger_cursor_lineage_repair_latest_rebuilt_hash: Option<String>,
-    pub(crate) recommended_next_action: String,
-    pub(crate) path_present: bool,
-    pub(crate) nsld_owned: Option<bool>,
-    pub(crate) object_valid: bool,
-    pub(crate) object_path: String,
-    pub(crate) object_family: String,
-    pub(crate) object_magic_status: String,
-    pub(crate) object_magic: Option<String>,
-    pub(crate) object_expected_size_bytes: Option<usize>,
-    pub(crate) object_actual_size_bytes: Option<usize>,
-    pub(crate) object_expected_hash: Option<String>,
-    pub(crate) object_actual_hash: Option<String>,
-    pub(crate) object_issues: Vec<String>,
-    pub(crate) blockers: Vec<String>,
-    pub(crate) first_blocker: Option<String>,
-}
 
 pub(crate) fn nsld_final_executable_output_boundary_summary(
     plan: &nuisc::linker::LinkPlan,
@@ -200,6 +112,7 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         &Path::new(&plan.output_dir).join("nuis.build.manifest.toml"),
     );
     let debugger_cursor_lineage = read_debugger_cursor_lineage(Path::new(&plan.output_dir));
+    let debugger_cursor_lineage_repair = debugger_cursor_lineage.repair;
 
     NsldFinalExecutableOutputBoundarySummary {
         ready,
@@ -271,22 +184,34 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
             .map(str::to_owned),
         debugger_cursor_lineage_next_action: debugger_cursor_lineage.next_action.map(str::to_owned),
         debugger_cursor_lineage_next_command: debugger_cursor_lineage.next_command,
-        debugger_cursor_lineage_repair_contract: debugger_cursor_lineage.repair.contract.to_owned(),
-        debugger_cursor_lineage_repair_path: debugger_cursor_lineage.repair.path,
-        debugger_cursor_lineage_repair_status: debugger_cursor_lineage.repair.status.to_owned(),
-        debugger_cursor_lineage_repair_entry_count: debugger_cursor_lineage.repair.entry_count,
-        debugger_cursor_lineage_repair_latest_mutated: debugger_cursor_lineage
-            .repair
+        debugger_cursor_lineage_repair_contract: debugger_cursor_lineage_repair.contract.to_owned(),
+        debugger_cursor_lineage_repair_path: debugger_cursor_lineage_repair.path,
+        debugger_cursor_lineage_repair_status: debugger_cursor_lineage_repair.status.to_owned(),
+        debugger_cursor_lineage_repair_entry_count: debugger_cursor_lineage_repair.entry_count,
+        debugger_cursor_lineage_repair_rotation_generation: debugger_cursor_lineage_repair
+            .rotation_generation,
+        debugger_cursor_lineage_repair_evicted_prefix_hash: debugger_cursor_lineage_repair
+            .evicted_prefix_hash,
+        debugger_cursor_lineage_repair_window_hash: debugger_cursor_lineage_repair.window_hash,
+        debugger_cursor_lineage_repair_latest_mutated: debugger_cursor_lineage_repair
             .latest_mutated,
-        debugger_cursor_lineage_repair_latest_archived_path: debugger_cursor_lineage
-            .repair
+        debugger_cursor_lineage_repair_latest_event_status: debugger_cursor_lineage_repair
+            .latest_event_status,
+        debugger_cursor_lineage_repair_latest_lineage_mutated: debugger_cursor_lineage_repair
+            .latest_lineage_mutated,
+        debugger_cursor_lineage_repair_latest_journal_mutated: debugger_cursor_lineage_repair
+            .latest_repair_journal_mutated,
+        debugger_cursor_lineage_repair_latest_archived_path: debugger_cursor_lineage_repair
             .latest_archived_path,
-        debugger_cursor_lineage_repair_latest_archived_hash: debugger_cursor_lineage
-            .repair
+        debugger_cursor_lineage_repair_latest_archived_hash: debugger_cursor_lineage_repair
             .latest_archived_hash,
-        debugger_cursor_lineage_repair_latest_rebuilt_hash: debugger_cursor_lineage
-            .repair
+        debugger_cursor_lineage_repair_latest_archived_journal_path: debugger_cursor_lineage_repair
+            .latest_archived_repair_journal_path,
+        debugger_cursor_lineage_repair_latest_archived_journal_hash: debugger_cursor_lineage_repair
+            .latest_archived_repair_journal_hash,
+        debugger_cursor_lineage_repair_latest_rebuilt_hash: debugger_cursor_lineage_repair
             .latest_rebuilt_hash,
+        debugger_cursor_lineage_repair_action: debugger_cursor_lineage_repair.action,
         recommended_next_action,
         path_present,
         nsld_owned,

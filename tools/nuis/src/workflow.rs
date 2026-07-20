@@ -9,6 +9,7 @@ mod link_plan;
 mod link_plan_commands;
 mod link_plan_domain;
 mod link_plan_final_output;
+mod link_plan_final_output_summary;
 mod link_plan_json;
 mod link_plan_json_nsld_output;
 mod link_plan_tail;
@@ -58,9 +59,8 @@ pub(crate) use link_plan_commands::{
     release_check_nsld_drive_until_clean_command_for_output_dir,
     release_check_nsld_drive_until_clean_json_command_for_output_dir,
 };
-pub(crate) use link_plan_final_output::{
-    nsld_final_executable_output_boundary_summary, NsldFinalExecutableOutputBoundarySummary,
-};
+pub(crate) use link_plan_final_output::nsld_final_executable_output_boundary_summary;
+pub(crate) use link_plan_final_output_summary::NsldFinalExecutableOutputBoundarySummary;
 pub(crate) use link_plan_json::append_workflow_link_plan_json_fields;
 pub(crate) use link_plan_tail::{
     nsld_final_executable_tail_summary, NsldFinalExecutableTailSummary,

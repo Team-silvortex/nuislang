@@ -258,14 +258,30 @@ a content-hash-qualified `.invalid-<hash>.toml` archive before a one-entry
 lineage is rebuilt atomically from the current cursor. Repeating repair is
 idempotent. Actual rebuilds also append an atomically validated, bounded audit
 entry to `nuis.nsdb.replay-cursor.lineage-repairs.toml` under
-`nsdb-yir-replay-cursor-lineage-repair-journal-v2`; healthy `already-ready`
+`nsdb-yir-replay-cursor-lineage-repair-journal-v5`; healthy `already-ready`
 probes do not modify this journal. Each entry records the archived path and
-content hash plus the rebuilt cursor hash.
+content hash plus the rebuilt cursor hash. Every retained event also carries a
+canonical `previous_event_hash`/`current_event_hash` pair. Nsdb and Nuis both
+recompute that event-content chain independently, so changing a retained field
+or breaking retained adjacency invalidates the journal. Bounded rotation keeps
+the predecessor hash on the first retained event, allowing the remaining eight
+events to stay internally verifiable. The v4 header persists a monotonic
+`rotation_generation` plus `evicted_prefix_hash`. An unrotated journal must
+start at sequence zero with a `none` prefix; a rotated journal must retain a
+full eight-entry window whose first sequence and predecessor match the header.
+This distinguishes legitimate bounded eviction from a shortened front window.
 
 Nuis validates this journal independently through
 `nuis-debugger-cursor-lineage-repair-mirror-v1`. Final-output and closure
 summaries retain the journal status/count, latest mutation flag, archived
-path/hash, and rebuilt hash after command stdout has disappeared. Readiness
+path/hash, rebuilt hash, validated rotation generation, and evicted-prefix hash
+after command stdout has disappeared. Nuis also derives a canonical
+`repair_window_hash` from the protocol, lineage path, rotation metadata,
+retained event head/tail, and authoritative lineage hash. Nsdb v5 persists the
+same producer-computed digest in the journal header; both Nsdb and Nuis reject
+a mismatch after independently recomputing it. The digest is stable across TOML
+formatting changes but changes when the validated window advances.
+Readiness
 requires the archived bytes to match their recorded hash and the latest rebuilt
 hash to match the active lineage. The official three-domain smoke covers
 stale-hash diagnosis, archive/rebuild, persistent repair evidence, restored
@@ -283,6 +299,13 @@ frontdoor performs a journal-only recovery. Nsdb emits
 `repair-history-recovered`, preserves lineage bytes, and reports
 `lineage_mutated = false` separately from `repair_journal_mutated = true`.
 Ordinary healthy checks keep both flags false; lineage rebuilds set both true.
+The persistent Nuis mirror retains the latest event status, both mutation
+scopes, and the archived repair-journal path/hash, so journal-only recovery
+remains distinguishable after command stdout has disappeared.
+If that journal fails validation, final-output and closure summaries expose
+`repair-history-contract-invalid`, `repair-cursor-lineage-history`, and a
+concrete `nuis debug-lineage-repair ... --json` command. The command can then
+perform journal-only recovery without changing healthy lineage.
 
 Replay source selection remains deterministic. Payload-execution handoff
 events are preferred whenever present. When that list is empty, Nsdb projects
