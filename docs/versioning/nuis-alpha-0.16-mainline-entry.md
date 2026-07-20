@@ -1,6 +1,6 @@
-# `nuis` `alpha-0.13.*` Mainline Entry
+# `nuis` `alpha-0.16.*` Mainline Entry
 
-This file is a predecessor short entry point for the `alpha-0.13.*` line.
+This file is the current short entry point for the `alpha-0.16.*` line.
 
 It does not replace the `alpha-0.10.*` executable-artifact closure entry, the
 `alpha-0.8.*` binary-linking convergence entry, the `alpha-0.7.*` std/tooling
@@ -9,7 +9,7 @@ baseline. Those remain predecessor and baseline context.
 
 Short rule:
 
-During `alpha-0.13.*`, this line is where nuis treats the development tensor as the default
+`alpha-0.16.*` is where nuis treats the development tensor as the default
 mainline steering surface: close the weakest verified cell first, keep the
 compiler/linker/std/heterogeneous surfaces on one route, and avoid adding new
 islands unless they are immediately registered, tested, and explainable.
@@ -23,8 +23,8 @@ Read the current line as:
 * `alpha-0.7.*` made std-backed tooling examples the default smoke surface
 * `alpha-0.8.*` made binary-linking convergence the default toolchain pressure
 * `alpha-0.10.*` made executable-artifact closure the active integration gate
-* `alpha-0.13.*` made tensor-guided closure hardening the working mode
-* current docs should now say `alpha-0.16.*` for present-tense work and link this
+* `alpha-0.16.*` makes tensor-guided closure hardening the current working mode
+* current docs should say `alpha-0.16.*` for present-tense work and link older
   alpha docs as predecessor/baseline context
 
 ## Current Front Doors
@@ -45,7 +45,7 @@ Start here:
 12. [nuis-alpha-0.4-system-inventory.md](nuis-alpha-0.4-system-inventory.md)
 13. [nuis-alpha-0.4-mainline-hardening-plan.md](nuis-alpha-0.4-mainline-hardening-plan.md)
 
-## Main Target During `alpha-0.13.*`
+## Main Target During `alpha-0.16.*`
 
 The main target is not broad feature sprawl.
 
@@ -105,7 +105,7 @@ Read the current pressure order as:
 
 ## What Should Not Be Claimed Yet
 
-`alpha-0.13.*` should not claim:
+`alpha-0.16.*` should not claim:
 
 * final self-hosting
 * final std API stability
@@ -122,4 +122,4 @@ Safe wording:
   device execution is not yet final
 * say `blocked executable artifact` when the pipeline can prove the boundary but
   cannot yet produce a runnable host artifact
-* say `current line` for `alpha-0.13.*`
+* say `current line` for `alpha-0.16.*`

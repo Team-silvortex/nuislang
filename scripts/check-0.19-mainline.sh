@@ -15,6 +15,8 @@ run cargo test -q -p nuisc tests_control_flow
 run cargo test -q -p nuisc tests_loop_flow
 run cargo test -q -p nuisc tests_loop_post_flow
 run cargo test -q -p nuisc generic_method_bounds
+run cargo test -q -p nuisc checked_in_docs_do_not_embed_host_absolute_paths
+run bash scripts/check-doc-links.sh
 run cargo test -q -p nuisc --test state_compile
 run cargo test -q -p nuisc --test task_compile
 run cargo test -q -p nuisc --test memory_compile

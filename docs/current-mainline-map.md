@@ -7,9 +7,9 @@ local README for the area you are actively touching.
 
 ## Fast Reading Order
 
-If you only need the shortest current `alpha-0.13.*` reading route, use this order:
+If you only need the shortest current `alpha-0.16.*` reading route, use this order:
 
-1. [versioning/nuis-alpha-0.13-mainline-entry.md](versioning/nuis-alpha-0.13-mainline-entry.md)
+1. [versioning/nuis-alpha-0.16-mainline-entry.md](versioning/nuis-alpha-0.16-mainline-entry.md)
 2. [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
 3. [versioning/nuis-alpha-0.10-mainline-entry.md](versioning/nuis-alpha-0.10-mainline-entry.md)
 4. [versioning/nuis-alpha-0.8-mainline-entry.md](versioning/nuis-alpha-0.8-mainline-entry.md)
@@ -47,8 +47,8 @@ Short rule:
   [README.md](../README.md)
 * current development tensor progress model:
   [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
-* current `alpha-0.13.*` entry:
-  [versioning/nuis-alpha-0.13-mainline-entry.md](versioning/nuis-alpha-0.13-mainline-entry.md)
+* current `alpha-0.16.*` entry:
+  [versioning/nuis-alpha-0.16-mainline-entry.md](versioning/nuis-alpha-0.16-mainline-entry.md)
 * predecessor `alpha-0.10.*` executable-artifact closure entry:
   [versioning/nuis-alpha-0.10-mainline-entry.md](versioning/nuis-alpha-0.10-mainline-entry.md)
 * predecessor `alpha-0.8.*` binary convergence entry:

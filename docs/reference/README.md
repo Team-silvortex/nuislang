@@ -14,7 +14,7 @@ task/pointer rules?", read:
 If you want a short current phase summary before drilling into individual
 contracts, start with:
 
-* [../versioning/nuis-alpha-0.13-mainline-entry.md](../../docs/versioning/nuis-alpha-0.13-mainline-entry.md)
+* [../versioning/nuis-alpha-0.16-mainline-entry.md](../../docs/versioning/nuis-alpha-0.16-mainline-entry.md)
 * [../versioning/nuis-alpha-0.10-mainline-entry.md](../../docs/versioning/nuis-alpha-0.10-mainline-entry.md)
 * [../versioning/nuis-alpha-0.8-mainline-entry.md](../../docs/versioning/nuis-alpha-0.8-mainline-entry.md)
 * [../versioning/nuis-alpha-0.7-mainline-entry.md](../../docs/versioning/nuis-alpha-0.7-mainline-entry.md)
@@ -97,9 +97,9 @@ If your question is specifically “what remains between the current Nsld
 container and a runnable Nuis-owned heterogeneous executable?”, start with
 [nsld-binary-assembly-gap-map.md](nsld-binary-assembly-gap-map.md).
 
-If your question is specifically “what is the current alpha-0.13 tensor-guided
+If your question is specifically “what is the current alpha-0.16 tensor-guided
 closure hardening target and what wording is safe?”, start with
-[../versioning/nuis-alpha-0.13-mainline-entry.md](../../docs/versioning/nuis-alpha-0.13-mainline-entry.md).
+[../versioning/nuis-alpha-0.16-mainline-entry.md](../../docs/versioning/nuis-alpha-0.16-mainline-entry.md).
 
 If your question is specifically “what did the alpha-0.10 executable artifact
 target establish?”, read

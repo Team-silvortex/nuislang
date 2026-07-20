@@ -21,7 +21,7 @@ Read the current line as:
 * `alpha-0.6.*` introduced the named Nsld linker frontdoor
 * `alpha-0.7.*` made std-backed tooling examples the default smoke surface
 * `alpha-0.8.*` made binary linking convergence the default toolchain pressure
-* current docs should say `alpha-0.13.*` for present-tense work and link
+* current docs should say `alpha-0.16.*` for present-tense work and link
   `alpha-0.8.*` as predecessor binary-linking convergence context
 
 ## Current Front Doors

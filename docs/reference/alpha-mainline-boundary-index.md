@@ -3,9 +3,9 @@
 This file is the shortest predecessor index for the mainline boundaries that
 mattered most before `alpha-0.0.1`.
 
-For present-tense `alpha-0.13.*` work, start with:
+For present-tense `alpha-0.16.*` work, start with:
 
-* [../versioning/nuis-alpha-0.13-mainline-entry.md](../../docs/versioning/nuis-alpha-0.13-mainline-entry.md)
+* [../versioning/nuis-alpha-0.16-mainline-entry.md](../../docs/versioning/nuis-alpha-0.16-mainline-entry.md)
 * [../versioning/nuis-alpha-0.10-mainline-entry.md](../../docs/versioning/nuis-alpha-0.10-mainline-entry.md)
 * [../versioning/nuis-alpha-0.8-mainline-entry.md](../../docs/versioning/nuis-alpha-0.8-mainline-entry.md)
 * [../versioning/nuis-alpha-0.7-mainline-entry.md](../../docs/versioning/nuis-alpha-0.7-mainline-entry.md)

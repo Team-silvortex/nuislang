@@ -6,4 +6,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/check-text-encoding.py
+      - run: bash scripts/check-host-absolute-paths.sh
+      - run: bash scripts/check-doc-links.sh
       - run: cargo build --workspace --verbose
