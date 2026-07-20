@@ -208,6 +208,7 @@ mod reports;
 mod reports_check;
 mod reports_final;
 mod reports_final_launcher;
+mod reports_final_output;
 mod reports_link_inputs;
 mod reports_object;
 mod toml;

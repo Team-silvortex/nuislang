@@ -1,6 +1,7 @@
 pub(crate) use super::reports_check::*;
 pub(crate) use super::reports_final::*;
 pub(crate) use super::reports_final_launcher::*;
+pub(crate) use super::reports_final_output::*;
 pub(crate) use super::reports_link_inputs::*;
 pub(crate) use super::reports_object::*;
 

@@ -3,6 +3,7 @@
 mod digest_sha256;
 mod handoff;
 mod model;
+mod provider_completion_integrity;
 mod provider_runner_metal;
 mod provider_runner_registry;
 mod provider_sample;
@@ -71,7 +72,7 @@ pub fn payload_execution_replay_summary(
             provider_family: event.provider_family.clone(),
             output_contract: event.output_contract.clone(),
             output_evidence: event.output_evidence.clone(),
-            record_hash: handoff::provider_completion_record_hash(
+            record_hash: provider_completion_integrity::record_hash(
                 event,
                 if handoff.provider_completion_digest_contract == "none" {
                     "nuis-provider-completion-digest-fnv1a64-v1"
