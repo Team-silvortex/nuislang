@@ -205,6 +205,26 @@ fn parses_debug_resume_json_with_manifest_input() {
 }
 
 #[test]
+fn parses_debug_lineage_repair_json_with_manifest_input() {
+    let command = parse_args(
+        [
+            "debug-lineage-repair".to_owned(),
+            "--json".to_owned(),
+            "target/demo/nuis.build.manifest.toml".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .expect("debug-lineage-repair json parses");
+    assert_eq!(
+        command,
+        CommandKind::DebugLineageRepair {
+            input: PathBuf::from("target/demo/nuis.build.manifest.toml"),
+            json: true,
+        }
+    );
+}
+
+#[test]
 fn parses_debug_resume_typed_stop_and_cursor_output() {
     let command = parse_args(
         [

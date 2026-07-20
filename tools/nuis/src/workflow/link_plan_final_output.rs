@@ -72,6 +72,14 @@ pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) debugger_cursor_lineage_first_blocker: Option<String>,
     pub(crate) debugger_cursor_lineage_next_action: Option<String>,
     pub(crate) debugger_cursor_lineage_next_command: Option<String>,
+    pub(crate) debugger_cursor_lineage_repair_contract: String,
+    pub(crate) debugger_cursor_lineage_repair_path: String,
+    pub(crate) debugger_cursor_lineage_repair_status: String,
+    pub(crate) debugger_cursor_lineage_repair_entry_count: usize,
+    pub(crate) debugger_cursor_lineage_repair_latest_mutated: Option<bool>,
+    pub(crate) debugger_cursor_lineage_repair_latest_archived_path: Option<String>,
+    pub(crate) debugger_cursor_lineage_repair_latest_archived_hash: Option<String>,
+    pub(crate) debugger_cursor_lineage_repair_latest_rebuilt_hash: Option<String>,
     pub(crate) recommended_next_action: String,
     pub(crate) path_present: bool,
     pub(crate) nsld_owned: Option<bool>,
@@ -263,6 +271,22 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
             .map(str::to_owned),
         debugger_cursor_lineage_next_action: debugger_cursor_lineage.next_action.map(str::to_owned),
         debugger_cursor_lineage_next_command: debugger_cursor_lineage.next_command,
+        debugger_cursor_lineage_repair_contract: debugger_cursor_lineage.repair.contract.to_owned(),
+        debugger_cursor_lineage_repair_path: debugger_cursor_lineage.repair.path,
+        debugger_cursor_lineage_repair_status: debugger_cursor_lineage.repair.status.to_owned(),
+        debugger_cursor_lineage_repair_entry_count: debugger_cursor_lineage.repair.entry_count,
+        debugger_cursor_lineage_repair_latest_mutated: debugger_cursor_lineage
+            .repair
+            .latest_mutated,
+        debugger_cursor_lineage_repair_latest_archived_path: debugger_cursor_lineage
+            .repair
+            .latest_archived_path,
+        debugger_cursor_lineage_repair_latest_archived_hash: debugger_cursor_lineage
+            .repair
+            .latest_archived_hash,
+        debugger_cursor_lineage_repair_latest_rebuilt_hash: debugger_cursor_lineage
+            .repair
+            .latest_rebuilt_hash,
         recommended_next_action,
         path_present,
         nsld_owned,

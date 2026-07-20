@@ -389,6 +389,58 @@ pub(super) fn write_nsld_final_output_text_fields<W: fmt::Write>(
     )?;
     writeln!(
         out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_repair_contract: {}",
+        final_output.debugger_cursor_lineage_repair_contract
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_repair_path: {}",
+        final_output.debugger_cursor_lineage_repair_path
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_repair_status: {}",
+        final_output.debugger_cursor_lineage_repair_status
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_repair_entry_count: {}",
+        final_output.debugger_cursor_lineage_repair_entry_count
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_repair_latest_mutated: {}",
+        final_output
+            .debugger_cursor_lineage_repair_latest_mutated
+            .map(crate::yes_no)
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_repair_latest_archived_path: {}",
+        final_output
+            .debugger_cursor_lineage_repair_latest_archived_path
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_repair_latest_archived_hash: {}",
+        final_output
+            .debugger_cursor_lineage_repair_latest_archived_hash
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_repair_latest_rebuilt_hash: {}",
+        final_output
+            .debugger_cursor_lineage_repair_latest_rebuilt_hash
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
         "  nsld_final_executable_output_recommended_next_action: {}",
         final_output.recommended_next_action
     )?;

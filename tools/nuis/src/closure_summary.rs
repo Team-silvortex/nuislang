@@ -34,6 +34,14 @@ pub(crate) struct DebuggerCursorLineageClosureMirror {
     pub(crate) first_blocker: Option<String>,
     pub(crate) next_action: Option<String>,
     pub(crate) next_command: Option<String>,
+    pub(crate) repair_contract: String,
+    pub(crate) repair_path: String,
+    pub(crate) repair_status: String,
+    pub(crate) repair_entry_count: usize,
+    pub(crate) repair_latest_mutated: Option<bool>,
+    pub(crate) repair_latest_archived_path: Option<String>,
+    pub(crate) repair_latest_archived_hash: Option<String>,
+    pub(crate) repair_latest_rebuilt_hash: Option<String>,
 }
 
 impl DebuggerCursorLineageClosureMirror {
@@ -51,6 +59,20 @@ impl DebuggerCursorLineageClosureMirror {
             first_blocker: final_output.debugger_cursor_lineage_first_blocker.clone(),
             next_action: final_output.debugger_cursor_lineage_next_action.clone(),
             next_command: final_output.debugger_cursor_lineage_next_command.clone(),
+            repair_contract: final_output.debugger_cursor_lineage_repair_contract.clone(),
+            repair_path: final_output.debugger_cursor_lineage_repair_path.clone(),
+            repair_status: final_output.debugger_cursor_lineage_repair_status.clone(),
+            repair_entry_count: final_output.debugger_cursor_lineage_repair_entry_count,
+            repair_latest_mutated: final_output.debugger_cursor_lineage_repair_latest_mutated,
+            repair_latest_archived_path: final_output
+                .debugger_cursor_lineage_repair_latest_archived_path
+                .clone(),
+            repair_latest_archived_hash: final_output
+                .debugger_cursor_lineage_repair_latest_archived_hash
+                .clone(),
+            repair_latest_rebuilt_hash: final_output
+                .debugger_cursor_lineage_repair_latest_rebuilt_hash
+                .clone(),
         }
     }
 }
@@ -313,7 +335,7 @@ impl FrontdoorClosureSummary {
     }
 
     pub(crate) fn json_fields(&self) -> Vec<String> {
-        vec![
+        let mut fields = vec![
             crate::json_field("closure_summary_source", self.source),
             crate::json_field("closure_summary_status", &self.status),
             crate::json_bool_field("closure_summary_ready", self.ready),
@@ -442,7 +464,13 @@ impl FrontdoorClosureSummary {
                     .as_ref()
                     .and_then(|mirror| mirror.next_command.as_deref()),
             ),
-        ]
+        ];
+        fields.extend(
+            crate::closure_summary_lineage_repair_json::lineage_repair_json_fields(
+                self.debugger_cursor_lineage.as_ref(),
+            ),
+        );
+        fields
     }
 }
 
@@ -709,6 +737,16 @@ mod tests {
             debugger_cursor_lineage_first_blocker: None,
             debugger_cursor_lineage_next_action: None,
             debugger_cursor_lineage_next_command: None,
+            debugger_cursor_lineage_repair_contract:
+                "nuis-debugger-cursor-lineage-repair-mirror-v1".to_owned(),
+            debugger_cursor_lineage_repair_path: "out/nuis.nsdb.replay-cursor.lineage-repairs.toml"
+                .to_owned(),
+            debugger_cursor_lineage_repair_status: "repair-history-unavailable".to_owned(),
+            debugger_cursor_lineage_repair_entry_count: 0,
+            debugger_cursor_lineage_repair_latest_mutated: None,
+            debugger_cursor_lineage_repair_latest_archived_path: None,
+            debugger_cursor_lineage_repair_latest_archived_hash: None,
+            debugger_cursor_lineage_repair_latest_rebuilt_hash: None,
             recommended_next_action: "run-artifact".to_owned(),
             path_present: true,
             nsld_owned: Some(true),

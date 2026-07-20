@@ -767,23 +767,31 @@ fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
         ) && invalid_report_stdout.contains(
             "\"nsld_final_executable_output_debugger_cursor_lineage_next_action\":\"repair-cursor-lineage\""
         ) && invalid_report_stdout.contains(
-            "\"nsld_final_executable_output_debugger_cursor_lineage_next_command\":\"nsdb cursor-lineage-repair "
+            "\"nsld_final_executable_output_debugger_cursor_lineage_next_command\":\"nuis debug-lineage-repair "
         ) && invalid_report_stdout.contains(
             "\"closure_summary_debugger_cursor_lineage_first_blocker\":\"lineage-latest-hash-mismatch\""
         ),
         "Nuis should expose an actionable stable blocker for stale cursor lineage\n{invalid_report_stdout}"
     );
-    let repaired = run_nsdb(&["cursor-lineage-repair", &output_dir_text, "--json"]);
-    assert_success(&repaired, "nsdb repair debugger cursor lineage");
+    let repaired = run_nuis(&["debug-lineage-repair", &output_dir_text, "--json"]);
+    assert_success(&repaired, "nuis repair debugger cursor lineage");
     let repaired_stdout = String::from_utf8_lossy(&repaired.stdout);
     assert!(
-        repaired_stdout.contains("\"contract\":\"nsdb-yir-replay-cursor-lineage-repair-v1\"")
+        repaired_stdout.contains("\"contract\":\"nsdb-yir-replay-cursor-lineage-repair-v2\"")
             && repaired_stdout.contains("\"status\":\"lineage-rebuilt\"")
             && repaired_stdout.contains("\"mutated\":true")
             && repaired_stdout.contains("\"archived_path\":\"")
             && repaired_stdout.contains("\"entry_count\":1")
             && repaired_stdout.contains("\"latest_hash\":\"0x"),
         "Nsdb should archive and rebuild invalid cursor lineage\n{repaired_stdout}"
+    );
+    let already_ready = run_nuis(&["debug-lineage-repair", &output_dir_text, "--json"]);
+    assert_success(&already_ready, "nuis keep healthy cursor lineage unchanged");
+    let already_ready_stdout = String::from_utf8_lossy(&already_ready.stdout);
+    assert!(
+        already_ready_stdout.contains("\"status\":\"already-ready\"")
+            && already_ready_stdout.contains("\"mutated\":false"),
+        "Nuis should preserve Nsdb's idempotent healthy-lineage result\n{already_ready_stdout}"
     );
     let repaired_report = run_nuis(&["build-report", "--json", &output_dir_text]);
     assert_success(
@@ -800,6 +808,91 @@ fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
                 "\"nsld_final_executable_output_debugger_cursor_lineage_first_blocker\":null"
             ),
         "Nuis should report repaired cursor lineage as ready\n{repaired_report_stdout}"
+    );
+    assert!(
+        repaired_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_repair_contract\":\"nuis-debugger-cursor-lineage-repair-mirror-v1\""
+        ) && repaired_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_repair_status\":\"repair-history-ready\""
+        ) && repaired_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_repair_entry_count\":1"
+        ) && repaired_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_repair_latest_mutated\":true"
+        ) && repaired_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_repair_latest_archived_path\":\""
+        ) && repaired_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_repair_latest_archived_hash\":\"0x"
+        ) && repaired_report_stdout.contains(&format!(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_repair_latest_rebuilt_hash\":\"{latest_hash}\""
+        )) && repaired_report_stdout.contains(
+            "\"closure_summary_debugger_cursor_lineage_repair_status\":\"repair-history-ready\""
+        ) && repaired_report_stdout.contains(
+            "\"closure_summary_debugger_cursor_lineage_repair_entry_count\":1"
+        ) && repaired_report_stdout.contains(&format!(
+            "\"closure_summary_debugger_cursor_lineage_repair_latest_rebuilt_hash\":\"{latest_hash}\""
+        )),
+        "Nuis should preserve cursor-lineage repair audit evidence beyond command stdout\n{repaired_report_stdout}"
+    );
+    let repaired_lineage_source = fs::read_to_string(&lineage_path)
+        .expect("read repaired cursor lineage before journal recovery smoke");
+    fs::write(
+        &lineage_path,
+        repaired_lineage_source.replacen(latest_hash, "0x0000000000000000", 1),
+    )
+    .expect("damage cursor lineage before journal recovery smoke");
+    let repair_journal_path = output_dir.join("nuis.nsdb.replay-cursor.lineage-repairs.toml");
+    fs::write(&repair_journal_path, "protocol = \"damaged-journal\"\n")
+        .expect("damage cursor lineage repair journal");
+    let recovered = run_nuis(&["debug-lineage-repair", &output_dir_text, "--json"]);
+    assert_success(&recovered, "nuis recover damaged lineage repair journal");
+    let recovered_stdout = String::from_utf8_lossy(&recovered.stdout);
+    assert!(
+        recovered_stdout.contains("\"status\":\"lineage-rebuilt\"")
+            && recovered_stdout.contains("\"archived_repair_journal_path\":\""),
+        "Nuis should archive the damaged repair journal before rebuilding lineage\n{recovered_stdout}"
+    );
+    let recovered_report = run_nuis(&["build-report", "--json", &output_dir_text]);
+    assert_success(&recovered_report, "nuis mirror recovered repair journal");
+    let recovered_report_stdout = String::from_utf8_lossy(&recovered_report.stdout);
+    assert!(
+        recovered_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_repair_status\":\"repair-history-ready\""
+        ) && recovered_report_stdout.contains(
+            "\"closure_summary_debugger_cursor_lineage_repair_status\":\"repair-history-ready\""
+        ),
+        "Nuis should mirror the recovered cursor-lineage repair journal\n{recovered_report_stdout}"
+    );
+    let healthy_lineage =
+        fs::read(&lineage_path).expect("read healthy lineage before journal-only recovery smoke");
+    fs::write(&repair_journal_path, "protocol = \"journal-only-damage\"\n")
+        .expect("damage only cursor lineage repair journal");
+    let journal_only = run_nuis(&["debug-lineage-repair", &output_dir_text, "--json"]);
+    assert_success(
+        &journal_only,
+        "nuis recover journal without lineage rebuild",
+    );
+    let journal_only_stdout = String::from_utf8_lossy(&journal_only.stdout);
+    assert!(
+        journal_only_stdout.contains("\"contract\":\"nsdb-yir-replay-cursor-lineage-repair-v2\"")
+            && journal_only_stdout.contains("\"status\":\"repair-history-recovered\"")
+            && journal_only_stdout.contains("\"mutated\":true")
+            && journal_only_stdout.contains("\"lineage_mutated\":false")
+            && journal_only_stdout.contains("\"repair_journal_mutated\":true")
+            && journal_only_stdout.contains("\"archived_repair_journal_path\":\""),
+        "Nuis should report journal-only recovery with separate mutation scopes\n{journal_only_stdout}"
+    );
+    assert_eq!(
+        fs::read(&lineage_path).expect("read lineage after journal-only recovery"),
+        healthy_lineage,
+        "journal-only recovery must preserve authoritative lineage bytes"
+    );
+    let journal_only_report = run_nuis(&["build-report", "--json", &output_dir_text]);
+    assert_success(&journal_only_report, "nuis mirror journal-only recovery");
+    assert!(
+        String::from_utf8_lossy(&journal_only_report.stdout).contains(
+            "\"nsld_final_executable_output_debugger_cursor_lineage_repair_status\":\"repair-history-ready\""
+        ),
+        "Nuis should return journal-only recovery to repair-history-ready"
     );
 
     let resumed_again = run_nuis(&[

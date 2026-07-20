@@ -129,6 +129,10 @@ pub enum CommandKind {
         breakpoint_entry: Option<String>,
         cursor_output: Option<PathBuf>,
     },
+    DebugLineageRepair {
+        input: PathBuf,
+        json: bool,
+    },
     DumpAst {
         input: PathBuf,
     },
@@ -373,6 +377,13 @@ where
                 cursor_output: parsed.cursor_output,
             })
         }
+        "debug-lineage-repair" => {
+            let (input, json) = parse_required_json_input(
+                &mut args,
+                "usage: nuis debug-lineage-repair [--json] <artifact-output-dir|nuis.build.manifest.toml>",
+            )?;
+            Ok(CommandKind::DebugLineageRepair { input, json })
+        }
         "dump-ast" => Ok(CommandKind::DumpAst {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         }),
@@ -430,7 +441,7 @@ where
         }),
         "galaxy" => parse_galaxy_args(args),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `debug-lineage-repair`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
         )),
     }
 }

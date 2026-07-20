@@ -524,6 +524,60 @@ pub(super) fn nsld_tail_json_fields(
                 .as_ref()
                 .and_then(|summary| summary.debugger_cursor_lineage_next_command.as_deref()),
         ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_contract",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.debugger_cursor_lineage_repair_contract.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_path",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.debugger_cursor_lineage_repair_path.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_status",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.debugger_cursor_lineage_repair_status.as_str()),
+        ),
+        json_optional_usize_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_entry_count",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.debugger_cursor_lineage_repair_entry_count),
+        ),
+        crate::json_optional_bool_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_mutated",
+            final_output_summary
+                .as_ref()
+                .and_then(|summary| summary.debugger_cursor_lineage_repair_latest_mutated),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_archived_path",
+            final_output_summary.as_ref().and_then(|summary| {
+                summary
+                    .debugger_cursor_lineage_repair_latest_archived_path
+                    .as_deref()
+            }),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_archived_hash",
+            final_output_summary.as_ref().and_then(|summary| {
+                summary
+                    .debugger_cursor_lineage_repair_latest_archived_hash
+                    .as_deref()
+            }),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_rebuilt_hash",
+            final_output_summary.as_ref().and_then(|summary| {
+                summary
+                    .debugger_cursor_lineage_repair_latest_rebuilt_hash
+                    .as_deref()
+            }),
+        ),
         crate::json_bool_field(
             "nsld_final_executable_output_path_present",
             final_output_summary

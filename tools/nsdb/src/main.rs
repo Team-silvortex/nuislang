@@ -1,6 +1,7 @@
 mod cli;
 mod cursor;
 mod cursor_lineage;
+mod cursor_lineage_repair_journal;
 mod display;
 mod handoff;
 mod hetero_trace;
@@ -141,14 +142,22 @@ fn run() -> Result<(), String> {
             let report = crate::cursor_lineage::repair_cursor_lineage(output_dir, &manifest)?;
             if json {
                 println!(
-                    "{{\"tool\":\"nsdb\",\"kind\":\"cursor_lineage_repair\",\"contract\":\"{}\",\"status\":\"{}\",\"mutated\":{},\"cursor_path\":\"{}\",\"lineage_path\":\"{}\",\"archived_path\":{},\"entry_count\":{},\"latest_hash\":\"{}\"}}",
+                    "{{\"tool\":\"nsdb\",\"kind\":\"cursor_lineage_repair\",\"contract\":\"{}\",\"status\":\"{}\",\"mutated\":{},\"lineage_mutated\":{},\"repair_journal_mutated\":{},\"cursor_path\":\"{}\",\"lineage_path\":\"{}\",\"archived_path\":{},\"repair_journal_path\":\"{}\",\"archived_repair_journal_path\":{},\"entry_count\":{},\"latest_hash\":\"{}\"}}",
                     report.contract,
                     report.status,
                     report.mutated,
+                    report.lineage_mutated,
+                    report.repair_journal_mutated,
                     json_escape(&report.cursor_path),
                     json_escape(&report.lineage_path),
                     report
                         .archived_path
+                        .as_deref()
+                        .map(|path| format!("\"{}\"", json_escape(path)))
+                        .unwrap_or_else(|| "null".to_owned()),
+                    json_escape(&report.repair_journal_path),
+                    report
+                        .archived_repair_journal_path
                         .as_deref()
                         .map(|path| format!("\"{}\"", json_escape(path)))
                         .unwrap_or_else(|| "null".to_owned()),
@@ -159,6 +168,14 @@ fn run() -> Result<(), String> {
                 println!("cursor_lineage_repair_contract: {}", report.contract);
                 println!("cursor_lineage_repair_status: {}", report.status);
                 println!("cursor_lineage_repair_mutated: {}", report.mutated);
+                println!(
+                    "cursor_lineage_repair_lineage_mutated: {}",
+                    report.lineage_mutated
+                );
+                println!(
+                    "cursor_lineage_repair_journal_mutated: {}",
+                    report.repair_journal_mutated
+                );
                 println!("cursor_lineage_repair_cursor_path: {}", report.cursor_path);
                 println!(
                     "cursor_lineage_repair_lineage_path: {}",
@@ -167,6 +184,17 @@ fn run() -> Result<(), String> {
                 println!(
                     "cursor_lineage_repair_archived_path: {}",
                     report.archived_path.as_deref().unwrap_or("<none>")
+                );
+                println!(
+                    "cursor_lineage_repair_journal_path: {}",
+                    report.repair_journal_path
+                );
+                println!(
+                    "cursor_lineage_repair_archived_journal_path: {}",
+                    report
+                        .archived_repair_journal_path
+                        .as_deref()
+                        .unwrap_or("<none>")
                 );
                 println!("cursor_lineage_repair_entry_count: {}", report.entry_count);
                 println!("cursor_lineage_repair_latest_hash: {}", report.latest_hash);

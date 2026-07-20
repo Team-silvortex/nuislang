@@ -12,7 +12,7 @@ pub(crate) fn handle_debug_resume(
     breakpoint_entry: Option<String>,
     cursor_output: Option<PathBuf>,
 ) -> Result<(), String> {
-    let (output_dir, manifest) = resolve_debug_resume_input(&input)?;
+    let (output_dir, manifest) = resolve_artifact_output_input(&input, "debug-resume")?;
     let cursor = read_debugger_cursor_handoff(&output_dir, &manifest);
     if !cursor.ready {
         return Err(format!(
@@ -57,31 +57,34 @@ pub(crate) fn handle_debug_resume(
     }
 }
 
-fn resolve_debug_resume_input(input: &Path) -> Result<(PathBuf, PathBuf), String> {
+pub(crate) fn resolve_artifact_output_input(
+    input: &Path,
+    command_name: &str,
+) -> Result<(PathBuf, PathBuf), String> {
     let (output_dir, manifest) = if input.is_dir() {
         (input.to_path_buf(), input.join("nuis.build.manifest.toml"))
     } else if input.file_name().and_then(|name| name.to_str()) == Some("nuis.build.manifest.toml") {
         let output_dir = input
             .parent()
-            .ok_or_else(|| "debug-resume manifest has no output directory".to_owned())?
+            .ok_or_else(|| format!("{command_name} manifest has no output directory"))?
             .to_path_buf();
         (output_dir, input.to_path_buf())
     } else {
         return Err(format!(
-            "debug-resume expected an artifact output directory or `nuis.build.manifest.toml`, found `{}`",
+            "{command_name} expected an artifact output directory or `nuis.build.manifest.toml`, found `{}`",
             input.display()
         ));
     };
     if !manifest.is_file() {
         return Err(format!(
-            "debug-resume output `{}` does not contain `nuis.build.manifest.toml`",
+            "{command_name} output `{}` does not contain `nuis.build.manifest.toml`",
             output_dir.display()
         ));
     }
     Ok((output_dir, manifest))
 }
 
-fn resolve_nsdb_program() -> PathBuf {
+pub(crate) fn resolve_nsdb_program() -> PathBuf {
     if let Some(program) = std::env::var_os("NUIS_NSDB_BIN") {
         return PathBuf::from(program);
     }
@@ -96,7 +99,7 @@ fn resolve_nsdb_program() -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::resolve_debug_resume_input;
+    use super::resolve_artifact_output_input;
     use std::fs;
 
     #[test]
@@ -108,11 +111,11 @@ mod tests {
         fs::write(&manifest, "manifest = true\n").expect("write manifest");
 
         assert_eq!(
-            resolve_debug_resume_input(&root).expect("resolve directory"),
+            resolve_artifact_output_input(&root, "debug-resume").expect("resolve directory"),
             (root.clone(), manifest.clone())
         );
         assert_eq!(
-            resolve_debug_resume_input(&manifest).expect("resolve manifest"),
+            resolve_artifact_output_input(&manifest, "debug-resume").expect("resolve manifest"),
             (root.clone(), manifest)
         );
         fs::remove_dir_all(root).expect("remove debug resume test directory");

@@ -298,6 +298,54 @@ pub(super) fn nsld_final_output_json_fields(
                 .and_then(|summary| summary.debugger_cursor_lineage_next_command.as_deref()),
         ),
         json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_contract",
+            nsld_final_output
+                .map(|summary| summary.debugger_cursor_lineage_repair_contract.as_str()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_path",
+            nsld_final_output.map(|summary| summary.debugger_cursor_lineage_repair_path.as_str()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_status",
+            nsld_final_output
+                .map(|summary| summary.debugger_cursor_lineage_repair_status.as_str()),
+        ),
+        json_optional_usize_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_entry_count",
+            nsld_final_output
+                .map(|summary| summary.debugger_cursor_lineage_repair_entry_count),
+        ),
+        json_optional_bool_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_mutated",
+            nsld_final_output
+                .and_then(|summary| summary.debugger_cursor_lineage_repair_latest_mutated),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_archived_path",
+            nsld_final_output.and_then(|summary| {
+                summary
+                    .debugger_cursor_lineage_repair_latest_archived_path
+                    .as_deref()
+            }),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_archived_hash",
+            nsld_final_output.and_then(|summary| {
+                summary
+                    .debugger_cursor_lineage_repair_latest_archived_hash
+                    .as_deref()
+            }),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_repair_latest_rebuilt_hash",
+            nsld_final_output.and_then(|summary| {
+                summary
+                    .debugger_cursor_lineage_repair_latest_rebuilt_hash
+                    .as_deref()
+            }),
+        ),
+        json_optional_string_field(
             "nsld_final_executable_output_recommended_next_action",
             nsld_final_output.map(|summary| summary.recommended_next_action.as_str()),
         ),

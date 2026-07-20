@@ -2,6 +2,70 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "nsdb-cursor-lineage-repair-journal",
+        path: "tools/nsdb/src/cursor_lineage_repair_journal.rs",
+        required_patterns: &[
+            "nsdb-yir-replay-cursor-lineage-repair-journal-v2",
+            "nuis.nsdb.replay-cursor.lineage-repairs.toml",
+            "pub(super) fn record",
+            "pub(super) fn preflight",
+            "persist_validated_content_atomically",
+            "archived_repair_journal_path",
+            "archived_hash",
+            "rebuilt_hash",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-cursor-lineage-repair-journal-mirror",
+        path: "tools/nuis/src/artifact_nsdb_replay_cursor_lineage.rs",
+        required_patterns: &[
+            "nuis-debugger-cursor-lineage-repair-mirror-v1",
+            "repair-history-unavailable",
+            "repair-history-invalid",
+            "repair-history-ready",
+            "validate_repair_journal",
+            "latest_archived_hash",
+            "latest_rebuilt_hash",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-debugger-cursor-lineage-repair-frontdoor",
+        path: "tools/nuis/src/debug_lineage_repair_command.rs",
+        required_patterns: &[
+            "handle_debug_lineage_repair",
+            "resolve_artifact_output_input",
+            "read_debugger_cursor_lineage",
+            "lineage-unavailable",
+            "resolve_nsdb_program",
+            "cursor-lineage-repair",
+            "--json",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-debugger-cursor-lineage-repair-cli",
+        path: "tools/nuis/src/cli.rs",
+        required_patterns: &[
+            "DebugLineageRepair",
+            "debug-lineage-repair",
+            "parse_required_json_input",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-debugger-cursor-lineage-repair-official-smoke",
+        path: "tools/nuis/tests/official_galaxy_hetero_smoke.rs",
+        required_patterns: &[
+            "nuis debug-lineage-repair",
+            "run_nuis(&[\"debug-lineage-repair\"",
+            "nsdb-yir-replay-cursor-lineage-repair-v2",
+            "repair-history-recovered",
+            "lineage_mutated",
+            "repair_journal_mutated",
+            "lineage-rebuilt",
+            "archived_path",
+            "archived_repair_journal_path",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "language-bootstrap-result-constructor-ambiguity",
         path: "tools/nuisc/src/frontend/tests_generics/zero_arg_expectations.rs",
         required_patterns: &[

@@ -3,6 +3,8 @@ use std::{fs, path::Path};
 const CURSOR_FILE_NAME: &str = "nuis.nsdb.replay-cursor.toml";
 const LINEAGE_FILE_NAME: &str = "nuis.nsdb.replay-cursor.lineage.toml";
 const LINEAGE_PROTOCOL: &str = "nsdb-yir-replay-cursor-lineage-v1";
+const REPAIR_JOURNAL_FILE_NAME: &str = "nuis.nsdb.replay-cursor.lineage-repairs.toml";
+const REPAIR_JOURNAL_PROTOCOL: &str = "nsdb-yir-replay-cursor-lineage-repair-journal-v2";
 const LINEAGE_LIMIT: usize = 8;
 
 pub(crate) struct DebuggerCursorLineageMirror {
@@ -16,10 +18,35 @@ pub(crate) struct DebuggerCursorLineageMirror {
     pub(crate) first_blocker: Option<&'static str>,
     pub(crate) next_action: Option<&'static str>,
     pub(crate) next_command: Option<String>,
+    pub(crate) repair: DebuggerCursorLineageRepairMirror,
+}
+
+pub(crate) struct DebuggerCursorLineageRepairMirror {
+    pub(crate) contract: &'static str,
+    pub(crate) path: String,
+    pub(crate) status: &'static str,
+    pub(crate) entry_count: usize,
+    pub(crate) latest_mutated: Option<bool>,
+    pub(crate) latest_archived_path: Option<String>,
+    pub(crate) latest_archived_hash: Option<String>,
+    pub(crate) latest_rebuilt_hash: Option<String>,
 }
 
 pub(crate) fn read_debugger_cursor_lineage(output_dir: &Path) -> DebuggerCursorLineageMirror {
     let path = output_dir.join(LINEAGE_FILE_NAME);
+    let repair_unavailable = || DebuggerCursorLineageRepairMirror {
+        contract: "nuis-debugger-cursor-lineage-repair-mirror-v1",
+        path: output_dir
+            .join(REPAIR_JOURNAL_FILE_NAME)
+            .display()
+            .to_string(),
+        status: "repair-history-unavailable",
+        entry_count: 0,
+        latest_mutated: None,
+        latest_archived_path: None,
+        latest_archived_hash: None,
+        latest_rebuilt_hash: None,
+    };
     let unavailable = || DebuggerCursorLineageMirror {
         contract: "nuis-debugger-cursor-lineage-mirror-v1",
         source_protocol: LINEAGE_PROTOCOL,
@@ -31,6 +58,7 @@ pub(crate) fn read_debugger_cursor_lineage(output_dir: &Path) -> DebuggerCursorL
         first_blocker: None,
         next_action: None,
         next_command: None,
+        repair: repair_unavailable(),
     };
     let Ok(source) = fs::read_to_string(&path) else {
         return unavailable();
@@ -46,13 +74,14 @@ pub(crate) fn read_debugger_cursor_lineage(output_dir: &Path) -> DebuggerCursorL
                     first_blocker: Some(first_blocker),
                     next_action: Some("repair-cursor-lineage"),
                     next_command: Some(format!(
-                        "nsdb cursor-lineage-repair {} --json",
+                        "nuis debug-lineage-repair {} --json",
                         output_dir.display()
                     )),
                     ..unavailable()
                 };
             }
         };
+    let repair = read_repair_journal(output_dir, &path, &latest_hash);
     DebuggerCursorLineageMirror {
         contract: "nuis-debugger-cursor-lineage-mirror-v1",
         source_protocol: LINEAGE_PROTOCOL,
@@ -64,7 +93,156 @@ pub(crate) fn read_debugger_cursor_lineage(output_dir: &Path) -> DebuggerCursorL
         first_blocker: None,
         next_action: None,
         next_command: None,
+        repair,
     }
+}
+
+fn read_repair_journal(
+    output_dir: &Path,
+    lineage_path: &Path,
+    lineage_hash: &str,
+) -> DebuggerCursorLineageRepairMirror {
+    let path = output_dir.join(REPAIR_JOURNAL_FILE_NAME);
+    let unavailable = || DebuggerCursorLineageRepairMirror {
+        contract: "nuis-debugger-cursor-lineage-repair-mirror-v1",
+        path: path.display().to_string(),
+        status: "repair-history-unavailable",
+        entry_count: 0,
+        latest_mutated: None,
+        latest_archived_path: None,
+        latest_archived_hash: None,
+        latest_rebuilt_hash: None,
+    };
+    let Ok(source) = fs::read_to_string(&path) else {
+        return unavailable();
+    };
+    let Some(summary) = validate_repair_journal(&source, lineage_path, lineage_hash) else {
+        return DebuggerCursorLineageRepairMirror {
+            status: "repair-history-invalid",
+            ..unavailable()
+        };
+    };
+    DebuggerCursorLineageRepairMirror {
+        contract: "nuis-debugger-cursor-lineage-repair-mirror-v1",
+        path: path.display().to_string(),
+        status: "repair-history-ready",
+        entry_count: summary.entry_count,
+        latest_mutated: Some(summary.lineage_mutated || summary.repair_journal_mutated),
+        latest_archived_path: (!summary.archived_path.is_empty()).then_some(summary.archived_path),
+        latest_archived_hash: (summary.archived_hash != "none").then_some(summary.archived_hash),
+        latest_rebuilt_hash: Some(summary.rebuilt_hash),
+    }
+}
+
+struct RepairJournalSummary {
+    entry_count: usize,
+    archived_path: String,
+    archived_hash: String,
+    rebuilt_hash: String,
+    lineage_mutated: bool,
+    repair_journal_mutated: bool,
+}
+
+fn validate_repair_journal(
+    source: &str,
+    expected_lineage_path: &Path,
+    lineage_hash: &str,
+) -> Option<RepairJournalSummary> {
+    if field(source, "protocol").as_deref() != Some(REPAIR_JOURNAL_PROTOCOL)
+        || field(source, "entry_limit")?.parse::<usize>().ok()? != LINEAGE_LIMIT
+        || !same_path(
+            Path::new(&field(source, "lineage_path")?),
+            expected_lineage_path,
+        )
+    {
+        return None;
+    }
+    let declared_count = field(source, "entry_count")?.parse::<usize>().ok()?;
+    let entries = source
+        .split("[[entry]]")
+        .skip(1)
+        .map(parse_repair_entry)
+        .collect::<Option<Vec<_>>>()?;
+    if entries.is_empty() || entries.len() != declared_count || entries.len() > LINEAGE_LIMIT {
+        return None;
+    }
+    for (index, entry) in entries.iter().enumerate() {
+        if !matches!(
+            entry.status.as_str(),
+            "lineage-rebuilt" | "repair-history-recovered"
+        ) || !entry.repair_journal_mutated
+            || (entry.archived_hash != "none" && !is_hash(&entry.archived_hash))
+            || (entry.archived_repair_journal_hash != "none"
+                && !is_hash(&entry.archived_repair_journal_hash))
+            || !is_hash(&entry.rebuilt_hash)
+        {
+            return None;
+        }
+        if entry.status == "repair-history-recovered" && entry.lineage_mutated {
+            return None;
+        }
+        if let Some(previous) = index.checked_sub(1).and_then(|index| entries.get(index)) {
+            if entry.sequence != previous.sequence + 1 {
+                return None;
+            }
+        }
+    }
+    let latest = entries.last()?;
+    if latest.rebuilt_hash != lineage_hash {
+        return None;
+    }
+    if !latest.archived_path.is_empty() {
+        let bytes = fs::read(&latest.archived_path).ok()?;
+        if fnv1a64_hex(&bytes) != latest.archived_hash {
+            return None;
+        }
+    } else if latest.archived_hash != "none" {
+        return None;
+    }
+    if !latest.archived_repair_journal_path.is_empty() {
+        let bytes = fs::read(&latest.archived_repair_journal_path).ok()?;
+        if fnv1a64_hex(&bytes) != latest.archived_repair_journal_hash {
+            return None;
+        }
+    } else if latest.archived_repair_journal_hash != "none" {
+        return None;
+    }
+    Some(RepairJournalSummary {
+        entry_count: declared_count,
+        archived_path: latest.archived_path.clone(),
+        archived_hash: latest.archived_hash.clone(),
+        rebuilt_hash: latest.rebuilt_hash.clone(),
+        lineage_mutated: latest.lineage_mutated,
+        repair_journal_mutated: latest.repair_journal_mutated,
+    })
+}
+
+struct RepairJournalEntry {
+    sequence: u64,
+    status: String,
+    lineage_mutated: bool,
+    repair_journal_mutated: bool,
+    archived_path: String,
+    archived_hash: String,
+    archived_repair_journal_path: String,
+    archived_repair_journal_hash: String,
+    rebuilt_hash: String,
+}
+
+fn parse_repair_entry(source: &str) -> Option<RepairJournalEntry> {
+    Some(RepairJournalEntry {
+        sequence: field(source, "sequence")?.parse::<u64>().ok()?,
+        status: field(source, "status")?,
+        lineage_mutated: field(source, "lineage_mutated")?.parse::<bool>().ok()?,
+        repair_journal_mutated: field(source, "repair_journal_mutated")?
+            .parse::<bool>()
+            .ok()?,
+        archived_path: field(source, "archived_path")?,
+        archived_hash: field(source, "archived_hash")?,
+        archived_repair_journal_path: field(source, "archived_repair_journal_path")?,
+        archived_repair_journal_hash: field(source, "archived_repair_journal_hash")?,
+        rebuilt_hash: field(source, "rebuilt_hash")?,
+    })
 }
 
 fn validate_lineage(
@@ -268,7 +446,7 @@ mod tests {
         assert!(mirror
             .next_command
             .as_deref()
-            .is_some_and(|command| command.starts_with("nsdb cursor-lineage-repair ")));
+            .is_some_and(|command| command.starts_with("nuis debug-lineage-repair ")));
         fs::remove_dir_all(root).unwrap();
     }
 }

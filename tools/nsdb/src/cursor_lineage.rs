@@ -4,19 +4,25 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::cursor_lineage_repair_journal as repair_journal;
 use crate::{cursor::persist_validated_content_atomically, provider_sample_payload::fnv1a64_hex};
 
 const LINEAGE_PROTOCOL: &str = "nsdb-yir-replay-cursor-lineage-v1";
 const LINEAGE_LIMIT: usize = 8;
 const CURSOR_FILE_NAME: &str = "nuis.nsdb.replay-cursor.toml";
 
+#[derive(Debug)]
 pub(super) struct CursorLineageRepairReport {
     pub(super) contract: &'static str,
     pub(super) status: &'static str,
     pub(super) mutated: bool,
+    pub(super) lineage_mutated: bool,
+    pub(super) repair_journal_mutated: bool,
     pub(super) cursor_path: String,
     pub(super) lineage_path: String,
     pub(super) archived_path: Option<String>,
+    pub(super) repair_journal_path: String,
+    pub(super) archived_repair_journal_path: Option<String>,
     pub(super) entry_count: usize,
     pub(super) latest_hash: String,
 }
@@ -110,23 +116,61 @@ pub(super) fn repair_cursor_lineage(
     let current_hash = fnv1a64_hex(cursor_content.as_bytes());
     let lineage_path = cursor_lineage_path(&cursor_path)?;
     let expected_cursor_path = cursor_path.display().to_string();
-    if let Ok(lineage) = load_cursor_lineage(&lineage_path, &expected_cursor_path) {
-        if lineage
+    let lineage = load_cursor_lineage(&lineage_path, &expected_cursor_path).ok();
+    let lineage_ready = lineage.as_ref().is_some_and(|lineage| {
+        lineage
             .entries
             .last()
             .is_some_and(|entry| entry.current_hash == current_hash)
-        {
+    });
+    let repair_preflight = repair_journal::preflight(output_dir, &lineage_path)?;
+    if lineage_ready {
+        if repair_preflight.archived_path.is_some() {
+            repair_journal::record(
+                &repair_preflight,
+                &lineage_path,
+                "repair-history-recovered",
+                false,
+                None,
+                &current_hash,
+            )?;
             return Ok(CursorLineageRepairReport {
-                contract: "nsdb-yir-replay-cursor-lineage-repair-v1",
-                status: "already-ready",
-                mutated: false,
+                contract: "nsdb-yir-replay-cursor-lineage-repair-v2",
+                status: "repair-history-recovered",
+                mutated: true,
+                lineage_mutated: false,
+                repair_journal_mutated: true,
                 cursor_path: expected_cursor_path,
                 lineage_path: lineage_path.display().to_string(),
                 archived_path: None,
-                entry_count: lineage.entries.len(),
+                repair_journal_path: repair_preflight.path.display().to_string(),
+                archived_repair_journal_path: repair_preflight
+                    .archived_path
+                    .map(|path| path.display().to_string()),
+                entry_count: lineage
+                    .as_ref()
+                    .map(|lineage| lineage.entries.len())
+                    .unwrap_or(0),
                 latest_hash: current_hash,
             });
         }
+        return Ok(CursorLineageRepairReport {
+            contract: "nsdb-yir-replay-cursor-lineage-repair-v2",
+            status: "already-ready",
+            mutated: false,
+            lineage_mutated: false,
+            repair_journal_mutated: false,
+            cursor_path: expected_cursor_path,
+            lineage_path: lineage_path.display().to_string(),
+            archived_path: None,
+            repair_journal_path: repair_preflight.path.display().to_string(),
+            archived_repair_journal_path: None,
+            entry_count: lineage
+                .as_ref()
+                .map(|lineage| lineage.entries.len())
+                .unwrap_or(0),
+            latest_hash: current_hash,
+        });
     }
     let archived_path = if lineage_path.exists() {
         Some(archive_invalid_lineage(&lineage_path)?)
@@ -141,22 +185,40 @@ pub(super) fn repair_cursor_lineage(
         next_frame_id,
     )?;
     let rebuilt = load_cursor_lineage(&lineage_path, &expected_cursor_path)?;
+    repair_journal::record(
+        &repair_preflight,
+        &lineage_path,
+        "lineage-rebuilt",
+        true,
+        archived_path.as_deref(),
+        &current_hash,
+    )?;
     Ok(CursorLineageRepairReport {
-        contract: "nsdb-yir-replay-cursor-lineage-repair-v1",
+        contract: "nsdb-yir-replay-cursor-lineage-repair-v2",
         status: "lineage-rebuilt",
         mutated: true,
+        lineage_mutated: true,
+        repair_journal_mutated: true,
         cursor_path: expected_cursor_path,
         lineage_path: lineage_path.display().to_string(),
         archived_path: archived_path.map(|path| path.display().to_string()),
+        repair_journal_path: repair_preflight.path.display().to_string(),
+        archived_repair_journal_path: repair_preflight
+            .archived_path
+            .map(|path| path.display().to_string()),
         entry_count: rebuilt.entries.len(),
         latest_hash: current_hash,
     })
 }
 
 fn archive_invalid_lineage(path: &Path) -> Result<PathBuf, String> {
+    archive_invalid_sidecar(path, "cursor lineage")
+}
+
+fn archive_invalid_sidecar(path: &Path, description: &str) -> Result<PathBuf, String> {
     let source = fs::read(path).map_err(|error| {
         format!(
-            "failed to read invalid cursor lineage `{}`: {error}",
+            "failed to read invalid {description} `{}`: {error}",
             path.display()
         )
     })?;
@@ -164,7 +226,7 @@ fn archive_invalid_lineage(path: &Path) -> Result<PathBuf, String> {
     let file_name = path
         .file_name()
         .and_then(|name| name.to_str())
-        .ok_or_else(|| format!("cursor lineage path `{}` has no file name", path.display()))?;
+        .ok_or_else(|| format!("{description} path `{}` has no file name", path.display()))?;
     let stem = file_name.strip_suffix(".toml").unwrap_or(file_name);
     for suffix in 0..16 {
         let suffix = if suffix == 0 {
@@ -178,14 +240,14 @@ fn archive_invalid_lineage(path: &Path) -> Result<PathBuf, String> {
         }
         fs::rename(path, &archive).map_err(|error| {
             format!(
-                "failed to archive invalid cursor lineage `{}`: {error}",
-                path.display()
+                "failed to archive invalid {description} `{}`: {error}",
+                path.display(),
             )
         })?;
         return Ok(archive);
     }
     Err(format!(
-        "failed to reserve an archive path for invalid cursor lineage `{}`",
+        "failed to reserve an archive path for invalid {description} `{}`",
         path.display()
     ))
 }
@@ -473,16 +535,72 @@ mod tests {
         let repaired = repair_cursor_lineage(&root, &manifest).unwrap();
         assert_eq!(repaired.status, "lineage-rebuilt");
         assert!(repaired.mutated);
+        assert!(repaired.lineage_mutated);
+        assert!(repaired.repair_journal_mutated);
         assert_eq!(repaired.entry_count, 1);
         assert!(repaired
             .archived_path
             .as_deref()
             .is_some_and(|path| Path::new(path).exists()));
+        let journal_path = root.join(repair_journal::FILE_NAME);
+        let journal_before = fs::read_to_string(&journal_path).unwrap();
+        assert!(repair_journal::journal_is_valid(&journal_path, &lineage));
+        assert!(journal_before.contains("status = \"lineage-rebuilt\""));
+        assert!(journal_before.contains(&format!("rebuilt_hash = \"{}\"", repaired.latest_hash)));
 
         let repeated = repair_cursor_lineage(&root, &manifest).unwrap();
         assert_eq!(repeated.status, "already-ready");
         assert!(!repeated.mutated);
+        assert!(!repeated.lineage_mutated);
+        assert!(!repeated.repair_journal_mutated);
         assert_eq!(repeated.latest_hash, repaired.latest_hash);
+        assert_eq!(fs::read_to_string(&journal_path).unwrap(), journal_before);
+
+        let healthy_lineage = fs::read_to_string(&lineage).unwrap();
+        fs::write(&journal_path, "protocol = \"journal-only-damage\"\n").unwrap();
+        let journal_only = repair_cursor_lineage(&root, &manifest).unwrap();
+        assert_eq!(journal_only.status, "repair-history-recovered");
+        assert!(journal_only.mutated);
+        assert!(!journal_only.lineage_mutated);
+        assert!(journal_only.repair_journal_mutated);
+        assert_eq!(fs::read_to_string(&lineage).unwrap(), healthy_lineage);
+        let journal_only_source = fs::read_to_string(&journal_path).unwrap();
+        assert!(journal_only_source.contains("status = \"repair-history-recovered\""));
+        assert!(repair_journal::journal_is_valid(&journal_path, &lineage));
+
+        fs::write(&lineage, "protocol = \"damaged-again\"\n").unwrap();
+        fs::write(&journal_path, "protocol = \"damaged-journal\"\n").unwrap();
+        let recovered = repair_cursor_lineage(&root, &manifest).unwrap();
+        assert_eq!(recovered.status, "lineage-rebuilt");
+        assert!(recovered
+            .archived_repair_journal_path
+            .as_deref()
+            .is_some_and(|path| Path::new(path).exists()));
+        assert!(repair_journal::journal_is_valid(&journal_path, &lineage));
+
+        let damaged_lineage = "protocol = \"must-remain\"\n";
+        let damaged_journal = "protocol = \"cannot-archive\"\n";
+        fs::write(&lineage, damaged_lineage).unwrap();
+        fs::write(&journal_path, damaged_journal).unwrap();
+        let hash = fnv1a64_hex(damaged_journal.as_bytes())
+            .trim_start_matches("0x")
+            .to_owned();
+        let stem = repair_journal::FILE_NAME.trim_end_matches(".toml");
+        for suffix in 0..16 {
+            let suffix = if suffix == 0 {
+                String::new()
+            } else {
+                format!("-{suffix}")
+            };
+            fs::write(
+                root.join(format!("{stem}.invalid-{hash}{suffix}.toml")),
+                "reserved\n",
+            )
+            .unwrap();
+        }
+        let error = repair_cursor_lineage(&root, &manifest).unwrap_err();
+        assert!(error.contains("failed to reserve an archive path"));
+        assert_eq!(fs::read_to_string(&lineage).unwrap(), damaged_lineage);
         fs::remove_dir_all(root).unwrap();
     }
 }

@@ -248,13 +248,41 @@ Missing lineage remains optional; stale or malformed lineage is reported as
 `lineage-invalid` without blocking cursor continuation.
 
 Invalid mirrors also expose a stable first-blocker code plus
-`repair-cursor-lineage` and a concrete `nsdb cursor-lineage-repair ... --json`
-command. The repair command first validates the authoritative cursor. Healthy
+`repair-cursor-lineage` and a concrete
+`nuis debug-lineage-repair ... --json` command. This first-class Nuis frontdoor
+validates the artifact and rejects missing lineage before dispatching structured
+arguments through the same Nsdb executable boundary as `nuis debug-resume`.
+Nsdb remains the repair owner and first validates the authoritative cursor. Healthy
 lineage returns `already-ready` without mutation; invalid lineage is renamed to
 a content-hash-qualified `.invalid-<hash>.toml` archive before a one-entry
 lineage is rebuilt atomically from the current cursor. Repeating repair is
-idempotent. The official three-domain smoke covers stale-hash diagnosis,
-archive/rebuild, restored Nuis readiness, and continued cursor resume.
+idempotent. Actual rebuilds also append an atomically validated, bounded audit
+entry to `nuis.nsdb.replay-cursor.lineage-repairs.toml` under
+`nsdb-yir-replay-cursor-lineage-repair-journal-v2`; healthy `already-ready`
+probes do not modify this journal. Each entry records the archived path and
+content hash plus the rebuilt cursor hash.
+
+Nuis validates this journal independently through
+`nuis-debugger-cursor-lineage-repair-mirror-v1`. Final-output and closure
+summaries retain the journal status/count, latest mutation flag, archived
+path/hash, and rebuilt hash after command stdout has disappeared. Readiness
+requires the archived bytes to match their recorded hash and the latest rebuilt
+hash to match the active lineage. The official three-domain smoke covers
+stale-hash diagnosis, archive/rebuild, persistent repair evidence, restored
+Nuis readiness, and continued cursor resume.
+
+Before any lineage archive or rebuild, Nsdb preflights an existing repair
+journal. An invalid journal is content-hash archived first; if no archive slot
+can be reserved, the command fails while preserving the lineage bytes exactly.
+The repair result exposes both the active journal path and any archived journal
+path. After successful lineage recovery, a fresh validated journal is installed
+and becomes visible to the next independent Nuis report.
+
+When lineage is already healthy but the journal alone is invalid, the same
+frontdoor performs a journal-only recovery. Nsdb emits
+`repair-history-recovered`, preserves lineage bytes, and reports
+`lineage_mutated = false` separately from `repair_journal_mutated = true`.
+Ordinary healthy checks keep both flags false; lineage rebuilds set both true.
 
 Replay source selection remains deterministic. Payload-execution handoff
 events are preferred whenever present. When that list is empty, Nsdb projects
