@@ -157,6 +157,11 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         nsdb_first_provider_family: nsdb_replay.first_provider_family,
         nsdb_first_provider_output_contract: nsdb_replay.first_provider_output_contract,
         nsdb_first_provider_output_evidence: nsdb_replay.first_provider_output_evidence,
+        nsdb_provider_completion_claim_authority_contract: nsdb_replay
+            .provider_completion_claim_authority_contract,
+        nsdb_provider_completion_claim_authority: nsdb_replay.provider_completion_claim_authority,
+        nsdb_provider_completion_claim_authority_status: nsdb_replay
+            .provider_completion_claim_authority_status,
         nsdb_provider_completion_digest_contract: nsdb_replay.provider_completion_digest_contract,
         nsdb_provider_completion_set_hash_claim: nsdb_replay.provider_completion_set_hash_claim,
         nsdb_provider_completion_set_hash: nsdb_replay.provider_completion_set_hash,
@@ -317,6 +322,9 @@ struct NsldFinalExecutableOutputNsdbReplay {
     first_provider_family: Option<String>,
     first_provider_output_contract: Option<String>,
     first_provider_output_evidence: Option<String>,
+    provider_completion_claim_authority_contract: Option<String>,
+    provider_completion_claim_authority: Option<String>,
+    provider_completion_claim_authority_status: String,
     provider_completion_digest_contract: Option<String>,
     provider_completion_set_hash_claim: Option<String>,
     provider_completion_set_hash: Option<String>,
@@ -377,6 +385,15 @@ fn nsld_final_executable_output_nsdb_replay(
         first_provider_family: handoff.first_provider_family().map(str::to_owned),
         first_provider_output_contract: handoff.first_provider_output_contract().map(str::to_owned),
         first_provider_output_evidence: handoff.first_provider_output_evidence().map(str::to_owned),
+        provider_completion_claim_authority_contract: handoff
+            .provider_completion_claim_authority_contract()
+            .map(str::to_owned),
+        provider_completion_claim_authority: handoff
+            .provider_completion_claim_authority()
+            .map(str::to_owned),
+        provider_completion_claim_authority_status: handoff
+            .provider_completion_claim_authority_status()
+            .to_owned(),
         provider_completion_digest_contract: handoff
             .provider_completion_digest_contract()
             .map(str::to_owned),

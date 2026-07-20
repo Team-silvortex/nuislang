@@ -41,6 +41,9 @@ pub struct PayloadExecutionReplaySummary {
     pub first_provider_family: Option<String>,
     pub first_provider_output_contract: Option<String>,
     pub first_provider_output_evidence: Option<String>,
+    pub provider_completion_claim_authority_contract: Option<String>,
+    pub provider_completion_claim_authority: Option<String>,
+    pub provider_completion_claim_authority_status: String,
     pub provider_completion_digest_contract: Option<String>,
     pub provider_completion_set_hash_claim: Option<String>,
     pub provider_completion_set_hash: Option<String>,
@@ -129,6 +132,15 @@ pub fn payload_execution_replay_summary(
         first_provider_output_evidence: first_provider_completion
             .map(|completion| completion.output_evidence.clone())
             .filter(|value| value != "none" && !value.is_empty()),
+        provider_completion_claim_authority_contract: (handoff
+            .provider_completion_claim_authority_contract
+            != "none")
+            .then(|| handoff.provider_completion_claim_authority_contract.clone()),
+        provider_completion_claim_authority: (handoff.provider_completion_claim_authority
+            != "none")
+            .then(|| handoff.provider_completion_claim_authority.clone()),
+        provider_completion_claim_authority_status: handoff
+            .provider_completion_claim_authority_status,
         provider_completion_digest_contract: (handoff.provider_completion_digest_contract
             != "none")
             .then(|| handoff.provider_completion_digest_contract.clone()),
@@ -297,12 +309,20 @@ next_action = "handoff-payload-trace-to-nsdb"
             ));
         assert_eq!(
             summary.provider_completion_digest_contract.as_deref(),
-            Some("nuis-provider-completion-digest-sha256-v1")
+            Some("nuis-provider-completion-digest-sha256-authority-v1")
+        );
+        assert_eq!(
+            summary.provider_completion_claim_authority.as_deref(),
+            Some("nsdb:payload-execution-handoff-writer:v1")
+        );
+        assert_eq!(
+            summary.provider_completion_claim_authority_status,
+            "authorized"
         );
         let path = dir.join("nuis.nsdb.payload-execution-handoff.toml");
         let source = fs::read_to_string(&path).unwrap();
         assert!(source.contains(
-            "provider_completion_digest_contract = \"nuis-provider-completion-digest-sha256-v1\""
+            "provider_completion_digest_contract = \"nuis-provider-completion-digest-sha256-authority-v1\""
         ));
         let claim = summary.provider_completion_set_hash.as_deref().unwrap();
         assert!(source.contains(&format!("provider_completion_set_hash = \"{claim}\"")));

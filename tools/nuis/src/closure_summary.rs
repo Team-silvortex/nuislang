@@ -29,6 +29,9 @@ pub(crate) struct ProviderCompletionClosureMirror {
     pub(crate) family: Option<String>,
     pub(crate) output_contract: Option<String>,
     pub(crate) output_evidence: Option<String>,
+    pub(crate) claim_authority_contract: Option<String>,
+    pub(crate) claim_authority: Option<String>,
+    pub(crate) claim_authority_status: String,
     pub(crate) digest_contract: Option<String>,
     pub(crate) set_hash_claim: Option<String>,
     pub(crate) set_hash: Option<String>,
@@ -54,6 +57,15 @@ impl ProviderCompletionClosureMirror {
             family: final_output.nsdb_first_provider_family.clone(),
             output_contract: final_output.nsdb_first_provider_output_contract.clone(),
             output_evidence: final_output.nsdb_first_provider_output_evidence.clone(),
+            claim_authority_contract: final_output
+                .nsdb_provider_completion_claim_authority_contract
+                .clone(),
+            claim_authority: final_output
+                .nsdb_provider_completion_claim_authority
+                .clone(),
+            claim_authority_status: final_output
+                .nsdb_provider_completion_claim_authority_status
+                .clone(),
             digest_contract: final_output
                 .nsdb_provider_completion_digest_contract
                 .clone(),
@@ -502,6 +514,24 @@ impl FrontdoorClosureSummary {
                 self.provider_completion
                     .as_ref()
                     .and_then(|mirror| mirror.output_evidence.as_deref()),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_provider_completion_claim_authority_contract",
+                self.provider_completion
+                    .as_ref()
+                    .and_then(|mirror| mirror.claim_authority_contract.as_deref()),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_provider_completion_claim_authority",
+                self.provider_completion
+                    .as_ref()
+                    .and_then(|mirror| mirror.claim_authority.as_deref()),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_provider_completion_claim_authority_status",
+                self.provider_completion
+                    .as_ref()
+                    .map(|mirror| mirror.claim_authority_status.as_str()),
             ),
             crate::json_optional_string_field(
                 "closure_summary_provider_completion_digest_contract",

@@ -204,6 +204,22 @@ pub(crate) fn nsld_final_executable_output_report_json(
                 .as_deref(),
         ),
         json_optional_string_field(
+            "final_output_nsdb_provider_completion_claim_authority_contract",
+            report
+                .final_output_nsdb_provider_completion_claim_authority_contract
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "final_output_nsdb_provider_completion_claim_authority",
+            report
+                .final_output_nsdb_provider_completion_claim_authority
+                .as_deref(),
+        ),
+        json_string_field(
+            "final_output_nsdb_provider_completion_claim_authority_status",
+            &report.final_output_nsdb_provider_completion_claim_authority_status,
+        ),
+        json_optional_string_field(
             "final_output_nsdb_provider_completion_digest_contract",
             report
                 .final_output_nsdb_provider_completion_digest_contract

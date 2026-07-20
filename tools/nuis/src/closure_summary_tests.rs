@@ -13,6 +13,11 @@ fn final_output_closure_becomes_ready_when_replay_evidence_is_ready() {
         Some("nuis-provider-output-payload-handoff-v1".to_owned());
     final_output.nsdb_first_provider_output_evidence =
         Some("provider-output.toml:hash=0x1234".to_owned());
+    final_output.nsdb_provider_completion_claim_authority_contract =
+        Some("nuis-provider-completion-claim-authority-v1".to_owned());
+    final_output.nsdb_provider_completion_claim_authority =
+        Some("nsdb:payload-execution-handoff-writer:v1".to_owned());
+    final_output.nsdb_provider_completion_claim_authority_status = "authorized".to_owned();
     final_output.nsdb_provider_completion_digest_contract =
         Some("nuis-provider-completion-digest-fnv1a64-v1".to_owned());
     final_output.nsdb_provider_completion_set_hash_claim = Some("0xset1234".to_owned());
@@ -65,6 +70,11 @@ fn final_output_closure_becomes_ready_when_replay_evidence_is_ready() {
         provider.digest_contract.as_deref(),
         Some("nuis-provider-completion-digest-fnv1a64-v1")
     );
+    assert_eq!(
+        provider.claim_authority.as_deref(),
+        Some("nsdb:payload-execution-handoff-writer:v1")
+    );
+    assert_eq!(provider.claim_authority_status, "authorized");
     assert_eq!(provider.count, 2);
     assert_eq!(provider.family.as_deref(), Some("metal:apple-silicon-gpu"));
     assert_eq!(
@@ -106,6 +116,9 @@ fn final_output_closure_becomes_ready_when_replay_evidence_is_ready() {
     ));
     assert!(fields
         .contains(&"\"closure_summary_provider_completion_set_hash\":\"0xset1234\"".to_owned()));
+    assert!(fields.contains(
+        &"\"closure_summary_provider_completion_claim_authority_status\":\"authorized\"".to_owned()
+    ));
     assert!(fields.contains(
         &"\"closure_summary_provider_completion_digest_contract\":\"nuis-provider-completion-digest-fnv1a64-v1\"".to_owned()
     ));
@@ -272,6 +285,9 @@ fn final_output_summary(
         nsdb_first_provider_family: None,
         nsdb_first_provider_output_contract: None,
         nsdb_first_provider_output_evidence: None,
+        nsdb_provider_completion_claim_authority_contract: None,
+        nsdb_provider_completion_claim_authority: None,
+        nsdb_provider_completion_claim_authority_status: "not-applicable".to_owned(),
         nsdb_provider_completion_digest_contract: None,
         nsdb_provider_completion_set_hash_claim: None,
         nsdb_provider_completion_set_hash: None,

@@ -240,6 +240,26 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         )
     );
     println!(
+        "  final_output_nsdb_provider_completion_claim_authority_contract: {}",
+        optional_string_text(
+            report
+                .final_output_nsdb_provider_completion_claim_authority_contract
+                .as_deref()
+        )
+    );
+    println!(
+        "  final_output_nsdb_provider_completion_claim_authority: {}",
+        optional_string_text(
+            report
+                .final_output_nsdb_provider_completion_claim_authority
+                .as_deref()
+        )
+    );
+    println!(
+        "  final_output_nsdb_provider_completion_claim_authority_status: {}",
+        report.final_output_nsdb_provider_completion_claim_authority_status
+    );
+    println!(
         "  final_output_nsdb_provider_completion_digest_contract: {}",
         optional_string_text(
             report

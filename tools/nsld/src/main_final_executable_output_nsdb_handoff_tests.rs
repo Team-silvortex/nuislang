@@ -152,7 +152,17 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
         merged_output
             .final_output_nsdb_provider_completion_digest_contract
             .as_deref(),
-        Some("nuis-provider-completion-digest-sha256-v1")
+        Some("nuis-provider-completion-digest-sha256-authority-v1")
+    );
+    assert_eq!(
+        merged_output
+            .final_output_nsdb_provider_completion_claim_authority
+            .as_deref(),
+        Some("nsdb:payload-execution-handoff-writer:v1")
+    );
+    assert_eq!(
+        merged_output.final_output_nsdb_provider_completion_claim_authority_status,
+        "authorized"
     );
     assert_eq!(
         merged_output.final_output_nsdb_provider_completion_set_hash_claim,
@@ -181,7 +191,10 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
         .contains("\"final_output_nsdb_first_provider_family\":\"metal:apple-silicon-gpu\""));
     assert!(merged_output_json.contains("\"final_output_nsdb_provider_completions\":[{"));
     assert!(merged_output_json.contains(
-        "\"final_output_nsdb_provider_completion_digest_contract\":\"nuis-provider-completion-digest-sha256-v1\""
+        "\"final_output_nsdb_provider_completion_digest_contract\":\"nuis-provider-completion-digest-sha256-authority-v1\""
+    ));
+    assert!(merged_output_json.contains(
+        "\"final_output_nsdb_provider_completion_claim_authority_status\":\"authorized\""
     ));
     assert!(merged_output_json.contains(
         "\"final_output_nsdb_provider_completion_set_hash_validation_status\":\"verified\""

@@ -135,6 +135,63 @@ output_evidence = "coreml-output.toml:hash=0x5678"
         .provider_completions()
         .iter()
         .all(|completion| completion.record_hash.len() == 64));
+    assert_eq!(
+        sha_verified.provider_completion_claim_authority_status(),
+        "legacy-unattributed"
+    );
+
+    let authority_source = sha_claimed_source.replace(
+        "nuis-provider-completion-digest-sha256-v1",
+        "nuis-provider-completion-digest-sha256-authority-v1",
+    );
+    fs::write(&path, &authority_source).unwrap();
+    let missing_stale = read_persisted_nsdb_handoff(Some(&dir));
+    let missing_hash = missing_stale
+        .provider_completion_set_hash()
+        .unwrap()
+        .to_owned();
+    let missing_claimed_source = authority_source.replace(&sha_hash, &missing_hash);
+    fs::write(&path, &missing_claimed_source).unwrap();
+    let missing = read_persisted_nsdb_handoff(Some(&dir));
+    assert_eq!(
+        missing.provider_completion_set_hash_validation_status(),
+        "verified"
+    );
+    assert_eq!(
+        missing.provider_completion_claim_authority_status(),
+        "authority-missing"
+    );
+    assert_eq!(
+        missing.error(),
+        Some("provider-completion-claim-authority-missing")
+    );
+
+    let authority_source = authority_source.replace(
+        "provider_completion_digest_contract = ",
+        "provider_completion_claim_authority_contract = \"nuis-provider-completion-claim-authority-v1\"\nprovider_completion_claim_authority = \"nsdb:payload-execution-handoff-writer:v1\"\nprovider_completion_digest_contract = ",
+    );
+    fs::write(&path, &authority_source).unwrap();
+    let authority_stale = read_persisted_nsdb_handoff(Some(&dir));
+    let authority_hash = authority_stale
+        .provider_completion_set_hash()
+        .unwrap()
+        .to_owned();
+    let authority_claimed_source = authority_source.replace(&sha_hash, &authority_hash);
+    fs::write(&path, &authority_claimed_source).unwrap();
+    let authorized = read_persisted_nsdb_handoff(Some(&dir));
+    assert_eq!(
+        authorized.provider_completion_claim_authority_contract(),
+        Some("nuis-provider-completion-claim-authority-v1")
+    );
+    assert_eq!(
+        authorized.provider_completion_claim_authority(),
+        Some("nsdb:payload-execution-handoff-writer:v1")
+    );
+    assert_eq!(
+        authorized.provider_completion_claim_authority_status(),
+        "authorized"
+    );
+    assert_eq!(authorized.error(), None);
 
     fs::write(
         &path,

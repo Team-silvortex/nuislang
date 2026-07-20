@@ -13,6 +13,11 @@ const PROVIDER_COMPLETION_DIGEST_FNV1A64_CONTRACT: &str =
     "nuis-provider-completion-digest-fnv1a64-v1";
 const PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT: &str =
     "nuis-provider-completion-digest-sha256-v1";
+const PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT: &str =
+    "nuis-provider-completion-digest-sha256-authority-v1";
+const PROVIDER_COMPLETION_CLAIM_AUTHORITY_CONTRACT: &str =
+    "nuis-provider-completion-claim-authority-v1";
+const PROVIDER_COMPLETION_CLAIM_AUTHORITY: &str = "nsdb:payload-execution-handoff-writer:v1";
 
 pub(crate) struct LaunchEvidenceNsdbHandoffPersistence {
     persisted: bool,
@@ -37,6 +42,9 @@ pub(crate) struct PersistedNsdbHandoffSummary {
     first_provider_family: Option<String>,
     first_provider_output_contract: Option<String>,
     first_provider_output_evidence: Option<String>,
+    provider_completion_claim_authority_contract: Option<String>,
+    provider_completion_claim_authority: Option<String>,
+    provider_completion_claim_authority_status: String,
     provider_completion_digest_contract: Option<String>,
     provider_completion_set_hash_claim: Option<String>,
     provider_completion_set_hash: Option<String>,
@@ -97,6 +105,18 @@ impl PersistedNsdbHandoffSummary {
 
     pub(crate) fn provider_completion_digest_contract(&self) -> Option<&str> {
         self.provider_completion_digest_contract.as_deref()
+    }
+
+    pub(crate) fn provider_completion_claim_authority_contract(&self) -> Option<&str> {
+        self.provider_completion_claim_authority_contract.as_deref()
+    }
+
+    pub(crate) fn provider_completion_claim_authority(&self) -> Option<&str> {
+        self.provider_completion_claim_authority.as_deref()
+    }
+
+    pub(crate) fn provider_completion_claim_authority_status(&self) -> &str {
+        &self.provider_completion_claim_authority_status
     }
 
     pub(crate) fn provider_completion_set_hash_claim(&self) -> Option<&str> {
@@ -176,6 +196,18 @@ impl PersistedNsdbHandoffSummary {
                 self.first_provider_output_evidence.as_deref(),
             ),
             json_optional_string_field(
+                &format!("{prefix}_provider_completion_claim_authority_contract"),
+                self.provider_completion_claim_authority_contract.as_deref(),
+            ),
+            json_optional_string_field(
+                &format!("{prefix}_provider_completion_claim_authority"),
+                self.provider_completion_claim_authority.as_deref(),
+            ),
+            json_field(
+                &format!("{prefix}_provider_completion_claim_authority_status"),
+                &self.provider_completion_claim_authority_status,
+            ),
+            json_optional_string_field(
                 &format!("{prefix}_provider_completion_digest_contract"),
                 self.provider_completion_digest_contract.as_deref(),
             ),
@@ -226,6 +258,9 @@ pub(crate) fn read_persisted_nsdb_handoff(
             first_provider_family: None,
             first_provider_output_contract: None,
             first_provider_output_evidence: None,
+            provider_completion_claim_authority_contract: None,
+            provider_completion_claim_authority: None,
+            provider_completion_claim_authority_status: "not-applicable".to_owned(),
             provider_completion_digest_contract: None,
             provider_completion_set_hash_claim: None,
             provider_completion_set_hash: None,
@@ -254,6 +289,9 @@ pub(crate) fn read_persisted_nsdb_handoff(
             first_provider_family: None,
             first_provider_output_contract: None,
             first_provider_output_evidence: None,
+            provider_completion_claim_authority_contract: None,
+            provider_completion_claim_authority: None,
+            provider_completion_claim_authority_status: "not-applicable".to_owned(),
             provider_completion_digest_contract: None,
             provider_completion_set_hash_claim: None,
             provider_completion_set_hash: None,
@@ -268,6 +306,12 @@ pub(crate) fn read_persisted_nsdb_handoff(
     };
     let protocol = parse_string_toml_field(&source, "protocol");
     let record_count = parse_usize_toml_field(&source, "record_count").unwrap_or(0);
+    let provider_completion_claim_authority_contract =
+        parse_string_toml_field(&source, "provider_completion_claim_authority_contract")
+            .filter(|value| value != "none" && !value.is_empty());
+    let provider_completion_claim_authority =
+        parse_string_toml_field(&source, "provider_completion_claim_authority")
+            .filter(|value| value != "none" && !value.is_empty());
     let provider_completion_digest_contract =
         parse_string_toml_field(&source, "provider_completion_digest_contract")
             .filter(|value| value != "none" && !value.is_empty());
@@ -315,22 +359,36 @@ pub(crate) fn read_persisted_nsdb_handoff(
         None => legacy_provider_completion_set_hash,
         Some(
             contract @ (PROVIDER_COMPLETION_DIGEST_FNV1A64_CONTRACT
-            | PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT),
+            | PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT
+            | PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT),
         ) => (!provider_completions.is_empty()).then(|| {
             let material = provider_completions
                 .iter()
                 .map(|completion| completion.record_hash.as_str())
                 .collect::<Vec<_>>()
                 .join("\0");
-            let domain = if contract == PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT {
-                "provider-completion-set-v3"
-            } else {
-                "provider-completion-set-v2"
+            let (domain, authority_material) = match contract {
+                PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT => (
+                    "provider-completion-set-v4",
+                    format!(
+                        "{}\0{}\0",
+                        provider_completion_claim_authority_contract
+                            .as_deref()
+                            .unwrap_or("none"),
+                        provider_completion_claim_authority
+                            .as_deref()
+                            .unwrap_or("none")
+                    ),
+                ),
+                PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT => {
+                    ("provider-completion-set-v3", String::new())
+                }
+                _ => ("provider-completion-set-v2", String::new()),
             };
             digest_hex(
                 contract,
                 format!(
-                    "{domain}\0{}\0{record_count}\0{}\0{material}",
+                    "{domain}\0{authority_material}{}\0{record_count}\0{}\0{material}",
                     protocol.as_deref().unwrap_or("none"),
                     provider_completions.len()
                 )
@@ -350,6 +408,8 @@ pub(crate) fn read_persisted_nsdb_handoff(
             != Some(PROVIDER_COMPLETION_DIGEST_FNV1A64_CONTRACT)
         && provider_completion_digest_contract.as_deref()
             != Some(PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT)
+        && provider_completion_digest_contract.as_deref()
+            != Some(PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT)
     {
         "unsupported-digest-contract"
     } else if provider_completion_set_hash_claim.is_none() {
@@ -364,10 +424,42 @@ pub(crate) fn read_persisted_nsdb_handoff(
         "mismatch"
     }
     .to_owned();
-    let error = match provider_completion_set_hash_validation_status.as_str() {
-        "mismatch" => Some("provider-completion-set-hash-mismatch".to_owned()),
-        "unsupported-digest-contract" => {
+    let provider_completion_claim_authority_status = if provider_completions.is_empty() {
+        "not-applicable"
+    } else if provider_completion_digest_contract.as_deref()
+        != Some(PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT)
+    {
+        "legacy-unattributed"
+    } else if provider_completion_claim_authority_contract.is_none()
+        || provider_completion_claim_authority.is_none()
+    {
+        "authority-missing"
+    } else if provider_completion_claim_authority_contract.as_deref()
+        != Some(PROVIDER_COMPLETION_CLAIM_AUTHORITY_CONTRACT)
+    {
+        "unsupported-authority-contract"
+    } else if provider_completion_claim_authority.as_deref()
+        != Some(PROVIDER_COMPLETION_CLAIM_AUTHORITY)
+    {
+        "authority-untrusted"
+    } else {
+        "authorized"
+    }
+    .to_owned();
+    let error = match (
+        provider_completion_set_hash_validation_status.as_str(),
+        provider_completion_claim_authority_status.as_str(),
+    ) {
+        ("mismatch", _) => Some("provider-completion-set-hash-mismatch".to_owned()),
+        ("unsupported-digest-contract", _) => {
             Some("provider-completion-digest-contract-unsupported".to_owned())
+        }
+        (_, "authority-missing") => Some("provider-completion-claim-authority-missing".to_owned()),
+        (_, "unsupported-authority-contract") => {
+            Some("provider-completion-claim-authority-contract-unsupported".to_owned())
+        }
+        (_, "authority-untrusted") => {
+            Some("provider-completion-claim-authority-untrusted".to_owned())
         }
         _ => None,
     };
@@ -391,6 +483,9 @@ pub(crate) fn read_persisted_nsdb_handoff(
         first_provider_output_evidence: first_provider_completion
             .map(|completion| completion.output_evidence.clone())
             .filter(|value| value != "none" && !value.is_empty()),
+        provider_completion_claim_authority_contract,
+        provider_completion_claim_authority,
+        provider_completion_claim_authority_status,
         provider_completion_digest_contract,
         provider_completion_set_hash_claim,
         provider_completion_set_hash,
@@ -681,7 +776,10 @@ fn fnv1a64_hex(bytes: &[u8]) -> String {
 fn digest_hex(contract: &str, bytes: &[u8]) -> Option<String> {
     match contract {
         PROVIDER_COMPLETION_DIGEST_FNV1A64_CONTRACT => Some(fnv1a64_hex(bytes)),
-        PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT => Some(crate::digest_sha256::sha256_hex(bytes)),
+        PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT
+        | PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT => {
+            Some(crate::digest_sha256::sha256_hex(bytes))
+        }
         _ => None,
     }
 }

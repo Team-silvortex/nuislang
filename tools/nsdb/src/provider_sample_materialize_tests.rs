@@ -238,7 +238,11 @@ next_action = "handoff-payload-trace-to-nsdb"
         .is_some_and(|hash| hash.len() == 64 && hash.bytes().all(|byte| byte.is_ascii_hexdigit())));
     assert_eq!(
         replay.provider_completion_digest_contract.as_deref(),
-        Some("nuis-provider-completion-digest-sha256-v1")
+        Some("nuis-provider-completion-digest-sha256-authority-v1")
+    );
+    assert_eq!(
+        replay.provider_completion_claim_authority_status,
+        "authorized"
     );
     assert_eq!(replay.provider_completions.len(), 1);
     assert_eq!(

@@ -337,17 +337,22 @@ set hash as a producer claim. Matching claims are `verified`; historical
 handoffs without a claim remain readable as `legacy-unclaimed`, while old
 claims without a digest contract are independently checked as
 `legacy-verified`. New handoffs declare
-`nuis-provider-completion-digest-sha256-v1`; both record hashes and the set-v3
-claim use SHA-256. Its canonical set material binds the handoff protocol,
-declared total record count, provider completion count, and ordered record
-hashes. The earlier `nuis-provider-completion-digest-fnv1a64-v1` contract
-remains independently readable with set-v2 material, while no-contract claims
+`nuis-provider-completion-digest-sha256-authority-v1`; record hashes use
+SHA-256 and the set-v4 claim additionally binds
+`nuis-provider-completion-claim-authority-v1` plus the whitelisted producer id
+`nsdb:payload-execution-handoff-writer:v1`. Its canonical set material also
+binds the handoff protocol, declared total record count, provider completion
+count, and ordered record hashes. Missing, unsupported, or untrusted authority
+metadata blocks readiness. The earlier SHA-256 set-v3 and
+`nuis-provider-completion-digest-fnv1a64-v1` set-v2 contracts remain
+independently readable, while no-contract claims
 retain set-v1 legacy verification. Mismatches and unsupported digest contracts
 block Nsdb replay, Nuis closure readiness, and subsequent handoff updates so a
 write cannot silently normalize tampered evidence. Nsld and closure JSON expose
 the digest contract, claim, independently computed value, and validation
-status. SHA-256 provides collision-resistant content integrity, but the claim
-is not yet authenticated to a producer identity.
+status. This provides deterministic whitelist attribution and binds identity
+metadata against accidental drift, but it is not yet an unforgeable producer
+signature because no public-key trust root verifies the claim.
 The write path is generic and idempotent by `(trace_id, execution_phase)`: it
 preserves unrelated host and device records instead of rebuilding a fixed
 backend combination. Nsld uses

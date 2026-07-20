@@ -11,6 +11,11 @@ const PROVIDER_COMPLETION_DIGEST_FNV1A64_CONTRACT: &str =
     "nuis-provider-completion-digest-fnv1a64-v1";
 const PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT: &str =
     "nuis-provider-completion-digest-sha256-v1";
+const PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT: &str =
+    "nuis-provider-completion-digest-sha256-authority-v1";
+const PROVIDER_COMPLETION_CLAIM_AUTHORITY_CONTRACT: &str =
+    "nuis-provider-completion-claim-authority-v1";
+const PROVIDER_COMPLETION_CLAIM_AUTHORITY: &str = "nsdb:payload-execution-handoff-writer:v1";
 
 pub(crate) fn persist_provider_completion_handoff(
     output_dir: &Path,
@@ -59,6 +64,17 @@ pub(crate) fn persist_payload_execution_handoff_record(
         return Err(format!(
             "provider completion digest validation failed in existing handoff: {}",
             existing.provider_completion_set_hash_validation_status
+        ));
+    }
+    if existing.available
+        && matches!(
+            existing.provider_completion_claim_authority_status.as_str(),
+            "authority-missing" | "unsupported-authority-contract" | "authority-untrusted"
+        )
+    {
+        return Err(format!(
+            "provider completion authority validation failed in existing handoff: {}",
+            existing.provider_completion_claim_authority_status
         ));
     }
     let mut events = if existing.available
@@ -202,8 +218,18 @@ fn render_payload_execution_handoff(
     );
     push_toml_string(
         &mut out,
+        "provider_completion_claim_authority_contract",
+        PROVIDER_COMPLETION_CLAIM_AUTHORITY_CONTRACT,
+    );
+    push_toml_string(
+        &mut out,
+        "provider_completion_claim_authority",
+        PROVIDER_COMPLETION_CLAIM_AUTHORITY,
+    );
+    push_toml_string(
+        &mut out,
         "provider_completion_digest_contract",
-        PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT,
+        PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT,
     );
     push_toml_string(
         &mut out,
@@ -212,7 +238,9 @@ fn render_payload_execution_handoff(
             events,
             HANDOFF_PROTOCOL,
             events.len(),
-            PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT,
+            PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT,
+            PROVIDER_COMPLETION_CLAIM_AUTHORITY_CONTRACT,
+            PROVIDER_COMPLETION_CLAIM_AUTHORITY,
         )
         .as_deref()
         .unwrap_or("none"),
@@ -288,6 +316,9 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
             first_next_action: "none".to_owned(),
             first_entry_symbol: "none".to_owned(),
             first_execution_phase: "none".to_owned(),
+            provider_completion_claim_authority_contract: "none".to_owned(),
+            provider_completion_claim_authority: "none".to_owned(),
+            provider_completion_claim_authority_status: "not-applicable".to_owned(),
             provider_completion_digest_contract: "none".to_owned(),
             provider_completion_set_hash_claim: "none".to_owned(),
             provider_completion_set_hash_actual: "none".to_owned(),
@@ -307,6 +338,12 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
     let record_count = parse_usize_toml_field(&source, "record_count").unwrap_or(0);
     let ready_record_count = parse_usize_toml_field(&source, "ready_record_count").unwrap_or(0);
     let events = parse_payload_execution_events(&source);
+    let provider_completion_claim_authority_contract =
+        parse_string_toml_field(&source, "provider_completion_claim_authority_contract")
+            .unwrap_or_else(|| "none".to_owned());
+    let provider_completion_claim_authority =
+        parse_string_toml_field(&source, "provider_completion_claim_authority")
+            .unwrap_or_else(|| "none".to_owned());
     let provider_completion_digest_contract =
         parse_string_toml_field(&source, "provider_completion_digest_contract")
             .unwrap_or_else(|| "none".to_owned());
@@ -319,11 +356,14 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
     let provider_completion_set_hash_actual = match provider_completion_digest_contract.as_str() {
         "none" => legacy_provider_completion_set_hash(&events),
         PROVIDER_COMPLETION_DIGEST_FNV1A64_CONTRACT
-        | PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT => provider_completion_set_hash(
+        | PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT
+        | PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT => provider_completion_set_hash(
             &events,
             &protocol,
             record_count,
             &provider_completion_digest_contract,
+            &provider_completion_claim_authority_contract,
+            &provider_completion_claim_authority,
         ),
         _ => None,
     }
@@ -333,6 +373,8 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
     } else if provider_completion_digest_contract != "none"
         && provider_completion_digest_contract != PROVIDER_COMPLETION_DIGEST_FNV1A64_CONTRACT
         && provider_completion_digest_contract != PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT
+        && provider_completion_digest_contract
+            != PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT
     {
         "unsupported-digest-contract"
     } else if provider_completion_set_hash_claim == "none" {
@@ -347,6 +389,26 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
         "mismatch"
     }
     .to_owned();
+    let provider_completion_claim_authority_status = if !has_provider_completions {
+        "not-applicable"
+    } else if provider_completion_digest_contract
+        != PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT
+    {
+        "legacy-unattributed"
+    } else if provider_completion_claim_authority_contract == "none"
+        || provider_completion_claim_authority == "none"
+    {
+        "authority-missing"
+    } else if provider_completion_claim_authority_contract
+        != PROVIDER_COMPLETION_CLAIM_AUTHORITY_CONTRACT
+    {
+        "unsupported-authority-contract"
+    } else if provider_completion_claim_authority != PROVIDER_COMPLETION_CLAIM_AUTHORITY {
+        "authority-untrusted"
+    } else {
+        "authorized"
+    }
+    .to_owned();
     let first_event = events.first();
     let first_status = parse_string_toml_field(&source, "first_status")
         .or_else(|| first_event.map(|event| event.status.clone()))
@@ -357,6 +419,7 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
         record_count,
         &first_status,
         &provider_completion_set_hash_validation_status,
+        &provider_completion_claim_authority_status,
     );
     NsdbPayloadExecutionHandoffInfo {
         available: true,
@@ -379,6 +442,9 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
         first_execution_phase: first_event
             .map(|event| event.execution_phase.clone())
             .unwrap_or_else(|| "none".to_owned()),
+        provider_completion_claim_authority_contract,
+        provider_completion_claim_authority,
+        provider_completion_claim_authority_status,
         provider_completion_digest_contract,
         provider_completion_set_hash_claim,
         provider_completion_set_hash_actual,
@@ -419,6 +485,7 @@ fn payload_handoff_status(
     record_count: usize,
     first_status: &str,
     provider_completion_set_hash_validation_status: &str,
+    provider_completion_claim_authority_status: &str,
 ) -> String {
     if protocol != "nuis-nsdb-payload-execution-handoff-v1" {
         return "unsupported-protocol".to_owned();
@@ -434,6 +501,14 @@ fn payload_handoff_status(
         "unsupported-digest-contract" => {
             return "provider-completion-digest-contract-unsupported".to_owned()
         }
+        _ => {}
+    }
+    match provider_completion_claim_authority_status {
+        "authority-missing" => return "provider-completion-claim-authority-missing".to_owned(),
+        "unsupported-authority-contract" => {
+            return "provider-completion-claim-authority-contract-unsupported".to_owned()
+        }
+        "authority-untrusted" => return "provider-completion-claim-authority-untrusted".to_owned(),
         _ => {}
     }
     if first_status == "ready" {
@@ -459,6 +534,8 @@ pub(crate) fn provider_completion_set_hash(
     protocol: &str,
     record_count: usize,
     digest_contract: &str,
+    authority_contract: &str,
+    authority: &str,
 ) -> Option<String> {
     let record_hashes = events
         .iter()
@@ -467,15 +544,20 @@ pub(crate) fn provider_completion_set_hash(
         .collect::<Option<Vec<_>>>()?;
     (!record_hashes.is_empty()).then(|| {
         let material = record_hashes.join("\0");
-        let domain = if digest_contract == PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT {
-            "provider-completion-set-v3"
-        } else {
-            "provider-completion-set-v2"
+        let (domain, authority_material) = match digest_contract {
+            PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT => (
+                "provider-completion-set-v4",
+                format!("{authority_contract}\0{authority}\0"),
+            ),
+            PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT => {
+                ("provider-completion-set-v3", String::new())
+            }
+            _ => ("provider-completion-set-v2", String::new()),
         };
         digest_hex(
             digest_contract,
             format!(
-                "{domain}\0{protocol}\0{record_count}\0{}\0{material}",
+                "{domain}\0{authority_material}{protocol}\0{record_count}\0{}\0{material}",
                 record_hashes.len()
             )
             .as_bytes(),
@@ -502,7 +584,10 @@ fn legacy_provider_completion_set_hash(events: &[NsdbPayloadExecutionEvent]) -> 
 fn digest_hex(contract: &str, bytes: &[u8]) -> Option<String> {
     match contract {
         PROVIDER_COMPLETION_DIGEST_FNV1A64_CONTRACT => Some(fnv1a64_hex(bytes)),
-        PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT => Some(crate::digest_sha256::sha256_hex(bytes)),
+        PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT
+        | PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT => {
+            Some(crate::digest_sha256::sha256_hex(bytes))
+        }
         _ => None,
     }
 }
