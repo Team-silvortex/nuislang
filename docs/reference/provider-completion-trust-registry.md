@@ -60,6 +60,17 @@ at the same generation as `signature-trust-registry-fork`.
 Anchor creation and upgrades use a synchronized temporary file, file sync,
 atomic rename, directory sync, and a cross-process create-new lock. Nsdb and
 Nuis implement the anchor reader/writer independently and share only the file
-protocol. Deployment should protect the registry and anchor with host
-permissions; a future platform integration may place the anchor in an OS-backed
-secure store and add stale-lock recovery after interrupted processes.
+protocol. The lock uses
+`nuis-provider-completion-trust-anchor-lock-v1` and records its owner PID,
+creation timestamp, and owner token. Locks older than 30 seconds are recovered;
+the token prevents a recovered lock's former owner from deleting its successor.
+Fresh malformed locks fail closed; malformed locks older than the lease are
+recovered using their filesystem modification timestamp.
+
+`NUIS_PROVIDER_COMPLETION_TRUST_ANCHOR_BACKEND` selects the storage adapter.
+The only current value is `file-v1`, which is also the default. Unknown adapters
+fail closed as `signature-trust-anchor-invalid`; this contract leaves room for
+future Keychain, TPM, or protected-directory adapters without coupling the
+signature verifier to one operating system. Deployment should still protect the
+registry and anchor with host permissions. Deleting a `file-v1` anchor resets it
+to first-use trust, so it is not yet a substitute for OS-protected storage.
