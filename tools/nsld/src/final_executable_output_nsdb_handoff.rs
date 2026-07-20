@@ -50,6 +50,12 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
         replay_summary.provider_completion_claim_authority;
     report.final_output_nsdb_provider_completion_claim_authority_status =
         replay_summary.provider_completion_claim_authority_status;
+    report.final_output_nsdb_provider_completion_signature_contract =
+        replay_summary.provider_completion_signature_contract;
+    report.final_output_nsdb_provider_completion_signature_public_key_id =
+        replay_summary.provider_completion_signature_public_key_id;
+    report.final_output_nsdb_provider_completion_signature_status =
+        replay_summary.provider_completion_signature_status;
     report.final_output_nsdb_provider_completion_digest_contract =
         replay_summary.provider_completion_digest_contract;
     report.final_output_nsdb_provider_completion_set_hash_claim =

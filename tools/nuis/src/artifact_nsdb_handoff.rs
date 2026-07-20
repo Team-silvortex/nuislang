@@ -1,12 +1,17 @@
 use crate::{
     artifact_launch_evidence::RunArtifactLaunchEvidence,
     artifact_nsdb_handoff_integrity::{
-        legacy_set_hash, record_hash, set_hash,
+        legacy_set_hash, record_hash, set_hash, signature_message,
         CLAIM_AUTHORITY as PROVIDER_COMPLETION_CLAIM_AUTHORITY,
         CLAIM_AUTHORITY_CONTRACT as PROVIDER_COMPLETION_CLAIM_AUTHORITY_CONTRACT,
         DIGEST_FNV1A64_CONTRACT as PROVIDER_COMPLETION_DIGEST_FNV1A64_CONTRACT,
         DIGEST_SHA256_AUTHORITY_CONTRACT as PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT,
         DIGEST_SHA256_CONTRACT as PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT,
+        DIGEST_SHA256_SIGNED_CONTRACT as PROVIDER_COMPLETION_DIGEST_SHA256_SIGNED_CONTRACT,
+    },
+    artifact_nsdb_handoff_signature::{
+        parse_and_verify as parse_and_verify_provider_completion_signature,
+        validation_error as provider_completion_signature_error,
     },
     json_bool_field, json_field, json_optional_string_field, json_usize_field,
 };
@@ -44,6 +49,9 @@ pub(crate) struct PersistedNsdbHandoffSummary {
     provider_completion_claim_authority_contract: Option<String>,
     provider_completion_claim_authority: Option<String>,
     provider_completion_claim_authority_status: String,
+    provider_completion_signature_contract: Option<String>,
+    provider_completion_signature_public_key_id: Option<String>,
+    provider_completion_signature_status: String,
     provider_completion_digest_contract: Option<String>,
     provider_completion_set_hash_claim: Option<String>,
     provider_completion_set_hash: Option<String>,
@@ -116,6 +124,14 @@ impl PersistedNsdbHandoffSummary {
 
     pub(crate) fn provider_completion_claim_authority_status(&self) -> &str {
         &self.provider_completion_claim_authority_status
+    }
+
+    pub(crate) fn signature_summary(&self) -> (Option<&str>, Option<&str>, &str) {
+        (
+            self.provider_completion_signature_contract.as_deref(),
+            self.provider_completion_signature_public_key_id.as_deref(),
+            &self.provider_completion_signature_status,
+        )
     }
 
     pub(crate) fn provider_completion_set_hash_claim(&self) -> Option<&str> {
@@ -207,6 +223,18 @@ impl PersistedNsdbHandoffSummary {
                 &self.provider_completion_claim_authority_status,
             ),
             json_optional_string_field(
+                &format!("{prefix}_provider_completion_signature_contract"),
+                self.provider_completion_signature_contract.as_deref(),
+            ),
+            json_optional_string_field(
+                &format!("{prefix}_provider_completion_signature_public_key_id"),
+                self.provider_completion_signature_public_key_id.as_deref(),
+            ),
+            json_field(
+                &format!("{prefix}_provider_completion_signature_status"),
+                &self.provider_completion_signature_status,
+            ),
+            json_optional_string_field(
                 &format!("{prefix}_provider_completion_digest_contract"),
                 self.provider_completion_digest_contract.as_deref(),
             ),
@@ -260,6 +288,9 @@ pub(crate) fn read_persisted_nsdb_handoff(
             provider_completion_claim_authority_contract: None,
             provider_completion_claim_authority: None,
             provider_completion_claim_authority_status: "not-applicable".to_owned(),
+            provider_completion_signature_contract: None,
+            provider_completion_signature_public_key_id: None,
+            provider_completion_signature_status: "not-applicable".to_owned(),
             provider_completion_digest_contract: None,
             provider_completion_set_hash_claim: None,
             provider_completion_set_hash: None,
@@ -291,6 +322,9 @@ pub(crate) fn read_persisted_nsdb_handoff(
             provider_completion_claim_authority_contract: None,
             provider_completion_claim_authority: None,
             provider_completion_claim_authority_status: "not-applicable".to_owned(),
+            provider_completion_signature_contract: None,
+            provider_completion_signature_public_key_id: None,
+            provider_completion_signature_status: "not-applicable".to_owned(),
             provider_completion_digest_contract: None,
             provider_completion_set_hash_claim: None,
             provider_completion_set_hash: None,
@@ -355,7 +389,8 @@ pub(crate) fn read_persisted_nsdb_handoff(
         Some(
             contract @ (PROVIDER_COMPLETION_DIGEST_FNV1A64_CONTRACT
             | PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT
-            | PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT),
+            | PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT
+            | PROVIDER_COMPLETION_DIGEST_SHA256_SIGNED_CONTRACT),
         ) => set_hash(
             &record_hashes,
             protocol.as_deref().unwrap_or("none"),
@@ -378,6 +413,8 @@ pub(crate) fn read_persisted_nsdb_handoff(
             != Some(PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT)
         && provider_completion_digest_contract.as_deref()
             != Some(PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT)
+        && provider_completion_digest_contract.as_deref()
+            != Some(PROVIDER_COMPLETION_DIGEST_SHA256_SIGNED_CONTRACT)
     {
         "unsupported-digest-contract"
     } else if provider_completion_set_hash_claim.is_none() {
@@ -396,6 +433,8 @@ pub(crate) fn read_persisted_nsdb_handoff(
         "not-applicable"
     } else if provider_completion_digest_contract.as_deref()
         != Some(PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT)
+        && provider_completion_digest_contract.as_deref()
+            != Some(PROVIDER_COMPLETION_DIGEST_SHA256_SIGNED_CONTRACT)
     {
         "legacy-unattributed"
     } else if provider_completion_claim_authority_contract.is_none()
@@ -414,22 +453,46 @@ pub(crate) fn read_persisted_nsdb_handoff(
         "authorized"
     }
     .to_owned();
+    let signature_message = signature_message(
+        protocol.as_deref().unwrap_or("none"),
+        provider_completion_digest_contract
+            .as_deref()
+            .unwrap_or("none"),
+        provider_completion_claim_authority_contract
+            .as_deref()
+            .unwrap_or("none"),
+        provider_completion_claim_authority
+            .as_deref()
+            .unwrap_or("none"),
+        provider_completion_set_hash.as_deref().unwrap_or("none"),
+    );
+    let signature = parse_and_verify_provider_completion_signature(
+        &source,
+        !provider_completions.is_empty(),
+        provider_completion_digest_contract.as_deref()
+            == Some(PROVIDER_COMPLETION_DIGEST_SHA256_SIGNED_CONTRACT),
+        &signature_message,
+    );
+    let provider_completion_signature_status = signature.status;
     let error = match (
         provider_completion_set_hash_validation_status.as_str(),
         provider_completion_claim_authority_status.as_str(),
+        provider_completion_signature_status.as_str(),
     ) {
-        ("mismatch", _) => Some("provider-completion-set-hash-mismatch".to_owned()),
-        ("unsupported-digest-contract", _) => {
+        ("mismatch", _, _) => Some("provider-completion-set-hash-mismatch".to_owned()),
+        ("unsupported-digest-contract", _, _) => {
             Some("provider-completion-digest-contract-unsupported".to_owned())
         }
-        (_, "authority-missing") => Some("provider-completion-claim-authority-missing".to_owned()),
-        (_, "unsupported-authority-contract") => {
+        (_, "authority-missing", _) => {
+            Some("provider-completion-claim-authority-missing".to_owned())
+        }
+        (_, "unsupported-authority-contract", _) => {
             Some("provider-completion-claim-authority-contract-unsupported".to_owned())
         }
-        (_, "authority-untrusted") => {
+        (_, "authority-untrusted", _) => {
             Some("provider-completion-claim-authority-untrusted".to_owned())
         }
-        _ => None,
+        _ => provider_completion_signature_error(&provider_completion_signature_status),
     };
     PersistedNsdbHandoffSummary {
         available: true,
@@ -454,6 +517,9 @@ pub(crate) fn read_persisted_nsdb_handoff(
         provider_completion_claim_authority_contract,
         provider_completion_claim_authority,
         provider_completion_claim_authority_status,
+        provider_completion_signature_contract: signature.contract,
+        provider_completion_signature_public_key_id: signature.public_key_id,
+        provider_completion_signature_status,
         provider_completion_digest_contract,
         provider_completion_set_hash_claim,
         provider_completion_set_hash,

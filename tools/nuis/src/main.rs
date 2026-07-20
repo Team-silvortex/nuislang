@@ -7,6 +7,7 @@ mod artifact_launch_evidence;
 mod artifact_materialization;
 mod artifact_nsdb_handoff;
 mod artifact_nsdb_handoff_integrity;
+mod artifact_nsdb_handoff_signature;
 mod artifact_nsdb_replay_cursor;
 mod artifact_nsdb_replay_cursor_lineage;
 mod artifact_runtime_command;

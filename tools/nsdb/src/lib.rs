@@ -4,6 +4,7 @@ mod digest_sha256;
 mod handoff;
 mod model;
 mod provider_completion_integrity;
+mod provider_completion_signature;
 mod provider_runner_metal;
 mod provider_runner_registry;
 mod provider_sample;
@@ -45,6 +46,9 @@ pub struct PayloadExecutionReplaySummary {
     pub provider_completion_claim_authority_contract: Option<String>,
     pub provider_completion_claim_authority: Option<String>,
     pub provider_completion_claim_authority_status: String,
+    pub provider_completion_signature_contract: Option<String>,
+    pub provider_completion_signature_public_key_id: Option<String>,
+    pub provider_completion_signature_status: String,
     pub provider_completion_digest_contract: Option<String>,
     pub provider_completion_set_hash_claim: Option<String>,
     pub provider_completion_set_hash: Option<String>,
@@ -142,6 +146,14 @@ pub fn payload_execution_replay_summary(
             .then(|| handoff.provider_completion_claim_authority.clone()),
         provider_completion_claim_authority_status: handoff
             .provider_completion_claim_authority_status,
+        provider_completion_signature_contract: (handoff.provider_completion_signature_contract
+            != "none")
+            .then(|| handoff.provider_completion_signature_contract.clone()),
+        provider_completion_signature_public_key_id: (handoff
+            .provider_completion_signature_public_key_id
+            != "none")
+            .then(|| handoff.provider_completion_signature_public_key_id.clone()),
+        provider_completion_signature_status: handoff.provider_completion_signature_status,
         provider_completion_digest_contract: (handoff.provider_completion_digest_contract
             != "none")
             .then(|| handoff.provider_completion_digest_contract.clone()),

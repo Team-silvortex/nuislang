@@ -13,6 +13,7 @@ nuis-artifact = { path = "../../crates/nuis-artifact" }
 nuis-semantics = { path = "../../crates/nuis-semantics" }
 nuis-runtime = { path = "../../crates/nuis-runtime" }
 nuisc = { path = "../nuisc" }
+ed25519-dalek.workspace = true
 
 [dev-dependencies]
 nsdb = { path = "../nsdb" }

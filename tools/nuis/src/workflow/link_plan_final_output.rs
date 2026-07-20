@@ -162,6 +162,11 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         nsdb_provider_completion_claim_authority: nsdb_replay.provider_completion_claim_authority,
         nsdb_provider_completion_claim_authority_status: nsdb_replay
             .provider_completion_claim_authority_status,
+        nsdb_provider_completion_signature_contract: nsdb_replay
+            .provider_completion_signature_contract,
+        nsdb_provider_completion_signature_public_key_id: nsdb_replay
+            .provider_completion_signature_public_key_id,
+        nsdb_provider_completion_signature_status: nsdb_replay.provider_completion_signature_status,
         nsdb_provider_completion_digest_contract: nsdb_replay.provider_completion_digest_contract,
         nsdb_provider_completion_set_hash_claim: nsdb_replay.provider_completion_set_hash_claim,
         nsdb_provider_completion_set_hash: nsdb_replay.provider_completion_set_hash,
@@ -325,6 +330,9 @@ struct NsldFinalExecutableOutputNsdbReplay {
     provider_completion_claim_authority_contract: Option<String>,
     provider_completion_claim_authority: Option<String>,
     provider_completion_claim_authority_status: String,
+    provider_completion_signature_contract: Option<String>,
+    provider_completion_signature_public_key_id: Option<String>,
+    provider_completion_signature_status: String,
     provider_completion_digest_contract: Option<String>,
     provider_completion_set_hash_claim: Option<String>,
     provider_completion_set_hash: Option<String>,
@@ -370,6 +378,8 @@ fn nsld_final_executable_output_nsdb_replay(
                 .display()
         ))
     });
+    let (signature_contract, signature_public_key_id, signature_status) =
+        handoff.signature_summary();
     NsldFinalExecutableOutputNsdbReplay {
         contract: "nsdb-payload-execution-replay-plan-v1".to_owned(),
         ready,
@@ -394,6 +404,9 @@ fn nsld_final_executable_output_nsdb_replay(
         provider_completion_claim_authority_status: handoff
             .provider_completion_claim_authority_status()
             .to_owned(),
+        provider_completion_signature_contract: signature_contract.map(str::to_owned),
+        provider_completion_signature_public_key_id: signature_public_key_id.map(str::to_owned),
+        provider_completion_signature_status: signature_status.to_owned(),
         provider_completion_digest_contract: handoff
             .provider_completion_digest_contract()
             .map(str::to_owned),

@@ -4,12 +4,17 @@ use crate::model::{
 };
 use crate::provider_completion_integrity::{
     legacy_set_hash as legacy_provider_completion_set_hash,
-    set_hash as provider_completion_set_hash,
+    set_hash as provider_completion_set_hash, signature_message,
     CLAIM_AUTHORITY as PROVIDER_COMPLETION_CLAIM_AUTHORITY,
     CLAIM_AUTHORITY_CONTRACT as PROVIDER_COMPLETION_CLAIM_AUTHORITY_CONTRACT,
     DIGEST_FNV1A64_CONTRACT as PROVIDER_COMPLETION_DIGEST_FNV1A64_CONTRACT,
     DIGEST_SHA256_AUTHORITY_CONTRACT as PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT,
     DIGEST_SHA256_CONTRACT as PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT,
+    DIGEST_SHA256_SIGNED_CONTRACT as PROVIDER_COMPLETION_DIGEST_SHA256_SIGNED_CONTRACT,
+};
+use crate::provider_completion_signature::{
+    sign_from_environment, signing_key_configured, verify_from_environment,
+    SIGNATURE_CONTRACT as PROVIDER_COMPLETION_SIGNATURE_CONTRACT,
 };
 use std::{fs, path::Path};
 
@@ -77,6 +82,17 @@ pub(crate) fn persist_payload_execution_handoff_record(
             existing.provider_completion_claim_authority_status
         ));
     }
+    if existing.available
+        && !matches!(
+            existing.provider_completion_signature_status.as_str(),
+            "not-applicable" | "legacy-unsigned" | "signature-verified"
+        )
+    {
+        return Err(format!(
+            "provider completion signature validation failed in existing handoff: {}",
+            existing.provider_completion_signature_status
+        ));
+    }
     let mut events = if existing.available
         && existing.protocol == HANDOFF_PROTOCOL
         && existing.debugger_contract == DEBUGGER_CONTRACT
@@ -97,7 +113,7 @@ pub(crate) fn persist_payload_execution_handoff_record(
     for (index, event) in events.iter_mut().enumerate() {
         event.index = index;
     }
-    let content = render_payload_execution_handoff(&events, &existing, source);
+    let content = render_payload_execution_handoff(&events, &existing, source)?;
     let path = output_dir.join(HANDOFF_FILE_NAME);
     fs::write(&path, content).map_err(|error| {
         format!(
@@ -187,7 +203,7 @@ fn render_payload_execution_handoff(
     events: &[NsdbPayloadExecutionEvent],
     existing: &NsdbPayloadExecutionHandoffInfo,
     source: &str,
-) -> String {
+) -> Result<String, String> {
     let ready_count = events
         .iter()
         .filter(|event| event.status == "ready")
@@ -229,22 +245,51 @@ fn render_payload_execution_handoff(
     push_toml_string(
         &mut out,
         "provider_completion_digest_contract",
-        PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT,
+        if signing_key_configured() {
+            PROVIDER_COMPLETION_DIGEST_SHA256_SIGNED_CONTRACT
+        } else {
+            PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT
+        },
     );
-    push_toml_string(
-        &mut out,
-        "provider_completion_set_hash",
-        provider_completion_set_hash(
-            events,
-            HANDOFF_PROTOCOL,
-            events.len(),
-            PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT,
-            PROVIDER_COMPLETION_CLAIM_AUTHORITY_CONTRACT,
-            PROVIDER_COMPLETION_CLAIM_AUTHORITY,
-        )
-        .as_deref()
-        .unwrap_or("none"),
+    let digest_contract = if signing_key_configured() {
+        PROVIDER_COMPLETION_DIGEST_SHA256_SIGNED_CONTRACT
+    } else {
+        PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT
+    };
+    let set_hash = provider_completion_set_hash(
+        events,
+        HANDOFF_PROTOCOL,
+        events.len(),
+        digest_contract,
+        PROVIDER_COMPLETION_CLAIM_AUTHORITY_CONTRACT,
+        PROVIDER_COMPLETION_CLAIM_AUTHORITY,
+    )
+    .unwrap_or_else(|| "none".to_owned());
+    push_toml_string(&mut out, "provider_completion_set_hash", &set_hash);
+    let signature_message = signature_message(
+        HANDOFF_PROTOCOL,
+        digest_contract,
+        PROVIDER_COMPLETION_CLAIM_AUTHORITY_CONTRACT,
+        PROVIDER_COMPLETION_CLAIM_AUTHORITY,
+        &set_hash,
     );
+    if let Some(signature) = sign_from_environment(&signature_message)? {
+        push_toml_string(
+            &mut out,
+            "provider_completion_signature_contract",
+            PROVIDER_COMPLETION_SIGNATURE_CONTRACT,
+        );
+        push_toml_string(
+            &mut out,
+            "provider_completion_signature_public_key_id",
+            &signature.public_key_id,
+        );
+        push_toml_string(
+            &mut out,
+            "provider_completion_signature",
+            &signature.signature_hex,
+        );
+    }
     push_toml_string(
         &mut out,
         "hetero_execution_closure_protocol",
@@ -297,7 +342,7 @@ fn render_payload_execution_handoff(
         );
         push_toml_string(&mut out, "next_action", &event.next_action);
     }
-    out
+    Ok(out)
 }
 
 pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadExecutionHandoffInfo {
@@ -319,6 +364,10 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
             provider_completion_claim_authority_contract: "none".to_owned(),
             provider_completion_claim_authority: "none".to_owned(),
             provider_completion_claim_authority_status: "not-applicable".to_owned(),
+            provider_completion_signature_contract: "none".to_owned(),
+            provider_completion_signature_public_key_id: "none".to_owned(),
+            provider_completion_signature: "none".to_owned(),
+            provider_completion_signature_status: "not-applicable".to_owned(),
             provider_completion_digest_contract: "none".to_owned(),
             provider_completion_set_hash_claim: "none".to_owned(),
             provider_completion_set_hash_actual: "none".to_owned(),
@@ -344,6 +393,15 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
     let provider_completion_claim_authority =
         parse_string_toml_field(&source, "provider_completion_claim_authority")
             .unwrap_or_else(|| "none".to_owned());
+    let provider_completion_signature_contract =
+        parse_string_toml_field(&source, "provider_completion_signature_contract")
+            .unwrap_or_else(|| "none".to_owned());
+    let provider_completion_signature_public_key_id =
+        parse_string_toml_field(&source, "provider_completion_signature_public_key_id")
+            .unwrap_or_else(|| "none".to_owned());
+    let provider_completion_signature =
+        parse_string_toml_field(&source, "provider_completion_signature")
+            .unwrap_or_else(|| "none".to_owned());
     let provider_completion_digest_contract =
         parse_string_toml_field(&source, "provider_completion_digest_contract")
             .unwrap_or_else(|| "none".to_owned());
@@ -357,7 +415,8 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
         "none" => legacy_provider_completion_set_hash(&events),
         PROVIDER_COMPLETION_DIGEST_FNV1A64_CONTRACT
         | PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT
-        | PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT => provider_completion_set_hash(
+        | PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT
+        | PROVIDER_COMPLETION_DIGEST_SHA256_SIGNED_CONTRACT => provider_completion_set_hash(
             &events,
             &protocol,
             record_count,
@@ -375,6 +434,7 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
         && provider_completion_digest_contract != PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT
         && provider_completion_digest_contract
             != PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT
+        && provider_completion_digest_contract != PROVIDER_COMPLETION_DIGEST_SHA256_SIGNED_CONTRACT
     {
         "unsupported-digest-contract"
     } else if provider_completion_set_hash_claim == "none" {
@@ -393,6 +453,7 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
         "not-applicable"
     } else if provider_completion_digest_contract
         != PROVIDER_COMPLETION_DIGEST_SHA256_AUTHORITY_CONTRACT
+        && provider_completion_digest_contract != PROVIDER_COMPLETION_DIGEST_SHA256_SIGNED_CONTRACT
     {
         "legacy-unattributed"
     } else if provider_completion_claim_authority_contract == "none"
@@ -409,6 +470,31 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
         "authorized"
     }
     .to_owned();
+    let provider_completion_signature_status = if !has_provider_completions {
+        "not-applicable"
+    } else if provider_completion_digest_contract
+        != PROVIDER_COMPLETION_DIGEST_SHA256_SIGNED_CONTRACT
+        && provider_completion_signature_contract == "none"
+        && provider_completion_signature_public_key_id == "none"
+        && provider_completion_signature == "none"
+    {
+        "legacy-unsigned"
+    } else {
+        let message = signature_message(
+            &protocol,
+            &provider_completion_digest_contract,
+            &provider_completion_claim_authority_contract,
+            &provider_completion_claim_authority,
+            &provider_completion_set_hash_actual,
+        );
+        verify_from_environment(
+            &provider_completion_signature_contract,
+            &provider_completion_signature_public_key_id,
+            &provider_completion_signature,
+            &message,
+        )
+    }
+    .to_owned();
     let first_event = events.first();
     let first_status = parse_string_toml_field(&source, "first_status")
         .or_else(|| first_event.map(|event| event.status.clone()))
@@ -420,6 +506,7 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
         &first_status,
         &provider_completion_set_hash_validation_status,
         &provider_completion_claim_authority_status,
+        &provider_completion_signature_status,
     );
     NsdbPayloadExecutionHandoffInfo {
         available: true,
@@ -445,6 +532,10 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
         provider_completion_claim_authority_contract,
         provider_completion_claim_authority,
         provider_completion_claim_authority_status,
+        provider_completion_signature_contract,
+        provider_completion_signature_public_key_id,
+        provider_completion_signature,
+        provider_completion_signature_status,
         provider_completion_digest_contract,
         provider_completion_set_hash_claim,
         provider_completion_set_hash_actual,
@@ -486,6 +577,7 @@ fn payload_handoff_status(
     first_status: &str,
     provider_completion_set_hash_validation_status: &str,
     provider_completion_claim_authority_status: &str,
+    provider_completion_signature_status: &str,
 ) -> String {
     if protocol != "nuis-nsdb-payload-execution-handoff-v1" {
         return "unsupported-protocol".to_owned();
@@ -509,6 +601,18 @@ fn payload_handoff_status(
             return "provider-completion-claim-authority-contract-unsupported".to_owned()
         }
         "authority-untrusted" => return "provider-completion-claim-authority-untrusted".to_owned(),
+        _ => {}
+    }
+    match provider_completion_signature_status {
+        "signature-missing" => return "provider-completion-signature-missing".to_owned(),
+        "unsupported-signature-contract" => {
+            return "provider-completion-signature-contract-unsupported".to_owned()
+        }
+        "signature-key-untrusted" => {
+            return "provider-completion-signature-key-untrusted".to_owned()
+        }
+        "signature-malformed" => return "provider-completion-signature-malformed".to_owned(),
+        "signature-mismatch" => return "provider-completion-signature-mismatch".to_owned(),
         _ => {}
     }
     if first_status == "ready" {

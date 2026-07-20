@@ -220,6 +220,22 @@ pub(crate) fn nsld_final_executable_output_report_json(
             &report.final_output_nsdb_provider_completion_claim_authority_status,
         ),
         json_optional_string_field(
+            "final_output_nsdb_provider_completion_signature_contract",
+            report
+                .final_output_nsdb_provider_completion_signature_contract
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "final_output_nsdb_provider_completion_signature_public_key_id",
+            report
+                .final_output_nsdb_provider_completion_signature_public_key_id
+                .as_deref(),
+        ),
+        json_string_field(
+            "final_output_nsdb_provider_completion_signature_status",
+            &report.final_output_nsdb_provider_completion_signature_status,
+        ),
+        json_optional_string_field(
             "final_output_nsdb_provider_completion_digest_contract",
             report
                 .final_output_nsdb_provider_completion_digest_contract

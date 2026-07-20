@@ -2,6 +2,8 @@ pub(crate) const DIGEST_FNV1A64_CONTRACT: &str = "nuis-provider-completion-diges
 pub(crate) const DIGEST_SHA256_CONTRACT: &str = "nuis-provider-completion-digest-sha256-v1";
 pub(crate) const DIGEST_SHA256_AUTHORITY_CONTRACT: &str =
     "nuis-provider-completion-digest-sha256-authority-v1";
+pub(crate) const DIGEST_SHA256_SIGNED_CONTRACT: &str =
+    "nuis-provider-completion-digest-sha256-signed-v1";
 pub(crate) const CLAIM_AUTHORITY_CONTRACT: &str = "nuis-provider-completion-claim-authority-v1";
 pub(crate) const CLAIM_AUTHORITY: &str = "nsdb:payload-execution-handoff-writer:v1";
 
@@ -22,8 +24,12 @@ pub(crate) fn set_hash(
     }
     let material = record_hashes.join("\0");
     let (domain, authority_material) = match digest_contract {
-        DIGEST_SHA256_AUTHORITY_CONTRACT => (
-            "provider-completion-set-v4",
+        DIGEST_SHA256_AUTHORITY_CONTRACT | DIGEST_SHA256_SIGNED_CONTRACT => (
+            if digest_contract == DIGEST_SHA256_SIGNED_CONTRACT {
+                "provider-completion-set-v5"
+            } else {
+                "provider-completion-set-v4"
+            },
             format!(
                 "{}\0{}\0",
                 authority_contract.unwrap_or("none"),
@@ -51,12 +57,25 @@ pub(crate) fn legacy_set_hash(record_hashes: &[&str]) -> Option<String> {
     })
 }
 
+pub(crate) fn signature_message(
+    protocol: &str,
+    digest_contract: &str,
+    authority_contract: &str,
+    authority: &str,
+    set_hash: &str,
+) -> Vec<u8> {
+    format!(
+        "provider-completion-signature-v1\0{protocol}\0{digest_contract}\0{authority_contract}\0{authority}\0{set_hash}"
+    )
+    .into_bytes()
+}
+
 fn digest_hex(contract: &str, bytes: &[u8]) -> Option<String> {
     match contract {
         DIGEST_FNV1A64_CONTRACT => Some(fnv1a64_hex(bytes)),
-        DIGEST_SHA256_CONTRACT | DIGEST_SHA256_AUTHORITY_CONTRACT => {
-            Some(crate::digest_sha256::sha256_hex(bytes))
-        }
+        DIGEST_SHA256_CONTRACT
+        | DIGEST_SHA256_AUTHORITY_CONTRACT
+        | DIGEST_SHA256_SIGNED_CONTRACT => Some(crate::digest_sha256::sha256_hex(bytes)),
         _ => None,
     }
 }

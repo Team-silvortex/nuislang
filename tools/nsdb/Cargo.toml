@@ -10,3 +10,4 @@ description = "Nsdb YIR-layer debugger front-door prototype for the Nuis toolcha
 
 [dependencies]
 nuisc = { path = "../nuisc" }
+ed25519-dalek.workspace = true
