@@ -106,7 +106,7 @@ static int64_t nuis_host_cwd_len_value(void) {
 
 static int64_t nuis_host_temp_dir_handle(void) {
     const char* tmp = getenv("TMPDIR");
-    if (tmp == NULL || tmp[0] == '\0') tmp = "/tmp";
+    if (tmp == NULL || tmp[0] == '\0') tmp = ".";
     return nuis_host_text_register(tmp);
 }
 
@@ -117,7 +117,7 @@ static int64_t nuis_host_temp_path_len(void) {
 static int64_t nuis_host_temp_file_handle(int64_t prefix_handle) {
     const char* prefix = nuis_host_text_lookup(prefix_handle);
     const char* tmp = getenv("TMPDIR");
-    if (tmp == NULL || tmp[0] == '\0') tmp = "/tmp";
+    if (tmp == NULL || tmp[0] == '\0') tmp = ".";
     char buffer[PATH_MAX];
     snprintf(buffer, sizeof(buffer), "%s/%sXXXXXX", tmp, (prefix != NULL && prefix[0] != '\0') ? prefix : "nuis");
     int fd = mkstemp(buffer);

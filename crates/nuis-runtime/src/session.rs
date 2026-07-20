@@ -127,8 +127,19 @@ mod tests {
         ArtifactHashEntry, BuildManifest, BuildManifestDomainBuildUnit, DomainBuildUnitPayloadBlob,
         NuisCompiledArtifact, NuisExecutableEnvelope, NuisLifecycleContract,
     };
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::LoadedExecutable;
+
+    fn temp_dir(label: &str) -> std::path::PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("nuis_runtime_session_{label}_{unique}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
 
     fn domain_unit(
         domain_family: &str,
@@ -194,6 +205,12 @@ mod tests {
         domain_units: Vec<BuildManifestDomainBuildUnit>,
         domain_payload_blobs: Vec<DomainBuildUnitPayloadBlob>,
     ) -> LoadedExecutable {
+        let output_dir = temp_dir("loaded_executable");
+        let input_path = output_dir.join("demo.ns");
+        let envelope_path = output_dir.join("nuis.executable.envelope.toml");
+        let artifact_path = output_dir.join("nuis.compiled.artifact");
+        let artifact_binary_path = output_dir.join("demo");
+
         let envelope = NuisExecutableEnvelope {
             schema: "nuis-executable-envelope-v1".to_owned(),
             executable_kind: "native-cpu-llvm".to_owned(),
@@ -240,13 +257,13 @@ mod tests {
             envelope,
             manifest: BuildManifest {
                 schema: "nuis-build-manifest-v1".to_owned(),
-                input: "/tmp/demo.ns".to_owned(),
-                output_dir: "/tmp/out".to_owned(),
+                input: input_path.display().to_string(),
+                output_dir: output_dir.display().to_string(),
                 packaging_mode: "native-cpu-llvm".to_owned(),
-                envelope_path: "/tmp/out/nuis.executable.envelope.toml".to_owned(),
+                envelope_path: envelope_path.display().to_string(),
                 envelope_schema: "nuis-executable-envelope-v1".to_owned(),
                 envelope_package_count: domain_units.len(),
-                artifact_path: "/tmp/out/nuis.compiled.artifact".to_owned(),
+                artifact_path: artifact_path.display().to_string(),
                 artifact_schema: "nuis-compiled-artifact-v1".to_owned(),
                 artifact_binary_name: "demo".to_owned(),
                 artifact_binary_bytes: 4,
@@ -288,7 +305,7 @@ mod tests {
                 clock_protocol_inline: None,
                 artifact_hashes: vec![ArtifactHashEntry {
                     kind: "binary".to_owned(),
-                    path: "/tmp/out/demo".to_owned(),
+                    path: artifact_binary_path.display().to_string(),
                     bytes: 4,
                     fnv1a64: "0x0000000000000000".to_owned(),
                 }],

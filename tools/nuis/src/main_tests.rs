@@ -132,7 +132,7 @@ blockers = []
     .expect("write ready final executable pipeline placeholder");
     fs::write(
         output_dir.join("nuis.host-entrypoint.sh"),
-        "#!/bin/sh\nset -eu\nNUIS_HOST_ENTRYPOINT_STUB_PROTOCOL='nuis-nsld-host-entrypoint-v1'\nexport NUIS_HOST_ENTRYPOINT_STUB_PROTOCOL\nexec nuis-host-runner --manifest 'manifest.toml' --nsb 'nuis-app.nsb' --output-dir 'out' --scheduler-entry 'nuis.scheduler.loop.v1' --lifecycle-hook 'on_process_start'\n",
+        "#!/usr/bin/env sh\nset -eu\nNUIS_HOST_ENTRYPOINT_STUB_PROTOCOL='nuis-nsld-host-entrypoint-v1'\nexport NUIS_HOST_ENTRYPOINT_STUB_PROTOCOL\nexec nuis-host-runner --manifest 'manifest.toml' --nsb 'nuis-app.nsb' --output-dir 'out' --scheduler-entry 'nuis.scheduler.loop.v1' --lifecycle-hook 'on_process_start'\n",
     )
     .expect("write host entrypoint placeholder");
 }

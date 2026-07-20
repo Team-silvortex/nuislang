@@ -67,10 +67,30 @@ the token prevents a recovered lock's former owner from deleting its successor.
 Fresh malformed locks fail closed; malformed locks older than the lease are
 recovered using their filesystem modification timestamp.
 
+Initialization also persists
+`nuis-provider-completion-trust-anchor-marker-v1`. It defaults to
+`<anchor>.initialized`; set `NUIS_PROVIDER_COMPLETION_TRUST_ANCHOR_MARKER` to
+place it in a separately protected location. A marker with a missing anchor is
+treated as anchor deletion and fails closed. Existing anchor-v1 deployments
+without a marker migrate on their next successful verification, which also
+recovers the safe crash window between initial anchor and marker writes. The
+marker binds the anchor protocol, registry protocol, initial generation, and
+initial registry hash.
+
 `NUIS_PROVIDER_COMPLETION_TRUST_ANCHOR_BACKEND` selects the storage adapter.
-The only current value is `file-v1`, which is also the default. Unknown adapters
-fail closed as `signature-trust-anchor-invalid`; this contract leaves room for
-future Keychain, TPM, or protected-directory adapters without coupling the
-signature verifier to one operating system. Deployment should still protect the
-registry and anchor with host permissions. Deleting a `file-v1` anchor resets it
-to first-use trust, so it is not yet a substitute for OS-protected storage.
+The defaults are:
+
+* `file-v1` (default): uses `<registry path>.anchor` and `<anchor>.initialized`
+  with optional overrides.
+* `protected-file-v1`: requires explicit `NUIS_PROVIDER_COMPLETION_TRUST_ANCHOR` and
+  `NUIS_PROVIDER_COMPLETION_TRUST_ANCHOR_MARKER` and enforces protected parent
+  directories for both paths.
+
+Unknown adapters fail closed as `signature-trust-anchor-invalid`; this contract
+leaves room for future Keychain, TPM, or protected-directory adapters without
+coupling the signature verifier to one operating system. Protected deployment
+should use host-level access control to protect registry, anchor, and marker with
+separate directories, and avoid sharing symlinked locations. Deleting both a
+`file-v1` anchor and its marker still resets the pair to first-use trust, while
+`protected-file-v1` requires protected explicit paths and does not support this
+silent reset path.

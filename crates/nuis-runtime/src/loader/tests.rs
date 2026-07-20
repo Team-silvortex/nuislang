@@ -22,15 +22,22 @@ fn temp_dir(label: &str) -> std::path::PathBuf {
 
 #[test]
 fn loader_reads_embedded_manifest_into_loaded_executable() {
-    let manifest = r#"
+    let output_dir = temp_dir("embedded_manifest");
+    let input_path = output_dir.join("demo.ns");
+    let envelope_path = output_dir.join("nuis.executable.envelope.toml");
+    let artifact_path = output_dir.join("nuis.compiled.artifact");
+    let clock_protocol_path = output_dir.join("nuis.clock-protocol.toml");
+
+    let manifest = format!(
+        r#"
 manifest_schema = "nuis-build-manifest-v1"
-input = "/tmp/demo.ns"
-output_dir = "/tmp/out"
+input = "{input_path}"
+output_dir = "{output_dir}"
 packaging_mode = "native-cpu-llvm"
-path = "/tmp/out/nuis.executable.envelope.toml"
+path = "{envelope_path}"
 schema = "nuis-executable-envelope-v1"
 package_count = 1
-artifact_path = "/tmp/out/nuis.compiled.artifact"
+artifact_path = "{artifact_path}"
 artifact_schema = "nuis-compiled-artifact-v1"
 artifact_binary_name = "demo.bin"
 artifact_binary_bytes = 3
@@ -54,14 +61,14 @@ cpu_target_clang = "x86_64-unknown-linux-gnu"
 cpu_target_cross = true
 
 [clock_protocol]
-clock_protocol_path = "/tmp/out/nuis.clock-protocol.toml"
+clock_protocol_path = "{clock_protocol_path}"
 clock_protocol_schema = "nuis-clock-protocol-v1"
 clock_protocol_domains = 1
 clock_protocol_inline = "schema = \"nuis-clock-protocol-v1\"\nmode = \"host-lifecycle-clock\"\nsource = \"test\"\ndefault_time_mode = \"logical\"\nlifecycle_tick_policy = \"cooperative\"\n[validation]\nchecked = 8\nvalid = true\nissues = []\n[[clock_domain]]\nindex = 0\ndomain_family = \"cpu\"\npackage_id = \"official.cpu\"\nclock_domain_id = \"cpu.clock.host.v1\"\nclock_kind = \"host-monotonic\"\nclock_epoch_kind = \"host-epoch\"\nclock_resolution = \"cpu.tick_i64\"\nclock_bridge_default = \"global->monotonic:bridge\"\nlifecycle_hook = \"on_scheduler_tick\"\n[[clock_edge]]\nindex = 0\nfrom = \"global.clock.root.v1\"\nto = \"cpu.clock.host.v1\"\nrelation = \"global->monotonic:bridge\"\nsource = \"test\"\n"
 
 [[artifact_hash]]
 kind = "artifact"
-path = "/tmp/out/nuis.compiled.artifact"
+path = "{artifact_path}"
 bytes = 3
 fnv1a64 = "0x0000000000000000"
 
@@ -75,7 +82,13 @@ domain_family = "cpu"
 selected_lowering_target = "llvm"
 contract_family = "nustar.cpu"
 packaging_role = "host-binary"
-"#;
+"#,
+        input_path = input_path.display(),
+        output_dir = output_dir.display(),
+        envelope_path = envelope_path.display(),
+        artifact_path = artifact_path.display(),
+        clock_protocol_path = clock_protocol_path.display(),
+    );
     let envelope = NuisExecutableEnvelope {
         schema: "nuis-executable-envelope-v1".to_owned(),
         executable_kind: "native-cpu-llvm".to_owned(),
@@ -143,7 +156,9 @@ packaging_role = "host-binary"
 
 #[test]
 fn loader_rejects_invalid_embedded_clock_protocol() {
+    let output_dir = temp_dir("clock_protocol_invalid");
     let manifest = minimal_manifest_with_clock_protocol(
+        &output_dir,
         1,
         "schema = \"nuis-clock-protocol-v1\"\nmode = \"host-lifecycle-clock\"\nsource = \"test\"\ndefault_time_mode = \"logical\"\nlifecycle_tick_policy = \"cooperative\"\n[validation]\nchecked = 1\nvalid = false\nissues = [\"broken\"]\n[[clock_domain]]\nindex = 0\ndomain_family = \"cpu\"\npackage_id = \"official.cpu\"\nclock_domain_id = \"cpu.clock.host.v1\"\nclock_kind = \"host-monotonic\"\nclock_epoch_kind = \"host-epoch\"\nclock_resolution = \"cpu.tick_i64\"\nclock_bridge_default = \"global->monotonic:bridge\"\nlifecycle_hook = \"on_scheduler_tick\"\n",
     );
@@ -160,7 +175,9 @@ fn loader_rejects_invalid_embedded_clock_protocol() {
 
 #[test]
 fn loader_rejects_clock_protocol_domain_count_mismatch() {
+    let output_dir = temp_dir("clock_protocol_mismatch");
     let manifest = minimal_manifest_with_clock_protocol(
+        &output_dir,
         2,
         "schema = \"nuis-clock-protocol-v1\"\nmode = \"host-lifecycle-clock\"\nsource = \"test\"\ndefault_time_mode = \"logical\"\nlifecycle_tick_policy = \"cooperative\"\n[validation]\nchecked = 1\nvalid = true\nissues = []\n[[clock_domain]]\nindex = 0\ndomain_family = \"cpu\"\npackage_id = \"official.cpu\"\nclock_domain_id = \"cpu.clock.host.v1\"\nclock_kind = \"host-monotonic\"\nclock_epoch_kind = \"host-epoch\"\nclock_resolution = \"cpu.tick_i64\"\nclock_bridge_default = \"global->monotonic:bridge\"\nlifecycle_hook = \"on_scheduler_tick\"\n",
     );
@@ -178,6 +195,13 @@ fn loader_rejects_clock_protocol_domain_count_mismatch() {
 #[test]
 fn loader_reads_bridge_registry_and_host_plan_index() {
     let dir = temp_dir("bridge_assets");
+    let bridge_registry_path = dir.join("missing.bridge.registry.toml");
+    let host_plan_index_path = dir.join("missing.host-bridge.plan-index.toml");
+    let output_dir = dir.clone();
+    let output_envelope_path = output_dir.join("nuis.executable.envelope.toml");
+    let artifact_path = output_dir.join("nuis.compiled.artifact");
+    let network_bridge_stub_path = output_dir.join("network.bridge.stub.txt");
+    let network_payload_path = output_dir.join("network.payload.bin");
     let bridge_registry_source = r#"schema = "nuis-bridge-registry-v1"
 bridge_count = 1
 domains = ["network"]
@@ -187,8 +211,8 @@ domain_family = "network"
 package_id = "official.network"
 backend_family = "urlsession"
 selected_lowering_target = "urlsession"
-bridge_stub_path = "/tmp/network.bridge.stub.txt"
-payload_blob_path = "/tmp/network.payload.bin"
+bridge_stub_path = "{network_bridge_stub_path}"
+payload_blob_path = "{network_payload_path}"
 "#;
     let host_plan_source = r#"schema = "nuis-host-bridge-plan-index-v1"
 plan_count = 1
@@ -197,7 +221,7 @@ domains = ["network"]
 [[plan]]
 domain_family = "network"
 package_id = "official.network"
-bridge_stub_path = "/tmp/network.bridge.stub.txt"
+bridge_stub_path = "{network_bridge_stub_path}"
 bridge_surface = "host-ffi.bridge.network"
 scheduler_binding = "network-poll-bridge"
 phase_order = ["bind", "submit", "wait", "finalize"]
@@ -241,13 +265,13 @@ plan_inline = "bridge_kind = \"managed-lifecycle-bridge\""
     let payload_blob_hex = hex_encode_bytes(&encode_domain_payload_blob(&payload_blob).unwrap());
     let manifest = format!(
         r#"manifest_schema = "nuis-build-manifest-v1"
-input = "/tmp/demo.ns"
+input = "{input_path}"
 output_dir = "{output_dir}"
 packaging_mode = "native-cpu-llvm"
-path = "/tmp/out/nuis.executable.envelope.toml"
+path = "{output_envelope_path}"
 schema = "nuis-executable-envelope-v1"
 package_count = 2
-artifact_path = "/tmp/out/nuis.compiled.artifact"
+artifact_path = "{artifact_path}"
 artifact_schema = "nuis-compiled-artifact-v1"
 artifact_binary_name = "demo.bin"
 artifact_binary_bytes = 3
@@ -269,18 +293,18 @@ cpu_target_object_format = "elf"
 cpu_target_calling_abi = "sysv64"
 cpu_target_clang = "x86_64-unknown-linux-gnu"
 cpu_target_cross = true
-bridge_registry_path = "/tmp/missing.bridge.registry.toml"
+bridge_registry_path = "{bridge_registry_path}"
 bridge_registry_schema = "nuis-bridge-registry-v1"
 bridge_registry_units = 1
 bridge_registry_inline = "{bridge_registry_source}"
-host_bridge_plan_index_path = "/tmp/missing.host-bridge.plan-index.toml"
+host_bridge_plan_index_path = "{host_plan_index_path}"
 host_bridge_plan_index_schema = "nuis-host-bridge-plan-index-v1"
 host_bridge_plan_units = 1
 host_bridge_plan_index_inline = "{host_plan_source}"
 
 [[artifact_hash]]
 kind = "artifact"
-path = "/tmp/out/nuis.compiled.artifact"
+path = "{artifact_path}"
 bytes = 3
 fnv1a64 = "0x0000000000000000"
 
@@ -304,13 +328,20 @@ package_id = "official.network"
 domain_family = "network"
 backend_family = "urlsession"
 selected_lowering_target = "urlsession"
-artifact_bridge_stub_path = "/tmp/network.bridge.stub.txt"
-artifact_payload_blob_path = "/tmp/network.payload.bin"
+artifact_bridge_stub_path = "{network_bridge_stub_path}"
+artifact_payload_blob_path = "{network_payload_path}"
 artifact_payload_blob_inline = "{payload_blob_hex}"
 contract_family = "nustar.network"
 packaging_role = "hetero-contract"
 "#,
-        output_dir = dir.display(),
+        input_path = dir.join("demo.ns").display(),
+        output_dir = output_dir.display(),
+        output_envelope_path = output_envelope_path.display(),
+        bridge_registry_path = bridge_registry_path.display(),
+        host_plan_index_path = host_plan_index_path.display(),
+        artifact_path = artifact_path.display(),
+        network_bridge_stub_path = network_bridge_stub_path.display(),
+        network_payload_path = network_payload_path.display(),
         bridge_registry_source = bridge_registry_source
             .replace('\\', "\\\\")
             .replace('"', "\\\"")
@@ -398,16 +429,24 @@ packaging_role = "hetero-contract"
     );
 }
 
-fn minimal_manifest_with_clock_protocol(clock_domains: usize, clock_protocol: &str) -> String {
+fn minimal_manifest_with_clock_protocol(
+    output_dir: &std::path::Path,
+    clock_domains: usize,
+    clock_protocol: &str,
+) -> String {
+    let input_path = output_dir.join("demo.ns");
+    let manifest_envelope_path = output_dir.join("nuis.executable.envelope.toml");
+    let artifact_path = output_dir.join("nuis.compiled.artifact");
+
     format!(
         r#"manifest_schema = "nuis-build-manifest-v1"
-input = "/tmp/demo.ns"
-output_dir = "/tmp/out"
+input = "{input_path}"
+output_dir = "{output_dir}"
 packaging_mode = "native-cpu-llvm"
-path = "/tmp/out/nuis.executable.envelope.toml"
+path = "{manifest_envelope_path}"
 schema = "nuis-executable-envelope-v1"
 package_count = 1
-artifact_path = "/tmp/out/nuis.compiled.artifact"
+artifact_path = "{artifact_path}"
 artifact_schema = "nuis-compiled-artifact-v1"
 artifact_binary_name = "demo.bin"
 artifact_binary_bytes = 3
@@ -437,7 +476,7 @@ clock_protocol_inline = "{clock_protocol}"
 
 [[artifact_hash]]
 kind = "artifact"
-path = "/tmp/out/nuis.compiled.artifact"
+path = "{artifact_path}"
 bytes = 3
 fnv1a64 = "0x0000000000000000"
 
@@ -452,6 +491,10 @@ selected_lowering_target = "llvm"
 contract_family = "nustar.cpu"
 packaging_role = "host-binary"
 "#,
+        input_path = input_path.display(),
+        output_dir = output_dir.display(),
+        manifest_envelope_path = manifest_envelope_path.display(),
+        artifact_path = artifact_path.display(),
         clock_protocol = escape_toml_test_string(clock_protocol)
     )
 }

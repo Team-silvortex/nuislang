@@ -135,7 +135,7 @@ because standalone single-file domain lowering still depends on loaded
 
 ```bash
 cargo run -p nuis -- check examples/ns/demos/window_controls_demo.ns
-cargo run -p nuis -- build examples/ns/demos/window_controls_demo.ns /tmp/window_controls_demo_ns
+cargo run -p nuis -- build examples/ns/demos/window_controls_demo.ns "$TMPDIR/window_controls_demo_ns"
 
 cargo run -p nuis -- check examples/projects/domains/shader_profile_demo
 cargo run -p nuis -- check examples/projects/domains/kernel_profile_demo

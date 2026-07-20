@@ -130,7 +130,7 @@ fn project_metadata_summary_mismatch_error_falls_back_to_manifest_commands_when_
         "build/nuis.project.galaxy.txt",
         "summary\tgalaxies=1",
         "summary\tgalaxies=0\ncore\tpackage=nuis.core",
-        "/tmp/definitely-missing-nuis-project-input",
+        "definitely-missing-nuis-project-input",
         "build/out",
     );
     assert!(message.contains("older nuisc metadata format"));

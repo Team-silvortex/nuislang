@@ -3,17 +3,18 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+DEFAULT_TEMP_DIR="${TMPDIR:-/tmp}"
 
 if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
   echo "usage: run-preview.sh [module.yir output.ppm [scale]]" >&2
-  echo "defaults: examples/yir/demos/window_controls_demo.yir /tmp/window_controls_demo.ppm 4" >&2
+  echo "defaults: examples/yir/demos/window_controls_demo.yir ${DEFAULT_TEMP_DIR}/window_controls_demo.ppm 4" >&2
   exit 0
 fi
 
 if [ "$#" -eq 0 ]; then
   MODULE_PATH="examples/yir/demos/window_controls_demo.yir"
-  OUTPUT_PATH="/tmp/window_controls_demo.ppm"
-  PLAN_PATH="/tmp/window_controls_demo.plan"
+  OUTPUT_PATH="${DEFAULT_TEMP_DIR}/window_controls_demo.ppm"
+  PLAN_PATH="${DEFAULT_TEMP_DIR}/window_controls_demo.plan"
   SCALE="4"
 elif [ "$#" -ge 2 ]; then
   MODULE_PATH="$1"

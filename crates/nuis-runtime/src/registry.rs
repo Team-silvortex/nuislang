@@ -74,8 +74,19 @@ impl AdapterRegistry {
 #[cfg(test)]
 mod tests {
     use nuis_artifact::BuildManifestDomainBuildUnit;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::{AdapterRegistry, DomainAdapter};
+
+    fn temp_dir(label: &str) -> std::path::PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("nuis_runtime_registry_{label}_{unique}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
 
     struct TestAdapter;
 
@@ -90,6 +101,10 @@ mod tests {
     }
 
     fn network_unit() -> BuildManifestDomainBuildUnit {
+        let output_dir = temp_dir("network_unit");
+        let bridge_stub_path = output_dir.join("network.bridge.stub.txt");
+        let payload_blob_path = output_dir.join("network.payload.bin");
+
         BuildManifestDomainBuildUnit {
             package_id: "official.network".to_owned(),
             domain_family: "network".to_owned(),
@@ -108,10 +123,10 @@ mod tests {
             artifact_stub_path: None,
             artifact_stub_inline: None,
             artifact_payload_path: None,
-            artifact_bridge_stub_path: Some("/tmp/network.bridge.stub.txt".to_owned()),
+            artifact_bridge_stub_path: Some(bridge_stub_path.display().to_string()),
             artifact_ir_sidecar_path: None,
             artifact_bridge_stub_inline: None,
-            artifact_payload_blob_path: Some("/tmp/network.payload.bin".to_owned()),
+            artifact_payload_blob_path: Some(payload_blob_path.display().to_string()),
             artifact_payload_blob_bytes: None,
             artifact_payload_format: None,
             artifact_payload_blob_inline: None,

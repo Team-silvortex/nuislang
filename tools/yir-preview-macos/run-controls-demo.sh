@@ -2,4 +2,5 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-bash "${SCRIPT_DIR}/run-preview.sh" examples/yir/window_controls_demo.yir /tmp/window_controls_demo.ppm 4
+DEFAULT_OUTPUT_PATH="${TMPDIR:-/tmp}/window_controls_demo.ppm"
+bash "${SCRIPT_DIR}/run-preview.sh" examples/yir/window_controls_demo.yir "${DEFAULT_OUTPUT_PATH}" 4

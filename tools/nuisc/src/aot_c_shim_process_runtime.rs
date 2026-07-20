@@ -113,7 +113,7 @@ static pid_t nuis_host_spawn_shell(char* program, int64_t cwd_handle) {
         if (cwd != NULL && cwd[0] != '\0') {
             if (chdir(cwd) != 0) _exit(127);
         }
-        execl("/bin/sh", "sh", "-c", program, (char*)NULL);
+        execlp("sh", "sh", "-c", program, (char*)NULL);
         _exit(127);
     }
     return pid;

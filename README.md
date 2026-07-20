@@ -140,6 +140,20 @@ cargo run -p nuis -- run-artifact \
   examples/bins/native_artifact_closure_demo_project/nuis.build.manifest.toml
 ```
 
+Developer-machine hygiene (项目开发辅助范式):
+
+```bash
+# Project-level workflow we run at local iteration checkpoints:
+# 1) preview reclaimable generated artifacts (safe, non-destructive)
+scripts/disk-clean-safe.sh
+
+# 2) apply the canonical cleanup pass
+scripts/disk-clean-safe.sh --apply
+
+# 3) optional extended cleanup when workspace/cargo caches also need reclamation
+scripts/disk-clean-safe.sh --apply --workspace --cargo-cache
+```
+
 `nsld drive` without `--apply` is a non-mutating dry run. `--apply` writes at
 most one whitelisted linker artifact step, while `--apply --until-clean` keeps
 applying whitelisted steps until the chain is clean or reaches a structured

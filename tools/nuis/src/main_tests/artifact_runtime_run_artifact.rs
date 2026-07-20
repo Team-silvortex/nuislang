@@ -398,7 +398,7 @@ mod cpu Main {
     write_ready_nsld_final_tail_placeholders(&output_dir);
     fs::write(
         output_dir.join("nuis.host-entrypoint.sh"),
-        "#!/bin/sh\nset -eu\nexec nuis-host-runner --manifest 'manifest.toml'\n",
+        "#!/usr/bin/env sh\nset -eu\nexec nuis-host-runner --manifest 'manifest.toml'\n",
     )
     .expect("write invalid entrypoint stub");
 

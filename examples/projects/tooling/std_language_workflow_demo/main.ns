@@ -165,9 +165,9 @@ mod cpu Main {
   fn capture_std_language_workflow() -> StdLanguageWorkflowReport {
     let empty_args: i64 = text_handle("");
     let first_step: WorkflowStep =
-      build_workflow_step(text_handle("language-first"), text_handle("/usr/bin/true"), empty_args, true);
+      build_workflow_step(text_handle("language-first"), text_handle("true"), empty_args, true);
     let second_step: WorkflowStep =
-      build_workflow_step(text_handle("language-second"), text_handle("/usr/bin/true"), empty_args, false);
+      build_workflow_step(text_handle("language-second"), text_handle("true"), empty_args, false);
     let first_report: WorkflowStepReport = run_workflow_step(first_step);
     let stopped: bool = StdCliContracts.workflow_should_stop(
       first_step.fail_fast,

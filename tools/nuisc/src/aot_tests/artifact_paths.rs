@@ -37,7 +37,7 @@ fn verify_compiled_artifact_preserves_heterogeneous_domain_unit_paths() {
         &dir,
         &written,
         &BuildManifestContext {
-            input_path: "/tmp/hetero_artifact.ns".to_owned(),
+            input_path: dir.join("hetero_artifact.ns").to_string_lossy().to_string(),
             output_dir: dir.display().to_string(),
             loaded_nustar: vec![
                 "official.cpu".to_owned(),

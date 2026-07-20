@@ -37,7 +37,7 @@ fn build_manifest_tracks_heterogeneous_domain_build_units() {
         &dir,
         &written,
         &BuildManifestContext {
-            input_path: "/tmp/hetero.ns".to_owned(),
+            input_path: dir.join("hetero.ns").to_string_lossy().to_string(),
             output_dir: dir.display().to_string(),
             loaded_nustar: vec![
                 "official.cpu".to_owned(),

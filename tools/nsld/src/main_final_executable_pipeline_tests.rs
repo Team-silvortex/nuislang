@@ -136,7 +136,7 @@ fn emit_final_executable_pipeline_writes_launcher_closure() {
         .is_some_and(
             |command| command.contains("--output-dir '") && command.contains("path space")
         ));
-    assert!(entrypoint_source.starts_with("#!/bin/sh\n"));
+    assert!(entrypoint_source.starts_with("#!/usr/bin/env sh\n"));
     assert!(entrypoint_source
         .contains("NUIS_HOST_ENTRYPOINT_STUB_PROTOCOL='nuis-nsld-host-entrypoint-v1'"));
     assert!(entrypoint_source.contains("export NUIS_HOST_ENTRYPOINT_STUB_PROTOCOL"));
@@ -618,7 +618,7 @@ fn verify_final_executable_pipeline_reports_tampered_entrypoint_materialization(
         .expect("entrypoint path");
     fs::write(
         &entrypoint_path,
-        "#!/bin/sh\nset -eu\necho tampered-entrypoint\n",
+        "#!/usr/bin/env sh\nset -eu\necho tampered-entrypoint\n",
     )
     .unwrap();
 

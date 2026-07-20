@@ -149,14 +149,19 @@ mod tests {
     }
 
     fn sample_compiled_artifact() -> NuisCompiledArtifact {
-        let build_manifest_source = r#"manifest_schema = "nuis-build-manifest-v1"
-input = "/tmp/demo.ns"
-output_dir = "/tmp/out"
+        let output_dir = temp_dir("sample_compiled_artifact");
+        let input_path = output_dir.join("demo.ns");
+        let envelope_path = output_dir.join("nuis.executable.envelope.toml");
+        let artifact_path = output_dir.join("nuis.compiled.artifact");
+        let build_manifest_source = format!(
+            r#"manifest_schema = "nuis-build-manifest-v1"
+input = "{input_path}"
+output_dir = "{output_dir}"
 packaging_mode = "native-cpu-llvm"
-path = "/tmp/out/nuis.executable.envelope.toml"
+path = "{manifest_path}"
 schema = "nuis-executable-envelope-v1"
 package_count = 1
-artifact_path = "/tmp/out/nuis.compiled.artifact"
+artifact_path = "{artifact_path}"
 artifact_schema = "nuis-compiled-artifact-v1"
 artifact_binary_name = "demo"
 artifact_binary_bytes = 3
@@ -190,7 +195,12 @@ backend_family = "llvm"
 selected_lowering_target = "llvm"
 contract_family = "nustar.cpu"
 packaging_role = "host-binary"
-"#
+"#,
+            input_path = input_path.display(),
+            output_dir = output_dir.display(),
+            manifest_path = envelope_path.display(),
+            artifact_path = artifact_path.display()
+        )
         .to_owned();
         NuisCompiledArtifact {
             schema: "nuis-compiled-artifact-v1".to_owned(),
@@ -412,15 +422,26 @@ packaging_role = "host-binary"
             ],
         };
         let encoded_blob = encode_domain_payload_blob(&blob).unwrap();
+        let output_dir = temp_dir("sample_window_aot_bundle");
+        let input_path = output_dir.join("demo.ns");
+        let envelope_path = output_dir.join("nuis.executable.envelope.toml");
+        let artifact_path = output_dir.join("nuis.compiled.artifact");
+        let bridge_registry_path = output_dir.join("nuis.bridge.registry.toml");
+        let host_bridge_plan_index_path = output_dir.join("nuis.host-bridge.plan-index.toml");
+        let network_artifact_path = output_dir.join("nuis.domain.network.artifact.toml");
+        let network_payload_path = output_dir.join("nuis.domain.network.payload.toml");
+        let network_bridge_stub_path = output_dir.join("nuis.domain.network.bridge.stub.txt");
+        let network_ir_sidecar_path = output_dir.join("nuis.domain.network.lowering.ir.txt");
+        let network_payload_blob_path = output_dir.join("nuis.domain.network.payload.bin");
         let manifest = format!(
             r#"manifest_schema = "nuis-build-manifest-v1"
-input = "/tmp/demo.ns"
-output_dir = "/tmp/out"
+input = "{input_path}"
+output_dir = "{output_dir}"
 packaging_mode = "window-aot-bundle"
-path = "/tmp/out/nuis.executable.envelope.toml"
+path = "{manifest_path}"
 schema = "nuis-executable-envelope-v1"
 package_count = 2
-artifact_path = "/tmp/out/nuis.compiled.artifact"
+artifact_path = "{artifact_path}"
 artifact_schema = "nuis-compiled-artifact-v1"
 artifact_binary_name = "demo.bin"
 artifact_binary_bytes = 3
@@ -442,18 +463,18 @@ cpu_target_object_format = "elf"
 cpu_target_calling_abi = "sysv64"
 cpu_target_clang = "x86_64-unknown-linux-gnu"
 cpu_target_cross = true
-bridge_registry_path = "/tmp/out/nuis.bridge.registry.toml"
+bridge_registry_path = "{bridge_registry_path}"
 bridge_registry_schema = "nuis-bridge-registry-v1"
 bridge_registry_units = 1
 bridge_registry_inline = "schema = \"nuis-bridge-registry-v1\"\nbridge_count = 1\ndomains = [\"network\"]\n"
-host_bridge_plan_index_path = "/tmp/out/nuis.host-bridge.plan-index.toml"
+host_bridge_plan_index_path = "{host_bridge_plan_index_path}"
 host_bridge_plan_index_schema = "nuis-host-bridge-plan-index-v1"
 host_bridge_plan_units = 1
 host_bridge_plan_index_inline = "schema = \"nuis-host-bridge-plan-index-v1\"\nplan_count = 1\ndomains = [\"network\"]\n"
 
 [[artifact_hash]]
 kind = "artifact"
-path = "/tmp/out/nuis.compiled.artifact"
+path = "{artifact_path}"
 bytes = 3
 fnv1a64 = "0x0000000000000000"
 
@@ -477,19 +498,30 @@ package_id = "official.network"
 domain_family = "network"
 backend_family = "urlsession"
 selected_lowering_target = "urlsession"
-artifact_stub_path = "/tmp/out/nuis.domain.network.artifact.toml"
+artifact_stub_path = "{artifact_stub_path}"
 artifact_stub_inline = "schema = \"nuis-domain-build-unit-v1\""
-artifact_payload_path = "/tmp/out/nuis.domain.network.payload.toml"
-artifact_bridge_stub_path = "/tmp/out/nuis.domain.network.bridge.stub.txt"
-artifact_ir_sidecar_path = "/tmp/out/nuis.domain.network.lowering.ir.txt"
+artifact_payload_path = "{artifact_payload_path}"
+artifact_bridge_stub_path = "{artifact_bridge_stub_path}"
+artifact_ir_sidecar_path = "{artifact_ir_sidecar_path}"
 artifact_bridge_stub_inline = "schema = \"nuis-host-bridge-spec-v1\""
-artifact_payload_blob_path = "/tmp/out/nuis.domain.network.payload.bin"
+artifact_payload_blob_path = "{artifact_payload_blob_path}"
 artifact_payload_blob_bytes = {blob_bytes}
 artifact_payload_format = "ndpb-v2"
 artifact_payload_blob_inline = "{blob_hex}"
 contract_family = "nustar.network"
 packaging_role = "hetero-contract"
 "#,
+            input_path = input_path.display(),
+            output_dir = output_dir.display(),
+            manifest_path = envelope_path.display(),
+            artifact_path = artifact_path.display(),
+            bridge_registry_path = bridge_registry_path.display(),
+            host_bridge_plan_index_path = host_bridge_plan_index_path.display(),
+            artifact_stub_path = network_artifact_path.display(),
+            artifact_payload_path = network_payload_path.display(),
+            artifact_bridge_stub_path = network_bridge_stub_path.display(),
+            artifact_ir_sidecar_path = network_ir_sidecar_path.display(),
+            artifact_payload_blob_path = network_payload_blob_path.display(),
             blob_bytes = encoded_blob.len(),
             blob_hex = hex_encode_bytes(&encoded_blob),
         );

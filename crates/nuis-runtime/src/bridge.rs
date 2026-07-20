@@ -129,6 +129,16 @@ mod tests {
 
     use super::BridgeExecutor;
 
+    fn temp_dir(label: &str) -> std::path::PathBuf {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("nuis_runtime_bridge_{label}_{unique}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
     struct NetworkAdapter;
 
     impl DomainAdapter for NetworkAdapter {
@@ -142,6 +152,13 @@ mod tests {
     }
 
     fn loaded_executable() -> LoadedExecutable {
+        let output_dir = temp_dir("loaded_executable");
+        let input_path = output_dir.join("demo.ns");
+        let envelope_path = output_dir.join("nuis.executable.envelope.toml");
+        let artifact_path = output_dir.join("nuis.compiled.artifact");
+        let bridge_stub_path = output_dir.join("network.bridge.stub.txt");
+        let payload_blob_path = output_dir.join("network.payload.bin");
+
         let unit = BuildManifestDomainBuildUnit {
             package_id: "official.network".to_owned(),
             domain_family: "network".to_owned(),
@@ -160,10 +177,10 @@ mod tests {
             artifact_stub_path: None,
             artifact_stub_inline: None,
             artifact_payload_path: None,
-            artifact_bridge_stub_path: Some("/tmp/network.bridge.stub.txt".to_owned()),
+            artifact_bridge_stub_path: Some(bridge_stub_path.display().to_string()),
             artifact_ir_sidecar_path: None,
             artifact_bridge_stub_inline: None,
-            artifact_payload_blob_path: Some("/tmp/network.payload.bin".to_owned()),
+            artifact_payload_blob_path: Some(payload_blob_path.display().to_string()),
             artifact_payload_blob_bytes: None,
             artifact_payload_format: None,
             artifact_payload_blob_inline: None,
@@ -217,13 +234,13 @@ mod tests {
             },
             manifest: BuildManifest {
                 schema: "nuis-build-manifest-v1".to_owned(),
-                input: "/tmp/demo.ns".to_owned(),
-                output_dir: "/tmp/out".to_owned(),
+                input: input_path.display().to_string(),
+                output_dir: output_dir.display().to_string(),
                 packaging_mode: "native-cpu-llvm".to_owned(),
-                envelope_path: "/tmp/out/nuis.executable.envelope.toml".to_owned(),
+                envelope_path: envelope_path.display().to_string(),
                 envelope_schema: "nuis-executable-envelope-v1".to_owned(),
                 envelope_package_count: 1,
-                artifact_path: "/tmp/out/nuis.compiled.artifact".to_owned(),
+                artifact_path: artifact_path.display().to_string(),
                 artifact_schema: "nuis-compiled-artifact-v1".to_owned(),
                 artifact_binary_name: "demo.bin".to_owned(),
                 artifact_binary_bytes: 3,
@@ -312,8 +329,8 @@ mod tests {
                     package_id: "official.network".to_owned(),
                     backend_family: "urlsession".to_owned(),
                     selected_lowering_target: "urlsession".to_owned(),
-                    bridge_stub_path: "/tmp/network.bridge.stub.txt".to_owned(),
-                    payload_blob_path: "/tmp/network.payload.bin".to_owned(),
+                    bridge_stub_path: bridge_stub_path.display().to_string(),
+                    payload_blob_path: payload_blob_path.display().to_string(),
                     plan_inline: String::new(),
                 }],
             }),
@@ -324,7 +341,7 @@ mod tests {
                 entries: vec![HostBridgePlanEntry {
                     domain_family: "network".to_owned(),
                     package_id: "official.network".to_owned(),
-                    bridge_stub_path: "/tmp/network.bridge.stub.txt".to_owned(),
+                    bridge_stub_path: bridge_stub_path.display().to_string(),
                     bridge_surface: "host-ffi.bridge.network".to_owned(),
                     scheduler_binding: "network-poll-bridge".to_owned(),
                     phase_order: vec![

@@ -53,7 +53,7 @@ pub(crate) fn compile_native_binary(
     exe_path: &Path,
     cpu_target: &CpuBuildTarget,
 ) -> Result<(), String> {
-    let output = Command::new("/usr/bin/clang")
+    let output = Command::new("clang")
         .arg("-target")
         .arg(&cpu_target.clang_target)
         .arg(ll_path)

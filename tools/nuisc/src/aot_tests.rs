@@ -90,7 +90,7 @@ fn write_minimal_cpu_artifact(label: &str) -> (PathBuf, PathBuf) {
         &dir,
         &written,
         &BuildManifestContext {
-            input_path: "/tmp/demo.ns".to_owned(),
+            input_path: dir.join("demo.ns").to_string_lossy().to_string(),
             output_dir: dir.display().to_string(),
             loaded_nustar: vec!["official.cpu".to_owned()],
             compile_cache: None,

@@ -49,23 +49,23 @@ Runnable libc smoke:
 
 ```bash
 cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
-  examples/ns/ffi/libc_usleep_demo.ns /tmp/nuis_libc_usleep_demo
-cargo run -p nuis -- run-artifact /tmp/nuis_libc_usleep_demo
+  examples/ns/ffi/libc_usleep_demo.ns "$TMPDIR/nuis_libc_usleep_demo"
+cargo run -p nuis -- run-artifact "$TMPDIR/nuis_libc_usleep_demo"
 cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
-  examples/ns/ffi/libc_puts_demo.ns /tmp/nuis_libc_puts_demo
-cargo run -p nuis -- run-artifact /tmp/nuis_libc_puts_demo
+  examples/ns/ffi/libc_puts_demo.ns "$TMPDIR/nuis_libc_puts_demo"
+cargo run -p nuis -- run-artifact "$TMPDIR/nuis_libc_puts_demo"
 cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
-  examples/ns/ffi/libc_strlen_demo.ns /tmp/nuis_libc_strlen_demo
-cargo run -p nuis -- run-artifact /tmp/nuis_libc_strlen_demo
+  examples/ns/ffi/libc_strlen_demo.ns "$TMPDIR/nuis_libc_strlen_demo"
+cargo run -p nuis -- run-artifact "$TMPDIR/nuis_libc_strlen_demo"
 cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
-  examples/ns/ffi/libc_write_demo.ns /tmp/nuis_libc_write_demo
-cargo run -p nuis -- run-artifact /tmp/nuis_libc_write_demo
+  examples/ns/ffi/libc_write_demo.ns "$TMPDIR/nuis_libc_write_demo"
+cargo run -p nuis -- run-artifact "$TMPDIR/nuis_libc_write_demo"
 cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
-  examples/ns/ffi/libc_close_demo.ns /tmp/nuis_libc_close_demo
-cargo run -p nuis -- run-artifact /tmp/nuis_libc_close_demo
+  examples/ns/ffi/libc_close_demo.ns "$TMPDIR/nuis_libc_close_demo"
+cargo run -p nuis -- run-artifact "$TMPDIR/nuis_libc_close_demo"
 cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
-  examples/ns/ffi/libc_read_buffer_demo.ns /tmp/nuis_libc_read_buffer_demo
-cargo run -p nuis -- run-artifact /tmp/nuis_libc_read_buffer_demo
+  examples/ns/ffi/libc_read_buffer_demo.ns "$TMPDIR/nuis_libc_read_buffer_demo"
+cargo run -p nuis -- run-artifact "$TMPDIR/nuis_libc_read_buffer_demo"
 ```
 
 Task/runtime ladder:

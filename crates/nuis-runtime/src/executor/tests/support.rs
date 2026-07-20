@@ -251,10 +251,11 @@ pub(super) fn sample_network_payload() -> DomainBuildUnitPayloadBlob {
 }
 
 pub(super) fn sample_network_host_plan() -> HostBridgePlanEntry {
+    let bridge_stub_path = std::env::temp_dir().join("network.bridge.stub.txt");
     HostBridgePlanEntry {
         domain_family: "network".to_owned(),
         package_id: "official.network".to_owned(),
-        bridge_stub_path: "/tmp/network.bridge.stub.txt".to_owned(),
+        bridge_stub_path: bridge_stub_path.display().to_string(),
         bridge_surface: "host-ffi.bridge.network".to_owned(),
         scheduler_binding: "network-poll-bridge".to_owned(),
         phase_order: vec![
@@ -268,13 +269,16 @@ pub(super) fn sample_network_host_plan() -> HostBridgePlanEntry {
 }
 
 pub(super) fn sample_network_bridge_registry() -> BridgeRegistryEntry {
+    let bridge_stub_path = std::env::temp_dir().join("network.bridge.stub.txt");
+    let payload_blob_path = std::env::temp_dir().join("network.payload.bin");
+
     BridgeRegistryEntry {
         domain_family: "network".to_owned(),
         package_id: "official.network".to_owned(),
         backend_family: "urlsession".to_owned(),
         selected_lowering_target: "urlsession.socket-io".to_owned(),
-        bridge_stub_path: "/tmp/network.bridge.stub.txt".to_owned(),
-        payload_blob_path: "/tmp/network.payload.bin".to_owned(),
+        bridge_stub_path: bridge_stub_path.display().to_string(),
+        payload_blob_path: payload_blob_path.display().to_string(),
         plan_inline: "bridge_kind = \"managed-lifecycle-bridge\"".to_owned(),
     }
 }
@@ -422,10 +426,13 @@ pub(super) fn sample_host_plan(
     package_id: &str,
     scheduler: &str,
 ) -> HostBridgePlanEntry {
+    let bridge_stub_path = std::env::temp_dir()
+        .join(format!("nuis_runtime_host_plan_{domain_family}"))
+        .join(format!("{domain_family}.bridge.stub.txt"));
     HostBridgePlanEntry {
         domain_family: domain_family.to_owned(),
         package_id: package_id.to_owned(),
-        bridge_stub_path: format!("/tmp/{domain_family}.bridge.stub.txt"),
+        bridge_stub_path: bridge_stub_path.display().to_string(),
         bridge_surface: format!("host-ffi.bridge.{domain_family}"),
         scheduler_binding: scheduler.to_owned(),
         phase_order: vec![
@@ -444,13 +451,17 @@ pub(super) fn sample_bridge_registry(
     backend: &str,
     target: &str,
 ) -> BridgeRegistryEntry {
+    let base_dir = std::env::temp_dir().join(format!("nuis_runtime_bridge_registry_{domain_family}"));
+    let bridge_stub_path = base_dir.join(format!("{domain_family}.bridge.stub.txt"));
+    let payload_blob_path = base_dir.join(format!("{domain_family}.payload.bin"));
+
     BridgeRegistryEntry {
         domain_family: domain_family.to_owned(),
         package_id: package_id.to_owned(),
         backend_family: backend.to_owned(),
         selected_lowering_target: target.to_owned(),
-        bridge_stub_path: format!("/tmp/{domain_family}.bridge.stub.txt"),
-        payload_blob_path: format!("/tmp/{domain_family}.payload.bin"),
+        bridge_stub_path: bridge_stub_path.display().to_string(),
+        payload_blob_path: payload_blob_path.display().to_string(),
         plan_inline: "bridge_kind = \"managed-lifecycle-bridge\"".to_owned(),
     }
 }

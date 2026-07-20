@@ -369,7 +369,7 @@ mod cpu Main {
 
 #[test]
 fn timeout_helper_marks_child_as_timed_out() {
-    let mut child = Command::new("/bin/sh")
+    let mut child = Command::new("sh")
         .arg("-c")
         .arg("sleep 1")
         .stdout(Stdio::null())
@@ -392,7 +392,7 @@ fn timeout_helper_marks_child_as_timed_out() {
 
 #[test]
 fn timeout_helper_supports_wall_clock_domain() {
-    let mut child = Command::new("/bin/sh")
+    let mut child = Command::new("sh")
         .arg("-c")
         .arg("sleep 1")
         .stdout(Stdio::null())
@@ -442,7 +442,7 @@ mod cpu Main {
 
 #[test]
 fn timeout_helper_supports_global_clock_domain() {
-    let mut child = Command::new("/bin/sh")
+    let mut child = Command::new("sh")
         .arg("-c")
         .arg("sleep 1")
         .stdout(Stdio::null())

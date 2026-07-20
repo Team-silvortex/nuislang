@@ -20,7 +20,7 @@ fn execute_u32_add_platform(input: u32, delta: u32) -> Result<MetalProviderExecu
     let paths = TempMetalRunnerPaths::new();
     fs::write(&paths.source, METAL_RUNNER_SOURCE)
         .map_err(|error| format!("failed to materialize Metal runner source: {error}"))?;
-    let compile = Command::new("/usr/bin/clang")
+    let compile = Command::new("clang")
         .args([
             "-fobjc-arc",
             "-framework",

@@ -34,7 +34,7 @@ Useful commands:
 
 ```bash
 cargo run -p nuis -- dump-yir examples/ns/data/hello_data.ns
-cargo run -p nuis -- build examples/ns/data/hello_instantiate.ns /tmp/nuis_hello_instantiate
+cargo run -p nuis -- build examples/ns/data/hello_instantiate.ns "$TMPDIR/nuis_hello_instantiate"
 ```
 
 Project-scale `data_profile_*` flows currently live in:

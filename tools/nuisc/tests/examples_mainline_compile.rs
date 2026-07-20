@@ -1,5 +1,9 @@
 use std::{fs, path::Path};
 
+fn should_skip_dir_name(name: &str) -> bool {
+    matches!(name, ".git" | "target" | ".github" | ".idea" | ".vscode")
+}
+
 const SHADER_KERNEL_PROFILE_MAINLINE_EXAMPLES: &[&str] = &[
     "../../examples/projects/domains/shader_profile_demo",
     "../../examples/projects/domains/shader_render_profile_demo",
@@ -21,6 +25,9 @@ fn collect_ns_files(root: &Path, files: &mut Vec<std::path::PathBuf>) {
     {
         let path = entry.unwrap().path();
         if path.is_dir() {
+            if should_skip_dir_name(path.file_name().and_then(|value| value.to_str()).unwrap_or("")) {
+                continue;
+            }
             collect_ns_files(&path, files);
         } else if path.extension().and_then(|value| value.to_str()) == Some("ns") {
             files.push(path);
@@ -34,6 +41,9 @@ fn collect_named_files(root: &Path, file_name: &str, files: &mut Vec<std::path::
     {
         let path = entry.unwrap().path();
         if path.is_dir() {
+            if should_skip_dir_name(path.file_name().and_then(|value| value.to_str()).unwrap_or("")) {
+                continue;
+            }
             collect_named_files(&path, file_name, files);
         } else if path.file_name().and_then(|value| value.to_str()) == Some(file_name) {
             files.push(path);
@@ -47,6 +57,9 @@ fn collect_files_with_extension(root: &Path, extension: &str, files: &mut Vec<st
     {
         let path = entry.unwrap().path();
         if path.is_dir() {
+            if should_skip_dir_name(path.file_name().and_then(|value| value.to_str()).unwrap_or("")) {
+                continue;
+            }
             collect_files_with_extension(&path, extension, files);
         } else if path.extension().and_then(|value| value.to_str()) == Some(extension) {
             files.push(path);
@@ -145,14 +158,22 @@ fn checked_in_example_manifests_use_current_abi_field() {
 #[test]
 fn checked_in_docs_do_not_embed_host_absolute_paths() {
     let mut docs = Vec::new();
-    collect_files_with_extension(Path::new("../../docs"), "md", &mut docs);
-    collect_files_with_extension(Path::new("../../examples"), "md", &mut docs);
-    docs.push(Path::new("../../README.md").to_path_buf());
+    collect_files_with_extension(Path::new("../../"), "md", &mut docs);
 
     for path in docs {
         let source = fs::read_to_string(&path)
             .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
-        for forbidden in ["/Users/", "/private/", "/var/folders/", "file://"] {
+        for forbidden in [
+            "/Users/",
+            "/private/",
+            "/var/folders/",
+            "/tmp/",
+            "/var/tmp/",
+            "/Library/",
+            "/Applications/",
+            "/.../",
+            "file://",
+        ] {
             assert!(
                 !source.contains(forbidden),
                 "checked-in doc `{}` should avoid host absolute path `{forbidden}`",

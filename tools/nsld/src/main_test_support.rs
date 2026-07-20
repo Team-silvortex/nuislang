@@ -16,7 +16,7 @@ pub(crate) fn empty_link_plan() -> LinkPlan {
             machine_os: "macos".to_owned(),
             object_format: "mach-o".to_owned(),
             calling_abi: "aapcs64".to_owned(),
-            clang_target: "arm64-apple-macos".to_owned(),
+            clang_target: "aarch64-apple-darwin".to_owned(),
             cross_compile: false,
         },
         lifecycle: LinkPlanLifecycle {

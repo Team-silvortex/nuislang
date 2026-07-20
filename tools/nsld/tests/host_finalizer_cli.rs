@@ -211,7 +211,7 @@ fn write_native_cpu_fixture(dir: &Path) -> PathBuf {
 fn write_fake_clang(path: &Path) {
     fs::write(
         path,
-        "#!/bin/sh\nout=\"\"\nwhile [ \"$#\" -gt 0 ]; do\n  if [ \"$1\" = \"-o\" ]; then\n    shift\n    out=\"$1\"\n  fi\n  shift\ndone\nif [ -z \"$out\" ]; then\n  exit 64\nfi\nprintf 'host-native-executable\\n' > \"$out\"\nprintf 'invoked\\n' > \"$out.invoked\"\n",
+        "#!/usr/bin/env sh\nout=\"\"\nwhile [ \"$#\" -gt 0 ]; do\n  if [ \"$1\" = \"-o\" ]; then\n    shift\n    out=\"$1\"\n  fi\n  shift\ndone\nif [ -z \"$out\" ]; then\n  exit 64\nfi\nprintf 'host-native-executable\\n' > \"$out\"\nprintf 'invoked\\n' > \"$out.invoked\"\n",
     )
     .unwrap();
     let mut permissions = fs::metadata(path).unwrap().permissions();

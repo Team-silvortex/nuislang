@@ -854,29 +854,60 @@ fn inspect_project_metadata_reports_host_ffi_footprint_for_proxy_output() {
 
 #[test]
 fn project_metadata_render_helpers_expose_summary_and_paths() {
+    let demo_root = temp_dir("project_metadata_render_helpers_paths_demo").join("demo");
     let summary = ProjectMetadataSummary {
         source_kind: "build-manifest".to_owned(),
         project_name: Some("demo".to_owned()),
-        project_root: Some("/tmp/demo".to_owned()),
-        manifest_path: Some("/tmp/demo/nuis.toml".to_owned()),
-        build_manifest_path: Some("/tmp/demo/build/nuis.build.manifest.toml".to_owned()),
-        artifact_path: Some("/tmp/demo/build/nuis.compiled.artifact".to_owned()),
-        docs_index_path: Some("/tmp/demo/build/nuis.project.docs.txt".to_owned()),
+        project_root: Some(demo_root.to_string_lossy().to_string()),
+        manifest_path: Some(demo_root.join("nuis.toml").to_string_lossy().to_string()),
+        build_manifest_path: Some(
+            demo_root
+                .join("build/nuis.build.manifest.toml")
+                .to_string_lossy()
+                .to_string(),
+        ),
+        artifact_path: Some(
+            demo_root
+                .join("build/nuis.compiled.artifact")
+                .to_string_lossy()
+                .to_string(),
+        ),
+        docs_index_path: Some(
+            demo_root
+                .join("build/nuis.project.docs.txt")
+                .to_string_lossy()
+                .to_string(),
+        ),
         docs_module_count: 4,
         docs_documented_module_count: 3,
         docs_documented_item_count: 12,
-        imports_index_path: Some("/tmp/demo/build/nuis.project.imports.txt".to_owned()),
+        imports_index_path: Some(
+            demo_root
+                .join("build/nuis.project.imports.txt")
+                .to_string_lossy()
+                .to_string(),
+        ),
         imports_library_count: 6,
         imports_visible_library_count: 5,
         imports_visible_module_count: 7,
         imports_documented_visible_module_count: 4,
         imports_documented_visible_item_count: 10,
-        galaxy_index_path: Some("/tmp/demo/build/nuis.project.galaxy.txt".to_owned()),
+        galaxy_index_path: Some(
+            demo_root
+                .join("build/nuis.project.galaxy.txt")
+                .to_string_lossy()
+                .to_string(),
+        ),
         galaxy_count: 3,
         documented_galaxy_count: 2,
         documented_galaxy_library_module_count: 5,
         documented_galaxy_item_count: 10,
-        host_ffi_index_path: Some("/tmp/demo/build/nuis.project.host_ffi.txt".to_owned()),
+        host_ffi_index_path: Some(
+            demo_root
+                .join("build/nuis.project.host_ffi.txt")
+                .to_string_lossy()
+                .to_string(),
+        ),
         host_ffi_symbol_count: 2,
         host_ffi_policy_count: 2,
     };
@@ -889,14 +920,34 @@ fn project_metadata_render_helpers_expose_summary_and_paths() {
     assert!(compact.contains("host_ffi=2/2"));
 
     let paths = render_project_metadata_paths(&summary);
-    assert!(paths.contains("project_root=/tmp/demo"));
-    assert!(paths.contains("manifest_path=/tmp/demo/nuis.toml"));
-    assert!(paths.contains("build_manifest_path=/tmp/demo/build/nuis.build.manifest.toml"));
-    assert!(paths.contains("artifact_path=/tmp/demo/build/nuis.compiled.artifact"));
-    assert!(paths.contains("docs_index_path=/tmp/demo/build/nuis.project.docs.txt"));
-    assert!(paths.contains("imports_index_path=/tmp/demo/build/nuis.project.imports.txt"));
-    assert!(paths.contains("galaxy_index_path=/tmp/demo/build/nuis.project.galaxy.txt"));
-    assert!(paths.contains("host_ffi_index_path=/tmp/demo/build/nuis.project.host_ffi.txt"));
+    assert!(paths.contains(&format!("project_root={}", demo_root.display())));
+    assert!(paths.contains(&format!("manifest_path={}", demo_root.join("nuis.toml").display())));
+    assert!(paths.contains(&format!(
+        "build_manifest_path={}",
+        demo_root.join("build/nuis.build.manifest.toml").display()
+    )));
+    assert!(paths.contains(&format!(
+        "artifact_path={}",
+        demo_root.join("build/nuis.compiled.artifact").display()
+    )));
+    assert!(paths.contains(&format!(
+        "docs_index_path={}",
+        demo_root.join("build/nuis.project.docs.txt").display()
+    )));
+    assert!(paths.contains(&format!(
+        "imports_index_path={}",
+        demo_root.join("build/nuis.project.imports.txt").display()
+    )));
+    assert!(paths.contains(&format!(
+        "galaxy_index_path={}",
+        demo_root.join("build/nuis.project.galaxy.txt").display()
+    )));
+    assert!(paths.contains(&format!(
+        "host_ffi_index_path={}",
+        demo_root
+            .join("build/nuis.project.host_ffi.txt")
+            .display()
+    )));
 }
 
 #[test]

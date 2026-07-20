@@ -45,7 +45,7 @@ Use:
 ```bash
 cargo run -p yir-run -- examples/yir/demos/hello_yir.yir
 cargo run -p yir-run -- examples/yir/demos/window_controls_demo.yir
-cargo run -p yir-pack-aot -- examples/yir/demos/window_controls_demo.yir /tmp/window_controls_demo_yir 4
+cargo run -p yir-pack-aot -- examples/yir/demos/window_controls_demo.yir "$TMPDIR/window_controls_demo_yir" 4
 ```
 
 Also useful while comparing handwritten graphs against the `.ns` pipeline:
@@ -64,4 +64,4 @@ Current reading guidance:
 * use the invalid examples to understand verifier boundaries, especially for memory, data-plane, and ownership-sensitive paths
 
 When you want a native artifact from a handwritten graph, rebuild it into a
-local output directory such as `/tmp/window_controls_demo_yir`.
+local output directory such as `$TMPDIR/window_controls_demo_yir`.

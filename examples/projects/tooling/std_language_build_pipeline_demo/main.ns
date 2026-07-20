@@ -178,13 +178,13 @@ mod cpu Main {
   fn capture_std_language_build_pipeline() -> StdLanguageBuildPipelineReport {
     let empty_args: i64 = text_handle("");
     let prepare: BuildStageReport =
-      run_stage(text_handle("prepare"), text_handle("/usr/bin/true"), empty_args);
+      run_stage(text_handle("prepare"), text_handle("true"), empty_args);
     let check: BuildStageReport =
-      run_stage(text_handle("check"), text_handle("/usr/bin/true"), empty_args);
+      run_stage(text_handle("check"), text_handle("true"), empty_args);
     let compile: BuildStageReport =
-      run_stage(text_handle("compile"), text_handle("/usr/bin/true"), empty_args);
+      run_stage(text_handle("compile"), text_handle("true"), empty_args);
     let package: BuildStageReport =
-      run_stage(text_handle("package"), text_handle("/usr/bin/true"), empty_args);
+      run_stage(text_handle("package"), text_handle("true"), empty_args);
     return build_pipeline_report(prepare, check, compile, package);
   }
 

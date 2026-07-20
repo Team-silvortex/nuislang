@@ -34,17 +34,17 @@ fn build_manifest_round_trips_cpu_target_metadata() {
         cross_compile: true,
     };
     let manifest = super::write_build_manifest(
-            &dir,
-            &written,
-            &BuildManifestContext {
-                input_path: "/tmp/demo.ns".to_owned(),
-                output_dir: dir.display().to_string(),
-                loaded_nustar: vec!["official.cpu".to_owned()],
-                compile_cache: Some(BuildManifestCacheInfo {
-                    status: "miss".to_owned(),
-                    key: "abc".to_owned(),
-                    root: "/tmp/cache".to_owned(),
-                }),
+        &dir,
+        &written,
+        &BuildManifestContext {
+            input_path: dir.join("demo.ns").to_string_lossy().to_string(),
+            output_dir: dir.display().to_string(),
+            loaded_nustar: vec!["official.cpu".to_owned()],
+            compile_cache: Some(BuildManifestCacheInfo {
+                status: "miss".to_owned(),
+                key: "abc".to_owned(),
+                root: dir.join("cache").to_string_lossy().to_string(),
+            }),
                 project: Some(BuildManifestProjectInfo {
                     name: "demo".to_owned(),
                     abi_mode: "explicit".to_owned(),

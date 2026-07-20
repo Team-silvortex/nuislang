@@ -187,9 +187,9 @@ mod cpu Main {
   fn capture_workflow_runtime_project() -> WorkflowReport {
     let empty_args: i64 = text_handle("");
     let first_step: WorkflowStep =
-      build_workflow_step(text_handle("first"), text_handle("/usr/bin/true"), empty_args, true);
+      build_workflow_step(text_handle("first"), text_handle("true"), empty_args, true);
     let second_step: WorkflowStep =
-      build_workflow_step(text_handle("second"), text_handle("/usr/bin/true"), empty_args, false);
+      build_workflow_step(text_handle("second"), text_handle("true"), empty_args, false);
     let first_report: WorkflowStepReport = run_workflow_step(first_step);
 
     if workflow_should_stop(first_step, first_report) {

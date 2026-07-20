@@ -37,7 +37,7 @@ fn build_manifest_emits_shader_ir_sidecar() {
         &dir,
         &written,
         &BuildManifestContext {
-            input_path: "/tmp/shader.ns".to_owned(),
+            input_path: dir.join("shader.ns").to_string_lossy().to_string(),
             output_dir: dir.display().to_string(),
             loaded_nustar: vec!["official.cpu".to_owned(), "official.shader".to_owned()],
             compile_cache: None,

@@ -2306,7 +2306,7 @@ fn c_string_literal(raw: &str) -> String {
 }
 
 fn compile_native_binary(ll_path: &Path, shim_path: &Path, exe_path: &Path) -> Result<(), String> {
-    let output = Command::new("/usr/bin/clang")
+    let output = Command::new("clang")
         .arg(ll_path)
         .arg(shim_path)
         .arg("-O2")
@@ -2332,7 +2332,7 @@ fn compile_native_appkit_binary(
     runtime_staticlib_path: Option<&Path>,
     exe_path: &Path,
 ) -> Result<(), String> {
-    let mut command = Command::new("/usr/bin/clang");
+    let mut command = Command::new("clang");
     command
         .arg(ll_path)
         .arg(host_path)

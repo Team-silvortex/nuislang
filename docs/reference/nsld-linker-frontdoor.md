@@ -367,7 +367,7 @@ blockers = []
 order_index = 0
 section_id = "sec0000.compiled-artifact"
 section_kind = "compiled-artifact"
-source_path = "/.../nuis.compiled.artifact"
+source_path = "ARTIFACT_ROOT/nuis.compiled.artifact"
 source_hash = "0x..."
 required = true
 ```
@@ -405,7 +405,7 @@ blockers = []
 order_index = 0
 section_id = "sec0000.compiled-artifact"
 section_kind = "compiled-artifact"
-source_path = "/.../nuis.compiled.artifact"
+source_path = "ARTIFACT_ROOT/nuis.compiled.artifact"
 source_hash = "0x..."
 required = true
 ```
@@ -519,14 +519,14 @@ container_version = 1
 section_count = 6
 section_table_hash = "0x..."
 container_layout_hash = "0x..."
-output_path = "/.../nuis.nsld.container"
+output_path = "ARTIFACT_ROOT/nuis.nsld.container"
 blockers = []
 
 [[section]]
 order_index = 0
 section_id = "sec0000.compiled-artifact"
 section_kind = "compiled-artifact"
-source_path = "/.../nuis.compiled.artifact"
+source_path = "ARTIFACT_ROOT/nuis.compiled.artifact"
 source_hash = "0x..."
 required = true
 ```
@@ -587,7 +587,7 @@ container_section_table_hash = "0x..."
 container_layout_hash = "0x..."
 container_hash = "0x..."
 loader_readiness = "host-assisted"
-loader_blockers = ["external-import:final-stage-driver:cc", "external-import:clang-target:arm64-apple-macosx", "external-import:c-world-policy:wrapped"]
+loader_blockers = ["external-import:final-stage-driver:cc", "external-import:clang-target:arm64-apple-darwin", "external-import:c-world-policy:wrapped"]
 loader_entry_kind = "lifecycle-bootstrap"
 loader_entry_symbol = "nustar.bootstrap.v1"
 loader_entry_section_id = "sec0000.compiled-artifact"
@@ -601,7 +601,7 @@ external_import_count = 3
 external_import_table_hash = "0x..."
 payload_size_bytes = 1234
 payload_hash = "0x..."
-payload_path = "/.../nuis.nsld.container.payload"
+payload_path = "ARTIFACT_ROOT/nuis.nsld.container.payload"
 blockers = []
 
 [[loader_symbol]]
@@ -649,7 +649,7 @@ required = true
 [[external_import]]
 import_id = "imp0001.clang-target"
 import_kind = "clang-target"
-import_name = "arm64-apple-macosx"
+import_name = "arm64-apple-darwin"
 provider = "host-toolchain"
 required = true
 
@@ -664,7 +664,7 @@ required = true
 order_index = 0
 section_id = "sec0000.compiled-artifact"
 section_kind = "compiled-artifact"
-source_path = "/.../nuis.compiled.artifact"
+source_path = "ARTIFACT_ROOT/nuis.compiled.artifact"
 source_hash = "0x..."
 payload_hash = "0x..."
 required = true
@@ -1576,8 +1576,8 @@ clock_edge_count = 3
 data_segment_count = 1
 final_stage_link_mode = "host-toolchain-finalize"
 host_wrapper_required = true
-compiled_artifact_path = "/.../nuis.compiled.artifact"
-native_output_path = "/.../shader_profile_demo"
+compiled_artifact_path = "ARTIFACT_ROOT/nuis.compiled.artifact"
+native_output_path = "ARTIFACT_ROOT/shader_profile_demo"
 issues = []
 ```
 
@@ -1613,7 +1613,7 @@ input_id = "li0000.shader.official.shader"
 input_kind = "lowering-ir-sidecar"
 domain_family = "shader"
 package_id = "official.shader"
-path = "/.../nuis.domain.shader.lowering.ir.txt"
+path = "ARTIFACT_ROOT/nuis.domain.shader.lowering.ir.txt"
 native_ir = "msl2.4"
 dispatch_lowering = "command-encoder-draw-dispatch"
 contract_count = 3

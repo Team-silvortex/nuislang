@@ -234,6 +234,7 @@ fn drive_until_clean_names_provider_sample_boundary_stop_reason() {
 fn drive_until_clean_names_blocked_provider_sample_repair_stop_reason() {
     let reason =
         "final executable output boundary is blocked by `device-provider-sample:metal:apple-silicon-gpu:blocked:1:provider-sample-blocked`; repair provider output payload diagnostics before relinking";
+    let output_dir = std::env::temp_dir().join("nuis");
 
     assert_eq!(
         final_output_boundary_stop_reason(Some(reason)),
@@ -247,9 +248,10 @@ fn drive_until_clean_names_blocked_provider_sample_repair_stop_reason() {
         stop_reason: "provider-output-payload-repair-required".to_owned(),
         stop_command_id: Some("repair-provider-output-payload".to_owned()),
         stop_source: Some("final-output-boundary".to_owned()),
-        stop_command_resolved: Some(
-            "nsdb materialize-provider-samples /tmp/nuis --json".to_owned(),
-        ),
+        stop_command_resolved: Some(format!(
+            "nsdb materialize-provider-samples {} --json",
+            output_dir.display()
+        )),
         stop_action_reason: Some(reason.to_owned()),
         stop_gate_action: None,
         stop_gate_env_assignments: Vec::new(),

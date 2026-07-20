@@ -1,3 +1,5 @@
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::{
     env, fs,
     fs::OpenOptions,
@@ -11,10 +13,19 @@ use std::{
 const ANCHOR_PROTOCOL: &str = "nuis-provider-completion-trust-anchor-v1";
 const ANCHOR_PATH_ENV: &str = "NUIS_PROVIDER_COMPLETION_TRUST_ANCHOR";
 const ANCHOR_BACKEND_ENV: &str = "NUIS_PROVIDER_COMPLETION_TRUST_ANCHOR_BACKEND";
+const ANCHOR_MARKER_ENV: &str = "NUIS_PROVIDER_COMPLETION_TRUST_ANCHOR_MARKER";
 const FILE_BACKEND: &str = "file-v1";
+const PROTECTED_FILE_BACKEND: &str = "protected-file-v1";
+const MARKER_PROTOCOL: &str = "nuis-provider-completion-trust-anchor-marker-v1";
 const LOCK_PROTOCOL: &str = "nuis-provider-completion-trust-anchor-lock-v1";
 const LOCK_STALE_AFTER_MS: u128 = 30_000;
 static LOCK_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
+#[derive(Clone, Copy)]
+enum TrustAnchorBackend {
+    File,
+    ProtectedFile,
+}
 
 pub(crate) enum AnchorCheck {
     Accepted,
@@ -29,24 +40,138 @@ pub(crate) fn enforce(
     generation: usize,
     registry_hash: &str,
 ) -> AnchorCheck {
-    let backend_supported = env::var_os(ANCHOR_BACKEND_ENV).map_or(true, |backend| {
-        backend.to_str().is_some_and(is_supported_backend)
-    });
-    if !backend_supported {
+    let backend = match env::var_os(ANCHOR_BACKEND_ENV) {
+        Some(raw) => match parse_anchor_backend(&raw) {
+            Some(value) => value,
+            None => return AnchorCheck::Invalid,
+        },
+        None => TrustAnchorBackend::File,
+    };
+    let Some((path, marker_path)) = resolve_anchor_paths(registry_path, &backend) else {
         return AnchorCheck::Invalid;
+    };
+    enforce_at_paths(
+        &path,
+        &marker_path,
+        registry_protocol,
+        generation,
+        registry_hash,
+    )
+}
+
+fn parse_anchor_backend(raw: &std::ffi::OsString) -> Option<TrustAnchorBackend> {
+    let backend = raw.to_str()?;
+    (backend == FILE_BACKEND)
+        .then_some(TrustAnchorBackend::File)
+        .or_else(|| {
+            (backend == PROTECTED_FILE_BACKEND).then_some(TrustAnchorBackend::ProtectedFile)
+        })
+}
+
+fn resolve_anchor_paths(
+    registry_path: &Path,
+    backend: &TrustAnchorBackend,
+) -> Option<(PathBuf, PathBuf)> {
+    let anchor_path = match backend {
+        TrustAnchorBackend::File => env::var_os(ANCHOR_PATH_ENV)
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                PathBuf::from(format!("{}.anchor", registry_path.to_string_lossy()))
+            }),
+        TrustAnchorBackend::ProtectedFile => env::var_os(ANCHOR_PATH_ENV).map(PathBuf::from)?,
+    };
+    if anchor_path.as_os_str().is_empty() {
+        return None;
     }
-    let path = env::var_os(ANCHOR_PATH_ENV)
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(format!("{}.anchor", registry_path.to_string_lossy())));
-    enforce_at_path(&path, registry_protocol, generation, registry_hash)
+    let marker_path = match backend {
+        TrustAnchorBackend::File => env::var_os(ANCHOR_MARKER_ENV)
+            .map(PathBuf::from)
+            .unwrap_or_else(|| default_marker_path(&anchor_path)),
+        TrustAnchorBackend::ProtectedFile => env::var_os(ANCHOR_MARKER_ENV).map(PathBuf::from)?,
+    };
+    if marker_path.as_os_str().is_empty() || anchor_path == marker_path {
+        return None;
+    }
+    if !is_anchor_path_valid(&anchor_path, *backend) {
+        return None;
+    }
+    if !is_anchor_path_valid(&marker_path, *backend) {
+        return None;
+    }
+    if let TrustAnchorBackend::ProtectedFile = backend {
+        if anchor_path.parent().is_none() || marker_path.parent().is_none() {
+            return None;
+        }
+        if anchor_path.parent() == marker_path.parent() {
+            return None;
+        }
+    }
+    Some((anchor_path, marker_path))
+}
+
+fn is_anchor_path_valid(path: &Path, backend: TrustAnchorBackend) -> bool {
+    let Some(parent) = path.parent() else {
+        return false;
+    };
+    if is_symlink_path(path) {
+        return false;
+    }
+    if !is_existing_directory(parent) {
+        return false;
+    }
+    if let TrustAnchorBackend::ProtectedFile = backend {
+        return is_protected_directory(parent);
+    }
+    true
+}
+
+fn is_existing_directory(path: &Path) -> bool {
+    fs::metadata(path).is_ok_and(|metadata| metadata.is_dir())
+}
+
+fn is_protected_directory(path: &Path) -> bool {
+    #[cfg(unix)]
+    if !fs::metadata(path).is_ok_and(|metadata| {
+        (metadata.permissions().mode() & 0o022) == 0 && !is_symlink_path(path)
+    }) {
+        return false;
+    }
+    true
+}
+
+#[cfg(not(unix))]
+fn is_protected_directory(path: &Path) -> bool {
+    let _ = path;
+    true
+}
+
+fn is_symlink_path(path: &Path) -> bool {
+    fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink())
 }
 
 fn is_supported_backend(backend: &str) -> bool {
-    backend == FILE_BACKEND
+    backend == FILE_BACKEND || backend == PROTECTED_FILE_BACKEND
 }
 
+#[cfg(test)]
 fn enforce_at_path(
     path: &Path,
+    registry_protocol: &str,
+    generation: usize,
+    registry_hash: &str,
+) -> AnchorCheck {
+    enforce_at_paths(
+        path,
+        &default_marker_path(path),
+        registry_protocol,
+        generation,
+        registry_hash,
+    )
+}
+
+fn enforce_at_paths(
+    path: &Path,
+    marker_path: &Path,
     registry_protocol: &str,
     generation: usize,
     registry_hash: &str,
@@ -55,28 +180,84 @@ fn enforce_at_path(
     let Ok(_guard) = AnchorLock::acquire(lock_path) else {
         return AnchorCheck::Invalid;
     };
-    match read_anchor(&path) {
-        Ok(None) => persist_anchor(&path, registry_protocol, generation, registry_hash)
-            .map_or(AnchorCheck::Invalid, |_| AnchorCheck::Accepted),
-        Ok(Some(anchor)) if anchor.registry_protocol != registry_protocol => AnchorCheck::Invalid,
-        Ok(Some(anchor)) if generation < anchor.highest_generation => AnchorCheck::Rollback,
-        Ok(Some(anchor)) if generation == anchor.highest_generation => {
-            if registry_hash == anchor.registry_hash {
-                AnchorCheck::Accepted
-            } else {
-                AnchorCheck::Fork
+    let marker = match read_marker(marker_path) {
+        Ok(marker) => marker,
+        Err(()) => return AnchorCheck::Invalid,
+    };
+    let anchor = match read_anchor(path) {
+        Ok(anchor) => anchor,
+        Err(()) => return AnchorCheck::Invalid,
+    };
+    let (anchor, marker_missing) = match (anchor, marker) {
+        (None, Some(_)) => return AnchorCheck::Invalid,
+        (None, None) => {
+            let anchor = TrustAnchor {
+                registry_protocol: registry_protocol.to_owned(),
+                highest_generation: generation,
+                registry_hash: registry_hash.to_owned(),
+            };
+            if persist_anchor(path, registry_protocol, generation, registry_hash).is_err()
+                || persist_marker(marker_path, &anchor).is_err()
+            {
+                return AnchorCheck::Invalid;
             }
+            return AnchorCheck::Accepted;
         }
-        Ok(Some(_)) => persist_anchor(&path, registry_protocol, generation, registry_hash)
-            .map_or(AnchorCheck::Invalid, |_| AnchorCheck::Accepted),
-        Err(()) => AnchorCheck::Invalid,
+        (Some(anchor), None) => (anchor, true),
+        (Some(anchor), Some(marker)) => {
+            if !marker.matches(&anchor) {
+                return AnchorCheck::Invalid;
+            }
+            (anchor, false)
+        }
+    };
+    if anchor.registry_protocol != registry_protocol {
+        AnchorCheck::Invalid
+    } else if generation < anchor.highest_generation {
+        AnchorCheck::Rollback
+    } else if generation == anchor.highest_generation {
+        if registry_hash == anchor.registry_hash {
+            if marker_missing && persist_marker(marker_path, &anchor).is_err() {
+                AnchorCheck::Invalid
+            } else {
+                AnchorCheck::Accepted
+            }
+        } else {
+            AnchorCheck::Fork
+        }
+    } else {
+        if marker_missing && persist_marker(marker_path, &anchor).is_err() {
+            AnchorCheck::Invalid
+        } else {
+            persist_anchor(path, registry_protocol, generation, registry_hash)
+                .map_or(AnchorCheck::Invalid, |_| AnchorCheck::Accepted)
+        }
     }
+}
+
+fn default_marker_path(path: &Path) -> PathBuf {
+    PathBuf::from(format!("{}.initialized", path.to_string_lossy()))
 }
 
 struct TrustAnchor {
     registry_protocol: String,
     highest_generation: usize,
     registry_hash: String,
+}
+
+struct TrustAnchorMarker {
+    registry_protocol: String,
+    initialized_generation: usize,
+    initialized_registry_hash: String,
+}
+
+impl TrustAnchorMarker {
+    fn matches(&self, anchor: &TrustAnchor) -> bool {
+        self.registry_protocol == anchor.registry_protocol
+            && self.initialized_generation <= anchor.highest_generation
+            && (self.initialized_generation < anchor.highest_generation
+                || self.initialized_registry_hash == anchor.registry_hash)
+    }
 }
 
 fn read_anchor(path: &Path) -> Result<Option<TrustAnchor>, ()> {
@@ -99,6 +280,28 @@ fn read_anchor(path: &Path) -> Result<Option<TrustAnchor>, ()> {
     }))
 }
 
+fn read_marker(path: &Path) -> Result<Option<TrustAnchorMarker>, ()> {
+    let source = match fs::read_to_string(path) {
+        Ok(source) => source,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(_) => return Err(()),
+    };
+    if string_field(&source, "protocol").as_deref() != Some(MARKER_PROTOCOL)
+        || string_field(&source, "anchor_protocol").as_deref() != Some(ANCHOR_PROTOCOL)
+    {
+        return Err(());
+    }
+    Ok(Some(TrustAnchorMarker {
+        registry_protocol: string_field(&source, "registry_protocol").ok_or(())?,
+        initialized_generation: usize_field(&source, "initialized_generation")
+            .filter(|value| *value > 0)
+            .ok_or(())?,
+        initialized_registry_hash: string_field(&source, "initialized_registry_hash")
+            .filter(|value| value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit()))
+            .ok_or(())?,
+    }))
+}
+
 fn persist_anchor(
     path: &Path,
     registry_protocol: &str,
@@ -109,15 +312,28 @@ fn persist_anchor(
     let content = format!(
         "protocol = \"{ANCHOR_PROTOCOL}\"\nregistry_protocol = \"{registry_protocol}\"\nhighest_generation = {generation}\nregistry_hash = \"{hash}\"\n"
     );
+    persist_atomic(path, &temporary, content.as_bytes())
+}
+
+fn persist_marker(path: &Path, anchor: &TrustAnchor) -> Result<(), ()> {
+    let temporary = PathBuf::from(format!("{}.tmp", path.to_string_lossy()));
+    let content = format!(
+        "protocol = \"{MARKER_PROTOCOL}\"\nanchor_protocol = \"{ANCHOR_PROTOCOL}\"\nregistry_protocol = \"{}\"\ninitialized_generation = {}\ninitialized_registry_hash = \"{}\"\n",
+        anchor.registry_protocol, anchor.highest_generation, anchor.registry_hash
+    );
+    persist_atomic(path, &temporary, content.as_bytes())
+}
+
+fn persist_atomic(path: &Path, temporary: &Path, content: &[u8]) -> Result<(), ()> {
     let mut file = OpenOptions::new()
         .create(true)
         .truncate(true)
         .write(true)
-        .open(&temporary)
+        .open(temporary)
         .map_err(|_| ())?;
-    file.write_all(content.as_bytes()).map_err(|_| ())?;
+    file.write_all(content).map_err(|_| ())?;
     file.sync_all().map_err(|_| ())?;
-    fs::rename(&temporary, path).map_err(|_| ())?;
+    fs::rename(temporary, path).map_err(|_| ())?;
     if let Some(parent) = path.parent() {
         OpenOptions::new()
             .read(true)
@@ -252,6 +468,11 @@ fn u128_field(source: &str, key: &str) -> Option<u128> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
+    use std::sync::Mutex;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn anchor_rejects_rollback_and_same_generation_fork() {
@@ -275,6 +496,32 @@ mod tests {
             enforce_at_path(&anchor, "registry-v1", 3, &"c".repeat(64)),
             AnchorCheck::Accepted
         ));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn anchor_backend_unknown_fails_closed() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let root = env::temp_dir().join(format!(
+            "nsdb-trust-anchor-invalid-backend-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let anchor = root.join("anchor.toml");
+        env::set_var(ANCHOR_BACKEND_ENV, "unknown");
+        env::set_var(ANCHOR_PATH_ENV, &anchor);
+        assert!(matches!(
+            enforce(
+                &root.join("registry.toml"),
+                "registry-v1",
+                2,
+                &"a".repeat(64)
+            ),
+            AnchorCheck::Invalid
+        ));
+        env::remove_var(ANCHOR_BACKEND_ENV);
+        env::remove_var(ANCHOR_PATH_ENV);
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -303,7 +550,133 @@ mod tests {
     #[test]
     fn anchor_backend_contract_fails_closed() {
         assert!(is_supported_backend(FILE_BACKEND));
+        assert!(is_supported_backend(PROTECTED_FILE_BACKEND));
         assert!(!is_supported_backend("keychain-v1"));
+    }
+
+    #[test]
+    fn protected_file_backend_requires_explicit_paths() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let root = env::temp_dir().join(format!("nsdb-protected-backend-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let anchor = root.join("anchors/trust.anchor");
+        let marker = root.join("markers/trust.initialized");
+        let anchor_parent = anchor.parent().unwrap();
+        let marker_parent = marker.parent().unwrap();
+        fs::create_dir_all(anchor.parent().unwrap()).unwrap();
+        fs::create_dir_all(marker.parent().unwrap()).unwrap();
+        env::set_var(ANCHOR_BACKEND_ENV, PROTECTED_FILE_BACKEND);
+        env::set_var(ANCHOR_PATH_ENV, &anchor);
+        let _ = env::remove_var(ANCHOR_MARKER_ENV);
+        assert!(matches!(
+            enforce(
+                &root.join("registry.toml"),
+                "registry-v1",
+                2,
+                &"a".repeat(64)
+            ),
+            AnchorCheck::Invalid
+        ));
+        env::set_var(ANCHOR_MARKER_ENV, &marker);
+        #[cfg(unix)]
+        {
+            fs::set_permissions(anchor_parent, PermissionsExt::from_mode(0o700)).unwrap();
+            fs::set_permissions(marker_parent, PermissionsExt::from_mode(0o700)).unwrap();
+        }
+        assert!(matches!(
+            enforce(
+                &root.join("registry.toml"),
+                "registry-v1",
+                2,
+                &"a".repeat(64)
+            ),
+            AnchorCheck::Accepted
+        ));
+        assert!(matches!(
+            enforce(
+                &root.join("registry.toml"),
+                "registry-v1",
+                2,
+                &"a".repeat(64)
+            ),
+            AnchorCheck::Accepted
+        ));
+        env::set_var(ANCHOR_PATH_ENV, marker);
+        assert!(matches!(
+            enforce(
+                &root.join("registry.toml"),
+                "registry-v1",
+                2,
+                &"a".repeat(64)
+            ),
+            AnchorCheck::Invalid
+        ));
+        env::remove_var(ANCHOR_BACKEND_ENV);
+        env::remove_var(ANCHOR_PATH_ENV);
+        env::remove_var(ANCHOR_MARKER_ENV);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn protected_file_backend_rejects_world_writable_parent_and_parent_symlink() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let root = env::temp_dir().join(format!(
+            "nsdb-protected-backend-perm-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let anchor_parent = root.join("a");
+        let marker_parent = root.join("m");
+        fs::create_dir_all(&anchor_parent).unwrap();
+        fs::create_dir_all(&marker_parent).unwrap();
+        let anchor = anchor_parent.join("trust.anchor");
+        let marker = marker_parent.join("trust.initialized");
+        fs::set_permissions(&anchor_parent, PermissionsExt::from_mode(0o777)).unwrap();
+        fs::set_permissions(&marker_parent, PermissionsExt::from_mode(0o777)).unwrap();
+        env::set_var(ANCHOR_BACKEND_ENV, PROTECTED_FILE_BACKEND);
+        env::set_var(ANCHOR_PATH_ENV, &anchor);
+        env::set_var(ANCHOR_MARKER_ENV, &marker);
+        assert!(matches!(
+            enforce(
+                &root.join("registry.toml"),
+                "registry-v1",
+                2,
+                &"a".repeat(64)
+            ),
+            AnchorCheck::Invalid
+        ));
+        fs::set_permissions(&anchor_parent, PermissionsExt::from_mode(0o755)).unwrap();
+        fs::set_permissions(&marker_parent, PermissionsExt::from_mode(0o755)).unwrap();
+        assert!(matches!(
+            enforce(
+                &root.join("registry.toml"),
+                "registry-v1",
+                2,
+                &"a".repeat(64)
+            ),
+            AnchorCheck::Accepted
+        ));
+        let symlink_parent = root.join("symlink-marker");
+        let marker_target = root.join("other");
+        fs::create_dir_all(&marker_target).unwrap();
+        std::os::unix::fs::symlink(&marker_target, &symlink_parent).unwrap();
+        env::set_var(ANCHOR_MARKER_ENV, symlink_parent.join("trust.initialized"));
+        assert!(matches!(
+            enforce(
+                &root.join("registry.toml"),
+                "registry-v1",
+                2,
+                &"a".repeat(64)
+            ),
+            AnchorCheck::Invalid
+        ));
+        env::remove_var(ANCHOR_BACKEND_ENV);
+        env::remove_var(ANCHOR_PATH_ENV);
+        env::remove_var(ANCHOR_MARKER_ENV);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -315,6 +688,54 @@ mod tests {
         fs::write(&lock, "partial").unwrap();
         assert!(!lock_is_stale(&lock, now_unix_ms().unwrap()));
         assert!(lock_is_stale(&lock, u128::MAX));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn initialization_marker_detects_anchor_deletion() {
+        let root = env::temp_dir().join(format!("nsdb-anchor-marker-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let anchor = root.join("anchor.toml");
+        let marker = root.join("protected/anchor.initialized");
+        fs::create_dir_all(marker.parent().unwrap()).unwrap();
+        assert!(matches!(
+            enforce_at_paths(&anchor, &marker, "registry-v1", 2, &"a".repeat(64)),
+            AnchorCheck::Accepted
+        ));
+        assert!(marker.exists());
+        fs::remove_file(&anchor).unwrap();
+        assert!(matches!(
+            enforce_at_paths(&anchor, &marker, "registry-v1", 2, &"a".repeat(64)),
+            AnchorCheck::Invalid
+        ));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn existing_anchor_migrates_to_marker_protocol() {
+        let root = env::temp_dir().join(format!("nsdb-anchor-migration-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let anchor = root.join("anchor.toml");
+        let marker = default_marker_path(&anchor);
+        persist_anchor(&anchor, "registry-v1", 3, &"b".repeat(64)).unwrap();
+        assert!(matches!(
+            enforce_at_paths(&anchor, &marker, "registry-v1", 3, &"c".repeat(64)),
+            AnchorCheck::Fork
+        ));
+        assert!(!marker.exists());
+        assert!(matches!(
+            enforce_at_paths(&anchor, &marker, "registry-v1", 3, &"b".repeat(64)),
+            AnchorCheck::Accepted
+        ));
+        assert_eq!(
+            read_marker(&marker)
+                .unwrap()
+                .unwrap()
+                .initialized_generation,
+            3
+        );
         fs::remove_dir_all(root).unwrap();
     }
 }
