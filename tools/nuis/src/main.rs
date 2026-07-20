@@ -8,6 +8,8 @@ mod artifact_materialization;
 mod artifact_nsdb_handoff;
 mod artifact_nsdb_handoff_integrity;
 mod artifact_nsdb_handoff_signature;
+mod artifact_nsdb_handoff_trust_anchor;
+mod artifact_nsdb_handoff_trust_registry;
 mod artifact_nsdb_replay_cursor;
 mod artifact_nsdb_replay_cursor_lineage;
 mod artifact_runtime_command;

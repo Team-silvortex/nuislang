@@ -13,7 +13,8 @@ use crate::provider_completion_integrity::{
     DIGEST_SHA256_SIGNED_CONTRACT as PROVIDER_COMPLETION_DIGEST_SHA256_SIGNED_CONTRACT,
 };
 use crate::provider_completion_signature::{
-    sign_from_environment, signing_key_configured, verify_from_environment,
+    handoff_error_status as provider_completion_signature_error, sign_from_environment,
+    signing_key_configured, verify_from_environment,
     SIGNATURE_CONTRACT as PROVIDER_COMPLETION_SIGNATURE_CONTRACT,
 };
 use std::{fs, path::Path};
@@ -603,17 +604,9 @@ fn payload_handoff_status(
         "authority-untrusted" => return "provider-completion-claim-authority-untrusted".to_owned(),
         _ => {}
     }
-    match provider_completion_signature_status {
-        "signature-missing" => return "provider-completion-signature-missing".to_owned(),
-        "unsupported-signature-contract" => {
-            return "provider-completion-signature-contract-unsupported".to_owned()
-        }
-        "signature-key-untrusted" => {
-            return "provider-completion-signature-key-untrusted".to_owned()
-        }
-        "signature-malformed" => return "provider-completion-signature-malformed".to_owned(),
-        "signature-mismatch" => return "provider-completion-signature-mismatch".to_owned(),
-        _ => {}
+    if let Some(status) = provider_completion_signature_error(provider_completion_signature_status)
+    {
+        return status.to_owned();
     }
     if first_status == "ready" {
         "ready".to_owned()

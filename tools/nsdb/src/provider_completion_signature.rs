@@ -1,9 +1,10 @@
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use std::env;
 
+use crate::provider_completion_trust_registry::{lookup_from_environment, TrustedKeyLookup};
+
 pub(crate) const SIGNATURE_CONTRACT: &str = "nuis-provider-completion-signature-ed25519-v1";
 pub(crate) const SIGNING_KEY_ENV: &str = "NUIS_PROVIDER_COMPLETION_SIGNING_KEY_HEX";
-pub(crate) const TRUSTED_KEYS_ENV: &str = "NUIS_PROVIDER_COMPLETION_TRUSTED_PUBLIC_KEYS";
 
 pub(crate) struct ProviderCompletionSignatureClaim {
     pub(crate) public_key_id: String,
@@ -43,8 +44,14 @@ pub(crate) fn verify_from_environment(
     if contract != SIGNATURE_CONTRACT {
         return "unsupported-signature-contract";
     }
-    let Some(verifying_key) = trusted_key(public_key_id_claim) else {
-        return "signature-key-untrusted";
+    let verifying_key = match lookup_from_environment(public_key_id_claim) {
+        TrustedKeyLookup::Active(key) => key,
+        TrustedKeyLookup::Revoked => return "signature-key-revoked",
+        TrustedKeyLookup::Missing => return "signature-key-untrusted",
+        TrustedKeyLookup::Invalid => return "signature-trust-registry-invalid",
+        TrustedKeyLookup::Rollback => return "signature-trust-registry-rollback",
+        TrustedKeyLookup::Fork => return "signature-trust-registry-fork",
+        TrustedKeyLookup::AnchorInvalid => return "signature-trust-anchor-invalid",
     };
     let Ok(signature_bytes) = decode_array::<64>(signature_hex, "signature") else {
         return "signature-malformed";
@@ -57,24 +64,30 @@ pub(crate) fn verify_from_environment(
     }
 }
 
-fn trusted_key(key_id: &str) -> Option<VerifyingKey> {
-    if let Ok(registry) = env::var(TRUSTED_KEYS_ENV) {
-        for entry in registry.split([',', ';']) {
-            let Some((candidate_id, encoded_key)) = entry.trim().split_once('=') else {
-                continue;
-            };
-            if candidate_id.trim() != key_id {
-                continue;
-            }
-            let bytes = decode_array::<32>(encoded_key.trim(), "trusted public key").ok()?;
-            let key = VerifyingKey::from_bytes(&bytes).ok()?;
-            return (public_key_id(&key) == key_id).then_some(key);
+pub(crate) fn handoff_error_status(status: &str) -> Option<&'static str> {
+    match status {
+        "signature-missing" => Some("provider-completion-signature-missing"),
+        "unsupported-signature-contract" => {
+            Some("provider-completion-signature-contract-unsupported")
         }
+        "signature-key-untrusted" => Some("provider-completion-signature-key-untrusted"),
+        "signature-key-revoked" => Some("provider-completion-signature-key-revoked"),
+        "signature-trust-registry-invalid" => {
+            Some("provider-completion-signature-trust-registry-invalid")
+        }
+        "signature-trust-registry-rollback" => {
+            Some("provider-completion-signature-trust-registry-rollback")
+        }
+        "signature-trust-registry-fork" => {
+            Some("provider-completion-signature-trust-registry-fork")
+        }
+        "signature-trust-anchor-invalid" => {
+            Some("provider-completion-signature-trust-anchor-invalid")
+        }
+        "signature-malformed" => Some("provider-completion-signature-malformed"),
+        "signature-mismatch" => Some("provider-completion-signature-mismatch"),
+        _ => None,
     }
-    let encoded = env::var(SIGNING_KEY_ENV).ok()?;
-    let signing_key = SigningKey::from_bytes(&decode_array::<32>(&encoded, "signing key").ok()?);
-    let key = signing_key.verifying_key();
-    (public_key_id(&key) == key_id).then_some(key)
 }
 
 fn public_key_id(key: &VerifyingKey) -> String {

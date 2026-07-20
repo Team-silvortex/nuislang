@@ -13,6 +13,8 @@ mod model;
 mod payload_decoder;
 mod provider_completion_integrity;
 mod provider_completion_signature;
+mod provider_completion_trust_anchor;
+mod provider_completion_trust_registry;
 mod provider_runner_metal;
 mod provider_runner_registry;
 mod provider_sample;
