@@ -110,6 +110,7 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
             condition,
             then_owner,
             else_owner,
+            ..
         } => {
             collect_instantiated_units_expr(condition, units);
             collect_instantiated_units_expr(then_owner, units);

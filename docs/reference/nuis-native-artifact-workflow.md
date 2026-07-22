@@ -100,6 +100,7 @@ cargo run -p nuis -- project-doctor \
 Read `status` as the stable top-level transcript sample:
 
 ```text
+frontdoor_reading_order_contract: nuis-frontdoor-reading-order-v1
 frontdoor_reading_order: closure_summary -> dev_tensor_weakest_task_card_handoff
 frontdoor_sample_closure_summary: closure_summary_status -> closure_summary_next_action -> closure_summary_next_command
 frontdoor_sample_tensor_handoff: dev_tensor_weakest_task_card_coordinate -> dev_tensor_weakest_task_card_handoff_coordinate -> dev_tensor_weakest_task_card_handoff_command
@@ -242,6 +243,8 @@ artifact-follow-up state:
 * `artifact_closure_entrypoint_protocol_valid`
 * `artifact_closure_reason`
 * `nsld_final_executable_output_recommended_next_action`
+* `nsld_final_executable_output_artifact_chain_safe_next_contract`
+* `nsld_final_executable_output_artifact_chain_safe_next_probe_command`
 * `nsld_final_executable_output_path_present`
 * `nsld_final_executable_output_nsld_owned`
 * `nsld_final_executable_output_blockers`
@@ -315,6 +318,11 @@ Short reading rule:
   pipeline artifact exists
 * `nsld_final_executable_output_recommended_next_action` gives scripts the next
   boundary action without forcing them to interpret every blocker string
+* `nsld_final_executable_output_artifact_chain_safe_next_contract` and
+  `nsld_final_executable_output_artifact_chain_safe_next_probe_command` let
+  object-package and replay consumers return to the shared
+  `nsld-drive-safe-next-v1` probe before mutating linker state; replay itself
+  remains read-only and does not acquire linker transition semantics
 * `nsld_self_owned_image_status` is the normalized script-facing state for the
   internal `.nsb` image layer before host-shell or OS-native materialization
 * `nsld_entrypoint_materialization_status` separates the next entrypoint layer

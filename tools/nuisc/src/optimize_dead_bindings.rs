@@ -194,6 +194,7 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
             condition,
             then_owner,
             else_owner,
+            ..
         } => {
             collect_used_vars_expr(condition, out);
             collect_used_vars_expr(then_owner, out);

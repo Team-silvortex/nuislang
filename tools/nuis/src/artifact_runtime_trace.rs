@@ -1,7 +1,8 @@
 use crate::artifact_device_sample::{
-    device_sample_contract_for_trace, push_device_sample_handoff_queue_toml,
-    render_device_provider_sample_manifest_toml, summarize_device_samples, DeviceSampleContract,
-    DeviceSampleSummary, DEVICE_PROVIDER_SAMPLE_FILE_NAME,
+    device_sample_contract_for_trace, persist_device_sample_input_payloads,
+    push_device_sample_handoff_queue_toml, render_device_provider_sample_manifest_toml,
+    summarize_device_samples, DeviceSampleContract, DeviceSampleSummary,
+    DEVICE_PROVIDER_SAMPLE_FILE_NAME,
 };
 use crate::artifact_doctor::BackendArtifactPayloadEvidence;
 use crate::artifact_runtime_persistence::HeteroRuntimeTracePersistence;
@@ -310,8 +311,14 @@ impl HeteroRuntimeTraceSummary {
                 let decoder_manifest_record_count = payload_decoder_manifest_record_count(self);
                 let (provider_sample_source, provider_sample_record_count) =
                     self.render_device_provider_sample_manifest_toml();
-                let provider_sample_result =
-                    fs::write(&provider_sample_manifest_path, provider_sample_source);
+                let provider_sample_result = persist_device_sample_input_payloads(
+                    output_dir,
+                    self.records.iter().map(|record| &record.device_sample),
+                )
+                .and_then(|()| {
+                    fs::write(&provider_sample_manifest_path, provider_sample_source)
+                        .map_err(|error| error.to_string())
+                });
                 match fs::write(&decoder_manifest_path, decoder_manifest_source) {
                     Ok(()) => HeteroRuntimeTracePersistence {
                         persisted: true,

@@ -921,7 +921,10 @@ fn project_metadata_render_helpers_expose_summary_and_paths() {
 
     let paths = render_project_metadata_paths(&summary);
     assert!(paths.contains(&format!("project_root={}", demo_root.display())));
-    assert!(paths.contains(&format!("manifest_path={}", demo_root.join("nuis.toml").display())));
+    assert!(paths.contains(&format!(
+        "manifest_path={}",
+        demo_root.join("nuis.toml").display()
+    )));
     assert!(paths.contains(&format!(
         "build_manifest_path={}",
         demo_root.join("build/nuis.build.manifest.toml").display()
@@ -944,9 +947,7 @@ fn project_metadata_render_helpers_expose_summary_and_paths() {
     )));
     assert!(paths.contains(&format!(
         "host_ffi_index_path={}",
-        demo_root
-            .join("build/nuis.project.host_ffi.txt")
-            .display()
+        demo_root.join("build/nuis.project.host_ffi.txt").display()
     )));
 }
 

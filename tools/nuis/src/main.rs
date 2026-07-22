@@ -1,3 +1,4 @@
+mod artifact_coreml_model;
 mod artifact_device_sample;
 mod artifact_doctor;
 mod artifact_doctor_mirrors;
@@ -170,6 +171,10 @@ fn run() -> Result<(), String> {
             println!("nuis toolchain frontdoor");
             print_workflow_frontdoor_surface(&frontdoor);
             println!(
+                "  frontdoor_reading_order_contract: {}",
+                workflow::FRONTDOOR_READING_ORDER_CONTRACT
+            );
+            println!(
                 "  frontdoor_reading_order: {}",
                 workflow::FRONTDOOR_READING_ORDER
             );
@@ -198,6 +203,30 @@ fn run() -> Result<(), String> {
             let dev_tensor = dev_tensor::dev_tensor_summary();
             let dev_tensor_drift = dev_tensor::dev_tensor_drift_summary();
             println!("  dev_tensor_model: architecture-module-function-progress-tensor");
+            println!(
+                "  dev_tensor_hierarchy_protocol: {}",
+                dev_tensor.hierarchy_protocol_version
+            );
+            println!(
+                "  dev_tensor_hierarchy_validation_status: {}",
+                dev_tensor.hierarchy_validation_status
+            );
+            println!(
+                "  dev_tensor_hierarchy_validation_node_count: {}",
+                dev_tensor.hierarchy_validation_node_count
+            );
+            println!(
+                "  dev_tensor_hierarchy_validation_max_depth: {}",
+                dev_tensor.hierarchy_validation_max_depth
+            );
+            println!(
+                "  dev_tensor_hierarchy_validation_error_count: {}",
+                dev_tensor.hierarchy_validation_error_count
+            );
+            println!(
+                "  dev_tensor_hierarchy_validation_first_error: {}",
+                dev_tensor.hierarchy_validation_first_error
+            );
             println!("  dev_tensor_cells: {}", dev_tensor.cell_count);
             println!(
                 "  dev_tensor_bootstrap_critical_cells: {}",

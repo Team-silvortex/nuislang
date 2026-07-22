@@ -439,6 +439,8 @@ fn owned_pointer_branch_result_is_a_glm_resource() {
     let encoded = vec![
         "choose_left".to_owned(),
         "owned_ptr".to_owned(),
+        "address_kind=node".to_owned(),
+        "nullable=true".to_owned(),
         "1".to_owned(),
         "cpu".to_owned(),
         "take_ptr_drop_other".to_owned(),
@@ -460,6 +462,8 @@ fn owned_pointer_branch_result_is_a_glm_resource() {
     ];
     let parsed = crate::parse_branch_effect_args(&encoded).unwrap();
     assert_eq!(parsed.merge_result, crate::BranchEffectResult::OwnedPointer);
+    assert_eq!(parsed.address_kind, Some("node"));
+    assert!(parsed.nullable);
     assert!(crate::branch_effect_merge_is_valid(&parsed));
     let profile =
         crate::glm_profile_for_operation(&Operation::parse("cpu.branch_effect", encoded).unwrap());

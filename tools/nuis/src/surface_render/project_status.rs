@@ -62,6 +62,34 @@ pub(crate) fn write_project_status_text_summary<W: fmt::Write>(
     writeln!(out, "  root: {}", project.root.display()).map_err(|e| e.to_string())?;
     writeln!(out, "  manifest: {}", project.manifest_path.display()).map_err(|e| e.to_string())?;
     writeln!(out, "  entry: {}", project.manifest.entry).map_err(|e| e.to_string())?;
+    writeln!(out, "  closure_summary_source: {}", closure_summary.source)
+        .map_err(|e| e.to_string())?;
+    writeln!(out, "  closure_summary_status: {}", closure_summary.status)
+        .map_err(|e| e.to_string())?;
+    writeln!(out, "  closure_summary_ready: {}", closure_summary.ready)
+        .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  closure_summary_primary_blocker: {}",
+        closure_summary
+            .primary_blocker
+            .as_deref()
+            .unwrap_or("<none>")
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  closure_summary_next_action: {}",
+        closure_summary.next_action
+    )
+    .map_err(|e| e.to_string())?;
+    writeln!(
+        out,
+        "  closure_summary_next_command: {}",
+        closure_summary.next_command.as_deref().unwrap_or("<none>")
+    )
+    .map_err(|e| e.to_string())?;
+    crate::workflow::write_workflow_frontdoor_reading_order(out)?;
     writeln!(out, "  frontdoor.source_kind: {}", frontdoor.source_kind)
         .map_err(|e| e.to_string())?;
     writeln!(
@@ -116,23 +144,6 @@ pub(crate) fn write_project_status_text_summary<W: fmt::Write>(
         out,
         "  recommended_reason: {}",
         frontdoor.recommended_reason
-    )
-    .map_err(|e| e.to_string())?;
-    writeln!(out, "  closure_summary_status: {}", closure_summary.status)
-        .map_err(|e| e.to_string())?;
-    writeln!(
-        out,
-        "  closure_summary_primary_blocker: {}",
-        closure_summary
-            .primary_blocker
-            .as_deref()
-            .unwrap_or("<none>")
-    )
-    .map_err(|e| e.to_string())?;
-    writeln!(
-        out,
-        "  closure_summary_next_action: {}",
-        closure_summary.next_action
     )
     .map_err(|e| e.to_string())?;
     writeln!(

@@ -44,6 +44,7 @@ pub(in crate::nir_verify) fn apply_guaranteed_expr_effects(
             condition,
             then_owner,
             else_owner,
+            ..
         } => {
             apply_guaranteed_expr_effects(
                 condition,

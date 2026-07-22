@@ -17,6 +17,11 @@ __pycache__/
 # Contains mutation testing data
 **/mutants.out*/
 
+# Ignore dynamic/shared library outputs that may be produced by local test builds
+*.so
+*.dylib
+*.dll
+
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore

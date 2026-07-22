@@ -92,18 +92,18 @@ fn framework_roots() -> Vec<PathBuf> {
     }
     if let Some(xcode_root) = xcode_select_root() {
         roots.push(
-            xcode_root.join("Platforms").join("MacOSX.platform").join("Developer").join("SDKs").join(
-                "MacOSX.sdk",
-            )
-            .join("System")
-            .join("Library")
-            .join("Frameworks"),
+            xcode_root
+                .join("Platforms")
+                .join("MacOSX.platform")
+                .join("Developer")
+                .join("SDKs")
+                .join("MacOSX.sdk")
+                .join("System")
+                .join("Library")
+                .join("Frameworks"),
         );
     }
-    roots
-        .into_iter()
-        .filter(|path| path.exists())
-        .collect()
+    roots.into_iter().filter(|path| path.exists()).collect()
 }
 
 #[cfg(target_os = "macos")]
@@ -132,10 +132,7 @@ fn xcode_select_root() -> Option<PathBuf> {
 
 #[cfg(target_os = "macos")]
 fn command_output_trimmed(command: &str, args: &[&str]) -> Option<String> {
-    let output = Command::new(command)
-        .args(args)
-        .output()
-        .ok()?;
+    let output = Command::new(command).args(args).output().ok()?;
     if !output.status.success() {
         return None;
     }

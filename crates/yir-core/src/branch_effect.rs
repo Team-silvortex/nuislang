@@ -103,6 +103,8 @@ impl BranchEffectAction<'_> {
 pub struct BranchEffectArgs<'a> {
     pub condition: &'a str,
     pub merge_result: BranchEffectResult,
+    pub address_kind: Option<&'a str>,
+    pub nullable: bool,
     pub then_actions: Vec<BranchEffectAction<'a>>,
     pub else_actions: Vec<BranchEffectAction<'a>>,
 }
@@ -111,21 +113,48 @@ pub fn parse_branch_effect_args(args: &[String]) -> Option<BranchEffectArgs<'_>>
     let condition = args.first()?.as_str();
     let merge_result = BranchEffectResult::parse(args.get(1)?)?;
     let mut cursor = 2usize;
+    let address_kind = args
+        .get(cursor)
+        .and_then(|value| value.strip_prefix("address_kind="));
+    let nullable = if address_kind.is_some() {
+        cursor += 1;
+        let value = args.get(cursor)?.strip_prefix("nullable=")?;
+        cursor += 1;
+        match value {
+            "true" => true,
+            "false" => false,
+            _ => return None,
+        }
+    } else {
+        false
+    };
     let then_actions = parse_actions(args, &mut cursor)?;
     let else_actions = parse_actions(args, &mut cursor)?;
     (cursor == args.len()).then_some(BranchEffectArgs {
         condition,
         merge_result,
+        address_kind,
+        nullable,
         then_actions,
         else_actions,
     })
 }
 
 pub fn branch_effect_merge_is_valid(args: &BranchEffectArgs<'_>) -> bool {
-    args.merge_result == BranchEffectResult::Unit
-        || [args.then_actions.last(), args.else_actions.last()]
-            .into_iter()
-            .all(|action| action.is_some_and(|action| action.result == args.merge_result))
+    let metadata_valid = match args.merge_result {
+        BranchEffectResult::OwnedPointer => args.address_kind.is_none_or(|kind| {
+            !kind.is_empty()
+                && kind
+                    .chars()
+                    .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-')
+        }),
+        _ => args.address_kind.is_none() && !args.nullable,
+    };
+    metadata_valid
+        && (args.merge_result == BranchEffectResult::Unit
+            || [args.then_actions.last(), args.else_actions.last()]
+                .into_iter()
+                .all(|action| action.is_some_and(|action| action.result == args.merge_result)))
 }
 
 fn parse_actions<'a>(

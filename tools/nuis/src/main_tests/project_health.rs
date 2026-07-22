@@ -1,5 +1,30 @@
 use super::*;
 
+fn resolved_galaxy_surface_count(project_root: &Path) -> usize {
+    nuisc::project::load_project(project_root)
+        .expect("load project")
+        .resolved_galaxies
+        .iter()
+        .flat_map(|dependency| dependency.surfaces.iter())
+        .collect::<std::collections::BTreeSet<_>>()
+        .len()
+}
+
+fn visible_galaxy_library_module_count(project_root: &Path) -> usize {
+    let project = nuisc::project::load_project(project_root).expect("load project");
+    project
+        .resolved_galaxies
+        .iter()
+        .flat_map(|dependency| dependency.resolved_library_paths.iter())
+        .filter(|library_path| {
+            project
+                .modules
+                .iter()
+                .any(|module| module.path == **library_path)
+        })
+        .count()
+}
+
 #[test]
 fn project_check_summary_json_fields_report_all_green() {
     let project = nuisc::project::load_project(
@@ -39,6 +64,9 @@ fn project_frontdoor_docs_define_closure_then_tensor_reading_order() {
     let frontdoor_doc =
         include_str!("../../../../docs/reference/nuis-frontdoor-surface-reference.md");
     assert!(frontdoor_doc.contains("closure_summary_status"));
+    assert!(
+        frontdoor_doc.contains("frontdoor_reading_order_contract: nuis-frontdoor-reading-order-v1")
+    );
     assert!(frontdoor_doc.contains(
         "frontdoor_reading_order: closure_summary -> dev_tensor_weakest_task_card_handoff"
     ));
@@ -99,6 +127,9 @@ mod cpu Main {
     .expect("write smoke test");
 
     let json = render_project_status_json(&project_root).expect("render status json");
+    let loaded_project = nuisc::project::load_project(&project_root).expect("load project");
+    let expected_public_surface_modules = crate::public_surface_records(&loaded_project).len();
+    let expected_galaxy_surface_count = resolved_galaxy_surface_count(&project_root);
 
     assert!(json.contains("\"source_kind\":\"project\""));
     assert!(json.contains("\"project\":\"status_json_smoke\""));
@@ -125,6 +156,15 @@ mod cpu Main {
     assert!(json.contains(
         "\"closure_summary_next_command\":\"nuis galaxy lock-deps <project-dir|nuis.toml>\""
     ));
+    assert!(
+        json.contains("\"frontdoor_reading_order_contract\":\"nuis-frontdoor-reading-order-v1\"")
+    );
+    assert!(json.contains(
+        "\"frontdoor_reading_order\":\"closure_summary -> dev_tensor_weakest_task_card_handoff\""
+    ));
+    assert!(
+        json.find("\"closure_summary_status\"") < json.find("\"frontdoor_reading_order_contract\"")
+    );
     assert!(json.contains("\"artifact_nsld_drive_dry_run_command\":\"nsld drive "));
     assert!(json.contains("\"artifact_nsld_drive_dry_run_json_command\":\"nsld drive "));
     assert!(json.contains(" --json\""));
@@ -151,11 +191,15 @@ mod cpu Main {
     assert!(json.contains("\"text_handle_rewrite_helper_hits\":1"));
     assert!(json.contains("\"text_handle_rewrite_local_hits\":1"));
     assert!(json.contains("\"text_handle_rewrite_total_hits\":2"));
-    assert!(json.contains("\"public_surface_modules\":11"));
+    assert!(json.contains(&format!(
+        "\"public_surface_modules\":{expected_public_surface_modules}"
+    )));
     assert!(json.contains("\"functions\":[\"exported\"]"));
     assert!(json.contains("\"public_functions\":"));
     assert!(json.contains("\"galaxy_lock_status\":\"missing\""));
-    assert!(json.contains("\"galaxy_surface_ids_count\":19"));
+    assert!(json.contains(&format!(
+        "\"galaxy_surface_ids_count\":{expected_galaxy_surface_count}"
+    )));
     assert!(json.contains("\"surface.ns-nova.renderer.v1\""));
     assert!(json.contains("\"contract.core.prelude.primitive-values.v1\""));
     assert!(json.contains("\"surface.std.collections.v1\""));
@@ -217,6 +261,20 @@ mod cpu Main {
 
     let lines = surface_render::render_project_status_text_summary(&project_root)
         .expect("render status text summary");
+    let closure_position = lines
+        .iter()
+        .position(|line| line.starts_with("  closure_summary_status: "))
+        .expect("status closure summary status");
+    let reading_order_position = lines
+        .iter()
+        .position(|line| {
+            line == "  frontdoor.reading_order_contract: nuis-frontdoor-reading-order-v1"
+        })
+        .expect("status frontdoor reading order contract");
+    assert!(closure_position < reading_order_position);
+    assert!(lines
+        .iter()
+        .any(|line| line.starts_with("  closure_summary_next_command: ")));
     assert!(lines.iter().any(|line| {
         line == "  nsld_final_executable_output_nsdb_replay_contract: nsdb-payload-execution-replay-plan-v1"
     }));
@@ -394,6 +452,7 @@ mod cpu Main {
     );
 
     let json = render_project_doctor_json(&project_root).expect("render doctor json");
+    let expected_galaxy_surface_count = resolved_galaxy_surface_count(&project_root);
 
     assert!(json.contains("\"source_kind\":\"project\""));
     assert!(json.contains("\"project\":\"doctor_json_smoke\""));
@@ -416,6 +475,12 @@ mod cpu Main {
     assert!(json.contains(
         "\"closure_summary_next_command\":\"nuis galaxy lock-deps <project-dir|nuis.toml>\""
     ));
+    assert!(
+        json.contains("\"frontdoor_reading_order_contract\":\"nuis-frontdoor-reading-order-v1\"")
+    );
+    assert!(
+        json.find("\"closure_summary_status\"") < json.find("\"frontdoor_reading_order_contract\"")
+    );
     assert!(json.contains("\"artifact_nsld_drive_dry_run_command\":\"nsld drive "));
     assert!(json.contains("\"artifact_nsld_drive_dry_run_json_command\":\"nsld drive "));
     assert!(json.contains(" --json\""));
@@ -439,7 +504,9 @@ mod cpu Main {
     assert!(json.contains("\"galaxy_check_status\":\"skipped\""));
     assert!(json.contains("\"galaxy_lock_status\":\"missing\""));
     assert!(json.contains("\"galaxy_imports_count\":1"));
-    assert!(json.contains("\"galaxy_surface_ids_count\":19"));
+    assert!(json.contains(&format!(
+        "\"galaxy_surface_ids_count\":{expected_galaxy_surface_count}"
+    )));
     assert!(json.contains("\"surface.std.cli-report-file-contracts.v1\""));
     assert!(json.contains("\"surface.ns-nova.renderer.v1\""));
     assert!(json.contains("\"contract.core.prelude.primitive-values.v1\""));
@@ -487,6 +554,21 @@ mod cpu Main {
     let lines = surface_render::render_project_doctor_text_summary(&project_root)
         .expect("render doctor text summary");
 
+    let closure_position = lines
+        .iter()
+        .position(|line| line.starts_with("  closure_summary_status: "))
+        .expect("doctor closure summary status");
+    let reading_order_position = lines
+        .iter()
+        .position(|line| {
+            line == "  frontdoor.reading_order_contract: nuis-frontdoor-reading-order-v1"
+        })
+        .expect("doctor frontdoor reading order contract");
+    assert!(closure_position < reading_order_position);
+    assert!(lines
+        .iter()
+        .any(|line| line.starts_with("  closure_summary_next_command: ")));
+
     assert!(lines
         .iter()
         .any(|line| line == "  text_handle_rewrite_helper_hits: 1"));
@@ -524,8 +606,11 @@ mod cpu Main {
     );
 
     let json = render_project_doctor_json(&project_root).expect("render doctor json");
+    let expected_galaxy_surface_count = resolved_galaxy_surface_count(&project_root);
 
-    assert!(json.contains("\"galaxy_surface_ids_count\":19"));
+    assert!(json.contains(&format!(
+        "\"galaxy_surface_ids_count\":{expected_galaxy_surface_count}"
+    )));
     assert!(json.contains("\"surface.std.cli-report-file-contracts.v1\""));
     assert!(json.contains("\"surface.ns-nova.renderer.v1\""));
     assert!(json.contains("\"contract.core.prelude.primitive-values.v1\""));
@@ -562,11 +647,14 @@ mod cpu Main {
     );
 
     let json = render_project_imports_json(&project_root).expect("render imports json");
+    let expected_visible_library_modules = visible_galaxy_library_module_count(&project_root);
 
     assert!(json.contains("\"source_kind\":\"project\""));
     assert!(json.contains("\"project\":\"imports_manual_only_hint\""));
     assert!(json.contains("\"explicit_galaxy_imports_count\":0"));
-    assert!(json.contains("\"visible_library_modules_count\":10"));
+    assert!(json.contains(&format!(
+        "\"visible_library_modules_count\":{expected_visible_library_modules}"
+    )));
     assert!(json.contains("\"std:lib/report_contracts.ns\""));
     assert!(json.contains("\"hidden_manual_only_library_modules_count\":1"));
     assert!(

@@ -4,6 +4,16 @@ pub(super) fn nsld_final_output_json_fields(
     nsld_final_output: Option<&NsldFinalExecutableOutputBoundarySummary>,
 ) -> Vec<String> {
     vec![
+        json_optional_string_field(
+            "nsld_final_executable_output_artifact_chain_safe_next_contract",
+            nsld_final_output
+                .map(|summary| summary.artifact_chain_safe_next_contract.as_str()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_artifact_chain_safe_next_probe_command",
+            nsld_final_output
+                .map(|summary| summary.artifact_chain_safe_next_probe_command.as_str()),
+        ),
         json_bool_field(
             "nsld_final_executable_output_ready",
             nsld_final_output.is_some_and(|summary| summary.ready),

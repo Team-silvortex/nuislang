@@ -7,15 +7,21 @@ mod provider_completion_integrity;
 mod provider_completion_signature;
 mod provider_completion_trust_anchor;
 mod provider_completion_trust_registry;
+mod provider_output_comparison;
+mod provider_request;
+mod provider_runner_coreml;
 mod provider_runner_metal;
 mod provider_runner_registry;
 mod provider_sample;
+mod provider_sample_artifact;
 mod provider_sample_execute;
 mod provider_sample_execution;
 mod provider_sample_materialize;
 #[cfg(test)]
 mod provider_sample_materialize_tests;
 mod provider_sample_payload;
+#[cfg(test)]
+mod provider_sample_payload_tests;
 mod provider_sample_runner;
 
 pub use model::{

@@ -24,6 +24,9 @@ fn status_prints_closure_then_tensor_handoff_sample() {
     );
 
     let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("dev_tensor_hierarchy_protocol: nuis-dev-tensor-hierarchy-v1"));
+    assert!(stdout.contains("dev_tensor_hierarchy_validation_status: clean"));
+    assert!(stdout.contains("dev_tensor_hierarchy_validation_error_count: 0"));
     let reading_order = stdout
         .find("frontdoor_reading_order: closure_summary -> dev_tensor_weakest_task_card_handoff")
         .expect("status should expose frontdoor reading order");

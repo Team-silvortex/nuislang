@@ -82,15 +82,26 @@ The defaults are:
 
 * `file-v1` (default): uses `<registry path>.anchor` and `<anchor>.initialized`
   with optional overrides.
-* `protected-file-v1`: requires explicit `NUIS_PROVIDER_COMPLETION_TRUST_ANCHOR` and
-  `NUIS_PROVIDER_COMPLETION_TRUST_ANCHOR_MARKER` and enforces protected parent
-  directories for both paths.
+* `protected-file-v1`: requires explicit
+  `NUIS_PROVIDER_COMPLETION_TRUST_ANCHOR`,
+  `NUIS_PROVIDER_COMPLETION_TRUST_ANCHOR_MARKER`,
+  `NUIS_PROVIDER_COMPLETION_TRUST_ANCHOR_ROOT`, and
+  `NUIS_PROVIDER_COMPLETION_TRUST_ANCHOR_MARKER_ROOT`. The two roots must be
+  different absolute Unix directories with mode `0700`; each configured file
+  must be a direct child of its declared root. Anchor and marker writes use
+  owner-only `0600` files, protected temporary files use create-new semantics,
+  and lock files are also `0600`. Existing symlinks, non-regular files,
+  group/other-accessible roots or files, relative paths, and root/path mismatch
+  fail closed. This filesystem adapter is unavailable on non-Unix hosts until
+  an equivalent ACL verifier exists.
 
 Unknown adapters fail closed as `signature-trust-anchor-invalid`; this contract
 leaves room for future Keychain, TPM, or protected-directory adapters without
 coupling the signature verifier to one operating system. Protected deployment
 should use host-level access control to protect registry, anchor, and marker with
 separate directories, and avoid sharing symlinked locations. Deleting both a
-`file-v1` anchor and its marker still resets the pair to first-use trust, while
-`protected-file-v1` requires protected explicit paths and does not support this
-silent reset path.
+registry-adjacent `file-v1` anchor and marker cannot reset an active
+`protected-file-v1` deployment because neither independent verifier consults
+those ordinary paths. Deleting both protected files with authority over both
+roots can still reset this filesystem-only adapter; preventing privileged root
+compromise requires a later Keychain, TPM, or OS service backend.

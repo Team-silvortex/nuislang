@@ -183,6 +183,7 @@ fn note_nested_expr_effects(
             condition,
             then_owner,
             else_owner,
+            ..
         } => {
             note_binding_effects(condition, "_", moved, borrows, borrow_bindings);
             note_binding_effects(then_owner, "_", moved, borrows, borrow_bindings);

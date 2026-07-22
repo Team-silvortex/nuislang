@@ -245,8 +245,81 @@ fn assert_official_galaxy_hetero_build(
     );
     if expects_std_pgm_marker {
         assert!(
-            run_json_stdout.contains("std-preprocessed-pgm:input_bytes=20"),
+            run_json_stdout.contains("std-preprocessed-pgm:input_bytes=20")
+                && run_json_stdout.contains(
+                    "provider_buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1",
+                )
+                && run_json_stdout.contains(
+                    "provider_kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1",
+                )
+                && run_json_stdout.contains("provider_buffer_id=input.pixels")
+                && run_json_stdout.contains("provider_kernel_id=pixelmagic.gray8.invert")
+                && run_json_stdout.contains("pixel_format=gray8")
+                && run_json_stdout.contains("pixel_width=2")
+                && run_json_stdout.contains("pixel_height=2")
+                && run_json_stdout.contains(
+                    "pixel_payload_path=nuis.pixelmagic.std-preprocessed.gray8.bin",
+                ),
             "PixelMagic shader trace did not carry std-preprocessed PGM evidence\n{run_json_stdout}"
+        );
+        assert_eq!(
+            fs::read(output_dir.join("nuis.pixelmagic.std-preprocessed.gray8.bin"))
+                .expect("read persisted PixelMagic input payload"),
+            [0, 4, 9, 8]
+        );
+    }
+    let expects_coreml_vector = backend_family == "coreml" && target_device == "apple-ane";
+    if expects_coreml_vector {
+        assert!(
+            run_json_stdout.contains("provider_buffer_element_type=f32")
+                && run_json_stdout.contains("provider_buffer_layout=tensor-contiguous")
+                && run_json_stdout.contains("provider_buffer_shape=16x64x64")
+                && run_json_stdout
+                    .contains("provider_kernel_id=witsage.feature-grid.projection")
+                && run_json_stdout.contains(
+                    "provider_model_asset_descriptor_contract=nuis-provider-model-asset-descriptor-v1",
+                )
+                && run_json_stdout.contains(
+                    "provider_model_asset_path=nuis.witsage.feature-grid-projection.mlmodel",
+                )
+                && run_json_stdout.contains(
+                    "provider_request_collection_contract=nuis-provider-request-collection-v1",
+                )
+                && run_json_stdout.contains("provider_request_count=2")
+                && run_json_stdout.contains(
+                    "provider_output_comparison_descriptor_contract=nuis-provider-output-comparison-descriptor-v1",
+                )
+                && run_json_stdout
+                    .contains("provider_request_1_kernel_id=witsage.vector.affine"),
+            "WitSage kernel trace did not carry the registered CoreML request\n{run_json_stdout}"
+        );
+        let dense_payload = fs::read(output_dir.join("nuis.witsage.feature-grid.f32.bin"))
+            .expect("read persisted WitSage feature-grid payload");
+        assert_eq!(dense_payload.len(), 16 * 64 * 64 * 4);
+        assert!(dense_payload
+            .chunks_exact(4)
+            .all(|bytes| f32::from_le_bytes(bytes.try_into().unwrap()) == 1.0));
+        assert_eq!(
+            fs::read(output_dir.join("nuis.witsage.vector.f32.bin"))
+                .expect("read persisted WitSage vector payload"),
+            [
+                0x00, 0x00, 0x80, 0x3f, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x40, 0x40, 0x00, 0x00,
+                0x80, 0x40,
+            ]
+        );
+        assert!(
+            fs::metadata(output_dir.join("nuis.witsage.feature-grid-projection.mlmodel"))
+                .expect("persisted WitSage dense CoreML model")
+                .len()
+                > 1_000
+        );
+        assert_eq!(
+            fs::read(output_dir.join("nuis.witsage.vector-affine.expected.f32.bin"))
+                .expect("read persisted WitSage affine expected output"),
+            [
+                0x00, 0x00, 0x40, 0x40, 0x00, 0x00, 0xa0, 0x40, 0x00, 0x00, 0xe0, 0x40, 0x00, 0x00,
+                0x10, 0x41,
+            ]
         );
     }
 
@@ -303,7 +376,8 @@ fn assert_official_galaxy_hetero_build(
     );
     assert!(matches!(
         executed.first_output_payload_comparison_status.as_str(),
-        "ready-for-comparison"
+        "comparison-passed"
+            | "ready-for-comparison"
             | "awaiting-provider-output-payload"
             | "host-fallback-output-comparison-deferred"
     ));
@@ -329,7 +403,7 @@ fn assert_official_galaxy_hetero_build(
             );
             assert_eq!(
                 executed.first_output_payload_native_execution_contract,
-                "nuis-metal-provider-runner-v1"
+                "nuis-metal-gray8-provider-runner-v1"
             );
             assert_eq!(
                 executed.first_output_payload_native_execution_status,
@@ -346,10 +420,63 @@ fn assert_official_galaxy_hetero_build(
                 "nuis-deterministic-provider-output-v1"
             );
         }
-        assert_eq!(executed.first_output_payload_native_output_bytes, "24");
+        assert_eq!(executed.first_output_payload_native_output_bytes, "4");
         assert!(executed
             .first_output_payload_native_output_hash
             .starts_with("0x"));
+    }
+    if expects_coreml_vector
+        && executed.first_provider_execution_mode == "real-device-provider-runner"
+    {
+        assert_eq!(
+            executed.first_output_payload_native_output_kind,
+            "provider-tensor-f32"
+        );
+        assert_eq!(
+            executed.first_output_payload_native_output_status,
+            "coreml-api-output-ready"
+        );
+        assert_eq!(
+            executed.first_output_payload_native_execution_contract,
+            "nuis-coreml-model-prediction-provider-runner-v1"
+        );
+        assert_eq!(
+            executed.first_output_payload_native_execution_status,
+            "coreml-model-prediction-completed"
+        );
+        assert_eq!(executed.first_output_payload_native_output_bytes, "262144");
+        assert!(executed
+            .first_output_payload_native_device
+            .contains("CoreML.framework"));
+        assert!(executed
+            .first_output_payload_native_output_hash
+            .starts_with("0x"));
+        assert_eq!(
+            executed.first_output_payload_native_output_hash, "0x9d85be94894a2325",
+            "CoreML feature-grid projection must return 65,536 deterministic f32 ones"
+        );
+        assert_eq!(
+            executed.first_output_payload_native_compute_plan_contract,
+            "nuis-coreml-compute-plan-evidence-v1"
+        );
+        assert_eq!(
+            executed.first_output_payload_native_compute_plan_status,
+            "ready"
+        );
+        assert!(
+            executed
+                .first_output_payload_native_compute_plan_layer_count
+                .parse::<usize>()
+                .expect("CoreML compute-plan layer count")
+                > 0
+        );
+        assert_eq!(
+            executed.first_output_payload_native_compute_plan_preferred_devices,
+            "neural-engine"
+        );
+        assert!(executed
+            .first_output_payload_native_compute_plan_supported_devices
+            .contains("neural-engine"));
     }
     if executed.output_payload_count == 0 {
         assert_eq!(executed.first_output_payload_evidence, "none");
@@ -357,7 +484,13 @@ fn assert_official_galaxy_hetero_build(
         assert_eq!(executed.status, "provider-output-payloads-ready");
         assert_eq!(
             executed.first_output_payload_comparison_status,
-            "ready-for-comparison"
+            if expects_coreml_vector
+                && executed.first_provider_execution_mode == "real-device-provider-runner"
+            {
+                "comparison-passed"
+            } else {
+                "ready-for-comparison"
+            }
         );
         assert!(executed.first_output_payload_evidence.contains(&format!(
             "nuis.nsdb.provider-output.{provider_family_artifact}.toml:hash=0x"
@@ -469,9 +602,10 @@ fn assert_official_galaxy_hetero_build(
         assert!(provider_samples.contains(&format!(
             "provider_output_payload_evidence = \"nuis.nsdb.provider-output.{provider_family_artifact}.toml:hash=0x"
         )));
-        let expected_payload_kind = if expects_std_pgm_marker
-            && executed.first_output_payload_native_output_status == "metal-api-output-ready"
-        {
+        let expected_payload_kind = if matches!(
+            executed.first_output_payload_native_output_status.as_str(),
+            "metal-api-output-ready" | "coreml-api-output-ready"
+        ) {
             "output_payload_kind = \"real-device-api-output\""
         } else {
             "output_payload_kind = \"real-device-adapter-output\""
@@ -515,8 +649,38 @@ fn assert_official_galaxy_hetero_build(
     if expects_std_pgm_marker {
         assert_file_contains(
             &provider_output_payload_path,
+            "provider_request_source = \"registered-descriptors\"",
+            "official galaxy provider request source",
+        );
+        assert_file_contains(
+            &provider_output_payload_path,
+            "provider_buffer_descriptor_contract = \"nuis-provider-buffer-descriptor-v1\"",
+            "official galaxy provider buffer descriptor contract",
+        );
+        assert_file_contains(
+            &provider_output_payload_path,
+            "provider_buffer_id = \"input.pixels\"",
+            "official galaxy provider buffer id",
+        );
+        assert_file_contains(
+            &provider_output_payload_path,
+            "provider_kernel_descriptor_contract = \"nuis-provider-kernel-descriptor-v1\"",
+            "official galaxy provider kernel descriptor contract",
+        );
+        assert_file_contains(
+            &provider_output_payload_path,
+            "provider_kernel_id = \"pixelmagic.gray8.invert\"",
+            "official galaxy provider kernel id",
+        );
+        assert_file_contains(
+            &provider_output_payload_path,
             "std-preprocessed-pgm:input_bytes=20",
             "official galaxy provider output payload std image evidence",
+        );
+        assert_file_contains(
+            &provider_output_payload_path,
+            "pixel_payload_path=nuis.pixelmagic.std-preprocessed.gray8.bin",
+            "official galaxy provider output payload pixel path evidence",
         );
         assert_file_contains(
             &provider_output_payload_path,
@@ -525,7 +689,7 @@ fn assert_official_galaxy_hetero_build(
         );
         assert_file_contains(
             &provider_output_payload_path,
-            "native_output_bytes = \"24\"",
+            "native_output_bytes = \"4\"",
             "official galaxy provider output payload native output bytes",
         );
         assert_file_contains(
@@ -538,6 +702,139 @@ fn assert_official_galaxy_hetero_build(
             "native_output_device = \"",
             "official galaxy provider output payload native device",
         );
+    }
+    if expects_coreml_vector {
+        assert_file_contains(
+            &provider_output_payload_path,
+            "provider_request_source = \"registered-collection\"",
+            "official galaxy CoreML provider request source",
+        );
+        assert_file_contains(
+            &provider_output_payload_path,
+            "provider_buffer_element_type = \"f32\"",
+            "official galaxy CoreML provider buffer element type",
+        );
+        assert_file_contains(
+            &provider_output_payload_path,
+            "provider_kernel_id = \"witsage.feature-grid.projection\"",
+            "official galaxy CoreML provider kernel id",
+        );
+        assert_file_contains(
+            &provider_output_payload_path,
+            "provider_model_asset_descriptor_contract = \"nuis-provider-model-asset-descriptor-v1\"",
+            "official galaxy CoreML model asset contract",
+        );
+        assert_file_contains(
+            &provider_output_payload_path,
+            "provider_output_comparison_descriptor_contract = \"nuis-provider-output-comparison-descriptor-v1\"",
+            "official galaxy CoreML output comparison contract",
+        );
+        if executed.first_provider_execution_mode == "real-device-provider-runner" {
+            assert_eq!(
+                executed.first_output_payload_comparison_status,
+                "comparison-passed"
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "comparison_status = \"comparison-passed\"",
+                "official galaxy CoreML aggregate comparison status",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_execution_contract = \"nuis-coreml-model-prediction-provider-runner-v1\"",
+                "official galaxy CoreML native execution contract",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_execution_status = \"coreml-model-prediction-completed\"",
+                "official galaxy CoreML native execution status",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_compute_plan_contract = \"nuis-coreml-compute-plan-evidence-v1\"",
+                "official galaxy CoreML compute-plan contract",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_compute_plan_status = \"ready\"",
+                "official galaxy CoreML compute-plan status",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_collection_contract = \"nuis-provider-output-collection-v1\"",
+                "official galaxy CoreML output collection contract",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_count = \"2\"",
+                "official galaxy CoreML output count",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "provider_request_order = \"witsage.feature-grid.projection,witsage.vector.affine\"",
+                "official galaxy CoreML request order",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_collection_hash = \"0x",
+                "official galaxy CoreML output collection hash",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_0_request_id = \"witsage.feature-grid.projection\"",
+                "official galaxy dense output identity",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_0_compute_plan_preferred_devices = \"neural-engine\"",
+                "official galaxy dense output compute preference",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_0_comparison_status = \"comparison-passed\"",
+                "official galaxy dense output comparison status",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_0_comparison_element_count = \"65536\"",
+                "official galaxy dense output comparison element count",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_0_comparison_mismatch_count = \"0\"",
+                "official galaxy dense output comparison mismatch count",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_1_request_id = \"witsage.vector.affine\"",
+                "official galaxy affine output identity",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_1_hash = \"0x44cf8b51954a5de2\"",
+                "official galaxy affine output hash",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_1_compute_plan_preferred_devices = \"cpu\"",
+                "official galaxy affine output compute preference",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_1_comparison_contract = \"nuis-provider-output-comparison-descriptor-v1\"",
+                "official galaxy affine output comparison contract",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_1_comparison_status = \"comparison-passed\"",
+                "official galaxy affine output comparison status",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_1_comparison_element_count = \"4\"",
+                "official galaxy affine output comparison element count",
+            );
+        }
     }
     assert!(provider_samples
         .contains("materialization_detail = \"deterministic-provider-sample-artifact:"));

@@ -313,3 +313,63 @@ fn owned_pointer_branch_requires_matching_owner_sets() {
     let error = crate::cpu_heap::verify_cpu_heap_protocol(&module).unwrap_err();
     assert!(error.contains("must consume the same two owners"));
 }
+
+#[test]
+fn owned_pointer_branch_rejects_mismatched_address_kind() {
+    let module = YirModule {
+        version: "0.1".to_owned(),
+        resources: vec![Resource {
+            name: "cpu0".to_owned(),
+            kind: ResourceKind::parse("cpu.arm64"),
+        }],
+        nodes: vec![
+            node("nil", "cpu0", "cpu.null", &[]),
+            node("value", "cpu0", "cpu.const", &["10"]),
+            node("choose", "cpu0", "cpu.const_bool", &["true"]),
+            node("left", "cpu0", "cpu.alloc_node", &["value", "nil"]),
+            node("right", "cpu0", "cpu.alloc_node", &["value", "nil"]),
+            node(
+                "selected",
+                "cpu0",
+                "cpu.branch_effect",
+                &[
+                    "choose",
+                    "owned_ptr",
+                    "address_kind=buffer",
+                    "nullable=false",
+                    "1",
+                    "cpu",
+                    "take_ptr_drop_other",
+                    "owned_ptr",
+                    "2",
+                    "resource_own",
+                    "left",
+                    "resource_own",
+                    "right",
+                    "1",
+                    "cpu",
+                    "take_ptr_drop_other",
+                    "owned_ptr",
+                    "2",
+                    "resource_own",
+                    "right",
+                    "resource_own",
+                    "left",
+                ],
+            ),
+        ],
+        edges: vec![
+            dep("value", "left"),
+            dep("nil", "left"),
+            dep("value", "right"),
+            dep("nil", "right"),
+            dep("choose", "selected"),
+            dep("left", "selected"),
+            dep("right", "selected"),
+        ],
+        node_lanes: BTreeMap::new(),
+    };
+
+    let error = crate::cpu_heap::verify_cpu_heap_protocol(&module).unwrap_err();
+    assert!(error.contains("address kind `buffer` does not match owner"));
+}

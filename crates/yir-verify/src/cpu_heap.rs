@@ -314,6 +314,19 @@ fn verify_owned_pointer_branch_merge(
             PointerState::Owned(id) => {
                 ensure_live_heap(heap, id, node)?;
                 ensure_no_active_borrows(borrow_counts, id, node, "branch pointer merge")?;
+                if let Some(address_kind) = args.address_kind {
+                    let kind_matches = matches!(
+                        (address_kind, heap.get(&id).map(|binding| binding.kind)),
+                        ("node", Some(HeapObjectKind::Node { .. }))
+                            | ("buffer", Some(HeapObjectKind::Buffer { .. }))
+                    );
+                    if !kind_matches {
+                        return Err(format!(
+                            "node `{}` owned pointer branch address kind `{address_kind}` does not match owner `{source_name}`",
+                            node.name
+                        ));
+                    }
+                }
                 if !heap_ids.insert(id) {
                     return Err(format!(
                         "node `{}` owned pointer branch aliases owner `{source_name}`",

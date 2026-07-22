@@ -27,6 +27,8 @@ fn lowers_source_owned_pointer_selection_to_branch_effect() {
         .find(|node| node.op.instruction == "branch_effect")
         .expect("owned pointer branch effect");
     assert_eq!(branch.op.args.get(1).map(String::as_str), Some("owned_ptr"));
+    assert!(branch.op.args.iter().any(|arg| arg == "address_kind=node"));
+    assert!(branch.op.args.iter().any(|arg| arg == "nullable=false"));
     assert_eq!(
         branch
             .op
@@ -40,6 +42,94 @@ fn lowers_source_owned_pointer_selection_to_branch_effect() {
     let llvm = yir_lower_llvm::emit_module(&yir).expect("owned pointer select LLVM lowering");
     assert!(llvm.contains("phi ptr"));
     assert!(!llvm.contains("deferred lowering for cpu.branch_effect"));
+}
+
+#[test]
+fn lowers_registered_buffer_owned_pointer_selection() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let left: ref Buffer = alloc_buffer(2, 41);
+            let right: ref Buffer = alloc_buffer(2, 73);
+            let selected: ref Buffer = select_owned_ptr(false, move(left), move(right));
+            let value: i64 = load_at(selected, 1);
+            free(selected);
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    crate::nir_verify::verify_nir_module(&module).expect("buffer owner select should verify");
+    let yir = lower_nir_to_yir_builtin_cpu(&module).expect("buffer owner select should lower");
+    let branch = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.instruction == "branch_effect")
+        .expect("buffer branch effect");
+    assert!(branch
+        .op
+        .args
+        .iter()
+        .any(|arg| arg == "address_kind=buffer"));
+    assert!(branch.op.args.iter().any(|arg| arg == "nullable=false"));
+    yir_verify::verify_module(&yir).expect("buffer address kind should match heap owners");
+
+    let llvm = yir_lower_llvm::emit_module(&yir).expect("buffer owner select LLVM lowering");
+    assert!(llvm.contains("phi ptr"));
+    assert!(!llvm.contains("deferred lowering for cpu.branch_effect"));
+}
+
+#[test]
+fn widens_live_owned_pointer_selection_to_nullable_result() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let left: ref Node = alloc_node(41, null());
+            let right: ref Node = alloc_node(73, null());
+            let selected: ref Node? = select_owned_ptr(true, move(left), move(right));
+            free(selected);
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).expect("nullable result should lower");
+    let branch = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.instruction == "branch_effect")
+        .expect("nullable branch effect");
+    assert!(branch.op.args.iter().any(|arg| arg == "address_kind=node"));
+    assert!(branch.op.args.iter().any(|arg| arg == "nullable=true"));
+}
+
+#[test]
+fn rejects_nullable_owned_pointer_candidates() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let left: ref Node? = null();
+            let right: ref Node? = null();
+            let selected: ref Node? = select_owned_ptr(true, move(left), move(right));
+            free(selected);
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(
+        error.contains("nullable candidates are not owned resources"),
+        "unexpected diagnostic: {error}"
+    );
 }
 
 #[test]

@@ -5,6 +5,17 @@ mod cpu Main {
     let selected: ref Node = select_owned_ptr(false, move(left), move(right));
     let value: i64 = load_value(selected);
     free(selected);
-    return value;
+
+    let nullable_left: ref Node = alloc_node(5, null());
+    let nullable_right: ref Node = alloc_node(7, null());
+    let nullable_selected: ref Node? = select_owned_ptr(true, move(nullable_left), move(nullable_right));
+    free(nullable_selected);
+
+    let left_buffer: ref Buffer = alloc_buffer(2, 5);
+    let right_buffer: ref Buffer = alloc_buffer(2, 11);
+    let selected_buffer: ref Buffer = select_owned_ptr(true, move(left_buffer), move(right_buffer));
+    let buffer_value: i64 = load_at(selected_buffer, 1);
+    free(selected_buffer);
+    return value + buffer_value;
   }
 }

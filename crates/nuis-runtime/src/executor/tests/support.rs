@@ -451,7 +451,8 @@ pub(super) fn sample_bridge_registry(
     backend: &str,
     target: &str,
 ) -> BridgeRegistryEntry {
-    let base_dir = std::env::temp_dir().join(format!("nuis_runtime_bridge_registry_{domain_family}"));
+    let base_dir =
+        std::env::temp_dir().join(format!("nuis_runtime_bridge_registry_{domain_family}"));
     let bridge_stub_path = base_dir.join(format!("{domain_family}.bridge.stub.txt"));
     let payload_blob_path = base_dir.join(format!("{domain_family}.payload.bin"));
 

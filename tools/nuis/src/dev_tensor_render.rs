@@ -35,7 +35,33 @@ pub(crate) fn render_dev_tensor_json_impl() -> String {
             json_field("kind", "nuis_dev_tensor"),
             json_field("model", "architecture-module-function-progress-tensor"),
             json_field("version", "dev-tensor-v1"),
-            json_field("status_protocol_version", hierarchy.protocol_version),
+            json_field(
+                "hierarchy_protocol_version",
+                hierarchy.hierarchy_protocol_version,
+            ),
+            json_field("status_protocol_version", hierarchy.status_protocol_version),
+            json_field("hierarchy_validation_status", hierarchy.validation.status),
+            json_usize_field(
+                "hierarchy_validation_node_count",
+                hierarchy.validation.node_count,
+            ),
+            json_usize_field(
+                "hierarchy_validation_max_depth",
+                hierarchy.validation.max_depth,
+            ),
+            json_usize_field(
+                "hierarchy_validation_error_count",
+                hierarchy.validation.error_count,
+            ),
+            json_field(
+                "hierarchy_validation_first_error",
+                hierarchy
+                    .validation
+                    .first_error
+                    .as_deref()
+                    .unwrap_or("<none>"),
+            ),
+            json_string_array_field("hierarchy_validation_errors", &hierarchy.validation.errors),
             json_usize_field("axis_count", 3),
             json_field("axis_0", "architecture"),
             json_field("axis_1", "module"),
@@ -325,7 +351,38 @@ pub(crate) fn render_dev_tensor_text_impl() -> Vec<String> {
         "nuis development tensor".to_owned(),
         "  model: architecture-module-function-progress-tensor".to_owned(),
         "  version: dev-tensor-v1".to_owned(),
-        format!("  status_protocol_version: {}", hierarchy.protocol_version),
+        format!(
+            "  hierarchy_protocol_version: {}",
+            hierarchy.hierarchy_protocol_version
+        ),
+        format!(
+            "  status_protocol_version: {}",
+            hierarchy.status_protocol_version
+        ),
+        format!(
+            "  hierarchy_validation_status: {}",
+            hierarchy.validation.status
+        ),
+        format!(
+            "  hierarchy_validation_node_count: {}",
+            hierarchy.validation.node_count
+        ),
+        format!(
+            "  hierarchy_validation_max_depth: {}",
+            hierarchy.validation.max_depth
+        ),
+        format!(
+            "  hierarchy_validation_error_count: {}",
+            hierarchy.validation.error_count
+        ),
+        format!(
+            "  hierarchy_validation_first_error: {}",
+            hierarchy
+                .validation
+                .first_error
+                .as_deref()
+                .unwrap_or("<none>")
+        ),
         "  axes: architecture, module, function".to_owned(),
         format!("  hierarchy_root_status: {}", hierarchy.root.status),
         format!("  hierarchy_root_progress: {}", hierarchy.root.progress),

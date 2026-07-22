@@ -1,6 +1,7 @@
 use super::{
     link_plan::{parse_bool_field, parse_string_field, parse_usize_field},
     link_plan_final_output_summary::NsldFinalExecutableOutputBoundarySummary,
+    nsld_drive_command_set_for_output_dir,
     object_identity::workflow_object_identity,
 };
 use crate::artifact_doctor_mirrors::collect_device_provider_sample_manifest_mirror;
@@ -113,8 +114,11 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
     );
     let debugger_cursor_lineage = read_debugger_cursor_lineage(Path::new(&plan.output_dir));
     let debugger_cursor_lineage_repair = debugger_cursor_lineage.repair;
+    let drive_command_set = nsld_drive_command_set_for_output_dir(Path::new(&plan.output_dir));
 
     NsldFinalExecutableOutputBoundarySummary {
+        artifact_chain_safe_next_contract: drive_command_set.safe_next_contract,
+        artifact_chain_safe_next_probe_command: drive_command_set.safe_next_probe_json_command,
         ready,
         boundary_status,
         materialization_status,

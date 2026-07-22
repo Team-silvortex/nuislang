@@ -4,6 +4,7 @@ use crate::{
         dev_tensor_drift_summary as build_dev_tensor_drift_summary, DevTensorDriftSummary,
     },
     dev_tensor_drift_data::dev_tensor_drift_checks,
+    dev_tensor_hierarchy::dev_tensor_hierarchy_summary,
     dev_tensor_manifest::{dev_tensor_manifest_coverage, DevTensorManifestCoverage},
     dev_tensor_milestones::{
         dev_tensor_milestone_coverage, expected_coordinates_from_milestones,
@@ -63,6 +64,12 @@ pub(crate) struct DevTensorCoverageSummary {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DevTensorSummary {
+    pub(crate) hierarchy_protocol_version: &'static str,
+    pub(crate) hierarchy_validation_status: &'static str,
+    pub(crate) hierarchy_validation_node_count: usize,
+    pub(crate) hierarchy_validation_max_depth: usize,
+    pub(crate) hierarchy_validation_error_count: usize,
+    pub(crate) hierarchy_validation_first_error: String,
     pub(crate) architecture_count: usize,
     pub(crate) module_count: usize,
     pub(crate) function_count: usize,
@@ -107,6 +114,7 @@ pub(crate) struct DevTensorSummary {
 
 pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
     let coverage = dev_tensor_coverage_summary();
+    let hierarchy = dev_tensor_hierarchy_summary();
     let mut architectures = BTreeSet::new();
     let mut modules = BTreeSet::new();
     let mut functions = BTreeSet::new();
@@ -123,7 +131,9 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
             critical_count += 1;
             critical_progress += cell.progress;
             if weakest_bootstrap
-                .map(|weakest| cell.progress < weakest.progress)
+                .map(|weakest| {
+                    dev_tensor_cell_weakness_key(cell) < dev_tensor_cell_weakness_key(weakest)
+                })
                 .unwrap_or(true)
             {
                 weakest_bootstrap = Some(cell);
@@ -137,8 +147,11 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
     let task_card_priority_reason = weakest_bootstrap
         .map(|cell| {
             format!(
-                "lowest bootstrap-critical progress: {}/100 at {}",
-                cell.progress, task_card_coordinate
+                "weakest bootstrap-critical status/progress ordering: status `{}` rank {}, progress {}/100 at {}",
+                cell.status,
+                dev_tensor_status_rank(cell.status),
+                cell.progress,
+                task_card_coordinate
             )
         })
         .unwrap_or_else(|| "no bootstrap-critical tensor cell is currently registered".to_owned());
@@ -156,8 +169,11 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
     let handoff_reason = handoff_bootstrap
         .map(|cell| {
             format!(
-                "weakest coordinate is the dev tensor itself; after refreshing the tensor, continue at {} with {}/100 progress",
-                handoff_coordinate, cell.progress
+                "weakest coordinate is the dev tensor itself; after refreshing the tensor, continue at {} with status `{}` rank {} and {}/100 progress",
+                handoff_coordinate,
+                cell.status,
+                dev_tensor_status_rank(cell.status),
+                cell.progress
             )
         })
         .unwrap_or_else(|| {
@@ -167,6 +183,15 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
             )
         });
     DevTensorSummary {
+        hierarchy_protocol_version: hierarchy.hierarchy_protocol_version,
+        hierarchy_validation_status: hierarchy.validation.status,
+        hierarchy_validation_node_count: hierarchy.validation.node_count,
+        hierarchy_validation_max_depth: hierarchy.validation.max_depth,
+        hierarchy_validation_error_count: hierarchy.validation.error_count,
+        hierarchy_validation_first_error: hierarchy
+            .validation
+            .first_error
+            .unwrap_or_else(|| "<none>".to_owned()),
         architecture_count: architectures.len(),
         module_count: modules.len(),
         function_count: functions.len(),
@@ -217,7 +242,7 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
             .map(|cell| cell.expected_artifact)
             .unwrap_or("<none>"),
         weakest_bootstrap_task_card_protocol: DEV_TENSOR_TASK_CARD_PROTOCOL,
-        weakest_bootstrap_task_card_source: "weakest-bootstrap-progress",
+        weakest_bootstrap_task_card_source: "weakest-bootstrap-status-progress-path",
         weakest_bootstrap_task_card_status: if task_card_ready { "ready" } else { "blocked" },
         weakest_bootstrap_task_card_ready: task_card_ready,
         weakest_bootstrap_task_card_coordinate: task_card_coordinate,
@@ -261,14 +286,26 @@ fn dev_tensor_handoff_bootstrap_cell(weakest: &DevTensorCell) -> Option<&'static
     {
         return None;
     }
-    DEV_TENSOR_CELLS
+    select_dev_tensor_handoff_bootstrap_cell(DEV_TENSOR_CELLS)
+}
+
+fn select_dev_tensor_handoff_bootstrap_cell(cells: &[DevTensorCell]) -> Option<&DevTensorCell> {
+    cells
         .iter()
         .filter(|cell| cell.bootstrap_critical)
         .filter(|cell| {
             dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function)
                 != "developer-system/dev-tensor/architecture-module-function-progress-model"
         })
-        .min_by_key(|cell| cell.progress)
+        .min_by_key(|cell| dev_tensor_cell_weakness_key(cell))
+}
+
+fn dev_tensor_cell_weakness_key(cell: &DevTensorCell) -> (usize, usize, String) {
+    (
+        dev_tensor_status_rank(cell.status),
+        cell.progress,
+        dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function),
+    )
 }
 
 pub(crate) fn dev_tensor_coverage_summary() -> DevTensorCoverageSummary {
@@ -404,8 +441,40 @@ mod tests {
     use crate::dev_tensor_data::DEV_TENSOR_EXPECTED_COORDINATES;
 
     #[test]
+    fn handoff_selection_is_status_aware_and_input_order_independent() {
+        let selected = select_dev_tensor_handoff_bootstrap_cell(DEV_TENSOR_CELLS)
+            .expect("select handoff cell");
+        let mut reversed = DEV_TENSOR_CELLS.to_vec();
+        reversed.reverse();
+        let reversed_selected = select_dev_tensor_handoff_bootstrap_cell(&reversed)
+            .expect("select reversed handoff cell");
+
+        let expected = "heterogeneous-runtime/nustar/registered-domain-contracts";
+        assert_eq!(
+            dev_tensor_coordinate_key(selected.architecture, selected.module, selected.function),
+            expected
+        );
+        assert_eq!(
+            dev_tensor_coordinate_key(
+                reversed_selected.architecture,
+                reversed_selected.module,
+                reversed_selected.function
+            ),
+            expected
+        );
+        assert_eq!(selected.status, "usable");
+    }
+
+    #[test]
     fn dev_tensor_summary_reports_three_axes_and_cells() {
         let summary = dev_tensor_summary();
+        assert_eq!(
+            summary.hierarchy_protocol_version,
+            "nuis-dev-tensor-hierarchy-v1"
+        );
+        assert_eq!(summary.hierarchy_validation_status, "clean");
+        assert_eq!(summary.hierarchy_validation_error_count, 0);
+        assert_eq!(summary.hierarchy_validation_first_error, "<none>");
         assert_eq!(summary.cell_count, DEV_TENSOR_CELLS.len());
         assert!(summary.architecture_count >= 5);
         assert!(summary.module_count >= 5);
@@ -431,7 +500,7 @@ mod tests {
         );
         assert_eq!(
             summary.weakest_bootstrap_task_card_source,
-            "weakest-bootstrap-progress"
+            "weakest-bootstrap-status-progress-path"
         );
         assert_eq!(summary.weakest_bootstrap_task_card_status, "ready");
         assert!(summary.weakest_bootstrap_task_card_ready);
@@ -439,7 +508,7 @@ mod tests {
         assert!(summary.weakest_bootstrap_task_card_coordinate.contains('/'));
         assert!(summary
             .weakest_bootstrap_task_card_priority_reason
-            .contains("lowest bootstrap-critical progress"));
+            .contains("weakest bootstrap-critical status/progress ordering"));
         assert_eq!(
             summary.weakest_bootstrap_task_card_action,
             summary.weakest_bootstrap_next_action
@@ -455,6 +524,10 @@ mod tests {
         assert_ne!(
             summary.weakest_bootstrap_task_card_handoff_coordinate,
             "<none>"
+        );
+        assert_eq!(
+            summary.weakest_bootstrap_task_card_handoff_coordinate,
+            "heterogeneous-runtime/nustar/registered-domain-contracts"
         );
         assert!(summary
             .weakest_bootstrap_task_card_handoff_coordinate
@@ -474,7 +547,15 @@ mod tests {
         );
         assert!(summary.weakest_bootstrap_progress <= summary.bootstrap_critical_average_progress);
         let hierarchy = crate::dev_tensor_hierarchy::dev_tensor_hierarchy_summary();
-        assert_eq!(hierarchy.protocol_version, "dev-tensor-status-v1");
+        assert_eq!(
+            hierarchy.hierarchy_protocol_version,
+            "nuis-dev-tensor-hierarchy-v1"
+        );
+        assert_eq!(hierarchy.status_protocol_version, "dev-tensor-status-v1");
+        assert_eq!(hierarchy.validation.status, "clean");
+        assert_eq!(hierarchy.validation.error_count, 0);
+        assert_eq!(hierarchy.validation.max_depth, 3);
+        assert!(hierarchy.validation.node_count > DEV_TENSOR_CELLS.len());
         assert_eq!(hierarchy.root.level, "root");
         assert_eq!(hierarchy.root.cell_count, DEV_TENSOR_CELLS.len());
         assert!(!hierarchy.root.children.is_empty());
@@ -527,6 +608,10 @@ mod tests {
         assert!(json.contains("\"axis_2\":\"function\""));
         assert!(json.contains("\"hierarchy_root_status\""));
         assert!(json.contains("\"hierarchy_root_weakest_child_path\""));
+        assert!(json.contains("\"hierarchy_protocol_version\":\"nuis-dev-tensor-hierarchy-v1\""));
+        assert!(json.contains("\"hierarchy_validation_status\":\"clean\""));
+        assert!(json.contains("\"hierarchy_validation_error_count\":0"));
+        assert!(json.contains("\"hierarchy_validation_max_depth\":3"));
         assert!(json.contains("\"status_protocol\":["));
         assert!(json.contains("\"hierarchy\":{\"level\":\"root\""));
         assert!(json.contains("\"children\":["));
@@ -548,9 +633,9 @@ mod tests {
         assert!(json.contains("\"weakest_bootstrap_expected_artifact\""));
         assert!(json
             .contains("\"weakest_bootstrap_task_card_protocol\":\"nuis-dev-tensor-task-card-v1\""));
-        assert!(
-            json.contains("\"weakest_bootstrap_task_card_source\":\"weakest-bootstrap-progress\"")
-        );
+        assert!(json.contains(
+            "\"weakest_bootstrap_task_card_source\":\"weakest-bootstrap-status-progress-path\""
+        ));
         assert!(json.contains("\"weakest_bootstrap_task_card_status\":\"ready\""));
         assert!(json.contains("\"weakest_bootstrap_task_card_ready\":true"));
         assert!(json.contains("\"weakest_bootstrap_task_card_coordinate\""));
@@ -564,7 +649,7 @@ mod tests {
         assert!(json.contains("\"weakest_bootstrap_task_card_handoff_action\""));
         assert!(json.contains("\"weakest_bootstrap_task_card_handoff_command\""));
         assert!(json.contains("\"weakest_bootstrap_task_card_handoff_expected_artifact\""));
-        assert!(json.contains("lowest bootstrap-critical progress"));
+        assert!(json.contains("weakest bootstrap-critical status/progress ordering"));
         assert!(json.contains("\"blocker\""));
         assert!(json.contains("\"next_action\""));
         assert!(json.contains("\"validation_command\""));
@@ -662,6 +747,10 @@ mod tests {
         assert!(text.contains("status_protocol_version: dev-tensor-status-v1"));
         assert!(text.contains("hierarchy_root_status:"));
         assert!(text.contains("hierarchy_root_weakest_child_path:"));
+        assert!(text.contains("hierarchy_protocol_version: nuis-dev-tensor-hierarchy-v1"));
+        assert!(text.contains("hierarchy_validation_status: clean"));
+        assert!(text.contains("hierarchy_validation_error_count: 0"));
+        assert!(text.contains("hierarchy_validation_max_depth: 3"));
         assert!(text.contains("weakest_bootstrap_next_step:"));
         assert!(text.contains("weakest_bootstrap_evidence:"));
         assert!(text.contains("weakest_bootstrap_blocker:"));
@@ -669,7 +758,9 @@ mod tests {
         assert!(text.contains("weakest_bootstrap_validation_command:"));
         assert!(text.contains("weakest_bootstrap_expected_artifact:"));
         assert!(text.contains("weakest_bootstrap_task_card_protocol: nuis-dev-tensor-task-card-v1"));
-        assert!(text.contains("weakest_bootstrap_task_card_source: weakest-bootstrap-progress"));
+        assert!(text.contains(
+            "weakest_bootstrap_task_card_source: weakest-bootstrap-status-progress-path"
+        ));
         assert!(text.contains("weakest_bootstrap_task_card_status: ready"));
         assert!(text.contains("weakest_bootstrap_task_card_ready: true"));
         assert!(text.contains("weakest_bootstrap_task_card_coordinate:"));
@@ -683,7 +774,7 @@ mod tests {
         assert!(text.contains("weakest_bootstrap_task_card_handoff_action:"));
         assert!(text.contains("weakest_bootstrap_task_card_handoff_command:"));
         assert!(text.contains("weakest_bootstrap_task_card_handoff_expected_artifact:"));
-        assert!(text.contains("lowest bootstrap-critical progress"));
+        assert!(text.contains("weakest bootstrap-critical status/progress ordering"));
         assert!(text.contains("    blocker:"));
         assert!(text.contains("    next_action:"));
         assert!(text.contains("    validation_command:"));

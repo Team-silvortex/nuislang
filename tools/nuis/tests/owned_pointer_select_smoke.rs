@@ -41,14 +41,17 @@ fn owned_pointer_select_runs_as_native_binary() {
     assert!(yir.contains("cpu.branch_effect"));
     assert!(yir.contains("owned_ptr"));
     assert!(yir.contains("take_ptr_drop_other"));
+    assert!(yir.contains("address_kind=node"));
+    assert!(yir.contains("address_kind=buffer"));
+    assert!(yir.contains("nullable=true"));
 
     let llvm = read(&output_dir.join("owned_pointer_select_demo.ll"));
     assert!(llvm.contains("phi ptr"));
-    assert_eq!(llvm.matches("call void @free(ptr").count(), 3);
+    assert_eq!(llvm.matches("call void @free(ptr").count(), 9);
     assert!(!llvm.contains("deferred lowering for cpu.branch_effect"));
 
     let run = Command::new(output_dir.join("owned_pointer_select_demo"))
         .output()
         .expect("run owned pointer select demo");
-    assert_eq!(run.status.code(), Some(73));
+    assert_eq!(run.status.code(), Some(78));
 }

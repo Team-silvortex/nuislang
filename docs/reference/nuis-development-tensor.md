@@ -67,6 +67,13 @@ The JSON surface is intentionally simple:
 * `axis_2 = "function"`
 * `status_protocol_version`
 * `status_protocol = [...]`
+* `hierarchy_protocol_version`
+* `hierarchy_validation_status`
+* `hierarchy_validation_node_count`
+* `hierarchy_validation_max_depth`
+* `hierarchy_validation_error_count`
+* `hierarchy_validation_first_error`
+* `hierarchy_validation_errors`
 * `hierarchy_root_status`
 * `hierarchy_root_progress`
 * `hierarchy_root_weakest_child_path`
@@ -162,6 +169,14 @@ recursive hierarchy:
 
 `root -> architecture -> module -> function`
 
+The recursive representation is governed by
+`nuis-dev-tensor-hierarchy-v1`. Its validator walks the full tree and checks
+legal level transitions, parent-derived paths, unique nodes, progress bounds,
+branch status/progress/count aggregates, weakest-child selection, and the
+two-way mapping between function leaves and registered tensor cells. A clean
+tree reports `hierarchy_validation_status = "clean"`; malformed trees report
+the first error and the complete deterministic error list.
+
 Each hierarchy node carries:
 
 * `level`
@@ -194,15 +209,25 @@ The task-card protocol is `nuis-dev-tensor-task-card-v1`. A ready task card
 means the tensor found a weakest bootstrap-critical coordinate and coordinate
 coverage is currently clean.
 
+Task-card selection uses the deterministic ordering
+`status_rank -> progress -> coordinate`, reported as source
+`weakest-bootstrap-status-progress-path`. Lower status maturity is weaker;
+progress breaks status ties, and the full coordinate makes selection stable
+when input registration order changes.
+
 The task-card also exposes a handoff bundle. When the weakest coordinate is the
 tensor itself, `weakest_bootstrap_task_card_handoff_mode` becomes
 `self-maintenance-handoff` and the handoff coordinate names the next weakest
 bootstrap-critical non-tensor cell to continue after refreshing the model.
 Otherwise the handoff mode is `direct` and mirrors the current task-card
-coordinate.
+coordinate. The same status/progress/path ordering chooses the non-tensor
+handoff, so a completed stable frontdoor does not hide a merely usable runtime
+lane just because it appears earlier in the source snapshot.
 
-`nuis status` also prints the short tensor summary. That makes the model part
-of the toolchain self-orientation surface, not just a separate report command.
+`nuis status` also prints the short tensor summary plus hierarchy protocol and
+validation state. That makes the model part of the toolchain self-orientation
+surface, not just a separate report command, and prevents task handoff from
+trusting an invalid recursive projection.
 
 ## Coverage Manifest
 
@@ -373,7 +398,59 @@ host IO report lane, direct stdin consumption by the built binary, and
 The PixelMagic side of that lane now also keeps `std-preprocessed-pgm` input
 evidence visible through provider-sample materialization and
 `execute-provider-samples` comparison metadata, including the input evidence
-hash used by later shader output comparison.
+hash used by later shader output comparison. That evidence now binds a raw
+`gray8` payload path, dimensions, stride, maximum value, operation, byte count,
+and content hash. These values now lower into package-independent
+`nuis-provider-buffer-descriptor-v1` and
+`nuis-provider-kernel-descriptor-v1` requests; Nsdb converts legacy evidence
+into the same model but native adapters consume only the registered request.
+The official heterogeneous smoke verifies persistence of the four source
+pixels and, on supported macOS hosts, submits them through the registered Metal
+runner for real buffer upload, invert dispatch, readback, and output hashing.
+Unsupported hosts keep the deterministic provider fallback.
+
+The WitSage side now uses the same registered provider request model for a
+contiguous four-element `f32` tensor and `witsage.vector.affine` kernel. On
+macOS, Nuis persists a deterministic `.mlmodel` asset and binds its path,
+length, hash, input feature, and output feature through
+`nuis-provider-model-asset-descriptor-v1`. Nsdb validates that descriptor,
+compiles and loads the model through CoreML, requests `CPUAndNeuralEngine`
+compute units, executes `predictionFromFeatures`, and verifies the affine
+result `[3, 5, 7, 9]` through stable output bytes and hash evidence. This is a
+real `MLModel` prediction closure. It does not prove that CoreML scheduled the
+operation on ANE. The adapter now loads `MLComputePlan` and emits
+`nuis-coreml-compute-plan-evidence-v1`, including layer count plus preferred
+and supported compute-device sets. On the M2 smoke host the affine model has
+four CoreML plan layers, supports CPU, GPU, and Neural Engine, but prefers CPU.
+That result is preserved rather than upgraded into a false ANE-execution
+claim: CoreML's public plan API describes anticipated device usage, and this
+small graph is not an effective Neural Engine workload.
+
+The second registered model is a deterministic `16x64x64` feature-grid
+projection. Nuis persists its 256 KiB all-ones input and hash-bound model asset;
+Nsdb consumes the same generic buffer/kernel/model descriptors, without
+matching a WitSage operation name. The prediction returns 65,536 `f32` ones,
+while its one-layer compute plan supports CPU, GPU, and Neural Engine and
+prefers Neural Engine on the M2 smoke host. The affine and feature-grid tests
+therefore provide honest CPU-preferred and ANE-preferred baselines.
+
+Both operations now coexist in one `nuis-provider-request-collection-v1`
+record. Collection order is explicit (`feature-grid` then `affine`), every
+request retains independent buffer/kernel/model validation, and Nsdb executes
+all entries fail-closed. `nuis-provider-output-collection-v1` mirrors indexed
+request identities, byte counts, hashes, execution/compute-plan evidence, and
+an order-sensitive collection hash. Each model request also binds a
+`nuis-provider-output-comparison-descriptor-v1` to its output buffer, `f32`
+shape, hash-bound expected asset, absolute/relative tolerance, and non-finite
+policy. Nsdb reads the expected asset independently and compares every returned
+element before emitting `comparison-passed`; shape/byte-count mismatches,
+tampered expected assets, invalid policies, NaN/Inf under `reject`, and values
+outside tolerance all fail closed. The official M2 lane compares 65,536 dense
+elements and four affine elements with zero mismatches.
+
+The next collection boundary is dependency structure. Requests are ordered but
+do not yet declare producer/consumer data-flow edges, so independent entries
+are closed while graph-shaped provider work remains explicit future work.
 
 The language-core checks anchor the bootstrap-critical
 `language-core/nuisc/type-control-flow-generics` cell to:
@@ -671,9 +748,13 @@ names, and LLVM emits path-local frees plus `phi ptr`. Typed source lowering is
 now exposed as `select_owned_ptr(condition, move(left), move(right))`. Both
 candidates must be same-typed, named, distinct owners; NIR verification rejects
 aliasing and any later reuse, while cleanup synthesis removes both consumed
-inputs. `owned_pointer_select_demo` proves the selected pointer reaches
-`load_value` and one final `free` in a native binary with exit `73`. Nullable,
-projected, task-carried, and non-Node registered address results remain closed.
+inputs. The YIR merge now carries explicit `address_kind=node|buffer` and
+`nullable=true|false` metadata. Heap verification rejects kind/object mismatch;
+source may widen two live owners into an optional result but still rejects
+nullable candidates. `owned_pointer_select_demo` executes Node,
+nullable-result, and Buffer selections, reaches both `load_value` and
+`load_at`, and proves final survivor cleanup in a native binary with exit `78`.
+Projected and task-carried address results remain closed.
 The runtime now defines `NuisSchedulerOwnedBlobV1` as the first GLM-tokened
 dynamic leaf primitive. It deep-copies borrowed bytes and has scheduler-native
 move/drop hooks; a compiled harness covers take and cancellation. Recursive

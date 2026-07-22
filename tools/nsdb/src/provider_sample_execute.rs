@@ -1,4 +1,6 @@
 use crate::{
+    provider_output_comparison::compare_provider_output,
+    provider_request::{provider_request_collection_from_evidence, ProviderRequest},
     provider_runner_registry::{
         provider_runner_real_device_probe_status, select_provider_runner_adapter,
     },
@@ -8,9 +10,9 @@ use crate::{
     },
     provider_sample_execution::provider_execution_outcome,
     provider_sample_payload::{
-        fnv1a64_hex, pixelmagic_metal_output_summary, pixelmagic_native_output_summary,
-        provider_output_payload_file_name, render_real_device_provider_output_payload,
-        std_preprocessed_pgm_input_bytes, PixelMagicNativeOutputSummary,
+        coreml_native_output_summary, fnv1a64_hex, pixelmagic_metal_output_summary,
+        pixelmagic_native_output_summary, provider_output_payload_file_name,
+        render_real_device_provider_output_payload, PixelMagicNativeOutputSummary,
     },
 };
 use std::{collections::BTreeSet, fs, path::Path};
@@ -41,6 +43,11 @@ pub struct ProviderSampleExecuteReport {
     pub first_output_payload_native_execution_contract: String,
     pub first_output_payload_native_execution_status: String,
     pub first_output_payload_native_device: String,
+    pub first_output_payload_native_compute_plan_contract: String,
+    pub first_output_payload_native_compute_plan_status: String,
+    pub first_output_payload_native_compute_plan_layer_count: String,
+    pub first_output_payload_native_compute_plan_preferred_devices: String,
+    pub first_output_payload_native_compute_plan_supported_devices: String,
     pub next_action: String,
     pub next_command: String,
 }
@@ -118,7 +125,7 @@ pub fn execute_provider_samples(
     }
     let first_native_output = output_payloads
         .first()
-        .and_then(|payload| payload.native_output.as_ref())
+        .and_then(|payload| payload.native_outputs.first())
         .map(|summary| {
             (
                 summary.kind.clone(),
@@ -128,6 +135,11 @@ pub fn execute_provider_samples(
                 summary.execution_contract.clone(),
                 summary.execution_status.clone(),
                 summary.device.clone(),
+                summary.compute_plan_contract.clone(),
+                summary.compute_plan_status.clone(),
+                summary.compute_plan_layer_count.clone(),
+                summary.compute_plan_preferred_devices.clone(),
+                summary.compute_plan_supported_devices.clone(),
             )
         })
         .or_else(|| {
@@ -142,6 +154,11 @@ pub fn execute_provider_samples(
                             summary.execution_contract,
                             summary.execution_status,
                             summary.device,
+                            summary.compute_plan_contract,
+                            summary.compute_plan_status,
+                            summary.compute_plan_layer_count,
+                            summary.compute_plan_preferred_devices,
+                            summary.compute_plan_supported_devices,
                         )
                     })
             })
@@ -151,15 +168,29 @@ pub fn execute_provider_samples(
                 "none".to_owned(),
                 "none".to_owned(),
                 "none".to_owned(),
+                "0".to_owned(),
+                "none".to_owned(),
+                "none".to_owned(),
+                "none".to_owned(),
+                "none".to_owned(),
                 "none".to_owned(),
                 "none".to_owned(),
                 "none".to_owned(),
                 "none".to_owned(),
             )
         });
-    let first_output_payload_comparison_status =
-        output_payload_comparison_status(!output_payloads.is_empty(), &first_provider_boundary.2)
-            .to_owned();
+    let first_output_payload_comparison_status = output_payloads
+        .first()
+        .and_then(|payload| payload.native_outputs.first())
+        .filter(|summary| summary.comparison_contract != "none")
+        .map(|summary| summary.comparison_status.clone())
+        .unwrap_or_else(|| {
+            output_payload_comparison_status(
+                !output_payloads.is_empty(),
+                &first_provider_boundary.2,
+            )
+            .to_owned()
+        });
     Ok(ProviderSampleExecuteReport {
         status: if output_payloads.is_empty() {
             "no-real-device-provider-output".to_owned()
@@ -193,6 +224,11 @@ pub fn execute_provider_samples(
         first_output_payload_native_execution_contract: first_native_output.4,
         first_output_payload_native_execution_status: first_native_output.5,
         first_output_payload_native_device: first_native_output.6,
+        first_output_payload_native_compute_plan_contract: first_native_output.7,
+        first_output_payload_native_compute_plan_status: first_native_output.8,
+        first_output_payload_native_compute_plan_layer_count: first_native_output.9,
+        first_output_payload_native_compute_plan_preferred_devices: first_native_output.10,
+        first_output_payload_native_compute_plan_supported_devices: first_native_output.11,
         next_action: "materialize-provider-samples".to_owned(),
         next_command: format!(
             "nsdb materialize-provider-samples {} --json",
@@ -213,7 +249,7 @@ fn output_payload_comparison_status(payload_ready: bool, capability_status: &str
 
 struct WrittenProviderOutput {
     evidence: String,
-    native_output: Option<PixelMagicNativeOutputSummary>,
+    native_outputs: Vec<PixelMagicNativeOutputSummary>,
 }
 
 fn write_provider_output_payload(
@@ -222,34 +258,139 @@ fn write_provider_output_payload(
     adapter: &crate::provider_runner_registry::ProviderRunnerAdapter,
 ) -> Result<WrittenProviderOutput, String> {
     let file_name = provider_output_payload_file_name(&record.provider_family);
-    let native_output = execute_native_provider_output(record, adapter)?;
-    let content =
-        render_real_device_provider_output_payload(record, adapter, native_output.as_ref());
+    let native_outputs = execute_native_provider_outputs(output_dir, record, adapter)?;
+    let content = render_real_device_provider_output_payload(record, adapter, &native_outputs);
     let hash = fnv1a64_hex(content.as_bytes());
     fs::write(output_dir.join(&file_name), content).map_err(|error| {
         format!("failed to write provider output payload `{file_name}`: {error}")
     })?;
     Ok(WrittenProviderOutput {
         evidence: format!("{file_name}:hash={hash}:status=written"),
-        native_output,
+        native_outputs,
     })
 }
 
-fn execute_native_provider_output(
+fn execute_native_provider_outputs(
+    output_dir: &Path,
     record: &crate::model::NsdbDeviceProviderSampleRecordInfo,
     adapter: &crate::provider_runner_registry::ProviderRunnerAdapter,
-) -> Result<Option<PixelMagicNativeOutputSummary>, String> {
-    if adapter.kind != "metal-real-device-runner" {
-        return Ok(None);
+) -> Result<Vec<PixelMagicNativeOutputSummary>, String> {
+    if adapter.kind != "metal-real-device-runner" && adapter.kind != "coreml-real-device-runner" {
+        return Ok(Vec::new());
     }
-    let Some(input_bytes) = std_preprocessed_pgm_input_bytes(&record.input_evidence) else {
-        return Ok(None);
+    let Some(collection) = provider_request_collection_from_evidence(&record.input_evidence) else {
+        return Ok(Vec::new());
     };
-    let input = u32::try_from(input_bytes)
-        .map_err(|_| "PixelMagic Metal sample input exceeds u32 range".to_owned())?;
-    let execution = crate::provider_runner_metal::execute_u32_add(input, 4)?;
-    Ok(Some(pixelmagic_metal_output_summary(
-        &record.input_evidence,
-        &execution,
-    )))
+    collection
+        .requests
+        .iter()
+        .map(|request| execute_native_provider_request(output_dir, record, adapter, request))
+        .collect()
+}
+
+fn execute_native_provider_request(
+    output_dir: &Path,
+    record: &crate::model::NsdbDeviceProviderSampleRecordInfo,
+    adapter: &crate::provider_runner_registry::ProviderRunnerAdapter,
+    request: &ProviderRequest,
+) -> Result<PixelMagicNativeOutputSummary, String> {
+    let payload_path = resolve_provider_payload_path(output_dir, &request.buffer.payload_path)?;
+    let payload = fs::read(&payload_path).map_err(|error| {
+        format!(
+            "failed to read provider input buffer `{}`: {error}",
+            payload_path.display()
+        )
+    })?;
+    if payload.len() != request.buffer.byte_length
+        || fnv1a64_hex(&payload) != request.buffer.content_hash
+    {
+        return Err("provider input buffer size/hash evidence mismatch".to_owned());
+    }
+    match adapter.kind {
+        "metal-real-device-runner" => {
+            if request.buffer.element_type != "u8"
+                || !request.buffer.layout.contains("pixel-format=gray8")
+                || request.kernel.id != "pixelmagic.gray8.invert"
+                || request.kernel.operation != "invert"
+            {
+                return Err(format!(
+                    "Metal provider adapter does not support buffer `{}` with kernel `{}`",
+                    request.buffer.layout, request.kernel.id
+                ));
+            }
+            let max_value = request.scalar_u8("max_value").ok_or_else(|| {
+                "Metal provider request is missing u8 scalar `max_value`".to_owned()
+            })?;
+            let execution =
+                crate::provider_runner_metal::execute_gray8_invert(&payload_path, max_value)?;
+            Ok(pixelmagic_metal_output_summary(
+                &record.input_evidence,
+                &execution,
+            ))
+        }
+        "coreml-real-device-runner" => {
+            if request.buffer.element_type != "f32" || request.buffer.layout != "tensor-contiguous"
+            {
+                return Err(format!(
+                    "CoreML provider adapter requires a contiguous f32 tensor, got `{}` with `{}` elements",
+                    request.buffer.layout, request.buffer.element_type
+                ));
+            }
+            let model = request.model_asset.as_ref().ok_or_else(|| {
+                "CoreML provider request is missing a model asset descriptor".to_owned()
+            })?;
+            let model_path = resolve_provider_payload_path(output_dir, &model.path)?;
+            let model_bytes = fs::read(&model_path).map_err(|error| {
+                format!(
+                    "failed to read provider model asset `{}`: {error}",
+                    model_path.display()
+                )
+            })?;
+            if model_bytes.len() != model.byte_length
+                || fnv1a64_hex(&model_bytes) != model.content_hash
+            {
+                return Err("provider model asset size/hash evidence mismatch".to_owned());
+            }
+            let execution = crate::provider_runner_coreml::execute_model_prediction(
+                &model_path,
+                &payload_path,
+                &model.input_feature,
+                &model.output_feature,
+                &request.buffer.shape,
+            )?;
+            let comparison = request
+                .output_comparison
+                .as_ref()
+                .map(|descriptor| {
+                    compare_provider_output(output_dir, descriptor, &execution.output_bytes)
+                })
+                .transpose()?;
+            Ok(coreml_native_output_summary(
+                &request.kernel.id,
+                &execution,
+                comparison.as_ref(),
+            ))
+        }
+        _ => Err(format!(
+            "provider adapter `{}` cannot execute request `{}`",
+            adapter.adapter_id, request.kernel.id
+        )),
+    }
+}
+
+fn resolve_provider_payload_path(
+    output_dir: &Path,
+    relative: &str,
+) -> Result<std::path::PathBuf, String> {
+    let relative = Path::new(relative);
+    if relative.is_absolute()
+        || relative.components().count() != 1
+        || !matches!(
+            relative.components().next(),
+            Some(std::path::Component::Normal(_))
+        )
+    {
+        return Err("provider input buffer path must be one output-relative file name".to_owned());
+    }
+    Ok(output_dir.join(relative))
 }

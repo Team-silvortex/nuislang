@@ -6,6 +6,7 @@ pub(crate) fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
             condition,
             then_owner,
             else_owner,
+            ..
         } => {
             f(condition);
             f(then_owner);

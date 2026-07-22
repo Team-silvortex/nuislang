@@ -31,11 +31,18 @@ pub(crate) fn infer_nir_expr_type(
         NirExpr::SelectOwnedPointer {
             then_owner,
             else_owner,
+            nullable,
             ..
         } => {
-            let then_type = infer_nir_expr_type(then_owner, bindings, signatures, struct_table)?;
+            let mut then_type =
+                infer_nir_expr_type(then_owner, bindings, signatures, struct_table)?;
             let else_type = infer_nir_expr_type(else_owner, bindings, signatures, struct_table)?;
-            (then_type == else_type && then_type.is_ref).then_some(then_type)
+            if then_type == else_type && then_type.is_ref {
+                then_type.is_optional = *nullable;
+                Some(then_type)
+            } else {
+                None
+            }
         }
         NirExpr::BorrowEnd(_) => Some(unit_type()),
         NirExpr::HostBufferHandle(_) => Some(i64_type()),

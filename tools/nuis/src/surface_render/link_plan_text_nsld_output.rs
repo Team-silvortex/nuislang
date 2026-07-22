@@ -264,6 +264,16 @@ pub(super) fn write_nsld_final_output_text_fields<W: fmt::Write>(
     )?;
     writeln!(
         out,
+        "  nsld_final_executable_output_artifact_chain_safe_next_contract: {}",
+        final_output.artifact_chain_safe_next_contract
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_artifact_chain_safe_next_probe_command: {}",
+        final_output.artifact_chain_safe_next_probe_command
+    )?;
+    writeln!(
+        out,
         "  nsld_final_executable_output_object_package_contract: {}",
         final_output.object_package_summary_contract
     )?;

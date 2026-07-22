@@ -2,12 +2,14 @@ use crate::{
     json::{json_bool_field, json_optional_string_field, json_string_field, json_usize_field},
     model::NsdbInspectReport,
     transcript::{
-        build_replay_transcript_with_control, NsdbReplayControl, NsdbReplayTranscriptFrame,
+        build_replay_transcript, build_replay_transcript_with_control, NsdbReplayControl,
+        NsdbReplayTranscriptFrame,
     },
 };
 
 pub(crate) fn nsdb_replay_transcript_json(report: &NsdbInspectReport) -> String {
-    nsdb_replay_transcript_json_with_control(report, &NsdbReplayControl::default())
+    let transcript = build_replay_transcript(report);
+    nsdb_replay_transcript_json_from_transcript(report, transcript)
 }
 
 pub(crate) fn nsdb_replay_transcript_json_with_control(
@@ -15,6 +17,13 @@ pub(crate) fn nsdb_replay_transcript_json_with_control(
     control: &NsdbReplayControl,
 ) -> String {
     let transcript = build_replay_transcript_with_control(report, control);
+    nsdb_replay_transcript_json_from_transcript(report, transcript)
+}
+
+fn nsdb_replay_transcript_json_from_transcript(
+    report: &NsdbInspectReport,
+    transcript: crate::transcript::NsdbReplayTranscript,
+) -> String {
     let fields = vec![
         json_string_field("tool", "nsdb"),
         json_string_field("kind", "nsdb_yir_replay_transcript"),

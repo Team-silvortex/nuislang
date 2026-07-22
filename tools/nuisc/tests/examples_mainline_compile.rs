@@ -25,7 +25,11 @@ fn collect_ns_files(root: &Path, files: &mut Vec<std::path::PathBuf>) {
     {
         let path = entry.unwrap().path();
         if path.is_dir() {
-            if should_skip_dir_name(path.file_name().and_then(|value| value.to_str()).unwrap_or("")) {
+            if should_skip_dir_name(
+                path.file_name()
+                    .and_then(|value| value.to_str())
+                    .unwrap_or(""),
+            ) {
                 continue;
             }
             collect_ns_files(&path, files);
@@ -41,7 +45,11 @@ fn collect_named_files(root: &Path, file_name: &str, files: &mut Vec<std::path::
     {
         let path = entry.unwrap().path();
         if path.is_dir() {
-            if should_skip_dir_name(path.file_name().and_then(|value| value.to_str()).unwrap_or("")) {
+            if should_skip_dir_name(
+                path.file_name()
+                    .and_then(|value| value.to_str())
+                    .unwrap_or(""),
+            ) {
                 continue;
             }
             collect_named_files(&path, file_name, files);
@@ -57,7 +65,11 @@ fn collect_files_with_extension(root: &Path, extension: &str, files: &mut Vec<st
     {
         let path = entry.unwrap().path();
         if path.is_dir() {
-            if should_skip_dir_name(path.file_name().and_then(|value| value.to_str()).unwrap_or("")) {
+            if should_skip_dir_name(
+                path.file_name()
+                    .and_then(|value| value.to_str())
+                    .unwrap_or(""),
+            ) {
                 continue;
             }
             collect_files_with_extension(&path, extension, files);

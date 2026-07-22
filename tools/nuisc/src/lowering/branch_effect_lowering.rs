@@ -9,6 +9,8 @@ pub(super) fn lower_owned_pointer_select(
     condition: &NirExpr,
     then_owner: &NirExpr,
     else_owner: &NirExpr,
+    address_kind: nuis_semantics::model::NirOwnedPointerAddressKind,
+    nullable: bool,
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
 ) -> Result<String, String> {
@@ -34,6 +36,8 @@ pub(super) fn lower_owned_pointer_select(
         yir_core::BranchEffectResult::OwnedPointer
             .as_str()
             .to_owned(),
+        format!("address_kind={}", address_kind.as_str()),
+        format!("nullable={nullable}"),
     ];
     encode_planned_actions(std::slice::from_ref(&then_action), &mut args);
     encode_planned_actions(std::slice::from_ref(&else_action), &mut args);

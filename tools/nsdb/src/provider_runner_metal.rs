@@ -1,22 +1,29 @@
+use std::path::Path;
 #[cfg(target_os = "macos")]
 use std::{fs, path::PathBuf, process::Command, time::SystemTime};
 
 #[cfg(target_os = "macos")]
-const METAL_RUNNER_SOURCE: &str = include_str!("../provider-runners/metal_u32_add.m");
+const METAL_RUNNER_SOURCE: &str = include_str!("../provider-runners/metal_gray8_invert.m");
 
 pub(crate) struct MetalProviderExecution {
     pub(crate) contract: &'static str,
     pub(crate) status: &'static str,
     pub(crate) device: String,
-    pub(crate) output: u32,
+    pub(crate) output_bytes: Vec<u8>,
 }
 
-pub(crate) fn execute_u32_add(input: u32, delta: u32) -> Result<MetalProviderExecution, String> {
-    execute_u32_add_platform(input, delta)
+pub(crate) fn execute_gray8_invert(
+    input_path: &Path,
+    max_value: u8,
+) -> Result<MetalProviderExecution, String> {
+    execute_gray8_invert_platform(input_path, max_value)
 }
 
 #[cfg(target_os = "macos")]
-fn execute_u32_add_platform(input: u32, delta: u32) -> Result<MetalProviderExecution, String> {
+fn execute_gray8_invert_platform(
+    input_path: &Path,
+    max_value: u8,
+) -> Result<MetalProviderExecution, String> {
     let paths = TempMetalRunnerPaths::new();
     fs::write(&paths.source, METAL_RUNNER_SOURCE)
         .map_err(|error| format!("failed to materialize Metal runner source: {error}"))?;
@@ -40,7 +47,8 @@ fn execute_u32_add_platform(input: u32, delta: u32) -> Result<MetalProviderExecu
         ));
     }
     let execution = Command::new(&paths.binary)
-        .args([input.to_string(), delta.to_string()])
+        .arg(input_path)
+        .arg(max_value.to_string())
         .output()
         .map_err(|error| format!("failed to launch Metal provider runner: {error}"))?;
     if !execution.status.success() {
@@ -53,7 +61,10 @@ fn execute_u32_add_platform(input: u32, delta: u32) -> Result<MetalProviderExecu
 }
 
 #[cfg(not(target_os = "macos"))]
-fn execute_u32_add_platform(_input: u32, _delta: u32) -> Result<MetalProviderExecution, String> {
+fn execute_gray8_invert_platform(
+    _input_path: &Path,
+    _max_value: u8,
+) -> Result<MetalProviderExecution, String> {
     Err("Metal provider runner is unavailable on this host".to_owned())
 }
 
@@ -63,7 +74,7 @@ fn parse_metal_runner_output(output: &str) -> Result<MetalProviderExecution, Str
             .lines()
             .find_map(|line| line.strip_prefix(&format!("{name}=")))
     };
-    if field("protocol") != Some("nuis-metal-provider-runner-v1") {
+    if field("protocol") != Some("nuis-metal-gray8-provider-runner-v1") {
         return Err("Metal provider runner returned an unsupported protocol".to_owned());
     }
     if field("status") != Some("ready") {
@@ -73,16 +84,36 @@ fn parse_metal_runner_output(output: &str) -> Result<MetalProviderExecution, Str
         .filter(|value| !value.is_empty())
         .ok_or_else(|| "Metal provider runner omitted device identity".to_owned())?
         .to_owned();
-    let output = field("output")
-        .ok_or_else(|| "Metal provider runner omitted output".to_owned())?
-        .parse::<u32>()
-        .map_err(|error| format!("Metal provider runner output is invalid: {error}"))?;
+    let output_bytes = decode_hex(
+        field("output_hex")
+            .ok_or_else(|| "Metal provider runner omitted output bytes".to_owned())?,
+    )?;
+    let declared_bytes = field("output_bytes")
+        .ok_or_else(|| "Metal provider runner omitted output byte count".to_owned())?
+        .parse::<usize>()
+        .map_err(|error| format!("Metal provider runner byte count is invalid: {error}"))?;
+    if output_bytes.len() != declared_bytes {
+        return Err("Metal provider runner output byte count mismatch".to_owned());
+    }
     Ok(MetalProviderExecution {
-        contract: "nuis-metal-provider-runner-v1",
+        contract: "nuis-metal-gray8-provider-runner-v1",
         status: "metal-command-buffer-completed",
         device,
-        output,
+        output_bytes,
     })
+}
+
+fn decode_hex(value: &str) -> Result<Vec<u8>, String> {
+    if value.len() % 2 != 0 {
+        return Err("Metal provider runner output hex has odd length".to_owned());
+    }
+    (0..value.len())
+        .step_by(2)
+        .map(|index| {
+            u8::from_str_radix(&value[index..index + 2], 16)
+                .map_err(|error| format!("Metal provider runner output hex is invalid: {error}"))
+        })
+        .collect()
 }
 
 #[cfg(target_os = "macos")]
@@ -117,29 +148,36 @@ impl Drop for TempMetalRunnerPaths {
 
 #[cfg(test)]
 mod tests {
-    use super::{execute_u32_add, parse_metal_runner_output};
+    use super::{execute_gray8_invert, parse_metal_runner_output};
 
     #[test]
     fn parses_ready_metal_runner_output() {
         let execution = parse_metal_runner_output(
-            "protocol=nuis-metal-provider-runner-v1\nstatus=ready\ndevice=Apple M2\noutput=24\n",
+            "protocol=nuis-metal-gray8-provider-runner-v1\nstatus=ready\ndevice=Apple M2\noutput_bytes=4\noutput_hex=0f0b0607\n",
         )
         .unwrap();
 
-        assert_eq!(execution.contract, "nuis-metal-provider-runner-v1");
+        assert_eq!(execution.contract, "nuis-metal-gray8-provider-runner-v1");
         assert_eq!(execution.status, "metal-command-buffer-completed");
         assert_eq!(execution.device, "Apple M2");
-        assert_eq!(execution.output, 24);
+        assert_eq!(execution.output_bytes, [15, 11, 6, 7]);
     }
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn executes_u32_add_on_the_system_metal_device() {
-        let execution = execute_u32_add(20, 4).expect("system Metal provider execution");
+    fn executes_gray8_invert_on_the_system_metal_device() {
+        let input = std::env::temp_dir().join(format!(
+            "nuis-metal-gray8-input-{}-{}.bin",
+            std::process::id(),
+            std::thread::current().name().unwrap_or("test")
+        ));
+        std::fs::write(&input, [0, 4, 9, 8]).unwrap();
+        let execution = execute_gray8_invert(&input, 15).expect("system Metal provider execution");
+        let _ = std::fs::remove_file(input);
 
-        assert_eq!(execution.contract, "nuis-metal-provider-runner-v1");
+        assert_eq!(execution.contract, "nuis-metal-gray8-provider-runner-v1");
         assert_eq!(execution.status, "metal-command-buffer-completed");
         assert!(!execution.device.is_empty());
-        assert_eq!(execution.output, 24);
+        assert_eq!(execution.output_bytes, [15, 11, 6, 7]);
     }
 }

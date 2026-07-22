@@ -27,8 +27,10 @@ pub(crate) use frontdoor::{
 };
 pub(crate) use frontdoor::{
     print_workflow_frontdoor_surface, project_frontdoor_surface, single_source_frontdoor_surface,
-    toolchain_frontdoor_surface, workflow_frontdoor_json_object_field, WorkflowFrontdoorSurface,
-    FRONTDOOR_READING_ORDER, FRONTDOOR_SAMPLE_CLOSURE_SUMMARY, FRONTDOOR_SAMPLE_TENSOR_HANDOFF,
+    toolchain_frontdoor_surface, workflow_frontdoor_json_object_field,
+    write_workflow_frontdoor_reading_order, WorkflowFrontdoorSurface, FRONTDOOR_READING_ORDER,
+    FRONTDOOR_READING_ORDER_CONTRACT, FRONTDOOR_SAMPLE_CLOSURE_SUMMARY,
+    FRONTDOOR_SAMPLE_TENSOR_HANDOFF,
 };
 pub(crate) use json_bits::{
     append_json_object_fields, artifact_lowering_units_json, json_object_array_field,

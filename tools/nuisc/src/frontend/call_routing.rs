@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+use nuis_semantics::model::NirOwnedPointerAddressKind;
+
 use super::call_helpers::{ensure_move_like, ensure_ref_like};
 use super::data_builtins::{lower_data_builtin_call, DataBuiltinInput};
 use super::data_profile_builtins::{lower_data_profile_builtin_call, DataProfileBuiltinInput};
@@ -276,10 +278,31 @@ pub(super) fn lower_routed_call_or_core_builtin(
                     else_type.render()
                 ));
             }
+            if then_type.is_optional {
+                return Err(
+                    "select_owned_ptr(...) nullable candidates are not owned resources; select two live owners and widen only the result"
+                        .to_owned(),
+                );
+            }
+            let address_kind = NirOwnedPointerAddressKind::for_target(&then_type.name)
+                .ok_or_else(|| {
+                    format!(
+                        "select_owned_ptr(...) address target `{}` has no registered owned-selection kind",
+                        then_type.name
+                    )
+                })?;
+            let nullable = expected.is_some_and(|expected| {
+                expected.is_ref
+                    && expected.is_optional
+                    && expected.name == then_type.name
+                    && expected.generic_args == then_type.generic_args
+            });
             NirExpr::SelectOwnedPointer {
                 condition: Box::new(condition),
                 then_owner: Box::new(then_owner),
                 else_owner: Box::new(else_owner),
+                address_kind,
+                nullable,
             }
         }
         "alloc_node" => {

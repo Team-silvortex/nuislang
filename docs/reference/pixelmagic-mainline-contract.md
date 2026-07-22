@@ -105,11 +105,21 @@ At the current repository stage, `PixelMagic` already has:
 * a checked-in project-shaped domain pipeline
 * shader/data/cpu cooperation through the current packet/resource/render route
 * a registered Metal provider runner that submits a real compute command buffer
-  on macOS and records the Metal device plus output evidence
+  on macOS, uploads a shape/hash-validated raw `gray8` payload, dispatches an
+  invert kernel, reads the transformed bytes back, and records the Metal device
+  plus output byte/hash evidence
+* package-independent `nuis-provider-buffer-descriptor-v1` and
+  `nuis-provider-kernel-descriptor-v1` requests carrying buffer identity,
+  element/layout/shape/stride, payload integrity, kernel bindings, dispatch,
+  and typed scalar arguments across the Nuis-to-Nsdb boundary
 
-The current native sample deliberately proves the backend boundary with a
-scalar image-byte-count operation. It is real Metal execution, but it is not
-yet a full PGM pixel-buffer upload, filter dispatch, and readback pipeline.
+The current native sample is a complete narrow data path rather than a scalar
+proxy: std preprocessing persists a 2 x 2 PGM-derived payload, provider evidence
+binds its format, dimensions, stride, maximum value, operation, size, path, and
+hash, and Nsdb validates the registered buffer/kernel descriptors before Metal
+execution. Legacy `pixel_*` evidence remains readable through a compatibility
+conversion, but native execution consumes only the common provider request.
+The scope remains deliberately small: only `gray8` invert is executable today.
 
 ## What Is Not Done Yet
 
@@ -120,7 +130,8 @@ yet a full PGM pixel-buffer upload, filter dispatch, and readback pipeline.
 * a real import-based package workflow
 * a finished public filter family API
 * a backend-complete texture upload/runtime contract
-* full image-buffer execution through the current Metal provider runner
+* additional registered image-buffer/filter kernels beyond the first `gray8`
+  invert operation
 
 ## Reading Order
 

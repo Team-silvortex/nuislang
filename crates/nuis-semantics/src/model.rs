@@ -239,6 +239,29 @@ pub enum NirAddressClass {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirOwnedPointerAddressKind {
+    Node,
+    Buffer,
+}
+
+impl NirOwnedPointerAddressKind {
+    pub fn for_target(target: &str) -> Option<Self> {
+        Some(match target {
+            "Node" => Self::Node,
+            "Buffer" => Self::Buffer,
+            _ => return None,
+        })
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Node => "node",
+            Self::Buffer => "buffer",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NirContainerKind {
     Window,
     Pipe,

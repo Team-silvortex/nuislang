@@ -7,6 +7,18 @@ pub(super) fn nsld_tail_json_fields(
 ) -> Vec<String> {
     vec![
         crate::json_optional_string_field(
+            "nsld_final_executable_output_artifact_chain_safe_next_contract",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.artifact_chain_safe_next_contract.as_str()),
+        ),
+        crate::json_optional_string_field(
+            "nsld_final_executable_output_artifact_chain_safe_next_probe_command",
+            final_output_summary
+                .as_ref()
+                .map(|summary| summary.artifact_chain_safe_next_probe_command.as_str()),
+        ),
+        crate::json_optional_string_field(
             "nsld_final_executable_pipeline_command",
             final_tail_summary
                 .as_ref()

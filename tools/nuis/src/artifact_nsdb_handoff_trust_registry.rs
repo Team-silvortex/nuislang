@@ -213,6 +213,9 @@ mod tests {
 
     #[test]
     fn independent_environment_lookup_rejects_anchor_rollback() {
+        let _guard = crate::artifact_nsdb_handoff_trust_anchor::TEST_ENV_LOCK
+            .lock()
+            .unwrap();
         let root = env::temp_dir().join(format!("nuis-registry-anchor-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).unwrap();

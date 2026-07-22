@@ -462,11 +462,17 @@ the path-local `free` plus `phi ptr`. Source code constructs this result with
 candidates must be distinct and have the same owned address type. NIR ownership
 verification consumes both regardless of the selected path, rejects aliases
 and later reuse, and cleanup synthesis does not free either stale input. The
-native owned-pointer-selection smoke selects, loads, and finally frees the
-surviving pointer with exit `73`. One native `i64` smoke executes both merge leaves in the same
+YIR result now carries an explicit `address_kind=<node|buffer>` plus
+`nullable=<true|false>` header. The heap verifier checks that declared kind
+against both live objects before moving their source names. Source may widen a
+selection of two live non-null owners into an optional result, but optional
+candidates remain rejected because `null` is not an owned resource. The native
+owned-pointer-selection smoke executes Node, nullable-result, and Buffer
+selection, loads the selected values, and finally frees every survivor with
+exit `78`. One native `i64` smoke executes both merge leaves in the same
 binary and returns their sum, while the owned-transfer smoke observes distinct
 helper output while retaining one Node allocation in LLVM. Duplicate,
-asymmetric, projected, nullable, borrowed, returned, task-carried, or
+asymmetric, projected, nullable-candidate, borrowed, returned, task-carried, or
 otherwise unsupported merge-visible action results remain rejected.
 
 Today `nuis` does **not** yet have:

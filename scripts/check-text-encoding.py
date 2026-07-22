@@ -49,6 +49,8 @@ def tracked_text_paths(root: Path) -> list[Path]:
         if not raw_path:
             continue
         relative = Path(raw_path.decode("utf-8"))
+        if not (root / relative).is_file():
+            continue
         if relative.name in TEXT_FILENAMES or relative.suffix.lower() in TEXT_SUFFIXES:
             paths.append(relative)
     return paths

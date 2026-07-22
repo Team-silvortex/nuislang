@@ -40,11 +40,15 @@ pub(super) fn render_nir_expr(value: &NirExpr) -> String {
             condition,
             then_owner,
             else_owner,
+            address_kind,
+            nullable,
         } => format!(
-            "select_owned_ptr({}, {}, {})",
+            "select_owned_ptr({}, {}, {}) /* address_kind={} nullable={} */",
             render_nir_expr(condition),
             render_nir_expr(then_owner),
-            render_nir_expr(else_owner)
+            render_nir_expr(else_owner),
+            address_kind.as_str(),
+            nullable
         ),
         NirExpr::HostBufferHandle(value) => {
             format!("host_buffer_handle({})", render_nir_expr(value))

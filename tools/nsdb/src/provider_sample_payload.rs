@@ -1,5 +1,10 @@
+pub(crate) use crate::provider_sample_artifact::{fnv1a64_hex, provider_output_payload_file_name};
 use crate::{
     model::NsdbDeviceProviderSampleRecordInfo,
+    provider_request::{
+        provider_request_collection_from_evidence, provider_request_from_evidence, ProviderRequest,
+        PROVIDER_REQUEST_COLLECTION_CONTRACT,
+    },
     provider_sample_runner::{provider_execution_outcome_for_runner, ProviderSampleRunner},
 };
 use std::{fs, path::Path};
@@ -18,6 +23,7 @@ pub(crate) struct ProviderOutputPayloadSummary {
 }
 
 pub(crate) struct PixelMagicNativeOutputSummary {
+    pub(crate) request_id: String,
     pub(crate) kind: String,
     pub(crate) status: String,
     pub(crate) bytes: String,
@@ -25,6 +31,18 @@ pub(crate) struct PixelMagicNativeOutputSummary {
     pub(crate) execution_contract: String,
     pub(crate) execution_status: String,
     pub(crate) device: String,
+    pub(crate) compute_plan_contract: String,
+    pub(crate) compute_plan_status: String,
+    pub(crate) compute_plan_layer_count: String,
+    pub(crate) compute_plan_preferred_devices: String,
+    pub(crate) compute_plan_supported_devices: String,
+    pub(crate) comparison_contract: String,
+    pub(crate) comparison_status: String,
+    pub(crate) comparison_element_count: String,
+    pub(crate) comparison_mismatch_count: String,
+    pub(crate) comparison_max_absolute_error: String,
+    pub(crate) comparison_max_relative_error: String,
+    pub(crate) comparison_non_finite_count: String,
 }
 
 const PROVIDER_OUTPUT_PAYLOAD_PROTOCOL: &str = "nuis-provider-output-payload-v1";
@@ -210,7 +228,7 @@ fn validate_provider_output_payload(
 pub(crate) fn render_real_device_provider_output_payload(
     record: &NsdbDeviceProviderSampleRecordInfo,
     adapter: &crate::provider_runner_registry::ProviderRunnerAdapter,
-    native_output: Option<&PixelMagicNativeOutputSummary>,
+    native_outputs: &[PixelMagicNativeOutputSummary],
 ) -> String {
     let mut out = render_provider_output_payload_header(
         record,
@@ -222,7 +240,7 @@ pub(crate) fn render_real_device_provider_output_payload(
     push_toml_string(
         &mut out,
         "output_payload_kind",
-        if native_output.is_some() {
+        if !native_outputs.is_empty() {
             "real-device-api-output"
         } else {
             "real-device-adapter-output"
@@ -231,15 +249,44 @@ pub(crate) fn render_real_device_provider_output_payload(
     push_toml_string(
         &mut out,
         "output_payload_status",
-        if native_output.is_some() {
+        if !native_outputs.is_empty() {
             "native-api-output-ready"
         } else {
             "adapter-output-ready"
         },
     );
-    push_toml_string(&mut out, "comparison_status", "ready-for-comparison");
-    if let Some(summary) = native_output {
+    let comparison_status = if native_outputs.iter().any(|output| {
+        output.comparison_contract != "none" && output.comparison_status == "comparison-passed"
+    }) && native_outputs
+        .iter()
+        .filter(|output| output.comparison_contract != "none")
+        .all(|output| output.comparison_status == "comparison-passed")
+    {
+        "comparison-passed"
+    } else {
+        "ready-for-comparison"
+    };
+    push_toml_string(&mut out, "comparison_status", comparison_status);
+    if let Some(summary) = native_outputs.first() {
         push_pixelmagic_native_output_summary(&mut out, summary);
+        push_toml_string(
+            &mut out,
+            "native_output_collection_contract",
+            "nuis-provider-output-collection-v1",
+        );
+        push_toml_string(
+            &mut out,
+            "native_output_count",
+            &native_outputs.len().to_string(),
+        );
+        push_toml_string(
+            &mut out,
+            "native_output_collection_hash",
+            &native_output_collection_hash(native_outputs),
+        );
+        for (index, output) in native_outputs.iter().enumerate() {
+            push_indexed_native_output(&mut out, index, output);
+        }
     } else {
         push_pixelmagic_image_output_summary(&mut out, record);
     }
@@ -273,8 +320,13 @@ pub(crate) fn pixelmagic_native_output_summary(
     provider_family: &str,
 ) -> Option<PixelMagicNativeOutputSummary> {
     let input_bytes = std_preprocessed_pgm_input_bytes(input_evidence)?;
-    let output_bytes = pixelmagic_deterministic_output_bytes(input_bytes, provider_family);
+    let output_bytes = provider_request_from_evidence(input_evidence)
+        .map(|request| request.buffer.byte_length)
+        .unwrap_or_else(|| pixelmagic_deterministic_output_bytes(input_bytes, provider_family));
     Some(PixelMagicNativeOutputSummary {
+        request_id: provider_request_from_evidence(input_evidence)
+            .map(|request| request.kernel.id)
+            .unwrap_or_else(|| "pixelmagic.legacy".to_owned()),
         kind: "pixelmagic-image-bytes".to_owned(),
         status: "deterministic-provider-output-ready".to_owned(),
         bytes: output_bytes.to_string(),
@@ -282,28 +334,94 @@ pub(crate) fn pixelmagic_native_output_summary(
         execution_contract: "nuis-deterministic-provider-output-v1".to_owned(),
         execution_status: "host-deterministic-output-ready".to_owned(),
         device: "host-deterministic-fallback".to_owned(),
+        compute_plan_contract: "none".to_owned(),
+        compute_plan_status: "not-applicable".to_owned(),
+        compute_plan_layer_count: "0".to_owned(),
+        compute_plan_preferred_devices: "none".to_owned(),
+        compute_plan_supported_devices: "none".to_owned(),
+        comparison_contract: "none".to_owned(),
+        comparison_status: "not-applicable".to_owned(),
+        comparison_element_count: "0".to_owned(),
+        comparison_mismatch_count: "0".to_owned(),
+        comparison_max_absolute_error: "0".to_owned(),
+        comparison_max_relative_error: "0".to_owned(),
+        comparison_non_finite_count: "0".to_owned(),
     })
 }
 
 pub(crate) fn pixelmagic_metal_output_summary(
-    input_evidence: &str,
+    _input_evidence: &str,
     execution: &crate::provider_runner_metal::MetalProviderExecution,
 ) -> PixelMagicNativeOutputSummary {
-    let bytes = execution.output.to_string();
+    let bytes = execution.output_bytes.len().to_string();
     PixelMagicNativeOutputSummary {
+        request_id: provider_request_from_evidence(_input_evidence)
+            .map(|request| request.kernel.id)
+            .unwrap_or_else(|| "pixelmagic.legacy".to_owned()),
         kind: "pixelmagic-image-bytes".to_owned(),
         status: "metal-api-output-ready".to_owned(),
-        hash: fnv1a64_hex(
-            format!(
-                "{input_evidence}:{}:{}:{bytes}",
-                execution.contract, execution.device
-            )
-            .as_bytes(),
-        ),
+        hash: fnv1a64_hex(&execution.output_bytes),
         bytes,
         execution_contract: execution.contract.to_owned(),
         execution_status: execution.status.to_owned(),
         device: execution.device.clone(),
+        compute_plan_contract: "none".to_owned(),
+        compute_plan_status: "not-applicable".to_owned(),
+        compute_plan_layer_count: "0".to_owned(),
+        compute_plan_preferred_devices: "none".to_owned(),
+        compute_plan_supported_devices: "none".to_owned(),
+        comparison_contract: "none".to_owned(),
+        comparison_status: "not-applicable".to_owned(),
+        comparison_element_count: "0".to_owned(),
+        comparison_mismatch_count: "0".to_owned(),
+        comparison_max_absolute_error: "0".to_owned(),
+        comparison_max_relative_error: "0".to_owned(),
+        comparison_non_finite_count: "0".to_owned(),
+    }
+}
+
+pub(crate) fn coreml_native_output_summary(
+    request_id: &str,
+    execution: &crate::provider_runner_coreml::CoreMlProviderExecution,
+    comparison: Option<&crate::provider_output_comparison::ProviderOutputComparisonResult>,
+) -> PixelMagicNativeOutputSummary {
+    PixelMagicNativeOutputSummary {
+        request_id: request_id.to_owned(),
+        kind: "provider-tensor-f32".to_owned(),
+        status: "coreml-api-output-ready".to_owned(),
+        hash: fnv1a64_hex(&execution.output_bytes),
+        bytes: execution.output_bytes.len().to_string(),
+        execution_contract: execution.contract.to_owned(),
+        execution_status: execution.status.to_owned(),
+        device: execution.device.clone(),
+        compute_plan_contract: execution.compute_plan_contract.clone(),
+        compute_plan_status: execution.compute_plan_status.clone(),
+        compute_plan_layer_count: execution.compute_plan_layer_count.to_string(),
+        compute_plan_preferred_devices: execution.compute_plan_preferred_devices.clone(),
+        compute_plan_supported_devices: execution.compute_plan_supported_devices.clone(),
+        comparison_contract: comparison
+            .map(|comparison| comparison.contract)
+            .unwrap_or("none")
+            .to_owned(),
+        comparison_status: comparison
+            .map(|comparison| comparison.status)
+            .unwrap_or("not-applicable")
+            .to_owned(),
+        comparison_element_count: comparison
+            .map(|comparison| comparison.compared_elements.to_string())
+            .unwrap_or_else(|| "0".to_owned()),
+        comparison_mismatch_count: comparison
+            .map(|comparison| comparison.mismatch_count.to_string())
+            .unwrap_or_else(|| "0".to_owned()),
+        comparison_max_absolute_error: comparison
+            .map(|comparison| comparison.max_absolute_error.clone())
+            .unwrap_or_else(|| "0".to_owned()),
+        comparison_max_relative_error: comparison
+            .map(|comparison| comparison.max_relative_error.clone())
+            .unwrap_or_else(|| "0".to_owned()),
+        comparison_non_finite_count: comparison
+            .map(|comparison| comparison.non_finite_count.to_string())
+            .unwrap_or_else(|| "0".to_owned()),
     }
 }
 
@@ -339,6 +457,125 @@ fn push_pixelmagic_native_output_summary(
         &summary.execution_status,
     );
     push_toml_string(out, "native_output_device", &summary.device);
+    push_toml_string(
+        out,
+        "native_output_compute_plan_contract",
+        &summary.compute_plan_contract,
+    );
+    push_toml_string(
+        out,
+        "native_output_compute_plan_status",
+        &summary.compute_plan_status,
+    );
+    push_toml_string(
+        out,
+        "native_output_compute_plan_layer_count",
+        &summary.compute_plan_layer_count,
+    );
+    push_toml_string(
+        out,
+        "native_output_compute_plan_preferred_devices",
+        &summary.compute_plan_preferred_devices,
+    );
+    push_toml_string(
+        out,
+        "native_output_compute_plan_supported_devices",
+        &summary.compute_plan_supported_devices,
+    );
+    push_toml_string(
+        out,
+        "native_output_comparison_contract",
+        &summary.comparison_contract,
+    );
+    push_toml_string(
+        out,
+        "native_output_comparison_status",
+        &summary.comparison_status,
+    );
+    push_toml_string(
+        out,
+        "native_output_comparison_element_count",
+        &summary.comparison_element_count,
+    );
+    push_toml_string(
+        out,
+        "native_output_comparison_mismatch_count",
+        &summary.comparison_mismatch_count,
+    );
+    push_toml_string(
+        out,
+        "native_output_comparison_max_absolute_error",
+        &summary.comparison_max_absolute_error,
+    );
+    push_toml_string(
+        out,
+        "native_output_comparison_max_relative_error",
+        &summary.comparison_max_relative_error,
+    );
+    push_toml_string(
+        out,
+        "native_output_comparison_non_finite_count",
+        &summary.comparison_non_finite_count,
+    );
+}
+
+fn push_indexed_native_output(
+    out: &mut String,
+    index: usize,
+    summary: &PixelMagicNativeOutputSummary,
+) {
+    let prefix = format!("native_output_{index}_");
+    for (name, value) in [
+        ("request_id", summary.request_id.as_str()),
+        ("kind", summary.kind.as_str()),
+        ("status", summary.status.as_str()),
+        ("bytes", summary.bytes.as_str()),
+        ("hash", summary.hash.as_str()),
+        ("execution_contract", summary.execution_contract.as_str()),
+        ("execution_status", summary.execution_status.as_str()),
+        ("device", summary.device.as_str()),
+        (
+            "compute_plan_contract",
+            summary.compute_plan_contract.as_str(),
+        ),
+        ("compute_plan_status", summary.compute_plan_status.as_str()),
+        (
+            "compute_plan_layer_count",
+            summary.compute_plan_layer_count.as_str(),
+        ),
+        (
+            "compute_plan_preferred_devices",
+            summary.compute_plan_preferred_devices.as_str(),
+        ),
+        (
+            "compute_plan_supported_devices",
+            summary.compute_plan_supported_devices.as_str(),
+        ),
+        ("comparison_contract", summary.comparison_contract.as_str()),
+        ("comparison_status", summary.comparison_status.as_str()),
+        (
+            "comparison_element_count",
+            summary.comparison_element_count.as_str(),
+        ),
+        (
+            "comparison_mismatch_count",
+            summary.comparison_mismatch_count.as_str(),
+        ),
+        (
+            "comparison_max_absolute_error",
+            summary.comparison_max_absolute_error.as_str(),
+        ),
+        (
+            "comparison_max_relative_error",
+            summary.comparison_max_relative_error.as_str(),
+        ),
+        (
+            "comparison_non_finite_count",
+            summary.comparison_non_finite_count.as_str(),
+        ),
+    ] {
+        push_toml_string(out, &format!("{prefix}{name}"), value);
+    }
 }
 
 pub(crate) fn std_preprocessed_pgm_input_bytes(input_evidence: &str) -> Option<usize> {
@@ -400,36 +637,165 @@ fn render_provider_output_payload_header(
         "input_evidence_hash",
         &fnv1a64_hex(record.input_evidence.as_bytes()),
     );
+    if let Some(request) = provider_request_from_evidence(&record.input_evidence) {
+        if let Some(collection) = provider_request_collection_from_evidence(&record.input_evidence)
+        {
+            push_toml_string(
+                &mut out,
+                "provider_request_collection_contract",
+                PROVIDER_REQUEST_COLLECTION_CONTRACT,
+            );
+            push_toml_string(
+                &mut out,
+                "provider_request_count",
+                &collection.requests.len().to_string(),
+            );
+            push_toml_string(
+                &mut out,
+                "provider_request_order",
+                &collection
+                    .requests
+                    .iter()
+                    .map(|request| request.kernel.id.as_str())
+                    .collect::<Vec<_>>()
+                    .join(","),
+            );
+        }
+        push_provider_request_summary(&mut out, &request);
+    }
     out
 }
 
-pub(crate) fn provider_output_payload_file_name(provider_family: &str) -> String {
-    format!(
-        "nuis.nsdb.provider-output.{}.toml",
-        sanitize_artifact_component(provider_family)
-    )
-}
-
-fn sanitize_artifact_component(value: &str) -> String {
-    value
-        .chars()
-        .map(|ch| {
-            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
-                ch
-            } else {
-                '-'
-            }
+fn native_output_collection_hash(outputs: &[PixelMagicNativeOutputSummary]) -> String {
+    let canonical = outputs
+        .iter()
+        .enumerate()
+        .map(|(index, output)| {
+            format!(
+                "{index}:{}:{}:{}:{};",
+                output.request_id,
+                output.hash,
+                output.comparison_contract,
+                output.comparison_status
+            )
         })
-        .collect()
+        .collect::<String>();
+    fnv1a64_hex(canonical.as_bytes())
 }
 
-pub(crate) fn fnv1a64_hex(bytes: &[u8]) -> String {
-    let mut hash: u64 = 0xcbf29ce484222325;
-    for byte in bytes {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x100000001b3);
+fn push_provider_request_summary(out: &mut String, request: &ProviderRequest) {
+    push_toml_string(out, "provider_request_source", request.source);
+    push_toml_string(
+        out,
+        "provider_buffer_descriptor_contract",
+        crate::provider_request::PROVIDER_BUFFER_DESCRIPTOR_CONTRACT,
+    );
+    push_toml_string(out, "provider_buffer_id", &request.buffer.id);
+    push_toml_string(
+        out,
+        "provider_buffer_element_type",
+        &request.buffer.element_type,
+    );
+    push_toml_string(out, "provider_buffer_layout", &request.buffer.layout);
+    push_toml_string(
+        out,
+        "provider_kernel_descriptor_contract",
+        crate::provider_request::PROVIDER_KERNEL_DESCRIPTOR_CONTRACT,
+    );
+    push_toml_string(out, "provider_kernel_id", &request.kernel.id);
+    push_toml_string(out, "provider_kernel_operation", &request.kernel.operation);
+    push_toml_string(
+        out,
+        "provider_kernel_input_buffer",
+        &request.kernel.input_buffer,
+    );
+    push_toml_string(
+        out,
+        "provider_kernel_output_buffer",
+        &request.kernel.output_buffer,
+    );
+    if let Some(model) = &request.model_asset {
+        push_toml_string(
+            out,
+            "provider_model_asset_descriptor_contract",
+            crate::provider_request::PROVIDER_MODEL_ASSET_DESCRIPTOR_CONTRACT,
+        );
+        push_toml_string(out, "provider_model_asset_id", &model.id);
+        push_toml_string(out, "provider_model_asset_format", &model.format);
+        push_toml_string(out, "provider_model_asset_path", &model.path);
+        push_toml_string(
+            out,
+            "provider_model_asset_byte_length",
+            &model.byte_length.to_string(),
+        );
+        push_toml_string(
+            out,
+            "provider_model_asset_content_hash",
+            &model.content_hash,
+        );
+        push_toml_string(
+            out,
+            "provider_model_asset_input_feature",
+            &model.input_feature,
+        );
+        push_toml_string(
+            out,
+            "provider_model_asset_output_feature",
+            &model.output_feature,
+        );
     }
-    format!("0x{hash:016x}")
+    if let Some(comparison) = &request.output_comparison {
+        push_toml_string(
+            out,
+            "provider_output_comparison_descriptor_contract",
+            crate::provider_request::PROVIDER_OUTPUT_COMPARISON_DESCRIPTOR_CONTRACT,
+        );
+        push_toml_string(
+            out,
+            "provider_output_comparison_output_buffer",
+            &comparison.output_buffer,
+        );
+        push_toml_string(
+            out,
+            "provider_output_comparison_element_type",
+            &comparison.element_type,
+        );
+        push_toml_string(
+            out,
+            "provider_output_comparison_shape",
+            &comparison
+                .shape
+                .iter()
+                .map(usize::to_string)
+                .collect::<Vec<_>>()
+                .join("x"),
+        );
+        push_toml_string(
+            out,
+            "provider_output_comparison_expected_path",
+            &comparison.expected_path,
+        );
+        push_toml_string(
+            out,
+            "provider_output_comparison_expected_content_hash",
+            &comparison.expected_content_hash,
+        );
+        push_toml_string(
+            out,
+            "provider_output_comparison_absolute_tolerance",
+            &comparison.absolute_tolerance,
+        );
+        push_toml_string(
+            out,
+            "provider_output_comparison_relative_tolerance",
+            &comparison.relative_tolerance,
+        );
+        push_toml_string(
+            out,
+            "provider_output_comparison_non_finite_policy",
+            &comparison.non_finite_policy,
+        );
+    }
 }
 
 fn push_toml_string(out: &mut String, key: &str, value: &str) {
@@ -437,70 +803,4 @@ fn push_toml_string(out: &mut String, key: &str, value: &str) {
     out.push_str(" = \"");
     out.push_str(&value.replace('\\', "\\\\").replace('"', "\\\""));
     out.push_str("\"\n");
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::provider_runner_registry::ProviderRunnerAdapter;
-
-    fn sample_record(input_evidence: &str) -> NsdbDeviceProviderSampleRecordInfo {
-        NsdbDeviceProviderSampleRecordInfo {
-            index: 0,
-            valid: true,
-            trace_id: "payload-trace:pixelmagic:0".to_owned(),
-            provider: "PixelMagic".to_owned(),
-            provider_family: "metal:apple-silicon-gpu".to_owned(),
-            requested_runner_contract: "nuis-provider-runner-v1".to_owned(),
-            requested_runner_adapter_contract: "nuis-provider-runner-adapter-v1".to_owned(),
-            requested_runner_adapter_id: "metal.apple-silicon-gpu.real-device".to_owned(),
-            requested_runner_adapter_capability_status: "registered-real-device".to_owned(),
-            handoff_target: "device-provider-sample".to_owned(),
-            sample_status: "provider-execution-ready".to_owned(),
-            validation_status: "provider-execution-validated".to_owned(),
-            input_evidence: input_evidence.to_owned(),
-            output_evidence: "none".to_owned(),
-            provider_output_payload_contract: "none".to_owned(),
-            provider_output_payload_status: "none".to_owned(),
-            provider_output_payload_evidence_status: "none".to_owned(),
-            provider_output_payload_evidence: "none".to_owned(),
-            provider_output_payload_detail: "none".to_owned(),
-            provider_output_payload_next_action: "none".to_owned(),
-            materialization_status: "provider-sample-materialized".to_owned(),
-            materialization_detail: "test".to_owned(),
-            next_action: "replay-device-sample".to_owned(),
-            diagnostic: "none".to_owned(),
-        }
-    }
-
-    #[test]
-    fn pixelmagic_native_output_summary_tracks_std_pgm_bytes() {
-        let summary =
-            pixelmagic_native_output_summary("std-preprocessed-pgm:input_bytes=20", "metal")
-                .expect("pixelmagic output summary");
-
-        assert_eq!(summary.kind, "pixelmagic-image-bytes");
-        assert_eq!(summary.status, "deterministic-provider-output-ready");
-        assert_eq!(summary.bytes, "24");
-        assert!(summary.hash.starts_with("0x"));
-    }
-
-    #[test]
-    fn real_device_payload_carries_pixelmagic_output_bytes() {
-        let record = sample_record("std-preprocessed-pgm:input_bytes=20");
-        let adapter = ProviderRunnerAdapter {
-            adapter_id: "metal.apple-silicon-gpu.real-device",
-            capability_status: "registered-real-device",
-            real_device_capable: true,
-            kind: "metal-real-device-runner",
-            execution_mode: "real-device-provider-runner",
-        };
-
-        let payload = render_real_device_provider_output_payload(&record, &adapter, None);
-
-        assert!(payload.contains("comparison_input_kind = \"std-preprocessed-pgm\""));
-        assert!(payload.contains("native_output_kind = \"pixelmagic-image-bytes\""));
-        assert!(payload.contains("native_output_bytes = \"24\""));
-        assert!(payload.contains("native_output_hash = \"0x"));
-    }
 }

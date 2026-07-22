@@ -14,6 +14,22 @@ pub(crate) fn append_workflow_contract_json_fields(
         out,
         vec![
             crate::workflow_frontdoor_json_object_field(frontdoor),
+            crate::json_field(
+                "frontdoor_reading_order_contract",
+                crate::workflow::FRONTDOOR_READING_ORDER_CONTRACT,
+            ),
+            crate::json_field(
+                "frontdoor_reading_order",
+                crate::workflow::FRONTDOOR_READING_ORDER,
+            ),
+            crate::json_field(
+                "frontdoor_sample_closure_summary",
+                crate::workflow::FRONTDOOR_SAMPLE_CLOSURE_SUMMARY,
+            ),
+            crate::json_field(
+                "frontdoor_sample_tensor_handoff",
+                crate::workflow::FRONTDOOR_SAMPLE_TENSOR_HANDOFF,
+            ),
             crate::json_field("workflow_kind", frontdoor.workflow_kind),
             crate::json_field("workflow_brief", frontdoor.workflow_brief),
             crate::json_field("workflow_samples", frontdoor.workflow_samples),
@@ -70,6 +86,22 @@ pub(crate) fn workflow_contract_json_fields(
 ) -> Vec<String> {
     let mut fields = vec![
         crate::workflow_frontdoor_json_object_field(frontdoor),
+        crate::json_field(
+            "frontdoor_reading_order_contract",
+            crate::workflow::FRONTDOOR_READING_ORDER_CONTRACT,
+        ),
+        crate::json_field(
+            "frontdoor_reading_order",
+            crate::workflow::FRONTDOOR_READING_ORDER,
+        ),
+        crate::json_field(
+            "frontdoor_sample_closure_summary",
+            crate::workflow::FRONTDOOR_SAMPLE_CLOSURE_SUMMARY,
+        ),
+        crate::json_field(
+            "frontdoor_sample_tensor_handoff",
+            crate::workflow::FRONTDOOR_SAMPLE_TENSOR_HANDOFF,
+        ),
         crate::json_field("workflow_kind", frontdoor.workflow_kind),
         crate::json_field("workflow_brief", frontdoor.workflow_brief),
         crate::json_field("workflow_samples", frontdoor.workflow_samples),

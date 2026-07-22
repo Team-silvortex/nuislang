@@ -68,6 +68,22 @@ Current first responsibility:
 * give kernel-backed examples a stable `WitSageKernelSurface` module for
   `galaxy = ["witsage=workspace"]`
 
+Current native execution baseline:
+
+* a four-element affine CoreML model verifies deterministic CPU-preferred
+  prediction and output evidence
+* a `16x64x64` feature-grid projection verifies deterministic
+  Neural-Engine-preferred prediction on the M2 smoke host
+* both models cross the same provider-neutral buffer, kernel, model-asset, and
+  compute-plan contracts; Nsdb does not recognize WitSage operation names
+* one ordered provider request collection executes both models and emits
+  independently identified outputs plus an order-sensitive collection hash
+* each model binds a versioned `f32` output comparison descriptor with shape,
+  expected asset hash, absolute/relative tolerance, and non-finite policy
+* Nsdb independently compares all 65,536 feature-grid values and all four
+  affine values before accepting the collection; mismatch or asset tampering
+  blocks the entire provider output
+
 Current official surface registry:
 
 * `contract.witsage.dataset.v1`

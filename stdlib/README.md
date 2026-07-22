@@ -84,19 +84,20 @@ At the current repo stage:
 * the std smoke lane also builds one PixelMagic shader pipeline demo and one
   WitSage kernel tensor demo, checking their hetero domain artifacts, payload
   metadata, and sidecar lowering IR without claiming full device execution yet
-* `nsdb materialize-provider-samples` now replaces the old mock provider result
+* `nsdb materialize-provider-samples` replaces the old mock provider result
   string with a deterministic `nuis.nsdb.provider-sample.*.toml` artifact and
   hash-backed `output_evidence`; this gives PixelMagic/WitSage a concrete
-  replay/debug artifact while keeping real Metal/CoreML provider runners as the
-  next step
+  replay/debug artifact while provider implementations remain independently
+  registered
 * provider samples now carry the `nuis-provider-runner-adapter-v1` adapter
   contract, adapter id, and capability status; the current host-simulated
   runner is therefore one registered adapter, not a baked-in backend limit
-* PixelMagic provider execution now lifts the std-preprocessed PGM marker into
-  deterministic native image output byte summaries (`native_output_bytes` and
-  `native_output_hash`) inside `execute-provider-samples` and provider output
-  payload files; this is still protocol-produced evidence, not yet a real Metal
-  kernel result
+* PixelMagic provider execution now persists the std-preprocessed raw `gray8`
+  payload with dimensions, stride, maximum value, operation, byte count, and
+  hash evidence; on supported macOS hosts `execute-provider-samples` validates
+  that payload, uploads it to a Metal buffer, dispatches the invert kernel, and
+  records real readback bytes/hash/device evidence, while other hosts retain a
+  deterministic fallback
 
 Asset view by layer:
 

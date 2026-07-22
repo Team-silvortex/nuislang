@@ -4,6 +4,9 @@ use super::*;
 fn workflow_docs_define_closure_then_tensor_reading_order() {
     let workflow_doc = include_str!("../../../../docs/reference/nuis-native-artifact-workflow.md");
     assert!(workflow_doc.contains("`closure_summary_*` is the canonical human closure line"));
+    assert!(
+        workflow_doc.contains("frontdoor_reading_order_contract: nuis-frontdoor-reading-order-v1")
+    );
     assert!(workflow_doc.contains(
         "frontdoor_reading_order: closure_summary -> dev_tensor_weakest_task_card_handoff"
     ));
@@ -52,6 +55,19 @@ mod cpu Main {
 
     assert!(json.contains("\"source_kind\":\"project\""));
     assert!(json.contains("\"workflow_kind\":\"project_compile_workflow\""));
+    assert!(
+        json.contains("\"frontdoor_reading_order_contract\":\"nuis-frontdoor-reading-order-v1\"")
+    );
+    assert!(json.contains(
+        "\"frontdoor_reading_order\":\"closure_summary -> dev_tensor_weakest_task_card_handoff\""
+    ));
+    assert!(json.contains("\"frontdoor_sample_closure_summary\":\"closure_summary_status -> closure_summary_next_action -> closure_summary_next_command\""));
+    assert!(json.contains("\"frontdoor_sample_tensor_handoff\":\"dev_tensor_weakest_task_card_coordinate -> dev_tensor_weakest_task_card_handoff_coordinate -> dev_tensor_weakest_task_card_handoff_command\""));
+    assert!(
+        json.find("\"closure_summary_status\"") < json.find("\"frontdoor_reading_order_contract\"")
+    );
+    assert!(json
+        .contains("\"frontdoor\":{\"reading_order_contract\":\"nuis-frontdoor-reading-order-v1\""));
     assert!(json.contains(&format!(
         "\"default_build_output_dir\":\"{}\"",
         output_dir.display()
@@ -481,6 +497,8 @@ mod cpu Main {
     );
     assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_first_blocker\":null"));
     for needle in [
+        "\"nsld_final_executable_output_artifact_chain_safe_next_contract\":\"nsld-drive-safe-next-v1\"",
+        "\"nsld_final_executable_output_artifact_chain_safe_next_probe_command\":\"nsld drive ",
         "\"nsld_final_executable_output_object_package_contract\":\"nsld-object-package-summary-v1\"",
         "\"nsld_final_executable_output_object_package_ready\":true",
         "\"nsld_final_executable_output_object_package_status\":\"replay-ready\"",
@@ -489,6 +507,8 @@ mod cpu Main {
         "\"nsld_final_executable_output_debugger_transcript_status\":\"transcript-ready\"",
         "\"nsld_final_executable_output_debugger_transcript_next_command\":\"nsdb replay ",
         "\"closure_summary_object_package_ready\":true",
+        "\"closure_summary_artifact_chain_safe_next_contract\":\"nsld-drive-safe-next-v1\"",
+        "\"closure_summary_artifact_chain_safe_next_probe_command\":\"nsld drive ",
         "\"closure_summary_debugger_transcript_contract\":\"nsdb-yir-replay-transcript-v1\"",
         "\"closure_summary_debugger_transcript_ready\":true",
         "\"closure_summary_debugger_transcript_status\":\"transcript-ready\"",

@@ -1,4 +1,5 @@
 use super::*;
+use std::fmt;
 
 pub(super) fn single_source_workflow_next_step_label() -> &'static str {
     "check"
@@ -33,6 +34,7 @@ pub(crate) struct WorkflowFrontdoorSurface {
 
 pub(crate) const FRONTDOOR_READING_ORDER: &str =
     "closure_summary -> dev_tensor_weakest_task_card_handoff";
+pub(crate) const FRONTDOOR_READING_ORDER_CONTRACT: &str = "nuis-frontdoor-reading-order-v1";
 pub(crate) const FRONTDOOR_SAMPLE_CLOSURE_SUMMARY: &str =
     "closure_summary_status -> closure_summary_next_action -> closure_summary_next_command";
 pub(crate) const FRONTDOOR_SAMPLE_TENSOR_HANDOFF: &str =
@@ -56,6 +58,10 @@ pub(crate) fn build_workflow_frontdoor_surface(
 #[allow(dead_code)]
 pub(crate) fn workflow_frontdoor_json_fields(surface: &WorkflowFrontdoorSurface) -> Vec<String> {
     vec![
+        json_field("reading_order_contract", FRONTDOOR_READING_ORDER_CONTRACT),
+        json_field("reading_order", FRONTDOOR_READING_ORDER),
+        json_field("sample_closure_summary", FRONTDOOR_SAMPLE_CLOSURE_SUMMARY),
+        json_field("sample_tensor_handoff", FRONTDOOR_SAMPLE_TENSOR_HANDOFF),
         json_field("source_kind", surface.source_kind),
         json_field("workflow_kind", surface.workflow_kind),
         json_field("workflow_brief", surface.workflow_brief),
@@ -73,6 +79,10 @@ pub(crate) fn append_workflow_frontdoor_json_fields(
     append_json_field_strings(
         out,
         vec![
+            json_field("reading_order_contract", FRONTDOOR_READING_ORDER_CONTRACT),
+            json_field("reading_order", FRONTDOOR_READING_ORDER),
+            json_field("sample_closure_summary", FRONTDOOR_SAMPLE_CLOSURE_SUMMARY),
+            json_field("sample_tensor_handoff", FRONTDOOR_SAMPLE_TENSOR_HANDOFF),
             json_field("source_kind", surface.source_kind),
             json_field("workflow_kind", surface.workflow_kind),
             json_field("workflow_brief", surface.workflow_brief),
@@ -91,7 +101,33 @@ pub(crate) fn workflow_frontdoor_json_object_field(surface: &WorkflowFrontdoorSu
     out
 }
 
+pub(crate) fn write_workflow_frontdoor_reading_order<W: fmt::Write>(
+    out: &mut W,
+) -> Result<(), String> {
+    writeln!(
+        out,
+        "  frontdoor.reading_order_contract: {FRONTDOOR_READING_ORDER_CONTRACT}"
+    )
+    .map_err(|error| error.to_string())?;
+    writeln!(out, "  frontdoor.reading_order: {FRONTDOOR_READING_ORDER}")
+        .map_err(|error| error.to_string())?;
+    writeln!(
+        out,
+        "  frontdoor.sample_closure_summary: {FRONTDOOR_SAMPLE_CLOSURE_SUMMARY}"
+    )
+    .map_err(|error| error.to_string())?;
+    writeln!(
+        out,
+        "  frontdoor.sample_tensor_handoff: {FRONTDOOR_SAMPLE_TENSOR_HANDOFF}"
+    )
+    .map_err(|error| error.to_string())
+}
+
 pub(crate) fn print_workflow_frontdoor_surface(surface: &WorkflowFrontdoorSurface) {
+    println!("  frontdoor.reading_order_contract: {FRONTDOOR_READING_ORDER_CONTRACT}");
+    println!("  frontdoor.reading_order: {FRONTDOOR_READING_ORDER}");
+    println!("  frontdoor.sample_closure_summary: {FRONTDOOR_SAMPLE_CLOSURE_SUMMARY}");
+    println!("  frontdoor.sample_tensor_handoff: {FRONTDOOR_SAMPLE_TENSOR_HANDOFF}");
     println!("  frontdoor.source_kind: {}", surface.source_kind);
     println!("  frontdoor.workflow_kind: {}", surface.workflow_kind);
     println!("  frontdoor.workflow_brief: {}", surface.workflow_brief);

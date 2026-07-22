@@ -341,6 +341,16 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
             closure_summary.next_command.as_deref(),
         ),
         crate::json_optional_string_field(
+            "closure_summary_artifact_chain_safe_next_contract",
+            closure_summary.artifact_chain_safe_next_contract.as_deref(),
+        ),
+        crate::json_optional_string_field(
+            "closure_summary_artifact_chain_safe_next_probe_command",
+            closure_summary
+                .artifact_chain_safe_next_probe_command
+                .as_deref(),
+        ),
+        crate::json_optional_string_field(
             "closure_summary_object_package_contract",
             closure_summary.object_package_summary_contract.as_deref(),
         ),

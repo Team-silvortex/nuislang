@@ -21,6 +21,8 @@ pub enum NirExpr {
         condition: Box<NirExpr>,
         then_owner: Box<NirExpr>,
         else_owner: Box<NirExpr>,
+        address_kind: NirOwnedPointerAddressKind,
+        nullable: bool,
     },
     AllocNode {
         value: Box<NirExpr>,

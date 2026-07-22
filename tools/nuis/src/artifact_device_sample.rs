@@ -1,5 +1,5 @@
 use crate::{json_field, json_string_array_field, json_usize_field};
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, fs, path::Path};
 
 pub(crate) const DEVICE_SAMPLE_SCHEMA: &str = "nsdb-yir-device-execution-sample-v1";
 pub(crate) const DEFERRED_DEVICE_SAMPLE_PROVIDER: &str = "nustar-deferred-device-sample-v1";
@@ -7,6 +7,19 @@ pub(crate) const DEVICE_SAMPLE_HANDOFF_PROTOCOL: &str = "nuis-device-sample-prov
 pub(crate) const DEVICE_PROVIDER_SAMPLE_FILE_NAME: &str = "nuis.nsdb.device-provider-samples.toml";
 pub(crate) const DEVICE_PROVIDER_SAMPLE_PROTOCOL: &str = "nuis-device-provider-samples-v1";
 pub(crate) const DEVICE_PROVIDER_SAMPLE_SCHEMA: &str = "nsdb-yir-device-provider-sample-v1";
+const PIXELMAGIC_STD_PIXEL_PAYLOAD_FILE_NAME: &str = "nuis.pixelmagic.std-preprocessed.gray8.bin";
+const PIXELMAGIC_STD_PIXEL_PAYLOAD: &[u8] = &[0, 4, 9, 8];
+const WITSAGE_VECTOR_PAYLOAD_FILE_NAME: &str = "nuis.witsage.vector.f32.bin";
+const WITSAGE_VECTOR_MODEL_FILE_NAME: &str = "nuis.witsage.vector-affine.mlmodel";
+const WITSAGE_VECTOR_EXPECTED_FILE_NAME: &str = "nuis.witsage.vector-affine.expected.f32.bin";
+const WITSAGE_DENSE_PAYLOAD_FILE_NAME: &str = "nuis.witsage.feature-grid.f32.bin";
+const WITSAGE_DENSE_MODEL_FILE_NAME: &str = "nuis.witsage.feature-grid-projection.mlmodel";
+const WITSAGE_VECTOR_PAYLOAD: &[u8] = &[
+    0x00, 0x00, 0x80, 0x3f, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x40, 0x40, 0x00, 0x00, 0x80, 0x40,
+];
+const WITSAGE_VECTOR_EXPECTED: &[u8] = &[
+    0x00, 0x00, 0x40, 0x40, 0x00, 0x00, 0xa0, 0x40, 0x00, 0x00, 0xe0, 0x40, 0x00, 0x00, 0x10, 0x41,
+];
 
 pub(crate) struct DeviceSampleContract {
     pub(crate) provider: String,
@@ -338,6 +351,56 @@ pub(crate) fn render_device_provider_sample_manifest_toml<'a>(
     (out, records.len())
 }
 
+pub(crate) fn persist_device_sample_input_payloads<'a>(
+    output_dir: &Path,
+    samples: impl Iterator<Item = &'a DeviceSampleContract>,
+) -> Result<(), String> {
+    let evidence = samples
+        .map(|sample| sample.input_evidence.as_str())
+        .collect::<Vec<_>>();
+    if evidence
+        .iter()
+        .any(|item| item.contains("std-preprocessed-pgm:input_bytes=20"))
+    {
+        fs::write(
+            output_dir.join(PIXELMAGIC_STD_PIXEL_PAYLOAD_FILE_NAME),
+            PIXELMAGIC_STD_PIXEL_PAYLOAD,
+        )
+        .map_err(|error| format!("failed to persist PixelMagic std pixel payload: {error}"))?;
+    }
+    if evidence
+        .iter()
+        .any(|item| item.contains("provider_model_asset_id=witsage."))
+    {
+        fs::write(
+            output_dir.join(WITSAGE_VECTOR_PAYLOAD_FILE_NAME),
+            WITSAGE_VECTOR_PAYLOAD,
+        )
+        .map_err(|error| format!("failed to persist WitSage vector payload: {error}"))?;
+        fs::write(
+            output_dir.join(WITSAGE_VECTOR_MODEL_FILE_NAME),
+            crate::artifact_coreml_model::witsage_vector_affine_model(),
+        )
+        .map_err(|error| format!("failed to persist WitSage CoreML model: {error}"))?;
+        fs::write(
+            output_dir.join(WITSAGE_VECTOR_EXPECTED_FILE_NAME),
+            WITSAGE_VECTOR_EXPECTED,
+        )
+        .map_err(|error| format!("failed to persist WitSage expected vector output: {error}"))?;
+        fs::write(
+            output_dir.join(WITSAGE_DENSE_PAYLOAD_FILE_NAME),
+            witsage_dense_payload(),
+        )
+        .map_err(|error| format!("failed to persist WitSage dense payload: {error}"))?;
+        fs::write(
+            output_dir.join(WITSAGE_DENSE_MODEL_FILE_NAME),
+            crate::artifact_coreml_model::witsage_dense_transform_model(),
+        )
+        .map_err(|error| format!("failed to persist WitSage dense CoreML model: {error}"))?;
+    }
+    Ok(())
+}
+
 struct RequestedProviderRunner {
     contract: &'static str,
     adapter_contract: &'static str,
@@ -388,10 +451,76 @@ fn input_evidence(
         (None, None) => "payload-evidence-missing".to_owned(),
     };
     if backend_family == Some("metal") && target_device == Some("apple-silicon-gpu") {
-        format!("{base};std-preprocessed-pgm:input_bytes=20")
+        format!(
+            "{base};provider_buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;provider_buffer_id=input.pixels;provider_buffer_element_type=u8;provider_buffer_layout=image-2d-row-major:pixel-format=gray8;provider_buffer_shape=2x2;provider_buffer_row_stride_bytes=2;provider_buffer_byte_length={};provider_buffer_payload_path={PIXELMAGIC_STD_PIXEL_PAYLOAD_FILE_NAME};provider_buffer_content_hash={};provider_kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;provider_kernel_id=pixelmagic.gray8.invert;provider_kernel_operation=invert;provider_kernel_input_buffer=input.pixels;provider_kernel_output_buffer=output.pixels;provider_kernel_dispatch=2x2x1;provider_kernel_scalar_bindings=max_value:u8:15;std-preprocessed-pgm:input_bytes=20;pixel_format=gray8;pixel_width=2;pixel_height=2;pixel_stride=2;pixel_max_value=15;pixel_operation=invert;pixel_payload_path={PIXELMAGIC_STD_PIXEL_PAYLOAD_FILE_NAME};pixel_payload_bytes={};pixel_payload_hash={}",
+            PIXELMAGIC_STD_PIXEL_PAYLOAD.len(),
+            fnv1a64_hex(PIXELMAGIC_STD_PIXEL_PAYLOAD),
+            PIXELMAGIC_STD_PIXEL_PAYLOAD.len(),
+            fnv1a64_hex(PIXELMAGIC_STD_PIXEL_PAYLOAD)
+        )
+    } else if backend_family == Some("coreml") && target_device == Some("apple-ane") {
+        let payload = witsage_dense_payload();
+        let model = crate::artifact_coreml_model::witsage_dense_transform_model();
+        let singular = format!(
+            "{base};provider_buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;provider_buffer_id=input.features;provider_buffer_element_type=f32;provider_buffer_layout=tensor-contiguous;provider_buffer_shape=16x64x64;provider_buffer_row_stride_bytes=256;provider_buffer_byte_length={};provider_buffer_payload_path={WITSAGE_DENSE_PAYLOAD_FILE_NAME};provider_buffer_content_hash={};provider_kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;provider_kernel_id=witsage.feature-grid.projection;provider_kernel_operation=model-predict;provider_kernel_input_buffer=input.features;provider_kernel_output_buffer=output.features;provider_kernel_dispatch=16x64x64;provider_model_asset_descriptor_contract=nuis-provider-model-asset-descriptor-v1;provider_model_asset_id=witsage.feature-grid-projection.coreml;provider_model_asset_format=coreml-specification;provider_model_asset_path={WITSAGE_DENSE_MODEL_FILE_NAME};provider_model_asset_byte_length={};provider_model_asset_content_hash={};provider_model_asset_input_feature=input.features;provider_model_asset_output_feature=output.features;provider_output_comparison_descriptor_contract=nuis-provider-output-comparison-descriptor-v1;provider_output_comparison_output_buffer=output.features;provider_output_comparison_element_type=f32;provider_output_comparison_shape=16x64x64;provider_output_comparison_expected_path={WITSAGE_DENSE_PAYLOAD_FILE_NAME};provider_output_comparison_expected_byte_length={};provider_output_comparison_expected_content_hash={};provider_output_comparison_absolute_tolerance=0;provider_output_comparison_relative_tolerance=0;provider_output_comparison_non_finite_policy=reject",
+            payload.len(),
+            fnv1a64_hex(&payload),
+            model.len(),
+            fnv1a64_hex(&model),
+            payload.len(),
+            fnv1a64_hex(&payload)
+        );
+        let dense = witsage_dense_collection_request(0, &payload, &model);
+        let affine_model = crate::artifact_coreml_model::witsage_vector_affine_model();
+        let affine = witsage_affine_collection_request(1, &affine_model);
+        format!(
+            "{singular};provider_request_collection_contract=nuis-provider-request-collection-v1;provider_request_count=2;{dense};{affine}"
+        )
     } else {
         base
     }
+}
+
+fn witsage_dense_payload() -> Vec<u8> {
+    vec![1.0f32; 16 * 64 * 64]
+        .into_iter()
+        .flat_map(f32::to_le_bytes)
+        .collect()
+}
+
+fn witsage_dense_collection_request(index: usize, payload: &[u8], model: &[u8]) -> String {
+    let prefix = format!("provider_request_{index}_");
+    format!(
+        "{prefix}buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;{prefix}buffer_id=input.features;{prefix}buffer_element_type=f32;{prefix}buffer_layout=tensor-contiguous;{prefix}buffer_shape=16x64x64;{prefix}buffer_row_stride_bytes=256;{prefix}buffer_byte_length={};{prefix}buffer_payload_path={WITSAGE_DENSE_PAYLOAD_FILE_NAME};{prefix}buffer_content_hash={};{prefix}kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;{prefix}kernel_id=witsage.feature-grid.projection;{prefix}kernel_operation=model-predict;{prefix}kernel_input_buffer=input.features;{prefix}kernel_output_buffer=output.features;{prefix}kernel_dispatch=16x64x64;{prefix}model_asset_descriptor_contract=nuis-provider-model-asset-descriptor-v1;{prefix}model_asset_id=witsage.feature-grid-projection.coreml;{prefix}model_asset_format=coreml-specification;{prefix}model_asset_path={WITSAGE_DENSE_MODEL_FILE_NAME};{prefix}model_asset_byte_length={};{prefix}model_asset_content_hash={};{prefix}model_asset_input_feature=input.features;{prefix}model_asset_output_feature=output.features;{prefix}output_comparison_descriptor_contract=nuis-provider-output-comparison-descriptor-v1;{prefix}output_comparison_output_buffer=output.features;{prefix}output_comparison_element_type=f32;{prefix}output_comparison_shape=16x64x64;{prefix}output_comparison_expected_path={WITSAGE_DENSE_PAYLOAD_FILE_NAME};{prefix}output_comparison_expected_byte_length={};{prefix}output_comparison_expected_content_hash={};{prefix}output_comparison_absolute_tolerance=0;{prefix}output_comparison_relative_tolerance=0;{prefix}output_comparison_non_finite_policy=reject",
+        payload.len(),
+        fnv1a64_hex(payload),
+        model.len(),
+        fnv1a64_hex(model),
+        payload.len(),
+        fnv1a64_hex(payload)
+    )
+}
+
+fn witsage_affine_collection_request(index: usize, model: &[u8]) -> String {
+    let prefix = format!("provider_request_{index}_");
+    format!(
+        "{prefix}buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;{prefix}buffer_id=input.features;{prefix}buffer_element_type=f32;{prefix}buffer_layout=tensor-contiguous;{prefix}buffer_shape=1x1x4;{prefix}buffer_row_stride_bytes=16;{prefix}buffer_byte_length={};{prefix}buffer_payload_path={WITSAGE_VECTOR_PAYLOAD_FILE_NAME};{prefix}buffer_content_hash={};{prefix}kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;{prefix}kernel_id=witsage.vector.affine;{prefix}kernel_operation=affine;{prefix}kernel_input_buffer=input.features;{prefix}kernel_output_buffer=output.features;{prefix}kernel_dispatch=1x1x4;{prefix}kernel_scalar_bindings=scale:f32:2,bias:f32:1;{prefix}model_asset_descriptor_contract=nuis-provider-model-asset-descriptor-v1;{prefix}model_asset_id=witsage.vector-affine.coreml;{prefix}model_asset_format=coreml-specification;{prefix}model_asset_path={WITSAGE_VECTOR_MODEL_FILE_NAME};{prefix}model_asset_byte_length={};{prefix}model_asset_content_hash={};{prefix}model_asset_input_feature=input.features;{prefix}model_asset_output_feature=output.features;{prefix}output_comparison_descriptor_contract=nuis-provider-output-comparison-descriptor-v1;{prefix}output_comparison_output_buffer=output.features;{prefix}output_comparison_element_type=f32;{prefix}output_comparison_shape=1x1x4;{prefix}output_comparison_expected_path={WITSAGE_VECTOR_EXPECTED_FILE_NAME};{prefix}output_comparison_expected_byte_length={};{prefix}output_comparison_expected_content_hash={};{prefix}output_comparison_absolute_tolerance=0;{prefix}output_comparison_relative_tolerance=0;{prefix}output_comparison_non_finite_policy=reject",
+        WITSAGE_VECTOR_PAYLOAD.len(),
+        fnv1a64_hex(WITSAGE_VECTOR_PAYLOAD),
+        model.len(),
+        fnv1a64_hex(model),
+        WITSAGE_VECTOR_EXPECTED.len(),
+        fnv1a64_hex(WITSAGE_VECTOR_EXPECTED)
+    )
+}
+
+fn fnv1a64_hex(bytes: &[u8]) -> String {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("0x{hash:016x}")
 }
 
 fn validation_status(sample_status: &str) -> String {

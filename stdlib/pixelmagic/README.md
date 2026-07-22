@@ -114,9 +114,9 @@ Current first responsibility:
 * provide a stable checked-in bridge from host-preprocessed image description to shader-facing resource metadata
 * provide first reusable helper totals for chained filters, image analysis
   quality, and texture handoff scoring
-* surface deterministic native image output byte/hash summaries for
-  std-preprocessed PGM provider samples until real Metal-backed execution
-  replaces the protocol-level byte producer
+* persist shape/hash-bound raw `gray8` data for std-preprocessed PGM provider
+  samples and execute the first complete upload/invert/readback path through a
+  registered native Metal runner, with deterministic fallback elsewhere
 
 Current official surface registry:
 

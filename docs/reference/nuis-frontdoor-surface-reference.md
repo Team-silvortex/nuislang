@@ -124,6 +124,7 @@ The top-level `nuis status` frontdoor prints the same order as a stable
 transcript sample:
 
 ```text
+frontdoor_reading_order_contract: nuis-frontdoor-reading-order-v1
 frontdoor_reading_order: closure_summary -> dev_tensor_weakest_task_card_handoff
 frontdoor_sample_closure_summary: closure_summary_status -> closure_summary_next_action -> closure_summary_next_command
 frontdoor_sample_tensor_handoff: dev_tensor_weakest_task_card_coordinate -> dev_tensor_weakest_task_card_handoff_coordinate -> dev_tensor_weakest_task_card_handoff_command

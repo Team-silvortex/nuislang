@@ -10,6 +10,8 @@ pub(crate) struct ProviderCompletionBoundarySummary {
 }
 
 pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
+    pub(crate) artifact_chain_safe_next_contract: String,
+    pub(crate) artifact_chain_safe_next_probe_command: String,
     pub(crate) ready: bool,
     pub(crate) boundary_status: String,
     pub(crate) materialization_status: String,

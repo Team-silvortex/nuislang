@@ -23,6 +23,7 @@ pub(super) fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Resu
             condition,
             then_owner,
             else_owner,
+            ..
         } => {
             verify_expr_uses(condition, moved)?;
             verify_expr_uses(then_owner, moved)?;

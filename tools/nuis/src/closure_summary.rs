@@ -5,6 +5,8 @@ pub(crate) struct FrontdoorClosureSummary {
     pub(crate) primary_blocker: Option<String>,
     pub(crate) next_action: String,
     pub(crate) next_command: Option<String>,
+    pub(crate) artifact_chain_safe_next_contract: Option<String>,
+    pub(crate) artifact_chain_safe_next_probe_command: Option<String>,
     pub(crate) object_package_summary_contract: Option<String>,
     pub(crate) object_package_summary_ready: Option<bool>,
     pub(crate) object_package_summary_status: Option<String>,
@@ -219,6 +221,8 @@ impl FrontdoorClosureSummary {
             } else {
                 Some(recommended_command.to_owned())
             },
+            artifact_chain_safe_next_contract: None,
+            artifact_chain_safe_next_probe_command: None,
             object_package_summary_contract: None,
             object_package_summary_ready: None,
             object_package_summary_status: None,
@@ -252,6 +256,8 @@ impl FrontdoorClosureSummary {
             primary_blocker: if ready { None } else { Some(reason.to_owned()) },
             next_action: action.to_owned(),
             next_command: command.map(str::to_owned),
+            artifact_chain_safe_next_contract: None,
+            artifact_chain_safe_next_probe_command: None,
             object_package_summary_contract: None,
             object_package_summary_ready: None,
             object_package_summary_status: None,
@@ -289,6 +295,12 @@ impl FrontdoorClosureSummary {
                 primary_blocker: None,
                 next_action: "run-artifact-or-replay-nsdb".to_owned(),
                 next_command: final_output.nsdb_replay_next_command.clone(),
+                artifact_chain_safe_next_contract: Some(
+                    final_output.artifact_chain_safe_next_contract.clone(),
+                ),
+                artifact_chain_safe_next_probe_command: Some(
+                    final_output.artifact_chain_safe_next_probe_command.clone(),
+                ),
                 object_package_summary_contract: Some(
                     final_output.object_package_summary_contract.clone(),
                 ),
@@ -340,6 +352,12 @@ impl FrontdoorClosureSummary {
                     .nsdb_replay_next_command
                     .clone()
                     .or_else(|| command.map(str::to_owned)),
+                artifact_chain_safe_next_contract: Some(
+                    final_output.artifact_chain_safe_next_contract.clone(),
+                ),
+                artifact_chain_safe_next_probe_command: Some(
+                    final_output.artifact_chain_safe_next_probe_command.clone(),
+                ),
                 object_package_summary_contract: Some(
                     final_output.object_package_summary_contract.clone(),
                 ),
@@ -382,6 +400,10 @@ impl FrontdoorClosureSummary {
         mut self,
         final_output: &crate::workflow::NsldFinalExecutableOutputBoundarySummary,
     ) -> Self {
+        self.artifact_chain_safe_next_contract =
+            Some(final_output.artifact_chain_safe_next_contract.clone());
+        self.artifact_chain_safe_next_probe_command =
+            Some(final_output.artifact_chain_safe_next_probe_command.clone());
         self.object_package_summary_contract =
             Some(final_output.object_package_summary_contract.clone());
         self.object_package_summary_ready = Some(final_output.object_package_summary_ready);
@@ -436,6 +458,10 @@ impl FrontdoorClosureSummary {
             )),
             next_action: "nsld-drive-safe-next".to_owned(),
             next_command: Some(command_set.safe_next_probe_json_command.clone()),
+            artifact_chain_safe_next_contract: Some(command_set.safe_next_contract.clone()),
+            artifact_chain_safe_next_probe_command: Some(
+                command_set.safe_next_probe_json_command.clone(),
+            ),
             object_package_summary_contract: self.object_package_summary_contract,
             object_package_summary_ready: self.object_package_summary_ready,
             object_package_summary_status: self.object_package_summary_status,
@@ -468,6 +494,14 @@ impl FrontdoorClosureSummary {
             crate::json_optional_string_field(
                 "closure_summary_next_command",
                 self.next_command.as_deref(),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_artifact_chain_safe_next_contract",
+                self.artifact_chain_safe_next_contract.as_deref(),
+            ),
+            crate::json_optional_string_field(
+                "closure_summary_artifact_chain_safe_next_probe_command",
+                self.artifact_chain_safe_next_probe_command.as_deref(),
             ),
             crate::json_optional_string_field(
                 "closure_summary_object_package_contract",

@@ -56,6 +56,14 @@ fn final_output_closure_becomes_ready_when_replay_evidence_is_ready() {
         Some("nsdb replay out --json")
     );
     assert_eq!(
+        summary.artifact_chain_safe_next_contract.as_deref(),
+        Some("nsld-drive-safe-next-v1")
+    );
+    assert_eq!(
+        summary.artifact_chain_safe_next_probe_command.as_deref(),
+        Some("nsld drive out/nuis.build.manifest.toml --apply --until-clean --json")
+    );
+    assert_eq!(
         summary.object_package_summary_contract.as_deref(),
         Some("nsld-object-package-summary-v1")
     );
@@ -102,6 +110,11 @@ fn final_output_closure_becomes_ready_when_replay_evidence_is_ready() {
         Some("0xfedcba9876543210")
     );
     let fields = summary.json_fields();
+    assert!(fields.contains(
+        &"\"closure_summary_artifact_chain_safe_next_contract\":\"nsld-drive-safe-next-v1\""
+            .to_owned()
+    ));
+    assert!(fields.contains(&"\"closure_summary_artifact_chain_safe_next_probe_command\":\"nsld drive out/nuis.build.manifest.toml --apply --until-clean --json\"".to_owned()));
     assert!(fields.contains(
         &"\"closure_summary_debugger_cursor_lineage_repair_rotation_generation\":4".to_owned()
     ));
@@ -242,6 +255,9 @@ fn final_output_summary(
     nsdb_replay_first_blocker: Option<String>,
 ) -> crate::workflow::NsldFinalExecutableOutputBoundarySummary {
     crate::workflow::NsldFinalExecutableOutputBoundarySummary {
+        artifact_chain_safe_next_contract: "nsld-drive-safe-next-v1".to_owned(),
+        artifact_chain_safe_next_probe_command:
+            "nsld drive out/nuis.build.manifest.toml --apply --until-clean --json".to_owned(),
         ready,
         boundary_status: "ready".to_owned(),
         materialization_status: "self-contained-image-ready".to_owned(),

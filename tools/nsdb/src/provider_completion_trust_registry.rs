@@ -208,6 +208,9 @@ mod tests {
 
     #[test]
     fn environment_lookup_enforces_generation_anchor() {
+        let _guard = crate::provider_completion_trust_anchor::TEST_ENV_LOCK
+            .lock()
+            .unwrap();
         let root = env::temp_dir().join(format!("nsdb-registry-anchor-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).unwrap();
