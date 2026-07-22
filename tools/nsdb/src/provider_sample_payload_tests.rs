@@ -91,6 +91,12 @@ fn real_device_payload_carries_released_transport_receipt() {
         carrier_input_contract: "nuis-provider-carrier-input-v1".to_owned(),
         carrier_input_kind: "path".to_owned(),
         carrier_input_handle: "none".to_owned(),
+        carrier_channel_registry_contract: "nuis-provider-carrier-channel-registry-v1".to_owned(),
+        carrier_channel_registry_source: "builtin-provider-carrier-channel-registry".to_owned(),
+        carrier_channel_adapter_id: "none".to_owned(),
+        carrier_channel_adapter_capability_status: "not-required".to_owned(),
+        carrier_channel_contract: "nuis-provider-carrier-channel-v1".to_owned(),
+        carrier_channel_mode: "not-required".to_owned(),
         carrier_identity: "owned-file:0x1234".to_owned(),
         byte_length: 16,
         materialize_status: "materialized".to_owned(),
@@ -103,6 +109,11 @@ fn real_device_payload_carries_released_transport_receipt() {
     let payload = render_real_device_provider_output_payload(&record, &adapter, &[], &[receipt]);
     assert!(payload.contains("nuis-provider-edge-transport-receipt-v1"));
     assert!(payload.contains("nuis-provider-edge-staging-registry-v1"));
+    assert!(payload.contains("nuis-provider-carrier-channel-v1"));
+    assert!(payload.contains("nuis-provider-carrier-channel-registry-v1"));
+    assert!(payload.contains("builtin-provider-carrier-channel-registry"));
+    assert!(payload.contains("carrier_channel_adapter_capability_status = \"not-required\""));
+    assert!(payload.contains("carrier_channel_mode = \"not-required\""));
     assert!(payload.contains("host.visible.owned-file.v1"));
     assert!(payload.contains("registered-available"));
     assert!(payload.contains("provider_edge_transport_receipt_0_release_status = \"released\""));

@@ -485,10 +485,31 @@ outside the graph executor. Receipts include registry source, selected adapter,
 and capability status. `nuis-provider-carrier-input-v1` now supplies `path` and
 `opaque-bytes` variants. `auto` selects `memory.owned-bytes.v1`, and the Metal
 f32 runner consumes its handle-bound bytes directly through the native `hex:`
-input boundary; the CoreML-to-Metal edge no longer creates a provider-edge
-file. The remaining boundary is CoreML: named model inputs are still path-only,
-so affine, chained-affine, and Add fan-in dependencies continue to use the
-host-file compatibility adapter until the CoreML runner accepts opaque bytes.
+input boundary. CoreML named inputs now consume the same opaque bytes, so all
+four dependency edges use independent `memory.owned-bytes.v1` carriers: the
+chained edge, both Add fan-in edges, and the final CoreML-to-Metal edge. Four
+receipts preserve their distinct ownership tokens, clocks, handles, and hashes.
+`nuis-provider-carrier-channel-v1` removes that argv boundary. Rust emits a
+binary stdin packet with fixed magic, frame count, ordered frame index, byte
+length, FNV-64, and raw payload. CoreML validates and consumes multiple named
+frames, while Metal consumes the same single-frame protocol. Receipts expose
+`framed-stdin` as the channel mode.
+`nuis-provider-carrier-channel-registry-v1` now moves that choice behind a
+provider-neutral registry. On Unix, `auto` selects `inherited.fd.v1`; the parent
+keeps `FD_CLOEXEC`, the forked child alone clears it before `exec`, and the
+descriptor argument binds frame index, packet length, and packet FNV-64. The
+temporary carrier is unlinked immediately after creation. CoreML and Metal
+validate both the outer descriptor evidence and the inner per-frame evidence.
+Other hosts select `framed.stdin.v1`, which remains an explicit portable
+fallback. Receipts preserve registry source, adapter identity, capability
+status, and selected mode. The Unix child now maps that anonymous carrier
+read-only instead of reading it into a new allocation, and frame payloads are
+no-copy `NSData` views over the verified mapping. CoreML carrier inputs use
+contiguous `MLMultiArray` data-pointer views rather than element-wise copies.
+The remaining boundary is the Metal upload: its current payload starts after a
+32-byte packet header, so it cannot yet satisfy the page-alignment contract of
+`newBufferWithBytesNoCopy`. A page-aligned inherited layout is the next adapter
+step; framed stdin and path inputs retain their compatibility behavior.
 
 The language-core checks anchor the bootstrap-critical
 `language-core/nuisc/type-control-flow-generics` cell to:

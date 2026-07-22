@@ -1,7 +1,17 @@
+#[cfg(target_os = "macos")]
+use crate::provider_carrier_channel_registry::{
+    prepare_provider_carrier_channel, select_provider_carrier_channel_adapter,
+    PreparedProviderCarrierChannel,
+};
 use crate::provider_carrier_input::ProviderCarrierInput;
 use std::{ffi::OsStr, path::Path};
 #[cfg(target_os = "macos")]
-use std::{fs, path::PathBuf, process::Command, time::SystemTime};
+use std::{
+    fs,
+    path::PathBuf,
+    process::{Command, Stdio},
+    time::SystemTime,
+};
 
 #[cfg(target_os = "macos")]
 const METAL_RUNNER_SOURCE: &str = include_str!("../provider-runners/metal_gray8_invert.m");
@@ -51,6 +61,7 @@ fn execute_f32_bias_platform(
         &bias.to_string(),
         "nuis-metal-f32-bias-provider-runner-v1",
         METAL_F32_BIAS_SOURCE,
+        None,
     )
 }
 
@@ -59,12 +70,16 @@ fn execute_f32_bias_bytes_platform(
     input: &[u8],
     bias: f32,
 ) -> Result<MetalProviderExecution, String> {
-    let argument = format!("hex:{}", encode_hex(input));
+    let channel_adapter = select_provider_carrier_channel_adapter("auto")
+        .ok_or_else(|| "Metal provider carrier channel is unavailable".to_owned())?;
+    let channel = prepare_provider_carrier_channel(channel_adapter, &[input])?;
+    let argument = channel.frame_argument(0);
     execute_metal_scalar_platform(
-        argument.as_ref(),
+        OsStr::new(&argument),
         &bias.to_string(),
         "nuis-metal-f32-bias-provider-runner-v1",
         METAL_F32_BIAS_SOURCE,
+        Some(&channel),
     )
 }
 
@@ -78,6 +93,7 @@ fn execute_gray8_invert_platform(
         &max_value.to_string(),
         "nuis-metal-gray8-provider-runner-v1",
         METAL_RUNNER_SOURCE,
+        None,
     )
 }
 
@@ -103,6 +119,7 @@ fn execute_metal_scalar_platform(
     scalar: &str,
     contract: &'static str,
     source: &str,
+    carrier_channel: Option<&PreparedProviderCarrierChannel>,
 ) -> Result<MetalProviderExecution, String> {
     let paths = TempMetalRunnerPaths::new();
     fs::write(&paths.source, source)
@@ -110,6 +127,7 @@ fn execute_metal_scalar_platform(
     let compile = Command::new("clang")
         .args([
             "-fobjc-arc",
+            "-fblocks",
             "-framework",
             "Foundation",
             "-framework",
@@ -126,11 +144,24 @@ fn execute_metal_scalar_platform(
             String::from_utf8_lossy(&compile.stderr).trim()
         ));
     }
-    let execution = Command::new(&paths.binary)
-        .arg(input_argument)
-        .arg(scalar)
-        .output()
-        .map_err(|error| format!("failed to launch Metal provider runner: {error}"))?;
+    let mut command = Command::new(&paths.binary);
+    command.arg(input_argument).arg(scalar);
+    let execution = if let Some(channel) = carrier_channel {
+        channel.configure_command(&mut command);
+        let mut child = command
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|error| format!("failed to launch Metal provider runner: {error}"))?;
+        channel.complete_spawn(&mut child)?;
+        child
+            .wait_with_output()
+            .map_err(|error| format!("failed to wait for Metal provider runner: {error}"))?
+    } else {
+        command
+            .output()
+            .map_err(|error| format!("failed to launch Metal provider runner: {error}"))?
+    };
     if !execution.status.success() {
         return Err(format!(
             "Metal provider runner failed: {}",
@@ -138,10 +169,6 @@ fn execute_metal_scalar_platform(
         ));
     }
     parse_metal_runner_output_for(&String::from_utf8_lossy(&execution.stdout), contract)
-}
-
-fn encode_hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 #[cfg(not(target_os = "macos"))]

@@ -1,6 +1,16 @@
+#[cfg(target_os = "macos")]
+use crate::provider_carrier_channel_registry::{
+    prepare_provider_carrier_channel, select_provider_carrier_channel_adapter,
+};
+use crate::provider_carrier_input::ProviderCarrierInput;
 use std::path::Path;
 #[cfg(target_os = "macos")]
-use std::{fs, path::PathBuf, process::Command, time::SystemTime};
+use std::{
+    fs,
+    path::PathBuf,
+    process::{Command, Stdio},
+    time::SystemTime,
+};
 
 #[cfg(target_os = "macos")]
 const COREML_RUNNER_SOURCE: &str = include_str!("../provider-runners/coreml_vector_affine.m");
@@ -18,7 +28,7 @@ pub(crate) struct CoreMlProviderExecution {
 }
 
 pub(crate) struct CoreMlProviderInput<'a> {
-    pub(crate) path: &'a Path,
+    pub(crate) input: &'a ProviderCarrierInput,
     pub(crate) feature: &'a str,
     pub(crate) shape: &'a [usize],
 }
@@ -71,15 +81,50 @@ fn execute_model_prediction_platform(
         .arg("--multi")
         .arg(output_feature)
         .arg(format_shape(output_shape));
+    let carrier_frames = inputs
+        .iter()
+        .filter_map(|input| match input.input {
+            ProviderCarrierInput::Path(_) => None,
+            ProviderCarrierInput::OpaqueBytes { bytes, .. } => Some(bytes.as_slice()),
+        })
+        .collect::<Vec<_>>();
+    let channel = if carrier_frames.is_empty() {
+        None
+    } else {
+        let adapter = select_provider_carrier_channel_adapter("auto")
+            .ok_or_else(|| "CoreML provider carrier channel is unavailable".to_owned())?;
+        Some(prepare_provider_carrier_channel(adapter, &carrier_frames)?)
+    };
+    let mut frame_index = 0;
     for input in inputs {
-        command
-            .arg(input.feature)
-            .arg(input.path)
-            .arg(format_shape(input.shape));
+        command.arg(input.feature);
+        match input.input {
+            ProviderCarrierInput::Path(path) => command.arg(path),
+            ProviderCarrierInput::OpaqueBytes { .. } => {
+                let argument = channel
+                    .as_ref()
+                    .expect("opaque inputs require a prepared carrier channel")
+                    .frame_argument(frame_index);
+                frame_index += 1;
+                command.arg(argument)
+            }
+        };
+        command.arg(format_shape(input.shape));
     }
-    let execution = command
-        .output()
+    if let Some(channel) = &channel {
+        channel.configure_command(&mut command);
+    }
+    let mut child = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(|error| format!("failed to launch CoreML provider runner: {error}"))?;
+    if let Some(channel) = &channel {
+        channel.complete_spawn(&mut child)?;
+    }
+    let execution = child
+        .wait_with_output()
+        .map_err(|error| format!("failed to wait for CoreML provider runner: {error}"))?;
     if !execution.status.success() {
         return Err(format!(
             "CoreML provider runner failed: {}",

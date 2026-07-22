@@ -858,17 +858,17 @@ pub(super) fn assert_official_galaxy_hetero_build(
             );
             assert_file_contains(
                 &provider_output_payload_path,
-                "provider_edge_transport_count = \"1\"",
+                "provider_edge_transport_count = \"4\"",
                 "official galaxy cross-provider transport count",
             );
             assert_file_contains(
                 &provider_output_payload_path,
-                "provider_edge_transport_ownership_tokens = \"glm:provider-edge:witsage.vector.add:output.features->witsage.vector.metal-bias:input.features\"",
+                "provider_edge_transport_ownership_tokens = \"glm:provider-edge:witsage.vector.affine:output.features->witsage.vector.affine.chained:input.features,glm:provider-edge:witsage.vector.affine:output.features->witsage.vector.add:input.left,glm:provider-edge:witsage.vector.affine.chained:output.features->witsage.vector.add:input.right,glm:provider-edge:witsage.vector.add:output.features->witsage.vector.metal-bias:input.features\"",
                 "official galaxy cross-provider GLM ownership token",
             );
             assert_file_contains(
                 &provider_output_payload_path,
-                "provider_edge_transport_staging_modes = \"auto\"",
+                "provider_edge_transport_staging_modes = \"auto,auto,auto,auto\"",
                 "official galaxy cross-provider staging mode",
             );
             assert_file_contains(
@@ -878,24 +878,31 @@ pub(super) fn assert_official_galaxy_hetero_build(
             );
             assert_file_contains(
                 &provider_output_payload_path,
-                "provider_edge_transport_receipt_count = \"1\"",
+                "provider_edge_transport_receipt_count = \"4\"",
                 "official galaxy cross-provider transport receipt count",
             );
             assert_file_contains(
                 &provider_output_payload_path,
-                "provider_edge_transport_receipt_0_staging_registry_contract = \"nuis-provider-edge-staging-registry-v1\"",
+                "provider_edge_transport_receipt_3_staging_registry_contract = \"nuis-provider-edge-staging-registry-v1\"",
                 "official galaxy staging registry contract",
             );
             assert_file_contains(
                 &provider_output_payload_path,
-                "provider_edge_transport_receipt_0_staging_adapter_id = \"memory.owned-bytes.v1\"",
+                "provider_edge_transport_receipt_3_staging_adapter_id = \"memory.owned-bytes.v1\"",
                 "official galaxy selected staging adapter",
             );
             assert_file_contains(
                 &provider_output_payload_path,
-                "provider_edge_transport_receipt_0_staging_adapter_capability_status = \"registered-available\"",
+                "provider_edge_transport_receipt_3_staging_adapter_capability_status = \"registered-available\"",
                 "official galaxy staging adapter capability",
             );
+            for evidence in [
+                "provider_edge_transport_receipt_3_carrier_channel_registry_contract = \"nuis-provider-carrier-channel-registry-v1\"",
+                "provider_edge_transport_receipt_3_carrier_channel_adapter_id = \"inherited.fd.v1\"",
+                "provider_edge_transport_receipt_3_carrier_channel_mode = \"inherited-fd\"",
+            ] {
+                assert_file_contains(&provider_output_payload_path, evidence, "official galaxy carrier channel");
+            }
             for (field, status) in [
                 ("materialize_status", "materialized"),
                 ("consume_status", "consumed"),
@@ -903,7 +910,7 @@ pub(super) fn assert_official_galaxy_hetero_build(
             ] {
                 assert_file_contains(
                     &provider_output_payload_path,
-                    &format!("provider_edge_transport_receipt_0_{field} = \"{status}\""),
+                    &format!("provider_edge_transport_receipt_3_{field} = \"{status}\""),
                     "official galaxy cross-provider transport receipt transition",
                 );
             }
@@ -914,13 +921,13 @@ pub(super) fn assert_official_galaxy_hetero_build(
             ] {
                 assert_file_contains(
                     &provider_output_payload_path,
-                    &format!("provider_edge_transport_receipt_0_{field} = \"0x3efcc146d99e0b55\""),
+                    &format!("provider_edge_transport_receipt_3_{field} = \"0x3efcc146d99e0b55\""),
                     "official galaxy cross-provider stable receipt hash",
                 );
             }
             assert_file_contains(
                 &provider_output_payload_path,
-                "provider_edge_transport_receipt_0_byte_length = \"16\"",
+                "provider_edge_transport_receipt_3_byte_length = \"16\"",
                 "official galaxy cross-provider receipt byte length",
             );
             assert_file_contains(

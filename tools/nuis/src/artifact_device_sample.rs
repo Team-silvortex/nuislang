@@ -537,7 +537,7 @@ fn witsage_dense_collection_request(index: usize, payload: &[u8], model: &[u8]) 
         payload.len(),
         fnv1a64_hex(payload)
     );
-    format!(
+    let request = format!(
         "{request};{}",
         witsage_input_binding(
             &prefix,
@@ -549,7 +549,8 @@ fn witsage_dense_collection_request(index: usize, payload: &[u8], model: &[u8]) 
             "none",
             "none",
         )
-    )
+    );
+    request
 }
 
 fn witsage_affine_collection_request(index: usize, model: &[u8]) -> String {
@@ -563,7 +564,7 @@ fn witsage_affine_collection_request(index: usize, model: &[u8]) -> String {
         WITSAGE_VECTOR_EXPECTED.len(),
         fnv1a64_hex(WITSAGE_VECTOR_EXPECTED)
     );
-    format!(
+    let request = format!(
         "{request};{}",
         witsage_input_binding(
             &prefix,
@@ -575,7 +576,8 @@ fn witsage_affine_collection_request(index: usize, model: &[u8]) -> String {
             "none",
             "none",
         )
-    )
+    );
+    request
 }
 
 fn witsage_chained_affine_collection_request(index: usize, model: &[u8]) -> String {
@@ -589,7 +591,7 @@ fn witsage_chained_affine_collection_request(index: usize, model: &[u8]) -> Stri
         WITSAGE_CHAINED_EXPECTED.len(),
         fnv1a64_hex(WITSAGE_CHAINED_EXPECTED)
     );
-    format!(
+    let request = format!(
         "{request};{}",
         witsage_input_binding(
             &prefix,
@@ -601,6 +603,14 @@ fn witsage_chained_affine_collection_request(index: usize, model: &[u8]) -> Stri
             "witsage.vector.affine",
             "output.features",
         )
+    );
+    with_dependency_transport(
+        request,
+        index,
+        0,
+        "input.features",
+        "glm:provider-edge:witsage.vector.affine:output.features->witsage.vector.affine.chained:input.features",
+        1,
     )
 }
 
@@ -620,9 +630,25 @@ fn witsage_input_binding(
     )
 }
 
+fn with_dependency_transport(
+    request: String,
+    request_index: usize,
+    edge_index: usize,
+    consumer_input: &str,
+    ownership_token: &str,
+    producer_index: usize,
+) -> String {
+    let prefix = format!("provider_request_{request_index}_dependency_{edge_index}_");
+    let anchor = format!("{prefix}consumer_input_buffer={consumer_input}");
+    let transport = format!(
+        "{anchor};{prefix}transport_contract=nuis-provider-edge-transport-v1;{prefix}transport_ownership_token={ownership_token};{prefix}transport_staging_mode=auto;{prefix}transport_producer_clock_evidence=provider-clock:request-{producer_index}:completed;{prefix}transport_consumer_clock_evidence=provider-clock:request-{request_index}:dispatch-ready"
+    );
+    request.replacen(&anchor, &transport, 1)
+}
+
 fn witsage_add_collection_request(index: usize, model: &[u8]) -> String {
     let prefix = format!("provider_request_{index}_");
-    format!(
+    let request = format!(
         "{prefix}buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;{prefix}buffer_id=input.left;{prefix}buffer_element_type=f32;{prefix}buffer_layout=tensor-contiguous;{prefix}buffer_shape=1x1x4;{prefix}buffer_row_stride_bytes=16;{prefix}buffer_byte_length={};{prefix}buffer_payload_path={WITSAGE_VECTOR_EXPECTED_FILE_NAME};{prefix}buffer_content_hash={};{prefix}kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;{prefix}kernel_id=witsage.vector.add;{prefix}kernel_operation=add;{prefix}kernel_input_buffer=input.left;{prefix}kernel_input_buffers=input.left,input.right;{prefix}kernel_output_buffer=output.features;{prefix}kernel_dispatch=1x1x4;{prefix}model_asset_descriptor_contract=nuis-provider-model-asset-descriptor-v1;{prefix}model_asset_id=witsage.vector-add.coreml;{prefix}model_asset_format=coreml-specification;{prefix}model_asset_path={WITSAGE_ADD_MODEL_FILE_NAME};{prefix}model_asset_byte_length={};{prefix}model_asset_content_hash={};{prefix}model_asset_input_feature=input.left;{prefix}model_asset_input_features=input.left,input.right;{prefix}model_asset_output_feature=output.features;{prefix}output_comparison_descriptor_contract=nuis-provider-output-comparison-descriptor-v1;{prefix}output_comparison_output_buffer=output.features;{prefix}output_comparison_element_type=f32;{prefix}output_comparison_shape=1x1x4;{prefix}output_comparison_expected_path={WITSAGE_ADD_EXPECTED_FILE_NAME};{prefix}output_comparison_expected_byte_length={};{prefix}output_comparison_expected_content_hash={};{prefix}output_comparison_absolute_tolerance=0;{prefix}output_comparison_relative_tolerance=0;{prefix}output_comparison_non_finite_policy=reject;{prefix}dependency_contract=nuis-provider-request-dependency-v1;{prefix}dependency_count=2;{prefix}dependency_0_producer_request_id=witsage.vector.affine;{prefix}dependency_0_producer_output_buffer=output.features;{prefix}dependency_0_consumer_input_buffer=input.left;{prefix}dependency_1_producer_request_id=witsage.vector.affine.chained;{prefix}dependency_1_producer_output_buffer=output.features;{prefix}dependency_1_consumer_input_buffer=input.right;{prefix}input_binding_contract=nuis-provider-input-binding-v1;{prefix}input_binding_count=2;{prefix}input_binding_0_name=input.left;{prefix}input_binding_0_source=dependency;{prefix}input_binding_0_element_type=f32;{prefix}input_binding_0_shape=1x1x4;{prefix}input_binding_0_byte_length={};{prefix}input_binding_0_content_hash={};{prefix}input_binding_0_payload_path=none;{prefix}input_binding_0_producer_request_id=witsage.vector.affine;{prefix}input_binding_0_producer_output_buffer=output.features;{prefix}input_binding_1_name=input.right;{prefix}input_binding_1_source=dependency;{prefix}input_binding_1_element_type=f32;{prefix}input_binding_1_shape=1x1x4;{prefix}input_binding_1_byte_length={};{prefix}input_binding_1_content_hash={};{prefix}input_binding_1_payload_path=none;{prefix}input_binding_1_producer_request_id=witsage.vector.affine.chained;{prefix}input_binding_1_producer_output_buffer=output.features;{prefix}adapter_binding_contract=nuis-provider-request-adapter-binding-v1;{prefix}adapter_binding_provider_family=coreml:apple-ane;{prefix}adapter_binding_execution_requirement=real-device",
         WITSAGE_VECTOR_EXPECTED.len(),
         fnv1a64_hex(WITSAGE_VECTOR_EXPECTED),
@@ -634,6 +660,22 @@ fn witsage_add_collection_request(index: usize, model: &[u8]) -> String {
         fnv1a64_hex(WITSAGE_VECTOR_EXPECTED),
         WITSAGE_CHAINED_EXPECTED.len(),
         fnv1a64_hex(WITSAGE_CHAINED_EXPECTED),
+    );
+    let request = with_dependency_transport(
+        request,
+        index,
+        0,
+        "input.left",
+        "glm:provider-edge:witsage.vector.affine:output.features->witsage.vector.add:input.left",
+        1,
+    );
+    with_dependency_transport(
+        request,
+        index,
+        1,
+        "input.right",
+        "glm:provider-edge:witsage.vector.affine.chained:output.features->witsage.vector.add:input.right",
+        2,
     )
 }
 

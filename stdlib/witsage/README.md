@@ -106,6 +106,16 @@ Current native execution baseline:
   `host.visible.owned-file.v1` as an explicit compatibility adapter
 * `nuis-provider-carrier-input-v1` lets the Metal f32 runner consume the
   CoreML Add output as opaque bytes without a provider-edge file
+* CoreML named inputs consume the same opaque carrier ABI, so chained affine
+  and both Add fan-in edges are memory-backed and independently receipted
+* `nuis-provider-carrier-channel-v1` carries those named inputs as binary stdin
+  frames with explicit index, length, and FNV-64 instead of hexadecimal argv
+* `nuis-provider-carrier-channel-registry-v1` selects `inherited.fd.v1` on Unix
+  with child-only inheritance plus packet length/hash validation, while
+  `framed.stdin.v1` remains the portable fallback on other hosts
+* Unix native runners consume the inherited packet through read-only mmap and
+  no-copy frame views; CoreML wraps carrier-backed f32 inputs directly as
+  contiguous `MLMultiArray` data pointers
 
 Current official surface registry:
 

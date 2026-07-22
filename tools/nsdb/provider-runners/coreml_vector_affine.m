@@ -1,6 +1,11 @@
 #import <CoreML/CoreML.h>
 #import <Foundation/Foundation.h>
+#include <limits.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+static NSData *carrierPacketOwner = nil;
 
 static NSString *deviceKind(id<MLComputeDeviceProtocol> device) {
     if ([device isKindOfClass:[MLNeuralEngineComputeDevice class]]) {
@@ -27,9 +32,126 @@ static int fail(NSString *message) {
     return 1;
 }
 
-static MLMultiArray *tensorFromFile(NSString *path, NSString *shapeText,
-                                    NSError **error) {
-    NSData *input = [NSData dataWithContentsOfFile:path];
+static uint64_t readLittle(const uint8_t *bytes, NSUInteger width) {
+    uint64_t value = 0;
+    for (NSUInteger index = 0; index < width; index++) value |= (uint64_t)bytes[index] << (index * 8);
+    return value;
+}
+
+static uint64_t fnv1a64(NSData *data) {
+    uint64_t hash = 0xcbf29ce484222325ULL;
+    const uint8_t *bytes = data.bytes;
+    for (NSUInteger index = 0; index < data.length; index++) {
+        hash ^= bytes[index];
+        hash *= 0x100000001b3ULL;
+    }
+    return hash;
+}
+
+static BOOL fdDescriptor(NSString *value, int *fd, uint64_t *frame,
+                         uint64_t *length, uint64_t *hash) {
+    NSArray<NSString *> *parts = [value componentsSeparatedByString:@":"];
+    if (parts.count != 5 || ![parts[0] isEqualToString:@"fd"]) return NO;
+    unsigned long long values[4] = {0};
+    for (NSUInteger index = 0; index < 4; index++) {
+        NSScanner *scanner = [NSScanner scannerWithString:parts[index + 1]];
+        if (![scanner scanUnsignedLongLong:&values[index]] || !scanner.isAtEnd) return NO;
+    }
+    if (values[0] > INT_MAX) return NO;
+    *fd = (int)values[0];
+    *frame = values[1];
+    *length = values[2];
+    *hash = values[3];
+    return YES;
+}
+
+static NSData *mappedCarrierPacket(int fd, uint64_t length, uint64_t expectedHash) {
+    if (length == 0 || length > NSUIntegerMax) return nil;
+    void *mapping = mmap(NULL, (size_t)length, PROT_READ, MAP_PRIVATE, fd, 0);
+    close(fd);
+    if (mapping == MAP_FAILED) return nil;
+    NSData *packet = [[NSData alloc]
+        initWithBytesNoCopy:mapping
+                     length:(NSUInteger)length
+                deallocator:^(void *bytes, NSUInteger mappedLength) {
+                    munmap(bytes, mappedLength);
+                }];
+    if (fnv1a64(packet) != expectedHash) return nil;
+    carrierPacketOwner = packet;
+    return packet;
+}
+
+static NSDictionary<NSNumber *, NSData *> *carrierFrames(int argc, const char *argv[]) {
+    NSString *descriptor = nil;
+    BOOL usesStdin = NO;
+    for (int index = 1; index < argc; index++) {
+        NSString *value = @(argv[index]);
+        if ([value hasPrefix:@"fd:"] && descriptor == nil) descriptor = value;
+        if ([value hasPrefix:@"frame:"]) usesStdin = YES;
+    }
+    if (descriptor == nil && !usesStdin) return @{};
+    NSData *packet = nil;
+    if (descriptor != nil) {
+        int fd = -1;
+        uint64_t frame = 0;
+        uint64_t length = 0;
+        uint64_t expectedHash = 0;
+        if (!fdDescriptor(descriptor, &fd, &frame, &length, &expectedHash)) return nil;
+        packet = mappedCarrierPacket(fd, length, expectedHash);
+        if (packet == nil) return nil;
+    } else {
+        packet = [[NSFileHandle fileHandleWithStandardInput] readDataToEndOfFile];
+    }
+    const uint8_t *bytes = packet.bytes;
+    if (packet.length < 12 || memcmp(bytes, "NUISPCV1", 8) != 0) return nil;
+    NSUInteger cursor = 8;
+    uint64_t frameCount = readLittle(bytes + cursor, 4);
+    cursor += 4;
+    NSMutableDictionary<NSNumber *, NSData *> *frames = [NSMutableDictionary dictionary];
+    for (uint64_t frame = 0; frame < frameCount; frame++) {
+        if (cursor > packet.length || packet.length - cursor < 20) return nil;
+        uint64_t index = readLittle(bytes + cursor, 4);
+        uint64_t length = readLittle(bytes + cursor + 4, 8);
+        uint64_t expectedHash = readLittle(bytes + cursor + 12, 8);
+        cursor += 20;
+        if (length > NSUIntegerMax || cursor > packet.length || length > packet.length - cursor) return nil;
+        NSData *payload = descriptor != nil
+            ? [NSData dataWithBytesNoCopy:(void *)(bytes + cursor)
+                                   length:(NSUInteger)length
+                             freeWhenDone:NO]
+            : [packet subdataWithRange:NSMakeRange(cursor, (NSUInteger)length)];
+        NSNumber *key = @(index);
+        if (frames[key] != nil || fnv1a64(payload) != expectedHash) return nil;
+        frames[key] = payload;
+        cursor += (NSUInteger)length;
+    }
+    return cursor == packet.length ? frames : nil;
+}
+
+static NSData *inputData(NSString *value, NSDictionary<NSNumber *, NSData *> *frames) {
+    if (![value hasPrefix:@"frame:"] && ![value hasPrefix:@"fd:"]) {
+        return [NSData dataWithContentsOfFile:value];
+    }
+    NSString *indexText = nil;
+    if ([value hasPrefix:@"fd:"]) {
+        int fd = -1;
+        uint64_t frame = 0;
+        uint64_t length = 0;
+        uint64_t hash = 0;
+        if (!fdDescriptor(value, &fd, &frame, &length, &hash)) return nil;
+        indexText = [NSString stringWithFormat:@"%llu", frame];
+    } else {
+        indexText = [value substringFromIndex:6];
+    }
+    NSScanner *scanner = [NSScanner scannerWithString:indexText];
+    unsigned long long index = 0;
+    if (![scanner scanUnsignedLongLong:&index] || !scanner.isAtEnd) return nil;
+    return frames[@(index)];
+}
+
+static MLMultiArray *tensorFromInput(NSString *value, NSString *shapeText,
+                                     NSDictionary<NSNumber *, NSData *> *frames, NSError **error) {
+    NSData *input = inputData(value, frames);
     if (input == nil || input.length == 0 || input.length % sizeof(float) != 0) {
         return nil;
     }
@@ -48,15 +170,34 @@ static MLMultiArray *tensorFromFile(NSString *path, NSString *shapeText,
     if (shape.count == 0 || shapeCount != count) {
         return nil;
     }
-    MLMultiArray *tensor = [[MLMultiArray alloc] initWithShape:shape
-                                                     dataType:MLMultiArrayDataTypeFloat32
-                                                        error:error];
+    BOOL carrierBacked = [value hasPrefix:@"frame:"] || [value hasPrefix:@"fd:"];
+    MLMultiArray *tensor = nil;
+    if (carrierBacked) {
+        NSMutableArray<NSNumber *> *strides = [NSMutableArray arrayWithCapacity:shape.count];
+        NSUInteger stride = 1;
+        for (NSInteger index = (NSInteger)shape.count - 1; index >= 0; index--) {
+            [strides insertObject:@(stride) atIndex:0];
+            stride *= shape[(NSUInteger)index].unsignedIntegerValue;
+        }
+        tensor = [[MLMultiArray alloc] initWithDataPointer:(void *)input.bytes
+                                                    shape:shape
+                                                 dataType:MLMultiArrayDataTypeFloat32
+                                                  strides:strides
+                                              deallocator:nil
+                                                    error:error];
+    } else {
+        tensor = [[MLMultiArray alloc] initWithShape:shape
+                                           dataType:MLMultiArrayDataTypeFloat32
+                                              error:error];
+    }
     if (tensor == nil) {
         return nil;
     }
-    const float *values = (const float *)input.bytes;
-    for (NSUInteger index = 0; index < count; index++) {
-        tensor[index] = @(values[index]);
+    if (!carrierBacked) {
+        const float *values = (const float *)input.bytes;
+        for (NSUInteger index = 0; index < count; index++) {
+            tensor[index] = @(values[index]);
+        }
     }
     return tensor;
 }
@@ -87,17 +228,19 @@ int main(int argc, const char *argv[]) {
         if (outputCount == 0) return fail(@"CoreML output shape is invalid");
         NSMutableDictionary<NSString *, MLFeatureValue *> *inputFeatures =
             [NSMutableDictionary dictionary];
+        NSDictionary<NSNumber *, NSData *> *frames = carrierFrames(argc, argv);
+        if (frames == nil) return fail(@"CoreML carrier frame packet is invalid");
         if (multi) {
             for (int index = 5; index < argc; index += 3) {
                 NSString *feature = @(argv[index]);
-                MLMultiArray *tensor = tensorFromFile(@(argv[index + 1]), @(argv[index + 2]), &error);
+                MLMultiArray *tensor = tensorFromInput(@(argv[index + 1]), @(argv[index + 2]), frames, &error);
                 if (tensor == nil || inputFeatures[feature] != nil) {
                     return fail(@"CoreML named input is invalid or duplicated");
                 }
                 inputFeatures[feature] = [MLFeatureValue featureValueWithMultiArray:tensor];
             }
         } else {
-            MLMultiArray *tensor = tensorFromFile(@(argv[2]), @(argv[5]), &error);
+            MLMultiArray *tensor = tensorFromInput(@(argv[2]), @(argv[5]), frames, &error);
             if (tensor == nil) return fail(@"CoreML input must match its contiguous f32 shape");
             inputFeatures[@(argv[3])] = [MLFeatureValue featureValueWithMultiArray:tensor];
         }

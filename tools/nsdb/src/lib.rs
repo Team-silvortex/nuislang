@@ -4,6 +4,10 @@ mod digest_sha256;
 mod handoff;
 mod model;
 mod provider_adapter_binding;
+mod provider_carrier_channel;
+mod provider_carrier_channel_registry;
+#[cfg(unix)]
+mod provider_carrier_channel_unix;
 mod provider_carrier_input;
 mod provider_completion_integrity;
 mod provider_completion_signature;
@@ -29,6 +33,7 @@ mod provider_sample_payload;
 #[cfg(test)]
 mod provider_sample_payload_tests;
 mod provider_sample_runner;
+mod provider_transport_receipt_payload;
 
 pub use model::{
     PayloadExecutionHandoffPersistSummary, PayloadExecutionHandoffRecord,

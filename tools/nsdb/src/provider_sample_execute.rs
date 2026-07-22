@@ -1,4 +1,9 @@
 use crate::{
+    provider_carrier_channel::PROVIDER_CARRIER_CHANNEL_CONTRACT,
+    provider_carrier_channel_registry::{
+        select_provider_carrier_channel_adapter, PROVIDER_CARRIER_CHANNEL_REGISTRY_CONTRACT,
+        PROVIDER_CARRIER_CHANNEL_REGISTRY_SOURCE,
+    },
     provider_carrier_input::{ProviderCarrierInput, PROVIDER_CARRIER_INPUT_CONTRACT},
     provider_edge_staging_registry::{
         cleanup_provider_edge_carrier, consume_provider_edge_carrier,
@@ -455,15 +460,13 @@ fn execute_native_provider_request(
                 .zip(&model.input_features)
                 .zip(&request.input_bindings)
                 .map(|((input, feature), binding)| {
-                    Ok(crate::provider_runner_coreml::CoreMlProviderInput {
-                        path: input.input().path().ok_or_else(|| {
-                            "CoreML provider requires a path carrier input".to_owned()
-                        })?,
+                    crate::provider_runner_coreml::CoreMlProviderInput {
+                        input: input.input(),
                         feature,
                         shape: &binding.shape,
-                    })
+                    }
                 })
-                .collect::<Result<Vec<_>, String>>()?;
+                .collect::<Vec<_>>();
             let output_shape = request
                 .output_comparison
                 .as_ref()
@@ -540,6 +543,15 @@ impl PreparedProviderInput {
                 .map(|descriptor| fnv1a64_hex(descriptor.ownership_token.as_bytes()))
                 .unwrap_or_else(|| "legacy".to_owned());
             let carrier = materialize_provider_edge_carrier(staging_adapter, &owner_hash, bytes)?;
+            let channel_adapter = if carrier.input.kind() == "opaque-bytes" {
+                Some(
+                    select_provider_carrier_channel_adapter("auto").ok_or_else(|| {
+                        "no provider carrier channel adapter supports opaque bytes".to_owned()
+                    })?,
+                )
+            } else {
+                None
+            };
             return Ok(Self {
                 artifact_input: None,
                 staging_adapter: Some(staging_adapter),
@@ -552,6 +564,23 @@ impl PreparedProviderInput {
                     carrier_input_contract: PROVIDER_CARRIER_INPUT_CONTRACT.to_owned(),
                     carrier_input_kind: carrier.input.kind().to_owned(),
                     carrier_input_handle: carrier.input.handle().unwrap_or("none").to_owned(),
+                    carrier_channel_registry_contract: PROVIDER_CARRIER_CHANNEL_REGISTRY_CONTRACT
+                        .to_owned(),
+                    carrier_channel_registry_source: PROVIDER_CARRIER_CHANNEL_REGISTRY_SOURCE
+                        .to_owned(),
+                    carrier_channel_adapter_id: channel_adapter
+                        .map(|adapter| adapter.adapter_id)
+                        .unwrap_or("none")
+                        .to_owned(),
+                    carrier_channel_adapter_capability_status: channel_adapter
+                        .map(|adapter| adapter.capability_status)
+                        .unwrap_or("not-required")
+                        .to_owned(),
+                    carrier_channel_contract: PROVIDER_CARRIER_CHANNEL_CONTRACT.to_owned(),
+                    carrier_channel_mode: channel_adapter
+                        .map(|adapter| adapter.mode)
+                        .unwrap_or("not-required")
+                        .to_owned(),
                     carrier_identity: carrier.identity.clone(),
                     byte_length: bytes.len(),
                     materialize_status: "materialized".to_owned(),
