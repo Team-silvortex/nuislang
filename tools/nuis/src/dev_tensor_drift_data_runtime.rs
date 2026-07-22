@@ -440,7 +440,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
         },
     DevTensorDriftCheckSpec {
             id: "nsdb-yir-replay-cursor-official-hetero-smoke",
-            path: "tools/nuis/tests/official_galaxy_hetero_smoke.rs",
+            path: "tools/nuis/tests/official_galaxy_hetero_smoke/replay.rs",
             required_patterns: &[
                 "nuis.nsdb.replay-cursor.toml",
                 "nsdb-yir-replay-cursor-record-v1",
@@ -913,11 +913,19 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
                 "host_stderr_write",
             ],
         },
-    DevTensorDriftCheckSpec {
-            id: "official-galaxy-hetero-smoke",
+        DevTensorDriftCheckSpec {
+            id: "official-galaxy-hetero-smoke-entry",
             path: "tools/nuis/tests/official_galaxy_hetero_smoke.rs",
             required_patterns: &[
                 "official_galaxy_hetero_projects_emit_shader_and_kernel_artifacts",
+                "PixelMagicContracts.shader_pipeline_total",
+                "WitSageContracts.kernel_pipeline_total",
+            ],
+        },
+        DevTensorDriftCheckSpec {
+            id: "official-galaxy-hetero-smoke",
+            path: "tools/nuis/tests/official_galaxy_hetero_smoke/build.rs",
+            required_patterns: &[
                 "nsld drive apply official galaxy hetero smoke",
                 "whitelisted-artifact-mutation",
                 "nsld-drive-safe-next-v1",
@@ -925,8 +933,6 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
                 "resolve-final-output-nsdb-replay",
                 "nsld_final_executable_output_nsdb_replay_contract",
                 "nsld_final_executable_output_nsdb_replay_first_blocker",
-                "PixelMagicContracts.shader_pipeline_total",
-                "WitSageContracts.kernel_pipeline_total",
                 "hetero_runtime_trace_device_sample_descriptor_count",
                 "materialize_provider_samples",
                 "provider-sample-materialized",
@@ -950,7 +956,8 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
                 "nuis-provider-request-collection-v1",
                 "nuis-provider-request-dependency-v1",
                 "nuis-provider-input-binding-v1",
-                "provider_request_count=4",
+                "provider_request_count=5",
+                "nuis-provider-request-adapter-binding-v1",
                 "provider_request_2_dependency_0_producer_request_id=witsage.vector.affine",
                 "registered-descriptors",
                 "nuis-metal-gray8-provider-runner-v1",
@@ -965,6 +972,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
                 "native_output_1_comparison_status",
                 "native_output_2_request_id",
                 "native_output_3_request_id",
+                "native_output_4_request_id",
                 "artifact_device_provider_sample_manifest_status",
                 "replay-device-sample",
             ],
@@ -991,6 +999,16 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
                 "waitUntilCompleted",
                 "nuis-metal-gray8-provider-runner-v1",
                 "output_hex",
+            ],
+        },
+        DevTensorDriftCheckSpec {
+            id: "nsdb-provider-adapter-binding",
+            path: "tools/nsdb/src/provider_adapter_binding.rs",
+            required_patterns: &[
+                "nuis-provider-request-adapter-binding-v1",
+                "provider_family",
+                "execution_requirement",
+                "real-device",
             ],
         },
         DevTensorDriftCheckSpec {
@@ -1039,6 +1057,17 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
                 "non_finite_policy",
                 "comparison-passed",
                 "size/hash evidence mismatch",
+            ],
+        },
+        DevTensorDriftCheckSpec {
+            id: "nsdb-metal-f32-provider-runner-source",
+            path: "tools/nsdb/provider-runners/metal_f32_bias.m",
+            required_patterns: &[
+                "nuis_f32_bias",
+                "nuis-metal-f32-bias-provider-runner-v1",
+                "newBufferWithBytes",
+                "dispatchThreads",
+                "waitUntilCompleted",
             ],
         },
         DevTensorDriftCheckSpec {

@@ -464,9 +464,12 @@ CoreML adapter now consumes ordered named feature/path/shape inputs. A real
 two-input Add request fans affine and chained-affine outputs into
 `[10, 16, 22, 28]` and passes independent comparison.
 
-The next heterogeneous boundary is per-request adapter ownership. One adapter
-is still selected for the complete collection, so fan-in works within CoreML
-but cannot yet cross Metal, CoreML, kernel, or future providers in one graph.
+`nuis-provider-request-adapter-binding-v1` moves provider-family selection onto
+each request while leaving adapter choice to the registry. The official graph
+executes four CoreML requests, then transports Add output into a Metal `f32`
+bias kernel and compares `[11, 17, 23, 29]`. The next boundary is transport
+metadata: the cross-adapter carrier is currently an implicit temporary file
+without explicit GLM ownership, staging lifetime, or clock evidence.
 
 The language-core checks anchor the bootstrap-critical
 `language-core/nuisc/type-control-flow-generics` cell to:

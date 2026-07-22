@@ -1,3 +1,4 @@
+use crate::provider_adapter_binding::{parse_adapter_binding, ProviderAdapterBinding};
 use crate::provider_input_binding::{
     parse_input_bindings, validate_dependency_binding, validate_input_bindings,
     ProviderInputBinding,
@@ -84,6 +85,7 @@ pub(crate) struct ProviderRequest {
     pub(crate) output_comparison: Option<ProviderOutputComparisonDescriptor>,
     pub(crate) dependencies: Vec<ProviderRequestDependency>,
     pub(crate) input_bindings: Vec<ProviderInputBinding>,
+    pub(crate) adapter_binding: Option<ProviderAdapterBinding>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -98,6 +100,16 @@ impl ProviderRequest {
             .scalar_bindings
             .iter()
             .find(|binding| binding.name == name && binding.value_type == "u8")?
+            .value
+            .parse()
+            .ok()
+    }
+
+    pub(crate) fn scalar_f32(&self, name: &str) -> Option<f32> {
+        self.kernel
+            .scalar_bindings
+            .iter()
+            .find(|binding| binding.name == name && binding.value_type == "f32")?
             .value
             .parse()
             .ok()
@@ -144,6 +156,7 @@ fn parse_registered_collection(input_evidence: &str) -> Option<ProviderRequestCo
                 &format!("provider_request_{index}_output_comparison_"),
                 &format!("provider_request_{index}_dependency_"),
                 &format!("provider_request_{index}_input_binding_"),
+                &format!("provider_request_{index}_adapter_binding_"),
             )
         })
         .collect::<Option<Vec<_>>>()?;
@@ -170,6 +183,7 @@ fn parse_registered_request(input_evidence: &str) -> Option<ProviderRequest> {
         "provider_output_comparison_",
         "provider_dependency_",
         "provider_input_binding_",
+        "provider_adapter_binding_",
     )
 }
 
@@ -222,6 +236,7 @@ fn parse_legacy_pixelmagic_request(input_evidence: &str) -> Option<ProviderReque
             producer_request_id: "none".to_owned(),
             producer_output_buffer: "none".to_owned(),
         }],
+        adapter_binding: None,
     })
 }
 
@@ -234,6 +249,7 @@ fn build_request(
     comparison_prefix: &str,
     dependency_prefix: &str,
     input_binding_prefix: &str,
+    adapter_binding_prefix: &str,
 ) -> Option<ProviderRequest> {
     let buffer = ProviderBufferDescriptor {
         id: field(fields, buffer_prefix, "id")?.clone(),
@@ -268,6 +284,7 @@ fn build_request(
     let dependencies = parse_dependencies(fields, dependency_prefix)?;
     let input_bindings =
         parse_input_bindings(fields, input_binding_prefix, &buffer, &dependencies)?;
+    let adapter_binding = parse_adapter_binding(fields, adapter_binding_prefix)?;
     validate_request(ProviderRequest {
         source,
         buffer,
@@ -276,6 +293,7 @@ fn build_request(
         output_comparison,
         dependencies,
         input_bindings,
+        adapter_binding,
     })
 }
 

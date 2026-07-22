@@ -11,9 +11,10 @@ use crate::{
     },
     provider_sample_execution::provider_execution_outcome,
     provider_sample_payload::{
-        coreml_native_output_summary, fnv1a64_hex, pixelmagic_metal_output_summary,
-        pixelmagic_native_output_summary, provider_output_payload_file_name,
-        render_real_device_provider_output_payload, PixelMagicNativeOutputSummary,
+        coreml_native_output_summary, fnv1a64_hex, metal_native_output_summary,
+        pixelmagic_metal_output_summary, pixelmagic_native_output_summary,
+        provider_output_payload_file_name, render_real_device_provider_output_payload,
+        PixelMagicNativeOutputSummary,
     },
 };
 use std::{
@@ -290,8 +291,26 @@ fn execute_native_provider_outputs(
     let mut completed = BTreeMap::<String, Vec<u8>>::new();
     let mut summaries = Vec::with_capacity(collection.requests.len());
     for request in &collection.requests {
-        let execution =
-            execute_native_provider_request(output_dir, record, adapter, request, &completed)?;
+        let request_adapter = request
+            .adapter_binding
+            .as_ref()
+            .map(|binding| select_provider_runner_adapter(&binding.provider_family));
+        let effective_adapter = request_adapter.as_ref().unwrap_or(adapter);
+        if request.adapter_binding.as_ref().is_some_and(|binding| {
+            binding.execution_requirement == "real-device" && !effective_adapter.real_device_capable
+        }) {
+            return Err(format!(
+                "provider request `{}` requires an unavailable real-device adapter",
+                request.kernel.id
+            ));
+        }
+        let execution = execute_native_provider_request(
+            output_dir,
+            record,
+            effective_adapter,
+            request,
+            &completed,
+        )?;
         completed.insert(request.kernel.id.clone(), execution.output_bytes);
         summaries.push(execution.summary);
     }
@@ -317,24 +336,52 @@ fn execute_native_provider_request(
         .collect::<Result<Vec<_>, _>>()?;
     match adapter.kind {
         "metal-real-device-runner" => {
-            if inputs.len() != 1
-                || request.buffer.element_type != "u8"
-                || !request.buffer.layout.contains("pixel-format=gray8")
-                || request.kernel.id != "pixelmagic.gray8.invert"
-                || request.kernel.operation != "invert"
-            {
+            if inputs.len() != 1 {
                 return Err(format!(
-                    "Metal provider adapter does not support buffer `{}` with kernel `{}`",
-                    request.buffer.layout, request.kernel.id
+                    "Metal provider adapter requires one input for kernel `{}`",
+                    request.kernel.id
                 ));
             }
-            let max_value = request.scalar_u8("max_value").ok_or_else(|| {
-                "Metal provider request is missing u8 scalar `max_value`".to_owned()
-            })?;
-            let execution =
-                crate::provider_runner_metal::execute_gray8_invert(&inputs[0].path, max_value)?;
+            let execution = if request.buffer.element_type == "u8"
+                && request.buffer.layout.contains("pixel-format=gray8")
+                && request.kernel.operation == "invert"
+            {
+                let max_value = request.scalar_u8("max_value").ok_or_else(|| {
+                    "Metal provider request is missing u8 scalar `max_value`".to_owned()
+                })?;
+                crate::provider_runner_metal::execute_gray8_invert(&inputs[0].path, max_value)?
+            } else if request.buffer.element_type == "f32"
+                && request.buffer.layout == "tensor-contiguous"
+                && request.kernel.operation == "bias"
+            {
+                let bias = request.scalar_f32("bias").ok_or_else(|| {
+                    "Metal provider request is missing f32 scalar `bias`".to_owned()
+                })?;
+                crate::provider_runner_metal::execute_f32_bias(&inputs[0].path, bias)?
+            } else {
+                return Err(format!(
+                    "Metal provider adapter does not support buffer `{}` operation `{}`",
+                    request.buffer.layout, request.kernel.operation
+                ));
+            };
+            let comparison = request
+                .output_comparison
+                .as_ref()
+                .map(|descriptor| {
+                    compare_provider_output(output_dir, descriptor, &execution.output_bytes)
+                })
+                .transpose()?;
             Ok(NativeProviderRequestExecution {
-                summary: pixelmagic_metal_output_summary(&record.input_evidence, &execution),
+                summary: if request.kernel.operation == "invert" {
+                    pixelmagic_metal_output_summary(&record.input_evidence, &execution)
+                } else {
+                    metal_native_output_summary(
+                        request.kernel.id.clone(),
+                        "provider-tensor-f32",
+                        &execution,
+                        comparison.as_ref(),
+                    )
+                },
                 output_bytes: execution.output_bytes,
             })
         }

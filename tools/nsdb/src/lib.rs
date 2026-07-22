@@ -3,6 +3,7 @@
 mod digest_sha256;
 mod handoff;
 mod model;
+mod provider_adapter_binding;
 mod provider_completion_integrity;
 mod provider_completion_signature;
 mod provider_completion_trust_anchor;

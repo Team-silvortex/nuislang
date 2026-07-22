@@ -93,6 +93,8 @@ Current native execution baseline:
 * the CoreML adapter executes ordered named features; a real Add model fans
   affine and chained-affine outputs into `[10, 16, 22, 28]` through the same
   independent output comparison boundary
+* per-request adapter bindings then carry the Add output into a real Metal
+  `f32` bias kernel, producing and comparing `[11, 17, 23, 29]`
 
 Current official surface registry:
 

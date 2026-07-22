@@ -88,7 +88,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
     },
     DevTensorDriftCheckSpec {
         id: "nuis-debugger-cursor-lineage-repair-official-smoke",
-        path: "tools/nuis/tests/official_galaxy_hetero_smoke.rs",
+        path: "tools/nuis/tests/official_galaxy_hetero_smoke/replay.rs",
         required_patterns: &[
             "nuis debug-lineage-repair",
             "run_nuis(&[\"debug-lineage-repair\"",

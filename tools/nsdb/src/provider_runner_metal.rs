@@ -4,6 +4,8 @@ use std::{fs, path::PathBuf, process::Command, time::SystemTime};
 
 #[cfg(target_os = "macos")]
 const METAL_RUNNER_SOURCE: &str = include_str!("../provider-runners/metal_gray8_invert.m");
+#[cfg(target_os = "macos")]
+const METAL_F32_BIAS_SOURCE: &str = include_str!("../provider-runners/metal_f32_bias.m");
 
 pub(crate) struct MetalProviderExecution {
     pub(crate) contract: &'static str,
@@ -19,13 +21,56 @@ pub(crate) fn execute_gray8_invert(
     execute_gray8_invert_platform(input_path, max_value)
 }
 
+pub(crate) fn execute_f32_bias(
+    input_path: &Path,
+    bias: f32,
+) -> Result<MetalProviderExecution, String> {
+    execute_f32_bias_platform(input_path, bias)
+}
+
+#[cfg(target_os = "macos")]
+fn execute_f32_bias_platform(
+    input_path: &Path,
+    bias: f32,
+) -> Result<MetalProviderExecution, String> {
+    execute_metal_scalar_platform(
+        input_path,
+        &bias.to_string(),
+        "nuis-metal-f32-bias-provider-runner-v1",
+        METAL_F32_BIAS_SOURCE,
+    )
+}
+
 #[cfg(target_os = "macos")]
 fn execute_gray8_invert_platform(
     input_path: &Path,
     max_value: u8,
 ) -> Result<MetalProviderExecution, String> {
+    execute_metal_scalar_platform(
+        input_path,
+        &max_value.to_string(),
+        "nuis-metal-gray8-provider-runner-v1",
+        METAL_RUNNER_SOURCE,
+    )
+}
+
+#[cfg(not(target_os = "macos"))]
+fn execute_f32_bias_platform(
+    _input_path: &Path,
+    _bias: f32,
+) -> Result<MetalProviderExecution, String> {
+    Err("Metal provider runner is unavailable on this host".to_owned())
+}
+
+#[cfg(target_os = "macos")]
+fn execute_metal_scalar_platform(
+    input_path: &Path,
+    scalar: &str,
+    contract: &'static str,
+    source: &str,
+) -> Result<MetalProviderExecution, String> {
     let paths = TempMetalRunnerPaths::new();
-    fs::write(&paths.source, METAL_RUNNER_SOURCE)
+    fs::write(&paths.source, source)
         .map_err(|error| format!("failed to materialize Metal runner source: {error}"))?;
     let compile = Command::new("clang")
         .args([
@@ -48,7 +93,7 @@ fn execute_gray8_invert_platform(
     }
     let execution = Command::new(&paths.binary)
         .arg(input_path)
-        .arg(max_value.to_string())
+        .arg(scalar)
         .output()
         .map_err(|error| format!("failed to launch Metal provider runner: {error}"))?;
     if !execution.status.success() {
@@ -57,7 +102,7 @@ fn execute_gray8_invert_platform(
             String::from_utf8_lossy(&execution.stderr).trim()
         ));
     }
-    parse_metal_runner_output(&String::from_utf8_lossy(&execution.stdout))
+    parse_metal_runner_output_for(&String::from_utf8_lossy(&execution.stdout), contract)
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -68,13 +113,21 @@ fn execute_gray8_invert_platform(
     Err("Metal provider runner is unavailable on this host".to_owned())
 }
 
+#[cfg(test)]
 fn parse_metal_runner_output(output: &str) -> Result<MetalProviderExecution, String> {
+    parse_metal_runner_output_for(output, "nuis-metal-gray8-provider-runner-v1")
+}
+
+fn parse_metal_runner_output_for(
+    output: &str,
+    expected_contract: &'static str,
+) -> Result<MetalProviderExecution, String> {
     let field = |name: &str| {
         output
             .lines()
             .find_map(|line| line.strip_prefix(&format!("{name}=")))
     };
-    if field("protocol") != Some("nuis-metal-gray8-provider-runner-v1") {
+    if field("protocol") != Some(expected_contract) {
         return Err("Metal provider runner returned an unsupported protocol".to_owned());
     }
     if field("status") != Some("ready") {
@@ -96,7 +149,7 @@ fn parse_metal_runner_output(output: &str) -> Result<MetalProviderExecution, Str
         return Err("Metal provider runner output byte count mismatch".to_owned());
     }
     Ok(MetalProviderExecution {
-        contract: "nuis-metal-gray8-provider-runner-v1",
+        contract: expected_contract,
         status: "metal-command-buffer-completed",
         device,
         output_bytes,

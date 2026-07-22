@@ -11,6 +11,7 @@ mod json_replay;
 mod json_transcript;
 mod model;
 mod payload_decoder;
+mod provider_adapter_binding;
 mod provider_completion_integrity;
 mod provider_completion_signature;
 mod provider_completion_trust_anchor;

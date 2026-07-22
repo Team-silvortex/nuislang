@@ -350,12 +350,26 @@ pub(crate) fn pixelmagic_metal_output_summary(
     _input_evidence: &str,
     execution: &crate::provider_runner_metal::MetalProviderExecution,
 ) -> PixelMagicNativeOutputSummary {
-    let bytes = execution.output_bytes.len().to_string();
-    PixelMagicNativeOutputSummary {
-        request_id: provider_request_from_evidence(_input_evidence)
+    metal_native_output_summary(
+        provider_request_from_evidence(_input_evidence)
             .map(|request| request.kernel.id)
             .unwrap_or_else(|| "pixelmagic.legacy".to_owned()),
-        kind: "pixelmagic-image-bytes".to_owned(),
+        "pixelmagic-image-bytes",
+        execution,
+        None,
+    )
+}
+
+pub(crate) fn metal_native_output_summary(
+    request_id: String,
+    kind: &str,
+    execution: &crate::provider_runner_metal::MetalProviderExecution,
+    comparison: Option<&crate::provider_output_comparison::ProviderOutputComparisonResult>,
+) -> PixelMagicNativeOutputSummary {
+    let bytes = execution.output_bytes.len().to_string();
+    PixelMagicNativeOutputSummary {
+        request_id,
+        kind: kind.to_owned(),
         status: "metal-api-output-ready".to_owned(),
         hash: fnv1a64_hex(&execution.output_bytes),
         bytes,
@@ -367,13 +381,29 @@ pub(crate) fn pixelmagic_metal_output_summary(
         compute_plan_layer_count: "0".to_owned(),
         compute_plan_preferred_devices: "none".to_owned(),
         compute_plan_supported_devices: "none".to_owned(),
-        comparison_contract: "none".to_owned(),
-        comparison_status: "not-applicable".to_owned(),
-        comparison_element_count: "0".to_owned(),
-        comparison_mismatch_count: "0".to_owned(),
-        comparison_max_absolute_error: "0".to_owned(),
-        comparison_max_relative_error: "0".to_owned(),
-        comparison_non_finite_count: "0".to_owned(),
+        comparison_contract: comparison
+            .map(|value| value.contract)
+            .unwrap_or("none")
+            .to_owned(),
+        comparison_status: comparison
+            .map(|value| value.status)
+            .unwrap_or("not-applicable")
+            .to_owned(),
+        comparison_element_count: comparison
+            .map(|value| value.compared_elements.to_string())
+            .unwrap_or_else(|| "0".to_owned()),
+        comparison_mismatch_count: comparison
+            .map(|value| value.mismatch_count.to_string())
+            .unwrap_or_else(|| "0".to_owned()),
+        comparison_max_absolute_error: comparison
+            .map(|value| value.max_absolute_error.clone())
+            .unwrap_or_else(|| "0".to_owned()),
+        comparison_max_relative_error: comparison
+            .map(|value| value.max_relative_error.clone())
+            .unwrap_or_else(|| "0".to_owned()),
+        comparison_non_finite_count: comparison
+            .map(|value| value.non_finite_count.to_string())
+            .unwrap_or_else(|| "0".to_owned()),
     }
 }
 

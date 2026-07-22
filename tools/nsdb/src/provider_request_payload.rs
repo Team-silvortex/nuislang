@@ -34,6 +34,22 @@ pub(crate) fn render_provider_request_evidence(input_evidence: &str) -> String {
                 .collect::<Vec<_>>()
                 .join(","),
         );
+        push_toml_string(
+            &mut out,
+            "provider_request_adapter_order",
+            &collection
+                .requests
+                .iter()
+                .map(|request| {
+                    request
+                        .adapter_binding
+                        .as_ref()
+                        .map(|binding| binding.provider_family.as_str())
+                        .unwrap_or("record-provider")
+                })
+                .collect::<Vec<_>>()
+                .join(","),
+        );
         let dependency_edges = collection
             .requests
             .iter()
