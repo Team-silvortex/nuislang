@@ -86,6 +86,21 @@ pub(super) fn lower_data_cpu_expr(
             input, offset, len, state, bindings,
         )),
         NirExpr::DataHandleTable(entries) => Some(Ok(lower_data_handle_table(entries, state))),
+        NirExpr::DataProviderRequestIngress {
+            request_handle,
+            descriptor_table_handle,
+            descriptor_count,
+            provider_key,
+            capability_hash,
+        } => Some(lower_data_provider_request_ingress(
+            request_handle,
+            descriptor_table_handle,
+            descriptor_count,
+            provider_key,
+            capability_hash,
+            state,
+            bindings,
+        )),
         _ => None,
     }
 }
@@ -309,4 +324,37 @@ fn lower_data_handle_table(entries: &[(String, String)], state: &mut LoweringSta
         },
     });
     name
+}
+
+fn lower_data_provider_request_ingress(
+    request_handle: &NirExpr,
+    descriptor_table_handle: &NirExpr,
+    descriptor_count: &NirExpr,
+    provider_key: &NirExpr,
+    capability_hash: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    ensure_fabric_resource(state.yir);
+    let args = [
+        lower_expr(request_handle, state, bindings)?,
+        lower_expr(descriptor_table_handle, state, bindings)?,
+        lower_expr(descriptor_count, state, bindings)?,
+        lower_expr(provider_key, state, bindings)?,
+        lower_expr(capability_hash, state, bindings)?,
+    ];
+    let name = next_name(state, "provider_request_ingress");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "fabric0".to_owned(),
+        op: Operation {
+            module: "data".to_owned(),
+            instruction: "provider_request_ingress".to_owned(),
+            args: args.to_vec(),
+        },
+    });
+    for arg in &args {
+        push_dep_edges(state, arg, &name);
+    }
+    Ok(name)
 }

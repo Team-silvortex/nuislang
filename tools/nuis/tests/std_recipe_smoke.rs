@@ -32,32 +32,48 @@ fn assert_success(output: &std::process::Output, context: &str) {
     );
 }
 
-const PRINT_RECIPE_CASES: &[(&str, &str, bool)] = &[
+const PRINT_RECIPE_CASES: &[(&str, &str, bool, Option<&str>)] = &[
     (
         "std_line_input",
         "../../stdlib/std/line_input_recipe.ns",
         true,
+        None,
     ),
     (
         "pixelmagic_invert",
         "../../stdlib/pixelmagic/core/invert_recipe.ns",
         false,
+        None,
     ),
     (
         "witsage_knn",
         "../../stdlib/witsage/core/knn_recipe.ns",
         false,
+        None,
     ),
     (
         "std_net_result_enum",
         "../../stdlib/std/net_result_enum_recipe.ns",
         true,
+        None,
+    ),
+    (
+        "std_provider_worker_runtime",
+        "../../stdlib/std/provider_worker_runtime_recipe.ns",
+        false,
+        Some("14"),
+    ),
+    (
+        "std_provider_worker_dispatch",
+        "../../stdlib/std/provider_worker_dispatch_recipe.ns",
+        false,
+        Some("14"),
     ),
 ];
 
 #[test]
 fn print_style_official_recipes_build_and_run() {
-    for (label, source, has_host_extern) in PRINT_RECIPE_CASES {
+    for (label, source, has_host_extern, expected_stdout) in PRINT_RECIPE_CASES {
         let output_dir = temp_dir(label);
         let output_dir_text = output_dir.display().to_string();
 
@@ -77,6 +93,13 @@ fn print_style_official_recipes_build_and_run() {
 
         let run = run_nuis(&["run-artifact", &output_dir_text]);
         assert_success(&run, &format!("nuis run-artifact {source}"));
-        assert!(String::from_utf8_lossy(&run.stdout).contains("exit_status: 0"));
+        let run_stdout = String::from_utf8_lossy(&run.stdout);
+        assert!(run_stdout.contains("exit_status: 0"));
+        if let Some(expected_stdout) = expected_stdout {
+            assert!(
+                run_stdout.contains(expected_stdout),
+                "nuis run-artifact {source} did not contain `{expected_stdout}`\n{run_stdout}"
+            );
+        }
     }
 }

@@ -1,0 +1,95 @@
+/// Provider-neutral worker lifecycle owned by Nuis rather than a host runner.
+mod cpu StdProviderWorkerContracts {
+  pub struct ProviderWorkerState {
+    pub status: i64,
+    pub next_sequence: i64,
+    pub accepted: i64,
+    pub rejected: i64,
+    pub committed: i64
+  }
+
+  pub fn status_open() -> i64 {
+    return 1;
+  }
+
+  pub fn status_closed() -> i64 {
+    return 2;
+  }
+
+  pub fn open() -> ProviderWorkerState {
+    return ProviderWorkerState {
+      status: status_open(),
+      next_sequence: 0,
+      accepted: 0,
+      rejected: 0,
+      committed: 0
+    };
+  }
+
+  pub fn request_valid(
+    state: ProviderWorkerState,
+    sequence: i64,
+    payload_hash_valid: bool,
+    descriptor_roles_valid: bool
+  ) -> bool {
+    if state.status != status_open() {
+      return false;
+    }
+    if sequence != state.next_sequence {
+      return false;
+    }
+    if !payload_hash_valid {
+      return false;
+    }
+    return descriptor_roles_valid;
+  }
+
+  pub fn complete_request(
+    state: ProviderWorkerState,
+    sequence: i64,
+    payload_hash_valid: bool,
+    descriptor_roles_valid: bool,
+    dispatch_status: i64,
+    response_committed: bool
+  ) -> ProviderWorkerState {
+    let valid: bool = request_valid(
+      state,
+      sequence,
+      payload_hash_valid,
+      descriptor_roles_valid
+    );
+    if valid && dispatch_status >= 0 && response_committed {
+      return ProviderWorkerState {
+        status: state.status,
+        next_sequence: state.next_sequence + 1,
+        accepted: state.accepted + 1,
+        rejected: state.rejected,
+        committed: state.committed + 1
+      };
+    }
+    return ProviderWorkerState {
+      status: state.status,
+      next_sequence: state.next_sequence + 1,
+      accepted: state.accepted,
+      rejected: state.rejected + 1,
+      committed: state.committed
+    };
+  }
+
+  pub fn close(state: ProviderWorkerState) -> ProviderWorkerState {
+    return ProviderWorkerState {
+      status: status_closed(),
+      next_sequence: state.next_sequence,
+      accepted: state.accepted,
+      rejected: state.rejected,
+      committed: state.committed
+    };
+  }
+
+  pub fn closed_cleanly(state: ProviderWorkerState) -> bool {
+    if state.status != status_closed() {
+      return false;
+    }
+    return state.accepted == state.committed;
+  }
+}

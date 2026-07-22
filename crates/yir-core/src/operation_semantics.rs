@@ -84,6 +84,9 @@ impl Operation {
             (OperationDomainFamily::Data, "value") => SemanticOp::DataValue,
             (OperationDomainFamily::Data, "marker") => SemanticOp::DataMarker,
             (OperationDomainFamily::Data, "handle_table") => SemanticOp::DataHandleTable,
+            (OperationDomainFamily::Data, "provider_request_ingress") => {
+                SemanticOp::DataProviderRequestIngress
+            }
             (OperationDomainFamily::Data, "bind_core") => SemanticOp::DataBindCore,
             (OperationDomainFamily::Shader, "observe") => SemanticOp::ShaderObserve,
             (OperationDomainFamily::Shader, "is_pass_ready") => SemanticOp::ShaderIsPassReady,
@@ -152,6 +155,7 @@ impl Operation {
         match self.semantic_op() {
             SemanticOp::DataBindCore => Some(DataFabricPrimitive::Bind),
             SemanticOp::DataHandleTable => Some(DataFabricPrimitive::Handle),
+            SemanticOp::DataProviderRequestIngress => Some(DataFabricPrimitive::Ingress),
             SemanticOp::DataMarker => Some(DataFabricPrimitive::Marker),
             SemanticOp::DataMove => Some(DataFabricPrimitive::Move),
             SemanticOp::DataCopyWindow
@@ -247,6 +251,7 @@ impl Operation {
             SemanticOp::DataBindCore => "data.bind_core",
             SemanticOp::DataMarker => "data.marker",
             SemanticOp::DataHandleTable => "data.handle_table",
+            SemanticOp::DataProviderRequestIngress => "data.provider_request_ingress",
             SemanticOp::DataOutputPipe => "data.output_pipe",
             SemanticOp::DataInputPipe => "data.input_pipe",
             SemanticOp::DataCopyWindow => "data.copy_window",

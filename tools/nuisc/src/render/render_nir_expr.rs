@@ -118,6 +118,20 @@ pub(super) fn render_nir_expr(value: &NirExpr) -> String {
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
+        NirExpr::DataProviderRequestIngress {
+            request_handle,
+            descriptor_table_handle,
+            descriptor_count,
+            provider_key,
+            capability_hash,
+        } => format!(
+            "provider_request_ingress({}, {}, {}, {}, {})",
+            render_nir_expr(request_handle),
+            render_nir_expr(descriptor_table_handle),
+            render_nir_expr(descriptor_count),
+            render_nir_expr(provider_key),
+            render_nir_expr(capability_hash)
+        ),
         NirExpr::CpuBindCore(core) => format!("cpu_bind_core({core})"),
         NirExpr::CpuWindow {
             width,

@@ -280,6 +280,17 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::ShaderBeginPass { .. }
         | NirExpr::ShaderDrawInstanced { .. }
         | NirExpr::ShaderProfileRender { .. } => None,
+        NirExpr::DataProviderRequestIngress { .. } => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Val,
+            accesses: vec![
+                NirGlmAccess {
+                    class: NirGlmValueClass::Val,
+                    mode: NirGlmUseMode::Read,
+                };
+                5
+            ],
+            effect: NirGlmEffect::None,
+        }),
         NirExpr::DataOutputPipe(_) => Some(NirGlmProfile {
             result_class: NirGlmValueClass::Val,
             accesses: vec![NirGlmAccess {

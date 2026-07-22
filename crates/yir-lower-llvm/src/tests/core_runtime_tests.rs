@@ -168,3 +168,51 @@ fn emits_three_arg_cpu_extern_calls() {
     assert!(llvm_ir.contains("declare i64 @host_subprocess_spawn(i64, i64, i64)"));
     assert!(llvm_ir.contains("call i64 @host_subprocess_spawn(i64"));
 }
+
+#[test]
+fn lowers_conditional_loop_carry_with_invariant_payload() {
+    let mut module = module_with_cpu0();
+    for (name, value) in [
+        ("initial", "0"),
+        ("limit", "3"),
+        ("step", "1"),
+        ("carry_initial", "0"),
+        ("condition_rhs", "2"),
+        ("invariant", "1"),
+    ] {
+        push_cpu_const_i64(&mut module, name, value);
+    }
+    push_cpu_node(
+        &mut module,
+        "loop",
+        "cpu.loop_while_scalar_cond_chain",
+        vec![
+            "initial",
+            "limit",
+            "step",
+            "lt",
+            "add",
+            "carry_initial",
+            "current_eq",
+            "condition_rhs",
+            "keep",
+            "add_invariant",
+            "invariant",
+        ],
+    );
+    for dependency in [
+        "initial",
+        "limit",
+        "step",
+        "carry_initial",
+        "condition_rhs",
+        "invariant",
+    ] {
+        push_dep(&mut module, dependency, "loop");
+    }
+
+    let llvm_ir = emit_module(&module).expect("conditional loop lowering should succeed");
+    assert!(llvm_ir.contains("loop_while_scalar_cond_chain_cond"));
+    assert!(llvm_ir.contains("select i1"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.loop_while_scalar_cond_chain"));
+}

@@ -176,6 +176,26 @@ impl RegisteredMod for DataMod {
                 }
                 Ok(Value::DataHandleTable(DataHandleTable { entries }))
             }
+            "provider_request_ingress" => {
+                let request_handle = state.expect_value(&node.op.args[0])?.clone();
+                for arg in &node.op.args[1..] {
+                    state.expect_value(arg)?;
+                }
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect data.provider_request_ingress @{} [{}]: request {}, descriptor table {}, descriptor count {}, provider {}, capability {}",
+                        node.resource,
+                        resource.kind.raw,
+                        node.op.args[0],
+                        node.op.args[1],
+                        node.op.args[2],
+                        node.op.args[3],
+                        node.op.args[4],
+                    ),
+                );
+                Ok(request_handle)
+            }
             "bind_core" => {
                 let core_index = node.op.args[0].parse::<usize>().map_err(|_| {
                     format!(

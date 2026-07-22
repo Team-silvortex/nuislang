@@ -2,7 +2,7 @@
 
 use crate::carry_payload::carry_source_payload_len;
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum LoopCondExpr {
+pub enum LoopCondExpr {
     Leaf {
         kind: String,
         rhs: Option<String>,
@@ -30,16 +30,16 @@ pub(crate) enum LoopFlowExpr {
     },
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ParsedConditionalCarry {
-    pub(crate) initial: String,
-    pub(crate) condition: LoopCondExpr,
-    pub(crate) then_source: ParsedCarryBranchSource,
-    pub(crate) else_source: ParsedCarryBranchSource,
+pub struct ParsedConditionalCarry {
+    pub initial: String,
+    pub condition: LoopCondExpr,
+    pub then_source: ParsedCarryBranchSource,
+    pub else_source: ParsedCarryBranchSource,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ParsedCarryBranchSource {
-    pub(crate) kind: String,
-    pub(crate) payload: Vec<String>,
+pub struct ParsedCarryBranchSource {
+    pub kind: String,
+    pub payload: Vec<String>,
 }
 pub(crate) fn validate_loop_compare_kind(kind: &str, node_name: &str) -> Result<(), String> {
     match kind {
@@ -312,7 +312,7 @@ pub(crate) fn parse_loop_carry_condition_expr(
     }
 }
 
-pub(crate) fn parse_conditional_carries(
+pub fn parse_conditional_carries(
     args: &[String],
     start: usize,
     node_name: &str,

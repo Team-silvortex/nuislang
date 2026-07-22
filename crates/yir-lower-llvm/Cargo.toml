@@ -10,4 +10,5 @@ description = "A small LLVM IR text emitter for the CPU slice of YIR graphs."
 
 [dependencies]
 yir-core = { path = "../yir-core" }
+yir-domain-cpu = { path = "../yir-domain-cpu" }
 yir-verify = { path = "../yir-verify" }

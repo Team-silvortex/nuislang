@@ -1,0 +1,67 @@
+use cpu StdProviderWorkerContracts;
+
+mod cpu Main {
+  struct ProviderWorkerRuntimeSummary {
+    status: i64,
+    next_sequence: i64,
+    accepted: i64,
+    rejected: i64,
+    committed: i64,
+    closed_cleanly: bool
+  }
+
+  fn run_worker(request_count: i64, rejected_sequence: i64) -> ProviderWorkerRuntimeSummary {
+    let sequence: i64 = 0;
+    let accepted: i64 = 0;
+    let rejected: i64 = 0;
+    let committed: i64 = 0;
+    while sequence < request_count {
+      let sequence: i64 = sequence + 1;
+      if sequence == rejected_sequence + 1 {
+        let accepted: i64 = accepted + 0;
+      } else {
+        let accepted: i64 = accepted + 1;
+      }
+      if sequence == rejected_sequence + 1 {
+        let rejected: i64 = rejected + 1;
+      } else {
+        let rejected: i64 = rejected + 0;
+      }
+      if sequence == rejected_sequence + 1 {
+        let committed: i64 = committed + 0;
+      } else {
+        let committed: i64 = committed + 1;
+      }
+    }
+    let state: ProviderWorkerState = StdProviderWorkerContracts.close(
+      ProviderWorkerState {
+        status: StdProviderWorkerContracts.status_open(),
+        next_sequence: sequence,
+        accepted: accepted,
+        rejected: rejected,
+        committed: committed
+      }
+    );
+    return ProviderWorkerRuntimeSummary {
+      status: state.status,
+      next_sequence: state.next_sequence,
+      accepted: state.accepted,
+      rejected: state.rejected,
+      committed: state.committed,
+      closed_cleanly: StdProviderWorkerContracts.closed_cleanly(state)
+    };
+  }
+
+  fn main() {
+    let summary: ProviderWorkerRuntimeSummary = run_worker(4, 2);
+    let clean_score: i64 = if summary.closed_cleanly { 1 } else { 0 };
+    print(
+      summary.status
+        + summary.next_sequence
+        + summary.accepted
+        + summary.rejected
+        + summary.committed
+        + clean_score
+    );
+  }
+}

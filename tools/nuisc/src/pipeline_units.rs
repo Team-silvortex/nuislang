@@ -116,6 +116,23 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
             collect_instantiated_units_expr(then_owner, units);
             collect_instantiated_units_expr(else_owner, units);
         }
+        NirExpr::DataProviderRequestIngress {
+            request_handle,
+            descriptor_table_handle,
+            descriptor_count,
+            provider_key,
+            capability_hash,
+        } => {
+            for value in [
+                request_handle,
+                descriptor_table_handle,
+                descriptor_count,
+                provider_key,
+                capability_hash,
+            ] {
+                collect_instantiated_units_expr(value, units);
+            }
+        }
         NirExpr::CpuBindCore(_)
         | NirExpr::CpuWindow { .. }
         | NirExpr::CpuInputI64 { .. }

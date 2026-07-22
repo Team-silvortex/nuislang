@@ -88,6 +88,13 @@ pub enum NirExpr {
         len: Box<NirExpr>,
     },
     DataHandleTable(Vec<(String, String)>),
+    DataProviderRequestIngress {
+        request_handle: Box<NirExpr>,
+        descriptor_table_handle: Box<NirExpr>,
+        descriptor_count: Box<NirExpr>,
+        provider_key: Box<NirExpr>,
+        capability_hash: Box<NirExpr>,
+    },
     CpuBindCore(i64),
     CpuWindow {
         width: i64,

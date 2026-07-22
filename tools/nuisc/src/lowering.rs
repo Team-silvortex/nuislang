@@ -250,7 +250,8 @@ fn lower_expr(
         | NirExpr::DataWriteWindow { .. }
         | NirExpr::DataFreezeWindow(_)
         | NirExpr::DataImmutableWindow { .. }
-        | NirExpr::DataHandleTable(_) => lower_data_cpu_expr(expr, state, bindings)
+        | NirExpr::DataHandleTable(_)
+        | NirExpr::DataProviderRequestIngress { .. } => lower_data_cpu_expr(expr, state, bindings)
             .expect("data expr family must be handled by lower_data_cpu_expr"),
         NirExpr::Instantiate { .. }
         | NirExpr::CpuBindCore(_)

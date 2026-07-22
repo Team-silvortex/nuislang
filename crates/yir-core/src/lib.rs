@@ -82,6 +82,7 @@ pub enum SemanticOp {
     DataValue,
     DataMarker,
     DataHandleTable,
+    DataProviderRequestIngress,
     DataBindCore,
     ShaderObserve,
     ShaderIsPassReady,
@@ -112,6 +113,7 @@ pub enum SemanticOp {
 pub enum DataFabricPrimitive {
     Bind,
     Handle,
+    Ingress,
     Marker,
     Move,
     Window,
@@ -124,6 +126,7 @@ impl DataFabricPrimitive {
         match self {
             Self::Bind => "bind",
             Self::Handle => "handle",
+            Self::Ingress => "ingress",
             Self::Marker => "marker",
             Self::Move => "move",
             Self::Window => "window",

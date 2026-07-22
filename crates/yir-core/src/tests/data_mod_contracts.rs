@@ -278,10 +278,14 @@ fn data_mod_read_window_reads_buffer_backed_window_storage() {
 }
 
 #[test]
-fn classifies_data_fabric_primitives_into_seven_families() {
+fn classifies_data_fabric_primitives_into_eight_families() {
     let cases = [
         ("data.bind_core", Some(DataFabricPrimitive::Bind)),
         ("data.handle_table", Some(DataFabricPrimitive::Handle)),
+        (
+            "data.provider_request_ingress",
+            Some(DataFabricPrimitive::Ingress),
+        ),
         ("data.marker", Some(DataFabricPrimitive::Marker)),
         ("data.move", Some(DataFabricPrimitive::Move)),
         ("data.copy_window", Some(DataFabricPrimitive::Window)),
@@ -300,4 +304,51 @@ fn classifies_data_fabric_primitives_into_seven_families() {
         let parsed = Operation::parse(op, Vec::new()).unwrap();
         assert_eq!(parsed.data_fabric_primitive(), expected, "op={op}");
     }
+}
+
+#[test]
+fn data_mod_imports_provider_request_as_opaque_handle() {
+    let resource = Resource {
+        name: "fabric0".to_owned(),
+        kind: ResourceKind::parse("data.fabric"),
+    };
+    let node = Node {
+        name: "request".to_owned(),
+        resource: "fabric0".to_owned(),
+        op: Operation::parse(
+            "data.provider_request_ingress",
+            vec![
+                "request_handle",
+                "descriptor_table",
+                "count",
+                "provider",
+                "capability",
+            ]
+            .into_iter()
+            .map(str::to_owned)
+            .collect(),
+        )
+        .unwrap(),
+    };
+    let data_mod = DataMod;
+    let semantics = data_mod
+        .describe(&node, &resource)
+        .expect("describe ingress");
+    assert_eq!(semantics.dependencies.len(), 5);
+    assert!(semantics.has_effect);
+
+    let mut state = ExecutionState::default();
+    for (name, value) in [
+        ("request_handle", 101),
+        ("descriptor_table", 501),
+        ("count", 2),
+        ("provider", 20),
+        ("capability", 2020),
+    ] {
+        state.values.insert(name.to_owned(), Value::Int(value));
+    }
+    let value = data_mod
+        .execute(&node, &resource, &mut state)
+        .expect("execute ingress");
+    assert_eq!(value, Value::Int(101));
 }

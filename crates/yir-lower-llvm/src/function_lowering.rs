@@ -112,6 +112,10 @@ pub(super) fn emit_cpu_function(
             continue;
         }
 
+        if lower_data_provider_request_ingress(node, &mut state) {
+            continue;
+        }
+
         if !resource.kind.is_family("cpu") {
             state.body.push(format!(
                 "  ; deferred lowering for {} on {} ({})",

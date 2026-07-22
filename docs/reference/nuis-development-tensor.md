@@ -576,10 +576,39 @@ now closes the request-meaning boundary. `NUISPWU2` separates a UTF-8 control
 header from opaque bytes, binds the bytes by length and FNV-1a hash, and requires
 one ordered semantic role for every transferred descriptor. The C worker parses
 binary payloads containing NUL, newline, and non-UTF-8 bytes, independently
-checks the hash and role count, and returns both in `NUISPWUR2` receipts. The
-next boundary is execution integration: the Objective-C CoreML runner still
-launches once per request and must become a persistent loop that maps ordered
-model, input, and output roles without embedding CoreML policy in the transport.
+checks the hash and role count. `NUISPWUR3` completes the reverse direction
+with a separately length/hash-bound opaque response while also binding the
+original request hash and role manifest. Binary response bytes therefore need
+no provider-specific side channel. The worker control plane now begins in Nuis
+itself: `StdProviderWorkerContracts` owns ordered lifecycle state, and
+`provider_worker_runtime_recipe.ns` checks, AOT-builds, and executes its native
+accept/reject/commit loop with deterministic output `14`. C and Objective-C
+runners remain bootstrap ABI probes or one-shot fallbacks, not owners of worker
+policy. The next boundary is exposing system request ingress, descriptor
+handles, and Kernel Nustar dispatch as registered Nuis intrinsics so a Nuis
+entrypoint can own the persistent worker loop end to end.
+
+`StdProviderWorkerDispatchContracts` now closes the Nuis-side dispatch half of
+that boundary. It models opaque request and descriptor-table handles plus an
+open-ended registered binding containing provider key, dispatch token,
+capability hash, and enabled state. Nuis validates handle shape and binding
+identity, rejects a mismatched capability hash, then advances the existing
+ordered lifecycle. `provider_worker_dispatch_recipe.ns` loads CPU and data
+Nustars, emits a visible `data.handle_table`, AOT-builds, and executes with
+output `14`; the official std recipe smoke runs both worker recipes. The
+remaining gap is a registered request-ingress YIR intrinsic whose platform
+adapter imports real transport handles without owning validation or dispatch.
+
+That ingress intrinsic is now registered. The Nuis builtin
+`provider_request_ingress(request, descriptor_table, count, provider,
+capability)` lowers to effectful `data.provider_request_ingress`; its five
+inputs remain explicit YIR dependencies, Data Nustar interpretation returns the
+opaque request handle, GLM records five value reads, and CPU LLVM lowering
+performs only scalar passthrough. The dispatch recipe now obtains every request
+handle through this node and still executes with output `14` and no ingress
+deferred notes. The remaining boundary is operational: map a verified
+`NUISPWU2` packet and received descriptor table into these five fields, then
+invoke an exported Nuis worker entrypoint instead of the standalone probe.
 
 The language-core checks anchor the bootstrap-critical
 `language-core/nuisc/type-control-flow-generics` cell to:

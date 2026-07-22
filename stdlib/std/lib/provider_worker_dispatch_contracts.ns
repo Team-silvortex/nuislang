@@ -1,0 +1,84 @@
+use cpu StdProviderWorkerContracts;
+
+/// Provider-neutral dispatch registration and request handles owned by Nuis.
+mod cpu StdProviderWorkerDispatchContracts {
+  pub struct ProviderDispatchBinding {
+    pub provider_key: i64,
+    pub dispatch_token: i64,
+    pub capability_hash: i64,
+    pub enabled: bool
+  }
+
+  pub struct ProviderWorkerRequest {
+    pub request_handle: i64,
+    pub sequence: i64,
+    pub provider_key: i64,
+    pub descriptor_table_handle: i64,
+    pub descriptor_count: i64,
+    pub capability_hash: i64,
+    pub payload_hash_valid: bool,
+    pub descriptor_roles_valid: bool
+  }
+
+  pub fn binding_valid(binding: ProviderDispatchBinding) -> bool {
+    if !binding.enabled {
+      return false;
+    }
+    if binding.provider_key <= 0 {
+      return false;
+    }
+    if binding.dispatch_token <= 0 {
+      return false;
+    }
+    return binding.capability_hash > 0;
+  }
+
+  pub fn request_handles_valid(request: ProviderWorkerRequest) -> bool {
+    if request.request_handle <= 0 {
+      return false;
+    }
+    if request.descriptor_count < 0 {
+      return false;
+    }
+    if request.descriptor_count > 0 && request.descriptor_table_handle <= 0 {
+      return false;
+    }
+    return true;
+  }
+
+  pub fn dispatch_status(
+    request: ProviderWorkerRequest,
+    binding: ProviderDispatchBinding
+  ) -> i64 {
+    if !binding_valid(binding) {
+      return -1;
+    }
+    if !request_handles_valid(request) {
+      return -2;
+    }
+    if request.provider_key != binding.provider_key {
+      return -3;
+    }
+    if request.capability_hash != binding.capability_hash {
+      return -4;
+    }
+    return binding.dispatch_token;
+  }
+
+  pub fn process_request(
+    state: ProviderWorkerState,
+    request: ProviderWorkerRequest,
+    binding: ProviderDispatchBinding,
+    response_committed: bool
+  ) -> ProviderWorkerState {
+    let dispatch: i64 = dispatch_status(request, binding);
+    return StdProviderWorkerContracts.complete_request(
+      state,
+      request.sequence,
+      request.payload_hash_valid,
+      request.descriptor_roles_valid,
+      dispatch,
+      response_committed
+    );
+  }
+}

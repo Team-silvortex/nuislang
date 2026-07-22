@@ -341,6 +341,30 @@ pub(super) fn lower_data_builtin_call(
             validate_type_ref(&handle_table_type)?;
             NirExpr::DataHandleTable(entries)
         }
+        "provider_request_ingress" => {
+            let [request_handle, descriptor_table_handle, descriptor_count, provider_key, capability_hash] =
+                args
+            else {
+                return Err("provider_request_ingress(...) expects 5 args".to_owned());
+            };
+            let lower_i64 = |value: &AstExpr| {
+                lower_expr(
+                    value,
+                    current_domain,
+                    bindings,
+                    signatures,
+                    struct_table,
+                    Some(&i64_type()),
+                )
+            };
+            NirExpr::DataProviderRequestIngress {
+                request_handle: Box::new(lower_i64(request_handle)?),
+                descriptor_table_handle: Box::new(lower_i64(descriptor_table_handle)?),
+                descriptor_count: Box::new(lower_i64(descriptor_count)?),
+                provider_key: Box::new(lower_i64(provider_key)?),
+                capability_hash: Box::new(lower_i64(capability_hash)?),
+            }
+        }
         _ => return Ok(None),
     };
     Ok(Some(expr))

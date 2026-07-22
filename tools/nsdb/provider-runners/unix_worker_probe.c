@@ -16,6 +16,19 @@ static int send_text(int socket_fd, const char *text) {
     return send(socket_fd, text, length, 0) == (ssize_t)length ? 0 : 1;
 }
 
+static int send_reply(int socket_fd, const char *header,
+                      const unsigned char *payload, size_t payload_length) {
+    struct iovec parts[2] = {
+        {.iov_base = (void *)header, .iov_len = strlen(header)},
+        {.iov_base = (void *)payload, .iov_len = payload_length},
+    };
+    struct msghdr message = {0};
+    message.msg_iov = parts;
+    message.msg_iovlen = 2;
+    size_t expected = parts[0].iov_len + parts[1].iov_len;
+    return sendmsg(socket_fd, &message, 0) == (ssize_t)expected ? 0 : 1;
+}
+
 static void fnv1a64_hex(const unsigned char *bytes, size_t length, char output[19]) {
     uint64_t hash = UINT64_C(0xcbf29ce484222325);
     for (size_t index = 0; index < length; index++) {
@@ -106,10 +119,10 @@ int main(void) {
         }
         char receipt[4096];
         snprintf(receipt, sizeof(receipt),
-                 "NUISPWUR2\t%s\t%zu\t%s\t%d\t%zu\t%u\t%s\t%s",
+                 "NUISPWUR3\t%s\t%zu\t%s\t%d\t%zu\t%u\t%s\t%s\t%zu\t%s\n",
                  lease, sequence, request, getpid(), descriptor_count, byte_sum,
-                 actual_hash, roles);
-        if (send_text(socket_fd, receipt) != 0) return 12;
+                 actual_hash, roles, payload_length, actual_hash);
+        if (send_reply(socket_fd, receipt, payload, payload_length) != 0) return 12;
         if (strcmp(request, "__close__") == 0) break;
     }
     close(socket_fd);

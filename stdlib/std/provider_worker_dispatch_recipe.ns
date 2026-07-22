@@ -1,0 +1,95 @@
+use cpu StdProviderWorkerContracts;
+use cpu StdProviderWorkerDispatchContracts;
+
+mod cpu Main {
+  fn binding(
+    provider_key: i64,
+    dispatch_token: i64,
+    capability_hash: i64
+  ) -> ProviderDispatchBinding {
+    return ProviderDispatchBinding {
+      provider_key: provider_key,
+      dispatch_token: dispatch_token,
+      capability_hash: capability_hash,
+      enabled: true
+    };
+  }
+
+  fn request(
+    request_handle: i64,
+    sequence: i64,
+    provider_key: i64,
+    descriptor_table_handle: i64,
+    descriptor_count: i64,
+    capability_hash: i64
+  ) -> ProviderWorkerRequest {
+    let imported_request_handle: i64 = provider_request_ingress(
+      request_handle,
+      descriptor_table_handle,
+      descriptor_count,
+      provider_key,
+      capability_hash
+    );
+    return ProviderWorkerRequest {
+      request_handle: imported_request_handle,
+      sequence: sequence,
+      provider_key: provider_key,
+      descriptor_table_handle: descriptor_table_handle,
+      descriptor_count: descriptor_count,
+      capability_hash: capability_hash,
+      payload_hash_valid: true,
+      descriptor_roles_valid: true
+    };
+  }
+
+  fn main() {
+    data_bind_core(1);
+    let handles: HandleTable = data_handle_table(
+      "host=cpu0",
+      "fabric=fabric0"
+    );
+    let ready: Marker = data_marker("std_provider_worker_dispatch_ready");
+
+    let shader: ProviderDispatchBinding = binding(20, 200, 2020);
+    let kernel: ProviderDispatchBinding = binding(30, 300, 3030);
+    let opened: ProviderWorkerState = StdProviderWorkerContracts.open();
+    let first: ProviderWorkerState = StdProviderWorkerDispatchContracts.process_request(
+      opened,
+      request(101, 0, 20, 501, 2, 2020),
+      shader,
+      true
+    );
+    let second: ProviderWorkerState = StdProviderWorkerDispatchContracts.process_request(
+      first,
+      request(102, 1, 30, 502, 3, 3030),
+      kernel,
+      true
+    );
+    let rejected: ProviderWorkerState = StdProviderWorkerDispatchContracts.process_request(
+      second,
+      request(103, 2, 20, 503, 1, 9999),
+      shader,
+      true
+    );
+    let fourth: ProviderWorkerState = StdProviderWorkerDispatchContracts.process_request(
+      rejected,
+      request(104, 3, 30, 504, 1, 3030),
+      kernel,
+      true
+    );
+    let closed: ProviderWorkerState = StdProviderWorkerContracts.close(fourth);
+    let clean: i64 = if StdProviderWorkerContracts.closed_cleanly(closed) {
+      1
+    } else {
+      0
+    };
+    print(
+      closed.status
+        + closed.next_sequence
+        + closed.accepted
+        + closed.rejected
+        + closed.committed
+        + clean
+    );
+  }
+}

@@ -1,6 +1,6 @@
 use crate::provider_worker_request::{
-    decode_provider_worker_request, encode_provider_worker_request, render_role_manifest,
-    validate_frame_token, MAX_PROVIDER_WORKER_DESCRIPTORS,
+    decode_provider_worker_reply, decode_provider_worker_request, encode_provider_worker_request,
+    render_role_manifest, validate_frame_token, MAX_PROVIDER_WORKER_DESCRIPTORS,
 };
 use std::{
     mem::{size_of, zeroed},
@@ -29,6 +29,7 @@ pub(crate) struct UnixWorkerProcessReply {
     pub(crate) first_byte_sum: u32,
     pub(crate) payload_hash: String,
     pub(crate) descriptor_roles: Vec<String>,
+    pub(crate) payload: Vec<u8>,
 }
 
 pub(crate) struct UnixWorkerRequest {
@@ -344,16 +345,21 @@ fn receive_process_reply(
     expected_payload: &[u8],
     expected_descriptor_roles: &[&str],
 ) -> Result<UnixWorkerProcessReply, String> {
-    let text = receive_text(socket)?;
-    let fields = text.split('\t').collect::<Vec<_>>();
-    if fields.len() != 9
-        || fields[0] != "NUISPWUR2"
-        || fields[1] != expected_lease_id
-        || fields[2] != expected_sequence.to_string()
-        || fields[3] != expected_request_id
-        || fields[4] != expected_worker_pid.to_string()
-        || fields[7] != crate::provider_sample_artifact::fnv1a64_hex(expected_payload)
-        || fields[8] != render_role_manifest(expected_descriptor_roles)
+    let packet = receive_packet(socket)?;
+    let envelope = decode_provider_worker_reply(&packet)?;
+    let expected_payload_hash = crate::provider_sample_artifact::fnv1a64_hex(expected_payload);
+    if envelope.lease_id != expected_lease_id
+        || envelope.sequence != expected_sequence
+        || envelope.request_id != expected_request_id
+        || envelope.worker_pid != expected_worker_pid
+        || envelope.request_payload_hash != expected_payload_hash
+        || render_role_manifest(
+            &envelope
+                .descriptor_roles
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+        ) != render_role_manifest(expected_descriptor_roles)
     {
         return Err("Unix provider worker receipt identity mismatch".to_owned());
     }
@@ -361,27 +367,26 @@ fn receive_process_reply(
         sequence: expected_sequence,
         request_id: expected_request_id.to_owned(),
         worker_pid: expected_worker_pid,
-        descriptor_count: fields[5]
-            .parse::<usize>()
-            .map_err(|error| format!("Unix provider worker fd count is invalid: {error}"))?,
-        first_byte_sum: fields[6]
-            .parse::<u32>()
-            .map_err(|error| format!("Unix provider worker byte sum is invalid: {error}"))?,
-        payload_hash: fields[7].to_owned(),
-        descriptor_roles: if fields[8] == "-" {
-            Vec::new()
-        } else {
-            fields[8].split(',').map(str::to_owned).collect()
-        },
+        descriptor_count: envelope.descriptor_count,
+        first_byte_sum: envelope.first_byte_sum,
+        payload_hash: envelope.payload_hash,
+        descriptor_roles: envelope.descriptor_roles,
+        payload: envelope.payload,
     })
 }
 
-fn receive_text(socket: &UnixDatagram) -> Result<String, String> {
-    let mut bytes = [0u8; MAX_FRAME_BYTES];
+fn receive_packet(socket: &UnixDatagram) -> Result<Vec<u8>, String> {
+    let mut bytes = vec![0u8; MAX_FRAME_BYTES];
     let received = socket
         .recv(&mut bytes)
-        .map_err(|error| format!("failed to receive Unix provider worker receipt: {error}"))?;
-    std::str::from_utf8(&bytes[..received])
+        .map_err(|error| format!("failed to receive Unix provider worker packet: {error}"))?;
+    bytes.truncate(received);
+    Ok(bytes)
+}
+
+fn receive_text(socket: &UnixDatagram) -> Result<String, String> {
+    let bytes = receive_packet(socket)?;
+    std::str::from_utf8(&bytes)
         .map(str::to_owned)
         .map_err(|_| "Unix provider worker receipt is not UTF-8".to_owned())
 }
@@ -520,6 +525,8 @@ mod tests {
             first_reply.payload_hash,
             crate::provider_sample_artifact::fnv1a64_hex(&[0, b'\n', 0xff])
         );
+        assert_eq!(first_reply.payload, [0, b'\n', 0xff]);
+        assert_eq!(second_reply.payload, b"shape=f32x4");
         assert_eq!(worker.close().expect("close"), first_reply.worker_pid);
     }
 

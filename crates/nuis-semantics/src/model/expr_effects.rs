@@ -48,6 +48,7 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         NirExpr::DataBindCore(_)
         | NirExpr::DataMarker(_)
         | NirExpr::DataHandleTable(_)
+        | NirExpr::DataProviderRequestIngress { .. }
         | NirExpr::DataResult { .. }
         | NirExpr::DataReady(_)
         | NirExpr::DataMoved(_)

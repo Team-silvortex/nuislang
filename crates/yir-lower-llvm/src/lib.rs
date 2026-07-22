@@ -16,6 +16,7 @@ mod branch_effect_lowering;
 mod call_lowering;
 mod call_return;
 mod cast_lowering;
+mod data_ingress_lowering;
 mod effect_flow_loop_lowering;
 mod emit_utils;
 mod extern_abi;
@@ -68,6 +69,7 @@ use call_return::{
     emit_typed_return_from_last_value,
 };
 use cast_lowering::lower_cpu_cast_node;
+use data_ingress_lowering::lower_data_provider_request_ingress;
 use effect_flow_loop_lowering::lower_cpu_effect_flow_loop_node;
 use emit_utils::{fresh_block, fresh_global, fresh_reg, llvm_c_string_bytes, lower_buffer_fill};
 use extern_abi::render_dynamic_extern_decls;

@@ -24,9 +24,25 @@ macro_rules! lower_loop_cond_chain {
                 let step_kind = node.op.args[4].as_str();
                 let mut carry_initial_values = Vec::new();
                 let mut carry_specs = Vec::new();
+                let mut carry_source_values = Vec::new();
                 let mut deferred = false;
-                for chunk in node.op.args[5..].chunks(5) {
-                    let carry_initial_value = registers.get(&chunk[0]).cloned();
+                let parsed_carries = match yir_domain_cpu::parse_conditional_carries(
+                    &node.op.args,
+                    5,
+                    &node.name,
+                    true,
+                ) {
+                    Ok(carries) => carries,
+                    Err(error) => {
+                        body.push(format!(
+                            "  ; deferred lowering for cpu.{loop_instruction} `{}` because conditional carry metadata is invalid: {error}",
+                            node.name,
+                        ));
+                        continue;
+                    }
+                };
+                for carry in parsed_carries {
+                    let carry_initial_value = registers.get(&carry.initial).cloned();
                     let Some(carry_initial_value) = carry_initial_value else {
                         body.push(format!(
                             "  ; deferred lowering for cpu.{loop_instruction} `{}` because one or more carry initials are outside the current CPU LLVM slice",
@@ -36,10 +52,19 @@ macro_rules! lower_loop_cond_chain {
                         break;
                     };
                     carry_initial_values.push(carry_initial_value);
-                    let cond_rhs = if chunk[1] == "always" {
-                        None
-                    } else {
-                        let cond_rhs_value = registers.get(&chunk[2]).cloned();
+                    let (cond_kind, cond_rhs_name) = match carry.condition {
+                        yir_domain_cpu::LoopCondExpr::Leaf { kind, rhs } => (kind, rhs),
+                        yir_domain_cpu::LoopCondExpr::Binary { .. } => {
+                            body.push(format!(
+                                "  ; deferred lowering for cpu.{loop_instruction} `{}` because compound conditional carries are not yet in the current CPU LLVM slice",
+                                node.name,
+                            ));
+                            deferred = true;
+                            break;
+                        }
+                    };
+                    let cond_rhs = if let Some(cond_rhs_name) = cond_rhs_name {
+                        let cond_rhs_value = registers.get(&cond_rhs_name).cloned();
                         let Some(cond_rhs_value) = cond_rhs_value else {
                             body.push(format!(
                                 "  ; deferred lowering for cpu.{loop_instruction} `{}` because one or more condition rhs values are outside the current CPU LLVM slice",
@@ -49,12 +74,41 @@ macro_rules! lower_loop_cond_chain {
                             break;
                         };
                         Some(cond_rhs_value)
+                    } else {
+                        None
+                    };
+                    let mut lower_source = |source: yir_domain_cpu::ParsedCarryBranchSource| {
+                        let mut payload_values = Vec::new();
+                        for payload_name in source.payload {
+                            let Some(payload_value) = registers.get(&payload_name).cloned() else {
+                                return None;
+                            };
+                            carry_source_values.push(payload_value.clone());
+                            payload_values.push(payload_value);
+                        }
+                        Some((source.kind, payload_values))
+                    };
+                    let Some(then_source) = lower_source(carry.then_source) else {
+                        body.push(format!(
+                            "  ; deferred lowering for cpu.{loop_instruction} `{}` because a then-carry payload is outside the current CPU LLVM slice",
+                            node.name,
+                        ));
+                        deferred = true;
+                        break;
+                    };
+                    let Some(else_source) = lower_source(carry.else_source) else {
+                        body.push(format!(
+                            "  ; deferred lowering for cpu.{loop_instruction} `{}` because an else-carry payload is outside the current CPU LLVM slice",
+                            node.name,
+                        ));
+                        deferred = true;
+                        break;
                     };
                     carry_specs.push((
-                        chunk[1].clone(),
+                        cond_kind,
                         cond_rhs,
-                        chunk[3].clone(),
-                        chunk[4].clone(),
+                        then_source,
+                        else_source,
                     ));
                 }
                 if deferred {
@@ -64,6 +118,7 @@ macro_rules! lower_loop_cond_chain {
                     [&initial_value, &limit_value, &step_value]
                         .into_iter()
                         .chain(carry_initial_values.iter())
+                        .chain(carry_source_values.iter())
                         .chain(
                             carry_specs
                                 .iter()
@@ -127,7 +182,7 @@ macro_rules! lower_loop_cond_chain {
                     continue;
                 }
                 let mut lowered_carry_specs = Vec::new();
-                for (cond_kind, cond_rhs, then_kind, else_kind) in carry_specs {
+                for (cond_kind, cond_rhs, then_source, else_source) in carry_specs {
                     let lowered_cond_rhs = if let Some(cond_rhs) = cond_rhs {
                         let Some(cond_rhs) = coerce_to_loop_scalar(
                             &cond_rhs,
@@ -146,7 +201,33 @@ macro_rules! lower_loop_cond_chain {
                     } else {
                         None
                     };
-                    lowered_carry_specs.push((cond_kind, lowered_cond_rhs, then_kind, else_kind));
+                    let mut lower_source_payload = |(kind, payload): (String, Vec<LlvmValueRef>)| {
+                        let mut lowered = Vec::new();
+                        for value in payload {
+                            let value = coerce_to_loop_scalar(
+                                &value,
+                                loop_scalar_kind,
+                                &mut body,
+                                &mut next_reg,
+                            )?;
+                            lowered.push(value);
+                        }
+                        Some((kind, lowered))
+                    };
+                    let Some(then_source) = lower_source_payload(then_source) else {
+                        deferred = true;
+                        break;
+                    };
+                    let Some(else_source) = lower_source_payload(else_source) else {
+                        deferred = true;
+                        break;
+                    };
+                    lowered_carry_specs.push((
+                        cond_kind,
+                        lowered_cond_rhs,
+                        then_source,
+                        else_source,
+                    ));
                 }
                 if deferred {
                     continue;
@@ -215,12 +296,24 @@ macro_rules! lower_loop_cond_chain {
                     ));
                     current_carries.push(carry_before);
                 }
-                let resolve_source = |kind: &str,
+                let resolve_source = |source: &(String, Vec<String>),
                                       next_current: &String,
                                       next_carries: &Vec<String>|
                  -> Result<(String, &'static str), String> {
-                    if matches!(kind, "keep" | "keep_prev_carry") {
+                    let (kind, payload) = source;
+                    if matches!(kind.as_str(), "keep" | "keep_prev_carry") {
                         return Ok((String::new(), "keep"));
+                    }
+                    if matches!(kind.as_str(), "add_invariant" | "mul_invariant") {
+                        let value = payload.first().ok_or_else(|| {
+                            format!(
+                                "cpu.{loop_instruction} `{}` carry kind `{kind}` is missing its invariant payload during LLVM lowering",
+                                node.name,
+                            )
+                        })?;
+                        let value = value.clone();
+                        let op = if kind == "add_invariant" { "add" } else { "mul" };
+                        return Ok((value, op));
                     }
                     if kind == "add_current" {
                         return Ok((next_current.clone(), "add"));
@@ -296,13 +389,14 @@ macro_rules! lower_loop_cond_chain {
                         ))
                 };
                 let mut next_carries = Vec::new();
-                for (index, (cond_kind, cond_rhs, then_kind, else_kind)) in
+                for (index, (cond_kind, cond_rhs, then_source, else_source)) in
                     lowered_carry_specs.iter().enumerate()
                 {
-                    let then_value = if matches!(then_kind.as_str(), "keep" | "keep_prev_carry") {
+                    let then_value = if matches!(then_source.0.as_str(), "keep" | "keep_prev_carry") {
                         current_carries[index].clone()
                     } else {
-                        let (source, op) = resolve_source(then_kind, &next_current, &next_carries)?;
+                        let (source, op) =
+                            resolve_source(then_source, &next_current, &next_carries)?;
                         emit_loop_numeric_op(
                             &mut body,
                             &mut next_reg,
@@ -318,10 +412,11 @@ macro_rules! lower_loop_cond_chain {
                             )
                         })?
                     };
-                    let else_value = if matches!(else_kind.as_str(), "keep" | "keep_prev_carry") {
+                    let else_value = if matches!(else_source.0.as_str(), "keep" | "keep_prev_carry") {
                         current_carries[index].clone()
                     } else {
-                        let (source, op) = resolve_source(else_kind, &next_current, &next_carries)?;
+                        let (source, op) =
+                            resolve_source(else_source, &next_current, &next_carries)?;
                         emit_loop_numeric_op(
                             &mut body,
                             &mut next_reg,

@@ -29,6 +29,9 @@ use execute_scalar::execute_cpu_scalar_node;
 use execute_tasks::execute_cpu_task_node;
 use execute_values::execute_cpu_value_node;
 use loop_metadata::*;
+pub use loop_metadata::{
+    parse_conditional_carries, LoopCondExpr, ParsedCarryBranchSource, ParsedConditionalCarry,
+};
 use runtime_helpers::*;
 pub struct CpuMod;
 

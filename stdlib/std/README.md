@@ -208,6 +208,17 @@ First auto-injectable library module:
   CLI/report-file validation, including argv output-path presence, report text
   readiness, file write coverage, console echo coverage, and process-style
   report helper exit codes
+* [lib/provider_worker_contracts.ns](lib/provider_worker_contracts.ns)
+  exposes the Nuis-owned provider-worker lifecycle state machine for ordered
+  request validation, accept/reject accounting, committed responses, and clean
+  close checks; `provider_worker_runtime_recipe.ns` AOT-builds and executes the
+  native loop without placing worker policy in a C or Objective-C runner
+* [lib/provider_worker_dispatch_contracts.ns](lib/provider_worker_dispatch_contracts.ns)
+  adds registration-driven dispatch in Nuis through opaque request and
+  descriptor-table handles, open-ended provider keys, dispatch tokens, and
+  capability hashes; `provider_worker_dispatch_recipe.ns` proves accepted and
+  rejected bindings through CPU/data YIR plus native output `14`; every request
+  enters through the registered `data.provider_request_ingress` intrinsic
 
 Intended scope:
 

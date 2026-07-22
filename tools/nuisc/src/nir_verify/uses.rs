@@ -30,6 +30,23 @@ pub(super) fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Resu
             verify_expr_uses(else_owner, moved)?;
         }
         NirExpr::Instantiate { .. } => {}
+        NirExpr::DataProviderRequestIngress {
+            request_handle,
+            descriptor_table_handle,
+            descriptor_count,
+            provider_key,
+            capability_hash,
+        } => {
+            for value in [
+                request_handle,
+                descriptor_table_handle,
+                descriptor_count,
+                provider_key,
+                capability_hash,
+            ] {
+                verify_expr_uses(value, moved)?;
+            }
+        }
         NirExpr::CastI64ToI32(inner)
         | NirExpr::CastI32ToI64(inner)
         | NirExpr::CastI64ToBool(inner)

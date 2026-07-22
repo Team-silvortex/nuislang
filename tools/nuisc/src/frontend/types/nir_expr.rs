@@ -334,6 +334,7 @@ pub(crate) fn infer_nir_expr_type(
             .and_then(|sig| sig.return_type.clone()),
         NirExpr::DataMarker(_) => Some(named_type("Marker")),
         NirExpr::DataHandleTable(_) => Some(named_type("HandleTable")),
+        NirExpr::DataProviderRequestIngress { .. } => Some(i64_type()),
         NirExpr::ShaderTarget { .. } => Some(named_type("Target")),
         NirExpr::ShaderViewport { .. } => Some(named_type("Viewport")),
         NirExpr::ShaderPipeline { .. } => Some(named_type("Pipeline")),

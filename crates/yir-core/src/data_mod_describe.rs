@@ -23,6 +23,7 @@ pub(crate) fn describe_data_node(
         "observe" => describe_observe(node),
         "is_ready" | "is_moved" | "is_windowed" | "value" => describe_result_access(node),
         "handle_table" => describe_handle_table(node),
+        "provider_request_ingress" => describe_provider_request_ingress(node),
         "bind_core" => describe_bind_core(node),
         other => Err(format!("unknown data instruction `{other}`")),
     }
@@ -149,6 +150,16 @@ fn describe_handle_table(node: &Node) -> Result<InstructionSemantics, String> {
         }
     }
     Ok(InstructionSemantics::pure(Vec::new()))
+}
+
+fn describe_provider_request_ingress(node: &Node) -> Result<InstructionSemantics, String> {
+    if node.op.args.len() != 5 {
+        return Err(format!(
+            "node `{}` expects `data.provider_request_ingress <name> <resource> <request_handle> <descriptor_table_handle> <descriptor_count> <provider_key> <capability_hash>`",
+            node.name
+        ));
+    }
+    Ok(InstructionSemantics::effect(node.op.args.clone()))
 }
 
 fn describe_bind_core(node: &Node) -> Result<InstructionSemantics, String> {

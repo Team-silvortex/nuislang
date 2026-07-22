@@ -16,7 +16,9 @@ surfaces = [
   "surface.std.time-benchmark-contracts.v1",
   "surface.std.hetero-test-benchmark-contracts.v1",
   "surface.std.cli-report-file-contracts.v1",
-  "surface.std.language-result-hof-contracts.v1"
+  "surface.std.language-result-hof-contracts.v1",
+  "surface.std.provider-worker-lifecycle.v1",
+  "surface.std.provider-worker-dispatch.v1"
 ]
 
 library_modules = [
@@ -30,7 +32,9 @@ library_modules = [
   "lib/hetero_contracts.ns",
   "lib/report_contracts.ns",
   "lib/language_core.ns",
-  "lib/language_ops.ns"
+  "lib/language_ops.ns",
+  "lib/provider_worker_contracts.ns",
+  "lib/provider_worker_dispatch_contracts.ns"
 ]
 
 library_import_policy = "project-auto"
@@ -151,6 +155,8 @@ source_modules = [
   "benchmark_report_count_recipe.ns",
   "benchmark_report_file_recipe.ns",
   "hetero_proxy_benchmark_recipe.ns",
+  "provider_worker_runtime_recipe.ns",
+  "provider_worker_dispatch_recipe.ns",
   "cwd_runtime.ns",
   "cwd_runtime_recipe.ns",
   "temp_runtime.ns",

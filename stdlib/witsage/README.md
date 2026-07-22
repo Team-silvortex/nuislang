@@ -137,6 +137,12 @@ Current native execution baseline:
   under ordered requests and exits through the same session control socket
 * `nuis-provider-worker-request-envelope-v1` carries hash-checked opaque binary
   request bytes plus one ordered semantic role for every transferred descriptor
+  and returns independently hash-checked opaque result bytes through `NUISPWUR3`
+* `std` now provides a Nuis-authored provider-worker lifecycle contract and an
+  AOT-executed native loop recipe; C and Objective-C runners remain thin ABI
+  probes or one-shot fallbacks rather than worker control-plane implementations
+* Nuis-owned worker dispatch bindings now carry opaque request/descriptor-table
+  handles and capability hashes without enumerating finite backend combinations
 * all four dependency edges reuse sealed producer output carriers directly
   through `provider.output.transfer.v1`, with independent lifecycle receipts
 

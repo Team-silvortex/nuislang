@@ -18,6 +18,14 @@ practical and intentional.
 The long-range architecture should still treat those pieces as compatibility
 and bootstrap layers rather than as the semantic center of the system.
 
+The compiler itself is the current self-hosting exception. Everywhere else,
+implementation should move into Nuis as soon as the language and lowering are
+capable: standard-library behavior, lifecycle loops, runtime orchestration,
+workers, schedulers, and official Galaxy logic should not remain in a host
+language merely because a bootstrap prototype began there. Foreign-language
+code should converge toward thin registered ABI adapters with no product
+policy.
+
 ## Architecture North Star
 
 The eventual target is a `nuis`-native computing base for heterogeneous XR and

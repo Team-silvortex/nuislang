@@ -68,6 +68,23 @@ the same evidence chain. If it cannot be checked, linked, inspected, traced, or
 represented in the tensor, it is probably still a sketch rather than mainline
 truth.
 
+## Native-Language Ownership Rule
+
+Until self-hosting, the compiler implementation may remain on its Rust host
+base. Outside that explicit bootstrap exception, new std, runtime, worker,
+scheduler, and official Galaxy control logic should be authored in Nuis
+whenever the language and lowering can express it.
+
+C, C++, Objective-C, and platform SDK languages may remain at registered ABI
+boundaries where the host exposes no native Nuis interface. Those adapters must
+stay generated or deliberately thin, policy-free, replaceable, and visible to
+YIR/GLM contracts. They must not silently become the owners of lifecycle loops,
+request protocols, scheduling, memory policy, or Nustar dispatch.
+
+Short rule:
+
+`compiler hosting is temporary; product control flow belongs to Nuis`
+
 ## What Alpha-0.13 Should Optimize
 
 Prefer work in this order:
