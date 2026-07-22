@@ -214,6 +214,15 @@ pub(super) fn assert_official_galaxy_hetero_build(
                 )
                 && run_json_stdout.contains(
                     "provider_request_4_adapter_binding_provider_family=metal:apple-silicon-gpu",
+                )
+                && run_json_stdout.contains(
+                    "provider_request_4_dependency_0_transport_contract=nuis-provider-edge-transport-v1",
+                )
+                && run_json_stdout.contains(
+                    "provider_request_4_dependency_0_transport_producer_clock_evidence=provider-clock:request-3:completed",
+                )
+                && run_json_stdout.contains(
+                    "provider_request_4_dependency_0_transport_consumer_clock_evidence=provider-clock:request-4:dispatch-ready",
                 ),
             "WitSage kernel trace did not carry the registered CoreML request\n{run_json_stdout}"
         );
@@ -841,6 +850,78 @@ pub(super) fn assert_official_galaxy_hetero_build(
                 &provider_output_payload_path,
                 "provider_request_adapter_order = \"coreml:apple-ane,coreml:apple-ane,coreml:apple-ane,coreml:apple-ane,metal:apple-silicon-gpu\"",
                 "official galaxy cross-provider adapter order",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "provider_edge_transport_contract = \"nuis-provider-edge-transport-v1\"",
+                "official galaxy cross-provider transport contract",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "provider_edge_transport_count = \"1\"",
+                "official galaxy cross-provider transport count",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "provider_edge_transport_ownership_tokens = \"glm:provider-edge:witsage.vector.add:output.features->witsage.vector.metal-bias:input.features\"",
+                "official galaxy cross-provider GLM ownership token",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "provider_edge_transport_staging_modes = \"auto\"",
+                "official galaxy cross-provider staging mode",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "provider_edge_transport_receipt_contract = \"nuis-provider-edge-transport-receipt-v1\"",
+                "official galaxy cross-provider transport receipt contract",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "provider_edge_transport_receipt_count = \"1\"",
+                "official galaxy cross-provider transport receipt count",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "provider_edge_transport_receipt_0_staging_registry_contract = \"nuis-provider-edge-staging-registry-v1\"",
+                "official galaxy staging registry contract",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "provider_edge_transport_receipt_0_staging_adapter_id = \"memory.owned-bytes.v1\"",
+                "official galaxy selected staging adapter",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "provider_edge_transport_receipt_0_staging_adapter_capability_status = \"registered-available\"",
+                "official galaxy staging adapter capability",
+            );
+            for (field, status) in [
+                ("materialize_status", "materialized"),
+                ("consume_status", "consumed"),
+                ("release_status", "released"),
+            ] {
+                assert_file_contains(
+                    &provider_output_payload_path,
+                    &format!("provider_edge_transport_receipt_0_{field} = \"{status}\""),
+                    "official galaxy cross-provider transport receipt transition",
+                );
+            }
+            for field in [
+                "materialize_payload_hash",
+                "consume_payload_hash",
+                "release_payload_hash",
+            ] {
+                assert_file_contains(
+                    &provider_output_payload_path,
+                    &format!("provider_edge_transport_receipt_0_{field} = \"0x3efcc146d99e0b55\""),
+                    "official galaxy cross-provider stable receipt hash",
+                );
+            }
+            assert_file_contains(
+                &provider_output_payload_path,
+                "provider_edge_transport_receipt_0_byte_length = \"16\"",
+                "official galaxy cross-provider receipt byte length",
             );
             assert_file_contains(
                 &provider_output_payload_path,

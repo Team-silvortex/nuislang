@@ -467,9 +467,28 @@ two-input Add request fans affine and chained-affine outputs into
 `nuis-provider-request-adapter-binding-v1` moves provider-family selection onto
 each request while leaving adapter choice to the registry. The official graph
 executes four CoreML requests, then transports Add output into a Metal `f32`
-bias kernel and compares `[11, 17, 23, 29]`. The next boundary is transport
-metadata: the cross-adapter carrier is currently an implicit temporary file
-without explicit GLM ownership, staging lifetime, or clock evidence.
+bias kernel and compares `[11, 17, 23, 29]`.
+`nuis-provider-edge-transport-v1` now binds that cross-adapter edge to an exact
+GLM ownership token, `host-visible-owned-file` staging mode, producer-completed
+clock, and consumer-dispatch-ready clock. Cross-provider dependencies without
+that descriptor fail closed, while the provider output payload mirrors the
+transport count and ordered evidence. The next boundary is a runtime receipt
+that proves materialization, consumption, and release against one payload hash.
+`nuis-provider-edge-transport-receipt-v1` now records those three transitions,
+the 16-byte carrier size, an ownership-derived carrier identity, and the same
+hash at every stage. The carrier is re-read after provider execution and the
+receipt reaches `released` only after deletion succeeds. The remaining boundary
+was implementation selection. `nuis-provider-edge-staging-registry-v1` now
+selects `host.visible.owned-file.v1` deterministically for explicit mode or
+`auto` fallback and owns materialize, consume, release, and cleanup operations
+outside the graph executor. Receipts include registry source, selected adapter,
+and capability status. `nuis-provider-carrier-input-v1` now supplies `path` and
+`opaque-bytes` variants. `auto` selects `memory.owned-bytes.v1`, and the Metal
+f32 runner consumes its handle-bound bytes directly through the native `hex:`
+input boundary; the CoreML-to-Metal edge no longer creates a provider-edge
+file. The remaining boundary is CoreML: named model inputs are still path-only,
+so affine, chained-affine, and Add fan-in dependencies continue to use the
+host-file compatibility adapter until the CoreML runner accepts opaque bytes.
 
 The language-core checks anchor the bootstrap-critical
 `language-core/nuisc/type-control-flow-generics` cell to:

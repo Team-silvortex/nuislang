@@ -1,4 +1,5 @@
-use std::path::Path;
+use crate::provider_carrier_input::ProviderCarrierInput;
+use std::{ffi::OsStr, path::Path};
 #[cfg(target_os = "macos")]
 use std::{fs, path::PathBuf, process::Command, time::SystemTime};
 
@@ -28,13 +29,39 @@ pub(crate) fn execute_f32_bias(
     execute_f32_bias_platform(input_path, bias)
 }
 
+pub(crate) fn execute_f32_bias_input(
+    input: &ProviderCarrierInput,
+    bias: f32,
+) -> Result<MetalProviderExecution, String> {
+    match input {
+        ProviderCarrierInput::Path(path) => execute_f32_bias(path, bias),
+        ProviderCarrierInput::OpaqueBytes { bytes, .. } => {
+            execute_f32_bias_bytes_platform(bytes, bias)
+        }
+    }
+}
+
 #[cfg(target_os = "macos")]
 fn execute_f32_bias_platform(
     input_path: &Path,
     bias: f32,
 ) -> Result<MetalProviderExecution, String> {
     execute_metal_scalar_platform(
-        input_path,
+        input_path.as_os_str(),
+        &bias.to_string(),
+        "nuis-metal-f32-bias-provider-runner-v1",
+        METAL_F32_BIAS_SOURCE,
+    )
+}
+
+#[cfg(target_os = "macos")]
+fn execute_f32_bias_bytes_platform(
+    input: &[u8],
+    bias: f32,
+) -> Result<MetalProviderExecution, String> {
+    let argument = format!("hex:{}", encode_hex(input));
+    execute_metal_scalar_platform(
+        argument.as_ref(),
         &bias.to_string(),
         "nuis-metal-f32-bias-provider-runner-v1",
         METAL_F32_BIAS_SOURCE,
@@ -47,7 +74,7 @@ fn execute_gray8_invert_platform(
     max_value: u8,
 ) -> Result<MetalProviderExecution, String> {
     execute_metal_scalar_platform(
-        input_path,
+        input_path.as_os_str(),
         &max_value.to_string(),
         "nuis-metal-gray8-provider-runner-v1",
         METAL_RUNNER_SOURCE,
@@ -62,9 +89,17 @@ fn execute_f32_bias_platform(
     Err("Metal provider runner is unavailable on this host".to_owned())
 }
 
+#[cfg(not(target_os = "macos"))]
+fn execute_f32_bias_bytes_platform(
+    _input: &[u8],
+    _bias: f32,
+) -> Result<MetalProviderExecution, String> {
+    Err("Metal provider runner is unavailable on this host".to_owned())
+}
+
 #[cfg(target_os = "macos")]
 fn execute_metal_scalar_platform(
-    input_path: &Path,
+    input_argument: &OsStr,
     scalar: &str,
     contract: &'static str,
     source: &str,
@@ -92,7 +127,7 @@ fn execute_metal_scalar_platform(
         ));
     }
     let execution = Command::new(&paths.binary)
-        .arg(input_path)
+        .arg(input_argument)
         .arg(scalar)
         .output()
         .map_err(|error| format!("failed to launch Metal provider runner: {error}"))?;
@@ -103,6 +138,10 @@ fn execute_metal_scalar_platform(
         ));
     }
     parse_metal_runner_output_for(&String::from_utf8_lossy(&execution.stdout), contract)
+}
+
+fn encode_hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -201,7 +240,8 @@ impl Drop for TempMetalRunnerPaths {
 
 #[cfg(test)]
 mod tests {
-    use super::{execute_gray8_invert, parse_metal_runner_output};
+    use super::{execute_f32_bias_input, execute_gray8_invert, parse_metal_runner_output};
+    use crate::provider_carrier_input::ProviderCarrierInput;
 
     #[test]
     fn parses_ready_metal_runner_output() {
@@ -232,5 +272,24 @@ mod tests {
         assert_eq!(execution.status, "metal-command-buffer-completed");
         assert!(!execution.device.is_empty());
         assert_eq!(execution.output_bytes, [15, 11, 6, 7]);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn executes_f32_bias_from_opaque_carrier_bytes() {
+        let input = ProviderCarrierInput::OpaqueBytes {
+            handle: "memory:metal-test".to_owned(),
+            bytes: [10.0f32, 16.0, 22.0, 28.0]
+                .into_iter()
+                .flat_map(f32::to_le_bytes)
+                .collect(),
+        };
+        let execution = execute_f32_bias_input(&input, 1.0).expect("opaque Metal input");
+        let values = execution
+            .output_bytes
+            .chunks_exact(4)
+            .map(|bytes| f32::from_le_bytes(bytes.try_into().unwrap()))
+            .collect::<Vec<_>>();
+        assert_eq!(values, [11.0, 17.0, 23.0, 29.0]);
     }
 }

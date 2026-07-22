@@ -1,4 +1,13 @@
 use crate::{
+    provider_carrier_input::{ProviderCarrierInput, PROVIDER_CARRIER_INPUT_CONTRACT},
+    provider_edge_staging_registry::{
+        cleanup_provider_edge_carrier, consume_provider_edge_carrier,
+        materialize_provider_edge_carrier, release_provider_edge_carrier,
+        select_provider_edge_staging_adapter, ProviderEdgeStagingAdapter,
+        ProviderEdgeStagingCarrier, PROVIDER_EDGE_STAGING_REGISTRY_CONTRACT,
+        PROVIDER_EDGE_STAGING_REGISTRY_SOURCE,
+    },
+    provider_edge_transport::{ProviderEdgeTransportDescriptor, ProviderEdgeTransportReceipt},
     provider_input_binding::ProviderInputBinding,
     provider_output_comparison::compare_provider_output,
     provider_request::{provider_request_collection_from_evidence, ProviderRequest},
@@ -20,8 +29,7 @@ use crate::{
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
-    path::{Path, PathBuf},
-    time::SystemTime,
+    path::Path,
 };
 
 pub struct ProviderSampleExecuteReport {
@@ -265,31 +273,48 @@ fn write_provider_output_payload(
     adapter: &crate::provider_runner_registry::ProviderRunnerAdapter,
 ) -> Result<WrittenProviderOutput, String> {
     let file_name = provider_output_payload_file_name(&record.provider_family);
-    let native_outputs = execute_native_provider_outputs(output_dir, record, adapter)?;
-    let content = render_real_device_provider_output_payload(record, adapter, &native_outputs);
+    let execution = execute_native_provider_outputs(output_dir, record, adapter)?;
+    let content = render_real_device_provider_output_payload(
+        record,
+        adapter,
+        &execution.native_outputs,
+        &execution.transport_receipts,
+    );
     let hash = fnv1a64_hex(content.as_bytes());
     fs::write(output_dir.join(&file_name), content).map_err(|error| {
         format!("failed to write provider output payload `{file_name}`: {error}")
     })?;
     Ok(WrittenProviderOutput {
         evidence: format!("{file_name}:hash={hash}:status=written"),
-        native_outputs,
+        native_outputs: execution.native_outputs,
     })
+}
+
+struct NativeProviderOutputs {
+    native_outputs: Vec<PixelMagicNativeOutputSummary>,
+    transport_receipts: Vec<ProviderEdgeTransportReceipt>,
 }
 
 fn execute_native_provider_outputs(
     output_dir: &Path,
     record: &crate::model::NsdbDeviceProviderSampleRecordInfo,
     adapter: &crate::provider_runner_registry::ProviderRunnerAdapter,
-) -> Result<Vec<PixelMagicNativeOutputSummary>, String> {
+) -> Result<NativeProviderOutputs, String> {
     if adapter.kind != "metal-real-device-runner" && adapter.kind != "coreml-real-device-runner" {
-        return Ok(Vec::new());
+        return Ok(NativeProviderOutputs {
+            native_outputs: Vec::new(),
+            transport_receipts: Vec::new(),
+        });
     }
     let Some(collection) = provider_request_collection_from_evidence(&record.input_evidence) else {
-        return Ok(Vec::new());
+        return Ok(NativeProviderOutputs {
+            native_outputs: Vec::new(),
+            transport_receipts: Vec::new(),
+        });
     };
     let mut completed = BTreeMap::<String, Vec<u8>>::new();
     let mut summaries = Vec::with_capacity(collection.requests.len());
+    let mut transport_receipts = Vec::new();
     for request in &collection.requests {
         let request_adapter = request
             .adapter_binding
@@ -313,13 +338,18 @@ fn execute_native_provider_outputs(
         )?;
         completed.insert(request.kernel.id.clone(), execution.output_bytes);
         summaries.push(execution.summary);
+        transport_receipts.extend(execution.transport_receipts);
     }
-    Ok(summaries)
+    Ok(NativeProviderOutputs {
+        native_outputs: summaries,
+        transport_receipts,
+    })
 }
 
 struct NativeProviderRequestExecution {
     summary: PixelMagicNativeOutputSummary,
     output_bytes: Vec<u8>,
+    transport_receipts: Vec<ProviderEdgeTransportReceipt>,
 }
 
 fn execute_native_provider_request(
@@ -332,9 +362,16 @@ fn execute_native_provider_request(
     let inputs = request
         .input_bindings
         .iter()
-        .map(|binding| PreparedProviderInput::new(output_dir, binding, completed))
+        .map(|binding| {
+            let transport = request
+                .dependencies
+                .iter()
+                .find(|dependency| dependency.consumer_input_buffer == binding.name)
+                .and_then(|dependency| dependency.transport.as_ref());
+            PreparedProviderInput::new(output_dir, binding, transport, completed)
+        })
         .collect::<Result<Vec<_>, _>>()?;
-    match adapter.kind {
+    let mut request_execution = match adapter.kind {
         "metal-real-device-runner" => {
             if inputs.len() != 1 {
                 return Err(format!(
@@ -349,7 +386,11 @@ fn execute_native_provider_request(
                 let max_value = request.scalar_u8("max_value").ok_or_else(|| {
                     "Metal provider request is missing u8 scalar `max_value`".to_owned()
                 })?;
-                crate::provider_runner_metal::execute_gray8_invert(&inputs[0].path, max_value)?
+                let path = inputs[0]
+                    .input()
+                    .path()
+                    .ok_or_else(|| "Metal gray8 provider requires a path input".to_owned())?;
+                crate::provider_runner_metal::execute_gray8_invert(path, max_value)?
             } else if request.buffer.element_type == "f32"
                 && request.buffer.layout == "tensor-contiguous"
                 && request.kernel.operation == "bias"
@@ -357,7 +398,7 @@ fn execute_native_provider_request(
                 let bias = request.scalar_f32("bias").ok_or_else(|| {
                     "Metal provider request is missing f32 scalar `bias`".to_owned()
                 })?;
-                crate::provider_runner_metal::execute_f32_bias(&inputs[0].path, bias)?
+                crate::provider_runner_metal::execute_f32_bias_input(inputs[0].input(), bias)?
             } else {
                 return Err(format!(
                     "Metal provider adapter does not support buffer `{}` operation `{}`",
@@ -383,6 +424,7 @@ fn execute_native_provider_request(
                     )
                 },
                 output_bytes: execution.output_bytes,
+                transport_receipts: Vec::new(),
             })
         }
         "coreml-real-device-runner" => {
@@ -413,13 +455,15 @@ fn execute_native_provider_request(
                 .zip(&model.input_features)
                 .zip(&request.input_bindings)
                 .map(|((input, feature), binding)| {
-                    crate::provider_runner_coreml::CoreMlProviderInput {
-                        path: &input.path,
+                    Ok(crate::provider_runner_coreml::CoreMlProviderInput {
+                        path: input.input().path().ok_or_else(|| {
+                            "CoreML provider requires a path carrier input".to_owned()
+                        })?,
                         feature,
                         shape: &binding.shape,
-                    }
+                    })
                 })
-                .collect::<Vec<_>>();
+                .collect::<Result<Vec<_>, String>>()?;
             let output_shape = request
                 .output_comparison
                 .as_ref()
@@ -445,24 +489,36 @@ fn execute_native_provider_request(
                     comparison.as_ref(),
                 ),
                 output_bytes: execution.output_bytes,
+                transport_receipts: Vec::new(),
             })
         }
         _ => Err(format!(
             "provider adapter `{}` cannot execute request `{}`",
             adapter.adapter_id, request.kernel.id
         )),
-    }
+    }?;
+    request_execution.transport_receipts = inputs
+        .into_iter()
+        .map(PreparedProviderInput::finish)
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .flatten()
+        .collect();
+    Ok(request_execution)
 }
 
 struct PreparedProviderInput {
-    path: PathBuf,
-    remove_on_drop: bool,
+    artifact_input: Option<ProviderCarrierInput>,
+    staging_adapter: Option<ProviderEdgeStagingAdapter>,
+    carrier: Option<ProviderEdgeStagingCarrier>,
+    transport_receipt: Option<ProviderEdgeTransportReceipt>,
 }
 
 impl PreparedProviderInput {
     fn new(
         output_dir: &Path,
         binding: &ProviderInputBinding,
+        transport: Option<&ProviderEdgeTransportDescriptor>,
         completed: &BTreeMap<String, Vec<u8>>,
     ) -> Result<Self, String> {
         if binding.source == "dependency" {
@@ -473,20 +529,39 @@ impl PreparedProviderInput {
                 )
             })?;
             validate_input_bytes(binding, bytes)?;
-            let nonce = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos();
-            let path = std::env::temp_dir().join(format!(
-                "nuis-provider-edge-input-{}-{nonce}.bin",
-                std::process::id()
-            ));
-            fs::write(&path, bytes).map_err(|error| {
-                format!("failed to materialize provider dependency input: {error}")
-            })?;
+            let requested_mode = transport
+                .map(|descriptor| descriptor.staging_mode.as_str())
+                .unwrap_or("host-visible-owned-file");
+            let staging_adapter =
+                select_provider_edge_staging_adapter(requested_mode).ok_or_else(|| {
+                    format!("no provider edge staging adapter supports `{requested_mode}`")
+                })?;
+            let owner_hash = transport
+                .map(|descriptor| fnv1a64_hex(descriptor.ownership_token.as_bytes()))
+                .unwrap_or_else(|| "legacy".to_owned());
+            let carrier = materialize_provider_edge_carrier(staging_adapter, &owner_hash, bytes)?;
             return Ok(Self {
-                path,
-                remove_on_drop: true,
+                artifact_input: None,
+                staging_adapter: Some(staging_adapter),
+                transport_receipt: transport.map(|descriptor| ProviderEdgeTransportReceipt {
+                    ownership_token: descriptor.ownership_token.clone(),
+                    staging_registry_contract: PROVIDER_EDGE_STAGING_REGISTRY_CONTRACT.to_owned(),
+                    staging_registry_source: PROVIDER_EDGE_STAGING_REGISTRY_SOURCE.to_owned(),
+                    staging_adapter_id: staging_adapter.adapter_id.to_owned(),
+                    staging_adapter_capability_status: staging_adapter.capability_status.to_owned(),
+                    carrier_input_contract: PROVIDER_CARRIER_INPUT_CONTRACT.to_owned(),
+                    carrier_input_kind: carrier.input.kind().to_owned(),
+                    carrier_input_handle: carrier.input.handle().unwrap_or("none").to_owned(),
+                    carrier_identity: carrier.identity.clone(),
+                    byte_length: bytes.len(),
+                    materialize_status: "materialized".to_owned(),
+                    materialize_payload_hash: fnv1a64_hex(bytes),
+                    consume_status: "pending".to_owned(),
+                    consume_payload_hash: "pending".to_owned(),
+                    release_status: "pending".to_owned(),
+                    release_payload_hash: "pending".to_owned(),
+                }),
+                carrier: Some(carrier),
             });
         }
         let path = resolve_provider_payload_path(output_dir, &binding.payload_path)?;
@@ -498,9 +573,43 @@ impl PreparedProviderInput {
         })?;
         validate_input_bytes(binding, &bytes)?;
         Ok(Self {
-            path,
-            remove_on_drop: false,
+            artifact_input: Some(ProviderCarrierInput::Path(path)),
+            staging_adapter: None,
+            carrier: None,
+            transport_receipt: None,
         })
+    }
+
+    fn input(&self) -> &ProviderCarrierInput {
+        self.carrier
+            .as_ref()
+            .map(|carrier| &carrier.input)
+            .or(self.artifact_input.as_ref())
+            .expect("prepared provider input must own one carrier")
+    }
+
+    fn finish(mut self) -> Result<Option<ProviderEdgeTransportReceipt>, String> {
+        let mut receipt = self.transport_receipt.take();
+        if let (Some(adapter), Some(carrier)) = (self.staging_adapter, self.carrier.as_mut()) {
+            let bytes = consume_provider_edge_carrier(adapter, carrier)?;
+            let payload_hash = fnv1a64_hex(&bytes);
+            if let Some(receipt) = receipt.as_mut() {
+                if bytes.len() != receipt.byte_length
+                    || payload_hash != receipt.materialize_payload_hash
+                {
+                    return Err("provider edge carrier changed before consumption".to_owned());
+                }
+                receipt.consume_status = "consumed".to_owned();
+                receipt.consume_payload_hash = payload_hash.clone();
+            }
+            release_provider_edge_carrier(adapter, carrier)?;
+            self.carrier = None;
+            if let Some(receipt) = receipt.as_mut() {
+                receipt.release_status = "released".to_owned();
+                receipt.release_payload_hash = payload_hash;
+            }
+        }
+        Ok(receipt)
     }
 }
 
@@ -516,8 +625,8 @@ fn validate_input_bytes(binding: &ProviderInputBinding, bytes: &[u8]) -> Result<
 
 impl Drop for PreparedProviderInput {
     fn drop(&mut self) {
-        if self.remove_on_drop {
-            let _ = fs::remove_file(&self.path);
+        if let Some(carrier) = self.carrier.as_mut() {
+            cleanup_provider_edge_carrier(carrier);
         }
     }
 }

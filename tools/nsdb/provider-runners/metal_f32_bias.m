@@ -6,10 +6,26 @@ static int fail(NSString *message) {
     return 1;
 }
 
+static NSData *inputData(const char *argument) {
+    NSString *value = @(argument);
+    if (![value hasPrefix:@"hex:"]) return [NSData dataWithContentsOfFile:value];
+    NSString *hex = [value substringFromIndex:4];
+    if (hex.length == 0 || hex.length % 2 != 0) return nil;
+    NSMutableData *data = [NSMutableData dataWithCapacity:hex.length / 2];
+    for (NSUInteger index = 0; index < hex.length; index += 2) {
+        unsigned int byte = 0;
+        NSScanner *scanner = [NSScanner scannerWithString:[hex substringWithRange:NSMakeRange(index, 2)]];
+        if (![scanner scanHexInt:&byte] || !scanner.isAtEnd) return nil;
+        uint8_t value = (uint8_t)byte;
+        [data appendBytes:&value length:1];
+    }
+    return data;
+}
+
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
-        if (argc != 3) return fail(@"usage: metal_f32_bias <input-path> <bias>");
-        NSData *input = [NSData dataWithContentsOfFile:@(argv[1])];
+        if (argc != 3) return fail(@"usage: metal_f32_bias <input-path|hex:bytes> <bias>");
+        NSData *input = inputData(argv[1]);
         if (input == nil || input.length == 0 || input.length % sizeof(float) != 0) {
             return fail(@"Metal f32 input unavailable or misaligned");
         }

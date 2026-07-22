@@ -1,4 +1,7 @@
 use crate::provider_adapter_binding::{parse_adapter_binding, ProviderAdapterBinding};
+use crate::provider_edge_transport::{
+    parse_edge_transport, validate_dependency_transport, ProviderEdgeTransportDescriptor,
+};
 use crate::provider_input_binding::{
     parse_input_bindings, validate_dependency_binding, validate_input_bindings,
     ProviderInputBinding,
@@ -74,6 +77,7 @@ pub(crate) struct ProviderRequestDependency {
     pub(crate) producer_request_id: String,
     pub(crate) producer_output_buffer: String,
     pub(crate) consumer_input_buffer: String,
+    pub(crate) transport: Option<ProviderEdgeTransportDescriptor>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -363,6 +367,7 @@ fn parse_dependencies(
                     .clone(),
                 consumer_input_buffer: field(fields, &edge_prefix, "consumer_input_buffer")?
                     .clone(),
+                transport: parse_edge_transport(fields, &edge_prefix)?,
             })
         })
         .collect()
@@ -397,6 +402,13 @@ fn validate_collection_dependencies(requests: &[ProviderRequest]) -> bool {
                                 && validate_dependency_binding(
                                     &requests[*producer_index],
                                     request,
+                                    dependency,
+                                )
+                                && validate_dependency_transport(
+                                    &requests[*producer_index],
+                                    *producer_index,
+                                    request,
+                                    consumer_index,
                                     dependency,
                                 )
                         })

@@ -1,4 +1,5 @@
 use crate::{
+    provider_edge_transport::PROVIDER_EDGE_TRANSPORT_CONTRACT,
     provider_request::{
         provider_request_collection_from_evidence, provider_request_from_evidence, ProviderRequest,
         PROVIDER_BUFFER_DESCRIPTOR_CONTRACT, PROVIDER_KERNEL_DESCRIPTOR_CONTRACT,
@@ -85,6 +86,58 @@ pub(crate) fn render_provider_request_evidence(input_evidence: &str) -> String {
             "provider_request_dependency_graph_hash",
             &fnv1a64_hex(dependency_edges.join(";").as_bytes()),
         );
+        let transports = collection
+            .requests
+            .iter()
+            .flat_map(|request| request.dependencies.iter())
+            .filter_map(|dependency| dependency.transport.as_ref())
+            .collect::<Vec<_>>();
+        push_toml_string(
+            &mut out,
+            "provider_edge_transport_contract",
+            PROVIDER_EDGE_TRANSPORT_CONTRACT,
+        );
+        push_toml_string(
+            &mut out,
+            "provider_edge_transport_count",
+            &transports.len().to_string(),
+        );
+        for (name, values) in [
+            (
+                "ownership_tokens",
+                transports
+                    .iter()
+                    .map(|item| item.ownership_token.as_str())
+                    .collect::<Vec<_>>(),
+            ),
+            (
+                "staging_modes",
+                transports
+                    .iter()
+                    .map(|item| item.staging_mode.as_str())
+                    .collect::<Vec<_>>(),
+            ),
+            (
+                "producer_clock_evidence",
+                transports
+                    .iter()
+                    .map(|item| item.producer_clock_evidence.as_str())
+                    .collect::<Vec<_>>(),
+            ),
+            (
+                "consumer_clock_evidence",
+                transports
+                    .iter()
+                    .map(|item| item.consumer_clock_evidence.as_str())
+                    .collect::<Vec<_>>(),
+            ),
+        ] {
+            push_toml_string(
+                &mut out,
+                &format!("provider_edge_transport_{name}"),
+                &values.join(","),
+            );
+        }
     }
     push_provider_request_summary(&mut out, &request);
     out

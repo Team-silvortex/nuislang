@@ -95,6 +95,17 @@ Current native execution baseline:
   independent output comparison boundary
 * per-request adapter bindings then carry the Add output into a real Metal
   `f32` bias kernel, producing and comparing `[11, 17, 23, 29]`
+* `nuis-provider-edge-transport-v1` binds that CoreML-to-Metal edge to a GLM
+  ownership token, host-visible staging, and producer/consumer request clocks;
+  cross-provider edges without valid transport evidence fail before execution
+* `nuis-provider-edge-transport-receipt-v1` proves that carrier was
+  materialized, consumed, and released with one stable payload hash before the
+  provider output is accepted
+* `nuis-provider-edge-staging-registry-v1` selects the staging implementation;
+  `auto` selects `memory.owned-bytes.v1` and retains
+  `host.visible.owned-file.v1` as an explicit compatibility adapter
+* `nuis-provider-carrier-input-v1` lets the Metal f32 runner consume the
+  CoreML Add output as opaque bytes without a provider-edge file
 
 Current official surface registry:
 

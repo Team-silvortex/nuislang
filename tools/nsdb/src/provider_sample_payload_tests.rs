@@ -1,5 +1,6 @@
 use crate::{
     model::NsdbDeviceProviderSampleRecordInfo,
+    provider_edge_transport::ProviderEdgeTransportReceipt,
     provider_request::provider_request_from_evidence,
     provider_runner_registry::ProviderRunnerAdapter,
     provider_sample_payload::{
@@ -64,9 +65,46 @@ fn real_device_payload_carries_pixelmagic_output_bytes() {
         kind: "metal-real-device-runner",
         execution_mode: "real-device-provider-runner",
     };
-    let payload = render_real_device_provider_output_payload(&record, &adapter, &[]);
+    let payload = render_real_device_provider_output_payload(&record, &adapter, &[], &[]);
     assert!(payload.contains("comparison_input_kind = \"std-preprocessed-pgm\""));
     assert!(payload.contains("native_output_kind = \"pixelmagic-image-bytes\""));
     assert!(payload.contains("native_output_bytes = \"4\""));
     assert!(payload.contains("native_output_hash = \"0x"));
+}
+
+#[test]
+fn real_device_payload_carries_released_transport_receipt() {
+    let record = sample_record(PIXEL_INPUT_EVIDENCE);
+    let adapter = ProviderRunnerAdapter {
+        adapter_id: "metal.apple-silicon-gpu.real-device",
+        capability_status: "registered-real-device",
+        real_device_capable: true,
+        kind: "metal-real-device-runner",
+        execution_mode: "real-device-provider-runner",
+    };
+    let receipt = ProviderEdgeTransportReceipt {
+        ownership_token: "glm:provider-edge:a:out->b:in".to_owned(),
+        staging_registry_contract: "nuis-provider-edge-staging-registry-v1".to_owned(),
+        staging_registry_source: "builtin-provider-edge-staging-registry".to_owned(),
+        staging_adapter_id: "host.visible.owned-file.v1".to_owned(),
+        staging_adapter_capability_status: "registered-available".to_owned(),
+        carrier_input_contract: "nuis-provider-carrier-input-v1".to_owned(),
+        carrier_input_kind: "path".to_owned(),
+        carrier_input_handle: "none".to_owned(),
+        carrier_identity: "owned-file:0x1234".to_owned(),
+        byte_length: 16,
+        materialize_status: "materialized".to_owned(),
+        materialize_payload_hash: "0xabcd".to_owned(),
+        consume_status: "consumed".to_owned(),
+        consume_payload_hash: "0xabcd".to_owned(),
+        release_status: "released".to_owned(),
+        release_payload_hash: "0xabcd".to_owned(),
+    };
+    let payload = render_real_device_provider_output_payload(&record, &adapter, &[], &[receipt]);
+    assert!(payload.contains("nuis-provider-edge-transport-receipt-v1"));
+    assert!(payload.contains("nuis-provider-edge-staging-registry-v1"));
+    assert!(payload.contains("host.visible.owned-file.v1"));
+    assert!(payload.contains("registered-available"));
+    assert!(payload.contains("provider_edge_transport_receipt_0_release_status = \"released\""));
+    assert_eq!(payload.matches("0xabcd").count(), 3);
 }
