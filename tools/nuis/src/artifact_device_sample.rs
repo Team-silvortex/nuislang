@@ -12,13 +12,23 @@ const PIXELMAGIC_STD_PIXEL_PAYLOAD: &[u8] = &[0, 4, 9, 8];
 const WITSAGE_VECTOR_PAYLOAD_FILE_NAME: &str = "nuis.witsage.vector.f32.bin";
 const WITSAGE_VECTOR_MODEL_FILE_NAME: &str = "nuis.witsage.vector-affine.mlmodel";
 const WITSAGE_VECTOR_EXPECTED_FILE_NAME: &str = "nuis.witsage.vector-affine.expected.f32.bin";
+const WITSAGE_CHAINED_EXPECTED_FILE_NAME: &str =
+    "nuis.witsage.vector-affine-chained.expected.f32.bin";
 const WITSAGE_DENSE_PAYLOAD_FILE_NAME: &str = "nuis.witsage.feature-grid.f32.bin";
 const WITSAGE_DENSE_MODEL_FILE_NAME: &str = "nuis.witsage.feature-grid-projection.mlmodel";
+const WITSAGE_ADD_MODEL_FILE_NAME: &str = "nuis.witsage.vector-add.mlmodel";
+const WITSAGE_ADD_EXPECTED_FILE_NAME: &str = "nuis.witsage.vector-add.expected.f32.bin";
 const WITSAGE_VECTOR_PAYLOAD: &[u8] = &[
     0x00, 0x00, 0x80, 0x3f, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x40, 0x40, 0x00, 0x00, 0x80, 0x40,
 ];
 const WITSAGE_VECTOR_EXPECTED: &[u8] = &[
     0x00, 0x00, 0x40, 0x40, 0x00, 0x00, 0xa0, 0x40, 0x00, 0x00, 0xe0, 0x40, 0x00, 0x00, 0x10, 0x41,
+];
+const WITSAGE_CHAINED_EXPECTED: &[u8] = &[
+    0x00, 0x00, 0xe0, 0x40, 0x00, 0x00, 0x30, 0x41, 0x00, 0x00, 0x70, 0x41, 0x00, 0x00, 0x98, 0x41,
+];
+const WITSAGE_ADD_EXPECTED: &[u8] = &[
+    0x00, 0x00, 0x20, 0x41, 0x00, 0x00, 0x80, 0x41, 0x00, 0x00, 0xb0, 0x41, 0x00, 0x00, 0xe0, 0x41,
 ];
 
 pub(crate) struct DeviceSampleContract {
@@ -388,6 +398,11 @@ pub(crate) fn persist_device_sample_input_payloads<'a>(
         )
         .map_err(|error| format!("failed to persist WitSage expected vector output: {error}"))?;
         fs::write(
+            output_dir.join(WITSAGE_CHAINED_EXPECTED_FILE_NAME),
+            WITSAGE_CHAINED_EXPECTED,
+        )
+        .map_err(|error| format!("failed to persist WitSage chained expected output: {error}"))?;
+        fs::write(
             output_dir.join(WITSAGE_DENSE_PAYLOAD_FILE_NAME),
             witsage_dense_payload(),
         )
@@ -397,6 +412,16 @@ pub(crate) fn persist_device_sample_input_payloads<'a>(
             crate::artifact_coreml_model::witsage_dense_transform_model(),
         )
         .map_err(|error| format!("failed to persist WitSage dense CoreML model: {error}"))?;
+        fs::write(
+            output_dir.join(WITSAGE_ADD_MODEL_FILE_NAME),
+            crate::artifact_coreml_model::witsage_vector_add_model(),
+        )
+        .map_err(|error| format!("failed to persist WitSage add CoreML model: {error}"))?;
+        fs::write(
+            output_dir.join(WITSAGE_ADD_EXPECTED_FILE_NAME),
+            WITSAGE_ADD_EXPECTED,
+        )
+        .map_err(|error| format!("failed to persist WitSage add expected output: {error}"))?;
     }
     Ok(())
 }
@@ -473,8 +498,11 @@ fn input_evidence(
         let dense = witsage_dense_collection_request(0, &payload, &model);
         let affine_model = crate::artifact_coreml_model::witsage_vector_affine_model();
         let affine = witsage_affine_collection_request(1, &affine_model);
+        let chained = witsage_chained_affine_collection_request(2, &affine_model);
+        let add_model = crate::artifact_coreml_model::witsage_vector_add_model();
+        let add = witsage_add_collection_request(3, &add_model);
         format!(
-            "{singular};provider_request_collection_contract=nuis-provider-request-collection-v1;provider_request_count=2;{dense};{affine}"
+            "{singular};provider_request_collection_contract=nuis-provider-request-collection-v1;provider_request_count=4;{dense};{affine};{chained};{add}"
         )
     } else {
         base
@@ -490,27 +518,112 @@ fn witsage_dense_payload() -> Vec<u8> {
 
 fn witsage_dense_collection_request(index: usize, payload: &[u8], model: &[u8]) -> String {
     let prefix = format!("provider_request_{index}_");
-    format!(
-        "{prefix}buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;{prefix}buffer_id=input.features;{prefix}buffer_element_type=f32;{prefix}buffer_layout=tensor-contiguous;{prefix}buffer_shape=16x64x64;{prefix}buffer_row_stride_bytes=256;{prefix}buffer_byte_length={};{prefix}buffer_payload_path={WITSAGE_DENSE_PAYLOAD_FILE_NAME};{prefix}buffer_content_hash={};{prefix}kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;{prefix}kernel_id=witsage.feature-grid.projection;{prefix}kernel_operation=model-predict;{prefix}kernel_input_buffer=input.features;{prefix}kernel_output_buffer=output.features;{prefix}kernel_dispatch=16x64x64;{prefix}model_asset_descriptor_contract=nuis-provider-model-asset-descriptor-v1;{prefix}model_asset_id=witsage.feature-grid-projection.coreml;{prefix}model_asset_format=coreml-specification;{prefix}model_asset_path={WITSAGE_DENSE_MODEL_FILE_NAME};{prefix}model_asset_byte_length={};{prefix}model_asset_content_hash={};{prefix}model_asset_input_feature=input.features;{prefix}model_asset_output_feature=output.features;{prefix}output_comparison_descriptor_contract=nuis-provider-output-comparison-descriptor-v1;{prefix}output_comparison_output_buffer=output.features;{prefix}output_comparison_element_type=f32;{prefix}output_comparison_shape=16x64x64;{prefix}output_comparison_expected_path={WITSAGE_DENSE_PAYLOAD_FILE_NAME};{prefix}output_comparison_expected_byte_length={};{prefix}output_comparison_expected_content_hash={};{prefix}output_comparison_absolute_tolerance=0;{prefix}output_comparison_relative_tolerance=0;{prefix}output_comparison_non_finite_policy=reject",
+    let request = format!(
+        "{prefix}buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;{prefix}buffer_id=input.features;{prefix}buffer_element_type=f32;{prefix}buffer_layout=tensor-contiguous;{prefix}buffer_shape=16x64x64;{prefix}buffer_row_stride_bytes=256;{prefix}buffer_byte_length={};{prefix}buffer_payload_path={WITSAGE_DENSE_PAYLOAD_FILE_NAME};{prefix}buffer_content_hash={};{prefix}kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;{prefix}kernel_id=witsage.feature-grid.projection;{prefix}kernel_operation=model-predict;{prefix}kernel_input_buffer=input.features;{prefix}kernel_output_buffer=output.features;{prefix}kernel_dispatch=16x64x64;{prefix}model_asset_descriptor_contract=nuis-provider-model-asset-descriptor-v1;{prefix}model_asset_id=witsage.feature-grid-projection.coreml;{prefix}model_asset_format=coreml-specification;{prefix}model_asset_path={WITSAGE_DENSE_MODEL_FILE_NAME};{prefix}model_asset_byte_length={};{prefix}model_asset_content_hash={};{prefix}model_asset_input_feature=input.features;{prefix}model_asset_output_feature=output.features;{prefix}output_comparison_descriptor_contract=nuis-provider-output-comparison-descriptor-v1;{prefix}output_comparison_output_buffer=output.features;{prefix}output_comparison_element_type=f32;{prefix}output_comparison_shape=16x64x64;{prefix}output_comparison_expected_path={WITSAGE_DENSE_PAYLOAD_FILE_NAME};{prefix}output_comparison_expected_byte_length={};{prefix}output_comparison_expected_content_hash={};{prefix}output_comparison_absolute_tolerance=0;{prefix}output_comparison_relative_tolerance=0;{prefix}output_comparison_non_finite_policy=reject;{prefix}dependency_contract=nuis-provider-request-dependency-v1;{prefix}dependency_count=0",
         payload.len(),
         fnv1a64_hex(payload),
         model.len(),
         fnv1a64_hex(model),
         payload.len(),
         fnv1a64_hex(payload)
+    );
+    format!(
+        "{request};{}",
+        witsage_input_binding(
+            &prefix,
+            "artifact",
+            "16x64x64",
+            payload.len(),
+            &fnv1a64_hex(payload),
+            WITSAGE_DENSE_PAYLOAD_FILE_NAME,
+            "none",
+            "none",
+        )
     )
 }
 
 fn witsage_affine_collection_request(index: usize, model: &[u8]) -> String {
     let prefix = format!("provider_request_{index}_");
-    format!(
-        "{prefix}buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;{prefix}buffer_id=input.features;{prefix}buffer_element_type=f32;{prefix}buffer_layout=tensor-contiguous;{prefix}buffer_shape=1x1x4;{prefix}buffer_row_stride_bytes=16;{prefix}buffer_byte_length={};{prefix}buffer_payload_path={WITSAGE_VECTOR_PAYLOAD_FILE_NAME};{prefix}buffer_content_hash={};{prefix}kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;{prefix}kernel_id=witsage.vector.affine;{prefix}kernel_operation=affine;{prefix}kernel_input_buffer=input.features;{prefix}kernel_output_buffer=output.features;{prefix}kernel_dispatch=1x1x4;{prefix}kernel_scalar_bindings=scale:f32:2,bias:f32:1;{prefix}model_asset_descriptor_contract=nuis-provider-model-asset-descriptor-v1;{prefix}model_asset_id=witsage.vector-affine.coreml;{prefix}model_asset_format=coreml-specification;{prefix}model_asset_path={WITSAGE_VECTOR_MODEL_FILE_NAME};{prefix}model_asset_byte_length={};{prefix}model_asset_content_hash={};{prefix}model_asset_input_feature=input.features;{prefix}model_asset_output_feature=output.features;{prefix}output_comparison_descriptor_contract=nuis-provider-output-comparison-descriptor-v1;{prefix}output_comparison_output_buffer=output.features;{prefix}output_comparison_element_type=f32;{prefix}output_comparison_shape=1x1x4;{prefix}output_comparison_expected_path={WITSAGE_VECTOR_EXPECTED_FILE_NAME};{prefix}output_comparison_expected_byte_length={};{prefix}output_comparison_expected_content_hash={};{prefix}output_comparison_absolute_tolerance=0;{prefix}output_comparison_relative_tolerance=0;{prefix}output_comparison_non_finite_policy=reject",
+    let request = format!(
+        "{prefix}buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;{prefix}buffer_id=input.features;{prefix}buffer_element_type=f32;{prefix}buffer_layout=tensor-contiguous;{prefix}buffer_shape=1x1x4;{prefix}buffer_row_stride_bytes=16;{prefix}buffer_byte_length={};{prefix}buffer_payload_path={WITSAGE_VECTOR_PAYLOAD_FILE_NAME};{prefix}buffer_content_hash={};{prefix}kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;{prefix}kernel_id=witsage.vector.affine;{prefix}kernel_operation=affine;{prefix}kernel_input_buffer=input.features;{prefix}kernel_output_buffer=output.features;{prefix}kernel_dispatch=1x1x4;{prefix}kernel_scalar_bindings=scale:f32:2,bias:f32:1;{prefix}model_asset_descriptor_contract=nuis-provider-model-asset-descriptor-v1;{prefix}model_asset_id=witsage.vector-affine.coreml;{prefix}model_asset_format=coreml-specification;{prefix}model_asset_path={WITSAGE_VECTOR_MODEL_FILE_NAME};{prefix}model_asset_byte_length={};{prefix}model_asset_content_hash={};{prefix}model_asset_input_feature=input.features;{prefix}model_asset_output_feature=output.features;{prefix}output_comparison_descriptor_contract=nuis-provider-output-comparison-descriptor-v1;{prefix}output_comparison_output_buffer=output.features;{prefix}output_comparison_element_type=f32;{prefix}output_comparison_shape=1x1x4;{prefix}output_comparison_expected_path={WITSAGE_VECTOR_EXPECTED_FILE_NAME};{prefix}output_comparison_expected_byte_length={};{prefix}output_comparison_expected_content_hash={};{prefix}output_comparison_absolute_tolerance=0;{prefix}output_comparison_relative_tolerance=0;{prefix}output_comparison_non_finite_policy=reject;{prefix}dependency_contract=nuis-provider-request-dependency-v1;{prefix}dependency_count=0",
         WITSAGE_VECTOR_PAYLOAD.len(),
         fnv1a64_hex(WITSAGE_VECTOR_PAYLOAD),
         model.len(),
         fnv1a64_hex(model),
         WITSAGE_VECTOR_EXPECTED.len(),
         fnv1a64_hex(WITSAGE_VECTOR_EXPECTED)
+    );
+    format!(
+        "{request};{}",
+        witsage_input_binding(
+            &prefix,
+            "artifact",
+            "1x1x4",
+            WITSAGE_VECTOR_PAYLOAD.len(),
+            &fnv1a64_hex(WITSAGE_VECTOR_PAYLOAD),
+            WITSAGE_VECTOR_PAYLOAD_FILE_NAME,
+            "none",
+            "none",
+        )
+    )
+}
+
+fn witsage_chained_affine_collection_request(index: usize, model: &[u8]) -> String {
+    let prefix = format!("provider_request_{index}_");
+    let request = format!(
+        "{prefix}buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;{prefix}buffer_id=input.features;{prefix}buffer_element_type=f32;{prefix}buffer_layout=tensor-contiguous;{prefix}buffer_shape=1x1x4;{prefix}buffer_row_stride_bytes=16;{prefix}buffer_byte_length={};{prefix}buffer_payload_path={WITSAGE_VECTOR_EXPECTED_FILE_NAME};{prefix}buffer_content_hash={};{prefix}kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;{prefix}kernel_id=witsage.vector.affine.chained;{prefix}kernel_operation=affine;{prefix}kernel_input_buffer=input.features;{prefix}kernel_output_buffer=output.features;{prefix}kernel_dispatch=1x1x4;{prefix}kernel_scalar_bindings=scale:f32:2,bias:f32:1;{prefix}model_asset_descriptor_contract=nuis-provider-model-asset-descriptor-v1;{prefix}model_asset_id=witsage.vector-affine-chained.coreml;{prefix}model_asset_format=coreml-specification;{prefix}model_asset_path={WITSAGE_VECTOR_MODEL_FILE_NAME};{prefix}model_asset_byte_length={};{prefix}model_asset_content_hash={};{prefix}model_asset_input_feature=input.features;{prefix}model_asset_output_feature=output.features;{prefix}output_comparison_descriptor_contract=nuis-provider-output-comparison-descriptor-v1;{prefix}output_comparison_output_buffer=output.features;{prefix}output_comparison_element_type=f32;{prefix}output_comparison_shape=1x1x4;{prefix}output_comparison_expected_path={WITSAGE_CHAINED_EXPECTED_FILE_NAME};{prefix}output_comparison_expected_byte_length={};{prefix}output_comparison_expected_content_hash={};{prefix}output_comparison_absolute_tolerance=0;{prefix}output_comparison_relative_tolerance=0;{prefix}output_comparison_non_finite_policy=reject;{prefix}dependency_contract=nuis-provider-request-dependency-v1;{prefix}dependency_count=1;{prefix}dependency_0_producer_request_id=witsage.vector.affine;{prefix}dependency_0_producer_output_buffer=output.features;{prefix}dependency_0_consumer_input_buffer=input.features",
+        WITSAGE_VECTOR_EXPECTED.len(),
+        fnv1a64_hex(WITSAGE_VECTOR_EXPECTED),
+        model.len(),
+        fnv1a64_hex(model),
+        WITSAGE_CHAINED_EXPECTED.len(),
+        fnv1a64_hex(WITSAGE_CHAINED_EXPECTED)
+    );
+    format!(
+        "{request};{}",
+        witsage_input_binding(
+            &prefix,
+            "dependency",
+            "1x1x4",
+            WITSAGE_VECTOR_EXPECTED.len(),
+            &fnv1a64_hex(WITSAGE_VECTOR_EXPECTED),
+            "none",
+            "witsage.vector.affine",
+            "output.features",
+        )
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn witsage_input_binding(
+    prefix: &str,
+    source: &str,
+    shape: &str,
+    byte_length: usize,
+    content_hash: &str,
+    payload_path: &str,
+    producer_request_id: &str,
+    producer_output_buffer: &str,
+) -> String {
+    format!(
+        "{prefix}input_binding_contract=nuis-provider-input-binding-v1;{prefix}input_binding_count=1;{prefix}input_binding_0_name=input.features;{prefix}input_binding_0_source={source};{prefix}input_binding_0_element_type=f32;{prefix}input_binding_0_shape={shape};{prefix}input_binding_0_byte_length={byte_length};{prefix}input_binding_0_content_hash={content_hash};{prefix}input_binding_0_payload_path={payload_path};{prefix}input_binding_0_producer_request_id={producer_request_id};{prefix}input_binding_0_producer_output_buffer={producer_output_buffer}"
+    )
+}
+
+fn witsage_add_collection_request(index: usize, model: &[u8]) -> String {
+    let prefix = format!("provider_request_{index}_");
+    format!(
+        "{prefix}buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;{prefix}buffer_id=input.left;{prefix}buffer_element_type=f32;{prefix}buffer_layout=tensor-contiguous;{prefix}buffer_shape=1x1x4;{prefix}buffer_row_stride_bytes=16;{prefix}buffer_byte_length={};{prefix}buffer_payload_path={WITSAGE_VECTOR_EXPECTED_FILE_NAME};{prefix}buffer_content_hash={};{prefix}kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;{prefix}kernel_id=witsage.vector.add;{prefix}kernel_operation=add;{prefix}kernel_input_buffer=input.left;{prefix}kernel_input_buffers=input.left,input.right;{prefix}kernel_output_buffer=output.features;{prefix}kernel_dispatch=1x1x4;{prefix}model_asset_descriptor_contract=nuis-provider-model-asset-descriptor-v1;{prefix}model_asset_id=witsage.vector-add.coreml;{prefix}model_asset_format=coreml-specification;{prefix}model_asset_path={WITSAGE_ADD_MODEL_FILE_NAME};{prefix}model_asset_byte_length={};{prefix}model_asset_content_hash={};{prefix}model_asset_input_feature=input.left;{prefix}model_asset_input_features=input.left,input.right;{prefix}model_asset_output_feature=output.features;{prefix}output_comparison_descriptor_contract=nuis-provider-output-comparison-descriptor-v1;{prefix}output_comparison_output_buffer=output.features;{prefix}output_comparison_element_type=f32;{prefix}output_comparison_shape=1x1x4;{prefix}output_comparison_expected_path={WITSAGE_ADD_EXPECTED_FILE_NAME};{prefix}output_comparison_expected_byte_length={};{prefix}output_comparison_expected_content_hash={};{prefix}output_comparison_absolute_tolerance=0;{prefix}output_comparison_relative_tolerance=0;{prefix}output_comparison_non_finite_policy=reject;{prefix}dependency_contract=nuis-provider-request-dependency-v1;{prefix}dependency_count=2;{prefix}dependency_0_producer_request_id=witsage.vector.affine;{prefix}dependency_0_producer_output_buffer=output.features;{prefix}dependency_0_consumer_input_buffer=input.left;{prefix}dependency_1_producer_request_id=witsage.vector.affine.chained;{prefix}dependency_1_producer_output_buffer=output.features;{prefix}dependency_1_consumer_input_buffer=input.right;{prefix}input_binding_contract=nuis-provider-input-binding-v1;{prefix}input_binding_count=2;{prefix}input_binding_0_name=input.left;{prefix}input_binding_0_source=dependency;{prefix}input_binding_0_element_type=f32;{prefix}input_binding_0_shape=1x1x4;{prefix}input_binding_0_byte_length={};{prefix}input_binding_0_content_hash={};{prefix}input_binding_0_payload_path=none;{prefix}input_binding_0_producer_request_id=witsage.vector.affine;{prefix}input_binding_0_producer_output_buffer=output.features;{prefix}input_binding_1_name=input.right;{prefix}input_binding_1_source=dependency;{prefix}input_binding_1_element_type=f32;{prefix}input_binding_1_shape=1x1x4;{prefix}input_binding_1_byte_length={};{prefix}input_binding_1_content_hash={};{prefix}input_binding_1_payload_path=none;{prefix}input_binding_1_producer_request_id=witsage.vector.affine.chained;{prefix}input_binding_1_producer_output_buffer=output.features",
+        WITSAGE_VECTOR_EXPECTED.len(),
+        fnv1a64_hex(WITSAGE_VECTOR_EXPECTED),
+        model.len(),
+        fnv1a64_hex(model),
+        WITSAGE_ADD_EXPECTED.len(),
+        fnv1a64_hex(WITSAGE_ADD_EXPECTED),
+        WITSAGE_VECTOR_EXPECTED.len(),
+        fnv1a64_hex(WITSAGE_VECTOR_EXPECTED),
+        WITSAGE_CHAINED_EXPECTED.len(),
+        fnv1a64_hex(WITSAGE_CHAINED_EXPECTED),
     )
 }
 

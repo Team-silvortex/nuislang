@@ -1,4 +1,5 @@
 use crate::{
+    provider_input_binding::ProviderInputBinding,
     provider_output_comparison::compare_provider_output,
     provider_request::{provider_request_collection_from_evidence, ProviderRequest},
     provider_runner_registry::{
@@ -15,7 +16,12 @@ use crate::{
         render_real_device_provider_output_payload, PixelMagicNativeOutputSummary,
     },
 };
-use std::{collections::BTreeSet, fs, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs,
+    path::{Path, PathBuf},
+    time::SystemTime,
+};
 
 pub struct ProviderSampleExecuteReport {
     pub status: String,
@@ -281,11 +287,20 @@ fn execute_native_provider_outputs(
     let Some(collection) = provider_request_collection_from_evidence(&record.input_evidence) else {
         return Ok(Vec::new());
     };
-    collection
-        .requests
-        .iter()
-        .map(|request| execute_native_provider_request(output_dir, record, adapter, request))
-        .collect()
+    let mut completed = BTreeMap::<String, Vec<u8>>::new();
+    let mut summaries = Vec::with_capacity(collection.requests.len());
+    for request in &collection.requests {
+        let execution =
+            execute_native_provider_request(output_dir, record, adapter, request, &completed)?;
+        completed.insert(request.kernel.id.clone(), execution.output_bytes);
+        summaries.push(execution.summary);
+    }
+    Ok(summaries)
+}
+
+struct NativeProviderRequestExecution {
+    summary: PixelMagicNativeOutputSummary,
+    output_bytes: Vec<u8>,
 }
 
 fn execute_native_provider_request(
@@ -293,22 +308,17 @@ fn execute_native_provider_request(
     record: &crate::model::NsdbDeviceProviderSampleRecordInfo,
     adapter: &crate::provider_runner_registry::ProviderRunnerAdapter,
     request: &ProviderRequest,
-) -> Result<PixelMagicNativeOutputSummary, String> {
-    let payload_path = resolve_provider_payload_path(output_dir, &request.buffer.payload_path)?;
-    let payload = fs::read(&payload_path).map_err(|error| {
-        format!(
-            "failed to read provider input buffer `{}`: {error}",
-            payload_path.display()
-        )
-    })?;
-    if payload.len() != request.buffer.byte_length
-        || fnv1a64_hex(&payload) != request.buffer.content_hash
-    {
-        return Err("provider input buffer size/hash evidence mismatch".to_owned());
-    }
+    completed: &BTreeMap<String, Vec<u8>>,
+) -> Result<NativeProviderRequestExecution, String> {
+    let inputs = request
+        .input_bindings
+        .iter()
+        .map(|binding| PreparedProviderInput::new(output_dir, binding, completed))
+        .collect::<Result<Vec<_>, _>>()?;
     match adapter.kind {
         "metal-real-device-runner" => {
-            if request.buffer.element_type != "u8"
+            if inputs.len() != 1
+                || request.buffer.element_type != "u8"
                 || !request.buffer.layout.contains("pixel-format=gray8")
                 || request.kernel.id != "pixelmagic.gray8.invert"
                 || request.kernel.operation != "invert"
@@ -322,11 +332,11 @@ fn execute_native_provider_request(
                 "Metal provider request is missing u8 scalar `max_value`".to_owned()
             })?;
             let execution =
-                crate::provider_runner_metal::execute_gray8_invert(&payload_path, max_value)?;
-            Ok(pixelmagic_metal_output_summary(
-                &record.input_evidence,
-                &execution,
-            ))
+                crate::provider_runner_metal::execute_gray8_invert(&inputs[0].path, max_value)?;
+            Ok(NativeProviderRequestExecution {
+                summary: pixelmagic_metal_output_summary(&record.input_evidence, &execution),
+                output_bytes: execution.output_bytes,
+            })
         }
         "coreml-real-device-runner" => {
             if request.buffer.element_type != "f32" || request.buffer.layout != "tensor-contiguous"
@@ -351,12 +361,28 @@ fn execute_native_provider_request(
             {
                 return Err("provider model asset size/hash evidence mismatch".to_owned());
             }
-            let execution = crate::provider_runner_coreml::execute_model_prediction(
+            let coreml_inputs = inputs
+                .iter()
+                .zip(&model.input_features)
+                .zip(&request.input_bindings)
+                .map(|((input, feature), binding)| {
+                    crate::provider_runner_coreml::CoreMlProviderInput {
+                        path: &input.path,
+                        feature,
+                        shape: &binding.shape,
+                    }
+                })
+                .collect::<Vec<_>>();
+            let output_shape = request
+                .output_comparison
+                .as_ref()
+                .map(|comparison| comparison.shape.as_slice())
+                .unwrap_or(request.buffer.shape.as_slice());
+            let execution = crate::provider_runner_coreml::execute_model_prediction_inputs(
                 &model_path,
-                &payload_path,
-                &model.input_feature,
+                &coreml_inputs,
                 &model.output_feature,
-                &request.buffer.shape,
+                output_shape,
             )?;
             let comparison = request
                 .output_comparison
@@ -365,16 +391,87 @@ fn execute_native_provider_request(
                     compare_provider_output(output_dir, descriptor, &execution.output_bytes)
                 })
                 .transpose()?;
-            Ok(coreml_native_output_summary(
-                &request.kernel.id,
-                &execution,
-                comparison.as_ref(),
-            ))
+            Ok(NativeProviderRequestExecution {
+                summary: coreml_native_output_summary(
+                    &request.kernel.id,
+                    &execution,
+                    comparison.as_ref(),
+                ),
+                output_bytes: execution.output_bytes,
+            })
         }
         _ => Err(format!(
             "provider adapter `{}` cannot execute request `{}`",
             adapter.adapter_id, request.kernel.id
         )),
+    }
+}
+
+struct PreparedProviderInput {
+    path: PathBuf,
+    remove_on_drop: bool,
+}
+
+impl PreparedProviderInput {
+    fn new(
+        output_dir: &Path,
+        binding: &ProviderInputBinding,
+        completed: &BTreeMap<String, Vec<u8>>,
+    ) -> Result<Self, String> {
+        if binding.source == "dependency" {
+            let bytes = completed.get(&binding.producer_request_id).ok_or_else(|| {
+                format!(
+                    "provider dependency `{}` has no completed output",
+                    binding.producer_request_id
+                )
+            })?;
+            validate_input_bytes(binding, bytes)?;
+            let nonce = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos();
+            let path = std::env::temp_dir().join(format!(
+                "nuis-provider-edge-input-{}-{nonce}.bin",
+                std::process::id()
+            ));
+            fs::write(&path, bytes).map_err(|error| {
+                format!("failed to materialize provider dependency input: {error}")
+            })?;
+            return Ok(Self {
+                path,
+                remove_on_drop: true,
+            });
+        }
+        let path = resolve_provider_payload_path(output_dir, &binding.payload_path)?;
+        let bytes = fs::read(&path).map_err(|error| {
+            format!(
+                "failed to read provider input buffer `{}`: {error}",
+                path.display()
+            )
+        })?;
+        validate_input_bytes(binding, &bytes)?;
+        Ok(Self {
+            path,
+            remove_on_drop: false,
+        })
+    }
+}
+
+fn validate_input_bytes(binding: &ProviderInputBinding, bytes: &[u8]) -> Result<(), String> {
+    if bytes.len() != binding.byte_length || fnv1a64_hex(bytes) != binding.content_hash {
+        return Err(format!(
+            "provider input binding `{}` size/hash evidence mismatch",
+            binding.name
+        ));
+    }
+    Ok(())
+}
+
+impl Drop for PreparedProviderInput {
+    fn drop(&mut self) {
+        if self.remove_on_drop {
+            let _ = fs::remove_file(&self.path);
+        }
     }
 }
 

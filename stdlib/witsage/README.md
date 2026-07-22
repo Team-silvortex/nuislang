@@ -76,13 +76,23 @@ Current native execution baseline:
   Neural-Engine-preferred prediction on the M2 smoke host
 * both models cross the same provider-neutral buffer, kernel, model-asset, and
   compute-plan contracts; Nsdb does not recognize WitSage operation names
-* one ordered provider request collection executes both models and emits
-  independently identified outputs plus an order-sensitive collection hash
+* one ordered provider request collection executes feature-grid, affine, and a
+  dependency-bound chained affine, emitting independently identified outputs
+  plus order-sensitive graph and collection hashes
 * each model binds a versioned `f32` output comparison descriptor with shape,
   expected asset hash, absolute/relative tolerance, and non-finite policy
-* Nsdb independently compares all 65,536 feature-grid values and all four
-  affine values before accepting the collection; mismatch or asset tampering
-  blocks the entire provider output
+* Nsdb independently compares all 65,536 feature-grid values and both
+  four-element affine outputs before accepting the collection; the chained
+  request consumes the first affine's real CoreML output and verifies
+  `[7, 11, 15, 19]`
+* missing, duplicate, cyclic, forward, or buffer-mismatched dependency edges
+  block the collection before provider execution
+* `nuis-provider-input-binding-v1` gives every input an ordered name, source,
+  type, shape, byte length, and hash; the current requests publish explicit
+  artifact/dependency bindings and fan-in is protocol-validatable
+* the CoreML adapter executes ordered named features; a real Add model fans
+  affine and chained-affine outputs into `[10, 16, 22, 28]` through the same
+  independent output comparison boundary
 
 Current official surface registry:
 

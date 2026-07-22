@@ -434,8 +434,9 @@ while its one-layer compute plan supports CPU, GPU, and Neural Engine and
 prefers Neural Engine on the M2 smoke host. The affine and feature-grid tests
 therefore provide honest CPU-preferred and ANE-preferred baselines.
 
-Both operations now coexist in one `nuis-provider-request-collection-v1`
-record. Collection order is explicit (`feature-grid` then `affine`), every
+The operations now coexist in one `nuis-provider-request-collection-v1`
+record. Collection order is explicit (`feature-grid`, `affine`, then
+`chained-affine`), every
 request retains independent buffer/kernel/model validation, and Nsdb executes
 all entries fail-closed. `nuis-provider-output-collection-v1` mirrors indexed
 request identities, byte counts, hashes, execution/compute-plan evidence, and
@@ -446,11 +447,26 @@ policy. Nsdb reads the expected asset independently and compares every returned
 element before emitting `comparison-passed`; shape/byte-count mismatches,
 tampered expected assets, invalid policies, NaN/Inf under `reject`, and values
 outside tolerance all fail closed. The official M2 lane compares 65,536 dense
-elements and four affine elements with zero mismatches.
+elements plus both four-element affine outputs with zero mismatches.
 
-The next collection boundary is dependency structure. Requests are ordered but
-do not yet declare producer/consumer data-flow edges, so independent entries
-are closed while graph-shaped provider work remains explicit future work.
+`nuis-provider-request-dependency-v1` now binds a producer request/output
+buffer to a consumer input buffer. Nsdb validates request identity, unique
+edges, buffer names, acyclicity, and producer-before-consumer topology before
+execution. The third request consumes the preceding CoreML affine output and
+predicts `[7, 11, 15, 19]`, proving the edge carries real device data rather
+than metadata alone.
+
+`nuis-provider-input-binding-v1` adds ordered named inputs with artifact or
+dependency source, element type, shape, byte length, and content hash. Legacy
+single-input descriptors normalize into the same model, while protocol tests
+represent fan-in and reject duplicate names or edge/binding mismatch. The
+CoreML adapter now consumes ordered named feature/path/shape inputs. A real
+two-input Add request fans affine and chained-affine outputs into
+`[10, 16, 22, 28]` and passes independent comparison.
+
+The next heterogeneous boundary is per-request adapter ownership. One adapter
+is still selected for the complete collection, so fan-in works within CoreML
+but cannot yet cross Metal, CoreML, kernel, or future providers in one graph.
 
 The language-core checks anchor the bootstrap-critical
 `language-core/nuisc/type-control-flow-generics` cell to:

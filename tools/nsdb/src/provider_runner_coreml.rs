@@ -17,23 +17,30 @@ pub(crate) struct CoreMlProviderExecution {
     pub(crate) output_bytes: Vec<u8>,
 }
 
-pub(crate) fn execute_model_prediction(
+pub(crate) struct CoreMlProviderInput<'a> {
+    pub(crate) path: &'a Path,
+    pub(crate) feature: &'a str,
+    pub(crate) shape: &'a [usize],
+}
+
+pub(crate) fn execute_model_prediction_inputs(
     model_path: &Path,
-    input_path: &Path,
-    input_feature: &str,
+    inputs: &[CoreMlProviderInput<'_>],
     output_feature: &str,
-    shape: &[usize],
+    output_shape: &[usize],
 ) -> Result<CoreMlProviderExecution, String> {
-    execute_model_prediction_platform(model_path, input_path, input_feature, output_feature, shape)
+    if inputs.is_empty() || inputs.iter().any(|input| input.shape.is_empty()) {
+        return Err("CoreML provider runner requires named input tensors".to_owned());
+    }
+    execute_model_prediction_platform(model_path, inputs, output_feature, output_shape)
 }
 
 #[cfg(target_os = "macos")]
 fn execute_model_prediction_platform(
     model_path: &Path,
-    input_path: &Path,
-    input_feature: &str,
+    inputs: &[CoreMlProviderInput<'_>],
     output_feature: &str,
-    shape: &[usize],
+    output_shape: &[usize],
 ) -> Result<CoreMlProviderExecution, String> {
     let paths = TempCoreMlRunnerPaths::new();
     fs::write(&paths.source, COREML_RUNNER_SOURCE)
@@ -58,18 +65,19 @@ fn execute_model_prediction_platform(
             String::from_utf8_lossy(&compile.stderr).trim()
         ));
     }
-    let execution = Command::new(&paths.binary)
+    let mut command = Command::new(&paths.binary);
+    command
         .arg(model_path)
-        .arg(input_path)
-        .arg(input_feature)
+        .arg("--multi")
         .arg(output_feature)
-        .arg(
-            shape
-                .iter()
-                .map(usize::to_string)
-                .collect::<Vec<_>>()
-                .join("x"),
-        )
+        .arg(format_shape(output_shape));
+    for input in inputs {
+        command
+            .arg(input.feature)
+            .arg(input.path)
+            .arg(format_shape(input.shape));
+    }
+    let execution = command
         .output()
         .map_err(|error| format!("failed to launch CoreML provider runner: {error}"))?;
     if !execution.status.success() {
@@ -84,12 +92,19 @@ fn execute_model_prediction_platform(
 #[cfg(not(target_os = "macos"))]
 fn execute_model_prediction_platform(
     _model_path: &Path,
-    _input_path: &Path,
-    _input_feature: &str,
+    _inputs: &[CoreMlProviderInput<'_>],
     _output_feature: &str,
-    _shape: &[usize],
+    _output_shape: &[usize],
 ) -> Result<CoreMlProviderExecution, String> {
     Err("CoreML provider runner is unavailable on this host".to_owned())
+}
+
+fn format_shape(shape: &[usize]) -> String {
+    shape
+        .iter()
+        .map(usize::to_string)
+        .collect::<Vec<_>>()
+        .join("x")
 }
 
 fn parse_coreml_runner_output(output: &str) -> Result<CoreMlProviderExecution, String> {

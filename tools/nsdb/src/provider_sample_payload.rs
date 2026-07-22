@@ -1,10 +1,7 @@
 pub(crate) use crate::provider_sample_artifact::{fnv1a64_hex, provider_output_payload_file_name};
 use crate::{
     model::NsdbDeviceProviderSampleRecordInfo,
-    provider_request::{
-        provider_request_collection_from_evidence, provider_request_from_evidence, ProviderRequest,
-        PROVIDER_REQUEST_COLLECTION_CONTRACT,
-    },
+    provider_request::provider_request_from_evidence,
     provider_sample_runner::{provider_execution_outcome_for_runner, ProviderSampleRunner},
 };
 use std::{fs, path::Path};
@@ -637,32 +634,9 @@ fn render_provider_output_payload_header(
         "input_evidence_hash",
         &fnv1a64_hex(record.input_evidence.as_bytes()),
     );
-    if let Some(request) = provider_request_from_evidence(&record.input_evidence) {
-        if let Some(collection) = provider_request_collection_from_evidence(&record.input_evidence)
-        {
-            push_toml_string(
-                &mut out,
-                "provider_request_collection_contract",
-                PROVIDER_REQUEST_COLLECTION_CONTRACT,
-            );
-            push_toml_string(
-                &mut out,
-                "provider_request_count",
-                &collection.requests.len().to_string(),
-            );
-            push_toml_string(
-                &mut out,
-                "provider_request_order",
-                &collection
-                    .requests
-                    .iter()
-                    .map(|request| request.kernel.id.as_str())
-                    .collect::<Vec<_>>()
-                    .join(","),
-            );
-        }
-        push_provider_request_summary(&mut out, &request);
-    }
+    out.push_str(
+        &crate::provider_request_payload::render_provider_request_evidence(&record.input_evidence),
+    );
     out
 }
 
@@ -681,121 +655,6 @@ fn native_output_collection_hash(outputs: &[PixelMagicNativeOutputSummary]) -> S
         })
         .collect::<String>();
     fnv1a64_hex(canonical.as_bytes())
-}
-
-fn push_provider_request_summary(out: &mut String, request: &ProviderRequest) {
-    push_toml_string(out, "provider_request_source", request.source);
-    push_toml_string(
-        out,
-        "provider_buffer_descriptor_contract",
-        crate::provider_request::PROVIDER_BUFFER_DESCRIPTOR_CONTRACT,
-    );
-    push_toml_string(out, "provider_buffer_id", &request.buffer.id);
-    push_toml_string(
-        out,
-        "provider_buffer_element_type",
-        &request.buffer.element_type,
-    );
-    push_toml_string(out, "provider_buffer_layout", &request.buffer.layout);
-    push_toml_string(
-        out,
-        "provider_kernel_descriptor_contract",
-        crate::provider_request::PROVIDER_KERNEL_DESCRIPTOR_CONTRACT,
-    );
-    push_toml_string(out, "provider_kernel_id", &request.kernel.id);
-    push_toml_string(out, "provider_kernel_operation", &request.kernel.operation);
-    push_toml_string(
-        out,
-        "provider_kernel_input_buffer",
-        &request.kernel.input_buffer,
-    );
-    push_toml_string(
-        out,
-        "provider_kernel_output_buffer",
-        &request.kernel.output_buffer,
-    );
-    if let Some(model) = &request.model_asset {
-        push_toml_string(
-            out,
-            "provider_model_asset_descriptor_contract",
-            crate::provider_request::PROVIDER_MODEL_ASSET_DESCRIPTOR_CONTRACT,
-        );
-        push_toml_string(out, "provider_model_asset_id", &model.id);
-        push_toml_string(out, "provider_model_asset_format", &model.format);
-        push_toml_string(out, "provider_model_asset_path", &model.path);
-        push_toml_string(
-            out,
-            "provider_model_asset_byte_length",
-            &model.byte_length.to_string(),
-        );
-        push_toml_string(
-            out,
-            "provider_model_asset_content_hash",
-            &model.content_hash,
-        );
-        push_toml_string(
-            out,
-            "provider_model_asset_input_feature",
-            &model.input_feature,
-        );
-        push_toml_string(
-            out,
-            "provider_model_asset_output_feature",
-            &model.output_feature,
-        );
-    }
-    if let Some(comparison) = &request.output_comparison {
-        push_toml_string(
-            out,
-            "provider_output_comparison_descriptor_contract",
-            crate::provider_request::PROVIDER_OUTPUT_COMPARISON_DESCRIPTOR_CONTRACT,
-        );
-        push_toml_string(
-            out,
-            "provider_output_comparison_output_buffer",
-            &comparison.output_buffer,
-        );
-        push_toml_string(
-            out,
-            "provider_output_comparison_element_type",
-            &comparison.element_type,
-        );
-        push_toml_string(
-            out,
-            "provider_output_comparison_shape",
-            &comparison
-                .shape
-                .iter()
-                .map(usize::to_string)
-                .collect::<Vec<_>>()
-                .join("x"),
-        );
-        push_toml_string(
-            out,
-            "provider_output_comparison_expected_path",
-            &comparison.expected_path,
-        );
-        push_toml_string(
-            out,
-            "provider_output_comparison_expected_content_hash",
-            &comparison.expected_content_hash,
-        );
-        push_toml_string(
-            out,
-            "provider_output_comparison_absolute_tolerance",
-            &comparison.absolute_tolerance,
-        );
-        push_toml_string(
-            out,
-            "provider_output_comparison_relative_tolerance",
-            &comparison.relative_tolerance,
-        );
-        push_toml_string(
-            out,
-            "provider_output_comparison_non_finite_policy",
-            &comparison.non_finite_policy,
-        );
-    }
 }
 
 fn push_toml_string(out: &mut String, key: &str, value: &str) {

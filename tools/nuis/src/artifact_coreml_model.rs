@@ -1,5 +1,7 @@
 const INPUT_FEATURE: &str = "input.features";
 const OUTPUT_FEATURE: &str = "output.features";
+const LEFT_FEATURE: &str = "input.left";
+const RIGHT_FEATURE: &str = "input.right";
 
 pub(crate) fn witsage_vector_affine_model() -> Vec<u8> {
     let input = feature_description(INPUT_FEATURE, &[1, 1, 4]);
@@ -56,6 +58,28 @@ pub(crate) fn witsage_dense_transform_model() -> Vec<u8> {
     push_string(&mut layer, 2, INPUT_FEATURE);
     push_string(&mut layer, 3, OUTPUT_FEATURE);
     push_message(&mut layer, 100, &projection);
+
+    let mut network = Vec::new();
+    push_message(&mut network, 1, &layer);
+    model(description, network)
+}
+
+pub(crate) fn witsage_vector_add_model() -> Vec<u8> {
+    let left = feature_description(LEFT_FEATURE, &[1, 1, 4]);
+    let right = feature_description(RIGHT_FEATURE, &[1, 1, 4]);
+    let output = feature_description(OUTPUT_FEATURE, &[1, 1, 4]);
+
+    let mut description = Vec::new();
+    push_message(&mut description, 1, &left);
+    push_message(&mut description, 1, &right);
+    push_message(&mut description, 10, &output);
+
+    let mut layer = Vec::new();
+    push_string(&mut layer, 1, "witsage.vector.add");
+    push_string(&mut layer, 2, LEFT_FEATURE);
+    push_string(&mut layer, 2, RIGHT_FEATURE);
+    push_string(&mut layer, 3, OUTPUT_FEATURE);
+    push_message(&mut layer, 230, &[]);
 
     let mut network = Vec::new();
     push_message(&mut network, 1, &layer);
@@ -131,7 +155,9 @@ fn push_varint(out: &mut Vec<u8>, mut value: u64) {
 
 #[cfg(test)]
 mod tests {
-    use super::{witsage_dense_transform_model, witsage_vector_affine_model};
+    use super::{
+        witsage_dense_transform_model, witsage_vector_add_model, witsage_vector_affine_model,
+    };
 
     #[test]
     fn emits_a_stable_nonempty_coreml_specification() {
@@ -146,6 +172,14 @@ mod tests {
         let first = witsage_dense_transform_model();
         assert_eq!(first, witsage_dense_transform_model());
         assert!(first.len() > 1_000);
+        assert_eq!(first.first(), Some(&8));
+    }
+
+    #[test]
+    fn emits_a_stable_multi_input_add_coreml_specification() {
+        let first = witsage_vector_add_model();
+        assert_eq!(first, witsage_vector_add_model());
+        assert!(first.len() > 100);
         assert_eq!(first.first(), Some(&8));
     }
 
@@ -248,6 +282,37 @@ mod tests {
         assert!(
             affine_stdout.contains("output_hex=000040400000a0400000e04000001041"),
             "{affine_stdout}"
+        );
+
+        let add_model = root.join("add.mlmodel");
+        let right_input = root.join("right-input.bin");
+        fs::write(&add_model, witsage_vector_add_model()).unwrap();
+        fs::write(
+            &right_input,
+            [7.0f32, 11.0, 15.0, 19.0]
+                .into_iter()
+                .flat_map(f32::to_le_bytes)
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        let add = Command::new(&binary)
+            .args([&add_model])
+            .args(["--multi", "output.features", "1x1x4", "input.left"])
+            .arg(&affine_input)
+            .args(["1x1x4", "input.right"])
+            .arg(&right_input)
+            .arg("1x1x4")
+            .output()
+            .unwrap();
+        let add_stdout = String::from_utf8_lossy(&add.stdout);
+        assert!(
+            add.status.success(),
+            "{}",
+            String::from_utf8_lossy(&add.stderr)
+        );
+        assert!(
+            add_stdout.contains("output_hex=0000004100005041000090410000b841"),
+            "{add_stdout}"
         );
         let _ = fs::remove_dir_all(root);
     }

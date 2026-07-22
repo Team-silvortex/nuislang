@@ -285,12 +285,24 @@ fn assert_official_galaxy_hetero_build(
                 && run_json_stdout.contains(
                     "provider_request_collection_contract=nuis-provider-request-collection-v1",
                 )
-                && run_json_stdout.contains("provider_request_count=2")
+                && run_json_stdout.contains("provider_request_count=4")
                 && run_json_stdout.contains(
                     "provider_output_comparison_descriptor_contract=nuis-provider-output-comparison-descriptor-v1",
                 )
+                && run_json_stdout.contains(
+                    "provider_request_0_input_binding_contract=nuis-provider-input-binding-v1",
+                )
                 && run_json_stdout
-                    .contains("provider_request_1_kernel_id=witsage.vector.affine"),
+                    .contains("provider_request_1_kernel_id=witsage.vector.affine")
+                && run_json_stdout.contains(
+                    "provider_request_2_kernel_id=witsage.vector.affine.chained",
+                )
+                && run_json_stdout.contains(
+                    "provider_request_2_dependency_0_producer_request_id=witsage.vector.affine",
+                )
+                && run_json_stdout.contains(
+                    "provider_request_3_kernel_input_buffers=input.left,input.right",
+                ),
             "WitSage kernel trace did not carry the registered CoreML request\n{run_json_stdout}"
         );
         let dense_payload = fs::read(output_dir.join("nuis.witsage.feature-grid.f32.bin"))
@@ -319,6 +331,22 @@ fn assert_official_galaxy_hetero_build(
             [
                 0x00, 0x00, 0x40, 0x40, 0x00, 0x00, 0xa0, 0x40, 0x00, 0x00, 0xe0, 0x40, 0x00, 0x00,
                 0x10, 0x41,
+            ]
+        );
+        assert_eq!(
+            fs::read(output_dir.join("nuis.witsage.vector-affine-chained.expected.f32.bin"))
+                .expect("read persisted WitSage chained expected output"),
+            [
+                0x00, 0x00, 0xe0, 0x40, 0x00, 0x00, 0x30, 0x41, 0x00, 0x00, 0x70, 0x41, 0x00, 0x00,
+                0x98, 0x41,
+            ]
+        );
+        assert_eq!(
+            fs::read(output_dir.join("nuis.witsage.vector-add.expected.f32.bin"))
+                .expect("read persisted WitSage add expected output"),
+            [
+                0x00, 0x00, 0x20, 0x41, 0x00, 0x00, 0x80, 0x41, 0x00, 0x00, 0xb0, 0x41, 0x00, 0x00,
+                0xe0, 0x41,
             ]
         );
     }
@@ -729,6 +757,16 @@ fn assert_official_galaxy_hetero_build(
             "provider_output_comparison_descriptor_contract = \"nuis-provider-output-comparison-descriptor-v1\"",
             "official galaxy CoreML output comparison contract",
         );
+        assert_file_contains(
+            &provider_output_payload_path,
+            "provider_input_binding_contract = \"nuis-provider-input-binding-v1\"",
+            "official galaxy CoreML input binding contract",
+        );
+        assert_file_contains(
+            &provider_output_payload_path,
+            "provider_input_binding_0_source = \"artifact\"",
+            "official galaxy CoreML first input binding source",
+        );
         if executed.first_provider_execution_mode == "real-device-provider-runner" {
             assert_eq!(
                 executed.first_output_payload_comparison_status,
@@ -766,13 +804,28 @@ fn assert_official_galaxy_hetero_build(
             );
             assert_file_contains(
                 &provider_output_payload_path,
-                "native_output_count = \"2\"",
+                "native_output_count = \"4\"",
                 "official galaxy CoreML output count",
             );
             assert_file_contains(
                 &provider_output_payload_path,
-                "provider_request_order = \"witsage.feature-grid.projection,witsage.vector.affine\"",
+                "provider_request_order = \"witsage.feature-grid.projection,witsage.vector.affine,witsage.vector.affine.chained,witsage.vector.add\"",
                 "official galaxy CoreML request order",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "provider_request_dependency_contract = \"nuis-provider-request-dependency-v1\"",
+                "official galaxy CoreML dependency contract",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "provider_request_dependency_edge_count = \"3\"",
+                "official galaxy CoreML dependency edge count",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "provider_request_dependency_edges = \"witsage.vector.affine.output.features->witsage.vector.affine.chained.input.features,witsage.vector.affine.output.features->witsage.vector.add.input.left,witsage.vector.affine.chained.output.features->witsage.vector.add.input.right\"",
+                "official galaxy CoreML dependency edge",
             );
             assert_file_contains(
                 &provider_output_payload_path,
@@ -833,6 +886,36 @@ fn assert_official_galaxy_hetero_build(
                 &provider_output_payload_path,
                 "native_output_1_comparison_element_count = \"4\"",
                 "official galaxy affine output comparison element count",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_2_request_id = \"witsage.vector.affine.chained\"",
+                "official galaxy chained affine output identity",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_2_hash = \"0x834758988854dc4a\"",
+                "official galaxy chained affine output hash",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_2_comparison_status = \"comparison-passed\"",
+                "official galaxy chained affine comparison status",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_3_request_id = \"witsage.vector.add\"",
+                "official galaxy fan-in output identity",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_3_hash = \"0x3efcc146d99e0b55\"",
+                "official galaxy fan-in output hash",
+            );
+            assert_file_contains(
+                &provider_output_payload_path,
+                "native_output_3_comparison_status = \"comparison-passed\"",
+                "official galaxy fan-in comparison status",
             );
         }
     }

@@ -1,5 +1,6 @@
 #import <CoreML/CoreML.h>
 #import <Foundation/Foundation.h>
+#include <string.h>
 
 static NSString *deviceKind(id<MLComputeDeviceProtocol> device) {
     if ([device isKindOfClass:[MLNeuralEngineComputeDevice class]]) {
@@ -26,42 +27,79 @@ static int fail(NSString *message) {
     return 1;
 }
 
+static MLMultiArray *tensorFromFile(NSString *path, NSString *shapeText,
+                                    NSError **error) {
+    NSData *input = [NSData dataWithContentsOfFile:path];
+    if (input == nil || input.length == 0 || input.length % sizeof(float) != 0) {
+        return nil;
+    }
+    NSArray<NSString *> *dimensionTexts = [shapeText componentsSeparatedByString:@"x"];
+    NSMutableArray<NSNumber *> *shape = [NSMutableArray arrayWithCapacity:dimensionTexts.count];
+    NSUInteger shapeCount = 1;
+    for (NSString *text in dimensionTexts) {
+        NSInteger dimension = text.integerValue;
+        if (dimension <= 0 || shapeCount > NSUIntegerMax / (NSUInteger)dimension) {
+            return nil;
+        }
+        shapeCount *= (NSUInteger)dimension;
+        [shape addObject:@(dimension)];
+    }
+    NSUInteger count = input.length / sizeof(float);
+    if (shape.count == 0 || shapeCount != count) {
+        return nil;
+    }
+    MLMultiArray *tensor = [[MLMultiArray alloc] initWithShape:shape
+                                                     dataType:MLMultiArrayDataTypeFloat32
+                                                        error:error];
+    if (tensor == nil) {
+        return nil;
+    }
+    const float *values = (const float *)input.bytes;
+    for (NSUInteger index = 0; index < count; index++) {
+        tensor[index] = @(values[index]);
+    }
+    return tensor;
+}
+
+static NSUInteger elementCount(NSString *shapeText) {
+    NSUInteger count = 1;
+    NSArray<NSString *> *dimensions = [shapeText componentsSeparatedByString:@"x"];
+    if (dimensions.count == 0) return 0;
+    for (NSString *text in dimensions) {
+        NSInteger dimension = text.integerValue;
+        if (dimension <= 0 || count > NSUIntegerMax / (NSUInteger)dimension) return 0;
+        count *= (NSUInteger)dimension;
+    }
+    return count;
+}
+
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
-        if (argc != 6) {
-            return fail(@"usage: coreml_vector_affine <model-path> <input-path> <input-feature> <output-feature> <shape>");
+        BOOL multi = argc >= 8 && strcmp(argv[2], "--multi") == 0 && (argc - 5) % 3 == 0;
+        if (argc != 6 && !multi) {
+            return fail(@"usage: coreml_runner <model> <input-path> <input-feature> <output-feature> <shape> | <model> --multi <output-feature> <output-shape> (<input-feature> <input-path> <shape>)+");
         }
         NSURL *modelURL = [NSURL fileURLWithPath:@(argv[1])];
-        NSData *input = [NSData dataWithContentsOfFile:@(argv[2])];
-        if (input == nil || input.length == 0 || input.length % sizeof(float) != 0) {
-            return fail(@"CoreML input must contain contiguous f32 values");
-        }
         NSError *error = nil;
-        NSUInteger count = input.length / sizeof(float);
-        NSArray<NSString *> *dimensionTexts = [@(argv[5]) componentsSeparatedByString:@"x"];
-        NSMutableArray<NSNumber *> *shape = [NSMutableArray arrayWithCapacity:dimensionTexts.count];
-        NSUInteger shapeCount = 1;
-        for (NSString *text in dimensionTexts) {
-            NSInteger dimension = text.integerValue;
-            if (dimension <= 0 || shapeCount > NSUIntegerMax / (NSUInteger)dimension) {
-                return fail(@"CoreML input shape contains an invalid dimension");
+        NSString *outputFeature = multi ? @(argv[3]) : @(argv[4]);
+        NSString *outputShape = multi ? @(argv[4]) : @(argv[5]);
+        NSUInteger outputCount = elementCount(outputShape);
+        if (outputCount == 0) return fail(@"CoreML output shape is invalid");
+        NSMutableDictionary<NSString *, MLFeatureValue *> *inputFeatures =
+            [NSMutableDictionary dictionary];
+        if (multi) {
+            for (int index = 5; index < argc; index += 3) {
+                NSString *feature = @(argv[index]);
+                MLMultiArray *tensor = tensorFromFile(@(argv[index + 1]), @(argv[index + 2]), &error);
+                if (tensor == nil || inputFeatures[feature] != nil) {
+                    return fail(@"CoreML named input is invalid or duplicated");
+                }
+                inputFeatures[feature] = [MLFeatureValue featureValueWithMultiArray:tensor];
             }
-            shapeCount *= (NSUInteger)dimension;
-            [shape addObject:@(dimension)];
-        }
-        if (shape.count == 0 || shapeCount != count) {
-            return fail(@"CoreML input shape does not match the input element count");
-        }
-        MLMultiArray *tensor = [[MLMultiArray alloc]
-            initWithShape:shape
-                 dataType:MLMultiArrayDataTypeFloat32
-                    error:&error];
-        if (tensor == nil) {
-            return fail([NSString stringWithFormat:@"CoreML MLMultiArray unavailable: %@", error]);
-        }
-        const float *values = (const float *)input.bytes;
-        for (NSUInteger index = 0; index < count; index++) {
-            tensor[index] = @(values[index]);
+        } else {
+            MLMultiArray *tensor = tensorFromFile(@(argv[2]), @(argv[5]), &error);
+            if (tensor == nil) return fail(@"CoreML input must match its contiguous f32 shape");
+            inputFeatures[@(argv[3])] = [MLFeatureValue featureValueWithMultiArray:tensor];
         }
         MLModelConfiguration *configuration = [[MLModelConfiguration alloc] init];
         configuration.computeUnits = MLComputeUnitsCPUAndNeuralEngine;
@@ -76,10 +114,8 @@ int main(int argc, const char *argv[]) {
         if (model == nil) {
             return fail([NSString stringWithFormat:@"CoreML model loading failed: %@", error]);
         }
-        NSString *inputFeature = @(argv[3]);
-        NSString *outputFeature = @(argv[4]);
         MLDictionaryFeatureProvider *features = [[MLDictionaryFeatureProvider alloc]
-            initWithDictionary:@{ inputFeature: [MLFeatureValue featureValueWithMultiArray:tensor] }
+            initWithDictionary:inputFeatures
                          error:&error];
         if (features == nil) {
             return fail([NSString stringWithFormat:@"CoreML input feature creation failed: %@", error]);
@@ -89,12 +125,12 @@ int main(int argc, const char *argv[]) {
             return fail([NSString stringWithFormat:@"CoreML prediction failed: %@", error]);
         }
         MLMultiArray *predictionTensor = [prediction featureValueForName:outputFeature].multiArrayValue;
-        if (predictionTensor == nil || predictionTensor.count != count) {
+        if (predictionTensor == nil || predictionTensor.count != outputCount) {
             return fail(@"CoreML prediction returned an invalid output tensor");
         }
-        NSMutableData *output = [NSMutableData dataWithLength:input.length];
+        NSMutableData *output = [NSMutableData dataWithLength:outputCount * sizeof(float)];
         float *result = (float *)output.mutableBytes;
-        for (NSUInteger index = 0; index < count; index++) {
+        for (NSUInteger index = 0; index < outputCount; index++) {
             result[index] = predictionTensor[index].floatValue;
         }
 

@@ -1,4 +1,8 @@
-use std::collections::BTreeMap;
+use crate::provider_input_binding::{
+    parse_input_bindings, validate_dependency_binding, validate_input_bindings,
+    ProviderInputBinding,
+};
+use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) const PROVIDER_BUFFER_DESCRIPTOR_CONTRACT: &str = "nuis-provider-buffer-descriptor-v1";
 pub(crate) const PROVIDER_KERNEL_DESCRIPTOR_CONTRACT: &str = "nuis-provider-kernel-descriptor-v1";
@@ -6,6 +10,7 @@ pub(crate) const PROVIDER_MODEL_ASSET_DESCRIPTOR_CONTRACT: &str =
     "nuis-provider-model-asset-descriptor-v1";
 pub(crate) const PROVIDER_OUTPUT_COMPARISON_DESCRIPTOR_CONTRACT: &str =
     "nuis-provider-output-comparison-descriptor-v1";
+pub(crate) const PROVIDER_REQUEST_DEPENDENCY_CONTRACT: &str = "nuis-provider-request-dependency-v1";
 pub(crate) const PROVIDER_REQUEST_COLLECTION_CONTRACT: &str = "nuis-provider-request-collection-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,6 +37,7 @@ pub(crate) struct ProviderKernelDescriptor {
     pub(crate) id: String,
     pub(crate) operation: String,
     pub(crate) input_buffer: String,
+    pub(crate) input_buffers: Vec<String>,
     pub(crate) output_buffer: String,
     pub(crate) dispatch: Vec<usize>,
     pub(crate) scalar_bindings: Vec<ProviderScalarBinding>,
@@ -45,6 +51,7 @@ pub(crate) struct ProviderModelAssetDescriptor {
     pub(crate) byte_length: usize,
     pub(crate) content_hash: String,
     pub(crate) input_feature: String,
+    pub(crate) input_features: Vec<String>,
     pub(crate) output_feature: String,
 }
 
@@ -61,6 +68,13 @@ pub(crate) struct ProviderOutputComparisonDescriptor {
     pub(crate) non_finite_policy: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct ProviderRequestDependency {
+    pub(crate) producer_request_id: String,
+    pub(crate) producer_output_buffer: String,
+    pub(crate) consumer_input_buffer: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProviderRequest {
     pub(crate) source: &'static str,
@@ -68,6 +82,8 @@ pub(crate) struct ProviderRequest {
     pub(crate) kernel: ProviderKernelDescriptor,
     pub(crate) model_asset: Option<ProviderModelAssetDescriptor>,
     pub(crate) output_comparison: Option<ProviderOutputComparisonDescriptor>,
+    pub(crate) dependencies: Vec<ProviderRequestDependency>,
+    pub(crate) input_bindings: Vec<ProviderInputBinding>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -126,16 +142,12 @@ fn parse_registered_collection(input_evidence: &str) -> Option<ProviderRequestCo
                 &format!("provider_request_{index}_kernel_"),
                 &format!("provider_request_{index}_model_asset_"),
                 &format!("provider_request_{index}_output_comparison_"),
+                &format!("provider_request_{index}_dependency_"),
+                &format!("provider_request_{index}_input_binding_"),
             )
         })
         .collect::<Option<Vec<_>>>()?;
-    let mut identities = requests
-        .iter()
-        .map(|request| request.kernel.id.as_str())
-        .collect::<Vec<_>>();
-    identities.sort_unstable();
-    identities.dedup();
-    (identities.len() == requests.len()).then_some(ProviderRequestCollection {
+    validate_collection_dependencies(&requests).then_some(ProviderRequestCollection {
         source: "registered-collection",
         requests,
     })
@@ -156,6 +168,8 @@ fn parse_registered_request(input_evidence: &str) -> Option<ProviderRequest> {
         "provider_kernel_",
         "provider_model_asset_",
         "provider_output_comparison_",
+        "provider_dependency_",
+        "provider_input_binding_",
     )
 }
 
@@ -185,6 +199,7 @@ fn parse_legacy_pixelmagic_request(input_evidence: &str) -> Option<ProviderReque
             id: "pixelmagic.gray8.invert".to_owned(),
             operation: fields.get("pixel_operation")?.clone(),
             input_buffer: "input.pixels".to_owned(),
+            input_buffers: vec!["input.pixels".to_owned()],
             output_buffer: "output.pixels".to_owned(),
             dispatch: vec![width, height, 1],
             scalar_bindings: vec![ProviderScalarBinding {
@@ -195,6 +210,18 @@ fn parse_legacy_pixelmagic_request(input_evidence: &str) -> Option<ProviderReque
         },
         model_asset: None,
         output_comparison: None,
+        dependencies: Vec::new(),
+        input_bindings: vec![ProviderInputBinding {
+            name: "input.pixels".to_owned(),
+            source: "artifact".to_owned(),
+            element_type: "u8".to_owned(),
+            shape: vec![width, height],
+            byte_length,
+            content_hash: fields.get("pixel_payload_hash")?.clone(),
+            payload_path: fields.get("pixel_payload_path")?.clone(),
+            producer_request_id: "none".to_owned(),
+            producer_output_buffer: "none".to_owned(),
+        }],
     })
 }
 
@@ -205,6 +232,8 @@ fn build_request(
     kernel_prefix: &str,
     model_prefix: &str,
     comparison_prefix: &str,
+    dependency_prefix: &str,
+    input_binding_prefix: &str,
 ) -> Option<ProviderRequest> {
     let buffer = ProviderBufferDescriptor {
         id: field(fields, buffer_prefix, "id")?.clone(),
@@ -218,10 +247,15 @@ fn build_request(
         payload_path: field(fields, buffer_prefix, "payload_path")?.clone(),
         content_hash: field(fields, buffer_prefix, "content_hash")?.clone(),
     };
+    let input_buffer = field(fields, kernel_prefix, "input_buffer")?.clone();
     let kernel = ProviderKernelDescriptor {
         id: field(fields, kernel_prefix, "id")?.clone(),
         operation: field(fields, kernel_prefix, "operation")?.clone(),
-        input_buffer: field(fields, kernel_prefix, "input_buffer")?.clone(),
+        input_buffer: input_buffer.clone(),
+        input_buffers: match field(fields, kernel_prefix, "input_buffers") {
+            Some(value) => parse_nonempty_list(value)?,
+            None => vec![input_buffer],
+        },
         output_buffer: field(fields, kernel_prefix, "output_buffer")?.clone(),
         dispatch: parse_dimensions(field(fields, kernel_prefix, "dispatch")?)?,
         scalar_bindings: match field(fields, kernel_prefix, "scalar_bindings") {
@@ -231,12 +265,17 @@ fn build_request(
     };
     let model_asset = parse_model_asset(fields, model_prefix)?;
     let output_comparison = parse_output_comparison(fields, comparison_prefix)?;
+    let dependencies = parse_dependencies(fields, dependency_prefix)?;
+    let input_bindings =
+        parse_input_bindings(fields, input_binding_prefix, &buffer, &dependencies)?;
     validate_request(ProviderRequest {
         source,
         buffer,
         kernel,
         model_asset,
         output_comparison,
+        dependencies,
+        input_bindings,
     })
 }
 
@@ -248,13 +287,18 @@ fn parse_model_asset(
         return Some(None);
     };
     (contract == PROVIDER_MODEL_ASSET_DESCRIPTOR_CONTRACT).then_some(())?;
+    let input_feature = field(fields, prefix, "input_feature")?.clone();
     Some(Some(ProviderModelAssetDescriptor {
         id: field(fields, prefix, "id")?.clone(),
         format: field(fields, prefix, "format")?.clone(),
         path: field(fields, prefix, "path")?.clone(),
         byte_length: field(fields, prefix, "byte_length")?.parse().ok()?,
         content_hash: field(fields, prefix, "content_hash")?.clone(),
-        input_feature: field(fields, prefix, "input_feature")?.clone(),
+        input_feature: input_feature.clone(),
+        input_features: match field(fields, prefix, "input_features") {
+            Some(value) => parse_nonempty_list(value)?,
+            None => vec![input_feature],
+        },
         output_feature: field(fields, prefix, "output_feature")?.clone(),
     }))
 }
@@ -280,6 +324,99 @@ fn parse_output_comparison(
         relative_tolerance: field(fields, prefix, "relative_tolerance")?.clone(),
         non_finite_policy: field(fields, prefix, "non_finite_policy")?.clone(),
     }))
+}
+
+fn parse_dependencies(
+    fields: &BTreeMap<String, String>,
+    prefix: &str,
+) -> Option<Vec<ProviderRequestDependency>> {
+    let Some(contract) = field(fields, prefix, "contract") else {
+        return field(fields, prefix, "count").is_none().then(Vec::new);
+    };
+    (contract == PROVIDER_REQUEST_DEPENDENCY_CONTRACT).then_some(())?;
+    let count = field(fields, prefix, "count")?.parse::<usize>().ok()?;
+    (count <= 64).then_some(())?;
+    (0..count)
+        .map(|index| {
+            let edge_prefix = format!("{prefix}{index}_");
+            Some(ProviderRequestDependency {
+                producer_request_id: field(fields, &edge_prefix, "producer_request_id")?.clone(),
+                producer_output_buffer: field(fields, &edge_prefix, "producer_output_buffer")?
+                    .clone(),
+                consumer_input_buffer: field(fields, &edge_prefix, "consumer_input_buffer")?
+                    .clone(),
+            })
+        })
+        .collect()
+}
+
+fn validate_collection_dependencies(requests: &[ProviderRequest]) -> bool {
+    let positions = requests
+        .iter()
+        .enumerate()
+        .map(|(index, request)| (request.kernel.id.as_str(), index))
+        .collect::<BTreeMap<_, _>>();
+    if positions.len() != requests.len() || !dependency_graph_is_acyclic(requests, &positions) {
+        return false;
+    }
+    requests
+        .iter()
+        .enumerate()
+        .all(|(consumer_index, request)| {
+            let unique = request.dependencies.iter().collect::<BTreeSet<_>>();
+            unique.len() == request.dependencies.len()
+                && request.dependencies.iter().all(|dependency| {
+                    positions
+                        .get(dependency.producer_request_id.as_str())
+                        .is_some_and(|producer_index| {
+                            *producer_index < consumer_index
+                                && requests[*producer_index].kernel.output_buffer
+                                    == dependency.producer_output_buffer
+                                && request
+                                    .kernel
+                                    .input_buffers
+                                    .contains(&dependency.consumer_input_buffer)
+                                && validate_dependency_binding(
+                                    &requests[*producer_index],
+                                    request,
+                                    dependency,
+                                )
+                        })
+                })
+        })
+}
+
+fn dependency_graph_is_acyclic(
+    requests: &[ProviderRequest],
+    positions: &BTreeMap<&str, usize>,
+) -> bool {
+    fn visit(
+        index: usize,
+        requests: &[ProviderRequest],
+        positions: &BTreeMap<&str, usize>,
+        states: &mut [u8],
+    ) -> bool {
+        if states[index] == 1 {
+            return false;
+        }
+        if states[index] == 2 {
+            return true;
+        }
+        states[index] = 1;
+        for dependency in &requests[index].dependencies {
+            let Some(producer) = positions.get(dependency.producer_request_id.as_str()) else {
+                return false;
+            };
+            if !visit(*producer, requests, positions, states) {
+                return false;
+            }
+        }
+        states[index] = 2;
+        true
+    }
+
+    let mut states = vec![0u8; requests.len()];
+    (0..requests.len()).all(|index| visit(index, requests, positions, &mut states))
 }
 
 fn validate_request(request: ProviderRequest) -> Option<ProviderRequest> {
@@ -313,6 +450,7 @@ fn validate_request(request: ProviderRequest) -> Option<ProviderRequest> {
             && asset.byte_length > 0
             && asset.content_hash.starts_with("0x")
             && asset.input_feature == request.kernel.input_buffer
+            && asset.input_features == request.kernel.input_buffers
             && asset.output_feature == request.kernel.output_buffer
     });
     let comparison_valid = request.output_comparison.as_ref().is_none_or(|comparison| {
@@ -351,8 +489,9 @@ fn validate_request(request: ProviderRequest) -> Option<ProviderRequest> {
             !binding.name.is_empty() && !binding.value_type.is_empty() && !binding.value.is_empty()
         })
         && model_asset_valid
-        && comparison_valid)
-        .then_some(request)
+        && comparison_valid
+        && validate_input_bindings(&request))
+    .then_some(request)
 }
 
 fn evidence_fields(input_evidence: &str) -> BTreeMap<String, String> {
@@ -390,6 +529,11 @@ fn parse_scalar_bindings(value: &str) -> Option<Vec<ProviderScalarBinding>> {
             parts.next().is_none().then_some(parsed)
         })
         .collect()
+}
+
+fn parse_nonempty_list(value: &str) -> Option<Vec<String>> {
+    let values = value.split(',').map(str::to_owned).collect::<Vec<_>>();
+    (!values.is_empty() && values.iter().all(|value| !value.is_empty())).then_some(values)
 }
 
 #[cfg(test)]
@@ -504,6 +648,115 @@ mod tests {
             "provider_request_collection_contract={PROVIDER_REQUEST_COLLECTION_CONTRACT};provider_request_count=2;{};{}",
             indexed_request(0, "duplicate"),
             indexed_request(1, "duplicate")
+        );
+        assert!(provider_request_collection_from_evidence(&evidence).is_none());
+    }
+
+    fn dependency(index: usize, producer: &str) -> String {
+        format!(
+            "provider_request_{index}_dependency_contract={PROVIDER_REQUEST_DEPENDENCY_CONTRACT};provider_request_{index}_dependency_count=1;provider_request_{index}_dependency_0_producer_request_id={producer};provider_request_{index}_dependency_0_producer_output_buffer=output.pixels;provider_request_{index}_dependency_0_consumer_input_buffer=input.pixels"
+        )
+    }
+
+    #[test]
+    fn parses_backward_provider_request_dependency() {
+        let evidence = format!(
+            "provider_request_collection_contract={PROVIDER_REQUEST_COLLECTION_CONTRACT};provider_request_count=2;{};{};{}",
+            indexed_request(0, "first"),
+            indexed_request(1, "second"),
+            dependency(1, "first")
+        );
+        let collection = provider_request_collection_from_evidence(&evidence).expect("dependency");
+        assert_eq!(collection.requests[1].dependencies.len(), 1);
+        assert_eq!(
+            collection.requests[1].dependencies[0].producer_request_id,
+            "first"
+        );
+    }
+
+    #[test]
+    fn rejects_missing_self_or_forward_dependency_target() {
+        for producer in ["missing", "first", "second"] {
+            let evidence = format!(
+                "provider_request_collection_contract={PROVIDER_REQUEST_COLLECTION_CONTRACT};provider_request_count=2;{};{};{}",
+                indexed_request(0, "first"),
+                indexed_request(1, "second"),
+                dependency(0, producer)
+            );
+            assert!(provider_request_collection_from_evidence(&evidence).is_none());
+        }
+    }
+
+    #[test]
+    fn rejects_duplicate_dependency_edge() {
+        let duplicate = dependency(1, "first")
+            .replace("dependency_count=1", "dependency_count=2")
+            + ";provider_request_1_dependency_1_producer_request_id=first;provider_request_1_dependency_1_producer_output_buffer=output.pixels;provider_request_1_dependency_1_consumer_input_buffer=input.pixels";
+        let evidence = format!(
+            "provider_request_collection_contract={PROVIDER_REQUEST_COLLECTION_CONTRACT};provider_request_count=2;{};{};{duplicate}",
+            indexed_request(0, "first"),
+            indexed_request(1, "second")
+        );
+        assert!(provider_request_collection_from_evidence(&evidence).is_none());
+    }
+
+    #[test]
+    fn rejects_cyclic_dependency_graph() {
+        let evidence = format!(
+            "provider_request_collection_contract={PROVIDER_REQUEST_COLLECTION_CONTRACT};provider_request_count=2;{};{};{};{}",
+            indexed_request(0, "first"),
+            indexed_request(1, "second"),
+            dependency(0, "second"),
+            dependency(1, "first")
+        );
+        assert!(provider_request_collection_from_evidence(&evidence).is_none());
+    }
+
+    fn fan_in_bindings(second_name: &str) -> String {
+        format!(
+            "provider_request_1_input_binding_contract={};provider_request_1_input_binding_count=2;provider_request_1_input_binding_0_name=input.pixels;provider_request_1_input_binding_0_source=artifact;provider_request_1_input_binding_0_element_type=u8;provider_request_1_input_binding_0_shape=2x2;provider_request_1_input_binding_0_byte_length=4;provider_request_1_input_binding_0_content_hash=0x1234;provider_request_1_input_binding_0_payload_path=pixels.bin;provider_request_1_input_binding_0_producer_request_id=none;provider_request_1_input_binding_0_producer_output_buffer=none;provider_request_1_input_binding_1_name={second_name};provider_request_1_input_binding_1_source=dependency;provider_request_1_input_binding_1_element_type=u8;provider_request_1_input_binding_1_shape=2x2;provider_request_1_input_binding_1_byte_length=4;provider_request_1_input_binding_1_content_hash=0xabcd;provider_request_1_input_binding_1_payload_path=none;provider_request_1_input_binding_1_producer_request_id=first;provider_request_1_input_binding_1_producer_output_buffer=output.pixels",
+            crate::provider_input_binding::PROVIDER_INPUT_BINDING_CONTRACT
+        )
+    }
+
+    #[test]
+    fn parses_named_multi_input_fan_in_bindings() {
+        let second = indexed_request(1, "second").replace(
+            "provider_request_1_kernel_input_buffer=input.pixels",
+            "provider_request_1_kernel_input_buffer=input.pixels;provider_request_1_kernel_input_buffers=input.pixels,input.aux",
+        );
+        let edge = dependency(1, "first").replace(
+            "consumer_input_buffer=input.pixels",
+            "consumer_input_buffer=input.aux",
+        );
+        let evidence = format!(
+            "provider_request_collection_contract={PROVIDER_REQUEST_COLLECTION_CONTRACT};provider_request_count=2;{};{second};{edge};{}",
+            indexed_request(0, "first"),
+            fan_in_bindings("input.aux")
+        );
+        let collection = provider_request_collection_from_evidence(&evidence).expect("fan-in");
+        assert_eq!(collection.requests[1].kernel.input_buffers.len(), 2);
+        assert_eq!(collection.requests[1].input_bindings.len(), 2);
+        assert_eq!(
+            collection.requests[1].input_bindings[1].source,
+            "dependency"
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_named_input_binding() {
+        let second = indexed_request(1, "second").replace(
+            "provider_request_1_kernel_input_buffer=input.pixels",
+            "provider_request_1_kernel_input_buffer=input.pixels;provider_request_1_kernel_input_buffers=input.pixels,input.aux",
+        );
+        let edge = dependency(1, "first").replace(
+            "consumer_input_buffer=input.pixels",
+            "consumer_input_buffer=input.aux",
+        );
+        let evidence = format!(
+            "provider_request_collection_contract={PROVIDER_REQUEST_COLLECTION_CONTRACT};provider_request_count=2;{};{second};{edge};{}",
+            indexed_request(0, "first"),
+            fan_in_bindings("input.pixels")
         );
         assert!(provider_request_collection_from_evidence(&evidence).is_none());
     }
