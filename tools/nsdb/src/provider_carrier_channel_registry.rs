@@ -83,6 +83,14 @@ impl PreparedProviderCarrierChannel {
                 .map_err(|error| format!("failed to write provider carrier packet: {error}")),
         }
     }
+
+    pub(crate) fn try_clone_transferable(&self) -> Result<Option<Self>, String> {
+        match self {
+            #[cfg(unix)]
+            Self::InheritedFd(carrier) => carrier.try_clone().map(Self::InheritedFd).map(Some),
+            Self::FramedStdin(_) => Ok(None),
+        }
+    }
 }
 
 pub(crate) fn select_provider_carrier_channel_adapter(

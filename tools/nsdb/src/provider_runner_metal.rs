@@ -1,9 +1,17 @@
+use crate::provider_carrier_channel_registry::PreparedProviderCarrierChannel;
 #[cfg(target_os = "macos")]
 use crate::provider_carrier_channel_registry::{
     prepare_provider_carrier_channel, select_provider_carrier_channel_adapter,
-    PreparedProviderCarrierChannel,
 };
 use crate::provider_carrier_input::ProviderCarrierInput;
+#[cfg(target_os = "macos")]
+use crate::provider_output_carrier_registry::{
+    prepare_provider_output_carrier, select_provider_output_carrier_adapter,
+};
+use crate::provider_output_carrier_registry::{
+    ProviderOutputPayload, PROVIDER_OUTPUT_CARRIER_REGISTRY_CONTRACT,
+    PROVIDER_OUTPUT_CARRIER_REGISTRY_SOURCE, PROVIDER_OUTPUT_RESIDENCY_CONTRACT,
+};
 use std::{ffi::OsStr, path::Path};
 #[cfg(target_os = "macos")]
 use std::{
@@ -22,7 +30,17 @@ pub(crate) struct MetalProviderExecution {
     pub(crate) contract: &'static str,
     pub(crate) status: &'static str,
     pub(crate) device: String,
-    pub(crate) output_bytes: Vec<u8>,
+    pub(crate) output_carrier_registry_contract: String,
+    pub(crate) output_carrier_registry_source: String,
+    pub(crate) output_carrier_adapter_id: String,
+    pub(crate) output_carrier_mode: String,
+    pub(crate) output_residency_contract: String,
+    pub(crate) output_residency_kind: String,
+    pub(crate) output_transfer_scope: String,
+    pub(crate) output_observation_mode: String,
+    pub(crate) output_device_retention_status: String,
+    pub(crate) output_payload: ProviderOutputPayload,
+    pub(crate) transferable_output: Option<PreparedProviderCarrierChannel>,
 }
 
 pub(crate) fn execute_gray8_invert(
@@ -51,17 +69,32 @@ pub(crate) fn execute_f32_bias_input(
     }
 }
 
+pub(crate) fn execute_f32_bias_prepared_channel(
+    channel: &PreparedProviderCarrierChannel,
+    byte_len: usize,
+    bias: f32,
+) -> Result<MetalProviderExecution, String> {
+    execute_f32_bias_prepared_channel_platform(channel, byte_len, bias)
+}
+
 #[cfg(target_os = "macos")]
 fn execute_f32_bias_platform(
     input_path: &Path,
     bias: f32,
 ) -> Result<MetalProviderExecution, String> {
+    let output_byte_len = usize::try_from(
+        fs::metadata(input_path)
+            .map_err(|error| format!("failed to inspect Metal f32 input: {error}"))?
+            .len(),
+    )
+    .map_err(|_| "Metal f32 input length overflow".to_owned())?;
     execute_metal_scalar_platform(
         input_path.as_os_str(),
         &bias.to_string(),
         "nuis-metal-f32-bias-provider-runner-v1",
         METAL_F32_BIAS_SOURCE,
         None,
+        Some(output_byte_len),
     )
 }
 
@@ -80,6 +113,24 @@ fn execute_f32_bias_bytes_platform(
         "nuis-metal-f32-bias-provider-runner-v1",
         METAL_F32_BIAS_SOURCE,
         Some(&channel),
+        Some(input.len()),
+    )
+}
+
+#[cfg(target_os = "macos")]
+fn execute_f32_bias_prepared_channel_platform(
+    channel: &PreparedProviderCarrierChannel,
+    byte_len: usize,
+    bias: f32,
+) -> Result<MetalProviderExecution, String> {
+    let argument = channel.frame_argument(0);
+    execute_metal_scalar_platform(
+        OsStr::new(&argument),
+        &bias.to_string(),
+        "nuis-metal-f32-bias-provider-runner-v1",
+        METAL_F32_BIAS_SOURCE,
+        Some(channel),
+        Some(byte_len),
     )
 }
 
@@ -93,6 +144,7 @@ fn execute_gray8_invert_platform(
         &max_value.to_string(),
         "nuis-metal-gray8-provider-runner-v1",
         METAL_RUNNER_SOURCE,
+        None,
         None,
     )
 }
@@ -113,6 +165,15 @@ fn execute_f32_bias_bytes_platform(
     Err("Metal provider runner is unavailable on this host".to_owned())
 }
 
+#[cfg(not(target_os = "macos"))]
+fn execute_f32_bias_prepared_channel_platform(
+    _channel: &PreparedProviderCarrierChannel,
+    _byte_len: usize,
+    _bias: f32,
+) -> Result<MetalProviderExecution, String> {
+    Err("Metal provider runner is unavailable on this host".to_owned())
+}
+
 #[cfg(target_os = "macos")]
 fn execute_metal_scalar_platform(
     input_argument: &OsStr,
@@ -120,6 +181,7 @@ fn execute_metal_scalar_platform(
     contract: &'static str,
     source: &str,
     carrier_channel: Option<&PreparedProviderCarrierChannel>,
+    output_byte_len: Option<usize>,
 ) -> Result<MetalProviderExecution, String> {
     let paths = TempMetalRunnerPaths::new();
     fs::write(&paths.source, source)
@@ -146,29 +208,61 @@ fn execute_metal_scalar_platform(
     }
     let mut command = Command::new(&paths.binary);
     command.arg(input_argument).arg(scalar);
-    let execution = if let Some(channel) = carrier_channel {
+    let output_adapter = output_byte_len
+        .map(|_| {
+            select_provider_output_carrier_adapter("auto")
+                .ok_or_else(|| "Metal provider output carrier is unavailable".to_owned())
+        })
+        .transpose()?;
+    let output_carrier = output_adapter
+        .map(|adapter| {
+            prepare_provider_output_carrier(
+                adapter,
+                output_byte_len.expect("output adapter requires byte length"),
+            )
+        })
+        .transpose()?;
+    if let Some(channel) = carrier_channel {
         channel.configure_command(&mut command);
-        let mut child = command
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|error| format!("failed to launch Metal provider runner: {error}"))?;
+    }
+    if let Some(output_carrier) = &output_carrier {
+        output_carrier.configure_command(&mut command)?;
+    }
+    let mut child = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("failed to launch Metal provider runner: {error}"))?;
+    if let Some(channel) = carrier_channel {
         channel.complete_spawn(&mut child)?;
-        child
-            .wait_with_output()
-            .map_err(|error| format!("failed to wait for Metal provider runner: {error}"))?
-    } else {
-        command
-            .output()
-            .map_err(|error| format!("failed to launch Metal provider runner: {error}"))?
-    };
+    }
+    let execution = child
+        .wait_with_output()
+        .map_err(|error| format!("failed to wait for Metal provider runner: {error}"))?;
     if !execution.status.success() {
         return Err(format!(
             "Metal provider runner failed: {}",
             String::from_utf8_lossy(&execution.stderr).trim()
         ));
     }
-    parse_metal_runner_output_for(&String::from_utf8_lossy(&execution.stdout), contract)
+    let output = String::from_utf8_lossy(&execution.stdout);
+    let consumption = output_carrier
+        .map(|carrier| carrier.consume(&output))
+        .transpose()?;
+    let (carrier_payload, transferable_output) = consumption
+        .map(|consumption| (consumption.payload, consumption.transferable))
+        .unwrap_or((None, None));
+    let mut parsed = parse_metal_runner_output_with_payload(&output, contract, carrier_payload)?;
+    if let Some(adapter) = output_adapter {
+        parsed.output_carrier_adapter_id = adapter.adapter_id.to_owned();
+        parsed.output_carrier_mode = adapter.mode.to_owned();
+        parsed.output_residency_kind = adapter.residency_kind.to_owned();
+        parsed.output_transfer_scope = adapter.transfer_scope.to_owned();
+        parsed.output_observation_mode = adapter.observation_mode.to_owned();
+        parsed.output_device_retention_status = adapter.device_retention_status.to_owned();
+    }
+    parsed.transferable_output = transferable_output;
+    Ok(parsed)
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -184,9 +278,18 @@ fn parse_metal_runner_output(output: &str) -> Result<MetalProviderExecution, Str
     parse_metal_runner_output_for(output, "nuis-metal-gray8-provider-runner-v1")
 }
 
+#[cfg(test)]
 fn parse_metal_runner_output_for(
     output: &str,
     expected_contract: &'static str,
+) -> Result<MetalProviderExecution, String> {
+    parse_metal_runner_output_with_payload(output, expected_contract, None)
+}
+
+fn parse_metal_runner_output_with_payload(
+    output: &str,
+    expected_contract: &'static str,
+    carrier_payload: Option<ProviderOutputPayload>,
 ) -> Result<MetalProviderExecution, String> {
     let field = |name: &str| {
         output
@@ -203,22 +306,35 @@ fn parse_metal_runner_output_for(
         .filter(|value| !value.is_empty())
         .ok_or_else(|| "Metal provider runner omitted device identity".to_owned())?
         .to_owned();
-    let output_bytes = decode_hex(
-        field("output_hex")
-            .ok_or_else(|| "Metal provider runner omitted output bytes".to_owned())?,
-    )?;
+    let output_payload = match carrier_payload {
+        Some(payload) => payload,
+        None => ProviderOutputPayload::owned(decode_hex(
+            field("output_hex")
+                .ok_or_else(|| "Metal provider runner omitted output bytes".to_owned())?,
+        )?),
+    };
     let declared_bytes = field("output_bytes")
         .ok_or_else(|| "Metal provider runner omitted output byte count".to_owned())?
         .parse::<usize>()
         .map_err(|error| format!("Metal provider runner byte count is invalid: {error}"))?;
-    if output_bytes.len() != declared_bytes {
+    if output_payload.as_bytes().len() != declared_bytes {
         return Err("Metal provider runner output byte count mismatch".to_owned());
     }
     Ok(MetalProviderExecution {
         contract: expected_contract,
         status: "metal-command-buffer-completed",
         device,
-        output_bytes,
+        output_carrier_registry_contract: PROVIDER_OUTPUT_CARRIER_REGISTRY_CONTRACT.to_owned(),
+        output_carrier_registry_source: PROVIDER_OUTPUT_CARRIER_REGISTRY_SOURCE.to_owned(),
+        output_carrier_adapter_id: "hex.stdout.output.v1".to_owned(),
+        output_carrier_mode: "hex-stdout-output".to_owned(),
+        output_residency_contract: PROVIDER_OUTPUT_RESIDENCY_CONTRACT.to_owned(),
+        output_residency_kind: "host-owned-bytes".to_owned(),
+        output_transfer_scope: "observation-only".to_owned(),
+        output_observation_mode: "stdout-eager".to_owned(),
+        output_device_retention_status: "unsupported".to_owned(),
+        output_payload,
+        transferable_output: None,
     })
 }
 
@@ -280,7 +396,7 @@ mod tests {
         assert_eq!(execution.contract, "nuis-metal-gray8-provider-runner-v1");
         assert_eq!(execution.status, "metal-command-buffer-completed");
         assert_eq!(execution.device, "Apple M2");
-        assert_eq!(execution.output_bytes, [15, 11, 6, 7]);
+        assert_eq!(execution.output_payload.as_bytes(), [15, 11, 6, 7]);
     }
 
     #[cfg(target_os = "macos")]
@@ -298,7 +414,7 @@ mod tests {
         assert_eq!(execution.contract, "nuis-metal-gray8-provider-runner-v1");
         assert_eq!(execution.status, "metal-command-buffer-completed");
         assert!(!execution.device.is_empty());
-        assert_eq!(execution.output_bytes, [15, 11, 6, 7]);
+        assert_eq!(execution.output_payload.as_bytes(), [15, 11, 6, 7]);
     }
 
     #[cfg(target_os = "macos")]
@@ -313,7 +429,8 @@ mod tests {
         };
         let execution = execute_f32_bias_input(&input, 1.0).expect("opaque Metal input");
         let values = execution
-            .output_bytes
+            .output_payload
+            .as_bytes()
             .chunks_exact(4)
             .map(|bytes| f32::from_le_bytes(bytes.try_into().unwrap()))
             .collect::<Vec<_>>();

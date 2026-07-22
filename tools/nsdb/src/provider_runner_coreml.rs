@@ -1,8 +1,17 @@
+use crate::provider_carrier_channel_registry::PreparedProviderCarrierChannel;
 #[cfg(target_os = "macos")]
 use crate::provider_carrier_channel_registry::{
     prepare_provider_carrier_channel, select_provider_carrier_channel_adapter,
 };
 use crate::provider_carrier_input::ProviderCarrierInput;
+#[cfg(target_os = "macos")]
+use crate::provider_output_carrier_registry::{
+    prepare_provider_output_carrier, select_provider_output_carrier_adapter,
+};
+use crate::provider_output_carrier_registry::{
+    ProviderOutputPayload, PROVIDER_OUTPUT_CARRIER_REGISTRY_CONTRACT,
+    PROVIDER_OUTPUT_CARRIER_REGISTRY_SOURCE, PROVIDER_OUTPUT_RESIDENCY_CONTRACT,
+};
 use std::path::Path;
 #[cfg(target_os = "macos")]
 use std::{
@@ -24,13 +33,29 @@ pub(crate) struct CoreMlProviderExecution {
     pub(crate) compute_plan_layer_count: usize,
     pub(crate) compute_plan_preferred_devices: String,
     pub(crate) compute_plan_supported_devices: String,
-    pub(crate) output_bytes: Vec<u8>,
+    pub(crate) output_carrier_registry_contract: String,
+    pub(crate) output_carrier_registry_source: String,
+    pub(crate) output_carrier_adapter_id: String,
+    pub(crate) output_carrier_mode: String,
+    pub(crate) output_residency_contract: String,
+    pub(crate) output_residency_kind: String,
+    pub(crate) output_transfer_scope: String,
+    pub(crate) output_observation_mode: String,
+    pub(crate) output_device_retention_status: String,
+    pub(crate) output_payload: ProviderOutputPayload,
+    pub(crate) transferable_output: Option<PreparedProviderCarrierChannel>,
 }
 
 pub(crate) struct CoreMlProviderInput<'a> {
-    pub(crate) input: &'a ProviderCarrierInput,
+    pub(crate) source: CoreMlProviderInputSource<'a>,
     pub(crate) feature: &'a str,
     pub(crate) shape: &'a [usize],
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum CoreMlProviderInputSource<'a> {
+    Carrier(&'a ProviderCarrierInput),
+    PreparedChannel(&'a PreparedProviderCarrierChannel),
 }
 
 pub(crate) fn execute_model_prediction_inputs(
@@ -83,9 +108,13 @@ fn execute_model_prediction_platform(
         .arg(format_shape(output_shape));
     let carrier_frames = inputs
         .iter()
-        .filter_map(|input| match input.input {
-            ProviderCarrierInput::Path(_) => None,
-            ProviderCarrierInput::OpaqueBytes { bytes, .. } => Some(bytes.as_slice()),
+        .filter_map(|input| match input.source {
+            CoreMlProviderInputSource::Carrier(ProviderCarrierInput::Path(_))
+            | CoreMlProviderInputSource::PreparedChannel(_) => None,
+            CoreMlProviderInputSource::Carrier(ProviderCarrierInput::OpaqueBytes {
+                ref bytes,
+                ..
+            }) => Some(bytes.as_slice()),
         })
         .collect::<Vec<_>>();
     let channel = if carrier_frames.is_empty() {
@@ -98,9 +127,11 @@ fn execute_model_prediction_platform(
     let mut frame_index = 0;
     for input in inputs {
         command.arg(input.feature);
-        match input.input {
-            ProviderCarrierInput::Path(path) => command.arg(path),
-            ProviderCarrierInput::OpaqueBytes { .. } => {
+        match input.source {
+            CoreMlProviderInputSource::Carrier(ProviderCarrierInput::Path(path)) => {
+                command.arg(path)
+            }
+            CoreMlProviderInputSource::Carrier(ProviderCarrierInput::OpaqueBytes { .. }) => {
                 let argument = channel
                     .as_ref()
                     .expect("opaque inputs require a prepared carrier channel")
@@ -108,12 +139,28 @@ fn execute_model_prediction_platform(
                 frame_index += 1;
                 command.arg(argument)
             }
+            CoreMlProviderInputSource::PreparedChannel(channel) => {
+                command.arg(channel.frame_argument(0))
+            }
         };
         command.arg(format_shape(input.shape));
     }
+    let output_byte_len = output_shape
+        .iter()
+        .try_fold(4usize, |bytes, dimension| bytes.checked_mul(*dimension))
+        .ok_or_else(|| "CoreML provider output byte length overflow".to_owned())?;
+    let output_adapter = select_provider_output_carrier_adapter("auto")
+        .ok_or_else(|| "CoreML provider output carrier is unavailable".to_owned())?;
+    let output_carrier = prepare_provider_output_carrier(output_adapter, output_byte_len)?;
     if let Some(channel) = &channel {
         channel.configure_command(&mut command);
     }
+    for input in inputs {
+        if let CoreMlProviderInputSource::PreparedChannel(channel) = input.source {
+            channel.configure_command(&mut command);
+        }
+    }
+    output_carrier.configure_command(&mut command)?;
     let mut child = command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -121,6 +168,11 @@ fn execute_model_prediction_platform(
         .map_err(|error| format!("failed to launch CoreML provider runner: {error}"))?;
     if let Some(channel) = &channel {
         channel.complete_spawn(&mut child)?;
+    }
+    for input in inputs {
+        if let CoreMlProviderInputSource::PreparedChannel(channel) = input.source {
+            channel.complete_spawn(&mut child)?;
+        }
     }
     let execution = child
         .wait_with_output()
@@ -131,7 +183,17 @@ fn execute_model_prediction_platform(
             String::from_utf8_lossy(&execution.stderr).trim()
         ));
     }
-    parse_coreml_runner_output(&String::from_utf8_lossy(&execution.stdout))
+    let output = String::from_utf8_lossy(&execution.stdout);
+    let consumption = output_carrier.consume(&output)?;
+    let mut parsed = parse_coreml_runner_output_with_payload(&output, consumption.payload)?;
+    parsed.output_carrier_adapter_id = output_adapter.adapter_id.to_owned();
+    parsed.output_carrier_mode = output_adapter.mode.to_owned();
+    parsed.output_residency_kind = output_adapter.residency_kind.to_owned();
+    parsed.output_transfer_scope = output_adapter.transfer_scope.to_owned();
+    parsed.output_observation_mode = output_adapter.observation_mode.to_owned();
+    parsed.output_device_retention_status = output_adapter.device_retention_status.to_owned();
+    parsed.transferable_output = consumption.transferable;
+    Ok(parsed)
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -152,7 +214,15 @@ fn format_shape(shape: &[usize]) -> String {
         .join("x")
 }
 
+#[cfg(test)]
 fn parse_coreml_runner_output(output: &str) -> Result<CoreMlProviderExecution, String> {
+    parse_coreml_runner_output_with_payload(output, None)
+}
+
+fn parse_coreml_runner_output_with_payload(
+    output: &str,
+    carrier_payload: Option<ProviderOutputPayload>,
+) -> Result<CoreMlProviderExecution, String> {
     let field = |name: &str| {
         output
             .lines()
@@ -187,15 +257,18 @@ fn parse_coreml_runner_output(output: &str) -> Result<CoreMlProviderExecution, S
         required_device_set(field("compute_plan_preferred_devices"))?;
     let compute_plan_supported_devices =
         required_device_set(field("compute_plan_supported_devices"))?;
-    let output_bytes = decode_hex(
-        field("output_hex")
-            .ok_or_else(|| "CoreML provider runner omitted output bytes".to_owned())?,
-    )?;
+    let output_payload = match carrier_payload {
+        Some(payload) => payload,
+        None => ProviderOutputPayload::owned(decode_hex(
+            field("output_hex")
+                .ok_or_else(|| "CoreML provider runner omitted output bytes".to_owned())?,
+        )?),
+    };
     let declared_bytes = field("output_bytes")
         .ok_or_else(|| "CoreML provider runner omitted output byte count".to_owned())?
         .parse::<usize>()
         .map_err(|error| format!("CoreML provider runner byte count is invalid: {error}"))?;
-    if output_bytes.len() != declared_bytes {
+    if output_payload.as_bytes().len() != declared_bytes {
         return Err("CoreML provider runner output byte count mismatch".to_owned());
     }
     Ok(CoreMlProviderExecution {
@@ -207,7 +280,17 @@ fn parse_coreml_runner_output(output: &str) -> Result<CoreMlProviderExecution, S
         compute_plan_layer_count,
         compute_plan_preferred_devices,
         compute_plan_supported_devices,
-        output_bytes,
+        output_carrier_registry_contract: PROVIDER_OUTPUT_CARRIER_REGISTRY_CONTRACT.to_owned(),
+        output_carrier_registry_source: PROVIDER_OUTPUT_CARRIER_REGISTRY_SOURCE.to_owned(),
+        output_carrier_adapter_id: "hex.stdout.output.v1".to_owned(),
+        output_carrier_mode: "hex-stdout-output".to_owned(),
+        output_residency_contract: PROVIDER_OUTPUT_RESIDENCY_CONTRACT.to_owned(),
+        output_residency_kind: "host-owned-bytes".to_owned(),
+        output_transfer_scope: "observation-only".to_owned(),
+        output_observation_mode: "stdout-eager".to_owned(),
+        output_device_retention_status: "unsupported".to_owned(),
+        output_payload,
+        transferable_output: None,
     })
 }
 
@@ -289,6 +372,6 @@ mod tests {
             execution.compute_plan_supported_devices,
             "cpu,neural-engine"
         );
-        assert_eq!(execution.output_bytes, [0, 0, 64, 64]);
+        assert_eq!(execution.output_payload.as_bytes(), [0, 0, 64, 64]);
     }
 }

@@ -24,7 +24,12 @@ mod provider_completion_trust_registry;
 mod provider_edge_staging_registry;
 mod provider_edge_transport;
 mod provider_input_binding;
+mod provider_native_output_payload;
+mod provider_output_carrier_registry;
+#[cfg(unix)]
+mod provider_output_carrier_unix;
 mod provider_output_comparison;
+mod provider_prepared_input;
 mod provider_request;
 mod provider_request_payload;
 mod provider_runner_coreml;
@@ -39,6 +44,7 @@ mod provider_sample_payload;
 #[cfg(test)]
 mod provider_sample_payload_tests;
 mod provider_sample_runner;
+mod provider_session_registry;
 mod provider_transport_receipt_payload;
 mod replay;
 #[cfg(test)]

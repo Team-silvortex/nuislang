@@ -1,20 +1,8 @@
 use crate::{
-    provider_carrier_channel::PROVIDER_CARRIER_CHANNEL_CONTRACT,
-    provider_carrier_channel_registry::{
-        select_provider_carrier_channel_adapter, PROVIDER_CARRIER_CHANNEL_REGISTRY_CONTRACT,
-        PROVIDER_CARRIER_CHANNEL_REGISTRY_SOURCE,
-    },
-    provider_carrier_input::{ProviderCarrierInput, PROVIDER_CARRIER_INPUT_CONTRACT},
-    provider_edge_staging_registry::{
-        cleanup_provider_edge_carrier, consume_provider_edge_carrier,
-        materialize_provider_edge_carrier, release_provider_edge_carrier,
-        select_provider_edge_staging_adapter, ProviderEdgeStagingAdapter,
-        ProviderEdgeStagingCarrier, PROVIDER_EDGE_STAGING_REGISTRY_CONTRACT,
-        PROVIDER_EDGE_STAGING_REGISTRY_SOURCE,
-    },
-    provider_edge_transport::{ProviderEdgeTransportDescriptor, ProviderEdgeTransportReceipt},
-    provider_input_binding::ProviderInputBinding,
+    provider_edge_transport::ProviderEdgeTransportReceipt,
+    provider_output_carrier_registry::ProviderOutputPayload,
     provider_output_comparison::compare_provider_output,
+    provider_prepared_input::{CompletedProviderOutput, PreparedProviderInput},
     provider_request::{provider_request_collection_from_evidence, ProviderRequest},
     provider_runner_registry::{
         provider_runner_real_device_probe_status, select_provider_runner_adapter,
@@ -29,6 +17,11 @@ use crate::{
         pixelmagic_metal_output_summary, pixelmagic_native_output_summary,
         provider_output_payload_file_name, render_real_device_provider_output_payload,
         PixelMagicNativeOutputSummary,
+    },
+    provider_session_registry::{
+        select_provider_session_adapter, ProviderSessionLease, ProviderSessionRequest,
+        PROVIDER_OUTPUT_HANDLE_CONTRACT, PROVIDER_SESSION_LEASE_CONTRACT,
+        PROVIDER_SESSION_REGISTRY_CONTRACT, PROVIDER_SESSION_REGISTRY_SOURCE,
     },
 };
 use std::{
@@ -317,7 +310,8 @@ fn execute_native_provider_outputs(
             transport_receipts: Vec::new(),
         });
     };
-    let mut completed = BTreeMap::<String, Vec<u8>>::new();
+    let mut completed = BTreeMap::<String, CompletedProviderOutput>::new();
+    let mut sessions = BTreeMap::<String, ProviderSessionLease>::new();
     let mut summaries = Vec::with_capacity(collection.requests.len());
     let mut transport_receipts = Vec::new();
     for request in &collection.requests {
@@ -334,16 +328,49 @@ fn execute_native_provider_outputs(
                 request.kernel.id
             ));
         }
-        let execution = execute_native_provider_request(
+        let session_adapter = select_provider_session_adapter(effective_adapter.execution_mode)
+            .ok_or_else(|| {
+                format!(
+                    "provider adapter `{}` has no registered session adapter",
+                    effective_adapter.adapter_id
+                )
+            })?;
+        let provider_family = request
+            .adapter_binding
+            .as_ref()
+            .map(|binding| binding.provider_family.as_str())
+            .unwrap_or(&record.provider_family);
+        let session = sessions
+            .entry(effective_adapter.adapter_id.to_owned())
+            .or_insert_with(|| {
+                ProviderSessionLease::open(&record.trace_id, provider_family, session_adapter)
+            });
+        let session_request = session.begin_request(&request.kernel.id)?;
+        let mut execution = execute_native_provider_request(
             output_dir,
             record,
             effective_adapter,
             request,
             &completed,
         )?;
-        completed.insert(request.kernel.id.clone(), execution.output_bytes);
+        session.complete_request(&request.kernel.id)?;
+        bind_session_output(&mut execution.summary, &session_request);
+        completed.insert(
+            request.kernel.id.clone(),
+            CompletedProviderOutput {
+                payload: execution.output_payload,
+                transferable: execution.transferable_output,
+            },
+        );
         summaries.push(execution.summary);
         transport_receipts.extend(execution.transport_receipts);
+    }
+    drop(completed);
+    for session in sessions.values_mut() {
+        session.close()?;
+    }
+    for summary in &mut summaries {
+        summary.output_handle_release_status = "released-at-graph-close".to_owned();
     }
     Ok(NativeProviderOutputs {
         native_outputs: summaries,
@@ -351,9 +378,30 @@ fn execute_native_provider_outputs(
     })
 }
 
+fn bind_session_output(
+    summary: &mut PixelMagicNativeOutputSummary,
+    request: &ProviderSessionRequest,
+) {
+    summary.session_registry_contract = PROVIDER_SESSION_REGISTRY_CONTRACT.to_owned();
+    summary.session_registry_source = PROVIDER_SESSION_REGISTRY_SOURCE.to_owned();
+    summary.session_lease_contract = PROVIDER_SESSION_LEASE_CONTRACT.to_owned();
+    summary.session_lease_id = request.lease_id.clone();
+    summary.session_adapter_id = request.session_adapter_id.to_owned();
+    summary.session_mode = request.session_mode.to_owned();
+    summary.session_continuity = request.session_continuity.to_owned();
+    summary.session_lifecycle_hooks = request.session_lifecycle_hooks.to_owned();
+    summary.session_request_sequence = request.sequence.to_string();
+    summary.output_handle_contract = PROVIDER_OUTPUT_HANDLE_CONTRACT.to_owned();
+    summary.output_handle_id = request.output_handle_id.clone();
+    summary.output_handle_ownership_token = request.output_ownership_token.clone();
+    summary.output_handle_release_status = "lease-bound".to_owned();
+}
+
 struct NativeProviderRequestExecution {
     summary: PixelMagicNativeOutputSummary,
-    output_bytes: Vec<u8>,
+    output_payload: ProviderOutputPayload,
+    transferable_output:
+        Option<crate::provider_carrier_channel_registry::PreparedProviderCarrierChannel>,
     transport_receipts: Vec<ProviderEdgeTransportReceipt>,
 }
 
@@ -362,7 +410,7 @@ fn execute_native_provider_request(
     record: &crate::model::NsdbDeviceProviderSampleRecordInfo,
     adapter: &crate::provider_runner_registry::ProviderRunnerAdapter,
     request: &ProviderRequest,
-    completed: &BTreeMap<String, Vec<u8>>,
+    completed: &BTreeMap<String, CompletedProviderOutput>,
 ) -> Result<NativeProviderRequestExecution, String> {
     let inputs = request
         .input_bindings
@@ -373,7 +421,16 @@ fn execute_native_provider_request(
                 .iter()
                 .find(|dependency| dependency.consumer_input_buffer == binding.name)
                 .and_then(|dependency| dependency.transport.as_ref());
-            PreparedProviderInput::new(output_dir, binding, transport, completed)
+            PreparedProviderInput::new(
+                output_dir,
+                binding,
+                transport,
+                completed,
+                matches!(
+                    adapter.kind,
+                    "metal-real-device-runner" | "coreml-real-device-runner"
+                ),
+            )
         })
         .collect::<Result<Vec<_>, _>>()?;
     let mut request_execution = match adapter.kind {
@@ -403,7 +460,15 @@ fn execute_native_provider_request(
                 let bias = request.scalar_f32("bias").ok_or_else(|| {
                     "Metal provider request is missing f32 scalar `bias`".to_owned()
                 })?;
-                crate::provider_runner_metal::execute_f32_bias_input(inputs[0].input(), bias)?
+                if let Some(channel) = inputs[0].direct_channel() {
+                    crate::provider_runner_metal::execute_f32_bias_prepared_channel(
+                        channel,
+                        request.input_bindings[0].byte_length,
+                        bias,
+                    )?
+                } else {
+                    crate::provider_runner_metal::execute_f32_bias_input(inputs[0].input(), bias)?
+                }
             } else {
                 return Err(format!(
                     "Metal provider adapter does not support buffer `{}` operation `{}`",
@@ -414,7 +479,11 @@ fn execute_native_provider_request(
                 .output_comparison
                 .as_ref()
                 .map(|descriptor| {
-                    compare_provider_output(output_dir, descriptor, &execution.output_bytes)
+                    compare_provider_output(
+                        output_dir,
+                        descriptor,
+                        execution.output_payload.as_bytes(),
+                    )
                 })
                 .transpose()?;
             Ok(NativeProviderRequestExecution {
@@ -428,7 +497,8 @@ fn execute_native_provider_request(
                         comparison.as_ref(),
                     )
                 },
-                output_bytes: execution.output_bytes,
+                output_payload: execution.output_payload,
+                transferable_output: execution.transferable_output,
                 transport_receipts: Vec::new(),
             })
         }
@@ -460,8 +530,16 @@ fn execute_native_provider_request(
                 .zip(&model.input_features)
                 .zip(&request.input_bindings)
                 .map(|((input, feature), binding)| {
+                    let source = input.direct_channel().map_or_else(
+                        || {
+                            crate::provider_runner_coreml::CoreMlProviderInputSource::Carrier(
+                                input.input(),
+                            )
+                        },
+                        crate::provider_runner_coreml::CoreMlProviderInputSource::PreparedChannel,
+                    );
                     crate::provider_runner_coreml::CoreMlProviderInput {
-                        input: input.input(),
+                        source,
                         feature,
                         shape: &binding.shape,
                     }
@@ -482,7 +560,11 @@ fn execute_native_provider_request(
                 .output_comparison
                 .as_ref()
                 .map(|descriptor| {
-                    compare_provider_output(output_dir, descriptor, &execution.output_bytes)
+                    compare_provider_output(
+                        output_dir,
+                        descriptor,
+                        execution.output_payload.as_bytes(),
+                    )
                 })
                 .transpose()?;
             Ok(NativeProviderRequestExecution {
@@ -491,7 +573,8 @@ fn execute_native_provider_request(
                     &execution,
                     comparison.as_ref(),
                 ),
-                output_bytes: execution.output_bytes,
+                output_payload: execution.output_payload,
+                transferable_output: execution.transferable_output,
                 transport_receipts: Vec::new(),
             })
         }
@@ -510,157 +593,7 @@ fn execute_native_provider_request(
     Ok(request_execution)
 }
 
-struct PreparedProviderInput {
-    artifact_input: Option<ProviderCarrierInput>,
-    staging_adapter: Option<ProviderEdgeStagingAdapter>,
-    carrier: Option<ProviderEdgeStagingCarrier>,
-    transport_receipt: Option<ProviderEdgeTransportReceipt>,
-}
-
-impl PreparedProviderInput {
-    fn new(
-        output_dir: &Path,
-        binding: &ProviderInputBinding,
-        transport: Option<&ProviderEdgeTransportDescriptor>,
-        completed: &BTreeMap<String, Vec<u8>>,
-    ) -> Result<Self, String> {
-        if binding.source == "dependency" {
-            let bytes = completed.get(&binding.producer_request_id).ok_or_else(|| {
-                format!(
-                    "provider dependency `{}` has no completed output",
-                    binding.producer_request_id
-                )
-            })?;
-            validate_input_bytes(binding, bytes)?;
-            let requested_mode = transport
-                .map(|descriptor| descriptor.staging_mode.as_str())
-                .unwrap_or("host-visible-owned-file");
-            let staging_adapter =
-                select_provider_edge_staging_adapter(requested_mode).ok_or_else(|| {
-                    format!("no provider edge staging adapter supports `{requested_mode}`")
-                })?;
-            let owner_hash = transport
-                .map(|descriptor| fnv1a64_hex(descriptor.ownership_token.as_bytes()))
-                .unwrap_or_else(|| "legacy".to_owned());
-            let carrier = materialize_provider_edge_carrier(staging_adapter, &owner_hash, bytes)?;
-            let channel_adapter = if carrier.input.kind() == "opaque-bytes" {
-                Some(
-                    select_provider_carrier_channel_adapter("auto").ok_or_else(|| {
-                        "no provider carrier channel adapter supports opaque bytes".to_owned()
-                    })?,
-                )
-            } else {
-                None
-            };
-            return Ok(Self {
-                artifact_input: None,
-                staging_adapter: Some(staging_adapter),
-                transport_receipt: transport.map(|descriptor| ProviderEdgeTransportReceipt {
-                    ownership_token: descriptor.ownership_token.clone(),
-                    staging_registry_contract: PROVIDER_EDGE_STAGING_REGISTRY_CONTRACT.to_owned(),
-                    staging_registry_source: PROVIDER_EDGE_STAGING_REGISTRY_SOURCE.to_owned(),
-                    staging_adapter_id: staging_adapter.adapter_id.to_owned(),
-                    staging_adapter_capability_status: staging_adapter.capability_status.to_owned(),
-                    carrier_input_contract: PROVIDER_CARRIER_INPUT_CONTRACT.to_owned(),
-                    carrier_input_kind: carrier.input.kind().to_owned(),
-                    carrier_input_handle: carrier.input.handle().unwrap_or("none").to_owned(),
-                    carrier_channel_registry_contract: PROVIDER_CARRIER_CHANNEL_REGISTRY_CONTRACT
-                        .to_owned(),
-                    carrier_channel_registry_source: PROVIDER_CARRIER_CHANNEL_REGISTRY_SOURCE
-                        .to_owned(),
-                    carrier_channel_adapter_id: channel_adapter
-                        .map(|adapter| adapter.adapter_id)
-                        .unwrap_or("none")
-                        .to_owned(),
-                    carrier_channel_adapter_capability_status: channel_adapter
-                        .map(|adapter| adapter.capability_status)
-                        .unwrap_or("not-required")
-                        .to_owned(),
-                    carrier_channel_contract: PROVIDER_CARRIER_CHANNEL_CONTRACT.to_owned(),
-                    carrier_channel_mode: channel_adapter
-                        .map(|adapter| adapter.mode)
-                        .unwrap_or("not-required")
-                        .to_owned(),
-                    carrier_identity: carrier.identity.clone(),
-                    byte_length: bytes.len(),
-                    materialize_status: "materialized".to_owned(),
-                    materialize_payload_hash: fnv1a64_hex(bytes),
-                    consume_status: "pending".to_owned(),
-                    consume_payload_hash: "pending".to_owned(),
-                    release_status: "pending".to_owned(),
-                    release_payload_hash: "pending".to_owned(),
-                }),
-                carrier: Some(carrier),
-            });
-        }
-        let path = resolve_provider_payload_path(output_dir, &binding.payload_path)?;
-        let bytes = fs::read(&path).map_err(|error| {
-            format!(
-                "failed to read provider input buffer `{}`: {error}",
-                path.display()
-            )
-        })?;
-        validate_input_bytes(binding, &bytes)?;
-        Ok(Self {
-            artifact_input: Some(ProviderCarrierInput::Path(path)),
-            staging_adapter: None,
-            carrier: None,
-            transport_receipt: None,
-        })
-    }
-
-    fn input(&self) -> &ProviderCarrierInput {
-        self.carrier
-            .as_ref()
-            .map(|carrier| &carrier.input)
-            .or(self.artifact_input.as_ref())
-            .expect("prepared provider input must own one carrier")
-    }
-
-    fn finish(mut self) -> Result<Option<ProviderEdgeTransportReceipt>, String> {
-        let mut receipt = self.transport_receipt.take();
-        if let (Some(adapter), Some(carrier)) = (self.staging_adapter, self.carrier.as_mut()) {
-            let bytes = consume_provider_edge_carrier(adapter, carrier)?;
-            let payload_hash = fnv1a64_hex(&bytes);
-            if let Some(receipt) = receipt.as_mut() {
-                if bytes.len() != receipt.byte_length
-                    || payload_hash != receipt.materialize_payload_hash
-                {
-                    return Err("provider edge carrier changed before consumption".to_owned());
-                }
-                receipt.consume_status = "consumed".to_owned();
-                receipt.consume_payload_hash = payload_hash.clone();
-            }
-            release_provider_edge_carrier(adapter, carrier)?;
-            self.carrier = None;
-            if let Some(receipt) = receipt.as_mut() {
-                receipt.release_status = "released".to_owned();
-                receipt.release_payload_hash = payload_hash;
-            }
-        }
-        Ok(receipt)
-    }
-}
-
-fn validate_input_bytes(binding: &ProviderInputBinding, bytes: &[u8]) -> Result<(), String> {
-    if bytes.len() != binding.byte_length || fnv1a64_hex(bytes) != binding.content_hash {
-        return Err(format!(
-            "provider input binding `{}` size/hash evidence mismatch",
-            binding.name
-        ));
-    }
-    Ok(())
-}
-
-impl Drop for PreparedProviderInput {
-    fn drop(&mut self) {
-        if let Some(carrier) = self.carrier.as_mut() {
-            cleanup_provider_edge_carrier(carrier);
-        }
-    }
-}
-
-fn resolve_provider_payload_path(
+pub(crate) fn resolve_provider_payload_path(
     output_dir: &Path,
     relative: &str,
 ) -> Result<std::path::PathBuf, String> {

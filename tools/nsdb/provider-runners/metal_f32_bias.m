@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 static NSData *carrierPacketOwner = nil;
+static NSUInteger carrierMappedLength = 0;
 
 static int fail(NSString *message) {
     fprintf(stderr, "%s\n", message.UTF8String);
@@ -26,6 +27,40 @@ static uint64_t fnv1a64(NSData *data) {
         hash *= 0x100000001b3ULL;
     }
     return hash;
+}
+
+static BOOL emitOutput(const void *bytes, NSUInteger length) {
+    NSData *output = [NSData dataWithBytesNoCopy:(void *)bytes length:length freeWhenDone:NO];
+    const char *descriptorText = getenv("NUIS_PROVIDER_OUTPUT_FD");
+    if (descriptorText != NULL) {
+        NSArray<NSString *> *parts = [@(descriptorText) componentsSeparatedByString:@":"];
+        if (parts.count != 5 || ![parts[0] isEqualToString:@"fd"]) return NO;
+        unsigned long long values[4] = {0};
+        for (NSUInteger index = 0; index < 4; index++) {
+            NSScanner *scanner = [NSScanner scannerWithString:parts[index + 1]];
+            if (![scanner scanUnsignedLongLong:&values[index]] || !scanner.isAtEnd) return NO;
+        }
+        if (values[0] > INT_MAX || values[2] != length) return NO;
+        NSUInteger written = 0;
+        while (written < length) {
+            ssize_t count = pwrite((int)values[0], (const uint8_t *)bytes + written,
+                                   length - written, (off_t)(values[1] + written));
+            if (count <= 0) return NO;
+            written += (NSUInteger)count;
+        }
+        uint64_t hash = fnv1a64(output);
+        uint8_t littleHash[8];
+        for (NSUInteger index = 0; index < 8; index++) littleHash[index] = hash >> (index * 8);
+        if (pwrite((int)values[0], littleHash, 8, (off_t)values[3]) != 8) return NO;
+        printf("output_channel=inherited-fd\noutput_hash=%llu\n", hash);
+        return YES;
+    }
+    NSMutableString *hex = [NSMutableString stringWithCapacity:length * 2];
+    for (NSUInteger index = 0; index < length; index++) {
+        [hex appendFormat:@"%02x", ((const uint8_t *)bytes)[index]];
+    }
+    printf("output_channel=hex-stdout\noutput_hex=%s\n", hex.UTF8String);
+    return YES;
 }
 
 static BOOL fdDescriptor(NSString *value, int *fd, uint64_t *frame,
@@ -61,6 +96,30 @@ static NSData *mappedCarrierPacket(int fd, uint64_t length, uint64_t expectedHas
     return packet;
 }
 
+static NSData *alignedCarrierFrame(NSData *packet, uint64_t requestedFrame) {
+    const uint8_t *bytes = packet.bytes;
+    if (packet.length < 56 || memcmp(bytes, "NUISPFD1", 8) != 0) return nil;
+    uint64_t frameCount = readLittle(bytes + 8, 4);
+    uint64_t pageSize = readLittle(bytes + 12, 4);
+    if (frameCount != 1 || pageSize == 0 || (pageSize & (pageSize - 1)) != 0) return nil;
+    uint64_t index = readLittle(bytes + 16, 4);
+    uint64_t offset = readLittle(bytes + 24, 8);
+    uint64_t length = readLittle(bytes + 32, 8);
+    uint64_t mappedLength = readLittle(bytes + 40, 8);
+    uint64_t expectedHash = readLittle(bytes + 48, 8);
+    uint64_t headerEnd = (56 + pageSize - 1) & ~(pageSize - 1);
+    if (index != requestedFrame || offset > NSUIntegerMax || length > NSUIntegerMax ||
+        mappedLength > NSUIntegerMax || offset < headerEnd || offset % pageSize != 0 ||
+        mappedLength % pageSize != 0 || mappedLength < length || offset > packet.length ||
+        mappedLength > packet.length - (NSUInteger)offset) return nil;
+    NSData *payload = [NSData dataWithBytesNoCopy:(void *)(bytes + (NSUInteger)offset)
+                                           length:(NSUInteger)length
+                                     freeWhenDone:NO];
+    if (fnv1a64(payload) != expectedHash) return nil;
+    carrierMappedLength = (NSUInteger)mappedLength;
+    return payload;
+}
+
 static NSData *carrierFrame(const char *argument) {
     NSString *value = @(argument);
     if (![value hasPrefix:@"frame:"] && ![value hasPrefix:@"fd:"]) {
@@ -77,6 +136,9 @@ static NSData *carrierFrame(const char *argument) {
         packet = mappedCarrierPacket(fd, length, expectedHash);
         if (packet == nil) return nil;
         mappedPacket = YES;
+        if (packet.length >= 8 && memcmp(packet.bytes, "NUISPFD1", 8) == 0) {
+            return alignedCarrierFrame(packet, frame);
+        }
     } else {
         if (![value isEqualToString:@"frame:0"]) return nil;
         packet = [[NSFileHandle fileHandleWithStandardInput] readDataToEndOfFile];
@@ -122,8 +184,12 @@ int main(int argc, const char *argv[]) {
             return fail([NSString stringWithFormat:@"Metal f32 pipeline unavailable: %@", error]);
         }
         MTLResourceOptions options = MTLResourceStorageModeShared;
-        id<MTLBuffer> inputBuffer =
-            [device newBufferWithBytes:input.bytes length:input.length options:options];
+        id<MTLBuffer> inputBuffer = carrierMappedLength > 0
+            ? [device newBufferWithBytesNoCopy:(void *)input.bytes
+                                         length:carrierMappedLength
+                                        options:options
+                                    deallocator:nil]
+            : [device newBufferWithBytes:input.bytes length:input.length options:options];
         id<MTLBuffer> outputBuffer = [device newBufferWithLength:input.length options:options];
         id<MTLBuffer> biasBuffer = [device newBufferWithBytes:&bias length:sizeof(bias) options:options];
         id<MTLBuffer> countBuffer =
@@ -149,15 +215,12 @@ int main(int argc, const char *argv[]) {
         if (command.status != MTLCommandBufferStatusCompleted) {
             return fail([NSString stringWithFormat:@"Metal f32 command failed: %@", command.error]);
         }
-        const uint8_t *bytes = outputBuffer.contents;
-        NSMutableString *hex = [NSMutableString stringWithCapacity:input.length * 2];
-        for (NSUInteger index = 0; index < input.length; index++) {
-            [hex appendFormat:@"%02x", bytes[index]];
-        }
         printf("protocol=nuis-metal-f32-bias-provider-runner-v1\nstatus=ready\n");
         printf("device=%s\n", device.name.UTF8String);
         printf("output_bytes=%lu\n", (unsigned long)input.length);
-        printf("output_hex=%s\n", hex.UTF8String);
+        if (!emitOutput(outputBuffer.contents, input.length)) {
+            return fail(@"Metal f32 output carrier write failed");
+        }
         return 0;
     }
 }

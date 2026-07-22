@@ -506,10 +506,80 @@ status, and selected mode. The Unix child now maps that anonymous carrier
 read-only instead of reading it into a new allocation, and frame payloads are
 no-copy `NSData` views over the verified mapping. CoreML carrier inputs use
 contiguous `MLMultiArray` data-pointer views rather than element-wise copies.
-The remaining boundary is the Metal upload: its current payload starts after a
-32-byte packet header, so it cannot yet satisfy the page-alignment contract of
-`newBufferWithBytesNoCopy`. A page-aligned inherited layout is the next adapter
-step; framed stdin and path inputs retain their compatibility behavior.
+`NUISPFD1` now gives inherited carriers a separate page-aligned layout with
+ordered frame records, original and mapped lengths, aligned offsets, and
+per-frame hashes. Metal successfully wraps the mapped page span with
+`newBufferWithBytesNoCopy`, while CoreML keeps its direct `MLMultiArray` view.
+Framed stdin retains the compact `NUISPCV1` layout and path inputs keep their
+compatibility behavior. `nuis-provider-output-carrier-registry-v1` now closes
+the asymmetric output boundary. Unix selects `inherited.fd.output.v1`: the
+parent preallocates an unlinked writable descriptor, only the child inherits
+it, CoreML and Metal `pwrite` raw result bytes, and stdout carries only channel
+and FNV metadata. Rust maps the sealed packet read-only and verifies the exact
+declared result before comparison. `hex.stdout.output.v1` remains the portable fallback. Native output
+records expose registry source, adapter, and mode, and the adapter participates
+in the ordered collection hash. Native outputs are sealed as valid single-frame
+`NUISPFD1` objects. Every dependency edge clones that sealed carrier for its
+consumer, inherits the same storage, and records `provider.output.transfer.v1`,
+`inherited-frame`, and `transferred-output` evidence. Releasing a consumer
+closes only its cloned descriptor; producer ownership remains valid until graph
+teardown. CoreML configures each transferable input channel independently, and
+its native runner maps and validates every fd-backed packet separately. This
+covers the chained edge, both Add fan-in edges, and the final CoreML-to-Metal
+edge without rebundling dependency bytes. `ProviderOutputPayload` keeps that
+verified mmap view alive for comparisons, summaries, hashes, and completed
+output metadata, while portable hexadecimal output uses an owned fallback.
+Dependency execution and observation therefore share the inherited storage.
+Writable single-frame carriers write only their fixed `NUISPFD1` metadata and
+use `set_len` to establish the aligned payload span, avoiding output-sized
+zero-filled construction buffers. `nuis-provider-output-residency-v1` now binds
+each adapter to a residency kind, transfer scope, observation mode, and explicit
+device-retention status. Those fields are preserved in every native output and
+its ordered collection hash. Current adapters truthfully expose
+`host-visible-file` or `host-owned-bytes`; inherited-fd remains the portable
+comparison and cross-provider path. Device residency is still blocked by the
+one-request child-process runner model: Metal and CoreML objects disappear when
+the process exits. The next contract must therefore define a registered
+provider session lease and GLM-owned output-handle lifetime before any backend
+claims device-local retention. `nuis-provider-session-registry-v1` now selects
+the explicit `logical.request-process.v1` fallback. One deterministic lease is
+shared per runner adapter, request begin/complete hooks advance a strict
+sequence, and `nuis-provider-output-handle-v1` binds each result to a GLM token.
+Graph teardown drops completed payloads, closes every lease, and records handle
+release. Official execution proves CoreML sequence `0..3` and an independent
+Metal sequence `0`. This is ownership continuity, not device continuity: each
+request still launches a new child. A provider-neutral persistent worker
+transport is required before session adapters may advertise device retention.
+`nuis-provider-worker-transport-registry-v1` now registers
+`framed.stdio.worker.v1`. Its request and close frames bind lease, provider,
+sequence, request, and worker PID. A real child-process regression proves two
+ordered same-provider requests and close execute under one PID. This adapter is
+intentionally protocol-ready rather than graph-selected: stdio cannot pass fds
+created after worker startup. The next Unix adapter must bind `SCM_RIGHTS`
+descriptor counts to the same frame identity and close received descriptors on
+every mismatch before persistent CoreML or Metal execution can safely consume
+direct carriers. `unix.scm-rights.worker.v1` now provides that low-level
+adapter. Unix datagram frames bind lease, sequence, request, and declared fd
+count to `SOL_SOCKET/SCM_RIGHTS`; received descriptors immediately become
+`CLOEXEC` `OwnedFd` values. Tests read real file content through a transferred
+descriptor and prove identity mismatch closes the received fd with `EBADF`.
+The socketpair test and persistent-child PID test remain separate. The next
+step is inheriting one endpoint into a child worker, completing a PID-bound
+handshake, and transferring two distinct post-spawn carrier descriptors to that
+same process. `UnixWorkerProcessTransport` now closes that gap. Only the worker
+endpoint loses `FD_CLOEXEC` in `pre_exec`; the child handshake PID must equal
+`Child::id()`. A compiled worker receives two different post-spawn file
+descriptors at sequence `0/1`, reads first-byte evidence `17/29`, returns both
+receipts from the same PID, and exits through an explicit close request.
+Handshake failure kills and waits the child. `nuis-provider-worker-request-envelope-v1`
+now closes the request-meaning boundary. `NUISPWU2` separates a UTF-8 control
+header from opaque bytes, binds the bytes by length and FNV-1a hash, and requires
+one ordered semantic role for every transferred descriptor. The C worker parses
+binary payloads containing NUL, newline, and non-UTF-8 bytes, independently
+checks the hash and role count, and returns both in `NUISPWUR2` receipts. The
+next boundary is execution integration: the Objective-C CoreML runner still
+launches once per request and must become a persistent loop that maps ordered
+model, input, and output roles without embedding CoreML policy in the transport.
 
 The language-core checks anchor the bootstrap-critical
 `language-core/nuisc/type-control-flow-generics` cell to:

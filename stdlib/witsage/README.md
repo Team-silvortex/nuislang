@@ -106,8 +106,8 @@ Current native execution baseline:
   `host.visible.owned-file.v1` as an explicit compatibility adapter
 * `nuis-provider-carrier-input-v1` lets the Metal f32 runner consume the
   CoreML Add output as opaque bytes without a provider-edge file
-* CoreML named inputs consume the same opaque carrier ABI, so chained affine
-  and both Add fan-in edges are memory-backed and independently receipted
+* CoreML named inputs consume independent inherited carrier descriptors, so
+  chained affine and both Add fan-in edges avoid dependency-byte rebundling
 * `nuis-provider-carrier-channel-v1` carries those named inputs as binary stdin
   frames with explicit index, length, and FNV-64 instead of hexadecimal argv
 * `nuis-provider-carrier-channel-registry-v1` selects `inherited.fd.v1` on Unix
@@ -116,6 +116,29 @@ Current native execution baseline:
 * Unix native runners consume the inherited packet through read-only mmap and
   no-copy frame views; CoreML wraps carrier-backed f32 inputs directly as
   contiguous `MLMultiArray` data pointers
+* inherited frames use the page-aligned `NUISPFD1` layout, allowing Metal to
+  wrap verified input spans with `newBufferWithBytesNoCopy`
+* `nuis-provider-output-carrier-registry-v1` returns CoreML and Metal result
+  bytes through verified writable inherited fds on Unix, with hexadecimal
+  stdout retained only as a portable fallback
+* Unix output observation retains one read-only mmap-backed payload view for
+  comparison, hashes, summaries, and dependency metadata instead of a result copy
+* writable output carriers create only fixed frame metadata and a sparse aligned
+  file span, avoiding output-sized zero-filled construction buffers
+* `nuis-provider-output-residency-v1` reports residency, transfer scope,
+  observation mode, and device-retention capability without backend assumptions
+* `nuis-provider-session-registry-v1` assigns deterministic per-adapter leases,
+  ordered lifecycle hooks, and GLM-owned output handles released at graph close
+* `nuis-provider-worker-transport-registry-v1` proves ordered requests can share
+  one persistent child PID; its portable stdio path remains descriptor-free
+* Unix additionally registers `unix.scm-rights.worker.v1`, binding lease and
+  request frames to counted `SCM_RIGHTS` descriptors with close-on-error ownership
+* a PID-validated persistent child receives two distinct post-spawn descriptors
+  under ordered requests and exits through the same session control socket
+* `nuis-provider-worker-request-envelope-v1` carries hash-checked opaque binary
+  request bytes plus one ordered semantic role for every transferred descriptor
+* all four dependency edges reuse sealed producer output carriers directly
+  through `provider.output.transfer.v1`, with independent lifecycle receipts
 
 Current official surface registry:
 

@@ -38,6 +38,14 @@ const HOST_FILE_ADAPTER: ProviderEdgeStagingAdapter = ProviderEdgeStagingAdapter
     kind: "host-owned-file",
 };
 
+const OUTPUT_TRANSFER_ADAPTER: ProviderEdgeStagingAdapter = ProviderEdgeStagingAdapter {
+    adapter_id: "provider.output.transfer.v1",
+    staging_mode: "transferable-output-carrier",
+    capability_status: "registered-available",
+    priority: 0,
+    kind: "output-carrier-transfer",
+};
+
 const REGISTERED_ADAPTERS: &[ProviderEdgeStagingAdapter] = &[MEMORY_ADAPTER, HOST_FILE_ADAPTER];
 
 pub(crate) fn select_provider_edge_staging_adapter(
@@ -51,6 +59,10 @@ pub(crate) fn select_provider_edge_staging_adapter(
         })
         .min_by_key(|adapter| (adapter.priority, adapter.adapter_id))
         .copied()
+}
+
+pub(crate) fn provider_output_transfer_staging_adapter() -> ProviderEdgeStagingAdapter {
+    OUTPUT_TRANSFER_ADAPTER
 }
 
 pub(crate) fn materialize_provider_edge_carrier(

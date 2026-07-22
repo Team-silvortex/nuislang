@@ -5,7 +5,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-static NSData *carrierPacketOwner = nil;
+static NSMutableArray<NSData *> *carrierPacketOwners = nil;
 
 static NSString *deviceKind(id<MLComputeDeviceProtocol> device) {
     if ([device isKindOfClass:[MLNeuralEngineComputeDevice class]]) {
@@ -48,6 +48,40 @@ static uint64_t fnv1a64(NSData *data) {
     return hash;
 }
 
+static BOOL emitOutput(NSData *output) {
+    const char *descriptorText = getenv("NUIS_PROVIDER_OUTPUT_FD");
+    if (descriptorText != NULL) {
+        NSArray<NSString *> *parts = [@(descriptorText) componentsSeparatedByString:@":"];
+        if (parts.count != 5 || ![parts[0] isEqualToString:@"fd"]) return NO;
+        unsigned long long values[4] = {0};
+        for (NSUInteger index = 0; index < 4; index++) {
+            NSScanner *scanner = [NSScanner scannerWithString:parts[index + 1]];
+            if (![scanner scanUnsignedLongLong:&values[index]] || !scanner.isAtEnd) return NO;
+        }
+        if (values[0] > INT_MAX || values[2] != output.length) return NO;
+        NSUInteger written = 0;
+        while (written < output.length) {
+            ssize_t count = pwrite((int)values[0], (const uint8_t *)output.bytes + written,
+                                   output.length - written, (off_t)(values[1] + written));
+            if (count <= 0) return NO;
+            written += (NSUInteger)count;
+        }
+        uint64_t hash = fnv1a64(output);
+        uint8_t littleHash[8];
+        for (NSUInteger index = 0; index < 8; index++) littleHash[index] = hash >> (index * 8);
+        if (pwrite((int)values[0], littleHash, 8, (off_t)values[3]) != 8) return NO;
+        printf("output_channel=inherited-fd\noutput_hash=%llu\n", hash);
+        return YES;
+    }
+    const unsigned char *bytes = output.bytes;
+    NSMutableString *hex = [NSMutableString stringWithCapacity:output.length * 2];
+    for (NSUInteger index = 0; index < output.length; index++) {
+        [hex appendFormat:@"%02x", bytes[index]];
+    }
+    printf("output_channel=hex-stdout\noutput_hex=%s\n", hex.UTF8String);
+    return YES;
+}
+
 static BOOL fdDescriptor(NSString *value, int *fd, uint64_t *frame,
                          uint64_t *length, uint64_t *hash) {
     NSArray<NSString *> *parts = [value componentsSeparatedByString:@":"];
@@ -77,31 +111,50 @@ static NSData *mappedCarrierPacket(int fd, uint64_t length, uint64_t expectedHas
                     munmap(bytes, mappedLength);
                 }];
     if (fnv1a64(packet) != expectedHash) return nil;
-    carrierPacketOwner = packet;
+    if (carrierPacketOwners == nil) carrierPacketOwners = [NSMutableArray array];
+    [carrierPacketOwners addObject:packet];
     return packet;
 }
 
+static NSDictionary<NSNumber *, NSData *> *alignedCarrierFrames(NSData *packet) {
+    const uint8_t *bytes = packet.bytes;
+    if (packet.length < 16 || memcmp(bytes, "NUISPFD1", 8) != 0) return nil;
+    uint64_t frameCount = readLittle(bytes + 8, 4);
+    uint64_t pageSize = readLittle(bytes + 12, 4);
+    if (pageSize == 0 || (pageSize & (pageSize - 1)) != 0 || frameCount > NSUIntegerMax) return nil;
+    if (frameCount > (packet.length - 16) / 40) return nil;
+    uint64_t previousEnd = (16 + frameCount * 40 + pageSize - 1) & ~(pageSize - 1);
+    NSMutableDictionary<NSNumber *, NSData *> *frames = [NSMutableDictionary dictionary];
+    for (uint64_t frame = 0; frame < frameCount; frame++) {
+        NSUInteger cursor = 16 + (NSUInteger)frame * 40;
+        uint64_t index = readLittle(bytes + cursor, 4);
+        uint64_t offset = readLittle(bytes + cursor + 8, 8);
+        uint64_t length = readLittle(bytes + cursor + 16, 8);
+        uint64_t mappedLength = readLittle(bytes + cursor + 24, 8);
+        uint64_t expectedHash = readLittle(bytes + cursor + 32, 8);
+        if (index != frame || offset > NSUIntegerMax || length > NSUIntegerMax ||
+            mappedLength > NSUIntegerMax || offset < previousEnd ||
+            offset % pageSize != 0 || mappedLength % pageSize != 0 || mappedLength < length ||
+            offset > packet.length || mappedLength > packet.length - (NSUInteger)offset) return nil;
+        NSData *payload = [NSData dataWithBytesNoCopy:(void *)(bytes + (NSUInteger)offset)
+                                               length:(NSUInteger)length
+                                         freeWhenDone:NO];
+        NSNumber *key = @(index);
+        if (frames[key] != nil || fnv1a64(payload) != expectedHash) return nil;
+        frames[key] = payload;
+        previousEnd = offset + mappedLength;
+    }
+    return frames;
+}
+
 static NSDictionary<NSNumber *, NSData *> *carrierFrames(int argc, const char *argv[]) {
-    NSString *descriptor = nil;
     BOOL usesStdin = NO;
     for (int index = 1; index < argc; index++) {
         NSString *value = @(argv[index]);
-        if ([value hasPrefix:@"fd:"] && descriptor == nil) descriptor = value;
         if ([value hasPrefix:@"frame:"]) usesStdin = YES;
     }
-    if (descriptor == nil && !usesStdin) return @{};
-    NSData *packet = nil;
-    if (descriptor != nil) {
-        int fd = -1;
-        uint64_t frame = 0;
-        uint64_t length = 0;
-        uint64_t expectedHash = 0;
-        if (!fdDescriptor(descriptor, &fd, &frame, &length, &expectedHash)) return nil;
-        packet = mappedCarrierPacket(fd, length, expectedHash);
-        if (packet == nil) return nil;
-    } else {
-        packet = [[NSFileHandle fileHandleWithStandardInput] readDataToEndOfFile];
-    }
+    if (!usesStdin) return @{};
+    NSData *packet = [[NSFileHandle fileHandleWithStandardInput] readDataToEndOfFile];
     const uint8_t *bytes = packet.bytes;
     if (packet.length < 12 || memcmp(bytes, "NUISPCV1", 8) != 0) return nil;
     NSUInteger cursor = 8;
@@ -115,11 +168,7 @@ static NSDictionary<NSNumber *, NSData *> *carrierFrames(int argc, const char *a
         uint64_t expectedHash = readLittle(bytes + cursor + 12, 8);
         cursor += 20;
         if (length > NSUIntegerMax || cursor > packet.length || length > packet.length - cursor) return nil;
-        NSData *payload = descriptor != nil
-            ? [NSData dataWithBytesNoCopy:(void *)(bytes + cursor)
-                                   length:(NSUInteger)length
-                             freeWhenDone:NO]
-            : [packet subdataWithRange:NSMakeRange(cursor, (NSUInteger)length)];
+        NSData *payload = [packet subdataWithRange:NSMakeRange(cursor, (NSUInteger)length)];
         NSNumber *key = @(index);
         if (frames[key] != nil || fnv1a64(payload) != expectedHash) return nil;
         frames[key] = payload;
@@ -132,17 +181,18 @@ static NSData *inputData(NSString *value, NSDictionary<NSNumber *, NSData *> *fr
     if (![value hasPrefix:@"frame:"] && ![value hasPrefix:@"fd:"]) {
         return [NSData dataWithContentsOfFile:value];
     }
-    NSString *indexText = nil;
     if ([value hasPrefix:@"fd:"]) {
         int fd = -1;
         uint64_t frame = 0;
         uint64_t length = 0;
         uint64_t hash = 0;
         if (!fdDescriptor(value, &fd, &frame, &length, &hash)) return nil;
-        indexText = [NSString stringWithFormat:@"%llu", frame];
-    } else {
-        indexText = [value substringFromIndex:6];
+        NSData *packet = mappedCarrierPacket(fd, length, hash);
+        if (packet == nil) return nil;
+        NSDictionary<NSNumber *, NSData *> *mappedFrames = alignedCarrierFrames(packet);
+        return mappedFrames[@(frame)];
     }
+    NSString *indexText = [value substringFromIndex:6];
     NSScanner *scanner = [NSScanner scannerWithString:indexText];
     unsigned long long index = 0;
     if (![scanner scanUnsignedLongLong:&index] || !scanner.isAtEnd) return nil;
@@ -319,11 +369,6 @@ int main(int argc, const char *argv[]) {
             if (preferredDevices.length == 0) preferredDevices = @"none";
             if (supportedDevices.length == 0) supportedDevices = @"none";
         }
-        const unsigned char *bytes = output.bytes;
-        NSMutableString *hex = [NSMutableString stringWithCapacity:output.length * 2];
-        for (NSUInteger index = 0; index < output.length; index++) {
-            [hex appendFormat:@"%02x", bytes[index]];
-        }
         printf("protocol=nuis-coreml-model-prediction-provider-runner-v1\n");
         printf("status=ready\n");
         printf("device=CoreML.framework:MLModel:CPUAndNeuralEngine-requested\n");
@@ -333,7 +378,7 @@ int main(int argc, const char *argv[]) {
         printf("compute_plan_preferred_devices=%s\n", preferredDevices.UTF8String);
         printf("compute_plan_supported_devices=%s\n", supportedDevices.UTF8String);
         printf("output_bytes=%lu\n", (unsigned long)output.length);
-        printf("output_hex=%s\n", hex.UTF8String);
+        if (!emitOutput(output)) return fail(@"CoreML output carrier write failed");
         return 0;
     }
 }

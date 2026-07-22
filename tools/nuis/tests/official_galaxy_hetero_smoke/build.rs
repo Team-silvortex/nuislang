@@ -886,20 +886,26 @@ pub(super) fn assert_official_galaxy_hetero_build(
                 "provider_edge_transport_receipt_3_staging_registry_contract = \"nuis-provider-edge-staging-registry-v1\"",
                 "official galaxy staging registry contract",
             );
-            assert_file_contains(
-                &provider_output_payload_path,
-                "provider_edge_transport_receipt_3_staging_adapter_id = \"memory.owned-bytes.v1\"",
-                "official galaxy selected staging adapter",
-            );
+            for index in 0..4 {
+                assert_file_contains(&provider_output_payload_path, &format!(
+                    "provider_edge_transport_receipt_{index}_staging_adapter_id = \"provider.output.transfer.v1\""
+                ), "official galaxy transferred output staging adapter");
+            }
             assert_file_contains(
                 &provider_output_payload_path,
                 "provider_edge_transport_receipt_3_staging_adapter_capability_status = \"registered-available\"",
                 "official galaxy staging adapter capability",
             );
             for evidence in [
-                "provider_edge_transport_receipt_3_carrier_channel_registry_contract = \"nuis-provider-carrier-channel-registry-v1\"",
-                "provider_edge_transport_receipt_3_carrier_channel_adapter_id = \"inherited.fd.v1\"",
-                "provider_edge_transport_receipt_3_carrier_channel_mode = \"inherited-fd\"",
+                "native_output_4_output_residency_contract = \"nuis-provider-output-residency-v1\"",
+                "native_output_4_output_residency_kind = \"host-visible-file\"",
+                "native_output_0_session_lease_contract = \"nuis-provider-session-lease-v1\"",
+                "native_output_0_session_adapter_id = \"logical.request-process.v1\"",
+                "native_output_0_session_lifecycle_hooks = \"graph-open,request-begin,request-complete,graph-close\"",
+                "native_output_3_session_request_sequence = \"3\"",
+                "native_output_4_session_request_sequence = \"0\"",
+                "native_output_4_output_handle_ownership_token = \"glm:provider-session-output:metal:apple-silicon-gpu:0:witsage.vector.metal-bias\"",
+                "native_output_4_output_handle_release_status = \"released-at-graph-close\"",
             ] {
                 assert_file_contains(&provider_output_payload_path, evidence, "official galaxy carrier channel");
             }
