@@ -659,6 +659,11 @@ pub(super) fn assert_official_galaxy_hetero_build(
             "native_output_device = \"",
             "official galaxy provider output payload native device",
         );
+        assert_file_contains(
+            &provider_output_payload_path,
+            "native_output_0_worker_execution_capsule_invocation_mode = \"worker-process-adapter-v1\"",
+            "official galaxy Metal worker-owned adapter invocation",
+        );
     }
     if expects_coreml_vector {
         assert_file_contains(

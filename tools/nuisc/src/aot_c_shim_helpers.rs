@@ -365,6 +365,7 @@ pub(crate) fn render_registered_host_ffi_body(
             ("nuis_host_provider_worker_launch_capability_hash", 0)
         }
         "host_provider_worker_reply" => ("nuis_host_provider_worker_reply", 1),
+        "host_provider_worker_invoke_capsule" => ("nuis_host_provider_worker_invoke_capsule", 1),
         "host_provider_worker_close" => ("nuis_host_provider_worker_close", 0),
         "host_command_spawn" => ("nuis_host_command_spawn", 2),
         "host_command_spawn_in" => ("nuis_host_command_spawn_in", 4),

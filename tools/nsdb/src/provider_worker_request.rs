@@ -3,7 +3,7 @@ use crate::provider_sample_artifact::fnv1a64_hex;
 pub(crate) const PROVIDER_WORKER_REQUEST_CONTRACT: &str =
     "nuis-provider-worker-request-envelope-v1";
 pub(crate) const PROVIDER_WORKER_REQUEST_MAGIC: &str = "NUISPWU2";
-pub(crate) const PROVIDER_WORKER_REPLY_MAGIC: &str = "NUISPWUR4";
+pub(crate) const PROVIDER_WORKER_REPLY_MAGIC: &str = "NUISPWUR5";
 pub(crate) const MAX_PROVIDER_WORKER_PAYLOAD_BYTES: usize = 60 * 1024;
 pub(crate) const MAX_PROVIDER_WORKER_DESCRIPTORS: usize = 16;
 
@@ -30,6 +30,10 @@ pub(crate) struct ProviderWorkerReplyEnvelope {
     pub(crate) descriptor_roles: Vec<String>,
     pub(crate) payload: Vec<u8>,
     pub(crate) payload_hash: String,
+    pub(crate) output_descriptor_count: usize,
+    pub(crate) output_descriptor_roles: Vec<String>,
+    pub(crate) output_descriptor_byte_length: usize,
+    pub(crate) output_descriptor_hash: String,
 }
 
 pub(crate) fn encode_provider_worker_request(
@@ -108,6 +112,10 @@ pub(crate) struct ProviderWorkerReplyIdentity<'a> {
     pub(crate) dispatch_status: i64,
     pub(crate) request_payload_hash: &'a str,
     pub(crate) descriptor_roles: &'a [&'a str],
+    pub(crate) output_descriptor_count: usize,
+    pub(crate) output_descriptor_roles: &'a [&'a str],
+    pub(crate) output_descriptor_byte_length: usize,
+    pub(crate) output_descriptor_hash: &'a str,
 }
 
 pub(crate) fn encode_provider_worker_reply(
@@ -121,10 +129,14 @@ pub(crate) fn encode_provider_worker_reply(
     if identity.descriptor_count != identity.descriptor_roles.len() {
         return Err("provider worker reply descriptor role count mismatch".to_owned());
     }
+    validate_descriptor_roles(identity.output_descriptor_roles)?;
+    if identity.output_descriptor_count != identity.output_descriptor_roles.len() {
+        return Err("provider worker output descriptor role count mismatch".to_owned());
+    }
     let payload_hash = fnv1a64_hex(payload);
     let roles = render_role_manifest(identity.descriptor_roles);
     let header = format!(
-        "{PROVIDER_WORKER_REPLY_MAGIC}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{roles}\t{}\t{payload_hash}\n",
+        "{PROVIDER_WORKER_REPLY_MAGIC}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{roles}\t{}\t{payload_hash}\t{}\t{}\t{}\t{}\n",
         identity.lease_id,
         identity.sequence,
         identity.request_id,
@@ -134,6 +146,10 @@ pub(crate) fn encode_provider_worker_reply(
         identity.dispatch_status,
         identity.request_payload_hash,
         payload.len(),
+        identity.output_descriptor_count,
+        render_role_manifest(identity.output_descriptor_roles),
+        identity.output_descriptor_byte_length,
+        identity.output_descriptor_hash,
     );
     let mut frame = Vec::with_capacity(header.len() + payload.len());
     frame.extend_from_slice(header.as_bytes());
@@ -143,6 +159,7 @@ pub(crate) fn encode_provider_worker_reply(
 
 pub(crate) fn decode_provider_worker_reply(
     frame: &[u8],
+    received_output_descriptor_count: usize,
 ) -> Result<ProviderWorkerReplyEnvelope, String> {
     let header_end = frame
         .iter()
@@ -151,7 +168,7 @@ pub(crate) fn decode_provider_worker_reply(
     let header = std::str::from_utf8(&frame[..header_end])
         .map_err(|_| "provider worker reply header is not UTF-8".to_owned())?;
     let fields = header.split('\t').collect::<Vec<_>>();
-    if fields.len() != 12 || fields[0] != PROVIDER_WORKER_REPLY_MAGIC {
+    if fields.len() != 16 || fields[0] != PROVIDER_WORKER_REPLY_MAGIC {
         return Err("provider worker reply envelope is invalid".to_owned());
     }
     validate_frame_token(fields[1], "reply lease id")?;
@@ -176,6 +193,18 @@ pub(crate) fn decode_provider_worker_reply(
     if fields[11] != payload_hash {
         return Err("provider worker reply payload hash mismatch".to_owned());
     }
+    let output_descriptor_count = parse_usize(fields[12], "output descriptor count")?;
+    if output_descriptor_count != received_output_descriptor_count {
+        return Err("provider worker output descriptor count mismatch".to_owned());
+    }
+    let output_descriptor_roles = parse_role_manifest(fields[13], output_descriptor_count)?;
+    let output_descriptor_byte_length = parse_usize(fields[14], "output descriptor byte length")?;
+    validate_hash_token(fields[15], "output descriptor hash")?;
+    if (output_descriptor_count == 0)
+        != (output_descriptor_byte_length == 0 && fields[15] == "0x0000000000000000")
+    {
+        return Err("provider worker output descriptor metadata is inconsistent".to_owned());
+    }
     Ok(ProviderWorkerReplyEnvelope {
         lease_id: fields[1].to_owned(),
         sequence: parse_usize(fields[2], "reply sequence")?,
@@ -192,6 +221,10 @@ pub(crate) fn decode_provider_worker_reply(
         descriptor_roles,
         payload: payload.to_vec(),
         payload_hash,
+        output_descriptor_count,
+        output_descriptor_roles,
+        output_descriptor_byte_length,
+        output_descriptor_hash: fields[15].to_owned(),
     })
 }
 
@@ -245,6 +278,16 @@ pub(crate) fn validate_frame_token(value: &str, name: &str) -> Result<(), String
 fn validate_payload(payload: &[u8]) -> Result<(), String> {
     if payload.len() > MAX_PROVIDER_WORKER_PAYLOAD_BYTES {
         return Err("provider worker request payload is too large".to_owned());
+    }
+    Ok(())
+}
+
+fn validate_hash_token(value: &str, name: &str) -> Result<(), String> {
+    if value.len() != 18
+        || !value.starts_with("0x")
+        || !value[2..].bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err(format!("provider worker {name} is invalid"));
     }
     Ok(())
 }
@@ -312,16 +355,23 @@ mod tests {
                 dispatch_status: 5,
                 request_payload_hash: "0x0123456789abcdef",
                 descriptor_roles: &["input.primary", "output.result"],
+                output_descriptor_count: 1,
+                output_descriptor_roles: &["output.result"],
+                output_descriptor_byte_length: 24,
+                output_descriptor_hash: "0x1111111111111111",
             },
             &payload,
         )
         .expect("encode");
-        let decoded = decode_provider_worker_reply(&encoded).expect("decode");
+        let decoded = decode_provider_worker_reply(&encoded, 1).expect("decode");
         assert_eq!(decoded.payload, payload);
         assert_eq!(decoded.payload_hash, fnv1a64_hex(&payload));
         assert_eq!(decoded.descriptor_roles, ["input.primary", "output.result"]);
         assert_eq!(decoded.dispatch_status, 5);
         assert_eq!(decoded.request_payload_hash, "0x0123456789abcdef");
+        assert_eq!(decoded.output_descriptor_roles, ["output.result"]);
+        assert_eq!(decoded.output_descriptor_byte_length, 24);
+        assert_eq!(decoded.output_descriptor_hash, "0x1111111111111111");
     }
 
     #[test]
@@ -337,11 +387,15 @@ mod tests {
                 dispatch_status: -7,
                 request_payload_hash: "0x0123456789abcdef",
                 descriptor_roles: &[],
+                output_descriptor_count: 0,
+                output_descriptor_roles: &[],
+                output_descriptor_byte_length: 0,
+                output_descriptor_hash: "0x0000000000000000",
             },
             b"request",
         )
         .expect("encode");
-        assert!(decode_provider_worker_reply(&encoded)
+        assert!(decode_provider_worker_reply(&encoded, 0)
             .expect_err("negative Nuis status must fail closed")
             .contains("dispatch was not granted"));
     }

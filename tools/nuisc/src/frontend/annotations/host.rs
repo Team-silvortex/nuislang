@@ -133,6 +133,10 @@ const STD_HOST_SYMBOLS: &[(&str, &str)] = &[
     ),
     ("provider_worker.is_close", "host_provider_worker_is_close"),
     (
+        "provider_worker.invoke_capsule",
+        "host_provider_worker_invoke_capsule",
+    ),
+    (
         "provider_worker.launch_capability_hash",
         "host_provider_worker_launch_capability_hash",
     ),

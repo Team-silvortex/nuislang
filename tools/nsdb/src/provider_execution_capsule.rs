@@ -3,6 +3,10 @@ pub(crate) const PROVIDER_EXECUTION_CAPSULE_REGISTRY_SOURCE: &str =
     "builtin-nustar-provider-execution-capsule-registry";
 pub(crate) const PROVIDER_EXECUTION_CAPSULE_INVOCATION_MODE: &str =
     "worker-authorized-parent-adapter-v1";
+pub(crate) const PROVIDER_EXECUTION_CAPSULE_INVOKER_CONTRACT: &str =
+    "nuis-provider-execution-capsule-invoker-v1";
+pub(crate) const PROVIDER_EXECUTION_CAPSULE_INVOKER_REGISTRY_SOURCE: &str =
+    "builtin-nustar-provider-execution-capsule-invoker-registry";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProviderExecutionCapsuleRegistration {
@@ -13,6 +17,15 @@ pub(crate) struct ProviderExecutionCapsuleRegistration {
     pub(crate) invocation_mode: &'static str,
     pub(crate) input_roles: Vec<String>,
     pub(crate) output_roles: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ProviderExecutionCapsuleInvokerRegistration {
+    pub(crate) contract: &'static str,
+    pub(crate) registry_source: &'static str,
+    pub(crate) invoker_id: String,
+    pub(crate) invoker_token: String,
+    pub(crate) output_carrier_contract: &'static str,
 }
 
 pub(crate) fn register_provider_execution_capsule(
@@ -51,6 +64,34 @@ pub(crate) fn register_provider_execution_capsule(
         invocation_mode: PROVIDER_EXECUTION_CAPSULE_INVOCATION_MODE,
         input_roles: input_roles.to_vec(),
         output_roles: output_roles.to_vec(),
+    })
+}
+
+pub(crate) fn register_provider_execution_capsule_invoker(
+    capsule: &ProviderExecutionCapsuleRegistration,
+    adapter_id: &str,
+) -> Option<ProviderExecutionCapsuleInvokerRegistration> {
+    if capsule.contract != PROVIDER_EXECUTION_CAPSULE_CONTRACT
+        || capsule.registry_source != PROVIDER_EXECUTION_CAPSULE_REGISTRY_SOURCE
+        || !is_capsule_token(adapter_id)
+        || capsule.output_roles.is_empty()
+    {
+        return None;
+    }
+    let identity = format!(
+        "{}:{}:{}:{}",
+        capsule.capsule_id,
+        adapter_id,
+        capsule.capsule_token,
+        capsule.output_roles.join(",")
+    );
+    let identity_hash = stable_capsule_scalar(identity.as_bytes());
+    Some(ProviderExecutionCapsuleInvokerRegistration {
+        contract: PROVIDER_EXECUTION_CAPSULE_INVOKER_CONTRACT,
+        registry_source: PROVIDER_EXECUTION_CAPSULE_INVOKER_REGISTRY_SOURCE,
+        invoker_id: format!("capsule-invoker:{identity_hash}"),
+        invoker_token: format!("invoker-token:{identity_hash}"),
+        output_carrier_contract: "nuis-provider-worker-output-descriptor-v1",
     })
 }
 
@@ -116,6 +157,20 @@ mod tests {
         assert_ne!(first.capsule_token, other.capsule_token);
         assert_eq!(first.contract, PROVIDER_EXECUTION_CAPSULE_CONTRACT);
         assert_eq!(first.invocation_mode, "worker-authorized-parent-adapter-v1");
+        let invoker = register_provider_execution_capsule_invoker(&first, "adapter.generic")
+            .expect("invoker");
+        let repeated_invoker =
+            register_provider_execution_capsule_invoker(&first, "adapter.generic")
+                .expect("repeated invoker");
+        assert_eq!(invoker, repeated_invoker);
+        assert_eq!(
+            invoker.contract,
+            PROVIDER_EXECUTION_CAPSULE_INVOKER_CONTRACT
+        );
+        assert_eq!(
+            invoker.output_carrier_contract,
+            "nuis-provider-worker-output-descriptor-v1"
+        );
     }
 
     #[test]

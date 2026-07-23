@@ -114,6 +114,42 @@ pub(crate) fn push_native_output_summary(
             summary.worker_execution_capsule_status.as_str(),
         ),
         (
+            "worker_execution_capsule_invoker_contract",
+            summary.worker_execution_capsule_invoker_contract.as_str(),
+        ),
+        (
+            "worker_execution_capsule_invoker_id",
+            summary.worker_execution_capsule_invoker_id.as_str(),
+        ),
+        (
+            "worker_execution_capsule_invoker_status",
+            summary.worker_execution_capsule_invoker_status.as_str(),
+        ),
+        (
+            "worker_output_descriptor_contract",
+            summary.worker_output_descriptor_contract.as_str(),
+        ),
+        (
+            "worker_output_descriptor_roles",
+            summary.worker_output_descriptor_roles.as_str(),
+        ),
+        (
+            "worker_output_descriptor_count",
+            summary.worker_output_descriptor_count.as_str(),
+        ),
+        (
+            "worker_output_descriptor_byte_length",
+            summary.worker_output_descriptor_byte_length.as_str(),
+        ),
+        (
+            "worker_output_descriptor_hash",
+            summary.worker_output_descriptor_hash.as_str(),
+        ),
+        (
+            "worker_output_receipt_status",
+            summary.worker_output_receipt_status.as_str(),
+        ),
+        (
             "worker_dispatch_permit_contract",
             summary.worker_dispatch_permit_contract.as_str(),
         ),
@@ -304,6 +340,42 @@ pub(crate) fn push_indexed_native_output(
         (
             "worker_execution_capsule_status",
             summary.worker_execution_capsule_status.as_str(),
+        ),
+        (
+            "worker_execution_capsule_invoker_contract",
+            summary.worker_execution_capsule_invoker_contract.as_str(),
+        ),
+        (
+            "worker_execution_capsule_invoker_id",
+            summary.worker_execution_capsule_invoker_id.as_str(),
+        ),
+        (
+            "worker_execution_capsule_invoker_status",
+            summary.worker_execution_capsule_invoker_status.as_str(),
+        ),
+        (
+            "worker_output_descriptor_contract",
+            summary.worker_output_descriptor_contract.as_str(),
+        ),
+        (
+            "worker_output_descriptor_roles",
+            summary.worker_output_descriptor_roles.as_str(),
+        ),
+        (
+            "worker_output_descriptor_count",
+            summary.worker_output_descriptor_count.as_str(),
+        ),
+        (
+            "worker_output_descriptor_byte_length",
+            summary.worker_output_descriptor_byte_length.as_str(),
+        ),
+        (
+            "worker_output_descriptor_hash",
+            summary.worker_output_descriptor_hash.as_str(),
+        ),
+        (
+            "worker_output_receipt_status",
+            summary.worker_output_receipt_status.as_str(),
         ),
         (
             "worker_dispatch_permit_contract",

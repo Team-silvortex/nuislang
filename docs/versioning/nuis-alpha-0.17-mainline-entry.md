@@ -93,7 +93,8 @@ The repository currently verifies:
 * binary-safe, length-bound, hash-bound request and response payloads
 * open-ended provider, adapter, and operation registration identities
 * a Nuis-authored lifecycle and request-ingress loop
-* a reply protocol, `NUISPWUR4`, carrying the positive Nuis ingress status
+* a reply protocol, `NUISPWUR5`, carrying the positive Nuis invocation status
+  plus a worker-owned output descriptor role, length, and hash
 * fail-closed rejection of non-positive worker dispatch status
 * operation permit evidence in final native-output summaries
 * `nuis-provider-execution-capsule-v1` registration binding provider, adapter,
@@ -102,6 +103,8 @@ The repository currently verifies:
   final native-output summaries
 * capsule token and input/output role counts validated by the persistent Nuis
   worker through eight-dependency `data.provider_request_ingress`
+* a registry-derived capsule invoker called by Nuis before reply
+* independent parent-side verification of the returned output descriptor
 * return-producing effectful `if` lowering through the open
   `compare_call_result` host-call guard protocol, with the provider worker
   proving unselected reply calls remain unexecuted
@@ -140,9 +143,9 @@ owner of Metal, CoreML, CUDA, ROCm, Vulkan, network, or future hardware policy.
 
 Short rule:
 
-`registration now chooses and authorizes the capsule; next the Nuis worker must
-own invocation; capsule identity already reaches Nuis/YIR; the Nustar owns
-backend meaning; Nsdb verifies and records the result`
+`registration chooses and authorizes the capsule; the Nuis worker owns the
+generic process-adapter invocation; the Nustar owns backend meaning; Nsdb
+verifies and records the returned descriptor`
 
 ## Native-Language Ownership
 
@@ -188,11 +191,14 @@ Safe wording:
 
 * `registered heterogeneous worker boundary`
 * `worker-authorized operation permit`
+* `worker-invoked provider-neutral execution capsule`
+* `NUISPWUR5 worker-owned output descriptor receipt`
+* `hash-bound worker process-adapter launch for PixelMagic gray8 Metal`
 * `real Metal/CoreML provider smoke`
 * `binary-linking convergence`
 * `executable-artifact closure`
 * `Nuis-owned lifecycle with thin host ABI adapters`
-* `provider-neutral execution capsule is the next closure boundary`
+* `ordered multi-input worker adapter transport is the next closure boundary`
 
 ## Exit Evidence
 

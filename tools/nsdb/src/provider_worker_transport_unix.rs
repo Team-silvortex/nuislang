@@ -33,6 +33,11 @@ pub(crate) struct UnixWorkerProcessReply {
     pub(crate) payload_hash: String,
     pub(crate) descriptor_roles: Vec<String>,
     pub(crate) payload: Vec<u8>,
+    pub(crate) output_descriptors: Vec<OwnedFd>,
+    pub(crate) output_descriptor_roles: Vec<String>,
+    pub(crate) output_descriptor_byte_length: usize,
+    pub(crate) output_descriptor_hash: String,
+    pub(crate) output_descriptor_payload: Vec<u8>,
 }
 
 pub(crate) struct UnixWorkerRequest {
@@ -386,8 +391,8 @@ fn receive_process_reply(
     expected_payload: &[u8],
     expected_descriptor_roles: &[&str],
 ) -> Result<UnixWorkerProcessReply, String> {
-    let packet = receive_packet(socket)?;
-    let envelope = decode_provider_worker_reply(&packet)?;
+    let (packet, output_descriptors) = receive_reply_packet(socket)?;
+    let envelope = decode_provider_worker_reply(&packet, output_descriptors.len())?;
     let expected_payload_hash = crate::provider_sample_artifact::fnv1a64_hex(expected_payload);
     if envelope.lease_id != expected_lease_id
         || envelope.sequence != expected_sequence
@@ -404,6 +409,11 @@ fn receive_process_reply(
     {
         return Err("Unix provider worker receipt identity mismatch".to_owned());
     }
+    let output_descriptor_payload = verify_output_descriptors(
+        &output_descriptors,
+        envelope.output_descriptor_byte_length,
+        &envelope.output_descriptor_hash,
+    )?;
     Ok(UnixWorkerProcessReply {
         sequence: expected_sequence,
         request_id: expected_request_id.to_owned(),
@@ -414,7 +424,76 @@ fn receive_process_reply(
         payload_hash: envelope.payload_hash,
         descriptor_roles: envelope.descriptor_roles,
         payload: envelope.payload,
+        output_descriptors,
+        output_descriptor_roles: envelope.output_descriptor_roles,
+        output_descriptor_byte_length: envelope.output_descriptor_byte_length,
+        output_descriptor_hash: envelope.output_descriptor_hash,
+        output_descriptor_payload,
     })
+}
+
+fn receive_reply_packet(socket: &UnixDatagram) -> Result<(Vec<u8>, Vec<OwnedFd>), String> {
+    let mut frame = vec![0u8; MAX_FRAME_BYTES];
+    let mut iov = libc::iovec {
+        iov_base: frame.as_mut_ptr().cast(),
+        iov_len: frame.len(),
+    };
+    let mut control = descriptor_control_buffer(MAX_PROVIDER_WORKER_DESCRIPTORS);
+    let mut message = unsafe { zeroed::<libc::msghdr>() };
+    message.msg_iov = &mut iov;
+    message.msg_iovlen = 1;
+    message.msg_control = control.as_mut_ptr().cast();
+    message.msg_controllen = control
+        .len()
+        .try_into()
+        .map_err(|_| "provider worker reply control length overflow")?;
+    let received = unsafe { libc::recvmsg(socket.as_raw_fd(), &mut message, 0) };
+    if received < 0 {
+        return Err(format!(
+            "failed to receive Unix provider worker reply: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+    if message.msg_flags & (libc::MSG_TRUNC | libc::MSG_CTRUNC) != 0 {
+        return Err("provider worker reply or output descriptors were truncated".to_owned());
+    }
+    let descriptors = receive_descriptors(&message)?;
+    for descriptor in &descriptors {
+        set_close_on_exec(descriptor.as_raw_fd())?;
+    }
+    frame.truncate(received as usize);
+    Ok((frame, descriptors))
+}
+
+fn verify_output_descriptors(
+    descriptors: &[OwnedFd],
+    byte_length: usize,
+    expected_hash: &str,
+) -> Result<Vec<u8>, String> {
+    if descriptors.is_empty() {
+        return (byte_length == 0 && expected_hash == "0x0000000000000000")
+            .then(Vec::new)
+            .ok_or_else(|| "provider worker empty output receipt is inconsistent".to_owned());
+    }
+    if descriptors.len() != 1 || byte_length == 0 || byte_length > MAX_FRAME_BYTES {
+        return Err("provider worker output descriptor shape is unsupported".to_owned());
+    }
+    let mut bytes = vec![0u8; byte_length];
+    let read = unsafe {
+        libc::pread(
+            descriptors[0].as_raw_fd(),
+            bytes.as_mut_ptr().cast(),
+            bytes.len(),
+            0,
+        )
+    };
+    if read < 0 || read as usize != bytes.len() {
+        return Err("provider worker output descriptor payload is unreadable".to_owned());
+    }
+    if crate::provider_sample_artifact::fnv1a64_hex(&bytes) != expected_hash {
+        return Err("provider worker output descriptor hash mismatch".to_owned());
+    }
+    Ok(bytes)
 }
 
 fn receive_packet(socket: &UnixDatagram) -> Result<Vec<u8>, String> {
@@ -511,6 +590,15 @@ mod tests {
     }
 
     #[test]
+    fn output_descriptor_receipt_rejects_hash_mismatch() {
+        let file = File::open("Cargo.toml").expect("file");
+        let descriptors = vec![OwnedFd::from(file)];
+        let error = verify_output_descriptors(&descriptors, 1, "0x0000000000000000")
+            .expect_err("forged output hash");
+        assert!(error.contains("output descriptor hash mismatch"));
+    }
+
+    #[test]
     fn nuis_worker_image_receives_two_distinct_post_spawn_descriptors() {
         let paths = WorkerProbePaths::new();
         let first_image = crate::provider_worker_image::resolve_provider_worker_image(
@@ -540,7 +628,8 @@ mod tests {
             role: "input.primary",
             descriptor: first.as_fd(),
         }];
-        let first_payload = b"capsule_token=capsule-token:101\ninputs=1\noutputs=1\n";
+        let first_payload =
+            b"capsule_token=capsule-token:101\ninvoker_token=invoker-token:301\ninput_roles=input.primary\noutput_roles=output.result\ninputs=1\noutputs=1\n";
         let first_reply = worker
             .request("first", first_payload, &first_descriptors)
             .expect("first request");
@@ -548,7 +637,8 @@ mod tests {
             role: "output.result",
             descriptor: second.as_fd(),
         }];
-        let second_payload = b"capsule_token=capsule-token:202\ninputs=1\noutputs=1\n";
+        let second_payload =
+            b"capsule_token=capsule-token:202\ninvoker_token=invoker-token:302\ninput_roles=output.result\noutput_roles=output.result\ninputs=1\noutputs=1\n";
         let second_reply = worker
             .request("second", second_payload, &second_descriptors)
             .expect("second request");
@@ -571,6 +661,13 @@ mod tests {
         );
         assert_eq!(first_reply.descriptor_roles, ["input.primary"]);
         assert_eq!(second_reply.descriptor_roles, ["output.result"]);
+        assert_eq!(first_reply.output_descriptor_roles, ["output.result"]);
+        assert_eq!(second_reply.output_descriptor_roles, ["output.result"]);
+        assert_eq!(first_reply.output_descriptors.len(), 1);
+        assert_eq!(second_reply.output_descriptors.len(), 1);
+        assert_eq!(first_reply.output_descriptor_byte_length, 24);
+        assert_eq!(second_reply.output_descriptor_byte_length, 24);
+        assert_ne!(first_reply.output_descriptor_hash, "0x0000000000000000");
         assert_eq!(
             first_reply.payload_hash,
             crate::provider_sample_artifact::fnv1a64_hex(first_payload)

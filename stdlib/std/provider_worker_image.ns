@@ -21,6 +21,8 @@ mod cpu Main {
   fn host_provider_worker_capsule_output_count() -> i64;
   extern "c" @host_symbol("provider_worker.is_close")
   fn host_provider_worker_is_close() -> i64;
+  extern "c" @host_symbol("provider_worker.invoke_capsule")
+  fn host_provider_worker_invoke_capsule(ingress_status: i64) -> i64;
   extern "c" @host_symbol("provider_worker.launch_provider_key")
   fn host_provider_worker_launch_provider_key() -> i64;
   extern "c" @host_symbol("provider_worker.launch_capability_hash")
@@ -96,7 +98,11 @@ mod cpu Main {
     if ingress_status <= 0 {
       return -3;
     }
-    if host_provider_worker_reply(ingress_status) != 0 {
+    let invocation_status: i64 = host_provider_worker_invoke_capsule(ingress_status);
+    if invocation_status <= 0 {
+      return -5;
+    }
+    if host_provider_worker_reply(invocation_status) != 0 {
       return -4;
     }
     return running;

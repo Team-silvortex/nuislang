@@ -1,5 +1,7 @@
 #[cfg(unix)]
-use crate::provider_worker_lease::{ProviderWorkerDispatchReceipt, ProviderWorkerLeaseManager};
+use crate::provider_worker_lease::{
+    ProviderWorkerAdapterLaunch, ProviderWorkerDispatchReceipt, ProviderWorkerLeaseManager,
+};
 use crate::{
     provider_edge_transport::ProviderEdgeTransportReceipt,
     provider_output_carrier_registry::ProviderOutputPayload,
@@ -428,6 +430,19 @@ fn bind_worker_output(
     summary.worker_execution_capsule_input_roles = receipt.execution_capsule_input_roles.clone();
     summary.worker_execution_capsule_output_roles = receipt.execution_capsule_output_roles.clone();
     summary.worker_execution_capsule_status = receipt.execution_capsule_status.to_owned();
+    summary.worker_execution_capsule_invoker_contract =
+        receipt.execution_capsule_invoker_contract.to_owned();
+    summary.worker_execution_capsule_invoker_id = receipt.execution_capsule_invoker_id.clone();
+    summary.worker_execution_capsule_invoker_status =
+        receipt.execution_capsule_invoker_status.to_owned();
+    summary.worker_output_descriptor_contract =
+        receipt.worker_output_descriptor_contract.to_owned();
+    summary.worker_output_descriptor_roles = receipt.worker_output_descriptor_roles.clone();
+    summary.worker_output_descriptor_count = receipt.worker_output_descriptor_count.to_string();
+    summary.worker_output_descriptor_byte_length =
+        receipt.worker_output_descriptor_byte_length.to_string();
+    summary.worker_output_descriptor_hash = receipt.worker_output_descriptor_hash.clone();
+    summary.worker_output_receipt_status = receipt.worker_output_receipt_status.to_owned();
     summary.worker_dispatch_permit_contract = receipt.dispatch_permit_contract.to_owned();
     summary.worker_dispatch_permit_status = receipt.dispatch_permit_status.to_owned();
     summary.worker_dispatch_status = receipt.dispatch_status.to_string();
@@ -472,6 +487,34 @@ fn execute_native_provider_request(
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
+    #[cfg(target_os = "macos")]
+    let prepared_worker_adapter = if adapter.kind == "metal-real-device-runner"
+        && request.buffer.element_type == "u8"
+        && request.buffer.layout.contains("pixel-format=gray8")
+        && request.kernel.operation == "invert"
+    {
+        Some(
+            crate::provider_runner_metal::prepare_gray8_worker_invocation(
+                request.scalar_u8("max_value").ok_or_else(|| {
+                    "Metal provider request is missing u8 scalar `max_value`".to_owned()
+                })?,
+            )?,
+        )
+    } else {
+        None
+    };
+    #[cfg(target_os = "macos")]
+    let worker_adapter_launch =
+        prepared_worker_adapter
+            .as_ref()
+            .map(|prepared| ProviderWorkerAdapterLaunch {
+                executable_path: prepared.executable_path(),
+                executable_hash: &prepared.executable_hash,
+                runner_contract: prepared.contract,
+                scalar_argument: &prepared.scalar_argument,
+            });
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let worker_adapter_launch: Option<ProviderWorkerAdapterLaunch<'_>> = None;
     #[cfg(unix)]
     let worker_receipt = worker_leases.dispatch(
         adapter.adapter_id,
@@ -480,6 +523,7 @@ fn execute_native_provider_request(
         session_request.sequence,
         request,
         &inputs,
+        worker_adapter_launch.as_ref(),
     )?;
     #[cfg(not(unix))]
     return Err("native provider worker leases require a registered host transport".to_owned());
@@ -498,11 +542,18 @@ fn execute_native_provider_request(
                 let max_value = request.scalar_u8("max_value").ok_or_else(|| {
                     "Metal provider request is missing u8 scalar `max_value`".to_owned()
                 })?;
-                let path = inputs[0]
-                    .input()
-                    .path()
-                    .ok_or_else(|| "Metal gray8 provider requires a path input".to_owned())?;
-                crate::provider_runner_metal::execute_gray8_invert(path, max_value)?
+                if worker_receipt.execution_capsule_invocation_mode == "worker-process-adapter-v1" {
+                    crate::provider_runner_metal::parse_metal_worker_output(
+                        &worker_receipt.worker_output_payload,
+                        "nuis-metal-gray8-provider-runner-v1",
+                    )?
+                } else {
+                    let path = inputs[0]
+                        .input()
+                        .path()
+                        .ok_or_else(|| "Metal gray8 provider requires a path input".to_owned())?;
+                    crate::provider_runner_metal::execute_gray8_invert(path, max_value)?
+                }
             } else if request.buffer.element_type == "f32"
                 && request.buffer.layout == "tensor-contiguous"
                 && request.kernel.operation == "bias"

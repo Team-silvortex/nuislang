@@ -26,6 +26,21 @@ const METAL_RUNNER_SOURCE: &str = include_str!("../provider-runners/metal_gray8_
 #[cfg(target_os = "macos")]
 const METAL_F32_BIAS_SOURCE: &str = include_str!("../provider-runners/metal_f32_bias.m");
 
+#[cfg(target_os = "macos")]
+pub(crate) struct PreparedMetalWorkerInvocation {
+    paths: TempMetalRunnerPaths,
+    pub(crate) contract: &'static str,
+    pub(crate) executable_hash: String,
+    pub(crate) scalar_argument: String,
+}
+
+#[cfg(target_os = "macos")]
+impl PreparedMetalWorkerInvocation {
+    pub(crate) fn executable_path(&self) -> &Path {
+        &self.paths.binary
+    }
+}
+
 pub(crate) struct MetalProviderExecution {
     pub(crate) contract: &'static str,
     pub(crate) status: &'static str,
@@ -48,6 +63,21 @@ pub(crate) fn execute_gray8_invert(
     max_value: u8,
 ) -> Result<MetalProviderExecution, String> {
     execute_gray8_invert_platform(input_path, max_value)
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn prepare_gray8_worker_invocation(
+    max_value: u8,
+) -> Result<PreparedMetalWorkerInvocation, String> {
+    let paths = compile_metal_runner(METAL_RUNNER_SOURCE)?;
+    let executable = fs::read(&paths.binary)
+        .map_err(|error| format!("failed to hash Metal worker adapter: {error}"))?;
+    Ok(PreparedMetalWorkerInvocation {
+        paths,
+        contract: "nuis-metal-gray8-provider-runner-v1",
+        executable_hash: crate::provider_sample_artifact::fnv1a64_hex(&executable),
+        scalar_argument: max_value.to_string(),
+    })
 }
 
 pub(crate) fn execute_f32_bias(
@@ -183,29 +213,7 @@ fn execute_metal_scalar_platform(
     carrier_channel: Option<&PreparedProviderCarrierChannel>,
     output_byte_len: Option<usize>,
 ) -> Result<MetalProviderExecution, String> {
-    let paths = TempMetalRunnerPaths::new();
-    fs::write(&paths.source, source)
-        .map_err(|error| format!("failed to materialize Metal runner source: {error}"))?;
-    let compile = Command::new("clang")
-        .args([
-            "-fobjc-arc",
-            "-fblocks",
-            "-framework",
-            "Foundation",
-            "-framework",
-            "Metal",
-        ])
-        .arg(&paths.source)
-        .arg("-o")
-        .arg(&paths.binary)
-        .output()
-        .map_err(|error| format!("failed to launch Metal runner compiler: {error}"))?;
-    if !compile.status.success() {
-        return Err(format!(
-            "Metal runner compilation failed: {}",
-            String::from_utf8_lossy(&compile.stderr).trim()
-        ));
-    }
+    let paths = compile_metal_runner(source)?;
     let mut command = Command::new(&paths.binary);
     command.arg(input_argument).arg(scalar);
     let output_adapter = output_byte_len
@@ -263,6 +271,34 @@ fn execute_metal_scalar_platform(
     }
     parsed.transferable_output = transferable_output;
     Ok(parsed)
+}
+
+#[cfg(target_os = "macos")]
+fn compile_metal_runner(source: &str) -> Result<TempMetalRunnerPaths, String> {
+    let paths = TempMetalRunnerPaths::new();
+    fs::write(&paths.source, source)
+        .map_err(|error| format!("failed to materialize Metal runner source: {error}"))?;
+    let compile = Command::new("clang")
+        .args([
+            "-fobjc-arc",
+            "-fblocks",
+            "-framework",
+            "Foundation",
+            "-framework",
+            "Metal",
+        ])
+        .arg(&paths.source)
+        .arg("-o")
+        .arg(&paths.binary)
+        .output()
+        .map_err(|error| format!("failed to launch Metal runner compiler: {error}"))?;
+    if !compile.status.success() {
+        return Err(format!(
+            "Metal runner compilation failed: {}",
+            String::from_utf8_lossy(&compile.stderr).trim()
+        ));
+    }
+    Ok(paths)
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -336,6 +372,15 @@ fn parse_metal_runner_output_with_payload(
         output_payload,
         transferable_output: None,
     })
+}
+
+pub(crate) fn parse_metal_worker_output(
+    output: &[u8],
+    expected_contract: &'static str,
+) -> Result<MetalProviderExecution, String> {
+    let output = std::str::from_utf8(output)
+        .map_err(|_| "Metal worker adapter output is not UTF-8".to_owned())?;
+    parse_metal_runner_output_with_payload(output, expected_contract, None)
 }
 
 fn decode_hex(value: &str) -> Result<Vec<u8>, String> {
