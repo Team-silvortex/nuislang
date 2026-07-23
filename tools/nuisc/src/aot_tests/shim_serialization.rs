@@ -246,3 +246,22 @@ fn c_shim_source_includes_exported_main_wrapper() {
     assert!(shim.contains("int64_t entry_main(void) {"));
     assert!(shim.contains("return nuis_yir_entry();"));
 }
+
+#[test]
+fn parameterized_export_wrapper_forwards_to_nuis_function() {
+    use crate::aot_c_shim_helpers::{render_exported_entry_wrapper, ExportedEntry};
+
+    let wrapper = render_exported_entry_wrapper(&ExportedEntry {
+        function_name: "worker_request".to_owned(),
+        symbol: "nuis_provider_worker_request_v1".to_owned(),
+        param_count: 5,
+    });
+
+    assert!(wrapper.contains(
+        "extern int64_t nuis_fn_worker_request(int64_t arg0, int64_t arg1, int64_t arg2, int64_t arg3, int64_t arg4);"
+    ));
+    assert!(wrapper.contains(
+        "int64_t nuis_provider_worker_request_v1(int64_t arg0, int64_t arg1, int64_t arg2, int64_t arg3, int64_t arg4)"
+    ));
+    assert!(wrapper.contains("return nuis_fn_worker_request(arg0, arg1, arg2, arg3, arg4);"));
+}

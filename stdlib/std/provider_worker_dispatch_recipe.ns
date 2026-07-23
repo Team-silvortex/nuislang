@@ -2,6 +2,35 @@ use cpu StdProviderWorkerContracts;
 use cpu StdProviderWorkerDispatchContracts;
 
 mod cpu Main {
+  @export(name = "nuis_provider_worker_request_v1")
+  fn worker_request(
+    request_handle: i64,
+    descriptor_table_handle: i64,
+    descriptor_count: i64,
+    provider_key: i64,
+    capability_hash: i64
+  ) -> i64 {
+    if request_handle <= 0 {
+      return -1;
+    }
+    if descriptor_count < 0 {
+      return -2;
+    }
+    if descriptor_count > 0 && descriptor_table_handle <= 0 {
+      return -3;
+    }
+    if provider_key <= 0 || capability_hash <= 0 {
+      return -4;
+    }
+    return provider_request_ingress(
+      request_handle,
+      descriptor_table_handle,
+      descriptor_count,
+      provider_key,
+      capability_hash
+    );
+  }
+
   fn binding(
     provider_key: i64,
     dispatch_token: i64,
@@ -23,7 +52,7 @@ mod cpu Main {
     descriptor_count: i64,
     capability_hash: i64
   ) -> ProviderWorkerRequest {
-    let imported_request_handle: i64 = provider_request_ingress(
+    let imported_request_handle: i64 = worker_request(
       request_handle,
       descriptor_table_handle,
       descriptor_count,

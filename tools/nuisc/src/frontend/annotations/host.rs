@@ -106,6 +106,36 @@ const STD_HOST_SYMBOLS: &[(&str, &str)] = &[
     ("process.exit_code", "host_process_exit_code"),
     ("process.id", "host_process_id"),
     ("process.status", "host_process_status"),
+    (
+        "provider_worker.capability_hash",
+        "host_provider_worker_capability_hash",
+    ),
+    ("provider_worker.close", "host_provider_worker_close"),
+    (
+        "provider_worker.descriptor_count",
+        "host_provider_worker_descriptor_count",
+    ),
+    (
+        "provider_worker.descriptor_table",
+        "host_provider_worker_descriptor_table",
+    ),
+    ("provider_worker.is_close", "host_provider_worker_is_close"),
+    (
+        "provider_worker.launch_capability_hash",
+        "host_provider_worker_launch_capability_hash",
+    ),
+    (
+        "provider_worker.launch_provider_key",
+        "host_provider_worker_launch_provider_key",
+    ),
+    ("provider_worker.open", "host_provider_worker_open"),
+    (
+        "provider_worker.provider_key",
+        "host_provider_worker_provider_key",
+    ),
+    ("provider_worker.receive", "host_provider_worker_receive"),
+    ("provider_worker.reply", "host_provider_worker_reply"),
+    ("provider_worker.request", "host_provider_worker_request"),
     ("result.error", "host_result_error"),
     ("result.is_ok", "host_result_is_ok"),
     ("result.value", "host_result_value"),
@@ -153,16 +183,39 @@ pub(crate) fn validate_export_annotations(module: &AstModule) -> Result<(), Stri
                 module.unit, function.name
             ));
         }
-        if function.name != "main" {
+        if function.is_async {
             return Err(format!(
-                "function `{}` uses `@export(name = \"{}\")`, but only `fn main()` can be exported in the current MVP",
+                "function `{}` uses `@export(name = \"{}\")`, but exported functions cannot be async in the current scalar ABI",
                 function.name, export_name
             ));
         }
-        if !function.params.is_empty() {
+        if !function.generic_params.is_empty() {
             return Err(format!(
-                "function `{}` uses `@export(name = \"{}\")`, but exported `fn main()` cannot take parameters in the current MVP",
+                "function `{}` uses `@export(name = \"{}\")`, but exported functions cannot be generic in the current scalar ABI",
                 function.name, export_name
+            ));
+        }
+        if function.name != "main" {
+            if !function
+                .params
+                .iter()
+                .all(|param| is_i64_type_ref(&param.ty))
+            {
+                return Err(format!(
+                    "function `{}` uses `@export(name = \"{}\")`, but exported function parameters currently require scalar `i64`",
+                    function.name, export_name
+                ));
+            }
+            if !function.return_type.as_ref().is_some_and(is_i64_type_ref) {
+                return Err(format!(
+                    "function `{}` uses `@export(name = \"{}\")`, but exported functions currently require `-> i64`",
+                    function.name, export_name
+                ));
+            }
+        } else if !function.params.is_empty() {
+            return Err(format!(
+                "function `main` uses `@export(name = \"{}\")`, but the process entry cannot take parameters",
+                export_name
             ));
         }
         if !seen_export_names.insert(export_name.clone()) {

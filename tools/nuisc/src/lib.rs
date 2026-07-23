@@ -14,6 +14,7 @@ mod aot_c_shim_network_runtime;
 mod aot_c_shim_owned_blob_runtime;
 mod aot_c_shim_path_runtime;
 mod aot_c_shim_process_runtime;
+mod aot_c_shim_provider_worker_runtime;
 mod aot_c_shim_runtime;
 mod aot_c_shim_serialization_runtime;
 mod aot_c_shim_source;

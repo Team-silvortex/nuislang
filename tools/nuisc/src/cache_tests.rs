@@ -69,4 +69,24 @@ mod tests {
 
         fs::remove_dir_all(&temp_dir).unwrap();
     }
+
+    #[test]
+    fn explicit_compile_identity_participates_in_cache_key() {
+        let temp_dir = temp_path("identity");
+        fs::create_dir_all(&temp_dir).unwrap();
+        let source = temp_dir.join("worker.ns");
+        fs::write(&source, "mod cpu Main { fn main() -> i64 { return 0; } }").unwrap();
+
+        let first = compute_compile_cache_key_with_identity(&source, None, "worker-image-v1")
+            .expect("first key");
+        let second = compute_compile_cache_key_with_identity(&source, None, "worker-image-v2")
+            .expect("second key");
+
+        assert_ne!(first.key, second.key);
+        assert!(first
+            .input_labels
+            .iter()
+            .any(|label| label == "compile.cache.identity"));
+        fs::remove_dir_all(&temp_dir).unwrap();
+    }
 }

@@ -4,13 +4,30 @@ pub fn compute_compile_cache_key(
     input: &Path,
     project: Option<&LoadedProject>,
 ) -> Result<CompileCacheKey, String> {
-    compute_compile_cache_key_with_plan(input, project, None)
+    compute_compile_cache_key_with_plan_and_identity(input, project, None, None)
+}
+
+pub fn compute_compile_cache_key_with_identity(
+    input: &Path,
+    project: Option<&LoadedProject>,
+    identity: &str,
+) -> Result<CompileCacheKey, String> {
+    compute_compile_cache_key_with_plan_and_identity(input, project, None, Some(identity))
 }
 
 pub fn compute_compile_cache_key_with_plan(
     input: &Path,
     project: Option<&LoadedProject>,
     plan: Option<&ProjectCompilationPlan>,
+) -> Result<CompileCacheKey, String> {
+    compute_compile_cache_key_with_plan_and_identity(input, project, plan, None)
+}
+
+fn compute_compile_cache_key_with_plan_and_identity(
+    input: &Path,
+    project: Option<&LoadedProject>,
+    plan: Option<&ProjectCompilationPlan>,
+    identity: Option<&str>,
 ) -> Result<CompileCacheKey, String> {
     let root = cache_root(input, project);
     let mut records = vec![
@@ -31,6 +48,15 @@ pub fn compute_compile_cache_key_with_plan(
             crate::engine::default_engine().profile.as_bytes().to_vec(),
         ),
     ];
+    if let Some(identity) = identity {
+        if identity.is_empty() {
+            return Err("compile cache identity cannot be empty".to_owned());
+        }
+        records.push(CacheFingerprintRecord::inline_bytes(
+            "compile.cache.identity",
+            identity.as_bytes().to_vec(),
+        ));
+    }
 
     if let Some(project) = project {
         if let Some(plan) = plan {

@@ -30,7 +30,10 @@ pub use cache_entry::{
     compile_cache_status, compile_cache_status_with_plan, lookup_compile_cache,
     restore_compile_cache, store_compile_cache,
 };
-pub use cache_key::{compute_compile_cache_key, compute_compile_cache_key_with_plan};
+pub use cache_key::{
+    compute_compile_cache_key, compute_compile_cache_key_with_identity,
+    compute_compile_cache_key_with_plan,
+};
 pub use cache_maintenance::{
     clean_compile_cache, clean_compile_cache_summary, clean_compile_cache_with_plan,
     compile_cache_inventory, compile_cache_inventory_summary, prune_compile_cache,

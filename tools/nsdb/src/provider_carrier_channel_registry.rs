@@ -2,6 +2,7 @@ use crate::provider_carrier_channel::encode_provider_carrier_frames;
 #[cfg(unix)]
 use crate::provider_carrier_channel_unix::InheritedFdCarrier;
 use std::{
+    fs::File,
     io::Write,
     process::{Child, Command, Stdio},
 };
@@ -88,6 +89,14 @@ impl PreparedProviderCarrierChannel {
         match self {
             #[cfg(unix)]
             Self::InheritedFd(carrier) => carrier.try_clone().map(Self::InheritedFd).map(Some),
+            Self::FramedStdin(_) => Ok(None),
+        }
+    }
+
+    #[cfg(unix)]
+    pub(crate) fn try_clone_worker_descriptor(&self) -> Result<Option<File>, String> {
+        match self {
+            Self::InheritedFd(carrier) => carrier.try_clone_descriptor().map(Some),
             Self::FramedStdin(_) => Ok(None),
         }
     }

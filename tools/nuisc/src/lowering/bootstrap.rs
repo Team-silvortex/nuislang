@@ -86,11 +86,26 @@ pub(super) fn lower_nir_to_yir_builtin_cpu_with_registry(
     let rewritten_module = rewrite_self_tail_recursive_functions(module);
     let module = &rewritten_module;
     super::nested_owned_returns::validate_selected_owned_pointer_transfers(module)?;
+    let exported_functions = module
+        .functions
+        .iter()
+        .filter(|function| function.name != "main")
+        .filter(|function| {
+            function
+                .annotations
+                .iter()
+                .any(|annotation| annotation.name == "export")
+        })
+        .map(|function| function.name.clone())
+        .collect::<BTreeSet<_>>();
     let direct_call_functions = collect_recursive_direct_call_functions(module)
         .union(&super::scoped_loop_lowering::collect_scoped_loop_helper_functions(module))
         .cloned()
         .collect::<BTreeSet<_>>()
         .union(&collect_conditional_owned_return_helpers(module))
+        .cloned()
+        .collect::<BTreeSet<_>>()
+        .union(&exported_functions)
         .cloned()
         .collect::<BTreeSet<_>>();
     let async_helper_functions = collect_recursive_async_helper_functions(module);

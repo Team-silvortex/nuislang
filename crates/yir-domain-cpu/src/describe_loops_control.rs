@@ -567,7 +567,7 @@ pub(super) fn describe_cpu_loops_control_node(
                     ));
                 }
             }
-            for carry_kind in node.op.args[8..].iter().step_by(2) {
+            for carry_kind in node.op.args.get(8..).unwrap_or_default().iter().step_by(2) {
                 if carry_kind == "add_current" {
                     continue;
                 }

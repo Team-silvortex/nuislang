@@ -1,6 +1,22 @@
 use std::path::PathBuf;
 use std::process::Command;
 
+pub(crate) const PROVIDER_WORKER_IMAGE_REGISTRY_CONTRACT: &str =
+    "nuis-provider-worker-image-registry-v1";
+pub(crate) const PROVIDER_WORKER_IMAGE_REGISTRY_SOURCE: &str =
+    "builtin-nustar-provider-worker-image-registry";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ProviderWorkerImageRegistration {
+    pub(crate) registry_contract: &'static str,
+    pub(crate) registry_source: &'static str,
+    pub(crate) image_id: &'static str,
+    pub(crate) source_path: &'static str,
+    pub(crate) cache_identity: &'static str,
+    pub(crate) provider_key: i64,
+    pub(crate) capability_hash: i64,
+}
+
 pub(crate) struct ProviderRunnerAdapter {
     pub(crate) adapter_id: &'static str,
     pub(crate) capability_status: &'static str,
@@ -48,6 +64,37 @@ pub(crate) fn select_provider_runner_adapter(provider_family: &str) -> ProviderR
             execution_mode: "host-simulated-provider-runner",
         },
     }
+}
+
+pub(crate) fn select_provider_worker_image_registration(
+    provider_family: &str,
+) -> Option<ProviderWorkerImageRegistration> {
+    let (domain, backend) = provider_family.split_once(':')?;
+    if domain.is_empty() || backend.is_empty() {
+        return None;
+    }
+    Some(ProviderWorkerImageRegistration {
+        registry_contract: PROVIDER_WORKER_IMAGE_REGISTRY_CONTRACT,
+        registry_source: PROVIDER_WORKER_IMAGE_REGISTRY_SOURCE,
+        image_id: "std.provider-worker.unix.v1",
+        source_path: "stdlib/std/provider_worker_image.ns",
+        cache_identity: "std.provider-worker.unix.aot-v2",
+        provider_key: stable_registration_scalar(provider_family.as_bytes()),
+        capability_hash: stable_registration_scalar(
+            format!("{provider_family}:provider-worker-capability-v1").as_bytes(),
+        ),
+    })
+}
+
+fn stable_registration_scalar(bytes: &[u8]) -> i64 {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    i64::try_from(hash & i64::MAX as u64)
+        .unwrap_or(i64::MAX)
+        .max(1)
 }
 
 pub(crate) fn provider_runner_real_device_probe_status(provider_family: &str) -> &'static str {
@@ -146,7 +193,10 @@ fn command_output_trimmed(command: &str, args: &[&str]) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{provider_runner_real_device_probe_status, select_provider_runner_adapter};
+    use super::{
+        provider_runner_real_device_probe_status, select_provider_runner_adapter,
+        select_provider_worker_image_registration, PROVIDER_WORKER_IMAGE_REGISTRY_CONTRACT,
+    };
 
     #[test]
     fn reports_unknown_provider_family_as_unsupported() {
@@ -162,5 +212,25 @@ mod tests {
         assert_eq!(adapter.adapter_id, "generic.device.host-simulated");
         assert_eq!(adapter.capability_status, "registered-host-simulated");
         assert!(!adapter.real_device_capable);
+    }
+
+    #[test]
+    fn worker_image_registration_is_open_ended_and_provider_bound() {
+        let first = select_provider_worker_image_registration("spirv:vulkan-gpu")
+            .expect("generic provider registration");
+        let repeated = select_provider_worker_image_registration("spirv:vulkan-gpu")
+            .expect("stable provider registration");
+        let other = select_provider_worker_image_registration("kernel:cpu-avx2")
+            .expect("other provider registration");
+
+        assert_eq!(
+            first.registry_contract,
+            PROVIDER_WORKER_IMAGE_REGISTRY_CONTRACT
+        );
+        assert_eq!(first, repeated);
+        assert_ne!(first.provider_key, other.provider_key);
+        assert_ne!(first.capability_hash, other.capability_hash);
+        assert_eq!(first.source_path, other.source_path);
+        assert_eq!(first.cache_identity, other.cache_identity);
     }
 }

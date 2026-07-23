@@ -606,9 +606,60 @@ inputs remain explicit YIR dependencies, Data Nustar interpretation returns the
 opaque request handle, GLM records five value reads, and CPU LLVM lowering
 performs only scalar passthrough. The dispatch recipe now obtains every request
 handle through this node and still executes with output `14` and no ingress
-deferred notes. The remaining boundary is operational: map a verified
-`NUISPWU2` packet and received descriptor table into these five fields, then
-invoke an exported Nuis worker entrypoint instead of the standalone probe.
+deferred notes.
+
+That scalar boundary is now concrete. Parameterized `@export` functions may
+expose a non-async, non-generic `i64` ABI; exported helpers are materialized
+even when `main` does not call them, and LLVM scalar calls no longer impose an
+artificial three-argument ceiling. The dispatch recipe exports
+`nuis_provider_worker_request_v1(request, descriptor_table, count, provider,
+capability)`, performs handle checks in Nuis, enters the registered Data Nustar
+intrinsic, remains visible in the native symbol table, and still executes with
+output `14`. `nuis-provider-worker-ingress-adapter-v1` is deliberately
+policy-free: after `NUISPWU2` verification and runtime handle registration it
+only maps the request handle, descriptor-table handle/count, provider key, and
+capability hash into that static function signature. The remaining gap is no
+longer the ABI contract. `provider_worker_image.ns` now owns an async
+`open -> while receive -> worker_request -> reply -> close` lifecycle. Its AOT
+shim contributes only one-frame `recvmsg`/`sendmsg`, envelope verification, and
+descriptor ownership primitives when the worker host-symbol surface is used.
+The Nsdb transport regression compiles and links this Nuis source in-process,
+then proves one worker PID receives two post-spawn SCM_RIGHTS descriptors with
+first-byte evidence `17/29`, echoes both opaque payloads, and exits through the
+Nuis-owned close branch. The standalone C worker probe has been removed. The
+next gap is registration-driven worker image selection and build reuse rather
+than selecting this official source directly inside the regression.
+
+Worker image selection and build reuse are now registration-driven.
+`nuis-provider-worker-image-registry-v1` accepts any valid `domain:backend`
+family, derives stable positive provider/capability scalars, and points to one
+provider-neutral official worker source plus a versioned cache identity. The
+resolver salts the normal `nuisc` content-addressed key with that identity,
+restores a cached AOT image when available, and injects only the registered
+launch scalars into the worker command. The persistent transport regression
+resolves twice into independent output directories, requires the second result
+to be a cache hit with the same key, and runs only that restored binary. The
+remaining integration gap is moving resolver ownership into the normal
+provider execution/session path so one registered worker instance is leased
+and reused automatically rather than being opened directly by a regression.
+
+That integration is now present. Normal provider sample execution leases one
+registration-resolved Nuis worker per adapter/session, binds worker sequence to
+the logical session sequence, transfers every available prepared input through
+SCM_RIGHTS, records worker identity, resolver/cache status, descriptor count,
+and payload hash in each indexed native output, and closes all workers at graph
+teardown. Startup is an explicit `NUISPWUH0 -> NUISPWUH1` exchange with bounded
+socket I/O. Content cache entries remain shared, while each live adapter gets a
+separate transient restored executable directory; this avoids rewriting a
+running Mach-O image when a second backend starts, and all transient copies are
+removed after close. The five-request official WitSage/PixelMagic graph now
+proves CoreML worker order `0..3`, Metal worker order `0`, two-descriptor fan-in,
+cross-provider descriptor transfer, and successful native comparisons. The
+next gap is execution ownership: the Nuis worker currently validates and
+receipts the registered request before Nsdb invokes the concrete provider
+adapter in its parent process. The backend dispatch and output-carrier result
+must move behind the worker boundary without teaching the worker finite backend
+combinations.
 
 The language-core checks anchor the bootstrap-critical
 `language-core/nuisc/type-control-flow-generics` cell to:

@@ -40,6 +40,10 @@ mod provider_sample_payload_tests;
 mod provider_sample_runner;
 mod provider_session_registry;
 mod provider_transport_receipt_payload;
+mod provider_worker_image;
+mod provider_worker_ingress;
+#[cfg(unix)]
+mod provider_worker_lease;
 mod provider_worker_request;
 mod provider_worker_transport;
 #[cfg(unix)]

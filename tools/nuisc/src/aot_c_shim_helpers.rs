@@ -2,6 +2,12 @@ use std::collections::BTreeMap;
 
 use nuis_semantics::model::{AstExternFunction, AstModule, AstTypeRef};
 
+pub(crate) struct ExportedEntry {
+    pub(crate) function_name: String,
+    pub(crate) symbol: String,
+    pub(crate) param_count: usize,
+}
+
 pub(crate) fn ast_uses_network_lifecycle_surface(ast: &AstModule) -> bool {
     ast.domain == "network"
         || ast
@@ -16,6 +22,12 @@ pub(crate) fn ast_uses_hetero_lifecycle_surface(ast: &AstModule) -> bool {
         || ast.externs.iter().any(|function| {
             function.name.starts_with("host_shader_") || function.name.starts_with("host_kernel_")
         })
+}
+
+pub(crate) fn ast_uses_provider_worker_surface(ast: &AstModule) -> bool {
+    ast.externs
+        .iter()
+        .any(|function| function.name.starts_with("host_provider_worker_"))
 }
 
 pub(crate) fn ast_hetero_lifecycle_surface_slots(ast: &AstModule) -> usize {
@@ -34,10 +46,9 @@ pub(crate) fn ast_hetero_lifecycle_surface_slots(ast: &AstModule) -> usize {
             .count()
 }
 
-pub(crate) fn collect_exported_entry_symbols(ast: &AstModule) -> Vec<String> {
+pub(crate) fn collect_exported_entries(ast: &AstModule) -> Vec<ExportedEntry> {
     ast.functions
         .iter()
-        .filter(|function| function.name == "main")
         .filter_map(|function| {
             function
                 .attributes
@@ -45,15 +56,38 @@ pub(crate) fn collect_exported_entry_symbols(ast: &AstModule) -> Vec<String> {
                 .find(|attribute| attribute.name == "export")
                 .and_then(|attribute| attribute.args.first())
                 .and_then(|arg| match &arg.value {
-                    nuis_semantics::model::AstAttributeValue::String(value) => Some(value.clone()),
+                    nuis_semantics::model::AstAttributeValue::String(value) => {
+                        Some(ExportedEntry {
+                            function_name: function.name.clone(),
+                            symbol: value.clone(),
+                            param_count: function.params.len(),
+                        })
+                    }
                     _ => None,
                 })
         })
         .collect()
 }
 
-pub(crate) fn render_exported_entry_wrapper(symbol: &str) -> String {
-    format!("int64_t {symbol}(void) {{\n    return nuis_yir_entry();\n}}\n")
+pub(crate) fn render_exported_entry_wrapper(entry: &ExportedEntry) -> String {
+    if entry.function_name == "main" {
+        return format!(
+            "int64_t {}(void) {{\n    return nuis_yir_entry();\n}}\n",
+            entry.symbol
+        );
+    }
+    let declaration_params = (0..entry.param_count)
+        .map(|index| format!("int64_t arg{index}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let call_params = (0..entry.param_count)
+        .map(|index| format!("arg{index}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "extern int64_t nuis_fn_{}({declaration_params});\nint64_t {}({declaration_params}) {{\n    return nuis_fn_{}({call_params});\n}}\n",
+        entry.function_name, entry.symbol, entry.function_name
+    )
 }
 
 pub(crate) fn render_lifecycle_export_wrappers() -> String {
@@ -305,6 +339,26 @@ pub(crate) fn render_registered_host_ffi_body(
         "host_process_id" => ("nuis_host_process_id", 0),
         "host_process_status" => ("nuis_host_process_status", 0),
         "host_process_exit_code" => ("nuis_host_process_exit_code", 1),
+        "host_provider_worker_open" => ("nuis_host_provider_worker_open", 2),
+        "host_provider_worker_receive" => ("nuis_host_provider_worker_receive", 0),
+        "host_provider_worker_request" => ("nuis_host_provider_worker_request", 0),
+        "host_provider_worker_descriptor_table" => {
+            ("nuis_host_provider_worker_descriptor_table", 0)
+        }
+        "host_provider_worker_descriptor_count" => {
+            ("nuis_host_provider_worker_descriptor_count", 0)
+        }
+        "host_provider_worker_provider_key" => ("nuis_host_provider_worker_provider_key", 0),
+        "host_provider_worker_capability_hash" => ("nuis_host_provider_worker_capability_hash", 0),
+        "host_provider_worker_is_close" => ("nuis_host_provider_worker_is_close", 0),
+        "host_provider_worker_launch_provider_key" => {
+            ("nuis_host_provider_worker_launch_provider_key", 0)
+        }
+        "host_provider_worker_launch_capability_hash" => {
+            ("nuis_host_provider_worker_launch_capability_hash", 0)
+        }
+        "host_provider_worker_reply" => ("nuis_host_provider_worker_reply", 1),
+        "host_provider_worker_close" => ("nuis_host_provider_worker_close", 0),
         "host_command_spawn" => ("nuis_host_command_spawn", 2),
         "host_command_spawn_in" => ("nuis_host_command_spawn_in", 4),
         "host_command_status" => ("nuis_host_command_status", 1),

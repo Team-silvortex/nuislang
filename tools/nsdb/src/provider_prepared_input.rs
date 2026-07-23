@@ -194,6 +194,24 @@ impl PreparedProviderInput {
         self.direct_channel.as_ref()
     }
 
+    #[cfg(unix)]
+    pub(crate) fn try_clone_worker_descriptor(&self) -> Result<Option<fs::File>, String> {
+        if let Some(channel) = &self.direct_channel {
+            return channel.try_clone_worker_descriptor();
+        }
+        self.input()
+            .path()
+            .map(|path| {
+                fs::File::open(path).map_err(|error| {
+                    format!(
+                        "failed to open provider input descriptor `{}`: {error}",
+                        path.display()
+                    )
+                })
+            })
+            .transpose()
+    }
+
     pub(crate) fn finish(mut self) -> Result<Option<ProviderEdgeTransportReceipt>, String> {
         let mut receipt = self.transport_receipt.take();
         if self.direct_channel.take().is_some() {

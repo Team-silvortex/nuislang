@@ -1,3 +1,5 @@
+#[cfg(unix)]
+use crate::provider_worker_lease::{ProviderWorkerDispatchReceipt, ProviderWorkerLeaseManager};
 use crate::{
     provider_edge_transport::ProviderEdgeTransportReceipt,
     provider_output_carrier_registry::ProviderOutputPayload,
@@ -312,6 +314,8 @@ fn execute_native_provider_outputs(
     };
     let mut completed = BTreeMap::<String, CompletedProviderOutput>::new();
     let mut sessions = BTreeMap::<String, ProviderSessionLease>::new();
+    #[cfg(unix)]
+    let mut worker_leases = ProviderWorkerLeaseManager::new(output_dir);
     let mut summaries = Vec::with_capacity(collection.requests.len());
     let mut transport_receipts = Vec::new();
     for request in &collection.requests {
@@ -352,6 +356,10 @@ fn execute_native_provider_outputs(
             effective_adapter,
             request,
             &completed,
+            provider_family,
+            &session_request,
+            #[cfg(unix)]
+            &mut worker_leases,
         )?;
         session.complete_request(&request.kernel.id)?;
         bind_session_output(&mut execution.summary, &session_request);
@@ -369,6 +377,8 @@ fn execute_native_provider_outputs(
     for session in sessions.values_mut() {
         session.close()?;
     }
+    #[cfg(unix)]
+    worker_leases.close()?;
     for summary in &mut summaries {
         summary.output_handle_release_status = "released-at-graph-close".to_owned();
     }
@@ -397,6 +407,20 @@ fn bind_session_output(
     summary.output_handle_release_status = "lease-bound".to_owned();
 }
 
+#[cfg(unix)]
+fn bind_worker_output(
+    summary: &mut PixelMagicNativeOutputSummary,
+    receipt: &ProviderWorkerDispatchReceipt,
+) {
+    summary.worker_lease_contract = receipt.lease_contract.to_owned();
+    summary.worker_resolver_contract = receipt.resolver_contract.to_owned();
+    summary.worker_cache_status = receipt.cache_status.to_owned();
+    summary.worker_pid = receipt.worker_pid.to_string();
+    summary.worker_request_sequence = receipt.sequence.to_string();
+    summary.worker_descriptor_count = receipt.descriptor_count.to_string();
+    summary.worker_payload_hash = receipt.payload_hash.clone();
+}
+
 struct NativeProviderRequestExecution {
     summary: PixelMagicNativeOutputSummary,
     output_payload: ProviderOutputPayload,
@@ -411,6 +435,9 @@ fn execute_native_provider_request(
     adapter: &crate::provider_runner_registry::ProviderRunnerAdapter,
     request: &ProviderRequest,
     completed: &BTreeMap<String, CompletedProviderOutput>,
+    provider_family: &str,
+    session_request: &ProviderSessionRequest,
+    #[cfg(unix)] worker_leases: &mut ProviderWorkerLeaseManager,
 ) -> Result<NativeProviderRequestExecution, String> {
     let inputs = request
         .input_bindings
@@ -433,6 +460,17 @@ fn execute_native_provider_request(
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
+    #[cfg(unix)]
+    let worker_receipt = worker_leases.dispatch(
+        adapter.adapter_id,
+        provider_family,
+        &session_request.lease_id,
+        session_request.sequence,
+        request,
+        &inputs,
+    )?;
+    #[cfg(not(unix))]
+    return Err("native provider worker leases require a registered host transport".to_owned());
     let mut request_execution = match adapter.kind {
         "metal-real-device-runner" => {
             if inputs.len() != 1 {
@@ -590,6 +628,8 @@ fn execute_native_provider_request(
         .into_iter()
         .flatten()
         .collect();
+    #[cfg(unix)]
+    bind_worker_output(&mut request_execution.summary, &worker_receipt);
     Ok(request_execution)
 }
 

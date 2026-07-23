@@ -218,7 +218,11 @@ First auto-injectable library module:
   descriptor-table handles, open-ended provider keys, dispatch tokens, and
   capability hashes; `provider_worker_dispatch_recipe.ns` proves accepted and
   rejected bindings through CPU/data YIR plus native output `14`; every request
-  enters through the registered `data.provider_request_ingress` intrinsic
+  enters through the registered `data.provider_request_ingress` intrinsic, and
+  the recipe exports the five-scalar `nuis_provider_worker_request_v1` static
+  ABI so transport adapters do not own worker validation or dispatch policy;
+  `provider_worker_image.ns` owns the persistent async receive/dispatch/reply
+  loop and runs under the real `NUISPWU2` plus SCM_RIGHTS transport regression
 
 Intended scope:
 

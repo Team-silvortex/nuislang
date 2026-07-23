@@ -63,6 +63,25 @@ pub(crate) fn push_native_output_summary(
             summary.session_request_sequence.as_str(),
         ),
         (
+            "worker_lease_contract",
+            summary.worker_lease_contract.as_str(),
+        ),
+        (
+            "worker_resolver_contract",
+            summary.worker_resolver_contract.as_str(),
+        ),
+        ("worker_cache_status", summary.worker_cache_status.as_str()),
+        ("worker_pid", summary.worker_pid.as_str()),
+        (
+            "worker_request_sequence",
+            summary.worker_request_sequence.as_str(),
+        ),
+        (
+            "worker_descriptor_count",
+            summary.worker_descriptor_count.as_str(),
+        ),
+        ("worker_payload_hash", summary.worker_payload_hash.as_str()),
+        (
             "output_handle_contract",
             summary.output_handle_contract.as_str(),
         ),
@@ -191,6 +210,25 @@ pub(crate) fn push_indexed_native_output(
             "session_request_sequence",
             summary.session_request_sequence.as_str(),
         ),
+        (
+            "worker_lease_contract",
+            summary.worker_lease_contract.as_str(),
+        ),
+        (
+            "worker_resolver_contract",
+            summary.worker_resolver_contract.as_str(),
+        ),
+        ("worker_cache_status", summary.worker_cache_status.as_str()),
+        ("worker_pid", summary.worker_pid.as_str()),
+        (
+            "worker_request_sequence",
+            summary.worker_request_sequence.as_str(),
+        ),
+        (
+            "worker_descriptor_count",
+            summary.worker_descriptor_count.as_str(),
+        ),
+        ("worker_payload_hash", summary.worker_payload_hash.as_str()),
         (
             "output_handle_contract",
             summary.output_handle_contract.as_str(),

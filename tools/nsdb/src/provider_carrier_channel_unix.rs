@@ -212,6 +212,12 @@ impl InheritedFdCarrier {
         })
     }
 
+    pub(crate) fn try_clone_descriptor(&self) -> Result<File, String> {
+        self.file
+            .try_clone()
+            .map_err(|error| format!("failed to clone inherited-fd descriptor: {error}"))
+    }
+
     pub(crate) fn configure_command(&self, command: &mut Command) {
         let fd = self.file.as_raw_fd();
         unsafe {

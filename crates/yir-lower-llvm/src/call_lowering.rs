@@ -335,34 +335,11 @@ pub(crate) fn lower_cpu_call_node(
 
     let reg = fresh_reg(next_reg);
     let symbol = format!("nuis_fn_{callee}");
-    let call = match lowered_args.as_slice() {
-        [] => format!(
-            "call {} @{symbol}()",
-            cpu_scalar_kind_llvm_type(signature.ret)
-        ),
-        [a0] => format!(
-            "call {} @{symbol}({a0})",
-            cpu_scalar_kind_llvm_type(signature.ret)
-        ),
-        [a0, a1] => format!(
-            "call {} @{symbol}({a0}, {a1})",
-            cpu_scalar_kind_llvm_type(signature.ret)
-        ),
-        [a0, a1, a2] => format!(
-            "call {} @{symbol}({a0}, {a1}, {a2})",
-            cpu_scalar_kind_llvm_type(signature.ret)
-        ),
-        _ => {
-            body.push(format!(
-                "  ; deferred lowering for cpu.{} `{}` because callee `{}` has unsupported arity {}",
-                node.op.instruction,
-                node.name,
-                callee,
-                lowered_args.len()
-            ));
-            return Ok(true);
-        }
-    };
+    let call = format!(
+        "call {} @{symbol}({})",
+        cpu_scalar_kind_llvm_type(signature.ret),
+        lowered_args.join(", ")
+    );
     body.push(format!("  {reg} = {call}"));
 
     if node.op.instruction == "call_owned_struct" {

@@ -8,9 +8,11 @@ use std::{
     os::unix::net::UnixDatagram,
     os::unix::process::CommandExt,
     process::{Child, Command},
+    time::Duration,
 };
 
 const MAX_FRAME_BYTES: usize = 64 * 1024;
+const WORKER_IO_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub(crate) struct UnixWorkerProcessTransport {
     child: Child,
@@ -56,6 +58,12 @@ impl UnixWorkerProcessTransport {
     pub(crate) fn spawn(command: &mut Command, lease_id: &str) -> Result<Self, String> {
         validate_frame_token(lease_id, "lease id")?;
         let (parent_socket, child_socket) = worker_socket_pair()?;
+        parent_socket
+            .set_read_timeout(Some(WORKER_IO_TIMEOUT))
+            .map_err(|error| format!("failed to set provider worker read timeout: {error}"))?;
+        parent_socket
+            .set_write_timeout(Some(WORKER_IO_TIMEOUT))
+            .map_err(|error| format!("failed to set provider worker write timeout: {error}"))?;
         let child_fd = child_socket.as_raw_fd();
         command.env("NUIS_PROVIDER_WORKER_SOCKET_FD", child_fd.to_string());
         unsafe {
@@ -73,6 +81,12 @@ impl UnixWorkerProcessTransport {
             .map_err(|error| format!("failed to spawn Unix provider worker: {error}"))?;
         drop(child_socket);
         let handshake_result = (|| {
+            let sent = parent_socket.send(b"NUISPWUH0").map_err(|error| {
+                format!("failed to start Unix provider worker handshake: {error}")
+            })?;
+            if sent != b"NUISPWUH0".len() {
+                return Err("Unix provider worker handshake request was truncated".to_owned());
+            }
             let handshake = receive_text(&parent_socket)?;
             let fields = handshake.split('\t').collect::<Vec<_>>();
             if fields.len() != 2 || fields[0] != "NUISPWUH1" {
@@ -89,9 +103,15 @@ impl UnixWorkerProcessTransport {
         let worker_pid = match handshake_result {
             Ok(worker_pid) => worker_pid,
             Err(error) => {
+                let exited = child
+                    .try_wait()
+                    .ok()
+                    .flatten()
+                    .map(|status| format!("; child exited with status {status}"))
+                    .unwrap_or_default();
                 let _ = child.kill();
                 let _ = child.wait();
-                return Err(error);
+                return Err(format!("{error}{exited}"));
             }
         };
         Ok(Self {
@@ -407,8 +427,6 @@ mod tests {
         time::SystemTime,
     };
 
-    const WORKER_PROBE_SOURCE: &str = include_str!("../provider-runners/unix_worker_probe.c");
-
     #[test]
     fn rights_frame_binds_identity_count_and_cloexec() {
         let (sender, receiver) = worker_socket_pair().expect("pair");
@@ -471,25 +489,29 @@ mod tests {
     }
 
     #[test]
-    fn persistent_child_receives_two_distinct_post_spawn_descriptors() {
+    fn nuis_worker_image_receives_two_distinct_post_spawn_descriptors() {
         let paths = WorkerProbePaths::new();
-        fs::write(&paths.source, WORKER_PROBE_SOURCE).expect("source");
-        let compile = Command::new("cc")
-            .arg(&paths.source)
-            .arg("-o")
-            .arg(&paths.binary)
-            .output()
-            .expect("compiler");
-        assert!(
-            compile.status.success(),
-            "{}",
-            String::from_utf8_lossy(&compile.stderr)
+        let first_image = crate::provider_worker_image::resolve_provider_worker_image(
+            "coreml:apple-ane",
+            &paths.output_dir,
+        )
+        .expect("resolve Nuis worker");
+        let cached_image = crate::provider_worker_image::resolve_provider_worker_image(
+            "coreml:apple-ane",
+            &paths.cache_output_dir,
+        )
+        .expect("restore Nuis worker");
+        assert_eq!(cached_image.cache_status, "hit");
+        assert_eq!(first_image.cache_key, cached_image.cache_key);
+        assert_eq!(
+            cached_image.resolver_contract,
+            crate::provider_worker_image::PROVIDER_WORKER_IMAGE_RESOLVER_CONTRACT
         );
         fs::write(&paths.first, [17u8]).expect("first");
         fs::write(&paths.second, [29u8]).expect("second");
         let first = File::open(&paths.first).expect("first file");
         let second = File::open(&paths.second).expect("second file");
-        let mut command = Command::new(&paths.binary);
+        let mut command = cached_image.command();
         let mut worker =
             UnixWorkerProcessTransport::spawn(&mut command, "lease:persistent").expect("worker");
         let first_descriptors = [UnixWorkerDescriptor {
@@ -531,8 +553,8 @@ mod tests {
     }
 
     struct WorkerProbePaths {
-        source: PathBuf,
-        binary: PathBuf,
+        output_dir: PathBuf,
+        cache_output_dir: PathBuf,
         first: PathBuf,
         second: PathBuf,
     }
@@ -546,8 +568,8 @@ mod tests {
             let stem = format!("nuis-provider-worker-{}-{nonce}", std::process::id());
             let temp = std::env::temp_dir();
             Self {
-                source: temp.join(format!("{stem}.c")),
-                binary: temp.join(&stem),
+                output_dir: temp.join(format!("{stem}.build")),
+                cache_output_dir: temp.join(format!("{stem}.cached-build")),
                 first: temp.join(format!("{stem}.first")),
                 second: temp.join(format!("{stem}.second")),
             }
@@ -556,7 +578,9 @@ mod tests {
 
     impl Drop for WorkerProbePaths {
         fn drop(&mut self) {
-            for path in [&self.source, &self.binary, &self.first, &self.second] {
+            let _ = fs::remove_dir_all(&self.output_dir);
+            let _ = fs::remove_dir_all(&self.cache_output_dir);
+            for path in [&self.first, &self.second] {
                 let _ = fs::remove_file(path);
             }
         }

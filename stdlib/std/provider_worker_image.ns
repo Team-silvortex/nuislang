@@ -1,0 +1,101 @@
+mod cpu Main {
+  extern "c" @host_symbol("provider_worker.open")
+  fn host_provider_worker_open(provider_key: i64, capability_hash: i64) -> i64;
+  extern "c" @host_symbol("provider_worker.receive")
+  fn host_provider_worker_receive() -> i64;
+  extern "c" @host_symbol("provider_worker.request")
+  fn host_provider_worker_request() -> i64;
+  extern "c" @host_symbol("provider_worker.descriptor_table")
+  fn host_provider_worker_descriptor_table() -> i64;
+  extern "c" @host_symbol("provider_worker.descriptor_count")
+  fn host_provider_worker_descriptor_count() -> i64;
+  extern "c" @host_symbol("provider_worker.provider_key")
+  fn host_provider_worker_provider_key() -> i64;
+  extern "c" @host_symbol("provider_worker.capability_hash")
+  fn host_provider_worker_capability_hash() -> i64;
+  extern "c" @host_symbol("provider_worker.is_close")
+  fn host_provider_worker_is_close() -> i64;
+  extern "c" @host_symbol("provider_worker.launch_provider_key")
+  fn host_provider_worker_launch_provider_key() -> i64;
+  extern "c" @host_symbol("provider_worker.launch_capability_hash")
+  fn host_provider_worker_launch_capability_hash() -> i64;
+  extern "c" @host_symbol("provider_worker.reply")
+  fn host_provider_worker_reply(ingress_status: i64) -> i64;
+  extern "c" @host_symbol("provider_worker.close")
+  fn host_provider_worker_close() -> i64;
+
+  @export(name = "nuis_provider_worker_request_v1")
+  fn worker_request(
+    request_handle: i64,
+    descriptor_table_handle: i64,
+    descriptor_count: i64,
+    provider_key: i64,
+    capability_hash: i64
+  ) -> i64 {
+    if request_handle <= 0 {
+      return -1;
+    }
+    if descriptor_count < 0 {
+      return -2;
+    }
+    if descriptor_count > 0 && descriptor_table_handle <= 0 {
+      return -3;
+    }
+    if provider_key <= 0 || capability_hash <= 0 {
+      return -4;
+    }
+    return provider_request_ingress(
+      request_handle,
+      descriptor_table_handle,
+      descriptor_count,
+      provider_key,
+      capability_hash
+    );
+  }
+
+  async fn step_worker(running: i64) -> i64 {
+    let received: i64 = host_provider_worker_receive();
+    if received != 1 {
+      return -2;
+    }
+    let ingress_status: i64 = worker_request(
+        host_provider_worker_request(),
+        host_provider_worker_descriptor_table(),
+        host_provider_worker_descriptor_count(),
+        host_provider_worker_provider_key(),
+        host_provider_worker_capability_hash()
+    );
+    if ingress_status <= 0 {
+      return -3;
+    }
+    let closing: i64 = host_provider_worker_is_close();
+    if host_provider_worker_reply(ingress_status) != 0 {
+      return -4;
+    }
+    if closing != 0 {
+      return 0;
+    }
+    return running;
+  }
+
+  async fn main() -> i64 {
+    let provider_key: i64 = host_provider_worker_launch_provider_key();
+    let capability_hash: i64 = host_provider_worker_launch_capability_hash();
+    let opened: i64 = host_provider_worker_open(provider_key, capability_hash);
+    if opened != 0 {
+      return 1;
+    }
+    let running: i64 = 1;
+    while running == 1 {
+      let running: i64 = await step_worker(running);
+      if running != 1 {
+        break;
+      }
+    }
+    let closed: i64 = host_provider_worker_close();
+    if running == 0 {
+      return closed;
+    }
+    return 5;
+  }
+}

@@ -156,6 +156,7 @@ source_modules = [
   "benchmark_report_file_recipe.ns",
   "hetero_proxy_benchmark_recipe.ns",
   "provider_worker_runtime_recipe.ns",
+  "provider_worker_image.ns",
   "provider_worker_dispatch_recipe.ns",
   "cwd_runtime.ns",
   "cwd_runtime_recipe.ns",

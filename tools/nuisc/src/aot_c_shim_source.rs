@@ -7,8 +7,9 @@ use crate::aot_c_shim_fs_runtime::append_c_shim_fs_runtime;
 use crate::aot_c_shim_header_runtime::append_c_shim_header_runtime;
 use crate::aot_c_shim_helpers::{
     ast_hetero_lifecycle_surface_slots, ast_uses_hetero_lifecycle_surface,
-    ast_uses_network_lifecycle_surface, collect_exported_entry_symbols, collect_host_ffi_symbols,
-    render_exported_entry_wrapper, render_host_ffi_stub, render_lifecycle_export_wrappers,
+    ast_uses_network_lifecycle_surface, ast_uses_provider_worker_surface, collect_exported_entries,
+    collect_host_ffi_symbols, render_exported_entry_wrapper, render_host_ffi_stub,
+    render_lifecycle_export_wrappers,
 };
 use crate::aot_c_shim_http_runtime::append_c_shim_http_runtime;
 use crate::aot_c_shim_network_owned_runtime::append_c_shim_network_owned_runtime;
@@ -17,6 +18,7 @@ use crate::aot_c_shim_network_runtime::append_c_shim_network_runtime;
 use crate::aot_c_shim_owned_blob_runtime::append_c_shim_owned_blob_runtime;
 use crate::aot_c_shim_path_runtime::append_c_shim_path_runtime;
 use crate::aot_c_shim_process_runtime::append_c_shim_process_runtime;
+use crate::aot_c_shim_provider_worker_runtime::append_c_shim_provider_worker_runtime;
 use crate::aot_c_shim_runtime::{
     append_c_shim_lifecycle_runtime, append_c_shim_main, append_c_shim_prelude,
 };
@@ -55,6 +57,9 @@ pub(crate) fn render_c_shim_source(ast: &AstModule) -> String {
     append_c_shim_path_runtime(&mut out);
     append_c_shim_fs_runtime(&mut out);
     append_c_shim_process_runtime(&mut out);
+    if ast_uses_provider_worker_surface(ast) {
+        append_c_shim_provider_worker_runtime(&mut out);
+    }
     append_c_shim_network_runtime(&mut out);
     append_c_shim_network_probe_runtime(&mut out);
     append_c_shim_network_owned_runtime(&mut out);
@@ -63,9 +68,9 @@ pub(crate) fn render_c_shim_source(ast: &AstModule) -> String {
         out.push('\n');
         out.push_str(&render_host_ffi_stub(&symbol, function));
     }
-    for export_name in collect_exported_entry_symbols(ast) {
+    for entry in collect_exported_entries(ast) {
         out.push('\n');
-        out.push_str(&render_exported_entry_wrapper(&export_name));
+        out.push_str(&render_exported_entry_wrapper(&entry));
     }
     out.push('\n');
     out.push_str(&render_lifecycle_export_wrappers());

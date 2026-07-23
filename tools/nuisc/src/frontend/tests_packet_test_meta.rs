@@ -403,24 +403,48 @@ fn rejects_malformed_export_annotation() {
 }
 
 #[test]
-fn rejects_export_annotation_on_non_main_function() {
+fn accepts_scalar_export_annotation_on_non_main_function() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          @export(name = "entry_main")
+          fn helper(value: i64) -> i64 {
+            return value;
+          }
+
+          fn main() -> i64 {
+            return helper(0);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name == "helper"));
+}
+
+#[test]
+fn rejects_non_scalar_export_function_boundary() {
     let error = parse_nuis_module(
         r#"
         mod cpu Main {
           @export(name = "entry_main")
-          fn helper() -> i64 {
+          fn helper(value: String) -> i64 {
             return 0;
           }
 
           fn main() -> i64 {
-            return helper();
+            return 0;
           }
         }
         "#,
     )
     .unwrap_err();
 
-    assert!(error.contains("only `fn main()` can be exported"));
+    assert!(error.contains("parameters currently require scalar `i64`"));
 }
 
 #[test]
