@@ -52,6 +52,23 @@ pub(crate) struct ProviderProcessAdapterCache {
 }
 
 impl ProviderProcessAdapterCache {
+    pub(crate) fn resolve_c(
+        &mut self,
+        stem: &str,
+        source: &str,
+        contract: &'static str,
+    ) -> Result<ResolvedProviderProcessAdapter<'_>, String> {
+        let identity = process_adapter_cache_identity(source, contract, &["abi:c"]);
+        let cache_status = if self.images.contains_key(&identity) {
+            "hit"
+        } else {
+            let image = compile_c_process_adapter(stem, source, contract)?;
+            self.images.insert(identity.clone(), image);
+            "compiled"
+        };
+        resolved_process_adapter(&self.images, &identity, cache_status)
+    }
+
     pub(crate) fn resolve_objc(
         &mut self,
         stem: &str,
@@ -67,16 +84,23 @@ impl ProviderProcessAdapterCache {
             self.images.insert(identity.clone(), image);
             "compiled"
         };
-        let (cache_identity, image) = self
-            .images
-            .get_key_value(&identity)
-            .expect("provider process adapter cache entry was inserted");
-        Ok(ResolvedProviderProcessAdapter {
-            image,
-            cache_identity,
-            cache_status,
-        })
+        resolved_process_adapter(&self.images, &identity, cache_status)
     }
+}
+
+fn resolved_process_adapter<'a>(
+    images: &'a BTreeMap<String, PreparedProviderProcessAdapter>,
+    identity: &str,
+    cache_status: &'static str,
+) -> Result<ResolvedProviderProcessAdapter<'a>, String> {
+    let (cache_identity, image) = images
+        .get_key_value(identity)
+        .ok_or_else(|| "provider process adapter cache insertion failed".to_owned())?;
+    Ok(ResolvedProviderProcessAdapter {
+        image,
+        cache_identity,
+        cache_status,
+    })
 }
 
 fn process_adapter_cache_identity(source: &str, contract: &str, frameworks: &[&str]) -> String {
@@ -132,6 +156,44 @@ fn compile_objc_process_adapter(
     })
 }
 
+fn compile_c_process_adapter(
+    stem: &str,
+    source: &str,
+    contract: &'static str,
+) -> Result<PreparedProviderProcessAdapter, String> {
+    let nonce = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let stem = format!("nuis-nsdb-{stem}-{}-{nonce}", std::process::id());
+    let temp = std::env::temp_dir();
+    let source_path = temp.join(format!("{stem}.c"));
+    let executable_path = temp.join(stem);
+    fs::write(&source_path, source)
+        .map_err(|error| format!("failed to materialize provider adapter source: {error}"))?;
+    let compiler = std::env::var_os("CC").unwrap_or_else(|| "cc".into());
+    let compile = Command::new(compiler)
+        .arg(&source_path)
+        .arg("-o")
+        .arg(&executable_path)
+        .output()
+        .map_err(|error| format!("failed to launch C ABI adapter compiler: {error}"))?;
+    if !compile.status.success() {
+        return Err(format!(
+            "C ABI provider adapter compilation failed: {}",
+            String::from_utf8_lossy(&compile.stderr).trim()
+        ));
+    }
+    let executable = fs::read(&executable_path)
+        .map_err(|error| format!("failed to hash C ABI provider adapter executable: {error}"))?;
+    Ok(PreparedProviderProcessAdapter {
+        source_path,
+        executable_path,
+        contract,
+        executable_hash: fnv1a64_hex(&executable),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -155,6 +217,29 @@ mod tests {
             base,
             process_adapter_cache_identity("source-a", "contract-a", &["Foundation", "CoreML"])
         );
+    }
+
+    #[test]
+    fn portable_c_adapter_uses_the_same_content_addressed_cache() {
+        let mut cache = ProviderProcessAdapterCache::default();
+        let first = cache
+            .resolve_c(
+                "cache-probe",
+                "int main(void) { return 0; }",
+                "nuis-provider-cache-probe-v1",
+            )
+            .expect("compile C adapter");
+        assert_eq!(first.cache_status, "compiled");
+        let first_identity = first.cache_identity.to_owned();
+        let second = cache
+            .resolve_c(
+                "cache-probe",
+                "int main(void) { return 0; }",
+                "nuis-provider-cache-probe-v1",
+            )
+            .expect("reuse C adapter");
+        assert_eq!(second.cache_status, "hit");
+        assert_eq!(second.cache_identity, first_identity);
     }
 }
 

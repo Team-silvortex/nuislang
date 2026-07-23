@@ -1,13 +1,7 @@
 #![cfg(unix)]
 
 use crate::{
-    provider_graph_output::CompletedProviderOutputs,
-    provider_prepared_input::PreparedProviderInput,
-    provider_request::provider_request_from_evidence,
-    provider_sample_execute::execute_provider_samples,
-    provider_sample_payload::fnv1a64_hex,
-    provider_session_registry::{select_provider_session_adapter, ProviderSessionLease},
-    provider_worker_lease::ProviderWorkerLeaseManager,
+    provider_sample_execute::execute_provider_samples, provider_sample_payload::fnv1a64_hex,
 };
 use std::{
     env, fs,
@@ -58,8 +52,8 @@ provider_output_binding_1_shape=3;\
 provider_output_binding_1_byte_length=24;\
 provider_output_binding_1_comparison_id=none"
     );
-    let (primary_expected, audit_expected) =
-        produce_expected_fan_out(&output_dir, &base_evidence, "hetero-trace:data:host");
+    let primary_expected = (1_u8..=24).collect::<Vec<_>>();
+    let audit_expected = (31_u8..=54).collect::<Vec<_>>();
     fs::write(output_dir.join("expected-primary.bin"), &primary_expected).unwrap();
     fs::write(output_dir.join("expected-audit.bin"), &audit_expected).unwrap();
     let evidence = format!(
@@ -117,6 +111,13 @@ materialization_status = "provider-sample-materialized"
         report.first_output_payload_native_execution_contract,
         "nuis-provider-worker-native-execution-v1"
     );
+    assert!(payload.contains(
+        "native_output_worker_execution_capsule_invocation_mode = \"nuis-provider-worker-process-adapter-v5\""
+    ));
+    assert!(payload.contains(
+        "native_output_worker_adapter_cache_contract = \"nuis-provider-process-adapter-cache-v1\""
+    ));
+    assert!(payload.contains("native_output_worker_adapter_cache_status = \"compiled\""));
     assert!(payload.contains("native_output_worker_output_descriptor_count = \"2\""));
     assert!(payload.contains(
         "native_output_worker_output_descriptor_roles = \"output.primary,output.audit\""
@@ -152,6 +153,9 @@ materialization_status = "provider-sample-materialized"
     assert!(payload.contains("native_output_comparison_collection_element_counts = \"3,3\""));
     assert!(payload.contains("native_output_comparison_collection_mismatch_counts = \"0,0\""));
     assert!(payload.contains(
+        "native_output_worker_additional_output_retention_statuses = \"transferable-carrier\""
+    ));
+    assert!(payload.contains(
         "native_output_graph_output_ownership_contract = \"nuis-provider-graph-output-ownership-v1\""
     ));
     assert!(payload.contains("native_output_graph_output_release_count = \"2\""));
@@ -164,62 +168,4 @@ materialization_status = "provider-sample-materialized"
     );
 
     fs::remove_dir_all(output_dir).unwrap();
-}
-
-fn produce_expected_fan_out(
-    output_dir: &std::path::Path,
-    evidence: &str,
-    trace_id: &str,
-) -> (Vec<u8>, Vec<u8>) {
-    let request = provider_request_from_evidence(evidence).expect("baseline request");
-    let completed = CompletedProviderOutputs::new();
-    let prepared = PreparedProviderInput::new(
-        output_dir,
-        &request.input_bindings[0],
-        None,
-        &completed,
-        true,
-    )
-    .expect("baseline input");
-    let adapter = select_provider_session_adapter("real-device-provider-runner").unwrap();
-    let mut session = ProviderSessionLease::open(trace_id, "data:host", adapter);
-    let session_request = session
-        .begin_request_with_output_roles(
-            &request.kernel.id,
-            &request
-                .output_bindings
-                .iter()
-                .map(|binding| binding.role.clone())
-                .collect::<Vec<_>>(),
-        )
-        .unwrap();
-    let mut manager = ProviderWorkerLeaseManager::new(output_dir);
-    let mut receipt = manager
-        .dispatch(
-            "data.host.provider-worker-native",
-            "data:host",
-            &session_request.lease_id,
-            session_request.sequence,
-            &request,
-            &[prepared],
-            None,
-        )
-        .expect("baseline fan-out");
-    let primary = receipt
-        .worker_output_result
-        .take()
-        .and_then(|result| result.payload)
-        .map(|payload| payload.as_bytes().to_vec())
-        .unwrap_or_else(|| std::mem::take(&mut receipt.worker_output_payload));
-    let mut audit = receipt.additional_worker_outputs.remove(0);
-    let audit = audit
-        .result
-        .take()
-        .and_then(|result| result.payload)
-        .map(|payload| payload.as_bytes().to_vec())
-        .unwrap_or_else(|| std::mem::take(&mut audit.payload));
-    manager.close().unwrap();
-    session.complete_request(&request.kernel.id).unwrap();
-    session.close().unwrap();
-    (primary, audit)
 }

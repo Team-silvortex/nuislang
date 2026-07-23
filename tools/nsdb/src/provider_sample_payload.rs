@@ -1,5 +1,6 @@
 pub(crate) use crate::provider_sample_artifact::{fnv1a64_hex, provider_output_payload_file_name};
 pub(crate) use crate::provider_sample_output_model::PixelMagicNativeOutputSummary;
+pub(crate) type ProviderNativeOutputSummary = PixelMagicNativeOutputSummary;
 use crate::{
     model::NsdbDeviceProviderSampleRecordInfo,
     provider_edge_transport::ProviderEdgeTransportReceipt,
@@ -418,12 +419,12 @@ pub(crate) fn pixelmagic_native_output_summary(
     })
 }
 
-pub(crate) fn pixelmagic_metal_output_summary(
-    _input_evidence: &str,
+pub(crate) fn gray8_metal_output_summary(
+    input_evidence: &str,
     execution: &crate::provider_runner_metal::MetalProviderExecution,
-) -> PixelMagicNativeOutputSummary {
+) -> ProviderNativeOutputSummary {
     metal_native_output_summary(
-        provider_request_from_evidence(_input_evidence)
+        provider_request_from_evidence(input_evidence)
             .map(|request| request.kernel.id)
             .unwrap_or_else(|| "pixelmagic.legacy".to_owned()),
         "pixelmagic-image-bytes",

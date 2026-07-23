@@ -831,9 +831,41 @@ buffers, statuses, element counts, and mismatch counts through
 `nuis-provider-output-comparison-collection-result-v1`; the compatibility
 comparison fields still mirror the first result. Ordered process-adapter
 control and multi-FD carrier materialization are now closed at lease level.
-The next boundary is registering a concrete multi-output process adapter in
-the normal `execute-provider-samples` route so this proof is no longer confined
-to a portable lease regression.
+The normal `execute-provider-samples` route now selects the Native execution
+registration for the same request. Its content-addressed cache compiles or
+reuses a portable thin C ABI adapter, process-adapter v5 supplies two inherited
+output descriptors, and the adapter returns distinct primary/audit hashes.
+Both `NUISPFD1` results remain transferable, both fixed expected assets compare
+with zero mismatch, and graph close releases both roles. The ABI shim owns no
+scheduling or backend selection; those remain in Nuis and the registration
+contract.
+
+`nuis-provider-execution-adapter-registry-v1` now removes concrete backend
+execution branches from that frontdoor. Native, Metal, and CoreML each register
+their own worker-descriptor requirement, optional process-adapter preparation,
+request validation, execution, and result interpretation callbacks. The common
+registry owns only callback composition and contract validation.
+`provider_sample_execute` selects one registration and invokes it without
+naming a backend, operation, model API, or runner protocol. A source-level
+regression rejects reintroduction of concrete runner names into the frontdoor.
+This is static registration for AOT determinism, not a dynamic plugin segment.
+
+`nuis-provider-runner-profile-registry-v1` applies the same boundary to runner
+selection. Data, Metal, and CoreML each own their provider family, probe
+callback, available adapter, and fallback adapter. The central selector only
+performs a contract-checked lookup, invokes the registered probe, and chooses
+available or fallback state. Tests require unique families and reject
+reintroduction of a provider-specific `match` into the selector.
+
+`nuis-provider-bundle-registry-v1` now cross-binds each provider's unique
+bundle ID, runner profile, and Unix execution adapter as one static
+contribution. Runner-family and execution-adapter selection consume the same
+AOT membership list, so adding or removing a provider cannot silently update
+only one side. Lookup validates the outer bundle contract and both nested
+registry contracts before exposing a contribution. No dynamic segment is
+introduced. The remaining handwritten boundary is the single bundle
+membership array; deterministic generation of that list from registered
+Nustar package manifests is next.
 
 Return-producing `if` lowering now preserves control dependence for nested
 extern-call comparisons. The open `compare_call_result` mode of

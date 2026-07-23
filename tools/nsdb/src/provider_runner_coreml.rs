@@ -1,3 +1,6 @@
+use crate::provider_bundle_registry::{
+    ProviderBundleRegistration, PROVIDER_BUNDLE_REGISTRY_CONTRACT,
+};
 use crate::provider_carrier_channel_registry::PreparedProviderCarrierChannel;
 #[cfg(target_os = "macos")]
 use crate::provider_carrier_channel_registry::{
@@ -17,6 +20,10 @@ use crate::provider_output_carrier_registry::{
 use crate::provider_process_adapter::{
     ProviderProcessAdapterCache, ResolvedProviderProcessAdapter,
 };
+use crate::provider_runner_registry::{
+    framework_probe_status, ProviderRunnerAdapter, ProviderRunnerProfile,
+    PROVIDER_RUNNER_PROFILE_REGISTRY_CONTRACT,
+};
 use std::path::Path;
 #[cfg(target_os = "macos")]
 use std::{
@@ -28,6 +35,39 @@ use std::{
 
 #[cfg(target_os = "macos")]
 const COREML_RUNNER_SOURCE: &str = include_str!("../provider-runners/coreml_vector_affine.m");
+
+pub(crate) const PROVIDER_BUNDLE: ProviderBundleRegistration = ProviderBundleRegistration {
+    registry_contract: PROVIDER_BUNDLE_REGISTRY_CONTRACT,
+    bundle_id: "coreml.apple-ane.bundle.v1",
+    runner_profile: RUNNER_PROFILE,
+    #[cfg(unix)]
+    execution_adapter: crate::provider_execution_coreml::REGISTRATION,
+};
+
+pub(crate) const RUNNER_PROFILE: ProviderRunnerProfile = ProviderRunnerProfile {
+    registry_contract: PROVIDER_RUNNER_PROFILE_REGISTRY_CONTRACT,
+    provider_family: "coreml:apple-ane",
+    probe_status: coreml_probe_status,
+    available_probe_status: "real-device-candidate-available",
+    available_adapter: ProviderRunnerAdapter {
+        adapter_id: "coreml.apple-ane.real-device",
+        capability_status: "registered-real-device",
+        real_device_capable: true,
+        kind: "coreml-real-device-runner",
+        execution_mode: "real-device-provider-runner",
+    },
+    fallback_adapter: ProviderRunnerAdapter {
+        adapter_id: "coreml.apple-ane.host-simulated",
+        capability_status: "registered-host-simulated",
+        real_device_capable: false,
+        kind: "coreml-host-simulated-runner",
+        execution_mode: "host-simulated-provider-runner",
+    },
+};
+
+fn coreml_probe_status() -> &'static str {
+    framework_probe_status("CoreML.framework")
+}
 
 #[cfg(target_os = "macos")]
 pub(crate) fn prepare_coreml_worker_invocation(

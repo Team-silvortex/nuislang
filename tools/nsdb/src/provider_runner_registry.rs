@@ -13,6 +13,8 @@ pub(crate) const PROVIDER_WORKER_IMAGE_REGISTRY_SOURCE: &str =
     "builtin-nustar-provider-worker-image-registry";
 pub(crate) const PROVIDER_WORKER_OPERATION_REGISTRY_CONTRACT: &str =
     "nuis-provider-worker-operation-registry-v1";
+pub(crate) const PROVIDER_RUNNER_PROFILE_REGISTRY_CONTRACT: &str =
+    "nuis-provider-runner-profile-registry-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProviderWorkerImageRegistration {
@@ -35,6 +37,7 @@ pub(crate) struct ProviderWorkerOperationRegistration {
     pub(crate) operation_token: String,
 }
 
+#[derive(Clone, Copy)]
 pub(crate) struct ProviderRunnerAdapter {
     pub(crate) adapter_id: &'static str,
     pub(crate) capability_status: &'static str,
@@ -43,52 +46,38 @@ pub(crate) struct ProviderRunnerAdapter {
     pub(crate) execution_mode: &'static str,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct ProviderRunnerProfile {
+    pub(crate) registry_contract: &'static str,
+    pub(crate) provider_family: &'static str,
+    pub(crate) probe_status: fn() -> &'static str,
+    pub(crate) available_probe_status: &'static str,
+    pub(crate) available_adapter: ProviderRunnerAdapter,
+    pub(crate) fallback_adapter: ProviderRunnerAdapter,
+}
+
+const GENERIC_HOST_SIMULATED_ADAPTER: ProviderRunnerAdapter = ProviderRunnerAdapter {
+    adapter_id: "generic.device.host-simulated",
+    capability_status: "registered-host-simulated",
+    real_device_capable: false,
+    kind: "generic-host-simulated-runner",
+    execution_mode: "host-simulated-provider-runner",
+};
+
 pub(crate) fn select_provider_runner_adapter(provider_family: &str) -> ProviderRunnerAdapter {
-    let probe_status = provider_runner_real_device_probe_status(provider_family);
-    match (provider_family, probe_status) {
-        ("data:host", "native-provider-worker-available") => ProviderRunnerAdapter {
-            adapter_id: "data.host.provider-worker-native",
-            capability_status: "registered-native-worker",
-            real_device_capable: true,
-            kind: "provider-worker-native-runner",
-            execution_mode: "real-device-provider-runner",
-        },
-        ("metal:apple-silicon-gpu", "real-device-candidate-available") => ProviderRunnerAdapter {
-            adapter_id: "metal.apple-silicon-gpu.real-device",
-            capability_status: "registered-real-device",
-            real_device_capable: true,
-            kind: "metal-real-device-runner",
-            execution_mode: "real-device-provider-runner",
-        },
-        ("coreml:apple-ane", "real-device-candidate-available") => ProviderRunnerAdapter {
-            adapter_id: "coreml.apple-ane.real-device",
-            capability_status: "registered-real-device",
-            real_device_capable: true,
-            kind: "coreml-real-device-runner",
-            execution_mode: "real-device-provider-runner",
-        },
-        ("metal:apple-silicon-gpu", _) => ProviderRunnerAdapter {
-            adapter_id: "metal.apple-silicon-gpu.host-simulated",
-            capability_status: "registered-host-simulated",
-            real_device_capable: false,
-            kind: "metal-host-simulated-runner",
-            execution_mode: "host-simulated-provider-runner",
-        },
-        ("coreml:apple-ane", _) => ProviderRunnerAdapter {
-            adapter_id: "coreml.apple-ane.host-simulated",
-            capability_status: "registered-host-simulated",
-            real_device_capable: false,
-            kind: "coreml-host-simulated-runner",
-            execution_mode: "host-simulated-provider-runner",
-        },
-        _ => ProviderRunnerAdapter {
-            adapter_id: "generic.device.host-simulated",
-            capability_status: "registered-host-simulated",
-            real_device_capable: false,
-            kind: "generic-host-simulated-runner",
-            execution_mode: "host-simulated-provider-runner",
-        },
+    let Some(profile) = select_provider_runner_profile(provider_family) else {
+        return GENERIC_HOST_SIMULATED_ADAPTER;
+    };
+    if (profile.probe_status)() == profile.available_probe_status {
+        profile.available_adapter
+    } else {
+        profile.fallback_adapter
     }
+}
+
+fn select_provider_runner_profile(provider_family: &str) -> Option<&'static ProviderRunnerProfile> {
+    crate::provider_bundle_registry::select_provider_bundle_by_family(provider_family)
+        .map(|bundle| &bundle.runner_profile)
 }
 
 pub(crate) fn select_provider_worker_image_registration(
@@ -162,16 +151,12 @@ fn stable_registration_scalar(bytes: &[u8]) -> i64 {
 }
 
 pub(crate) fn provider_runner_real_device_probe_status(provider_family: &str) -> &'static str {
-    match provider_family {
-        "data:host" if cfg!(unix) => "native-provider-worker-available",
-        "data:host" => "native-provider-worker-unavailable",
-        "metal:apple-silicon-gpu" => framework_probe_status("Metal.framework"),
-        "coreml:apple-ane" => framework_probe_status("CoreML.framework"),
-        _ => "real-device-candidate-unsupported",
-    }
+    select_provider_runner_profile(provider_family)
+        .map(|profile| (profile.probe_status)())
+        .unwrap_or("real-device-candidate-unsupported")
 }
 
-fn framework_probe_status(framework_name: &str) -> &'static str {
+pub(crate) fn framework_probe_status(framework_name: &str) -> &'static str {
     if has_framework(framework_name) {
         "real-device-candidate-available"
     } else {
@@ -262,8 +247,39 @@ mod tests {
     use super::{
         provider_runner_real_device_probe_status, select_provider_runner_adapter,
         select_provider_worker_image_registration, select_provider_worker_operation_registration,
-        PROVIDER_WORKER_IMAGE_REGISTRY_CONTRACT,
+        PROVIDER_RUNNER_PROFILE_REGISTRY_CONTRACT, PROVIDER_WORKER_IMAGE_REGISTRY_CONTRACT,
     };
+
+    #[test]
+    fn runner_profiles_are_unique_contract_bound_static_contributions() {
+        let profiles = crate::provider_bundle_registry::provider_bundle_registrations()
+            .iter()
+            .map(|bundle| &bundle.runner_profile)
+            .collect::<Vec<_>>();
+        assert!(profiles.len() >= 3);
+        assert!(profiles.iter().all(|profile| {
+            profile.registry_contract == PROVIDER_RUNNER_PROFILE_REGISTRY_CONTRACT
+        }));
+        let families = profiles
+            .iter()
+            .map(|profile| profile.provider_family)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(families.len(), profiles.len());
+    }
+
+    #[test]
+    fn runner_selector_contains_no_provider_specific_match() {
+        let source = include_str!("provider_runner_registry.rs");
+        let selector = source
+            .split_once("pub(crate) fn select_provider_runner_adapter")
+            .and_then(|(_, tail)| tail.split_once("fn select_provider_runner_profile"))
+            .map(|(selector, _)| selector)
+            .expect("runner selector source");
+        assert!(!selector.contains("match"));
+        assert!(!selector.contains("data:host"));
+        assert!(!selector.contains("metal:apple-silicon-gpu"));
+        assert!(!selector.contains("coreml:apple-ane"));
+    }
 
     #[test]
     fn reports_unknown_provider_family_as_unsupported() {

@@ -4,6 +4,7 @@ mod digest_sha256;
 mod handoff;
 mod model;
 mod provider_adapter_binding;
+mod provider_bundle_registry;
 mod provider_carrier_channel;
 mod provider_carrier_channel_registry;
 #[cfg(unix)]
@@ -15,7 +16,15 @@ mod provider_completion_trust_anchor;
 mod provider_completion_trust_registry;
 mod provider_edge_staging_registry;
 mod provider_edge_transport;
+#[cfg(unix)]
+mod provider_execution_adapter;
 mod provider_execution_capsule;
+#[cfg(unix)]
+mod provider_execution_coreml;
+#[cfg(unix)]
+mod provider_execution_metal;
+#[cfg(unix)]
+mod provider_execution_native;
 mod provider_graph_output;
 mod provider_input_binding;
 mod provider_native_output_payload;
@@ -30,6 +39,7 @@ mod provider_request;
 mod provider_request_payload;
 mod provider_runner_coreml;
 mod provider_runner_metal;
+mod provider_runner_native;
 mod provider_runner_registry;
 mod provider_sample;
 mod provider_sample_artifact;
