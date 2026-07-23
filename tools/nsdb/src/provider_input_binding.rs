@@ -116,21 +116,34 @@ pub(crate) fn validate_dependency_binding(
     else {
         return false;
     };
-    producer
-        .output_comparison
-        .as_ref()
-        .is_none_or(|comparison| {
-            binding.element_type == comparison.element_type
-                && binding.shape == comparison.shape
-                && binding.byte_length == comparison.expected_byte_length
-                && binding.content_hash == comparison.expected_content_hash
-        })
+    let Some(output) = producer
+        .output_bindings
+        .iter()
+        .find(|output| output.buffer == dependency.producer_output_buffer)
+    else {
+        return false;
+    };
+    binding.element_type == output.element_type
+        && binding.shape == output.shape
+        && binding.byte_length == output.byte_length
+        && if output.comparison_id == "none" {
+            true
+        } else {
+            producer
+                .output_comparison
+                .as_ref()
+                .is_some_and(|comparison| {
+                    output.comparison_id == format!("comparison.{}", comparison.output_buffer)
+                        && binding.content_hash == comparison.expected_content_hash
+                })
+        }
 }
 
 fn valid_binding(binding: &ProviderInputBinding) -> bool {
     let width = match binding.element_type.as_str() {
         "u8" => 1,
-        "f32" => 4,
+        "u32" | "i32" | "f32" => 4,
+        "u64" | "i64" | "f64" => 8,
         _ => return false,
     };
     let bytes = binding

@@ -16,6 +16,7 @@ mod provider_completion_trust_registry;
 mod provider_edge_staging_registry;
 mod provider_edge_transport;
 mod provider_execution_capsule;
+mod provider_graph_output;
 mod provider_input_binding;
 mod provider_native_output_payload;
 mod provider_output_carrier_registry;
@@ -42,6 +43,7 @@ mod provider_sample_payload;
 mod provider_sample_payload_tests;
 mod provider_sample_runner;
 mod provider_session_registry;
+mod provider_session_summary;
 mod provider_transport_receipt_payload;
 #[cfg(unix)]
 mod provider_worker_control;

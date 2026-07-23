@@ -13,17 +13,12 @@ use crate::{
         PROVIDER_EDGE_STAGING_REGISTRY_CONTRACT, PROVIDER_EDGE_STAGING_REGISTRY_SOURCE,
     },
     provider_edge_transport::{ProviderEdgeTransportDescriptor, ProviderEdgeTransportReceipt},
+    provider_graph_output::{CompletedProviderOutputKey, CompletedProviderOutputs},
     provider_input_binding::ProviderInputBinding,
-    provider_output_carrier_registry::ProviderOutputPayload,
     provider_sample_execute::resolve_provider_payload_path,
     provider_sample_payload::fnv1a64_hex,
 };
-use std::{collections::BTreeMap, fs, path::Path};
-
-pub(crate) struct CompletedProviderOutput {
-    pub(crate) payload: ProviderOutputPayload,
-    pub(crate) transferable: Option<PreparedProviderCarrierChannel>,
-}
+use std::{fs, path::Path};
 
 pub(crate) struct PreparedProviderInput {
     artifact_input: Option<ProviderCarrierInput>,
@@ -38,17 +33,28 @@ impl PreparedProviderInput {
         output_dir: &Path,
         binding: &ProviderInputBinding,
         transport: Option<&ProviderEdgeTransportDescriptor>,
-        completed: &BTreeMap<String, CompletedProviderOutput>,
+        completed: &CompletedProviderOutputs,
         allow_direct_transfer: bool,
     ) -> Result<Self, String> {
         if binding.source == "dependency" {
-            let completed_output =
-                completed.get(&binding.producer_request_id).ok_or_else(|| {
-                    format!(
-                        "provider dependency `{}` has no completed output",
-                        binding.producer_request_id
-                    )
-                })?;
+            let output_key = CompletedProviderOutputKey::new(
+                &binding.producer_request_id,
+                &binding.producer_output_buffer,
+            );
+            let completed_output = completed.get(&output_key).ok_or_else(|| {
+                format!(
+                    "provider dependency `{}` has no completed output buffer `{}`",
+                    binding.producer_request_id, binding.producer_output_buffer
+                )
+            })?;
+            if completed_output.buffer != binding.producer_output_buffer {
+                return Err(format!(
+                    "provider dependency `{}` resolved output buffer `{}` as `{}`",
+                    binding.producer_request_id,
+                    binding.producer_output_buffer,
+                    completed_output.buffer
+                ));
+            }
             let bytes = completed_output.payload.as_bytes();
             validate_input_bytes(binding, bytes)?;
             let direct_channel = if allow_direct_transfer {
@@ -79,7 +85,12 @@ impl PreparedProviderInput {
                             .to_owned(),
                         carrier_input_contract: PROVIDER_CARRIER_INPUT_CONTRACT.to_owned(),
                         carrier_input_kind: "inherited-frame".to_owned(),
-                        carrier_input_handle: format!("output:{}", binding.producer_request_id),
+                        carrier_input_handle: format!(
+                            "output:{}:{}:{}",
+                            binding.producer_request_id,
+                            binding.producer_output_buffer,
+                            completed_output.role
+                        ),
                         carrier_channel_registry_contract:
                             PROVIDER_CARRIER_CHANNEL_REGISTRY_CONTRACT.to_owned(),
                         carrier_channel_registry_source: PROVIDER_CARRIER_CHANNEL_REGISTRY_SOURCE
@@ -90,8 +101,10 @@ impl PreparedProviderInput {
                         carrier_channel_contract: PROVIDER_CARRIER_CHANNEL_CONTRACT.to_owned(),
                         carrier_channel_mode: "inherited-fd".to_owned(),
                         carrier_identity: format!(
-                            "transferred-output:{}",
-                            binding.producer_request_id
+                            "transferred-output:{}:{}:{}",
+                            binding.producer_request_id,
+                            binding.producer_output_buffer,
+                            completed_output.role
                         ),
                         byte_length: bytes.len(),
                         materialize_status: "materialized".to_owned(),

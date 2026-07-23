@@ -3,8 +3,15 @@ use super::{
     validate_dispatch_payload_size, ProviderWorkerAdapterLaunch, ProviderWorkerLeaseManager,
     MAX_PROVIDER_WORKER_DISPATCH_PAYLOAD_BYTES,
 };
+use crate::{
+    provider_graph_output::{
+        completed_additional_worker_outputs, CompletedProviderOutput, CompletedProviderOutputs,
+        PROVIDER_GRAPH_OUTPUT_OWNERSHIP_CONTRACT,
+    },
+    provider_input_binding::ProviderInputBinding,
+    provider_output_carrier_registry::ProviderOutputPayload,
+};
 use std::{
-    collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
     time::SystemTime,
@@ -128,15 +135,16 @@ fn lease_preserves_registered_primary_and_additional_outputs() {
     fs::write(paths.root.join("input.bin"), input).expect("input");
     let hash = crate::provider_sample_artifact::fnv1a64_hex(&input);
     let evidence = format!(
-        "provider_buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;provider_buffer_id=input.pixels;provider_buffer_element_type=u8;provider_buffer_layout=image-2d-row-major:pixel-format=gray8;provider_buffer_shape=2x2;provider_buffer_row_stride_bytes=2;provider_buffer_byte_length=4;provider_buffer_payload_path=input.bin;provider_buffer_content_hash={hash};provider_kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;provider_kernel_id=provider.fan-out;provider_kernel_operation=fan-out;provider_kernel_input_buffer=input.pixels;provider_kernel_output_buffer=output.primary;provider_kernel_dispatch=2x2x1;provider_output_binding_contract=nuis-provider-output-binding-v1;provider_output_binding_count=2;provider_output_binding_0_role=output.primary;provider_output_binding_0_buffer=output.primary;provider_output_binding_1_role=output.audit;provider_output_binding_1_buffer=output.audit"
-    );
+            "provider_buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;provider_buffer_id=input.pixels;provider_buffer_element_type=u8;provider_buffer_layout=image-2d-row-major:pixel-format=gray8;provider_buffer_shape=2x2;provider_buffer_row_stride_bytes=2;provider_buffer_byte_length=4;provider_buffer_payload_path=input.bin;provider_buffer_content_hash={hash};provider_kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;provider_kernel_id=provider.fan-out;provider_kernel_operation=fan-out;provider_kernel_input_buffer=input.pixels;provider_kernel_output_buffer=output.primary;provider_kernel_dispatch=2x2x1;provider_output_binding_contract=nuis-provider-output-binding-v1;provider_output_binding_count=2;provider_output_binding_0_role=output.primary;provider_output_binding_0_buffer=output.primary;provider_output_binding_0_element_type=u64;provider_output_binding_0_shape=3;provider_output_binding_0_byte_length=24;provider_output_binding_0_comparison_id=none;provider_output_binding_1_role=output.audit;provider_output_binding_1_buffer=output.audit;provider_output_binding_1_element_type=u64;provider_output_binding_1_shape=3;provider_output_binding_1_byte_length=24;provider_output_binding_1_comparison_id=none"
+        );
     let request =
         crate::provider_request::provider_request_from_evidence(&evidence).expect("request");
+    let completed = crate::provider_graph_output::CompletedProviderOutputs::new();
     let prepared = crate::provider_prepared_input::PreparedProviderInput::new(
         &paths.root,
         &request.input_bindings[0],
         None,
-        &BTreeMap::new(),
+        &completed,
         true,
     )
     .expect("prepared input");
@@ -160,7 +168,92 @@ fn lease_preserves_registered_primary_and_additional_outputs() {
         receipt.additional_worker_outputs[0].retention_status(),
         "verified-payload"
     );
+    let primary_payload = receipt.worker_output_payload.clone();
+    let audit_payload = receipt.additional_worker_outputs[0].payload.clone();
+    let additional =
+        completed_additional_worker_outputs(&request, receipt.additional_worker_outputs)
+            .expect("additional graph output");
+    let mut completed_outputs = CompletedProviderOutputs::new();
+    completed_outputs
+        .insert(
+            &request.kernel.id,
+            CompletedProviderOutput {
+                role: request.output_bindings[0].role.clone(),
+                buffer: request.output_bindings[0].buffer.clone(),
+                payload: ProviderOutputPayload::owned(primary_payload.clone()),
+                transferable: None,
+            },
+        )
+        .expect("primary graph output");
+    for output in additional {
+        completed_outputs
+            .insert(&request.kernel.id, output)
+            .expect("additional graph output");
+    }
+    let primary_binding = worker_dependency_binding(
+        "input.primary",
+        "output.primary",
+        &primary_payload,
+        &request.kernel.id,
+    );
+    let audit_binding = worker_dependency_binding(
+        "input.audit",
+        "output.audit",
+        &audit_payload,
+        &request.kernel.id,
+    );
+    let primary_input = crate::provider_prepared_input::PreparedProviderInput::new(
+        &paths.root,
+        &primary_binding,
+        None,
+        &completed_outputs,
+        false,
+    )
+    .expect("primary dependency input");
+    let audit_input = crate::provider_prepared_input::PreparedProviderInput::new(
+        &paths.root,
+        &audit_binding,
+        None,
+        &completed_outputs,
+        false,
+    )
+    .expect("audit dependency input");
+    assert_eq!(
+        fs::read(primary_input.input().path().expect("primary path")).expect("primary bytes"),
+        primary_payload
+    );
+    assert_eq!(
+        fs::read(audit_input.input().path().expect("audit path")).expect("audit bytes"),
+        audit_payload
+    );
+    primary_input.finish().expect("finish primary");
+    audit_input.finish().expect("finish audit");
+    let graph_close = completed_outputs.close();
+    assert_eq!(
+        graph_close.contract,
+        PROVIDER_GRAPH_OUTPUT_OWNERSHIP_CONTRACT
+    );
+    assert_eq!(graph_close.released_output_count, 2);
     manager.close().expect("close");
+}
+
+fn worker_dependency_binding(
+    name: &str,
+    output_buffer: &str,
+    payload: &[u8],
+    producer_request_id: &str,
+) -> ProviderInputBinding {
+    ProviderInputBinding {
+        name: name.to_owned(),
+        source: "dependency".to_owned(),
+        element_type: "u64".to_owned(),
+        shape: vec![3],
+        byte_length: payload.len(),
+        content_hash: crate::provider_sample_artifact::fnv1a64_hex(payload),
+        payload_path: "none".to_owned(),
+        producer_request_id: producer_request_id.to_owned(),
+        producer_output_buffer: output_buffer.to_owned(),
+    }
 }
 
 struct LeaseFanOutPaths {

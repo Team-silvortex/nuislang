@@ -68,6 +68,9 @@ pub(super) fn assert_provider_execution_evidence(provider_output_payload_path: &
         "native_output_4_output_handle_ids = \"provider-session:",
         "native_output_4_output_handle_ownership_tokens = \"glm:provider-session-output:",
         "native_output_4_output_handle_release_status = \"released-at-graph-close\"",
+        "native_output_4_graph_output_ownership_contract = \"nuis-provider-graph-output-ownership-v1\"",
+        "native_output_4_graph_output_release_count = \"5\"",
+        "native_output_4_graph_output_release_roles = \"output.result,output.result,output.result,output.result,output.result\"",
     ] {
         assert_file_contains(
             provider_output_payload_path,

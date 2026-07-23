@@ -243,6 +243,18 @@ pub(crate) fn push_native_output_summary(
             summary.output_handle_release_status.as_str(),
         ),
         (
+            "graph_output_ownership_contract",
+            summary.graph_output_ownership_contract.as_str(),
+        ),
+        (
+            "graph_output_release_count",
+            summary.graph_output_release_count.as_str(),
+        ),
+        (
+            "graph_output_release_roles",
+            summary.graph_output_release_roles.as_str(),
+        ),
+        (
             "compute_plan_contract",
             summary.compute_plan_contract.as_str(),
         ),
@@ -537,6 +549,18 @@ pub(crate) fn push_indexed_native_output(
         (
             "output_handle_release_status",
             summary.output_handle_release_status.as_str(),
+        ),
+        (
+            "graph_output_ownership_contract",
+            summary.graph_output_ownership_contract.as_str(),
+        ),
+        (
+            "graph_output_release_count",
+            summary.graph_output_release_count.as_str(),
+        ),
+        (
+            "graph_output_release_roles",
+            summary.graph_output_release_roles.as_str(),
         ),
         (
             "compute_plan_contract",

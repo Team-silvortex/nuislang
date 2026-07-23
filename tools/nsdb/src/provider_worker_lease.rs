@@ -343,6 +343,20 @@ impl ProviderWorkerLeaseManager {
                 },
             )
             .collect::<Result<Vec<_>, String>>()?;
+        for (output, binding) in worker_outputs.iter().zip(&request.output_bindings) {
+            let semantic_byte_length = output
+                .result
+                .as_ref()
+                .and_then(|result| result.payload.as_ref())
+                .map(|payload| payload.as_bytes().len())
+                .unwrap_or(output.payload.len());
+            if output.role != binding.role || semantic_byte_length != binding.byte_length {
+                return Err(format!(
+                    "provider worker output `{}` semantic length {semantic_byte_length} does not match registered binding `{}` length {}",
+                    output.role, binding.role, binding.byte_length
+                ));
+            }
+        }
         let primary_output = worker_outputs.remove(0);
         Ok(ProviderWorkerDispatchReceipt {
             lease_contract: PROVIDER_WORKER_LEASE_CONTRACT,

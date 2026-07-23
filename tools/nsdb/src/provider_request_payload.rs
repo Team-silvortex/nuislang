@@ -195,6 +195,31 @@ fn push_provider_request_summary(out: &mut String, request: &ProviderRequest) {
             &format!("provider_output_binding_{index}_buffer"),
             &binding.buffer,
         );
+        push_toml_string(
+            out,
+            &format!("provider_output_binding_{index}_element_type"),
+            &binding.element_type,
+        );
+        push_toml_string(
+            out,
+            &format!("provider_output_binding_{index}_shape"),
+            &binding
+                .shape
+                .iter()
+                .map(usize::to_string)
+                .collect::<Vec<_>>()
+                .join("x"),
+        );
+        push_toml_string(
+            out,
+            &format!("provider_output_binding_{index}_byte_length"),
+            &binding.byte_length.to_string(),
+        );
+        push_toml_string(
+            out,
+            &format!("provider_output_binding_{index}_comparison_id"),
+            &binding.comparison_id,
+        );
     }
     push_toml_string(
         out,

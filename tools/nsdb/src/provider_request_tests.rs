@@ -27,7 +27,7 @@ fn parses_registered_buffer_and_kernel_descriptors() {
 #[test]
 fn parses_ordered_multi_output_bindings_with_compatibility_primary() {
     let evidence = format!(
-        "{REGISTERED};provider_output_binding_contract={PROVIDER_OUTPUT_BINDING_CONTRACT};provider_output_binding_count=2;provider_output_binding_0_role=output.primary;provider_output_binding_0_buffer=output.pixels;provider_output_binding_1_role=output.audit;provider_output_binding_1_buffer=output.audit"
+        "{REGISTERED};provider_output_binding_contract={PROVIDER_OUTPUT_BINDING_CONTRACT};provider_output_binding_count=2;provider_output_binding_0_role=output.primary;provider_output_binding_0_buffer=output.pixels;provider_output_binding_0_element_type=u8;provider_output_binding_0_shape=2x2;provider_output_binding_0_byte_length=4;provider_output_binding_0_comparison_id=none;provider_output_binding_1_role=output.audit;provider_output_binding_1_buffer=output.audit;provider_output_binding_1_element_type=u64;provider_output_binding_1_shape=3;provider_output_binding_1_byte_length=24;provider_output_binding_1_comparison_id=none"
     );
     let request = provider_request_from_evidence(&evidence).expect("multi-output request");
     assert_eq!(
@@ -41,6 +41,12 @@ fn parses_ordered_multi_output_bindings_with_compatibility_primary() {
             ("output.audit", "output.audit")
         ]
     );
+    assert_eq!(request.output_bindings[0].element_type, "u8");
+    assert_eq!(request.output_bindings[0].shape, [2, 2]);
+    assert_eq!(request.output_bindings[0].byte_length, 4);
+    assert_eq!(request.output_bindings[1].element_type, "u64");
+    assert_eq!(request.output_bindings[1].shape, [3]);
+    assert_eq!(request.output_bindings[1].byte_length, 24);
 }
 
 #[test]
@@ -238,4 +244,28 @@ fn rejects_duplicate_named_input_binding() {
         fan_in_bindings("input.pixels")
     );
     assert!(provider_request_collection_from_evidence(&evidence).is_none());
+}
+
+#[test]
+fn collection_dependency_selects_additional_output_semantics() {
+    let producer = indexed_request(0, "producer").replace(
+        "provider_request_0_kernel_output_buffer=output.pixels",
+        "provider_request_0_kernel_output_buffer=output.primary;provider_request_0_output_binding_contract=nuis-provider-output-binding-v1;provider_request_0_output_binding_count=2;provider_request_0_output_binding_0_role=output.primary;provider_request_0_output_binding_0_buffer=output.primary;provider_request_0_output_binding_0_element_type=u8;provider_request_0_output_binding_0_shape=2x2;provider_request_0_output_binding_0_byte_length=4;provider_request_0_output_binding_0_comparison_id=none;provider_request_0_output_binding_1_role=output.audit;provider_request_0_output_binding_1_buffer=output.audit;provider_request_0_output_binding_1_element_type=u64;provider_request_0_output_binding_1_shape=3;provider_request_0_output_binding_1_byte_length=24;provider_request_0_output_binding_1_comparison_id=none",
+    );
+    let consumer = indexed_request(1, "consumer").replace(
+        "provider_request_1_kernel_input_buffer=input.pixels",
+        "provider_request_1_kernel_input_buffer=input.pixels;provider_request_1_kernel_input_buffers=input.pixels,input.audit",
+    );
+    let dependency = "provider_request_1_dependency_contract=nuis-provider-request-dependency-v1;provider_request_1_dependency_count=1;provider_request_1_dependency_0_producer_request_id=producer;provider_request_1_dependency_0_producer_output_buffer=output.audit;provider_request_1_dependency_0_consumer_input_buffer=input.audit";
+    let bindings = "provider_request_1_input_binding_contract=nuis-provider-input-binding-v1;provider_request_1_input_binding_count=2;provider_request_1_input_binding_0_name=input.pixels;provider_request_1_input_binding_0_source=artifact;provider_request_1_input_binding_0_element_type=u8;provider_request_1_input_binding_0_shape=2x2;provider_request_1_input_binding_0_byte_length=4;provider_request_1_input_binding_0_content_hash=0x1234;provider_request_1_input_binding_0_payload_path=pixels.bin;provider_request_1_input_binding_0_producer_request_id=none;provider_request_1_input_binding_0_producer_output_buffer=none;provider_request_1_input_binding_1_name=input.audit;provider_request_1_input_binding_1_source=dependency;provider_request_1_input_binding_1_element_type=u64;provider_request_1_input_binding_1_shape=3;provider_request_1_input_binding_1_byte_length=24;provider_request_1_input_binding_1_content_hash=0xaudit;provider_request_1_input_binding_1_payload_path=none;provider_request_1_input_binding_1_producer_request_id=producer;provider_request_1_input_binding_1_producer_output_buffer=output.audit";
+    let evidence = format!(
+        "provider_request_collection_contract={PROVIDER_REQUEST_COLLECTION_CONTRACT};provider_request_count=2;{producer};{consumer};{dependency};{bindings}"
+    );
+    let collection =
+        provider_request_collection_from_evidence(&evidence).expect("additional output dependency");
+    let dependency_binding = &collection.requests[1].input_bindings[1];
+    assert_eq!(dependency_binding.producer_output_buffer, "output.audit");
+    assert_eq!(dependency_binding.element_type, "u64");
+    assert_eq!(dependency_binding.shape, [3]);
+    assert_eq!(dependency_binding.byte_length, 24);
 }

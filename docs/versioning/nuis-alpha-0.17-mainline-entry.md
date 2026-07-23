@@ -129,8 +129,16 @@ registered eight-output budget; a provider-neutral regression proves
 three-input fan-in and two-output fan-out. Ordered output bindings now reach the
 provider request, worker lease, and session: all reply descriptors are retained
 and verified, and every output role receives its own session handle and GLM
-ownership token. The highest-value next boundary is publishing all of those
-outputs into graph ownership rather than only the compatibility primary output.
+ownership token. `nuis-provider-graph-output-ownership-v1` now indexes
+completion by request plus output buffer, routes distinct outputs to distinct
+consumers, and emits an explicit graph-close release receipt. The highest-value
+next boundary is a real backend operation with multiple semantic outputs and
+per-output shape/type/comparison descriptors, rather than transport-only
+fan-out. Output bindings now carry those semantic fields, and the
+provider-neutral Nuis worker proves two distinct `u64[3]` outputs through lease,
+graph routing, two dependency consumers, and graph-close release. Remaining
+work is to expose this path through normal provider-sample execution and
+per-output comparison evidence.
 
 The worker should consume:
 

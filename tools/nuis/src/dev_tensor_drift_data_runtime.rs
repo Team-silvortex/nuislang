@@ -1198,7 +1198,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
             id: "nsdb-provider-output-carrier-transfer",
             path: "tools/nsdb/src/provider_prepared_input.rs",
             required_patterns: &[
-                "CompletedProviderOutput",
+                "CompletedProviderOutputKey",
                 "direct_channel",
                 "try_clone_transferable",
                 "provider_output_transfer_staging_adapter",
@@ -1234,8 +1234,51 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
                 "begin_request_with_output_roles",
                 "complete_request",
                 "bind_session_output",
-                "output_handle_roles",
                 "released-at-graph-close",
+                "graph_output_close",
+                "graph_output_release_count",
+            ],
+        },
+        DevTensorDriftCheckSpec {
+            id: "nsdb-provider-session-summary",
+            path: "tools/nsdb/src/provider_session_summary.rs",
+            required_patterns: &[
+                "bind_session_output",
+                "output_handle_roles",
+                "output_handle_ids",
+                "output_handle_ownership_tokens",
+            ],
+        },
+        DevTensorDriftCheckSpec {
+            id: "nsdb-provider-graph-output-ownership",
+            path: "tools/nsdb/src/provider_graph_output.rs",
+            required_patterns: &[
+                "nuis-provider-graph-output-ownership-v1",
+                "CompletedProviderOutputKey",
+                "completed_additional_worker_outputs",
+                "binding.byte_length",
+                "payload_hash_valid",
+                "released_output_count",
+                "released_output_roles",
+            ],
+        },
+        DevTensorDriftCheckSpec {
+            id: "nsdb-provider-graph-output-regression",
+            path: "tools/nsdb/src/provider_graph_output_tests.rs",
+            required_patterns: &[
+                "graph_routes_distinct_outputs_to_consumers_and_releases_all_at_close",
+                "worker_additional_output_becomes_registered_graph_output",
+                "buffer.primary",
+                "buffer.audit",
+            ],
+        },
+        DevTensorDriftCheckSpec {
+            id: "nsdb-provider-graph-output-evidence",
+            path: "tools/nsdb/src/provider_native_output_payload.rs",
+            required_patterns: &[
+                "graph_output_ownership_contract",
+                "graph_output_release_count",
+                "graph_output_release_roles",
             ],
         },
         DevTensorDriftCheckSpec {
@@ -1532,6 +1575,8 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
             required_patterns: &[
                 "lease_preserves_registered_primary_and_additional_outputs",
                 "nuis-provider-output-binding-v1",
+                "PROVIDER_GRAPH_OUTPUT_OWNERSHIP_CONTRACT",
+                "worker_dependency_binding",
                 "output.audit",
                 "verified-payload",
             ],
@@ -1567,6 +1612,9 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
                 "native_output_4_output_handle_roles",
                 "native_output_4_output_handle_ids",
                 "native_output_4_output_handle_ownership_tokens",
+                "native_output_4_graph_output_ownership_contract",
+                "native_output_4_graph_output_release_count",
+                "native_output_4_graph_output_release_roles",
             ],
         },
         DevTensorDriftCheckSpec {
@@ -1980,6 +2028,9 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
                 "nuis-provider-output-binding-v1",
                 "ProviderOutputBinding",
                 "output_bindings",
+                "element_type",
+                "byte_length",
+                "comparison_id",
                 "provider_request_from_evidence",
                 "parse_legacy_pixelmagic_request",
             ],
@@ -1989,6 +2040,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
             path: "tools/nsdb/src/provider_request_tests.rs",
             required_patterns: &[
                 "parses_ordered_multi_output_bindings_with_compatibility_primary",
+                "collection_dependency_selects_additional_output_semantics",
                 "rejects_registered_descriptor_with_mismatched_buffer_binding",
                 "output.audit",
             ],

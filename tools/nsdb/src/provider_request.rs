@@ -85,6 +85,10 @@ pub(crate) struct ProviderRequestDependency {
 pub(crate) struct ProviderOutputBinding {
     pub(crate) role: String,
     pub(crate) buffer: String,
+    pub(crate) element_type: String,
+    pub(crate) shape: Vec<usize>,
+    pub(crate) byte_length: usize,
+    pub(crate) comparison_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -239,6 +243,10 @@ fn parse_legacy_pixelmagic_request(input_evidence: &str) -> Option<ProviderReque
         output_bindings: vec![ProviderOutputBinding {
             role: "output.result".to_owned(),
             buffer: "output.pixels".to_owned(),
+            element_type: "u8".to_owned(),
+            shape: vec![width, height],
+            byte_length,
+            comparison_id: "none".to_owned(),
         }],
         model_asset: None,
         output_comparison: None,
@@ -299,9 +307,14 @@ fn build_request(
         },
     };
     let model_asset = parse_model_asset(fields, model_prefix)?;
-    let output_bindings =
-        parse_output_bindings(fields, output_binding_prefix, &kernel.output_buffer)?;
     let output_comparison = parse_output_comparison(fields, comparison_prefix)?;
+    let output_bindings = parse_output_bindings(
+        fields,
+        output_binding_prefix,
+        &kernel.output_buffer,
+        &buffer,
+        output_comparison.as_ref(),
+    )?;
     let dependencies = parse_dependencies(fields, dependency_prefix)?;
     let input_bindings =
         parse_input_bindings(fields, input_binding_prefix, &buffer, &dependencies)?;
@@ -323,11 +336,29 @@ fn parse_output_bindings(
     fields: &BTreeMap<String, String>,
     prefix: &str,
     compatibility_output_buffer: &str,
+    buffer: &ProviderBufferDescriptor,
+    comparison: Option<&ProviderOutputComparisonDescriptor>,
 ) -> Option<Vec<ProviderOutputBinding>> {
+    let compatibility_element_type = comparison
+        .map(|value| value.element_type.as_str())
+        .unwrap_or(&buffer.element_type);
+    let compatibility_shape = comparison
+        .map(|value| value.shape.as_slice())
+        .unwrap_or(&buffer.shape);
+    let compatibility_byte_length = comparison
+        .map(|value| value.expected_byte_length)
+        .unwrap_or(buffer.byte_length);
+    let compatibility_comparison_id = comparison
+        .map(|value| format!("comparison.{}", value.output_buffer))
+        .unwrap_or_else(|| "none".to_owned());
     let Some(contract) = field(fields, prefix, "contract") else {
         return Some(vec![ProviderOutputBinding {
             role: "output.result".to_owned(),
             buffer: compatibility_output_buffer.to_owned(),
+            element_type: compatibility_element_type.to_owned(),
+            shape: compatibility_shape.to_vec(),
+            byte_length: compatibility_byte_length,
+            comparison_id: compatibility_comparison_id,
         }]);
     };
     (contract == PROVIDER_OUTPUT_BINDING_CONTRACT).then_some(())?;
@@ -339,6 +370,25 @@ fn parse_output_bindings(
             Some(ProviderOutputBinding {
                 role: field(fields, &item_prefix, "role")?.clone(),
                 buffer: field(fields, &item_prefix, "buffer")?.clone(),
+                element_type: field(fields, &item_prefix, "element_type")
+                    .map(String::as_str)
+                    .unwrap_or(compatibility_element_type)
+                    .to_owned(),
+                shape: field(fields, &item_prefix, "shape")
+                    .map(|value| parse_dimensions(value))
+                    .unwrap_or_else(|| Some(compatibility_shape.to_vec()))?,
+                byte_length: field(fields, &item_prefix, "byte_length")
+                    .map(|value| value.parse().ok())
+                    .unwrap_or(Some(compatibility_byte_length))?,
+                comparison_id: field(fields, &item_prefix, "comparison_id")
+                    .cloned()
+                    .unwrap_or_else(|| {
+                        if index == 0 {
+                            compatibility_comparison_id.clone()
+                        } else {
+                            "none".to_owned()
+                        }
+                    }),
             })
         })
         .collect()
@@ -561,6 +611,7 @@ fn validate_request(request: ProviderRequest) -> Option<ProviderRequest> {
             && request.output_bindings.iter().all(|binding| {
                 is_output_role(&binding.role)
                     && !binding.buffer.is_empty()
+                    && output_binding_semantics_are_valid(binding)
                     && roles.insert(binding.role.as_str())
                     && buffers.insert(binding.buffer.as_str())
             })
@@ -583,6 +634,25 @@ fn validate_request(request: ProviderRequest) -> Option<ProviderRequest> {
         && output_bindings_valid
         && validate_input_bindings(&request))
     .then_some(request)
+}
+
+fn output_binding_semantics_are_valid(binding: &ProviderOutputBinding) -> bool {
+    let element_width = match binding.element_type.as_str() {
+        "u8" => 1usize,
+        "f32" | "u32" | "i32" => 4usize,
+        "u64" | "i64" | "f64" => 8usize,
+        _ => return false,
+    };
+    let expected_bytes = binding
+        .shape
+        .iter()
+        .try_fold(element_width, |bytes, dimension| {
+            bytes.checked_mul(*dimension)
+        });
+    !binding.shape.is_empty()
+        && binding.shape.iter().all(|dimension| *dimension > 0)
+        && expected_bytes == Some(binding.byte_length)
+        && (binding.comparison_id == "none" || binding.comparison_id.starts_with("comparison."))
 }
 
 fn is_output_role(value: &str) -> bool {

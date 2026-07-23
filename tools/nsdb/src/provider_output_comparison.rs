@@ -139,7 +139,12 @@ fn format_number(value: f64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::SystemTime;
+    use std::{
+        sync::atomic::{AtomicU64, Ordering},
+        time::SystemTime,
+    };
+
+    static TEMP_DIR_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
     fn descriptor(expected: &[u8]) -> ProviderOutputComparisonDescriptor {
         ProviderOutputComparisonDescriptor {
@@ -161,8 +166,9 @@ mod tests {
             .unwrap_or_default()
             .as_nanos();
         let path = std::env::temp_dir().join(format!(
-            "nuis-provider-output-comparison-{}-{nonce}",
-            std::process::id()
+            "nuis-provider-output-comparison-{}-{nonce}-{}",
+            std::process::id(),
+            TEMP_DIR_SEQUENCE.fetch_add(1, Ordering::Relaxed)
         ));
         fs::create_dir_all(&path).unwrap();
         path

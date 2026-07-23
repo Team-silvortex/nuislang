@@ -781,12 +781,31 @@ the first binding remains the compatibility `kernel.output_buffer`.
 of dropping descriptors above slot zero, and reports the retained payload or
 transferable-carrier state for each additional role. Provider sessions allocate
 one `nuis-provider-output-handle-v1` handle and GLM ownership token per role,
-with the compatibility handle pointing at the primary binding. The remaining
-boundary is graph publication: completed outputs are still indexed only by
-request identity and only the primary output reaches downstream dependency
-lookup. The next slice must index completion by request plus output
-buffer/role, preserve every carrier through graph close, and prove that two
-consumers can select distinct outputs from one producer.
+with the compatibility handle pointing at the primary binding. The graph
+boundary is now explicit through
+`nuis-provider-graph-output-ownership-v1`. Completed outputs are indexed by
+producer request plus output buffer, retain the registered role for audit
+evidence, and reject duplicate publication. Dependency preparation selects the
+exact producer buffer instead of falling back to a request-wide primary
+result. A two-consumer regression selects different payloads from one producer,
+and graph close reports the released output count and roles. Worker additional
+outputs are also converted through their registered bindings before
+publication.
+
+Each output binding now also carries `element_type`, `shape`, `byte_length`,
+and an optional `comparison_id`. Compatibility requests derive those fields
+from the primary buffer or comparison descriptor, while explicit fan-out may
+declare different semantics per role. Dependency validation resolves the
+selected producer output before checking consumer type, shape, and length.
+Lease consumption compares the unpacked semantic payload length rather than a
+wrapped `NUISPFD1` carrier length. The provider-neutral Nuis worker now proves
+the complete shortest route with two distinct `u64[3]` outputs: both
+descriptors are verified, published into graph ownership, consumed through
+separate dependency bindings, and released together at graph close. The next
+boundary is frontdoor integration: normal provider-sample execution still
+selects only concrete Metal/CoreML real-device runners, process-adapter control
+still declares one output length, and comparison evidence remains singular per
+request.
 
 Return-producing `if` lowering now preserves control dependence for nested
 extern-call comparisons. The open `compare_call_result` mode of

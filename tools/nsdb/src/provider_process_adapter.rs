@@ -253,21 +253,7 @@ pub(crate) fn validate_provider_model_asset(
 
 pub(crate) fn provider_output_byte_length(request: &ProviderRequest) -> Option<usize> {
     request
-        .output_comparison
-        .as_ref()
-        .map(|comparison| comparison.expected_byte_length)
-        .or_else(|| {
-            let element_bytes = match request.buffer.element_type.as_str() {
-                "u8" => 1usize,
-                "f32" => 4usize,
-                _ => return None,
-            };
-            request
-                .buffer
-                .shape
-                .iter()
-                .try_fold(element_bytes, |bytes, dimension| {
-                    bytes.checked_mul(*dimension)
-                })
-        })
+        .output_bindings
+        .first()
+        .map(|binding| binding.byte_length)
 }

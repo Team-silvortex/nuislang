@@ -1,3 +1,5 @@
+#[cfg(unix)]
+use crate::provider_graph_output::completed_additional_worker_outputs;
 #[cfg(target_os = "macos")]
 use crate::provider_process_adapter::worker_descriptor_argument;
 #[cfg(unix)]
@@ -6,9 +8,10 @@ use crate::provider_worker_lease::{ProviderWorkerAdapterLaunch, ProviderWorkerLe
 use crate::provider_worker_summary::bind_worker_output;
 use crate::{
     provider_edge_transport::ProviderEdgeTransportReceipt,
+    provider_graph_output::{CompletedProviderOutput, CompletedProviderOutputs},
     provider_output_carrier_registry::ProviderOutputPayload,
     provider_output_comparison::compare_provider_output,
-    provider_prepared_input::{CompletedProviderOutput, PreparedProviderInput},
+    provider_prepared_input::PreparedProviderInput,
     provider_process_adapter::{
         coreml_worker_arguments, provider_output_byte_length, validate_provider_model_asset,
         ProviderProcessAdapterCache, PROVIDER_PROCESS_ADAPTER_CACHE_CONTRACT,
@@ -30,9 +33,8 @@ use crate::{
     },
     provider_session_registry::{
         select_provider_session_adapter, ProviderSessionLease, ProviderSessionRequest,
-        PROVIDER_OUTPUT_HANDLE_CONTRACT, PROVIDER_SESSION_LEASE_CONTRACT,
-        PROVIDER_SESSION_REGISTRY_CONTRACT, PROVIDER_SESSION_REGISTRY_SOURCE,
     },
+    provider_session_summary::bind_session_output,
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -320,7 +322,7 @@ fn execute_native_provider_outputs(
             transport_receipts: Vec::new(),
         });
     };
-    let mut completed = BTreeMap::<String, CompletedProviderOutput>::new();
+    let mut completed = CompletedProviderOutputs::new();
     let mut sessions = BTreeMap::<String, ProviderSessionLease>::new();
     #[cfg(unix)]
     let mut worker_leases = ProviderWorkerLeaseManager::new(output_dir);
@@ -381,17 +383,24 @@ fn execute_native_provider_outputs(
         )?;
         session.complete_request(&request.kernel.id)?;
         bind_session_output(&mut execution.summary, &session_request);
-        completed.insert(
-            request.kernel.id.clone(),
-            CompletedProviderOutput {
-                payload: execution.output_payload,
-                transferable: execution.transferable_output,
-            },
-        );
+        let primary_binding = request
+            .output_bindings
+            .first()
+            .expect("validated provider request has a primary output binding");
+        let primary_output = CompletedProviderOutput {
+            role: primary_binding.role.clone(),
+            buffer: primary_binding.buffer.clone(),
+            payload: execution.output_payload,
+            transferable: execution.transferable_output,
+        };
+        completed.insert(&request.kernel.id, primary_output)?;
+        for output in execution.additional_outputs {
+            completed.insert(&request.kernel.id, output)?;
+        }
         summaries.push(execution.summary);
         transport_receipts.extend(execution.transport_receipts);
     }
-    drop(completed);
+    let graph_output_close = completed.close();
     for session in sessions.values_mut() {
         session.close()?;
     }
@@ -399,6 +408,9 @@ fn execute_native_provider_outputs(
     worker_leases.close()?;
     for summary in &mut summaries {
         summary.output_handle_release_status = "released-at-graph-close".to_owned();
+        summary.graph_output_ownership_contract = graph_output_close.contract.to_owned();
+        summary.graph_output_release_count = graph_output_close.released_output_count.to_string();
+        summary.graph_output_release_roles = graph_output_close.released_output_roles.clone();
     }
     Ok(NativeProviderOutputs {
         native_outputs: summaries,
@@ -406,48 +418,12 @@ fn execute_native_provider_outputs(
     })
 }
 
-fn bind_session_output(
-    summary: &mut PixelMagicNativeOutputSummary,
-    request: &ProviderSessionRequest,
-) {
-    summary.session_registry_contract = PROVIDER_SESSION_REGISTRY_CONTRACT.to_owned();
-    summary.session_registry_source = PROVIDER_SESSION_REGISTRY_SOURCE.to_owned();
-    summary.session_lease_contract = PROVIDER_SESSION_LEASE_CONTRACT.to_owned();
-    summary.session_lease_id = request.lease_id.clone();
-    summary.session_adapter_id = request.session_adapter_id.to_owned();
-    summary.session_mode = request.session_mode.to_owned();
-    summary.session_continuity = request.session_continuity.to_owned();
-    summary.session_lifecycle_hooks = request.session_lifecycle_hooks.to_owned();
-    summary.session_request_sequence = request.sequence.to_string();
-    summary.output_handle_contract = PROVIDER_OUTPUT_HANDLE_CONTRACT.to_owned();
-    summary.output_handle_id = request.output_handle_id.clone();
-    summary.output_handle_ownership_token = request.output_ownership_token.clone();
-    summary.output_handle_roles = request
-        .output_handles
-        .iter()
-        .map(|handle| handle.role.as_str())
-        .collect::<Vec<_>>()
-        .join(",");
-    summary.output_handle_ids = request
-        .output_handles
-        .iter()
-        .map(|handle| handle.handle_id.as_str())
-        .collect::<Vec<_>>()
-        .join(",");
-    summary.output_handle_ownership_tokens = request
-        .output_handles
-        .iter()
-        .map(|handle| handle.ownership_token.as_str())
-        .collect::<Vec<_>>()
-        .join(",");
-    summary.output_handle_release_status = "lease-bound".to_owned();
-}
-
 struct NativeProviderRequestExecution {
     summary: PixelMagicNativeOutputSummary,
     output_payload: ProviderOutputPayload,
     transferable_output:
         Option<crate::provider_carrier_channel_registry::PreparedProviderCarrierChannel>,
+    additional_outputs: Vec<CompletedProviderOutput>,
     transport_receipts: Vec<ProviderEdgeTransportReceipt>,
 }
 
@@ -456,7 +432,7 @@ fn execute_native_provider_request(
     record: &crate::model::NsdbDeviceProviderSampleRecordInfo,
     adapter: &crate::provider_runner_registry::ProviderRunnerAdapter,
     request: &ProviderRequest,
-    completed: &BTreeMap<String, CompletedProviderOutput>,
+    completed: &CompletedProviderOutputs,
     provider_family: &str,
     session_request: &ProviderSessionRequest,
     #[cfg(unix)] worker_leases: &mut ProviderWorkerLeaseManager,
@@ -669,6 +645,7 @@ fn execute_native_provider_request(
                 },
                 output_payload: execution.output_payload,
                 transferable_output: execution.transferable_output,
+                additional_outputs: Vec::new(),
                 transport_receipts: Vec::new(),
             })
         }
@@ -746,6 +723,7 @@ fn execute_native_provider_request(
                 ),
                 output_payload: execution.output_payload,
                 transferable_output: execution.transferable_output,
+                additional_outputs: Vec::new(),
                 transport_receipts: Vec::new(),
             })
         }
@@ -767,6 +745,13 @@ fn execute_native_provider_request(
         &worker_receipt,
         worker_adapter_launch.as_ref(),
     );
+    #[cfg(unix)]
+    {
+        request_execution.additional_outputs = completed_additional_worker_outputs(
+            request,
+            std::mem::take(&mut worker_receipt.additional_worker_outputs),
+        )?;
+    }
     Ok(request_execution)
 }
 
