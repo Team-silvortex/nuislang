@@ -2,13 +2,52 @@
 use crate::provider_worker_lease::ProviderWorkerOutput;
 use crate::{
     provider_carrier_channel_registry::PreparedProviderCarrierChannel,
-    provider_output_carrier_registry::ProviderOutputPayload, provider_request::ProviderRequest,
+    provider_output_carrier_registry::ProviderOutputPayload,
+    provider_request::{ProviderRequest, PROVIDER_OUTPUT_BINDING_CONTRACT},
     provider_sample_payload::fnv1a64_hex,
+    provider_sample_payload::PixelMagicNativeOutputSummary,
 };
 use std::collections::BTreeMap;
 
 pub(crate) const PROVIDER_GRAPH_OUTPUT_OWNERSHIP_CONTRACT: &str =
     "nuis-provider-graph-output-ownership-v1";
+
+pub(crate) fn bind_output_binding_summary(
+    summary: &mut PixelMagicNativeOutputSummary,
+    request: &ProviderRequest,
+) {
+    summary.output_binding_contract = PROVIDER_OUTPUT_BINDING_CONTRACT.to_owned();
+    summary.output_binding_count = request.output_bindings.len().to_string();
+    summary.output_binding_roles = output_binding_manifest(request, |binding| binding.role.clone());
+    summary.output_binding_buffers =
+        output_binding_manifest(request, |binding| binding.buffer.clone());
+    summary.output_binding_element_types =
+        output_binding_manifest(request, |binding| binding.element_type.clone());
+    summary.output_binding_shapes = output_binding_manifest(request, |binding| {
+        binding
+            .shape
+            .iter()
+            .map(usize::to_string)
+            .collect::<Vec<_>>()
+            .join("x")
+    });
+    summary.output_binding_byte_lengths =
+        output_binding_manifest(request, |binding| binding.byte_length.to_string());
+    summary.output_binding_comparison_ids =
+        output_binding_manifest(request, |binding| binding.comparison_id.clone());
+}
+
+fn output_binding_manifest(
+    request: &ProviderRequest,
+    value: impl Fn(&crate::provider_request::ProviderOutputBinding) -> String,
+) -> String {
+    request
+        .output_bindings
+        .iter()
+        .map(value)
+        .collect::<Vec<_>>()
+        .join(",")
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct CompletedProviderOutputKey {

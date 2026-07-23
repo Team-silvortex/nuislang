@@ -17,6 +17,7 @@ mod aot_c_shim_process_runtime;
 mod aot_c_shim_provider_worker_control;
 mod aot_c_shim_provider_worker_launch;
 mod aot_c_shim_provider_worker_output;
+mod aot_c_shim_provider_worker_process_adapter;
 mod aot_c_shim_provider_worker_result;
 mod aot_c_shim_provider_worker_runtime;
 mod aot_c_shim_runtime;

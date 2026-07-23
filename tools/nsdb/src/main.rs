@@ -31,6 +31,7 @@ mod provider_output_carrier_registry;
 #[cfg(unix)]
 mod provider_output_carrier_unix;
 mod provider_output_comparison;
+mod provider_output_comparison_descriptor;
 mod provider_prepared_input;
 mod provider_process_adapter;
 mod provider_request;
@@ -58,6 +59,8 @@ mod provider_worker_descriptor_capability;
 mod provider_worker_image;
 #[cfg(unix)]
 mod provider_worker_lease;
+#[cfg(unix)]
+mod provider_worker_native_execution;
 #[allow(dead_code)]
 mod provider_worker_request;
 #[cfg(unix)]

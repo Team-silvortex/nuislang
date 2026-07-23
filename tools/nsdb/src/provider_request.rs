@@ -6,6 +6,9 @@ use crate::provider_input_binding::{
     parse_input_bindings, validate_dependency_binding, validate_input_bindings,
     ProviderInputBinding,
 };
+use crate::provider_output_comparison_descriptor::{
+    parse_output_comparisons, validate_output_comparisons,
+};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) const PROVIDER_BUFFER_DESCRIPTOR_CONTRACT: &str = "nuis-provider-buffer-descriptor-v1";
@@ -14,6 +17,8 @@ pub(crate) const PROVIDER_MODEL_ASSET_DESCRIPTOR_CONTRACT: &str =
     "nuis-provider-model-asset-descriptor-v1";
 pub(crate) const PROVIDER_OUTPUT_COMPARISON_DESCRIPTOR_CONTRACT: &str =
     "nuis-provider-output-comparison-descriptor-v1";
+pub(crate) const PROVIDER_OUTPUT_COMPARISON_COLLECTION_CONTRACT: &str =
+    "nuis-provider-output-comparison-collection-v1";
 pub(crate) const PROVIDER_OUTPUT_BINDING_CONTRACT: &str = "nuis-provider-output-binding-v1";
 pub(crate) const PROVIDER_REQUEST_DEPENDENCY_CONTRACT: &str = "nuis-provider-request-dependency-v1";
 pub(crate) const PROVIDER_REQUEST_COLLECTION_CONTRACT: &str = "nuis-provider-request-collection-v1";
@@ -62,6 +67,7 @@ pub(crate) struct ProviderModelAssetDescriptor {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProviderOutputComparisonDescriptor {
+    pub(crate) id: String,
     pub(crate) output_buffer: String,
     pub(crate) element_type: String,
     pub(crate) shape: Vec<usize>,
@@ -99,6 +105,7 @@ pub(crate) struct ProviderRequest {
     pub(crate) output_bindings: Vec<ProviderOutputBinding>,
     pub(crate) model_asset: Option<ProviderModelAssetDescriptor>,
     pub(crate) output_comparison: Option<ProviderOutputComparisonDescriptor>,
+    pub(crate) output_comparisons: Vec<ProviderOutputComparisonDescriptor>,
     pub(crate) dependencies: Vec<ProviderRequestDependency>,
     pub(crate) input_bindings: Vec<ProviderInputBinding>,
     pub(crate) adapter_binding: Option<ProviderAdapterBinding>,
@@ -250,6 +257,7 @@ fn parse_legacy_pixelmagic_request(input_evidence: &str) -> Option<ProviderReque
         }],
         model_asset: None,
         output_comparison: None,
+        output_comparisons: Vec::new(),
         dependencies: Vec::new(),
         input_bindings: vec![ProviderInputBinding {
             name: "input.pixels".to_owned(),
@@ -307,7 +315,11 @@ fn build_request(
         },
     };
     let model_asset = parse_model_asset(fields, model_prefix)?;
-    let output_comparison = parse_output_comparison(fields, comparison_prefix)?;
+    let output_comparisons = parse_output_comparisons(fields, comparison_prefix)?;
+    let output_comparison = output_comparisons
+        .iter()
+        .find(|comparison| comparison.output_buffer == kernel.output_buffer)
+        .cloned();
     let output_bindings = parse_output_bindings(
         fields,
         output_binding_prefix,
@@ -326,6 +338,7 @@ fn build_request(
         output_bindings,
         model_asset,
         output_comparison,
+        output_comparisons,
         dependencies,
         input_bindings,
         adapter_binding,
@@ -415,29 +428,6 @@ fn parse_model_asset(
             None => vec![input_feature],
         },
         output_feature: field(fields, prefix, "output_feature")?.clone(),
-    }))
-}
-
-fn parse_output_comparison(
-    fields: &BTreeMap<String, String>,
-    prefix: &str,
-) -> Option<Option<ProviderOutputComparisonDescriptor>> {
-    let Some(contract) = field(fields, prefix, "descriptor_contract") else {
-        return Some(None);
-    };
-    (contract == PROVIDER_OUTPUT_COMPARISON_DESCRIPTOR_CONTRACT).then_some(())?;
-    Some(Some(ProviderOutputComparisonDescriptor {
-        output_buffer: field(fields, prefix, "output_buffer")?.clone(),
-        element_type: field(fields, prefix, "element_type")?.clone(),
-        shape: parse_dimensions(field(fields, prefix, "shape")?)?,
-        expected_path: field(fields, prefix, "expected_path")?.clone(),
-        expected_byte_length: field(fields, prefix, "expected_byte_length")?
-            .parse()
-            .ok()?,
-        expected_content_hash: field(fields, prefix, "expected_content_hash")?.clone(),
-        absolute_tolerance: field(fields, prefix, "absolute_tolerance")?.clone(),
-        relative_tolerance: field(fields, prefix, "relative_tolerance")?.clone(),
-        non_finite_policy: field(fields, prefix, "non_finite_policy")?.clone(),
     }))
 }
 
@@ -580,28 +570,6 @@ fn validate_request(request: ProviderRequest) -> Option<ProviderRequest> {
             && asset.input_features == request.kernel.input_buffers
             && asset.output_feature == request.kernel.output_buffer
     });
-    let comparison_valid = request.output_comparison.as_ref().is_none_or(|comparison| {
-        let tolerance_valid = |value: &str| {
-            value
-                .parse::<f64>()
-                .is_ok_and(|value| value.is_finite() && value >= 0.0)
-        };
-        let comparison_elements = comparison
-            .shape
-            .iter()
-            .try_fold(1usize, |count, dimension| count.checked_mul(*dimension));
-        comparison.output_buffer == request.kernel.output_buffer
-            && comparison.element_type == "f32"
-            && comparison.shape.iter().all(|dimension| *dimension > 0)
-            && comparison_elements
-                .and_then(|count| count.checked_mul(4))
-                .is_some_and(|bytes| bytes == comparison.expected_byte_length)
-            && !comparison.expected_path.is_empty()
-            && comparison.expected_content_hash.starts_with("0x")
-            && tolerance_valid(&comparison.absolute_tolerance)
-            && tolerance_valid(&comparison.relative_tolerance)
-            && matches!(comparison.non_finite_policy.as_str(), "reject" | "equal")
-    });
     let output_bindings_valid = {
         let mut roles = BTreeSet::new();
         let mut buffers = BTreeSet::new();
@@ -630,8 +598,8 @@ fn validate_request(request: ProviderRequest) -> Option<ProviderRequest> {
             !binding.name.is_empty() && !binding.value_type.is_empty() && !binding.value.is_empty()
         })
         && model_asset_valid
-        && comparison_valid
         && output_bindings_valid
+        && validate_output_comparisons(&request.output_comparisons, &request.output_bindings)
         && validate_input_bindings(&request))
     .then_some(request)
 }

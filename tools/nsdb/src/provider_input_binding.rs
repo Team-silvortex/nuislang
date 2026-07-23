@@ -130,12 +130,10 @@ pub(crate) fn validate_dependency_binding(
             true
         } else {
             producer
-                .output_comparison
-                .as_ref()
-                .is_some_and(|comparison| {
-                    output.comparison_id == format!("comparison.{}", comparison.output_buffer)
-                        && binding.content_hash == comparison.expected_content_hash
-                })
+                .output_comparisons
+                .iter()
+                .find(|comparison| comparison.id == output.comparison_id)
+                .is_some_and(|comparison| binding.content_hash == comparison.expected_content_hash)
         }
 }
 

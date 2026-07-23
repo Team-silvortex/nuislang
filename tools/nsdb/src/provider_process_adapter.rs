@@ -251,9 +251,10 @@ pub(crate) fn validate_provider_model_asset(
     Ok(model_path)
 }
 
-pub(crate) fn provider_output_byte_length(request: &ProviderRequest) -> Option<usize> {
+pub(crate) fn provider_output_manifest(request: &ProviderRequest) -> (Vec<String>, Vec<usize>) {
     request
         .output_bindings
-        .first()
-        .map(|binding| binding.byte_length)
+        .iter()
+        .map(|binding| (binding.role.clone(), binding.byte_length))
+        .unzip()
 }

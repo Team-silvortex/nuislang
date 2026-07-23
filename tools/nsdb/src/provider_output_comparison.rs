@@ -3,18 +3,67 @@ use crate::{
         ProviderOutputComparisonDescriptor, PROVIDER_OUTPUT_COMPARISON_DESCRIPTOR_CONTRACT,
     },
     provider_sample_payload::fnv1a64_hex,
+    provider_sample_payload::PixelMagicNativeOutputSummary,
 };
 use std::{fs, path::Path};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProviderOutputComparisonResult {
     pub(crate) contract: &'static str,
+    pub(crate) comparison_id: String,
+    pub(crate) output_buffer: String,
     pub(crate) status: &'static str,
     pub(crate) compared_elements: usize,
     pub(crate) mismatch_count: usize,
     pub(crate) max_absolute_error: String,
     pub(crate) max_relative_error: String,
     pub(crate) non_finite_count: usize,
+}
+
+pub(crate) const PROVIDER_OUTPUT_COMPARISON_COLLECTION_RESULT_CONTRACT: &str =
+    "nuis-provider-output-comparison-collection-result-v1";
+
+pub(crate) fn bind_output_comparison_collection(
+    summary: &mut PixelMagicNativeOutputSummary,
+    results: &[ProviderOutputComparisonResult],
+    compatibility_output_buffer: &str,
+) {
+    summary.comparison_collection_contract =
+        PROVIDER_OUTPUT_COMPARISON_COLLECTION_RESULT_CONTRACT.to_owned();
+    summary.comparison_collection_count = results.len().to_string();
+    summary.comparison_collection_ids =
+        comparison_manifest(results, |result| result.comparison_id.clone());
+    summary.comparison_collection_output_buffers =
+        comparison_manifest(results, |result| result.output_buffer.clone());
+    summary.comparison_collection_statuses =
+        comparison_manifest(results, |result| result.status.to_owned());
+    summary.comparison_collection_element_counts =
+        comparison_manifest(results, |result| result.compared_elements.to_string());
+    summary.comparison_collection_mismatch_counts =
+        comparison_manifest(results, |result| result.mismatch_count.to_string());
+    if let Some(primary) = results
+        .iter()
+        .find(|result| result.output_buffer == compatibility_output_buffer)
+    {
+        summary.comparison_contract = primary.contract.to_owned();
+        summary.comparison_status = primary.status.to_owned();
+        summary.comparison_element_count = primary.compared_elements.to_string();
+        summary.comparison_mismatch_count = primary.mismatch_count.to_string();
+        summary.comparison_max_absolute_error = primary.max_absolute_error.clone();
+        summary.comparison_max_relative_error = primary.max_relative_error.clone();
+        summary.comparison_non_finite_count = primary.non_finite_count.to_string();
+    }
+}
+
+fn comparison_manifest(
+    results: &[ProviderOutputComparisonResult],
+    value: impl Fn(&ProviderOutputComparisonResult) -> String,
+) -> String {
+    if results.is_empty() {
+        "none".to_owned()
+    } else {
+        results.iter().map(value).collect::<Vec<_>>().join(",")
+    }
 }
 
 pub(crate) fn compare_provider_output(
@@ -41,7 +90,10 @@ pub(crate) fn compare_provider_output(
             actual.len()
         ));
     }
-    if descriptor.element_type != "f32" || actual.len() % 4 != 0 {
+    if descriptor.element_type != "f32" {
+        return compare_exact_provider_output(descriptor, actual, &expected);
+    }
+    if actual.len() % 4 != 0 {
         return Err("provider output comparison requires complete f32 elements".to_owned());
     }
     let absolute_tolerance = parse_tolerance("absolute", &descriptor.absolute_tolerance)?;
@@ -95,12 +147,76 @@ pub(crate) fn compare_provider_output(
     }
     Ok(ProviderOutputComparisonResult {
         contract: PROVIDER_OUTPUT_COMPARISON_DESCRIPTOR_CONTRACT,
+        comparison_id: descriptor.id.clone(),
+        output_buffer: descriptor.output_buffer.clone(),
         status: "comparison-passed",
         compared_elements: actual.len() / 4,
         mismatch_count,
         max_absolute_error: format_number(max_absolute_error),
         max_relative_error: format_number(max_relative_error),
         non_finite_count,
+    })
+}
+
+pub(crate) fn compare_provider_output_collection(
+    output_dir: &Path,
+    descriptors: &[ProviderOutputComparisonDescriptor],
+    outputs: &[(&str, &[u8])],
+) -> Result<Vec<ProviderOutputComparisonResult>, String> {
+    descriptors
+        .iter()
+        .map(|descriptor| {
+            let actual = outputs
+                .iter()
+                .find_map(|(buffer, payload)| {
+                    (*buffer == descriptor.output_buffer).then_some(*payload)
+                })
+                .ok_or_else(|| {
+                    format!(
+                        "provider comparison `{}` has no completed output buffer `{}`",
+                        descriptor.id, descriptor.output_buffer
+                    )
+                })?;
+            compare_provider_output(output_dir, descriptor, actual)
+        })
+        .collect()
+}
+
+fn compare_exact_provider_output(
+    descriptor: &ProviderOutputComparisonDescriptor,
+    actual: &[u8],
+    expected: &[u8],
+) -> Result<ProviderOutputComparisonResult, String> {
+    let element_width = match descriptor.element_type.as_str() {
+        "u8" => 1,
+        "u32" | "i32" => 4,
+        "u64" | "i64" => 8,
+        other => {
+            return Err(format!(
+                "provider output exact comparison does not support `{other}`"
+            ));
+        }
+    };
+    let mismatch_count = actual
+        .chunks_exact(element_width)
+        .zip(expected.chunks_exact(element_width))
+        .filter(|(actual, expected)| actual != expected)
+        .count();
+    if mismatch_count > 0 {
+        return Err(format!(
+            "provider output comparison failed: {mismatch_count} mismatched elements"
+        ));
+    }
+    Ok(ProviderOutputComparisonResult {
+        contract: PROVIDER_OUTPUT_COMPARISON_DESCRIPTOR_CONTRACT,
+        comparison_id: descriptor.id.clone(),
+        output_buffer: descriptor.output_buffer.clone(),
+        status: "comparison-passed",
+        compared_elements: actual.len() / element_width,
+        mismatch_count,
+        max_absolute_error: "0".to_owned(),
+        max_relative_error: "0".to_owned(),
+        non_finite_count: 0,
     })
 }
 
@@ -148,6 +264,7 @@ mod tests {
 
     fn descriptor(expected: &[u8]) -> ProviderOutputComparisonDescriptor {
         ProviderOutputComparisonDescriptor {
+            id: "comparison.output.features".to_owned(),
             output_buffer: "output.features".to_owned(),
             element_type: "f32".to_owned(),
             shape: vec![2],

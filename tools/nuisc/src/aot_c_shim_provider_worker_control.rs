@@ -74,14 +74,12 @@ static int nuis_provider_worker_load_adapter_control(
     char reference[128];
     char* fields[3];
     if (!nuis_provider_worker_payload_text(
-            "adapter_control_ref", reference, sizeof(reference))
-        || nuis_provider_worker_split_tabs(reference, fields, 3) != 3
+            "adapter_control_ref", reference, sizeof(reference))) return -1;
+    if (nuis_provider_worker_split_tabs(reference, fields, 3) != 3
         || strcmp(
             fields[0],
             "nuis-provider-worker-adapter-control-carrier-v1") != 0
-        || nuis_provider_worker_input_fd_count >= nuis_provider_worker_fd_count) {
-        return 0;
-    }
+        || nuis_provider_worker_input_fd_count >= nuis_provider_worker_fd_count) return -2;
     char* length_end = NULL;
     unsigned long long declared_length = strtoull(fields[1], &length_end, 10);
     if (*fields[1] == '\0'
@@ -90,7 +88,7 @@ static int nuis_provider_worker_load_adapter_control(
         || declared_length >= output_capacity
         || strlen(fields[2]) != 18
         || strncmp(fields[2], "0x", 2) != 0) {
-        return 0;
+        return -3;
     }
     int descriptor = nuis_provider_worker_fds[nuis_provider_worker_input_fd_count];
     ssize_t received = pread(
@@ -98,7 +96,7 @@ static int nuis_provider_worker_load_adapter_control(
     unsigned char extra = 0;
     if (received != (ssize_t)declared_length
         || pread(descriptor, &extra, 1, (off_t)declared_length) != 0) {
-        return 0;
+        return -4;
     }
     output[declared_length] = '\0';
     char actual_hash[19];
@@ -106,7 +104,7 @@ static int nuis_provider_worker_load_adapter_control(
         (const unsigned char*)output,
         (size_t)declared_length,
         actual_hash);
-    return strcmp(actual_hash, fields[2]) == 0;
+    return strcmp(actual_hash, fields[2]) == 0 ? 1 : -5;
 }
 "#,
     );

@@ -8,12 +8,16 @@ use crate::provider_worker_lease::{ProviderWorkerAdapterLaunch, ProviderWorkerLe
 use crate::provider_worker_summary::bind_worker_output;
 use crate::{
     provider_edge_transport::ProviderEdgeTransportReceipt,
-    provider_graph_output::{CompletedProviderOutput, CompletedProviderOutputs},
+    provider_graph_output::{
+        bind_output_binding_summary, CompletedProviderOutput, CompletedProviderOutputs,
+    },
     provider_output_carrier_registry::ProviderOutputPayload,
-    provider_output_comparison::compare_provider_output,
+    provider_output_comparison::{
+        bind_output_comparison_collection, compare_provider_output_collection,
+    },
     provider_prepared_input::PreparedProviderInput,
     provider_process_adapter::{
-        coreml_worker_arguments, provider_output_byte_length, validate_provider_model_asset,
+        coreml_worker_arguments, provider_output_manifest, validate_provider_model_asset,
         ProviderProcessAdapterCache, PROVIDER_PROCESS_ADAPTER_CACHE_CONTRACT,
     },
     provider_request::{provider_request_collection_from_evidence, ProviderRequest},
@@ -310,7 +314,10 @@ fn execute_native_provider_outputs(
     record: &crate::model::NsdbDeviceProviderSampleRecordInfo,
     adapter: &crate::provider_runner_registry::ProviderRunnerAdapter,
 ) -> Result<NativeProviderOutputs, String> {
-    if adapter.kind != "metal-real-device-runner" && adapter.kind != "coreml-real-device-runner" {
+    if !matches!(
+        adapter.kind,
+        "metal-real-device-runner" | "coreml-real-device-runner" | "provider-worker-native-runner"
+    ) {
         return Ok(NativeProviderOutputs {
             native_outputs: Vec::new(),
             transport_receipts: Vec::new(),
@@ -383,6 +390,27 @@ fn execute_native_provider_outputs(
         )?;
         session.complete_request(&request.kernel.id)?;
         bind_session_output(&mut execution.summary, &session_request);
+        bind_output_binding_summary(&mut execution.summary, request);
+        let mut comparison_payloads = vec![(
+            request.output_bindings[0].buffer.as_str(),
+            execution.output_payload.as_bytes(),
+        )];
+        comparison_payloads.extend(
+            execution
+                .additional_outputs
+                .iter()
+                .map(|output| (output.buffer.as_str(), output.payload.as_bytes())),
+        );
+        let comparison_results = compare_provider_output_collection(
+            output_dir,
+            &request.output_comparisons,
+            &comparison_payloads,
+        )?;
+        bind_output_comparison_collection(
+            &mut execution.summary,
+            &comparison_results,
+            &request.kernel.output_buffer,
+        );
         let primary_binding = request
             .output_bindings
             .first()
@@ -464,8 +492,7 @@ fn execute_native_provider_request(
     } else {
         None
     };
-    let output_byte_length = provider_output_byte_length(request)
-        .ok_or_else(|| "provider worker output byte length is not representable".to_owned())?;
+    let (adapter_output_roles, adapter_output_byte_lengths) = provider_output_manifest(request);
     #[cfg(target_os = "macos")]
     let prepared_worker_adapter = if adapter.kind == "metal-real-device-runner" {
         if request.buffer.element_type == "u8"
@@ -549,7 +576,8 @@ fn execute_native_provider_request(
                 cache_identity: prepared.cache_identity,
                 cache_status: prepared.cache_status,
                 arguments: &worker_adapter_arguments,
-                output_byte_length,
+                output_roles: &adapter_output_roles,
+                output_byte_lengths: &adapter_output_byte_lengths,
             });
     #[cfg(all(unix, not(target_os = "macos")))]
     let worker_adapter_launch: Option<ProviderWorkerAdapterLaunch<'_>> = None;
@@ -566,6 +594,22 @@ fn execute_native_provider_request(
     #[cfg(not(unix))]
     return Err("native provider worker leases require a registered host transport".to_owned());
     let mut request_execution = match adapter.kind {
+        "provider-worker-native-runner" => {
+            let (summary, output_payload, transferable_output) =
+                crate::provider_worker_native_execution::take_provider_worker_native_output(
+                    &record.input_evidence,
+                    provider_family,
+                    request,
+                    &mut worker_receipt,
+                )?;
+            Ok(NativeProviderRequestExecution {
+                summary,
+                output_payload,
+                transferable_output,
+                additional_outputs: Vec::new(),
+                transport_receipts: Vec::new(),
+            })
+        }
         "metal-real-device-runner" => {
             if inputs.len() != 1 {
                 return Err(format!(
@@ -580,7 +624,9 @@ fn execute_native_provider_request(
                 let max_value = request.scalar_u8("max_value").ok_or_else(|| {
                     "Metal provider request is missing u8 scalar `max_value`".to_owned()
                 })?;
-                if worker_receipt.execution_capsule_invocation_mode == "worker-process-adapter-v4" {
+                if worker_receipt.execution_capsule_invocation_mode
+                    == "nuis-provider-worker-process-adapter-v5"
+                {
                     crate::provider_runner_metal::parse_metal_worker_output(
                         &worker_receipt.worker_output_payload,
                         "nuis-metal-gray8-provider-runner-v1",
@@ -600,7 +646,9 @@ fn execute_native_provider_request(
                 let bias = request.scalar_f32("bias").ok_or_else(|| {
                     "Metal provider request is missing f32 scalar `bias`".to_owned()
                 })?;
-                if worker_receipt.execution_capsule_invocation_mode == "worker-process-adapter-v4" {
+                if worker_receipt.execution_capsule_invocation_mode
+                    == "nuis-provider-worker-process-adapter-v5"
+                {
                     crate::provider_runner_metal::parse_metal_worker_output(
                         &worker_receipt.worker_output_payload,
                         "nuis-metal-f32-bias-provider-runner-v1",
@@ -621,17 +669,6 @@ fn execute_native_provider_request(
                     request.buffer.layout, request.kernel.operation
                 ));
             };
-            let comparison = request
-                .output_comparison
-                .as_ref()
-                .map(|descriptor| {
-                    compare_provider_output(
-                        output_dir,
-                        descriptor,
-                        execution.output_payload.as_bytes(),
-                    )
-                })
-                .transpose()?;
             Ok(NativeProviderRequestExecution {
                 summary: if request.kernel.operation == "invert" {
                     pixelmagic_metal_output_summary(&record.input_evidence, &execution)
@@ -640,7 +677,7 @@ fn execute_native_provider_request(
                         request.kernel.id.clone(),
                         "provider-tensor-f32",
                         &execution,
-                        comparison.as_ref(),
+                        None,
                     )
                 },
                 output_payload: execution.output_payload,
@@ -690,7 +727,7 @@ fn execute_native_provider_request(
                 .map(|comparison| comparison.shape.as_slice())
                 .unwrap_or(request.buffer.shape.as_slice());
             let execution = if worker_receipt.execution_capsule_invocation_mode
-                == "worker-process-adapter-v4"
+                == "nuis-provider-worker-process-adapter-v5"
             {
                 crate::provider_runner_coreml::parse_coreml_worker_output(
                     &worker_receipt.worker_output_payload,
@@ -704,23 +741,8 @@ fn execute_native_provider_request(
                     output_shape,
                 )?
             };
-            let comparison = request
-                .output_comparison
-                .as_ref()
-                .map(|descriptor| {
-                    compare_provider_output(
-                        output_dir,
-                        descriptor,
-                        execution.output_payload.as_bytes(),
-                    )
-                })
-                .transpose()?;
             Ok(NativeProviderRequestExecution {
-                summary: coreml_native_output_summary(
-                    &request.kernel.id,
-                    &execution,
-                    comparison.as_ref(),
-                ),
+                summary: coreml_native_output_summary(&request.kernel.id, &execution, None),
                 output_payload: execution.output_payload,
                 transferable_output: execution.transferable_output,
                 additional_outputs: Vec::new(),

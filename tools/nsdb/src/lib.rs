@@ -23,6 +23,7 @@ mod provider_output_carrier_registry;
 #[cfg(unix)]
 mod provider_output_carrier_unix;
 mod provider_output_comparison;
+mod provider_output_comparison_descriptor;
 mod provider_prepared_input;
 mod provider_process_adapter;
 mod provider_request;
@@ -33,6 +34,8 @@ mod provider_runner_registry;
 mod provider_sample;
 mod provider_sample_artifact;
 mod provider_sample_execute;
+#[cfg(test)]
+mod provider_sample_execute_tests;
 mod provider_sample_execution;
 mod provider_sample_materialize;
 #[cfg(test)]
@@ -52,6 +55,8 @@ mod provider_worker_image;
 mod provider_worker_ingress;
 #[cfg(unix)]
 mod provider_worker_lease;
+#[cfg(unix)]
+mod provider_worker_native_execution;
 mod provider_worker_request;
 #[cfg(unix)]
 mod provider_worker_result;

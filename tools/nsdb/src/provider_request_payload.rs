@@ -298,57 +298,66 @@ fn push_provider_request_summary(out: &mut String, request: &ProviderRequest) {
             &model.output_feature,
         );
     }
+    if !request.output_comparisons.is_empty() {
+        push_toml_string(
+            out,
+            "provider_output_comparison_collection_contract",
+            crate::provider_request::PROVIDER_OUTPUT_COMPARISON_COLLECTION_CONTRACT,
+        );
+        push_toml_string(
+            out,
+            "provider_output_comparison_collection_count",
+            &request.output_comparisons.len().to_string(),
+        );
+        for (index, comparison) in request.output_comparisons.iter().enumerate() {
+            push_output_comparison_descriptor(
+                out,
+                &format!("provider_output_comparison_item_{index}_"),
+                comparison,
+            );
+        }
+    }
     if let Some(comparison) = &request.output_comparison {
-        push_toml_string(
-            out,
-            "provider_output_comparison_descriptor_contract",
-            PROVIDER_OUTPUT_COMPARISON_DESCRIPTOR_CONTRACT,
-        );
-        push_toml_string(
-            out,
-            "provider_output_comparison_output_buffer",
-            &comparison.output_buffer,
-        );
-        push_toml_string(
-            out,
-            "provider_output_comparison_element_type",
-            &comparison.element_type,
-        );
-        push_toml_string(
-            out,
-            "provider_output_comparison_shape",
-            &comparison
+        push_output_comparison_descriptor(out, "provider_output_comparison_", comparison);
+    }
+}
+
+fn push_output_comparison_descriptor(
+    out: &mut String,
+    prefix: &str,
+    comparison: &crate::provider_request::ProviderOutputComparisonDescriptor,
+) {
+    for (name, value) in [
+        ("id", comparison.id.clone()),
+        (
+            "descriptor_contract",
+            PROVIDER_OUTPUT_COMPARISON_DESCRIPTOR_CONTRACT.to_owned(),
+        ),
+        ("output_buffer", comparison.output_buffer.clone()),
+        ("element_type", comparison.element_type.clone()),
+        (
+            "shape",
+            comparison
                 .shape
                 .iter()
                 .map(usize::to_string)
                 .collect::<Vec<_>>()
                 .join("x"),
-        );
-        push_toml_string(
-            out,
-            "provider_output_comparison_expected_path",
-            &comparison.expected_path,
-        );
-        push_toml_string(
-            out,
-            "provider_output_comparison_expected_content_hash",
-            &comparison.expected_content_hash,
-        );
-        push_toml_string(
-            out,
-            "provider_output_comparison_absolute_tolerance",
-            &comparison.absolute_tolerance,
-        );
-        push_toml_string(
-            out,
-            "provider_output_comparison_relative_tolerance",
-            &comparison.relative_tolerance,
-        );
-        push_toml_string(
-            out,
-            "provider_output_comparison_non_finite_policy",
-            &comparison.non_finite_policy,
-        );
+        ),
+        ("expected_path", comparison.expected_path.clone()),
+        (
+            "expected_byte_length",
+            comparison.expected_byte_length.to_string(),
+        ),
+        (
+            "expected_content_hash",
+            comparison.expected_content_hash.clone(),
+        ),
+        ("absolute_tolerance", comparison.absolute_tolerance.clone()),
+        ("relative_tolerance", comparison.relative_tolerance.clone()),
+        ("non_finite_policy", comparison.non_finite_policy.clone()),
+    ] {
+        push_toml_string(out, &format!("{prefix}{name}"), &value);
     }
 }
 

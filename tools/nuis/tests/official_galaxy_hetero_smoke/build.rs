@@ -661,7 +661,7 @@ pub(super) fn assert_official_galaxy_hetero_build(
         );
         assert_file_contains(
             &provider_output_payload_path,
-            "native_output_0_worker_execution_capsule_invocation_mode = \"worker-process-adapter-v4\"",
+            "native_output_0_worker_execution_capsule_invocation_mode = \"nuis-provider-worker-process-adapter-v5\"",
             "official galaxy Metal worker-owned adapter invocation",
         );
     }

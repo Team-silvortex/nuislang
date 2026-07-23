@@ -742,12 +742,29 @@ regression proves oversized metadata fails closed. The next boundary is a
 hash-bound control-carrier class for manifests that exceed the inline budget;
 it must remain distinct from semantic `input.N` capsule roles.
 
+`nuis-provider-worker-adapter-control-v2` and
+`nuis-provider-worker-process-adapter-v5` replace the scalar output length
+with an ordered output count, role manifest, and byte-length manifest. Nsdb
+rejects empty, duplicate, malformed, zero-length, or count-mismatched
+registrations before dispatch. The v27 Nuis worker creates one page-aligned
+`NUISPFD1` carrier per slot and exposes the ordered
+`NUIS_PROVIDER_OUTPUT_FDS` manifest as
+`role=fd:descriptor:payload-offset:semantic-length:hash-offset`.
+`NUIS_PROVIDER_OUTPUT_FD` remains the slot-zero compatibility view for existing
+Metal/CoreML adapters. Multi-output adapters return an ordered decimal
+`output_hashes` manifest. The worker verifies each protocol hash against both
+the carrier's stored hash and the actual payload, then hashes and returns every
+whole carrier. Nsdb consumes the same slot-indexed hashes and preserves every
+result as a transferable carrier. A real portable child-process regression
+writes distinct `u64[3]` primary and audit outputs through two inherited
+descriptors and proves both payloads survive independently.
+
 `nuis-provider-worker-adapter-control-carrier-v1` now closes that boundary.
 Manifests above the 384-byte inline control budget are written to an immediately
 unlinked file, while the request carries only its contract, byte length, and
 FNV hash. Its SCM_RIGHTS role is `control.adapter`, must be unique and last, and
 is excluded from Nuis ingress descriptor count, capsule input roles, input byte
-sum, and adapter argument descriptor indices. The v25 worker independently
+sum, and adapter argument descriptor indices. The v27 worker independently
 reads the exact declared length, rejects trailing bytes or hash drift, and then
 parses the same open control record. Official CoreML execution reports
 `worker_adapter_control_mode = carrier` while the Add node still reports two
@@ -801,11 +818,22 @@ Lease consumption compares the unpacked semantic payload length rather than a
 wrapped `NUISPFD1` carrier length. The provider-neutral Nuis worker now proves
 the complete shortest route with two distinct `u64[3]` outputs: both
 descriptors are verified, published into graph ownership, consumed through
-separate dependency bindings, and released together at graph close. The next
-boundary is frontdoor integration: normal provider-sample execution still
-selects only concrete Metal/CoreML real-device runners, process-adapter control
-still declares one output length, and comparison evidence remains singular per
-request.
+separate dependency bindings, and released together at graph close. The open
+runner registry now also exposes `data.host.provider-worker-native`, so normal
+`execute-provider-samples` execution reaches that same dual-output path without
+a Metal/CoreML identity check. Final output evidence publishes ordered roles,
+buffers, element types, shapes, byte lengths, and comparison identities beside
+descriptor and graph release evidence.
+`nuis-provider-output-comparison-collection-v1` now binds unique comparison IDs
+to those output bindings. The native worker frontdoor independently compares
+both `u64[3]` payloads against hash-bound assets and publishes ordered IDs,
+buffers, statuses, element counts, and mismatch counts through
+`nuis-provider-output-comparison-collection-result-v1`; the compatibility
+comparison fields still mirror the first result. Ordered process-adapter
+control and multi-FD carrier materialization are now closed at lease level.
+The next boundary is registering a concrete multi-output process adapter in
+the normal `execute-provider-samples` route so this proof is no longer confined
+to a portable lease regression.
 
 Return-producing `if` lowering now preserves control dependence for nested
 extern-call comparisons. The open `compare_call_result` mode of

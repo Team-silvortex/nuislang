@@ -255,6 +255,66 @@ pub(crate) fn push_native_output_summary(
             summary.graph_output_release_roles.as_str(),
         ),
         (
+            "output_binding_contract",
+            summary.output_binding_contract.as_str(),
+        ),
+        (
+            "output_binding_count",
+            summary.output_binding_count.as_str(),
+        ),
+        (
+            "output_binding_roles",
+            summary.output_binding_roles.as_str(),
+        ),
+        (
+            "output_binding_buffers",
+            summary.output_binding_buffers.as_str(),
+        ),
+        (
+            "output_binding_element_types",
+            summary.output_binding_element_types.as_str(),
+        ),
+        (
+            "output_binding_shapes",
+            summary.output_binding_shapes.as_str(),
+        ),
+        (
+            "output_binding_byte_lengths",
+            summary.output_binding_byte_lengths.as_str(),
+        ),
+        (
+            "output_binding_comparison_ids",
+            summary.output_binding_comparison_ids.as_str(),
+        ),
+        (
+            "comparison_collection_contract",
+            summary.comparison_collection_contract.as_str(),
+        ),
+        (
+            "comparison_collection_count",
+            summary.comparison_collection_count.as_str(),
+        ),
+        (
+            "comparison_collection_ids",
+            summary.comparison_collection_ids.as_str(),
+        ),
+        (
+            "comparison_collection_output_buffers",
+            summary.comparison_collection_output_buffers.as_str(),
+        ),
+        (
+            "comparison_collection_statuses",
+            summary.comparison_collection_statuses.as_str(),
+        ),
+        (
+            "comparison_collection_element_counts",
+            summary.comparison_collection_element_counts.as_str(),
+        ),
+        (
+            "comparison_collection_mismatch_counts",
+            summary.comparison_collection_mismatch_counts.as_str(),
+        ),
+        (
             "compute_plan_contract",
             summary.compute_plan_contract.as_str(),
         ),
@@ -561,6 +621,66 @@ pub(crate) fn push_indexed_native_output(
         (
             "graph_output_release_roles",
             summary.graph_output_release_roles.as_str(),
+        ),
+        (
+            "output_binding_contract",
+            summary.output_binding_contract.as_str(),
+        ),
+        (
+            "output_binding_count",
+            summary.output_binding_count.as_str(),
+        ),
+        (
+            "output_binding_roles",
+            summary.output_binding_roles.as_str(),
+        ),
+        (
+            "output_binding_buffers",
+            summary.output_binding_buffers.as_str(),
+        ),
+        (
+            "output_binding_element_types",
+            summary.output_binding_element_types.as_str(),
+        ),
+        (
+            "output_binding_shapes",
+            summary.output_binding_shapes.as_str(),
+        ),
+        (
+            "output_binding_byte_lengths",
+            summary.output_binding_byte_lengths.as_str(),
+        ),
+        (
+            "output_binding_comparison_ids",
+            summary.output_binding_comparison_ids.as_str(),
+        ),
+        (
+            "comparison_collection_contract",
+            summary.comparison_collection_contract.as_str(),
+        ),
+        (
+            "comparison_collection_count",
+            summary.comparison_collection_count.as_str(),
+        ),
+        (
+            "comparison_collection_ids",
+            summary.comparison_collection_ids.as_str(),
+        ),
+        (
+            "comparison_collection_output_buffers",
+            summary.comparison_collection_output_buffers.as_str(),
+        ),
+        (
+            "comparison_collection_statuses",
+            summary.comparison_collection_statuses.as_str(),
+        ),
+        (
+            "comparison_collection_element_counts",
+            summary.comparison_collection_element_counts.as_str(),
+        ),
+        (
+            "comparison_collection_mismatch_counts",
+            summary.comparison_collection_mismatch_counts.as_str(),
         ),
         (
             "compute_plan_contract",

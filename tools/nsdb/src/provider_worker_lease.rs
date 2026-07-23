@@ -32,9 +32,9 @@ pub(crate) const PROVIDER_WORKER_LEASE_CONTRACT: &str = "nuis-provider-worker-le
 pub(crate) const PROVIDER_WORKER_DISPATCH_PERMIT_CONTRACT: &str =
     "nuis-provider-worker-dispatch-permit-v1";
 pub(crate) const PROVIDER_WORKER_PROCESS_ADAPTER_CONTRACT: &str =
-    "nuis-provider-worker-process-adapter-v4";
+    "nuis-provider-worker-process-adapter-v5";
 pub(crate) const PROVIDER_WORKER_ADAPTER_CONTROL_CONTRACT: &str =
-    "nuis-provider-worker-adapter-control-v1";
+    "nuis-provider-worker-adapter-control-v2";
 const MAX_PROVIDER_WORKER_DISPATCH_PAYLOAD_BYTES: usize = 1800;
 const MAX_INLINE_ADAPTER_CONTROL_BYTES: usize = 384;
 
@@ -46,7 +46,8 @@ pub(crate) struct ProviderWorkerAdapterLaunch<'a> {
     pub(crate) cache_identity: &'a str,
     pub(crate) cache_status: &'a str,
     pub(crate) arguments: &'a [String],
-    pub(crate) output_byte_length: usize,
+    pub(crate) output_roles: &'a [String],
+    pub(crate) output_byte_lengths: &'a [usize],
 }
 
 struct RenderedProviderDispatch {
@@ -320,10 +321,15 @@ impl ProviderWorkerLeaseManager {
             .zip(reply.output_descriptor_hashes)
             .zip(reply.output_descriptor_modes)
             .zip(reply.output_descriptor_payloads)
+            .enumerate()
             .map(
-                |(((((descriptor, role), byte_length), payload_hash), mode), payload)| {
+                |(
+                    output_index,
+                    (((((descriptor, role), byte_length), payload_hash), mode), payload),
+                )| {
                     let result = crate::provider_worker_result::consume_worker_result_descriptor(
                         descriptor,
+                        output_index,
                         &mode,
                         byte_length,
                         &payload_hash,
@@ -376,7 +382,7 @@ impl ProviderWorkerLeaseManager {
             execution_capsule_id: capsule.capsule_id,
             execution_capsule_token: capsule.capsule_token,
             execution_capsule_invocation_mode: if adapter_launch.is_some() {
-                "worker-process-adapter-v4"
+                PROVIDER_WORKER_PROCESS_ADAPTER_CONTRACT
             } else {
                 capsule.invocation_mode
             },
@@ -492,7 +498,14 @@ fn render_adapter_control(launch: &ProviderWorkerAdapterLaunch<'_>) -> String {
         launch.executable_path.display().to_string(),
         launch.executable_hash.to_owned(),
         launch.runner_contract.to_owned(),
-        launch.output_byte_length.to_string(),
+        launch.output_roles.len().to_string(),
+        launch.output_roles.join(","),
+        launch
+            .output_byte_lengths
+            .iter()
+            .map(usize::to_string)
+            .collect::<Vec<_>>()
+            .join(","),
         launch.arguments.len().to_string(),
     ];
     fields.extend(launch.arguments.iter().cloned());
@@ -537,7 +550,22 @@ fn validate_adapter_launch(
         || path.len() >= 2048
         || launch.arguments.is_empty()
         || launch.arguments.len() > 32
-        || launch.output_byte_length == 0
+        || launch.output_roles.is_empty()
+        || launch.output_roles.len() > 8
+        || launch.output_roles.len() != launch.output_byte_lengths.len()
+        || launch.output_byte_lengths.contains(&0)
+        || launch.output_roles.iter().any(|role| {
+            !role.starts_with("output.")
+                || !role
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+        })
+        || launch
+            .output_roles
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+            != launch.output_roles.len()
         || launch.arguments.iter().any(|argument| {
             argument.len() >= 2048 || !is_adapter_argument(argument, descriptor_count)
         })

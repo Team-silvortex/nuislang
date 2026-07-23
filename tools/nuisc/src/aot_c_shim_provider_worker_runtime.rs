@@ -45,6 +45,9 @@ static unsigned int nuis_provider_worker_input_byte_sum = 0;
     );
     crate::aot_c_shim_provider_worker_control::append_provider_worker_control_helpers(out);
     crate::aot_c_shim_provider_worker_result::append_provider_worker_result_helpers(out);
+    crate::aot_c_shim_provider_worker_process_adapter::append_provider_worker_process_adapter_helpers(
+        out,
+    );
     crate::aot_c_shim_provider_worker_launch::append_provider_worker_launch_helpers(out);
     crate::aot_c_shim_provider_worker_output::append_provider_worker_output_helpers(out);
     out.push_str(
@@ -323,24 +326,23 @@ int64_t nuis_host_provider_worker_is_close(void) {
 
 static int nuis_provider_worker_invoke_process_adapter(void) {
     char control[NUIS_PROVIDER_WORKER_MAX_FRAME_BYTES];
-    char* fields[39];
+    char* fields[41];
     char launch_contract[128];
     char executable[2048];
     char executable_hash[32];
-    if (!nuis_provider_worker_load_adapter_control(control, sizeof(control))) {
-        return -1;
-    }
+    int control_status =
+        nuis_provider_worker_load_adapter_control(control, sizeof(control));
+    if (control_status <= 0) return -20 + control_status;
     size_t field_count =
         nuis_provider_worker_split_tabs(control, fields, sizeof(fields) / sizeof(fields[0]));
-    if (field_count < 7
-        || strcmp(fields[0], "nuis-provider-worker-adapter-control-v1") != 0
-        || strcmp(fields[1], "nuis-provider-worker-process-adapter-v4") != 0) {
-        return -1;
-    }
-    char* output_end = NULL;
+    if (field_count < 9
+        || strcmp(fields[0], "nuis-provider-worker-adapter-control-v2") != 0
+        || strcmp(fields[1], "nuis-provider-worker-process-adapter-v5") != 0) return -10;
     char* count_end = NULL;
-    long long output_byte_length = strtoll(fields[5], &output_end, 10);
-    long long argument_count = strtoll(fields[6], &count_end, 10);
+    char* output_count_end = NULL;
+    long long output_count = strtoll(fields[5], &output_count_end, 10);
+    long long argument_count = strtoll(fields[8], &count_end, 10);
+    size_t output_byte_lengths[NUIS_PROVIDER_WORKER_MAX_OUTPUT_FDS] = {0};
     int launch_length = snprintf(
         launch_contract, sizeof(launch_contract), "%s", fields[1]);
     int executable_length = snprintf(
@@ -353,65 +355,37 @@ static int nuis_provider_worker_invoke_process_adapter(void) {
         || (size_t)executable_length >= sizeof(executable)
         || hash_length <= 0
         || (size_t)hash_length >= sizeof(executable_hash)
-        || fields[4][0] == '\0'
-        || *fields[5] == '\0'
-        || *output_end != '\0'
-        || *fields[6] == '\0'
+        || fields[4][0] == '\0') return -11;
+    if (*fields[5] == '\0'
+        || *output_count_end != '\0'
+        || output_count <= 0
+        || output_count > NUIS_PROVIDER_WORKER_MAX_OUTPUT_FDS
+        || (size_t)output_count > nuis_provider_worker_max_output_fds
+        || strcmp(fields[6], nuis_provider_worker_output_roles) != 0
+        || nuis_provider_worker_role_count(fields[6]) != (size_t)output_count
+        || *fields[7] == '\0'
+        || !nuis_provider_worker_parse_size_manifest(
+            fields[7],
+            (size_t)output_count,
+            output_byte_lengths)) return -12;
+    if (*fields[8] == '\0'
         || *count_end != '\0'
         || argument_count <= 0
         || argument_count > 32
-        || output_byte_length <= 0
-        || field_count != 7 + (size_t)argument_count) {
-        return -1;
-    }
+        || field_count != 9 + (size_t)argument_count) return -13;
     char actual_hash[19];
     if (!nuis_provider_worker_hash_file(executable, actual_hash)
         || strcmp(actual_hash, executable_hash) != 0) {
         return -2;
     }
-    nuis_provider_worker_output_file = tmpfile();
-    if (nuis_provider_worker_output_file == NULL) return -3;
-    nuis_provider_worker_output_count = 1;
-    memcpy(nuis_provider_worker_output_modes[0], "nuispfd1-result", 16);
+    if (!nuis_provider_worker_prepare_adapter_outputs(
+            (size_t)output_count,
+            output_byte_lengths)) {
+        nuis_provider_worker_release_output();
+        return -3;
+    }
     FILE* protocol_file = tmpfile();
     if (protocol_file == NULL) {
-        nuis_provider_worker_release_output();
-        return -3;
-    }
-    long page_size_value = sysconf(_SC_PAGESIZE);
-    if (page_size_value <= 0) {
-        fclose(protocol_file);
-        nuis_provider_worker_release_output();
-        return -3;
-    }
-    size_t page_size = (size_t)page_size_value;
-    size_t payload_offset = ((56 + page_size - 1) / page_size) * page_size;
-    size_t mapped_length =
-        (((size_t)output_byte_length + page_size - 1) / page_size) * page_size;
-    if (mapped_length < (size_t)output_byte_length
-        || payload_offset > SIZE_MAX - mapped_length) {
-        fclose(protocol_file);
-        nuis_provider_worker_release_output();
-        return -3;
-    }
-    size_t packet_length = payload_offset + mapped_length;
-    unsigned char carrier_header[56] = {0};
-    memcpy(carrier_header, "NUISPFD1", 8);
-    uint32_t frame_count = 1;
-    uint32_t encoded_page_size = (uint32_t)page_size;
-    uint64_t encoded_payload_offset = (uint64_t)payload_offset;
-    uint64_t encoded_output_length = (uint64_t)output_byte_length;
-    uint64_t encoded_mapped_length = (uint64_t)mapped_length;
-    memcpy(carrier_header + 8, &frame_count, sizeof(frame_count));
-    memcpy(carrier_header + 12, &encoded_page_size, sizeof(encoded_page_size));
-    memcpy(carrier_header + 24, &encoded_payload_offset, sizeof(encoded_payload_offset));
-    memcpy(carrier_header + 32, &encoded_output_length, sizeof(encoded_output_length));
-    memcpy(carrier_header + 40, &encoded_mapped_length, sizeof(encoded_mapped_length));
-    if (fwrite(carrier_header, 1, sizeof(carrier_header), nuis_provider_worker_output_file)
-            != sizeof(carrier_header)
-        || fflush(nuis_provider_worker_output_file) != 0
-        || ftruncate(fileno(nuis_provider_worker_output_file), (off_t)packet_length) != 0) {
-        fclose(protocol_file);
         nuis_provider_worker_release_output();
         return -3;
     }
@@ -426,21 +400,7 @@ static int nuis_provider_worker_invoke_process_adapter(void) {
             || dup2(fileno(protocol_file), STDERR_FILENO) < 0) {
             _exit(126);
         }
-        int output_fd = fileno(nuis_provider_worker_output_file);
-        int output_flags = fcntl(output_fd, F_GETFD);
-        char output_descriptor[128];
-        int output_descriptor_length = snprintf(
-            output_descriptor,
-            sizeof(output_descriptor),
-            "fd:%d:%zu:%lld:48",
-            output_fd,
-            payload_offset,
-            (long long)output_byte_length);
-        if (output_flags < 0
-            || fcntl(output_fd, F_SETFD, output_flags & ~FD_CLOEXEC) < 0
-            || output_descriptor_length <= 0
-            || (size_t)output_descriptor_length >= sizeof(output_descriptor)
-            || setenv("NUIS_PROVIDER_OUTPUT_FD", output_descriptor, 1) != 0) {
+        if (!nuis_provider_worker_expose_adapter_outputs(output_byte_lengths)) {
             _exit(126);
         }
         for (size_t index = 0; index < nuis_provider_worker_input_fd_count; index++) {
@@ -457,7 +417,7 @@ static int nuis_provider_worker_invoke_process_adapter(void) {
         char* arguments[34];
         arguments[0] = executable;
         for (int64_t index = 0; index < argument_count; index++) {
-            const char* encoded = fields[7 + index];
+            const char* encoded = fields[9 + index];
             int resolved_length = 0;
             if (strncmp(encoded, "literal:", 8) == 0 && encoded[8] != '\0') {
                 resolved_length = snprintf(
@@ -578,46 +538,12 @@ static int nuis_provider_worker_invoke_process_adapter(void) {
         nuis_provider_worker_adapter_protocol,
         nuis_provider_worker_adapter_protocol_length,
         nuis_provider_worker_adapter_protocol_hash);
-    uint64_t declared_output_hash = 0;
-    uint64_t stored_output_hash = 0;
-    uint64_t actual_output_hash = 0;
-    uint64_t packet_hash = 0;
-    if (!nuis_provider_worker_protocol_u64("output_hash", &declared_output_hash)
-        || pread(
-               fileno(nuis_provider_worker_output_file),
-               &stored_output_hash,
-               sizeof(stored_output_hash),
-               48) != sizeof(stored_output_hash)
-        || !nuis_provider_worker_hash_fd(
-            fileno(nuis_provider_worker_output_file),
-            payload_offset,
-            (size_t)output_byte_length,
-            &actual_output_hash)
-        || actual_output_hash != declared_output_hash
-        || stored_output_hash != declared_output_hash
-        || !nuis_provider_worker_hash_fd(
-            fileno(nuis_provider_worker_output_file),
-            0,
-            packet_length,
-            &packet_hash)) {
-        fprintf(
-            stderr,
-            "provider worker direct-result validation failed: declared=%llu stored=%llu actual=%llu bytes=%lld packet=%zu\n",
-            (unsigned long long)declared_output_hash,
-            (unsigned long long)stored_output_hash,
-            (unsigned long long)actual_output_hash,
-            (long long)output_byte_length,
-            packet_length);
+    if (!nuis_provider_worker_validate_adapter_outputs(output_byte_lengths)) {
+        fprintf(stderr, "provider worker multi-output direct-result validation failed\n");
         fflush(stderr);
         nuis_provider_worker_release_output();
         return -7;
     }
-    nuis_provider_worker_output_length = packet_length;
-    snprintf(
-        nuis_provider_worker_output_hash,
-        sizeof(nuis_provider_worker_output_hash),
-        "0x%016llx",
-        (unsigned long long)packet_hash);
     return 0;
 }
 
@@ -656,10 +582,6 @@ int64_t nuis_host_provider_worker_invoke_capsule(int64_t ingress_status) {
     }
     if (nuis_provider_worker_payload_has("adapter_control")
         || nuis_provider_worker_payload_has("adapter_control_ref")) {
-        if (declared_output_count != 1) {
-            nuis_provider_worker_report_error("process-adapter-output-count", -4);
-            return -4;
-        }
         int adapter_status = nuis_provider_worker_invoke_process_adapter();
         if (adapter_status != 0) {
             fprintf(

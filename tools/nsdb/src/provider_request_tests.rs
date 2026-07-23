@@ -92,9 +92,29 @@ fn parses_hash_bound_output_comparison_descriptor() {
         .expect("request with comparison")
         .output_comparison
         .expect("comparison descriptor");
+    assert_eq!(comparison.id, "comparison.output.pixels");
     assert_eq!(comparison.shape, [2, 2]);
     assert_eq!(comparison.expected_byte_length, 16);
     assert_eq!(comparison.non_finite_policy, "reject");
+}
+
+#[test]
+fn parses_output_comparison_collection_bound_to_distinct_outputs() {
+    let evidence = format!(
+        "{REGISTERED};provider_output_binding_contract={PROVIDER_OUTPUT_BINDING_CONTRACT};provider_output_binding_count=2;provider_output_binding_0_role=output.primary;provider_output_binding_0_buffer=output.pixels;provider_output_binding_0_element_type=u64;provider_output_binding_0_shape=3;provider_output_binding_0_byte_length=24;provider_output_binding_0_comparison_id=comparison.primary;provider_output_binding_1_role=output.audit;provider_output_binding_1_buffer=output.audit;provider_output_binding_1_element_type=u64;provider_output_binding_1_shape=3;provider_output_binding_1_byte_length=24;provider_output_binding_1_comparison_id=comparison.audit;provider_output_comparison_collection_contract={PROVIDER_OUTPUT_COMPARISON_COLLECTION_CONTRACT};provider_output_comparison_collection_count=2;provider_output_comparison_item_0_id=comparison.primary;provider_output_comparison_item_0_descriptor_contract={PROVIDER_OUTPUT_COMPARISON_DESCRIPTOR_CONTRACT};provider_output_comparison_item_0_output_buffer=output.pixels;provider_output_comparison_item_0_element_type=u64;provider_output_comparison_item_0_shape=3;provider_output_comparison_item_0_expected_path=primary.bin;provider_output_comparison_item_0_expected_byte_length=24;provider_output_comparison_item_0_expected_content_hash=0xprimary;provider_output_comparison_item_0_absolute_tolerance=0;provider_output_comparison_item_0_relative_tolerance=0;provider_output_comparison_item_0_non_finite_policy=reject;provider_output_comparison_item_1_id=comparison.audit;provider_output_comparison_item_1_descriptor_contract={PROVIDER_OUTPUT_COMPARISON_DESCRIPTOR_CONTRACT};provider_output_comparison_item_1_output_buffer=output.audit;provider_output_comparison_item_1_element_type=u64;provider_output_comparison_item_1_shape=3;provider_output_comparison_item_1_expected_path=audit.bin;provider_output_comparison_item_1_expected_byte_length=24;provider_output_comparison_item_1_expected_content_hash=0xaudit;provider_output_comparison_item_1_absolute_tolerance=0;provider_output_comparison_item_1_relative_tolerance=0;provider_output_comparison_item_1_non_finite_policy=reject"
+    );
+    let request = provider_request_from_evidence(&evidence).expect("comparison collection");
+    assert_eq!(request.output_comparisons.len(), 2);
+    assert_eq!(request.output_comparisons[0].id, "comparison.primary");
+    assert_eq!(request.output_comparisons[1].output_buffer, "output.audit");
+    assert_eq!(
+        request
+            .output_bindings
+            .iter()
+            .map(|binding| binding.comparison_id.as_str())
+            .collect::<Vec<_>>(),
+        ["comparison.primary", "comparison.audit"]
+    );
 }
 
 #[test]

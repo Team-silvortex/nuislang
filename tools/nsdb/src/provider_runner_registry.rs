@@ -46,6 +46,13 @@ pub(crate) struct ProviderRunnerAdapter {
 pub(crate) fn select_provider_runner_adapter(provider_family: &str) -> ProviderRunnerAdapter {
     let probe_status = provider_runner_real_device_probe_status(provider_family);
     match (provider_family, probe_status) {
+        ("data:host", "native-provider-worker-available") => ProviderRunnerAdapter {
+            adapter_id: "data.host.provider-worker-native",
+            capability_status: "registered-native-worker",
+            real_device_capable: true,
+            kind: "provider-worker-native-runner",
+            execution_mode: "real-device-provider-runner",
+        },
         ("metal:apple-silicon-gpu", "real-device-candidate-available") => ProviderRunnerAdapter {
             adapter_id: "metal.apple-silicon-gpu.real-device",
             capability_status: "registered-real-device",
@@ -96,7 +103,7 @@ pub(crate) fn select_provider_worker_image_registration(
         registry_source: PROVIDER_WORKER_IMAGE_REGISTRY_SOURCE,
         image_id: "std.provider-worker.unix.v1",
         source_path: "stdlib/std/provider_worker_image.ns",
-        cache_identity: "std.provider-worker.unix.aot-v25",
+        cache_identity: "std.provider-worker.unix.aot-v27",
         provider_key: stable_registration_scalar(provider_family.as_bytes()),
         capability_hash: stable_registration_scalar(
             format!("{provider_family}:provider-worker-capability-v1").as_bytes(),
@@ -156,6 +163,8 @@ fn stable_registration_scalar(bytes: &[u8]) -> i64 {
 
 pub(crate) fn provider_runner_real_device_probe_status(provider_family: &str) -> &'static str {
     match provider_family {
+        "data:host" if cfg!(unix) => "native-provider-worker-available",
+        "data:host" => "native-provider-worker-unavailable",
         "metal:apple-silicon-gpu" => framework_probe_status("Metal.framework"),
         "coreml:apple-ane" => framework_probe_status("CoreML.framework"),
         _ => "real-device-candidate-unsupported",
