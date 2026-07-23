@@ -86,6 +86,34 @@ pub(crate) fn push_native_output_summary(
             summary.worker_operation_token.as_str(),
         ),
         (
+            "worker_execution_capsule_contract",
+            summary.worker_execution_capsule_contract.as_str(),
+        ),
+        (
+            "worker_execution_capsule_id",
+            summary.worker_execution_capsule_id.as_str(),
+        ),
+        (
+            "worker_execution_capsule_token",
+            summary.worker_execution_capsule_token.as_str(),
+        ),
+        (
+            "worker_execution_capsule_invocation_mode",
+            summary.worker_execution_capsule_invocation_mode.as_str(),
+        ),
+        (
+            "worker_execution_capsule_input_roles",
+            summary.worker_execution_capsule_input_roles.as_str(),
+        ),
+        (
+            "worker_execution_capsule_output_roles",
+            summary.worker_execution_capsule_output_roles.as_str(),
+        ),
+        (
+            "worker_execution_capsule_status",
+            summary.worker_execution_capsule_status.as_str(),
+        ),
+        (
             "worker_dispatch_permit_contract",
             summary.worker_dispatch_permit_contract.as_str(),
         ),
@@ -248,6 +276,34 @@ pub(crate) fn push_indexed_native_output(
         (
             "worker_operation_token",
             summary.worker_operation_token.as_str(),
+        ),
+        (
+            "worker_execution_capsule_contract",
+            summary.worker_execution_capsule_contract.as_str(),
+        ),
+        (
+            "worker_execution_capsule_id",
+            summary.worker_execution_capsule_id.as_str(),
+        ),
+        (
+            "worker_execution_capsule_token",
+            summary.worker_execution_capsule_token.as_str(),
+        ),
+        (
+            "worker_execution_capsule_invocation_mode",
+            summary.worker_execution_capsule_invocation_mode.as_str(),
+        ),
+        (
+            "worker_execution_capsule_input_roles",
+            summary.worker_execution_capsule_input_roles.as_str(),
+        ),
+        (
+            "worker_execution_capsule_output_roles",
+            summary.worker_execution_capsule_output_roles.as_str(),
+        ),
+        (
+            "worker_execution_capsule_status",
+            summary.worker_execution_capsule_status.as_str(),
         ),
         (
             "worker_dispatch_permit_contract",

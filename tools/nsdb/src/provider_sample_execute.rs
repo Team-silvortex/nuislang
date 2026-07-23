@@ -420,6 +420,14 @@ fn bind_worker_output(
     summary.worker_descriptor_count = receipt.descriptor_count.to_string();
     summary.worker_payload_hash = receipt.payload_hash.clone();
     summary.worker_operation_token = receipt.operation_token.clone();
+    summary.worker_execution_capsule_contract = receipt.execution_capsule_contract.to_owned();
+    summary.worker_execution_capsule_id = receipt.execution_capsule_id.clone();
+    summary.worker_execution_capsule_token = receipt.execution_capsule_token.clone();
+    summary.worker_execution_capsule_invocation_mode =
+        receipt.execution_capsule_invocation_mode.to_owned();
+    summary.worker_execution_capsule_input_roles = receipt.execution_capsule_input_roles.clone();
+    summary.worker_execution_capsule_output_roles = receipt.execution_capsule_output_roles.clone();
+    summary.worker_execution_capsule_status = receipt.execution_capsule_status.to_owned();
     summary.worker_dispatch_permit_contract = receipt.dispatch_permit_contract.to_owned();
     summary.worker_dispatch_permit_status = receipt.dispatch_permit_status.to_owned();
     summary.worker_dispatch_status = receipt.dispatch_status.to_string();

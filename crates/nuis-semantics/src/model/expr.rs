@@ -94,6 +94,9 @@ pub enum NirExpr {
         descriptor_count: Box<NirExpr>,
         provider_key: Box<NirExpr>,
         capability_hash: Box<NirExpr>,
+        capsule_token: Option<Box<NirExpr>>,
+        input_role_count: Option<Box<NirExpr>>,
+        output_role_count: Option<Box<NirExpr>>,
     },
     CpuBindCore(i64),
     CpuWindow {

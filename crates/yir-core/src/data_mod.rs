@@ -181,10 +181,18 @@ impl RegisteredMod for DataMod {
                 for arg in &node.op.args[1..] {
                     state.expect_value(arg)?;
                 }
+                let capsule = if node.op.args.len() == 8 {
+                    format!(
+                        ", capsule {}, input roles {}, output roles {}",
+                        node.op.args[5], node.op.args[6], node.op.args[7]
+                    )
+                } else {
+                    String::new()
+                };
                 state.push_resource_event(
                     resource,
                     format!(
-                        "effect data.provider_request_ingress @{} [{}]: request {}, descriptor table {}, descriptor count {}, provider {}, capability {}",
+                        "effect data.provider_request_ingress @{} [{}]: request {}, descriptor table {}, descriptor count {}, provider {}, capability {}{}",
                         node.resource,
                         resource.kind.raw,
                         node.op.args[0],
@@ -192,6 +200,7 @@ impl RegisteredMod for DataMod {
                         node.op.args[2],
                         node.op.args[3],
                         node.op.args[4],
+                        capsule,
                     ),
                 );
                 Ok(request_handle)

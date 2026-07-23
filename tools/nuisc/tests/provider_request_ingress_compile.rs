@@ -46,7 +46,34 @@ fn rejects_provider_request_ingress_with_incomplete_contract() {
     .err()
     .expect("incomplete ingress contract should fail");
 
-    assert!(error.contains("provider_request_ingress(...) expects 5 args"));
+    assert!(error.contains("expects 5 legacy args or 8 capsule args"));
+}
+
+#[test]
+fn lowers_capsule_provider_request_ingress_with_eight_dependencies() {
+    let artifacts = nuisc::pipeline::compile_source(
+        r#"
+        mod cpu Main {
+          fn main() {
+            let request: i64 =
+              provider_request_ingress(101, 501, 2, 20, 2020, 3030, 2, 1);
+            print(request);
+          }
+        }
+        "#,
+    )
+    .expect("capsule provider request ingress should compile");
+
+    let ingress = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| node.op.module == "data" && node.op.instruction == "provider_request_ingress")
+        .expect("expected capsule ingress node");
+    assert_eq!(ingress.op.args.len(), 8);
+    assert!(artifacts
+        .llvm_ir
+        .contains("Nuis-owned provider capsule ingress"));
 }
 
 #[test]

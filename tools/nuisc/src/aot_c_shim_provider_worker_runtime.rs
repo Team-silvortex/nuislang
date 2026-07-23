@@ -52,6 +52,39 @@ static size_t nuis_provider_worker_role_count(const char* roles) {
     return count;
 }
 
+static int64_t nuis_provider_worker_payload_scalar(
+    const char* key,
+    const char* value_prefix) {
+    if (nuis_provider_worker_payload == NULL) return -1;
+    size_t key_length = strlen(key);
+    size_t prefix_length = strlen(value_prefix);
+    const unsigned char* cursor = nuis_provider_worker_payload;
+    const unsigned char* end = cursor + nuis_provider_worker_payload_length;
+    while (cursor < end) {
+        const unsigned char* newline = memchr(cursor, '\n', (size_t)(end - cursor));
+        const unsigned char* line_end = newline == NULL ? end : newline;
+        size_t line_length = (size_t)(line_end - cursor);
+        if (line_length > key_length + 1 + prefix_length
+            && memcmp(cursor, key, key_length) == 0
+            && cursor[key_length] == '='
+            && memcmp(cursor + key_length + 1, value_prefix, prefix_length) == 0) {
+            const unsigned char* digits = cursor + key_length + 1 + prefix_length;
+            uint64_t value = 0;
+            if (digits == line_end) return -1;
+            for (const unsigned char* digit = digits; digit < line_end; digit++) {
+                if (*digit < '0' || *digit > '9') return -1;
+                uint64_t component = (uint64_t)(*digit - '0');
+                if (value > ((uint64_t)INT64_MAX - component) / 10) return -1;
+                value = value * 10 + component;
+            }
+            return (int64_t)value;
+        }
+        if (newline == NULL) break;
+        cursor = newline + 1;
+    }
+    return -1;
+}
+
 static int64_t nuis_provider_worker_launch_scalar(const char* name) {
     const char* text = getenv(name);
     if (text == NULL) return 0;
@@ -204,6 +237,18 @@ int64_t nuis_host_provider_worker_provider_key(void) {
 
 int64_t nuis_host_provider_worker_capability_hash(void) {
     return nuis_provider_worker_capability;
+}
+
+int64_t nuis_host_provider_worker_capsule_token(void) {
+    return nuis_provider_worker_payload_scalar("capsule_token", "capsule-token:");
+}
+
+int64_t nuis_host_provider_worker_capsule_input_count(void) {
+    return nuis_provider_worker_payload_scalar("inputs", "");
+}
+
+int64_t nuis_host_provider_worker_capsule_output_count(void) {
+    return nuis_provider_worker_payload_scalar("outputs", "");
 }
 
 int64_t nuis_host_provider_worker_is_close(void) {

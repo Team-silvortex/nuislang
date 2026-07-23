@@ -132,6 +132,29 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "language-effectful-if-control-dependence",
+        path: "tools/nuisc/tests/effectful_if_compile.rs",
+        required_patterns: &[
+            "lowers_nested_effectful_if_call_inside_selected_return_branch",
+            "compare_call_result",
+            "guard_host_call_return",
+            "guard_host_call_return_then.",
+            "host_provider_worker_reply",
+            "call < continuation",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-effectful-if-llvm-protocol",
+        path: "crates/yir-lower-llvm/src/guard_host_call.rs",
+        required_patterns: &[
+            "CompareCallResult",
+            "compare_call_result",
+            "call_results.get(result_name)",
+            "guard_host_call_return_then",
+            "select i1",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "dev-tensor-status-task-card-frontdoor",
         path: "tools/nuis/src/main.rs",
         required_patterns: &[
@@ -610,7 +633,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "dev_tensor_cell_weakness_key",
             "select_dev_tensor_handoff_bootstrap_cell",
             "handoff_selection_is_status_aware_and_input_order_independent",
-            "heterogeneous-runtime/nustar/registered-domain-contracts",
+            "select current weakest handoff",
         ],
     },
     DevTensorDriftCheckSpec {

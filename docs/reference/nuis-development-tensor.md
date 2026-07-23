@@ -611,6 +611,16 @@ performs only scalar passthrough. The dispatch recipe now obtains every request
 handle through this node and still executes with output `14` and no ingress
 deferred notes.
 
+The same intrinsic now also accepts the capsule form
+`provider_request_ingress(request, descriptor_table, count, provider,
+capability, capsule_token, input_roles, output_roles)`. The compatibility form
+remains valid, while the capsule form emits eight explicit YIR dependencies and
+eight GLM reads. The persistent Nuis worker reads these three additional
+scalars from the hash-verified request, rejects invalid token or role counts,
+and only then returns the ingress status used by the dispatch permit. The host
+shim performs bounded scalar extraction only; it does not choose providers,
+operations, or policy.
+
 That scalar boundary is now concrete. Parameterized `@export` functions may
 expose a non-async, non-generic `i64` ABI; exported helpers are materialized
 even when `main` does not call them, and LLVM scalar calls no longer impose an
@@ -621,8 +631,11 @@ intrinsic, remains visible in the native symbol table, and still executes with
 output `14`. `nuis-provider-worker-ingress-adapter-v1` is deliberately
 policy-free: after `NUISPWU2` verification and runtime handle registration it
 only maps the request handle, descriptor-table handle/count, provider key, and
-capability hash into that static function signature. The remaining gap is no
-longer the ABI contract. `provider_worker_image.ns` now owns an async
+capability hash into the compatibility signature. Its capsule mapping contract
+additionally carries the token and input/output role counts as eight neutral
+scalars; the AOT worker reads the extra three through registered host symbols
+to avoid imposing an eight-argument platform ABI. The remaining gap is no
+longer the scalar contract. `provider_worker_image.ns` now owns an async
 `open -> while receive -> worker_request -> reply -> close` lifecycle. Its AOT
 shim contributes only one-frame `recvmsg`/`sendmsg`, envelope verification, and
 descriptor ownership primitives when the worker host-symbol surface is used.
@@ -675,6 +688,24 @@ records the token, permit contract, and `granted` state before the concrete
 runner branch can execute. This establishes an operation-level authorization
 gate but does not yet move the runner process itself: the next boundary is a
 registered execution capsule and output-carrier reply owned by the Nuis worker.
+`nuis-provider-execution-capsule-v1` now closes the descriptor half: it binds
+provider, adapter, operation token, and ordered input/output carrier roles into
+a stable capsule id/token, and final output evidence records its honest
+`worker-authorized-parent-adapter-v1` mode. The remaining gap is invocation:
+the persistent Nuis worker must execute that registered capsule and return the
+verified output-carrier receipt instead of authorizing an Nsdb-parent call.
+Capsule identity is no longer hidden behind that boundary: token and declared
+input/output role counts now enter the registered Data Nustar operation and
+survive as YIR metadata. Concrete adapter invocation and output allocation are
+the remaining ownership gap.
+
+Return-producing `if` lowering now preserves control dependence for nested
+extern-call comparisons. The open `compare_call_result` mode of
+`cpu.guard_host_call_return` executes the host call only inside the selected
+LLVM block, compares its result there, and returns the matched or unmatched
+scalar without eager evaluation. The persistent provider worker uses this
+shape for its close reply, so its two-request native regression also proves
+that an unselected reply call cannot release the active request descriptors.
 
 The language-core checks anchor the bootstrap-critical
 `language-core/nuisc/type-control-flow-generics` cell to:

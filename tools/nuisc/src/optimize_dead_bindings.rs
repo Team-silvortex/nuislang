@@ -206,6 +206,9 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
             descriptor_count,
             provider_key,
             capability_hash,
+            capsule_token,
+            input_role_count,
+            output_role_count,
         } => {
             for value in [
                 request_handle,
@@ -214,6 +217,12 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
                 provider_key,
                 capability_hash,
             ] {
+                collect_used_vars_expr(value, out);
+            }
+            for value in [capsule_token, input_role_count, output_role_count]
+                .into_iter()
+                .flatten()
+            {
                 collect_used_vars_expr(value, out);
             }
         }

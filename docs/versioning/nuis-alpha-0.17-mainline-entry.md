@@ -96,6 +96,15 @@ The repository currently verifies:
 * a reply protocol, `NUISPWUR4`, carrying the positive Nuis ingress status
 * fail-closed rejection of non-positive worker dispatch status
 * operation permit evidence in final native-output summaries
+* `nuis-provider-execution-capsule-v1` registration binding provider, adapter,
+  operation token, and ordered input/output carrier roles
+* stable capsule id/token evidence carried through worker authorization into
+  final native-output summaries
+* capsule token and input/output role counts validated by the persistent Nuis
+  worker through eight-dependency `data.provider_request_ingress`
+* return-producing effectful `if` lowering through the open
+  `compare_call_result` host-call guard protocol, with the provider worker
+  proving unselected reply calls remain unexecuted
 * four ordered CoreML requests and one Metal request in the official
   heterogeneous smoke route
 * fan-in descriptors, cross-provider transfer evidence, output comparison,
@@ -106,7 +115,9 @@ binary closure.
 
 ## Main Target During Alpha-0.17
 
-The highest-value next boundary is a provider-neutral execution capsule.
+The provider-neutral execution capsule contract and its Nuis/YIR ingress now
+exist. The highest-value next boundary is moving concrete invocation into the
+persistent Nuis worker.
 
 The worker should consume:
 
@@ -129,8 +140,9 @@ owner of Metal, CoreML, CUDA, ROCm, Vulkan, network, or future hardware policy.
 
 Short rule:
 
-`registration chooses the capsule; the Nuis worker owns invocation; the Nustar
-owns backend meaning; Nsdb verifies and records the result`
+`registration now chooses and authorizes the capsule; next the Nuis worker must
+own invocation; capsule identity already reaches Nuis/YIR; the Nustar owns
+backend meaning; Nsdb verifies and records the result`
 
 ## Native-Language Ownership
 

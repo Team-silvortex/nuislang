@@ -311,6 +311,8 @@ mod tests {
                 "surface.std.hetero-test-benchmark-contracts.v1".to_owned(),
                 "surface.std.cli-report-file-contracts.v1".to_owned(),
                 "surface.std.language-result-hof-contracts.v1".to_owned(),
+                "surface.std.provider-worker-lifecycle.v1".to_owned(),
+                "surface.std.provider-worker-dispatch.v1".to_owned(),
             ]
         );
         assert_eq!(
@@ -327,6 +329,8 @@ mod tests {
                 "lib/report_contracts.ns".to_owned(),
                 "lib/language_core.ns".to_owned(),
                 "lib/language_ops.ns".to_owned(),
+                "lib/provider_worker_contracts.ns".to_owned(),
+                "lib/provider_worker_dispatch_contracts.ns".to_owned(),
             ]
         );
     }

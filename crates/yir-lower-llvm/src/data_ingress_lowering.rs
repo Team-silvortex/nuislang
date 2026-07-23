@@ -25,10 +25,13 @@ pub(crate) fn lower_data_provider_request_ingress(
         return true;
     };
 
-    state.body.push(
+    state.body.push(if node.op.args.len() == 8 {
+        "  ; Nuis-owned provider capsule ingress preserves descriptor/provider/role metadata in YIR"
+            .to_owned()
+    } else {
         "  ; Nuis-owned provider request ingress preserves descriptor/provider metadata in YIR"
-            .to_owned(),
-    );
+            .to_owned()
+    });
     state
         .registers
         .insert(node.name.clone(), LlvmValueRef::I64(request_handle.clone()));

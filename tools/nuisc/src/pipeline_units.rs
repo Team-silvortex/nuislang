@@ -122,6 +122,9 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
             descriptor_count,
             provider_key,
             capability_hash,
+            capsule_token,
+            input_role_count,
+            output_role_count,
         } => {
             for value in [
                 request_handle,
@@ -130,6 +133,12 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
                 provider_key,
                 capability_hash,
             ] {
+                collect_instantiated_units_expr(value, units);
+            }
+            for value in [capsule_token, input_role_count, output_role_count]
+                .into_iter()
+                .flatten()
+            {
                 collect_instantiated_units_expr(value, units);
             }
         }

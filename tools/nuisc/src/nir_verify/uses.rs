@@ -36,6 +36,9 @@ pub(super) fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Resu
             descriptor_count,
             provider_key,
             capability_hash,
+            capsule_token,
+            input_role_count,
+            output_role_count,
         } => {
             for value in [
                 request_handle,
@@ -44,6 +47,12 @@ pub(super) fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Resu
                 provider_key,
                 capability_hash,
             ] {
+                verify_expr_uses(value, moved)?;
+            }
+            for value in [capsule_token, input_role_count, output_role_count]
+                .into_iter()
+                .flatten()
+            {
                 verify_expr_uses(value, moved)?;
             }
         }

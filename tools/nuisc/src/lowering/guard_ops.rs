@@ -182,16 +182,8 @@ pub(super) fn lower_guard_host_call_return(
         },
     });
     push_dep_edges(state, &condition_name, &name);
-    if let PreparedHostCallReturnSpec::Value(return_name) = &returned {
-        push_dep_edges(state, return_name, &name);
-    }
-    for arg_name in calls.iter().flat_map(|(_, _, _, call_args)| call_args) {
-        push_dep_edges(state, arg_name, &name);
-    }
+    push_host_call_return_deps(state, &name, &returned, &calls);
     let mut effects = vec![condition_name];
-    if let PreparedHostCallReturnSpec::Value(return_name) = returned {
-        effects.push(return_name);
-    }
     effects.extend(
         calls
             .iter()
@@ -240,6 +232,13 @@ pub(super) fn lower_branch_host_call_return(
 
 pub(super) enum PreparedHostCallReturnSpec {
     Value(String),
+    CompareCallResult {
+        result_name: String,
+        op: NirBinaryOp,
+        expected: String,
+        matched: String,
+        unmatched: String,
+    },
     WriteFlushExitCode {
         write_name: String,
         flush_name: String,
@@ -256,6 +255,21 @@ fn encode_host_call_return_args(
         PreparedHostCallReturnSpec::Value(return_name) => {
             args.extend(["value".to_owned(), "1".to_owned(), return_name.clone()]);
         }
+        PreparedHostCallReturnSpec::CompareCallResult {
+            result_name,
+            op,
+            expected,
+            matched,
+            unmatched,
+        } => args.extend([
+            "compare_call_result".to_owned(),
+            "5".to_owned(),
+            result_name.clone(),
+            render_branch_comparison(*op).to_owned(),
+            expected.clone(),
+            matched.clone(),
+            unmatched.clone(),
+        ]),
         PreparedHostCallReturnSpec::WriteFlushExitCode {
             write_name,
             flush_name,
@@ -287,8 +301,31 @@ fn push_host_call_return_deps(
     if let PreparedHostCallReturnSpec::Value(return_name) = returned {
         push_dep_edges(state, return_name, name);
     }
+    if let PreparedHostCallReturnSpec::CompareCallResult {
+        expected,
+        matched,
+        unmatched,
+        ..
+    } = returned
+    {
+        for value in [expected, matched, unmatched] {
+            push_dep_edges(state, value, name);
+        }
+    }
     for arg_name in calls.iter().flat_map(|(_, _, _, call_args)| call_args) {
         push_dep_edges(state, arg_name, name);
+    }
+}
+
+fn render_branch_comparison(op: NirBinaryOp) -> &'static str {
+    match op {
+        NirBinaryOp::Eq => "eq",
+        NirBinaryOp::Ne => "ne",
+        NirBinaryOp::Lt => "lt",
+        NirBinaryOp::Le => "le",
+        NirBinaryOp::Gt => "gt",
+        NirBinaryOp::Ge => "ge",
+        _ => unreachable!("prepared host-call comparison must use a comparison operator"),
     }
 }
 

@@ -92,12 +92,18 @@ pub(super) fn lower_data_cpu_expr(
             descriptor_count,
             provider_key,
             capability_hash,
+            capsule_token,
+            input_role_count,
+            output_role_count,
         } => Some(lower_data_provider_request_ingress(
             request_handle,
             descriptor_table_handle,
             descriptor_count,
             provider_key,
             capability_hash,
+            capsule_token.as_deref(),
+            input_role_count.as_deref(),
+            output_role_count.as_deref(),
             state,
             bindings,
         )),
@@ -332,17 +338,29 @@ fn lower_data_provider_request_ingress(
     descriptor_count: &NirExpr,
     provider_key: &NirExpr,
     capability_hash: &NirExpr,
+    capsule_token: Option<&NirExpr>,
+    input_role_count: Option<&NirExpr>,
+    output_role_count: Option<&NirExpr>,
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
 ) -> Result<String, String> {
     ensure_fabric_resource(state.yir);
-    let args = [
+    let mut args = vec![
         lower_expr(request_handle, state, bindings)?,
         lower_expr(descriptor_table_handle, state, bindings)?,
         lower_expr(descriptor_count, state, bindings)?,
         lower_expr(provider_key, state, bindings)?,
         lower_expr(capability_hash, state, bindings)?,
     ];
+    match (capsule_token, input_role_count, output_role_count) {
+        (Some(token), Some(inputs), Some(outputs)) => {
+            args.push(lower_expr(token, state, bindings)?);
+            args.push(lower_expr(inputs, state, bindings)?);
+            args.push(lower_expr(outputs, state, bindings)?);
+        }
+        (None, None, None) => {}
+        _ => return Err("provider request capsule ingress metadata is incomplete".to_owned()),
+    }
     let name = next_name(state, "provider_request_ingress");
     state.yir.nodes.push(Node {
         name: name.clone(),
@@ -350,7 +368,7 @@ fn lower_data_provider_request_ingress(
         op: Operation {
             module: "data".to_owned(),
             instruction: "provider_request_ingress".to_owned(),
-            args: args.to_vec(),
+            args: args.clone(),
         },
     });
     for arg in &args {

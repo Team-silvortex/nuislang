@@ -19,7 +19,8 @@ pub(super) use loop_purity_collect::{
 };
 pub(super) use loop_purity_expr::{extract_pure_branch_binding, is_terminal_branch_pure_expr};
 pub(in crate::lowering) use loop_purity_host_calls::{
-    prepare_guard_host_call_stmt, prepare_host_call_computed_return,
+    prepare_guard_host_call_stmt, prepare_host_call_compare_return,
+    prepare_host_call_computed_return,
 };
 pub(super) use loop_purity_normalize::normalize_pure_bool_test_expr;
 pub(in crate::lowering) use loop_purity_refs::expr_references_names;

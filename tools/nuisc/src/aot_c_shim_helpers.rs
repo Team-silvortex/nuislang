@@ -350,6 +350,13 @@ pub(crate) fn render_registered_host_ffi_body(
         }
         "host_provider_worker_provider_key" => ("nuis_host_provider_worker_provider_key", 0),
         "host_provider_worker_capability_hash" => ("nuis_host_provider_worker_capability_hash", 0),
+        "host_provider_worker_capsule_token" => ("nuis_host_provider_worker_capsule_token", 0),
+        "host_provider_worker_capsule_input_count" => {
+            ("nuis_host_provider_worker_capsule_input_count", 0)
+        }
+        "host_provider_worker_capsule_output_count" => {
+            ("nuis_host_provider_worker_capsule_output_count", 0)
+        }
         "host_provider_worker_is_close" => ("nuis_host_provider_worker_is_close", 0),
         "host_provider_worker_launch_provider_key" => {
             ("nuis_host_provider_worker_launch_provider_key", 0)

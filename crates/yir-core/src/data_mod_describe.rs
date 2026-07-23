@@ -153,9 +153,9 @@ fn describe_handle_table(node: &Node) -> Result<InstructionSemantics, String> {
 }
 
 fn describe_provider_request_ingress(node: &Node) -> Result<InstructionSemantics, String> {
-    if node.op.args.len() != 5 {
+    if !matches!(node.op.args.len(), 5 | 8) {
         return Err(format!(
-            "node `{}` expects `data.provider_request_ingress <name> <resource> <request_handle> <descriptor_table_handle> <descriptor_count> <provider_key> <capability_hash>`",
+            "node `{}` expects 5 legacy or 8 capsule arguments for `data.provider_request_ingress`",
             node.name
         ));
     }

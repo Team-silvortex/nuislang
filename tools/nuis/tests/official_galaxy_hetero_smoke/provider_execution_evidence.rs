@@ -1,0 +1,44 @@
+use super::*;
+
+pub(super) fn assert_provider_execution_evidence(provider_output_payload_path: &Path) {
+    for evidence in [
+        "native_output_4_output_residency_contract = \"nuis-provider-output-residency-v1\"",
+        "native_output_4_output_residency_kind = \"host-visible-file\"",
+        "native_output_0_session_lease_contract = \"nuis-provider-session-lease-v1\"",
+        "native_output_0_session_adapter_id = \"logical.request-process.v1\"",
+        "native_output_0_session_lifecycle_hooks = \"graph-open,request-begin,request-complete,graph-close\"",
+        "native_output_3_session_request_sequence = \"3\"",
+        "native_output_4_session_request_sequence = \"0\"",
+        "native_output_0_worker_lease_contract = \"nuis-provider-worker-lease-v1\"",
+        "native_output_0_worker_resolver_contract = \"nuis-provider-worker-image-resolver-v1\"",
+        "native_output_3_worker_request_sequence = \"3\"",
+        "native_output_4_worker_request_sequence = \"0\"",
+        "native_output_3_worker_descriptor_count = \"2\"",
+        "native_output_4_worker_descriptor_count = \"1\"",
+        "native_output_0_worker_pid = \"",
+        "native_output_0_worker_payload_hash = \"0x",
+        "native_output_0_worker_operation_token = \"operation:",
+        "native_output_0_worker_execution_capsule_contract = \"nuis-provider-execution-capsule-v1\"",
+        "native_output_0_worker_execution_capsule_id = \"capsule:",
+        "native_output_0_worker_execution_capsule_token = \"capsule-token:",
+        "native_output_0_worker_execution_capsule_invocation_mode = \"worker-authorized-parent-adapter-v1\"",
+        "native_output_0_worker_execution_capsule_input_roles = \"input.0\"",
+        "native_output_3_worker_execution_capsule_input_roles = \"input.0,input.1\"",
+        "native_output_4_worker_execution_capsule_output_roles = \"output.result\"",
+        "native_output_4_worker_execution_capsule_status = \"worker-authorized\"",
+        "native_output_0_worker_dispatch_permit_contract = \"nuis-provider-worker-dispatch-permit-v1\"",
+        "native_output_0_worker_dispatch_permit_status = \"granted\"",
+        "native_output_4_worker_dispatch_permit_status = \"granted\"",
+        "native_output_0_worker_dispatch_status = \"1\"",
+        "native_output_3_worker_dispatch_status = \"4\"",
+        "native_output_4_worker_dispatch_status = \"1\"",
+        "native_output_4_output_handle_ownership_token = \"glm:provider-session-output:metal:apple-silicon-gpu:0:witsage.vector.metal-bias\"",
+        "native_output_4_output_handle_release_status = \"released-at-graph-close\"",
+    ] {
+        assert_file_contains(
+            provider_output_payload_path,
+            evidence,
+            "official galaxy provider execution",
+        );
+    }
+}

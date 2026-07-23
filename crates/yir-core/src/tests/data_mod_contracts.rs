@@ -352,3 +352,51 @@ fn data_mod_imports_provider_request_as_opaque_handle() {
         .expect("execute ingress");
     assert_eq!(value, Value::Int(101));
 }
+
+#[test]
+fn data_mod_imports_capsule_request_with_eight_dependencies() {
+    let resource = Resource {
+        name: "fabric0".to_owned(),
+        kind: ResourceKind::parse("data.fabric"),
+    };
+    let names = [
+        "request_handle",
+        "descriptor_table",
+        "count",
+        "provider",
+        "capability",
+        "capsule",
+        "input_roles",
+        "output_roles",
+    ];
+    let node = Node {
+        name: "capsule_request".to_owned(),
+        resource: "fabric0".to_owned(),
+        op: Operation::parse(
+            "data.provider_request_ingress",
+            names.into_iter().map(str::to_owned).collect(),
+        )
+        .unwrap(),
+    };
+    let data_mod = DataMod;
+    let semantics = data_mod
+        .describe(&node, &resource)
+        .expect("describe capsule ingress");
+    assert_eq!(semantics.dependencies.len(), 8);
+    assert!(semantics.has_effect);
+
+    let mut state = ExecutionState::default();
+    for (index, name) in names.into_iter().enumerate() {
+        state
+            .values
+            .insert(name.to_owned(), Value::Int(index as i64 + 1));
+    }
+    assert_eq!(
+        data_mod.execute(&node, &resource, &mut state).unwrap(),
+        Value::Int(1)
+    );
+    assert!(state
+        .events
+        .iter()
+        .any(|event| event.contains("capsule capsule")));
+}

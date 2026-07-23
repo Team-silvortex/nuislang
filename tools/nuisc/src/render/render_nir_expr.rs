@@ -124,14 +124,26 @@ pub(super) fn render_nir_expr(value: &NirExpr) -> String {
             descriptor_count,
             provider_key,
             capability_hash,
-        } => format!(
-            "provider_request_ingress({}, {}, {}, {}, {})",
-            render_nir_expr(request_handle),
-            render_nir_expr(descriptor_table_handle),
-            render_nir_expr(descriptor_count),
-            render_nir_expr(provider_key),
-            render_nir_expr(capability_hash)
-        ),
+            capsule_token,
+            input_role_count,
+            output_role_count,
+        } => {
+            let mut args = vec![
+                render_nir_expr(request_handle),
+                render_nir_expr(descriptor_table_handle),
+                render_nir_expr(descriptor_count),
+                render_nir_expr(provider_key),
+                render_nir_expr(capability_hash),
+            ];
+            if let (Some(token), Some(inputs), Some(outputs)) =
+                (capsule_token, input_role_count, output_role_count)
+            {
+                args.push(render_nir_expr(token));
+                args.push(render_nir_expr(inputs));
+                args.push(render_nir_expr(outputs));
+            }
+            format!("provider_request_ingress({})", args.join(", "))
+        }
         NirExpr::CpuBindCore(core) => format!("cpu_bind_core({core})"),
         NirExpr::CpuWindow {
             width,

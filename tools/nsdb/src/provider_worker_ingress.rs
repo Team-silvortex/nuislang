@@ -16,9 +16,13 @@ pub(crate) struct ProviderWorkerIngressFields {
     pub(crate) descriptor_count: i64,
     pub(crate) provider_key: i64,
     pub(crate) capability_hash: i64,
+    pub(crate) capsule_token: i64,
+    pub(crate) input_role_count: i64,
+    pub(crate) output_role_count: i64,
 }
 
-pub(crate) type ProviderWorkerIngressEntrypoint = extern "C" fn(i64, i64, i64, i64, i64) -> i64;
+pub(crate) type ProviderWorkerIngressEntrypoint =
+    extern "C" fn(i64, i64, i64, i64, i64, i64, i64, i64) -> i64;
 
 #[cfg(unix)]
 pub(crate) fn map_verified_unix_request_to_ingress(
@@ -43,18 +47,42 @@ pub(crate) fn map_verified_unix_request_to_ingress(
     if registration.provider_key <= 0 || registration.capability_hash <= 0 {
         return Err("provider worker ingress registration is invalid".to_owned());
     }
+    let capsule_token = payload_scalar(&request.payload, "capsule_token", "capsule-token:")?;
+    let input_role_count = payload_scalar(&request.payload, "inputs", "")?;
+    let output_role_count = payload_scalar(&request.payload, "outputs", "")?;
     let descriptor_count = request
         .descriptors
         .len()
         .try_into()
         .map_err(|_| "provider worker descriptor count exceeds the scalar ABI".to_owned())?;
+    if capsule_token <= 0 || input_role_count != descriptor_count || output_role_count <= 0 {
+        return Err("provider worker capsule ingress metadata is inconsistent".to_owned());
+    }
     Ok(ProviderWorkerIngressFields {
         request_handle,
         descriptor_table_handle,
         descriptor_count,
         provider_key: registration.provider_key,
         capability_hash: registration.capability_hash,
+        capsule_token,
+        input_role_count,
+        output_role_count,
     })
+}
+
+fn payload_scalar(payload: &[u8], key: &str, prefix: &str) -> Result<i64, String> {
+    let text = std::str::from_utf8(payload)
+        .map_err(|_| "provider worker capsule payload is not UTF-8".to_owned())?;
+    let value = text
+        .lines()
+        .find_map(|line| line.strip_prefix(&format!("{key}=")))
+        .and_then(|value| value.strip_prefix(prefix))
+        .ok_or_else(|| format!("provider worker capsule payload is missing `{key}`"))?;
+    value
+        .parse::<i64>()
+        .ok()
+        .filter(|value| *value >= 0)
+        .ok_or_else(|| format!("provider worker capsule payload has invalid `{key}`"))
 }
 
 pub(crate) fn invoke_provider_worker_ingress(
@@ -67,6 +95,9 @@ pub(crate) fn invoke_provider_worker_ingress(
         fields.descriptor_count,
         fields.provider_key,
         fields.capability_hash,
+        fields.capsule_token,
+        fields.input_role_count,
+        fields.output_role_count,
     )
 }
 
@@ -84,14 +115,17 @@ mod tests {
         count: i64,
         provider: i64,
         capability: i64,
+        capsule: i64,
+        inputs: i64,
+        outputs: i64,
     ) -> i64 {
-        request + descriptors + count + provider + capability
+        request + descriptors + count + provider + capability + capsule + inputs + outputs
     }
 
     #[test]
-    fn verified_unix_request_maps_to_five_nuis_ingress_scalars() {
+    fn verified_unix_request_maps_to_eight_nuis_capsule_ingress_scalars() {
         let descriptor: OwnedFd = File::open("/dev/null").expect("descriptor").into();
-        let payload = vec![0, 17, 255];
+        let payload = b"capsule_token=capsule-token:3030\ninputs=1\noutputs=1\n".to_vec();
         let request = UnixWorkerRequest {
             lease_id: "lease:test".to_owned(),
             sequence: 0,
@@ -113,6 +147,9 @@ mod tests {
         .expect("verified ingress mapping");
 
         assert_eq!(fields.descriptor_count, 1);
-        assert_eq!(invoke_provider_worker_ingress(ingress_probe, fields), 2643);
+        assert_eq!(fields.capsule_token, 3030);
+        assert_eq!(fields.input_role_count, 1);
+        assert_eq!(fields.output_role_count, 1);
+        assert_eq!(invoke_provider_worker_ingress(ingress_probe, fields), 5675);
     }
 }

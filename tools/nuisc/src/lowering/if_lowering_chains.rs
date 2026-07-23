@@ -86,6 +86,9 @@ pub(in crate::lowering) fn lower_guard_return_chain(
         }, tail @ ..]
             if else_body.is_empty() =>
         {
+            if expr_contains_conditional_effect_primitive(condition) {
+                return Ok(None);
+            }
             let condition_name = lower_expr(condition, state, bindings)?;
             let Some(lhs) = lower_return_if_chain(then_body, state, bindings)? else {
                 return Ok(None);

@@ -37,6 +37,7 @@ pub(super) fn expr_contains_conditional_effect_primitive(expr: &NirExpr) -> bool
             inner.as_ref(),
             NirExpr::Call { .. } | NirExpr::MethodCall { .. }
         ),
+        NirExpr::CpuExternCall { .. } | NirExpr::CpuExternCallI32 { .. } => true,
         _ if is_branch_local_runtime_consumer(expr) => true,
         _ if is_branch_local_runtime_observer(expr) => false,
         NirExpr::Borrow(inner)
@@ -146,9 +147,7 @@ pub(super) fn expr_contains_conditional_effect_primitive(expr: &NirExpr) -> bool
                 || expr_contains_conditional_effect_primitive(index)
                 || expr_contains_conditional_effect_primitive(value)
         }
-        NirExpr::Call { args, .. }
-        | NirExpr::MethodCall { args, .. }
-        | NirExpr::CpuExternCall { args, .. } => {
+        NirExpr::Call { args, .. } | NirExpr::MethodCall { args, .. } => {
             args.iter().any(expr_contains_conditional_effect_primitive)
         }
         NirExpr::StructLiteral { fields, .. } => fields

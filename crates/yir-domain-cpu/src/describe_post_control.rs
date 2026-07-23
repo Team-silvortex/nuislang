@@ -339,6 +339,7 @@ pub(super) fn describe_cpu_post_control_node(
             let mut inputs = vec![node.op.args[0].clone()];
             match node.op.args.get(1).map(String::as_str) {
                 Some("value") => inputs.push(node.op.args[3].clone()),
+                Some("compare_call_result") => inputs.extend(node.op.args[5..8].iter().cloned()),
                 Some("write_flush_exit_code") => {}
                 _ if node.op.args[2].parse::<usize>().is_ok() => {
                     inputs.push(node.op.args[1].clone())

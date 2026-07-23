@@ -6,7 +6,7 @@ pub(in crate::lowering) fn prepare_guard_host_call_stmt(
     match stmt {
         NirStmt::Expr(NirExpr::CpuExternCall {
             abi, callee, args, ..
-        }) if is_guard_host_call(callee) => Some((
+        }) => Some((
             None,
             PreparedHostCall {
                 result_name: None,
@@ -65,6 +65,81 @@ pub(in crate::lowering) fn prepare_host_call_computed_return(
         },
         _ => None,
     }
+}
+
+pub(in crate::lowering) fn prepare_host_call_compare_return(
+    condition: &NirExpr,
+    matched: &NirExpr,
+    unmatched: &NirExpr,
+    pure_helpers: &BTreeSet<String>,
+) -> Option<(PreparedHostCall, PreparedHostCallReturn)> {
+    if !is_terminal_branch_pure_expr(matched, pure_helpers)
+        || !is_terminal_branch_pure_expr(unmatched, pure_helpers)
+    {
+        return None;
+    }
+    let NirExpr::Binary { op, lhs, rhs } = condition else {
+        return None;
+    };
+    let (call, expected, op) = match (lhs.as_ref(), rhs.as_ref()) {
+        (
+            NirExpr::CpuExternCall {
+                abi, callee, args, ..
+            },
+            expected,
+        ) => (
+            PreparedHostCall {
+                result_name: Some("__nuis_branch_host_result".to_owned()),
+                abi: abi.clone(),
+                callee: callee.clone(),
+                args: args.clone(),
+            },
+            expected.clone(),
+            *op,
+        ),
+        (
+            expected,
+            NirExpr::CpuExternCall {
+                abi, callee, args, ..
+            },
+        ) => (
+            PreparedHostCall {
+                result_name: Some("__nuis_branch_host_result".to_owned()),
+                abi: abi.clone(),
+                callee: callee.clone(),
+                args: args.clone(),
+            },
+            expected.clone(),
+            reverse_comparison(*op)?,
+        ),
+        _ => return None,
+    };
+    if !is_terminal_branch_pure_expr(&expected, pure_helpers) {
+        return None;
+    }
+    let result_name = call.result_name.clone()?;
+    Some((
+        call,
+        PreparedHostCallReturn::CompareCallResult {
+            result_name,
+            op,
+            expected,
+            matched: matched.clone(),
+            unmatched: unmatched.clone(),
+        },
+    ))
+}
+
+fn reverse_comparison(op: NirBinaryOp) -> Option<NirBinaryOp> {
+    Some(match op {
+        NirBinaryOp::Eq => NirBinaryOp::Eq,
+        NirBinaryOp::Ne => NirBinaryOp::Ne,
+        NirBinaryOp::Lt => NirBinaryOp::Gt,
+        NirBinaryOp::Le => NirBinaryOp::Ge,
+        NirBinaryOp::Gt => NirBinaryOp::Lt,
+        NirBinaryOp::Ge => NirBinaryOp::Le,
+        _ => return None,
+    })
 }
 
 fn is_guard_host_output_call(callee: &str) -> bool {

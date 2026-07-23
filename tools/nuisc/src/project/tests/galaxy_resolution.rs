@@ -84,7 +84,9 @@ mod cpu Main {
             "lib/hetero_contracts.ns".to_owned(),
             "lib/report_contracts.ns".to_owned(),
             "lib/language_core.ns".to_owned(),
-            "lib/language_ops.ns".to_owned()
+            "lib/language_ops.ns".to_owned(),
+            "lib/provider_worker_contracts.ns".to_owned(),
+            "lib/provider_worker_dispatch_contracts.ns".to_owned()
         ]
     );
 
@@ -151,12 +153,12 @@ mod cpu Main {
     assert!(modules_index.contains(
         "main.ns\tmod cpu Main\tentry=true\tsource_kind=project-local\tmanifest_spec=main.ns"
     ));
-    assert!(docs_index.contains("summary\tmodules=19\tdocumented_modules=18\tdocumented_items="));
+    assert!(docs_index.contains("summary\tmodules=21\tdocumented_modules=20\tdocumented_items="));
     assert!(docs_index.contains("module\tcpu.Main\titems=0\tsource_kind=project-local"));
     assert!(docs_index
         .contains("module\tcpu.PixelMagicContracts\titems=34\tsource_kind=galaxy-auto-inject"));
     assert!(imports_index.contains(
-        "summary\tlibraries=18\tvisible_libraries=18\tvisible_modules=19\tdocumented_visible_modules=18\tdocumented_visible_items="
+        "summary\tlibraries=20\tvisible_libraries=20\tvisible_modules=21\tdocumented_visible_modules=20\tdocumented_visible_items="
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
@@ -1059,7 +1061,7 @@ mod cpu Main {
 
     let imports_index = render_project_import_index(&project);
     assert!(imports_index.contains(
-        "summary\tlibraries=18\tvisible_libraries=18\tvisible_modules=19\tdocumented_visible_modules=18\tdocumented_visible_items="
+        "summary\tlibraries=20\tvisible_libraries=20\tvisible_modules=21\tdocumented_visible_modules=20\tdocumented_visible_items="
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"

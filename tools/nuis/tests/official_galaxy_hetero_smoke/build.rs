@@ -896,34 +896,7 @@ pub(super) fn assert_official_galaxy_hetero_build(
                 "provider_edge_transport_receipt_3_staging_adapter_capability_status = \"registered-available\"",
                 "official galaxy staging adapter capability",
             );
-            for evidence in [
-                "native_output_4_output_residency_contract = \"nuis-provider-output-residency-v1\"",
-                "native_output_4_output_residency_kind = \"host-visible-file\"",
-                "native_output_0_session_lease_contract = \"nuis-provider-session-lease-v1\"",
-                "native_output_0_session_adapter_id = \"logical.request-process.v1\"",
-                "native_output_0_session_lifecycle_hooks = \"graph-open,request-begin,request-complete,graph-close\"",
-                "native_output_3_session_request_sequence = \"3\"",
-                "native_output_4_session_request_sequence = \"0\"",
-                "native_output_0_worker_lease_contract = \"nuis-provider-worker-lease-v1\"",
-                "native_output_0_worker_resolver_contract = \"nuis-provider-worker-image-resolver-v1\"",
-                "native_output_3_worker_request_sequence = \"3\"",
-                "native_output_4_worker_request_sequence = \"0\"",
-                "native_output_3_worker_descriptor_count = \"2\"",
-                "native_output_4_worker_descriptor_count = \"1\"",
-                "native_output_0_worker_pid = \"",
-                "native_output_0_worker_payload_hash = \"0x",
-                "native_output_0_worker_operation_token = \"operation:",
-                "native_output_0_worker_dispatch_permit_contract = \"nuis-provider-worker-dispatch-permit-v1\"",
-                "native_output_0_worker_dispatch_permit_status = \"granted\"",
-                "native_output_4_worker_dispatch_permit_status = \"granted\"",
-                "native_output_0_worker_dispatch_status = \"1\"",
-                "native_output_3_worker_dispatch_status = \"4\"",
-                "native_output_4_worker_dispatch_status = \"1\"",
-                "native_output_4_output_handle_ownership_token = \"glm:provider-session-output:metal:apple-silicon-gpu:0:witsage.vector.metal-bias\"",
-                "native_output_4_output_handle_release_status = \"released-at-graph-close\"",
-            ] {
-                assert_file_contains(&provider_output_payload_path, evidence, "official galaxy carrier channel");
-            }
+            assert_provider_execution_evidence(&provider_output_payload_path);
             for (field, status) in [
                 ("materialize_status", "materialized"),
                 ("consume_status", "consumed"),

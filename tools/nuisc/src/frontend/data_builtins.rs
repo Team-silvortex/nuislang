@@ -342,10 +342,40 @@ pub(super) fn lower_data_builtin_call(
             NirExpr::DataHandleTable(entries)
         }
         "provider_request_ingress" => {
-            let [request_handle, descriptor_table_handle, descriptor_count, provider_key, capability_hash] =
-                args
-            else {
-                return Err("provider_request_ingress(...) expects 5 args".to_owned());
+            let (
+                request_handle,
+                descriptor_table_handle,
+                descriptor_count,
+                provider_key,
+                capability_hash,
+                capsule,
+            ) = match args {
+                [request_handle, descriptor_table_handle, descriptor_count, provider_key, capability_hash] => {
+                    (
+                        request_handle,
+                        descriptor_table_handle,
+                        descriptor_count,
+                        provider_key,
+                        capability_hash,
+                        None,
+                    )
+                }
+                [request_handle, descriptor_table_handle, descriptor_count, provider_key, capability_hash, capsule_token, input_role_count, output_role_count] => {
+                    (
+                        request_handle,
+                        descriptor_table_handle,
+                        descriptor_count,
+                        provider_key,
+                        capability_hash,
+                        Some((capsule_token, input_role_count, output_role_count)),
+                    )
+                }
+                _ => {
+                    return Err(
+                        "provider_request_ingress(...) expects 5 legacy args or 8 capsule args"
+                            .to_owned(),
+                    )
+                }
             };
             let lower_i64 = |value: &AstExpr| {
                 lower_expr(
@@ -357,12 +387,23 @@ pub(super) fn lower_data_builtin_call(
                     Some(&i64_type()),
                 )
             };
+            let (capsule_token, input_role_count, output_role_count) = match capsule {
+                Some((token, inputs, outputs)) => (
+                    Some(Box::new(lower_i64(token)?)),
+                    Some(Box::new(lower_i64(inputs)?)),
+                    Some(Box::new(lower_i64(outputs)?)),
+                ),
+                None => (None, None, None),
+            };
             NirExpr::DataProviderRequestIngress {
                 request_handle: Box::new(lower_i64(request_handle)?),
                 descriptor_table_handle: Box::new(lower_i64(descriptor_table_handle)?),
                 descriptor_count: Box::new(lower_i64(descriptor_count)?),
                 provider_key: Box::new(lower_i64(provider_key)?),
                 capability_hash: Box::new(lower_i64(capability_hash)?),
+                capsule_token,
+                input_role_count,
+                output_role_count,
             }
         }
         _ => return Ok(None),

@@ -15,6 +15,7 @@ mod provider_completion_trust_anchor;
 mod provider_completion_trust_registry;
 mod provider_edge_staging_registry;
 mod provider_edge_transport;
+mod provider_execution_capsule;
 mod provider_input_binding;
 mod provider_native_output_payload;
 mod provider_output_carrier_registry;

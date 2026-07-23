@@ -88,6 +88,13 @@ pub(super) struct PreparedHostCall {
 
 pub(super) enum PreparedHostCallReturn {
     Expr(NirExpr),
+    CompareCallResult {
+        result_name: String,
+        op: NirBinaryOp,
+        expected: NirExpr,
+        matched: NirExpr,
+        unmatched: NirExpr,
+    },
     WriteFlushExitCode {
         write_name: String,
         flush_name: String,

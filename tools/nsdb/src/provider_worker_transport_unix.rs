@@ -135,14 +135,23 @@ impl UnixWorkerProcessTransport {
             return Err("Unix provider worker is closed".to_owned());
         }
         let sequence = self.next_sequence;
-        send_worker_request(
+        if let Err(error) = send_worker_request(
             &self.socket,
             &self.lease_id,
             sequence,
             request_id,
             payload,
             descriptors,
-        )?;
+        ) {
+            let exited = self
+                .child
+                .try_wait()
+                .ok()
+                .flatten()
+                .map(|status| format!("; child exited with status {status}"))
+                .unwrap_or_default();
+            return Err(format!("{error}{exited}"));
+        }
         let descriptor_roles = descriptors
             .iter()
             .map(|descriptor| descriptor.role)
@@ -158,6 +167,17 @@ impl UnixWorkerProcessTransport {
         )?;
         if reply.descriptor_count != descriptors.len() {
             return Err("Unix provider worker receipt descriptor count mismatch".to_owned());
+        }
+        if request_id != "__close__" {
+            if let Some(status) = self
+                .child
+                .try_wait()
+                .map_err(|error| format!("failed to inspect Unix provider worker: {error}"))?
+            {
+                return Err(format!(
+                    "Unix provider worker exited with status {status} after replying to `{request_id}`"
+                ));
+            }
         }
         self.next_sequence += 1;
         Ok(reply)
@@ -520,15 +540,17 @@ mod tests {
             role: "input.primary",
             descriptor: first.as_fd(),
         }];
+        let first_payload = b"capsule_token=capsule-token:101\ninputs=1\noutputs=1\n";
         let first_reply = worker
-            .request("first", &[0, b'\n', 0xff], &first_descriptors)
+            .request("first", first_payload, &first_descriptors)
             .expect("first request");
         let second_descriptors = [UnixWorkerDescriptor {
             role: "output.result",
             descriptor: second.as_fd(),
         }];
+        let second_payload = b"capsule_token=capsule-token:202\ninputs=1\noutputs=1\n";
         let second_reply = worker
-            .request("second", b"shape=f32x4", &second_descriptors)
+            .request("second", second_payload, &second_descriptors)
             .expect("second request");
         assert_eq!((first_reply.sequence, second_reply.sequence), (0, 1));
         assert_eq!(
@@ -551,10 +573,10 @@ mod tests {
         assert_eq!(second_reply.descriptor_roles, ["output.result"]);
         assert_eq!(
             first_reply.payload_hash,
-            crate::provider_sample_artifact::fnv1a64_hex(&[0, b'\n', 0xff])
+            crate::provider_sample_artifact::fnv1a64_hex(first_payload)
         );
-        assert_eq!(first_reply.payload, [0, b'\n', 0xff]);
-        assert_eq!(second_reply.payload, b"shape=f32x4");
+        assert_eq!(first_reply.payload, first_payload);
+        assert_eq!(second_reply.payload, second_payload);
         assert_eq!(worker.close().expect("close"), first_reply.worker_pid);
     }
 

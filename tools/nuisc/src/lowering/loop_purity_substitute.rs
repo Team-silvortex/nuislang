@@ -508,6 +508,29 @@ pub(in crate::lowering) fn prepare_terminal_branch(
     stmts: &[NirStmt],
     pure_helpers: &BTreeSet<String>,
 ) -> Option<PreparedTerminalBranch> {
+    if let [NirStmt::If {
+        condition,
+        then_body,
+        else_body,
+    }, tail @ ..] = stmts
+    {
+        if else_body.is_empty() {
+            if let (
+                [NirStmt::Return(Some(matched)) | NirStmt::Expr(matched)],
+                [NirStmt::Return(Some(unmatched)) | NirStmt::Expr(unmatched)],
+            ) = (then_body.as_slice(), tail)
+            {
+                if let Some((call, returned)) =
+                    prepare_host_call_compare_return(condition, matched, unmatched, pure_helpers)
+                {
+                    return Some(PreparedTerminalBranch::HostCallReturn {
+                        calls: vec![call],
+                        returned,
+                    });
+                }
+            }
+        }
+    }
     if let [binding @ (NirStmt::Let { .. } | NirStmt::Const { .. }), tail @ ..] = stmts {
         if let Some((name, value)) = extract_pure_branch_binding(binding, pure_helpers) {
             let prepared = prepare_terminal_branch(tail, pure_helpers)?;
@@ -566,7 +589,8 @@ pub(in crate::lowering) fn prepare_terminal_branch(
                 && expr_references_names(
                     match &returned {
                         PreparedHostCallReturn::Expr(expr) => expr,
-                        PreparedHostCallReturn::WriteFlushExitCode { .. } => unreachable!(),
+                        PreparedHostCallReturn::CompareCallResult { .. }
+                        | PreparedHostCallReturn::WriteFlushExitCode { .. } => unreachable!(),
                     },
                     &effect_bindings,
                 )
@@ -591,6 +615,19 @@ fn substitute_prepared_host_call_return(
         PreparedHostCallReturn::Expr(expr) => PreparedHostCallReturn::Expr(
             substitute_branch_binding(&expr, binding_name, binding_value),
         ),
+        PreparedHostCallReturn::CompareCallResult {
+            result_name,
+            op,
+            expected,
+            matched,
+            unmatched,
+        } => PreparedHostCallReturn::CompareCallResult {
+            result_name,
+            op,
+            expected: substitute_branch_binding(&expected, binding_name, binding_value),
+            matched: substitute_branch_binding(&matched, binding_name, binding_value),
+            unmatched: substitute_branch_binding(&unmatched, binding_name, binding_value),
+        },
         PreparedHostCallReturn::WriteFlushExitCode {
             write_name,
             flush_name,

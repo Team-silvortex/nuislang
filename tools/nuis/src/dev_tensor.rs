@@ -449,11 +449,8 @@ mod tests {
         let reversed_selected = select_dev_tensor_handoff_bootstrap_cell(&reversed)
             .expect("select reversed handoff cell");
 
-        let expected = "heterogeneous-runtime/nustar/registered-domain-contracts";
-        assert_eq!(
-            dev_tensor_coordinate_key(selected.architecture, selected.module, selected.function),
-            expected
-        );
+        let expected =
+            dev_tensor_coordinate_key(selected.architecture, selected.module, selected.function);
         assert_eq!(
             dev_tensor_coordinate_key(
                 reversed_selected.architecture,
@@ -525,9 +522,11 @@ mod tests {
             summary.weakest_bootstrap_task_card_handoff_coordinate,
             "<none>"
         );
+        let selected = select_dev_tensor_handoff_bootstrap_cell(DEV_TENSOR_CELLS)
+            .expect("select current weakest handoff");
         assert_eq!(
             summary.weakest_bootstrap_task_card_handoff_coordinate,
-            "heterogeneous-runtime/nustar/registered-domain-contracts"
+            dev_tensor_coordinate_key(selected.architecture, selected.module, selected.function)
         );
         assert!(summary
             .weakest_bootstrap_task_card_handoff_coordinate

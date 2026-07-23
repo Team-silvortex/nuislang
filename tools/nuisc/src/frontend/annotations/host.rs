@@ -110,6 +110,18 @@ const STD_HOST_SYMBOLS: &[(&str, &str)] = &[
         "provider_worker.capability_hash",
         "host_provider_worker_capability_hash",
     ),
+    (
+        "provider_worker.capsule_input_count",
+        "host_provider_worker_capsule_input_count",
+    ),
+    (
+        "provider_worker.capsule_output_count",
+        "host_provider_worker_capsule_output_count",
+    ),
+    (
+        "provider_worker.capsule_token",
+        "host_provider_worker_capsule_token",
+    ),
     ("provider_worker.close", "host_provider_worker_close"),
     (
         "provider_worker.descriptor_count",

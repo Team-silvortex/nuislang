@@ -23,6 +23,13 @@ struct GuardHostCall {
 
 enum GuardHostReturn {
     Value(String),
+    CompareCallResult {
+        result_name: String,
+        op: String,
+        expected: String,
+        matched: String,
+        unmatched: String,
+    },
     WriteFlushExitCode {
         write_name: String,
         flush_name: String,
@@ -48,6 +55,7 @@ pub(super) fn lower_guard_host_call_return(
     };
     let return_value = match &returned {
         GuardHostReturn::Value(return_name) => registers.get(return_name).cloned(),
+        GuardHostReturn::CompareCallResult { .. } => None,
         GuardHostReturn::WriteFlushExitCode { .. } => None,
     };
     let Some(cond_value) = cond_value else {
@@ -91,6 +99,7 @@ pub(super) fn lower_guard_host_call_return(
         &returned,
         return_value.as_ref(),
         &call_results,
+        registers,
         node,
     ) {
         return false;
@@ -166,6 +175,7 @@ pub(super) fn lower_branch_host_call_return(
         &then_returned,
         then_return_value.as_ref(),
         then_calls,
+        registers,
         node,
     ) {
         return false;
@@ -178,6 +188,7 @@ pub(super) fn lower_branch_host_call_return(
         &else_returned,
         else_return_value.as_ref(),
         else_calls,
+        registers,
         node,
     )
 }
@@ -188,7 +199,7 @@ fn parse_guard_host_call_return(node: &Node) -> Option<(GuardHostReturn, Vec<Gua
     }
     if matches!(
         node.op.args.get(1).map(String::as_str),
-        Some("value" | "write_flush_exit_code")
+        Some("value" | "compare_call_result" | "write_flush_exit_code")
     ) {
         return parse_guard_host_call_return_v2(node);
     }
@@ -238,6 +249,13 @@ fn parse_host_call_return_component(
     let return_args = args.get(start + 2..start + 2 + return_arg_count)?.to_vec();
     let returned = match mode {
         "value" if return_args.len() == 1 => GuardHostReturn::Value(return_args[0].clone()),
+        "compare_call_result" if return_args.len() == 5 => GuardHostReturn::CompareCallResult {
+            result_name: return_args[0].clone(),
+            op: return_args[1].clone(),
+            expected: return_args[2].clone(),
+            matched: return_args[3].clone(),
+            unmatched: return_args[4].clone(),
+        },
         "write_flush_exit_code" if return_args.len() == 2 || return_args.len() == 3 => {
             GuardHostReturn::WriteFlushExitCode {
                 write_name: return_args[0].clone(),
@@ -325,6 +343,7 @@ fn guard_host_value_return(
 ) -> Option<LlvmValueRef> {
     match returned {
         GuardHostReturn::Value(return_name) => registers.get(return_name).cloned(),
+        GuardHostReturn::CompareCallResult { .. } => None,
         GuardHostReturn::WriteFlushExitCode { .. } => None,
     }
 }
@@ -336,6 +355,7 @@ fn emit_host_call_return_body(
     returned: &GuardHostReturn,
     return_value: Option<&LlvmValueRef>,
     lowered_calls: Vec<(Option<String>, String)>,
+    registers: &BTreeMap<String, LlvmValueRef>,
     node: &Node,
 ) -> bool {
     let mut call_results = BTreeMap::new();
@@ -353,6 +373,7 @@ fn emit_host_call_return_body(
         returned,
         return_value,
         &call_results,
+        registers,
         node,
     )
 }
@@ -364,6 +385,7 @@ fn emit_guard_host_return(
     returned: &GuardHostReturn,
     return_value: Option<&LlvmValueRef>,
     call_results: &BTreeMap<String, String>,
+    registers: &BTreeMap<String, LlvmValueRef>,
     node: &Node,
 ) -> bool {
     match returned {
@@ -377,6 +399,57 @@ fn emit_guard_host_return(
                 return false;
             }
             true
+        }
+        GuardHostReturn::CompareCallResult {
+            result_name,
+            op,
+            expected,
+            matched,
+            unmatched,
+        } => {
+            let (Some(result), Some(expected), Some(matched), Some(unmatched)) = (
+                call_results.get(result_name),
+                registers.get(expected),
+                registers.get(matched),
+                registers.get(unmatched),
+            ) else {
+                body.push(format!("  ; deferred lowering for cpu.guard_host_call_return `{}` because compare_call_result references a missing call result or scalar", node.name));
+                return false;
+            };
+            let (Some(expected), Some(matched), Some(unmatched)) = (
+                coerce_to_i64(expected, body, next_reg),
+                coerce_to_i64(matched, body, next_reg),
+                coerce_to_i64(unmatched, body, next_reg),
+            ) else {
+                body.push(format!("  ; deferred lowering for cpu.guard_host_call_return `{}` because compare_call_result values are not scalar", node.name));
+                return false;
+            };
+            let predicate = match op.as_str() {
+                "eq" => "eq",
+                "ne" => "ne",
+                "lt" => "slt",
+                "le" => "sle",
+                "gt" => "sgt",
+                "ge" => "sge",
+                _ => {
+                    body.push(format!("  ; deferred lowering for cpu.guard_host_call_return `{}` because compare_call_result operator `{op}` is invalid", node.name));
+                    return false;
+                }
+            };
+            let compared = fresh_reg(next_reg);
+            let selected = fresh_reg(next_reg);
+            body.push(format!(
+                "  {compared} = icmp {predicate} i64 {result}, {expected}"
+            ));
+            body.push(format!(
+                "  {selected} = select i1 {compared}, i64 {matched}, i64 {unmatched}"
+            ));
+            emit_typed_return_from_value(
+                body,
+                next_reg,
+                function_return_kind,
+                &LlvmValueRef::I64(selected),
+            )
         }
         GuardHostReturn::WriteFlushExitCode {
             write_name,

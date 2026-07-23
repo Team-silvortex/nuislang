@@ -13,6 +13,12 @@ mod cpu Main {
   fn host_provider_worker_provider_key() -> i64;
   extern "c" @host_symbol("provider_worker.capability_hash")
   fn host_provider_worker_capability_hash() -> i64;
+  extern "c" @host_symbol("provider_worker.capsule_token")
+  fn host_provider_worker_capsule_token() -> i64;
+  extern "c" @host_symbol("provider_worker.capsule_input_count")
+  fn host_provider_worker_capsule_input_count() -> i64;
+  extern "c" @host_symbol("provider_worker.capsule_output_count")
+  fn host_provider_worker_capsule_output_count() -> i64;
   extern "c" @host_symbol("provider_worker.is_close")
   fn host_provider_worker_is_close() -> i64;
   extern "c" @host_symbol("provider_worker.launch_provider_key")
@@ -44,12 +50,27 @@ mod cpu Main {
     if provider_key <= 0 || capability_hash <= 0 {
       return -4;
     }
+    let capsule_token: i64 = host_provider_worker_capsule_token();
+    let input_role_count: i64 = host_provider_worker_capsule_input_count();
+    let output_role_count: i64 = host_provider_worker_capsule_output_count();
+    if capsule_token <= 0 {
+      return -5;
+    }
+    if input_role_count != descriptor_count {
+      return -6;
+    }
+    if output_role_count <= 0 {
+      return -7;
+    }
     return provider_request_ingress(
       request_handle,
       descriptor_table_handle,
       descriptor_count,
       provider_key,
-      capability_hash
+      capability_hash,
+      capsule_token,
+      input_role_count,
+      output_role_count
     );
   }
 
@@ -57,6 +78,13 @@ mod cpu Main {
     let received: i64 = host_provider_worker_receive();
     if received != 1 {
       return -2;
+    }
+    let closing: i64 = host_provider_worker_is_close();
+    if closing != 0 {
+      if host_provider_worker_reply(1) != 0 {
+        return -4;
+      }
+      return 0;
     }
     let ingress_status: i64 = worker_request(
         host_provider_worker_request(),
@@ -68,12 +96,8 @@ mod cpu Main {
     if ingress_status <= 0 {
       return -3;
     }
-    let closing: i64 = host_provider_worker_is_close();
     if host_provider_worker_reply(ingress_status) != 0 {
       return -4;
-    }
-    if closing != 0 {
-      return 0;
     }
     return running;
   }

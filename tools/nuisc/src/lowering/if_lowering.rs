@@ -150,6 +150,19 @@ fn lower_prepared_host_call_return(
         PreparedHostCallReturn::Expr(returned) => {
             PreparedHostCallReturnSpec::Value(lower_expr(returned, state, bindings)?)
         }
+        PreparedHostCallReturn::CompareCallResult {
+            result_name,
+            op,
+            expected,
+            matched,
+            unmatched,
+        } => PreparedHostCallReturnSpec::CompareCallResult {
+            result_name: result_name.clone(),
+            op: *op,
+            expected: lower_expr(expected, state, bindings)?,
+            matched: lower_expr(matched, state, bindings)?,
+            unmatched: lower_expr(unmatched, state, bindings)?,
+        },
         PreparedHostCallReturn::WriteFlushExitCode {
             write_name,
             flush_name,

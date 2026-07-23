@@ -1,4 +1,8 @@
 use crate::{
+    provider_execution_capsule::{
+        register_provider_execution_capsule, render_capsule_roles,
+        ProviderExecutionCapsuleRegistration,
+    },
     provider_prepared_input::PreparedProviderInput,
     provider_request::ProviderRequest,
     provider_runner_registry::{
@@ -27,6 +31,13 @@ pub(crate) struct ProviderWorkerDispatchReceipt {
     pub(crate) descriptor_count: usize,
     pub(crate) payload_hash: String,
     pub(crate) operation_token: String,
+    pub(crate) execution_capsule_contract: &'static str,
+    pub(crate) execution_capsule_id: String,
+    pub(crate) execution_capsule_token: String,
+    pub(crate) execution_capsule_invocation_mode: &'static str,
+    pub(crate) execution_capsule_input_roles: String,
+    pub(crate) execution_capsule_output_roles: String,
+    pub(crate) execution_capsule_status: &'static str,
     pub(crate) dispatch_status: i64,
     pub(crate) dispatch_permit_contract: &'static str,
     pub(crate) dispatch_permit_status: &'static str,
@@ -121,7 +132,21 @@ impl ProviderWorkerLeaseManager {
                 request.kernel.operation
             )
         })?;
-        let payload = render_dispatch_payload(provider_family, request, &operation);
+        let output_roles = vec!["output.result".to_owned()];
+        let capsule = register_provider_execution_capsule(
+            provider_family,
+            adapter_id,
+            &operation.operation_token,
+            &roles,
+            &output_roles,
+        )
+        .ok_or_else(|| {
+            format!(
+                "provider execution capsule is not registrable for adapter `{adapter_id}` request `{}`",
+                request.kernel.id
+            )
+        })?;
+        let payload = render_dispatch_payload(provider_family, request, &operation, &capsule);
         let reply = lease
             .transport
             .request(&request.kernel.id, payload.as_bytes(), &descriptors)
@@ -149,6 +174,13 @@ impl ProviderWorkerLeaseManager {
             descriptor_count: reply.descriptor_count,
             payload_hash: reply.payload_hash,
             operation_token: operation.operation_token,
+            execution_capsule_contract: capsule.contract,
+            execution_capsule_id: capsule.capsule_id,
+            execution_capsule_token: capsule.capsule_token,
+            execution_capsule_invocation_mode: capsule.invocation_mode,
+            execution_capsule_input_roles: render_capsule_roles(&capsule.input_roles),
+            execution_capsule_output_roles: render_capsule_roles(&capsule.output_roles),
+            execution_capsule_status: "worker-authorized",
             dispatch_status: reply.dispatch_status,
             dispatch_permit_contract: PROVIDER_WORKER_DISPATCH_PERMIT_CONTRACT,
             dispatch_permit_status: "granted",
@@ -175,15 +207,24 @@ fn render_dispatch_payload(
     provider_family: &str,
     request: &ProviderRequest,
     operation: &ProviderWorkerOperationRegistration,
+    capsule: &ProviderExecutionCapsuleRegistration,
 ) -> String {
     format!(
-        "contract={}\nprovider={provider_family}\nadapter={}\nkernel={}\noperation={}\noperation_token={}\ninputs={}\n",
-        operation.registry_contract,
+        "contract={}\nregistry_source={}\ncapsule_id={}\ncapsule_token={}\ninvocation_mode={}\nprovider={provider_family}\nadapter={}\nkernel={}\noperation_registry_contract={}\noperation={}\noperation_token={}\ninput_roles={}\noutput_roles={}\ninputs={}\noutputs={}\n",
+        capsule.contract,
+        capsule.registry_source,
+        capsule.capsule_id,
+        capsule.capsule_token,
+        capsule.invocation_mode,
         operation.adapter_id,
         request.kernel.id,
+        operation.registry_contract,
         operation.operation,
         operation.operation_token,
-        request.input_bindings.len()
+        render_capsule_roles(&capsule.input_roles),
+        render_capsule_roles(&capsule.output_roles),
+        capsule.input_roles.len(),
+        capsule.output_roles.len(),
     )
 }
 
@@ -207,6 +248,8 @@ mod tests {
         assert!(source.contains("provider={provider_family}"));
         assert!(source.contains("request.kernel.id"));
         assert!(source.contains("operation.operation_token"));
+        assert!(source.contains("capsule.capsule_token"));
+        assert!(source.contains("output_roles"));
         assert_eq!(
             crate::provider_worker_image::PROVIDER_WORKER_IMAGE_RESOLVER_CONTRACT,
             "nuis-provider-worker-image-resolver-v1"

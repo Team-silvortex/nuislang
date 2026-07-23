@@ -280,14 +280,14 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::ShaderBeginPass { .. }
         | NirExpr::ShaderDrawInstanced { .. }
         | NirExpr::ShaderProfileRender { .. } => None,
-        NirExpr::DataProviderRequestIngress { .. } => Some(NirGlmProfile {
+        NirExpr::DataProviderRequestIngress { capsule_token, .. } => Some(NirGlmProfile {
             result_class: NirGlmValueClass::Val,
             accesses: vec![
                 NirGlmAccess {
                     class: NirGlmValueClass::Val,
                     mode: NirGlmUseMode::Read,
                 };
-                5
+                if capsule_token.is_some() { 8 } else { 5 }
             ],
             effect: NirGlmEffect::None,
         }),
