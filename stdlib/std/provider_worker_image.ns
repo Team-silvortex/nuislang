@@ -96,6 +96,7 @@ mod cpu Main {
         host_provider_worker_capability_hash()
     );
     if ingress_status <= 0 {
+      host_provider_worker_reply(ingress_status);
       return -3;
     }
     let invocation_status: i64 = host_provider_worker_invoke_capsule(ingress_status);

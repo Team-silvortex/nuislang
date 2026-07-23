@@ -23,6 +23,7 @@ mod provider_output_carrier_registry;
 mod provider_output_carrier_unix;
 mod provider_output_comparison;
 mod provider_prepared_input;
+mod provider_process_adapter;
 mod provider_request;
 mod provider_request_payload;
 mod provider_runner_coreml;
@@ -46,6 +47,8 @@ mod provider_worker_ingress;
 #[cfg(unix)]
 mod provider_worker_lease;
 mod provider_worker_request;
+#[cfg(unix)]
+mod provider_worker_result;
 mod provider_worker_transport;
 #[cfg(unix)]
 mod provider_worker_transport_unix;

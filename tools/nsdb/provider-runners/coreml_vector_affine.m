@@ -343,31 +343,27 @@ int main(int argc, const char *argv[]) {
                               dispatch_semaphore_signal(semaphore);
                           }];
             if (dispatch_semaphore_wait(semaphore,
-                    dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC)) != 0) {
-                return fail(@"CoreML compute-plan loading timed out");
-            }
-            if (computePlan == nil) {
-                return fail([NSString stringWithFormat:@"CoreML compute-plan loading failed: %@",
-                                                       computePlanError]);
-            }
-            NSArray<MLModelStructureNeuralNetworkLayer *> *layers =
-                computePlan.modelStructure.neuralNetwork.layers;
-            NSMutableOrderedSet<NSString *> *preferred = [NSMutableOrderedSet orderedSet];
-            NSMutableOrderedSet<NSString *> *supported = [NSMutableOrderedSet orderedSet];
-            for (MLModelStructureNeuralNetworkLayer *layer in layers) {
-                MLComputePlanDeviceUsage *usage =
-                    [computePlan computeDeviceUsageForNeuralNetworkLayer:layer];
-                addDevice(preferred, usage.preferredComputeDevice);
-                for (id<MLComputeDeviceProtocol> device in usage.supportedComputeDevices) {
-                    addDevice(supported, device);
+                    dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)) == 0 &&
+                computePlan != nil) {
+                NSArray<MLModelStructureNeuralNetworkLayer *> *layers =
+                    computePlan.modelStructure.neuralNetwork.layers;
+                NSMutableOrderedSet<NSString *> *preferred = [NSMutableOrderedSet orderedSet];
+                NSMutableOrderedSet<NSString *> *supported = [NSMutableOrderedSet orderedSet];
+                for (MLModelStructureNeuralNetworkLayer *layer in layers) {
+                    MLComputePlanDeviceUsage *usage =
+                        [computePlan computeDeviceUsageForNeuralNetworkLayer:layer];
+                    addDevice(preferred, usage.preferredComputeDevice);
+                    for (id<MLComputeDeviceProtocol> device in usage.supportedComputeDevices) {
+                        addDevice(supported, device);
+                    }
                 }
+                computePlanStatus = @"ready";
+                computePlanLayerCount = layers.count;
+                preferredDevices = [preferred.array componentsJoinedByString:@","];
+                supportedDevices = [supported.array componentsJoinedByString:@","];
+                if (preferredDevices.length == 0) preferredDevices = @"none";
+                if (supportedDevices.length == 0) supportedDevices = @"none";
             }
-            computePlanStatus = @"ready";
-            computePlanLayerCount = layers.count;
-            preferredDevices = [preferred.array componentsJoinedByString:@","];
-            supportedDevices = [supported.array componentsJoinedByString:@","];
-            if (preferredDevices.length == 0) preferredDevices = @"none";
-            if (supportedDevices.length == 0) supportedDevices = @"none";
         }
         printf("protocol=nuis-coreml-model-prediction-provider-runner-v1\n");
         printf("status=ready\n");

@@ -576,14 +576,14 @@ now closes the request-meaning boundary. `NUISPWU2` separates a UTF-8 control
 header from opaque bytes, binds the bytes by length and FNV-1a hash, and requires
 one ordered semantic role for every transferred descriptor. The C worker parses
 binary payloads containing NUL, newline, and non-UTF-8 bytes, independently
-checks the hash and role count. `NUISPWUR5` completes the reverse direction
-with a separately length/hash-bound opaque response while also binding the
-original request hash, input role manifest, output role manifest, and
-worker-owned descriptor length/hash. It carries the positive status returned
-by the Nuis invoker; decoding fails closed for zero or negative status,
-ancillary-count drift, or output-content mismatch, so a parent cannot
-synthesize its own dispatch permit or receipt. Binary response bytes therefore
-need no provider-specific side channel. The worker
+checks the hash and role count. `NUISPWUR6` completes the reverse direction
+without echoing the request body: it binds request length/hash identity, input
+and output role manifests, bounded adapter-protocol length/hash, output carrier
+mode, and worker-owned descriptor length/hash. It carries the positive status
+returned by the Nuis invoker; decoding fails closed for zero or negative
+status, ancillary-count drift, carrier-layout drift, or payload/packet hash
+drift. `NUISPWUE1` preserves the failing worker stage and status instead of
+collapsing every failure into the final process exit code. The worker
 control plane now begins in Nuis itself: `StdProviderWorkerContracts` owns
 ordered lifecycle state, and
 `provider_worker_runtime_recipe.ns` checks, AOT-builds, and executes its native
@@ -643,7 +643,7 @@ shim contributes only one-frame `recvmsg`/`sendmsg`, envelope verification, and
 descriptor ownership primitives when the worker host-symbol surface is used.
 The Nsdb transport regression compiles and links this Nuis source in-process,
 then proves one worker PID receives two post-spawn SCM_RIGHTS descriptors with
-first-byte evidence `17/29`, echoes both opaque payloads, and exits through the
+first-byte evidence `17/29`, acknowledges both opaque payload identities, and exits through the
 Nuis-owned close branch. The standalone C worker probe has been removed. The
 next gap is registration-driven worker image selection and build reuse rather
 than selecting this official source directly inside the regression.
@@ -673,11 +673,11 @@ running Mach-O image when a second backend starts, and all transient copies are
 removed after close. The five-request official WitSage/PixelMagic graph now
 proves CoreML worker order `0..3`, Metal worker order `0`, two-descriptor fan-in,
 cross-provider descriptor transfer, successful native comparisons, and one
-worker-owned output descriptor per request. The registered PixelMagic gray8
-Metal adapter now crosses that boundary: Nsdb materializes and hash-binds its
-adapter image, while the persistent Nuis worker launches it with the received
-input descriptor and returns the real adapter protocol output. Metal f32 and
-CoreML model execution remain parent-side compatibility paths.
+worker-owned output descriptor per request. The registered PixelMagic gray8 and
+WitSage f32 bias Metal adapters now cross that boundary: Nsdb materializes and
+hash-binds their adapter images, while persistent Nuis workers launch them with
+`path-fd` or `carrier-fd` input descriptors and return the real adapter protocol
+output. CoreML model execution remains a parent-side compatibility path.
 
 The parent-side call is now fail-closed behind
 `nuis-provider-worker-dispatch-permit-v1`.
@@ -697,17 +697,22 @@ a stable capsule id/token, and final output evidence records its honest
 `nuis-provider-execution-capsule-invoker-v1` now derives an open invoker
 identity from that capsule. The persistent Nuis worker explicitly calls the
 invoker after eight-scalar Data Nustar ingress succeeds. Its thin Unix adapter
-creates an anonymous 24-byte result descriptor and returns it through
-`NUISPWUR5` with an output role, byte length, and FNV hash. Nsdb receives the
-descriptor through SCM_RIGHTS and independently verifies all three fields
+creates an anonymous result descriptor and returns it through `NUISPWUR6` with
+an output role, carrier mode, byte length, and FNV hash. Nsdb receives the
+descriptor through SCM_RIGHTS and independently verifies all fields
 before recording `worker-invoked` and `verified`; it does not construct the
 descriptor or decide its contents. Capsule invocation and generic output
-allocation are therefore closed. `nuis-provider-worker-process-adapter-v1`
-adds the first concrete execution closure without adding a Metal operation
-switch to the worker: the launch descriptor binds the executable hash, runner
-contract, scalar argument, and ordered carrier role. The next ownership gap is
-generalizing this one-input route to ordered multi-input and direct
-output-carrier roles before migrating Metal f32 and CoreML adapters.
+allocation are therefore closed. `nuis-provider-worker-process-adapter-v4`
+adds open ordered `literal`, `verified-path`, `descriptor-path`, and
+`descriptor-carrier` argument templates without adding a Metal or CoreML
+operation switch to the worker. PixelMagic gray8, WitSage Metal f32 bias, the
+256 KiB feature-grid CoreML request, and chained single-input CoreML now execute
+below persistent Nuis workers. Each adapter writes into a worker-created
+`NUISPFD1`; stdout carries only bounded protocol metadata, and Nsdb verifies
+the frame layout, stored payload hash, computed payload hash, and whole-packet
+hash before restoring mmap-backed transferable ownership. The CoreML model path
+is independently FNV-verified before `execv`. The remaining ownership gap is
+ordered multi-input argument rendering for CoreML fan-in.
 
 Return-producing `if` lowering now preserves control dependence for nested
 extern-call comparisons. The open `compare_call_result` mode of

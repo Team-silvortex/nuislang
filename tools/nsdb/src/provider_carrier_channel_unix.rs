@@ -1,5 +1,4 @@
 use crate::provider_carrier_channel::fnv1a64;
-#[cfg(test)]
 use std::os::unix::fs::FileExt;
 use std::{
     ffi::c_void,
@@ -133,6 +132,72 @@ impl InheritedFdCarrier {
         })
     }
 
+    pub(crate) fn from_received_single_frame(
+        file: File,
+        packet_len: usize,
+        expected_packet_hash: u64,
+    ) -> Result<Self, String> {
+        if packet_len < INHERITED_FD_HEADER_LEN + INHERITED_FD_FRAME_RECORD_LEN
+            || file
+                .metadata()
+                .map_err(|error| format!("failed to inspect inherited-fd carrier: {error}"))?
+                .len()
+                != packet_len as u64
+        {
+            return Err("received inherited-fd carrier length mismatch".to_owned());
+        }
+        let mut header = [0u8; INHERITED_FD_HEADER_LEN + INHERITED_FD_FRAME_RECORD_LEN];
+        file.read_exact_at(&mut header, 0)
+            .map_err(|error| format!("failed to read inherited-fd carrier header: {error}"))?;
+        let read_u32 = |offset| {
+            u32::from_le_bytes(
+                header[offset..offset + 4]
+                    .try_into()
+                    .expect("fixed inherited-fd u32 field"),
+            )
+        };
+        let read_u64 = |offset| {
+            u64::from_le_bytes(
+                header[offset..offset + 8]
+                    .try_into()
+                    .expect("fixed inherited-fd u64 field"),
+            )
+        };
+        let page_size = system_page_size()?;
+        let payload_offset = usize::try_from(read_u64(24))
+            .map_err(|_| "received inherited-fd payload offset overflow".to_owned())?;
+        let byte_len = usize::try_from(read_u64(32))
+            .map_err(|_| "received inherited-fd payload length overflow".to_owned())?;
+        let mapped_len = usize::try_from(read_u64(40))
+            .map_err(|_| "received inherited-fd mapped length overflow".to_owned())?;
+        if &header[..8] != INHERITED_FD_MAGIC
+            || read_u32(8) != 1
+            || read_u32(12) as usize != page_size
+            || payload_offset
+                != align_up(
+                    INHERITED_FD_HEADER_LEN + INHERITED_FD_FRAME_RECORD_LEN,
+                    page_size,
+                )?
+            || mapped_len != align_up(byte_len.max(1), page_size)?
+            || payload_offset.checked_add(mapped_len) != Some(packet_len)
+        {
+            return Err("received inherited-fd carrier layout is invalid".to_owned());
+        }
+        if hash_file_prefix(&file, packet_len)? != expected_packet_hash {
+            return Err("received inherited-fd carrier packet hash mismatch".to_owned());
+        }
+        Ok(Self {
+            file,
+            packet_len,
+            packet_hash: expected_packet_hash,
+            frame_layouts: vec![InheritedFdFrameLayout {
+                offset: payload_offset,
+                byte_len,
+                hash_offset: 48,
+            }],
+        })
+    }
+
     pub(crate) fn output_descriptor(&self) -> Result<String, String> {
         let layout = self
             .frame_layouts
@@ -200,6 +265,13 @@ impl InheritedFdCarrier {
         )
     }
 
+    pub(crate) fn worker_frame_argument(&self, frame_index: usize) -> String {
+        format!(
+            "carrier-fd:{frame_index}:{}:{}",
+            self.packet_len, self.packet_hash
+        )
+    }
+
     pub(crate) fn try_clone(&self) -> Result<Self, String> {
         Ok(Self {
             file: self
@@ -230,6 +302,23 @@ impl InheritedFdCarrier {
             });
         }
     }
+}
+
+fn hash_file_prefix(file: &File, byte_len: usize) -> Result<u64, String> {
+    let mut hash = 0xcbf29ce484222325u64;
+    let mut bytes = [0u8; 64 * 1024];
+    let mut offset = 0usize;
+    while offset < byte_len {
+        let count = (byte_len - offset).min(bytes.len());
+        file.read_exact_at(&mut bytes[..count], offset as u64)
+            .map_err(|error| format!("failed to hash inherited-fd carrier: {error}"))?;
+        for byte in &bytes[..count] {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(0x100000001b3);
+        }
+        offset += count;
+    }
+    Ok(hash)
 }
 
 struct EncodedInheritedFdFrames {
@@ -340,8 +429,13 @@ mod tests {
     fn descriptor_binds_fd_frame_length_and_hash() {
         let carrier = InheritedFdCarrier::new(&[b"nuis"]).expect("carrier");
         let argument = carrier.frame_argument(0);
+        let worker_argument = carrier.worker_frame_argument(0);
         let fields = argument.split(':').collect::<Vec<_>>();
         assert_eq!(fields.len(), 5);
+        assert_eq!(
+            worker_argument,
+            format!("carrier-fd:0:{}:{}", fields[3], fields[4])
+        );
         assert_eq!(fields[0], "fd");
         assert_eq!(fields[2], "0");
         let packet_len = fields[3].parse::<usize>().expect("packet length");

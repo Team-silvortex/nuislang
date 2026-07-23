@@ -9,8 +9,13 @@ use crate::provider_output_carrier_registry::{
     prepare_provider_output_carrier, select_provider_output_carrier_adapter,
 };
 use crate::provider_output_carrier_registry::{
-    ProviderOutputPayload, PROVIDER_OUTPUT_CARRIER_REGISTRY_CONTRACT,
-    PROVIDER_OUTPUT_CARRIER_REGISTRY_SOURCE, PROVIDER_OUTPUT_RESIDENCY_CONTRACT,
+    ProviderOutputCarrierConsumption, ProviderOutputPayload,
+    PROVIDER_OUTPUT_CARRIER_REGISTRY_CONTRACT, PROVIDER_OUTPUT_CARRIER_REGISTRY_SOURCE,
+    PROVIDER_OUTPUT_RESIDENCY_CONTRACT,
+};
+#[cfg(target_os = "macos")]
+use crate::provider_process_adapter::{
+    compile_objc_process_adapter, PreparedProviderProcessAdapter,
 };
 use std::path::Path;
 #[cfg(target_os = "macos")]
@@ -23,6 +28,16 @@ use std::{
 
 #[cfg(target_os = "macos")]
 const COREML_RUNNER_SOURCE: &str = include_str!("../provider-runners/coreml_vector_affine.m");
+
+#[cfg(target_os = "macos")]
+pub(crate) fn prepare_coreml_worker_invocation() -> Result<PreparedProviderProcessAdapter, String> {
+    compile_objc_process_adapter(
+        "coreml-worker-adapter",
+        COREML_RUNNER_SOURCE,
+        "nuis-coreml-model-prediction-provider-runner-v1",
+        &["Foundation", "CoreML"],
+    )
+}
 
 pub(crate) struct CoreMlProviderExecution {
     pub(crate) contract: &'static str,
@@ -206,7 +221,7 @@ fn execute_model_prediction_platform(
     Err("CoreML provider runner is unavailable on this host".to_owned())
 }
 
-fn format_shape(shape: &[usize]) -> String {
+pub(crate) fn format_shape(shape: &[usize]) -> String {
     shape
         .iter()
         .map(usize::to_string)
@@ -292,6 +307,27 @@ fn parse_coreml_runner_output_with_payload(
         output_payload,
         transferable_output: None,
     })
+}
+
+pub(crate) fn parse_coreml_worker_output(
+    output: &[u8],
+    consumption: Option<ProviderOutputCarrierConsumption>,
+) -> Result<CoreMlProviderExecution, String> {
+    let output = std::str::from_utf8(output)
+        .map_err(|_| "CoreML worker adapter output is not UTF-8".to_owned())?;
+    let (payload, transferable) = consumption
+        .map(|consumption| (consumption.payload, consumption.transferable))
+        .unwrap_or_default();
+    let mut execution = parse_coreml_runner_output_with_payload(output, payload)?;
+    if transferable.is_some() {
+        execution.output_carrier_adapter_id = "inherited.fd.output.v1".to_owned();
+        execution.output_carrier_mode = "inherited-fd-output".to_owned();
+        execution.output_residency_kind = "host-visible-file".to_owned();
+        execution.output_transfer_scope = "cross-process-static".to_owned();
+        execution.output_observation_mode = "mapped-on-demand".to_owned();
+        execution.transferable_output = transferable;
+    }
+    Ok(execution)
 }
 
 fn required_device_set(value: Option<&str>) -> Result<String, String> {

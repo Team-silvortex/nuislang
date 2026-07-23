@@ -1,3 +1,5 @@
+#[cfg(target_os = "macos")]
+use crate::provider_process_adapter::worker_descriptor_argument;
 #[cfg(unix)]
 use crate::provider_worker_lease::{
     ProviderWorkerAdapterLaunch, ProviderWorkerDispatchReceipt, ProviderWorkerLeaseManager,
@@ -7,6 +9,7 @@ use crate::{
     provider_output_carrier_registry::ProviderOutputPayload,
     provider_output_comparison::compare_provider_output,
     provider_prepared_input::{CompletedProviderOutput, PreparedProviderInput},
+    provider_process_adapter::{provider_output_byte_length, validate_provider_model_asset},
     provider_request::{provider_request_collection_from_evidence, ProviderRequest},
     provider_runner_registry::{
         provider_runner_real_device_probe_status, select_provider_runner_adapter,
@@ -487,21 +490,91 @@ fn execute_native_provider_request(
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
-    #[cfg(target_os = "macos")]
-    let prepared_worker_adapter = if adapter.kind == "metal-real-device-runner"
-        && request.buffer.element_type == "u8"
-        && request.buffer.layout.contains("pixel-format=gray8")
-        && request.kernel.operation == "invert"
-    {
-        Some(
-            crate::provider_runner_metal::prepare_gray8_worker_invocation(
-                request.scalar_u8("max_value").ok_or_else(|| {
-                    "Metal provider request is missing u8 scalar `max_value`".to_owned()
-                })?,
-            )?,
-        )
+    let verified_coreml_model_path = if adapter.kind == "coreml-real-device-runner" {
+        Some(validate_provider_model_asset(output_dir, request)?)
     } else {
         None
+    };
+    let output_byte_length = provider_output_byte_length(request)
+        .ok_or_else(|| "provider worker output byte length is not representable".to_owned())?;
+    #[cfg(target_os = "macos")]
+    let prepared_worker_adapter = if adapter.kind == "metal-real-device-runner" {
+        if request.buffer.element_type == "u8"
+            && request.buffer.layout.contains("pixel-format=gray8")
+            && request.kernel.operation == "invert"
+        {
+            request.scalar_u8("max_value").ok_or_else(|| {
+                "Metal provider request is missing u8 scalar `max_value`".to_owned()
+            })?;
+            Some(crate::provider_runner_metal::prepare_gray8_worker_invocation()?)
+        } else if request.buffer.element_type == "f32"
+            && request.buffer.layout == "tensor-contiguous"
+            && request.kernel.operation == "bias"
+        {
+            request
+                .scalar_f32("bias")
+                .ok_or_else(|| "Metal provider request is missing f32 scalar `bias`".to_owned())?;
+            Some(crate::provider_runner_metal::prepare_f32_bias_worker_invocation()?)
+        } else {
+            None
+        }
+    } else if adapter.kind == "coreml-real-device-runner"
+        && inputs.len() == 1
+        && inputs[0].worker_adapter_argument().is_some()
+    {
+        Some(crate::provider_runner_coreml::prepare_coreml_worker_invocation()?)
+    } else {
+        None
+    };
+    #[cfg(target_os = "macos")]
+    let worker_adapter_arguments = if prepared_worker_adapter.is_some() {
+        let input_argument = worker_descriptor_argument(&inputs[0], 0)?;
+        if adapter.kind == "metal-real-device-runner" {
+            let scalar = if request.kernel.operation == "invert" {
+                request
+                    .scalar_u8("max_value")
+                    .expect("validated Metal max value")
+                    .to_string()
+            } else {
+                request
+                    .scalar_f32("bias")
+                    .expect("validated Metal bias")
+                    .to_string()
+            };
+            vec![input_argument, format!("literal:{scalar}")]
+        } else {
+            let model = request
+                .model_asset
+                .as_ref()
+                .expect("validated CoreML model descriptor");
+            let model_path = verified_coreml_model_path
+                .as_ref()
+                .expect("validated CoreML model path")
+                .to_str()
+                .ok_or_else(|| "CoreML model path is not UTF-8".to_owned())?;
+            let output_shape = request
+                .output_comparison
+                .as_ref()
+                .map(|comparison| comparison.shape.as_slice())
+                .unwrap_or(request.buffer.shape.as_slice());
+            vec![
+                format!("verified-path:{}:{model_path}", model.content_hash),
+                "literal:--multi".to_owned(),
+                format!("literal:{}", model.output_feature),
+                format!(
+                    "literal:{}",
+                    crate::provider_runner_coreml::format_shape(output_shape)
+                ),
+                format!("literal:{}", model.input_features[0]),
+                input_argument,
+                format!(
+                    "literal:{}",
+                    crate::provider_runner_coreml::format_shape(&request.input_bindings[0].shape)
+                ),
+            ]
+        }
+    } else {
+        Vec::new()
     };
     #[cfg(target_os = "macos")]
     let worker_adapter_launch =
@@ -511,12 +584,13 @@ fn execute_native_provider_request(
                 executable_path: prepared.executable_path(),
                 executable_hash: &prepared.executable_hash,
                 runner_contract: prepared.contract,
-                scalar_argument: &prepared.scalar_argument,
+                arguments: &worker_adapter_arguments,
+                output_byte_length,
             });
     #[cfg(all(unix, not(target_os = "macos")))]
     let worker_adapter_launch: Option<ProviderWorkerAdapterLaunch<'_>> = None;
     #[cfg(unix)]
-    let worker_receipt = worker_leases.dispatch(
+    let mut worker_receipt = worker_leases.dispatch(
         adapter.adapter_id,
         provider_family,
         &session_request.lease_id,
@@ -542,10 +616,11 @@ fn execute_native_provider_request(
                 let max_value = request.scalar_u8("max_value").ok_or_else(|| {
                     "Metal provider request is missing u8 scalar `max_value`".to_owned()
                 })?;
-                if worker_receipt.execution_capsule_invocation_mode == "worker-process-adapter-v1" {
+                if worker_receipt.execution_capsule_invocation_mode == "worker-process-adapter-v4" {
                     crate::provider_runner_metal::parse_metal_worker_output(
                         &worker_receipt.worker_output_payload,
                         "nuis-metal-gray8-provider-runner-v1",
+                        worker_receipt.worker_output_result.take(),
                     )?
                 } else {
                     let path = inputs[0]
@@ -561,7 +636,13 @@ fn execute_native_provider_request(
                 let bias = request.scalar_f32("bias").ok_or_else(|| {
                     "Metal provider request is missing f32 scalar `bias`".to_owned()
                 })?;
-                if let Some(channel) = inputs[0].direct_channel() {
+                if worker_receipt.execution_capsule_invocation_mode == "worker-process-adapter-v4" {
+                    crate::provider_runner_metal::parse_metal_worker_output(
+                        &worker_receipt.worker_output_payload,
+                        "nuis-metal-f32-bias-provider-runner-v1",
+                        worker_receipt.worker_output_result.take(),
+                    )?
+                } else if let Some(channel) = inputs[0].direct_channel() {
                     crate::provider_runner_metal::execute_f32_bias_prepared_channel(
                         channel,
                         request.input_bindings[0].byte_length,
@@ -611,21 +692,13 @@ fn execute_native_provider_request(
                     request.buffer.layout, request.buffer.element_type
                 ));
             }
-            let model = request.model_asset.as_ref().ok_or_else(|| {
-                "CoreML provider request is missing a model asset descriptor".to_owned()
-            })?;
-            let model_path = resolve_provider_payload_path(output_dir, &model.path)?;
-            let model_bytes = fs::read(&model_path).map_err(|error| {
-                format!(
-                    "failed to read provider model asset `{}`: {error}",
-                    model_path.display()
-                )
-            })?;
-            if model_bytes.len() != model.byte_length
-                || fnv1a64_hex(&model_bytes) != model.content_hash
-            {
-                return Err("provider model asset size/hash evidence mismatch".to_owned());
-            }
+            let model = request
+                .model_asset
+                .as_ref()
+                .expect("CoreML model descriptor was validated");
+            let model_path = verified_coreml_model_path
+                .as_ref()
+                .expect("CoreML model path was validated");
             let coreml_inputs = inputs
                 .iter()
                 .zip(&model.input_features)
@@ -651,12 +724,21 @@ fn execute_native_provider_request(
                 .as_ref()
                 .map(|comparison| comparison.shape.as_slice())
                 .unwrap_or(request.buffer.shape.as_slice());
-            let execution = crate::provider_runner_coreml::execute_model_prediction_inputs(
-                &model_path,
-                &coreml_inputs,
-                &model.output_feature,
-                output_shape,
-            )?;
+            let execution = if worker_receipt.execution_capsule_invocation_mode
+                == "worker-process-adapter-v4"
+            {
+                crate::provider_runner_coreml::parse_coreml_worker_output(
+                    &worker_receipt.worker_output_payload,
+                    worker_receipt.worker_output_result.take(),
+                )?
+            } else {
+                crate::provider_runner_coreml::execute_model_prediction_inputs(
+                    model_path,
+                    &coreml_inputs,
+                    &model.output_feature,
+                    output_shape,
+                )?
+            };
             let comparison = request
                 .output_comparison
                 .as_ref()

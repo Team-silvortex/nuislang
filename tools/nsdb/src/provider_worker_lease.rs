@@ -4,6 +4,7 @@ use crate::{
         render_capsule_roles, ProviderExecutionCapsuleInvokerRegistration,
         ProviderExecutionCapsuleRegistration,
     },
+    provider_output_carrier_registry::ProviderOutputCarrierConsumption,
     provider_prepared_input::PreparedProviderInput,
     provider_request::ProviderRequest,
     provider_runner_registry::{
@@ -23,13 +24,14 @@ pub(crate) const PROVIDER_WORKER_LEASE_CONTRACT: &str = "nuis-provider-worker-le
 pub(crate) const PROVIDER_WORKER_DISPATCH_PERMIT_CONTRACT: &str =
     "nuis-provider-worker-dispatch-permit-v1";
 pub(crate) const PROVIDER_WORKER_PROCESS_ADAPTER_CONTRACT: &str =
-    "nuis-provider-worker-process-adapter-v1";
+    "nuis-provider-worker-process-adapter-v4";
 
 pub(crate) struct ProviderWorkerAdapterLaunch<'a> {
     pub(crate) executable_path: &'a Path,
     pub(crate) executable_hash: &'a str,
     pub(crate) runner_contract: &'a str,
-    pub(crate) scalar_argument: &'a str,
+    pub(crate) arguments: &'a [String],
+    pub(crate) output_byte_length: usize,
 }
 
 pub(crate) struct ProviderWorkerDispatchReceipt {
@@ -57,6 +59,7 @@ pub(crate) struct ProviderWorkerDispatchReceipt {
     pub(crate) worker_output_descriptor_byte_length: usize,
     pub(crate) worker_output_descriptor_hash: String,
     pub(crate) worker_output_payload: Vec<u8>,
+    pub(crate) worker_output_result: Option<ProviderOutputCarrierConsumption>,
     pub(crate) worker_output_receipt_status: &'static str,
     pub(crate) dispatch_status: i64,
     pub(crate) dispatch_permit_contract: &'static str,
@@ -126,18 +129,24 @@ impl ProviderWorkerLeaseManager {
         }
         let files = inputs
             .iter()
-            .map(PreparedProviderInput::try_clone_worker_descriptor)
+            .enumerate()
+            .map(|(index, input)| {
+                input
+                    .try_clone_worker_descriptor()
+                    .map(|file| file.map(|file| (index, file)))
+            })
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()
             .flatten()
             .collect::<Vec<_>>();
-        let roles = (0..files.len())
-            .map(|index| format!("input.{index}"))
+        let roles = files
+            .iter()
+            .map(|(index, _)| format!("input.{index}"))
             .collect::<Vec<_>>();
         let descriptors = files
             .iter()
             .zip(&roles)
-            .map(|(file, role)| UnixWorkerDescriptor {
+            .map(|((_, file), role)| UnixWorkerDescriptor {
                 role,
                 descriptor: file.as_fd(),
             })
@@ -174,7 +183,7 @@ impl ProviderWorkerLeaseManager {
                     request.kernel.id
                 )
             })?;
-        validate_adapter_launch(adapter_launch)?;
+        validate_adapter_launch(adapter_launch, files.len())?;
         let payload = render_dispatch_payload(
             provider_family,
             request,
@@ -183,7 +192,7 @@ impl ProviderWorkerLeaseManager {
             &invoker,
             adapter_launch,
         );
-        let reply = lease
+        let mut reply = lease
             .transport
             .request(&request.kernel.id, payload.as_bytes(), &descriptors)
             .map_err(|error| {
@@ -198,14 +207,23 @@ impl ProviderWorkerLeaseManager {
                 reply.sequence
             ));
         }
-        if reply.payload != payload.as_bytes() {
-            return Err("provider worker changed the opaque request payload".to_owned());
-        }
         if reply.output_descriptor_roles != capsule.output_roles
             || reply.output_descriptors.len() != capsule.output_roles.len()
         {
             return Err("provider worker output descriptor roles do not match capsule".to_owned());
         }
+        let worker_output_result = crate::provider_worker_result::consume_worker_result(
+            &mut reply.output_descriptors,
+            &reply.output_descriptor_mode,
+            reply.output_descriptor_byte_length,
+            &reply.output_descriptor_hash,
+            &reply.adapter_protocol,
+        )?;
+        let worker_output_payload = if worker_output_result.is_some() {
+            reply.adapter_protocol
+        } else {
+            reply.output_descriptor_payload
+        };
         Ok(ProviderWorkerDispatchReceipt {
             lease_contract: PROVIDER_WORKER_LEASE_CONTRACT,
             resolver_contract: lease.resolver_contract,
@@ -219,7 +237,7 @@ impl ProviderWorkerLeaseManager {
             execution_capsule_id: capsule.capsule_id,
             execution_capsule_token: capsule.capsule_token,
             execution_capsule_invocation_mode: if adapter_launch.is_some() {
-                "worker-process-adapter-v1"
+                "worker-process-adapter-v4"
             } else {
                 capsule.invocation_mode
             },
@@ -231,10 +249,11 @@ impl ProviderWorkerLeaseManager {
             execution_capsule_invoker_status: "registered-invoked",
             worker_output_descriptor_contract: invoker.output_carrier_contract,
             worker_output_descriptor_roles: render_capsule_roles(&reply.output_descriptor_roles),
-            worker_output_descriptor_count: reply.output_descriptors.len(),
+            worker_output_descriptor_count: capsule.output_roles.len(),
             worker_output_descriptor_byte_length: reply.output_descriptor_byte_length,
             worker_output_descriptor_hash: reply.output_descriptor_hash,
-            worker_output_payload: reply.output_descriptor_payload,
+            worker_output_payload,
+            worker_output_result,
             worker_output_receipt_status: "verified",
             dispatch_status: reply.dispatch_status,
             dispatch_permit_contract: PROVIDER_WORKER_DISPATCH_PERMIT_CONTRACT,
@@ -290,17 +309,27 @@ fn render_dispatch_payload(
     );
     if let Some(launch) = adapter_launch {
         payload.push_str(&format!(
-            "adapter_launch_contract={PROVIDER_WORKER_PROCESS_ADAPTER_CONTRACT}\nadapter_executable={}\nadapter_executable_hash={}\nadapter_runner_contract={}\nadapter_scalar_argument={}\n",
+            "adapter_launch_contract={PROVIDER_WORKER_PROCESS_ADAPTER_CONTRACT}\nadapter_executable={}\nadapter_executable_hash={}\nadapter_runner_contract={}\nadapter_argument_count={}\n",
             launch.executable_path.display(),
             launch.executable_hash,
             launch.runner_contract,
-            launch.scalar_argument,
+            launch.arguments.len(),
         ));
+        payload.push_str(&format!(
+            "adapter_output_byte_length={}\n",
+            launch.output_byte_length
+        ));
+        for (index, argument) in launch.arguments.iter().enumerate() {
+            payload.push_str(&format!("adapter_argument_{index}={argument}\n"));
+        }
     }
     payload
 }
 
-fn validate_adapter_launch(launch: Option<&ProviderWorkerAdapterLaunch<'_>>) -> Result<(), String> {
+fn validate_adapter_launch(
+    launch: Option<&ProviderWorkerAdapterLaunch<'_>>,
+    descriptor_count: usize,
+) -> Result<(), String> {
     let Some(launch) = launch else {
         return Ok(());
     };
@@ -319,12 +348,68 @@ fn validate_adapter_launch(launch: Option<&ProviderWorkerAdapterLaunch<'_>>) -> 
             .runner_contract
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b':' | b'_' | b'-'))
-        || launch.scalar_argument.is_empty()
-        || launch.scalar_argument.contains(['\t', '\r', '\n'])
+        || launch.arguments.is_empty()
+        || launch.arguments.len() > 32
+        || launch.output_byte_length == 0
+        || launch
+            .arguments
+            .iter()
+            .any(|argument| !is_adapter_argument(argument, descriptor_count))
     {
         return Err("provider worker adapter launch descriptor is invalid".to_owned());
     }
     Ok(())
+}
+
+fn is_adapter_argument(value: &str, descriptor_count: usize) -> bool {
+    if value.contains(['\t', '\r', '\n']) {
+        return false;
+    }
+    if let Some(literal) = value.strip_prefix("literal:") {
+        return !literal.is_empty();
+    }
+    if let Some(binding) = value.strip_prefix("verified-path:") {
+        return binding
+            .split_once(':')
+            .is_some_and(|(hash, path)| is_fnv_hash(hash) && !path.is_empty());
+    }
+    if let Some(index) = value.strip_prefix("descriptor-path:") {
+        return valid_descriptor_index(index, descriptor_count);
+    }
+    value
+        .strip_prefix("descriptor-carrier:")
+        .and_then(|metadata| {
+            let mut fields = metadata.split(':');
+            Some((
+                fields.next()?,
+                fields.next()?,
+                fields.next()?,
+                fields.next()?,
+                fields.next(),
+            ))
+        })
+        .is_some_and(|(index, frame, length, hash, extra)| {
+            extra.is_none()
+                && valid_descriptor_index(index, descriptor_count)
+                && [frame, length, hash].iter().all(|field| is_decimal(field))
+        })
+}
+
+fn valid_descriptor_index(value: &str, descriptor_count: usize) -> bool {
+    is_decimal(value)
+        && value
+            .parse::<usize>()
+            .is_ok_and(|index| index < descriptor_count)
+}
+
+fn is_decimal(value: &str) -> bool {
+    !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+fn is_fnv_hash(value: &str) -> bool {
+    value.len() == 18
+        && value.starts_with("0x")
+        && value[2..].bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn remove_image_dir(path: &Path) -> Result<(), String> {
@@ -365,16 +450,40 @@ mod tests {
             executable_path: Path::new("adapter"),
             executable_hash: "not-a-hash",
             runner_contract: "runner.v1",
-            scalar_argument: "15",
+            arguments: &["descriptor-path:0".to_owned()],
+            output_byte_length: 4,
         };
-        assert!(validate_adapter_launch(Some(&invalid_hash)).is_err());
+        assert!(validate_adapter_launch(Some(&invalid_hash), 1).is_err());
 
-        let invalid_scalar = ProviderWorkerAdapterLaunch {
+        let invalid_literal = ProviderWorkerAdapterLaunch {
             executable_path: Path::new("adapter"),
             executable_hash: "0x0123456789abcdef",
             runner_contract: "runner.v1",
-            scalar_argument: "15\nnext",
+            arguments: &["literal:15\nnext".to_owned()],
+            output_byte_length: 4,
         };
-        assert!(validate_adapter_launch(Some(&invalid_scalar)).is_err());
+        assert!(validate_adapter_launch(Some(&invalid_literal), 1).is_err());
+
+        let invalid_descriptor = ProviderWorkerAdapterLaunch {
+            executable_path: Path::new("adapter"),
+            executable_hash: "0x0123456789abcdef",
+            runner_contract: "runner.v1",
+            arguments: &["descriptor-carrier:1:0:4096:42".to_owned()],
+            output_byte_length: 4,
+        };
+        assert!(validate_adapter_launch(Some(&invalid_descriptor), 1).is_err());
+
+        let ordered_arguments = ProviderWorkerAdapterLaunch {
+            executable_path: Path::new("adapter"),
+            executable_hash: "0x0123456789abcdef",
+            runner_contract: "runner.v1",
+            arguments: &[
+                "verified-path:0x0123456789abcdef:model.mlmodel".to_owned(),
+                "literal:--multi".to_owned(),
+                "descriptor-carrier:0:0:4096:42".to_owned(),
+            ],
+            output_byte_length: 4,
+        };
+        assert!(validate_adapter_launch(Some(&ordered_arguments), 1).is_ok());
     }
 }

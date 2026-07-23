@@ -212,6 +212,14 @@ impl PreparedProviderInput {
             .transpose()
     }
 
+    #[cfg(unix)]
+    pub(crate) fn worker_adapter_argument(&self) -> Option<String> {
+        self.direct_channel
+            .as_ref()
+            .and_then(|channel| channel.worker_frame_argument(0))
+            .or_else(|| self.input().path().map(|_| "path-fd".to_owned()))
+    }
+
     pub(crate) fn finish(mut self) -> Result<Option<ProviderEdgeTransportReceipt>, String> {
         let mut receipt = self.transport_receipt.take();
         if self.direct_channel.take().is_some() {

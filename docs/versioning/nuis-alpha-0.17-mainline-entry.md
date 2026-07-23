@@ -93,8 +93,10 @@ The repository currently verifies:
 * binary-safe, length-bound, hash-bound request and response payloads
 * open-ended provider, adapter, and operation registration identities
 * a Nuis-authored lifecycle and request-ingress loop
-* a reply protocol, `NUISPWUR5`, carrying the positive Nuis invocation status
-  plus a worker-owned output descriptor role, length, and hash
+* a reply protocol, `NUISPWUR6`, carrying the positive Nuis invocation status,
+  request identity without body echo, bounded adapter metadata, and a
+  worker-owned output carrier role, mode, length, and hash
+* a worker error receipt, `NUISPWUE1`, preserving failure stage and status
 * fail-closed rejection of non-positive worker dispatch status
 * operation permit evidence in final native-output summaries
 * `nuis-provider-execution-capsule-v1` registration binding provider, adapter,
@@ -192,13 +194,13 @@ Safe wording:
 * `registered heterogeneous worker boundary`
 * `worker-authorized operation permit`
 * `worker-invoked provider-neutral execution capsule`
-* `NUISPWUR5 worker-owned output descriptor receipt`
-* `hash-bound worker process-adapter launch for PixelMagic gray8 Metal`
+* `NUISPWUR6 worker-owned direct result-carrier receipt`
+* `ordered hash-bound worker process-adapter launch for Metal and large/chained CoreML`
 * `real Metal/CoreML provider smoke`
 * `binary-linking convergence`
 * `executable-artifact closure`
 * `Nuis-owned lifecycle with thin host ABI adapters`
-* `ordered multi-input worker adapter transport is the next closure boundary`
+* `multi-input CoreML worker fan-in is the next closure boundary`
 
 ## Exit Evidence
 
@@ -209,6 +211,7 @@ Alpha-0.17 should leave behind:
 * a verified output-carrier receipt returned across the worker protocol
 * no compiler-side finite list of allowed backend combinations
 * PixelMagic/WitSage evidence consuming the same capsule vocabulary
+* one hash-verified CoreML model adapter executing beneath the Nuis worker
 * Nsld and Nsdb metadata that can identify the executed capsule and outputs
 * development-tensor evidence naming the next weakest verified cell
 

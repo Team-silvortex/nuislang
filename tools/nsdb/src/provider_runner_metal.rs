@@ -9,8 +9,13 @@ use crate::provider_output_carrier_registry::{
     prepare_provider_output_carrier, select_provider_output_carrier_adapter,
 };
 use crate::provider_output_carrier_registry::{
-    ProviderOutputPayload, PROVIDER_OUTPUT_CARRIER_REGISTRY_CONTRACT,
-    PROVIDER_OUTPUT_CARRIER_REGISTRY_SOURCE, PROVIDER_OUTPUT_RESIDENCY_CONTRACT,
+    ProviderOutputCarrierConsumption, ProviderOutputPayload,
+    PROVIDER_OUTPUT_CARRIER_REGISTRY_CONTRACT, PROVIDER_OUTPUT_CARRIER_REGISTRY_SOURCE,
+    PROVIDER_OUTPUT_RESIDENCY_CONTRACT,
+};
+#[cfg(target_os = "macos")]
+use crate::provider_process_adapter::{
+    compile_objc_process_adapter, PreparedProviderProcessAdapter,
 };
 use std::{ffi::OsStr, path::Path};
 #[cfg(target_os = "macos")]
@@ -25,21 +30,6 @@ use std::{
 const METAL_RUNNER_SOURCE: &str = include_str!("../provider-runners/metal_gray8_invert.m");
 #[cfg(target_os = "macos")]
 const METAL_F32_BIAS_SOURCE: &str = include_str!("../provider-runners/metal_f32_bias.m");
-
-#[cfg(target_os = "macos")]
-pub(crate) struct PreparedMetalWorkerInvocation {
-    paths: TempMetalRunnerPaths,
-    pub(crate) contract: &'static str,
-    pub(crate) executable_hash: String,
-    pub(crate) scalar_argument: String,
-}
-
-#[cfg(target_os = "macos")]
-impl PreparedMetalWorkerInvocation {
-    pub(crate) fn executable_path(&self) -> &Path {
-        &self.paths.binary
-    }
-}
 
 pub(crate) struct MetalProviderExecution {
     pub(crate) contract: &'static str,
@@ -66,18 +56,30 @@ pub(crate) fn execute_gray8_invert(
 }
 
 #[cfg(target_os = "macos")]
-pub(crate) fn prepare_gray8_worker_invocation(
-    max_value: u8,
-) -> Result<PreparedMetalWorkerInvocation, String> {
-    let paths = compile_metal_runner(METAL_RUNNER_SOURCE)?;
-    let executable = fs::read(&paths.binary)
-        .map_err(|error| format!("failed to hash Metal worker adapter: {error}"))?;
-    Ok(PreparedMetalWorkerInvocation {
-        paths,
-        contract: "nuis-metal-gray8-provider-runner-v1",
-        executable_hash: crate::provider_sample_artifact::fnv1a64_hex(&executable),
-        scalar_argument: max_value.to_string(),
-    })
+pub(crate) fn prepare_gray8_worker_invocation() -> Result<PreparedProviderProcessAdapter, String> {
+    prepare_metal_worker_invocation(METAL_RUNNER_SOURCE, "nuis-metal-gray8-provider-runner-v1")
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn prepare_f32_bias_worker_invocation() -> Result<PreparedProviderProcessAdapter, String>
+{
+    prepare_metal_worker_invocation(
+        METAL_F32_BIAS_SOURCE,
+        "nuis-metal-f32-bias-provider-runner-v1",
+    )
+}
+
+#[cfg(target_os = "macos")]
+fn prepare_metal_worker_invocation(
+    source: &str,
+    contract: &'static str,
+) -> Result<PreparedProviderProcessAdapter, String> {
+    compile_objc_process_adapter(
+        "metal-worker-adapter",
+        source,
+        contract,
+        &["Foundation", "Metal"],
+    )
 }
 
 pub(crate) fn execute_f32_bias(
@@ -377,10 +379,23 @@ fn parse_metal_runner_output_with_payload(
 pub(crate) fn parse_metal_worker_output(
     output: &[u8],
     expected_contract: &'static str,
+    consumption: Option<ProviderOutputCarrierConsumption>,
 ) -> Result<MetalProviderExecution, String> {
     let output = std::str::from_utf8(output)
         .map_err(|_| "Metal worker adapter output is not UTF-8".to_owned())?;
-    parse_metal_runner_output_with_payload(output, expected_contract, None)
+    let (payload, transferable) = consumption
+        .map(|consumption| (consumption.payload, consumption.transferable))
+        .unwrap_or_default();
+    let mut execution = parse_metal_runner_output_with_payload(output, expected_contract, payload)?;
+    if transferable.is_some() {
+        execution.output_carrier_adapter_id = "inherited.fd.output.v1".to_owned();
+        execution.output_carrier_mode = "inherited-fd-output".to_owned();
+        execution.output_residency_kind = "host-visible-file".to_owned();
+        execution.output_transfer_scope = "cross-process-static".to_owned();
+        execution.output_observation_mode = "mapped-on-demand".to_owned();
+        execution.transferable_output = transferable;
+    }
+    Ok(execution)
 }
 
 fn decode_hex(value: &str) -> Result<Vec<u8>, String> {

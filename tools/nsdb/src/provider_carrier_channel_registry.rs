@@ -59,6 +59,14 @@ impl PreparedProviderCarrierChannel {
         }
     }
 
+    #[cfg(unix)]
+    pub(crate) fn worker_frame_argument(&self, frame_index: usize) -> Option<String> {
+        match self {
+            Self::InheritedFd(carrier) => Some(carrier.worker_frame_argument(frame_index)),
+            Self::FramedStdin(_) => None,
+        }
+    }
+
     pub(crate) fn configure_command(&self, command: &mut Command) {
         match self {
             #[cfg(unix)]

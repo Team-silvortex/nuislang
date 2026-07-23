@@ -3,16 +3,17 @@ use crate::provider_worker_request::{
     render_role_manifest, validate_frame_token, MAX_PROVIDER_WORKER_DESCRIPTORS,
 };
 use std::{
+    io::Read,
     mem::{size_of, zeroed},
     os::fd::{AsRawFd, BorrowedFd, FromRawFd, OwnedFd, RawFd},
     os::unix::net::UnixDatagram,
     os::unix::process::CommandExt,
-    process::{Child, Command},
-    time::Duration,
+    process::{Child, Command, Stdio},
+    time::{Duration, Instant},
 };
 
 const MAX_FRAME_BYTES: usize = 64 * 1024;
-const WORKER_IO_TIMEOUT: Duration = Duration::from_secs(30);
+const WORKER_IO_TIMEOUT: Duration = Duration::from_secs(120);
 
 pub(crate) struct UnixWorkerProcessTransport {
     child: Child,
@@ -32,12 +33,13 @@ pub(crate) struct UnixWorkerProcessReply {
     pub(crate) dispatch_status: i64,
     pub(crate) payload_hash: String,
     pub(crate) descriptor_roles: Vec<String>,
-    pub(crate) payload: Vec<u8>,
     pub(crate) output_descriptors: Vec<OwnedFd>,
     pub(crate) output_descriptor_roles: Vec<String>,
     pub(crate) output_descriptor_byte_length: usize,
     pub(crate) output_descriptor_hash: String,
+    pub(crate) output_descriptor_mode: String,
     pub(crate) output_descriptor_payload: Vec<u8>,
+    pub(crate) adapter_protocol: Vec<u8>,
 }
 
 pub(crate) struct UnixWorkerRequest {
@@ -72,6 +74,7 @@ impl UnixWorkerProcessTransport {
             .map_err(|error| format!("failed to set provider worker write timeout: {error}"))?;
         let child_fd = child_socket.as_raw_fd();
         command.env("NUIS_PROVIDER_WORKER_SOCKET_FD", child_fd.to_string());
+        command.stderr(Stdio::piped());
         unsafe {
             command.pre_exec(move || {
                 let flags = libc::fcntl(child_fd, libc::F_GETFD);
@@ -161,6 +164,7 @@ impl UnixWorkerProcessTransport {
             .iter()
             .map(|descriptor| descriptor.role)
             .collect::<Vec<_>>();
+        wait_for_worker_reply(&self.socket, &mut self.child, request_id)?;
         let reply = receive_process_reply(
             &self.socket,
             &self.lease_id,
@@ -169,7 +173,17 @@ impl UnixWorkerProcessTransport {
             self.worker_pid,
             payload,
             &descriptor_roles,
-        )?;
+        )
+        .map_err(|error| {
+            let exited = self
+                .child
+                .try_wait()
+                .ok()
+                .flatten()
+                .map(|status| format!("; worker exited with status {status}"))
+                .unwrap_or_default();
+            format!("{error}{exited}")
+        })?;
         if reply.descriptor_count != descriptors.len() {
             return Err("Unix provider worker receipt descriptor count mismatch".to_owned());
         }
@@ -207,6 +221,65 @@ impl Drop for UnixWorkerProcessTransport {
         if !self.closed {
             let _ = self.child.kill();
             let _ = self.child.wait();
+        }
+    }
+}
+
+fn wait_for_worker_reply(
+    socket: &UnixDatagram,
+    child: &mut Child,
+    request_id: &str,
+) -> Result<(), String> {
+    let deadline = Instant::now() + WORKER_IO_TIMEOUT;
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err(format!(
+                "Unix provider worker timed out before replying to `{request_id}`"
+            ));
+        }
+        let timeout_ms = remaining.as_millis().min(250) as libc::c_int;
+        let mut descriptor = libc::pollfd {
+            fd: socket.as_raw_fd(),
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        let status = unsafe { libc::poll(&mut descriptor, 1, timeout_ms) };
+        if status < 0 {
+            let error = std::io::Error::last_os_error();
+            if error.kind() == std::io::ErrorKind::Interrupted {
+                continue;
+            }
+            return Err(format!(
+                "failed to poll Unix provider worker reply: {error}"
+            ));
+        }
+        if status > 0 {
+            if descriptor.revents & libc::POLLIN != 0 {
+                return Ok(());
+            }
+            return Err(format!(
+                "Unix provider worker reply socket failed with events 0x{:x}",
+                descriptor.revents
+            ));
+        }
+        if let Some(status) = child
+            .try_wait()
+            .map_err(|error| format!("failed to inspect Unix provider worker: {error}"))?
+        {
+            let mut diagnostic = String::new();
+            if let Some(mut stderr) = child.stderr.take() {
+                let _ = stderr.read_to_string(&mut diagnostic);
+            }
+            let diagnostic = diagnostic.trim();
+            return Err(format!(
+                "Unix provider worker exited with status {status} before replying to `{request_id}`{}",
+                if diagnostic.is_empty() {
+                    String::new()
+                } else {
+                    format!(": {diagnostic}")
+                }
+            ));
         }
     }
 }
@@ -399,6 +472,8 @@ fn receive_process_reply(
         || envelope.request_id != expected_request_id
         || envelope.worker_pid != expected_worker_pid
         || envelope.request_payload_hash != expected_payload_hash
+        || envelope.request_payload_length != expected_payload.len()
+        || envelope.payload_hash != expected_payload_hash
         || render_role_manifest(
             &envelope
                 .descriptor_roles
@@ -413,6 +488,7 @@ fn receive_process_reply(
         &output_descriptors,
         envelope.output_descriptor_byte_length,
         &envelope.output_descriptor_hash,
+        &envelope.output_descriptor_mode,
     )?;
     Ok(UnixWorkerProcessReply {
         sequence: expected_sequence,
@@ -423,12 +499,13 @@ fn receive_process_reply(
         dispatch_status: envelope.dispatch_status,
         payload_hash: envelope.payload_hash,
         descriptor_roles: envelope.descriptor_roles,
-        payload: envelope.payload,
         output_descriptors,
         output_descriptor_roles: envelope.output_descriptor_roles,
         output_descriptor_byte_length: envelope.output_descriptor_byte_length,
         output_descriptor_hash: envelope.output_descriptor_hash,
+        output_descriptor_mode: envelope.output_descriptor_mode,
         output_descriptor_payload,
+        adapter_protocol: envelope.adapter_protocol,
     })
 }
 
@@ -469,14 +546,21 @@ fn verify_output_descriptors(
     descriptors: &[OwnedFd],
     byte_length: usize,
     expected_hash: &str,
+    mode: &str,
 ) -> Result<Vec<u8>, String> {
     if descriptors.is_empty() {
-        return (byte_length == 0 && expected_hash == "0x0000000000000000")
+        return (byte_length == 0 && expected_hash == "0x0000000000000000" && mode == "none")
             .then(Vec::new)
             .ok_or_else(|| "provider worker empty output receipt is inconsistent".to_owned());
     }
-    if descriptors.len() != 1 || byte_length == 0 || byte_length > MAX_FRAME_BYTES {
+    if descriptors.len() != 1 || byte_length == 0 {
         return Err("provider worker output descriptor shape is unsupported".to_owned());
+    }
+    if mode == "nuispfd1-result" {
+        return Ok(Vec::new());
+    }
+    if mode != "protocol-stdout" || byte_length > MAX_FRAME_BYTES {
+        return Err("provider worker output descriptor mode is unsupported".to_owned());
     }
     let mut bytes = vec![0u8; byte_length];
     let read = unsafe {
@@ -593,8 +677,9 @@ mod tests {
     fn output_descriptor_receipt_rejects_hash_mismatch() {
         let file = File::open("Cargo.toml").expect("file");
         let descriptors = vec![OwnedFd::from(file)];
-        let error = verify_output_descriptors(&descriptors, 1, "0x0000000000000000")
-            .expect_err("forged output hash");
+        let error =
+            verify_output_descriptors(&descriptors, 1, "0x0000000000000000", "protocol-stdout")
+                .expect_err("forged output hash");
         assert!(error.contains("output descriptor hash mismatch"));
     }
 
@@ -672,8 +757,6 @@ mod tests {
             first_reply.payload_hash,
             crate::provider_sample_artifact::fnv1a64_hex(first_payload)
         );
-        assert_eq!(first_reply.payload, first_payload);
-        assert_eq!(second_reply.payload, second_payload);
         assert_eq!(worker.close().expect("close"), first_reply.worker_pid);
     }
 

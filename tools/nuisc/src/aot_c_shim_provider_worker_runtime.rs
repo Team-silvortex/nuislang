@@ -4,6 +4,7 @@ pub(crate) fn append_c_shim_provider_worker_runtime(out: &mut String) {
 
 #include <sys/uio.h>
 #include <sys/wait.h>
+#include <errno.h>
 
 #define NUIS_PROVIDER_WORKER_MAX_FDS 16
 #define NUIS_PROVIDER_WORKER_MAX_FRAME_BYTES (64 * 1024)
@@ -26,7 +27,15 @@ static FILE* nuis_provider_worker_output_file = NULL;
 static size_t nuis_provider_worker_output_length = 0;
 static char nuis_provider_worker_output_hash[19] = "0x0000000000000000";
 static char nuis_provider_worker_output_roles[1024] = "-";
+static unsigned char nuis_provider_worker_adapter_protocol[NUIS_PROVIDER_WORKER_MAX_FRAME_BYTES];
+static size_t nuis_provider_worker_adapter_protocol_length = 0;
+static char nuis_provider_worker_adapter_protocol_hash[19] = "0xcbf29ce484222325";
 static unsigned int nuis_provider_worker_input_byte_sum = 0;
+"#,
+    );
+    crate::aot_c_shim_provider_worker_result::append_provider_worker_result_helpers(out);
+    out.push_str(
+        r#"
 
 static void nuis_provider_worker_release_output(void) {
     if (nuis_provider_worker_output_file != NULL) {
@@ -36,6 +45,8 @@ static void nuis_provider_worker_release_output(void) {
     nuis_provider_worker_output_length = 0;
     memcpy(nuis_provider_worker_output_hash, "0x0000000000000000", 19);
     memcpy(nuis_provider_worker_output_roles, "-", 2);
+    nuis_provider_worker_adapter_protocol_length = 0;
+    memcpy(nuis_provider_worker_adapter_protocol_hash, "0xcbf29ce484222325", 19);
     nuis_provider_worker_input_byte_sum = 0;
 }
 
@@ -47,6 +58,7 @@ static void nuis_provider_worker_release_fds(void) {
 }
 
 static int64_t nuis_provider_worker_receive_fail(int64_t status) {
+    nuis_provider_worker_report_error("request-receive", (int)status);
     nuis_provider_worker_release_fds();
     nuis_provider_worker_release_output();
     return status;
@@ -205,7 +217,10 @@ int64_t nuis_host_provider_worker_receive(void) {
     message.msg_control = control;
     message.msg_controllen = sizeof(control);
     ssize_t received = recvmsg(nuis_provider_worker_socket, &message, 0);
-    if (received <= 0) return -2;
+    if (received <= 0) {
+        nuis_provider_worker_report_error("request-receive", -2);
+        return -2;
+    }
     for (struct cmsghdr* header = CMSG_FIRSTHDR(&message); header != NULL;
          header = CMSG_NXTHDR(&message, header)) {
         if (header->cmsg_level != SOL_SOCKET || header->cmsg_type != SCM_RIGHTS) {
@@ -323,17 +338,20 @@ static int nuis_provider_worker_invoke_process_adapter(void) {
     char launch_contract[128];
     char executable[2048];
     char executable_hash[32];
-    char scalar[128];
-    if (nuis_provider_worker_fd_count != 1
-        || !nuis_provider_worker_payload_text(
+    int64_t argument_count = nuis_provider_worker_payload_scalar(
+        "adapter_argument_count", "");
+    int64_t output_byte_length = nuis_provider_worker_payload_scalar(
+        "adapter_output_byte_length", "");
+    if (!nuis_provider_worker_payload_text(
             "adapter_launch_contract", launch_contract, sizeof(launch_contract))
-        || strcmp(launch_contract, "nuis-provider-worker-process-adapter-v1") != 0
+        || strcmp(launch_contract, "nuis-provider-worker-process-adapter-v4") != 0
         || !nuis_provider_worker_payload_text(
             "adapter_executable", executable, sizeof(executable))
         || !nuis_provider_worker_payload_text(
             "adapter_executable_hash", executable_hash, sizeof(executable_hash))
-        || !nuis_provider_worker_payload_text(
-            "adapter_scalar_argument", scalar, sizeof(scalar))) {
+        || argument_count <= 0
+        || argument_count > 32
+        || output_byte_length <= 0) {
         return -1;
     }
     char actual_hash[19];
@@ -343,63 +361,261 @@ static int nuis_provider_worker_invoke_process_adapter(void) {
     }
     nuis_provider_worker_output_file = tmpfile();
     if (nuis_provider_worker_output_file == NULL) return -3;
+    FILE* protocol_file = tmpfile();
+    if (protocol_file == NULL) {
+        nuis_provider_worker_release_output();
+        return -3;
+    }
+    long page_size_value = sysconf(_SC_PAGESIZE);
+    if (page_size_value <= 0) {
+        fclose(protocol_file);
+        nuis_provider_worker_release_output();
+        return -3;
+    }
+    size_t page_size = (size_t)page_size_value;
+    size_t payload_offset = ((56 + page_size - 1) / page_size) * page_size;
+    size_t mapped_length =
+        (((size_t)output_byte_length + page_size - 1) / page_size) * page_size;
+    if (mapped_length < (size_t)output_byte_length
+        || payload_offset > SIZE_MAX - mapped_length) {
+        fclose(protocol_file);
+        nuis_provider_worker_release_output();
+        return -3;
+    }
+    size_t packet_length = payload_offset + mapped_length;
+    unsigned char carrier_header[56] = {0};
+    memcpy(carrier_header, "NUISPFD1", 8);
+    uint32_t frame_count = 1;
+    uint32_t encoded_page_size = (uint32_t)page_size;
+    uint64_t encoded_payload_offset = (uint64_t)payload_offset;
+    uint64_t encoded_output_length = (uint64_t)output_byte_length;
+    uint64_t encoded_mapped_length = (uint64_t)mapped_length;
+    memcpy(carrier_header + 8, &frame_count, sizeof(frame_count));
+    memcpy(carrier_header + 12, &encoded_page_size, sizeof(encoded_page_size));
+    memcpy(carrier_header + 24, &encoded_payload_offset, sizeof(encoded_payload_offset));
+    memcpy(carrier_header + 32, &encoded_output_length, sizeof(encoded_output_length));
+    memcpy(carrier_header + 40, &encoded_mapped_length, sizeof(encoded_mapped_length));
+    if (fwrite(carrier_header, 1, sizeof(carrier_header), nuis_provider_worker_output_file)
+            != sizeof(carrier_header)
+        || fflush(nuis_provider_worker_output_file) != 0
+        || ftruncate(fileno(nuis_provider_worker_output_file), (off_t)packet_length) != 0) {
+        fclose(protocol_file);
+        nuis_provider_worker_release_output();
+        return -3;
+    }
     pid_t child = fork();
     if (child < 0) {
+        fclose(protocol_file);
         nuis_provider_worker_release_output();
         return -4;
     }
     if (child == 0) {
-        int input_fd = nuis_provider_worker_fds[0];
-        int flags = fcntl(input_fd, F_GETFD);
-        if (flags < 0
-            || fcntl(input_fd, F_SETFD, flags & ~FD_CLOEXEC) < 0
-            || dup2(fileno(nuis_provider_worker_output_file), STDOUT_FILENO) < 0) {
+        if (dup2(fileno(protocol_file), STDOUT_FILENO) < 0
+            || dup2(fileno(protocol_file), STDERR_FILENO) < 0) {
             _exit(126);
         }
-        char input_path[64];
-        if (snprintf(input_path, sizeof(input_path), "/dev/fd/%d", input_fd) <= 0) {
+        int output_fd = fileno(nuis_provider_worker_output_file);
+        int output_flags = fcntl(output_fd, F_GETFD);
+        char output_descriptor[128];
+        int output_descriptor_length = snprintf(
+            output_descriptor,
+            sizeof(output_descriptor),
+            "fd:%d:%zu:%lld:48",
+            output_fd,
+            payload_offset,
+            (long long)output_byte_length);
+        if (output_flags < 0
+            || fcntl(output_fd, F_SETFD, output_flags & ~FD_CLOEXEC) < 0
+            || output_descriptor_length <= 0
+            || (size_t)output_descriptor_length >= sizeof(output_descriptor)
+            || setenv("NUIS_PROVIDER_OUTPUT_FD", output_descriptor, 1) != 0) {
             _exit(126);
         }
-        execl(executable, executable, input_path, scalar, (char*)NULL);
+        for (size_t index = 0; index < nuis_provider_worker_fd_count; index++) {
+            int flags = fcntl(nuis_provider_worker_fds[index], F_GETFD);
+            if (flags < 0
+                || fcntl(
+                    nuis_provider_worker_fds[index],
+                    F_SETFD,
+                    flags & ~FD_CLOEXEC) < 0) {
+                _exit(126);
+            }
+        }
+        char encoded_arguments[32][2048];
+        char resolved_arguments[32][2048];
+        char* arguments[34];
+        arguments[0] = executable;
+        for (int64_t index = 0; index < argument_count; index++) {
+            char key[64];
+            int key_length =
+                snprintf(key, sizeof(key), "adapter_argument_%lld", (long long)index);
+            if (key_length <= 0
+                || (size_t)key_length >= sizeof(key)
+                || !nuis_provider_worker_payload_text(
+                    key, encoded_arguments[index], sizeof(encoded_arguments[index]))) {
+                _exit(126);
+            }
+            const char* encoded = encoded_arguments[index];
+            int resolved_length = 0;
+            if (strncmp(encoded, "literal:", 8) == 0 && encoded[8] != '\0') {
+                resolved_length = snprintf(
+                    resolved_arguments[index],
+                    sizeof(resolved_arguments[index]),
+                    "%s",
+                    encoded + 8);
+            } else if (strncmp(encoded, "verified-path:", 14) == 0
+                && strlen(encoded + 14) > 19
+                && encoded[32] == ':') {
+                char expected_hash[19];
+                memcpy(expected_hash, encoded + 14, 18);
+                expected_hash[18] = '\0';
+                const char* path = encoded + 33;
+                char actual_path_hash[19];
+                if (*path == '\0'
+                    || !nuis_provider_worker_hash_file(path, actual_path_hash)
+                    || strcmp(expected_hash, actual_path_hash) != 0) {
+                    _exit(126);
+                }
+                resolved_length = snprintf(
+                    resolved_arguments[index],
+                    sizeof(resolved_arguments[index]),
+                    "%s",
+                    path);
+            } else if (strncmp(encoded, "descriptor-path:", 16) == 0) {
+                char tail = '\0';
+                size_t descriptor_index = 0;
+                if (sscanf(encoded + 16, "%zu%c", &descriptor_index, &tail) != 1
+                    || descriptor_index >= nuis_provider_worker_fd_count) {
+                    _exit(126);
+                }
+                resolved_length = snprintf(
+                    resolved_arguments[index],
+                    sizeof(resolved_arguments[index]),
+                    "/dev/fd/%d",
+                    nuis_provider_worker_fds[descriptor_index]);
+            } else if (strncmp(encoded, "descriptor-carrier:", 19) == 0) {
+                char tail = '\0';
+                size_t descriptor_index = 0;
+                unsigned long long frame = 0;
+                unsigned long long packet_length = 0;
+                unsigned long long packet_hash = 0;
+                if (sscanf(
+                        encoded + 19,
+                        "%zu:%llu:%llu:%llu%c",
+                        &descriptor_index,
+                        &frame,
+                        &packet_length,
+                        &packet_hash,
+                        &tail) != 4
+                    || descriptor_index >= nuis_provider_worker_fd_count) {
+                    _exit(126);
+                }
+                const char* metadata = strchr(encoded + 19, ':');
+                if (metadata == NULL || metadata[1] == '\0') _exit(126);
+                resolved_length = snprintf(
+                    resolved_arguments[index],
+                    sizeof(resolved_arguments[index]),
+                    "fd:%d:%s",
+                    nuis_provider_worker_fds[descriptor_index],
+                    metadata + 1);
+            } else {
+                _exit(126);
+            }
+            if (resolved_length <= 0
+                || (size_t)resolved_length >= sizeof(resolved_arguments[index])) {
+                _exit(126);
+            }
+            arguments[index + 1] = resolved_arguments[index];
+        }
+        arguments[argument_count + 1] = NULL;
+        execv(executable, arguments);
         _exit(127);
     }
     int status = 0;
     if (waitpid(child, &status, 0) != child
         || !WIFEXITED(status)
-        || WEXITSTATUS(status) != 0
-        || fflush(nuis_provider_worker_output_file) != 0
-        || fseek(nuis_provider_worker_output_file, 0, SEEK_END) != 0) {
+        || WEXITSTATUS(status) != 0) {
+        if (fflush(protocol_file) == 0
+            && fseek(protocol_file, 0, SEEK_SET) == 0) {
+            unsigned char diagnostic[4096];
+            size_t count = 0;
+            while ((count = fread(
+                       diagnostic,
+                       1,
+                       sizeof(diagnostic),
+                       protocol_file)) > 0) {
+                fwrite(diagnostic, 1, count, stderr);
+            }
+            fflush(stderr);
+        }
+        fclose(protocol_file);
         nuis_provider_worker_release_output();
         return -5;
     }
-    long output_length = ftell(nuis_provider_worker_output_file);
-    if (output_length <= 0 || output_length > NUIS_PROVIDER_WORKER_MAX_FRAME_BYTES
-        || fseek(nuis_provider_worker_output_file, 0, SEEK_SET) != 0) {
+    if (fflush(protocol_file) != 0
+        || fseek(protocol_file, 0, SEEK_END) != 0) {
+        fclose(protocol_file);
+        nuis_provider_worker_release_output();
+        return -5;
+    }
+    long protocol_length = ftell(protocol_file);
+    if (protocol_length <= 0 || protocol_length > NUIS_PROVIDER_WORKER_MAX_FRAME_BYTES
+        || fseek(protocol_file, 0, SEEK_SET) != 0
+        || fread(
+               nuis_provider_worker_adapter_protocol,
+               1,
+               (size_t)protocol_length,
+               protocol_file) != (size_t)protocol_length) {
+        fclose(protocol_file);
         nuis_provider_worker_release_output();
         return -6;
     }
-    unsigned char buffer[4096];
-    uint64_t hash = UINT64_C(0xcbf29ce484222325);
-    size_t remaining = (size_t)output_length;
-    while (remaining > 0) {
-        size_t requested = remaining < sizeof(buffer) ? remaining : sizeof(buffer);
-        size_t count = fread(buffer, 1, requested, nuis_provider_worker_output_file);
-        if (count != requested) {
-            nuis_provider_worker_release_output();
-            return -7;
-        }
-        for (size_t index = 0; index < count; index++) {
-            hash ^= buffer[index];
-            hash *= UINT64_C(0x100000001b3);
-        }
-        remaining -= count;
+    fclose(protocol_file);
+    nuis_provider_worker_adapter_protocol_length = (size_t)protocol_length;
+    nuis_provider_worker_hash(
+        nuis_provider_worker_adapter_protocol,
+        nuis_provider_worker_adapter_protocol_length,
+        nuis_provider_worker_adapter_protocol_hash);
+    uint64_t declared_output_hash = 0;
+    uint64_t stored_output_hash = 0;
+    uint64_t actual_output_hash = 0;
+    uint64_t packet_hash = 0;
+    if (!nuis_provider_worker_protocol_u64("output_hash", &declared_output_hash)
+        || pread(
+               fileno(nuis_provider_worker_output_file),
+               &stored_output_hash,
+               sizeof(stored_output_hash),
+               48) != sizeof(stored_output_hash)
+        || !nuis_provider_worker_hash_fd(
+            fileno(nuis_provider_worker_output_file),
+            payload_offset,
+            (size_t)output_byte_length,
+            &actual_output_hash)
+        || actual_output_hash != declared_output_hash
+        || stored_output_hash != declared_output_hash
+        || !nuis_provider_worker_hash_fd(
+            fileno(nuis_provider_worker_output_file),
+            0,
+            packet_length,
+            &packet_hash)) {
+        fprintf(
+            stderr,
+            "provider worker direct-result validation failed: declared=%llu stored=%llu actual=%llu bytes=%lld packet=%zu\n",
+            (unsigned long long)declared_output_hash,
+            (unsigned long long)stored_output_hash,
+            (unsigned long long)actual_output_hash,
+            (long long)output_byte_length,
+            packet_length);
+        fflush(stderr);
+        nuis_provider_worker_release_output();
+        return -7;
     }
-    nuis_provider_worker_output_length = (size_t)output_length;
+    nuis_provider_worker_output_length = packet_length;
     snprintf(
         nuis_provider_worker_output_hash,
         sizeof(nuis_provider_worker_output_hash),
         "0x%016llx",
-        (unsigned long long)hash);
+        (unsigned long long)packet_hash);
     return 0;
 }
 
@@ -414,11 +630,20 @@ int64_t nuis_host_provider_worker_invoke_capsule(int64_t ingress_status) {
             nuis_provider_worker_output_roles,
             sizeof(nuis_provider_worker_output_roles))
         || strchr(nuis_provider_worker_output_roles, ',') != NULL) {
+        fprintf(stderr, "provider worker capsule metadata validation failed\n");
+        fflush(stderr);
+        nuis_provider_worker_report_error("capsule-metadata", -1);
         return -1;
     }
     for (size_t index = 0; index < nuis_provider_worker_fd_count; index++) {
         unsigned char value = 0;
         if (pread(nuis_provider_worker_fds[index], &value, 1, 0) != 1) {
+            fprintf(
+                stderr,
+                "provider worker input descriptor %zu is unreadable\n",
+                index);
+            fflush(stderr);
+            nuis_provider_worker_report_error("input-descriptor", -2);
             return -2;
         }
         nuis_provider_worker_input_byte_sum += value;
@@ -428,7 +653,17 @@ int64_t nuis_host_provider_worker_invoke_capsule(int64_t ingress_status) {
             "adapter_launch_contract",
             adapter_launch_contract,
             sizeof(adapter_launch_contract))) {
-        return nuis_provider_worker_invoke_process_adapter() == 0 ? ingress_status : -3;
+        int adapter_status = nuis_provider_worker_invoke_process_adapter();
+        if (adapter_status != 0) {
+            fprintf(
+                stderr,
+                "provider worker process adapter failed with status %d\n",
+                adapter_status);
+            fflush(stderr);
+            nuis_provider_worker_report_error("process-adapter", adapter_status);
+            return -3;
+        }
+        return ingress_status;
     }
     uint64_t output_words[3] = {
         (uint64_t)nuis_provider_worker_payload_scalar("capsule_token", "capsule-token:"),
@@ -455,17 +690,26 @@ int64_t nuis_host_provider_worker_invoke_capsule(int64_t ingress_status) {
 }
 
 int64_t nuis_host_provider_worker_reply(int64_t invocation_status) {
-    if (nuis_provider_worker_socket < 0 || invocation_status <= 0) return -1;
+    if (nuis_provider_worker_socket < 0) return -1;
+    if (invocation_status <= 0) {
+        nuis_provider_worker_report_error("nuis-ingress", (int)invocation_status);
+        return -1;
+    }
     size_t output_count = nuis_provider_worker_output_file == NULL ? 0 : 1;
     const char* output_roles =
         output_count == 0 ? "-" : nuis_provider_worker_output_roles;
     const char* output_hash =
         output_count == 0 ? "0x0000000000000000" : nuis_provider_worker_output_hash;
+    const char* output_mode = output_count == 0
+        ? "none"
+        : (nuis_provider_worker_adapter_protocol_length == 0
+            ? "protocol-stdout"
+            : "nuispfd1-result");
     char receipt[4096];
     int header_length = snprintf(
         receipt,
         sizeof(receipt),
-        "NUISPWUR5\t%s\t%llu\t%s\t%d\t%zu\t%u\t%lld\t%s\t%s\t%zu\t%s\t%zu\t%s\t%zu\t%s\n",
+        "NUISPWUR6\t%s\t%llu\t%s\t%d\t%zu\t%u\t%lld\t%s\t%s\t%zu\t%s\t%zu\t%s\t%zu\t%s\t%s\t%zu\t%s\n",
         nuis_provider_worker_lease,
         nuis_provider_worker_sequence,
         nuis_provider_worker_request_id,
@@ -480,10 +724,16 @@ int64_t nuis_host_provider_worker_reply(int64_t invocation_status) {
         output_count,
         output_roles,
         nuis_provider_worker_output_length,
-        output_hash);
+        output_hash,
+        output_mode,
+        nuis_provider_worker_adapter_protocol_length,
+        nuis_provider_worker_adapter_protocol_hash);
     struct iovec parts[2] = {
         {.iov_base = receipt, .iov_len = (size_t)header_length},
-        {.iov_base = nuis_provider_worker_payload, .iov_len = nuis_provider_worker_payload_length},
+        {
+            .iov_base = nuis_provider_worker_adapter_protocol,
+            .iov_len = nuis_provider_worker_adapter_protocol_length,
+        },
     };
     struct msghdr message = {0};
     message.msg_iov = parts;
@@ -502,6 +752,10 @@ int64_t nuis_host_provider_worker_reply(int64_t invocation_status) {
     }
     size_t expected = parts[0].iov_len + parts[1].iov_len;
     ssize_t sent = sendmsg(nuis_provider_worker_socket, &message, 0);
+    int send_error = errno;
+    if (sent != (ssize_t)expected) {
+        nuis_provider_worker_report_error("reply-send", sent < 0 ? -send_error : (int)sent);
+    }
     nuis_provider_worker_release_fds();
     nuis_provider_worker_release_output();
     return sent == (ssize_t)expected ? 0 : -3;

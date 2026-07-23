@@ -1,9 +1,53 @@
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
+#include <limits.h>
+#include <unistd.h>
 
 static int fail(NSString *message) {
     fprintf(stderr, "%s\n", message.UTF8String);
     return 1;
+}
+
+static uint64_t fnv1a64(const uint8_t *bytes, NSUInteger length) {
+    uint64_t hash = 0xcbf29ce484222325ULL;
+    for (NSUInteger index = 0; index < length; index++) {
+        hash ^= bytes[index];
+        hash *= 0x100000001b3ULL;
+    }
+    return hash;
+}
+
+static BOOL emitOutput(const uint8_t *bytes, NSUInteger length) {
+    const char *descriptorText = getenv("NUIS_PROVIDER_OUTPUT_FD");
+    if (descriptorText != NULL) {
+        NSArray<NSString *> *parts = [@(descriptorText) componentsSeparatedByString:@":"];
+        if (parts.count != 5 || ![parts[0] isEqualToString:@"fd"]) return NO;
+        unsigned long long values[4] = {0};
+        for (NSUInteger index = 0; index < 4; index++) {
+            NSScanner *scanner = [NSScanner scannerWithString:parts[index + 1]];
+            if (![scanner scanUnsignedLongLong:&values[index]] || !scanner.isAtEnd) return NO;
+        }
+        if (values[0] > INT_MAX || values[2] != length) return NO;
+        NSUInteger written = 0;
+        while (written < length) {
+            ssize_t count = pwrite((int)values[0], bytes + written, length - written,
+                                   (off_t)(values[1] + written));
+            if (count <= 0) return NO;
+            written += (NSUInteger)count;
+        }
+        uint64_t hash = fnv1a64(bytes, length);
+        uint8_t littleHash[8];
+        for (NSUInteger index = 0; index < 8; index++) littleHash[index] = hash >> (index * 8);
+        if (pwrite((int)values[0], littleHash, 8, (off_t)values[3]) != 8) return NO;
+        printf("output_channel=inherited-fd\noutput_hash=%llu\n", hash);
+        return YES;
+    }
+    NSMutableString *hex = [NSMutableString stringWithCapacity:length * 2];
+    for (NSUInteger index = 0; index < length; index++) {
+        [hex appendFormat:@"%02x", bytes[index]];
+    }
+    printf("output_channel=hex-stdout\noutput_hex=%s\n", hex.UTF8String);
+    return YES;
 }
 
 int main(int argc, const char *argv[]) {
@@ -73,15 +117,11 @@ int main(int argc, const char *argv[]) {
         }
 
         const uint8_t *output = outputBuffer.contents;
-        NSMutableString *hex = [NSMutableString stringWithCapacity:byteCount * 2];
-        for (NSUInteger index = 0; index < byteCount; index++) {
-            [hex appendFormat:@"%02x", output[index]];
-        }
         printf("protocol=nuis-metal-gray8-provider-runner-v1\n");
         printf("status=ready\n");
         printf("device=%s\n", device.name.UTF8String);
         printf("output_bytes=%lu\n", (unsigned long)byteCount);
-        printf("output_hex=%s\n", hex.UTF8String);
+        if (!emitOutput(output, byteCount)) return fail(@"Metal output carrier write failed");
         return 0;
     }
 }
