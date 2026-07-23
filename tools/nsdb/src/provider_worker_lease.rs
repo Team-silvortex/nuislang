@@ -1,6 +1,9 @@
 use crate::{
     provider_prepared_input::PreparedProviderInput,
     provider_request::ProviderRequest,
+    provider_runner_registry::{
+        select_provider_worker_operation_registration, ProviderWorkerOperationRegistration,
+    },
     provider_worker_image::resolve_provider_worker_image,
     provider_worker_transport_unix::{UnixWorkerDescriptor, UnixWorkerProcessTransport},
 };
@@ -12,6 +15,8 @@ use std::{
 };
 
 pub(crate) const PROVIDER_WORKER_LEASE_CONTRACT: &str = "nuis-provider-worker-lease-v1";
+pub(crate) const PROVIDER_WORKER_DISPATCH_PERMIT_CONTRACT: &str =
+    "nuis-provider-worker-dispatch-permit-v1";
 
 pub(crate) struct ProviderWorkerDispatchReceipt {
     pub(crate) lease_contract: &'static str,
@@ -21,6 +26,10 @@ pub(crate) struct ProviderWorkerDispatchReceipt {
     pub(crate) sequence: usize,
     pub(crate) descriptor_count: usize,
     pub(crate) payload_hash: String,
+    pub(crate) operation_token: String,
+    pub(crate) dispatch_status: i64,
+    pub(crate) dispatch_permit_contract: &'static str,
+    pub(crate) dispatch_permit_status: &'static str,
 }
 
 struct ProviderWorkerLease {
@@ -101,7 +110,18 @@ impl ProviderWorkerLeaseManager {
                 descriptor: file.as_fd(),
             })
             .collect::<Vec<_>>();
-        let payload = render_dispatch_payload(provider_family, request);
+        let operation = select_provider_worker_operation_registration(
+            provider_family,
+            adapter_id,
+            &request.kernel.operation,
+        )
+        .ok_or_else(|| {
+            format!(
+                "provider worker operation `{}` is not registrable for adapter `{adapter_id}`",
+                request.kernel.operation
+            )
+        })?;
+        let payload = render_dispatch_payload(provider_family, request, &operation);
         let reply = lease
             .transport
             .request(&request.kernel.id, payload.as_bytes(), &descriptors)
@@ -128,6 +148,10 @@ impl ProviderWorkerLeaseManager {
             sequence: reply.sequence,
             descriptor_count: reply.descriptor_count,
             payload_hash: reply.payload_hash,
+            operation_token: operation.operation_token,
+            dispatch_status: reply.dispatch_status,
+            dispatch_permit_contract: PROVIDER_WORKER_DISPATCH_PERMIT_CONTRACT,
+            dispatch_permit_status: "granted",
         })
     }
 
@@ -147,11 +171,18 @@ impl Drop for ProviderWorkerLeaseManager {
     }
 }
 
-fn render_dispatch_payload(provider_family: &str, request: &ProviderRequest) -> String {
+fn render_dispatch_payload(
+    provider_family: &str,
+    request: &ProviderRequest,
+    operation: &ProviderWorkerOperationRegistration,
+) -> String {
     format!(
-        "provider={provider_family}\nkernel={}\noperation={}\ninputs={}\n",
+        "contract={}\nprovider={provider_family}\nadapter={}\nkernel={}\noperation={}\noperation_token={}\ninputs={}\n",
+        operation.registry_contract,
+        operation.adapter_id,
         request.kernel.id,
-        request.kernel.operation,
+        operation.operation,
+        operation.operation_token,
         request.input_bindings.len()
     )
 }
@@ -175,7 +206,7 @@ mod tests {
         let source = include_str!("provider_worker_lease.rs");
         assert!(source.contains("provider={provider_family}"));
         assert!(source.contains("request.kernel.id"));
-        assert!(source.contains("request.kernel.operation"));
+        assert!(source.contains("operation.operation_token"));
         assert_eq!(
             crate::provider_worker_image::PROVIDER_WORKER_IMAGE_RESOLVER_CONTRACT,
             "nuis-provider-worker-image-resolver-v1"

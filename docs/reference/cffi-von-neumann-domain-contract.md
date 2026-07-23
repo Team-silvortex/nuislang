@@ -1,7 +1,7 @@
 # CFFI / Von Neumann Domain Contract
 
 This note records a long-range architecture rule that already matters to
-current `alpha-0.16.*` linker, FFI, standard-library, and executable-artifact
+current `alpha-0.17.*` linker, FFI, standard-library, and heterogeneous-worker
 work.
 
 ## Short Rule

@@ -8,8 +8,10 @@ Canonical short map:
   Use that file for the shortest current reading path across task, host I/O,
   persistence, and filesystem surfaces. Use this README for local detail only.
 * [docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md](../../docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md)
-  Use that file for the current `0.20.*` refactor order and the current
-  “which lane do we normalize first?” answer.
+  Use that historical file for the refactor order inherited by the current
+  alpha line.
+* [docs/versioning/nuis-alpha-0.17-mainline-entry.md](../../docs/versioning/nuis-alpha-0.17-mainline-entry.md)
+  Use that file for the current registered heterogeneous execution pressure.
 
 Current source-style rule:
 
@@ -20,7 +22,7 @@ Current source-style rule:
 
 ## Current Refactor Frontdoor
 
-For the current `0.20.*` line, do not read `std` as one flat bucket first.
+For the current `alpha-0.17.*` line, do not read `std` as one flat bucket first.
 
 Read it in this order:
 
@@ -89,10 +91,9 @@ Use these as the primary cluster names when placing new work:
     `StdReportContracts` helper can consume an argv output path, write an
     inspectable report file, echo the same report to stdout, and preserve
     text-stat validation through the std lane.
-  - hetero provider samples now surface a `nuis-provider-runner-adapter-v1`
-    adapter contract, adapter id, and adapter capability status so the current
-    host-simulated provider runner is a registered adapter rather than a
-    hard-coded backend limit.
+  - heterogeneous provider samples surface registered adapter, operation,
+    worker lease, permit, and output-carrier evidence; supported Apple hosts
+    execute real Metal/CoreML adapters while portable fallback remains explicit
 * task/runtime
   - local router:
     [task/README.md](task/README.md)

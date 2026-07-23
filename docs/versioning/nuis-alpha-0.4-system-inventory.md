@@ -189,7 +189,8 @@ The best next work during `alpha-0.7.*` is:
 
 When documents conflict:
 
-1. prefer this file and the hardening plan for current alpha line intent
-2. prefer reference docs and tests for exact implementation truth
-3. treat `alpha-0.1.*`, `alpha-0.0.1`, and `0.20.*` docs as predecessor
+1. prefer `nuis-alpha-0.17-mainline-entry.md` for current alpha line intent
+2. use this file and the hardening plan as the `alpha-0.4.*` baseline
+3. prefer reference docs and tests for exact implementation truth
+4. treat `alpha-0.1.*`, `alpha-0.0.1`, and `0.20.*` docs as predecessor
    anchors unless they are explicitly linked from the current map

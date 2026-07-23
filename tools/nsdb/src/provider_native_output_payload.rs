@@ -82,6 +82,22 @@ pub(crate) fn push_native_output_summary(
         ),
         ("worker_payload_hash", summary.worker_payload_hash.as_str()),
         (
+            "worker_operation_token",
+            summary.worker_operation_token.as_str(),
+        ),
+        (
+            "worker_dispatch_permit_contract",
+            summary.worker_dispatch_permit_contract.as_str(),
+        ),
+        (
+            "worker_dispatch_permit_status",
+            summary.worker_dispatch_permit_status.as_str(),
+        ),
+        (
+            "worker_dispatch_status",
+            summary.worker_dispatch_status.as_str(),
+        ),
+        (
             "output_handle_contract",
             summary.output_handle_contract.as_str(),
         ),
@@ -229,6 +245,22 @@ pub(crate) fn push_indexed_native_output(
             summary.worker_descriptor_count.as_str(),
         ),
         ("worker_payload_hash", summary.worker_payload_hash.as_str()),
+        (
+            "worker_operation_token",
+            summary.worker_operation_token.as_str(),
+        ),
+        (
+            "worker_dispatch_permit_contract",
+            summary.worker_dispatch_permit_contract.as_str(),
+        ),
+        (
+            "worker_dispatch_permit_status",
+            summary.worker_dispatch_permit_status.as_str(),
+        ),
+        (
+            "worker_dispatch_status",
+            summary.worker_dispatch_status.as_str(),
+        ),
         (
             "output_handle_contract",
             summary.output_handle_contract.as_str(),

@@ -419,6 +419,10 @@ fn bind_worker_output(
     summary.worker_request_sequence = receipt.sequence.to_string();
     summary.worker_descriptor_count = receipt.descriptor_count.to_string();
     summary.worker_payload_hash = receipt.payload_hash.clone();
+    summary.worker_operation_token = receipt.operation_token.clone();
+    summary.worker_dispatch_permit_contract = receipt.dispatch_permit_contract.to_owned();
+    summary.worker_dispatch_permit_status = receipt.dispatch_permit_status.to_owned();
+    summary.worker_dispatch_status = receipt.dispatch_status.to_string();
 }
 
 struct NativeProviderRequestExecution {

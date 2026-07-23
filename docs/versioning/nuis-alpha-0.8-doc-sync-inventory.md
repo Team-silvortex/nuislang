@@ -6,6 +6,8 @@ predecessor line.
 
 It does not replace the current alpha entry:
 
+* [nuis-alpha-0.17-mainline-entry.md](nuis-alpha-0.17-mainline-entry.md)
+* [nuis-alpha-0.16-mainline-entry.md](nuis-alpha-0.16-mainline-entry.md)
 * [nuis-alpha-0.10-mainline-entry.md](nuis-alpha-0.10-mainline-entry.md)
 * [nuis-alpha-0.8-mainline-entry.md](nuis-alpha-0.8-mainline-entry.md)
 
@@ -27,7 +29,7 @@ The intended order is:
 
 1. top-level README for the current repo shape
 2. current mainline map for detailed routing
-3. alpha-0.16 mainline entry for current line wording
+3. alpha-0.17 mainline entry for current line wording
 4. alpha-0.8 mainline entry for predecessor binary-convergence wording
 5. reference docs for implementation truth
 6. examples and stdlib READMEs for local routes

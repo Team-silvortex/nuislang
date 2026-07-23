@@ -9,6 +9,7 @@ workflow/history checkpoints, and policy notes.
 
 If you want the current line instead of historical backfill, start with:
 
+* [nuis-alpha-0.17-mainline-entry.md](nuis-alpha-0.17-mainline-entry.md)
 * [nuis-alpha-0.16-mainline-entry.md](nuis-alpha-0.16-mainline-entry.md)
 * [nuis-alpha-0.10-mainline-entry.md](nuis-alpha-0.10-mainline-entry.md)
 * [nuis-alpha-0.8-mainline-entry.md](nuis-alpha-0.8-mainline-entry.md)
@@ -22,8 +23,10 @@ If you want the current line instead of historical backfill, start with:
 
 Use this first when the question is:
 
-* what the current `alpha-0.16.*` line adds on top of executable-artifact
-  closure by making development tensor evidence the main steering surface
+* what the current `alpha-0.17.*` line adds by making registered heterogeneous
+  worker execution the active integration gate
+* what the predecessor `alpha-0.16.*` line added by making development tensor
+  evidence the main steering surface
 * what the predecessor `alpha-0.10.*` line added on top of binary-linking
   convergence
 * why executable-artifact closure is now the first-read Nsld/toolchain pressure
@@ -34,10 +37,10 @@ Use this first when the question is:
 * what the predecessor `alpha-0.7.*` line established for std-backed tooling smoke
 * what the predecessor `alpha-0.6.*` line established for Nsld
 * what exists and what is still soft in the `alpha-0.4.*` hardening baseline
-* what the current mainline should optimize during `alpha-0.16.*`
-* which documentation routes and wording are current after the alpha-0.16
+* what the current mainline should optimize during `alpha-0.17.*`
+* which documentation routes and wording are current after the alpha-0.17
   entry refresh
-* which broad README surfaces were refreshed for alpha-0.16
+* which broad README surfaces were refreshed for alpha-0.17
 * what the `alpha-0.1.*` mainline established before this hardening pass
 * what should count as present-tense repo truth
 * which older files should now be treated as predecessor anchors
@@ -148,7 +151,8 @@ Read:
 
 Practical rule:
 
-* start at `alpha-0.16.*` mainline entry first
+* start at `alpha-0.17.*` mainline entry first
+* use `alpha-0.16.*` for the direct tensor-guided closure predecessor
 * use `alpha-0.7.*` for the predecessor std/tooling smoke entry
 * use `alpha-0.6.*` for the predecessor Nsld/frontdoor entry
 * use `alpha-0.4.*` inventory and hardening as the current baseline context

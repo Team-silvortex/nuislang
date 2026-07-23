@@ -5,6 +5,8 @@ pub(crate) const PROVIDER_WORKER_IMAGE_REGISTRY_CONTRACT: &str =
     "nuis-provider-worker-image-registry-v1";
 pub(crate) const PROVIDER_WORKER_IMAGE_REGISTRY_SOURCE: &str =
     "builtin-nustar-provider-worker-image-registry";
+pub(crate) const PROVIDER_WORKER_OPERATION_REGISTRY_CONTRACT: &str =
+    "nuis-provider-worker-operation-registry-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProviderWorkerImageRegistration {
@@ -15,6 +17,14 @@ pub(crate) struct ProviderWorkerImageRegistration {
     pub(crate) cache_identity: &'static str,
     pub(crate) provider_key: i64,
     pub(crate) capability_hash: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ProviderWorkerOperationRegistration {
+    pub(crate) registry_contract: &'static str,
+    pub(crate) adapter_id: String,
+    pub(crate) operation: String,
+    pub(crate) operation_token: String,
 }
 
 pub(crate) struct ProviderRunnerAdapter {
@@ -78,12 +88,42 @@ pub(crate) fn select_provider_worker_image_registration(
         registry_source: PROVIDER_WORKER_IMAGE_REGISTRY_SOURCE,
         image_id: "std.provider-worker.unix.v1",
         source_path: "stdlib/std/provider_worker_image.ns",
-        cache_identity: "std.provider-worker.unix.aot-v2",
+        cache_identity: "std.provider-worker.unix.aot-v3",
         provider_key: stable_registration_scalar(provider_family.as_bytes()),
         capability_hash: stable_registration_scalar(
             format!("{provider_family}:provider-worker-capability-v1").as_bytes(),
         ),
     })
+}
+
+pub(crate) fn select_provider_worker_operation_registration(
+    provider_family: &str,
+    adapter_id: &str,
+    operation: &str,
+) -> Option<ProviderWorkerOperationRegistration> {
+    if provider_family.split_once(':').is_none()
+        || !is_registration_token(adapter_id)
+        || !is_registration_token(operation)
+    {
+        return None;
+    }
+    let identity = format!("{provider_family}:{adapter_id}:{operation}");
+    Some(ProviderWorkerOperationRegistration {
+        registry_contract: PROVIDER_WORKER_OPERATION_REGISTRY_CONTRACT,
+        adapter_id: adapter_id.to_owned(),
+        operation: operation.to_owned(),
+        operation_token: format!(
+            "operation:{}",
+            stable_registration_scalar(identity.as_bytes())
+        ),
+    })
+}
+
+fn is_registration_token(value: &str) -> bool {
+    !value.is_empty()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b':' | b'_' | b'-'))
 }
 
 fn stable_registration_scalar(bytes: &[u8]) -> i64 {
@@ -195,7 +235,8 @@ fn command_output_trimmed(command: &str, args: &[&str]) -> Option<String> {
 mod tests {
     use super::{
         provider_runner_real_device_probe_status, select_provider_runner_adapter,
-        select_provider_worker_image_registration, PROVIDER_WORKER_IMAGE_REGISTRY_CONTRACT,
+        select_provider_worker_image_registration, select_provider_worker_operation_registration,
+        PROVIDER_WORKER_IMAGE_REGISTRY_CONTRACT,
     };
 
     #[test]
@@ -232,5 +273,35 @@ mod tests {
         assert_ne!(first.capability_hash, other.capability_hash);
         assert_eq!(first.source_path, other.source_path);
         assert_eq!(first.cache_identity, other.cache_identity);
+    }
+
+    #[test]
+    fn worker_operation_registration_is_open_ended_and_identity_bound() {
+        let first = select_provider_worker_operation_registration(
+            "spirv:vulkan-gpu",
+            "spirv.vulkan.real-device",
+            "convolve",
+        )
+        .expect("operation");
+        let repeated = select_provider_worker_operation_registration(
+            "spirv:vulkan-gpu",
+            "spirv.vulkan.real-device",
+            "convolve",
+        )
+        .expect("operation");
+        let other = select_provider_worker_operation_registration(
+            "spirv:vulkan-gpu",
+            "spirv.vulkan.real-device",
+            "reduce",
+        )
+        .expect("other operation");
+        assert_eq!(first, repeated);
+        assert_ne!(first.operation_token, other.operation_token);
+        assert!(select_provider_worker_operation_registration(
+            "spirv:vulkan-gpu",
+            "spirv/vulkan",
+            "convolve"
+        )
+        .is_none());
     }
 }

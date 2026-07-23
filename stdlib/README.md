@@ -74,25 +74,27 @@ At the current repo stage:
 * the live implementation focus is still on `nuis / nuisc / YIR / nustar`
 * but `stdlib` is no longer empty scaffolding; all five layers now carry real
   checked-in `.ns` assets
-* for the `alpha-0.13.*` line, `std`, PixelMagic, and WitSage are the practical
+* for the `alpha-0.17.*` line, `std`, PixelMagic, and WitSage are the practical
   proving surfaces for buildable CLI/tooling, image/resource, and kernel-facing
   classical ML contracts before `ns-nova` grows into a larger GUI/framework
   layer
 * PixelMagic and WitSage now each have a small report-file workload under
   `examples/projects/domains/` that consumes their official package contracts
   while reusing `StdReportContracts` from `std`
-* the std smoke lane also builds one PixelMagic shader pipeline demo and one
-  WitSage kernel tensor demo, checking their hetero domain artifacts, payload
-  metadata, and sidecar lowering IR without claiming full device execution yet
+* the official heterogeneous smoke lane now drives four ordered CoreML requests
+  and one Metal request through persistent registered Nuis workers, while
+  checking fan-in descriptors, cross-provider transfer, output comparison,
+  lifecycle release, and worker-issued operation permits
 * `nsdb materialize-provider-samples` replaces the old mock provider result
   string with a deterministic `nuis.nsdb.provider-sample.*.toml` artifact and
   hash-backed `output_evidence`; this gives PixelMagic/WitSage a concrete
   replay/debug artifact while provider implementations remain independently
   registered
 * provider samples now carry the `nuis-provider-runner-adapter-v1` adapter
-  contract, adapter id, and capability status; the current host-simulated
-  runner is therefore one registered adapter, not a baked-in backend limit
-* PixelMagic provider execution now persists the std-preprocessed raw `gray8`
+  contract, adapter id, and capability status; real Metal/CoreML adapters and
+  the host-simulated fallback all remain registry-selected capabilities rather
+  than baked-in backend limits
+* PixelMagic provider execution persists the std-preprocessed raw `gray8`
   payload with dimensions, stride, maximum value, operation, byte count, and
   hash evidence; on supported macOS hosts `execute-provider-samples` validates
   that payload, uploads it to a Metal buffer, dispatches the invert kernel, and
@@ -167,13 +169,13 @@ Current boundaries:
 * `ns-nova` remains deliberately later-stage because it depends on the lower
   AOT, library, shader, kernel, and future runtime layers
 
-Current alpha-0.13 priority order:
+Current alpha-0.17 priority order:
 
 1. keep `core` and `std` contracts buildable and boring
 2. keep filesystem, IO, text, result/error, benchmark, network, and host helpers
    useful for real CLI examples
-3. use PixelMagic to pressure shader/resource/image handoff contracts
-4. use WitSage to pressure kernel/classical-ML artifact contracts
+3. use PixelMagic to pressure registered shader execution and output carriers
+4. use WitSage to pressure registered kernel/model execution and fan-in carriers
 5. let `ns-nova` stay mostly contract/source-asset oriented until the lower
    AOT and official Galaxy layers are less soft
 

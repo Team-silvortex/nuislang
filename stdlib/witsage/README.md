@@ -137,14 +137,29 @@ Current native execution baseline:
   under ordered requests and exits through the same session control socket
 * `nuis-provider-worker-request-envelope-v1` carries hash-checked opaque binary
   request bytes plus one ordered semantic role for every transferred descriptor
-  and returns independently hash-checked opaque result bytes through `NUISPWUR3`
+  and returns independently hash-checked opaque result bytes plus the positive
+  Nuis ingress status through `NUISPWUR4`
 * `std` now provides a Nuis-authored provider-worker lifecycle contract and an
   AOT-executed native loop recipe; C and Objective-C runners remain thin ABI
   probes or one-shot fallbacks rather than worker control-plane implementations
 * Nuis-owned worker dispatch bindings now carry opaque request/descriptor-table
   handles and capability hashes without enumerating finite backend combinations
+* provider/adapter/operation registration derives an identity-bound operation
+  token; the worker reply carries the positive Nuis ingress status through
+  `NUISPWUR4`, and non-positive status fails closed before execution is accepted
+* final output summaries preserve the operation token, permit contract, permit
+  status, worker dispatch status, PID, sequence, descriptor count, and payload
+  hash for each CoreML and Metal request
 * all four dependency edges reuse sealed producer output carriers directly
   through `provider.output.transfer.v1`, with independent lifecycle receipts
+
+Current alpha-0.17 boundary:
+
+* CoreML and Metal execution is real on the supported Apple smoke host
+* lifecycle and dispatch authorization are Nuis-owned
+* concrete provider invocation still occurs after worker authorization
+* the next step is a provider-neutral execution capsule invoked inside the
+  persistent worker, returning a verified output-carrier receipt
 
 Current official surface registry:
 

@@ -24,7 +24,7 @@ Read the current line as:
 * `alpha-0.8.*` made binary-linking convergence the default toolchain pressure
 * `alpha-0.10.*` made executable-artifact closure the active integration gate
 * `alpha-0.13.*` made tensor-guided closure hardening the working mode
-* current docs should now say `alpha-0.16.*` for present-tense work and link this
+* current docs should now say `alpha-0.17.*` for present-tense work and link this
   alpha docs as predecessor/baseline context
 
 ## Current Front Doors

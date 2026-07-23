@@ -21,7 +21,7 @@ Read the current line as:
 * `alpha-0.6.*` introduced the named Nsld linker frontdoor
 * `alpha-0.7.*` made std contract consumption the default shape for tooling
   examples
-* current docs should say `alpha-0.16.*` for present-tense work and link
+* current docs should say `alpha-0.17.*` for present-tense work and link
   `alpha-0.7.*` as predecessor std/tooling smoke context
 
 ## Current Front Doors

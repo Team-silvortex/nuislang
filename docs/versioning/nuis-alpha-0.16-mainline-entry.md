@@ -1,6 +1,9 @@
 # `nuis` `alpha-0.16.*` Mainline Entry
 
-This file is the current short entry point for the `alpha-0.16.*` line.
+This file is the direct predecessor entry point for the `alpha-0.16.*` line.
+
+For present-tense work, start with
+[nuis-alpha-0.17-mainline-entry.md](nuis-alpha-0.17-mainline-entry.md).
 
 It does not replace the `alpha-0.10.*` executable-artifact closure entry, the
 `alpha-0.8.*` binary-linking convergence entry, the `alpha-0.7.*` std/tooling
@@ -24,8 +27,8 @@ Read the current line as:
 * `alpha-0.8.*` made binary-linking convergence the default toolchain pressure
 * `alpha-0.10.*` made executable-artifact closure the active integration gate
 * `alpha-0.16.*` makes tensor-guided closure hardening the current working mode
-* current docs should say `alpha-0.16.*` for present-tense work and link older
-  alpha docs as predecessor/baseline context
+* current docs should say `alpha-0.17.*` for present-tense work and treat this
+  file as the tensor-guided closure predecessor
 
 ## Current Front Doors
 
@@ -85,7 +88,7 @@ Short rule:
 
 `compiler hosting is temporary; product control flow belongs to Nuis`
 
-## What Alpha-0.13 Should Optimize
+## What Alpha-0.16 Should Optimize
 
 Prefer work in this order:
 
@@ -139,4 +142,4 @@ Safe wording:
   device execution is not yet final
 * say `blocked executable artifact` when the pipeline can prove the boundary but
   cannot yet produce a runnable host artifact
-* say `current line` for `alpha-0.16.*`
+* say `tensor-guided closure predecessor` for `alpha-0.16.*`

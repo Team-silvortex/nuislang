@@ -2,7 +2,7 @@
 
 `nsld` is the Nuis linker front-door.
 
-In the current alpha line it is still a CLI wrapper over repository-owned
+In the current `alpha-0.17.*` line it is still a CLI wrapper over repository-owned
 linker contract logic, including `nuisc::linker` helpers. That is intentional:
 the tool exists before the final self-owned linker core so the toolchain can
 start exercising linker plans, clock ordering, section/container metadata, and
@@ -57,6 +57,12 @@ expected/actual summaries. Treat those fields as linker protocol, not as
 cosmetic CLI output.
 
 The CLI should remain a human and script entry point for those capabilities.
+
+Current alpha-0.17 pressure is not to special-case Metal, CoreML, CUDA, or
+other providers in the linker. Nsld should consume registered heterogeneous
+payload and execution-capsule metadata after the worker boundary verifies it,
+then place those records according to the existing lifecycle, clock, and
+deterministic data-layout contracts.
 
 ## Current Module Map
 

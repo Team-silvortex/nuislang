@@ -576,11 +576,14 @@ now closes the request-meaning boundary. `NUISPWU2` separates a UTF-8 control
 header from opaque bytes, binds the bytes by length and FNV-1a hash, and requires
 one ordered semantic role for every transferred descriptor. The C worker parses
 binary payloads containing NUL, newline, and non-UTF-8 bytes, independently
-checks the hash and role count. `NUISPWUR3` completes the reverse direction
+checks the hash and role count. `NUISPWUR4` completes the reverse direction
 with a separately length/hash-bound opaque response while also binding the
-original request hash and role manifest. Binary response bytes therefore need
-no provider-specific side channel. The worker control plane now begins in Nuis
-itself: `StdProviderWorkerContracts` owns ordered lifecycle state, and
+original request hash and role manifest. It also carries the positive status
+returned by the Nuis ingress function; decoding fails closed for zero or
+negative status, so a parent cannot synthesize its own dispatch permit. Binary
+response bytes therefore need no provider-specific side channel. The worker
+control plane now begins in Nuis itself: `StdProviderWorkerContracts` owns
+ordered lifecycle state, and
 `provider_worker_runtime_recipe.ns` checks, AOT-builds, and executes its native
 accept/reject/commit loop with deterministic output `14`. C and Objective-C
 runners remain bootstrap ABI probes or one-shot fallbacks, not owners of worker
@@ -660,6 +663,18 @@ receipts the registered request before Nsdb invokes the concrete provider
 adapter in its parent process. The backend dispatch and output-carrier result
 must move behind the worker boundary without teaching the worker finite backend
 combinations.
+
+The parent-side call is now fail-closed behind
+`nuis-provider-worker-dispatch-permit-v1`.
+`nuis-provider-worker-operation-registry-v1` accepts any frame-safe
+provider/adapter/operation identity and derives a stable operation token without
+enumerating Metal, CoreML, or future backends. That contract, identity, token,
+kernel, and input count are carried inside the outer hash-bound worker payload.
+Only an exact worker receipt grants the permit; every indexed native output
+records the token, permit contract, and `granted` state before the concrete
+runner branch can execute. This establishes an operation-level authorization
+gate but does not yet move the runner process itself: the next boundary is a
+registered execution capsule and output-carrier reply owned by the Nuis worker.
 
 The language-core checks anchor the bootstrap-critical
 `language-core/nuisc/type-control-flow-generics` cell to:

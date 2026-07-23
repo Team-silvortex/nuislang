@@ -3,7 +3,7 @@ use crate::provider_sample_artifact::fnv1a64_hex;
 pub(crate) const PROVIDER_WORKER_REQUEST_CONTRACT: &str =
     "nuis-provider-worker-request-envelope-v1";
 pub(crate) const PROVIDER_WORKER_REQUEST_MAGIC: &str = "NUISPWU2";
-pub(crate) const PROVIDER_WORKER_REPLY_MAGIC: &str = "NUISPWUR3";
+pub(crate) const PROVIDER_WORKER_REPLY_MAGIC: &str = "NUISPWUR4";
 pub(crate) const MAX_PROVIDER_WORKER_PAYLOAD_BYTES: usize = 60 * 1024;
 pub(crate) const MAX_PROVIDER_WORKER_DESCRIPTORS: usize = 16;
 
@@ -25,6 +25,7 @@ pub(crate) struct ProviderWorkerReplyEnvelope {
     pub(crate) worker_pid: u32,
     pub(crate) descriptor_count: usize,
     pub(crate) first_byte_sum: u32,
+    pub(crate) dispatch_status: i64,
     pub(crate) request_payload_hash: String,
     pub(crate) descriptor_roles: Vec<String>,
     pub(crate) payload: Vec<u8>,
@@ -104,6 +105,7 @@ pub(crate) struct ProviderWorkerReplyIdentity<'a> {
     pub(crate) worker_pid: u32,
     pub(crate) descriptor_count: usize,
     pub(crate) first_byte_sum: u32,
+    pub(crate) dispatch_status: i64,
     pub(crate) request_payload_hash: &'a str,
     pub(crate) descriptor_roles: &'a [&'a str],
 }
@@ -122,13 +124,14 @@ pub(crate) fn encode_provider_worker_reply(
     let payload_hash = fnv1a64_hex(payload);
     let roles = render_role_manifest(identity.descriptor_roles);
     let header = format!(
-        "{PROVIDER_WORKER_REPLY_MAGIC}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{roles}\t{}\t{payload_hash}\n",
+        "{PROVIDER_WORKER_REPLY_MAGIC}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{roles}\t{}\t{payload_hash}\n",
         identity.lease_id,
         identity.sequence,
         identity.request_id,
         identity.worker_pid,
         identity.descriptor_count,
         identity.first_byte_sum,
+        identity.dispatch_status,
         identity.request_payload_hash,
         payload.len(),
     );
@@ -148,21 +151,29 @@ pub(crate) fn decode_provider_worker_reply(
     let header = std::str::from_utf8(&frame[..header_end])
         .map_err(|_| "provider worker reply header is not UTF-8".to_owned())?;
     let fields = header.split('\t').collect::<Vec<_>>();
-    if fields.len() != 11 || fields[0] != PROVIDER_WORKER_REPLY_MAGIC {
+    if fields.len() != 12 || fields[0] != PROVIDER_WORKER_REPLY_MAGIC {
         return Err("provider worker reply envelope is invalid".to_owned());
     }
     validate_frame_token(fields[1], "reply lease id")?;
     validate_frame_token(fields[3], "reply request id")?;
     let descriptor_count = parse_usize(fields[5], "reply descriptor count")?;
-    let descriptor_roles = parse_role_manifest(fields[8], descriptor_count)?;
-    let payload_length = parse_usize(fields[9], "reply payload length")?;
+    let dispatch_status = fields[7]
+        .parse::<i64>()
+        .map_err(|error| format!("provider worker dispatch status is invalid: {error}"))?;
+    if dispatch_status <= 0 {
+        return Err(format!(
+            "provider worker dispatch was not granted: status {dispatch_status}"
+        ));
+    }
+    let descriptor_roles = parse_role_manifest(fields[9], descriptor_count)?;
+    let payload_length = parse_usize(fields[10], "reply payload length")?;
     let payload = &frame[header_end + 1..];
     if payload.len() != payload_length {
         return Err("provider worker reply payload length mismatch".to_owned());
     }
     validate_payload(payload)?;
     let payload_hash = fnv1a64_hex(payload);
-    if fields[10] != payload_hash {
+    if fields[11] != payload_hash {
         return Err("provider worker reply payload hash mismatch".to_owned());
     }
     Ok(ProviderWorkerReplyEnvelope {
@@ -176,7 +187,8 @@ pub(crate) fn decode_provider_worker_reply(
         first_byte_sum: fields[6]
             .parse::<u32>()
             .map_err(|error| format!("provider worker reply byte sum is invalid: {error}"))?,
-        request_payload_hash: fields[7].to_owned(),
+        dispatch_status,
+        request_payload_hash: fields[8].to_owned(),
         descriptor_roles,
         payload: payload.to_vec(),
         payload_hash,
@@ -297,6 +309,7 @@ mod tests {
                 worker_pid: 123,
                 descriptor_count: 2,
                 first_byte_sum: 46,
+                dispatch_status: 5,
                 request_payload_hash: "0x0123456789abcdef",
                 descriptor_roles: &["input.primary", "output.result"],
             },
@@ -307,6 +320,29 @@ mod tests {
         assert_eq!(decoded.payload, payload);
         assert_eq!(decoded.payload_hash, fnv1a64_hex(&payload));
         assert_eq!(decoded.descriptor_roles, ["input.primary", "output.result"]);
+        assert_eq!(decoded.dispatch_status, 5);
         assert_eq!(decoded.request_payload_hash, "0x0123456789abcdef");
+    }
+
+    #[test]
+    fn reply_rejects_non_positive_nuis_dispatch_status() {
+        let encoded = encode_provider_worker_reply(
+            ProviderWorkerReplyIdentity {
+                lease_id: "lease:test",
+                sequence: 0,
+                request_id: "request.test",
+                worker_pid: 123,
+                descriptor_count: 0,
+                first_byte_sum: 0,
+                dispatch_status: -7,
+                request_payload_hash: "0x0123456789abcdef",
+                descriptor_roles: &[],
+            },
+            b"request",
+        )
+        .expect("encode");
+        assert!(decode_provider_worker_reply(&encoded)
+            .expect_err("negative Nuis status must fail closed")
+            .contains("dispatch was not granted"));
     }
 }

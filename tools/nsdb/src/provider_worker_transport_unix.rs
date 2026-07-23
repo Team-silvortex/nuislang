@@ -29,6 +29,7 @@ pub(crate) struct UnixWorkerProcessReply {
     pub(crate) worker_pid: u32,
     pub(crate) descriptor_count: usize,
     pub(crate) first_byte_sum: u32,
+    pub(crate) dispatch_status: i64,
     pub(crate) payload_hash: String,
     pub(crate) descriptor_roles: Vec<String>,
     pub(crate) payload: Vec<u8>,
@@ -389,6 +390,7 @@ fn receive_process_reply(
         worker_pid: expected_worker_pid,
         descriptor_count: envelope.descriptor_count,
         first_byte_sum: envelope.first_byte_sum,
+        dispatch_status: envelope.dispatch_status,
         payload_hash: envelope.payload_hash,
         descriptor_roles: envelope.descriptor_roles,
         payload: envelope.payload,
@@ -540,6 +542,10 @@ mod tests {
         assert_eq!(
             (first_reply.first_byte_sum, second_reply.first_byte_sum),
             (17, 29)
+        );
+        assert_eq!(
+            (first_reply.dispatch_status, second_reply.dispatch_status),
+            (1, 2)
         );
         assert_eq!(first_reply.descriptor_roles, ["input.primary"]);
         assert_eq!(second_reply.descriptor_roles, ["output.result"]);

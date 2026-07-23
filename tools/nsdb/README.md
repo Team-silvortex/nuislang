@@ -2,7 +2,9 @@
 
 `nsdb` is the Nuis YIR-level debugger metadata front-door.
 
-It is currently a compact CLI prototype over linker/YIR metadata inspection.
+It is currently a CLI frontdoor over linker/YIR metadata inspection, persisted
+payload handoffs, heterogeneous runtime traces, replay plans, provider samples,
+and registered provider-worker execution evidence.
 Native debuggers may still attach to the host shell binary, but `nsdb` owns the
 Nuis semantic debug view: YIR domains, clock edges, data segments, lowering
 units, sidecars, persisted payload execution handoff metadata, and future
@@ -56,6 +58,14 @@ time-travel yet.
 `run-artifact` also writes `nuis.nsdb.hetero-runtime-trace.toml`; `nsdb`
 consumes that trace file for replay-plan sample resolution rather than
 embedding runtime values in replay plans.
+
+During `alpha-0.17.*`, Nsdb also coordinates provider graph/session execution
+without owning backend policy. Persistent Nuis workers authorize registered
+provider/adapter/operation identities and return status-bound permits; native
+output records preserve worker PID, sequence, descriptor count, payload hash,
+operation token, and dispatch status. The next boundary is consuming a
+worker-returned execution-capsule/output-carrier receipt rather than invoking
+the concrete provider adapter in the Nsdb parent.
 Replay checkpoints surface materialized sample descriptors via
 `value_sample_materialization_*`, payload format/path, and bridge stub path;
 typed value decoding is still a later layer.

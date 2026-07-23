@@ -7,7 +7,7 @@
 
 ## Current Status
 
-The repository is on the `alpha-0.16.*` line. This is still an architecture
+The repository is entering the `alpha-0.17.*` line. This is still an architecture
 building line, not a beta-stability line, but the project now has one connected
 compiler/toolchain spine instead of separate experimental islands.
 
@@ -23,7 +23,8 @@ nuis source / nuis.toml project
   -> nsld binary-linking convergence
 ```
 
-The current `alpha-0.16.*` goal is tensor-guided closure hardening over the
+The current `alpha-0.17.*` goal is to turn the registered heterogeneous worker
+boundary into a real execution closure while preserving the tensor-guided
 minimal executable-artifact loop:
 
 ```text
@@ -35,6 +36,8 @@ project
   -> final-stage plan
   -> executable writer input
   -> self-contained Nsld image output or host-assisted finalization boundary
+  -> registered Nuis worker / Nustar execution capsule
+  -> verified heterogeneous output carrier
   -> run-artifact / trace readiness evidence
   -> development tensor status update
 ```
@@ -48,6 +51,7 @@ Start here for the current line:
 
 * [docs/current-mainline-map.md](docs/current-mainline-map.md)
 * [docs/reference/nuis-development-tensor.md](docs/reference/nuis-development-tensor.md)
+* [docs/versioning/nuis-alpha-0.17-mainline-entry.md](docs/versioning/nuis-alpha-0.17-mainline-entry.md)
 * [docs/versioning/nuis-alpha-0.16-mainline-entry.md](docs/versioning/nuis-alpha-0.16-mainline-entry.md)
 * [docs/versioning/nuis-alpha-0.10-mainline-entry.md](docs/versioning/nuis-alpha-0.10-mainline-entry.md)
 * [docs/versioning/nuis-alpha-0.8-mainline-entry.md](docs/versioning/nuis-alpha-0.8-mainline-entry.md)
@@ -79,6 +83,9 @@ Implemented or actively usable surfaces:
   container, closure, final-stage, self-contained image output, and readiness
   diagnostics.
 * `nsdb` as the YIR-level debugger metadata frontdoor.
+* Persistent registered provider workers with Nuis-owned lifecycle/ingress,
+  PID and sequence binding, descriptor transfer, operation permits, and real
+  Metal/CoreML smoke execution.
 * `nsbdr` as the future OS bundle/distribution frontdoor over final `nsld`
   outputs.
 * Standard-library source assets under `stdlib/core`, `stdlib/std`,
@@ -93,7 +100,7 @@ Still incomplete or intentionally soft:
 * final host-shell / OS-native executable linking
 * stable std import/autoinjection semantics
 * complete unsafe/raw-pointer policy
-* final GPU/NPU backend maturity
+* provider-neutral worker-side execution capsules and final GPU/NPU maturity
 * beta-level public API stability
 * self-hosting
 

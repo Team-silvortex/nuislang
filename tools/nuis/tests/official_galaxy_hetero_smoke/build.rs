@@ -912,6 +912,13 @@ pub(super) fn assert_official_galaxy_hetero_build(
                 "native_output_4_worker_descriptor_count = \"1\"",
                 "native_output_0_worker_pid = \"",
                 "native_output_0_worker_payload_hash = \"0x",
+                "native_output_0_worker_operation_token = \"operation:",
+                "native_output_0_worker_dispatch_permit_contract = \"nuis-provider-worker-dispatch-permit-v1\"",
+                "native_output_0_worker_dispatch_permit_status = \"granted\"",
+                "native_output_4_worker_dispatch_permit_status = \"granted\"",
+                "native_output_0_worker_dispatch_status = \"1\"",
+                "native_output_3_worker_dispatch_status = \"4\"",
+                "native_output_4_worker_dispatch_status = \"1\"",
                 "native_output_4_output_handle_ownership_token = \"glm:provider-session-output:metal:apple-silicon-gpu:0:witsage.vector.metal-bias\"",
                 "native_output_4_output_handle_release_status = \"released-at-graph-close\"",
             ] {

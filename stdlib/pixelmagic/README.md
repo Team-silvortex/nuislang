@@ -117,6 +117,18 @@ Current first responsibility:
 * persist shape/hash-bound raw `gray8` data for std-preprocessed PGM provider
   samples and execute the first complete upload/invert/readback path through a
   registered native Metal runner, with deterministic fallback elsewhere
+* participate in the persistent Nuis worker route through a registered Metal
+  provider/adapter/operation identity, worker-issued dispatch permit, inherited
+  input carrier, verified output carrier, and graph-close release evidence
+
+Current alpha-0.17 execution boundary:
+
+* real Metal upload, dispatch, and readback are regression-backed on supported
+  Apple hosts
+* the Nuis worker owns lifecycle, request ingress, and operation authorization
+* the Metal ABI runner remains a thin registered platform adapter
+* moving the actual adapter invocation and output-carrier creation behind a
+  provider-neutral worker execution capsule is the next closure step
 
 Current official surface registry:
 
