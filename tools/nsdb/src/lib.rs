@@ -49,6 +49,8 @@ mod provider_worker_lease;
 mod provider_worker_request;
 #[cfg(unix)]
 mod provider_worker_result;
+#[cfg(unix)]
+mod provider_worker_summary;
 mod provider_worker_transport;
 #[cfg(unix)]
 mod provider_worker_transport_unix;

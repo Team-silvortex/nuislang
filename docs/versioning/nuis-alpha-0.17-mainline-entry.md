@@ -120,9 +120,11 @@ binary closure.
 
 ## Main Target During Alpha-0.17
 
-The provider-neutral execution capsule contract and its Nuis/YIR ingress now
-exist. The highest-value next boundary is moving concrete invocation into the
-persistent Nuis worker.
+The provider-neutral execution capsule contract, its Nuis/YIR ingress, concrete
+Metal/CoreML invocation below the persistent worker, graph-scoped adapter image
+cache, and compact bounded adapter control record now exist. The highest-value
+next boundary is a hash-bound control carrier for manifests that exceed the
+portable inline budget without consuming semantic capsule input roles.
 
 The worker should consume:
 
@@ -195,12 +197,15 @@ Safe wording:
 * `worker-authorized operation permit`
 * `worker-invoked provider-neutral execution capsule`
 * `NUISPWUR6 worker-owned direct result-carrier receipt`
-* `ordered hash-bound worker process-adapter launch for Metal and large/chained CoreML`
+* `ordered hash-bound worker process-adapter launch for Metal and large/chained/fan-in CoreML`
 * `real Metal/CoreML provider smoke`
 * `binary-linking convergence`
 * `executable-artifact closure`
 * `Nuis-owned lifecycle with thin host ABI adapters`
-* `multi-input CoreML worker fan-in is the next closure boundary`
+* `graph-scoped registration-bound provider adapter image cache`
+* `one compiled CoreML adapter image reused by chained and fan-in requests`
+* `nuis-provider-worker-adapter-control-v1 compact bounded control metadata`
+* `oversized provider control rejected before sendmsg`
 
 ## Exit Evidence
 
@@ -212,6 +217,8 @@ Alpha-0.17 should leave behind:
 * no compiler-side finite list of allowed backend combinations
 * PixelMagic/WitSage evidence consuming the same capsule vocabulary
 * one hash-verified CoreML model adapter executing beneath the Nuis worker
+* one source/framework/target/contract-bound CoreML adapter image reused across
+  all four official CoreML requests and removed at graph close
 * Nsld and Nsdb metadata that can identify the executed capsule and outputs
 * development-tensor evidence naming the next weakest verified cell
 

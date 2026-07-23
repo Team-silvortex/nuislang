@@ -1,15 +1,18 @@
 #[cfg(target_os = "macos")]
 use crate::provider_process_adapter::worker_descriptor_argument;
 #[cfg(unix)]
-use crate::provider_worker_lease::{
-    ProviderWorkerAdapterLaunch, ProviderWorkerDispatchReceipt, ProviderWorkerLeaseManager,
-};
+use crate::provider_worker_lease::{ProviderWorkerAdapterLaunch, ProviderWorkerLeaseManager};
+#[cfg(unix)]
+use crate::provider_worker_summary::bind_worker_output;
 use crate::{
     provider_edge_transport::ProviderEdgeTransportReceipt,
     provider_output_carrier_registry::ProviderOutputPayload,
     provider_output_comparison::compare_provider_output,
     provider_prepared_input::{CompletedProviderOutput, PreparedProviderInput},
-    provider_process_adapter::{provider_output_byte_length, validate_provider_model_asset},
+    provider_process_adapter::{
+        coreml_worker_arguments, provider_output_byte_length, validate_provider_model_asset,
+        ProviderProcessAdapterCache, PROVIDER_PROCESS_ADAPTER_CACHE_CONTRACT,
+    },
     provider_request::{provider_request_collection_from_evidence, ProviderRequest},
     provider_runner_registry::{
         provider_runner_real_device_probe_status, select_provider_runner_adapter,
@@ -321,6 +324,8 @@ fn execute_native_provider_outputs(
     let mut sessions = BTreeMap::<String, ProviderSessionLease>::new();
     #[cfg(unix)]
     let mut worker_leases = ProviderWorkerLeaseManager::new(output_dir);
+    #[cfg(target_os = "macos")]
+    let mut process_adapter_cache = ProviderProcessAdapterCache::default();
     let mut summaries = Vec::with_capacity(collection.requests.len());
     let mut transport_receipts = Vec::new();
     for request in &collection.requests {
@@ -365,6 +370,8 @@ fn execute_native_provider_outputs(
             &session_request,
             #[cfg(unix)]
             &mut worker_leases,
+            #[cfg(target_os = "macos")]
+            &mut process_adapter_cache,
         )?;
         session.complete_request(&request.kernel.id)?;
         bind_session_output(&mut execution.summary, &session_request);
@@ -412,45 +419,6 @@ fn bind_session_output(
     summary.output_handle_release_status = "lease-bound".to_owned();
 }
 
-#[cfg(unix)]
-fn bind_worker_output(
-    summary: &mut PixelMagicNativeOutputSummary,
-    receipt: &ProviderWorkerDispatchReceipt,
-) {
-    summary.worker_lease_contract = receipt.lease_contract.to_owned();
-    summary.worker_resolver_contract = receipt.resolver_contract.to_owned();
-    summary.worker_cache_status = receipt.cache_status.to_owned();
-    summary.worker_pid = receipt.worker_pid.to_string();
-    summary.worker_request_sequence = receipt.sequence.to_string();
-    summary.worker_descriptor_count = receipt.descriptor_count.to_string();
-    summary.worker_payload_hash = receipt.payload_hash.clone();
-    summary.worker_operation_token = receipt.operation_token.clone();
-    summary.worker_execution_capsule_contract = receipt.execution_capsule_contract.to_owned();
-    summary.worker_execution_capsule_id = receipt.execution_capsule_id.clone();
-    summary.worker_execution_capsule_token = receipt.execution_capsule_token.clone();
-    summary.worker_execution_capsule_invocation_mode =
-        receipt.execution_capsule_invocation_mode.to_owned();
-    summary.worker_execution_capsule_input_roles = receipt.execution_capsule_input_roles.clone();
-    summary.worker_execution_capsule_output_roles = receipt.execution_capsule_output_roles.clone();
-    summary.worker_execution_capsule_status = receipt.execution_capsule_status.to_owned();
-    summary.worker_execution_capsule_invoker_contract =
-        receipt.execution_capsule_invoker_contract.to_owned();
-    summary.worker_execution_capsule_invoker_id = receipt.execution_capsule_invoker_id.clone();
-    summary.worker_execution_capsule_invoker_status =
-        receipt.execution_capsule_invoker_status.to_owned();
-    summary.worker_output_descriptor_contract =
-        receipt.worker_output_descriptor_contract.to_owned();
-    summary.worker_output_descriptor_roles = receipt.worker_output_descriptor_roles.clone();
-    summary.worker_output_descriptor_count = receipt.worker_output_descriptor_count.to_string();
-    summary.worker_output_descriptor_byte_length =
-        receipt.worker_output_descriptor_byte_length.to_string();
-    summary.worker_output_descriptor_hash = receipt.worker_output_descriptor_hash.clone();
-    summary.worker_output_receipt_status = receipt.worker_output_receipt_status.to_owned();
-    summary.worker_dispatch_permit_contract = receipt.dispatch_permit_contract.to_owned();
-    summary.worker_dispatch_permit_status = receipt.dispatch_permit_status.to_owned();
-    summary.worker_dispatch_status = receipt.dispatch_status.to_string();
-}
-
 struct NativeProviderRequestExecution {
     summary: PixelMagicNativeOutputSummary,
     output_payload: ProviderOutputPayload,
@@ -468,6 +436,7 @@ fn execute_native_provider_request(
     provider_family: &str,
     session_request: &ProviderSessionRequest,
     #[cfg(unix)] worker_leases: &mut ProviderWorkerLeaseManager,
+    #[cfg(target_os = "macos")] process_adapter_cache: &mut ProviderProcessAdapterCache,
 ) -> Result<NativeProviderRequestExecution, String> {
     let inputs = request
         .input_bindings
@@ -506,7 +475,11 @@ fn execute_native_provider_request(
             request.scalar_u8("max_value").ok_or_else(|| {
                 "Metal provider request is missing u8 scalar `max_value`".to_owned()
             })?;
-            Some(crate::provider_runner_metal::prepare_gray8_worker_invocation()?)
+            Some(
+                crate::provider_runner_metal::prepare_gray8_worker_invocation(
+                    process_adapter_cache,
+                )?,
+            )
         } else if request.buffer.element_type == "f32"
             && request.buffer.layout == "tensor-contiguous"
             && request.kernel.operation == "bias"
@@ -514,22 +487,34 @@ fn execute_native_provider_request(
             request
                 .scalar_f32("bias")
                 .ok_or_else(|| "Metal provider request is missing f32 scalar `bias`".to_owned())?;
-            Some(crate::provider_runner_metal::prepare_f32_bias_worker_invocation()?)
+            Some(
+                crate::provider_runner_metal::prepare_f32_bias_worker_invocation(
+                    process_adapter_cache,
+                )?,
+            )
         } else {
             None
         }
     } else if adapter.kind == "coreml-real-device-runner"
-        && inputs.len() == 1
-        && inputs[0].worker_adapter_argument().is_some()
+        && !inputs.is_empty()
+        && inputs
+            .iter()
+            .all(|input| input.worker_adapter_argument().is_some())
+        && request
+            .model_asset
+            .as_ref()
+            .is_some_and(|model| model.input_features.len() == inputs.len())
     {
-        Some(crate::provider_runner_coreml::prepare_coreml_worker_invocation()?)
+        Some(
+            crate::provider_runner_coreml::prepare_coreml_worker_invocation(process_adapter_cache)?,
+        )
     } else {
         None
     };
     #[cfg(target_os = "macos")]
     let worker_adapter_arguments = if prepared_worker_adapter.is_some() {
-        let input_argument = worker_descriptor_argument(&inputs[0], 0)?;
         if adapter.kind == "metal-real-device-runner" {
+            let input_argument = worker_descriptor_argument(&inputs[0], 0)?;
             let scalar = if request.kernel.operation == "invert" {
                 request
                     .scalar_u8("max_value")
@@ -543,35 +528,11 @@ fn execute_native_provider_request(
             };
             vec![input_argument, format!("literal:{scalar}")]
         } else {
-            let model = request
-                .model_asset
-                .as_ref()
-                .expect("validated CoreML model descriptor");
             let model_path = verified_coreml_model_path
                 .as_ref()
                 .expect("validated CoreML model path")
-                .to_str()
-                .ok_or_else(|| "CoreML model path is not UTF-8".to_owned())?;
-            let output_shape = request
-                .output_comparison
-                .as_ref()
-                .map(|comparison| comparison.shape.as_slice())
-                .unwrap_or(request.buffer.shape.as_slice());
-            vec![
-                format!("verified-path:{}:{model_path}", model.content_hash),
-                "literal:--multi".to_owned(),
-                format!("literal:{}", model.output_feature),
-                format!(
-                    "literal:{}",
-                    crate::provider_runner_coreml::format_shape(output_shape)
-                ),
-                format!("literal:{}", model.input_features[0]),
-                input_argument,
-                format!(
-                    "literal:{}",
-                    crate::provider_runner_coreml::format_shape(&request.input_bindings[0].shape)
-                ),
-            ]
+                .as_path();
+            coreml_worker_arguments(request, &inputs, model_path)?
         }
     } else {
         Vec::new()
@@ -582,8 +543,11 @@ fn execute_native_provider_request(
             .as_ref()
             .map(|prepared| ProviderWorkerAdapterLaunch {
                 executable_path: prepared.executable_path(),
-                executable_hash: &prepared.executable_hash,
-                runner_contract: prepared.contract,
+                executable_hash: prepared.executable_hash(),
+                runner_contract: prepared.contract(),
+                cache_contract: PROVIDER_PROCESS_ADAPTER_CACHE_CONTRACT,
+                cache_identity: prepared.cache_identity,
+                cache_status: prepared.cache_status,
                 arguments: &worker_adapter_arguments,
                 output_byte_length,
             });
@@ -774,7 +738,11 @@ fn execute_native_provider_request(
         .flatten()
         .collect();
     #[cfg(unix)]
-    bind_worker_output(&mut request_execution.summary, &worker_receipt);
+    bind_worker_output(
+        &mut request_execution.summary,
+        &worker_receipt,
+        worker_adapter_launch.as_ref(),
+    );
     Ok(request_execution)
 }
 

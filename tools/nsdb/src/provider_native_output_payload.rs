@@ -71,6 +71,26 @@ pub(crate) fn push_native_output_summary(
             summary.worker_resolver_contract.as_str(),
         ),
         ("worker_cache_status", summary.worker_cache_status.as_str()),
+        (
+            "worker_adapter_cache_contract",
+            summary.worker_adapter_cache_contract.as_str(),
+        ),
+        (
+            "worker_adapter_cache_identity",
+            summary.worker_adapter_cache_identity.as_str(),
+        ),
+        (
+            "worker_adapter_cache_status",
+            summary.worker_adapter_cache_status.as_str(),
+        ),
+        (
+            "worker_adapter_executable_hash",
+            summary.worker_adapter_executable_hash.as_str(),
+        ),
+        (
+            "worker_adapter_control_contract",
+            summary.worker_adapter_control_contract.as_str(),
+        ),
         ("worker_pid", summary.worker_pid.as_str()),
         (
             "worker_request_sequence",
@@ -299,6 +319,26 @@ pub(crate) fn push_indexed_native_output(
             summary.worker_resolver_contract.as_str(),
         ),
         ("worker_cache_status", summary.worker_cache_status.as_str()),
+        (
+            "worker_adapter_cache_contract",
+            summary.worker_adapter_cache_contract.as_str(),
+        ),
+        (
+            "worker_adapter_cache_identity",
+            summary.worker_adapter_cache_identity.as_str(),
+        ),
+        (
+            "worker_adapter_cache_status",
+            summary.worker_adapter_cache_status.as_str(),
+        ),
+        (
+            "worker_adapter_executable_hash",
+            summary.worker_adapter_executable_hash.as_str(),
+        ),
+        (
+            "worker_adapter_control_contract",
+            summary.worker_adapter_control_contract.as_str(),
+        ),
         ("worker_pid", summary.worker_pid.as_str()),
         (
             "worker_request_sequence",

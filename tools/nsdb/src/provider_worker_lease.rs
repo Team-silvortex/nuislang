@@ -25,11 +25,17 @@ pub(crate) const PROVIDER_WORKER_DISPATCH_PERMIT_CONTRACT: &str =
     "nuis-provider-worker-dispatch-permit-v1";
 pub(crate) const PROVIDER_WORKER_PROCESS_ADAPTER_CONTRACT: &str =
     "nuis-provider-worker-process-adapter-v4";
+pub(crate) const PROVIDER_WORKER_ADAPTER_CONTROL_CONTRACT: &str =
+    "nuis-provider-worker-adapter-control-v1";
+const MAX_PROVIDER_WORKER_DISPATCH_PAYLOAD_BYTES: usize = 1800;
 
 pub(crate) struct ProviderWorkerAdapterLaunch<'a> {
     pub(crate) executable_path: &'a Path,
     pub(crate) executable_hash: &'a str,
     pub(crate) runner_contract: &'a str,
+    pub(crate) cache_contract: &'a str,
+    pub(crate) cache_identity: &'a str,
+    pub(crate) cache_status: &'a str,
     pub(crate) arguments: &'a [String],
     pub(crate) output_byte_length: usize,
 }
@@ -191,7 +197,7 @@ impl ProviderWorkerLeaseManager {
             &capsule,
             &invoker,
             adapter_launch,
-        );
+        )?;
         let mut reply = lease
             .transport
             .request(&request.kernel.id, payload.as_bytes(), &descriptors)
@@ -284,7 +290,7 @@ fn render_dispatch_payload(
     capsule: &ProviderExecutionCapsuleRegistration,
     invoker: &ProviderExecutionCapsuleInvokerRegistration,
     adapter_launch: Option<&ProviderWorkerAdapterLaunch<'_>>,
-) -> String {
+) -> Result<String, String> {
     let mut payload = format!(
         "contract={}\nregistry_source={}\ncapsule_id={}\ncapsule_token={}\ninvocation_mode={}\ninvoker_contract={}\ninvoker_registry_source={}\ninvoker_id={}\ninvoker_token={}\noutput_carrier_contract={}\nprovider={provider_family}\nadapter={}\nkernel={}\noperation_registry_contract={}\noperation={}\noperation_token={}\ninput_roles={}\noutput_roles={}\ninputs={}\noutputs={}\n",
         capsule.contract,
@@ -308,22 +314,36 @@ fn render_dispatch_payload(
         capsule.output_roles.len(),
     );
     if let Some(launch) = adapter_launch {
-        payload.push_str(&format!(
-            "adapter_launch_contract={PROVIDER_WORKER_PROCESS_ADAPTER_CONTRACT}\nadapter_executable={}\nadapter_executable_hash={}\nadapter_runner_contract={}\nadapter_argument_count={}\n",
-            launch.executable_path.display(),
-            launch.executable_hash,
-            launch.runner_contract,
-            launch.arguments.len(),
-        ));
-        payload.push_str(&format!(
-            "adapter_output_byte_length={}\n",
-            launch.output_byte_length
-        ));
-        for (index, argument) in launch.arguments.iter().enumerate() {
-            payload.push_str(&format!("adapter_argument_{index}={argument}\n"));
-        }
+        payload.push_str("adapter_control=");
+        payload.push_str(&render_adapter_control(launch));
+        payload.push('\n');
     }
-    payload
+    validate_dispatch_payload_size(&payload)?;
+    Ok(payload)
+}
+
+fn render_adapter_control(launch: &ProviderWorkerAdapterLaunch<'_>) -> String {
+    let mut fields = vec![
+        PROVIDER_WORKER_ADAPTER_CONTROL_CONTRACT.to_owned(),
+        PROVIDER_WORKER_PROCESS_ADAPTER_CONTRACT.to_owned(),
+        launch.executable_path.display().to_string(),
+        launch.executable_hash.to_owned(),
+        launch.runner_contract.to_owned(),
+        launch.output_byte_length.to_string(),
+        launch.arguments.len().to_string(),
+    ];
+    fields.extend(launch.arguments.iter().cloned());
+    fields.join("\t")
+}
+
+fn validate_dispatch_payload_size(payload: &str) -> Result<(), String> {
+    if payload.len() > MAX_PROVIDER_WORKER_DISPATCH_PAYLOAD_BYTES {
+        return Err(format!(
+            "provider worker dispatch payload is too large: {} > {MAX_PROVIDER_WORKER_DISPATCH_PAYLOAD_BYTES}",
+            payload.len()
+        ));
+    }
+    Ok(())
 }
 
 fn validate_adapter_launch(
@@ -348,13 +368,16 @@ fn validate_adapter_launch(
             .runner_contract
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b':' | b'_' | b'-'))
+        || launch.cache_contract.is_empty()
+        || !launch.cache_identity.starts_with("adapter:0x")
+        || !matches!(launch.cache_status, "compiled" | "hit")
+        || path.len() >= 2048
         || launch.arguments.is_empty()
         || launch.arguments.len() > 32
         || launch.output_byte_length == 0
-        || launch
-            .arguments
-            .iter()
-            .any(|argument| !is_adapter_argument(argument, descriptor_count))
+        || launch.arguments.iter().any(|argument| {
+            argument.len() >= 2048 || !is_adapter_argument(argument, descriptor_count)
+        })
     {
         return Err("provider worker adapter launch descriptor is invalid".to_owned());
     }
@@ -426,7 +449,10 @@ fn remove_image_dir(path: &Path) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{validate_adapter_launch, ProviderWorkerAdapterLaunch};
+    use super::{
+        render_adapter_control, validate_adapter_launch, validate_dispatch_payload_size,
+        ProviderWorkerAdapterLaunch, MAX_PROVIDER_WORKER_DISPATCH_PAYLOAD_BYTES,
+    };
     use std::path::Path;
 
     #[test]
@@ -450,6 +476,9 @@ mod tests {
             executable_path: Path::new("adapter"),
             executable_hash: "not-a-hash",
             runner_contract: "runner.v1",
+            cache_contract: "cache.v1",
+            cache_identity: "adapter:0x0123456789abcdef",
+            cache_status: "compiled",
             arguments: &["descriptor-path:0".to_owned()],
             output_byte_length: 4,
         };
@@ -459,6 +488,9 @@ mod tests {
             executable_path: Path::new("adapter"),
             executable_hash: "0x0123456789abcdef",
             runner_contract: "runner.v1",
+            cache_contract: "cache.v1",
+            cache_identity: "adapter:0x0123456789abcdef",
+            cache_status: "compiled",
             arguments: &["literal:15\nnext".to_owned()],
             output_byte_length: 4,
         };
@@ -468,6 +500,9 @@ mod tests {
             executable_path: Path::new("adapter"),
             executable_hash: "0x0123456789abcdef",
             runner_contract: "runner.v1",
+            cache_contract: "cache.v1",
+            cache_identity: "adapter:0x0123456789abcdef",
+            cache_status: "compiled",
             arguments: &["descriptor-carrier:1:0:4096:42".to_owned()],
             output_byte_length: 4,
         };
@@ -477,6 +512,9 @@ mod tests {
             executable_path: Path::new("adapter"),
             executable_hash: "0x0123456789abcdef",
             runner_contract: "runner.v1",
+            cache_contract: "cache.v1",
+            cache_identity: "adapter:0x0123456789abcdef",
+            cache_status: "compiled",
             arguments: &[
                 "verified-path:0x0123456789abcdef:model.mlmodel".to_owned(),
                 "literal:--multi".to_owned(),
@@ -485,5 +523,26 @@ mod tests {
             output_byte_length: 4,
         };
         assert!(validate_adapter_launch(Some(&ordered_arguments), 1).is_ok());
+        let control = render_adapter_control(&ordered_arguments);
+        assert!(control.starts_with(
+            "nuis-provider-worker-adapter-control-v1\tnuis-provider-worker-process-adapter-v4\t"
+        ));
+        assert_eq!(
+            control.split('\t').skip(7).collect::<Vec<_>>(),
+            ordered_arguments.arguments
+        );
+        assert!(!control.contains("adapter_argument_"));
+
+        let oversized_argument = format!("literal:{}", "x".repeat(2048));
+        let oversized = ProviderWorkerAdapterLaunch {
+            arguments: &[oversized_argument],
+            ..ordered_arguments
+        };
+        assert!(validate_adapter_launch(Some(&oversized), 1).is_err());
+        assert!(validate_dispatch_payload_size(
+            &"x".repeat(MAX_PROVIDER_WORKER_DISPATCH_PAYLOAD_BYTES + 1)
+        )
+        .expect_err("oversized provider control payload")
+        .contains("dispatch payload is too large"));
     }
 }

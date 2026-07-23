@@ -3,11 +3,15 @@ use crate::{
     provider_sample_artifact::fnv1a64_hex, provider_sample_execute::resolve_provider_payload_path,
 };
 use std::{
+    collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
     process::Command,
     time::SystemTime,
 };
+
+pub(crate) const PROVIDER_PROCESS_ADAPTER_CACHE_CONTRACT: &str =
+    "nuis-provider-process-adapter-cache-v1";
 
 pub(crate) struct PreparedProviderProcessAdapter {
     source_path: PathBuf,
@@ -22,7 +26,70 @@ impl PreparedProviderProcessAdapter {
     }
 }
 
-pub(crate) fn compile_objc_process_adapter(
+pub(crate) struct ResolvedProviderProcessAdapter<'a> {
+    image: &'a PreparedProviderProcessAdapter,
+    pub(crate) cache_identity: &'a str,
+    pub(crate) cache_status: &'static str,
+}
+
+impl ResolvedProviderProcessAdapter<'_> {
+    pub(crate) fn executable_path(&self) -> &Path {
+        self.image.executable_path()
+    }
+
+    pub(crate) fn executable_hash(&self) -> &str {
+        &self.image.executable_hash
+    }
+
+    pub(crate) fn contract(&self) -> &'static str {
+        self.image.contract
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct ProviderProcessAdapterCache {
+    images: BTreeMap<String, PreparedProviderProcessAdapter>,
+}
+
+impl ProviderProcessAdapterCache {
+    pub(crate) fn resolve_objc(
+        &mut self,
+        stem: &str,
+        source: &str,
+        contract: &'static str,
+        frameworks: &[&str],
+    ) -> Result<ResolvedProviderProcessAdapter<'_>, String> {
+        let identity = process_adapter_cache_identity(source, contract, frameworks);
+        let cache_status = if self.images.contains_key(&identity) {
+            "hit"
+        } else {
+            let image = compile_objc_process_adapter(stem, source, contract, frameworks)?;
+            self.images.insert(identity.clone(), image);
+            "compiled"
+        };
+        let (cache_identity, image) = self
+            .images
+            .get_key_value(&identity)
+            .expect("provider process adapter cache entry was inserted");
+        Ok(ResolvedProviderProcessAdapter {
+            image,
+            cache_identity,
+            cache_status,
+        })
+    }
+}
+
+fn process_adapter_cache_identity(source: &str, contract: &str, frameworks: &[&str]) -> String {
+    let manifest = format!(
+        "contract={contract}\ntarget={}-{}\nframeworks={}\nsource={source}",
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+        frameworks.join(",")
+    );
+    format!("adapter:{}", fnv1a64_hex(manifest.as_bytes()))
+}
+
+fn compile_objc_process_adapter(
     stem: &str,
     source: &str,
     contract: &'static str,
@@ -65,6 +132,32 @@ pub(crate) fn compile_objc_process_adapter(
     })
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cache_identity_binds_source_contract_frameworks_and_target() {
+        let base = process_adapter_cache_identity("source-a", "contract-a", &["Foundation"]);
+        assert_eq!(
+            base,
+            process_adapter_cache_identity("source-a", "contract-a", &["Foundation"])
+        );
+        assert_ne!(
+            base,
+            process_adapter_cache_identity("source-b", "contract-a", &["Foundation"])
+        );
+        assert_ne!(
+            base,
+            process_adapter_cache_identity("source-a", "contract-b", &["Foundation"])
+        );
+        assert_ne!(
+            base,
+            process_adapter_cache_identity("source-a", "contract-a", &["Foundation", "CoreML"])
+        );
+    }
+}
+
 impl Drop for PreparedProviderProcessAdapter {
     fn drop(&mut self) {
         let _ = fs::remove_file(&self.source_path);
@@ -85,6 +178,56 @@ pub(crate) fn worker_descriptor_argument(
             .ok_or_else(|| "provider worker adapter input argument is invalid".to_owned()),
         None => Err("provider worker adapter input has no descriptor argument".to_owned()),
     }
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn coreml_worker_arguments(
+    request: &ProviderRequest,
+    inputs: &[PreparedProviderInput],
+    model_path: &Path,
+) -> Result<Vec<String>, String> {
+    let model = request
+        .model_asset
+        .as_ref()
+        .ok_or_else(|| "CoreML worker request is missing its model descriptor".to_owned())?;
+    if inputs.is_empty()
+        || inputs.len() != request.input_bindings.len()
+        || inputs.len() != model.input_features.len()
+    {
+        return Err("CoreML worker input feature/binding count mismatch".to_owned());
+    }
+    let model_path = model_path
+        .to_str()
+        .ok_or_else(|| "CoreML model path is not UTF-8".to_owned())?;
+    let output_shape = request
+        .output_comparison
+        .as_ref()
+        .map(|comparison| comparison.shape.as_slice())
+        .unwrap_or(request.buffer.shape.as_slice());
+    let mut arguments = vec![
+        format!("verified-path:{}:{model_path}", model.content_hash),
+        "literal:--multi".to_owned(),
+        format!("literal:{}", model.output_feature),
+        format!(
+            "literal:{}",
+            crate::provider_runner_coreml::format_shape(output_shape)
+        ),
+    ];
+    for (index, ((feature, binding), input)) in model
+        .input_features
+        .iter()
+        .zip(&request.input_bindings)
+        .zip(inputs)
+        .enumerate()
+    {
+        arguments.push(format!("literal:{feature}"));
+        arguments.push(worker_descriptor_argument(input, index)?);
+        arguments.push(format!(
+            "literal:{}",
+            crate::provider_runner_coreml::format_shape(&binding.shape)
+        ));
+    }
+    Ok(arguments)
 }
 
 pub(crate) fn validate_provider_model_asset(

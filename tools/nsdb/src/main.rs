@@ -57,6 +57,8 @@ mod provider_worker_request;
 #[cfg(unix)]
 mod provider_worker_result;
 #[cfg(unix)]
+mod provider_worker_summary;
+#[cfg(unix)]
 #[allow(dead_code)]
 mod provider_worker_transport_unix;
 mod replay;

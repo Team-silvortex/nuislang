@@ -677,9 +677,10 @@ worker-owned output descriptor per request. The registered PixelMagic gray8 and
 WitSage f32 bias Metal adapters now cross that boundary: Nsdb materializes and
 hash-binds their adapter images, while persistent Nuis workers launch them with
 `path-fd` or `carrier-fd` input descriptors and return the real adapter protocol
-output. CoreML model execution remains a parent-side compatibility path.
+output. At that integration stage, CoreML model execution still used a
+parent-side compatibility path.
 
-The parent-side call is now fail-closed behind
+That earlier parent-side compatibility stage was fail-closed behind
 `nuis-provider-worker-dispatch-permit-v1`.
 `nuis-provider-worker-operation-registry-v1` accepts any frame-safe
 provider/adapter/operation identity and derives a stable operation token without
@@ -702,7 +703,8 @@ an output role, carrier mode, byte length, and FNV hash. Nsdb receives the
 descriptor through SCM_RIGHTS and independently verifies all fields
 before recording `worker-invoked` and `verified`; it does not construct the
 descriptor or decide its contents. Capsule invocation and generic output
-allocation are therefore closed. `nuis-provider-worker-process-adapter-v4`
+allocation are therefore closed, and the compatibility stage is no longer the
+normal official execution route. `nuis-provider-worker-process-adapter-v4`
 adds open ordered `literal`, `verified-path`, `descriptor-path`, and
 `descriptor-carrier` argument templates without adding a Metal or CoreML
 operation switch to the worker. PixelMagic gray8, WitSage Metal f32 bias, the
@@ -711,8 +713,33 @@ below persistent Nuis workers. Each adapter writes into a worker-created
 `NUISPFD1`; stdout carries only bounded protocol metadata, and Nsdb verifies
 the frame layout, stored payload hash, computed payload hash, and whole-packet
 hash before restoring mmap-backed transferable ownership. The CoreML model path
-is independently FNV-verified before `execv`. The remaining ownership gap is
-ordered multi-input argument rendering for CoreML fan-in.
+is independently FNV-verified before `execv`. Ordered feature/carrier/shape
+triples now also move two-input CoreML fan-in beneath the same worker lease, so
+all five official nodes execute through process-adapter v4. The next practical
+boundary was eliminating repeated clang compilation of identical adapter
+images.
+
+`nuis-provider-process-adapter-cache-v1` now derives an open cache identity from
+adapter source, runner contract, ordered framework manifest, operating system,
+and architecture. The cache is graph-scoped: images are immutable while any
+request can execute them, then their source and executable files are removed at
+graph close instead of accumulating on disk. Official evidence requires the
+four CoreML requests to report `compiled,hit,hit,hit`; the distinct Metal
+source and contract report an independent `compiled` identity. Cache identity
+and status remain local Nsdb evidence rather than being copied into the worker
+request. This preserved the bounded worker frame after a real fan-in regression
+showed that extra line-oriented metadata could cross the macOS Unix datagram
+limit.
+
+`nuis-provider-worker-adapter-control-v1` now replaces repeated
+`adapter_argument_N` lines with one compact record containing a fixed launch
+header and an ordered open argument sequence. The whole request hash binds this
+record, individual paths and arguments must fit the worker ABI buffers, and a
+portable 1800-byte dispatch budget rejects growth before `sendmsg`. The real
+two-input fan-in route passes through the compact record, while a unit
+regression proves oversized metadata fails closed. The next boundary is a
+hash-bound control-carrier class for manifests that exceed the inline budget;
+it must remain distinct from semantic `input.N` capsule roles.
 
 Return-producing `if` lowering now preserves control dependence for nested
 extern-call comparisons. The open `compare_call_result` mode of

@@ -88,7 +88,7 @@ pub(crate) fn select_provider_worker_image_registration(
         registry_source: PROVIDER_WORKER_IMAGE_REGISTRY_SOURCE,
         image_id: "std.provider-worker.unix.v1",
         source_path: "stdlib/std/provider_worker_image.ns",
-        cache_identity: "std.provider-worker.unix.aot-v21",
+        cache_identity: "std.provider-worker.unix.aot-v22",
         provider_key: stable_registration_scalar(provider_family.as_bytes()),
         capability_hash: stable_registration_scalar(
             format!("{provider_family}:provider-worker-capability-v1").as_bytes(),

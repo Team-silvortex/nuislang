@@ -15,7 +15,7 @@ use crate::provider_output_carrier_registry::{
 };
 #[cfg(target_os = "macos")]
 use crate::provider_process_adapter::{
-    compile_objc_process_adapter, PreparedProviderProcessAdapter,
+    ProviderProcessAdapterCache, ResolvedProviderProcessAdapter,
 };
 use std::{ffi::OsStr, path::Path};
 #[cfg(target_os = "macos")]
@@ -56,25 +56,34 @@ pub(crate) fn execute_gray8_invert(
 }
 
 #[cfg(target_os = "macos")]
-pub(crate) fn prepare_gray8_worker_invocation() -> Result<PreparedProviderProcessAdapter, String> {
-    prepare_metal_worker_invocation(METAL_RUNNER_SOURCE, "nuis-metal-gray8-provider-runner-v1")
+pub(crate) fn prepare_gray8_worker_invocation(
+    cache: &mut ProviderProcessAdapterCache,
+) -> Result<ResolvedProviderProcessAdapter<'_>, String> {
+    prepare_metal_worker_invocation(
+        cache,
+        METAL_RUNNER_SOURCE,
+        "nuis-metal-gray8-provider-runner-v1",
+    )
 }
 
 #[cfg(target_os = "macos")]
-pub(crate) fn prepare_f32_bias_worker_invocation() -> Result<PreparedProviderProcessAdapter, String>
-{
+pub(crate) fn prepare_f32_bias_worker_invocation(
+    cache: &mut ProviderProcessAdapterCache,
+) -> Result<ResolvedProviderProcessAdapter<'_>, String> {
     prepare_metal_worker_invocation(
+        cache,
         METAL_F32_BIAS_SOURCE,
         "nuis-metal-f32-bias-provider-runner-v1",
     )
 }
 
 #[cfg(target_os = "macos")]
-fn prepare_metal_worker_invocation(
+fn prepare_metal_worker_invocation<'a>(
+    cache: &'a mut ProviderProcessAdapterCache,
     source: &str,
     contract: &'static str,
-) -> Result<PreparedProviderProcessAdapter, String> {
-    compile_objc_process_adapter(
+) -> Result<ResolvedProviderProcessAdapter<'a>, String> {
+    cache.resolve_objc(
         "metal-worker-adapter",
         source,
         contract,

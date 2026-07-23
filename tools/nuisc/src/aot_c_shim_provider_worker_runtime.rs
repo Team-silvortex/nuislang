@@ -33,6 +33,7 @@ static char nuis_provider_worker_adapter_protocol_hash[19] = "0xcbf29ce484222325
 static unsigned int nuis_provider_worker_input_byte_sum = 0;
 "#,
     );
+    crate::aot_c_shim_provider_worker_control::append_provider_worker_control_helpers(out);
     crate::aot_c_shim_provider_worker_result::append_provider_worker_result_helpers(out);
     out.push_str(
         r#"
@@ -335,23 +336,47 @@ int64_t nuis_host_provider_worker_is_close(void) {
 }
 
 static int nuis_provider_worker_invoke_process_adapter(void) {
+    char control[NUIS_PROVIDER_WORKER_MAX_FRAME_BYTES];
+    char* fields[39];
     char launch_contract[128];
     char executable[2048];
     char executable_hash[32];
-    int64_t argument_count = nuis_provider_worker_payload_scalar(
-        "adapter_argument_count", "");
-    int64_t output_byte_length = nuis_provider_worker_payload_scalar(
-        "adapter_output_byte_length", "");
     if (!nuis_provider_worker_payload_text(
-            "adapter_launch_contract", launch_contract, sizeof(launch_contract))
-        || strcmp(launch_contract, "nuis-provider-worker-process-adapter-v4") != 0
-        || !nuis_provider_worker_payload_text(
-            "adapter_executable", executable, sizeof(executable))
-        || !nuis_provider_worker_payload_text(
-            "adapter_executable_hash", executable_hash, sizeof(executable_hash))
+            "adapter_control", control, sizeof(control))) {
+        return -1;
+    }
+    size_t field_count =
+        nuis_provider_worker_split_tabs(control, fields, sizeof(fields) / sizeof(fields[0]));
+    if (field_count < 7
+        || strcmp(fields[0], "nuis-provider-worker-adapter-control-v1") != 0
+        || strcmp(fields[1], "nuis-provider-worker-process-adapter-v4") != 0) {
+        return -1;
+    }
+    char* output_end = NULL;
+    char* count_end = NULL;
+    long long output_byte_length = strtoll(fields[5], &output_end, 10);
+    long long argument_count = strtoll(fields[6], &count_end, 10);
+    int launch_length = snprintf(
+        launch_contract, sizeof(launch_contract), "%s", fields[1]);
+    int executable_length = snprintf(
+        executable, sizeof(executable), "%s", fields[2]);
+    int hash_length = snprintf(
+        executable_hash, sizeof(executable_hash), "%s", fields[3]);
+    if (launch_length <= 0
+        || (size_t)launch_length >= sizeof(launch_contract)
+        || executable_length <= 0
+        || (size_t)executable_length >= sizeof(executable)
+        || hash_length <= 0
+        || (size_t)hash_length >= sizeof(executable_hash)
+        || fields[4][0] == '\0'
+        || *fields[5] == '\0'
+        || *output_end != '\0'
+        || *fields[6] == '\0'
+        || *count_end != '\0'
         || argument_count <= 0
         || argument_count > 32
-        || output_byte_length <= 0) {
+        || output_byte_length <= 0
+        || field_count != 7 + (size_t)argument_count) {
         return -1;
     }
     char actual_hash[19];
@@ -441,21 +466,11 @@ static int nuis_provider_worker_invoke_process_adapter(void) {
                 _exit(126);
             }
         }
-        char encoded_arguments[32][2048];
         char resolved_arguments[32][2048];
         char* arguments[34];
         arguments[0] = executable;
         for (int64_t index = 0; index < argument_count; index++) {
-            char key[64];
-            int key_length =
-                snprintf(key, sizeof(key), "adapter_argument_%lld", (long long)index);
-            if (key_length <= 0
-                || (size_t)key_length >= sizeof(key)
-                || !nuis_provider_worker_payload_text(
-                    key, encoded_arguments[index], sizeof(encoded_arguments[index]))) {
-                _exit(126);
-            }
-            const char* encoded = encoded_arguments[index];
+            const char* encoded = fields[7 + index];
             int resolved_length = 0;
             if (strncmp(encoded, "literal:", 8) == 0 && encoded[8] != '\0') {
                 resolved_length = snprintf(
@@ -648,11 +663,7 @@ int64_t nuis_host_provider_worker_invoke_capsule(int64_t ingress_status) {
         }
         nuis_provider_worker_input_byte_sum += value;
     }
-    char adapter_launch_contract[128];
-    if (nuis_provider_worker_payload_text(
-            "adapter_launch_contract",
-            adapter_launch_contract,
-            sizeof(adapter_launch_contract))) {
+    if (nuis_provider_worker_payload_has("adapter_control")) {
         int adapter_status = nuis_provider_worker_invoke_process_adapter();
         if (adapter_status != 0) {
             fprintf(

@@ -15,7 +15,7 @@ use crate::provider_output_carrier_registry::{
 };
 #[cfg(target_os = "macos")]
 use crate::provider_process_adapter::{
-    compile_objc_process_adapter, PreparedProviderProcessAdapter,
+    ProviderProcessAdapterCache, ResolvedProviderProcessAdapter,
 };
 use std::path::Path;
 #[cfg(target_os = "macos")]
@@ -30,8 +30,10 @@ use std::{
 const COREML_RUNNER_SOURCE: &str = include_str!("../provider-runners/coreml_vector_affine.m");
 
 #[cfg(target_os = "macos")]
-pub(crate) fn prepare_coreml_worker_invocation() -> Result<PreparedProviderProcessAdapter, String> {
-    compile_objc_process_adapter(
+pub(crate) fn prepare_coreml_worker_invocation(
+    cache: &mut ProviderProcessAdapterCache,
+) -> Result<ResolvedProviderProcessAdapter<'_>, String> {
+    cache.resolve_objc(
         "coreml-worker-adapter",
         COREML_RUNNER_SOURCE,
         "nuis-coreml-model-prediction-provider-runner-v1",
