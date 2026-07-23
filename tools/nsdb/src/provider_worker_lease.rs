@@ -10,6 +10,14 @@ use crate::{
     provider_runner_registry::{
         select_provider_worker_operation_registration, ProviderWorkerOperationRegistration,
     },
+    provider_sample_artifact::fnv1a64_hex,
+    provider_worker_control::{
+        ProviderWorkerControlCarrier, PROVIDER_WORKER_ADAPTER_CONTROL_CARRIER_CONTRACT,
+        PROVIDER_WORKER_ADAPTER_CONTROL_ROLE,
+    },
+    provider_worker_descriptor_capability::{
+        ProviderWorkerDescriptorCapability, ProviderWorkerOutputDescriptorCapability,
+    },
     provider_worker_image::resolve_provider_worker_image,
     provider_worker_transport_unix::{UnixWorkerDescriptor, UnixWorkerProcessTransport},
 };
@@ -28,6 +36,7 @@ pub(crate) const PROVIDER_WORKER_PROCESS_ADAPTER_CONTRACT: &str =
 pub(crate) const PROVIDER_WORKER_ADAPTER_CONTROL_CONTRACT: &str =
     "nuis-provider-worker-adapter-control-v1";
 const MAX_PROVIDER_WORKER_DISPATCH_PAYLOAD_BYTES: usize = 1800;
+const MAX_INLINE_ADAPTER_CONTROL_BYTES: usize = 384;
 
 pub(crate) struct ProviderWorkerAdapterLaunch<'a> {
     pub(crate) executable_path: &'a Path,
@@ -40,6 +49,11 @@ pub(crate) struct ProviderWorkerAdapterLaunch<'a> {
     pub(crate) output_byte_length: usize,
 }
 
+struct RenderedProviderDispatch {
+    payload: String,
+    spilled_control: Option<Vec<u8>>,
+}
+
 pub(crate) struct ProviderWorkerDispatchReceipt {
     pub(crate) lease_contract: &'static str,
     pub(crate) resolver_contract: &'static str,
@@ -47,6 +61,11 @@ pub(crate) struct ProviderWorkerDispatchReceipt {
     pub(crate) worker_pid: u32,
     pub(crate) sequence: usize,
     pub(crate) descriptor_count: usize,
+    pub(crate) descriptor_capability_contract: &'static str,
+    pub(crate) max_semantic_descriptors: usize,
+    pub(crate) max_control_descriptors: usize,
+    pub(crate) output_descriptor_capability_contract: &'static str,
+    pub(crate) max_output_descriptors: usize,
     pub(crate) payload_hash: String,
     pub(crate) operation_token: String,
     pub(crate) execution_capsule_contract: &'static str,
@@ -66,16 +85,40 @@ pub(crate) struct ProviderWorkerDispatchReceipt {
     pub(crate) worker_output_descriptor_hash: String,
     pub(crate) worker_output_payload: Vec<u8>,
     pub(crate) worker_output_result: Option<ProviderOutputCarrierConsumption>,
+    pub(crate) additional_worker_outputs: Vec<ProviderWorkerOutput>,
     pub(crate) worker_output_receipt_status: &'static str,
+    pub(crate) adapter_control_mode: &'static str,
     pub(crate) dispatch_status: i64,
     pub(crate) dispatch_permit_contract: &'static str,
     pub(crate) dispatch_permit_status: &'static str,
+}
+
+pub(crate) struct ProviderWorkerOutput {
+    pub(crate) role: String,
+    pub(crate) byte_length: usize,
+    pub(crate) payload_hash: String,
+    pub(crate) payload: Vec<u8>,
+    pub(crate) result: Option<ProviderOutputCarrierConsumption>,
+}
+
+impl ProviderWorkerOutput {
+    pub(crate) fn retention_status(&self) -> &'static str {
+        if self.result.is_some() {
+            "transferable-carrier"
+        } else if !self.payload.is_empty() {
+            "verified-payload"
+        } else {
+            "empty"
+        }
+    }
 }
 
 struct ProviderWorkerLease {
     provider_family: String,
     resolver_contract: &'static str,
     cache_status: &'static str,
+    descriptor_capability: ProviderWorkerDescriptorCapability,
+    output_descriptor_capability: ProviderWorkerOutputDescriptorCapability,
     transport: UnixWorkerProcessTransport,
 }
 
@@ -106,19 +149,25 @@ impl ProviderWorkerLeaseManager {
             let adapter_image_dir = self.image_dir.join(adapter_id);
             let image = resolve_provider_worker_image(provider_family, &adapter_image_dir)?;
             let mut command = image.command();
-            let transport = UnixWorkerProcessTransport::spawn(&mut command, lease_id).map_err(
-                |error| {
+            let transport = UnixWorkerProcessTransport::spawn(
+                &mut command,
+                lease_id,
+                image.registration.descriptor_capability,
+                image.registration.output_descriptor_capability,
+            )
+            .map_err(|error| {
                     format!(
                         "provider worker `{adapter_id}` family `{provider_family}` failed to start: {error}"
                     )
-                },
-            )?;
+                })?;
             self.leases.insert(
                 adapter_id.to_owned(),
                 ProviderWorkerLease {
                     provider_family: provider_family.to_owned(),
                     resolver_contract: image.resolver_contract,
                     cache_status: image.cache_status,
+                    descriptor_capability: image.registration.descriptor_capability,
+                    output_descriptor_capability: image.registration.output_descriptor_capability,
                     transport,
                 },
             );
@@ -149,14 +198,6 @@ impl ProviderWorkerLeaseManager {
             .iter()
             .map(|(index, _)| format!("input.{index}"))
             .collect::<Vec<_>>();
-        let descriptors = files
-            .iter()
-            .zip(&roles)
-            .map(|((_, file), role)| UnixWorkerDescriptor {
-                role,
-                descriptor: file.as_fd(),
-            })
-            .collect::<Vec<_>>();
         let operation = select_provider_worker_operation_registration(
             provider_family,
             adapter_id,
@@ -168,7 +209,11 @@ impl ProviderWorkerLeaseManager {
                 request.kernel.operation
             )
         })?;
-        let output_roles = vec!["output.result".to_owned()];
+        let output_roles = request
+            .output_bindings
+            .iter()
+            .map(|binding| binding.role.clone())
+            .collect::<Vec<_>>();
         let capsule = register_provider_execution_capsule(
             provider_family,
             adapter_id,
@@ -190,7 +235,7 @@ impl ProviderWorkerLeaseManager {
                 )
             })?;
         validate_adapter_launch(adapter_launch, files.len())?;
-        let payload = render_dispatch_payload(
+        let dispatch = render_dispatch_payload(
             provider_family,
             request,
             &operation,
@@ -198,9 +243,50 @@ impl ProviderWorkerLeaseManager {
             &invoker,
             adapter_launch,
         )?;
-        let mut reply = lease
+        let control_carrier = dispatch
+            .spilled_control
+            .as_deref()
+            .map(ProviderWorkerControlCarrier::new)
+            .transpose()?;
+        if let Some(carrier) = control_carrier.as_ref() {
+            let evidence = format!(
+                "adapter_control_ref={PROVIDER_WORKER_ADAPTER_CONTROL_CARRIER_CONTRACT}\t{}\t{}",
+                carrier.byte_length, carrier.payload_hash
+            );
+            if !dispatch.payload.lines().any(|line| line == evidence) {
+                return Err(
+                    "provider worker control carrier metadata is not request-bound".to_owned(),
+                );
+            }
+        }
+        let adapter_control_mode = if control_carrier.is_some() {
+            "carrier"
+        } else if adapter_launch.is_some() {
+            "inline"
+        } else {
+            "none"
+        };
+        let mut descriptors = files
+            .iter()
+            .zip(&roles)
+            .map(|((_, file), role)| UnixWorkerDescriptor {
+                role,
+                descriptor: file.as_fd(),
+            })
+            .collect::<Vec<_>>();
+        if let Some(carrier) = control_carrier.as_ref() {
+            descriptors.push(UnixWorkerDescriptor {
+                role: PROVIDER_WORKER_ADAPTER_CONTROL_ROLE,
+                descriptor: carrier.file().as_fd(),
+            });
+        }
+        let reply = lease
             .transport
-            .request(&request.kernel.id, payload.as_bytes(), &descriptors)
+            .request(
+                &request.kernel.id,
+                dispatch.payload.as_bytes(),
+                &descriptors,
+            )
             .map_err(|error| {
                 format!(
                     "provider worker dispatch `{adapter_id}` request `{}` sequence {expected_sequence} failed: {error}",
@@ -218,25 +304,58 @@ impl ProviderWorkerLeaseManager {
         {
             return Err("provider worker output descriptor roles do not match capsule".to_owned());
         }
-        let worker_output_result = crate::provider_worker_result::consume_worker_result(
-            &mut reply.output_descriptors,
-            &reply.output_descriptor_mode,
-            reply.output_descriptor_byte_length,
-            &reply.output_descriptor_hash,
-            &reply.adapter_protocol,
-        )?;
-        let worker_output_payload = if worker_output_result.is_some() {
-            reply.adapter_protocol
-        } else {
-            reply.output_descriptor_payload
-        };
+        if reply.output_descriptor_modes.len() != capsule.output_roles.len()
+            || reply.output_descriptor_byte_lengths.len() != capsule.output_roles.len()
+            || reply.output_descriptor_hashes.len() != capsule.output_roles.len()
+            || reply.output_descriptor_payloads.len() != capsule.output_roles.len()
+        {
+            return Err("provider worker output descriptor evidence count mismatch".to_owned());
+        }
+        let adapter_protocol = reply.adapter_protocol;
+        let mut worker_outputs = reply
+            .output_descriptors
+            .into_iter()
+            .zip(reply.output_descriptor_roles)
+            .zip(reply.output_descriptor_byte_lengths)
+            .zip(reply.output_descriptor_hashes)
+            .zip(reply.output_descriptor_modes)
+            .zip(reply.output_descriptor_payloads)
+            .map(
+                |(((((descriptor, role), byte_length), payload_hash), mode), payload)| {
+                    let result = crate::provider_worker_result::consume_worker_result_descriptor(
+                        descriptor,
+                        &mode,
+                        byte_length,
+                        &payload_hash,
+                        &adapter_protocol,
+                    )?;
+                    Ok(ProviderWorkerOutput {
+                        role,
+                        byte_length,
+                        payload_hash,
+                        payload: if result.is_some() {
+                            adapter_protocol.clone()
+                        } else {
+                            payload
+                        },
+                        result,
+                    })
+                },
+            )
+            .collect::<Result<Vec<_>, String>>()?;
+        let primary_output = worker_outputs.remove(0);
         Ok(ProviderWorkerDispatchReceipt {
             lease_contract: PROVIDER_WORKER_LEASE_CONTRACT,
             resolver_contract: lease.resolver_contract,
             cache_status: lease.cache_status,
             worker_pid: reply.worker_pid,
             sequence: reply.sequence,
-            descriptor_count: reply.descriptor_count,
+            descriptor_count: capsule.input_roles.len(),
+            descriptor_capability_contract: lease.descriptor_capability.contract,
+            max_semantic_descriptors: lease.descriptor_capability.max_semantic_descriptors,
+            max_control_descriptors: lease.descriptor_capability.max_control_descriptors,
+            output_descriptor_capability_contract: lease.output_descriptor_capability.contract,
+            max_output_descriptors: lease.output_descriptor_capability.max_output_descriptors,
             payload_hash: reply.payload_hash,
             operation_token: operation.operation_token,
             execution_capsule_contract: capsule.contract,
@@ -254,13 +373,15 @@ impl ProviderWorkerLeaseManager {
             execution_capsule_invoker_id: invoker.invoker_id,
             execution_capsule_invoker_status: "registered-invoked",
             worker_output_descriptor_contract: invoker.output_carrier_contract,
-            worker_output_descriptor_roles: render_capsule_roles(&reply.output_descriptor_roles),
+            worker_output_descriptor_roles: render_capsule_roles(&capsule.output_roles),
             worker_output_descriptor_count: capsule.output_roles.len(),
-            worker_output_descriptor_byte_length: reply.output_descriptor_byte_length,
-            worker_output_descriptor_hash: reply.output_descriptor_hash,
-            worker_output_payload,
-            worker_output_result,
+            worker_output_descriptor_byte_length: primary_output.byte_length,
+            worker_output_descriptor_hash: primary_output.payload_hash,
+            worker_output_payload: primary_output.payload,
+            worker_output_result: primary_output.result,
+            additional_worker_outputs: worker_outputs,
             worker_output_receipt_status: "verified",
+            adapter_control_mode,
             dispatch_status: reply.dispatch_status,
             dispatch_permit_contract: PROVIDER_WORKER_DISPATCH_PERMIT_CONTRACT,
             dispatch_permit_status: "granted",
@@ -290,8 +411,8 @@ fn render_dispatch_payload(
     capsule: &ProviderExecutionCapsuleRegistration,
     invoker: &ProviderExecutionCapsuleInvokerRegistration,
     adapter_launch: Option<&ProviderWorkerAdapterLaunch<'_>>,
-) -> Result<String, String> {
-    let mut payload = format!(
+) -> Result<RenderedProviderDispatch, String> {
+    let payload = format!(
         "contract={}\nregistry_source={}\ncapsule_id={}\ncapsule_token={}\ninvocation_mode={}\ninvoker_contract={}\ninvoker_registry_source={}\ninvoker_id={}\ninvoker_token={}\noutput_carrier_contract={}\nprovider={provider_family}\nadapter={}\nkernel={}\noperation_registry_contract={}\noperation={}\noperation_token={}\ninput_roles={}\noutput_roles={}\ninputs={}\noutputs={}\n",
         capsule.contract,
         capsule.registry_source,
@@ -313,13 +434,41 @@ fn render_dispatch_payload(
         capsule.input_roles.len(),
         capsule.output_roles.len(),
     );
-    if let Some(launch) = adapter_launch {
-        payload.push_str("adapter_control=");
-        payload.push_str(&render_adapter_control(launch));
-        payload.push('\n');
+    let Some(launch) = adapter_launch else {
+        validate_dispatch_payload_size(&payload)?;
+        return Ok(RenderedProviderDispatch {
+            payload,
+            spilled_control: None,
+        });
+    };
+    attach_adapter_control(payload, launch)
+}
+
+fn attach_adapter_control(
+    payload: String,
+    launch: &ProviderWorkerAdapterLaunch<'_>,
+) -> Result<RenderedProviderDispatch, String> {
+    let control = render_adapter_control(launch);
+    let inline = format!("{payload}adapter_control={control}\n");
+    if control.len() <= MAX_INLINE_ADAPTER_CONTROL_BYTES
+        && validate_dispatch_payload_size(&inline).is_ok()
+    {
+        return Ok(RenderedProviderDispatch {
+            payload: inline,
+            spilled_control: None,
+        });
     }
-    validate_dispatch_payload_size(&payload)?;
-    Ok(payload)
+    let reference = format!(
+        "{PROVIDER_WORKER_ADAPTER_CONTROL_CARRIER_CONTRACT}\t{}\t{}",
+        control.len(),
+        fnv1a64_hex(control.as_bytes())
+    );
+    let spilled = format!("{payload}adapter_control_ref={reference}\n");
+    validate_dispatch_payload_size(&spilled)?;
+    Ok(RenderedProviderDispatch {
+        payload: spilled,
+        spilled_control: Some(control.into_bytes()),
+    })
 }
 
 fn render_adapter_control(launch: &ProviderWorkerAdapterLaunch<'_>) -> String {
@@ -448,101 +597,5 @@ fn remove_image_dir(path: &Path) -> Result<(), String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{
-        render_adapter_control, validate_adapter_launch, validate_dispatch_payload_size,
-        ProviderWorkerAdapterLaunch, MAX_PROVIDER_WORKER_DISPATCH_PAYLOAD_BYTES,
-    };
-    use std::path::Path;
-
-    #[test]
-    fn dispatch_payload_is_provider_and_request_bound() {
-        let source = include_str!("provider_worker_lease.rs");
-        assert!(source.contains("provider={provider_family}"));
-        assert!(source.contains("request.kernel.id"));
-        assert!(source.contains("operation.operation_token"));
-        assert!(source.contains("capsule.capsule_token"));
-        assert!(source.contains("invoker.invoker_token"));
-        assert!(source.contains("output_roles"));
-        assert_eq!(
-            crate::provider_worker_image::PROVIDER_WORKER_IMAGE_RESOLVER_CONTRACT,
-            "nuis-provider-worker-image-resolver-v1"
-        );
-    }
-
-    #[test]
-    fn adapter_launch_rejects_unbound_or_frame_unsafe_identity() {
-        let invalid_hash = ProviderWorkerAdapterLaunch {
-            executable_path: Path::new("adapter"),
-            executable_hash: "not-a-hash",
-            runner_contract: "runner.v1",
-            cache_contract: "cache.v1",
-            cache_identity: "adapter:0x0123456789abcdef",
-            cache_status: "compiled",
-            arguments: &["descriptor-path:0".to_owned()],
-            output_byte_length: 4,
-        };
-        assert!(validate_adapter_launch(Some(&invalid_hash), 1).is_err());
-
-        let invalid_literal = ProviderWorkerAdapterLaunch {
-            executable_path: Path::new("adapter"),
-            executable_hash: "0x0123456789abcdef",
-            runner_contract: "runner.v1",
-            cache_contract: "cache.v1",
-            cache_identity: "adapter:0x0123456789abcdef",
-            cache_status: "compiled",
-            arguments: &["literal:15\nnext".to_owned()],
-            output_byte_length: 4,
-        };
-        assert!(validate_adapter_launch(Some(&invalid_literal), 1).is_err());
-
-        let invalid_descriptor = ProviderWorkerAdapterLaunch {
-            executable_path: Path::new("adapter"),
-            executable_hash: "0x0123456789abcdef",
-            runner_contract: "runner.v1",
-            cache_contract: "cache.v1",
-            cache_identity: "adapter:0x0123456789abcdef",
-            cache_status: "compiled",
-            arguments: &["descriptor-carrier:1:0:4096:42".to_owned()],
-            output_byte_length: 4,
-        };
-        assert!(validate_adapter_launch(Some(&invalid_descriptor), 1).is_err());
-
-        let ordered_arguments = ProviderWorkerAdapterLaunch {
-            executable_path: Path::new("adapter"),
-            executable_hash: "0x0123456789abcdef",
-            runner_contract: "runner.v1",
-            cache_contract: "cache.v1",
-            cache_identity: "adapter:0x0123456789abcdef",
-            cache_status: "compiled",
-            arguments: &[
-                "verified-path:0x0123456789abcdef:model.mlmodel".to_owned(),
-                "literal:--multi".to_owned(),
-                "descriptor-carrier:0:0:4096:42".to_owned(),
-            ],
-            output_byte_length: 4,
-        };
-        assert!(validate_adapter_launch(Some(&ordered_arguments), 1).is_ok());
-        let control = render_adapter_control(&ordered_arguments);
-        assert!(control.starts_with(
-            "nuis-provider-worker-adapter-control-v1\tnuis-provider-worker-process-adapter-v4\t"
-        ));
-        assert_eq!(
-            control.split('\t').skip(7).collect::<Vec<_>>(),
-            ordered_arguments.arguments
-        );
-        assert!(!control.contains("adapter_argument_"));
-
-        let oversized_argument = format!("literal:{}", "x".repeat(2048));
-        let oversized = ProviderWorkerAdapterLaunch {
-            arguments: &[oversized_argument],
-            ..ordered_arguments
-        };
-        assert!(validate_adapter_launch(Some(&oversized), 1).is_err());
-        assert!(validate_dispatch_payload_size(
-            &"x".repeat(MAX_PROVIDER_WORKER_DISPATCH_PAYLOAD_BYTES + 1)
-        )
-        .expect_err("oversized provider control payload")
-        .contains("dispatch payload is too large"));
-    }
-}
+#[path = "provider_worker_lease_tests.rs"]
+mod tests;

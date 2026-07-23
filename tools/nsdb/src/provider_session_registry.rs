@@ -1,4 +1,5 @@
 use crate::provider_sample_payload::fnv1a64_hex;
+use std::collections::BTreeSet;
 
 pub(crate) const PROVIDER_SESSION_REGISTRY_CONTRACT: &str = "nuis-provider-session-registry-v1";
 pub(crate) const PROVIDER_SESSION_REGISTRY_SOURCE: &str = "builtin-provider-session-registry";
@@ -46,6 +47,13 @@ pub(crate) struct ProviderSessionRequest {
     pub(crate) sequence: usize,
     pub(crate) output_handle_id: String,
     pub(crate) output_ownership_token: String,
+    pub(crate) output_handles: Vec<ProviderSessionOutputHandle>,
+}
+
+pub(crate) struct ProviderSessionOutputHandle {
+    pub(crate) role: String,
+    pub(crate) handle_id: String,
+    pub(crate) ownership_token: String,
 }
 
 impl ProviderSessionLease {
@@ -66,15 +74,35 @@ impl ProviderSessionLease {
         }
     }
 
-    pub(crate) fn begin_request(
+    pub(crate) fn begin_request_with_output_roles(
         &mut self,
         request_id: &str,
+        output_roles: &[String],
     ) -> Result<ProviderSessionRequest, String> {
         if self.status != "open" || self.active_request.is_some() {
             return Err("provider session lease cannot begin another request".to_owned());
         }
+        let unique_roles = output_roles.iter().collect::<BTreeSet<_>>();
+        if output_roles.is_empty()
+            || output_roles.len() > 8
+            || unique_roles.len() != output_roles.len()
+            || output_roles.iter().any(|role| !is_output_role(role))
+        {
+            return Err("provider session output roles are invalid".to_owned());
+        }
         let sequence = self.next_sequence;
         self.active_request = Some(request_id.to_owned());
+        let output_handles = output_roles
+            .iter()
+            .map(|role| ProviderSessionOutputHandle {
+                role: role.clone(),
+                handle_id: format!("{}:output:{sequence}:{request_id}:{role}", self.lease_id),
+                ownership_token: format!(
+                    "glm:provider-session-output:{}:{sequence}:{request_id}:{role}",
+                    self.provider_family
+                ),
+            })
+            .collect::<Vec<_>>();
         Ok(ProviderSessionRequest {
             lease_id: self.lease_id.clone(),
             session_adapter_id: self.adapter.adapter_id,
@@ -82,11 +110,9 @@ impl ProviderSessionLease {
             session_continuity: self.adapter.continuity,
             session_lifecycle_hooks: self.adapter.lifecycle_hooks,
             sequence,
-            output_handle_id: format!("{}:output:{sequence}:{request_id}", self.lease_id),
-            output_ownership_token: format!(
-                "glm:provider-session-output:{}:{sequence}:{request_id}",
-                self.provider_family
-            ),
+            output_handle_id: output_handles[0].handle_id.clone(),
+            output_ownership_token: output_handles[0].ownership_token.clone(),
+            output_handles,
         })
     }
 
@@ -108,6 +134,13 @@ impl ProviderSessionLease {
     }
 }
 
+fn is_output_role(value: &str) -> bool {
+    value.starts_with("output.")
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -117,12 +150,23 @@ mod tests {
         let adapter =
             select_provider_session_adapter("real-device-provider-runner").expect("adapter");
         let mut lease = ProviderSessionLease::open("trace", "coreml:apple-ane", adapter);
-        let first = lease.begin_request("affine").expect("first");
+        let roles = ["output.result".to_owned()];
+        let first = lease
+            .begin_request_with_output_roles("affine", &roles)
+            .expect("first");
         assert_eq!(first.sequence, 0);
         assert!(first.output_ownership_token.starts_with("glm:"));
-        assert!(lease.begin_request("add").is_err());
+        assert!(lease
+            .begin_request_with_output_roles("add", &roles)
+            .is_err());
         lease.complete_request("affine").expect("complete");
-        assert_eq!(lease.begin_request("add").expect("second").sequence, 1);
+        assert_eq!(
+            lease
+                .begin_request_with_output_roles("add", &roles)
+                .expect("second")
+                .sequence,
+            1
+        );
     }
 
     #[test]
@@ -132,5 +176,31 @@ mod tests {
         assert_eq!(adapter.continuity, "graph-lease-only");
         assert_eq!(adapter.device_handle_retention_status, "unsupported");
         assert!(select_provider_session_adapter("host-fallback").is_none());
+    }
+
+    #[test]
+    fn request_allocates_ordered_role_bound_output_handles() {
+        let adapter =
+            select_provider_session_adapter("real-device-provider-runner").expect("adapter");
+        let mut lease = ProviderSessionLease::open("trace", "data:host", adapter);
+        let request = lease
+            .begin_request_with_output_roles(
+                "fan-out",
+                &["output.primary".to_owned(), "output.audit".to_owned()],
+            )
+            .expect("multi-output request");
+        assert_eq!(request.output_handles.len(), 2);
+        assert_eq!(
+            request
+                .output_handles
+                .iter()
+                .map(|handle| handle.role.as_str())
+                .collect::<Vec<_>>(),
+            ["output.primary", "output.audit"]
+        );
+        assert_ne!(
+            request.output_handles[0].ownership_token,
+            request.output_handles[1].ownership_token
+        );
     }
 }

@@ -1,6 +1,12 @@
 use std::path::PathBuf;
 use std::process::Command;
 
+use crate::provider_worker_descriptor_capability::{
+    ProviderWorkerDescriptorCapability, ProviderWorkerOutputDescriptorCapability,
+    PROVIDER_WORKER_DESCRIPTOR_CAPABILITY_CONTRACT,
+    PROVIDER_WORKER_OUTPUT_DESCRIPTOR_CAPABILITY_CONTRACT,
+};
+
 pub(crate) const PROVIDER_WORKER_IMAGE_REGISTRY_CONTRACT: &str =
     "nuis-provider-worker-image-registry-v1";
 pub(crate) const PROVIDER_WORKER_IMAGE_REGISTRY_SOURCE: &str =
@@ -17,6 +23,8 @@ pub(crate) struct ProviderWorkerImageRegistration {
     pub(crate) cache_identity: &'static str,
     pub(crate) provider_key: i64,
     pub(crate) capability_hash: i64,
+    pub(crate) descriptor_capability: ProviderWorkerDescriptorCapability,
+    pub(crate) output_descriptor_capability: ProviderWorkerOutputDescriptorCapability,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -88,11 +96,20 @@ pub(crate) fn select_provider_worker_image_registration(
         registry_source: PROVIDER_WORKER_IMAGE_REGISTRY_SOURCE,
         image_id: "std.provider-worker.unix.v1",
         source_path: "stdlib/std/provider_worker_image.ns",
-        cache_identity: "std.provider-worker.unix.aot-v22",
+        cache_identity: "std.provider-worker.unix.aot-v25",
         provider_key: stable_registration_scalar(provider_family.as_bytes()),
         capability_hash: stable_registration_scalar(
             format!("{provider_family}:provider-worker-capability-v1").as_bytes(),
         ),
+        descriptor_capability: ProviderWorkerDescriptorCapability {
+            contract: PROVIDER_WORKER_DESCRIPTOR_CAPABILITY_CONTRACT,
+            max_semantic_descriptors: 31,
+            max_control_descriptors: 1,
+        },
+        output_descriptor_capability: ProviderWorkerOutputDescriptorCapability {
+            contract: PROVIDER_WORKER_OUTPUT_DESCRIPTOR_CAPABILITY_CONTRACT,
+            max_output_descriptors: 8,
+        },
     })
 }
 

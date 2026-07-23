@@ -25,6 +25,35 @@ impl ResolvedProviderWorkerImage {
             "NUIS_PROVIDER_WORKER_CAPABILITY_HASH",
             self.registration.capability_hash.to_string(),
         );
+        command.env(
+            "NUIS_PROVIDER_WORKER_DESCRIPTOR_CONTRACT",
+            self.registration.descriptor_capability.contract,
+        );
+        command.env(
+            "NUIS_PROVIDER_WORKER_MAX_SEMANTIC_DESCRIPTORS",
+            self.registration
+                .descriptor_capability
+                .max_semantic_descriptors
+                .to_string(),
+        );
+        command.env(
+            "NUIS_PROVIDER_WORKER_MAX_CONTROL_DESCRIPTORS",
+            self.registration
+                .descriptor_capability
+                .max_control_descriptors
+                .to_string(),
+        );
+        command.env(
+            "NUIS_PROVIDER_WORKER_OUTPUT_DESCRIPTOR_CONTRACT",
+            self.registration.output_descriptor_capability.contract,
+        );
+        command.env(
+            "NUIS_PROVIDER_WORKER_MAX_OUTPUT_DESCRIPTORS",
+            self.registration
+                .output_descriptor_capability
+                .max_output_descriptors
+                .to_string(),
+        );
         command
     }
 }

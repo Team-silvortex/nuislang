@@ -176,6 +176,28 @@ fn push_provider_request_summary(out: &mut String, request: &ProviderRequest) {
     );
     push_toml_string(
         out,
+        "provider_output_binding_contract",
+        crate::provider_request::PROVIDER_OUTPUT_BINDING_CONTRACT,
+    );
+    push_toml_string(
+        out,
+        "provider_output_binding_count",
+        &request.output_bindings.len().to_string(),
+    );
+    for (index, binding) in request.output_bindings.iter().enumerate() {
+        push_toml_string(
+            out,
+            &format!("provider_output_binding_{index}_role"),
+            &binding.role,
+        );
+        push_toml_string(
+            out,
+            &format!("provider_output_binding_{index}_buffer"),
+            &binding.buffer,
+        );
+    }
+    push_toml_string(
+        out,
         "provider_input_binding_contract",
         crate::provider_input_binding::PROVIDER_INPUT_BINDING_CONTRACT,
     );

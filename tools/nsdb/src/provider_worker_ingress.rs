@@ -50,9 +50,7 @@ pub(crate) fn map_verified_unix_request_to_ingress(
     let capsule_token = payload_scalar(&request.payload, "capsule_token", "capsule-token:")?;
     let input_role_count = payload_scalar(&request.payload, "inputs", "")?;
     let output_role_count = payload_scalar(&request.payload, "outputs", "")?;
-    let descriptor_count = request
-        .descriptors
-        .len()
+    let descriptor_count = semantic_descriptor_count(&request.descriptor_roles)?
         .try_into()
         .map_err(|_| "provider worker descriptor count exceeds the scalar ABI".to_owned())?;
     if capsule_token <= 0 || input_role_count != descriptor_count || output_role_count <= 0 {
@@ -68,6 +66,19 @@ pub(crate) fn map_verified_unix_request_to_ingress(
         input_role_count,
         output_role_count,
     })
+}
+
+fn semantic_descriptor_count(roles: &[String]) -> Result<usize, String> {
+    let control_positions = roles
+        .iter()
+        .enumerate()
+        .filter_map(|(index, role)| (role == "control.adapter").then_some(index))
+        .collect::<Vec<_>>();
+    match control_positions.as_slice() {
+        [] => Ok(roles.len()),
+        [index] if *index + 1 == roles.len() => Ok(roles.len() - 1),
+        _ => Err("provider worker control descriptor role must be unique and last".to_owned()),
+    }
 }
 
 fn payload_scalar(payload: &[u8], key: &str, prefix: &str) -> Result<i64, String> {
@@ -151,5 +162,33 @@ mod tests {
         assert_eq!(fields.input_role_count, 1);
         assert_eq!(fields.output_role_count, 1);
         assert_eq!(invoke_provider_worker_ingress(ingress_probe, fields), 5675);
+    }
+
+    #[test]
+    fn control_descriptor_is_not_a_semantic_capsule_input() {
+        let input: OwnedFd = File::open("/dev/null").expect("input").into();
+        let control: OwnedFd = File::open("/dev/null").expect("control").into();
+        let payload = b"capsule_token=capsule-token:3030\ninputs=1\noutputs=1\n".to_vec();
+        let request = UnixWorkerRequest {
+            lease_id: "lease:test".to_owned(),
+            sequence: 0,
+            request_id: "request.test".to_owned(),
+            payload_hash: fnv1a64_hex(&payload),
+            payload,
+            descriptor_roles: vec!["input.0".to_owned(), "control.adapter".to_owned()],
+            descriptors: vec![input, control],
+        };
+        let fields = map_verified_unix_request_to_ingress(
+            &request,
+            101,
+            501,
+            ProviderWorkerIngressRegistration {
+                provider_key: 20,
+                capability_hash: 2020,
+            },
+        )
+        .expect("control descriptor is transport-only");
+        assert_eq!(fields.descriptor_count, 1);
+        assert_eq!(fields.input_role_count, 1);
     }
 }

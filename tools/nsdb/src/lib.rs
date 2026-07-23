@@ -36,12 +36,16 @@ mod provider_sample_execution;
 mod provider_sample_materialize;
 #[cfg(test)]
 mod provider_sample_materialize_tests;
+mod provider_sample_output_model;
 mod provider_sample_payload;
 #[cfg(test)]
 mod provider_sample_payload_tests;
 mod provider_sample_runner;
 mod provider_session_registry;
 mod provider_transport_receipt_payload;
+#[cfg(unix)]
+mod provider_worker_control;
+mod provider_worker_descriptor_capability;
 mod provider_worker_image;
 mod provider_worker_ingress;
 #[cfg(unix)]

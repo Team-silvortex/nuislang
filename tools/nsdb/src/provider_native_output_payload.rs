@@ -91,6 +91,10 @@ pub(crate) fn push_native_output_summary(
             "worker_adapter_control_contract",
             summary.worker_adapter_control_contract.as_str(),
         ),
+        (
+            "worker_adapter_control_mode",
+            summary.worker_adapter_control_mode.as_str(),
+        ),
         ("worker_pid", summary.worker_pid.as_str()),
         (
             "worker_request_sequence",
@@ -99,6 +103,28 @@ pub(crate) fn push_native_output_summary(
         (
             "worker_descriptor_count",
             summary.worker_descriptor_count.as_str(),
+        ),
+        (
+            "worker_descriptor_capability_contract",
+            summary.worker_descriptor_capability_contract.as_str(),
+        ),
+        (
+            "worker_max_semantic_descriptors",
+            summary.worker_max_semantic_descriptors.as_str(),
+        ),
+        (
+            "worker_max_control_descriptors",
+            summary.worker_max_control_descriptors.as_str(),
+        ),
+        (
+            "worker_output_descriptor_capability_contract",
+            summary
+                .worker_output_descriptor_capability_contract
+                .as_str(),
+        ),
+        (
+            "worker_max_output_descriptors",
+            summary.worker_max_output_descriptors.as_str(),
         ),
         ("worker_payload_hash", summary.worker_payload_hash.as_str()),
         (
@@ -166,6 +192,22 @@ pub(crate) fn push_native_output_summary(
             summary.worker_output_descriptor_hash.as_str(),
         ),
         (
+            "worker_additional_output_roles",
+            summary.worker_additional_output_roles.as_str(),
+        ),
+        (
+            "worker_additional_output_byte_lengths",
+            summary.worker_additional_output_byte_lengths.as_str(),
+        ),
+        (
+            "worker_additional_output_hashes",
+            summary.worker_additional_output_hashes.as_str(),
+        ),
+        (
+            "worker_additional_output_retention_statuses",
+            summary.worker_additional_output_retention_statuses.as_str(),
+        ),
+        (
             "worker_output_receipt_status",
             summary.worker_output_receipt_status.as_str(),
         ),
@@ -189,6 +231,12 @@ pub(crate) fn push_native_output_summary(
         (
             "output_handle_ownership_token",
             summary.output_handle_ownership_token.as_str(),
+        ),
+        ("output_handle_roles", summary.output_handle_roles.as_str()),
+        ("output_handle_ids", summary.output_handle_ids.as_str()),
+        (
+            "output_handle_ownership_tokens",
+            summary.output_handle_ownership_tokens.as_str(),
         ),
         (
             "output_handle_release_status",
@@ -339,6 +387,10 @@ pub(crate) fn push_indexed_native_output(
             "worker_adapter_control_contract",
             summary.worker_adapter_control_contract.as_str(),
         ),
+        (
+            "worker_adapter_control_mode",
+            summary.worker_adapter_control_mode.as_str(),
+        ),
         ("worker_pid", summary.worker_pid.as_str()),
         (
             "worker_request_sequence",
@@ -347,6 +399,28 @@ pub(crate) fn push_indexed_native_output(
         (
             "worker_descriptor_count",
             summary.worker_descriptor_count.as_str(),
+        ),
+        (
+            "worker_descriptor_capability_contract",
+            summary.worker_descriptor_capability_contract.as_str(),
+        ),
+        (
+            "worker_max_semantic_descriptors",
+            summary.worker_max_semantic_descriptors.as_str(),
+        ),
+        (
+            "worker_max_control_descriptors",
+            summary.worker_max_control_descriptors.as_str(),
+        ),
+        (
+            "worker_output_descriptor_capability_contract",
+            summary
+                .worker_output_descriptor_capability_contract
+                .as_str(),
+        ),
+        (
+            "worker_max_output_descriptors",
+            summary.worker_max_output_descriptors.as_str(),
         ),
         ("worker_payload_hash", summary.worker_payload_hash.as_str()),
         (
@@ -414,6 +488,22 @@ pub(crate) fn push_indexed_native_output(
             summary.worker_output_descriptor_hash.as_str(),
         ),
         (
+            "worker_additional_output_roles",
+            summary.worker_additional_output_roles.as_str(),
+        ),
+        (
+            "worker_additional_output_byte_lengths",
+            summary.worker_additional_output_byte_lengths.as_str(),
+        ),
+        (
+            "worker_additional_output_hashes",
+            summary.worker_additional_output_hashes.as_str(),
+        ),
+        (
+            "worker_additional_output_retention_statuses",
+            summary.worker_additional_output_retention_statuses.as_str(),
+        ),
+        (
             "worker_output_receipt_status",
             summary.worker_output_receipt_status.as_str(),
         ),
@@ -437,6 +527,12 @@ pub(crate) fn push_indexed_native_output(
         (
             "output_handle_ownership_token",
             summary.output_handle_ownership_token.as_str(),
+        ),
+        ("output_handle_roles", summary.output_handle_roles.as_str()),
+        ("output_handle_ids", summary.output_handle_ids.as_str()),
+        (
+            "output_handle_ownership_tokens",
+            summary.output_handle_ownership_tokens.as_str(),
         ),
         (
             "output_handle_release_status",

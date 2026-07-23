@@ -5,8 +5,8 @@ use crate::{
 };
 use std::{fs::File, os::fd::OwnedFd};
 
-pub(crate) fn consume_worker_result(
-    descriptors: &mut Vec<OwnedFd>,
+pub(crate) fn consume_worker_result_descriptor(
+    descriptor: OwnedFd,
     mode: &str,
     packet_len: usize,
     packet_hash: &str,
@@ -15,16 +15,9 @@ pub(crate) fn consume_worker_result(
     if mode != "nuispfd1-result" {
         return Ok(None);
     }
-    if descriptors.len() != 1 {
-        return Err("provider worker direct result requires one descriptor".to_owned());
-    }
     let packet_hash = parse_hex_hash(packet_hash, "packet")?;
     let output_hash = parse_protocol_hash(adapter_protocol)?;
-    let file = File::from(
-        descriptors
-            .pop()
-            .expect("validated provider worker result descriptor"),
-    );
+    let file = File::from(descriptor);
     let carrier = InheritedFdCarrier::from_received_single_frame(file, packet_len, packet_hash)?;
     let (frame, carrier) = carrier.verify_written_output(output_hash)?;
     Ok(Some(ProviderOutputCarrierConsumption {

@@ -93,7 +93,7 @@ The repository currently verifies:
 * binary-safe, length-bound, hash-bound request and response payloads
 * open-ended provider, adapter, and operation registration identities
 * a Nuis-authored lifecycle and request-ingress loop
-* a reply protocol, `NUISPWUR6`, carrying the positive Nuis invocation status,
+* a reply protocol, `NUISPWUR7`, carrying the positive Nuis invocation status,
   request identity without body echo, bounded adapter metadata, and a
   worker-owned output carrier role, mode, length, and hash
 * a worker error receipt, `NUISPWUE1`, preserving failure stage and status
@@ -122,9 +122,15 @@ binary closure.
 
 The provider-neutral execution capsule contract, its Nuis/YIR ingress, concrete
 Metal/CoreML invocation below the persistent worker, graph-scoped adapter image
-cache, and compact bounded adapter control record now exist. The highest-value
-next boundary is a hash-bound control carrier for manifests that exceed the
-portable inline budget without consuming semantic capsule input roles.
+cache, compact bounded adapter control record, hash-bound control carrier, and
+registration-negotiated descriptor capacity now exist. The v3 handshake
+separates 31 semantic input slots from one transport-control slot and a
+registered eight-output budget; a provider-neutral regression proves
+three-input fan-in and two-output fan-out. Ordered output bindings now reach the
+provider request, worker lease, and session: all reply descriptors are retained
+and verified, and every output role receives its own session handle and GLM
+ownership token. The highest-value next boundary is publishing all of those
+outputs into graph ownership rather than only the compatibility primary output.
 
 The worker should consume:
 
@@ -196,7 +202,7 @@ Safe wording:
 * `registered heterogeneous worker boundary`
 * `worker-authorized operation permit`
 * `worker-invoked provider-neutral execution capsule`
-* `NUISPWUR6 worker-owned direct result-carrier receipt`
+* `NUISPWUR7 ordered multi-output result-carrier receipt`
 * `ordered hash-bound worker process-adapter launch for Metal and large/chained/fan-in CoreML`
 * `real Metal/CoreML provider smoke`
 * `binary-linking convergence`
@@ -206,6 +212,10 @@ Safe wording:
 * `one compiled CoreML adapter image reused by chained and fan-in requests`
 * `nuis-provider-worker-adapter-control-v1 compact bounded control metadata`
 * `oversized provider control rejected before sendmsg`
+* `hash-bound control.adapter carrier excluded from capsule input counts`
+* `NUISPWUH3 registration-negotiated input/control/output descriptor capacity`
+* `provider-neutral three-input fan-in plus one control descriptor`
+* `provider-neutral two-output fan-out with independent length/hash/mode evidence`
 
 ## Exit Evidence
 

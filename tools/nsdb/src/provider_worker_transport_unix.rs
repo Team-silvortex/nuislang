@@ -1,3 +1,8 @@
+use crate::provider_worker_descriptor_capability::{
+    ProviderWorkerDescriptorCapability, ProviderWorkerOutputDescriptorCapability,
+    PROVIDER_WORKER_DESCRIPTOR_CAPABILITY_CONTRACT,
+    PROVIDER_WORKER_OUTPUT_DESCRIPTOR_CAPABILITY_CONTRACT,
+};
 use crate::provider_worker_request::{
     decode_provider_worker_reply, decode_provider_worker_request, encode_provider_worker_request,
     render_role_manifest, validate_frame_token, MAX_PROVIDER_WORKER_DESCRIPTORS,
@@ -21,6 +26,8 @@ pub(crate) struct UnixWorkerProcessTransport {
     lease_id: String,
     next_sequence: usize,
     worker_pid: u32,
+    descriptor_capability: ProviderWorkerDescriptorCapability,
+    output_descriptor_capability: ProviderWorkerOutputDescriptorCapability,
     closed: bool,
 }
 
@@ -35,10 +42,10 @@ pub(crate) struct UnixWorkerProcessReply {
     pub(crate) descriptor_roles: Vec<String>,
     pub(crate) output_descriptors: Vec<OwnedFd>,
     pub(crate) output_descriptor_roles: Vec<String>,
-    pub(crate) output_descriptor_byte_length: usize,
-    pub(crate) output_descriptor_hash: String,
-    pub(crate) output_descriptor_mode: String,
-    pub(crate) output_descriptor_payload: Vec<u8>,
+    pub(crate) output_descriptor_byte_lengths: Vec<usize>,
+    pub(crate) output_descriptor_hashes: Vec<String>,
+    pub(crate) output_descriptor_modes: Vec<String>,
+    pub(crate) output_descriptor_payloads: Vec<Vec<u8>>,
     pub(crate) adapter_protocol: Vec<u8>,
 }
 
@@ -63,8 +70,15 @@ pub(crate) fn worker_socket_pair() -> Result<(UnixDatagram, UnixDatagram), Strin
 }
 
 impl UnixWorkerProcessTransport {
-    pub(crate) fn spawn(command: &mut Command, lease_id: &str) -> Result<Self, String> {
+    pub(crate) fn spawn(
+        command: &mut Command,
+        lease_id: &str,
+        descriptor_capability: ProviderWorkerDescriptorCapability,
+        output_descriptor_capability: ProviderWorkerOutputDescriptorCapability,
+    ) -> Result<Self, String> {
         validate_frame_token(lease_id, "lease id")?;
+        descriptor_capability.validate()?;
+        output_descriptor_capability.validate()?;
         let (parent_socket, child_socket) = worker_socket_pair()?;
         parent_socket
             .set_read_timeout(Some(WORKER_IO_TIMEOUT))
@@ -98,7 +112,11 @@ impl UnixWorkerProcessTransport {
             }
             let handshake = receive_text(&parent_socket)?;
             let fields = handshake.split('\t').collect::<Vec<_>>();
-            if fields.len() != 2 || fields[0] != "NUISPWUH1" {
+            if fields.len() != 8
+                || fields[0] != "NUISPWUH3"
+                || fields[2] != PROVIDER_WORKER_DESCRIPTOR_CAPABILITY_CONTRACT
+                || fields[6] != PROVIDER_WORKER_OUTPUT_DESCRIPTOR_CAPABILITY_CONTRACT
+            {
                 return Err("Unix provider worker handshake is invalid".to_owned());
             }
             let worker_pid = fields[1]
@@ -106,6 +124,27 @@ impl UnixWorkerProcessTransport {
                 .map_err(|error| format!("Unix provider worker pid is invalid: {error}"))?;
             if worker_pid != child.id() {
                 return Err("Unix provider worker handshake pid mismatch".to_owned());
+            }
+            let semantic_limit = fields[3].parse::<usize>().map_err(|error| {
+                format!("Unix provider worker semantic descriptor limit is invalid: {error}")
+            })?;
+            let control_limit = fields[4].parse::<usize>().map_err(|error| {
+                format!("Unix provider worker control descriptor limit is invalid: {error}")
+            })?;
+            let total_limit = fields[5].parse::<usize>().map_err(|error| {
+                format!("Unix provider worker total descriptor limit is invalid: {error}")
+            })?;
+            if semantic_limit != descriptor_capability.max_semantic_descriptors
+                || control_limit != descriptor_capability.max_control_descriptors
+                || total_limit != descriptor_capability.total_limit()
+            {
+                return Err("Unix provider worker descriptor capability mismatch".to_owned());
+            }
+            let output_limit = fields[7].parse::<usize>().map_err(|error| {
+                format!("Unix provider worker output descriptor limit is invalid: {error}")
+            })?;
+            if output_limit != output_descriptor_capability.max_output_descriptors {
+                return Err("Unix provider worker output descriptor capability mismatch".to_owned());
             }
             Ok(worker_pid)
         })();
@@ -129,6 +168,8 @@ impl UnixWorkerProcessTransport {
             lease_id: lease_id.to_owned(),
             next_sequence: 0,
             worker_pid,
+            descriptor_capability,
+            output_descriptor_capability,
             closed: false,
         })
     }
@@ -142,6 +183,12 @@ impl UnixWorkerProcessTransport {
         if self.closed {
             return Err("Unix provider worker is closed".to_owned());
         }
+        let descriptor_roles = descriptors
+            .iter()
+            .map(|descriptor| descriptor.role)
+            .collect::<Vec<_>>();
+        self.descriptor_capability
+            .validate_roles(&descriptor_roles)?;
         let sequence = self.next_sequence;
         if let Err(error) = send_worker_request(
             &self.socket,
@@ -160,10 +207,6 @@ impl UnixWorkerProcessTransport {
                 .unwrap_or_default();
             return Err(format!("{error}{exited}"));
         }
-        let descriptor_roles = descriptors
-            .iter()
-            .map(|descriptor| descriptor.role)
-            .collect::<Vec<_>>();
         wait_for_worker_reply(&self.socket, &mut self.child, request_id)?;
         let reply = receive_process_reply(
             &self.socket,
@@ -173,6 +216,7 @@ impl UnixWorkerProcessTransport {
             self.worker_pid,
             payload,
             &descriptor_roles,
+            self.output_descriptor_capability,
         )
         .map_err(|error| {
             let exited = self
@@ -463,9 +507,13 @@ fn receive_process_reply(
     expected_worker_pid: u32,
     expected_payload: &[u8],
     expected_descriptor_roles: &[&str],
+    output_descriptor_capability: ProviderWorkerOutputDescriptorCapability,
 ) -> Result<UnixWorkerProcessReply, String> {
     let (packet, output_descriptors) = receive_reply_packet(socket)?;
     let envelope = decode_provider_worker_reply(&packet, output_descriptors.len())?;
+    if envelope.output_descriptor_count > output_descriptor_capability.max_output_descriptors {
+        return Err("Unix provider worker output descriptor capacity exceeded".to_owned());
+    }
     let expected_payload_hash = crate::provider_sample_artifact::fnv1a64_hex(expected_payload);
     if envelope.lease_id != expected_lease_id
         || envelope.sequence != expected_sequence
@@ -484,11 +532,11 @@ fn receive_process_reply(
     {
         return Err("Unix provider worker receipt identity mismatch".to_owned());
     }
-    let output_descriptor_payload = verify_output_descriptors(
+    let output_descriptor_payloads = verify_output_descriptors(
         &output_descriptors,
-        envelope.output_descriptor_byte_length,
-        &envelope.output_descriptor_hash,
-        &envelope.output_descriptor_mode,
+        &envelope.output_descriptor_byte_lengths,
+        &envelope.output_descriptor_hashes,
+        &envelope.output_descriptor_modes,
     )?;
     Ok(UnixWorkerProcessReply {
         sequence: expected_sequence,
@@ -501,10 +549,10 @@ fn receive_process_reply(
         descriptor_roles: envelope.descriptor_roles,
         output_descriptors,
         output_descriptor_roles: envelope.output_descriptor_roles,
-        output_descriptor_byte_length: envelope.output_descriptor_byte_length,
-        output_descriptor_hash: envelope.output_descriptor_hash,
-        output_descriptor_mode: envelope.output_descriptor_mode,
-        output_descriptor_payload,
+        output_descriptor_byte_lengths: envelope.output_descriptor_byte_lengths,
+        output_descriptor_hashes: envelope.output_descriptor_hashes,
+        output_descriptor_modes: envelope.output_descriptor_modes,
+        output_descriptor_payloads,
         adapter_protocol: envelope.adapter_protocol,
     })
 }
@@ -544,40 +592,53 @@ fn receive_reply_packet(socket: &UnixDatagram) -> Result<(Vec<u8>, Vec<OwnedFd>)
 
 fn verify_output_descriptors(
     descriptors: &[OwnedFd],
-    byte_length: usize,
-    expected_hash: &str,
-    mode: &str,
-) -> Result<Vec<u8>, String> {
+    byte_lengths: &[usize],
+    expected_hashes: &[String],
+    modes: &[String],
+) -> Result<Vec<Vec<u8>>, String> {
     if descriptors.is_empty() {
-        return (byte_length == 0 && expected_hash == "0x0000000000000000" && mode == "none")
+        return (byte_lengths.is_empty() && expected_hashes.is_empty() && modes.is_empty())
             .then(Vec::new)
             .ok_or_else(|| "provider worker empty output receipt is inconsistent".to_owned());
     }
-    if descriptors.len() != 1 || byte_length == 0 {
-        return Err("provider worker output descriptor shape is unsupported".to_owned());
+    if descriptors.len() != byte_lengths.len()
+        || descriptors.len() != expected_hashes.len()
+        || descriptors.len() != modes.len()
+    {
+        return Err("provider worker output descriptor metadata count mismatch".to_owned());
     }
-    if mode == "nuispfd1-result" {
-        return Ok(Vec::new());
+    let mut payloads = Vec::with_capacity(descriptors.len());
+    for (((descriptor, byte_length), expected_hash), mode) in descriptors
+        .iter()
+        .zip(byte_lengths)
+        .zip(expected_hashes)
+        .zip(modes)
+    {
+        if mode == "nuispfd1-result" {
+            payloads.push(Vec::new());
+            continue;
+        }
+        if mode != "protocol-stdout" || *byte_length == 0 || *byte_length > MAX_FRAME_BYTES {
+            return Err("provider worker output descriptor mode is unsupported".to_owned());
+        }
+        let mut bytes = vec![0u8; *byte_length];
+        let read = unsafe {
+            libc::pread(
+                descriptor.as_raw_fd(),
+                bytes.as_mut_ptr().cast(),
+                bytes.len(),
+                0,
+            )
+        };
+        if read < 0 || read as usize != bytes.len() {
+            return Err("provider worker output descriptor payload is unreadable".to_owned());
+        }
+        if crate::provider_sample_artifact::fnv1a64_hex(&bytes) != *expected_hash {
+            return Err("provider worker output descriptor hash mismatch".to_owned());
+        }
+        payloads.push(bytes);
     }
-    if mode != "protocol-stdout" || byte_length > MAX_FRAME_BYTES {
-        return Err("provider worker output descriptor mode is unsupported".to_owned());
-    }
-    let mut bytes = vec![0u8; byte_length];
-    let read = unsafe {
-        libc::pread(
-            descriptors[0].as_raw_fd(),
-            bytes.as_mut_ptr().cast(),
-            bytes.len(),
-            0,
-        )
-    };
-    if read < 0 || read as usize != bytes.len() {
-        return Err("provider worker output descriptor payload is unreadable".to_owned());
-    }
-    if crate::provider_sample_artifact::fnv1a64_hex(&bytes) != expected_hash {
-        return Err("provider worker output descriptor hash mismatch".to_owned());
-    }
-    Ok(bytes)
+    Ok(payloads)
 }
 
 fn receive_packet(socket: &UnixDatagram) -> Result<Vec<u8>, String> {
@@ -602,195 +663,5 @@ fn descriptor_control_buffer(count: usize) -> Vec<u8> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::{
-        fs::{self, File},
-        io::Read,
-        os::fd::AsFd,
-        path::PathBuf,
-        time::SystemTime,
-    };
-
-    #[test]
-    fn rights_frame_binds_identity_count_and_cloexec() {
-        let (sender, receiver) = worker_socket_pair().expect("pair");
-        let file = File::open("Cargo.toml").expect("file");
-        let descriptors = [UnixWorkerDescriptor {
-            role: "input.primary",
-            descriptor: file.as_fd(),
-        }];
-        send_worker_request(
-            &sender,
-            "lease:test",
-            2,
-            "request.test",
-            &[0, b'\n', 0xff],
-            &descriptors,
-        )
-        .expect("send");
-        let request =
-            receive_worker_request(&receiver, "lease:test", 2, "request.test").expect("receive");
-        assert_eq!(request.descriptors.len(), 1);
-        assert_eq!(request.payload, [0, b'\n', 0xff]);
-        assert_eq!(request.descriptor_roles, ["input.primary"]);
-        assert_ne!(
-            unsafe { libc::fcntl(request.descriptors[0].as_raw_fd(), libc::F_GETFD) }
-                & libc::FD_CLOEXEC,
-            0
-        );
-        let mut text = String::new();
-        File::from(request.descriptors.into_iter().next().unwrap())
-            .read_to_string(&mut text)
-            .expect("read");
-        assert!(text.contains("[workspace]") || text.contains("[package]"));
-    }
-
-    #[test]
-    fn identity_mismatch_closes_received_descriptors() {
-        let (sender, receiver) = worker_socket_pair().expect("pair");
-        let file = File::open("Cargo.toml").expect("file");
-        let descriptors = [UnixWorkerDescriptor {
-            role: "input.primary",
-            descriptor: file.as_fd(),
-        }];
-        send_worker_request(
-            &sender,
-            "lease:test",
-            0,
-            "request.test",
-            b"identity",
-            &descriptors,
-        )
-        .expect("send");
-        let request = receive_unchecked(&receiver).expect("receive");
-        let received_fd = request.descriptors[0].as_raw_fd();
-        assert!(validate_received_request(request, "lease:other", 0, "request.test").is_err());
-        assert_eq!(unsafe { libc::fcntl(received_fd, libc::F_GETFD) }, -1);
-        assert_eq!(
-            std::io::Error::last_os_error().raw_os_error(),
-            Some(libc::EBADF)
-        );
-    }
-
-    #[test]
-    fn output_descriptor_receipt_rejects_hash_mismatch() {
-        let file = File::open("Cargo.toml").expect("file");
-        let descriptors = vec![OwnedFd::from(file)];
-        let error =
-            verify_output_descriptors(&descriptors, 1, "0x0000000000000000", "protocol-stdout")
-                .expect_err("forged output hash");
-        assert!(error.contains("output descriptor hash mismatch"));
-    }
-
-    #[test]
-    fn nuis_worker_image_receives_two_distinct_post_spawn_descriptors() {
-        let paths = WorkerProbePaths::new();
-        let first_image = crate::provider_worker_image::resolve_provider_worker_image(
-            "coreml:apple-ane",
-            &paths.output_dir,
-        )
-        .expect("resolve Nuis worker");
-        let cached_image = crate::provider_worker_image::resolve_provider_worker_image(
-            "coreml:apple-ane",
-            &paths.cache_output_dir,
-        )
-        .expect("restore Nuis worker");
-        assert_eq!(cached_image.cache_status, "hit");
-        assert_eq!(first_image.cache_key, cached_image.cache_key);
-        assert_eq!(
-            cached_image.resolver_contract,
-            crate::provider_worker_image::PROVIDER_WORKER_IMAGE_RESOLVER_CONTRACT
-        );
-        fs::write(&paths.first, [17u8]).expect("first");
-        fs::write(&paths.second, [29u8]).expect("second");
-        let first = File::open(&paths.first).expect("first file");
-        let second = File::open(&paths.second).expect("second file");
-        let mut command = cached_image.command();
-        let mut worker =
-            UnixWorkerProcessTransport::spawn(&mut command, "lease:persistent").expect("worker");
-        let first_descriptors = [UnixWorkerDescriptor {
-            role: "input.primary",
-            descriptor: first.as_fd(),
-        }];
-        let first_payload =
-            b"capsule_token=capsule-token:101\ninvoker_token=invoker-token:301\ninput_roles=input.primary\noutput_roles=output.result\ninputs=1\noutputs=1\n";
-        let first_reply = worker
-            .request("first", first_payload, &first_descriptors)
-            .expect("first request");
-        let second_descriptors = [UnixWorkerDescriptor {
-            role: "output.result",
-            descriptor: second.as_fd(),
-        }];
-        let second_payload =
-            b"capsule_token=capsule-token:202\ninvoker_token=invoker-token:302\ninput_roles=output.result\noutput_roles=output.result\ninputs=1\noutputs=1\n";
-        let second_reply = worker
-            .request("second", second_payload, &second_descriptors)
-            .expect("second request");
-        assert_eq!((first_reply.sequence, second_reply.sequence), (0, 1));
-        assert_eq!(
-            (
-                first_reply.request_id.as_str(),
-                second_reply.request_id.as_str()
-            ),
-            ("first", "second")
-        );
-        assert_eq!(first_reply.worker_pid, second_reply.worker_pid);
-        assert_eq!(
-            (first_reply.first_byte_sum, second_reply.first_byte_sum),
-            (17, 29)
-        );
-        assert_eq!(
-            (first_reply.dispatch_status, second_reply.dispatch_status),
-            (1, 2)
-        );
-        assert_eq!(first_reply.descriptor_roles, ["input.primary"]);
-        assert_eq!(second_reply.descriptor_roles, ["output.result"]);
-        assert_eq!(first_reply.output_descriptor_roles, ["output.result"]);
-        assert_eq!(second_reply.output_descriptor_roles, ["output.result"]);
-        assert_eq!(first_reply.output_descriptors.len(), 1);
-        assert_eq!(second_reply.output_descriptors.len(), 1);
-        assert_eq!(first_reply.output_descriptor_byte_length, 24);
-        assert_eq!(second_reply.output_descriptor_byte_length, 24);
-        assert_ne!(first_reply.output_descriptor_hash, "0x0000000000000000");
-        assert_eq!(
-            first_reply.payload_hash,
-            crate::provider_sample_artifact::fnv1a64_hex(first_payload)
-        );
-        assert_eq!(worker.close().expect("close"), first_reply.worker_pid);
-    }
-
-    struct WorkerProbePaths {
-        output_dir: PathBuf,
-        cache_output_dir: PathBuf,
-        first: PathBuf,
-        second: PathBuf,
-    }
-
-    impl WorkerProbePaths {
-        fn new() -> Self {
-            let nonce = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos();
-            let stem = format!("nuis-provider-worker-{}-{nonce}", std::process::id());
-            let temp = std::env::temp_dir();
-            Self {
-                output_dir: temp.join(format!("{stem}.build")),
-                cache_output_dir: temp.join(format!("{stem}.cached-build")),
-                first: temp.join(format!("{stem}.first")),
-                second: temp.join(format!("{stem}.second")),
-            }
-        }
-    }
-
-    impl Drop for WorkerProbePaths {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.output_dir);
-            let _ = fs::remove_dir_all(&self.cache_output_dir);
-            for path in [&self.first, &self.second] {
-                let _ = fs::remove_file(path);
-            }
-        }
-    }
-}
+#[path = "provider_worker_transport_unix_tests.rs"]
+mod tests;

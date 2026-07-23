@@ -3,9 +3,9 @@ use crate::provider_sample_artifact::fnv1a64_hex;
 pub(crate) const PROVIDER_WORKER_REQUEST_CONTRACT: &str =
     "nuis-provider-worker-request-envelope-v1";
 pub(crate) const PROVIDER_WORKER_REQUEST_MAGIC: &str = "NUISPWU2";
-pub(crate) const PROVIDER_WORKER_REPLY_MAGIC: &str = "NUISPWUR6";
+pub(crate) const PROVIDER_WORKER_REPLY_MAGIC: &str = "NUISPWUR7";
 pub(crate) const MAX_PROVIDER_WORKER_PAYLOAD_BYTES: usize = 60 * 1024;
-pub(crate) const MAX_PROVIDER_WORKER_DESCRIPTORS: usize = 16;
+pub(crate) use crate::provider_worker_descriptor_capability::PROVIDER_WORKER_DESCRIPTOR_ENVELOPE_LIMIT as MAX_PROVIDER_WORKER_DESCRIPTORS;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct ProviderWorkerRequestEnvelope {
@@ -32,9 +32,9 @@ pub(crate) struct ProviderWorkerReplyEnvelope {
     pub(crate) payload_hash: String,
     pub(crate) output_descriptor_count: usize,
     pub(crate) output_descriptor_roles: Vec<String>,
-    pub(crate) output_descriptor_byte_length: usize,
-    pub(crate) output_descriptor_hash: String,
-    pub(crate) output_descriptor_mode: String,
+    pub(crate) output_descriptor_byte_lengths: Vec<usize>,
+    pub(crate) output_descriptor_hashes: Vec<String>,
+    pub(crate) output_descriptor_modes: Vec<String>,
     pub(crate) adapter_protocol: Vec<u8>,
     pub(crate) adapter_protocol_hash: String,
 }
@@ -117,9 +117,9 @@ pub(crate) struct ProviderWorkerReplyIdentity<'a> {
     pub(crate) descriptor_roles: &'a [&'a str],
     pub(crate) output_descriptor_count: usize,
     pub(crate) output_descriptor_roles: &'a [&'a str],
-    pub(crate) output_descriptor_byte_length: usize,
-    pub(crate) output_descriptor_hash: &'a str,
-    pub(crate) output_descriptor_mode: &'a str,
+    pub(crate) output_descriptor_byte_lengths: &'a [usize],
+    pub(crate) output_descriptor_hashes: &'a [&'a str],
+    pub(crate) output_descriptor_modes: &'a [&'a str],
 }
 
 pub(crate) fn encode_provider_worker_reply(
@@ -135,11 +135,16 @@ pub(crate) fn encode_provider_worker_reply(
         return Err("provider worker reply descriptor role count mismatch".to_owned());
     }
     validate_descriptor_roles(identity.output_descriptor_roles)?;
-    validate_frame_token(identity.output_descriptor_mode, "output descriptor mode")?;
     validate_payload(adapter_protocol)?;
     if identity.output_descriptor_count != identity.output_descriptor_roles.len() {
         return Err("provider worker output descriptor role count mismatch".to_owned());
     }
+    validate_output_descriptor_metadata(
+        identity.output_descriptor_count,
+        identity.output_descriptor_byte_lengths,
+        identity.output_descriptor_hashes,
+        identity.output_descriptor_modes,
+    )?;
     let payload_hash = fnv1a64_hex(payload);
     let adapter_protocol_hash = fnv1a64_hex(adapter_protocol);
     let roles = render_role_manifest(identity.descriptor_roles);
@@ -156,9 +161,9 @@ pub(crate) fn encode_provider_worker_reply(
         payload.len(),
         identity.output_descriptor_count,
         render_role_manifest(identity.output_descriptor_roles),
-        identity.output_descriptor_byte_length,
-        identity.output_descriptor_hash,
-        identity.output_descriptor_mode,
+        render_usize_manifest(identity.output_descriptor_byte_lengths),
+        render_string_manifest(identity.output_descriptor_hashes),
+        render_string_manifest(identity.output_descriptor_modes),
         adapter_protocol.len(),
     );
     let mut frame = Vec::with_capacity(header.len() + adapter_protocol.len());
@@ -215,14 +220,33 @@ pub(crate) fn decode_provider_worker_reply(
         return Err("provider worker output descriptor count mismatch".to_owned());
     }
     let output_descriptor_roles = parse_role_manifest(fields[13], output_descriptor_count)?;
-    let output_descriptor_byte_length = parse_usize(fields[14], "output descriptor byte length")?;
-    validate_hash_token(fields[15], "output descriptor hash")?;
-    validate_frame_token(fields[16], "output descriptor mode")?;
-    if (output_descriptor_count == 0)
-        != (output_descriptor_byte_length == 0 && fields[15] == "0x0000000000000000")
-    {
-        return Err("provider worker output descriptor metadata is inconsistent".to_owned());
-    }
+    let output_descriptor_byte_lengths = parse_usize_manifest(
+        fields[14],
+        output_descriptor_count,
+        "output descriptor byte length",
+    )?;
+    let output_descriptor_hashes = parse_string_manifest(
+        fields[15],
+        output_descriptor_count,
+        "output descriptor hash",
+    )?;
+    let output_descriptor_modes = parse_string_manifest(
+        fields[16],
+        output_descriptor_count,
+        "output descriptor mode",
+    )?;
+    validate_output_descriptor_metadata(
+        output_descriptor_count,
+        &output_descriptor_byte_lengths,
+        &output_descriptor_hashes
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        &output_descriptor_modes
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+    )?;
     Ok(ProviderWorkerReplyEnvelope {
         lease_id: fields[1].to_owned(),
         sequence: parse_usize(fields[2], "reply sequence")?,
@@ -241,9 +265,9 @@ pub(crate) fn decode_provider_worker_reply(
         payload_hash: fields[11].to_owned(),
         output_descriptor_count,
         output_descriptor_roles,
-        output_descriptor_byte_length,
-        output_descriptor_hash: fields[15].to_owned(),
-        output_descriptor_mode: fields[16].to_owned(),
+        output_descriptor_byte_lengths,
+        output_descriptor_hashes,
+        output_descriptor_modes,
         adapter_protocol: adapter_protocol.to_vec(),
         adapter_protocol_hash,
     })
@@ -255,6 +279,72 @@ pub(crate) fn render_role_manifest(descriptor_roles: &[&str]) -> String {
     } else {
         descriptor_roles.join(",")
     }
+}
+
+fn render_usize_manifest(values: &[usize]) -> String {
+    if values.is_empty() {
+        "-".to_owned()
+    } else {
+        values
+            .iter()
+            .map(usize::to_string)
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+}
+
+fn render_string_manifest(values: &[&str]) -> String {
+    if values.is_empty() {
+        "-".to_owned()
+    } else {
+        values.join(",")
+    }
+}
+
+fn parse_usize_manifest(
+    value: &str,
+    expected_count: usize,
+    name: &str,
+) -> Result<Vec<usize>, String> {
+    parse_string_manifest(value, expected_count, name)?
+        .iter()
+        .map(|value| parse_usize(value, name))
+        .collect()
+}
+
+fn parse_string_manifest(
+    value: &str,
+    expected_count: usize,
+    name: &str,
+) -> Result<Vec<String>, String> {
+    let values = if value == "-" {
+        Vec::new()
+    } else {
+        value.split(',').map(str::to_owned).collect::<Vec<_>>()
+    };
+    if values.len() != expected_count {
+        return Err(format!("provider worker {name} manifest count mismatch"));
+    }
+    Ok(values)
+}
+
+fn validate_output_descriptor_metadata(
+    count: usize,
+    lengths: &[usize],
+    hashes: &[&str],
+    modes: &[&str],
+) -> Result<(), String> {
+    if lengths.len() != count || hashes.len() != count || modes.len() != count {
+        return Err("provider worker output descriptor metadata count mismatch".to_owned());
+    }
+    for ((length, hash), mode) in lengths.iter().zip(hashes).zip(modes) {
+        if *length == 0 {
+            return Err("provider worker output descriptor length must be positive".to_owned());
+        }
+        validate_hash_token(hash, "output descriptor hash")?;
+        validate_frame_token(mode, "output descriptor mode")?;
+    }
+    Ok(())
 }
 
 fn parse_role_manifest(value: &str, expected_count: usize) -> Result<Vec<String>, String> {
@@ -377,26 +467,35 @@ mod tests {
                 dispatch_status: 5,
                 request_payload_hash: &request_payload_hash,
                 descriptor_roles: &["input.primary", "output.result"],
-                output_descriptor_count: 1,
-                output_descriptor_roles: &["output.result"],
-                output_descriptor_byte_length: 24,
-                output_descriptor_hash: "0x1111111111111111",
-                output_descriptor_mode: "nuispfd1-result",
+                output_descriptor_count: 2,
+                output_descriptor_roles: &["output.result", "output.audit"],
+                output_descriptor_byte_lengths: &[24, 8],
+                output_descriptor_hashes: &["0x1111111111111111", "0x2222222222222222"],
+                output_descriptor_modes: &["nuispfd1-result", "protocol-stdout"],
             },
             &payload,
             b"status=ready\n",
         )
         .expect("encode");
-        let decoded = decode_provider_worker_reply(&encoded, 1).expect("decode");
+        let decoded = decode_provider_worker_reply(&encoded, 2).expect("decode");
         assert_eq!(decoded.request_payload_length, payload.len());
         assert_eq!(decoded.payload_hash, fnv1a64_hex(&payload));
         assert_eq!(decoded.descriptor_roles, ["input.primary", "output.result"]);
         assert_eq!(decoded.dispatch_status, 5);
         assert_eq!(decoded.request_payload_hash, fnv1a64_hex(&payload));
-        assert_eq!(decoded.output_descriptor_roles, ["output.result"]);
-        assert_eq!(decoded.output_descriptor_byte_length, 24);
-        assert_eq!(decoded.output_descriptor_hash, "0x1111111111111111");
-        assert_eq!(decoded.output_descriptor_mode, "nuispfd1-result");
+        assert_eq!(
+            decoded.output_descriptor_roles,
+            ["output.result", "output.audit"]
+        );
+        assert_eq!(decoded.output_descriptor_byte_lengths, [24, 8]);
+        assert_eq!(
+            decoded.output_descriptor_hashes,
+            ["0x1111111111111111", "0x2222222222222222"]
+        );
+        assert_eq!(
+            decoded.output_descriptor_modes,
+            ["nuispfd1-result", "protocol-stdout"]
+        );
         assert_eq!(decoded.adapter_protocol, b"status=ready\n");
     }
 
@@ -415,9 +514,9 @@ mod tests {
                 descriptor_roles: &[],
                 output_descriptor_count: 0,
                 output_descriptor_roles: &[],
-                output_descriptor_byte_length: 0,
-                output_descriptor_hash: "0x0000000000000000",
-                output_descriptor_mode: "none",
+                output_descriptor_byte_lengths: &[],
+                output_descriptor_hashes: &[],
+                output_descriptor_modes: &[],
             },
             b"request",
             b"",

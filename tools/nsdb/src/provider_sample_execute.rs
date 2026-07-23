@@ -359,7 +359,13 @@ fn execute_native_provider_outputs(
             .or_insert_with(|| {
                 ProviderSessionLease::open(&record.trace_id, provider_family, session_adapter)
             });
-        let session_request = session.begin_request(&request.kernel.id)?;
+        let output_roles = request
+            .output_bindings
+            .iter()
+            .map(|binding| binding.role.clone())
+            .collect::<Vec<_>>();
+        let session_request =
+            session.begin_request_with_output_roles(&request.kernel.id, &output_roles)?;
         let mut execution = execute_native_provider_request(
             output_dir,
             record,
@@ -416,6 +422,24 @@ fn bind_session_output(
     summary.output_handle_contract = PROVIDER_OUTPUT_HANDLE_CONTRACT.to_owned();
     summary.output_handle_id = request.output_handle_id.clone();
     summary.output_handle_ownership_token = request.output_ownership_token.clone();
+    summary.output_handle_roles = request
+        .output_handles
+        .iter()
+        .map(|handle| handle.role.as_str())
+        .collect::<Vec<_>>()
+        .join(",");
+    summary.output_handle_ids = request
+        .output_handles
+        .iter()
+        .map(|handle| handle.handle_id.as_str())
+        .collect::<Vec<_>>()
+        .join(",");
+    summary.output_handle_ownership_tokens = request
+        .output_handles
+        .iter()
+        .map(|handle| handle.ownership_token.as_str())
+        .collect::<Vec<_>>()
+        .join(",");
     summary.output_handle_release_status = "lease-bound".to_owned();
 }
 

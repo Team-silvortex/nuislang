@@ -576,7 +576,7 @@ now closes the request-meaning boundary. `NUISPWU2` separates a UTF-8 control
 header from opaque bytes, binds the bytes by length and FNV-1a hash, and requires
 one ordered semantic role for every transferred descriptor. The C worker parses
 binary payloads containing NUL, newline, and non-UTF-8 bytes, independently
-checks the hash and role count. `NUISPWUR6` completes the reverse direction
+checks the hash and role count. `NUISPWUR7` completes the reverse direction
 without echoing the request body: it binds request length/hash identity, input
 and output role manifests, bounded adapter-protocol length/hash, output carrier
 mode, and worker-owned descriptor length/hash. It carries the positive status
@@ -666,8 +666,9 @@ registration-resolved Nuis worker per adapter/session, binds worker sequence to
 the logical session sequence, transfers every available prepared input through
 SCM_RIGHTS, records worker identity, resolver/cache status, descriptor count,
 and payload hash in each indexed native output, and closes all workers at graph
-teardown. Startup is an explicit `NUISPWUH0 -> NUISPWUH1` exchange with bounded
-socket I/O. Content cache entries remain shared, while each live adapter gets a
+teardown. Startup began as `NUISPWUH0 -> NUISPWUH1` and is now upgraded to the
+capacity-bearing `NUISPWUH3` reply, with bounded socket I/O. Content cache
+entries remain shared, while each live adapter gets a
 separate transient restored executable directory; this avoids rewriting a
 running Mach-O image when a second backend starts, and all transient copies are
 removed after close. The five-request official WitSage/PixelMagic graph now
@@ -698,7 +699,7 @@ a stable capsule id/token, and final output evidence records its honest
 `nuis-provider-execution-capsule-invoker-v1` now derives an open invoker
 identity from that capsule. The persistent Nuis worker explicitly calls the
 invoker after eight-scalar Data Nustar ingress succeeds. Its thin Unix adapter
-creates an anonymous result descriptor and returns it through `NUISPWUR6` with
+creates an anonymous result descriptor and returns it through `NUISPWUR7` with
 an output role, carrier mode, byte length, and FNV hash. Nsdb receives the
 descriptor through SCM_RIGHTS and independently verifies all fields
 before recording `worker-invoked` and `verified`; it does not construct the
@@ -740,6 +741,52 @@ two-input fan-in route passes through the compact record, while a unit
 regression proves oversized metadata fails closed. The next boundary is a
 hash-bound control-carrier class for manifests that exceed the inline budget;
 it must remain distinct from semantic `input.N` capsule roles.
+
+`nuis-provider-worker-adapter-control-carrier-v1` now closes that boundary.
+Manifests above the 384-byte inline control budget are written to an immediately
+unlinked file, while the request carries only its contract, byte length, and
+FNV hash. Its SCM_RIGHTS role is `control.adapter`, must be unique and last, and
+is excluded from Nuis ingress descriptor count, capsule input roles, input byte
+sum, and adapter argument descriptor indices. The v25 worker independently
+reads the exact declared length, rejects trailing bytes or hash drift, and then
+parses the same open control record. Official CoreML execution reports
+`worker_adapter_control_mode = carrier` while the Add node still reports two
+semantic descriptors.
+
+`nuis-provider-worker-descriptor-capability-v1` closes the hidden fixed-capacity
+boundary. Worker image registration declares 31 semantic input slots and one
+transport-control slot, the launch environment carries the same values, and
+the PID-bound `NUISPWUH3` handshake rejects disagreement before any request is
+sent. Nsdb validates every role set before `sendmsg`, while the C ABI adapter
+enforces the negotiated quotas after ancillary receipt. A provider-neutral
+worker regression transfers three semantic inputs plus one trailing
+`control.adapter`; only the semantic bytes contribute to the input sum and Nuis
+capsule count. Native output evidence exposes the negotiated contract and both
+limits.
+
+`nuis-provider-worker-output-descriptor-capability-v1` now separately registers
+an eight-output budget without conflating output fan-out with input/control
+capacity. `NUISPWUH3` proves both capability contracts before request traffic.
+`NUISPWUR7` replaces the single output length/hash/mode fields with ordered
+manifests aligned to output roles and received descriptors; Nsdb independently
+reads and hashes every ordinary output. A provider-neutral regression now
+combines three semantic inputs, one control descriptor, and two output roles,
+then verifies two distinct 24-byte carriers with different hashes. Existing
+Metal/CoreML adapters remain valid single-output consumers of slot zero.
+
+`nuis-provider-output-binding-v1` now lifts that ordered fan-out into
+`ProviderRequest`: each output has a distinct role and buffer identity while
+the first binding remains the compatibility `kernel.output_buffer`.
+`ProviderWorkerLease` consumes and verifies every returned descriptor instead
+of dropping descriptors above slot zero, and reports the retained payload or
+transferable-carrier state for each additional role. Provider sessions allocate
+one `nuis-provider-output-handle-v1` handle and GLM ownership token per role,
+with the compatibility handle pointing at the primary binding. The remaining
+boundary is graph publication: completed outputs are still indexed only by
+request identity and only the primary output reaches downstream dependency
+lookup. The next slice must index completion by request plus output
+buffer/role, preserve every carrier through graph close, and prove that two
+consumers can select distinct outputs from one producer.
 
 Return-producing `if` lowering now preserves control dependence for nested
 extern-call comparisons. The open `compare_call_result` mode of

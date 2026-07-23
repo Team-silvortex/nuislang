@@ -138,7 +138,7 @@ Current native execution baseline:
 * `nuis-provider-worker-request-envelope-v1` carries hash-checked opaque binary
   request bytes plus one ordered semantic role for every transferred descriptor
   and returns independently hash-checked opaque result bytes plus the positive
-  Nuis invocation status through `NUISPWUR6`
+  Nuis invocation status through `NUISPWUR7`
 * `std` now provides a Nuis-authored provider-worker lifecycle contract and an
   AOT-executed native loop recipe; C and Objective-C runners remain thin ABI
   probes or one-shot fallbacks rather than worker control-plane implementations
@@ -146,7 +146,7 @@ Current native execution baseline:
   handles and capability hashes without enumerating finite backend combinations
 * provider/adapter/operation registration derives an identity-bound operation
   token; the worker reply carries the positive Nuis invocation status and a
-  role/length/hash-bound worker output descriptor through `NUISPWUR6`, and
+  role/length/hash-bound worker output descriptor through `NUISPWUR7`, and
   non-positive status fails closed before execution is accepted
 * final output summaries preserve the operation token, permit contract, permit
   status, worker dispatch status, PID, sequence, descriptor count, and payload
