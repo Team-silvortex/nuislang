@@ -154,7 +154,7 @@ fn validate_surface_pattern_for_domain(
 }
 pub(super) fn render_manifest(manifest: &NustarPackageManifest) -> String {
     format!(
-        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nabi_profiles = {}\nabi_capabilities = {}\nabi_targets = {}\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nhost_ffi_surface = {}\nhost_ffi_abis = {}\nhost_ffi_bridge = \"{}\"\nsupport_surface = {}\nsupport_profile_slots = {}\ncapability_tags = {}\ndefault_lanes = {}\nclock_domain_id = \"{}\"\nclock_kind = \"{}\"\nclock_epoch_kind = \"{}\"\nclock_resolution = \"{}\"\nclock_bridge_default = \"{}\"\nprofiles = {}\nresource_families = {}\nunit_types = {}\nlowering_targets = {}\nops = {}\n",
+        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nabi_profiles = {}\nabi_capabilities = {}\nabi_targets = {}\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nhost_ffi_surface = {}\nhost_ffi_abis = {}\nhost_ffi_bridge = \"{}\"\nsupport_surface = {}\nsupport_profile_slots = {}\ncapability_tags = {}\ndefault_lanes = {}\nprovider_bundles = {}\nclock_domain_id = \"{}\"\nclock_kind = \"{}\"\nclock_epoch_kind = \"{}\"\nclock_resolution = \"{}\"\nclock_bridge_default = \"{}\"\nprofiles = {}\nresource_families = {}\nunit_types = {}\nlowering_targets = {}\nops = {}\n",
         manifest.manifest_schema,
         manifest.package_id,
         manifest.domain_family,
@@ -184,6 +184,7 @@ pub(super) fn render_manifest(manifest: &NustarPackageManifest) -> String {
         render_array(&manifest.support_profile_slots),
         render_array(&manifest.capability_tags),
         render_array(&manifest.default_lanes),
+        render_array(&manifest.provider_bundles),
         manifest.clock_domain_id,
         manifest.clock_kind,
         manifest.clock_epoch_kind,
@@ -293,6 +294,8 @@ pub(super) fn parse_manifest_text(
         capability_tags: parse_optional_string_array(source, "capability_tags")
             .unwrap_or_else(|| infer_default_capability_tags(&domain_family)),
         default_lanes: parse_optional_string_array(source, "default_lanes").unwrap_or_default(),
+        provider_bundles: parse_optional_string_array(source, "provider_bundles")
+            .unwrap_or_default(),
         clock_domain_id: parse_required_string(source, "clock_domain_id", path)?,
         clock_kind: parse_required_string(source, "clock_kind", path)?,
         clock_epoch_kind: parse_required_string(source, "clock_epoch_kind", path)?,

@@ -97,6 +97,10 @@ pub fn validate_registered_domains(root: &Path) -> Result<Vec<NustarRegistryIssu
 
     let mut issues = Vec::new();
     let mut seen_packages = BTreeSet::new();
+    let mut seen_provider_bundle_ids = BTreeSet::new();
+    let mut seen_provider_families = BTreeSet::new();
+    let mut seen_provider_adapter_kinds = BTreeSet::new();
+    let mut seen_provider_rust_consts = BTreeSet::new();
     for entry in &index {
         let manifest_path = manifest_path(&root, entry);
         if !seen_packages.insert(entry.package_id.clone()) {
@@ -116,6 +120,54 @@ pub fn validate_registered_domains(root: &Path) -> Result<Vec<NustarRegistryIssu
         let source = fs::read_to_string(&manifest_path)
             .map_err(|error| format!("failed to read `{}`: {error}", manifest_path.display()))?;
         let manifest = parse_manifest(&source, &manifest_path)?;
+
+        match crate::registry::provider_bundle_registrations(&manifest) {
+            Ok(registrations) => {
+                for registration in registrations {
+                    for (label, value, inserted) in [
+                        (
+                            "bundle id",
+                            registration.bundle_id.as_str(),
+                            seen_provider_bundle_ids.insert(registration.bundle_id.clone()),
+                        ),
+                        (
+                            "provider family",
+                            registration.provider_family.as_str(),
+                            seen_provider_families.insert(registration.provider_family.clone()),
+                        ),
+                        (
+                            "adapter kind",
+                            registration.adapter_kind.as_str(),
+                            seen_provider_adapter_kinds.insert(registration.adapter_kind.clone()),
+                        ),
+                        (
+                            "Rust const",
+                            registration.rust_const.as_str(),
+                            seen_provider_rust_consts.insert(registration.rust_const.clone()),
+                        ),
+                    ] {
+                        if !inserted {
+                            issues.push(NustarRegistryIssue {
+                                kind: NustarRegistryIssueKind::ProviderBundleContractMismatch,
+                                package: Some(manifest.package_id.clone()),
+                                domain: Some(manifest.domain_family.clone()),
+                                manifest_path: Some(manifest_path.display().to_string()),
+                                message: format!(
+                                    "provider bundle {label} `{value}` is duplicated across the registry"
+                                ),
+                            });
+                        }
+                    }
+                }
+            }
+            Err(error) => issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::ProviderBundleContractMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(manifest.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: error,
+            }),
+        }
 
         if manifest.package_id != entry.package_id {
             issues.push(NustarRegistryIssue {

@@ -139,6 +139,8 @@ mod tests {
     // helpers stay in each test file until they prove reusable across files.
     #[path = "abi_recommendation.rs"]
     mod abi_recommendation;
+    #[path = "abi_recommendation_shader.rs"]
+    mod abi_recommendation_shader;
     #[path = "galaxy_resolution.rs"]
     mod galaxy_resolution;
     #[path = "multidomain_async.rs"]

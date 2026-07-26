@@ -144,6 +144,8 @@ pub(crate) fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageM
     let capability_tags = parse_optional_string_array(source, "capability_tags")
         .unwrap_or_else(|| infer_default_capability_tags(&domain_family));
     let default_lanes = parse_optional_string_array(source, "default_lanes").unwrap_or_default();
+    let provider_bundles =
+        parse_optional_string_array(source, "provider_bundles").unwrap_or_default();
     let clock_domain_id = parse_optional_string(source, "clock_domain_id")
         .unwrap_or_else(|| format!("{domain_family}.clock.local.v1"));
     let clock_kind =
@@ -227,6 +229,7 @@ pub(crate) fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageM
         support_profile_slots,
         capability_tags,
         default_lanes,
+        provider_bundles,
         clock_domain_id,
         clock_kind,
         clock_epoch_kind,

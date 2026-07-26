@@ -4,6 +4,8 @@ use std::{fs, path::Path};
 pub(crate) const DEVICE_PROVIDER_SAMPLE_FILE_NAME: &str = "nuis.nsdb.device-provider-samples.toml";
 const DEVICE_PROVIDER_SAMPLE_PROTOCOL: &str = "nuis-device-provider-samples-v1";
 const DEVICE_PROVIDER_SAMPLE_SCHEMA: &str = "nsdb-yir-device-provider-sample-v1";
+const PROVIDER_BUNDLE_REGISTRY_CONTRACT: &str = "nuis-provider-bundle-registry-v1";
+const PROVIDER_BUNDLE_MANIFEST_CONTRACT: &str = "nuis-provider-bundle-manifest-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldDeviceProviderSampleEvidence {
@@ -14,6 +16,12 @@ pub(crate) struct NsldDeviceProviderSampleEvidence {
     pub(crate) ready_record_count: usize,
     pub(crate) pending_record_count: usize,
     pub(crate) blocked_record_count: usize,
+    pub(crate) provider_bundle_registry_contract: Option<String>,
+    pub(crate) provider_bundle_manifest_contract: Option<String>,
+    pub(crate) provider_bundle_manifest_hash: Option<String>,
+    pub(crate) provider_bundle_manifest_entry_count: Option<usize>,
+    pub(crate) first_provider_bundle_package_id: Option<String>,
+    pub(crate) first_provider_bundle_id: Option<String>,
     pub(crate) first_provider_family: Option<String>,
     pub(crate) first_materialization_status: Option<String>,
     pub(crate) first_blocker: Option<String>,
@@ -33,6 +41,12 @@ pub(crate) fn nsld_device_provider_sample_evidence(
             ready_record_count: 0,
             pending_record_count: 0,
             blocked_record_count: 0,
+            provider_bundle_registry_contract: None,
+            provider_bundle_manifest_contract: None,
+            provider_bundle_manifest_hash: None,
+            provider_bundle_manifest_entry_count: None,
+            first_provider_bundle_package_id: None,
+            first_provider_bundle_id: None,
             first_provider_family: None,
             first_materialization_status: None,
             first_blocker: None,
@@ -50,6 +64,21 @@ pub(crate) fn nsld_device_provider_sample_evidence(
     let pending_record_count = toml::usize_value(&source, "pending_record_count")
         .unwrap_or_else(|| provider_sample_pending_count(&records));
     let blocked_record_count = provider_sample_blocked_count(&records);
+    let provider_bundle_registry_contract =
+        toml::string_value(&source, "provider_bundle_registry_contract");
+    let provider_bundle_manifest_contract =
+        toml::string_value(&source, "provider_bundle_manifest_contract");
+    let provider_bundle_manifest_hash =
+        toml::string_value(&source, "provider_bundle_manifest_hash");
+    let provider_bundle_manifest_entry_count =
+        toml::usize_value(&source, "provider_bundle_manifest_entry_count");
+    let first_provider_bundle_package_id = toml::first_table_string_value(
+        &source,
+        "device_provider_samples",
+        "provider_bundle_package_id",
+    );
+    let first_provider_bundle_id =
+        toml::first_table_string_value(&source, "device_provider_samples", "provider_bundle_id");
     let first_provider_family =
         toml::first_table_string_value(&source, "device_provider_samples", "provider_family");
     let first_materialization_status = toml::first_table_string_value(
@@ -64,6 +93,12 @@ pub(crate) fn nsld_device_provider_sample_evidence(
         ready_record_count,
         pending_record_count,
         blocked_record_count,
+        provider_bundle_registry_contract.as_deref(),
+        provider_bundle_manifest_contract.as_deref(),
+        provider_bundle_manifest_hash.as_deref(),
+        provider_bundle_manifest_entry_count,
+        first_provider_bundle_package_id.as_deref(),
+        first_provider_bundle_id.as_deref(),
     );
     let first_blocker = provider_sample_first_blocker(
         &status,
@@ -81,6 +116,12 @@ pub(crate) fn nsld_device_provider_sample_evidence(
         ready_record_count,
         pending_record_count,
         blocked_record_count,
+        provider_bundle_registry_contract,
+        provider_bundle_manifest_contract,
+        provider_bundle_manifest_hash,
+        provider_bundle_manifest_entry_count,
+        first_provider_bundle_package_id,
+        first_provider_bundle_id,
         first_provider_family,
         first_materialization_status,
         first_blocker,
@@ -94,11 +135,26 @@ fn provider_sample_status(
     ready_record_count: usize,
     pending_record_count: usize,
     blocked_record_count: usize,
+    provider_bundle_registry_contract: Option<&str>,
+    provider_bundle_manifest_contract: Option<&str>,
+    provider_bundle_manifest_hash: Option<&str>,
+    provider_bundle_manifest_entry_count: Option<usize>,
+    first_provider_bundle_package_id: Option<&str>,
+    first_provider_bundle_id: Option<&str>,
 ) -> String {
     if protocol != DEVICE_PROVIDER_SAMPLE_PROTOCOL || schema != DEVICE_PROVIDER_SAMPLE_SCHEMA {
         "unsupported-protocol"
     } else if record_count == 0 {
         "empty"
+    } else if !provider_bundle_evidence_is_valid(
+        provider_bundle_registry_contract,
+        provider_bundle_manifest_contract,
+        provider_bundle_manifest_hash,
+        provider_bundle_manifest_entry_count,
+        first_provider_bundle_package_id,
+        first_provider_bundle_id,
+    ) {
+        "provider-bundle-evidence-invalid"
     } else if blocked_record_count > 0 {
         "blocked-provider-sample"
     } else if pending_record_count > 0 {
@@ -109,6 +165,27 @@ fn provider_sample_status(
         "partial"
     }
     .to_owned()
+}
+
+fn provider_bundle_evidence_is_valid(
+    registry_contract: Option<&str>,
+    manifest_contract: Option<&str>,
+    manifest_hash: Option<&str>,
+    manifest_entry_count: Option<usize>,
+    first_package_id: Option<&str>,
+    first_bundle_id: Option<&str>,
+) -> bool {
+    registry_contract == Some(PROVIDER_BUNDLE_REGISTRY_CONTRACT)
+        && manifest_contract == Some(PROVIDER_BUNDLE_MANIFEST_CONTRACT)
+        && manifest_hash.is_some_and(|hash| {
+            hash.len() == "fnv1a64:0000000000000000".len()
+                && hash
+                    .strip_prefix("fnv1a64:")
+                    .is_some_and(|value| value.bytes().all(|byte| byte.is_ascii_hexdigit()))
+        })
+        && manifest_entry_count.is_some_and(|count| count > 0)
+        && first_package_id.is_some_and(|value| !value.trim().is_empty())
+        && first_bundle_id.is_some_and(|value| !value.trim().is_empty())
 }
 
 fn provider_sample_first_blocker(
@@ -130,6 +207,10 @@ fn provider_sample_first_blocker(
             first_provider_family.unwrap_or("unknown-provider-family"),
             blocked_record_count,
             first_materialization_status.unwrap_or("provider-sample-blocked")
+        )),
+        "provider-bundle-evidence-invalid" => Some(format!(
+            "device-provider-sample:{}:provider-bundle-evidence-invalid",
+            first_provider_family.unwrap_or("unknown-provider-family")
         )),
         _ => Some(format!(
             "device-provider-sample:{}:{}",

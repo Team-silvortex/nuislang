@@ -28,6 +28,12 @@ pub struct ProviderSampleMaterializeReport {
     pub materialized_record_count: usize,
     pub skipped_record_count: usize,
     pub first_provider_family: String,
+    pub provider_bundle_registry_contract: String,
+    pub provider_bundle_manifest_contract: String,
+    pub provider_bundle_manifest_hash: String,
+    pub provider_bundle_manifest_entry_count: usize,
+    pub first_provider_bundle_package_id: String,
+    pub first_provider_bundle_id: String,
     pub first_provider_runner_contract: String,
     pub first_provider_runner_adapter_contract: String,
     pub first_provider_runner_adapter_id: String,
@@ -111,6 +117,9 @@ pub fn materialize_provider_samples(
             .and_then(provider_output_payload_from_record)
             .as_ref(),
     );
+    let first_provider_bundle = records.first().and_then(|record| {
+        crate::provider_bundle_registry::provider_bundle_evidence(&record.provider_family)
+    });
     Ok(ProviderSampleMaterializeReport {
         path: path.display().to_string(),
         provider_family_filter: provider_family_filter.map(str::to_owned),
@@ -124,6 +133,29 @@ pub fn materialize_provider_samples(
             .first()
             .map(|record| record.provider_family.clone())
             .unwrap_or_else(|| "none".to_owned()),
+        provider_bundle_registry_contract: first_provider_bundle
+            .map(|bundle| bundle.registry_contract)
+            .unwrap_or("none")
+            .to_owned(),
+        provider_bundle_manifest_contract: first_provider_bundle
+            .map(|bundle| bundle.manifest_contract)
+            .unwrap_or("none")
+            .to_owned(),
+        provider_bundle_manifest_hash: first_provider_bundle
+            .map(|bundle| bundle.manifest_hash)
+            .unwrap_or("none")
+            .to_owned(),
+        provider_bundle_manifest_entry_count: first_provider_bundle
+            .map(|bundle| bundle.manifest_entry_count)
+            .unwrap_or(0),
+        first_provider_bundle_package_id: first_provider_bundle
+            .map(|bundle| bundle.package_id)
+            .unwrap_or("none")
+            .to_owned(),
+        first_provider_bundle_id: first_provider_bundle
+            .map(|bundle| bundle.bundle_id)
+            .unwrap_or("none")
+            .to_owned(),
         first_provider_runner_contract: records
             .first()
             .map(|record| provider_runner_for(record).contract.to_owned())
@@ -470,11 +502,40 @@ fn render_materialized_manifest(records: &[NsdbDeviceProviderSampleRecordInfo]) 
     out.push_str(&format!("record_count = {}\n", records.len()));
     out.push_str(&format!("ready_record_count = {ready_count}\n"));
     out.push_str(&format!("pending_record_count = {pending_count}\n"));
+    if let Some(bundle) = records.first().and_then(|record| {
+        crate::provider_bundle_registry::provider_bundle_evidence(&record.provider_family)
+    }) {
+        push_toml_string(
+            &mut out,
+            "provider_bundle_registry_contract",
+            bundle.registry_contract,
+        );
+        push_toml_string(
+            &mut out,
+            "provider_bundle_manifest_contract",
+            bundle.manifest_contract,
+        );
+        push_toml_string(
+            &mut out,
+            "provider_bundle_manifest_hash",
+            bundle.manifest_hash,
+        );
+        out.push_str(&format!(
+            "provider_bundle_manifest_entry_count = {}\n",
+            bundle.manifest_entry_count
+        ));
+    }
     for record in records {
         out.push_str("\n[[device_provider_samples]]\n");
         push_toml_string(&mut out, "trace_id", &record.trace_id);
         push_toml_string(&mut out, "provider", &record.provider);
         push_toml_string(&mut out, "provider_family", &record.provider_family);
+        if let Some(bundle) =
+            crate::provider_bundle_registry::provider_bundle_evidence(&record.provider_family)
+        {
+            push_toml_string(&mut out, "provider_bundle_package_id", bundle.package_id);
+            push_toml_string(&mut out, "provider_bundle_id", bundle.bundle_id);
+        }
         push_toml_string(
             &mut out,
             "requested_runner_contract",

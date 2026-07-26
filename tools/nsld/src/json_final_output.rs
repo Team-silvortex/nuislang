@@ -347,6 +347,40 @@ pub(crate) fn nsld_final_executable_output_report_json(
             report.device_provider_sample_manifest_blocked_record_count,
         ),
         json_optional_string_field(
+            "device_provider_sample_provider_bundle_registry_contract",
+            report
+                .device_provider_sample_provider_bundle_registry_contract
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "device_provider_sample_provider_bundle_manifest_contract",
+            report
+                .device_provider_sample_provider_bundle_manifest_contract
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "device_provider_sample_provider_bundle_manifest_hash",
+            report
+                .device_provider_sample_provider_bundle_manifest_hash
+                .as_deref(),
+        ),
+        json_optional_usize_field(
+            "device_provider_sample_provider_bundle_manifest_entry_count",
+            report.device_provider_sample_provider_bundle_manifest_entry_count,
+        ),
+        json_optional_string_field(
+            "device_provider_sample_manifest_first_provider_bundle_package_id",
+            report
+                .device_provider_sample_manifest_first_provider_bundle_package_id
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "device_provider_sample_manifest_first_provider_bundle_id",
+            report
+                .device_provider_sample_manifest_first_provider_bundle_id
+                .as_deref(),
+        ),
+        json_optional_string_field(
             "device_provider_sample_manifest_first_provider_family",
             report
                 .device_provider_sample_manifest_first_provider_family

@@ -344,10 +344,16 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "created_unix_ms",
             "owner_token",
             "lock_is_stale",
-            "initialization_marker_detects_anchor_deletion",
-            "existing_anchor_migrates_to_marker_protocol",
             "AnchorCheck::Rollback",
             "AnchorCheck::Fork",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsdb-provider-completion-trust-anchor-regression",
+        path: "tools/nsdb/src/provider_completion_trust_anchor_tests.rs",
+        required_patterns: &[
+            "initialization_marker_detects_anchor_deletion",
+            "existing_anchor_migrates_to_marker_protocol",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -474,10 +480,16 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "created_unix_ms",
             "owner_token",
             "lock_is_stale",
-            "independently_detects_anchor_deletion_with_marker",
-            "independently_migrates_existing_anchor_to_marker",
             "AnchorCheck::Rollback",
             "AnchorCheck::Fork",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-independent-provider-completion-trust-anchor-regression",
+        path: "tools/nuis/src/artifact_nsdb_handoff_trust_anchor_tests.rs",
+        required_patterns: &[
+            "independently_detects_anchor_deletion_with_marker",
+            "independently_migrates_existing_anchor_to_marker",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -632,6 +644,12 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "weakest-bootstrap-status-progress-path",
             "dev_tensor_cell_weakness_key",
             "select_dev_tensor_handoff_bootstrap_cell",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "dev-tensor-status-aware-handoff-selection-regression",
+        path: "tools/nuis/src/dev_tensor_tests.rs",
+        required_patterns: &[
             "handoff_selection_is_status_aware_and_input_order_independent",
             "select current weakest handoff",
         ],
@@ -677,6 +695,35 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "milestone_constant_drift_count",
             "missing-from-milestone-manifest",
             "fallback_used",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "repository-line-budget-contract",
+        path: "tools/nuisc/tests/file_line_limit.rs",
+        required_patterns: &[
+            "DEFAULT_MAX_LINES: usize = 800",
+            "TEST_MAX_LINES: usize = 1000",
+            "MARKDOWN_MAX_LINES: usize = 2000",
+            "repository_text_files_respect_line_budget",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "dev-tensor-runtime-drift-segmentation",
+        path: "tools/nuis/src/dev_tensor_drift_data.rs",
+        required_patterns: &[
+            "DEV_TENSOR_RUNTIME_EXECUTION_DRIFT_CHECKS",
+            "DEV_TENSOR_RUNTIME_PROVIDER_DRIFT_CHECKS",
+            "DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuisc-test-suite-segmentation",
+        path: "tools/nuisc/src/lib_tests.rs",
+        required_patterns: &[
+            "lib_tests_artifact.rs",
+            "lib_tests_execution.rs",
+            "mod artifact_tests",
+            "mod execution_tests",
         ],
     },
 ];

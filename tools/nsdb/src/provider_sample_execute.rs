@@ -54,6 +54,12 @@ pub struct ProviderSampleExecuteReport {
     pub executable_record_count: usize,
     pub output_payload_count: usize,
     pub first_provider_family: String,
+    pub provider_bundle_registry_contract: String,
+    pub provider_bundle_manifest_contract: String,
+    pub provider_bundle_manifest_hash: String,
+    pub provider_bundle_manifest_entry_count: usize,
+    pub first_provider_bundle_package_id: String,
+    pub first_provider_bundle_id: String,
     pub first_provider_runner_adapter_id: String,
     pub first_provider_runner_adapter_capability_status: String,
     pub first_provider_runner_real_device_capable: bool,
@@ -143,6 +149,9 @@ pub fn execute_provider_samples(
                 "none".to_owned(),
             )
         });
+    let first_provider_bundle = matched_records.first().and_then(|record| {
+        crate::provider_bundle_registry::provider_bundle_evidence(&record.provider_family)
+    });
     let mut output_payloads = Vec::new();
     for record in &matched_records {
         let adapter = select_provider_runner_adapter(&record.provider_family);
@@ -232,6 +241,29 @@ pub fn execute_provider_samples(
         executable_record_count: output_payloads.len(),
         output_payload_count: output_payloads.len(),
         first_provider_family: first_provider_boundary.0,
+        provider_bundle_registry_contract: first_provider_bundle
+            .map(|bundle| bundle.registry_contract)
+            .unwrap_or("none")
+            .to_owned(),
+        provider_bundle_manifest_contract: first_provider_bundle
+            .map(|bundle| bundle.manifest_contract)
+            .unwrap_or("none")
+            .to_owned(),
+        provider_bundle_manifest_hash: first_provider_bundle
+            .map(|bundle| bundle.manifest_hash)
+            .unwrap_or("none")
+            .to_owned(),
+        provider_bundle_manifest_entry_count: first_provider_bundle
+            .map(|bundle| bundle.manifest_entry_count)
+            .unwrap_or(0),
+        first_provider_bundle_package_id: first_provider_bundle
+            .map(|bundle| bundle.package_id)
+            .unwrap_or("none")
+            .to_owned(),
+        first_provider_bundle_id: first_provider_bundle
+            .map(|bundle| bundle.bundle_id)
+            .unwrap_or("none")
+            .to_owned(),
         first_provider_runner_adapter_id: first_provider_boundary.1,
         first_provider_runner_adapter_capability_status: first_provider_boundary.2,
         first_provider_runner_real_device_capable: first_provider_boundary.3,

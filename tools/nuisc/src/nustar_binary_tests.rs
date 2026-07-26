@@ -1,6 +1,7 @@
 use super::manifest::parse_optional_string_array;
 use super::*;
 use crate::registry::NustarPackageManifest;
+use std::path::Path;
 
 #[derive(Debug)]
 struct PolicyCase {
@@ -89,6 +90,7 @@ fn make_manifest(domain: &str) -> NustarPackageManifest {
         support_profile_slots: Vec::new(),
         capability_tags: Vec::new(),
         default_lanes: Vec::new(),
+        provider_bundles: Vec::new(),
         clock_domain_id: format!("{domain}.clock.local.v1"),
         clock_kind: "local-monotonic".to_owned(),
         clock_epoch_kind: "domain-epoch".to_owned(),
@@ -117,6 +119,21 @@ fn string_array_parser_preserves_commas_inside_quoted_ffi_signatures() {
             "nurs:ffi_symbol:HostMath__speed_curve=i64(i64)"
         ]
     );
+}
+
+#[test]
+fn binary_manifest_round_trip_preserves_provider_bundle_registrations() {
+    let mut manifest = make_manifest("data");
+    manifest.abi_capabilities = vec!["data.abi.v1:op:data.*".to_owned()];
+    manifest.provider_bundles = vec![
+        "nuis-provider-bundle-manifest-entry-v1|data.host.bundle.v1|data:host|data.host.provider-worker-native|provider-worker-native-runner|provider_runner_native::PROVIDER_BUNDLE"
+            .to_owned(),
+    ];
+    let binary = default_binary(manifest.clone(), vec![1, 2, 3]);
+    let encoded = encode(&binary);
+    let decoded = decode(&encoded, Path::new("provider-bundle-round-trip.nustar"))
+        .expect("provider bundle binary");
+    assert_eq!(decoded.manifest.provider_bundles, manifest.provider_bundles);
 }
 
 #[test]

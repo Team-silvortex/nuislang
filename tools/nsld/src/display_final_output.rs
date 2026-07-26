@@ -346,6 +346,52 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         report.device_provider_sample_manifest_blocked_record_count
     );
     println!(
+        "  device_provider_sample_provider_bundle_registry_contract: {}",
+        optional_string_text(
+            report
+                .device_provider_sample_provider_bundle_registry_contract
+                .as_deref()
+        )
+    );
+    println!(
+        "  device_provider_sample_provider_bundle_manifest_contract: {}",
+        optional_string_text(
+            report
+                .device_provider_sample_provider_bundle_manifest_contract
+                .as_deref()
+        )
+    );
+    println!(
+        "  device_provider_sample_provider_bundle_manifest_hash: {}",
+        optional_string_text(
+            report
+                .device_provider_sample_provider_bundle_manifest_hash
+                .as_deref()
+        )
+    );
+    println!(
+        "  device_provider_sample_provider_bundle_manifest_entry_count: {}",
+        report
+            .device_provider_sample_provider_bundle_manifest_entry_count
+            .map_or_else(|| "none".to_owned(), |count| count.to_string())
+    );
+    println!(
+        "  device_provider_sample_manifest_first_provider_bundle_package_id: {}",
+        optional_string_text(
+            report
+                .device_provider_sample_manifest_first_provider_bundle_package_id
+                .as_deref()
+        )
+    );
+    println!(
+        "  device_provider_sample_manifest_first_provider_bundle_id: {}",
+        optional_string_text(
+            report
+                .device_provider_sample_manifest_first_provider_bundle_id
+                .as_deref()
+        )
+    );
+    println!(
         "  device_provider_sample_manifest_first_provider_family: {}",
         optional_string_text(
             report

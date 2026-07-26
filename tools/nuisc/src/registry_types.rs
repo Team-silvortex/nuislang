@@ -76,6 +76,7 @@ pub struct NustarPackageManifest {
     pub support_profile_slots: Vec<String>,
     pub capability_tags: Vec<String>,
     pub default_lanes: Vec<String>,
+    pub provider_bundles: Vec<String>,
     pub clock_domain_id: String,
     pub clock_kind: String,
     pub clock_epoch_kind: String,
@@ -246,6 +247,7 @@ pub enum NustarRegistryIssueKind {
     LaneContractMismatch,
     PackagingContractMismatch,
     DomainContractMismatch,
+    ProviderBundleContractMismatch,
 }
 
 impl NustarRegistryIssueKind {
@@ -263,6 +265,7 @@ impl NustarRegistryIssueKind {
             Self::LaneContractMismatch => "lane_contract_mismatch",
             Self::PackagingContractMismatch => "packaging_contract_mismatch",
             Self::DomainContractMismatch => "domain_contract_mismatch",
+            Self::ProviderBundleContractMismatch => "provider_bundle_contract_mismatch",
         }
     }
 
@@ -280,6 +283,7 @@ impl NustarRegistryIssueKind {
             Self::LaneContractMismatch => "NRV010",
             Self::PackagingContractMismatch => "NRV011",
             Self::DomainContractMismatch => "NRV012",
+            Self::ProviderBundleContractMismatch => "NRV013",
         }
     }
 }

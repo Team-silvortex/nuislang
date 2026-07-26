@@ -67,6 +67,30 @@ fn final_output_accepts_ready_device_provider_sample_manifest() {
     assert_eq!(report.device_provider_sample_manifest_status, "ready");
     assert_eq!(report.device_provider_sample_manifest_ready_record_count, 1);
     assert_eq!(
+        report
+            .device_provider_sample_provider_bundle_registry_contract
+            .as_deref(),
+        Some("nuis-provider-bundle-registry-v1")
+    );
+    assert_eq!(
+        report
+            .device_provider_sample_provider_bundle_manifest_hash
+            .as_deref(),
+        Some("fnv1a64:08a971e5a543be2e")
+    );
+    assert_eq!(
+        report
+            .device_provider_sample_manifest_first_provider_bundle_package_id
+            .as_deref(),
+        Some("official.shader")
+    );
+    assert_eq!(
+        report
+            .device_provider_sample_manifest_first_provider_bundle_id
+            .as_deref(),
+        Some("metal.apple-silicon-gpu.bundle.v1")
+    );
+    assert_eq!(
         report.device_provider_sample_manifest_pending_record_count,
         0
     );
@@ -75,6 +99,36 @@ fn final_output_accepts_ready_device_provider_sample_manifest() {
         .blockers
         .iter()
         .any(|blocker| blocker.starts_with("device-provider-sample:")));
+}
+
+#[test]
+fn final_output_rejects_provider_sample_without_bundle_provenance() {
+    let dir = temp_output_dir("missing-bundle-provenance");
+    fs::create_dir_all(&dir).unwrap();
+    write_provider_sample_manifest(&dir, "provider-sample-materialized", 1, 0);
+    let path = dir.join("nuis.nsdb.device-provider-samples.toml");
+    let source = fs::read_to_string(&path).unwrap();
+    let source = source
+        .lines()
+        .filter(|line| !line.starts_with("provider_bundle_"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    fs::write(&path, source).unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.final_stage.output_path = dir.join("demo").display().to_string();
+
+    let report = nsld_final_executable_output_report(Path::new("manifest.toml"), &plan);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert_eq!(
+        report.device_provider_sample_manifest_status,
+        "provider-bundle-evidence-invalid"
+    );
+    assert!(report
+        .device_provider_sample_manifest_first_blocker
+        .as_deref()
+        .is_some_and(|blocker| blocker.contains("provider-bundle-evidence-invalid")));
 }
 
 #[test]
@@ -303,11 +357,17 @@ status = "ready"
 record_count = 1
 ready_record_count = {ready_count}
 pending_record_count = {pending_count}
+provider_bundle_registry_contract = "nuis-provider-bundle-registry-v1"
+provider_bundle_manifest_contract = "nuis-provider-bundle-manifest-v1"
+provider_bundle_manifest_hash = "fnv1a64:08a971e5a543be2e"
+provider_bundle_manifest_entry_count = 3
 
 [[device_provider_samples]]
 trace_id = "hetero-trace:shader:metal:apple-silicon-gpu"
 provider = "nustar-deferred-device-sample-v1"
 provider_family = "metal:apple-silicon-gpu"
+provider_bundle_package_id = "official.shader"
+provider_bundle_id = "metal.apple-silicon-gpu.bundle.v1"
 handoff_target = "metal:apple-silicon-gpu"
 sample_status = "provider-execution-ready"
 validation_status = "provider-execution-validated"

@@ -62,6 +62,7 @@ support_surface = ["shader.profile.packet.v1", "shader.profile.packet.nova.v1", 
 support_profile_slots = ["target", "viewport", "pipeline", "vertex_count", "instance_count", "packet_color_slot", "packet_speed_slot", "packet_radius_slot", "slider_color_slot", "slider_speed_slot", "slider_radius_slot", "header_accent_slot", "toggle_live_slot", "focus_slot", "packet_tag", "material_mode", "pass_kind", "packet_field_count", "texture_format", "texture_width", "texture_height", "sampler_kind", "bind_set", "attachment_slot", "sample_uv_mode"]
 capability_tags = ["gpu-render", "frame-graph", "shader-ir", "resource-binding", "inline-wgsl", "texture-sampling", "bind-group-layout", "render-attachment"]
 default_lanes = ["shader.target_config=setup", "shader.target=setup", "shader.viewport=setup", "shader.pipeline=setup", "shader.inline_wgsl=setup", "shader.texture2d=resource", "shader.sampler=resource", "shader.bind_set=resource", "shader.attachment=resource", "shader.sample=render", "shader.sample_uv=render", "shader.begin_pass=render", "shader.draw_instanced=render"]
+provider_bundles = ["nuis-provider-bundle-manifest-entry-v1|metal.apple-silicon-gpu.bundle.v1|metal:apple-silicon-gpu|metal.apple-silicon-gpu.real-device|metal-real-device-runner|provider_runner_metal::PROVIDER_BUNDLE"]
 profiles = ["aot"]
 resource_families = ["shader", "shader.render"]
 unit_types = ["Material", "RenderPass", "SpriteShader", "SurfaceShader"]

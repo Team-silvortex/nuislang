@@ -101,6 +101,8 @@ mod tests_match_struct_bindings;
 #[cfg(test)]
 mod tests_match_struct_patterns;
 #[cfg(test)]
+mod tests_packet_test_lowering;
+#[cfg(test)]
 mod tests_packet_test_meta;
 #[cfg(test)]
 mod tests_parse_annotations;

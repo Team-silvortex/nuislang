@@ -57,7 +57,6 @@ fn exception_budgets() -> BTreeMap<&'static str, usize> {
         ("tools/nsld/src/object_writer_input.rs", 682),
         ("tools/nsld/src/reports.rs", 1109),
         ("tools/nuis/src/main.rs", 3244),
-        ("tools/nuis/src/dev_tensor_drift_data_runtime.rs", 921),
         (
             "tools/nuisc/src/frontend/tests_generic_method_bounds_control_flow.rs",
             815,
@@ -67,11 +66,9 @@ fn exception_budgets() -> BTreeMap<&'static str, usize> {
             "tools/nuisc/src/frontend/tests_match_struct_bindings.rs",
             973,
         ),
-        ("tools/nuisc/src/frontend/tests_packet_test_meta.rs", 615),
         ("tools/nuisc/src/frontend/tests_parse_annotations.rs", 1120),
         ("tools/nuisc/src/frontend/tests_try.rs", 1291),
         ("tools/nuisc/src/frontend/tests_types_async_window.rs", 938),
-        ("tools/nuisc/src/lib_tests.rs", 2065),
         (
             "tools/nuisc/src/lowering/tests_async_network_runtime.rs",
             657,
@@ -81,7 +78,6 @@ fn exception_budgets() -> BTreeMap<&'static str, usize> {
         ("tools/nuisc/src/lowering/tests_loops_basic.rs", 626),
         ("tools/nuisc/src/lowering/tests_recursion.rs", 850),
         ("tools/nuisc/src/nir_verify/tests.rs", 1789),
-        ("tools/nuisc/src/project/tests/abi_recommendation.rs", 1829),
         ("tools/nuisc/src/project/tests/galaxy_resolution.rs", 1139),
         (
             "tools/nuisc/src/project/tests/packet_data_contracts.rs",
@@ -92,7 +88,6 @@ fn exception_budgets() -> BTreeMap<&'static str, usize> {
             "tools/nuisc/src/project/tests/shader_nova_contracts.rs",
             2115,
         ),
-        ("tools/nuisc/src/registry_tests.rs", 1639),
         ("tools/nuisc/tests/glm_verify.rs", 1400),
         ("tools/nuisc/tests/memory_compile.rs", 1786),
         ("tools/nuisc/tests/network_compile.rs", 1446),

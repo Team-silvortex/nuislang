@@ -7,6 +7,9 @@ use crate::provider_runner_registry::{
 };
 
 pub(crate) const PROVIDER_BUNDLE_REGISTRY_CONTRACT: &str = "nuis-provider-bundle-registry-v1";
+pub(crate) const PROVIDER_BUNDLE_MANIFEST_CONTRACT: &str = "nuis-provider-bundle-manifest-v1";
+pub(crate) const PROVIDER_BUNDLE_MANIFEST_ENTRY_CONTRACT: &str =
+    nuisc::registry::NUSTAR_PROVIDER_BUNDLE_ENTRY_CONTRACT;
 
 #[derive(Clone, Copy)]
 pub(crate) struct ProviderBundleRegistration {
@@ -17,37 +20,179 @@ pub(crate) struct ProviderBundleRegistration {
     pub(crate) execution_adapter: ProviderExecutionAdapterRegistration,
 }
 
+pub(crate) struct ProviderBundleManifestEntry {
+    pub(crate) package_id: &'static str,
+    pub(crate) bundle_id: &'static str,
+    pub(crate) provider_family: &'static str,
+    pub(crate) runner_adapter_id: &'static str,
+    pub(crate) adapter_kind: &'static str,
+    pub(crate) rust_const: &'static str,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct ProviderBundleEvidence {
+    pub(crate) registry_contract: &'static str,
+    pub(crate) manifest_contract: &'static str,
+    pub(crate) manifest_hash: &'static str,
+    pub(crate) manifest_entry_count: usize,
+    pub(crate) package_id: &'static str,
+    pub(crate) bundle_id: &'static str,
+}
+
+include!(concat!(
+    env!("OUT_DIR"),
+    "/provider_bundle_registry_generated.rs"
+));
+
 pub(crate) fn provider_bundle_registrations() -> &'static [ProviderBundleRegistration] {
-    &[
-        crate::provider_runner_native::PROVIDER_BUNDLE,
-        crate::provider_runner_metal::PROVIDER_BUNDLE,
-        crate::provider_runner_coreml::PROVIDER_BUNDLE,
-    ]
+    PROVIDER_BUNDLE_REGISTRATIONS
 }
 
 pub(crate) fn select_provider_bundle_by_family(
     provider_family: &str,
 ) -> Option<&'static ProviderBundleRegistration> {
-    provider_bundle_registrations().iter().find(|bundle| {
-        bundle.registry_contract == PROVIDER_BUNDLE_REGISTRY_CONTRACT
-            && !bundle.bundle_id.is_empty()
-            && bundle.runner_profile.registry_contract == PROVIDER_RUNNER_PROFILE_REGISTRY_CONTRACT
-            && bundle.runner_profile.provider_family == provider_family
-    })
+    if !provider_bundle_manifest_is_valid() {
+        return None;
+    }
+    provider_bundle_manifest_entries()
+        .find(|(entry, bundle)| {
+            provider_bundle_entry_is_valid(entry, bundle)
+                && entry.provider_family == provider_family
+        })
+        .map(|(_, bundle)| bundle)
+}
+
+pub(crate) fn provider_bundle_evidence(provider_family: &str) -> Option<ProviderBundleEvidence> {
+    if !provider_bundle_manifest_is_valid() {
+        return None;
+    }
+    provider_bundle_manifest_entries()
+        .find(|(entry, bundle)| {
+            provider_bundle_entry_is_valid(entry, bundle)
+                && entry.provider_family == provider_family
+        })
+        .map(|(entry, _)| ProviderBundleEvidence {
+            registry_contract: PROVIDER_BUNDLE_REGISTRY_CONTRACT,
+            manifest_contract: PROVIDER_BUNDLE_MANIFEST_CONTRACT,
+            manifest_hash: PROVIDER_BUNDLE_MANIFEST_HASH,
+            manifest_entry_count: PROVIDER_BUNDLE_MANIFEST_ENTRY_COUNT,
+            package_id: entry.package_id,
+            bundle_id: entry.bundle_id,
+        })
+}
+
+pub(crate) fn append_provider_bundle_evidence(out: &mut String, provider_family: &str) {
+    let Some(bundle) = provider_bundle_evidence(provider_family) else {
+        return;
+    };
+    let push = crate::provider_sample_payload::push_toml_string;
+    push(
+        out,
+        "provider_bundle_registry_contract",
+        bundle.registry_contract,
+    );
+    push(
+        out,
+        "provider_bundle_manifest_contract",
+        bundle.manifest_contract,
+    );
+    push(out, "provider_bundle_manifest_hash", bundle.manifest_hash);
+    out.push_str(&format!(
+        "provider_bundle_manifest_entry_count = {}\n",
+        bundle.manifest_entry_count
+    ));
+    push(out, "provider_bundle_package_id", bundle.package_id);
+    push(out, "provider_bundle_id", bundle.bundle_id);
 }
 
 #[cfg(unix)]
 pub(crate) fn select_provider_bundle_by_adapter_kind(
     adapter_kind: &str,
 ) -> Option<&'static ProviderBundleRegistration> {
-    provider_bundle_registrations().iter().find(|bundle| {
-        bundle.registry_contract == PROVIDER_BUNDLE_REGISTRY_CONTRACT
-            && !bundle.bundle_id.is_empty()
-            && bundle.runner_profile.registry_contract == PROVIDER_RUNNER_PROFILE_REGISTRY_CONTRACT
-            && bundle.execution_adapter.registry_contract
-                == PROVIDER_EXECUTION_ADAPTER_REGISTRY_CONTRACT
-            && bundle.execution_adapter.adapter_kind == adapter_kind
-    })
+    if !provider_bundle_manifest_is_valid() {
+        return None;
+    }
+    provider_bundle_manifest_entries()
+        .find(|(entry, bundle)| {
+            provider_bundle_entry_is_valid(entry, bundle) && entry.adapter_kind == adapter_kind
+        })
+        .map(|(_, bundle)| bundle)
+}
+
+fn provider_bundle_manifest_entries() -> impl Iterator<
+    Item = (
+        &'static ProviderBundleManifestEntry,
+        &'static ProviderBundleRegistration,
+    ),
+> {
+    PROVIDER_BUNDLE_MANIFEST_ENTRIES
+        .iter()
+        .zip(provider_bundle_registrations())
+}
+
+fn provider_bundle_entry_is_valid(
+    entry: &ProviderBundleManifestEntry,
+    bundle: &ProviderBundleRegistration,
+) -> bool {
+    !entry.package_id.is_empty()
+        && !entry.rust_const.is_empty()
+        && bundle.registry_contract == PROVIDER_BUNDLE_REGISTRY_CONTRACT
+        && bundle.bundle_id == entry.bundle_id
+        && bundle.runner_profile.registry_contract == PROVIDER_RUNNER_PROFILE_REGISTRY_CONTRACT
+        && bundle.runner_profile.provider_family == entry.provider_family
+        && bundle.runner_profile.available_adapter.adapter_id == entry.runner_adapter_id
+        && bundle.runner_profile.available_adapter.kind == entry.adapter_kind
+        && {
+            #[cfg(unix)]
+            {
+                bundle.execution_adapter.registry_contract
+                    == PROVIDER_EXECUTION_ADAPTER_REGISTRY_CONTRACT
+                    && bundle.execution_adapter.adapter_kind == entry.adapter_kind
+            }
+            #[cfg(not(unix))]
+            {
+                true
+            }
+        }
+}
+
+fn provider_bundle_manifest_is_valid() -> bool {
+    if PROVIDER_BUNDLE_MANIFEST_ENTRY_COUNT != PROVIDER_BUNDLE_REGISTRATIONS.len()
+        || PROVIDER_BUNDLE_MANIFEST_ENTRY_COUNT != PROVIDER_BUNDLE_MANIFEST_ENTRIES.len()
+        || PROVIDER_BUNDLE_MANIFEST_ENTRIES
+            .windows(2)
+            .any(|window| window[0].bundle_id >= window[1].bundle_id)
+        || provider_bundle_manifest_entries()
+            .any(|(entry, bundle)| !provider_bundle_entry_is_valid(entry, bundle))
+    {
+        return false;
+    }
+    provider_bundle_manifest_hash() == PROVIDER_BUNDLE_MANIFEST_HASH
+}
+
+fn provider_bundle_manifest_hash() -> String {
+    let mut canonical = format!("{PROVIDER_BUNDLE_MANIFEST_CONTRACT}\n");
+    for entry in PROVIDER_BUNDLE_MANIFEST_ENTRIES {
+        canonical.push_str(&format!(
+            "{PROVIDER_BUNDLE_MANIFEST_ENTRY_CONTRACT}|{}|{}|{}|{}|{}|{}\n",
+            entry.package_id,
+            entry.bundle_id,
+            entry.provider_family,
+            entry.runner_adapter_id,
+            entry.adapter_kind,
+            entry.rust_const,
+        ));
+    }
+    format!("fnv1a64:{:016x}", fnv1a64(canonical.as_bytes()))
+}
+
+fn fnv1a64(bytes: &[u8]) -> u64 {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
 }
 
 #[cfg(test)]
@@ -56,6 +201,11 @@ mod tests {
 
     #[test]
     fn provider_bundles_cross_bind_unique_runner_and_execution_registrations() {
+        assert!(provider_bundle_manifest_is_valid());
+        assert_eq!(
+            provider_bundle_manifest_hash(),
+            PROVIDER_BUNDLE_MANIFEST_HASH
+        );
         let bundles = provider_bundle_registrations();
         assert!(bundles.len() >= 3);
         assert!(bundles.iter().all(|bundle| {

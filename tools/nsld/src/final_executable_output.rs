@@ -465,6 +465,18 @@ pub(crate) fn nsld_final_executable_output_report(
             .pending_record_count,
         device_provider_sample_manifest_blocked_record_count: device_provider_sample
             .blocked_record_count,
+        device_provider_sample_provider_bundle_registry_contract: device_provider_sample
+            .provider_bundle_registry_contract,
+        device_provider_sample_provider_bundle_manifest_contract: device_provider_sample
+            .provider_bundle_manifest_contract,
+        device_provider_sample_provider_bundle_manifest_hash: device_provider_sample
+            .provider_bundle_manifest_hash,
+        device_provider_sample_provider_bundle_manifest_entry_count: device_provider_sample
+            .provider_bundle_manifest_entry_count,
+        device_provider_sample_manifest_first_provider_bundle_package_id: device_provider_sample
+            .first_provider_bundle_package_id,
+        device_provider_sample_manifest_first_provider_bundle_id: device_provider_sample
+            .first_provider_bundle_id,
         device_provider_sample_manifest_first_provider_family: device_provider_sample
             .first_provider_family,
         device_provider_sample_manifest_first_materialization_status: device_provider_sample

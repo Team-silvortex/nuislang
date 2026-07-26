@@ -49,6 +49,14 @@ Short rule:
 `architecture tells where the work lives; module tells who owns it; function
 tells what capability is being matured`
 
+## Source Structure
+
+The repository applies an 800-line default to Rust and Nuis sources, 1000
+lines to test sources, and 2000 lines to Markdown. Runtime drift checks,
+trust-anchor regressions, workflow tests, packet annotation tests, ABI and
+registry tests, and Nuisc integration tests are split into ordered focused
+modules. Their former line-budget exceptions are removed rather than raised.
+
 ## CLI
 
 Use:
@@ -861,11 +869,29 @@ reintroduction of a provider-specific `match` into the selector.
 bundle ID, runner profile, and Unix execution adapter as one static
 contribution. Runner-family and execution-adapter selection consume the same
 AOT membership list, so adding or removing a provider cannot silently update
-only one side. Lookup validates the outer bundle contract and both nested
-registry contracts before exposing a contribution. No dynamic segment is
-introduced. The remaining handwritten boundary is the single bundle
-membership array; deterministic generation of that list from registered
-Nustar package manifests is next.
+only one side.
+
+The membership list is no longer handwritten.
+`nuis-provider-bundle-manifest-entry-v1` records are owned by the registered
+Data, Shader, and Kernel Nustar package manifests and survive `.nustar`
+manifest round trips. Nuisc validates their syntax and registry-wide unique
+bundle IDs, provider families, adapter kinds, and static implementation
+bindings. The Nsdb build stage consumes that verified registry, sorts entries
+by bundle ID, and emits `nuis-provider-bundle-manifest-v1` as an AOT-only Rust
+table with a canonical FNV hash. Runtime selection independently verifies the
+entry count, order, hash, package provenance, runner identity, execution kind,
+and concrete static bundle before exposing it. No repository path or dynamic
+plugin segment enters the resulting executable.
+
+Nsdb now carries that registry contract, manifest contract, canonical hash,
+entry count, package ID, and bundle ID through provider output payloads,
+materialized sample manifests, text reports, and JSON reports. Nsld consumes
+the same provider-neutral fields and mirrors them into final heterogeneous
+output metadata. A sample cannot become `ready` when the bundle evidence is
+missing or malformed; it becomes `provider-bundle-evidence-invalid` instead.
+The next boundary is mirroring this already validated identity into Nuis
+closure and package-summary audit surfaces without teaching Nuis any concrete
+provider family.
 
 Return-producing `if` lowering now preserves control dependence for nested
 extern-call comparisons. The open `compare_call_result` mode of

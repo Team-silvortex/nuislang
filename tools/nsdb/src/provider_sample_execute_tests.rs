@@ -100,6 +100,17 @@ materialization_status = "provider-sample-materialized"
     assert_eq!(report.status, "provider-output-payloads-ready");
     assert_eq!(report.output_payload_count, 1);
     assert_eq!(
+        report.provider_bundle_registry_contract,
+        "nuis-provider-bundle-registry-v1"
+    );
+    assert_eq!(
+        report.provider_bundle_manifest_contract,
+        "nuis-provider-bundle-manifest-v1"
+    );
+    assert_eq!(report.provider_bundle_manifest_entry_count, 3);
+    assert_eq!(report.first_provider_bundle_package_id, "official.data");
+    assert_eq!(report.first_provider_bundle_id, "data.host.bundle.v1");
+    assert_eq!(
         report.first_provider_runner_adapter_id,
         "data.host.provider-worker-native"
     );
@@ -111,6 +122,13 @@ materialization_status = "provider-sample-materialized"
         report.first_output_payload_native_execution_contract,
         "nuis-provider-worker-native-execution-v1"
     );
+    assert!(payload
+        .contains("provider_bundle_registry_contract = \"nuis-provider-bundle-registry-v1\""));
+    assert!(payload
+        .contains("provider_bundle_manifest_contract = \"nuis-provider-bundle-manifest-v1\""));
+    assert!(payload.contains("provider_bundle_manifest_entry_count = 3"));
+    assert!(payload.contains("provider_bundle_package_id = \"official.data\""));
+    assert!(payload.contains("provider_bundle_id = \"data.host.bundle.v1\""));
     assert!(payload.contains(
         "native_output_worker_execution_capsule_invocation_mode = \"nuis-provider-worker-process-adapter-v5\""
     ));

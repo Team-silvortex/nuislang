@@ -748,6 +748,10 @@ fn render_provider_output_payload_header(
     );
     push_toml_string(&mut out, "trace_id", &record.trace_id);
     push_toml_string(&mut out, "provider_family", &record.provider_family);
+    crate::provider_bundle_registry::append_provider_bundle_evidence(
+        &mut out,
+        &record.provider_family,
+    );
     push_toml_string(&mut out, "provider_runner_adapter_id", adapter_id);
     push_toml_string(
         &mut out,

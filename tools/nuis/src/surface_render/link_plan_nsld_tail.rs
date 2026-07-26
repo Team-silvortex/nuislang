@@ -1,3 +1,4 @@
+use super::{json_optional_u64_field, json_optional_usize_field};
 use crate::json_optional_bool_field;
 
 pub(super) fn nsld_tail_json_fields(
@@ -791,18 +792,4 @@ pub(super) fn nsld_tail_json_fields(
                 .and_then(|summary| summary.first_blocker.as_deref()),
         ),
     ]
-}
-
-fn json_optional_usize_field(name: &str, value: Option<usize>) -> String {
-    match value {
-        Some(value) => crate::json_usize_field(name, value),
-        None => format!("\"{name}\":null"),
-    }
-}
-
-fn json_optional_u64_field(name: &str, value: Option<u64>) -> String {
-    value.map_or_else(
-        || format!("\"{name}\":null"),
-        |value| format!("\"{name}\":{value}"),
-    )
 }

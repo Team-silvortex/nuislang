@@ -258,3 +258,5 @@ fn empty_galaxy_doctor(project_root: &Path) -> galaxy::GalaxyDoctorReport {
 mod stdlib_and_artifact;
 #[path = "main_tests/workflow_surface.rs"]
 mod workflow_surface;
+#[path = "main_tests/workflow_surface_contracts.rs"]
+mod workflow_surface_contracts;

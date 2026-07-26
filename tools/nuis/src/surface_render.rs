@@ -37,3 +37,17 @@ pub(crate) fn append_json_field_strings(
         out.push_str(&field);
     }
 }
+
+fn json_optional_usize_field(name: &str, value: Option<usize>) -> String {
+    value.map_or_else(
+        || format!("\"{name}\":null"),
+        |value| crate::json_usize_field(name, value),
+    )
+}
+
+fn json_optional_u64_field(name: &str, value: Option<u64>) -> String {
+    value.map_or_else(
+        || format!("\"{name}\":null"),
+        |value| format!("\"{name}\":{value}"),
+    )
+}

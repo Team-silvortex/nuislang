@@ -35,6 +35,10 @@ pub use crate::registry_project_check_render::{
     project_domain_registry_check_json, project_domain_registry_issue_json,
     render_project_domain_registry_check_lines, write_project_domain_registry_check_lines,
 };
+pub use crate::registry_provider_bundle::{
+    provider_bundle_registrations, NustarProviderBundleRegistration,
+    NUSTAR_PROVIDER_BUNDLE_ENTRY_CONTRACT,
+};
 pub use crate::registry_scheduler_summary::{
     scheduler_summary, std_net_summary, NustarSchedulerSummary, NustarStdNetSummary,
 };
