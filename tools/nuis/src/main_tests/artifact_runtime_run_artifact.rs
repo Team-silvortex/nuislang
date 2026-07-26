@@ -143,6 +143,27 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_output_object_package_ready\":"));
     assert!(json.contains("\"nsld_final_executable_output_debugger_transcript_contract\":"));
     assert!(json.contains("\"nsld_final_executable_output_debugger_transcript_ready\":"));
+    assert!(json.contains(
+        "\"nsld_final_executable_output_replay_vocabulary_contract\":\"nuis-final-output-replay-vocabulary-v1\""
+    ));
+    assert!(json.contains(
+        "\"nsld_final_executable_output_object_package_replay_vocabulary_contract\":\"nuis-final-output-replay-vocabulary-v1\""
+    ));
+    assert!(json.contains(
+        "\"nsld_final_executable_output_debugger_transcript_replay_vocabulary_contract\":\"nuis-final-output-replay-vocabulary-v1\""
+    ));
+    assert!(json.contains(
+        "\"nsld_final_executable_output_object_package_replay_source_contract\":\"nsdb-payload-execution-replay-plan-v1\""
+    ));
+    assert!(json.contains(
+        "\"nsld_final_executable_output_debugger_transcript_replay_source_contract\":\"nsdb-payload-execution-replay-plan-v1\""
+    ));
+    assert!(
+        json.contains("\"nsld_final_executable_output_object_package_replay_checkpoint_count\":")
+    );
+    assert!(json.contains(
+        "\"nsld_final_executable_output_debugger_transcript_replay_replayable_checkpoint_count\":"
+    ));
     assert!(json.contains("\"nsld_final_executable_output_recommended_next_action\":"));
     assert!(json.contains("\"nsld_final_executable_output_path_present\":"));
     assert!(json.contains("\"nsld_final_executable_output_nsld_owned\":null"));
@@ -202,6 +223,22 @@ mod cpu Main {
     assert!(json.contains(
         "\"nsld_final_executable_output_nsdb_replay_first_blocker\":\"payload-execution-replay:blocked-checkpoint\""
     ), "{json}");
+    assert!(json.contains("\"nsld_final_executable_output_object_package_replay_ready\":false"));
+    assert!(
+        json.contains("\"nsld_final_executable_output_object_package_replay_status\":\"blocked\"")
+    );
+    assert!(json.contains(
+        "\"nsld_final_executable_output_object_package_replay_first_blocker\":\"payload-execution-replay:blocked-checkpoint\""
+    ));
+    assert!(
+        json.contains("\"nsld_final_executable_output_debugger_transcript_replay_ready\":false")
+    );
+    assert!(json.contains(
+        "\"nsld_final_executable_output_debugger_transcript_replay_status\":\"blocked\""
+    ));
+    assert!(json.contains(
+        "\"nsld_final_executable_output_debugger_transcript_replay_first_blocker\":\"payload-execution-replay:blocked-checkpoint\""
+    ));
 }
 
 #[test]

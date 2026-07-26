@@ -117,6 +117,10 @@ Current first responsibility:
 * persist shape/hash-bound raw `gray8` data for std-preprocessed PGM provider
   samples and execute the first complete upload/invert/readback path through a
   registered native Metal runner, with deterministic fallback elsewhere
+* own `nuis.pixelmagic` registration of gray8 shape, payload, kernel, and
+  persistence metadata through the provider-neutral
+  `nuis-device-sample-input-registration-v1` table; std only supplies the host
+  preprocessing evidence and does not construct image requests
 * participate in the persistent Nuis worker route through a registered Metal
   provider/adapter/operation identity, worker-issued dispatch permit, inherited
   input carrier, verified output carrier, and graph-close release evidence
@@ -136,6 +140,7 @@ Current official surface registry:
 * `contract.pixelmagic.texture-handoff.v1`
 * `contract.pixelmagic.shader-facing-image-prep.v1`
 * `contract.pixelmagic.render-plan.v1`
+* `contract.pixelmagic.provider-sample-input-registration.v1`
 * `surface.pixelmagic.shader.contracts.v1`
 * `surface.pixelmagic.shader.packet-bridge.v1`
 * `surface.pixelmagic.shader.render.v1`

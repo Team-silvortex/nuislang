@@ -235,6 +235,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_EXECUTION_DRIFT_CHECKS: &[DevTensorDriftChec
                 "builtin-nustar-provider-runner-registry",
                 "provider_runner_real_device_capable",
                 "host-simulated-provider-runner",
+                "provider_sample_registration_contract=nuis-device-sample-input-registration-v1",
                 "first_output_payload_comparison_contract",
                 "first_output_payload_input_evidence_hash",
                 "first_output_payload_native_output_kind",

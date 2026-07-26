@@ -158,6 +158,7 @@ pub(super) fn assert_official_galaxy_hetero_build(
     if expects_std_pgm_marker {
         assert!(
             run_json_stdout.contains("std-preprocessed-pgm:input_bytes=20")
+                && run_json_stdout.contains("provider_sample_registration_contract=nuis-device-sample-input-registration-v1")
                 && run_json_stdout.contains(
                     "provider_buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1",
                 )

@@ -10,6 +10,7 @@ surfaces = [
   "contract.pixelmagic.texture-handoff.v1",
   "contract.pixelmagic.shader-facing-image-prep.v1",
   "contract.pixelmagic.render-plan.v1",
+  "contract.pixelmagic.provider-sample-input-registration.v1",
   "surface.pixelmagic.shader.contracts.v1",
   "surface.pixelmagic.shader.packet-bridge.v1",
   "surface.pixelmagic.shader.render.v1",

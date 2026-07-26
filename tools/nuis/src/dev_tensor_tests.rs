@@ -20,7 +20,57 @@ fn handoff_selection_is_status_aware_and_input_order_independent() {
         ),
         expected
     );
-    assert_eq!(selected.status, "usable");
+    assert_eq!(selected.status, "stable");
+}
+
+#[test]
+fn task_selection_falls_back_to_global_incomplete_after_bootstrap_closes() {
+    let selected = select_dev_tensor_task_cell(DEV_TENSOR_CELLS).expect("select global task");
+    assert_eq!(
+        dev_tensor_coordinate_key(selected.architecture, selected.module, selected.function),
+        "standard-library/pixelmagic/image-processing-lane"
+    );
+    assert!(!selected.bootstrap_critical);
+    assert_eq!(selected.status, "active");
+    assert_eq!(selected.progress, 70);
+}
+
+#[test]
+fn task_selection_keeps_bootstrap_priority_until_critical_cells_close() {
+    let cells = [
+        DevTensorCell {
+            architecture: "optional",
+            module: "lane",
+            function: "weaker",
+            status: "early",
+            progress: 10,
+            bootstrap_critical: false,
+            closure_role: "optional",
+            evidence: "evidence",
+            next_step: "next",
+            blocker: "none",
+            next_action: "advance optional",
+            validation_command: "validate optional",
+            expected_artifact: "optional artifact",
+        },
+        DevTensorCell {
+            architecture: "bootstrap",
+            module: "lane",
+            function: "required",
+            status: "usable",
+            progress: 90,
+            bootstrap_critical: true,
+            closure_role: "required",
+            evidence: "evidence",
+            next_step: "next",
+            blocker: "none",
+            next_action: "close bootstrap",
+            validation_command: "validate bootstrap",
+            expected_artifact: "bootstrap artifact",
+        },
+    ];
+    let selected = select_dev_tensor_task_cell(&cells).expect("select bootstrap task");
+    assert_eq!(selected.architecture, "bootstrap");
 }
 
 #[test]
@@ -58,7 +108,7 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
     );
     assert_eq!(
         summary.weakest_bootstrap_task_card_source,
-        "weakest-bootstrap-status-progress-path"
+        "weakest-global-incomplete-status-progress-path"
     );
     assert_eq!(summary.weakest_bootstrap_task_card_status, "ready");
     assert!(summary.weakest_bootstrap_task_card_ready);
@@ -66,25 +116,17 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
     assert!(summary.weakest_bootstrap_task_card_coordinate.contains('/'));
     assert!(summary
         .weakest_bootstrap_task_card_priority_reason
-        .contains("weakest bootstrap-critical status/progress ordering"));
+        .contains("all bootstrap-critical cells are stable at 100/100"));
     assert_eq!(
-        summary.weakest_bootstrap_task_card_action,
-        summary.weakest_bootstrap_next_action
-    );
-    assert_eq!(
-        summary.weakest_bootstrap_task_card_command,
-        summary.weakest_bootstrap_validation_command
-    );
-    assert_eq!(
-        summary.weakest_bootstrap_task_card_expected_artifact,
-        summary.weakest_bootstrap_expected_artifact
+        summary.weakest_bootstrap_task_card_coordinate,
+        "standard-library/pixelmagic/image-processing-lane"
     );
     assert_ne!(
         summary.weakest_bootstrap_task_card_handoff_coordinate,
         "<none>"
     );
-    let selected = select_dev_tensor_handoff_bootstrap_cell(DEV_TENSOR_CELLS)
-        .expect("select current weakest handoff");
+    let selected =
+        select_dev_tensor_task_cell(DEV_TENSOR_CELLS).expect("select current weakest handoff");
     assert_eq!(
         summary.weakest_bootstrap_task_card_handoff_coordinate,
         dev_tensor_coordinate_key(selected.architecture, selected.module, selected.function)
@@ -143,7 +185,7 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
             .common_ancestor_path,
         "<none>"
     );
-    assert!(summary.weakest_bootstrap_progress <= summary.bootstrap_critical_average_progress);
+    assert_eq!(summary.bootstrap_critical_average_progress, 100);
     let hierarchy = crate::dev_tensor_hierarchy::dev_tensor_hierarchy_summary();
     assert_eq!(
         hierarchy.hierarchy_protocol_version,
@@ -233,7 +275,7 @@ fn dev_tensor_json_exposes_coordinate_cells() {
         json.contains("\"weakest_bootstrap_task_card_protocol\":\"nuis-dev-tensor-task-card-v1\"")
     );
     assert!(json.contains(
-        "\"weakest_bootstrap_task_card_source\":\"weakest-bootstrap-status-progress-path\""
+        "\"weakest_bootstrap_task_card_source\":\"weakest-global-incomplete-status-progress-path\""
     ));
     assert!(json.contains("\"weakest_bootstrap_task_card_status\":\"ready\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_ready\":true"));
@@ -258,7 +300,7 @@ fn dev_tensor_json_exposes_coordinate_cells() {
     assert!(json.contains("\"weakest_bootstrap_task_card_handoff_ancestry\":[\"nuislang\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_common_ancestor_path\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_transition_depth\":"));
-    assert!(json.contains("weakest bootstrap-critical status/progress ordering"));
+    assert!(json.contains("all bootstrap-critical cells are stable at 100/100"));
     assert!(json.contains("\"blocker\""));
     assert!(json.contains("\"next_action\""));
     assert!(json.contains("\"validation_command\""));
@@ -367,9 +409,9 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("weakest_bootstrap_validation_command:"));
     assert!(text.contains("weakest_bootstrap_expected_artifact:"));
     assert!(text.contains("weakest_bootstrap_task_card_protocol: nuis-dev-tensor-task-card-v1"));
-    assert!(
-        text.contains("weakest_bootstrap_task_card_source: weakest-bootstrap-status-progress-path")
-    );
+    assert!(text.contains(
+        "weakest_bootstrap_task_card_source: weakest-global-incomplete-status-progress-path"
+    ));
     assert!(text.contains("weakest_bootstrap_task_card_status: ready"));
     assert!(text.contains("weakest_bootstrap_task_card_ready: true"));
     assert!(text.contains("weakest_bootstrap_task_card_coordinate:"));
@@ -392,7 +434,7 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("weakest_bootstrap_task_card_handoff_ancestor: nuislang"));
     assert!(text.contains("weakest_bootstrap_task_card_common_ancestor_path:"));
     assert!(text.contains("weakest_bootstrap_task_card_transition_depth:"));
-    assert!(text.contains("weakest bootstrap-critical status/progress ordering"));
+    assert!(text.contains("all bootstrap-critical cells are stable at 100/100"));
     assert!(text.contains("    blocker:"));
     assert!(text.contains("    next_action:"));
     assert!(text.contains("    validation_command:"));

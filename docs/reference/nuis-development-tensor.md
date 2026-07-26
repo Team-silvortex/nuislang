@@ -213,25 +213,34 @@ recursive form is intended to support future bootstrap planning where a weak
 architecture lane can be expanded into its weakest module and then into the
 exact function cell that needs work.
 
-The summary also mirrors the weakest bootstrap-critical function cell as a
-small navigation bundle: status, progress, closure role, evidence, and next
-step. This is the preferred first read when choosing the next mainline task.
-The same weakest cell is also projected into a small task-card surface:
+The summary mirrors the weakest bootstrap-critical function cell as a small
+closure bundle: status, progress, closure role, evidence, and next step. The
+task-card selector uses that lane while any bootstrap-critical cell remains
+below `stable/100`. Once every bootstrap-critical cell is closed, it
+automatically falls through to the weakest incomplete cell across the full
+tensor. The selected cell is projected into a small task-card surface:
 protocol, source, status, ready flag, coordinate, priority reason, action,
 validation command, and expected artifact. That gives scripts and future
 self-hosted tooling one stable bundle to consume without reassembling many
 `weakest_bootstrap_*` fields by hand.
 
+The transition reason is explicit:
+`all bootstrap-critical cells are stable at 100/100`; the task card is now
+continuing product capability work rather than reopening a completed bootstrap
+boundary.
+
 The task-card protocol is `nuis-dev-tensor-task-card-v1`. A ready task card
-means the tensor found a weakest bootstrap-critical coordinate, coordinate
-coverage is clean, the recursive hierarchy is clean, and the task/handoff
-lineage validation is clean.
+means the tensor found an actionable bootstrap or global incomplete
+coordinate, coordinate coverage is clean, the recursive hierarchy is clean,
+and the task/handoff lineage validation is clean. If every registered cell is
+`stable/100`, the card reports `complete` instead of inventing more work.
 
 Task-card selection uses the deterministic ordering
-`status_rank -> progress -> coordinate`, reported as source
-`weakest-bootstrap-status-progress-path`. Lower status maturity is weaker;
-progress breaks status ties, and the full coordinate makes selection stable
-when input registration order changes.
+`status_rank -> progress -> coordinate`. Before bootstrap closure its source is
+`weakest-bootstrap-status-progress-path`; after closure it becomes
+`weakest-global-incomplete-status-progress-path`. Lower status maturity is
+weaker, progress breaks status ties, and the full coordinate makes selection
+stable when input registration order changes.
 
 The task-card also exposes a handoff bundle. When the weakest coordinate is the
 tensor itself, `weakest_bootstrap_task_card_handoff_mode` becomes
@@ -424,13 +433,14 @@ roadmap phrase. The current std evidence also includes the observable CLI smoke
 `run-artifact --json` prelaunch readiness, stdout/stderr report output from the
 host IO report lane, direct stdin consumption by the built binary, and
 `host_stdin_read` / `host_stdout_write` / `host_stderr_write` lowering anchors.
-The PixelMagic side of that lane now also keeps `std-preprocessed-pgm` input
-evidence visible through provider-sample materialization and
-`execute-provider-samples` comparison metadata, including the input evidence
-hash used by later shader output comparison. That evidence now binds a raw
-`gray8` payload path, dimensions, stride, maximum value, operation, byte count,
-and content hash. These values now lower into package-independent
-`nuis-provider-buffer-descriptor-v1` and
+The std side of that lane now ends at `std-preprocessed-pgm` host preprocessing
+evidence. The static `nuis-device-sample-input-registration-v1` table then
+dispatches image construction to the `nuis.pixelmagic` registration, so the
+generic frontdoor never owns `gray8` shape, payload, kernel, hash, or persistence
+details. PixelMagic keeps that evidence visible through provider-sample
+materialization and `execute-provider-samples` comparison metadata, including
+the input evidence hash used by later shader output comparison. These values
+lower into package-independent `nuis-provider-buffer-descriptor-v1` and
 `nuis-provider-kernel-descriptor-v1` requests; Nsdb converts legacy evidence
 into the same model but native adapters consume only the registered request.
 The official heterogeneous smoke verifies persistence of the four source
@@ -1374,12 +1384,19 @@ The native-binary checks anchor the bootstrap-critical
 `native-binary-system/nsb-nsld/self-owned-binary-assembly` cell to the shared
 Nsld final-output replay vocabulary. Nsld still owns the concrete object and
 package summaries, while Nsdb owns the YIR replay transcript contract, but Nuis
-frontdoors now mirror both as abstract readiness fields:
+now captures their shared replay facts once through
+`nuis-final-output-replay-vocabulary-v1`. The typed vocabulary contains the
+source replay contract, readiness/status, checkpoint and replayable-checkpoint
+counts, replay command, next action/command, and first blocker. Object-package
+and debugger-transcript frontdoors project that complete vocabulary rather than
+reconstructing it independently:
 `nsld_final_executable_output_object_package_*`,
 `nsld_final_executable_output_debugger_transcript_*`, and
 `closure_summary_*_debugger_transcript_*`. This keeps run-artifact, workflow,
 project-status, and release/build-report surfaces aligned without coupling the
-frontdoor to Mach-O, ELF, PE, or any one future object format. Nsdb now layers
+frontdoor to Mach-O, ELF, PE, or any one future object format. Ready and blocked
+run-artifact regressions assert that both projections retain the same source
+contract, counts, commands, and blocker. Nsdb now layers
 `nsdb-yir-replay-control-v1` over that transcript: `--frame` consumes one exact
 index or frame id, while `--break-at` consumes the ordered prefix through an
 exact frame and reports `breakpoint-hit`. Missing or ambiguous targets fail

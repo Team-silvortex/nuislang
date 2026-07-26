@@ -8,6 +8,7 @@ use crate::{
     dev_tensor_drift_data_runtime_execution::DEV_TENSOR_RUNTIME_EXECUTION_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_nsld::DEV_TENSOR_RUNTIME_NSLD_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_provider::DEV_TENSOR_RUNTIME_PROVIDER_DRIFT_CHECKS,
+    dev_tensor_drift_data_runtime_provider_completion::DEV_TENSOR_RUNTIME_PROVIDER_COMPLETION_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_std::DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS,
 };
 
@@ -19,6 +20,7 @@ pub(crate) fn dev_tensor_drift_checks() -> impl Iterator<Item = &'static DevTens
         .chain(DEV_TENSOR_RUNTIME_DISPATCH_CAPABILITY_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_EXECUTION_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_PROVIDER_DRIFT_CHECKS.iter())
+        .chain(DEV_TENSOR_RUNTIME_PROVIDER_COMPLETION_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_DEV_LINEAGE_DRIFT_CHECKS.iter())

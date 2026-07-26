@@ -10,6 +10,8 @@ mod link_plan_commands;
 mod link_plan_domain;
 mod link_plan_final_output;
 mod link_plan_final_output_closure;
+mod link_plan_final_output_replay_vocabulary;
+mod link_plan_final_output_replay_vocabulary_json;
 mod link_plan_final_output_summary;
 mod link_plan_json;
 mod link_plan_json_nsld_output;
@@ -65,6 +67,8 @@ pub(crate) use link_plan_commands::{
     release_check_nsld_drive_until_clean_json_command_for_output_dir,
 };
 pub(crate) use link_plan_final_output::nsld_final_executable_output_boundary_summary;
+#[cfg(test)]
+pub(crate) use link_plan_final_output_replay_vocabulary::FinalOutputReplayVocabulary;
 pub(crate) use link_plan_final_output_summary::NsldFinalExecutableOutputBoundarySummary;
 #[cfg(test)]
 pub(crate) use link_plan_final_output_summary::ProviderCompletionBoundarySummary;

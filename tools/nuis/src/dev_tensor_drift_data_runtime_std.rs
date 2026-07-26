@@ -2,6 +2,38 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "provider-neutral-device-sample-input-registration",
+        path: "tools/nuis/src/artifact_device_sample_registration.rs",
+        required_patterns: &[
+            "nuis-device-sample-input-registration-v1",
+            "DeviceSampleInputRegistration",
+            "enrich_registered_input_evidence",
+            "persist_registered_input_payloads",
+            "registrations",
+            "unregistered backends must remain generic",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "pixelmagic-owned-device-sample-input-registration",
+        path: "tools/nuis/src/artifact_device_sample_pixelmagic.rs",
+        required_patterns: &[
+            "nuis.pixelmagic",
+            "pixelmagic.gray8.invert",
+            "provider_buffer_shape=2x2",
+            "STD_PIXEL_PAYLOAD_FILE_NAME",
+            "persist_pixelmagic_payloads",
+            "contract.pixelmagic.provider-sample-input-registration.v1",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "pixelmagic-provider-registration-package-surface",
+        path: "stdlib/pixelmagic/module.toml",
+        required_patterns: &[
+            "package_id = \"nuis.pixelmagic\"",
+            "contract.pixelmagic.provider-sample-input-registration.v1",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "std-tooling-doc-smoke-chain",
         path: "examples/projects/tooling/README.md",
         required_patterns: &[

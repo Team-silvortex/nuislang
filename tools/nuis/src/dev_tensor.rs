@@ -145,22 +145,45 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
         }
     }
     let cell_count = DEV_TENSOR_CELLS.len();
-    let task_card_coordinate = weakest_bootstrap
+    let bootstrap_closed = dev_tensor_bootstrap_cells_closed(DEV_TENSOR_CELLS);
+    let task_cell = select_dev_tensor_task_cell(DEV_TENSOR_CELLS);
+    let task_card_coordinate = task_cell
         .map(|cell| dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function))
         .unwrap_or_else(|| "<none>".to_owned());
-    let task_card_priority_reason = weakest_bootstrap
+    let task_card_source = if bootstrap_closed {
+        "weakest-global-incomplete-status-progress-path"
+    } else {
+        "weakest-bootstrap-status-progress-path"
+    };
+    let task_card_priority_reason = task_cell
         .map(|cell| {
-            format!(
-                "weakest bootstrap-critical status/progress ordering: status `{}` rank {}, progress {}/100 at {}",
-                cell.status,
-                dev_tensor_status_rank(cell.status),
-                cell.progress,
-                task_card_coordinate
-            )
+            if bootstrap_closed {
+                format!(
+                    "all bootstrap-critical cells are stable at 100/100; weakest global incomplete status/progress ordering: status `{}` rank {}, progress {}/100 at {}",
+                    cell.status,
+                    dev_tensor_status_rank(cell.status),
+                    cell.progress,
+                    task_card_coordinate
+                )
+            } else {
+                format!(
+                    "weakest bootstrap-critical status/progress ordering: status `{}` rank {}, progress {}/100 at {}",
+                    cell.status,
+                    dev_tensor_status_rank(cell.status),
+                    cell.progress,
+                    task_card_coordinate
+                )
+            }
         })
-        .unwrap_or_else(|| "no bootstrap-critical tensor cell is currently registered".to_owned());
+        .unwrap_or_else(|| {
+            if bootstrap_closed {
+                "all registered tensor cells are stable at 100/100".to_owned()
+            } else {
+                "no bootstrap-critical tensor cell is currently registered".to_owned()
+            }
+        });
     let handoff_bootstrap =
-        weakest_bootstrap.and_then(|weakest| dev_tensor_handoff_bootstrap_cell(weakest));
+        task_cell.and_then(|weakest| dev_tensor_handoff_bootstrap_cell(weakest));
     let handoff_coordinate = handoff_bootstrap
         .map(|cell| dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function))
         .unwrap_or_else(|| task_card_coordinate.clone());
@@ -176,7 +199,7 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
         &handoff_coordinate,
         handoff_mode,
     );
-    let task_card_ready = weakest_bootstrap.is_some()
+    let task_card_ready = task_cell.is_some()
         && coverage.status == "clean"
         && hierarchy.validation.status == "clean"
         && task_card_lineage.status == "clean";
@@ -192,7 +215,7 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
         })
         .unwrap_or_else(|| {
             format!(
-                "weakest bootstrap task card is directly actionable at {}",
+                "weakest task card is directly actionable at {}",
                 task_card_coordinate
             )
         });
@@ -256,33 +279,39 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
             .map(|cell| cell.expected_artifact)
             .unwrap_or("<none>"),
         weakest_bootstrap_task_card_protocol: DEV_TENSOR_TASK_CARD_PROTOCOL,
-        weakest_bootstrap_task_card_source: "weakest-bootstrap-status-progress-path",
-        weakest_bootstrap_task_card_status: if task_card_ready { "ready" } else { "blocked" },
+        weakest_bootstrap_task_card_source: task_card_source,
+        weakest_bootstrap_task_card_status: if task_card_ready {
+            "ready"
+        } else if bootstrap_closed && task_cell.is_none() {
+            "complete"
+        } else {
+            "blocked"
+        },
         weakest_bootstrap_task_card_ready: task_card_ready,
         weakest_bootstrap_task_card_coordinate: task_card_coordinate,
         weakest_bootstrap_task_card_priority_reason: task_card_priority_reason,
-        weakest_bootstrap_task_card_action: weakest_bootstrap
+        weakest_bootstrap_task_card_action: task_cell
             .map(|cell| cell.next_action)
             .unwrap_or("<none>"),
-        weakest_bootstrap_task_card_command: weakest_bootstrap
+        weakest_bootstrap_task_card_command: task_cell
             .map(|cell| cell.validation_command)
             .unwrap_or("<none>"),
-        weakest_bootstrap_task_card_expected_artifact: weakest_bootstrap
+        weakest_bootstrap_task_card_expected_artifact: task_cell
             .map(|cell| cell.expected_artifact)
             .unwrap_or("<none>"),
         weakest_bootstrap_task_card_handoff_mode: handoff_mode,
         weakest_bootstrap_task_card_handoff_coordinate: handoff_coordinate,
         weakest_bootstrap_task_card_handoff_reason: handoff_reason,
         weakest_bootstrap_task_card_handoff_action: handoff_bootstrap
-            .or(weakest_bootstrap)
+            .or(task_cell)
             .map(|cell| cell.next_action)
             .unwrap_or("<none>"),
         weakest_bootstrap_task_card_handoff_command: handoff_bootstrap
-            .or(weakest_bootstrap)
+            .or(task_cell)
             .map(|cell| cell.validation_command)
             .unwrap_or("<none>"),
         weakest_bootstrap_task_card_handoff_expected_artifact: handoff_bootstrap
-            .or(weakest_bootstrap)
+            .or(task_cell)
             .map(|cell| cell.expected_artifact)
             .unwrap_or("<none>"),
         weakest_bootstrap_task_card_lineage: task_card_lineage,
@@ -302,6 +331,25 @@ fn dev_tensor_handoff_bootstrap_cell(weakest: &DevTensorCell) -> Option<&'static
         return None;
     }
     select_dev_tensor_handoff_bootstrap_cell(DEV_TENSOR_CELLS)
+}
+
+fn dev_tensor_bootstrap_cells_closed(cells: &[DevTensorCell]) -> bool {
+    let mut critical = cells.iter().filter(|cell| cell.bootstrap_critical);
+    let critical_count = critical.clone().count();
+    critical_count > 0 && critical.all(|cell| cell.status == "stable" && cell.progress == 100)
+}
+
+fn select_dev_tensor_task_cell(cells: &[DevTensorCell]) -> Option<&DevTensorCell> {
+    if dev_tensor_bootstrap_cells_closed(cells) {
+        return cells
+            .iter()
+            .filter(|cell| cell.status != "stable" || cell.progress < 100)
+            .min_by_key(|cell| dev_tensor_cell_weakness_key(cell));
+    }
+    cells
+        .iter()
+        .filter(|cell| cell.bootstrap_critical)
+        .min_by_key(|cell| dev_tensor_cell_weakness_key(cell))
 }
 
 fn select_dev_tensor_handoff_bootstrap_cell(cells: &[DevTensorCell]) -> Option<&DevTensorCell> {

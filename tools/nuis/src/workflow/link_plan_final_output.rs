@@ -1,6 +1,9 @@
 use super::{
     link_plan::{parse_bool_field, parse_string_field, parse_usize_field},
     link_plan_final_output_closure::{debugger_transcript_summary, object_package_summary},
+    link_plan_final_output_replay_vocabulary::{
+        final_output_replay_vocabulary, FinalOutputReplayVocabularySource,
+    },
     link_plan_final_output_summary::NsldFinalExecutableOutputBoundarySummary,
     link_plan_provider_dispatch_identity::validated_provider_dispatch_identity_capability,
     nsld_drive_command_set_for_output_dir,
@@ -107,17 +110,20 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
     let provider_sample_manifest =
         collect_device_provider_sample_manifest_mirror(Some(Path::new(&plan.output_dir)));
     let nsdb_replay = nsld_final_executable_output_nsdb_replay(plan);
+    let replay_vocabulary = final_output_replay_vocabulary(FinalOutputReplayVocabularySource {
+        contract: &nsdb_replay.contract,
+        ready: nsdb_replay.ready,
+        status: &nsdb_replay.status,
+        checkpoint_count: nsdb_replay.checkpoint_count,
+        replayable_checkpoint_count: nsdb_replay.replayable_checkpoint_count,
+        command: nsdb_replay.command.as_deref(),
+        next_action: &nsdb_replay.next_action,
+        next_command: nsdb_replay.next_command.as_deref(),
+        first_blocker: nsdb_replay.first_blocker.as_deref(),
+    });
     let object_evidence = nsld_final_executable_output_object_evidence(plan);
-    let object_package_summary = object_package_summary(
-        nsdb_replay.ready,
-        nsdb_replay.next_command.as_deref(),
-        nsdb_replay.first_blocker.as_deref(),
-    );
-    let debugger_transcript = debugger_transcript_summary(
-        nsdb_replay.ready,
-        nsdb_replay.next_command.as_deref(),
-        nsdb_replay.first_blocker.as_deref(),
-    );
+    let object_package_summary = object_package_summary(&replay_vocabulary);
+    let debugger_transcript = debugger_transcript_summary(&replay_vocabulary);
     let debugger_cursor = read_debugger_cursor_handoff(
         Path::new(&plan.output_dir),
         &Path::new(&plan.output_dir).join("nuis.build.manifest.toml"),
@@ -226,6 +232,7 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         nsdb_replay_next_action: nsdb_replay.next_action,
         nsdb_replay_next_command: nsdb_replay.next_command,
         nsdb_replay_first_blocker: nsdb_replay.first_blocker,
+        replay_vocabulary,
         object_package_summary_contract: object_package_summary.contract,
         object_package_summary_ready: object_package_summary.ready,
         object_package_summary_status: object_package_summary.status,
@@ -235,6 +242,7 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         debugger_transcript_ready: debugger_transcript.ready,
         debugger_transcript_status: debugger_transcript.status,
         debugger_transcript_next_action: debugger_transcript.next_action,
+        debugger_transcript_next_command: debugger_transcript.next_command,
         debugger_transcript_first_blocker: debugger_transcript.first_blocker,
         debugger_cursor_handoff_contract: debugger_cursor.contract.to_owned(),
         debugger_cursor_path: debugger_cursor.path,

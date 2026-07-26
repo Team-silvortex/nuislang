@@ -381,25 +381,6 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         ],
     },
     DevTensorDriftCheckSpec {
-        id: "nuis-provider-completion-closure-mirror",
-        path: "tools/nuis/src/closure_summary.rs",
-        required_patterns: &[
-            "ProviderCompletionClosureMirror",
-            "closure_summary_provider_completion_count",
-            "closure_summary_first_provider_family",
-            "closure_summary_first_provider_output_contract",
-            "closure_summary_first_provider_output_evidence",
-            "closure_summary_provider_completion_claim_authority_contract",
-            "closure_summary_provider_completion_claim_authority",
-            "closure_summary_provider_completion_claim_authority_status",
-            "closure_summary_provider_completion_digest_contract",
-            "closure_summary_provider_completion_set_hash_claim",
-            "closure_summary_provider_completion_set_hash",
-            "closure_summary_provider_completion_set_hash_validation_status",
-            "closure_summary_provider_completions",
-        ],
-    },
-    DevTensorDriftCheckSpec {
         id: "nsdb-provider-completion-collection-summary",
         path: "tools/nsdb/src/lib.rs",
         required_patterns: &[
@@ -657,6 +638,8 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "weakest_bootstrap_task_card_handoff_expected_artifact",
             "nuis-dev-tensor-task-card-v1",
             "weakest-bootstrap-status-progress-path",
+            "weakest-global-incomplete-status-progress-path",
+            "all bootstrap-critical cells are stable at 100/100",
             "status_rank -> progress -> coordinate",
             "validation_command",
             "expected_artifact",
@@ -699,6 +682,9 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         path: "tools/nuis/src/dev_tensor.rs",
         required_patterns: &[
             "weakest-bootstrap-status-progress-path",
+            "weakest-global-incomplete-status-progress-path",
+            "dev_tensor_bootstrap_cells_closed",
+            "select_dev_tensor_task_cell",
             "dev_tensor_cell_weakness_key",
             "select_dev_tensor_handoff_bootstrap_cell",
         ],
@@ -708,6 +694,8 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         path: "tools/nuis/src/dev_tensor_tests.rs",
         required_patterns: &[
             "handoff_selection_is_status_aware_and_input_order_independent",
+            "task_selection_falls_back_to_global_incomplete_after_bootstrap_closes",
+            "task_selection_keeps_bootstrap_priority_until_critical_cells_close",
             "select current weakest handoff",
         ],
     },

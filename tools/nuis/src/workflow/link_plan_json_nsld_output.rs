@@ -425,7 +425,8 @@ pub(super) fn nsld_final_output_json_fields(
         ),
         json_optional_string_field(
             "nsld_final_executable_output_debugger_transcript_next_command",
-            nsld_final_output.and_then(|summary| summary.nsdb_replay_next_command.as_deref()),
+            nsld_final_output
+                .and_then(|summary| summary.debugger_transcript_next_command.as_deref()),
         ),
         json_optional_string_field(
             "nsld_final_executable_output_debugger_transcript_first_blocker",
@@ -703,6 +704,12 @@ pub(super) fn nsld_final_output_json_fields(
             nsld_final_output.and_then(|summary| summary.first_blocker.as_deref()),
         ),
     ];
+    fields.extend(
+        super::link_plan_final_output_replay_vocabulary_json::
+            final_output_replay_vocabulary_json_fields(
+                nsld_final_output.map(|summary| &summary.replay_vocabulary),
+            ),
+    );
     fields.extend(
         super::link_plan_provider_dispatch_identity_json::
             provider_dispatch_identity_capability_json_fields(

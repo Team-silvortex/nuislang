@@ -432,6 +432,39 @@ fn final_output_summary(
             .to_owned(),
         ),
         nsdb_replay_first_blocker,
+        replay_vocabulary: crate::workflow::FinalOutputReplayVocabulary {
+            contract: "nuis-final-output-replay-vocabulary-v1",
+            source_contract: "nsdb-payload-execution-replay-plan-v1".to_owned(),
+            ready: nsdb_replay_ready,
+            status: if nsdb_replay_ready {
+                "replay-evidence-ready"
+            } else {
+                "blocked"
+            }
+            .to_owned(),
+            checkpoint_count: usize::from(nsdb_replay_ready),
+            replayable_checkpoint_count: usize::from(nsdb_replay_ready),
+            command: nsdb_replay_ready.then(|| "nsdb replay out --json".to_owned()),
+            next_action: if nsdb_replay_ready {
+                "replay-nsdb-payload-execution"
+            } else {
+                "resolve-final-output-nsdb-replay"
+            }
+            .to_owned(),
+            next_command: Some(
+                if nsdb_replay_ready {
+                    "nsdb replay out --json"
+                } else {
+                    "nsld final-executable-output out/nuis.build.manifest.toml --json"
+                }
+                .to_owned(),
+            ),
+            first_blocker: if nsdb_replay_ready {
+                None
+            } else {
+                Some("payload-execution-replay:no-checkpoints".to_owned())
+            },
+        },
         object_package_summary_contract: "nsld-object-package-summary-v1".to_owned(),
         object_package_summary_ready: nsdb_replay_ready,
         object_package_summary_status: if nsdb_replay_ready {
@@ -468,6 +501,14 @@ fn final_output_summary(
             "resolve-nsdb-yir-replay-transcript"
         }
         .to_owned(),
+        debugger_transcript_next_command: Some(
+            if nsdb_replay_ready {
+                "nsdb replay out --json"
+            } else {
+                "nsld final-executable-output out/nuis.build.manifest.toml --json"
+            }
+            .to_owned(),
+        ),
         debugger_transcript_first_blocker: if nsdb_replay_ready {
             None
         } else {

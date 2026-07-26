@@ -1,4 +1,5 @@
 use crate::artifact_nsdb_replay_cursor_lineage::DebuggerCursorLineageRepairAction;
+use crate::workflow::link_plan_final_output_replay_vocabulary::FinalOutputReplayVocabulary;
 use crate::workflow::link_plan_provider_dispatch_identity::ValidatedProviderDispatchIdentityCapability;
 
 #[derive(Clone)]
@@ -77,6 +78,7 @@ pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) nsdb_replay_next_action: String,
     pub(crate) nsdb_replay_next_command: Option<String>,
     pub(crate) nsdb_replay_first_blocker: Option<String>,
+    pub(crate) replay_vocabulary: FinalOutputReplayVocabulary,
     pub(crate) object_package_summary_contract: String,
     pub(crate) object_package_summary_ready: bool,
     pub(crate) object_package_summary_status: String,
@@ -86,6 +88,7 @@ pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) debugger_transcript_ready: bool,
     pub(crate) debugger_transcript_status: String,
     pub(crate) debugger_transcript_next_action: String,
+    pub(crate) debugger_transcript_next_command: Option<String>,
     pub(crate) debugger_transcript_first_blocker: Option<String>,
     pub(crate) debugger_cursor_handoff_contract: String,
     pub(crate) debugger_cursor_path: String,

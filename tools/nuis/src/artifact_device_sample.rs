@@ -7,8 +7,6 @@ pub(crate) const DEVICE_SAMPLE_HANDOFF_PROTOCOL: &str = "nuis-device-sample-prov
 pub(crate) const DEVICE_PROVIDER_SAMPLE_FILE_NAME: &str = "nuis.nsdb.device-provider-samples.toml";
 pub(crate) const DEVICE_PROVIDER_SAMPLE_PROTOCOL: &str = "nuis-device-provider-samples-v1";
 pub(crate) const DEVICE_PROVIDER_SAMPLE_SCHEMA: &str = "nsdb-yir-device-provider-sample-v1";
-const PIXELMAGIC_STD_PIXEL_PAYLOAD_FILE_NAME: &str = "nuis.pixelmagic.std-preprocessed.gray8.bin";
-const PIXELMAGIC_STD_PIXEL_PAYLOAD: &[u8] = &[0, 4, 9, 8];
 const WITSAGE_VECTOR_PAYLOAD_FILE_NAME: &str = "nuis.witsage.vector.f32.bin";
 const WITSAGE_VECTOR_MODEL_FILE_NAME: &str = "nuis.witsage.vector-affine.mlmodel";
 const WITSAGE_VECTOR_EXPECTED_FILE_NAME: &str = "nuis.witsage.vector-affine.expected.f32.bin";
@@ -372,16 +370,9 @@ pub(crate) fn persist_device_sample_input_payloads<'a>(
     let evidence = samples
         .map(|sample| sample.input_evidence.as_str())
         .collect::<Vec<_>>();
-    if evidence
-        .iter()
-        .any(|item| item.contains("std-preprocessed-pgm:input_bytes=20"))
-    {
-        fs::write(
-            output_dir.join(PIXELMAGIC_STD_PIXEL_PAYLOAD_FILE_NAME),
-            PIXELMAGIC_STD_PIXEL_PAYLOAD,
-        )
-        .map_err(|error| format!("failed to persist PixelMagic std pixel payload: {error}"))?;
-    }
+    crate::artifact_device_sample_registration::persist_registered_input_payloads(
+        output_dir, &evidence,
+    )?;
     if evidence
         .iter()
         .any(|item| item.contains("provider_model_asset_id=witsage."))
@@ -484,15 +475,18 @@ fn input_evidence(
         (None, Some(path)) => format!("payload-format-missing:{path}"),
         (None, None) => "payload-evidence-missing".to_owned(),
     };
-    if backend_family == Some("metal") && target_device == Some("apple-silicon-gpu") {
-        format!(
-            "{base};provider_buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;provider_buffer_id=input.pixels;provider_buffer_element_type=u8;provider_buffer_layout=image-2d-row-major:pixel-format=gray8;provider_buffer_shape=2x2;provider_buffer_row_stride_bytes=2;provider_buffer_byte_length={};provider_buffer_payload_path={PIXELMAGIC_STD_PIXEL_PAYLOAD_FILE_NAME};provider_buffer_content_hash={};provider_kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;provider_kernel_id=pixelmagic.gray8.invert;provider_kernel_operation=invert;provider_kernel_input_buffer=input.pixels;provider_kernel_output_buffer=output.pixels;provider_kernel_dispatch=2x2x1;provider_kernel_scalar_bindings=max_value:u8:15;std-preprocessed-pgm:input_bytes=20;pixel_format=gray8;pixel_width=2;pixel_height=2;pixel_stride=2;pixel_max_value=15;pixel_operation=invert;pixel_payload_path={PIXELMAGIC_STD_PIXEL_PAYLOAD_FILE_NAME};pixel_payload_bytes={};pixel_payload_hash={}",
-            PIXELMAGIC_STD_PIXEL_PAYLOAD.len(),
-            fnv1a64_hex(PIXELMAGIC_STD_PIXEL_PAYLOAD),
-            PIXELMAGIC_STD_PIXEL_PAYLOAD.len(),
-            fnv1a64_hex(PIXELMAGIC_STD_PIXEL_PAYLOAD)
-        )
-    } else if backend_family == Some("coreml") && target_device == Some("apple-ane") {
+    if let (Some(backend_family), Some(target_device)) = (backend_family, target_device) {
+        if let Some(registered) =
+            crate::artifact_device_sample_registration::enrich_registered_input_evidence(
+                backend_family,
+                target_device,
+                &base,
+            )
+        {
+            return registered;
+        }
+    }
+    if backend_family == Some("coreml") && target_device == Some("apple-ane") {
         let payload = witsage_dense_payload();
         let model = crate::artifact_coreml_model::witsage_dense_transform_model();
         let singular = format!(
@@ -511,12 +505,11 @@ fn input_evidence(
         let add_model = crate::artifact_coreml_model::witsage_vector_add_model();
         let add = witsage_add_collection_request(3, &add_model);
         let metal = witsage_metal_bias_collection_request(4);
-        format!(
+        return format!(
             "{singular};provider_request_collection_contract=nuis-provider-request-collection-v1;provider_request_count=5;{dense};{affine};{chained};{add};{metal}"
-        )
-    } else {
-        base
+        );
     }
+    base
 }
 
 fn witsage_dense_payload() -> Vec<u8> {
