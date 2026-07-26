@@ -47,6 +47,29 @@ Short compatibility rule:
 That split is intentional. A future layout bump can be represented as a binary
 version change without pretending the whole language contract changed.
 
+Nsld's self-owned container metadata also carries an open
+`[[metadata_binding]]` table. A binding has an opaque id, versioned contract,
+value count, value hash, validation status, and required flag. Its table hash
+is part of the container metadata root, and every complete record is part of
+the container root. `identity.selected-provider-bundle-set` is the first
+registered use; it binds `nuis-selected-provider-bundle-set-v1` without making
+the container format aware of any finite backend combination.
+
+The self-contained final image carries the canonical Nsld container as its
+first payload. The Nsld container loader parses `metadata_binding` from those
+final-image bytes, recomputes the table hash, and rejects malformed,
+unverified, duplicate, or hash-drifted required bindings before lifecycle
+handoff. Loader verification is therefore tied to the emitted image rather
+than only to the sidecar used during package construction.
+
+`nuis-host-runner` repeats that verification from the mapped NSB payload
+without importing Nsld's verifier or trusting its boolean conclusion. Its
+report exposes the observed binding count, parsed count, table hash,
+validation status, and selected-set contract/count/hash. Nuis launch evidence
+requires an explicit zero-entry `not-applicable` proof or a non-empty
+`verified` proof before reporting the lifecycle handoff ready. Refreshing the
+outer NSB file hash after changing an inner binding does not bypass this gate.
+
 ## Layer Model
 
 ### 1. Build Manifest

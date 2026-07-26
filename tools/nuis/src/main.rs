@@ -4,6 +4,7 @@ mod artifact_doctor;
 mod artifact_doctor_mirrors;
 mod artifact_doctor_render;
 mod artifact_host_runner;
+mod artifact_launch_binding;
 mod artifact_launch_evidence;
 mod artifact_materialization;
 mod artifact_nsdb_handoff;

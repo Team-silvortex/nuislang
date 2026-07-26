@@ -901,9 +901,27 @@ ordered index/package/bundle/family tuples. Nsld and Nuis independently rebuild
 that sequence from every manifest record; a missing or mismatched contract,
 count, or FNV hash fails closed. The first-bundle fields remain compatibility
 mirrors, while package and closure audit surfaces carry the complete selected
-set identity. The next boundary is binding that verified identity into
-Nsld-owned immutable package/container bytes rather than reading it only from
-the Nsdb sidecar.
+set identity. Nsld now places that identity in its open `metadata_binding`
+table as `identity.selected-provider-bundle-set`. The binding table hash
+participates in `metadata_table_hash`, each complete binding record
+participates in `container_hash`, and disagreement prevents both container
+metadata and payload emission. This remains provider-neutral: Nsld sees an
+opaque contract/count/hash record, not a fixed Metal/CoreML combination.
+Pending or blocked device execution can still carry a verified selected-set
+identity through drive diagnostics, so selection integrity is not confused
+with execution completion. The final NSB image embeds the canonical container
+bytes. Nsld's container loader now extracts `metadata_binding` records from
+that real image payload, independently recomputes the table hash, validates
+required records and the selected-set shape, and blocks handoff after direct
+image mutation. Final-output JSON/text expose the loader-observed binding
+count, table hash, validation status, and selected-set contract/count/hash.
+`nuis-host-runner` now repeats the verification directly from mapped final
+image bytes and publishes count, parsed count, table hash, validation status,
+and selected-set identity. Nuis launch evidence requires this independently
+observed proof before reporting ready; a regression also proves that updating
+the outer NSB hash cannot hide an inner binding mutation. The next continuity
+boundary is Nsdb payload-handoff persistence and replay verification, which
+must prove that debugger evidence belongs to the same opaque provider set.
 
 Return-producing `if` lowering now preserves control dependence for nested
 extern-call comparisons. The open `compare_call_result` mode of

@@ -399,6 +399,17 @@ pub(crate) fn nsld_final_executable_output_report(
         container_loader_entry_kind: container_loader_evidence.entry_kind,
         container_loader_entry_section_id: container_loader_evidence.entry_section_id,
         container_loader_symbol_count: container_loader_evidence.symbol_count,
+        container_loader_metadata_binding_count: container_loader_evidence.metadata_binding_count,
+        container_loader_metadata_binding_table_hash: container_loader_evidence
+            .metadata_binding_table_hash,
+        container_loader_metadata_binding_validation_status: container_loader_evidence
+            .metadata_binding_validation_status,
+        container_loader_selected_provider_bundle_set_contract: container_loader_evidence
+            .selected_provider_bundle_set_contract,
+        container_loader_selected_provider_bundle_count: container_loader_evidence
+            .selected_provider_bundle_count,
+        container_loader_selected_provider_bundle_set_hash: container_loader_evidence
+            .selected_provider_bundle_set_hash,
         first_payload_execution_status: first_payload_execution.status,
         first_payload_execution_ready: first_payload_execution.ready,
         first_payload_execution_target: first_payload_execution.target,

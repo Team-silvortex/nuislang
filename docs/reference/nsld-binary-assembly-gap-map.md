@@ -50,6 +50,7 @@ It currently owns:
 * loader symbol seeds
 * relocation seeds
 * external import records
+* an open immutable metadata-binding table for versioned identity claims
 * payload hash and container hash
 * verification of metadata and payload consistency
 * deterministic final-stage plan before executable finalization
@@ -59,6 +60,20 @@ It currently owns:
 * deterministic blocked/final-output boundary report for host-assisted routes
 * normalized final-output materialization status and recommended next action for
   scripts that need to advance the binary assembly chain deterministically
+
+The first immutable binding is
+`identity.selected-provider-bundle-set`. Nsld accepts it only after
+independently verifying the provider-sample contract, count, and hash. The
+binding-table hash participates in the metadata root and each complete record
+participates in the container root; disagreement blocks container emission.
+The final NSB image embeds those canonical container bytes. Both the Nsld
+container loader and `nuis-host-runner` read the binding table from actual
+image payload bytes, independently recompute its table hash, validate required
+records and selected-set structure, and block handoff when the final image is
+mutated. Nuis launch evidence requires the host-runner-observed proof rather
+than trusting only Nsld's handoff-ready result. The remaining continuity gap
+is debugger persistence: Nsdb payload-handoff and replay records do not yet
+carry and revalidate the same opaque binding proof.
 
 It does not yet own:
 

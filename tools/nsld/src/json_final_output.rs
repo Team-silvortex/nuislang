@@ -95,6 +95,36 @@ pub(crate) fn nsld_final_executable_output_report_json(
             "container_loader_symbol_count",
             report.container_loader_symbol_count,
         ),
+        json_optional_usize_field(
+            "container_loader_metadata_binding_count",
+            report.container_loader_metadata_binding_count,
+        ),
+        json_optional_string_field(
+            "container_loader_metadata_binding_table_hash",
+            report
+                .container_loader_metadata_binding_table_hash
+                .as_deref(),
+        ),
+        json_string_field(
+            "container_loader_metadata_binding_validation_status",
+            &report.container_loader_metadata_binding_validation_status,
+        ),
+        json_optional_string_field(
+            "container_loader_selected_provider_bundle_set_contract",
+            report
+                .container_loader_selected_provider_bundle_set_contract
+                .as_deref(),
+        ),
+        json_optional_usize_field(
+            "container_loader_selected_provider_bundle_count",
+            report.container_loader_selected_provider_bundle_count,
+        ),
+        json_optional_string_field(
+            "container_loader_selected_provider_bundle_set_hash",
+            report
+                .container_loader_selected_provider_bundle_set_hash
+                .as_deref(),
+        ),
         json_string_field(
             "first_payload_execution_status",
             &report.first_payload_execution_status,

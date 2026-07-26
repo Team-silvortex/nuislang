@@ -279,11 +279,20 @@ status = "awaiting-provider-materialization"
 record_count = 1
 ready_record_count = 0
 pending_record_count = 1
+provider_bundle_registry_contract = "nuis-provider-bundle-registry-v1"
+provider_bundle_manifest_contract = "nuis-provider-bundle-manifest-v1"
+provider_bundle_manifest_hash = "fnv1a64:08a971e5a543be2e"
+provider_bundle_manifest_entry_count = 3
+selected_provider_bundle_set_contract = "nuis-selected-provider-bundle-set-v1"
+selected_provider_bundle_count = 1
+selected_provider_bundle_set_hash = "fnv1a64:5c7ac5158d84aa8b"
 
 [[device_provider_samples]]
 trace_id = "hetero-trace:shader:metal:apple-silicon-gpu"
 provider = "nustar-deferred-device-sample-v1"
 provider_family = "metal:apple-silicon-gpu"
+provider_bundle_package_id = "official.shader"
+provider_bundle_id = "metal.apple-silicon-gpu.bundle.v1"
 handoff_target = "metal:apple-silicon-gpu"
 sample_status = "pending-provider-execution"
 validation_status = "pending-provider-execution"
@@ -309,11 +318,20 @@ record_count = 1
 ready_record_count = 0
 pending_record_count = 0
 blocked_record_count = 1
+provider_bundle_registry_contract = "nuis-provider-bundle-registry-v1"
+provider_bundle_manifest_contract = "nuis-provider-bundle-manifest-v1"
+provider_bundle_manifest_hash = "fnv1a64:08a971e5a543be2e"
+provider_bundle_manifest_entry_count = 3
+selected_provider_bundle_set_contract = "nuis-selected-provider-bundle-set-v1"
+selected_provider_bundle_count = 1
+selected_provider_bundle_set_hash = "fnv1a64:5c7ac5158d84aa8b"
 
 [[device_provider_samples]]
 trace_id = "hetero-trace:shader:metal:apple-silicon-gpu"
 provider = "nustar-deferred-device-sample-v1"
 provider_family = "metal:apple-silicon-gpu"
+provider_bundle_package_id = "official.shader"
+provider_bundle_id = "metal.apple-silicon-gpu.bundle.v1"
 handoff_target = "metal:apple-silicon-gpu"
 sample_status = "provider-execution-blocked"
 validation_status = "provider-output-payload-invalid"

@@ -39,6 +39,13 @@ pub(crate) struct HostRunnerJsonSurface {
     pub(crate) container_loader_entry_section_id: Option<String>,
     pub(crate) container_loader_handoff_ready: Option<bool>,
     pub(crate) container_loader_handoff_status: Option<String>,
+    pub(crate) container_loader_metadata_binding_count: Option<usize>,
+    pub(crate) container_loader_metadata_binding_parsed_count: Option<usize>,
+    pub(crate) container_loader_metadata_binding_table_hash: Option<String>,
+    pub(crate) container_loader_metadata_binding_validation_status: Option<String>,
+    pub(crate) container_loader_selected_provider_bundle_set_contract: Option<String>,
+    pub(crate) container_loader_selected_provider_bundle_count: Option<usize>,
+    pub(crate) container_loader_selected_provider_bundle_set_hash: Option<String>,
     pub(crate) backend_artifact_payload_count: Option<usize>,
     pub(crate) backend_artifact_payload_parsed_count: Option<usize>,
     pub(crate) backend_artifact_payload_ready_count: Option<usize>,
@@ -69,6 +76,13 @@ impl HostRunnerJsonSurface {
             container_loader_entry_section_id: None,
             container_loader_handoff_ready: None,
             container_loader_handoff_status: None,
+            container_loader_metadata_binding_count: None,
+            container_loader_metadata_binding_parsed_count: None,
+            container_loader_metadata_binding_table_hash: None,
+            container_loader_metadata_binding_validation_status: None,
+            container_loader_selected_provider_bundle_set_contract: None,
+            container_loader_selected_provider_bundle_count: None,
+            container_loader_selected_provider_bundle_set_hash: None,
             backend_artifact_payload_count: None,
             backend_artifact_payload_parsed_count: None,
             backend_artifact_payload_ready_count: None,
@@ -99,6 +113,13 @@ impl HostRunnerJsonSurface {
             container_loader_entry_section_id: None,
             container_loader_handoff_ready: None,
             container_loader_handoff_status: None,
+            container_loader_metadata_binding_count: None,
+            container_loader_metadata_binding_parsed_count: None,
+            container_loader_metadata_binding_table_hash: None,
+            container_loader_metadata_binding_validation_status: None,
+            container_loader_selected_provider_bundle_set_contract: None,
+            container_loader_selected_provider_bundle_count: None,
+            container_loader_selected_provider_bundle_set_hash: None,
             backend_artifact_payload_count: None,
             backend_artifact_payload_parsed_count: None,
             backend_artifact_payload_ready_count: None,
@@ -160,6 +181,34 @@ impl HostRunnerJsonSurface {
             container_loader_handoff_status: json_string_value(
                 &output.stdout,
                 "container_loader_handoff_status",
+            ),
+            container_loader_metadata_binding_count: json_usize_value(
+                &output.stdout,
+                "container_loader_metadata_binding_count",
+            ),
+            container_loader_metadata_binding_parsed_count: json_usize_value(
+                &output.stdout,
+                "container_loader_metadata_binding_parsed_count",
+            ),
+            container_loader_metadata_binding_table_hash: json_string_value(
+                &output.stdout,
+                "container_loader_metadata_binding_table_hash",
+            ),
+            container_loader_metadata_binding_validation_status: json_string_value(
+                &output.stdout,
+                "container_loader_metadata_binding_validation_status",
+            ),
+            container_loader_selected_provider_bundle_set_contract: json_string_value(
+                &output.stdout,
+                "container_loader_selected_provider_bundle_set_contract",
+            ),
+            container_loader_selected_provider_bundle_count: json_usize_value(
+                &output.stdout,
+                "container_loader_selected_provider_bundle_count",
+            ),
+            container_loader_selected_provider_bundle_set_hash: json_string_value(
+                &output.stdout,
+                "container_loader_selected_provider_bundle_set_hash",
             ),
             backend_artifact_payload_count: json_usize_value(
                 &output.stdout,
@@ -238,6 +287,37 @@ impl HostRunnerJsonSurface {
             json_optional_string_field(
                 "host_runner_container_loader_handoff_status",
                 self.container_loader_handoff_status.as_deref(),
+            ),
+            json_optional_usize_field(
+                "host_runner_container_loader_metadata_binding_count",
+                self.container_loader_metadata_binding_count,
+            ),
+            json_optional_usize_field(
+                "host_runner_container_loader_metadata_binding_parsed_count",
+                self.container_loader_metadata_binding_parsed_count,
+            ),
+            json_optional_string_field(
+                "host_runner_container_loader_metadata_binding_table_hash",
+                self.container_loader_metadata_binding_table_hash.as_deref(),
+            ),
+            json_optional_string_field(
+                "host_runner_container_loader_metadata_binding_validation_status",
+                self.container_loader_metadata_binding_validation_status
+                    .as_deref(),
+            ),
+            json_optional_string_field(
+                "host_runner_container_loader_selected_provider_bundle_set_contract",
+                self.container_loader_selected_provider_bundle_set_contract
+                    .as_deref(),
+            ),
+            json_optional_usize_field(
+                "host_runner_container_loader_selected_provider_bundle_count",
+                self.container_loader_selected_provider_bundle_count,
+            ),
+            json_optional_string_field(
+                "host_runner_container_loader_selected_provider_bundle_set_hash",
+                self.container_loader_selected_provider_bundle_set_hash
+                    .as_deref(),
             ),
             json_optional_usize_field(
                 "host_runner_backend_artifact_payload_count",
@@ -324,13 +404,20 @@ mod tests {
         let output = HostRunnerOutput {
             program: PathBuf::from("nuis-host-runner"),
             status,
-            stdout: r#"{"ready":true,"backend_artifact_payload_count":2,"backend_artifact_payload_parsed_count":2,"backend_artifact_payload_ready_count":1,"backend_artifact_payload_first_id":"payload0005.backend-artifact","backend_artifact_payload_first_kind":"nustar-backend-artifact:kernel:aarch64:apple-silicon-cpu","backend_artifact_payload_first_role_status":"ready","backend_artifact_payload_table_hash":"0x7777777777777777"}"#.to_owned(),
+            stdout: r#"{"ready":true,"container_loader_metadata_binding_count":1,"container_loader_metadata_binding_parsed_count":1,"container_loader_metadata_binding_table_hash":"fnv1a64:1111111111111111","container_loader_metadata_binding_validation_status":"verified","container_loader_selected_provider_bundle_set_contract":"nuis-selected-provider-bundle-set-v1","container_loader_selected_provider_bundle_count":2,"container_loader_selected_provider_bundle_set_hash":"fnv1a64:2222222222222222","backend_artifact_payload_count":2,"backend_artifact_payload_parsed_count":2,"backend_artifact_payload_ready_count":1,"backend_artifact_payload_first_id":"payload0005.backend-artifact","backend_artifact_payload_first_kind":"nustar-backend-artifact:kernel:aarch64:apple-silicon-cpu","backend_artifact_payload_first_role_status":"ready","backend_artifact_payload_table_hash":"0x7777777777777777"}"#.to_owned(),
             stderr: String::new(),
         };
 
         let surface = HostRunnerJsonSurface::from_output(&output);
         let json = surface.json_fields().join(",");
 
+        assert!(json.contains("\"host_runner_container_loader_metadata_binding_count\":1"));
+        assert!(json.contains(
+            "\"host_runner_container_loader_metadata_binding_validation_status\":\"verified\""
+        ));
+        assert!(json.contains(
+            "\"host_runner_container_loader_selected_provider_bundle_set_contract\":\"nuis-selected-provider-bundle-set-v1\""
+        ));
         assert!(json.contains("\"host_runner_backend_artifact_payload_count\":2"));
         assert!(json.contains("\"host_runner_backend_artifact_payload_parsed_count\":2"));
         assert!(json.contains("\"host_runner_backend_artifact_payload_ready_count\":1"));

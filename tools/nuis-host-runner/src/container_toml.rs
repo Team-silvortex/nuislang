@@ -50,6 +50,10 @@ pub(super) fn bool_value_from_lines(lines: &[&str], key: &str) -> Option<bool> {
     }
 }
 
+pub(super) fn usize_value_from_lines(lines: &[&str], key: &str) -> Option<usize> {
+    raw_value_from_lines(lines, key)?.trim().parse().ok()
+}
+
 fn raw_value<'a>(source: &'a str, key: &str) -> Option<&'a str> {
     raw_value_from_lines(&source.lines().collect::<Vec<_>>(), key)
 }

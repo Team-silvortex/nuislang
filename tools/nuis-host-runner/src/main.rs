@@ -5,6 +5,7 @@ use std::{
 
 mod container;
 mod container_backend_payload;
+mod container_metadata_binding;
 mod container_toml;
 mod report;
 
@@ -143,6 +144,13 @@ struct RunnerReport {
     backend_artifact_payload_first_kind: Option<String>,
     backend_artifact_payload_first_role_status: Option<String>,
     backend_artifact_payload_table_hash: Option<String>,
+    container_loader_metadata_binding_count: Option<usize>,
+    container_loader_metadata_binding_parsed_count: usize,
+    container_loader_metadata_binding_table_hash: Option<String>,
+    container_loader_metadata_binding_validation_status: String,
+    container_loader_selected_provider_bundle_set_contract: Option<String>,
+    container_loader_selected_provider_bundle_count: Option<usize>,
+    container_loader_selected_provider_bundle_set_hash: Option<String>,
     container_payload_path: Option<String>,
     container_loader_handoff_status: String,
     container_loader_handoff_ready: bool,
@@ -444,6 +452,23 @@ fn validate_handoff(
             .backend_artifact_payload
             .first_role_status,
         backend_artifact_payload_table_hash: container_loader.backend_artifact_payload_table_hash,
+        container_loader_metadata_binding_count: container_loader.metadata_binding.declared_count,
+        container_loader_metadata_binding_parsed_count: container_loader
+            .metadata_binding
+            .parsed_count,
+        container_loader_metadata_binding_table_hash: container_loader.metadata_binding.table_hash,
+        container_loader_metadata_binding_validation_status: container_loader
+            .metadata_binding
+            .validation_status,
+        container_loader_selected_provider_bundle_set_contract: container_loader
+            .metadata_binding
+            .selected_set_contract,
+        container_loader_selected_provider_bundle_count: container_loader
+            .metadata_binding
+            .selected_set_count,
+        container_loader_selected_provider_bundle_set_hash: container_loader
+            .metadata_binding
+            .selected_set_hash,
         container_payload_path: container_loader.container_payload_path,
         container_loader_handoff_status: container_loader.handoff_status,
         container_loader_handoff_ready: container_loader.handoff_ready,

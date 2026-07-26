@@ -69,6 +69,21 @@ pub(crate) fn print_nsld_container_report(report: &NsldContainerReport) {
     println!("  container_magic: {}", report.container_magic);
     println!("  container_version: {}", report.container_version);
     println!("  metadata_table_hash: {}", report.metadata_table_hash);
+    println!(
+        "  metadata_binding_table_hash: {}",
+        report.metadata_binding_table_hash
+    );
+    for binding in &report.metadata_bindings {
+        println!(
+            "  metadata_binding: id={} contract={} count={} hash={} validation={} required={}",
+            binding.binding_id,
+            binding.contract,
+            binding.value_count,
+            binding.value_hash,
+            binding.validation_status,
+            binding.required
+        );
+    }
     println!("  container_layout_hash: {}", report.container_layout_hash);
     println!("  container_hash: {}", report.container_hash);
     println!("  loader_readiness: {}", report.loader_readiness);
@@ -183,6 +198,14 @@ pub(crate) fn print_nsld_container_emit_report(report: &NsldContainerEmitReport)
     println!("  ready: {}", report.ready);
     println!("  section_count: {}", report.section_count);
     println!("  metadata_table_hash: {}", report.metadata_table_hash);
+    println!(
+        "  metadata_binding_table_hash: {}",
+        report.metadata_binding_table_hash
+    );
+    println!(
+        "  metadata_binding_count: {}",
+        report.metadata_binding_count
+    );
     println!("  container_layout_hash: {}", report.container_layout_hash);
     println!("  container_hash: {}", report.container_hash);
     println!("  payload_size_bytes: {}", report.payload_size_bytes);

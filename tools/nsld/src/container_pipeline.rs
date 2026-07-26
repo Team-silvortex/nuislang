@@ -3,7 +3,9 @@ pub(crate) use super::container_pipeline_verify::nsld_verify_container_report;
 use super::{
     artifact_chain::{nsld_artifact_stage_kind_path_for_plan, NsldArtifactStageKind},
     assembly::nsld_section_manifest_report,
-    container, fnv1a64_hex,
+    container,
+    container_metadata_bindings::container_metadata_binding_evidence,
+    fnv1a64_hex,
     object_output::nsld_object_output_issues,
     toml,
 };
@@ -211,6 +213,9 @@ pub(crate) fn nsld_container_report(
     let backend_artifact_payloads = container::backend_artifact_payloads(plan);
     let backend_artifact_payload_table_hash =
         container::backend_artifact_payload_table_hash(&backend_artifact_payloads, fnv1a64_hex);
+    let metadata_binding_evidence = container_metadata_binding_evidence(&plan.output_dir);
+    let metadata_binding_table_hash =
+        container::metadata_binding_table_hash(&metadata_binding_evidence.bindings, fnv1a64_hex);
     let metadata_table_hash = container::metadata_table_hash(
         &container_section_table_hash,
         &loader_symbol_table_hash,
@@ -218,10 +223,14 @@ pub(crate) fn nsld_container_report(
         &compatibility_domain_table_hash,
         &external_import_table_hash,
         &backend_artifact_payload_table_hash,
+        &metadata_binding_table_hash,
         fnv1a64_hex,
     );
-    let loader_blockers = container::loader_blockers(&external_imports, &container_plan.blockers);
-    let loader_readiness = if !container_plan.ready || !container_plan.blockers.is_empty() {
+    let mut blockers = container_plan.blockers.clone();
+    blockers.extend(metadata_binding_evidence.blockers);
+    let loader_blockers = container::loader_blockers(&external_imports, &blockers);
+    let ready = container_plan.ready && blockers.is_empty();
+    let loader_readiness = if !ready {
         "blocked"
     } else if external_imports
         .iter()
@@ -245,6 +254,7 @@ pub(crate) fn nsld_container_report(
         &compatibility_domains,
         &external_imports,
         &backend_artifact_payloads,
+        &metadata_binding_evidence.bindings,
         &loader_readiness,
         &loader_blockers,
         payload_size_bytes,
@@ -253,10 +263,12 @@ pub(crate) fn nsld_container_report(
     );
     container::NsldContainerReport {
         manifest: manifest.display().to_string(),
-        ready: container_plan.ready,
+        ready,
         container_magic: container_plan.container_magic,
         container_version: container_plan.container_version,
         metadata_table_hash,
+        metadata_binding_table_hash,
+        metadata_bindings: metadata_binding_evidence.bindings,
         container_layout_hash: container_plan.container_layout_hash,
         container_hash,
         loader_readiness,
@@ -281,7 +293,7 @@ pub(crate) fn nsld_container_report(
         section_count: container_plan.section_count,
         container_section_table_hash,
         sections,
-        blockers: container_plan.blockers,
+        blockers,
     }
 }
 
@@ -290,6 +302,17 @@ pub(crate) fn nsld_emit_container_report(
     plan: &nuisc::linker::LinkPlan,
 ) -> Result<container::NsldContainerEmitReport, String> {
     let report = nsld_container_report(manifest, plan);
+    if !report.ready
+        && report
+            .blockers
+            .iter()
+            .any(|blocker| blocker.starts_with("metadata-binding:"))
+    {
+        return Err(format!(
+            "refusing to emit nsld container with invalid immutable metadata binding: {}",
+            report.blockers.join(", ")
+        ));
+    }
     let output_path = PathBuf::from(&report.output_path);
     let payload_path = PathBuf::from(&report.payload_path);
     fs::write(&payload_path, container::payload_bytes(&report.sections)).map_err(|error| {
@@ -311,6 +334,8 @@ pub(crate) fn nsld_emit_container_report(
         payload_path: payload_path.display().to_string(),
         ready: report.ready,
         metadata_table_hash: report.metadata_table_hash,
+        metadata_binding_table_hash: report.metadata_binding_table_hash,
+        metadata_binding_count: report.metadata_bindings.len(),
         container_layout_hash: report.container_layout_hash,
         container_hash: report.container_hash,
         payload_size_bytes: report.payload_size_bytes,

@@ -456,6 +456,11 @@ fn launch_evidence_first_blocker(
         if host_runner.ready != Some(true) {
             return Some("host-runner-probe:not-ready".to_owned());
         }
+        if let Some(blocker) =
+            crate::artifact_launch_binding::host_runner_binding_first_blocker(host_runner)
+        {
+            return Some(blocker);
+        }
         if host_runner.container_loader_handoff_ready != Some(true) {
             return Some("container-loader-handoff:not-ready".to_owned());
         }
@@ -701,100 +706,5 @@ pub(crate) fn optional_bool_text(value: Option<bool>) -> &'static str {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn launch_evidence_emits_payload_execution_trace_record_for_container_handoff() {
-        let prelaunch = crate::run_artifact::RunArtifactPrelaunchSummary {
-            kind: "nsld-host-entrypoint".to_owned(),
-            status: "ready".to_owned(),
-            evidence_status: "entrypoint-ready".to_owned(),
-            command: Some("nuis-host-runner app.nsb".to_owned()),
-            runner_command_present: true,
-            entrypoint_path: Some("nuis.nsld.final-executable-launcher.toml".to_owned()),
-            entrypoint_present: true,
-            entrypoint_protocol: Some("nuis-nsld-launcher-v1".to_owned()),
-            entrypoint_protocol_valid: Some(true),
-            reason: "ready".to_owned(),
-        };
-        let mut host_runner = HostRunnerJsonSurface {
-            invoked: true,
-            status: "ready".to_owned(),
-            program: Some("nuis-host-runner".to_owned()),
-            exit_status: Some("0".to_owned()),
-            error: None,
-            ready: Some(true),
-            would_enter_lifecycle_hook: Some(true),
-            nsb_readable: Some(true),
-            nsb_hash_matches: Some(true),
-            nsb_payload_region_mapped: Some(true),
-            nsb_payload_scan_kind: Some("nsld-container-toml".to_owned()),
-            container_loader_status: Some("parsed".to_owned()),
-            container_ready: Some(true),
-            container_loader_entry_kind: Some("lifecycle-bootstrap".to_owned()),
-            container_loader_entry_symbol: Some("main".to_owned()),
-            container_loader_entry_section_id: Some("sec0000.compiled-artifact".to_owned()),
-            container_loader_handoff_ready: Some(true),
-            container_loader_handoff_status: Some("ready".to_owned()),
-            backend_artifact_payload_count: Some(0),
-            backend_artifact_payload_parsed_count: Some(0),
-            backend_artifact_payload_ready_count: Some(0),
-            backend_artifact_payload_first_id: None,
-            backend_artifact_payload_first_kind: None,
-            backend_artifact_payload_first_role_status: None,
-            backend_artifact_payload_table_hash: None,
-        };
-
-        let evidence = RunArtifactLaunchEvidence::from_surfaces(&prelaunch, &host_runner);
-        let json = evidence.json_fields().join(",");
-
-        assert!(json.contains(
-            "\"launch_evidence_payload_execution_trace_protocol\":\"nsdb-yir-payload-execution-trace-v1\""
-        ));
-        assert!(json.contains("\"launch_evidence_payload_execution_trace_available\":true"));
-        assert!(json.contains("\"launch_evidence_payload_execution_trace_record_count\":1"));
-        assert!(json.contains("\"launch_evidence_payload_execution_trace_ready_record_count\":1"));
-        assert!(json.contains("\"launch_evidence_payload_execution_trace_records\":[{"));
-        assert!(json.contains("\"trace_id\":\"payload-trace:container-loader:main\""));
-        assert!(json.contains("\"execution_phase\":\"container-loader-handoff\""));
-        assert!(json.contains("\"target\":\"container-loader\""));
-        assert!(json.contains("\"entry_symbol\":\"main\""));
-        assert!(json.contains("\"entry_section_id\":\"sec0000.compiled-artifact\""));
-        assert!(json.contains("\"next_action\":\"handoff-payload-trace-to-nsdb\""));
-        assert!(json
-            .contains("\"launch_evidence_hetero_execution_closure_status\":\"payload-missing\""));
-
-        host_runner.backend_artifact_payload_count = Some(1);
-        host_runner.backend_artifact_payload_parsed_count = Some(1);
-        host_runner.backend_artifact_payload_ready_count = Some(1);
-        host_runner.backend_artifact_payload_first_id =
-            Some("payload0005.backend-artifact".to_owned());
-        host_runner.backend_artifact_payload_first_kind =
-            Some("nustar-backend-artifact:kernel:aarch64:apple-silicon-cpu".to_owned());
-        host_runner.backend_artifact_payload_first_role_status = Some("ready".to_owned());
-        let backend_evidence = crate::artifact_doctor::BackendArtifactPayloadEvidence {
-            available: true,
-            path: None,
-            count: 1,
-            present_count: 1,
-            role_status: "ready".to_owned(),
-            ids: vec!["payload0005.backend-artifact".to_owned()],
-            kinds: vec!["nustar-backend-artifact:kernel:aarch64:apple-silicon-cpu".to_owned()],
-            first_missing: None,
-        };
-        let closed_json = RunArtifactLaunchEvidence::from_surfaces_with_backend_payload_evidence(
-            &prelaunch,
-            &host_runner,
-            &backend_evidence,
-        )
-        .json_fields()
-        .join(",");
-        assert!(
-            closed_json.contains("\"launch_evidence_hetero_execution_closure_status\":\"closed\"")
-        );
-        assert!(closed_json.contains("\"launch_evidence_hetero_execution_closure_ready\":true"));
-        assert!(closed_json.contains(
-            "\"launch_evidence_hetero_execution_closure_next_action\":\"handoff-hetero-execution-evidence-to-nsdb\""
-        ));
-    }
-}
+#[path = "artifact_launch_evidence_tests.rs"]
+mod tests;

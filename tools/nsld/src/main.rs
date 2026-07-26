@@ -15,6 +15,7 @@ mod closure_snapshot_helpers;
 mod commands;
 mod container;
 mod container_hashes;
+mod container_metadata_bindings;
 mod container_model;
 mod container_pipeline;
 mod container_pipeline_actual;
@@ -44,6 +45,7 @@ mod display_object_image;
 mod display_prepare;
 mod display_text;
 mod drive;
+mod final_executable_container_binding;
 mod final_executable_container_loader;
 mod final_executable_emit;
 mod final_executable_emit_actual;
@@ -127,6 +129,8 @@ mod main_cli_tests;
 mod main_closure_tests;
 #[cfg(test)]
 mod main_container_domain_assertions;
+#[cfg(test)]
+mod main_container_metadata_binding_tests;
 #[cfg(test)]
 mod main_container_tests;
 #[cfg(test)]

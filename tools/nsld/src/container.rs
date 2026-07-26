@@ -352,6 +352,7 @@ pub(crate) fn file_hash(
     compatibility_domains: &[NsldContainerCompatibilityDomain],
     external_imports: &[NsldContainerExternalImport],
     backend_artifact_payloads: &[NsldContainerBackendArtifactPayload],
+    metadata_bindings: &[NsldContainerMetadataBinding],
     loader_readiness: &str,
     loader_blockers: &[String],
     payload_size_bytes: usize,
@@ -482,6 +483,25 @@ pub(crate) fn file_hash(
         material.push_str(&payload.payload_path);
         material.push('\t');
         material.push_str(&payload.role_status);
+        material.push('\n');
+    }
+    for binding in metadata_bindings {
+        material.push_str("metadata_binding\t");
+        material.push_str(&binding.binding_id);
+        material.push('\t');
+        material.push_str(&binding.contract);
+        material.push('\t');
+        material.push_str(&binding.value_count.to_string());
+        material.push('\t');
+        material.push_str(&binding.value_hash);
+        material.push('\t');
+        material.push_str(&binding.validation_status);
+        material.push('\t');
+        material.push_str(if binding.required {
+            "required"
+        } else {
+            "optional"
+        });
         material.push('\n');
     }
     for blocker in loader_blockers {

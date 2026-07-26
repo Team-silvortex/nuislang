@@ -112,6 +112,14 @@ pub(crate) fn render_container_toml(report: &NsldContainerReport) -> String {
         "metadata_table_hash = \"{}\"\n",
         escape_toml_string(&report.metadata_table_hash)
     ));
+    out.push_str(&format!(
+        "metadata_binding_count = {}\n",
+        report.metadata_bindings.len()
+    ));
+    out.push_str(&format!(
+        "metadata_binding_table_hash = \"{}\"\n",
+        escape_toml_string(&report.metadata_binding_table_hash)
+    ));
     out.push_str(&format!("section_count = {}\n", report.section_count));
     out.push_str(&format!(
         "container_section_table_hash = \"{}\"\n",
@@ -201,6 +209,27 @@ pub(crate) fn render_container_toml(report: &NsldContainerReport) -> String {
         "blockers = [{}]\n",
         toml_string_array_literal(&report.blockers)
     ));
+    for binding in &report.metadata_bindings {
+        out.push_str("\n[[metadata_binding]]\n");
+        out.push_str(&format!(
+            "binding_id = \"{}\"\n",
+            escape_toml_string(&binding.binding_id)
+        ));
+        out.push_str(&format!(
+            "contract = \"{}\"\n",
+            escape_toml_string(&binding.contract)
+        ));
+        out.push_str(&format!("value_count = {}\n", binding.value_count));
+        out.push_str(&format!(
+            "value_hash = \"{}\"\n",
+            escape_toml_string(&binding.value_hash)
+        ));
+        out.push_str(&format!(
+            "validation_status = \"{}\"\n",
+            escape_toml_string(&binding.validation_status)
+        ));
+        out.push_str(&format!("required = {}\n", binding.required));
+    }
     for symbol in &report.loader_symbols {
         out.push_str("\n[[loader_symbol]]\n");
         out.push_str(&format!(

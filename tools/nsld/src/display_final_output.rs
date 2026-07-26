@@ -128,6 +128,42 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         optional_usize_text(report.container_loader_symbol_count)
     );
     println!(
+        "  container_loader_metadata_binding_count: {}",
+        optional_usize_text(report.container_loader_metadata_binding_count)
+    );
+    println!(
+        "  container_loader_metadata_binding_table_hash: {}",
+        optional_string_text(
+            report
+                .container_loader_metadata_binding_table_hash
+                .as_deref()
+        )
+    );
+    println!(
+        "  container_loader_metadata_binding_validation_status: {}",
+        report.container_loader_metadata_binding_validation_status
+    );
+    println!(
+        "  container_loader_selected_provider_bundle_set_contract: {}",
+        optional_string_text(
+            report
+                .container_loader_selected_provider_bundle_set_contract
+                .as_deref()
+        )
+    );
+    println!(
+        "  container_loader_selected_provider_bundle_count: {}",
+        optional_usize_text(report.container_loader_selected_provider_bundle_count)
+    );
+    println!(
+        "  container_loader_selected_provider_bundle_set_hash: {}",
+        optional_string_text(
+            report
+                .container_loader_selected_provider_bundle_set_hash
+                .as_deref()
+        )
+    );
+    println!(
         "  first_payload_execution_status: {}",
         report.first_payload_execution_status
     );

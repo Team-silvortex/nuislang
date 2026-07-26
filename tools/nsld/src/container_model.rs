@@ -42,6 +42,8 @@ pub(crate) struct NsldContainerReport {
     pub(crate) container_magic: String,
     pub(crate) container_version: usize,
     pub(crate) metadata_table_hash: String,
+    pub(crate) metadata_binding_table_hash: String,
+    pub(crate) metadata_bindings: Vec<NsldContainerMetadataBinding>,
     pub(crate) container_layout_hash: String,
     pub(crate) container_hash: String,
     pub(crate) loader_readiness: String,
@@ -87,6 +89,16 @@ pub(crate) struct NsldContainerBackendArtifactPayload {
     pub(crate) payload_format: String,
     pub(crate) payload_path: String,
     pub(crate) role_status: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldContainerMetadataBinding {
+    pub(crate) binding_id: String,
+    pub(crate) contract: String,
+    pub(crate) value_count: usize,
+    pub(crate) value_hash: String,
+    pub(crate) validation_status: String,
+    pub(crate) required: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -142,6 +154,8 @@ pub(crate) struct NsldContainerEmitReport {
     pub(crate) payload_path: String,
     pub(crate) ready: bool,
     pub(crate) metadata_table_hash: String,
+    pub(crate) metadata_binding_table_hash: String,
+    pub(crate) metadata_binding_count: usize,
     pub(crate) container_layout_hash: String,
     pub(crate) container_hash: String,
     pub(crate) payload_size_bytes: usize,

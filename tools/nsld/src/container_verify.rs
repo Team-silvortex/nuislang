@@ -96,6 +96,24 @@ pub(crate) fn compatibility_domain_entries(
         .collect()
 }
 
+pub(crate) fn metadata_binding_entries(
+    source: &str,
+) -> Vec<container::NsldContainerMetadataBinding> {
+    toml_table_blocks(source, "metadata_binding")
+        .into_iter()
+        .filter_map(|block| {
+            Some(container::NsldContainerMetadataBinding {
+                binding_id: toml_block_string_value(&block, "binding_id")?,
+                contract: toml_block_string_value(&block, "contract")?,
+                value_count: toml_block_usize_value(&block, "value_count")?,
+                value_hash: toml_block_string_value(&block, "value_hash")?,
+                validation_status: toml_block_string_value(&block, "validation_status")?,
+                required: toml_block_bool_value(&block, "required")?,
+            })
+        })
+        .collect()
+}
+
 pub(crate) fn container_section_issues(
     expected: &[container::NsldContainerSectionEntry],
     actual: &[container::NsldContainerSectionEntry],

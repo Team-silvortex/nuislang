@@ -1,3 +1,4 @@
+use super::final_executable_container_binding::container_binding_evidence;
 use super::final_executable_image::parse_final_executable_image_header;
 use super::toml;
 
@@ -18,6 +19,12 @@ pub(crate) struct FinalExecutableContainerLoaderEvidence {
     pub(crate) entry_kind: Option<String>,
     pub(crate) entry_section_id: Option<String>,
     pub(crate) symbol_count: Option<usize>,
+    pub(crate) metadata_binding_count: Option<usize>,
+    pub(crate) metadata_binding_table_hash: Option<String>,
+    pub(crate) metadata_binding_validation_status: String,
+    pub(crate) selected_provider_bundle_set_contract: Option<String>,
+    pub(crate) selected_provider_bundle_count: Option<usize>,
+    pub(crate) selected_provider_bundle_set_hash: Option<String>,
 }
 
 pub(crate) fn final_executable_container_loader_evidence(
@@ -70,7 +77,9 @@ pub(crate) fn final_executable_container_loader_evidence(
     let entry_kind = toml::string_value(prefix, "loader_entry_kind");
     let entry_section_id = toml::string_value(prefix, "loader_entry_section_id");
     let symbol_count = toml::usize_value(prefix, "loader_symbol_count");
+    let binding_evidence = container_binding_evidence(payload, prefix);
     let mut blockers = string_array_or_empty(prefix, "loader_blockers");
+    blockers.extend(binding_evidence.blockers.iter().cloned());
     if readiness.as_deref() == Some("host-assisted") {
         blockers.retain(|blocker| !blocker.starts_with("external-import:"));
     }
@@ -107,6 +116,12 @@ pub(crate) fn final_executable_container_loader_evidence(
         entry_kind,
         entry_section_id,
         symbol_count,
+        metadata_binding_count: binding_evidence.count,
+        metadata_binding_table_hash: binding_evidence.table_hash,
+        metadata_binding_validation_status: binding_evidence.validation_status,
+        selected_provider_bundle_set_contract: binding_evidence.selected_set_contract,
+        selected_provider_bundle_count: binding_evidence.selected_set_count,
+        selected_provider_bundle_set_hash: binding_evidence.selected_set_hash,
     }
 }
 
@@ -188,6 +203,12 @@ fn empty_evidence(
         entry_kind: None,
         entry_section_id: None,
         symbol_count: None,
+        metadata_binding_count: None,
+        metadata_binding_table_hash: None,
+        metadata_binding_validation_status: "not-applicable".to_owned(),
+        selected_provider_bundle_set_contract: None,
+        selected_provider_bundle_count: None,
+        selected_provider_bundle_set_hash: None,
     }
 }
 

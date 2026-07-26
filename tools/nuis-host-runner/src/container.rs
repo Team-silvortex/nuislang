@@ -1,5 +1,6 @@
 use crate::{
     container_backend_payload::{scan_backend_artifact_payloads, BackendArtifactPayloadSummary},
+    container_metadata_binding::{scan_metadata_bindings, MetadataBindingSummary},
     container_toml::{
         array_table_blocks, bool_value, bool_value_from_lines, first_array_table_block,
         string_array_value, string_value, string_value_from_lines, usize_value,
@@ -83,6 +84,7 @@ pub(super) struct ContainerLoaderSummary {
     pub(super) compatibility_domain: CompatibilityDomainSummary,
     pub(super) external_import: ExternalImportSummary,
     pub(super) backend_artifact_payload: BackendArtifactPayloadSummary,
+    pub(super) metadata_binding: MetadataBindingSummary,
     pub(super) loader_symbol_table_hash: Option<String>,
     pub(super) relocation_table_hash: Option<String>,
     pub(super) compatibility_domain_table_hash: Option<String>,
@@ -168,6 +170,7 @@ pub(super) fn scan_container_loader(
     let external_import = scan_external_imports(source, external_import_count);
     let backend_artifact_payload =
         scan_backend_artifact_payloads(source, backend_artifact_payload_count);
+    let metadata_binding = scan_metadata_bindings(source);
     let handoff_blockers = container_loader_handoff_blockers(
         container_schema.as_deref(),
         container_schema_version,
@@ -190,6 +193,7 @@ pub(super) fn scan_container_loader(
         loader_symbol_count,
         &loader_symbol,
         &relocation,
+        &metadata_binding,
     );
     let handoff_ready = handoff_blockers.is_empty();
     ContainerLoaderSummary {
@@ -210,6 +214,7 @@ pub(super) fn scan_container_loader(
         compatibility_domain,
         external_import,
         backend_artifact_payload,
+        metadata_binding,
         loader_symbol_table_hash,
         relocation_table_hash,
         compatibility_domain_table_hash,
@@ -251,6 +256,7 @@ fn empty_container_loader(status: &str, handoff_blockers: Vec<String>) -> Contai
         compatibility_domain: CompatibilityDomainSummary::empty(status),
         external_import: ExternalImportSummary::empty(status),
         backend_artifact_payload: BackendArtifactPayloadSummary::empty(status),
+        metadata_binding: MetadataBindingSummary::not_applicable(),
         loader_symbol_table_hash: None,
         relocation_table_hash: None,
         compatibility_domain_table_hash: None,
@@ -482,8 +488,10 @@ fn container_loader_handoff_blockers(
     loader_symbol_count: Option<usize>,
     loader_symbol: &ContainerLoaderSymbolSummary,
     relocation: &ContainerRelocationSummary,
+    metadata_binding: &MetadataBindingSummary,
 ) -> Vec<String> {
     let mut blockers = Vec::new();
+    blockers.extend(metadata_binding.blockers.iter().cloned());
     let host_assisted_loader = loader_readiness == Some("host-assisted");
     match container_schema {
         Some(CONTAINER_SCHEMA) => {}

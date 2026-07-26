@@ -151,10 +151,33 @@ pub(crate) fn metadata_table_hash(
     compatibility_domain_table_hash: &str,
     external_import_table_hash: &str,
     backend_artifact_payload_table_hash: &str,
+    metadata_binding_table_hash: &str,
     hash_bytes: fn(&[u8]) -> String,
 ) -> String {
     let material = format!(
-        "{container_section_table_hash}\t{loader_symbol_table_hash}\t{relocation_table_hash}\t{compatibility_domain_table_hash}\t{external_import_table_hash}\t{backend_artifact_payload_table_hash}\n"
+        "{container_section_table_hash}\t{loader_symbol_table_hash}\t{relocation_table_hash}\t{compatibility_domain_table_hash}\t{external_import_table_hash}\t{backend_artifact_payload_table_hash}\t{metadata_binding_table_hash}\n"
     );
+    hash_bytes(material.as_bytes())
+}
+
+pub(crate) fn metadata_binding_table_hash(
+    bindings: &[NsldContainerMetadataBinding],
+    hash_bytes: fn(&[u8]) -> String,
+) -> String {
+    let mut material = String::new();
+    for binding in bindings {
+        material.push_str(&binding.binding_id);
+        material.push('\t');
+        material.push_str(&binding.contract);
+        material.push('\t');
+        material.push_str(&binding.value_count.to_string());
+        material.push('\t');
+        material.push_str(&binding.value_hash);
+        material.push('\t');
+        material.push_str(&binding.validation_status);
+        material.push('\t');
+        material.push_str(if binding.required { "true" } else { "false" });
+        material.push('\n');
+    }
     hash_bytes(material.as_bytes())
 }

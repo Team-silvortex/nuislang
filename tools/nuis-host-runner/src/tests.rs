@@ -5,7 +5,10 @@ fn nsb_payload() -> &'static [u8] {
 }
 
 fn nsb_bytes() -> Vec<u8> {
-    let payload = nsb_payload();
+    nsb_bytes_from_payload(nsb_payload())
+}
+
+fn nsb_bytes_from_payload(payload: &[u8]) -> Vec<u8> {
     let mut bytes = vec![0u8; IMAGE_HEADER_SIZE + payload.len()];
     bytes[0..8].copy_from_slice(IMAGE_MAGIC);
     bytes[8..12].copy_from_slice(&IMAGE_VERSION.to_le_bytes());
@@ -16,6 +19,29 @@ fn nsb_bytes() -> Vec<u8> {
     bytes[48..56].copy_from_slice(&0x5678u64.to_le_bytes());
     bytes[IMAGE_HEADER_SIZE..].copy_from_slice(payload);
     bytes
+}
+
+fn nsb_payload_with_selected_binding(value_hash: &str, table_hash: &str) -> Vec<u8> {
+    let source = std::str::from_utf8(nsb_payload()).expect("fixture is utf-8");
+    let source = source.replace(
+        "metadata_table_hash = \"0x1111111111111111\"\n",
+        &format!(
+            "metadata_table_hash = \"0x1111111111111111\"\nmetadata_binding_count = \
+             1\nmetadata_binding_table_hash = \"{table_hash}\"\n"
+        ),
+    );
+    source
+        .replace(
+            "\n[[loader_symbol]]\n",
+            &format!(
+                "\n[[metadata_binding]]\nbinding_id = \
+                 \"identity.selected-provider-bundle-set\"\ncontract = \
+                 \"nuis-selected-provider-bundle-set-v1\"\nvalue_count = 2\nvalue_hash = \
+                 \"{value_hash}\"\nvalidation_status = \"verified\"\nrequired = \
+                 true\n\n[[loader_symbol]]\n"
+            ),
+        )
+        .into_bytes()
 }
 
 fn manifest_source(nsb_hash: &str, nsb_size: usize) -> String {
@@ -229,6 +255,51 @@ fn validates_ready_launcher_handoff() {
     );
     assert!(report.blockers.is_empty());
     let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn blocks_lifecycle_handoff_after_inner_binding_tamper_even_with_new_outer_hash() {
+    let original_value_hash = "fnv1a64:1234567890abcdef";
+    let material = format!(
+        "identity.selected-provider-bundle-set\tnuis-selected-provider-bundle-set-v1\t2\t\
+         {original_value_hash}\tverified\ttrue\n"
+    );
+    let table_hash = fnv1a64_hex(material.as_bytes());
+    let tampered_payload =
+        nsb_payload_with_selected_binding("fnv1a64:fedcba0987654321", &table_hash);
+    let bytes = nsb_bytes_from_payload(&tampered_payload);
+    let manifest = parse_launcher_manifest(&manifest_source(&fnv1a64_hex(&bytes), bytes.len()))
+        .expect("manifest parses");
+    let dir = env::temp_dir().join(format!(
+        "nuis-host-runner-binding-tamper-test-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let nsb_path = dir.join("nuis-app.nsb");
+    fs::write(&nsb_path, bytes).expect("write nsb");
+
+    let report = validate_handoff(
+        &dir.join("nuis.nsld.final-executable-launcher.toml"),
+        &nsb_path,
+        Some(&dir),
+        "nuis.scheduler.loop.v1",
+        "on_process_start",
+        &manifest,
+    );
+
+    assert!(report.nsb_hash_matches);
+    assert_eq!(
+        report.container_loader_metadata_binding_validation_status,
+        "mismatch"
+    );
+    assert!(!report.container_loader_handoff_ready);
+    assert!(!report.ready);
+    assert!(report
+        .blockers
+        .iter()
+        .any(|blocker| blocker.contains("metadata-binding-table-hash-mismatch")));
+    let _ = fs::remove_dir_all(dir);
 }
 
 #[test]

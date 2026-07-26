@@ -314,6 +314,44 @@ pub(crate) const DEV_TENSOR_RUNTIME_PROVIDER_DRIFT_CHECKS: &[DevTensorDriftCheck
             ],
         },
         DevTensorDriftCheckSpec {
+            id: "nsld-selected-provider-bundle-container-binding",
+            path: "tools/nsld/src/main_container_metadata_binding_tests.rs",
+            required_patterns: &[
+                "container_immutably_binds_verified_selected_provider_bundle_set",
+                "identity.selected-provider-bundle-set",
+                "nuis-selected-provider-bundle-set-v1",
+                "metadata_binding_table_hash",
+                "container_emit_rejects_mismatched_selected_provider_bundle_set",
+                "container_verify_rejects_tampered_embedded_metadata_binding",
+                "final_image_loader_verifies_embedded_selected_provider_bundle_binding",
+                "container_loader_metadata_binding_validation_status",
+                "container_loader_selected_provider_bundle_set_contract",
+                "invalid immutable metadata binding",
+            ],
+        },
+        DevTensorDriftCheckSpec {
+            id: "host-runner-final-image-metadata-binding-verifier",
+            path: "tools/nuis-host-runner/src/container_metadata_binding.rs",
+            required_patterns: &[
+                "MetadataBindingSummary",
+                "scan_metadata_bindings",
+                "identity.selected-provider-bundle-set",
+                "nuis-selected-provider-bundle-set-v1",
+                "metadata-binding-table-hash-mismatch",
+                "rejects_length_preserving_selected_provider_binding_tamper",
+            ],
+        },
+        DevTensorDriftCheckSpec {
+            id: "nuis-launch-metadata-binding-gate",
+            path: "tools/nuis/src/artifact_launch_binding.rs",
+            required_patterns: &[
+                "host_runner_binding_first_blocker",
+                "container_loader_metadata_binding_validation_status",
+                "container-loader-metadata-binding:not-verified",
+                "selected-provider-bundle-set:contract-mismatch",
+            ],
+        },
+        DevTensorDriftCheckSpec {
             id: "nuisc-provider-bundle-manifest-schema",
             path: "tools/nuisc/src/registry_provider_bundle.rs",
             required_patterns: &[

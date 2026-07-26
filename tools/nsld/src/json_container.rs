@@ -85,6 +85,31 @@ pub(crate) fn nsld_container_report_json(report: &NsldContainerReport) -> String
         json_string_field("container_magic", &report.container_magic),
         json_usize_field("container_version", report.container_version),
         json_string_field("metadata_table_hash", &report.metadata_table_hash),
+        json_usize_field("metadata_binding_count", report.metadata_bindings.len()),
+        json_string_field(
+            "metadata_binding_table_hash",
+            &report.metadata_binding_table_hash,
+        ),
+        format!(
+            "\"metadata_bindings\":[{}]",
+            report
+                .metadata_bindings
+                .iter()
+                .map(|binding| format!(
+                    "{{{}}}",
+                    [
+                        json_string_field("binding_id", &binding.binding_id),
+                        json_string_field("contract", &binding.contract),
+                        json_usize_field("value_count", binding.value_count),
+                        json_string_field("value_hash", &binding.value_hash),
+                        json_string_field("validation_status", &binding.validation_status),
+                        json_bool_field("required", binding.required),
+                    ]
+                    .join(",")
+                ))
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
         json_string_field("container_layout_hash", &report.container_layout_hash),
         json_string_field("container_hash", &report.container_hash),
         json_string_field("loader_readiness", &report.loader_readiness),
@@ -159,6 +184,11 @@ pub(crate) fn nsld_container_emit_report_json(report: &NsldContainerEmitReport) 
         json_string_field("payload_path", &report.payload_path),
         json_bool_field("ready", report.ready),
         json_string_field("metadata_table_hash", &report.metadata_table_hash),
+        json_usize_field("metadata_binding_count", report.metadata_binding_count),
+        json_string_field(
+            "metadata_binding_table_hash",
+            &report.metadata_binding_table_hash,
+        ),
         json_string_field("container_layout_hash", &report.container_layout_hash),
         json_string_field("container_hash", &report.container_hash),
         json_usize_field("payload_size_bytes", report.payload_size_bytes),
