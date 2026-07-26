@@ -28,7 +28,7 @@ fn container_immutably_binds_verified_selected_provider_bundle_set() {
         .blockers
         .iter()
         .all(|blocker| !blocker.starts_with("metadata-binding:")));
-    assert_eq!(bound.metadata_bindings.len(), 1);
+    assert_eq!(bound.metadata_bindings.len(), 2);
     assert_eq!(
         bound.metadata_bindings[0].binding_id,
         "identity.selected-provider-bundle-set"
@@ -40,9 +40,23 @@ fn container_immutably_binds_verified_selected_provider_bundle_set() {
     assert_eq!(bound.metadata_bindings[0].value_count, 1);
     assert_eq!(bound.metadata_bindings[0].value_hash, SELECTED_SET_HASH);
     assert_eq!(bound.metadata_bindings[0].validation_status, "verified");
+    assert_eq!(
+        bound.metadata_bindings[1].binding_id,
+        "runtime.provider-dispatch-table"
+    );
+    assert_eq!(
+        bound.metadata_bindings[1].contract,
+        "nuis-final-image-provider-dispatch-v1"
+    );
+    assert_eq!(bound.provider_dispatch_validation_status, "verified");
+    assert_eq!(bound.provider_dispatches.len(), 1);
+    assert_eq!(
+        bound.provider_dispatches[0].bundle_id,
+        "metal.apple-silicon-gpu.bundle.v1"
+    );
     assert_ne!(bound.metadata_table_hash, unbound.metadata_table_hash);
     assert_ne!(bound.container_hash, unbound.container_hash);
-    assert_eq!(emitted.metadata_binding_count, 1);
+    assert_eq!(emitted.metadata_binding_count, 2);
     assert_eq!(
         emitted.metadata_binding_table_hash,
         bound.metadata_binding_table_hash
@@ -123,12 +137,16 @@ fn final_image_loader_verifies_embedded_selected_provider_bundle_binding() {
 
     let verified = nsld_final_executable_output_report(Path::new("manifest.toml"), &plan);
     let verified_json = super::json::nsld_final_executable_output_report_json(&verified);
-    assert!(verified.container_loader_handoff_ready);
+    assert!(
+        verified.container_loader_handoff_ready,
+        "{:?}",
+        verified.container_loader_handoff_first_blocker
+    );
     assert_eq!(
         verified.container_loader_metadata_binding_validation_status,
         "verified"
     );
-    assert_eq!(verified.container_loader_metadata_binding_count, Some(1));
+    assert_eq!(verified.container_loader_metadata_binding_count, Some(2));
     assert_eq!(
         verified
             .container_loader_selected_provider_bundle_set_contract
@@ -145,9 +163,22 @@ fn final_image_loader_verifies_embedded_selected_provider_bundle_binding() {
             .as_deref(),
         Some(SELECTED_SET_HASH)
     );
+    assert_eq!(
+        verified.container_loader_provider_dispatch_status,
+        "verified"
+    );
+    assert_eq!(verified.container_loader_provider_dispatch_count, 1);
+    assert_eq!(
+        verified
+            .container_loader_provider_dispatch_first_bundle_id
+            .as_deref(),
+        Some("metal.apple-silicon-gpu.bundle.v1")
+    );
     assert!(verified_json
         .contains("\"container_loader_metadata_binding_validation_status\":\"verified\""));
-    assert!(verified_json.contains("\"container_loader_metadata_binding_count\":1"));
+    assert!(verified_json.contains("\"container_loader_metadata_binding_count\":2"));
+    assert!(verified_json.contains("\"container_loader_provider_dispatch_status\":\"verified\""));
+    assert!(verified_json.contains("\"container_loader_provider_dispatch_count\":1"));
     assert!(verified_json.contains(
         "\"container_loader_selected_provider_bundle_set_contract\":\"nuis-selected-provider-bundle-set-v1\""
     ));
@@ -155,7 +186,26 @@ fn final_image_loader_verifies_embedded_selected_provider_bundle_binding() {
         "\"container_loader_selected_provider_bundle_set_hash\":\"{SELECTED_SET_HASH}\""
     )));
 
-    let mut tampered = fs::read(&plan.final_stage.output_path).unwrap();
+    let original = fs::read(&plan.final_stage.output_path).unwrap();
+    let mut dispatch_tampered = original.clone();
+    replace_bytes_once(
+        &mut dispatch_tampered,
+        b"runner_adapter_id = \"metal-gray8-invert\"",
+        b"runner_adapter_id = \"metal-gray8-driftt\"",
+    );
+    fs::write(&plan.final_stage.output_path, dispatch_tampered).unwrap();
+    let dispatch_rejected = nsld_final_executable_output_report(Path::new("manifest.toml"), &plan);
+    assert!(!dispatch_rejected.container_loader_handoff_ready);
+    assert_eq!(
+        dispatch_rejected.container_loader_provider_dispatch_status,
+        "mismatch"
+    );
+    assert!(dispatch_rejected
+        .container_loader_handoff_first_blocker
+        .as_deref()
+        .is_some_and(|blocker| blocker.contains("provider-dispatch-table-hash-mismatch")));
+
+    let mut tampered = original;
     replace_bytes_once(
         &mut tampered,
         format!("value_hash = \"{SELECTED_SET_HASH}\"").as_bytes(),
@@ -213,6 +263,9 @@ selected_provider_bundle_set_hash = "{hash}"
 provider_family = "metal:apple-silicon-gpu"
 provider_bundle_package_id = "official.shader"
 provider_bundle_id = "metal.apple-silicon-gpu.bundle.v1"
+requested_runner_contract = "nuis-provider-runner-v1"
+requested_runner_adapter_contract = "nuis-provider-runner-adapter-v1"
+requested_runner_adapter_id = "metal-gray8-invert"
 materialization_status = "provider-sample-materialized"
 "#
         ),

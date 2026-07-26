@@ -361,3 +361,16 @@ fn parses_final_executable_output_input_and_json_flag() {
         })
     );
 }
+
+#[test]
+fn parses_seal_input_and_json_flag() {
+    let command =
+        parse_args(vec!["seal".to_owned(), "out".to_owned(), "--json".to_owned()].into_iter());
+    assert_eq!(
+        command,
+        Ok(Command::Seal {
+            input: PathBuf::from("out"),
+            json: true
+        })
+    );
+}

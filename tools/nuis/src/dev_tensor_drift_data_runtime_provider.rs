@@ -776,4 +776,19 @@ pub(crate) const DEV_TENSOR_RUNTIME_PROVIDER_DRIFT_CHECKS: &[DevTensorDriftCheck
                 "65_568",
             ],
         },
+        DevTensorDriftCheckSpec {
+            id: "official-provider-complete-final-image-seal",
+            path: "tools/nuis/tests/official_galaxy_hetero_smoke/final_image.rs",
+            required_patterns: &[
+                "final-image-binding-proof:legacy-unbound",
+                "provider-complete sealing manifest",
+                "\"seal\"",
+                "nsld seals provider-complete final output",
+                "nsld-provider-neutral-seal-v1",
+                "bounded_stage_count",
+                "final_image_binding_proof_status",
+                "replay_status",
+                "loader_selected_provider_bundle_count",
+            ],
+        },
 ];

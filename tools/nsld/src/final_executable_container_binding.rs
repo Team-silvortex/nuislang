@@ -3,6 +3,8 @@ use std::collections::BTreeSet;
 
 const SELECTED_SET_BINDING_ID: &str = "identity.selected-provider-bundle-set";
 const SELECTED_SET_CONTRACT: &str = "nuis-selected-provider-bundle-set-v1";
+const PROVIDER_DISPATCH_BINDING_ID: &str = "runtime.provider-dispatch-table";
+const PROVIDER_DISPATCH_CONTRACT: &str = "nuis-final-image-provider-dispatch-v1";
 const BINDING_TABLE_MARKER: &[u8] = b"\n[[metadata_binding]]\n";
 const NEXT_TABLE_MARKER: &[u8] = b"\n[[loader_symbol]]\n";
 
@@ -14,6 +16,8 @@ pub(crate) struct FinalExecutableContainerBindingEvidence {
     pub(crate) selected_set_contract: Option<String>,
     pub(crate) selected_set_count: Option<usize>,
     pub(crate) selected_set_hash: Option<String>,
+    pub(crate) provider_dispatch_count: Option<usize>,
+    pub(crate) provider_dispatch_hash: Option<String>,
     pub(crate) blockers: Vec<String>,
 }
 
@@ -75,6 +79,20 @@ pub(crate) fn container_binding_evidence(
                 .push("container-loader:selected-provider-bundle-set-binding-invalid".to_owned());
         }
     }
+    let dispatch = bindings
+        .iter()
+        .find(|binding| binding.binding_id == PROVIDER_DISPATCH_BINDING_ID);
+    if selected.is_some()
+        && dispatch.is_none_or(|binding| {
+            binding.contract != PROVIDER_DISPATCH_CONTRACT
+                || binding.value_count == 0
+                || !binding.value_hash.starts_with("0x")
+                || binding.validation_status != "verified"
+                || !binding.required
+        })
+    {
+        blockers.push("container-loader:provider-dispatch-binding-invalid".to_owned());
+    }
     let validation_status = if blockers.is_empty() {
         if bindings.is_empty() {
             "not-applicable"
@@ -93,6 +111,8 @@ pub(crate) fn container_binding_evidence(
         selected_set_contract: selected.map(|binding| binding.contract.clone()),
         selected_set_count: selected.map(|binding| binding.value_count),
         selected_set_hash: selected.map(|binding| binding.value_hash.clone()),
+        provider_dispatch_count: dispatch.map(|binding| binding.value_count),
+        provider_dispatch_hash: dispatch.map(|binding| binding.value_hash.clone()),
         blockers,
     }
 }

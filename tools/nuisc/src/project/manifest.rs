@@ -12,6 +12,7 @@ pub(super) fn parse_project_manifest(
 ) -> Result<NuisProjectManifest, String> {
     let name = parse_required_string(source, "name", path)?;
     let entry = parse_required_string(source, "entry", path)?;
+    let packaging_mode = parse_optional_string(source, "packaging_mode");
     let modules = parse_optional_string_array(source, "modules").unwrap_or_default();
     let tests = parse_optional_string_array(source, "tests").unwrap_or_default();
     let links = parse_optional_link_array(source, "links").unwrap_or_default();
@@ -24,6 +25,7 @@ pub(super) fn parse_project_manifest(
     Ok(NuisProjectManifest {
         name,
         entry,
+        packaging_mode,
         modules,
         tests,
         links,
@@ -235,6 +237,20 @@ mod tests {
                 "main.ns".to_owned(),
                 "generated/report,with-comma.ns".to_owned()
             ]
+        );
+    }
+
+    #[test]
+    fn project_manifest_parses_packaging_mode() {
+        let manifest = parse_project_manifest(
+            "name = \"demo\"\nentry = \"main.ns\"\npackaging_mode = \"nuis-self-contained-image\"\n",
+            Path::new("nuis.toml"),
+        )
+        .expect("project manifest should parse");
+
+        assert_eq!(
+            manifest.packaging_mode.as_deref(),
+            Some("nuis-self-contained-image")
         );
     }
 }

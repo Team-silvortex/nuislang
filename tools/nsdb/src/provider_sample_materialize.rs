@@ -567,7 +567,14 @@ fn render_materialized_manifest(records: &[NsdbDeviceProviderSampleRecordInfo]) 
         push_toml_string(&mut out, "trace_id", &record.trace_id);
         push_toml_string(&mut out, "provider", &record.provider);
         push_toml_string(&mut out, "provider_family", &record.provider_family);
-        if let Some(bundle) =
+        if record.provider_bundle_package_id != "none" && record.provider_bundle_id != "none" {
+            push_toml_string(
+                &mut out,
+                "provider_bundle_package_id",
+                &record.provider_bundle_package_id,
+            );
+            push_toml_string(&mut out, "provider_bundle_id", &record.provider_bundle_id);
+        } else if let Some(bundle) =
             crate::provider_bundle_registry::provider_bundle_evidence(&record.provider_family)
         {
             push_toml_string(&mut out, "provider_bundle_package_id", bundle.package_id);

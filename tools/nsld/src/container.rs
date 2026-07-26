@@ -352,6 +352,7 @@ pub(crate) fn file_hash(
     compatibility_domains: &[NsldContainerCompatibilityDomain],
     external_imports: &[NsldContainerExternalImport],
     backend_artifact_payloads: &[NsldContainerBackendArtifactPayload],
+    provider_dispatches: &[NsldContainerProviderDispatch],
     metadata_bindings: &[NsldContainerMetadataBinding],
     loader_readiness: &str,
     loader_blockers: &[String],
@@ -483,6 +484,23 @@ pub(crate) fn file_hash(
         material.push_str(&payload.payload_path);
         material.push('\t');
         material.push_str(&payload.role_status);
+        material.push('\n');
+    }
+    for dispatch in provider_dispatches {
+        material.push_str("provider_dispatch\t");
+        material.push_str(&dispatch.dispatch_id);
+        material.push('\t');
+        material.push_str(&dispatch.package_id);
+        material.push('\t');
+        material.push_str(&dispatch.bundle_id);
+        material.push('\t');
+        material.push_str(&dispatch.provider_family);
+        material.push('\t');
+        material.push_str(&dispatch.runner_contract);
+        material.push('\t');
+        material.push_str(&dispatch.runner_adapter_contract);
+        material.push('\t');
+        material.push_str(&dispatch.runner_adapter_id);
         material.push('\n');
     }
     for binding in metadata_bindings {

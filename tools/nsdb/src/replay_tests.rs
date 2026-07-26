@@ -384,7 +384,17 @@ next_action = "execute-provider-sample"
             first_next_action: "handoff-payload-trace-to-nsdb".to_owned(),
             first_entry_symbol: "nuis.bootstrap.lifecycle.v1".to_owned(),
             first_execution_phase: "container-loader-handoff".to_owned(),
-            final_image_binding_proof: crate::handoff_binding::parse_and_verify(""),
+            final_image_binding_proof: crate::handoff_binding::from_claim(
+                &crate::model::FinalImageBindingProofClaim {
+                    binding_count: 0,
+                    binding_table_hash: "0xcbf29ce484222325".to_owned(),
+                    validation_status: "not-applicable".to_owned(),
+                    selected_set_contract: None,
+                    selected_set_count: None,
+                    selected_set_hash: None,
+                },
+            )
+            .unwrap(),
             provider_completion_claim_authority_contract: "none".to_owned(),
             provider_completion_claim_authority: "none".to_owned(),
             provider_completion_claim_authority_status: "not-applicable".to_owned(),
@@ -520,10 +530,15 @@ next_action = "execute-provider-sample"
                 trace_id: "hetero-trace:shader:metal:apple-silicon-gpu".to_owned(),
                 provider: "nustar-deferred-device-sample-v1".to_owned(),
                 provider_family: "metal:apple-silicon-gpu".to_owned(),
+                provider_bundle_package_id: "official.shader".to_owned(),
+                provider_bundle_id: "metal.apple-silicon-gpu.bundle.v1".to_owned(),
                 requested_runner_contract: "nuis-provider-runner-v1".to_owned(),
                 requested_runner_adapter_contract: "nuis-provider-runner-adapter-v1".to_owned(),
                 requested_runner_adapter_id: "metal.apple-silicon-gpu.host-simulated".to_owned(),
                 requested_runner_adapter_capability_status: "registered-host-simulated".to_owned(),
+                provider_runner_contract: "nuis-provider-runner-v1".to_owned(),
+                provider_runner_adapter_contract: "nuis-provider-runner-adapter-v1".to_owned(),
+                provider_runner_adapter_id: "metal.apple-silicon-gpu.host-simulated".to_owned(),
                 handoff_target: "metal:apple-silicon-gpu".to_owned(),
                 sample_status: "pending-provider-execution".to_owned(),
                 validation_status: "pending-provider-execution".to_owned(),
@@ -804,6 +819,24 @@ next_action = "execute-provider-sample"
     assert!(ready_plan.checkpoints[1]
         .value_sample_materialization_detail
         .contains("deterministic-provider-sample-artifact"));
+    let mut legacy_report = report.clone();
+    legacy_report
+        .payload_execution_handoff
+        .final_image_binding_proof = crate::handoff_binding::parse_and_verify("");
+    let legacy_plan = build_replay_plan(&legacy_report);
+    assert_eq!(legacy_plan.status, "blocked");
+    assert_eq!(
+        legacy_plan.first_blocker.as_deref(),
+        Some("final-image-binding-proof:legacy-unbound")
+    );
+    assert_eq!(
+        legacy_plan.next_action,
+        "rebuild-final-output-binding-proof"
+    );
+    let legacy_json = crate::json::nsdb_replay_plan_json(&legacy_report);
+    assert!(legacy_json.contains("\"replay_next_action\":\"rebuild-final-output-binding-proof\""));
+    assert!(legacy_json
+        .contains("\"replay_first_blocker\":\"final-image-binding-proof:legacy-unbound\""));
     let mut provider_only_report = report.clone();
     provider_only_report.payload_execution_handoff.events = vec![NsdbPayloadExecutionEvent {
         index: 0,
@@ -834,6 +867,16 @@ next_action = "execute-provider-sample"
     let ready_transcript = crate::transcript::build_replay_transcript(&report);
     assert_eq!(ready_transcript.status, "transcript-consumed");
     assert!(ready_transcript.ready);
+    assert_eq!(
+        ready_transcript.final_image_binding_proof_hash.as_deref(),
+        Some(
+            report
+                .payload_execution_handoff
+                .final_image_binding_proof
+                .proof_hash_actual
+                .as_str()
+        )
+    );
     assert_eq!(ready_transcript.checkpoint_count, 2);
     assert_eq!(ready_transcript.replayed_checkpoint_count, 2);
     assert!(ready_transcript.frames.iter().all(|frame| frame.consumed));
@@ -841,6 +884,10 @@ next_action = "execute-provider-sample"
     assert!(ready_transcript_json.contains("\"kind\":\"nsdb_yir_replay_transcript\""));
     assert!(ready_transcript_json
         .contains("\"debugger_transcript_contract\":\"nsdb-yir-replay-transcript-v1\""));
+    assert!(ready_transcript_json
+        .contains("\"debugger_transcript_identity_contract\":\"nsdb-yir-replay-identity-v1\""));
+    assert!(ready_transcript_json
+        .contains("\"debugger_transcript_final_image_binding_proof_hash\":\"fnv1a64:"));
     assert!(
         ready_transcript_json.contains("\"debugger_transcript_status\":\"transcript-consumed\"")
     );

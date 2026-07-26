@@ -1,7 +1,11 @@
-use crate::handoff_binding::{parse_and_verify as verify_binding_proof, render_fields};
+use crate::handoff_binding::{
+    from_claim as verify_binding_claim, parse_and_verify as verify_binding_proof, render_fields,
+    same_proof,
+};
 use crate::model::{
-    NsdbDeviceProviderSampleRecordInfo, NsdbPayloadExecutionEvent, NsdbPayloadExecutionHandoffInfo,
-    PayloadExecutionHandoffPersistSummary, PayloadExecutionHandoffRecord,
+    FinalImageBindingProofClaim, NsdbDeviceProviderSampleRecordInfo, NsdbPayloadExecutionEvent,
+    NsdbPayloadExecutionHandoffInfo, PayloadExecutionHandoffPersistSummary,
+    PayloadExecutionHandoffRecord,
 };
 use crate::provider_completion_integrity::{
     legacy_set_hash as legacy_provider_completion_set_hash,
@@ -59,7 +63,49 @@ pub(crate) fn persist_payload_execution_handoff_record(
     source: &str,
     record: PayloadExecutionHandoffRecord,
 ) -> Result<PayloadExecutionHandoffPersistSummary, String> {
+    persist_payload_execution_handoff_record_inner(output_dir, source, record, None)
+}
+
+#[allow(dead_code)]
+pub(crate) fn persist_payload_execution_handoff_record_with_final_image_binding(
+    output_dir: &Path,
+    source: &str,
+    record: PayloadExecutionHandoffRecord,
+    binding: FinalImageBindingProofClaim,
+) -> Result<PayloadExecutionHandoffPersistSummary, String> {
+    let binding = verify_binding_claim(&binding)?;
+    persist_payload_execution_handoff_record_inner(output_dir, source, record, Some(binding))
+}
+
+fn persist_payload_execution_handoff_record_inner(
+    output_dir: &Path,
+    source: &str,
+    record: PayloadExecutionHandoffRecord,
+    requested_binding: Option<crate::handoff_binding::FinalImageBindingProofInfo>,
+) -> Result<PayloadExecutionHandoffPersistSummary, String> {
     let existing = read_payload_execution_handoff(output_dir);
+    if existing.available
+        && !matches!(
+            existing.final_image_binding_proof.proof_status.as_str(),
+            "verified" | "verified-empty" | "legacy-unbound"
+        )
+    {
+        return Err(format!(
+            "final image binding proof validation failed in existing handoff: {}",
+            existing.final_image_binding_proof.proof_status
+        ));
+    }
+    let final_image_binding_proof = match requested_binding {
+        Some(requested)
+            if existing.available
+                && existing.final_image_binding_proof.contract != "none"
+                && !same_proof(&existing.final_image_binding_proof, &requested) =>
+        {
+            return Err("final image binding proof conflicts with existing handoff".to_owned());
+        }
+        Some(requested) => requested,
+        None => existing.final_image_binding_proof.clone(),
+    };
     if existing.available
         && matches!(
             existing
@@ -115,7 +161,8 @@ pub(crate) fn persist_payload_execution_handoff_record(
     for (index, event) in events.iter_mut().enumerate() {
         event.index = index;
     }
-    let content = render_payload_execution_handoff(&events, &existing, source)?;
+    let content =
+        render_payload_execution_handoff(&events, &existing, &final_image_binding_proof, source)?;
     let path = output_dir.join(HANDOFF_FILE_NAME);
     fs::write(&path, content).map_err(|error| {
         format!(
@@ -204,6 +251,7 @@ fn provider_completion_event(
 fn render_payload_execution_handoff(
     events: &[NsdbPayloadExecutionEvent],
     existing: &NsdbPayloadExecutionHandoffInfo,
+    final_image_binding_proof: &crate::handoff_binding::FinalImageBindingProofInfo,
     source: &str,
 ) -> Result<String, String> {
     let ready_count = events
@@ -217,7 +265,7 @@ fn render_payload_execution_handoff(
     push_toml_string(&mut out, "source", source);
     out.push_str(&format!("record_count = {}\n", events.len()));
     out.push_str(&format!("ready_record_count = {ready_count}\n"));
-    out.push_str(&render_fields(&existing.final_image_binding_proof));
+    out.push_str(&render_fields(final_image_binding_proof));
     push_toml_string(
         &mut out,
         "first_trace_id",

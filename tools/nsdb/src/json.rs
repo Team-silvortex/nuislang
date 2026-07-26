@@ -132,6 +132,15 @@ pub(crate) fn nsdb_inspect_report_json(report: &NsdbInspectReport) -> String {
                 .proof_status,
         ),
         json_string_field(
+            "payload_execution_handoff_final_image_binding_proof_next_action",
+            crate::handoff_binding::next_action(
+                &report
+                    .payload_execution_handoff
+                    .final_image_binding_proof
+                    .proof_status,
+            ),
+        ),
+        json_string_field(
             "payload_execution_handoff_hetero_execution_closure_protocol",
             &report
                 .payload_execution_handoff

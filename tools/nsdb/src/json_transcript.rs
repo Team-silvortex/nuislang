@@ -33,6 +33,14 @@ fn nsdb_replay_transcript_json_from_transcript(
             "debugger_transcript_source_contract",
             transcript.source_contract,
         ),
+        json_string_field(
+            "debugger_transcript_identity_contract",
+            transcript.identity_contract,
+        ),
+        json_optional_string_field(
+            "debugger_transcript_final_image_binding_proof_hash",
+            transcript.final_image_binding_proof_hash.as_deref(),
+        ),
         json_string_field("debugger_transcript_status", transcript.status),
         json_bool_field("debugger_transcript_ready", transcript.ready),
         json_string_field(

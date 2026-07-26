@@ -33,6 +33,12 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
         &report.final_output_nsdb_handoff_path,
     ));
     report.final_output_nsdb_replay_contract = replay_summary.contract.to_owned();
+    report.final_output_nsdb_final_image_binding_proof_contract =
+        replay_summary.final_image_binding_proof_contract;
+    report.final_output_nsdb_final_image_binding_proof_status =
+        replay_summary.final_image_binding_proof_status;
+    report.final_output_nsdb_final_image_binding_proof_hash =
+        replay_summary.final_image_binding_proof_hash;
     report.final_output_nsdb_replay_ready = replay_summary.status == "replay-evidence-ready";
     report.final_output_nsdb_replay_status = replay_summary.status;
     report.final_output_nsdb_replay_checkpoint_count = replay_summary.checkpoint_count;
@@ -83,12 +89,14 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
             ))
         )
     });
-    report.final_output_nsdb_replay_next_action = if report.final_output_nsdb_replay_ready {
-        "replay-nsdb-payload-execution"
-    } else {
-        "resolve-final-output-nsdb-replay"
-    }
-    .to_owned();
+    report.final_output_nsdb_replay_next_action =
+        if replay_summary.next_action == "rebuild-final-output-binding-proof" {
+            replay_summary.next_action
+        } else if report.final_output_nsdb_replay_ready {
+            "replay-nsdb-payload-execution".to_owned()
+        } else {
+            "resolve-final-output-nsdb-replay".to_owned()
+        };
     report.final_output_nsdb_replay_next_command =
         report.final_output_nsdb_replay_command.clone().or_else(|| {
             Some(format!(
@@ -171,10 +179,25 @@ pub(crate) fn persist_final_output_nsdb_handoff(
         first_blocker: record.first_blocker.clone().unwrap_or_default(),
         next_action: record.next_action.clone(),
     };
-    match nsdb::persist_payload_execution_handoff_record(
+    let binding = match final_output_binding_claim(report) {
+        Ok(binding) => binding,
+        Err(error) => {
+            return NsldFinalOutputNsdbHandoffSummary {
+                protocol: NSDB_HANDOFF_PROTOCOL,
+                persisted: false,
+                path: path_text,
+                record_count: 1,
+                ready_record_count: usize::from(record.status == "ready"),
+                first_trace_id: Some(record.trace_id),
+                error: Some(error),
+            };
+        }
+    };
+    match nsdb::persist_payload_execution_handoff_record_with_final_image_binding(
         output_dir,
         "nsld-final-executable-output",
         handoff_record,
+        binding,
     ) {
         Ok(summary) => NsldFinalOutputNsdbHandoffSummary {
             protocol: NSDB_HANDOFF_PROTOCOL,
@@ -195,6 +218,32 @@ pub(crate) fn persist_final_output_nsdb_handoff(
             error: Some(error),
         },
     }
+}
+
+fn final_output_binding_claim(
+    report: &NsldFinalExecutableOutputReport,
+) -> Result<nsdb::FinalImageBindingProofClaim, String> {
+    let binding_count = report
+        .container_loader_metadata_binding_count
+        .ok_or_else(|| "final image metadata binding count unavailable".to_owned())?;
+    let binding_table_hash = report
+        .container_loader_metadata_binding_table_hash
+        .clone()
+        .ok_or_else(|| "final image metadata binding table hash unavailable".to_owned())?;
+    Ok(nsdb::FinalImageBindingProofClaim {
+        binding_count,
+        binding_table_hash,
+        validation_status: report
+            .container_loader_metadata_binding_validation_status
+            .clone(),
+        selected_set_contract: report
+            .container_loader_selected_provider_bundle_set_contract
+            .clone(),
+        selected_set_count: report.container_loader_selected_provider_bundle_count,
+        selected_set_hash: report
+            .container_loader_selected_provider_bundle_set_hash
+            .clone(),
+    })
 }
 
 struct FinalOutputPayloadTraceRecord {

@@ -22,6 +22,7 @@ mod container_pipeline_actual;
 mod container_pipeline_mismatch;
 mod container_pipeline_tables;
 mod container_pipeline_verify;
+mod container_provider_dispatch;
 mod container_render;
 mod container_verify;
 mod context;
@@ -215,6 +216,9 @@ mod reports_final_launcher;
 mod reports_final_output;
 mod reports_link_inputs;
 mod reports_object;
+mod seal;
+#[cfg(test)]
+mod seal_tests;
 mod toml;
 mod toml_read;
 
@@ -251,6 +255,9 @@ fn run() -> Result<(), String> {
         return result;
     }
     if main_final_executable_commands::run_final_executable_command(&command)? {
+        return Ok(());
+    }
+    if seal::run_seal_command(&command)? {
         return Ok(());
     }
 

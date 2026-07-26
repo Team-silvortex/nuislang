@@ -6,6 +6,7 @@ const CONTAINER_SCHEMA_VERSION: usize = 1;
 const CONTAINER_KIND: &str = "deterministic-hetero-container";
 const PRODUCER: &str = "nsld";
 const PRODUCER_PHASE: &str = "alpha-0.6.0";
+const CONTAINER_CAPSULE_END_MARKER: &str = "# nuis-nsld-container-end-v1";
 
 use super::container_model::{NsldContainerPlanReport, NsldContainerReport};
 
@@ -194,6 +195,31 @@ pub(crate) fn render_container_toml(report: &NsldContainerReport) -> String {
         escape_toml_string(&report.backend_artifact_payload_table_hash)
     ));
     out.push_str(&format!(
+        "provider_dispatch_contract = \"{}\"\n",
+        escape_toml_string(&report.provider_dispatch_contract)
+    ));
+    out.push_str(&format!(
+        "provider_dispatch_validation_status = \"{}\"\n",
+        escape_toml_string(&report.provider_dispatch_validation_status)
+    ));
+    out.push_str(&format!(
+        "provider_dispatch_count = {}\n",
+        report.provider_dispatches.len()
+    ));
+    out.push_str(&format!(
+        "provider_dispatch_table_hash = \"{}\"\n",
+        escape_toml_string(&report.provider_dispatch_table_hash)
+    ));
+    out.push_str(&format!(
+        "provider_dispatch_selected_set_hash = \"{}\"\n",
+        escape_toml_string(
+            report
+                .provider_dispatch_selected_set_hash
+                .as_deref()
+                .unwrap_or("")
+        )
+    ));
+    out.push_str(&format!(
         "payload_size_bytes = {}\n",
         report.payload_size_bytes
     ));
@@ -209,6 +235,37 @@ pub(crate) fn render_container_toml(report: &NsldContainerReport) -> String {
         "blockers = [{}]\n",
         toml_string_array_literal(&report.blockers)
     ));
+    for dispatch in &report.provider_dispatches {
+        out.push_str("\n[[provider_dispatch]]\n");
+        out.push_str(&format!(
+            "dispatch_id = \"{}\"\n",
+            escape_toml_string(&dispatch.dispatch_id)
+        ));
+        out.push_str(&format!(
+            "provider_bundle_package_id = \"{}\"\n",
+            escape_toml_string(&dispatch.package_id)
+        ));
+        out.push_str(&format!(
+            "provider_bundle_id = \"{}\"\n",
+            escape_toml_string(&dispatch.bundle_id)
+        ));
+        out.push_str(&format!(
+            "provider_family = \"{}\"\n",
+            escape_toml_string(&dispatch.provider_family)
+        ));
+        out.push_str(&format!(
+            "runner_contract = \"{}\"\n",
+            escape_toml_string(&dispatch.runner_contract)
+        ));
+        out.push_str(&format!(
+            "runner_adapter_contract = \"{}\"\n",
+            escape_toml_string(&dispatch.runner_adapter_contract)
+        ));
+        out.push_str(&format!(
+            "runner_adapter_id = \"{}\"\n",
+            escape_toml_string(&dispatch.runner_adapter_id)
+        ));
+    }
     for binding in &report.metadata_bindings {
         out.push_str("\n[[metadata_binding]]\n");
         out.push_str(&format!(
@@ -386,6 +443,7 @@ pub(crate) fn render_container_toml(report: &NsldContainerReport) -> String {
         out.push_str(&format!("offset = {}\n", section.offset));
         out.push_str(&format!("size_bytes = {}\n", section.size_bytes));
     }
+    out.push_str(&format!("\n{CONTAINER_CAPSULE_END_MARKER}\n"));
     out
 }
 

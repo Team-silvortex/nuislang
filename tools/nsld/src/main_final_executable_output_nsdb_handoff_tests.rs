@@ -84,6 +84,12 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
     ));
     assert!(handoff.contains("first_status = \"ready\""));
     assert!(handoff.contains("first_next_action = \"handoff-payload-trace-to-nsdb\""));
+    assert!(handoff
+        .contains("final_image_binding_proof_contract = \"nuis-final-image-binding-proof-v1\""));
+    assert!(handoff.contains("final_image_metadata_binding_count = 0"));
+    assert!(handoff.contains("final_image_metadata_binding_table_hash = \"0xcbf29ce484222325\""));
+    assert!(handoff.contains("final_image_metadata_binding_validation_status = \"not-applicable\""));
+    assert!(handoff.contains("final_image_binding_proof_hash = \"fnv1a64:"));
     assert!(handoff.contains("[[records]]"));
     assert!(handoff.contains("execution_phase = \"container-loader-handoff\""));
     assert!(handoff.contains("entry_symbol = \"nuis.bootstrap.lifecycle.v1\""));
@@ -104,6 +110,20 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
         output.final_output_nsdb_replay_status,
         "replay-evidence-ready"
     );
+    assert_eq!(
+        output
+            .final_output_nsdb_final_image_binding_proof_contract
+            .as_deref(),
+        Some("nuis-final-image-binding-proof-v1")
+    );
+    assert_eq!(
+        output.final_output_nsdb_final_image_binding_proof_status,
+        "verified-empty"
+    );
+    assert!(output
+        .final_output_nsdb_final_image_binding_proof_hash
+        .as_deref()
+        .is_some_and(|hash| hash.starts_with("fnv1a64:")));
     assert_eq!(output.final_output_nsdb_replay_checkpoint_count, 1);
     assert_eq!(output.final_output_nsdb_replayable_checkpoint_count, 1);
     assert_eq!(merged_output.final_output_nsdb_handoff_record_count, 2);
@@ -125,6 +145,12 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
     assert!(merged_handoff.contains("execution_phase = \"container-loader-handoff\""));
     assert!(merged_handoff.contains("execution_phase = \"provider-device-completion\""));
     assert!(merged_handoff.contains("target = \"metal:apple-silicon-gpu\""));
+    assert!(merged_handoff
+        .contains("final_image_binding_proof_contract = \"nuis-final-image-binding-proof-v1\""));
+    assert_eq!(
+        merged_output.final_output_nsdb_final_image_binding_proof_status,
+        "verified-empty"
+    );
     assert_eq!(merged_output.final_output_nsdb_provider_completion_count, 1);
     assert_eq!(
         merged_output
@@ -260,6 +286,12 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
         "\"final_output_nsdb_handoff_first_trace_id\":\"payload-trace:container-loader:nuis.bootstrap.lifecycle.v1\""
     ));
     assert!(output_json.contains("\"final_output_nsdb_handoff_error\":null"));
+    assert!(output_json.contains(
+        "\"final_output_nsdb_final_image_binding_proof_contract\":\"nuis-final-image-binding-proof-v1\""
+    ));
+    assert!(output_json
+        .contains("\"final_output_nsdb_final_image_binding_proof_status\":\"verified-empty\""));
+    assert!(output_json.contains("\"final_output_nsdb_final_image_binding_proof_hash\":\"fnv1a64:"));
     assert!(output_json.contains(
         "\"final_output_nsdb_replay_contract\":\"nsdb-payload-execution-replay-plan-v1\""
     ));

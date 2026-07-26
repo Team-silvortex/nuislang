@@ -110,6 +110,15 @@ pub(crate) fn print_nsdb_inspect_report(report: &NsdbInspectReport) {
             .proof_status
     );
     println!(
+        "  payload_execution_handoff_final_image_binding_proof_next_action: {}",
+        crate::handoff_binding::next_action(
+            &report
+                .payload_execution_handoff
+                .final_image_binding_proof
+                .proof_status
+        )
+    );
+    println!(
         "  payload_execution_handoff_hetero_execution_closure_status: {}",
         report
             .payload_execution_handoff
@@ -393,6 +402,7 @@ pub(crate) fn print_nsdb_replay_plan(report: &NsdbInspectReport) {
     println!("Nsdb payload execution replay plan");
     println!("  manifest: {}", report.manifest);
     println!("  replay_protocol: {}", plan.protocol);
+    println!("  replay_next_action: {}", plan.next_action);
     println!("  replay_event_query_contract: nsdb-payload-execution-event-query-v1");
     println!("  replay_checkpoint_source: payload-execution-handoff-events");
     println!(
@@ -486,6 +496,17 @@ pub(crate) fn print_nsdb_replay_transcript_with_control(
     println!(
         "  debugger_transcript_source_contract: {}",
         transcript.source_contract
+    );
+    println!(
+        "  debugger_transcript_identity_contract: {}",
+        transcript.identity_contract
+    );
+    println!(
+        "  debugger_transcript_final_image_binding_proof_hash: {}",
+        transcript
+            .final_image_binding_proof_hash
+            .as_deref()
+            .unwrap_or("<none>")
     );
     println!("  debugger_transcript_status: {}", transcript.status);
     println!("  debugger_transcript_ready: {}", transcript.ready);

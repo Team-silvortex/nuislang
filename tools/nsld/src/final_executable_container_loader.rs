@@ -1,9 +1,10 @@
+use super::container_provider_dispatch::provider_dispatch_from_container;
 use super::final_executable_container_binding::container_binding_evidence;
 use super::final_executable_image::parse_final_executable_image_header;
 use super::toml;
 
 const CONTAINER_TOML_SCHEMA_MARKER: &[u8] = b"schema = \"nuis-nsld-container-v1\"";
-const CONTAINER_TOML_HANDOFF_END_MARKER: &[u8] = b"\nloader_symbol_count = ";
+const CONTAINER_TOML_CAPSULE_END_MARKER: &[u8] = b"\n# nuis-nsld-container-end-v1\n";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FinalExecutableContainerLoaderEvidence {
@@ -25,6 +26,11 @@ pub(crate) struct FinalExecutableContainerLoaderEvidence {
     pub(crate) selected_provider_bundle_set_contract: Option<String>,
     pub(crate) selected_provider_bundle_count: Option<usize>,
     pub(crate) selected_provider_bundle_set_hash: Option<String>,
+    pub(crate) provider_dispatch_status: String,
+    pub(crate) provider_dispatch_count: usize,
+    pub(crate) provider_dispatch_table_hash: Option<String>,
+    pub(crate) provider_dispatch_first_bundle_id: Option<String>,
+    pub(crate) provider_dispatch_first_provider_family: Option<String>,
 }
 
 pub(crate) fn final_executable_container_loader_evidence(
@@ -78,8 +84,16 @@ pub(crate) fn final_executable_container_loader_evidence(
     let entry_section_id = toml::string_value(prefix, "loader_entry_section_id");
     let symbol_count = toml::usize_value(prefix, "loader_symbol_count");
     let binding_evidence = container_binding_evidence(payload, prefix);
+    let provider_dispatch = provider_dispatch_from_container(
+        prefix,
+        binding_evidence.selected_set_count,
+        binding_evidence.selected_set_hash.as_deref(),
+        binding_evidence.provider_dispatch_count,
+        binding_evidence.provider_dispatch_hash.as_deref(),
+    );
     let mut blockers = string_array_or_empty(prefix, "loader_blockers");
     blockers.extend(binding_evidence.blockers.iter().cloned());
+    blockers.extend(provider_dispatch.blockers.iter().cloned());
     if readiness.as_deref() == Some("host-assisted") {
         blockers.retain(|blocker| !blocker.starts_with("external-import:"));
     }
@@ -122,6 +136,17 @@ pub(crate) fn final_executable_container_loader_evidence(
         selected_provider_bundle_set_contract: binding_evidence.selected_set_contract,
         selected_provider_bundle_count: binding_evidence.selected_set_count,
         selected_provider_bundle_set_hash: binding_evidence.selected_set_hash,
+        provider_dispatch_status: provider_dispatch.status,
+        provider_dispatch_count: provider_dispatch.entries.len(),
+        provider_dispatch_table_hash: Some(provider_dispatch.table_hash),
+        provider_dispatch_first_bundle_id: provider_dispatch
+            .entries
+            .first()
+            .map(|entry| entry.bundle_id.clone()),
+        provider_dispatch_first_provider_family: provider_dispatch
+            .entries
+            .first()
+            .map(|entry| entry.provider_family.clone()),
     }
 }
 
@@ -160,15 +185,8 @@ fn container_toml_capsule(payload: &[u8]) -> Result<Option<&str>, ()> {
 }
 
 fn container_toml_capsule_end(capsule: &[u8]) -> Option<usize> {
-    if let Some(line_offset) = find_bytes(capsule, CONTAINER_TOML_HANDOFF_END_MARKER) {
-        let line_start = line_offset.saturating_add(1);
-        let line_end = capsule[line_start..]
-            .iter()
-            .position(|byte| *byte == b'\n')
-            .map(|offset| line_start + offset + 1)?;
-        return Some(line_end);
-    }
-    capsule.iter().position(|byte| *byte == 0)
+    find_bytes(capsule, CONTAINER_TOML_CAPSULE_END_MARKER)
+        .map(|offset| offset.saturating_add(CONTAINER_TOML_CAPSULE_END_MARKER.len()))
 }
 
 fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
@@ -209,6 +227,11 @@ fn empty_evidence(
         selected_provider_bundle_set_contract: None,
         selected_provider_bundle_count: None,
         selected_provider_bundle_set_hash: None,
+        provider_dispatch_status: "not-applicable".to_owned(),
+        provider_dispatch_count: 0,
+        provider_dispatch_table_hash: None,
+        provider_dispatch_first_bundle_id: None,
+        provider_dispatch_first_provider_family: None,
     }
 }
 

@@ -1,5 +1,7 @@
 use std::{fs, path::Path};
 
+use crate::artifact_nsdb_handoff::read_persisted_nsdb_handoff;
+
 const CURSOR_FILE_NAME: &str = "nuis.nsdb.replay-cursor.toml";
 const LINEAGE_FILE_NAME: &str = "nuis.nsdb.replay-cursor.lineage.toml";
 const LINEAGE_PROTOCOL: &str = "nsdb-yir-replay-cursor-lineage-v1";
@@ -89,23 +91,34 @@ pub(crate) fn read_debugger_cursor_lineage(output_dir: &Path) -> DebuggerCursorL
         return unavailable();
     };
     let cursor_path = output_dir.join(CURSOR_FILE_NAME);
-    let cursor_hash = fs::read(&cursor_path).ok().map(|bytes| fnv1a64_hex(&bytes));
-    let (entry_count, latest_hash) =
-        match validate_lineage(&source, &cursor_path, cursor_hash.as_deref()) {
-            Ok(summary) => summary,
-            Err(first_blocker) => {
-                return DebuggerCursorLineageMirror {
-                    status: "lineage-invalid",
-                    first_blocker: Some(first_blocker),
-                    next_action: Some("repair-cursor-lineage"),
-                    next_command: Some(format!(
-                        "nuis debug-lineage-repair {} --json",
-                        output_dir.display()
-                    )),
-                    ..unavailable()
-                };
-            }
-        };
+    let cursor_source = fs::read_to_string(&cursor_path).ok();
+    let handoff = read_persisted_nsdb_handoff(Some(output_dir));
+    let expected_proof_hash = matches!(
+        handoff.final_image_binding_proof_status(),
+        "verified" | "verified-empty"
+    )
+    .then(|| handoff.final_image_binding_proof_hash())
+    .flatten();
+    let (entry_count, latest_hash) = match validate_lineage(
+        &source,
+        &cursor_path,
+        cursor_source.as_deref(),
+        expected_proof_hash,
+    ) {
+        Ok(summary) => summary,
+        Err(first_blocker) => {
+            return DebuggerCursorLineageMirror {
+                status: "lineage-invalid",
+                first_blocker: Some(first_blocker),
+                next_action: Some("repair-cursor-lineage"),
+                next_command: Some(format!(
+                    "nuis debug-lineage-repair {} --json",
+                    output_dir.display()
+                )),
+                ..unavailable()
+            };
+        }
+    };
     let repair = read_repair_journal(output_dir, &path, &latest_hash);
     DebuggerCursorLineageMirror {
         contract: "nuis-debugger-cursor-lineage-mirror-v1",
@@ -413,7 +426,8 @@ fn repair_window_hash(
 fn validate_lineage(
     source: &str,
     expected_cursor_path: &Path,
-    cursor_hash: Option<&str>,
+    cursor_source: Option<&str>,
+    expected_proof_hash: Option<&str>,
 ) -> Result<(usize, String), &'static str> {
     if field(source, "protocol").as_deref() != Some(LINEAGE_PROTOCOL) {
         return Err("lineage-protocol-invalid");
@@ -422,6 +436,19 @@ fn validate_lineage(
         != Some(LINEAGE_LIMIT)
     {
         return Err("lineage-limit-invalid");
+    }
+    if field(source, "identity_contract").as_deref() != Some("nsdb-yir-replay-identity-v1") {
+        return Err("lineage-identity-contract-invalid");
+    }
+    let expected_proof_hash = expected_proof_hash.ok_or("lineage-final-image-proof-unavailable")?;
+    if field(source, "final_image_binding_proof_hash").as_deref() != Some(expected_proof_hash) {
+        return Err("lineage-final-image-proof-mismatch");
+    }
+    let cursor_source = cursor_source.ok_or("lineage-authoritative-cursor-missing")?;
+    if field(cursor_source, "final_image_binding_proof_hash").as_deref()
+        != Some(expected_proof_hash)
+    {
+        return Err("lineage-cursor-final-image-proof-mismatch");
     }
     let Some(recorded_cursor_path) = field(source, "cursor_path") else {
         return Err("lineage-cursor-path-missing");
@@ -444,6 +471,7 @@ fn validate_lineage(
     for (index, entry) in entries.iter().enumerate() {
         if !is_hash(&entry.current_hash)
             || (entry.previous_hash != "none" && !is_hash(&entry.previous_hash))
+            || entry.final_image_binding_proof_hash != expected_proof_hash
         {
             return Err("lineage-entry-hash-invalid");
         }
@@ -460,7 +488,7 @@ fn validate_lineage(
         .ok_or("lineage-entry-count-invalid")?
         .current_hash
         .clone();
-    let cursor_hash = cursor_hash.ok_or("lineage-authoritative-cursor-missing")?;
+    let cursor_hash = fnv1a64_hex(cursor_source.as_bytes());
     if cursor_hash != latest_hash {
         return Err("lineage-latest-hash-mismatch");
     }
@@ -471,6 +499,7 @@ struct LineageEntry {
     sequence: u64,
     previous_hash: String,
     current_hash: String,
+    final_image_binding_proof_hash: String,
 }
 
 fn parse_entry(source: &str) -> Option<LineageEntry> {
@@ -478,6 +507,7 @@ fn parse_entry(source: &str) -> Option<LineageEntry> {
         sequence: field(source, "sequence")?.parse::<u64>().ok()?,
         previous_hash: field(source, "previous_hash")?,
         current_hash: field(source, "current_hash")?,
+        final_image_binding_proof_hash: field(source, "final_image_binding_proof_hash")?,
     })
 }
 
@@ -544,6 +574,7 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static TEMP_ID: AtomicU64 = AtomicU64::new(0);
+    const TEST_PROOF_HASH: &str = "fnv1a64:981b10a68f4e3dd7";
 
     fn temp_dir(label: &str) -> std::path::PathBuf {
         let id = TEMP_ID.fetch_add(1, Ordering::Relaxed);
@@ -555,24 +586,39 @@ mod tests {
         path
     }
 
+    fn write_proof(root: &Path) {
+        fs::write(
+            root.join("nuis.nsdb.payload-execution-handoff.toml"),
+            "final_image_binding_proof_contract = \"nuis-final-image-binding-proof-v1\"\nfinal_image_metadata_binding_count = 0\nfinal_image_metadata_binding_table_hash = \"0xcbf29ce484222325\"\nfinal_image_metadata_binding_validation_status = \"not-applicable\"\nfinal_image_selected_provider_bundle_set_contract = \"\"\nfinal_image_selected_provider_bundle_count = 0\nfinal_image_selected_provider_bundle_set_hash = \"\"\nfinal_image_binding_proof_hash = \"fnv1a64:981b10a68f4e3dd7\"\n",
+        )
+        .unwrap();
+    }
+
     #[test]
     fn mirrors_hash_checked_lineage_without_nsdb_types() {
         let root = temp_dir("ready");
         let cursor_path = root.join(CURSOR_FILE_NAME);
-        fs::write(&cursor_path, "cursor-v2").unwrap();
-        let first_hash = fnv1a64_hex(b"cursor-v1");
-        let latest_hash = fnv1a64_hex(b"cursor-v2");
+        write_proof(&root);
+        let first_cursor =
+            format!("cursor = 1\nfinal_image_binding_proof_hash = \"{TEST_PROOF_HASH}\"\n");
+        let latest_cursor =
+            format!("cursor = 2\nfinal_image_binding_proof_hash = \"{TEST_PROOF_HASH}\"\n");
+        fs::write(&cursor_path, &latest_cursor).unwrap();
+        let first_hash = fnv1a64_hex(first_cursor.as_bytes());
+        let latest_hash = fnv1a64_hex(latest_cursor.as_bytes());
         fs::write(
             root.join(LINEAGE_FILE_NAME),
             format!(
                 "protocol = \"{LINEAGE_PROTOCOL}\"\n\
+                 identity_contract = \"nsdb-yir-replay-identity-v1\"\n\
+                 final_image_binding_proof_hash = \"{TEST_PROOF_HASH}\"\n\
                  cursor_path = \"{}\"\n\
                  entry_limit = 8\n\
                  entry_count = 2\n\n\
                  [[entry]]\nsequence = 0\nprevious_hash = \"none\"\ncurrent_hash = \"{first_hash}\"\n\
-                 after_frame_id = \"frame-0\"\nnext_frame_id = \"frame-1\"\n\n\
+                 after_frame_id = \"frame-0\"\nnext_frame_id = \"frame-1\"\nfinal_image_binding_proof_hash = \"{TEST_PROOF_HASH}\"\n\n\
                  [[entry]]\nsequence = 1\nprevious_hash = \"{first_hash}\"\ncurrent_hash = \"{latest_hash}\"\n\
-                 after_frame_id = \"frame-1\"\nnext_frame_id = \"frame-2\"\n",
+                 after_frame_id = \"frame-1\"\nnext_frame_id = \"frame-2\"\nfinal_image_binding_proof_hash = \"{TEST_PROOF_HASH}\"\n",
                 cursor_path.display()
             ),
         )
@@ -590,13 +636,16 @@ mod tests {
     fn rejects_lineage_that_does_not_match_the_authoritative_cursor() {
         let root = temp_dir("stale");
         let cursor_path = root.join(CURSOR_FILE_NAME);
-        fs::write(&cursor_path, "cursor-v2").unwrap();
+        write_proof(&root);
+        let cursor =
+            format!("cursor = 2\nfinal_image_binding_proof_hash = \"{TEST_PROOF_HASH}\"\n");
+        fs::write(&cursor_path, cursor).unwrap();
         fs::write(
             root.join(LINEAGE_FILE_NAME),
             format!(
-                "protocol = \"{LINEAGE_PROTOCOL}\"\ncursor_path = \"{}\"\nentry_limit = 8\nentry_count = 1\n\n\
+                "protocol = \"{LINEAGE_PROTOCOL}\"\nidentity_contract = \"nsdb-yir-replay-identity-v1\"\nfinal_image_binding_proof_hash = \"{TEST_PROOF_HASH}\"\ncursor_path = \"{}\"\nentry_limit = 8\nentry_count = 1\n\n\
                  [[entry]]\nsequence = 0\nprevious_hash = \"none\"\ncurrent_hash = \"{}\"\n\
-                 after_frame_id = \"frame-0\"\nnext_frame_id = \"frame-1\"\n",
+                 after_frame_id = \"frame-0\"\nnext_frame_id = \"frame-1\"\nfinal_image_binding_proof_hash = \"{TEST_PROOF_HASH}\"\n",
                 cursor_path.display(),
                 fnv1a64_hex(b"cursor-v1")
             ),

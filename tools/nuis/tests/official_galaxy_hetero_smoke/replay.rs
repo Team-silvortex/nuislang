@@ -13,6 +13,15 @@ pub(super) fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
     let replay = run_nsdb(&["replay", &output_dir_text, "--json"]);
     assert_success(&replay, "nsdb replay official multi-checkpoint artifact");
     let replay_stdout = String::from_utf8_lossy(&replay.stdout);
+    assert!(
+        replay_stdout.contains("\"debugger_transcript_ready\":true")
+            && replay_stdout.contains(
+                "\"debugger_transcript_identity_contract\":\"nsdb-yir-replay-identity-v1\""
+            )
+            && replay_stdout
+                .contains("\"debugger_transcript_final_image_binding_proof_hash\":\"fnv1a64:",),
+        "provider-complete final image must expose a replay identity\n{replay_stdout}"
+    );
     let frame_ids = json_string_values(&replay_stdout, "frame_id");
     assert!(
         frame_ids.len() >= 3,
@@ -38,6 +47,16 @@ pub(super) fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
         &cursor_path,
         "protocol = \"nsdb-yir-replay-cursor-record-v1\"",
         "persisted replay cursor protocol",
+    );
+    assert_file_contains(
+        &cursor_path,
+        "identity_contract = \"nsdb-yir-replay-identity-v1\"",
+        "persisted replay cursor identity contract",
+    );
+    assert_file_contains(
+        &cursor_path,
+        "final_image_binding_proof_hash = \"fnv1a64:",
+        "persisted replay cursor final image identity",
     );
     assert_file_contains(
         &cursor_path,
@@ -112,6 +131,16 @@ pub(super) fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
         &lineage_path,
         "protocol = \"nsdb-yir-replay-cursor-lineage-v1\"",
         "replay cursor lineage protocol",
+    );
+    assert_file_contains(
+        &lineage_path,
+        "identity_contract = \"nsdb-yir-replay-identity-v1\"",
+        "replay cursor lineage identity contract",
+    );
+    assert_file_contains(
+        &lineage_path,
+        "final_image_binding_proof_hash = \"fnv1a64:",
+        "replay cursor lineage final image identity",
     );
     assert_file_contains(
         &lineage_path,

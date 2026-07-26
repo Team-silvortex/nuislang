@@ -332,6 +332,9 @@ fn nsld_final_executable_output_nsdb_replay(
     let replayable_checkpoint_count = handoff.ready_record_count();
     let first_blocker = if !handoff.available() {
         Some("payload-execution-handoff-missing".to_owned())
+    } else if handoff.available() && handoff.final_image_binding_proof_status() == "legacy-unbound"
+    {
+        Some("final-image-binding-proof:legacy-unbound".to_owned())
     } else if !handoff.hetero_execution_closure_ready() {
         handoff.hetero_execution_closure_blocker()
     } else if checkpoint_count == 0 {
@@ -345,6 +348,9 @@ fn nsld_final_executable_output_nsdb_replay(
     let command = ready.then(|| format!("nsdb replay {} --json", plan.output_dir));
     let next_action = if ready {
         "replay-nsdb-payload-execution"
+    } else if handoff.available() && handoff.final_image_binding_proof_status() == "legacy-unbound"
+    {
+        "rebuild-final-output-binding-proof"
     } else {
         "resolve-final-output-nsdb-replay"
     }

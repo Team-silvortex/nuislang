@@ -161,6 +161,7 @@ mod tests {
             manifest: NuisProjectManifest {
                 name: "test".to_owned(),
                 entry: "main.ns".to_owned(),
+                packaging_mode: None,
                 modules: vec![],
                 tests: vec![],
                 links: vec![],

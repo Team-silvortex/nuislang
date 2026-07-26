@@ -6,6 +6,7 @@ use std::{
 mod container;
 mod container_backend_payload;
 mod container_metadata_binding;
+mod container_provider_dispatch;
 mod container_toml;
 mod report;
 
@@ -15,6 +16,7 @@ use container::{
     CONTAINER_KIND, CONTAINER_MAGIC, CONTAINER_PRODUCER, CONTAINER_SCHEMA,
     CONTAINER_SCHEMA_VERSION, CONTAINER_VERSION,
 };
+use container_provider_dispatch::ProviderDispatchEntry;
 use report::{print_text_report, render_json_report};
 
 const RUNNER_PROTOCOL: &str = "nuis-host-runner-v1";
@@ -151,6 +153,12 @@ struct RunnerReport {
     container_loader_selected_provider_bundle_set_contract: Option<String>,
     container_loader_selected_provider_bundle_count: Option<usize>,
     container_loader_selected_provider_bundle_set_hash: Option<String>,
+    container_loader_provider_dispatch_status: String,
+    container_loader_provider_dispatch_count: Option<usize>,
+    container_loader_provider_dispatch_parsed_count: usize,
+    container_loader_provider_dispatch_table_hash: Option<String>,
+    container_loader_provider_dispatch_selected_set_hash: Option<String>,
+    container_loader_provider_dispatches: Vec<ProviderDispatchEntry>,
     container_payload_path: Option<String>,
     container_loader_handoff_status: String,
     container_loader_handoff_ready: bool,
@@ -469,6 +477,18 @@ fn validate_handoff(
         container_loader_selected_provider_bundle_set_hash: container_loader
             .metadata_binding
             .selected_set_hash,
+        container_loader_provider_dispatch_status: container_loader.provider_dispatch.status,
+        container_loader_provider_dispatch_count: container_loader.provider_dispatch.declared_count,
+        container_loader_provider_dispatch_parsed_count: container_loader
+            .provider_dispatch
+            .parsed_count,
+        container_loader_provider_dispatch_table_hash: container_loader
+            .provider_dispatch
+            .table_hash,
+        container_loader_provider_dispatch_selected_set_hash: container_loader
+            .provider_dispatch
+            .selected_set_hash,
+        container_loader_provider_dispatches: container_loader.provider_dispatch.entries,
         container_payload_path: container_loader.container_payload_path,
         container_loader_handoff_status: container_loader.handoff_status,
         container_loader_handoff_ready: container_loader.handoff_ready,

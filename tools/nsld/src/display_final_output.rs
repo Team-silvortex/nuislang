@@ -164,6 +164,38 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         )
     );
     println!(
+        "  container_loader_provider_dispatch_status: {}",
+        report.container_loader_provider_dispatch_status
+    );
+    println!(
+        "  container_loader_provider_dispatch_count: {}",
+        report.container_loader_provider_dispatch_count
+    );
+    println!(
+        "  container_loader_provider_dispatch_table_hash: {}",
+        optional_string_text(
+            report
+                .container_loader_provider_dispatch_table_hash
+                .as_deref()
+        )
+    );
+    println!(
+        "  container_loader_provider_dispatch_first_bundle_id: {}",
+        optional_string_text(
+            report
+                .container_loader_provider_dispatch_first_bundle_id
+                .as_deref()
+        )
+    );
+    println!(
+        "  container_loader_provider_dispatch_first_provider_family: {}",
+        optional_string_text(
+            report
+                .container_loader_provider_dispatch_first_provider_family
+                .as_deref()
+        )
+    );
+    println!(
         "  first_payload_execution_status: {}",
         report.first_payload_execution_status
     );
@@ -218,6 +250,26 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
     println!(
         "  final_output_nsdb_handoff_error: {}",
         optional_string_text(report.final_output_nsdb_handoff_error.as_deref())
+    );
+    println!(
+        "  final_output_nsdb_final_image_binding_proof_contract: {}",
+        optional_string_text(
+            report
+                .final_output_nsdb_final_image_binding_proof_contract
+                .as_deref()
+        )
+    );
+    println!(
+        "  final_output_nsdb_final_image_binding_proof_status: {}",
+        report.final_output_nsdb_final_image_binding_proof_status
+    );
+    println!(
+        "  final_output_nsdb_final_image_binding_proof_hash: {}",
+        optional_string_text(
+            report
+                .final_output_nsdb_final_image_binding_proof_hash
+                .as_deref()
+        )
     );
     println!(
         "  final_output_nsdb_replay_contract: {}",

@@ -355,6 +355,11 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
         replay_stdout.contains("\"kind\":\"nsdb_yir_replay_transcript\"")
             && replay_stdout
                 .contains("\"debugger_transcript_contract\":\"nsdb-yir-replay-transcript-v1\"")
+            && replay_stdout.contains(
+                "\"debugger_transcript_identity_contract\":\"nsdb-yir-replay-identity-v1\""
+            )
+            && replay_stdout
+                .contains("\"debugger_transcript_final_image_binding_proof_hash\":\"fnv1a64:")
             && replay_stdout.contains("\"debugger_transcript_status\":\"transcript-consumed\"")
             && replay_stdout.contains("\"debugger_transcript_ready\":true")
             && replay_stdout.contains("\"debugger_transcript_checkpoint_count\":1")

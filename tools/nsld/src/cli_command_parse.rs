@@ -65,6 +65,7 @@ where
         "emit-final-executable" => Command::EmitFinalExecutable { input, json },
         "verify-final-executable-emit" => Command::VerifyFinalExecutableEmit { input, json },
         "final-executable-output" => Command::FinalExecutableOutput { input, json },
+        "seal" => Command::Seal { input, json },
         "final-executable-launcher-manifest" => {
             Command::FinalExecutableLauncherManifest { input, json }
         }

@@ -11,6 +11,7 @@ use crate::transcript::{NsdbReplayControl, NsdbReplayTranscript};
 const CURSOR_PROTOCOL: &str = "nsdb-yir-replay-cursor-record-v1";
 const TRANSCRIPT_PROTOCOL: &str = "nsdb-yir-replay-transcript-v1";
 const SOURCE_CONTRACT: &str = "nsdb-payload-execution-replay-plan-v1";
+const IDENTITY_CONTRACT: &str = "nsdb-yir-replay-identity-v1";
 static CURSOR_TEMP_ID: AtomicU64 = AtomicU64::new(0);
 
 pub(crate) fn persist_replay_cursor(
@@ -35,10 +36,16 @@ pub(crate) fn persist_replay_cursor(
     let next_index = transcript
         .resume_next_frame_index
         .ok_or_else(|| "cannot persist replay cursor without next frame index".to_owned())?;
+    let proof_hash = transcript
+        .final_image_binding_proof_hash
+        .as_deref()
+        .ok_or_else(|| "cannot persist replay cursor without final image identity".to_owned())?;
     let content = format!(
         "protocol = \"{CURSOR_PROTOCOL}\"\n\
          transcript_contract = \"{}\"\n\
          source_contract = \"{}\"\n\
+         identity_contract = \"{}\"\n\
+         final_image_binding_proof_hash = \"{}\"\n\
          manifest = \"{}\"\n\
          status = \"resume-ready\"\n\
          after_frame_id = \"{}\"\n\
@@ -46,19 +53,22 @@ pub(crate) fn persist_replay_cursor(
          next_frame_id = \"{}\"\n",
         transcript.protocol,
         transcript.source_contract,
+        transcript.identity_contract,
+        proof_hash,
         escape_toml(&manifest.display().to_string()),
         escape_toml(after),
         next_index,
         escape_toml(next),
     );
     let previous = fs::read_to_string(output).ok();
-    persist_cursor_content_atomically(output, manifest, &content)?;
+    persist_cursor_content_atomically(output, manifest, proof_hash, &content)?;
     let _ = crate::cursor_lineage::record_cursor_lineage(
         output,
         previous.as_deref(),
         &content,
         after,
         next,
+        proof_hash,
     );
     Ok(())
 }
@@ -66,10 +76,11 @@ pub(crate) fn persist_replay_cursor(
 fn persist_cursor_content_atomically(
     output: &Path,
     manifest: &Path,
+    expected_proof_hash: &str,
     content: &str,
 ) -> Result<(), String> {
     persist_validated_content_atomically(output, content, |temporary| {
-        load_replay_cursor(temporary, manifest).map(|_| ())
+        load_replay_cursor(temporary, manifest, expected_proof_hash).map(|_| ())
     })
 }
 
@@ -164,6 +175,7 @@ fn sync_cursor_directory(parent: &Path) -> Result<(), String> {
 pub(crate) fn load_replay_cursor(
     input: &Path,
     manifest: &Path,
+    expected_proof_hash: &str,
 ) -> Result<NsdbReplayControl, String> {
     let source = fs::read_to_string(input).map_err(|error| {
         format!(
@@ -175,6 +187,12 @@ pub(crate) fn load_replay_cursor(
     require_field(&fields, "protocol", CURSOR_PROTOCOL)?;
     require_field(&fields, "transcript_contract", TRANSCRIPT_PROTOCOL)?;
     require_field(&fields, "source_contract", SOURCE_CONTRACT)?;
+    require_field(&fields, "identity_contract", IDENTITY_CONTRACT)?;
+    require_field(
+        &fields,
+        "final_image_binding_proof_hash",
+        expected_proof_hash,
+    )?;
     require_field(&fields, "status", "resume-ready")?;
 
     let recorded_manifest = field(&fields, "manifest")?;
@@ -211,6 +229,8 @@ fn parse_cursor_fields(source: &str) -> Result<BTreeMap<String, String>, String>
             "protocol"
                 | "transcript_contract"
                 | "source_contract"
+                | "identity_contract"
+                | "final_image_binding_proof_hash"
                 | "manifest"
                 | "status"
                 | "after_frame_id"
@@ -298,6 +318,7 @@ mod tests {
     };
 
     static TEMP_ID: AtomicU64 = AtomicU64::new(0);
+    const TEST_PROOF_HASH: &str = "fnv1a64:0123456789abcdef";
 
     fn temp_dir(label: &str) -> PathBuf {
         let id = TEMP_ID.fetch_add(1, Ordering::Relaxed);
@@ -312,6 +333,8 @@ mod tests {
             "protocol = \"nsdb-yir-replay-cursor-record-v1\"\n\
              transcript_contract = \"nsdb-yir-replay-transcript-v1\"\n\
              source_contract = \"nsdb-payload-execution-replay-plan-v1\"\n\
+             identity_contract = \"nsdb-yir-replay-identity-v1\"\n\
+             final_image_binding_proof_hash = \"{TEST_PROOF_HASH}\"\n\
              manifest = \"{}\"\n\
              status = \"resume-ready\"\n\
              after_frame_id = \"frame-0\"\n\
@@ -332,7 +355,7 @@ mod tests {
         fs::write(&requested, "manifest = true\n").expect("write requested manifest");
         fs::write(&cursor, cursor_source(&recorded, "")).expect("write cursor");
 
-        let error = load_replay_cursor(&cursor, &requested).unwrap_err();
+        let error = load_replay_cursor(&cursor, &requested, TEST_PROOF_HASH).unwrap_err();
         assert!(error.contains("does not match"));
         fs::remove_dir_all(root).expect("remove cursor test directory");
     }
@@ -346,7 +369,7 @@ mod tests {
         fs::write(&cursor, cursor_source(&manifest, "surprise = \"field\"\n"))
             .expect("write cursor");
 
-        let error = load_replay_cursor(&cursor, &manifest).unwrap_err();
+        let error = load_replay_cursor(&cursor, &manifest, TEST_PROOF_HASH).unwrap_err();
         assert!(error.contains("unknown replay cursor field"));
         fs::remove_dir_all(root).expect("remove cursor test directory");
     }
@@ -365,10 +388,11 @@ mod tests {
             )
             .replace("next_frame_id = \"frame-1\"", "next_frame_id = \"frame-2\"");
 
-        persist_cursor_content_atomically(&cursor, &manifest, &replacement)
+        persist_cursor_content_atomically(&cursor, &manifest, TEST_PROOF_HASH, &replacement)
             .expect("replace cursor atomically");
 
-        let loaded = load_replay_cursor(&cursor, &manifest).expect("load replaced cursor");
+        let loaded =
+            load_replay_cursor(&cursor, &manifest, TEST_PROOF_HASH).expect("load replaced cursor");
         assert_eq!(loaded.resume_after_frame_id.as_deref(), Some("frame-1"));
         assert_eq!(loaded.resume_next_frame_id.as_deref(), Some("frame-2"));
         assert!(!directory_contains_cursor_temp(&root));
@@ -384,12 +408,31 @@ mod tests {
         let original = cursor_source(&manifest, "");
         fs::write(&cursor, &original).expect("write old cursor");
 
-        let error = persist_cursor_content_atomically(&cursor, &manifest, "protocol = \"bad\"\n")
-            .unwrap_err();
+        let error = persist_cursor_content_atomically(
+            &cursor,
+            &manifest,
+            TEST_PROOF_HASH,
+            "protocol = \"bad\"\n",
+        )
+        .unwrap_err();
 
         assert!(error.contains("refusing to install invalid replay cursor"));
         assert_eq!(fs::read_to_string(&cursor).unwrap(), original);
         assert!(!directory_contains_cursor_temp(&root));
+        fs::remove_dir_all(root).expect("remove cursor test directory");
+    }
+
+    #[test]
+    fn rejects_cursor_from_another_final_image() {
+        let root = temp_dir("proof-mismatch");
+        let manifest = root.join("manifest.toml");
+        let cursor = root.join("cursor.toml");
+        fs::write(&manifest, "manifest = true\n").expect("write manifest");
+        fs::write(&cursor, cursor_source(&manifest, "")).expect("write cursor");
+
+        let error = load_replay_cursor(&cursor, &manifest, "fnv1a64:fedcba9876543210").unwrap_err();
+
+        assert!(error.contains("final_image_binding_proof_hash"));
         fs::remove_dir_all(root).expect("remove cursor test directory");
     }
 

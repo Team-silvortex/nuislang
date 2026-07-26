@@ -213,6 +213,8 @@ pub(crate) fn nsld_container_report(
     let backend_artifact_payloads = container::backend_artifact_payloads(plan);
     let backend_artifact_payload_table_hash =
         container::backend_artifact_payload_table_hash(&backend_artifact_payloads, fnv1a64_hex);
+    let provider_dispatch =
+        super::container_provider_dispatch::provider_dispatch_evidence(&plan.output_dir);
     let metadata_binding_evidence = container_metadata_binding_evidence(&plan.output_dir);
     let metadata_binding_table_hash =
         container::metadata_binding_table_hash(&metadata_binding_evidence.bindings, fnv1a64_hex);
@@ -223,10 +225,12 @@ pub(crate) fn nsld_container_report(
         &compatibility_domain_table_hash,
         &external_import_table_hash,
         &backend_artifact_payload_table_hash,
+        &provider_dispatch.table_hash,
         &metadata_binding_table_hash,
         fnv1a64_hex,
     );
     let mut blockers = container_plan.blockers.clone();
+    blockers.extend(provider_dispatch.blockers.iter().cloned());
     blockers.extend(metadata_binding_evidence.blockers);
     let loader_blockers = container::loader_blockers(&external_imports, &blockers);
     let ready = container_plan.ready && blockers.is_empty();
@@ -254,6 +258,7 @@ pub(crate) fn nsld_container_report(
         &compatibility_domains,
         &external_imports,
         &backend_artifact_payloads,
+        &provider_dispatch.entries,
         &metadata_binding_evidence.bindings,
         &loader_readiness,
         &loader_blockers,
@@ -286,6 +291,11 @@ pub(crate) fn nsld_container_report(
         external_imports,
         backend_artifact_payload_table_hash,
         backend_artifact_payloads,
+        provider_dispatch_contract: provider_dispatch.contract,
+        provider_dispatch_validation_status: provider_dispatch.status,
+        provider_dispatch_table_hash: provider_dispatch.table_hash,
+        provider_dispatch_selected_set_hash: provider_dispatch.selected_set_hash,
+        provider_dispatches: provider_dispatch.entries,
         payload_size_bytes,
         payload_hash,
         payload_path: format!("{}.payload", container_plan.output_path),

@@ -61,6 +61,11 @@ pub(crate) struct NsldContainerReport {
     pub(crate) external_imports: Vec<NsldContainerExternalImport>,
     pub(crate) backend_artifact_payload_table_hash: String,
     pub(crate) backend_artifact_payloads: Vec<NsldContainerBackendArtifactPayload>,
+    pub(crate) provider_dispatch_contract: String,
+    pub(crate) provider_dispatch_validation_status: String,
+    pub(crate) provider_dispatch_table_hash: String,
+    pub(crate) provider_dispatch_selected_set_hash: Option<String>,
+    pub(crate) provider_dispatches: Vec<NsldContainerProviderDispatch>,
     pub(crate) payload_size_bytes: usize,
     pub(crate) payload_hash: String,
     pub(crate) output_path: String,
@@ -69,6 +74,17 @@ pub(crate) struct NsldContainerReport {
     pub(crate) container_section_table_hash: String,
     pub(crate) sections: Vec<NsldContainerSectionEntry>,
     pub(crate) blockers: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldContainerProviderDispatch {
+    pub(crate) dispatch_id: String,
+    pub(crate) package_id: String,
+    pub(crate) bundle_id: String,
+    pub(crate) provider_family: String,
+    pub(crate) runner_contract: String,
+    pub(crate) runner_adapter_contract: String,
+    pub(crate) runner_adapter_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

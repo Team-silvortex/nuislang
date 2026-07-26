@@ -126,6 +126,32 @@ pub(crate) fn nsld_final_executable_output_report_json(
                 .as_deref(),
         ),
         json_string_field(
+            "container_loader_provider_dispatch_status",
+            &report.container_loader_provider_dispatch_status,
+        ),
+        json_usize_field(
+            "container_loader_provider_dispatch_count",
+            report.container_loader_provider_dispatch_count,
+        ),
+        json_optional_string_field(
+            "container_loader_provider_dispatch_table_hash",
+            report
+                .container_loader_provider_dispatch_table_hash
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "container_loader_provider_dispatch_first_bundle_id",
+            report
+                .container_loader_provider_dispatch_first_bundle_id
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "container_loader_provider_dispatch_first_provider_family",
+            report
+                .container_loader_provider_dispatch_first_provider_family
+                .as_deref(),
+        ),
+        json_string_field(
             "first_payload_execution_status",
             &report.first_payload_execution_status,
         ),
@@ -180,6 +206,22 @@ pub(crate) fn nsld_final_executable_output_report_json(
         json_optional_string_field(
             "final_output_nsdb_handoff_error",
             report.final_output_nsdb_handoff_error.as_deref(),
+        ),
+        json_optional_string_field(
+            "final_output_nsdb_final_image_binding_proof_contract",
+            report
+                .final_output_nsdb_final_image_binding_proof_contract
+                .as_deref(),
+        ),
+        json_string_field(
+            "final_output_nsdb_final_image_binding_proof_status",
+            &report.final_output_nsdb_final_image_binding_proof_status,
+        ),
+        json_optional_string_field(
+            "final_output_nsdb_final_image_binding_proof_hash",
+            report
+                .final_output_nsdb_final_image_binding_proof_hash
+                .as_deref(),
         ),
         json_string_field(
             "final_output_nsdb_replay_contract",

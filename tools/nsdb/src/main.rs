@@ -4,6 +4,7 @@ mod cursor_lineage;
 mod cursor_lineage_repair_journal;
 mod digest_sha256;
 mod display;
+mod final_image_provider_dispatch;
 mod handoff;
 mod handoff_binding;
 mod hetero_trace;
@@ -174,13 +175,16 @@ fn run() -> Result<(), String> {
             cursor_output,
         } => {
             let manifest = resolve_manifest_input(&input)?;
+            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
+            let report = nsdb_inspect_report(&manifest, &plan, event_filter);
             if let Some(path) = cursor_input.as_deref() {
-                let loaded = crate::cursor::load_replay_cursor(path, &manifest)?;
+                let proof_hash = crate::handoff_binding::replay_identity_hash(
+                    &report.payload_execution_handoff.final_image_binding_proof,
+                )?;
+                let loaded = crate::cursor::load_replay_cursor(path, &manifest, proof_hash)?;
                 replay_control.resume_after_frame_id = loaded.resume_after_frame_id;
                 replay_control.resume_next_frame_id = loaded.resume_next_frame_id;
             }
-            let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
-            let report = nsdb_inspect_report(&manifest, &plan, event_filter);
             if let Some(path) = cursor_output.as_deref() {
                 let transcript = crate::transcript::build_replay_transcript_with_control(
                     &report,
@@ -206,7 +210,11 @@ fn run() -> Result<(), String> {
             let output_dir = manifest.parent().ok_or_else(|| {
                 format!("manifest `{}` has no output directory", manifest.display())
             })?;
-            let report = crate::cursor_lineage::repair_cursor_lineage(output_dir, &manifest)?;
+            let handoff = crate::handoff::read_payload_execution_handoff(output_dir);
+            let proof_hash =
+                crate::handoff_binding::replay_identity_hash(&handoff.final_image_binding_proof)?;
+            let report =
+                crate::cursor_lineage::repair_cursor_lineage(output_dir, &manifest, proof_hash)?;
             if json {
                 println!(
                     "{{\"tool\":\"nsdb\",\"kind\":\"cursor_lineage_repair\",\"contract\":\"{}\",\"status\":\"{}\",\"mutated\":{},\"lineage_mutated\":{},\"repair_journal_mutated\":{},\"cursor_path\":\"{}\",\"lineage_path\":\"{}\",\"archived_path\":{},\"repair_journal_path\":\"{}\",\"archived_repair_journal_path\":{},\"entry_count\":{},\"latest_hash\":\"{}\"}}",
@@ -708,6 +716,12 @@ mod tests {
                 .to_owned(),
             selected_provider_bundle_count: 1,
             selected_provider_bundle_set_hash: "fnv1a64:e9a82b052c861b93".to_owned(),
+            final_image_dispatch_authority_status: "verified".to_owned(),
+            final_image_dispatch_image_path: "out/nuis-app.nsb".to_owned(),
+            final_image_dispatch_count: 1,
+            final_image_dispatch_matched_count: 1,
+            final_image_dispatch_table_hash: "0x1234567890abcdef".to_owned(),
+            final_image_dispatch_selected_set_hash: "fnv1a64:e9a82b052c861b93".to_owned(),
             first_provider_runner_adapter_id: "coreml.apple-ane.real-device".to_owned(),
             first_provider_runner_adapter_capability_status: "registered-real-device".to_owned(),
             first_provider_runner_real_device_capable: true,

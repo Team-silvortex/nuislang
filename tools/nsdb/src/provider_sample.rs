@@ -118,6 +118,10 @@ fn provider_sample_record_summary(
         trace_id,
         provider,
         provider_family,
+        provider_bundle_package_id: toml_string_value(record, "provider_bundle_package_id")
+            .unwrap_or_else(|| "none".to_owned()),
+        provider_bundle_id: toml_string_value(record, "provider_bundle_id")
+            .unwrap_or_else(|| "none".to_owned()),
         requested_runner_contract: toml_string_value(record, "requested_runner_contract")
             .unwrap_or_else(|| "none".to_owned()),
         requested_runner_adapter_contract: toml_string_value(
@@ -132,6 +136,18 @@ fn provider_sample_record_summary(
             "requested_runner_adapter_capability_status",
         )
         .unwrap_or_else(|| "none".to_owned()),
+        provider_runner_contract: toml_string_value(record, "provider_runner_contract")
+            .or_else(|| toml_string_value(record, "requested_runner_contract"))
+            .unwrap_or_else(|| "none".to_owned()),
+        provider_runner_adapter_contract: toml_string_value(
+            record,
+            "provider_runner_adapter_contract",
+        )
+        .or_else(|| toml_string_value(record, "requested_runner_adapter_contract"))
+        .unwrap_or_else(|| "none".to_owned()),
+        provider_runner_adapter_id: toml_string_value(record, "provider_runner_adapter_id")
+            .or_else(|| toml_string_value(record, "requested_runner_adapter_id"))
+            .unwrap_or_else(|| "none".to_owned()),
         handoff_target: toml_string_value(record, "handoff_target")
             .unwrap_or_else(|| "none".to_owned()),
         sample_status: toml_string_value(record, "sample_status")

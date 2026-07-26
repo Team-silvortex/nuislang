@@ -8,6 +8,7 @@ use nuis_semantics::model::{
 pub struct NuisProjectManifest {
     pub name: String,
     pub entry: String,
+    pub packaging_mode: Option<String>,
     pub modules: Vec<String>,
     pub tests: Vec<String>,
     pub links: Vec<ProjectLink>,

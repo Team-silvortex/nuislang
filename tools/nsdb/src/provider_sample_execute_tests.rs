@@ -98,6 +98,11 @@ materialization_status = "provider-sample-materialized"
         fs::read_to_string(output_dir.join("nuis.nsdb.provider-output.data-host.toml")).unwrap();
 
     assert_eq!(report.status, "provider-output-payloads-ready");
+    assert_eq!(
+        report.final_image_dispatch_authority_status,
+        "pre-seal-acquisition"
+    );
+    assert_eq!(report.final_image_dispatch_count, 0);
     assert_eq!(report.output_payload_count, 1);
     assert_eq!(
         report.provider_bundle_registry_contract,

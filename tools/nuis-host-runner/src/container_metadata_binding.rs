@@ -9,6 +9,8 @@ use std::collections::BTreeSet;
 
 const SELECTED_SET_BINDING_ID: &str = "identity.selected-provider-bundle-set";
 const SELECTED_SET_CONTRACT: &str = "nuis-selected-provider-bundle-set-v1";
+const PROVIDER_DISPATCH_BINDING_ID: &str = "runtime.provider-dispatch-table";
+const PROVIDER_DISPATCH_CONTRACT: &str = "nuis-final-image-provider-dispatch-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct MetadataBinding {
@@ -29,6 +31,8 @@ pub(super) struct MetadataBindingSummary {
     pub(super) selected_set_contract: Option<String>,
     pub(super) selected_set_count: Option<usize>,
     pub(super) selected_set_hash: Option<String>,
+    pub(super) provider_dispatch_count: Option<usize>,
+    pub(super) provider_dispatch_hash: Option<String>,
     pub(super) blockers: Vec<String>,
 }
 
@@ -90,6 +94,9 @@ pub(super) fn scan_metadata_bindings(source: &str) -> MetadataBindingSummary {
     let selected = bindings
         .iter()
         .find(|binding| binding.binding_id == SELECTED_SET_BINDING_ID);
+    let provider_dispatch = bindings
+        .iter()
+        .find(|binding| binding.binding_id == PROVIDER_DISPATCH_BINDING_ID);
     if selected.is_some_and(|binding| {
         binding.contract != SELECTED_SET_CONTRACT
             || binding.value_count == 0
@@ -98,6 +105,15 @@ pub(super) fn scan_metadata_bindings(source: &str) -> MetadataBindingSummary {
             || !binding.required
     }) {
         blockers.push("container-loader:selected-provider-bundle-set-binding-invalid".to_owned());
+    }
+    if provider_dispatch.is_some_and(|binding| {
+        binding.contract != PROVIDER_DISPATCH_CONTRACT
+            || binding.value_count == 0
+            || !valid_table_hash(&binding.value_hash)
+            || binding.validation_status != "verified"
+            || !binding.required
+    }) {
+        blockers.push("container-loader:provider-dispatch-binding-invalid".to_owned());
     }
 
     MetadataBindingSummary {
@@ -117,6 +133,8 @@ pub(super) fn scan_metadata_bindings(source: &str) -> MetadataBindingSummary {
         selected_set_contract: selected.map(|binding| binding.contract.clone()),
         selected_set_count: selected.map(|binding| binding.value_count),
         selected_set_hash: selected.map(|binding| binding.value_hash.clone()),
+        provider_dispatch_count: provider_dispatch.map(|binding| binding.value_count),
+        provider_dispatch_hash: provider_dispatch.map(|binding| binding.value_hash.clone()),
         blockers,
     }
 }
@@ -131,6 +149,8 @@ impl MetadataBindingSummary {
             selected_set_contract: None,
             selected_set_count: None,
             selected_set_hash: None,
+            provider_dispatch_count: None,
+            provider_dispatch_hash: None,
             blockers: Vec::new(),
         }
     }
@@ -158,6 +178,12 @@ fn metadata_binding_table_hash(bindings: &[MetadataBinding]) -> String {
 fn valid_fnv1a64(value: &str) -> bool {
     value
         .strip_prefix("fnv1a64:")
+        .is_some_and(|hex| hex.len() == 16 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
+}
+
+fn valid_table_hash(value: &str) -> bool {
+    value
+        .strip_prefix("0x")
         .is_some_and(|hex| hex.len() == 16 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
 }
 

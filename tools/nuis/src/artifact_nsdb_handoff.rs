@@ -102,6 +102,14 @@ impl PersistedNsdbHandoffSummary {
         self.error.as_deref()
     }
 
+    pub(crate) fn final_image_binding_proof_status(&self) -> &str {
+        &self.final_image_binding_proof.verification_status
+    }
+
+    pub(crate) fn final_image_binding_proof_hash(&self) -> Option<&str> {
+        self.final_image_binding_proof.proof_hash.as_deref()
+    }
+
     pub(crate) fn provider_completion_count(&self) -> usize {
         self.provider_completion_count
     }
@@ -245,6 +253,12 @@ impl PersistedNsdbHandoffSummary {
             json_field(
                 &format!("{prefix}_final_image_binding_proof_verification_status"),
                 &self.final_image_binding_proof.verification_status,
+            ),
+            json_field(
+                &format!("{prefix}_final_image_binding_proof_next_action"),
+                crate::artifact_nsdb_handoff_binding::next_action(
+                    &self.final_image_binding_proof.verification_status,
+                ),
             ),
             json_usize_field(
                 &format!("{prefix}_provider_completion_count"),

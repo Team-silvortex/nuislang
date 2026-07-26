@@ -230,7 +230,16 @@ next_action = "handoff-payload-trace-to-nsdb"
     assert_eq!(completion.target, "metal:apple-silicon-gpu");
     assert_eq!(completion.status, "ready");
     let replay = crate::payload_execution_replay_summary(&output_dir);
-    assert_eq!(replay.status, "replay-evidence-ready");
+    assert_eq!(replay.status, "blocked");
+    assert_eq!(
+        replay.first_blocker.as_deref(),
+        Some("final-image-binding-proof:legacy-unbound")
+    );
+    assert_eq!(replay.next_action, "rebuild-final-output-binding-proof");
+    assert_eq!(
+        replay.final_image_binding_proof_next_action,
+        "rebuild-final-output-binding-proof"
+    );
     assert_eq!(replay.checkpoint_count, 2);
     assert_eq!(replay.replayable_checkpoint_count, 2);
     assert_eq!(replay.provider_completion_count, 1);

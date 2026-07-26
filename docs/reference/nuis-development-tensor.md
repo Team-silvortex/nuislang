@@ -922,9 +922,48 @@ observed proof before reporting ready; a regression also proves that updating
 the outer NSB hash cannot hide an inner binding mutation. Run-artifact now
 persists a canonical `nuis-final-image-binding-proof-v1` declaration. Nuis and
 Nsdb independently recompute its proof hash, Nsdb preserves it across handoff
-record merges, and replay blocks after selected-set mutation. The next
-continuity boundary is the direct Nsld final-output writer, whose proof-less
-handoffs remain readable but are classified as `legacy-unbound`.
+record merges, and replay blocks after selected-set mutation. The direct Nsld
+final-output writer now sends the same provider-neutral loader evidence through
+Nsdb's claim API; Nsdb computes the proof, rejects conflicting final-image
+identity, and Nsld final-output summaries mirror `verified` or
+`verified-empty`. Proof-less handoffs remain readable as `legacy-unbound`, but
+the public replay summary, concrete Nsdb replay plan/transcript, and Nuis's
+independent final-output closure block them with
+`rebuild-final-output-binding-proof`. Provider completion before final-image
+evidence remains a valid mergeable lifecycle intermediate, not replay-ready
+evidence. `nsdb-yir-replay-identity-v1` now carries the verified proof hash
+through debugger transcripts, persisted cursors, resume validation, and every
+cursor-lineage event. Nuis independently compares the handoff, cursor, and
+lineage identities through its cursor and lineage mirrors before exposing each
+surface as ready. The official PixelMagic graph now proves the complete
+transition: its provider-complete intermediate is blocked as `legacy-unbound`,
+the project-declared self-contained rebuild feeds the provider-neutral
+`nsld seal` frontdoor, and the resulting Metal/CoreML NSB upgrades the same
+handoff before three-frame cursor and lineage replay. Seal preflight rejects
+host-finalized packaging and incomplete provider manifests before any bounded
+stage runs; success performs exactly prepare, final pipeline, and publication.
+The sealed NSB now owns a provider-neutral
+`nuis-final-image-provider-dispatch-v1` table. Each ordered entry binds its
+package, bundle, provider family, runner contract, adapter contract, and
+adapter ID. The required `runtime.provider-dispatch-table` metadata binding
+places its count/hash under both the metadata root and complete container
+hash. Nsld's final-image loader independently extracts the complete capsule
+from actual NSB bytes, recomputes dispatch and selected-set hashes, and rejects
+adapter drift even when the sidecar remains unchanged. An explicit
+`# nuis-nsld-container-end-v1` marker replaces the former field-position
+capsule boundary. Host runner now independently recomputes the table and
+selected-set hashes, verifies both required bindings, exposes all entries, and
+blocks lifecycle handoff on drift. Nsdb owns a separate final-image parser:
+launcher-less work is explicitly `pre-seal-acquisition`, while an existing
+launcher makes missing or damaged NSB state fatal. Before launching a worker,
+Nsdb matches package, bundle, family, actual runner/adapter identity, and the
+registered runtime adapter against the final image. The official CoreML/Metal
+route executes again after seal and proves all selected bundles were
+authorized by the NSB. Mutable sidecars are now request-detail carriers rather
+than dispatch authority. The next continuity boundary is carrying the direct
+dispatch table hash and matched entry into provider completion, transcript,
+and replay cursor records. Acquisition and self-contained rebuild remain
+explicit Nuis orchestration rather than linker policy.
 The contract keeps Nsld container table hashes in `0x<16-hex>` form and uses
 `fnv1a64:<16-hex>` for selected-set and proof hashes; independent consumers
 validate those field-specific encodings rather than conflating them.

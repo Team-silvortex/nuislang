@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 mod digest_sha256;
+mod final_image_provider_dispatch;
 mod handoff;
 mod handoff_binding;
 mod model;
@@ -78,8 +79,8 @@ mod provider_worker_transport;
 mod provider_worker_transport_unix;
 
 pub use model::{
-    PayloadExecutionHandoffPersistSummary, PayloadExecutionHandoffRecord,
-    PayloadExecutionProviderCompletion,
+    FinalImageBindingProofClaim, PayloadExecutionHandoffPersistSummary,
+    PayloadExecutionHandoffRecord, PayloadExecutionProviderCompletion,
 };
 pub use provider_sample_execute::{execute_provider_samples, ProviderSampleExecuteReport};
 pub use provider_sample_materialize::{
@@ -94,10 +95,22 @@ pub fn persist_payload_execution_handoff_record(
     handoff::persist_payload_execution_handoff_record(output_dir, source, record)
 }
 
+pub fn persist_payload_execution_handoff_record_with_final_image_binding(
+    output_dir: &std::path::Path,
+    source: &str,
+    record: PayloadExecutionHandoffRecord,
+    binding: FinalImageBindingProofClaim,
+) -> Result<PayloadExecutionHandoffPersistSummary, String> {
+    handoff::persist_payload_execution_handoff_record_with_final_image_binding(
+        output_dir, source, record, binding,
+    )
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PayloadExecutionReplaySummary {
     pub contract: &'static str,
     pub status: String,
+    pub next_action: String,
     pub checkpoint_count: usize,
     pub replayable_checkpoint_count: usize,
     pub provider_completion_count: usize,
@@ -118,6 +131,7 @@ pub struct PayloadExecutionReplaySummary {
     pub final_image_binding_proof_contract: Option<String>,
     pub final_image_binding_proof_status: String,
     pub final_image_binding_proof_hash: Option<String>,
+    pub final_image_binding_proof_next_action: String,
     pub first_blocker: Option<String>,
 }
 
@@ -158,6 +172,8 @@ pub fn payload_execution_replay_summary(
         Some("payload-execution-handoff-missing".to_owned())
     } else if handoff.status != "ready" {
         Some(format!("payload-execution-handoff:{}", handoff.status))
+    } else if handoff.final_image_binding_proof.proof_status == "legacy-unbound" {
+        Some("final-image-binding-proof:legacy-unbound".to_owned())
     } else if handoff.hetero_execution_closure_status != "none"
         && (handoff.hetero_execution_closure_status != "closed"
             || handoff.hetero_execution_closure_ready != "true")
@@ -182,13 +198,26 @@ pub fn payload_execution_replay_summary(
     } else {
         None
     };
+    let replay_ready = first_blocker.is_none();
+    let final_image_binding_proof_next_action =
+        handoff_binding::next_action(&handoff.final_image_binding_proof.proof_status).to_owned();
     PayloadExecutionReplaySummary {
         contract: "nsdb-payload-execution-replay-plan-v1",
-        status: if first_blocker.is_none() {
+        status: if replay_ready {
             "replay-evidence-ready".to_owned()
         } else {
             "blocked".to_owned()
         },
+        next_action: if replay_ready {
+            "replay-nsdb-payload-execution"
+        } else if handoff.available
+            && handoff.final_image_binding_proof.proof_status == "legacy-unbound"
+        {
+            "rebuild-final-output-binding-proof"
+        } else {
+            "resolve-payload-execution-replay"
+        }
+        .to_owned(),
         checkpoint_count,
         replayable_checkpoint_count,
         provider_completion_count: provider_completions.len(),
@@ -233,6 +262,7 @@ pub fn payload_execution_replay_summary(
         final_image_binding_proof_hash: (handoff.final_image_binding_proof.proof_hash_actual
             != "none")
             .then(|| handoff.final_image_binding_proof.proof_hash_actual.clone()),
+        final_image_binding_proof_next_action,
         first_blocker,
     }
 }
@@ -241,7 +271,8 @@ pub fn payload_execution_replay_summary(
 mod tests {
     use super::{
         payload_execution_replay_summary, persist_payload_execution_handoff_record,
-        PayloadExecutionHandoffRecord,
+        persist_payload_execution_handoff_record_with_final_image_binding,
+        FinalImageBindingProofClaim, PayloadExecutionHandoffRecord,
     };
     use std::{fs, path::Path};
 
@@ -261,6 +292,14 @@ ready_record_count = 1
 first_trace_id = "payload-trace:container-loader:main"
 first_status = "ready"
 first_next_action = "handoff-payload-trace-to-nsdb"
+final_image_binding_proof_contract = "nuis-final-image-binding-proof-v1"
+final_image_metadata_binding_count = 0
+final_image_metadata_binding_table_hash = "0xcbf29ce484222325"
+final_image_metadata_binding_validation_status = "not-applicable"
+final_image_selected_provider_bundle_set_contract = ""
+final_image_selected_provider_bundle_count = 0
+final_image_selected_provider_bundle_set_hash = ""
+final_image_binding_proof_hash = "fnv1a64:981b10a68f4e3dd7"
 
 [[records]]
 trace_id = "payload-trace:container-loader:main"
@@ -281,6 +320,8 @@ next_action = "handoff-payload-trace-to-nsdb"
 
         assert_eq!(summary.contract, "nsdb-payload-execution-replay-plan-v1");
         assert_eq!(summary.status, "replay-evidence-ready");
+        assert_eq!(summary.next_action, "replay-nsdb-payload-execution");
+        assert_eq!(summary.final_image_binding_proof_next_action, "none");
         assert_eq!(summary.checkpoint_count, 1);
         assert_eq!(summary.replayable_checkpoint_count, 1);
         assert_eq!(summary.first_blocker, None);
@@ -305,6 +346,14 @@ hetero_execution_closure_status = "host-runner-pending"
 hetero_execution_closure_ready = "false"
 hetero_execution_closure_first_blocker = "host-runner-backend-artifact-payload:not-observed"
 hetero_execution_closure_next_action = "run-host-runner-payload-probe"
+final_image_binding_proof_contract = "nuis-final-image-binding-proof-v1"
+final_image_metadata_binding_count = 0
+final_image_metadata_binding_table_hash = "0xcbf29ce484222325"
+final_image_metadata_binding_validation_status = "not-applicable"
+final_image_selected_provider_bundle_set_contract = ""
+final_image_selected_provider_bundle_count = 0
+final_image_selected_provider_bundle_set_hash = ""
+final_image_binding_proof_hash = "fnv1a64:981b10a68f4e3dd7"
 
 [[records]]
 trace_id = "payload-trace:container-loader:main"
@@ -422,6 +471,74 @@ next_action = "handoff-payload-trace-to-nsdb"
             rejected.first_blocker.as_deref(),
             Some("payload-execution-handoff:final-image-binding-proof-mismatch")
         );
+    }
+
+    #[test]
+    fn binding_claim_write_is_idempotent_and_rejects_final_image_conflict() {
+        let dir = std::env::temp_dir().join(format!(
+            "nsdb-final-image-binding-claim-{}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let record = PayloadExecutionHandoffRecord {
+            trace_id: "payload-trace:container-loader:main".to_owned(),
+            status: "ready".to_owned(),
+            execution_phase: "container-loader-handoff".to_owned(),
+            target: "container-loader".to_owned(),
+            entry_symbol: "main".to_owned(),
+            entry_kind: "lifecycle-bootstrap".to_owned(),
+            entry_section_id: "sec0000.compiled-artifact".to_owned(),
+            provider_family: String::new(),
+            output_contract: String::new(),
+            output_evidence: String::new(),
+            first_blocker: String::new(),
+            next_action: "handoff-payload-trace-to-nsdb".to_owned(),
+        };
+        let claim = FinalImageBindingProofClaim {
+            binding_count: 1,
+            binding_table_hash: "0x1111111111111111".to_owned(),
+            validation_status: "verified".to_owned(),
+            selected_set_contract: Some("nuis-selected-provider-bundle-set-v1".to_owned()),
+            selected_set_count: Some(2),
+            selected_set_hash: Some("fnv1a64:2222222222222222".to_owned()),
+        };
+        persist_payload_execution_handoff_record_with_final_image_binding(
+            &dir,
+            "claim-test",
+            record.clone(),
+            claim.clone(),
+        )
+        .unwrap();
+        persist_payload_execution_handoff_record_with_final_image_binding(
+            &dir,
+            "claim-test",
+            record.clone(),
+            claim.clone(),
+        )
+        .unwrap();
+        assert_eq!(
+            payload_execution_replay_summary(&dir).final_image_binding_proof_status,
+            "verified"
+        );
+
+        let mut conflicting = claim;
+        conflicting.binding_table_hash = "0x3333333333333333".to_owned();
+        let error = persist_payload_execution_handoff_record_with_final_image_binding(
+            &dir,
+            "claim-test",
+            record,
+            conflicting,
+        )
+        .unwrap_err();
+        assert_eq!(
+            error,
+            "final image binding proof conflicts with existing handoff"
+        );
+        assert_eq!(
+            payload_execution_replay_summary(&dir).final_image_binding_proof_status,
+            "verified"
+        );
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

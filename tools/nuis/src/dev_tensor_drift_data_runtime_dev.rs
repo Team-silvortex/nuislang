@@ -441,9 +441,12 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         id: "nsdb-final-image-binding-replay-verifier",
         path: "tools/nsdb/src/handoff_binding.rs",
         required_patterns: &[
+            "from_claim",
             "parse_and_verify",
             "nuis-final-image-binding-proof-v1",
             "proof_hash_actual",
+            "same_proof",
+            "rebuild-final-output-binding-proof",
             "independently_verifies_and_rejects_tampered_binding_proof",
         ],
     },
@@ -754,6 +757,16 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "lib_tests_execution.rs",
             "mod artifact_tests",
             "mod execution_tests",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuisc-project-packaging-mode-contract",
+        path: "tools/nuisc/src/project/manifest.rs",
+        required_patterns: &[
+            "packaging_mode",
+            "parse_optional_string",
+            "project_manifest_parses_packaging_mode",
+            "nuis-self-contained-image",
         ],
     },
 ];

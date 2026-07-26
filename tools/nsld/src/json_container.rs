@@ -110,6 +110,47 @@ pub(crate) fn nsld_container_report_json(report: &NsldContainerReport) -> String
                 .collect::<Vec<_>>()
                 .join(",")
         ),
+        json_string_field(
+            "provider_dispatch_contract",
+            &report.provider_dispatch_contract,
+        ),
+        json_string_field(
+            "provider_dispatch_validation_status",
+            &report.provider_dispatch_validation_status,
+        ),
+        json_usize_field("provider_dispatch_count", report.provider_dispatches.len()),
+        json_string_field(
+            "provider_dispatch_table_hash",
+            &report.provider_dispatch_table_hash,
+        ),
+        json_optional_string_field(
+            "provider_dispatch_selected_set_hash",
+            report.provider_dispatch_selected_set_hash.as_deref(),
+        ),
+        format!(
+            "\"provider_dispatches\":[{}]",
+            report
+                .provider_dispatches
+                .iter()
+                .map(|dispatch| format!(
+                    "{{{}}}",
+                    [
+                        json_string_field("dispatch_id", &dispatch.dispatch_id),
+                        json_string_field("package_id", &dispatch.package_id),
+                        json_string_field("bundle_id", &dispatch.bundle_id),
+                        json_string_field("provider_family", &dispatch.provider_family),
+                        json_string_field("runner_contract", &dispatch.runner_contract),
+                        json_string_field(
+                            "runner_adapter_contract",
+                            &dispatch.runner_adapter_contract
+                        ),
+                        json_string_field("runner_adapter_id", &dispatch.runner_adapter_id),
+                    ]
+                    .join(",")
+                ))
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
         json_string_field("container_layout_hash", &report.container_layout_hash),
         json_string_field("container_hash", &report.container_hash),
         json_string_field("loader_readiness", &report.loader_readiness),

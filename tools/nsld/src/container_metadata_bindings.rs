@@ -1,5 +1,8 @@
 use super::{
     container::NsldContainerMetadataBinding,
+    container_provider_dispatch::{
+        provider_dispatch_evidence, PROVIDER_DISPATCH_BINDING_ID, PROVIDER_DISPATCH_CONTRACT,
+    },
     final_executable_provider_sample::nsld_device_provider_sample_evidence,
 };
 
@@ -46,15 +49,37 @@ pub(crate) fn container_metadata_binding_evidence(
         return missing_selected_set_field("value-hash");
     };
 
+    let dispatch = provider_dispatch_evidence(output_dir);
+    if !dispatch.blockers.is_empty() {
+        return NsldContainerMetadataBindingEvidence {
+            bindings: Vec::new(),
+            blockers: dispatch
+                .blockers
+                .into_iter()
+                .map(|blocker| format!("metadata-binding:{PROVIDER_DISPATCH_BINDING_ID}:{blocker}"))
+                .collect(),
+        };
+    }
+
     NsldContainerMetadataBindingEvidence {
-        bindings: vec![NsldContainerMetadataBinding {
-            binding_id: SELECTED_PROVIDER_BUNDLE_BINDING_ID.to_owned(),
-            contract,
-            value_count,
-            value_hash,
-            validation_status: "verified".to_owned(),
-            required: true,
-        }],
+        bindings: vec![
+            NsldContainerMetadataBinding {
+                binding_id: SELECTED_PROVIDER_BUNDLE_BINDING_ID.to_owned(),
+                contract,
+                value_count,
+                value_hash,
+                validation_status: "verified".to_owned(),
+                required: true,
+            },
+            NsldContainerMetadataBinding {
+                binding_id: PROVIDER_DISPATCH_BINDING_ID.to_owned(),
+                contract: PROVIDER_DISPATCH_CONTRACT.to_owned(),
+                value_count: dispatch.entries.len(),
+                value_hash: dispatch.table_hash,
+                validation_status: "verified".to_owned(),
+                required: true,
+            },
+        ],
         blockers: Vec::new(),
     }
 }

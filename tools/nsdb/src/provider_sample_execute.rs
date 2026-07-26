@@ -9,6 +9,9 @@ use crate::provider_worker_lease::{ProviderWorkerAdapterLaunch, ProviderWorkerLe
 #[cfg(unix)]
 use crate::provider_worker_summary::bind_worker_output;
 use crate::{
+    final_image_provider_dispatch::{
+        final_image_provider_dispatch_authority, validate_provider_records_against_final_image,
+    },
     provider_edge_transport::ProviderEdgeTransportReceipt,
     provider_graph_output::{
         bind_output_binding_summary, CompletedProviderOutput, CompletedProviderOutputs,
@@ -63,6 +66,12 @@ pub struct ProviderSampleExecuteReport {
     pub selected_provider_bundle_set_contract: String,
     pub selected_provider_bundle_count: usize,
     pub selected_provider_bundle_set_hash: String,
+    pub final_image_dispatch_authority_status: String,
+    pub final_image_dispatch_image_path: String,
+    pub final_image_dispatch_count: usize,
+    pub final_image_dispatch_matched_count: usize,
+    pub final_image_dispatch_table_hash: String,
+    pub final_image_dispatch_selected_set_hash: String,
     pub first_provider_runner_adapter_id: String,
     pub first_provider_runner_adapter_capability_status: String,
     pub first_provider_runner_real_device_capable: bool,
@@ -122,6 +131,23 @@ pub fn execute_provider_samples(
             provider_family_filter.is_none_or(|family| record.provider_family == family)
         })
         .collect::<Vec<_>>();
+    let final_image_dispatch = final_image_provider_dispatch_authority(output_dir);
+    if !final_image_dispatch.blockers.is_empty() {
+        return Err(final_image_dispatch.blockers.join(", "));
+    }
+    let final_image_dispatch_matched_count =
+        validate_provider_records_against_final_image(&final_image_dispatch, &matched_records)?;
+    if final_image_dispatch.available {
+        for record in &matched_records {
+            let registered = select_provider_runner_adapter(&record.provider_family);
+            if registered.adapter_id != record.provider_runner_adapter_id {
+                return Err(format!(
+                    "final-image-dispatch:registered-adapter-drift:{}",
+                    record.provider_family
+                ));
+            }
+        }
+    }
     let first_provider_boundary = matched_records
         .first()
         .map(|record| {
@@ -284,6 +310,18 @@ pub fn execute_provider_samples(
             .unwrap_or(0),
         selected_provider_bundle_set_hash: selected_provider_bundle_set
             .map(|set| set.hash)
+            .unwrap_or_else(|| "none".to_owned()),
+        final_image_dispatch_authority_status: final_image_dispatch.status,
+        final_image_dispatch_image_path: final_image_dispatch
+            .image_path
+            .unwrap_or_else(|| "none".to_owned()),
+        final_image_dispatch_count: final_image_dispatch.entries.len(),
+        final_image_dispatch_matched_count,
+        final_image_dispatch_table_hash: final_image_dispatch
+            .table_hash
+            .unwrap_or_else(|| "none".to_owned()),
+        final_image_dispatch_selected_set_hash: final_image_dispatch
+            .selected_set_hash
             .unwrap_or_else(|| "none".to_owned()),
         first_provider_runner_adapter_id: first_provider_boundary.1,
         first_provider_runner_adapter_capability_status: first_provider_boundary.2,

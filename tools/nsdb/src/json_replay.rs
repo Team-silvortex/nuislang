@@ -25,6 +25,7 @@ pub(crate) fn nsdb_replay_plan_json(report: &NsdbInspectReport) -> String {
         json_string_field("kind", "nsdb_payload_execution_replay_plan"),
         json_string_field("manifest", &report.manifest),
         json_string_field("replay_protocol", plan.protocol),
+        json_string_field("replay_next_action", &plan.next_action),
         json_string_field(
             "replay_event_query_contract",
             "nsdb-payload-execution-event-query-v1",

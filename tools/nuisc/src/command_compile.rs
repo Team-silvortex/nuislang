@@ -89,11 +89,17 @@ pub(crate) fn run_compile(
     target: Option<String>,
     packaging_mode: Option<String>,
 ) -> Result<(), String> {
+    let resolved = resolve_compile_input(&input)?;
     let requested_packaging_mode = packaging_mode
         .as_deref()
+        .or_else(|| {
+            resolved
+                .project
+                .as_ref()
+                .and_then(|project| project.manifest.packaging_mode.as_deref())
+        })
         .map(validate_packaging_mode)
         .transpose()?;
-    let resolved = resolve_compile_input(&input)?;
     let cpu_target = aot::resolve_cpu_build_target(
         Path::new("nustar-packages"),
         resolved

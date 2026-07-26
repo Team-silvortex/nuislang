@@ -96,16 +96,18 @@ fn provider_family_artifact_component(provider_family: &str) -> String {
 
 #[path = "official_galaxy_hetero_smoke/build.rs"]
 mod build;
+#[path = "official_galaxy_hetero_smoke/final_image.rs"]
+mod final_image;
 #[path = "official_galaxy_hetero_smoke/provider_execution_evidence.rs"]
 mod provider_execution_evidence;
 #[path = "official_galaxy_hetero_smoke/replay.rs"]
 mod replay;
 
 use build::assert_official_galaxy_hetero_build;
+use final_image::finalize_official_hetero;
 use provider_execution_evidence::{
     assert_provider_bundle_audit_evidence, assert_provider_execution_evidence,
 };
-use replay::assert_multi_checkpoint_replay_resume;
 
 #[test]
 fn official_galaxy_hetero_projects_emit_shader_and_kernel_artifacts() {

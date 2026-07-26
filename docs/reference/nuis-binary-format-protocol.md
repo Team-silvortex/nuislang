@@ -76,8 +76,64 @@ contract, binding count, binding-table hash, validation status, and optional
 selected-set contract/count/hash. Nuis and Nsdb implement separate parsers and
 hash calculations. Nsdb preserves the proof when completion records are
 merged, exposes its status through inspect/replay summaries, and blocks replay
-when any bound value drifts. Older handoffs without the declaration remain
-readable as `legacy-unbound`; they are never reported as verified.
+when any bound value drifts. Nsld's direct final-output writer supplies the
+same loader-observed fields through the provider-neutral
+`FinalImageBindingProofClaim` API; Nsdb owns proof construction and refuses to
+replace an existing modern proof with a different final-image identity. Older
+handoffs without the declaration remain readable as `legacy-unbound`; they are
+never reported as verified and cannot enter either the public replay summary or
+the concrete Nsdb replay plan/transcript. Nuis independently applies the same
+gate at final-output closure. Every blocked legacy record reports
+`rebuild-final-output-binding-proof`, so migration requires rebuilding evidence
+from the final output rather than mutating historical state in place.
+
+Replay identity is now explicit under `nsdb-yir-replay-identity-v1`. Debugger
+transcripts expose the verified `final_image_binding_proof_hash`; persisted
+replay cursors require it; cursor loading compares it with the current inspect
+report before consuming frames; and the lineage header plus every lineage
+event repeat the same identity. Nuis performs a separate handoff/cursor/lineage
+verification: its cursor mirror compares handoff and cursor before advertising
+`debug-resume`, and its lineage mirror additionally validates every lineage
+claim. A provider completion handoff created before final-image assembly
+therefore remains inspectable but cannot create a replay cursor.
+
+The official PixelMagic route now crosses that continuity boundary. It first
+produces a provider-complete but non-replayable acquisition artifact, then
+rebuilds according to the project's `packaging_mode =
+"nuis-self-contained-image"` declaration. The provider-neutral `nsld seal`
+command verifies that any present provider sample manifest is complete and
+that its selected set is valid before running its fixed three stages: prepare,
+final pipeline, and final-output publication. Those stages embed the open
+selected-provider set, derive the proof from the final loader view, and upgrade
+the same handoff. Multi-frame replay and cursor lineage become ready only after
+this seal. The remaining boundary is post-seal runtime dispatch whose
+authority is the final image itself; acquisition and rebuild still remain
+separate Nuis orchestration steps.
+
+The container now embeds an ordered
+`nuis-final-image-provider-dispatch-v1` table. Entries are provider-neutral and
+bind dispatch ID, package ID, bundle ID, provider family, runner contract,
+runner-adapter contract, and runner-adapter ID. The required metadata binding
+`runtime.provider-dispatch-table` carries its count and canonical FNV hash;
+that binding participates in the metadata root and complete container hash.
+The loader scans the actual NSB payload, parses the table, recomputes both its
+hash and the selected-set hash, and cross-checks both required bindings. It
+therefore rejects adapter or provider identity drift independently of mutable
+build sidecars. The textual container capsule ends with
+`# nuis-nsld-container-end-v1`; consumers must not infer its boundary from the
+position of an ordinary top-level field.
+
+Host runner and Nsdb now implement independent consumers of this table.
+Host-runner exposes the complete ordered entries and rejects lifecycle handoff
+when the table, selected set, or required binding drifts. Nsdb distinguishes a
+launcher-less `pre-seal-acquisition` phase from final execution. Once a
+launcher exists, it validates the actual NSB and refuses fallback; every
+sidecar record must match the image's package, bundle, provider family, actual
+runner contract, adapter contract, and adapter ID before a provider worker is
+started. The selected runtime registry adapter must match as well. Sidecars
+therefore carry request payload details but no longer own dispatch selection.
+The next protocol addition is carrying the verified dispatch table hash and
+matched entry directly in provider completion and replay records.
 The embedded Nsld binding-table hash keeps the container protocol spelling
 `0x<16-hex>`, while selected-set and handoff-proof hashes use
 `fnv1a64:<16-hex>`. Consumers validate each field against its own contract

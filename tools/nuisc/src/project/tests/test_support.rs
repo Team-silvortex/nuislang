@@ -58,6 +58,7 @@ pub(super) fn loaded_project_fixture(
         manifest: NuisProjectManifest {
             name: name.to_owned(),
             entry: "main.ns".to_owned(),
+            packaging_mode: None,
             modules: modules.iter().map(|(path, _)| (*path).to_owned()).collect(),
             tests: vec![],
             links: vec![],

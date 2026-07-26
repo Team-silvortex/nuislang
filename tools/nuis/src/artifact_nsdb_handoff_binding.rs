@@ -82,6 +82,14 @@ pub(crate) fn independently_verify(source: &str) -> PersistedFinalImageBindingPr
     }
 }
 
+pub(crate) fn next_action(status: &str) -> &'static str {
+    match status {
+        "verified" | "verified-empty" => "none",
+        "legacy-unbound" => "rebuild-final-output-binding-proof",
+        _ => "repair-final-image-binding-proof",
+    }
+}
+
 fn canonical_hash(
     count: usize,
     table_hash: &str,

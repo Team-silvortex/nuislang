@@ -410,6 +410,15 @@ pub(crate) fn nsld_final_executable_output_report(
             .selected_provider_bundle_count,
         container_loader_selected_provider_bundle_set_hash: container_loader_evidence
             .selected_provider_bundle_set_hash,
+        container_loader_provider_dispatch_status: container_loader_evidence
+            .provider_dispatch_status,
+        container_loader_provider_dispatch_count: container_loader_evidence.provider_dispatch_count,
+        container_loader_provider_dispatch_table_hash: container_loader_evidence
+            .provider_dispatch_table_hash,
+        container_loader_provider_dispatch_first_bundle_id: container_loader_evidence
+            .provider_dispatch_first_bundle_id,
+        container_loader_provider_dispatch_first_provider_family: container_loader_evidence
+            .provider_dispatch_first_provider_family,
         first_payload_execution_status: first_payload_execution.status,
         first_payload_execution_ready: first_payload_execution.ready,
         first_payload_execution_target: first_payload_execution.target,
@@ -427,6 +436,9 @@ pub(crate) fn nsld_final_executable_output_report(
         final_output_nsdb_handoff_ready_record_count: 0,
         final_output_nsdb_handoff_first_trace_id: None,
         final_output_nsdb_handoff_error: None,
+        final_output_nsdb_final_image_binding_proof_contract: None,
+        final_output_nsdb_final_image_binding_proof_status: "legacy-unbound".to_owned(),
+        final_output_nsdb_final_image_binding_proof_hash: None,
         final_output_nsdb_replay_contract: "nsdb-payload-execution-replay-plan-v1".to_owned(),
         final_output_nsdb_replay_ready: nsdb_replay_ready,
         final_output_nsdb_replay_status: nsdb_replay_status.clone(),

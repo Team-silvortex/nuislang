@@ -127,6 +127,10 @@ pub(crate) enum Command {
         input: PathBuf,
         json: bool,
     },
+    Seal {
+        input: PathBuf,
+        json: bool,
+    },
     FinalExecutableLauncherManifest {
         input: PathBuf,
         json: bool,

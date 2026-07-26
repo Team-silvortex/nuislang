@@ -8,6 +8,7 @@ use crate::cursor_lineage_repair_journal as repair_journal;
 use crate::{cursor::persist_validated_content_atomically, provider_sample_payload::fnv1a64_hex};
 
 const LINEAGE_PROTOCOL: &str = "nsdb-yir-replay-cursor-lineage-v1";
+const IDENTITY_CONTRACT: &str = "nsdb-yir-replay-identity-v1";
 const LINEAGE_LIMIT: usize = 8;
 const CURSOR_FILE_NAME: &str = "nuis.nsdb.replay-cursor.toml";
 
@@ -34,11 +35,13 @@ struct CursorLineageEntry {
     current_hash: String,
     after_frame_id: String,
     next_frame_id: String,
+    final_image_binding_proof_hash: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct CursorLineage {
     cursor_path: String,
+    final_image_binding_proof_hash: String,
     entries: Vec<CursorLineageEntry>,
 }
 
@@ -48,6 +51,7 @@ pub(super) fn record_cursor_lineage(
     current_content: &str,
     after_frame_id: &str,
     next_frame_id: &str,
+    final_image_binding_proof_hash: &str,
 ) -> Result<(), String> {
     let sidecar_path = cursor_lineage_path(cursor_path)?;
     let cursor_path_text = cursor_path.display().to_string();
@@ -56,9 +60,13 @@ pub(super) fn record_cursor_lineage(
     } else {
         CursorLineage {
             cursor_path: cursor_path_text.clone(),
+            final_image_binding_proof_hash: final_image_binding_proof_hash.to_owned(),
             entries: Vec::new(),
         }
     };
+    if lineage.final_image_binding_proof_hash != final_image_binding_proof_hash {
+        return Err("cursor lineage belongs to another final image binding proof".to_owned());
+    }
     let previous_hash = previous_content
         .map(|content| fnv1a64_hex(content.as_bytes()))
         .unwrap_or_else(|| "none".to_owned());
@@ -81,6 +89,7 @@ pub(super) fn record_cursor_lineage(
         current_hash: fnv1a64_hex(current_content.as_bytes()),
         after_frame_id: after_frame_id.to_owned(),
         next_frame_id: next_frame_id.to_owned(),
+        final_image_binding_proof_hash: final_image_binding_proof_hash.to_owned(),
     });
     if lineage.entries.len() > LINEAGE_LIMIT {
         lineage
@@ -96,6 +105,7 @@ pub(super) fn record_cursor_lineage(
 pub(super) fn repair_cursor_lineage(
     output_dir: &Path,
     manifest: &Path,
+    final_image_binding_proof_hash: &str,
 ) -> Result<CursorLineageRepairReport, String> {
     let cursor_path = output_dir.join(CURSOR_FILE_NAME);
     let cursor_content = fs::read_to_string(&cursor_path).map_err(|error| {
@@ -104,7 +114,8 @@ pub(super) fn repair_cursor_lineage(
             cursor_path.display()
         )
     })?;
-    let control = crate::cursor::load_replay_cursor(&cursor_path, manifest)?;
+    let control =
+        crate::cursor::load_replay_cursor(&cursor_path, manifest, final_image_binding_proof_hash)?;
     let after_frame_id = control
         .resume_after_frame_id
         .as_deref()
@@ -118,10 +129,10 @@ pub(super) fn repair_cursor_lineage(
     let expected_cursor_path = cursor_path.display().to_string();
     let lineage = load_cursor_lineage(&lineage_path, &expected_cursor_path).ok();
     let lineage_ready = lineage.as_ref().is_some_and(|lineage| {
-        lineage
-            .entries
-            .last()
-            .is_some_and(|entry| entry.current_hash == current_hash)
+        lineage.entries.last().is_some_and(|entry| {
+            entry.current_hash == current_hash
+                && entry.final_image_binding_proof_hash == final_image_binding_proof_hash
+        })
     });
     let repair_preflight = repair_journal::preflight(output_dir, &lineage_path)?;
     if lineage_ready {
@@ -183,6 +194,7 @@ pub(super) fn repair_cursor_lineage(
         &cursor_content,
         after_frame_id,
         next_frame_id,
+        final_image_binding_proof_hash,
     )?;
     let rebuilt = load_cursor_lineage(&lineage_path, &expected_cursor_path)?;
     repair_journal::record(
@@ -267,9 +279,12 @@ fn cursor_lineage_path(cursor_path: &Path) -> Result<PathBuf, String> {
 fn render_cursor_lineage(lineage: &CursorLineage) -> String {
     let mut output = format!(
         "protocol = \"{LINEAGE_PROTOCOL}\"\n\
+         identity_contract = \"{IDENTITY_CONTRACT}\"\n\
+         final_image_binding_proof_hash = \"{}\"\n\
          cursor_path = \"{}\"\n\
          entry_limit = {LINEAGE_LIMIT}\n\
          entry_count = {}\n",
+        lineage.final_image_binding_proof_hash,
         escape_toml(&lineage.cursor_path),
         lineage.entries.len()
     );
@@ -280,12 +295,14 @@ fn render_cursor_lineage(lineage: &CursorLineage) -> String {
              previous_hash = \"{}\"\n\
              current_hash = \"{}\"\n\
              after_frame_id = \"{}\"\n\
-             next_frame_id = \"{}\"\n",
+             next_frame_id = \"{}\"\n\
+             final_image_binding_proof_hash = \"{}\"\n",
             entry.sequence,
             entry.previous_hash,
             entry.current_hash,
             escape_toml(&entry.after_frame_id),
             escape_toml(&entry.next_frame_id),
+            entry.final_image_binding_proof_hash,
         ));
     }
     output
@@ -334,10 +351,23 @@ fn parse_cursor_lineage(source: &str, expected_cursor_path: &str) -> Result<Curs
     }
     require_exact_keys(
         &header,
-        &["protocol", "cursor_path", "entry_limit", "entry_count"],
+        &[
+            "protocol",
+            "identity_contract",
+            "final_image_binding_proof_hash",
+            "cursor_path",
+            "entry_limit",
+            "entry_count",
+        ],
     )?;
     require_value(&header, "protocol", LINEAGE_PROTOCOL)?;
+    require_value(&header, "identity_contract", IDENTITY_CONTRACT)?;
     require_value(&header, "cursor_path", expected_cursor_path)?;
+    let final_image_binding_proof_hash =
+        field(&header, "final_image_binding_proof_hash")?.to_owned();
+    if !is_final_image_proof_hash(&final_image_binding_proof_hash) {
+        return Err("final_image_binding_proof_hash must be an FNV-1a64 hash".to_owned());
+    }
     require_value(&header, "entry_limit", &LINEAGE_LIMIT.to_string())?;
     let declared_count = field(&header, "entry_count")?
         .parse::<usize>()
@@ -348,9 +378,10 @@ fn parse_cursor_lineage(source: &str, expected_cursor_path: &str) -> Result<Curs
             entries.len()
         ));
     }
-    validate_lineage_entries(&entries)?;
+    validate_lineage_entries(&entries, &final_image_binding_proof_hash)?;
     Ok(CursorLineage {
         cursor_path: expected_cursor_path.to_owned(),
+        final_image_binding_proof_hash,
         entries,
     })
 }
@@ -364,6 +395,7 @@ fn parse_lineage_entry(fields: BTreeMap<String, String>) -> Result<CursorLineage
             "current_hash",
             "after_frame_id",
             "next_frame_id",
+            "final_image_binding_proof_hash",
         ],
     )?;
     Ok(CursorLineageEntry {
@@ -374,16 +406,24 @@ fn parse_lineage_entry(fields: BTreeMap<String, String>) -> Result<CursorLineage
         current_hash: field(&fields, "current_hash")?.to_owned(),
         after_frame_id: field(&fields, "after_frame_id")?.to_owned(),
         next_frame_id: field(&fields, "next_frame_id")?.to_owned(),
+        final_image_binding_proof_hash: field(&fields, "final_image_binding_proof_hash")?
+            .to_owned(),
     })
 }
 
-fn validate_lineage_entries(entries: &[CursorLineageEntry]) -> Result<(), String> {
+fn validate_lineage_entries(
+    entries: &[CursorLineageEntry],
+    final_image_binding_proof_hash: &str,
+) -> Result<(), String> {
     for (index, entry) in entries.iter().enumerate() {
         if entry.previous_hash != "none" && !is_fnv1a64_hex(&entry.previous_hash) {
             return Err(format!("entry {index} has invalid previous_hash"));
         }
         if !is_fnv1a64_hex(&entry.current_hash) {
             return Err(format!("entry {index} has invalid current_hash"));
+        }
+        if entry.final_image_binding_proof_hash != final_image_binding_proof_hash {
+            return Err(format!("entry {index} belongs to another final image"));
         }
         if let Some(previous) = index.checked_sub(1).and_then(|i| entries.get(i)) {
             if entry.sequence != previous.sequence + 1
@@ -442,6 +482,12 @@ fn is_fnv1a64_hex(value: &str) -> bool {
             .all(|character| character.is_ascii_hexdigit())
 }
 
+fn is_final_image_proof_hash(value: &str) -> bool {
+    value.strip_prefix("fnv1a64:").is_some_and(|hex| {
+        hex.len() == 16 && hex.chars().all(|character| character.is_ascii_hexdigit())
+    })
+}
+
 fn escape_toml(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
 }
@@ -452,6 +498,7 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static TEMP_ID: AtomicU64 = AtomicU64::new(0);
+    const TEST_PROOF_HASH: &str = "fnv1a64:0123456789abcdef";
 
     fn temp_dir(label: &str) -> PathBuf {
         let id = TEMP_ID.fetch_add(1, Ordering::Relaxed);
@@ -476,6 +523,7 @@ mod tests {
                 &current,
                 &format!("frame-{index}"),
                 &format!("frame-{}", index + 1),
+                TEST_PROOF_HASH,
             )
             .unwrap();
             previous = Some(current);
@@ -499,8 +547,15 @@ mod tests {
         let sidecar = cursor_lineage_path(&cursor).unwrap();
         fs::write(&sidecar, "protocol = \"damaged\"\n").unwrap();
 
-        let error =
-            record_cursor_lineage(&cursor, None, "cursor-0", "frame-0", "frame-1").unwrap_err();
+        let error = record_cursor_lineage(
+            &cursor,
+            None,
+            "cursor-0",
+            "frame-0",
+            "frame-1",
+            TEST_PROOF_HASH,
+        )
+        .unwrap_err();
 
         assert!(error.contains("invalid cursor lineage"));
         assert_eq!(
@@ -522,6 +577,8 @@ mod tests {
                 "protocol = \"nsdb-yir-replay-cursor-record-v1\"\n\
                  transcript_contract = \"nsdb-yir-replay-transcript-v1\"\n\
                  source_contract = \"nsdb-payload-execution-replay-plan-v1\"\n\
+                 identity_contract = \"nsdb-yir-replay-identity-v1\"\n\
+                 final_image_binding_proof_hash = \"{TEST_PROOF_HASH}\"\n\
                  manifest = \"{}\"\nstatus = \"resume-ready\"\n\
                  after_frame_id = \"frame-0\"\nnext_frame_index = 1\n\
                  next_frame_id = \"frame-1\"\n",
@@ -532,7 +589,7 @@ mod tests {
         let lineage = cursor_lineage_path(&cursor).unwrap();
         fs::write(&lineage, "protocol = \"damaged\"\n").unwrap();
 
-        let repaired = repair_cursor_lineage(&root, &manifest).unwrap();
+        let repaired = repair_cursor_lineage(&root, &manifest, TEST_PROOF_HASH).unwrap();
         assert_eq!(repaired.status, "lineage-rebuilt");
         assert!(repaired.mutated);
         assert!(repaired.lineage_mutated);
@@ -548,7 +605,7 @@ mod tests {
         assert!(journal_before.contains("status = \"lineage-rebuilt\""));
         assert!(journal_before.contains(&format!("rebuilt_hash = \"{}\"", repaired.latest_hash)));
 
-        let repeated = repair_cursor_lineage(&root, &manifest).unwrap();
+        let repeated = repair_cursor_lineage(&root, &manifest, TEST_PROOF_HASH).unwrap();
         assert_eq!(repeated.status, "already-ready");
         assert!(!repeated.mutated);
         assert!(!repeated.lineage_mutated);
@@ -558,7 +615,7 @@ mod tests {
 
         let healthy_lineage = fs::read_to_string(&lineage).unwrap();
         fs::write(&journal_path, "protocol = \"journal-only-damage\"\n").unwrap();
-        let journal_only = repair_cursor_lineage(&root, &manifest).unwrap();
+        let journal_only = repair_cursor_lineage(&root, &manifest, TEST_PROOF_HASH).unwrap();
         assert_eq!(journal_only.status, "repair-history-recovered");
         assert!(journal_only.mutated);
         assert!(!journal_only.lineage_mutated);
@@ -570,7 +627,7 @@ mod tests {
 
         fs::write(&lineage, "protocol = \"damaged-again\"\n").unwrap();
         fs::write(&journal_path, "protocol = \"damaged-journal\"\n").unwrap();
-        let recovered = repair_cursor_lineage(&root, &manifest).unwrap();
+        let recovered = repair_cursor_lineage(&root, &manifest, TEST_PROOF_HASH).unwrap();
         assert_eq!(recovered.status, "lineage-rebuilt");
         assert!(recovered
             .archived_repair_journal_path
@@ -598,7 +655,7 @@ mod tests {
             )
             .unwrap();
         }
-        let error = repair_cursor_lineage(&root, &manifest).unwrap_err();
+        let error = repair_cursor_lineage(&root, &manifest, TEST_PROOF_HASH).unwrap_err();
         assert!(error.contains("failed to reserve an archive path"));
         assert_eq!(fs::read_to_string(&lineage).unwrap(), damaged_lineage);
         fs::remove_dir_all(root).unwrap();

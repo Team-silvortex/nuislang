@@ -16,6 +16,8 @@ pub(crate) struct NsdbReplayControl {
 pub(crate) struct NsdbReplayTranscript {
     pub(crate) protocol: &'static str,
     pub(crate) source_contract: &'static str,
+    pub(crate) identity_contract: &'static str,
+    pub(crate) final_image_binding_proof_hash: Option<String>,
     pub(crate) control_protocol: &'static str,
     pub(crate) control_mode: &'static str,
     pub(crate) control_selector: Option<String>,
@@ -85,6 +87,12 @@ pub(crate) fn build_replay_transcript_with_control(
     NsdbReplayTranscript {
         protocol: "nsdb-yir-replay-transcript-v1",
         source_contract: plan.protocol,
+        identity_contract: "nsdb-yir-replay-identity-v1",
+        final_image_binding_proof_hash: crate::handoff_binding::replay_identity_hash(
+            &report.payload_execution_handoff.final_image_binding_proof,
+        )
+        .ok()
+        .map(str::to_owned),
         control_protocol: "nsdb-yir-replay-control-v1",
         control_mode: control_result.mode,
         control_selector: control_result.selector,

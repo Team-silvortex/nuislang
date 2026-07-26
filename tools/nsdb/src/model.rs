@@ -15,6 +15,17 @@ pub struct PayloadExecutionHandoffRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
+pub struct FinalImageBindingProofClaim {
+    pub binding_count: usize,
+    pub binding_table_hash: String,
+    pub validation_status: String,
+    pub selected_set_contract: Option<String>,
+    pub selected_set_count: Option<usize>,
+    pub selected_set_hash: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PayloadExecutionHandoffPersistSummary {
     pub record_count: usize,
     pub ready_record_count: usize,
@@ -84,10 +95,15 @@ pub(crate) struct NsdbDeviceProviderSampleRecordInfo {
     pub(crate) trace_id: String,
     pub(crate) provider: String,
     pub(crate) provider_family: String,
+    pub(crate) provider_bundle_package_id: String,
+    pub(crate) provider_bundle_id: String,
     pub(crate) requested_runner_contract: String,
     pub(crate) requested_runner_adapter_contract: String,
     pub(crate) requested_runner_adapter_id: String,
     pub(crate) requested_runner_adapter_capability_status: String,
+    pub(crate) provider_runner_contract: String,
+    pub(crate) provider_runner_adapter_contract: String,
+    pub(crate) provider_runner_adapter_id: String,
     pub(crate) handoff_target: String,
     pub(crate) sample_status: String,
     pub(crate) validation_status: String,

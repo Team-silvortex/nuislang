@@ -15,7 +15,13 @@ pub(super) fn assert_official_galaxy_hetero_build(
     let output_dir = temp_dir(label);
     let output_dir_text = output_dir.display().to_string();
 
-    let build = run_nuis(&["build", project, &output_dir_text]);
+    let build = run_nuis(&[
+        "build",
+        "--packaging-mode",
+        "window-aot-bundle",
+        project,
+        &output_dir_text,
+    ]);
     assert_success(&build, "nuis build official galaxy hetero smoke");
 
     let doctor_before_drive = run_nuis(&["artifact-doctor", "--json", &output_dir_text]);
@@ -988,7 +994,5 @@ pub(super) fn assert_official_galaxy_hetero_build(
         "\"artifact_device_provider_sample_manifest_first_materialization_status\":\"provider-sample-materialized\""
     ));
 
-    if label == "pixelmagic_pipeline_demo" {
-        assert_multi_checkpoint_replay_resume(&output_dir);
-    }
+    finalize_official_hetero(label, project, &output_dir, provider_record_count);
 }

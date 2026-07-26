@@ -151,11 +151,12 @@ pub(crate) fn metadata_table_hash(
     compatibility_domain_table_hash: &str,
     external_import_table_hash: &str,
     backend_artifact_payload_table_hash: &str,
+    provider_dispatch_table_hash: &str,
     metadata_binding_table_hash: &str,
     hash_bytes: fn(&[u8]) -> String,
 ) -> String {
     let material = format!(
-        "{container_section_table_hash}\t{loader_symbol_table_hash}\t{relocation_table_hash}\t{compatibility_domain_table_hash}\t{external_import_table_hash}\t{backend_artifact_payload_table_hash}\t{metadata_binding_table_hash}\n"
+        "{container_section_table_hash}\t{loader_symbol_table_hash}\t{relocation_table_hash}\t{compatibility_domain_table_hash}\t{external_import_table_hash}\t{backend_artifact_payload_table_hash}\t{provider_dispatch_table_hash}\t{metadata_binding_table_hash}\n"
     );
     hash_bytes(material.as_bytes())
 }

@@ -149,6 +149,14 @@ ready_record_count = 1
 first_trace_id = "payload-trace:container-loader:nuis.bootstrap.lifecycle.v1"
 first_status = "ready"
 first_next_action = "handoff-payload-trace-to-nsdb"
+final_image_binding_proof_contract = "nuis-final-image-binding-proof-v1"
+final_image_metadata_binding_count = 0
+final_image_metadata_binding_table_hash = "0xcbf29ce484222325"
+final_image_metadata_binding_validation_status = "not-applicable"
+final_image_selected_provider_bundle_set_contract = ""
+final_image_selected_provider_bundle_count = 0
+final_image_selected_provider_bundle_set_hash = ""
+final_image_binding_proof_hash = "fnv1a64:981b10a68f4e3dd7"
 
 [[records]]
 trace_id = "payload-trace:container-loader:nuis.bootstrap.lifecycle.v1"

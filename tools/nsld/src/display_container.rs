@@ -84,6 +84,29 @@ pub(crate) fn print_nsld_container_report(report: &NsldContainerReport) {
             binding.required
         );
     }
+    println!(
+        "  provider_dispatch: contract={} validation={} count={} table_hash={} selected_set_hash={}",
+        report.provider_dispatch_contract,
+        report.provider_dispatch_validation_status,
+        report.provider_dispatches.len(),
+        report.provider_dispatch_table_hash,
+        report
+            .provider_dispatch_selected_set_hash
+            .as_deref()
+            .unwrap_or("none")
+    );
+    for dispatch in &report.provider_dispatches {
+        println!(
+            "  provider_dispatch_entry: id={} package={} bundle={} family={} runner={} adapter_contract={} adapter={}",
+            dispatch.dispatch_id,
+            dispatch.package_id,
+            dispatch.bundle_id,
+            dispatch.provider_family,
+            dispatch.runner_contract,
+            dispatch.runner_adapter_contract,
+            dispatch.runner_adapter_id
+        );
+    }
     println!("  container_layout_hash: {}", report.container_layout_hash);
     println!("  container_hash: {}", report.container_hash);
     println!("  loader_readiness: {}", report.loader_readiness);

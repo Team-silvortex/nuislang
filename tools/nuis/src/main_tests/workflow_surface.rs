@@ -550,6 +550,23 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_output_object_issues\":["));
     assert!(json.contains("\"nsld_final_executable_output_blocker_count\":"));
     assert!(json.contains("\"nsld_final_executable_output_blockers\":["));
+
+    let handoff_path = output_dir.join("nuis.nsdb.payload-execution-handoff.toml");
+    let handoff = fs::read_to_string(&handoff_path).expect("read modern nsdb handoff");
+    let legacy = handoff
+        .lines()
+        .filter(|line| !line.starts_with("final_image_"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    fs::write(&handoff_path, legacy).expect("write legacy nsdb handoff");
+    let legacy_json = render_workflow_json(&project_root).expect("render legacy workflow json");
+    assert!(legacy_json.contains("\"nsld_final_executable_output_nsdb_replay_ready\":false"));
+    assert!(legacy_json.contains(
+        "\"nsld_final_executable_output_nsdb_replay_next_action\":\"rebuild-final-output-binding-proof\""
+    ));
+    assert!(legacy_json.contains(
+        "\"nsld_final_executable_output_nsdb_replay_first_blocker\":\"final-image-binding-proof:legacy-unbound\""
+    ));
 }
 
 #[test]

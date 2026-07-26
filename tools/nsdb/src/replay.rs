@@ -6,6 +6,7 @@ use crate::{
 pub(crate) struct NsdbReplayPlan {
     pub(crate) protocol: &'static str,
     pub(crate) status: String,
+    pub(crate) next_action: String,
     pub(crate) checkpoint_count: usize,
     pub(crate) replayable_checkpoint_count: usize,
     pub(crate) first_blocker: Option<String>,
@@ -72,20 +73,53 @@ pub(crate) fn build_replay_plan(report: &NsdbInspectReport) -> NsdbReplayPlan {
     let first_blocker = checkpoints
         .iter()
         .find_map(|checkpoint| checkpoint.first_blocker.clone());
+    let binding_blocker = final_image_binding_proof_blocker(report);
     let closure_blocker = hetero_execution_closure_blocker(report);
-    let plan_first_blocker = closure_blocker.or(first_blocker);
+    let plan_first_blocker = binding_blocker.or(closure_blocker).or(first_blocker);
+    let ready = plan_first_blocker.is_none();
     NsdbReplayPlan {
         protocol: "nsdb-payload-execution-replay-plan-v1",
-        status: if plan_first_blocker.is_none() {
+        status: if ready {
             "ready".to_owned()
         } else {
             "blocked".to_owned()
         },
+        next_action: if ready {
+            "consume-nsdb-yir-replay-plan"
+        } else if report.payload_execution_handoff.available
+            && report
+                .payload_execution_handoff
+                .final_image_binding_proof
+                .proof_status
+                == "legacy-unbound"
+        {
+            "rebuild-final-output-binding-proof"
+        } else {
+            "resolve-nsdb-yir-replay-plan"
+        }
+        .to_owned(),
         checkpoint_count: checkpoints.len(),
         replayable_checkpoint_count,
         first_blocker: plan_first_blocker,
         checkpoints,
     }
+}
+
+fn final_image_binding_proof_blocker(report: &NsdbInspectReport) -> Option<String> {
+    let handoff = &report.payload_execution_handoff;
+    if !handoff.available {
+        return None;
+    }
+    (!matches!(
+        handoff.final_image_binding_proof.proof_status.as_str(),
+        "verified" | "verified-empty"
+    ))
+    .then(|| {
+        format!(
+            "final-image-binding-proof:{}",
+            handoff.final_image_binding_proof.proof_status
+        )
+    })
 }
 
 fn replay_source_events(report: &NsdbInspectReport) -> Vec<NsdbPayloadExecutionEvent> {
