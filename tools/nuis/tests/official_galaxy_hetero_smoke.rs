@@ -99,7 +99,8 @@ mod replay;
 use build::assert_official_galaxy_hetero_build;
 use final_image::finalize_official_hetero;
 use provider_execution_evidence::{
-    assert_provider_bundle_audit_evidence, assert_provider_execution_evidence,
+    assert_pixelmagic_unary_execution, assert_provider_bundle_audit_evidence,
+    assert_provider_execution_evidence,
 };
 
 #[test]

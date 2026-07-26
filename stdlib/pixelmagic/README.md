@@ -114,13 +114,16 @@ Current first responsibility:
 * provide a stable checked-in bridge from host-preprocessed image description to shader-facing resource metadata
 * provide first reusable helper totals for chained filters, image analysis
   quality, and texture handoff scoring
-* persist shape/hash-bound raw `gray8` data for std-preprocessed PGM provider
-  samples and execute the first complete upload/invert/readback path through a
-  registered native Metal runner, with deterministic fallback elsewhere
-* own `nuis.pixelmagic` registration of gray8 shape, payload, kernel, and
-  persistence metadata through the provider-neutral
+* persist shape/hash-bound raw `gray8` data plus invert and chained-threshold
+  expected outputs, then execute both upload/dispatch/readback paths through a
+  generic registered Metal unary runner with exact comparisons
+* own `nuis.pixelmagic` registration of gray8 shape, payload, two-kernel
+  collection, and persistence metadata through the provider-neutral
   `nuis-device-sample-input-registration-v1` table; std only supplies the host
   preprocessing evidence and does not construct image requests
+* connect invert to threshold through package-authored provider dependency,
+  input-binding, GLM ownership, and clock evidence while Nsdb remains unaware of
+  PixelMagic operation names
 * participate in the persistent Nuis worker route through a registered Metal
   provider/adapter/operation identity, worker-issued dispatch permit, inherited
   input carrier, verified output carrier, and graph-close release evidence

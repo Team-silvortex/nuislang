@@ -167,6 +167,8 @@ pub(super) fn assert_official_galaxy_hetero_build(
                 )
                 && run_json_stdout.contains("provider_buffer_id=input.pixels")
                 && run_json_stdout.contains("provider_kernel_id=pixelmagic.gray8.invert")
+                && run_json_stdout
+                    .contains("provider_request_1_kernel_id=pixelmagic.gray8.threshold")
                 && run_json_stdout.contains("pixel_format=gray8")
                 && run_json_stdout.contains("pixel_width=2")
                 && run_json_stdout.contains("pixel_height=2")
@@ -448,13 +450,7 @@ pub(super) fn assert_official_galaxy_hetero_build(
         assert_eq!(executed.status, "provider-output-payloads-ready");
         assert_eq!(
             executed.first_output_payload_comparison_status,
-            if expects_coreml_vector
-                && executed.first_provider_execution_mode == "real-device-provider-runner"
-            {
-                "comparison-passed"
-            } else {
-                "ready-for-comparison"
-            }
+            "comparison-passed"
         );
         assert!(executed.first_output_payload_evidence.contains(&format!(
             "nuis.nsdb.provider-output.{provider_family_artifact}.toml:hash=0x"
@@ -611,11 +607,7 @@ pub(super) fn assert_official_galaxy_hetero_build(
         "official galaxy provider output payload input evidence hash",
     );
     if expects_std_pgm_marker {
-        assert_file_contains(
-            &provider_output_payload_path,
-            "provider_request_source = \"registered-descriptors\"",
-            "official galaxy provider request source",
-        );
+        assert_pixelmagic_unary_execution(&provider_output_payload_path);
         assert_file_contains(
             &provider_output_payload_path,
             "provider_buffer_descriptor_contract = \"nuis-provider-buffer-descriptor-v1\"",

@@ -419,20 +419,6 @@ pub(crate) fn pixelmagic_native_output_summary(
     })
 }
 
-pub(crate) fn gray8_metal_output_summary(
-    input_evidence: &str,
-    execution: &crate::provider_runner_metal::MetalProviderExecution,
-) -> ProviderNativeOutputSummary {
-    metal_native_output_summary(
-        provider_request_from_evidence(input_evidence)
-            .map(|request| request.kernel.id)
-            .unwrap_or_else(|| "pixelmagic.legacy".to_owned()),
-        "pixelmagic-image-bytes",
-        execution,
-        None,
-    )
-}
-
 pub(crate) fn metal_native_output_summary(
     request_id: String,
     kind: &str,

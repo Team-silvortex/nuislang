@@ -34,7 +34,7 @@ use std::{
 };
 
 #[cfg(target_os = "macos")]
-const METAL_RUNNER_SOURCE: &str = include_str!("../provider-runners/metal_gray8_invert.m");
+const METAL_GRAY8_UNARY_SOURCE: &str = include_str!("../provider-runners/metal_gray8_unary.m");
 #[cfg(target_os = "macos")]
 const METAL_F32_BIAS_SOURCE: &str = include_str!("../provider-runners/metal_f32_bias.m");
 
@@ -95,14 +95,33 @@ pub(crate) fn execute_gray8_invert(
     execute_gray8_invert_platform(input_path, max_value)
 }
 
+pub(crate) fn execute_gray8_threshold(
+    input_path: &Path,
+    threshold: u8,
+    max_value: u8,
+) -> Result<MetalProviderExecution, String> {
+    execute_gray8_threshold_platform(input_path, threshold, max_value)
+}
+
 #[cfg(target_os = "macos")]
 pub(crate) fn prepare_gray8_worker_invocation(
     cache: &mut ProviderProcessAdapterCache,
 ) -> Result<ResolvedProviderProcessAdapter<'_>, String> {
     prepare_metal_worker_invocation(
         cache,
-        METAL_RUNNER_SOURCE,
+        METAL_GRAY8_UNARY_SOURCE,
         "nuis-metal-gray8-provider-runner-v1",
+    )
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn prepare_gray8_threshold_worker_invocation(
+    cache: &mut ProviderProcessAdapterCache,
+) -> Result<ResolvedProviderProcessAdapter<'_>, String> {
+    prepare_metal_worker_invocation(
+        cache,
+        METAL_GRAY8_UNARY_SOURCE,
+        "nuis-metal-gray8-threshold-provider-runner-v1",
     )
 }
 
@@ -169,9 +188,9 @@ fn execute_f32_bias_platform(
             .len(),
     )
     .map_err(|_| "Metal f32 input length overflow".to_owned())?;
-    execute_metal_scalar_platform(
+    execute_metal_platform(
         input_path.as_os_str(),
-        &bias.to_string(),
+        &[bias.to_string()],
         "nuis-metal-f32-bias-provider-runner-v1",
         METAL_F32_BIAS_SOURCE,
         None,
@@ -188,9 +207,9 @@ fn execute_f32_bias_bytes_platform(
         .ok_or_else(|| "Metal provider carrier channel is unavailable".to_owned())?;
     let channel = prepare_provider_carrier_channel(channel_adapter, &[input])?;
     let argument = channel.frame_argument(0);
-    execute_metal_scalar_platform(
+    execute_metal_platform(
         OsStr::new(&argument),
-        &bias.to_string(),
+        &[bias.to_string()],
         "nuis-metal-f32-bias-provider-runner-v1",
         METAL_F32_BIAS_SOURCE,
         Some(&channel),
@@ -205,9 +224,9 @@ fn execute_f32_bias_prepared_channel_platform(
     bias: f32,
 ) -> Result<MetalProviderExecution, String> {
     let argument = channel.frame_argument(0);
-    execute_metal_scalar_platform(
+    execute_metal_platform(
         OsStr::new(&argument),
-        &bias.to_string(),
+        &[bias.to_string()],
         "nuis-metal-f32-bias-provider-runner-v1",
         METAL_F32_BIAS_SOURCE,
         Some(channel),
@@ -220,11 +239,35 @@ fn execute_gray8_invert_platform(
     input_path: &Path,
     max_value: u8,
 ) -> Result<MetalProviderExecution, String> {
-    execute_metal_scalar_platform(
+    execute_metal_platform(
         input_path.as_os_str(),
-        &max_value.to_string(),
+        &[
+            "invert".to_owned(),
+            max_value.to_string(),
+            max_value.to_string(),
+        ],
         "nuis-metal-gray8-provider-runner-v1",
-        METAL_RUNNER_SOURCE,
+        METAL_GRAY8_UNARY_SOURCE,
+        None,
+        None,
+    )
+}
+
+#[cfg(target_os = "macos")]
+fn execute_gray8_threshold_platform(
+    input_path: &Path,
+    threshold: u8,
+    max_value: u8,
+) -> Result<MetalProviderExecution, String> {
+    execute_metal_platform(
+        input_path.as_os_str(),
+        &[
+            "threshold".to_owned(),
+            threshold.to_string(),
+            max_value.to_string(),
+        ],
+        "nuis-metal-gray8-threshold-provider-runner-v1",
+        METAL_GRAY8_UNARY_SOURCE,
         None,
         None,
     )
@@ -256,9 +299,9 @@ fn execute_f32_bias_prepared_channel_platform(
 }
 
 #[cfg(target_os = "macos")]
-fn execute_metal_scalar_platform(
+fn execute_metal_platform(
     input_argument: &OsStr,
-    scalar: &str,
+    arguments: &[String],
     contract: &'static str,
     source: &str,
     carrier_channel: Option<&PreparedProviderCarrierChannel>,
@@ -266,7 +309,7 @@ fn execute_metal_scalar_platform(
 ) -> Result<MetalProviderExecution, String> {
     let paths = compile_metal_runner(source)?;
     let mut command = Command::new(&paths.binary);
-    command.arg(input_argument).arg(scalar);
+    command.arg(input_argument).args(arguments);
     let output_adapter = output_byte_len
         .map(|_| {
             select_provider_output_carrier_adapter("auto")
@@ -355,6 +398,15 @@ fn compile_metal_runner(source: &str) -> Result<TempMetalRunnerPaths, String> {
 #[cfg(not(target_os = "macos"))]
 fn execute_gray8_invert_platform(
     _input_path: &Path,
+    _max_value: u8,
+) -> Result<MetalProviderExecution, String> {
+    Err("Metal provider runner is unavailable on this host".to_owned())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn execute_gray8_threshold_platform(
+    _input_path: &Path,
+    _threshold: u8,
     _max_value: u8,
 ) -> Result<MetalProviderExecution, String> {
     Err("Metal provider runner is unavailable on this host".to_owned())
@@ -492,7 +544,10 @@ impl Drop for TempMetalRunnerPaths {
 
 #[cfg(test)]
 mod tests {
-    use super::{execute_f32_bias_input, execute_gray8_invert, parse_metal_runner_output};
+    use super::{
+        execute_f32_bias_input, execute_gray8_invert, execute_gray8_threshold,
+        parse_metal_runner_output,
+    };
     use crate::provider_carrier_input::ProviderCarrierInput;
 
     #[test]
@@ -524,6 +579,26 @@ mod tests {
         assert_eq!(execution.status, "metal-command-buffer-completed");
         assert!(!execution.device.is_empty());
         assert_eq!(execution.output_payload.as_bytes(), [15, 11, 6, 7]);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn executes_gray8_threshold_on_the_system_metal_device() {
+        let input = std::env::temp_dir().join(format!(
+            "nuis-metal-gray8-threshold-input-{}-{}.bin",
+            std::process::id(),
+            std::thread::current().name().unwrap_or("test")
+        ));
+        std::fs::write(&input, [0, 4, 9, 8]).unwrap();
+        let execution =
+            execute_gray8_threshold(&input, 8, 15).expect("system Metal threshold execution");
+        let _ = std::fs::remove_file(input);
+
+        assert_eq!(
+            execution.contract,
+            "nuis-metal-gray8-threshold-provider-runner-v1"
+        );
+        assert_eq!(execution.output_payload.as_bytes(), [0, 0, 15, 15]);
     }
 
     #[cfg(target_os = "macos")]

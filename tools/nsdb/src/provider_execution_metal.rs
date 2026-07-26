@@ -10,7 +10,7 @@ use crate::{
     },
     provider_prepared_input::PreparedProviderInput,
     provider_request::ProviderRequest,
-    provider_sample_payload::{gray8_metal_output_summary, metal_native_output_summary},
+    provider_sample_payload::metal_native_output_summary,
     provider_worker_lease::ProviderWorkerDispatchReceipt,
 };
 use std::path::Path;
@@ -40,13 +40,32 @@ fn prepare_worker_adapter(
             request.kernel.id
         ));
     }
-    let (prepared, scalar) = if is_gray8_invert(request) {
+    let (prepared, arguments) = if is_gray8_invert(request) {
         let max_value = request
             .scalar_u8("max_value")
             .ok_or_else(|| "Metal provider request is missing u8 scalar `max_value`".to_owned())?;
         (
             crate::provider_runner_metal::prepare_gray8_worker_invocation(cache)?,
-            max_value.to_string(),
+            vec![
+                "literal:invert".to_owned(),
+                format!("literal:{max_value}"),
+                format!("literal:{max_value}"),
+            ],
+        )
+    } else if is_gray8_threshold(request) {
+        let threshold = request
+            .scalar_u8("threshold")
+            .ok_or_else(|| "Metal provider request is missing u8 scalar `threshold`".to_owned())?;
+        let max_value = request
+            .scalar_u8("max_value")
+            .ok_or_else(|| "Metal provider request is missing u8 scalar `max_value`".to_owned())?;
+        (
+            crate::provider_runner_metal::prepare_gray8_threshold_worker_invocation(cache)?,
+            vec![
+                "literal:threshold".to_owned(),
+                format!("literal:{threshold}"),
+                format!("literal:{max_value}"),
+            ],
         )
     } else if is_f32_bias(request) {
         let bias = request
@@ -54,7 +73,7 @@ fn prepare_worker_adapter(
             .ok_or_else(|| "Metal provider request is missing f32 scalar `bias`".to_owned())?;
         (
             crate::provider_runner_metal::prepare_f32_bias_worker_invocation(cache)?,
-            bias.to_string(),
+            vec![format!("literal:{bias}")],
         )
     } else {
         return Ok(None);
@@ -65,15 +84,14 @@ fn prepare_worker_adapter(
         runner_contract: prepared.contract(),
         cache_identity: prepared.cache_identity.to_owned(),
         cache_status: prepared.cache_status,
-        arguments: vec![
-            worker_descriptor_argument(&inputs[0], 0)?,
-            format!("literal:{scalar}"),
-        ],
+        arguments: std::iter::once(worker_descriptor_argument(&inputs[0], 0)?)
+            .chain(arguments)
+            .collect(),
     }))
 }
 
 fn execute(
-    input_evidence: &str,
+    _input_evidence: &str,
     _provider_family: &str,
     _output_dir: &Path,
     request: &ProviderRequest,
@@ -103,6 +121,26 @@ fn execute(
                 .ok_or_else(|| "Metal gray8 provider requires a path input".to_owned())?;
             crate::provider_runner_metal::execute_gray8_invert(path, max_value)?
         }
+    } else if is_gray8_threshold(request) {
+        let threshold = request
+            .scalar_u8("threshold")
+            .ok_or_else(|| "Metal provider request is missing u8 scalar `threshold`".to_owned())?;
+        let max_value = request
+            .scalar_u8("max_value")
+            .ok_or_else(|| "Metal provider request is missing u8 scalar `max_value`".to_owned())?;
+        if uses_process_adapter(worker_receipt) {
+            crate::provider_runner_metal::parse_metal_worker_output(
+                &worker_receipt.worker_output_payload,
+                "nuis-metal-gray8-threshold-provider-runner-v1",
+                worker_receipt.worker_output_result.take(),
+            )?
+        } else {
+            let path = inputs[0]
+                .input()
+                .path()
+                .ok_or_else(|| "Metal gray8 provider requires a path input".to_owned())?;
+            crate::provider_runner_metal::execute_gray8_threshold(path, threshold, max_value)?
+        }
     } else if is_f32_bias(request) {
         let bias = request
             .scalar_f32("bias")
@@ -129,8 +167,13 @@ fn execute(
         ));
     };
     Ok(ProviderRequestExecution {
-        summary: if is_gray8_invert(request) {
-            gray8_metal_output_summary(input_evidence, &execution)
+        summary: if is_gray8_invert(request) || is_gray8_threshold(request) {
+            metal_native_output_summary(
+                request.kernel.id.clone(),
+                "pixelmagic-image-bytes",
+                &execution,
+                None,
+            )
         } else {
             metal_native_output_summary(
                 request.kernel.id.clone(),
@@ -150,6 +193,12 @@ fn is_gray8_invert(request: &ProviderRequest) -> bool {
     request.buffer.element_type == "u8"
         && request.buffer.layout.contains("pixel-format=gray8")
         && request.kernel.operation == "invert"
+}
+
+fn is_gray8_threshold(request: &ProviderRequest) -> bool {
+    request.buffer.element_type == "u8"
+        && request.buffer.layout.contains("pixel-format=gray8")
+        && request.kernel.operation == "threshold"
 }
 
 fn is_f32_bias(request: &ProviderRequest) -> bool {

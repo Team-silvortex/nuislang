@@ -32,7 +32,7 @@ fn task_selection_falls_back_to_global_incomplete_after_bootstrap_closes() {
     );
     assert!(!selected.bootstrap_critical);
     assert_eq!(selected.status, "active");
-    assert_eq!(selected.progress, 70);
+    assert_eq!(selected.progress, 78);
 }
 
 #[test]

@@ -129,3 +129,31 @@ pub(super) fn assert_provider_execution_evidence(provider_output_payload_path: &
         );
     }
 }
+
+pub(super) fn assert_pixelmagic_unary_execution(provider_output_payload_path: &Path) {
+    for evidence in [
+        "provider_request_source = \"registered-collection\"",
+        "native_output_count = \"2\"",
+        "provider_request_dependency_edge_count = \"1\"",
+        "provider_request_dependency_edges = \"pixelmagic.gray8.invert.output.pixels.invert->pixelmagic.gray8.threshold.input.pixels\"",
+        "provider_edge_transport_count = \"1\"",
+        "provider_edge_transport_receipt_count = \"1\"",
+        "provider_edge_transport_receipt_0_staging_adapter_id = \"provider.output.transfer.v1\"",
+        "provider_edge_transport_receipt_0_consume_status = \"consumed\"",
+        "provider_edge_transport_receipt_0_release_status = \"released\"",
+        "native_output_0_request_id = \"pixelmagic.gray8.invert\"",
+        "native_output_0_comparison_status = \"comparison-passed\"",
+        "native_output_1_request_id = \"pixelmagic.gray8.threshold\"",
+        "native_output_1_execution_contract = \"nuis-metal-gray8-threshold-provider-runner-v1\"",
+        "native_output_1_comparison_status = \"comparison-passed\"",
+        "native_output_1_comparison_element_count = \"4\"",
+        "native_output_1_comparison_mismatch_count = \"0\"",
+        "native_output_1_hash = \"0xfc6f93a90d12d41b\"",
+    ] {
+        assert_file_contains(
+            provider_output_payload_path,
+            evidence,
+            "official PixelMagic unary execution",
+        );
+    }
+}

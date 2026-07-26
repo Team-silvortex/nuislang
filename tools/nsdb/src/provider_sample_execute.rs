@@ -623,6 +623,12 @@ fn execute_native_provider_request(
         &inputs,
         &mut worker_receipt,
     )?;
+    if request_execution.summary.request_id != request.kernel.id {
+        return Err(format!(
+            "provider adapter `{}` returned output for request `{}` while executing `{}`",
+            adapter.adapter_id, request_execution.summary.request_id, request.kernel.id
+        ));
+    }
     request_execution.transport_receipts = inputs
         .into_iter()
         .map(PreparedProviderInput::finish)

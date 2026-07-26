@@ -444,9 +444,15 @@ lower into package-independent `nuis-provider-buffer-descriptor-v1` and
 `nuis-provider-kernel-descriptor-v1` requests; Nsdb converts legacy evidence
 into the same model but native adapters consume only the registered request.
 The official heterogeneous smoke verifies persistence of the four source
-pixels and, on supported macOS hosts, submits them through the registered Metal
-runner for real buffer upload, invert dispatch, readback, and output hashing.
-Unsupported hosts keep the deterministic provider fallback.
+pixels plus exact invert and chained-threshold baselines. On supported Apple
+hosts it submits a registered two-request collection through the generic Metal
+gray8 adapter. The second request consumes the first request's completed output
+through the provider dependency/input-binding contracts. A GLM ownership token
+and request-0-completed to request-1-dispatch-ready clock edge bind that
+transfer, and the execution payload records a consumed/released transport
+receipt. The resulting chain maps `[0,4,9,8]` to `[15,11,6,7]` and then
+`[15,15,0,0]` with zero comparison mismatches. Unsupported hosts keep the
+deterministic provider fallback.
 
 The WitSage side now uses the same registered provider request model for a
 contiguous four-element `f32` tensor and `witsage.vector.affine` kernel. On
