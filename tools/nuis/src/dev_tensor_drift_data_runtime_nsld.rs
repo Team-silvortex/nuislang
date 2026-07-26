@@ -429,6 +429,30 @@ pub(crate) const DEV_TENSOR_RUNTIME_NSLD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "nsdb-provider-completion-dispatch-authority",
+        path: "tools/nsdb/src/provider_completion_dispatch.rs",
+        required_patterns: &[
+            "nuis-provider-completion-dispatch-authority-v1",
+            "authority_for_record",
+            "completion_identity",
+            "verified_identity_hash",
+            "final-image-authority-missing",
+            "dispatch_id",
+            "runner_adapter_id",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-independent-provider-completion-dispatch-authority",
+        path: "tools/nuis/src/artifact_nsdb_handoff_dispatch.rs",
+        required_patterns: &[
+            "nuis-provider-completion-dispatch-authority-v1",
+            "parse_provider_completions",
+            "dispatch_identity",
+            "final-image-authority-missing",
+            "dispatch_runner_adapter_id",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "official-post-seal-provider-dispatch-execution",
         path: "tools/nuis/tests/official_galaxy_hetero_smoke/final_image.rs",
         required_patterns: &[

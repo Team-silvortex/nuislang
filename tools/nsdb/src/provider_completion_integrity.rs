@@ -13,10 +13,29 @@ pub(crate) fn record_hash(
     event: &NsdbPayloadExecutionEvent,
     digest_contract: &str,
 ) -> Option<String> {
-    let material = format!(
+    let mut material = format!(
         "{}\0{}\0{}\0{}",
         event.trace_id, event.provider_family, event.output_contract, event.output_evidence
     );
+    if event.provider_completion_dispatch.contract
+        == crate::provider_completion_dispatch::COMPLETION_AUTHORITY_CONTRACT
+        && event.provider_completion_dispatch.status != "not-applicable"
+    {
+        material.push_str(&format!(
+            "\0{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}",
+            event.provider_completion_dispatch.contract,
+            event.provider_completion_dispatch.status,
+            event.provider_completion_dispatch.table_hash,
+            event.provider_completion_dispatch.selected_set_hash,
+            event.provider_completion_dispatch.dispatch_id,
+            event.provider_completion_dispatch.package_id,
+            event.provider_completion_dispatch.bundle_id,
+            event.provider_completion_dispatch.provider_family,
+            event.provider_completion_dispatch.runner_contract,
+            event.provider_completion_dispatch.runner_adapter_contract,
+            event.provider_completion_dispatch.runner_adapter_id,
+        ));
+    }
     digest_hex(digest_contract, material.as_bytes())
 }
 

@@ -141,6 +141,41 @@ pub(crate) fn nsdb_inspect_report_json(report: &NsdbInspectReport) -> String {
             ),
         ),
         json_string_field(
+            "payload_execution_handoff_provider_dispatch_authority_contract",
+            &report
+                .payload_execution_handoff
+                .provider_completion_dispatch_identity
+                .contract,
+        ),
+        json_string_field(
+            "payload_execution_handoff_provider_dispatch_authority_status",
+            &report
+                .payload_execution_handoff
+                .provider_completion_dispatch_identity
+                .status,
+        ),
+        json_string_field(
+            "payload_execution_handoff_provider_dispatch_table_hash",
+            &report
+                .payload_execution_handoff
+                .provider_completion_dispatch_identity
+                .table_hash,
+        ),
+        json_string_field(
+            "payload_execution_handoff_provider_dispatch_selected_set_hash",
+            &report
+                .payload_execution_handoff
+                .provider_completion_dispatch_identity
+                .selected_set_hash,
+        ),
+        json_string_field(
+            "payload_execution_handoff_provider_dispatch_identity_hash",
+            &report
+                .payload_execution_handoff
+                .provider_completion_dispatch_identity
+                .identity_hash,
+        ),
+        json_string_field(
             "payload_execution_handoff_hetero_execution_closure_protocol",
             &report
                 .payload_execution_handoff

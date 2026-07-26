@@ -7,6 +7,10 @@ use crate::model::{
     NsdbPayloadExecutionHandoffInfo, PayloadExecutionHandoffPersistSummary,
     PayloadExecutionHandoffRecord,
 };
+use crate::provider_completion_dispatch::{
+    authority_for_record, bind_events_from_final_image, completion_identity,
+    parse_event_fields as parse_dispatch_fields, render_event_fields as render_dispatch_fields,
+};
 use crate::provider_completion_integrity::{
     legacy_set_hash as legacy_provider_completion_set_hash,
     set_hash as provider_completion_set_hash, signature_message,
@@ -32,6 +36,8 @@ pub(crate) fn persist_provider_completion_handoff(
     output_dir: &Path,
     records: &[NsdbDeviceProviderSampleRecordInfo],
 ) -> Result<usize, String> {
+    let final_image =
+        crate::final_image_provider_dispatch::final_image_provider_dispatch_authority(output_dir);
     let completions = records
         .iter()
         .filter(|record| {
@@ -39,16 +45,17 @@ pub(crate) fn persist_provider_completion_handoff(
                 && record.sample_status == "provider-execution-ready"
                 && record.validation_status == "provider-execution-validated"
         })
-        .map(provider_completion_event)
-        .collect::<Vec<_>>();
+        .map(|record| provider_completion_event(record, &final_image))
+        .collect::<Result<Vec<_>, _>>()?;
     if completions.is_empty() {
         return Ok(0);
     }
     for completion in completions {
-        persist_payload_execution_handoff_record(
+        persist_payload_execution_handoff_event_inner(
             output_dir,
             "nsdb-provider-sample-materialization",
-            public_handoff_record(completion),
+            completion,
+            None,
         )?;
     }
     Ok(read_payload_execution_handoff(output_dir)
@@ -58,6 +65,7 @@ pub(crate) fn persist_provider_completion_handoff(
         .count())
 }
 
+#[allow(dead_code)]
 pub(crate) fn persist_payload_execution_handoff_record(
     output_dir: &Path,
     source: &str,
@@ -81,6 +89,20 @@ fn persist_payload_execution_handoff_record_inner(
     output_dir: &Path,
     source: &str,
     record: PayloadExecutionHandoffRecord,
+    requested_binding: Option<crate::handoff_binding::FinalImageBindingProofInfo>,
+) -> Result<PayloadExecutionHandoffPersistSummary, String> {
+    persist_payload_execution_handoff_event_inner(
+        output_dir,
+        source,
+        internal_handoff_event(record),
+        requested_binding,
+    )
+}
+
+fn persist_payload_execution_handoff_event_inner(
+    output_dir: &Path,
+    source: &str,
+    replacement: NsdbPayloadExecutionEvent,
     requested_binding: Option<crate::handoff_binding::FinalImageBindingProofInfo>,
 ) -> Result<PayloadExecutionHandoffPersistSummary, String> {
     let existing = read_payload_execution_handoff(output_dir);
@@ -149,7 +171,6 @@ fn persist_payload_execution_handoff_record_inner(
     } else {
         Vec::new()
     };
-    let replacement = internal_handoff_event(record);
     if let Some(index) = events.iter().position(|event| {
         event.trace_id == replacement.trace_id
             && event.execution_phase == replacement.execution_phase
@@ -160,6 +181,12 @@ fn persist_payload_execution_handoff_record_inner(
     }
     for (index, event) in events.iter_mut().enumerate() {
         event.index = index;
+    }
+    if matches!(
+        final_image_binding_proof.proof_status.as_str(),
+        "verified" | "verified-empty"
+    ) {
+        bind_events_from_final_image(output_dir, &mut events)?;
     }
     let content =
         render_payload_execution_handoff(&events, &existing, &final_image_binding_proof, source)?;
@@ -180,23 +207,6 @@ fn persist_payload_execution_handoff_record_inner(
     })
 }
 
-fn public_handoff_record(event: NsdbPayloadExecutionEvent) -> PayloadExecutionHandoffRecord {
-    PayloadExecutionHandoffRecord {
-        trace_id: event.trace_id,
-        status: event.status,
-        execution_phase: event.execution_phase,
-        target: event.target,
-        entry_symbol: event.entry_symbol,
-        entry_kind: event.entry_kind,
-        entry_section_id: event.entry_section_id,
-        provider_family: event.provider_family,
-        output_contract: event.output_contract,
-        output_evidence: event.output_evidence,
-        first_blocker: event.first_blocker,
-        next_action: event.next_action,
-    }
-}
-
 fn internal_handoff_event(record: PayloadExecutionHandoffRecord) -> NsdbPayloadExecutionEvent {
     NsdbPayloadExecutionEvent {
         index: 0,
@@ -210,6 +220,7 @@ fn internal_handoff_event(record: PayloadExecutionHandoffRecord) -> NsdbPayloadE
         provider_family: record.provider_family,
         output_contract: record.output_contract,
         output_evidence: record.output_evidence,
+        provider_completion_dispatch: Default::default(),
         first_blocker: record.first_blocker,
         next_action: record.next_action,
     }
@@ -217,7 +228,8 @@ fn internal_handoff_event(record: PayloadExecutionHandoffRecord) -> NsdbPayloadE
 
 fn provider_completion_event(
     record: &NsdbDeviceProviderSampleRecordInfo,
-) -> NsdbPayloadExecutionEvent {
+    final_image: &crate::final_image_provider_dispatch::FinalImageProviderDispatchAuthority,
+) -> Result<NsdbPayloadExecutionEvent, String> {
     let output_evidence = if !matches!(
         record.provider_output_payload_evidence.as_str(),
         "none" | "not-materialized"
@@ -231,7 +243,7 @@ fn provider_completion_event(
     } else {
         record.provider_output_payload_contract.clone()
     };
-    NsdbPayloadExecutionEvent {
+    Ok(NsdbPayloadExecutionEvent {
         index: 0,
         trace_id: record.trace_id.clone(),
         status: "ready".to_owned(),
@@ -243,9 +255,10 @@ fn provider_completion_event(
         provider_family: record.provider_family.clone(),
         output_contract,
         output_evidence,
+        provider_completion_dispatch: authority_for_record(final_image, record)?,
         first_blocker: "none".to_owned(),
         next_action: "replay-provider-completion".to_owned(),
-    }
+    })
 }
 
 fn render_payload_execution_handoff(
@@ -382,6 +395,7 @@ fn render_payload_execution_handoff(
         push_toml_string(&mut out, "provider_family", &event.provider_family);
         push_toml_string(&mut out, "output_contract", &event.output_contract);
         push_toml_string(&mut out, "output_evidence", &event.output_evidence);
+        render_dispatch_fields(&mut out, &event.provider_completion_dispatch);
         push_toml_string(
             &mut out,
             "first_blocker",
@@ -424,6 +438,7 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
             provider_completion_set_hash_claim: "none".to_owned(),
             provider_completion_set_hash_actual: "none".to_owned(),
             provider_completion_set_hash_validation_status: "not-applicable".to_owned(),
+            provider_completion_dispatch_identity: completion_identity(&[], "legacy-unbound"),
             hetero_execution_closure_protocol: "none".to_owned(),
             hetero_execution_closure_status: "none".to_owned(),
             hetero_execution_closure_ready: "false".to_owned(),
@@ -440,6 +455,8 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
     let ready_record_count = parse_usize_toml_field(&source, "ready_record_count").unwrap_or(0);
     let events = parse_payload_execution_events(&source);
     let final_image_binding_proof = verify_binding_proof(&source);
+    let provider_completion_dispatch_identity =
+        completion_identity(&events, &final_image_binding_proof.proof_status);
     let provider_completion_claim_authority_contract =
         parse_string_toml_field(&source, "provider_completion_claim_authority_contract")
             .unwrap_or_else(|| "none".to_owned());
@@ -561,6 +578,7 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
         &provider_completion_claim_authority_status,
         &provider_completion_signature_status,
         &final_image_binding_proof.proof_status,
+        &provider_completion_dispatch_identity.status,
     );
     NsdbPayloadExecutionHandoffInfo {
         available: true,
@@ -595,6 +613,7 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
         provider_completion_set_hash_claim,
         provider_completion_set_hash_actual,
         provider_completion_set_hash_validation_status,
+        provider_completion_dispatch_identity,
         hetero_execution_closure_protocol: parse_string_toml_field(
             &source,
             "hetero_execution_closure_protocol",
@@ -634,6 +653,7 @@ fn payload_handoff_status(
     provider_completion_claim_authority_status: &str,
     provider_completion_signature_status: &str,
     final_image_binding_proof_status: &str,
+    provider_completion_dispatch_status: &str,
 ) -> String {
     if protocol != "nuis-nsdb-payload-execution-handoff-v1" {
         return "unsupported-protocol".to_owned();
@@ -649,6 +669,12 @@ fn payload_handoff_status(
         "verified" | "verified-empty" | "legacy-unbound"
     ) {
         return format!("final-image-binding-proof-{final_image_binding_proof_status}");
+    }
+    if matches!(
+        provider_completion_dispatch_status,
+        "mismatch" | "final-image-authority-missing"
+    ) {
+        return format!("provider-completion-dispatch-{provider_completion_dispatch_status}");
     }
     match provider_completion_set_hash_validation_status {
         "mismatch" => return "provider-completion-set-hash-mismatch".to_owned(),
@@ -701,6 +727,7 @@ fn parse_payload_execution_events(source: &str) -> Vec<NsdbPayloadExecutionEvent
                 .unwrap_or_else(|| "none".to_owned()),
             output_evidence: parse_string_toml_field(record, "output_evidence")
                 .unwrap_or_else(|| "none".to_owned()),
+            provider_completion_dispatch: parse_dispatch_fields(record),
             first_blocker: parse_string_toml_field(record, "first_blocker")
                 .filter(|value| !value.is_empty())
                 .unwrap_or_else(|| "none".to_owned()),

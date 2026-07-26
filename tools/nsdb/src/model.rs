@@ -39,6 +39,14 @@ pub struct PayloadExecutionProviderCompletion {
     pub provider_family: String,
     pub output_contract: String,
     pub output_evidence: String,
+    pub dispatch_authority_contract: String,
+    pub dispatch_authority_status: String,
+    pub dispatch_table_hash: String,
+    pub dispatch_selected_set_hash: String,
+    pub dispatch_id: String,
+    pub dispatch_package_id: String,
+    pub dispatch_bundle_id: String,
+    pub dispatch_runner_adapter_id: String,
     pub record_hash: String,
 }
 
@@ -251,6 +259,7 @@ pub(crate) struct NsdbPayloadExecutionHandoffInfo {
     pub(crate) provider_completion_set_hash_claim: String,
     pub(crate) provider_completion_set_hash_actual: String,
     pub(crate) provider_completion_set_hash_validation_status: String,
+    pub(crate) provider_completion_dispatch_identity: NsdbProviderCompletionDispatchIdentity,
     pub(crate) hetero_execution_closure_protocol: String,
     pub(crate) hetero_execution_closure_status: String,
     pub(crate) hetero_execution_closure_ready: String,
@@ -272,8 +281,63 @@ pub(crate) struct NsdbPayloadExecutionEvent {
     pub(crate) provider_family: String,
     pub(crate) output_contract: String,
     pub(crate) output_evidence: String,
+    pub(crate) provider_completion_dispatch: NsdbProviderCompletionDispatchAuthority,
     pub(crate) first_blocker: String,
     pub(crate) next_action: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsdbProviderCompletionDispatchAuthority {
+    pub(crate) contract: String,
+    pub(crate) status: String,
+    pub(crate) table_hash: String,
+    pub(crate) selected_set_hash: String,
+    pub(crate) dispatch_id: String,
+    pub(crate) package_id: String,
+    pub(crate) bundle_id: String,
+    pub(crate) provider_family: String,
+    pub(crate) runner_contract: String,
+    pub(crate) runner_adapter_contract: String,
+    pub(crate) runner_adapter_id: String,
+}
+
+impl Default for NsdbProviderCompletionDispatchAuthority {
+    fn default() -> Self {
+        Self {
+            contract: "nuis-provider-completion-dispatch-authority-v1".to_owned(),
+            status: "not-applicable".to_owned(),
+            table_hash: "none".to_owned(),
+            selected_set_hash: "none".to_owned(),
+            dispatch_id: "none".to_owned(),
+            package_id: "none".to_owned(),
+            bundle_id: "none".to_owned(),
+            provider_family: "none".to_owned(),
+            runner_contract: "none".to_owned(),
+            runner_adapter_contract: "none".to_owned(),
+            runner_adapter_id: "none".to_owned(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsdbProviderCompletionDispatchIdentity {
+    pub(crate) contract: String,
+    pub(crate) status: String,
+    pub(crate) table_hash: String,
+    pub(crate) selected_set_hash: String,
+    pub(crate) identity_hash: String,
+}
+
+impl Default for NsdbProviderCompletionDispatchIdentity {
+    fn default() -> Self {
+        Self {
+            contract: "nuis-provider-completion-dispatch-authority-v1".to_owned(),
+            status: "not-applicable".to_owned(),
+            table_hash: "none".to_owned(),
+            selected_set_hash: "none".to_owned(),
+            identity_hash: "none".to_owned(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -358,6 +422,7 @@ mod tests {
             provider_family: "none".to_owned(),
             output_contract: "none".to_owned(),
             output_evidence: "none".to_owned(),
+            provider_completion_dispatch: Default::default(),
             first_blocker: "device-execution-sample-missing".to_owned(),
             next_action: "materialize-device-execution-trace".to_owned(),
         };

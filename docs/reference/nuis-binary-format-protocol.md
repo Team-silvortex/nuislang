@@ -132,8 +132,24 @@ sidecar record must match the image's package, bundle, provider family, actual
 runner contract, adapter contract, and adapter ID before a provider worker is
 started. The selected runtime registry adapter must match as well. Sidecars
 therefore carry request payload details but no longer own dispatch selection.
-The next protocol addition is carrying the verified dispatch table hash and
-matched entry directly in provider completion and replay records.
+
+Post-seal completion now persists
+`nuis-provider-completion-dispatch-authority-v1` on every provider completion.
+The record binds the final-image table hash, selected-set hash, dispatch ID,
+package, bundle, provider family, runner contracts, and actual adapter ID.
+These fields participate in the completion record and signed set hashes.
+Nsdb and Nuis independently parse and recompute the extended canonical
+material while retaining legacy canonicalization for records without the new
+authority. A final-image-bound completion without verified authority fails
+closed.
+
+Replay transcripts expose the aggregated dispatch identity, and
+`nsdb-yir-replay-cursor-record-v2` persists its contract, table hash,
+selected-set hash, and identity hash beside the broader final-image proof.
+Nsdb compares all values with the current handoff before resume; Nuis performs
+the same comparison independently before advertising `debug-resume`. The next
+continuity boundary is carrying this identity into cursor-lineage and repair
+journal ancestry.
 The embedded Nsld binding-table hash keeps the container protocol spelling
 `0x<16-hex>`, while selected-set and handoff-proof hashes use
 `fnv1a64:<16-hex>`. Consumers validate each field against its own contract

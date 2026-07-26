@@ -9,6 +9,7 @@ mod artifact_launch_evidence;
 mod artifact_materialization;
 mod artifact_nsdb_handoff;
 mod artifact_nsdb_handoff_binding;
+mod artifact_nsdb_handoff_dispatch;
 mod artifact_nsdb_handoff_integrity;
 mod artifact_nsdb_handoff_render;
 mod artifact_nsdb_handoff_signature;

@@ -201,7 +201,7 @@ mod cpu Main {
     assert!(json.contains("\"nsld_final_executable_output_nsdb_replay_status\":\"blocked\""));
     assert!(json.contains(
         "\"nsld_final_executable_output_nsdb_replay_first_blocker\":\"payload-execution-replay:blocked-checkpoint\""
-    ));
+    ), "{json}");
 }
 
 #[test]

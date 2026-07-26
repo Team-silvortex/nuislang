@@ -3,7 +3,7 @@ use std::{fs, path::Path};
 use crate::artifact_nsdb_handoff::read_persisted_nsdb_handoff;
 
 const CURSOR_FILE_NAME: &str = "nuis.nsdb.replay-cursor.toml";
-const CURSOR_PROTOCOL: &str = "nsdb-yir-replay-cursor-record-v1";
+const CURSOR_PROTOCOL: &str = "nsdb-yir-replay-cursor-record-v2";
 const TRANSCRIPT_PROTOCOL: &str = "nsdb-yir-replay-transcript-v1";
 const SOURCE_CONTRACT: &str = "nsdb-payload-execution-replay-plan-v1";
 
@@ -32,6 +32,7 @@ pub(crate) fn read_debugger_cursor_handoff(
     };
     let handoff = read_persisted_nsdb_handoff(Some(output_dir));
     let expected_proof_hash = handoff.final_image_binding_proof_hash();
+    let dispatch_identity = handoff.provider_dispatch_identity();
     let ready = field(&source, "protocol").as_deref() == Some(CURSOR_PROTOCOL)
         && field(&source, "transcript_contract").as_deref() == Some(TRANSCRIPT_PROTOCOL)
         && field(&source, "source_contract").as_deref() == Some(SOURCE_CONTRACT)
@@ -43,6 +44,14 @@ pub(crate) fn read_debugger_cursor_handoff(
         && expected_proof_hash.is_some_and(|expected| {
             field(&source, "final_image_binding_proof_hash").as_deref() == Some(expected)
         })
+        && field(&source, "provider_dispatch_authority_contract").as_deref()
+            == Some(dispatch_identity.contract.as_str())
+        && field(&source, "provider_dispatch_table_hash").as_deref()
+            == Some(dispatch_identity.table_hash.as_str())
+        && field(&source, "provider_dispatch_selected_set_hash").as_deref()
+            == Some(dispatch_identity.selected_set_hash.as_str())
+        && field(&source, "provider_dispatch_identity_hash").as_deref()
+            == Some(dispatch_identity.identity_hash.as_str())
         && field(&source, "status").as_deref() == Some("resume-ready")
         && field(&source, "after_frame_id").is_some_and(|value| !value.is_empty())
         && field(&source, "next_frame_id").is_some_and(|value| !value.is_empty())
@@ -128,11 +137,15 @@ mod tests {
         fs::write(
             root.join("nuis.nsdb.replay-cursor.toml"),
             format!(
-                "protocol = \"nsdb-yir-replay-cursor-record-v1\"\n\
+                "protocol = \"nsdb-yir-replay-cursor-record-v2\"\n\
                  transcript_contract = \"nsdb-yir-replay-transcript-v1\"\n\
                  source_contract = \"nsdb-payload-execution-replay-plan-v1\"\n\
                  identity_contract = \"nsdb-yir-replay-identity-v1\"\n\
                  final_image_binding_proof_hash = \"fnv1a64:981b10a68f4e3dd7\"\n\
+                 provider_dispatch_authority_contract = \"nuis-provider-completion-dispatch-authority-v1\"\n\
+                 provider_dispatch_table_hash = \"none\"\n\
+                 provider_dispatch_selected_set_hash = \"none\"\n\
+                 provider_dispatch_identity_hash = \"none\"\n\
                  manifest = \"{}\"\n\
                  status = \"resume-ready\"\n\
                  after_frame_id = \"frame-0\"\n\

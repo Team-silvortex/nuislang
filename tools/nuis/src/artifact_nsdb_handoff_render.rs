@@ -1,9 +1,13 @@
 use crate::{
     artifact_launch_binding::FINAL_IMAGE_BINDING_PROOF_CONTRACT,
     artifact_launch_evidence::RunArtifactLaunchEvidence,
+    artifact_nsdb_handoff_binding::PersistedFinalImageBindingProof,
 };
 
-pub(crate) fn render_launch_evidence_nsdb_handoff(evidence: &RunArtifactLaunchEvidence) -> String {
+pub(crate) fn render_launch_evidence_nsdb_handoff(
+    evidence: &RunArtifactLaunchEvidence,
+    fallback_proof: Option<&PersistedFinalImageBindingProof>,
+) -> String {
     let records = evidence.payload_execution_trace_records();
     let ready_record_count = records
         .iter()
@@ -23,7 +27,7 @@ pub(crate) fn render_launch_evidence_nsdb_handoff(evidence: &RunArtifactLaunchEv
     push_string(&mut out, "source", "run-artifact-launch-evidence");
     out.push_str(&format!("record_count = {}\n", records.len()));
     out.push_str(&format!("ready_record_count = {ready_record_count}\n"));
-    render_final_image_binding_proof(&mut out, evidence);
+    render_final_image_binding_proof(&mut out, evidence, fallback_proof);
     push_string(
         &mut out,
         "hetero_execution_closure_protocol",
@@ -77,8 +81,15 @@ pub(crate) fn render_launch_evidence_nsdb_handoff(evidence: &RunArtifactLaunchEv
     out
 }
 
-fn render_final_image_binding_proof(out: &mut String, evidence: &RunArtifactLaunchEvidence) {
+fn render_final_image_binding_proof(
+    out: &mut String,
+    evidence: &RunArtifactLaunchEvidence,
+    fallback: Option<&PersistedFinalImageBindingProof>,
+) {
     let Some(proof) = evidence.final_image_binding_proof() else {
+        if let Some(proof) = fallback {
+            render_persisted_final_image_binding_proof(out, proof);
+        }
         return;
     };
     push_string(
@@ -117,6 +128,50 @@ fn render_final_image_binding_proof(out: &mut String, evidence: &RunArtifactLaun
         proof.selected_set_hash.as_deref(),
     );
     push_string(out, "final_image_binding_proof_hash", &proof.proof_hash());
+}
+
+fn render_persisted_final_image_binding_proof(
+    out: &mut String,
+    proof: &PersistedFinalImageBindingProof,
+) {
+    push_string(
+        out,
+        "final_image_binding_proof_contract",
+        proof.contract.as_deref().unwrap_or(""),
+    );
+    out.push_str(&format!(
+        "final_image_metadata_binding_count = {}\n",
+        proof.binding_count
+    ));
+    push_optional_string(
+        out,
+        "final_image_metadata_binding_table_hash",
+        proof.binding_table_hash.as_deref(),
+    );
+    push_string(
+        out,
+        "final_image_metadata_binding_validation_status",
+        &proof.validation_status,
+    );
+    push_optional_string(
+        out,
+        "final_image_selected_provider_bundle_set_contract",
+        proof.selected_set_contract.as_deref(),
+    );
+    out.push_str(&format!(
+        "final_image_selected_provider_bundle_count = {}\n",
+        proof.selected_set_count.unwrap_or(0)
+    ));
+    push_optional_string(
+        out,
+        "final_image_selected_provider_bundle_set_hash",
+        proof.selected_set_hash.as_deref(),
+    );
+    push_optional_string(
+        out,
+        "final_image_binding_proof_hash",
+        proof.proof_hash.as_deref(),
+    );
 }
 
 fn push_optional_string(out: &mut String, key: &str, value: Option<&str>) {

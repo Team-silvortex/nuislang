@@ -208,15 +208,19 @@ nsdb replay <artifact-output-dir> \
   --json
 ```
 
-The file uses `nsdb-yir-replay-cursor-record-v1` and records the transcript and
+The file uses `nsdb-yir-replay-cursor-record-v2` and records the transcript and
 replay-source contracts, manifest, stopped frame, immediate next frame index,
-and next frame id. Nsdb refuses to persist blocked or terminal cursors. Loading
-fails closed on malformed or unknown fields, incompatible contracts, non-ready
-status, or a different manifest. `--resume-cursor` is mutually exclusive with
+next frame id, and provider-dispatch authority identity. That identity binds
+the final-image dispatch contract, table hash, selected-set hash, and their
+combined identity hash; it is separate from the broader final-image proof.
+Nsdb refuses to persist blocked or terminal cursors. Loading fails closed on
+malformed or unknown fields, incompatible contracts, a different dispatch
+identity, non-ready status, or a different manifest. `--resume-cursor` is mutually exclusive with
 manual resume fields and `--frame`, but may be combined with a later breakpoint.
 Nuis mirrors this public artifact through `nuis-debugger-cursor-handoff-v1` as
 path/readiness/status metadata in final-output and closure summaries. This is an
-adapter boundary: Nuis does not import Nsdb implementation types, and absence
+adapter boundary: Nuis independently recomputes the completion dispatch
+identity without importing Nsdb implementation types, and absence
 of an optional cursor does not block binary readiness. A ready mirror also
 publishes a cursor-specific `next_command` through final-output and closure
 summaries; unavailable or invalid mirrors publish no continuation command.

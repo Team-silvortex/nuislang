@@ -12,6 +12,7 @@ mod provider_carrier_channel_registry;
 #[cfg(unix)]
 mod provider_carrier_channel_unix;
 mod provider_carrier_input;
+mod provider_completion_dispatch;
 mod provider_completion_integrity;
 mod provider_completion_signature;
 mod provider_completion_trust_anchor;
@@ -127,6 +128,11 @@ pub struct PayloadExecutionReplaySummary {
     pub provider_completion_set_hash_claim: Option<String>,
     pub provider_completion_set_hash: Option<String>,
     pub provider_completion_set_hash_validation_status: String,
+    pub provider_completion_dispatch_authority_contract: String,
+    pub provider_completion_dispatch_authority_status: String,
+    pub provider_completion_dispatch_table_hash: Option<String>,
+    pub provider_completion_dispatch_selected_set_hash: Option<String>,
+    pub provider_completion_dispatch_identity_hash: Option<String>,
     pub provider_completions: Vec<PayloadExecutionProviderCompletion>,
     pub final_image_binding_proof_contract: Option<String>,
     pub final_image_binding_proof_status: String,
@@ -154,6 +160,20 @@ pub fn payload_execution_replay_summary(
             provider_family: event.provider_family.clone(),
             output_contract: event.output_contract.clone(),
             output_evidence: event.output_evidence.clone(),
+            dispatch_authority_contract: event.provider_completion_dispatch.contract.clone(),
+            dispatch_authority_status: event.provider_completion_dispatch.status.clone(),
+            dispatch_table_hash: event.provider_completion_dispatch.table_hash.clone(),
+            dispatch_selected_set_hash: event
+                .provider_completion_dispatch
+                .selected_set_hash
+                .clone(),
+            dispatch_id: event.provider_completion_dispatch.dispatch_id.clone(),
+            dispatch_package_id: event.provider_completion_dispatch.package_id.clone(),
+            dispatch_bundle_id: event.provider_completion_dispatch.bundle_id.clone(),
+            dispatch_runner_adapter_id: event
+                .provider_completion_dispatch
+                .runner_adapter_id
+                .clone(),
             record_hash: provider_completion_integrity::record_hash(
                 event,
                 if handoff.provider_completion_digest_contract == "none" {
@@ -255,6 +275,25 @@ pub fn payload_execution_replay_summary(
         provider_completion_set_hash,
         provider_completion_set_hash_validation_status: handoff
             .provider_completion_set_hash_validation_status,
+        provider_completion_dispatch_authority_contract: handoff
+            .provider_completion_dispatch_identity
+            .contract
+            .clone(),
+        provider_completion_dispatch_authority_status: handoff
+            .provider_completion_dispatch_identity
+            .status
+            .clone(),
+        provider_completion_dispatch_table_hash: optional_identity_field(
+            &handoff.provider_completion_dispatch_identity.table_hash,
+        ),
+        provider_completion_dispatch_selected_set_hash: optional_identity_field(
+            &handoff
+                .provider_completion_dispatch_identity
+                .selected_set_hash,
+        ),
+        provider_completion_dispatch_identity_hash: optional_identity_field(
+            &handoff.provider_completion_dispatch_identity.identity_hash,
+        ),
         provider_completions,
         final_image_binding_proof_contract: (handoff.final_image_binding_proof.contract != "none")
             .then(|| handoff.final_image_binding_proof.contract.clone()),
@@ -265,6 +304,10 @@ pub fn payload_execution_replay_summary(
         final_image_binding_proof_next_action,
         first_blocker,
     }
+}
+
+fn optional_identity_field(value: &str) -> Option<String> {
+    (value != "none").then(|| value.to_owned())
 }
 
 #[cfg(test)]

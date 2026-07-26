@@ -3,8 +3,12 @@ use crate::{
     artifact_nsdb_handoff_binding::{
         independently_verify as verify_final_image_binding_proof, PersistedFinalImageBindingProof,
     },
+    artifact_nsdb_handoff_dispatch::{
+        dispatch_identity, parse_provider_completions, PersistedProviderCompletion,
+        PersistedProviderDispatchIdentity,
+    },
     artifact_nsdb_handoff_integrity::{
-        legacy_set_hash, record_hash, set_hash, signature_message,
+        legacy_set_hash, set_hash, signature_message,
         CLAIM_AUTHORITY as PROVIDER_COMPLETION_CLAIM_AUTHORITY,
         CLAIM_AUTHORITY_CONTRACT as PROVIDER_COMPLETION_CLAIM_AUTHORITY_CONTRACT,
         DIGEST_FNV1A64_CONTRACT as PROVIDER_COMPLETION_DIGEST_FNV1A64_CONTRACT,
@@ -74,15 +78,6 @@ pub(crate) struct PersistedNsdbHandoffSummary {
     hetero_execution_closure_first_blocker: Option<String>,
     hetero_execution_closure_next_action: Option<String>,
     error: Option<String>,
-}
-
-#[derive(Clone)]
-pub(crate) struct PersistedProviderCompletion {
-    pub(crate) trace_id: String,
-    pub(crate) provider_family: String,
-    pub(crate) output_contract: String,
-    pub(crate) output_evidence: String,
-    pub(crate) record_hash: String,
 }
 
 impl PersistedNsdbHandoffSummary {
@@ -164,6 +159,13 @@ impl PersistedNsdbHandoffSummary {
 
     pub(crate) fn provider_completions(&self) -> &[PersistedProviderCompletion] {
         &self.provider_completions
+    }
+
+    pub(crate) fn provider_dispatch_identity(&self) -> PersistedProviderDispatchIdentity {
+        dispatch_identity(
+            &self.provider_completions,
+            self.final_image_binding_proof_status(),
+        )
     }
 
     pub(crate) fn hetero_execution_closure_ready(&self) -> bool {
@@ -420,34 +422,7 @@ pub(crate) fn read_persisted_nsdb_handoff(
     let record_digest_contract = provider_completion_digest_contract
         .as_deref()
         .unwrap_or(PROVIDER_COMPLETION_DIGEST_FNV1A64_CONTRACT);
-    let provider_completions = source
-        .split("[[records]]")
-        .skip(1)
-        .filter(|record| {
-            parse_string_toml_field(record, "execution_phase").as_deref()
-                == Some("provider-device-completion")
-        })
-        .map(|record| {
-            let trace_id =
-                parse_string_toml_field(record, "trace_id").unwrap_or_else(|| "none".to_owned());
-            let provider_family = parse_string_toml_field(record, "provider_family")
-                .unwrap_or_else(|| "none".to_owned());
-            let output_contract = parse_string_toml_field(record, "output_contract")
-                .unwrap_or_else(|| "none".to_owned());
-            let output_evidence = parse_string_toml_field(record, "output_evidence")
-                .unwrap_or_else(|| "none".to_owned());
-            let material =
-                format!("{trace_id}\0{provider_family}\0{output_contract}\0{output_evidence}");
-            PersistedProviderCompletion {
-                trace_id,
-                provider_family,
-                output_contract,
-                output_evidence,
-                record_hash: record_hash(record_digest_contract, material.as_bytes())
-                    .unwrap_or_else(|| "none".to_owned()),
-            }
-        })
-        .collect::<Vec<_>>();
+    let provider_completions = parse_provider_completions(&source, record_digest_contract);
     let first_provider_completion = provider_completions.first();
     let record_hashes = provider_completions
         .iter()
@@ -543,29 +518,37 @@ pub(crate) fn read_persisted_nsdb_handoff(
         &signature_message,
     );
     let provider_completion_signature_status = signature.status;
+    let provider_dispatch_identity = dispatch_identity(
+        &provider_completions,
+        &final_image_binding_proof.verification_status,
+    );
     let error = match (
         final_image_binding_proof.verification_status.as_str(),
         provider_completion_set_hash_validation_status.as_str(),
         provider_completion_claim_authority_status.as_str(),
         provider_completion_signature_status.as_str(),
+        provider_dispatch_identity.status.as_str(),
     ) {
-        (status, _, _, _)
+        (status, _, _, _, _)
             if !matches!(status, "verified" | "verified-empty" | "legacy-unbound") =>
         {
             Some(format!("final-image-binding-proof-{status}"))
         }
-        (_, "mismatch", _, _) => Some("provider-completion-set-hash-mismatch".to_owned()),
-        (_, "unsupported-digest-contract", _, _) => {
+        (_, "mismatch", _, _, _) => Some("provider-completion-set-hash-mismatch".to_owned()),
+        (_, "unsupported-digest-contract", _, _, _) => {
             Some("provider-completion-digest-contract-unsupported".to_owned())
         }
-        (_, _, "authority-missing", _) => {
+        (_, _, "authority-missing", _, _) => {
             Some("provider-completion-claim-authority-missing".to_owned())
         }
-        (_, _, "unsupported-authority-contract", _) => {
+        (_, _, "unsupported-authority-contract", _, _) => {
             Some("provider-completion-claim-authority-contract-unsupported".to_owned())
         }
-        (_, _, "authority-untrusted", _) => {
+        (_, _, "authority-untrusted", _, _) => {
             Some("provider-completion-claim-authority-untrusted".to_owned())
+        }
+        (_, _, _, _, status @ ("mismatch" | "final-image-authority-missing")) => {
+            Some(format!("provider-completion-dispatch-{status}"))
         }
         _ => provider_completion_signature_error(&provider_completion_signature_status),
     };
@@ -722,7 +705,28 @@ pub(crate) fn persist_launch_evidence_nsdb_handoff(
     }
 
     let path = output_dir.join(NSDB_HANDOFF_FILE_NAME);
-    let content = render_launch_evidence_nsdb_handoff(evidence);
+    let existing_handoff = read_persisted_nsdb_handoff(Some(output_dir));
+    if existing_handoff.provider_completion_count > 0 && existing_handoff.error.is_none() {
+        return LaunchEvidenceNsdbHandoffPersistence {
+            persisted: true,
+            path: Some(path),
+            record_count: existing_handoff.record_count,
+            ready_record_count: existing_handoff.ready_record_count,
+            first_trace_id: existing_handoff.first_trace_id,
+            error: None,
+        };
+    }
+    let existing = fs::read_to_string(&path).ok();
+    let existing_proof = existing
+        .as_deref()
+        .map(verify_final_image_binding_proof)
+        .filter(|proof| {
+            matches!(
+                proof.verification_status.as_str(),
+                "verified" | "verified-empty"
+            )
+        });
+    let content = render_launch_evidence_nsdb_handoff(evidence, existing_proof.as_ref());
     match fs::write(&path, content) {
         Ok(()) => LaunchEvidenceNsdbHandoffPersistence {
             persisted: true,

@@ -6,9 +6,11 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
+use crate::model::NsdbInspectReport;
+use crate::model::NsdbProviderCompletionDispatchIdentity;
 use crate::transcript::{NsdbReplayControl, NsdbReplayTranscript};
 
-const CURSOR_PROTOCOL: &str = "nsdb-yir-replay-cursor-record-v1";
+const CURSOR_PROTOCOL: &str = "nsdb-yir-replay-cursor-record-v2";
 const TRANSCRIPT_PROTOCOL: &str = "nsdb-yir-replay-transcript-v1";
 const SOURCE_CONTRACT: &str = "nsdb-payload-execution-replay-plan-v1";
 const IDENTITY_CONTRACT: &str = "nsdb-yir-replay-identity-v1";
@@ -40,12 +42,20 @@ pub(crate) fn persist_replay_cursor(
         .final_image_binding_proof_hash
         .as_deref()
         .ok_or_else(|| "cannot persist replay cursor without final image identity".to_owned())?;
+    let dispatch_identity_hash = transcript
+        .provider_dispatch_identity_hash
+        .as_deref()
+        .unwrap_or("none");
     let content = format!(
         "protocol = \"{CURSOR_PROTOCOL}\"\n\
          transcript_contract = \"{}\"\n\
          source_contract = \"{}\"\n\
          identity_contract = \"{}\"\n\
          final_image_binding_proof_hash = \"{}\"\n\
+         provider_dispatch_authority_contract = \"{}\"\n\
+         provider_dispatch_table_hash = \"{}\"\n\
+         provider_dispatch_selected_set_hash = \"{}\"\n\
+         provider_dispatch_identity_hash = \"{}\"\n\
          manifest = \"{}\"\n\
          status = \"resume-ready\"\n\
          after_frame_id = \"{}\"\n\
@@ -55,6 +65,10 @@ pub(crate) fn persist_replay_cursor(
         transcript.source_contract,
         transcript.identity_contract,
         proof_hash,
+        transcript.provider_dispatch_authority_contract,
+        transcript.provider_dispatch_table_hash,
+        transcript.provider_dispatch_selected_set_hash,
+        dispatch_identity_hash,
         escape_toml(&manifest.display().to_string()),
         escape_toml(after),
         next_index,
@@ -193,6 +207,7 @@ pub(crate) fn load_replay_cursor(
         "final_image_binding_proof_hash",
         expected_proof_hash,
     )?;
+    validate_embedded_dispatch_identity(&fields)?;
     require_field(&fields, "status", "resume-ready")?;
 
     let recorded_manifest = field(&fields, "manifest")?;
@@ -213,6 +228,84 @@ pub(crate) fn load_replay_cursor(
     })
 }
 
+pub(crate) fn load_replay_cursor_with_dispatch(
+    input: &Path,
+    manifest: &Path,
+    expected_proof_hash: &str,
+    expected_dispatch: &NsdbProviderCompletionDispatchIdentity,
+) -> Result<NsdbReplayControl, String> {
+    let control = load_replay_cursor(input, manifest, expected_proof_hash)?;
+    let source = fs::read_to_string(input).map_err(|error| {
+        format!(
+            "failed to read replay cursor `{}`: {error}",
+            input.display()
+        )
+    })?;
+    let fields = parse_cursor_fields(&source)?;
+    for (key, expected) in [
+        (
+            "provider_dispatch_authority_contract",
+            expected_dispatch.contract.as_str(),
+        ),
+        (
+            "provider_dispatch_table_hash",
+            expected_dispatch.table_hash.as_str(),
+        ),
+        (
+            "provider_dispatch_selected_set_hash",
+            expected_dispatch.selected_set_hash.as_str(),
+        ),
+        (
+            "provider_dispatch_identity_hash",
+            expected_dispatch.identity_hash.as_str(),
+        ),
+    ] {
+        require_field(&fields, key, expected)?;
+    }
+    Ok(control)
+}
+
+pub(crate) fn load_replay_cursor_for_report(
+    input: &Path,
+    manifest: &Path,
+    report: &NsdbInspectReport,
+) -> Result<NsdbReplayControl, String> {
+    let proof_hash = crate::handoff_binding::replay_identity_hash(
+        &report.payload_execution_handoff.final_image_binding_proof,
+    )?;
+    load_replay_cursor_with_dispatch(
+        input,
+        manifest,
+        proof_hash,
+        &report
+            .payload_execution_handoff
+            .provider_completion_dispatch_identity,
+    )
+}
+
+fn validate_embedded_dispatch_identity(fields: &BTreeMap<String, String>) -> Result<(), String> {
+    let contract = field(fields, "provider_dispatch_authority_contract")?;
+    let table_hash = field(fields, "provider_dispatch_table_hash")?;
+    let selected_set_hash = field(fields, "provider_dispatch_selected_set_hash")?;
+    let identity_hash = field(fields, "provider_dispatch_identity_hash")?;
+    if identity_hash == "none" {
+        if table_hash == "none" && selected_set_hash == "none" {
+            return Ok(());
+        }
+        return Err("replay cursor provider dispatch identity is incomplete".to_owned());
+    }
+    let actual = crate::provider_completion_dispatch::verified_identity_hash(
+        contract,
+        table_hash,
+        selected_set_hash,
+    )
+    .ok_or_else(|| "replay cursor provider dispatch identity is invalid".to_owned())?;
+    if identity_hash != actual {
+        return Err("replay cursor provider dispatch identity hash mismatch".to_owned());
+    }
+    Ok(())
+}
+
 fn parse_cursor_fields(source: &str) -> Result<BTreeMap<String, String>, String> {
     let mut fields = BTreeMap::new();
     for (index, line) in source.lines().enumerate() {
@@ -231,6 +324,10 @@ fn parse_cursor_fields(source: &str) -> Result<BTreeMap<String, String>, String>
                 | "source_contract"
                 | "identity_contract"
                 | "final_image_binding_proof_hash"
+                | "provider_dispatch_authority_contract"
+                | "provider_dispatch_table_hash"
+                | "provider_dispatch_selected_set_hash"
+                | "provider_dispatch_identity_hash"
                 | "manifest"
                 | "status"
                 | "after_frame_id"
@@ -310,7 +407,10 @@ fn escape_toml(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{load_replay_cursor, persist_cursor_content_atomically};
+    use super::{
+        load_replay_cursor, load_replay_cursor_with_dispatch, persist_cursor_content_atomically,
+    };
+    use crate::model::NsdbProviderCompletionDispatchIdentity;
     use std::{
         fs,
         path::{Path, PathBuf},
@@ -330,11 +430,15 @@ mod tests {
 
     fn cursor_source(manifest: &Path, extra: &str) -> String {
         format!(
-            "protocol = \"nsdb-yir-replay-cursor-record-v1\"\n\
+            "protocol = \"nsdb-yir-replay-cursor-record-v2\"\n\
              transcript_contract = \"nsdb-yir-replay-transcript-v1\"\n\
              source_contract = \"nsdb-payload-execution-replay-plan-v1\"\n\
              identity_contract = \"nsdb-yir-replay-identity-v1\"\n\
              final_image_binding_proof_hash = \"{TEST_PROOF_HASH}\"\n\
+             provider_dispatch_authority_contract = \"nuis-provider-completion-dispatch-authority-v1\"\n\
+             provider_dispatch_table_hash = \"none\"\n\
+             provider_dispatch_selected_set_hash = \"none\"\n\
+             provider_dispatch_identity_hash = \"none\"\n\
              manifest = \"{}\"\n\
              status = \"resume-ready\"\n\
              after_frame_id = \"frame-0\"\n\
@@ -433,6 +537,28 @@ mod tests {
         let error = load_replay_cursor(&cursor, &manifest, "fnv1a64:fedcba9876543210").unwrap_err();
 
         assert!(error.contains("final_image_binding_proof_hash"));
+        fs::remove_dir_all(root).expect("remove cursor test directory");
+    }
+
+    #[test]
+    fn rejects_cursor_from_another_provider_dispatch_identity() {
+        let root = temp_dir("provider-dispatch-mismatch");
+        let manifest = root.join("manifest.toml");
+        let cursor = root.join("cursor.toml");
+        fs::write(&manifest, "manifest = true\n").expect("write manifest");
+        fs::write(&cursor, cursor_source(&manifest, "")).expect("write cursor");
+        let expected = NsdbProviderCompletionDispatchIdentity {
+            contract: "nuis-provider-completion-dispatch-authority-v1".to_owned(),
+            status: "verified".to_owned(),
+            table_hash: "fnv1a64:1111111111111111".to_owned(),
+            selected_set_hash: "fnv1a64:2222222222222222".to_owned(),
+            identity_hash: "fnv1a64:3333333333333333".to_owned(),
+        };
+
+        let error =
+            load_replay_cursor_with_dispatch(&cursor, &manifest, TEST_PROOF_HASH, &expected)
+                .unwrap_err();
+        assert!(error.contains("provider_dispatch_table_hash"));
         fs::remove_dir_all(root).expect("remove cursor test directory");
     }
 

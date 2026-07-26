@@ -41,6 +41,26 @@ fn nsdb_replay_transcript_json_from_transcript(
             "debugger_transcript_final_image_binding_proof_hash",
             transcript.final_image_binding_proof_hash.as_deref(),
         ),
+        json_string_field(
+            "debugger_transcript_provider_dispatch_authority_contract",
+            &transcript.provider_dispatch_authority_contract,
+        ),
+        json_string_field(
+            "debugger_transcript_provider_dispatch_authority_status",
+            &transcript.provider_dispatch_authority_status,
+        ),
+        json_string_field(
+            "debugger_transcript_provider_dispatch_table_hash",
+            &transcript.provider_dispatch_table_hash,
+        ),
+        json_string_field(
+            "debugger_transcript_provider_dispatch_selected_set_hash",
+            &transcript.provider_dispatch_selected_set_hash,
+        ),
+        json_optional_string_field(
+            "debugger_transcript_provider_dispatch_identity_hash",
+            transcript.provider_dispatch_identity_hash.as_deref(),
+        ),
         json_string_field("debugger_transcript_status", transcript.status),
         json_bool_field("debugger_transcript_ready", transcript.ready),
         json_string_field(

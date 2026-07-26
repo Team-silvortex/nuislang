@@ -20,6 +20,7 @@ mod provider_carrier_channel_registry;
 #[cfg(unix)]
 mod provider_carrier_channel_unix;
 mod provider_carrier_input;
+mod provider_completion_dispatch;
 mod provider_completion_integrity;
 mod provider_completion_signature;
 mod provider_completion_trust_anchor;
@@ -178,10 +179,8 @@ fn run() -> Result<(), String> {
             let plan = nuisc::linker::build_link_plan_from_manifest(&manifest)?;
             let report = nsdb_inspect_report(&manifest, &plan, event_filter);
             if let Some(path) = cursor_input.as_deref() {
-                let proof_hash = crate::handoff_binding::replay_identity_hash(
-                    &report.payload_execution_handoff.final_image_binding_proof,
-                )?;
-                let loaded = crate::cursor::load_replay_cursor(path, &manifest, proof_hash)?;
+                let loaded =
+                    crate::cursor::load_replay_cursor_for_report(path, &manifest, &report)?;
                 replay_control.resume_after_frame_id = loaded.resume_after_frame_id;
                 replay_control.resume_next_frame_id = loaded.resume_next_frame_id;
             }

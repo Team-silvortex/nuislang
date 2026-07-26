@@ -119,6 +119,29 @@ pub(crate) fn print_nsdb_inspect_report(report: &NsdbInspectReport) {
         )
     );
     println!(
+        "  payload_execution_handoff_provider_dispatch_authority: {} status={} table={} selected_set={} identity={}",
+        report
+            .payload_execution_handoff
+            .provider_completion_dispatch_identity
+            .contract,
+        report
+            .payload_execution_handoff
+            .provider_completion_dispatch_identity
+            .status,
+        report
+            .payload_execution_handoff
+            .provider_completion_dispatch_identity
+            .table_hash,
+        report
+            .payload_execution_handoff
+            .provider_completion_dispatch_identity
+            .selected_set_hash,
+        report
+            .payload_execution_handoff
+            .provider_completion_dispatch_identity
+            .identity_hash,
+    );
+    println!(
         "  payload_execution_handoff_hetero_execution_closure_status: {}",
         report
             .payload_execution_handoff
@@ -505,6 +528,17 @@ pub(crate) fn print_nsdb_replay_transcript_with_control(
         "  debugger_transcript_final_image_binding_proof_hash: {}",
         transcript
             .final_image_binding_proof_hash
+            .as_deref()
+            .unwrap_or("<none>")
+    );
+    println!(
+        "  debugger_transcript_provider_dispatch_authority: {} status={} table={} selected_set={} identity={}",
+        transcript.provider_dispatch_authority_contract,
+        transcript.provider_dispatch_authority_status,
+        transcript.provider_dispatch_table_hash,
+        transcript.provider_dispatch_selected_set_hash,
+        transcript
+            .provider_dispatch_identity_hash
             .as_deref()
             .unwrap_or("<none>")
     );

@@ -18,6 +18,11 @@ pub(crate) struct NsdbReplayTranscript {
     pub(crate) source_contract: &'static str,
     pub(crate) identity_contract: &'static str,
     pub(crate) final_image_binding_proof_hash: Option<String>,
+    pub(crate) provider_dispatch_authority_contract: String,
+    pub(crate) provider_dispatch_authority_status: String,
+    pub(crate) provider_dispatch_table_hash: String,
+    pub(crate) provider_dispatch_selected_set_hash: String,
+    pub(crate) provider_dispatch_identity_hash: Option<String>,
     pub(crate) control_protocol: &'static str,
     pub(crate) control_mode: &'static str,
     pub(crate) control_selector: Option<String>,
@@ -84,6 +89,9 @@ pub(crate) fn build_replay_transcript_with_control(
     let control_result = apply_replay_control(&mut frames, plan_ready, control);
     let ready = plan_ready && control_result.blocker.is_none();
     let resume_cursor = replay_resume_cursor(&frames, &control_result);
+    let dispatch_identity = &report
+        .payload_execution_handoff
+        .provider_completion_dispatch_identity;
     NsdbReplayTranscript {
         protocol: "nsdb-yir-replay-transcript-v1",
         source_contract: plan.protocol,
@@ -93,6 +101,12 @@ pub(crate) fn build_replay_transcript_with_control(
         )
         .ok()
         .map(str::to_owned),
+        provider_dispatch_authority_contract: dispatch_identity.contract.clone(),
+        provider_dispatch_authority_status: dispatch_identity.status.clone(),
+        provider_dispatch_table_hash: dispatch_identity.table_hash.clone(),
+        provider_dispatch_selected_set_hash: dispatch_identity.selected_set_hash.clone(),
+        provider_dispatch_identity_hash: (dispatch_identity.identity_hash != "none")
+            .then(|| dispatch_identity.identity_hash.clone()),
         control_protocol: "nsdb-yir-replay-control-v1",
         control_mode: control_result.mode,
         control_selector: control_result.selector,

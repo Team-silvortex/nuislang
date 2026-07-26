@@ -960,10 +960,15 @@ Nsdb matches package, bundle, family, actual runner/adapter identity, and the
 registered runtime adapter against the final image. The official CoreML/Metal
 route executes again after seal and proves all selected bundles were
 authorized by the NSB. Mutable sidecars are now request-detail carriers rather
-than dispatch authority. The next continuity boundary is carrying the direct
-dispatch table hash and matched entry into provider completion, transcript,
-and replay cursor records. Acquisition and self-contained rebuild remain
-explicit Nuis orchestration rather than linker policy.
+than dispatch authority. Provider completions bind their matched final-image
+entry and dispatch/selected-set hashes under
+`nuis-provider-completion-dispatch-authority-v1`; those fields participate in
+the signed completion-set digest. Nsdb and Nuis independently aggregate the
+same identity into replay transcripts and
+`nsdb-yir-replay-cursor-record-v2`, and both reject cursor drift. The next
+continuity boundary is binding this identity into cursor lineage and repair
+journal ancestry. Acquisition and self-contained rebuild remain explicit Nuis
+orchestration rather than linker policy.
 The contract keeps Nsld container table hashes in `0x<16-hex>` form and uses
 `fnv1a64:<16-hex>` for selected-set and proof hashes; independent consumers
 validate those field-specific encodings rather than conflating them.
@@ -1345,7 +1350,7 @@ frame; stale, mismatched, incomplete, and terminal cursors consume nothing. The
 PixelMagic smoke now proves a real multi-checkpoint stop-resume-stop command
 chain against heterogeneous trace records: Nsdb falls back from absent
 payload-handoff events to ordered metadata/device-dispatch trace frames, persists
-`nsdb-yir-replay-cursor-record-v1`, resumes exactly at the advertised successor,
+`nsdb-yir-replay-cursor-record-v2`, resumes exactly at the advertised successor,
 and stops again through `--resume-cursor`. Cursor loading validates the record,
 transcript/source contracts, and manifest before applying the exact successor.
 Nuis adapts that file through `nuis-debugger-cursor-handoff-v1`, mirroring its

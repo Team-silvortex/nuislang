@@ -19,7 +19,12 @@ pub(super) fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
                 "\"debugger_transcript_identity_contract\":\"nsdb-yir-replay-identity-v1\""
             )
             && replay_stdout
-                .contains("\"debugger_transcript_final_image_binding_proof_hash\":\"fnv1a64:",),
+                .contains("\"debugger_transcript_final_image_binding_proof_hash\":\"fnv1a64:",)
+            && replay_stdout.contains(
+                "\"debugger_transcript_provider_dispatch_authority_status\":\"verified\"",
+            )
+            && replay_stdout
+                .contains("\"debugger_transcript_provider_dispatch_identity_hash\":\"0x",),
         "provider-complete final image must expose a replay identity\n{replay_stdout}"
     );
     let frame_ids = json_string_values(&replay_stdout, "frame_id");
@@ -45,7 +50,7 @@ pub(super) fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
     assert_success(&stopped, "nsdb persist first hetero replay cursor");
     assert_file_contains(
         &cursor_path,
-        "protocol = \"nsdb-yir-replay-cursor-record-v1\"",
+        "protocol = \"nsdb-yir-replay-cursor-record-v2\"",
         "persisted replay cursor protocol",
     );
     assert_file_contains(
@@ -57,6 +62,11 @@ pub(super) fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
         &cursor_path,
         "final_image_binding_proof_hash = \"fnv1a64:",
         "persisted replay cursor final image identity",
+    );
+    assert_file_contains(
+        &cursor_path,
+        "provider_dispatch_identity_hash = \"0x",
+        "persisted replay cursor provider dispatch identity",
     );
     assert_file_contains(
         &cursor_path,

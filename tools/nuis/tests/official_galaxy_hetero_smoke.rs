@@ -29,13 +29,6 @@ fn run_nsld(args: &[&str]) -> std::process::Output {
             .output()
             .unwrap_or_else(|error| panic!("failed to run nsld {:?}: {error}", args));
     }
-    let fallback = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/debug/nsld");
-    if fallback.exists() {
-        return Command::new(fallback)
-            .args(args)
-            .output()
-            .unwrap_or_else(|error| panic!("failed to run nsld {:?}: {error}", args));
-    }
     Command::new("cargo")
         .args(["run", "-q", "-p", "nsld", "--"])
         .args(args)

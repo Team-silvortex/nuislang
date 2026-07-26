@@ -195,6 +195,9 @@ pub fn execute_provider_samples(
         }
         output_payloads.push(write_provider_output_payload(output_dir, record, &adapter)?);
     }
+    if final_image_dispatch.available {
+        crate::handoff::persist_provider_completion_handoff(output_dir, &manifest.records)?;
+    }
     let first_native_output = output_payloads
         .first()
         .and_then(|payload| payload.native_outputs.first())

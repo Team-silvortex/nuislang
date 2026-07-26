@@ -177,6 +177,7 @@ fn projected_hetero_runtime_events(report: &NsdbInspectReport) -> Vec<NsdbPayloa
             provider_family: "none".to_owned(),
             output_contract: "none".to_owned(),
             output_evidence: "none".to_owned(),
+            provider_completion_dispatch: Default::default(),
             first_blocker: if matches!(record.status.as_str(), "metadata-only" | "trace-ready") {
                 "none".to_owned()
             } else {

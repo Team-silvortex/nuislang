@@ -574,11 +574,15 @@ mod tests {
         fs::write(
             &cursor,
             format!(
-                "protocol = \"nsdb-yir-replay-cursor-record-v1\"\n\
+                "protocol = \"nsdb-yir-replay-cursor-record-v2\"\n\
                  transcript_contract = \"nsdb-yir-replay-transcript-v1\"\n\
                  source_contract = \"nsdb-payload-execution-replay-plan-v1\"\n\
                  identity_contract = \"nsdb-yir-replay-identity-v1\"\n\
                  final_image_binding_proof_hash = \"{TEST_PROOF_HASH}\"\n\
+                 provider_dispatch_authority_contract = \"nuis-provider-completion-dispatch-authority-v1\"\n\
+                 provider_dispatch_table_hash = \"none\"\n\
+                 provider_dispatch_selected_set_hash = \"none\"\n\
+                 provider_dispatch_identity_hash = \"none\"\n\
                  manifest = \"{}\"\nstatus = \"resume-ready\"\n\
                  after_frame_id = \"frame-0\"\nnext_frame_index = 1\n\
                  next_frame_id = \"frame-1\"\n",

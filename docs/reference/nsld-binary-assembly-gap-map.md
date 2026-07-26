@@ -374,6 +374,17 @@ field-level diagnostic such as
 It also compares relocation records field-by-field; for example, a changed
 symbol index is reported as `relocation_record[0].symbol_index mismatch`.
 
+The final-image dispatch handoff now continues past loader verification.
+Post-seal Nsdb execution writes
+`nuis-provider-completion-dispatch-authority-v1` into each completion, binding
+the immutable dispatch table, selected set, matched entry, and actual runner
+adapter. Completion-set hashes cover that authority. Nsdb and Nuis then
+independently carry the aggregate identity into replay transcripts and
+`nsdb-yir-replay-cursor-record-v2`; a cursor from another dispatch table is
+rejected even when its frame IDs and manifest still match. Cursor lineage and
+repair-journal ancestry remain the next persistence layer to receive this
+identity.
+
 ## Success Boundary
 
 Nsld reaches the first real binary assembly milestone when:

@@ -82,4 +82,26 @@ fn assemble_provider_complete_final_image(
         executed.final_image_dispatch_selected_set_hash,
         executed.selected_provider_bundle_set_hash
     );
+    let replay = nsdb::payload_execution_replay_summary(output_dir);
+    assert_eq!(
+        replay.provider_completion_dispatch_authority_status,
+        "verified"
+    );
+    assert_eq!(
+        replay.provider_completion_dispatch_table_hash.as_deref(),
+        Some(executed.final_image_dispatch_table_hash.as_str())
+    );
+    assert_eq!(
+        replay
+            .provider_completion_dispatch_selected_set_hash
+            .as_deref(),
+        Some(executed.final_image_dispatch_selected_set_hash.as_str())
+    );
+    assert!(replay.provider_completion_dispatch_identity_hash.is_some());
+    assert_eq!(replay.provider_completions.len(), provider_record_count);
+    assert!(replay.provider_completions.iter().all(|completion| {
+        completion.dispatch_authority_status == "verified"
+            && completion.dispatch_id != "none"
+            && completion.dispatch_runner_adapter_id != "none"
+    }));
 }
