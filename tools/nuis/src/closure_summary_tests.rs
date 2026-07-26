@@ -7,6 +7,19 @@ fn final_output_closure_becomes_ready_when_replay_evidence_is_ready() {
     final_output.debugger_cursor_lineage_repair_evicted_prefix_hash =
         Some("0x0123456789abcdef".to_owned());
     final_output.debugger_cursor_lineage_repair_window_hash = Some("0xfedcba9876543210".to_owned());
+    final_output.debugger_cursor_lineage_provider_dispatch_identity_hash =
+        Some("0x89abcdef01234567".to_owned());
+    final_output
+        .provider_dispatch_identity_capability
+        .source_status = "lineage-ready".to_owned();
+    final_output.provider_dispatch_identity_capability.ready = true;
+    final_output.provider_dispatch_identity_capability.status = "verified";
+    final_output
+        .provider_dispatch_identity_capability
+        .identity_hash = Some("0x89abcdef01234567".to_owned());
+    final_output
+        .provider_dispatch_identity_capability
+        .first_blocker = None;
     final_output.nsdb_provider_completion_count = 2;
     final_output.nsdb_first_provider_family = Some("metal:apple-silicon-gpu".to_owned());
     final_output.nsdb_first_provider_output_contract =
@@ -152,6 +165,10 @@ fn final_output_closure_becomes_ready_when_replay_evidence_is_ready() {
         lineage.repair_window_hash.as_deref(),
         Some("0xfedcba9876543210")
     );
+    assert_eq!(
+        lineage.provider_dispatch_identity_hash.as_deref(),
+        Some("0x89abcdef01234567")
+    );
     let fields = summary.json_fields();
     assert!(fields.contains(
         &"\"closure_summary_artifact_chain_safe_next_contract\":\"nsld-drive-safe-next-v1\""
@@ -164,6 +181,22 @@ fn final_output_closure_becomes_ready_when_replay_evidence_is_ready() {
     assert!(fields.contains(&"\"closure_summary_debugger_cursor_lineage_repair_evicted_prefix_hash\":\"0x0123456789abcdef\"".to_owned()));
     assert!(fields.contains(
         &"\"closure_summary_debugger_cursor_lineage_repair_window_hash\":\"0xfedcba9876543210\""
+            .to_owned()
+    ));
+    assert!(fields.contains(
+        &"\"closure_summary_debugger_cursor_lineage_provider_dispatch_identity_hash\":\"0x89abcdef01234567\""
+            .to_owned()
+    ));
+    assert!(fields.contains(
+        &"\"closure_summary_object_package_provider_dispatch_identity_hash\":\"0x89abcdef01234567\""
+            .to_owned()
+    ));
+    assert!(fields.contains(
+        &"\"closure_summary_debugger_api_provider_dispatch_identity_hash\":\"0x89abcdef01234567\""
+            .to_owned()
+    ));
+    assert!(fields.contains(
+        &"\"closure_summary_provider_dispatch_identity_projection_source\":\"debugger_cursor_lineage_provider_dispatch_identity_hash\""
             .to_owned()
     ));
     assert!(fields.contains(&"\"closure_summary_provider_completion_count\":2".to_owned()));
@@ -446,12 +479,25 @@ fn final_output_summary(
         debugger_cursor_status: "cursor-unavailable".to_owned(),
         debugger_cursor_next_command: None,
         debugger_cursor_lineage_contract: "nuis-debugger-cursor-lineage-mirror-v1".to_owned(),
-        debugger_cursor_lineage_source_protocol: "nsdb-yir-replay-cursor-lineage-v1".to_owned(),
+        debugger_cursor_lineage_source_protocol: "nsdb-yir-replay-cursor-lineage-v2".to_owned(),
         debugger_cursor_lineage_path: "out/nuis.nsdb.replay-cursor.lineage.toml".to_owned(),
         debugger_cursor_lineage_ready: false,
         debugger_cursor_lineage_status: "lineage-unavailable".to_owned(),
         debugger_cursor_lineage_entry_count: 0,
         debugger_cursor_lineage_latest_hash: None,
+        debugger_cursor_lineage_provider_dispatch_identity_hash: None,
+        provider_dispatch_identity_capability:
+            crate::workflow::ValidatedProviderDispatchIdentityCapability {
+                contract: "nuis-validated-provider-dispatch-identity-capability-v1",
+                source_contract: "nuis-debugger-cursor-lineage-mirror-v1".to_owned(),
+                source_status: "lineage-unavailable".to_owned(),
+                ready: false,
+                status: "blocked",
+                identity_hash: None,
+                first_blocker: Some(
+                    "validated-provider-dispatch-identity-source-unavailable".to_owned(),
+                ),
+            },
         debugger_cursor_lineage_first_blocker: None,
         debugger_cursor_lineage_next_action: None,
         debugger_cursor_lineage_next_command: None,

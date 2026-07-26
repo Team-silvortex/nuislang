@@ -133,16 +133,19 @@ fn owned_select_tree_validates_selected_exact_one_pointer_transfer() {
             "0",
             "1",
             "owned_transfer",
+            "address_kind=node",
+            "nullable=false",
             "head",
         ],
     );
     let mut state = ExecutionState::default();
+    let head = state.alloc_heap_node(17, None);
     state
         .values
         .insert("bytes".to_owned(), Value::OwnedBytes(vec![1, 2]));
     state
         .values
-        .insert("head".to_owned(), Value::Pointer(Some(17)));
+        .insert("head".to_owned(), Value::Pointer(Some(head)));
     assert_eq!(
         cpu.execute(&node, &resource, &mut state).unwrap(),
         Value::OwnedBytes(vec![1, 2])
@@ -152,5 +155,68 @@ fn owned_select_tree_validates_selected_exact_one_pointer_transfer() {
     assert!(cpu
         .execute(&node, &resource, &mut state)
         .unwrap_err()
-        .contains("null owned pointer transfer"));
+        .contains("null non-nullable node owned pointer transfer"));
+}
+
+#[test]
+fn owned_select_tree_consumes_transfer_kind_and_nullability_metadata() {
+    let cpu = CpuMod;
+    let resource = cpu_resource();
+    let transfer_node = |nullable: bool| {
+        cpu_node(
+            "selected",
+            "cpu.select_owned_bytes_tree",
+            vec![
+                "1",
+                "bytes",
+                "call",
+                "consume",
+                "0",
+                "1",
+                "owned_transfer",
+                "address_kind=buffer",
+                if nullable {
+                    "nullable=true"
+                } else {
+                    "nullable=false"
+                },
+                "scratch",
+            ],
+        )
+    };
+    let mut state = ExecutionState::default();
+    state
+        .values
+        .insert("bytes".to_owned(), Value::OwnedBytes(vec![1, 2]));
+    let scratch = state.alloc_heap_buffer(2, 9);
+    state
+        .values
+        .insert("scratch".to_owned(), Value::Pointer(Some(scratch)));
+    assert_eq!(
+        cpu.execute(&transfer_node(false), &resource, &mut state)
+            .unwrap(),
+        Value::OwnedBytes(vec![1, 2])
+    );
+
+    let head = state.alloc_heap_node(17, None);
+    state
+        .values
+        .insert("scratch".to_owned(), Value::Pointer(Some(head)));
+    assert!(cpu
+        .execute(&transfer_node(false), &resource, &mut state)
+        .unwrap_err()
+        .contains("node pointer"));
+
+    state
+        .values
+        .insert("scratch".to_owned(), Value::Pointer(None));
+    assert!(cpu
+        .execute(&transfer_node(false), &resource, &mut state)
+        .unwrap_err()
+        .contains("null non-nullable buffer owned pointer transfer"));
+    assert_eq!(
+        cpu.execute(&transfer_node(true), &resource, &mut state)
+            .unwrap(),
+        Value::OwnedBytes(vec![1, 2])
+    );
 }

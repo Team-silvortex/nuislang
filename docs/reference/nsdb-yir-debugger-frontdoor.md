@@ -237,19 +237,30 @@ the containing directory on Unix. Validation failures preserve the previous
 cursor and remove the temporary file. Each successful save also best-effort
 updates the sibling
 `nuis.nsdb.replay-cursor.lineage.toml` sidecar under
-`nsdb-yir-replay-cursor-lineage-v1`. It retains at most eight entries containing
-only a monotonic sequence, previous/current FNV-1a content hashes, and public
-after/next frame ids. Existing lineage must parse, match the cursor path, and
-continue the hash chain before replacement; a damaged sidecar is preserved and
-does not invalidate the already-installed authoritative cursor.
+`nsdb-yir-replay-cursor-lineage-v2`. It retains at most eight entries containing
+a monotonic sequence, previous/current FNV-1a content hashes, public after/next
+frame ids, final-image proof hash, and provider dispatch identity hash. The
+header repeats both identities. Existing lineage must parse, match the cursor
+path, preserve both identities, and continue the hash chain before replacement;
+a damaged sidecar is preserved and does not invalidate the already-installed
+authoritative cursor.
 
 Nuis consumes that sidecar through its own
 `nuis-debugger-cursor-lineage-mirror-v1` artifact adapter rather than importing
 Nsdb types. Final-output and closure summaries expose the source protocol,
-path, readiness, status, bounded entry count, and latest cursor hash. Readiness
-also requires the latest lineage hash to match the authoritative cursor bytes.
-Missing lineage remains optional; stale or malformed lineage is reported as
-`lineage-invalid` without blocking cursor continuation.
+path, readiness, status, bounded entry count, latest cursor hash, and the
+lineage-validated provider dispatch identity hash. Readiness also requires the
+latest lineage hash to match the authoritative cursor bytes. Display layers do
+not recompute provider authority: they only copy the identity emitted by the
+independent Nuis lineage mirror. Missing lineage remains optional; stale or
+malformed lineage is reported as `lineage-invalid` without blocking cursor
+continuation.
+
+Nuis lifts that accepted mirror into
+`nuis-validated-provider-dispatch-identity-capability-v1`. Object-package
+summary and debugger API projections consume the same capability and expose
+the same identity hash, source contract, source status, readiness, and blocker.
+They never parse the Nsdb lineage or final image independently.
 
 Invalid mirrors also expose a stable first-blocker code plus
 `repair-cursor-lineage` and a concrete
@@ -262,14 +273,16 @@ a content-hash-qualified `.invalid-<hash>.toml` archive before a one-entry
 lineage is rebuilt atomically from the current cursor. Repeating repair is
 idempotent. Actual rebuilds also append an atomically validated, bounded audit
 entry to `nuis.nsdb.replay-cursor.lineage-repairs.toml` under
-`nsdb-yir-replay-cursor-lineage-repair-journal-v5`; healthy `already-ready`
+`nsdb-yir-replay-cursor-lineage-repair-journal-v6`; healthy `already-ready`
 probes do not modify this journal. Each entry records the archived path and
-content hash plus the rebuilt cursor hash. Every retained event also carries a
-canonical `previous_event_hash`/`current_event_hash` pair. Nsdb and Nuis both
-recompute that event-content chain independently, so changing a retained field
-or breaking retained adjacency invalidates the journal. Bounded rotation keeps
-the predecessor hash on the first retained event, allowing the remaining eight
-events to stay internally verifiable. The v4 header persists a monotonic
+content hash plus the rebuilt cursor hash and provider dispatch identity hash.
+Every retained event also carries a canonical
+`previous_event_hash`/`current_event_hash` pair. Nsdb and Nuis both recompute
+that event-content chain independently, so changing a retained field, changing
+the dispatch identity, or breaking retained adjacency invalidates the journal.
+Bounded rotation keeps the predecessor hash on the first retained event,
+allowing the remaining eight events to stay internally verifiable. The v4
+header persists a monotonic
 `rotation_generation` plus `evicted_prefix_hash`. An unrotated journal must
 start at sequence zero with a `none` prefix; a rotated journal must retain a
 full eight-entry window whose first sequence and predecessor match the header.
@@ -280,9 +293,10 @@ Nuis validates this journal independently through
 summaries retain the journal status/count, latest mutation flag, archived
 path/hash, rebuilt hash, validated rotation generation, and evicted-prefix hash
 after command stdout has disappeared. Nuis also derives a canonical
-`repair_window_hash` from the protocol, lineage path, rotation metadata,
-retained event head/tail, and authoritative lineage hash. Nsdb v5 persists the
-same producer-computed digest in the journal header; both Nsdb and Nuis reject
+`repair_window_hash` from the protocol, lineage path, provider dispatch
+identity, rotation metadata, retained event head/tail, and authoritative
+lineage hash. Nsdb v6 persists the same producer-computed digest in the journal
+header; both Nsdb and Nuis reject
 a mismatch after independently recomputing it. The digest is stable across TOML
 formatting changes but changes when the validated window advances.
 Readiness

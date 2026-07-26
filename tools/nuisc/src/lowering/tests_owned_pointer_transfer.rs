@@ -57,6 +57,22 @@ fn lowers_exact_one_owned_pointer_transfer_across_selected_helpers() {
             .count(),
         2
     );
+    assert_eq!(
+        tree.op
+            .args
+            .iter()
+            .filter(|arg| arg.as_str() == "address_kind=node")
+            .count(),
+        2
+    );
+    assert_eq!(
+        tree.op
+            .args
+            .iter()
+            .filter(|arg| arg.as_str() == "nullable=false")
+            .count(),
+        2
+    );
     let profile = yir_core::glm_profile_for_operation(&tree.op);
     assert_eq!(
         profile
@@ -113,9 +129,90 @@ fn rejects_asymmetric_owned_pointer_transfer_across_selected_helpers() {
 
     let error = lower_nir_to_yir_builtin_cpu(&module).unwrap_err();
     assert!(
-        error.contains("same moved Node set on every reachable leaf"),
+        error.contains("same moved address metadata set on every reachable leaf"),
         "unexpected diagnostic: {error}"
     );
+}
+
+#[test]
+fn lowers_explicit_node_and_buffer_transfer_metadata() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn consume_left(bytes: Bytes, head: ref Node, scratch: ref Buffer) -> Bytes {
+            let observed: i64 = load_value(head) + load_at(scratch, 0);
+            free(head);
+            free(scratch);
+            return move(bytes);
+          }
+
+          fn consume_right(bytes: Bytes, head: ref Node, scratch: ref Buffer) -> Bytes {
+            let observed: i64 = load_value(head) + load_at(scratch, 0);
+            free(head);
+            free(scratch);
+            return move(bytes);
+          }
+
+          fn choose(bytes: Bytes, selector: bool) -> Bytes {
+            let head: ref Node = alloc_node(17, null());
+            let scratch: ref Buffer = alloc_buffer(2, 9);
+            if selector {
+              return consume_left(move(bytes), move(head), move(scratch));
+            } else {
+              return consume_right(move(bytes), move(head), move(scratch));
+            }
+          }
+
+          fn main() -> i64 {
+            let source: ref Buffer = alloc_buffer(1, 7);
+            let bytes: Bytes = copy_bytes(source);
+            let selected: Bytes = choose(move(bytes), true);
+            let len: i64 = bytes_len(selected);
+            drop_bytes(selected);
+            free(source);
+            return len;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let yir =
+        lower_nir_to_yir_builtin_cpu(&module).expect("typed Node/Buffer transfer should lower");
+    let tree = yir
+        .nodes
+        .iter()
+        .find(|node| node.op.instruction == "select_owned_bytes_tree")
+        .expect("typed transfer tree");
+    assert_eq!(
+        tree.op
+            .args
+            .iter()
+            .filter(|arg| arg.as_str() == "address_kind=node")
+            .count(),
+        2
+    );
+    assert_eq!(
+        tree.op
+            .args
+            .iter()
+            .filter(|arg| arg.as_str() == "address_kind=buffer")
+            .count(),
+        2
+    );
+    assert_eq!(
+        tree.op
+            .args
+            .iter()
+            .filter(|arg| arg.as_str() == "nullable=false")
+            .count(),
+        4
+    );
+
+    let llvm_ir = yir_lower_llvm::emit_module(&yir).expect("typed transfer LLVM lowering");
+    assert!(llvm_ir.contains("call ptr @nuis_fn_consume_left(ptr"));
+    assert!(llvm_ir.contains("call ptr @nuis_fn_consume_right(ptr"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.select_owned_bytes_tree"));
 }
 
 #[test]

@@ -414,6 +414,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_NSLD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
             "validate_provider_records_against_final_image",
             "final-image-dispatch:sidecar-runner-drift",
             "independently_loads_verified_dispatch_from_final_image",
+            "unready_launcher_remains_pre_seal_without_reading_missing_image",
             "rejects_final_image_adapter_hash_drift",
         ],
     },

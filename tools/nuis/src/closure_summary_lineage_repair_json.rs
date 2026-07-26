@@ -5,6 +5,10 @@ pub(crate) fn lineage_repair_json_fields(
 ) -> Vec<String> {
     vec![
         crate::json_optional_string_field(
+            "closure_summary_debugger_cursor_lineage_provider_dispatch_identity_hash",
+            mirror.and_then(|mirror| mirror.provider_dispatch_identity_hash.as_deref()),
+        ),
+        crate::json_optional_string_field(
             "closure_summary_debugger_cursor_lineage_repair_contract",
             mirror.map(|mirror| mirror.repair_contract.as_str()),
         ),

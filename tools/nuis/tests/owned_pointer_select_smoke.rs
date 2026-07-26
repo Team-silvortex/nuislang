@@ -44,14 +44,22 @@ fn owned_pointer_select_runs_as_native_binary() {
     assert!(yir.contains("address_kind=node"));
     assert!(yir.contains("address_kind=buffer"));
     assert!(yir.contains("nullable=true"));
+    assert_eq!(yir.matches("owned_transfer").count(), 4);
+    assert!(yir.matches("address_kind=node").count() >= 3);
+    assert!(yir.matches("address_kind=buffer").count() >= 3);
+    assert!(yir.matches("nullable=false").count() >= 6);
 
     let llvm = read(&output_dir.join("owned_pointer_select_demo.ll"));
     assert!(llvm.contains("phi ptr"));
-    assert_eq!(llvm.matches("call void @free(ptr").count(), 9);
+    assert!(llvm.contains("call ptr @nuis_fn_consume_transfer_left(ptr"));
+    assert!(llvm.contains("call ptr @nuis_fn_consume_transfer_right(ptr"));
+    assert_eq!(llvm.matches("call void @free(ptr").count(), 14);
     assert!(!llvm.contains("deferred lowering for cpu.branch_effect"));
+    assert!(!llvm.contains("deferred lowering for cpu.select_owned_bytes_tree"));
 
     let run = Command::new(output_dir.join("owned_pointer_select_demo"))
         .output()
         .expect("run owned pointer select demo");
-    assert_eq!(run.status.code(), Some(78));
+    assert_eq!(run.status.code(), Some(94));
+    fs::remove_dir_all(&output_dir).expect("clean owned pointer select smoke output");
 }

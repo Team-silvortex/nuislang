@@ -324,16 +324,41 @@ fn owned_select_tree_protocol_rejects_invalid_owner_paths() {
         "0".to_owned(),
         "1".to_owned(),
         "owned_transfer".to_owned(),
+        "address_kind=node".to_owned(),
+        "nullable=false".to_owned(),
         "head".to_owned(),
         "call".to_owned(),
         "consume_right".to_owned(),
         "0".to_owned(),
         "1".to_owned(),
         "owned_transfer".to_owned(),
+        "address_kind=node".to_owned(),
+        "nullable=false".to_owned(),
         "head".to_owned(),
     ];
     let parsed =
         crate::parse_owned_select_tree_args(&owned_transfer).expect("exact-one pointer transfer");
+    let crate::OwnedSelectTree::If {
+        then_tree,
+        else_tree,
+        ..
+    } = &parsed.tree
+    else {
+        panic!("expected pointer-transfer branch");
+    };
+    for branch in [then_tree.as_ref(), else_tree.as_ref()] {
+        let crate::OwnedSelectTree::Call { scalar_args, .. } = branch else {
+            panic!("expected pointer-transfer call");
+        };
+        assert!(matches!(
+            &scalar_args[0],
+            crate::OwnedSelectScalarArg::OwnedTransfer {
+                value: "head",
+                address_kind: crate::OwnedSelectTransferAddressKind::Node,
+                nullable: false,
+            }
+        ));
+    }
     let mut transfers = Vec::new();
     crate::owned_select_tree_transfers(&parsed.tree, &mut transfers);
     assert_eq!(transfers, ["head"]);
@@ -351,14 +376,42 @@ fn owned_select_tree_protocol_rejects_invalid_owner_paths() {
         .any(|access| access.input == "head" && access.mode == GlmUseMode::Read));
 
     let mut asymmetric = owned_transfer.clone();
-    asymmetric.truncate(asymmetric.len() - 2);
+    asymmetric.truncate(asymmetric.len() - 4);
     asymmetric.extend(["owner".to_owned(), "0".to_owned()]);
     assert!(crate::parse_owned_select_tree_args(&asymmetric).is_none());
 
+    let mut metadata_mismatch = owned_transfer.clone();
+    let second_kind = metadata_mismatch
+        .iter()
+        .rposition(|arg| arg == "address_kind=node")
+        .unwrap();
+    metadata_mismatch[second_kind] = "address_kind=buffer".to_owned();
+    assert!(crate::parse_owned_select_tree_args(&metadata_mismatch).is_none());
+
     let mut duplicate = owned_transfer;
     duplicate[7] = "2".to_owned();
-    duplicate.splice(10..10, ["owned_transfer".to_owned(), "head".to_owned()]);
+    duplicate.splice(
+        12..12,
+        [
+            "owned_transfer".to_owned(),
+            "address_kind=node".to_owned(),
+            "nullable=false".to_owned(),
+            "head".to_owned(),
+        ],
+    );
     assert!(crate::parse_owned_select_tree_args(&duplicate).is_none());
+
+    let legacy_untyped = vec![
+        "1".to_owned(),
+        "bytes".to_owned(),
+        "call".to_owned(),
+        "consume".to_owned(),
+        "0".to_owned(),
+        "1".to_owned(),
+        "owned_transfer".to_owned(),
+        "head".to_owned(),
+    ];
+    assert!(crate::parse_owned_select_tree_args(&legacy_untyped).is_none());
 }
 
 #[test]

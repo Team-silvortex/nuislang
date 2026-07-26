@@ -749,6 +749,11 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
         ),
     );
     fields.extend(
+        crate::closure_summary_dispatch_identity::ProviderDispatchIdentityClosureMirror::json_fields(
+            closure_summary.provider_dispatch_identity.as_ref(),
+        ),
+    );
+    fields.extend(
         crate::closure_summary_lineage_repair_json::lineage_repair_json_fields(
             closure_summary.debugger_cursor_lineage.as_ref(),
         ),

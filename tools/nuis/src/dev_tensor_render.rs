@@ -3,9 +3,12 @@ use crate::{
         dev_tensor_coverage_summary, dev_tensor_drift_summary, dev_tensor_summary, DevTensorCell,
     },
     dev_tensor_data::DEV_TENSOR_CELLS,
-    dev_tensor_drift::DevTensorDriftCheck,
     dev_tensor_hierarchy::{dev_tensor_hierarchy_summary, DevTensorHierarchyNode},
-    dev_tensor_status::{DevTensorStatusProtocolEntry, DEV_TENSOR_STATUS_PROTOCOL},
+    dev_tensor_render_protocol::{dev_tensor_drift_check_json, dev_tensor_status_protocol_json},
+    dev_tensor_status::DEV_TENSOR_STATUS_PROTOCOL,
+    dev_tensor_task_card_lineage_render::{
+        dev_tensor_task_card_lineage_json_fields, dev_tensor_task_card_lineage_text_lines,
+    },
     json_bool_field, json_field, json_string_array_field, json_usize_field,
     surface_render::append_json_field_strings,
 };
@@ -338,6 +341,7 @@ pub(crate) fn render_dev_tensor_json_impl() -> String {
             format!("\"cells\":[{}]", cells.join(",")),
         ],
     );
+    append_json_field_strings(&mut out, dev_tensor_task_card_lineage_json_fields(&summary));
     out.push('}');
     out
 }
@@ -671,6 +675,7 @@ pub(crate) fn render_dev_tensor_text_impl() -> Vec<String> {
             entry.status, entry.rank, entry.phase, entry.terminal, entry.blocks_bootstrap
         ));
     }
+    lines.extend(dev_tensor_task_card_lineage_text_lines(&summary));
     push_dev_tensor_hierarchy_text(&mut lines, &hierarchy.root, 1);
     for cell in DEV_TENSOR_CELLS {
         lines.push(format!(
@@ -724,20 +729,6 @@ fn dev_tensor_cell_json(cell: &DevTensorCell) -> String {
     )
 }
 
-fn dev_tensor_status_protocol_json(entry: &DevTensorStatusProtocolEntry) -> String {
-    format!(
-        "{{{}}}",
-        [
-            json_field("status", entry.status),
-            json_usize_field("rank", entry.rank),
-            json_field("phase", entry.phase),
-            json_bool_field("terminal", entry.terminal),
-            json_bool_field("blocks_bootstrap", entry.blocks_bootstrap),
-        ]
-        .join(",")
-    )
-}
-
 fn dev_tensor_hierarchy_node_json(node: &DevTensorHierarchyNode) -> String {
     let children = node
         .children
@@ -783,17 +774,4 @@ fn push_dev_tensor_hierarchy_text(
     for child in &node.children {
         push_dev_tensor_hierarchy_text(lines, child, depth + 1);
     }
-}
-
-fn dev_tensor_drift_check_json(check: &DevTensorDriftCheck) -> String {
-    format!(
-        "{{{}}}",
-        [
-            json_field("id", check.id),
-            json_field("path", check.path),
-            json_bool_field("passed", check.passed),
-            json_string_array_field("missing_patterns", &check.missing_patterns),
-        ]
-        .join(",")
-    )
 }

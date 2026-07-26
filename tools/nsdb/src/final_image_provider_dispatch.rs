@@ -50,14 +50,14 @@ pub(crate) fn final_image_provider_dispatch_authority(
     if !launcher_path.exists() {
         return pre_seal_authority();
     }
-    let mut blockers = Vec::new();
     let launcher = match fs::read_to_string(&launcher_path) {
         Ok(source) => source,
         Err(_) => return blocked_authority(None, "final-image-dispatch:launcher-unreadable"),
     };
     if bool_value(&launcher, "ready") != Some(true) {
-        blockers.push("final-image-dispatch:launcher-not-ready".to_owned());
+        return pre_seal_authority();
     }
+    let mut blockers = Vec::new();
     let Some(nsb_path_text) = string_value(&launcher, "nsb_path") else {
         return blocked_authority(None, "final-image-dispatch:nsb-path-missing");
     };
@@ -598,6 +598,25 @@ mod tests {
         assert_eq!(authority.status, "verified");
         assert_eq!(authority.entries.len(), 1);
         assert_eq!(matched, 1);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn unready_launcher_remains_pre_seal_without_reading_missing_image() {
+        let dir = temp_dir("unready-launcher");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join(LAUNCHER_FILE_NAME),
+            "ready = false\nnsb_path = \"missing.nsb\"\nnsb_hash = \"\"\n",
+        )
+        .unwrap();
+
+        let authority = final_image_provider_dispatch_authority(&dir);
+
+        assert!(!authority.available);
+        assert_eq!(authority.status, "pre-seal-acquisition");
+        assert!(authority.blockers.is_empty());
         fs::remove_dir_all(dir).unwrap();
     }
 

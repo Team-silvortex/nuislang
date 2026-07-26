@@ -1,3 +1,4 @@
+use super::link_plan_nsld_dispatch_identity::write_provider_dispatch_identity_capability;
 use std::fmt;
 
 pub(super) fn write_unavailable_nsld_final_output_text_fields<W: fmt::Write>(
@@ -120,7 +121,8 @@ pub(super) fn write_unavailable_nsld_final_output_text_fields<W: fmt::Write>(
         out,
         "  nsld_final_executable_output_blocker_count: <unavailable>"
     )?;
-    writeln!(out, "  nsld_final_executable_output_first_blocker: <none>")
+    writeln!(out, "  nsld_final_executable_output_first_blocker: <none>")?;
+    write_provider_dispatch_identity_capability(out, None)
 }
 
 pub(super) fn write_nsld_final_output_text_fields<W: fmt::Write>(
@@ -451,6 +453,14 @@ pub(super) fn write_nsld_final_output_text_fields<W: fmt::Write>(
     )?;
     writeln!(
         out,
+        "  nsld_final_executable_output_debugger_cursor_lineage_provider_dispatch_identity_hash: {}",
+        final_output
+            .debugger_cursor_lineage_provider_dispatch_identity_hash
+            .as_deref()
+            .unwrap_or("<none>")
+    )?;
+    writeln!(
+        out,
         "  nsld_final_executable_output_debugger_cursor_lineage_first_blocker: {}",
         final_output
             .debugger_cursor_lineage_first_blocker
@@ -687,6 +697,7 @@ pub(super) fn write_nsld_final_output_text_fields<W: fmt::Write>(
     for issue in &final_output.object_issues {
         writeln!(out, "  nsld_final_executable_output_object_issue: {issue}")?;
     }
+    write_provider_dispatch_identity_capability(out, Some(final_output))?;
     Ok(())
 }
 

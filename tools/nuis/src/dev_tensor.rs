@@ -11,6 +11,9 @@ use crate::{
         DevTensorMilestoneCoverage,
     },
     dev_tensor_status::dev_tensor_status_rank,
+    dev_tensor_task_card_lineage::{
+        validate_dev_tensor_task_card_lineage, DevTensorTaskCardLineage,
+    },
 };
 use std::collections::BTreeSet;
 
@@ -104,6 +107,7 @@ pub(crate) struct DevTensorSummary {
     pub(crate) weakest_bootstrap_task_card_handoff_action: &'static str,
     pub(crate) weakest_bootstrap_task_card_handoff_command: &'static str,
     pub(crate) weakest_bootstrap_task_card_handoff_expected_artifact: &'static str,
+    pub(crate) weakest_bootstrap_task_card_lineage: DevTensorTaskCardLineage,
     pub(crate) coverage_status: &'static str,
     pub(crate) coverage_expected_count: usize,
     pub(crate) coverage_covered_count: usize,
@@ -155,7 +159,6 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
             )
         })
         .unwrap_or_else(|| "no bootstrap-critical tensor cell is currently registered".to_owned());
-    let task_card_ready = weakest_bootstrap.is_some() && coverage.status == "clean";
     let handoff_bootstrap =
         weakest_bootstrap.and_then(|weakest| dev_tensor_handoff_bootstrap_cell(weakest));
     let handoff_coordinate = handoff_bootstrap
@@ -166,6 +169,17 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
     } else {
         "direct"
     };
+    let task_card_lineage = validate_dev_tensor_task_card_lineage(
+        &hierarchy.root,
+        hierarchy.validation.status,
+        &task_card_coordinate,
+        &handoff_coordinate,
+        handoff_mode,
+    );
+    let task_card_ready = weakest_bootstrap.is_some()
+        && coverage.status == "clean"
+        && hierarchy.validation.status == "clean"
+        && task_card_lineage.status == "clean";
     let handoff_reason = handoff_bootstrap
         .map(|cell| {
             format!(
@@ -271,6 +285,7 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
             .or(weakest_bootstrap)
             .map(|cell| cell.expected_artifact)
             .unwrap_or("<none>"),
+        weakest_bootstrap_task_card_lineage: task_card_lineage,
         coverage_status: coverage.status,
         coverage_expected_count: coverage.expected_count,
         coverage_covered_count: coverage.covered_count,

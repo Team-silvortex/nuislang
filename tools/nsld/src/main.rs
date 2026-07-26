@@ -36,6 +36,7 @@ mod display_final_host;
 mod display_final_image;
 mod display_final_launcher;
 mod display_final_output;
+mod display_final_output_trace;
 mod display_final_pipeline;
 mod display_final_stage;
 mod display_link_tables;

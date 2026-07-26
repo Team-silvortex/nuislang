@@ -515,15 +515,32 @@ fn expect_owned_tree_scalar_arg(
                 )),
             }
         }
-        yir_core::OwnedSelectScalarArg::OwnedTransfer { value } => {
+        yir_core::OwnedSelectScalarArg::OwnedTransfer {
+            value,
+            address_kind,
+            nullable,
+        } => {
             let value = state.expect_value(value)?.clone();
             match value {
-                Value::Pointer(Some(_)) => Ok(value),
+                Value::Pointer(Some(pointer)) => {
+                    match address_kind {
+                        yir_core::OwnedSelectTransferAddressKind::Node => {
+                            state.read_heap_node(Some(pointer))?;
+                        }
+                        yir_core::OwnedSelectTransferAddressKind::Buffer => {
+                            state.read_heap_buffer(Some(pointer))?;
+                        }
+                    }
+                    Ok(value)
+                }
+                Value::Pointer(None) if *nullable => Ok(value),
                 Value::Pointer(None) => Err(format!(
-                    "node `{node_name}` selected a null owned pointer transfer"
+                    "node `{node_name}` selected a null non-nullable {} owned pointer transfer",
+                    address_kind.as_str()
                 )),
                 other => Err(format!(
-                    "node `{node_name}` cannot transfer owned pointer from {other}"
+                    "node `{node_name}` cannot transfer {} owned pointer from {other}",
+                    address_kind.as_str()
                 )),
             }
         }

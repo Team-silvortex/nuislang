@@ -5,7 +5,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         id: "nsdb-cursor-lineage-repair-journal",
         path: "tools/nsdb/src/cursor_lineage_repair_journal.rs",
         required_patterns: &[
-            "nsdb-yir-replay-cursor-lineage-repair-journal-v5",
+            "nsdb-yir-replay-cursor-lineage-repair-journal-v6",
             "nuis.nsdb.replay-cursor.lineage-repairs.toml",
             "pub(super) fn record",
             "pub(super) fn preflight",
@@ -18,6 +18,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "event_hash",
             "rotation_generation",
             "evicted_prefix_hash",
+            "provider_dispatch_identity_hash",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -35,15 +36,26 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "latest_lineage_mutated",
             "latest_repair_journal_mutated",
             "latest_archived_repair_journal_hash",
-            "previous_event_hash",
-            "current_event_hash",
-            "repair_event_hash",
-            "rotation_generation",
-            "evicted_prefix_hash",
-            "repair_window_hash",
+            "validate_repair_journal",
             "repair-history-contract-invalid",
             "repair-cursor-lineage-history",
             "nuis debug-lineage-repair",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-cursor-lineage-repair-journal-validator",
+        path: "tools/nuis/src/artifact_nsdb_replay_cursor_lineage_repair.rs",
+        required_patterns: &[
+            "nsdb-yir-replay-cursor-lineage-repair-journal-v6",
+            "previous_event_hash",
+            "current_event_hash",
+            "event_hash",
+            "rotation_generation",
+            "evicted_prefix_hash",
+            "window_hash",
+            "provider_dispatch_identity_hash",
+            "independently_validates_dispatch_bound_journal",
+            "rejects_another_dispatch_identity_even_with_valid_old_hashes",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -66,6 +78,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "debugger_cursor_lineage_repair_rotation_generation",
             "debugger_cursor_lineage_repair_evicted_prefix_hash",
             "debugger_cursor_lineage_repair_window_hash",
+            "debugger_cursor_lineage_provider_dispatch_identity_hash",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -75,6 +88,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "closure_summary_debugger_cursor_lineage_repair_rotation_generation",
             "closure_summary_debugger_cursor_lineage_repair_evicted_prefix_hash",
             "closure_summary_debugger_cursor_lineage_repair_window_hash",
+            "closure_summary_debugger_cursor_lineage_provider_dispatch_identity_hash",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -100,6 +114,16 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "archived_path",
             "archived_repair_journal_path",
             "repair_rotation_generation",
+            "provider_dispatch_identity_hash",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-cursor-lineage-dispatch-final-output-json",
+        path: "tools/nuis/src/surface_render/link_plan_nsld_lineage.rs",
+        required_patterns: &[
+            "dispatch_identity_json_fields",
+            "nsld_final_executable_output_debugger_cursor_lineage_provider_dispatch_identity_hash",
+            "debugger_cursor_lineage_provider_dispatch_identity_hash",
         ],
     },
     DevTensorDriftCheckSpec {

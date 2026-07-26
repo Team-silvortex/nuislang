@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::provider_runner_registry::{
     select_provider_worker_image_registration, ProviderWorkerImageRegistration,
 };

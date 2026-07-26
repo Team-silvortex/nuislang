@@ -1,4 +1,28 @@
 mod cpu Main {
+  fn consume_transfer_left(bytes: Bytes, head: ref Node, scratch: ref Buffer) -> Bytes {
+    let observed: i64 = load_value(head) + load_at(scratch, 0);
+    free(head);
+    free(scratch);
+    return move(bytes);
+  }
+
+  fn consume_transfer_right(bytes: Bytes, head: ref Node, scratch: ref Buffer) -> Bytes {
+    let observed: i64 = load_value(head) + load_at(scratch, 0);
+    free(head);
+    free(scratch);
+    return move(bytes);
+  }
+
+  fn choose_transfer(bytes: Bytes, selector: bool) -> Bytes {
+    let head: ref Node = alloc_node(13, null());
+    let scratch: ref Buffer = alloc_buffer(2, 3);
+    if selector {
+      return consume_transfer_left(move(bytes), move(head), move(scratch));
+    } else {
+      return consume_transfer_right(move(bytes), move(head), move(scratch));
+    }
+  }
+
   fn main() -> i64 {
     let left: ref Node = alloc_node(41, null());
     let right: ref Node = alloc_node(73, null());
@@ -16,6 +40,13 @@ mod cpu Main {
     let selected_buffer: ref Buffer = select_owned_ptr(true, move(left_buffer), move(right_buffer));
     let buffer_value: i64 = load_at(selected_buffer, 1);
     free(selected_buffer);
-    return value + buffer_value;
+
+    let transfer_source: ref Buffer = alloc_buffer(2, 19);
+    let transfer_bytes: Bytes = copy_bytes(transfer_source);
+    let transferred: Bytes = choose_transfer(move(transfer_bytes), true);
+    let transfer_score: i64 = bytes_len(transferred);
+    drop_bytes(transferred);
+    free(transfer_source);
+    return value + buffer_value + transfer_score;
   }
 }

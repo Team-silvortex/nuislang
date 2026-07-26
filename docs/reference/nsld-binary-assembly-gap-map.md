@@ -381,9 +381,12 @@ the immutable dispatch table, selected set, matched entry, and actual runner
 adapter. Completion-set hashes cover that authority. Nsdb and Nuis then
 independently carry the aggregate identity into replay transcripts and
 `nsdb-yir-replay-cursor-record-v2`; a cursor from another dispatch table is
-rejected even when its frame IDs and manifest still match. Cursor lineage and
-repair-journal ancestry remain the next persistence layer to receive this
-identity.
+rejected even when its frame IDs and manifest still match. Cursor lineage v2
+and repair journal v6 now retain that identity across bounded generations,
+repair events, prefix rotation, and the canonical window hash. Nsdb and Nuis
+independently reject transplanted ancestry even when the broader final-image
+proof still matches. Nuis final-output text/JSON and closure JSON expose the
+identity accepted by the lineage mirror without rerunning authority selection.
 
 ## Success Boundary
 

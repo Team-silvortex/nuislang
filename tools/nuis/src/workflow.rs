@@ -13,6 +13,8 @@ mod link_plan_final_output_closure;
 mod link_plan_final_output_summary;
 mod link_plan_json;
 mod link_plan_json_nsld_output;
+mod link_plan_provider_dispatch_identity;
+mod link_plan_provider_dispatch_identity_json;
 mod link_plan_tail;
 mod object_identity;
 mod render;
@@ -67,6 +69,8 @@ pub(crate) use link_plan_final_output_summary::NsldFinalExecutableOutputBoundary
 #[cfg(test)]
 pub(crate) use link_plan_final_output_summary::ProviderCompletionBoundarySummary;
 pub(crate) use link_plan_json::append_workflow_link_plan_json_fields;
+#[cfg(test)]
+pub(crate) use link_plan_provider_dispatch_identity::ValidatedProviderDispatchIdentityCapability;
 pub(crate) use link_plan_tail::{
     nsld_final_executable_tail_summary, NsldFinalExecutableTailSummary,
 };

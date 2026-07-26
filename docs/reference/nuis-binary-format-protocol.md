@@ -91,11 +91,14 @@ Replay identity is now explicit under `nsdb-yir-replay-identity-v1`. Debugger
 transcripts expose the verified `final_image_binding_proof_hash`; persisted
 replay cursors require it; cursor loading compares it with the current inspect
 report before consuming frames; and the lineage header plus every lineage
-event repeat the same identity. Nuis performs a separate handoff/cursor/lineage
-verification: its cursor mirror compares handoff and cursor before advertising
-`debug-resume`, and its lineage mirror additionally validates every lineage
-claim. A provider completion handoff created before final-image assembly
-therefore remains inspectable but cannot create a replay cursor.
+event repeat the same final-image identity. Lineage v2 additionally repeats the
+provider dispatch identity in its header and entries, while repair journal v6
+binds it into each repair event and bounded-window hash. Nuis performs a
+separate handoff/cursor/lineage verification: its cursor mirror compares
+handoff and cursor before advertising `debug-resume`, and its lineage and
+repair mirrors additionally validate every identity claim. A provider
+completion handoff created before final-image assembly therefore remains
+inspectable but cannot create a replay cursor.
 
 The official PixelMagic route now crosses that continuity boundary. It first
 produces a provider-complete but non-replayable acquisition artifact, then
@@ -147,9 +150,13 @@ Replay transcripts expose the aggregated dispatch identity, and
 `nsdb-yir-replay-cursor-record-v2` persists its contract, table hash,
 selected-set hash, and identity hash beside the broader final-image proof.
 Nsdb compares all values with the current handoff before resume; Nuis performs
-the same comparison independently before advertising `debug-resume`. The next
-continuity boundary is carrying this identity into cursor-lineage and repair
-journal ancestry.
+the same comparison independently before advertising `debug-resume`.
+`nsdb-yir-replay-cursor-lineage-v2` carries the identity through retained
+cursor generations, and repair journal v6 includes it in event and
+repair-window hashes so history cannot move between dispatch tables that share
+the broader proof. Nuis final-output text/JSON and closure JSON expose this
+lineage-validated identity by copying the independent mirror result rather than
+recomputing dispatch authority.
 The embedded Nsld binding-table hash keeps the container protocol spelling
 `0x<16-hex>`, while selected-set and handoff-proof hashes use
 `fnv1a64:<16-hex>`. Consumers validate each field against its own contract

@@ -1,4 +1,5 @@
 use crate::artifact_nsdb_replay_cursor_lineage::DebuggerCursorLineageRepairAction;
+use crate::workflow::link_plan_provider_dispatch_identity::ValidatedProviderDispatchIdentityCapability;
 
 #[derive(Clone)]
 pub(crate) struct ProviderCompletionBoundarySummary {
@@ -98,6 +99,8 @@ pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) debugger_cursor_lineage_status: String,
     pub(crate) debugger_cursor_lineage_entry_count: usize,
     pub(crate) debugger_cursor_lineage_latest_hash: Option<String>,
+    pub(crate) debugger_cursor_lineage_provider_dispatch_identity_hash: Option<String>,
+    pub(crate) provider_dispatch_identity_capability: ValidatedProviderDispatchIdentityCapability,
     pub(crate) debugger_cursor_lineage_first_blocker: Option<String>,
     pub(crate) debugger_cursor_lineage_next_action: Option<String>,
     pub(crate) debugger_cursor_lineage_next_command: Option<String>,

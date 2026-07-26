@@ -468,11 +468,17 @@ against both live objects before moving their source names. Source may widen a
 selection of two live non-null owners into an optional result, but optional
 candidates remain rejected because `null` is not an owned resource. The native
 owned-pointer-selection smoke executes Node, nullable-result, and Buffer
-selection, loads the selected values, and finally frees every survivor with
-exit `78`. One native `i64` smoke executes both merge leaves in the same
+selection, then routes one Node plus one Buffer through a selected helper leaf.
+Each `owned_transfer` token carries explicit
+`address_kind=<node|buffer>` and `nullable=false`; YIR rejects branch metadata
+disagreement, CPU validates the selected heap object kind, and LLVM checks the
+helper ABI kind while preserving the Buffer pointer-and-length pair. Both
+helper leaves consume each transferred address exactly once. The native binary
+loads the selected values, observes the transferred Bytes length, frees every
+survivor, and exits `94`. One native `i64` smoke executes both merge leaves in the same
 binary and returns their sum, while the owned-transfer smoke observes distinct
 helper output while retaining one Node allocation in LLVM. Duplicate,
-asymmetric, projected, nullable-candidate, borrowed, returned, task-carried, or
+asymmetric, projected, nullable-transfer, borrowed, returned, task-carried, or
 otherwise unsupported merge-visible action results remain rejected.
 
 Today `nuis` does **not** yet have:

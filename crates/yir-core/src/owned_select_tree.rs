@@ -41,6 +41,29 @@ impl OwnedSelectScalarCast {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum OwnedSelectTransferAddressKind {
+    Node,
+    Buffer,
+}
+
+impl OwnedSelectTransferAddressKind {
+    pub fn parse_header(value: &str) -> Option<Self> {
+        Some(match value.strip_prefix("address_kind=")? {
+            "node" => Self::Node,
+            "buffer" => Self::Buffer,
+            _ => return None,
+        })
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Node => "node",
+            Self::Buffer => "buffer",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OwnedSelectScalarArg<'a> {
     Value(&'a str),
@@ -65,6 +88,8 @@ pub enum OwnedSelectScalarArg<'a> {
     },
     OwnedTransfer {
         value: &'a str,
+        address_kind: OwnedSelectTransferAddressKind,
+        nullable: bool,
     },
 }
 
@@ -201,9 +226,19 @@ fn parse_scalar_arg<'a>(
             })
         }
         "owned_transfer" => {
-            let value = args.get(*cursor)?;
-            *cursor += 1;
-            Some(OwnedSelectScalarArg::OwnedTransfer { value })
+            let address_kind = OwnedSelectTransferAddressKind::parse_header(args.get(*cursor)?)?;
+            let nullable = match args.get(cursor.checked_add(1)?)?.as_str() {
+                "nullable=true" => true,
+                "nullable=false" => false,
+                _ => return None,
+            };
+            let value = args.get(cursor.checked_add(2)?)?;
+            *cursor = cursor.checked_add(3)?;
+            Some(OwnedSelectScalarArg::OwnedTransfer {
+                value,
+                address_kind,
+                nullable,
+            })
         }
         _ => None,
     }
@@ -240,24 +275,31 @@ fn owned_select_scalar_arg_inputs<'a>(arg: &'a OwnedSelectScalarArg<'a>, out: &m
         OwnedSelectScalarArg::TraversalBorrow { value } => {
             owned_select_scalar_arg_inputs(value, out)
         }
-        OwnedSelectScalarArg::OwnedTransfer { value } => out.push(value),
+        OwnedSelectScalarArg::OwnedTransfer { value, .. } => out.push(value),
     }
 }
 
 pub fn owned_select_tree_transfers<'a>(tree: &'a OwnedSelectTree<'a>, out: &mut Vec<&'a str>) {
     if let Some(transfers) = owned_transfer_set(tree) {
-        out.extend(transfers);
+        out.extend(transfers.into_iter().map(|(value, _, _)| value));
     }
 }
 
-fn owned_transfer_set<'a>(tree: &'a OwnedSelectTree<'a>) -> Option<BTreeSet<&'a str>> {
+fn owned_transfer_set<'a>(
+    tree: &'a OwnedSelectTree<'a>,
+) -> Option<BTreeSet<(&'a str, OwnedSelectTransferAddressKind, bool)>> {
     match tree {
         OwnedSelectTree::Owner(_) => Some(BTreeSet::new()),
         OwnedSelectTree::Call { scalar_args, .. } => {
             let mut transfers = BTreeSet::new();
             for arg in scalar_args {
-                if let OwnedSelectScalarArg::OwnedTransfer { value } = arg {
-                    if !transfers.insert(*value) {
+                if let OwnedSelectScalarArg::OwnedTransfer {
+                    value,
+                    address_kind,
+                    nullable,
+                } = arg
+                {
+                    if !transfers.insert((*value, *address_kind, *nullable)) {
                         return None;
                     }
                 }

@@ -53,10 +53,17 @@ fn owned_tree_scalar_value(
             };
             Some(LlvmValueRef::Ptr(ptr))
         }
-        OwnedSelectScalarArg::OwnedTransfer { value } => {
+        OwnedSelectScalarArg::OwnedTransfer {
+            value, nullable, ..
+        } => {
             let LlvmValueRef::Ptr(ptr) = registers.get(*value)?.clone() else {
                 return None;
             };
+            if !nullable {
+                let proof = super::fresh_reg(next_reg);
+                body.push(format!("  {proof} = icmp ne ptr {ptr}, null"));
+                body.push(format!("  call void @llvm.assume(i1 {proof})"));
+            }
             Some(LlvmValueRef::Ptr(ptr))
         }
     }
@@ -139,17 +146,47 @@ pub(crate) fn lower_owned_tree_scalar_args(
     args.iter()
         .zip(kinds)
         .map(|(arg, kind)| {
+            if let OwnedSelectScalarArg::OwnedTransfer {
+                address_kind,
+                nullable,
+                ..
+            } = arg
+            {
+                let compatible = matches!(
+                    (address_kind, kind),
+                    (
+                        yir_core::OwnedSelectTransferAddressKind::Node,
+                        CpuCallScalarKind::TraversalPointer
+                    ) | (
+                        yir_core::OwnedSelectTransferAddressKind::Buffer,
+                        CpuCallScalarKind::BorrowedBuffer
+                    )
+                );
+                if !compatible || *nullable {
+                    return None;
+                }
+            }
             if *kind == CpuCallScalarKind::BorrowedBuffer {
                 let parts = match arg {
                     OwnedSelectScalarArg::Value(name) => {
                         borrowed_buffer_parts(registers, buffer_lengths, name)
                     }
+                    OwnedSelectScalarArg::OwnedTransfer {
+                        value,
+                        address_kind: yir_core::OwnedSelectTransferAddressKind::Buffer,
+                        nullable: false,
+                    } => borrowed_buffer_parts(registers, buffer_lengths, value),
                     _ => match owned_tree_scalar_value(registers, arg, body, next_reg)? {
                         LlvmValueRef::BorrowedBuffer { ptr, len } => Some((ptr, len)),
                         _ => None,
                     },
                 };
                 let (pointer, len) = parts?;
+                if matches!(arg, OwnedSelectScalarArg::OwnedTransfer { .. }) {
+                    let proof = super::fresh_reg(next_reg);
+                    body.push(format!("  {proof} = icmp ne ptr {pointer}, null"));
+                    body.push(format!("  call void @llvm.assume(i1 {proof})"));
+                }
                 return Some(format!("ptr {pointer}, i64 {len}"));
             }
             if *kind == CpuCallScalarKind::TraversalPointer {

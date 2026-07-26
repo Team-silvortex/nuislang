@@ -7,7 +7,7 @@ use std::{
 use crate::{cursor::persist_validated_content_atomically, provider_sample_payload::fnv1a64_hex};
 
 pub(super) const FILE_NAME: &str = "nuis.nsdb.replay-cursor.lineage-repairs.toml";
-const PROTOCOL: &str = "nsdb-yir-replay-cursor-lineage-repair-journal-v5";
+const PROTOCOL: &str = "nsdb-yir-replay-cursor-lineage-repair-journal-v6";
 const ENTRY_LIMIT: usize = 8;
 
 pub(super) struct RepairJournalPreflight {
@@ -29,11 +29,13 @@ struct Entry {
     archived_repair_journal_path: String,
     archived_repair_journal_hash: String,
     rebuilt_hash: String,
+    provider_dispatch_identity_hash: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Journal {
     lineage_path: String,
+    provider_dispatch_identity_hash: String,
     rotation_generation: u64,
     evicted_prefix_hash: String,
     window_hash: String,
@@ -43,10 +45,11 @@ struct Journal {
 pub(super) fn preflight(
     output_dir: &Path,
     lineage_path: &Path,
+    provider_dispatch_identity_hash: &str,
 ) -> Result<RepairJournalPreflight, String> {
     let path = output_dir.join(FILE_NAME);
     let lineage_path_text = lineage_path.display().to_string();
-    if !path.exists() || load(&path, &lineage_path_text).is_ok() {
+    if !path.exists() || load(&path, &lineage_path_text, provider_dispatch_identity_hash).is_ok() {
         return Ok(RepairJournalPreflight {
             path,
             archived_path: None,
@@ -75,13 +78,19 @@ pub(super) fn record(
     lineage_mutated: bool,
     archived_lineage_path: Option<&Path>,
     rebuilt_hash: &str,
+    provider_dispatch_identity_hash: &str,
 ) -> Result<(), String> {
     let lineage_path_text = lineage_path.display().to_string();
     let mut journal = if preflight.path.exists() {
-        load(&preflight.path, &lineage_path_text)?
+        load(
+            &preflight.path,
+            &lineage_path_text,
+            provider_dispatch_identity_hash,
+        )?
     } else {
         Journal {
             lineage_path: lineage_path_text.clone(),
+            provider_dispatch_identity_hash: provider_dispatch_identity_hash.to_owned(),
             rotation_generation: 0,
             evicted_prefix_hash: "none".to_owned(),
             window_hash: "none".to_owned(),
@@ -120,6 +129,7 @@ pub(super) fn record(
         archived_repair_journal_path,
         archived_repair_journal_hash,
         rebuilt_hash: rebuilt_hash.to_owned(),
+        provider_dispatch_identity_hash: provider_dispatch_identity_hash.to_owned(),
     };
     entry.current_event_hash = event_hash(&entry);
     journal.entries.push(entry);
@@ -137,7 +147,12 @@ pub(super) fn record(
     journal.window_hash = window_hash(&journal)?;
     let content = render(&journal);
     persist_validated_content_atomically(&preflight.path, &content, |temporary| {
-        load(temporary, &lineage_path_text).map(|_| ())
+        load(
+            temporary,
+            &lineage_path_text,
+            provider_dispatch_identity_hash,
+        )
+        .map(|_| ())
     })
 }
 
@@ -156,8 +171,9 @@ fn path_and_hash(path: Option<&Path>) -> Result<(String, String), String> {
 
 fn render(journal: &Journal) -> String {
     let mut output = format!(
-        "protocol = \"{PROTOCOL}\"\nlineage_path = \"{}\"\nentry_limit = {ENTRY_LIMIT}\nrotation_generation = {}\nevicted_prefix_hash = \"{}\"\nwindow_hash = \"{}\"\nentry_count = {}\n",
+        "protocol = \"{PROTOCOL}\"\nlineage_path = \"{}\"\nprovider_dispatch_identity_hash = \"{}\"\nentry_limit = {ENTRY_LIMIT}\nrotation_generation = {}\nevicted_prefix_hash = \"{}\"\nwindow_hash = \"{}\"\nentry_count = {}\n",
         escape(&journal.lineage_path),
+        journal.provider_dispatch_identity_hash,
         journal.rotation_generation,
         journal.evicted_prefix_hash,
         journal.window_hash,
@@ -165,7 +181,7 @@ fn render(journal: &Journal) -> String {
     );
     for entry in &journal.entries {
         output.push_str(&format!(
-            "\n[[entry]]\nsequence = {}\nprevious_event_hash = \"{}\"\ncurrent_event_hash = \"{}\"\nstatus = \"{}\"\nlineage_mutated = {}\nrepair_journal_mutated = {}\narchived_path = \"{}\"\narchived_hash = \"{}\"\narchived_repair_journal_path = \"{}\"\narchived_repair_journal_hash = \"{}\"\nrebuilt_hash = \"{}\"\n",
+            "\n[[entry]]\nsequence = {}\nprevious_event_hash = \"{}\"\ncurrent_event_hash = \"{}\"\nstatus = \"{}\"\nlineage_mutated = {}\nrepair_journal_mutated = {}\narchived_path = \"{}\"\narchived_hash = \"{}\"\narchived_repair_journal_path = \"{}\"\narchived_repair_journal_hash = \"{}\"\nrebuilt_hash = \"{}\"\nprovider_dispatch_identity_hash = \"{}\"\n",
             entry.sequence,
             entry.previous_event_hash,
             entry.current_event_hash,
@@ -177,27 +193,45 @@ fn render(journal: &Journal) -> String {
             escape(&entry.archived_repair_journal_path),
             entry.archived_repair_journal_hash,
             entry.rebuilt_hash,
+            entry.provider_dispatch_identity_hash,
         ));
     }
     output
 }
 
-fn load(path: &Path, expected_lineage_path: &str) -> Result<Journal, String> {
+fn load(
+    path: &Path,
+    expected_lineage_path: &str,
+    expected_provider_dispatch_identity_hash: &str,
+) -> Result<Journal, String> {
     let source = fs::read_to_string(path).map_err(|error| {
         format!(
             "failed to read repair journal `{}`: {error}",
             path.display()
         )
     })?;
-    parse(&source, expected_lineage_path)
-        .map_err(|error| format!("invalid cursor lineage repair journal: {error}"))
+    parse(
+        &source,
+        expected_lineage_path,
+        expected_provider_dispatch_identity_hash,
+    )
+    .map_err(|error| format!("invalid cursor lineage repair journal: {error}"))
 }
 
-fn parse(source: &str, expected_lineage_path: &str) -> Result<Journal, String> {
+fn parse(
+    source: &str,
+    expected_lineage_path: &str,
+    expected_provider_dispatch_identity_hash: &str,
+) -> Result<Journal, String> {
     let mut sections = source.split("[[entry]]");
     let header = fields(sections.next().unwrap_or_default())?;
     require(&header, "protocol", PROTOCOL)?;
     require(&header, "lineage_path", expected_lineage_path)?;
+    require(
+        &header,
+        "provider_dispatch_identity_hash",
+        expected_provider_dispatch_identity_hash,
+    )?;
     require(&header, "entry_limit", &ENTRY_LIMIT.to_string())?;
     let rotation_generation = value(&header, "rotation_generation")?
         .parse::<u64>()
@@ -238,6 +272,7 @@ fn parse(source: &str, expected_lineage_path: &str) -> Result<Journal, String> {
             || !is_hash(&entry.rebuilt_hash)
             || !valid_optional_hash(&entry.previous_event_hash)
             || !is_hash(&entry.current_event_hash)
+            || entry.provider_dispatch_identity_hash != expected_provider_dispatch_identity_hash
         {
             return Err("repair journal entry contract is invalid".to_owned());
         }
@@ -257,6 +292,7 @@ fn parse(source: &str, expected_lineage_path: &str) -> Result<Journal, String> {
     }
     let journal = Journal {
         lineage_path: expected_lineage_path.to_owned(),
+        provider_dispatch_identity_hash: expected_provider_dispatch_identity_hash.to_owned(),
         rotation_generation,
         evicted_prefix_hash,
         window_hash: claimed_window_hash.clone(),
@@ -288,6 +324,8 @@ fn parse_entry(source: &str) -> Result<Entry, String> {
         archived_repair_journal_path: value(&fields, "archived_repair_journal_path")?.to_owned(),
         archived_repair_journal_hash: value(&fields, "archived_repair_journal_hash")?.to_owned(),
         rebuilt_hash: value(&fields, "rebuilt_hash")?.to_owned(),
+        provider_dispatch_identity_hash: value(&fields, "provider_dispatch_identity_hash")?
+            .to_owned(),
     })
 }
 
@@ -304,6 +342,7 @@ fn event_hash(entry: &Entry) -> String {
         entry.archived_repair_journal_path.clone(),
         entry.archived_repair_journal_hash.clone(),
         entry.rebuilt_hash.clone(),
+        entry.provider_dispatch_identity_hash.clone(),
     ] {
         canonical.extend_from_slice(value.len().to_string().as_bytes());
         canonical.push(b':');
@@ -325,6 +364,7 @@ fn window_hash(journal: &Journal) -> Result<String, String> {
     for value in [
         PROTOCOL.to_owned(),
         journal.lineage_path.clone(),
+        journal.provider_dispatch_identity_hash.clone(),
         journal.rotation_generation.to_string(),
         journal.evicted_prefix_hash.clone(),
         journal.entries.len().to_string(),
@@ -428,8 +468,17 @@ fn escape(value: &str) -> String {
 }
 
 #[cfg(test)]
-pub(super) fn journal_is_valid(path: &Path, lineage_path: &Path) -> bool {
-    load(path, &lineage_path.display().to_string()).is_ok()
+pub(super) fn journal_is_valid(
+    path: &Path,
+    lineage_path: &Path,
+    provider_dispatch_identity_hash: &str,
+) -> bool {
+    load(
+        path,
+        &lineage_path.display().to_string(),
+        provider_dispatch_identity_hash,
+    )
+    .is_ok()
 }
 
 #[cfg(test)]
@@ -438,6 +487,7 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static TEMP_ID: AtomicU64 = AtomicU64::new(0);
+    const TEST_DISPATCH_IDENTITY_HASH: &str = "0x0123456789abcdef";
 
     fn temp_dir(label: &str) -> PathBuf {
         let id = TEMP_ID.fetch_add(1, Ordering::Relaxed);
@@ -450,7 +500,7 @@ mod tests {
     }
 
     fn record_event(root: &Path, lineage_path: &Path, rebuilt_hash: &str) {
-        let preflight = preflight(root, lineage_path).unwrap();
+        let preflight = preflight(root, lineage_path, TEST_DISPATCH_IDENTITY_HASH).unwrap();
         record(
             &preflight,
             lineage_path,
@@ -458,6 +508,7 @@ mod tests {
             false,
             None,
             rebuilt_hash,
+            TEST_DISPATCH_IDENTITY_HASH,
         )
         .unwrap();
     }
@@ -475,7 +526,12 @@ mod tests {
         let tampered = source.replacen("archived_path = \"\"", "archived_path = \"tampered\"", 1);
         fs::write(&journal_path, tampered).unwrap();
 
-        let error = load(&journal_path, &lineage_path.display().to_string()).unwrap_err();
+        let error = load(
+            &journal_path,
+            &lineage_path.display().to_string(),
+            TEST_DISPATCH_IDENTITY_HASH,
+        )
+        .unwrap_err();
         assert!(error.contains("event hash"));
         fs::remove_dir_all(root).unwrap();
     }
@@ -489,7 +545,12 @@ mod tests {
             record_event(&root, &lineage_path, &rebuilt_hash);
         }
 
-        let journal = load(&root.join(FILE_NAME), &lineage_path.display().to_string()).unwrap();
+        let journal = load(
+            &root.join(FILE_NAME),
+            &lineage_path.display().to_string(),
+            TEST_DISPATCH_IDENTITY_HASH,
+        )
+        .unwrap();
         assert_eq!(journal.entries.len(), ENTRY_LIMIT);
         assert_eq!(journal.rotation_generation, 4);
         assert_eq!(journal.entries.first().unwrap().sequence, 4);
@@ -512,7 +573,12 @@ mod tests {
 
         let journal_path = root.join(FILE_NAME);
         let source = fs::read_to_string(&journal_path).unwrap();
-        let journal = load(&journal_path, &lineage_path.display().to_string()).unwrap();
+        let journal = load(
+            &journal_path,
+            &lineage_path.display().to_string(),
+            TEST_DISPATCH_IDENTITY_HASH,
+        )
+        .unwrap();
         let tampered = source.replacen(
             &format!("window_hash = \"{}\"", journal.window_hash),
             "window_hash = \"0x0000000000000000\"",
@@ -520,7 +586,12 @@ mod tests {
         );
         fs::write(&journal_path, tampered).unwrap();
 
-        let error = load(&journal_path, &lineage_path.display().to_string()).unwrap_err();
+        let error = load(
+            &journal_path,
+            &lineage_path.display().to_string(),
+            TEST_DISPATCH_IDENTITY_HASH,
+        )
+        .unwrap_err();
         assert!(error.contains("window hash"));
         fs::remove_dir_all(root).unwrap();
     }
@@ -534,10 +605,36 @@ mod tests {
             record_event(&root, &lineage_path, &rebuilt_hash);
         }
 
-        let mut journal = load(&root.join(FILE_NAME), &lineage_path.display().to_string()).unwrap();
+        let mut journal = load(
+            &root.join(FILE_NAME),
+            &lineage_path.display().to_string(),
+            TEST_DISPATCH_IDENTITY_HASH,
+        )
+        .unwrap();
         journal.entries.remove(0);
-        let error = parse(&render(&journal), &lineage_path.display().to_string()).unwrap_err();
+        let error = parse(
+            &render(&journal),
+            &lineage_path.display().to_string(),
+            TEST_DISPATCH_IDENTITY_HASH,
+        )
+        .unwrap_err();
         assert!(error.contains("rotated prefix anchor"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rejects_another_provider_dispatch_identity() {
+        let root = temp_dir("dispatch-drift");
+        let lineage_path = root.join("lineage.toml");
+        record_event(&root, &lineage_path, &fnv1a64_hex(b"lineage"));
+
+        let error = load(
+            &root.join(FILE_NAME),
+            &lineage_path.display().to_string(),
+            "0xfedcba9876543210",
+        )
+        .unwrap_err();
+        assert!(error.contains("provider_dispatch_identity_hash"));
         fs::remove_dir_all(root).unwrap();
     }
 }

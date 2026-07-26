@@ -6,7 +6,7 @@ pub(super) fn nsld_tail_json_fields(
     final_tail_stage_records: &[String],
     final_output_summary: Option<&crate::workflow::NsldFinalExecutableOutputBoundarySummary>,
 ) -> Vec<String> {
-    vec![
+    let mut fields = vec![
         crate::json_optional_string_field(
             "nsld_final_executable_output_artifact_chain_safe_next_contract",
             final_output_summary
@@ -791,5 +791,8 @@ pub(super) fn nsld_tail_json_fields(
                 .as_ref()
                 .and_then(|summary| summary.first_blocker.as_deref()),
         ),
-    ]
+    ];
+    fields
+        .extend(super::link_plan_nsld_lineage::dispatch_identity_json_fields(final_output_summary));
+    fields
 }

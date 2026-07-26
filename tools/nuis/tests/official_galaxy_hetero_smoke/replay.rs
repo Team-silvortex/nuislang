@@ -139,7 +139,7 @@ pub(super) fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
     let lineage_path = output_dir.join("nuis.nsdb.replay-cursor.lineage.toml");
     assert_file_contains(
         &lineage_path,
-        "protocol = \"nsdb-yir-replay-cursor-lineage-v1\"",
+        "protocol = \"nsdb-yir-replay-cursor-lineage-v2\"",
         "replay cursor lineage protocol",
     );
     assert_file_contains(
@@ -151,6 +151,11 @@ pub(super) fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
         &lineage_path,
         "final_image_binding_proof_hash = \"fnv1a64:",
         "replay cursor lineage final image identity",
+    );
+    assert_file_contains(
+        &lineage_path,
+        "provider_dispatch_identity_hash = \"0x",
+        "replay cursor lineage provider dispatch identity",
     );
     assert_file_contains(
         &lineage_path,
@@ -182,6 +187,15 @@ pub(super) fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
         })
         .last()
         .expect("replay cursor lineage latest hash");
+    let provider_dispatch_identity_hash = lineage_source
+        .lines()
+        .filter_map(|line| {
+            line.trim()
+                .strip_prefix("provider_dispatch_identity_hash = \"")
+                .and_then(|value| value.strip_suffix('"'))
+        })
+        .last()
+        .expect("replay cursor lineage provider dispatch identity hash");
     let lineage_report = run_nuis(&["build-report", "--json", &output_dir_text]);
     assert_success(&lineage_report, "nuis mirror debugger cursor lineage");
     let lineage_report_stdout = String::from_utf8_lossy(&lineage_report.stdout);
@@ -189,7 +203,7 @@ pub(super) fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
         lineage_report_stdout.contains(
             "\"nsld_final_executable_output_debugger_cursor_lineage_contract\":\"nuis-debugger-cursor-lineage-mirror-v1\""
         ) && lineage_report_stdout.contains(
-            "\"nsld_final_executable_output_debugger_cursor_lineage_source_protocol\":\"nsdb-yir-replay-cursor-lineage-v1\""
+            "\"nsld_final_executable_output_debugger_cursor_lineage_source_protocol\":\"nsdb-yir-replay-cursor-lineage-v2\""
         ) && lineage_report_stdout.contains(
             "\"nsld_final_executable_output_debugger_cursor_lineage_ready\":true"
         ) && lineage_report_stdout.contains(
@@ -199,13 +213,53 @@ pub(super) fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
         ) && lineage_report_stdout.contains(&format!(
             "\"nsld_final_executable_output_debugger_cursor_lineage_latest_hash\":\"{latest_hash}\""
         )) && lineage_report_stdout.contains(
+            &format!(
+                "\"nsld_final_executable_output_debugger_cursor_lineage_provider_dispatch_identity_hash\":\"{provider_dispatch_identity_hash}\""
+            )
+        ) && lineage_report_stdout.contains(
+            "\"nsld_final_executable_output_object_package_provider_dispatch_identity_capability_contract\":\"nuis-validated-provider-dispatch-identity-capability-v1\""
+        ) && lineage_report_stdout.contains(
+            "\"nsld_final_executable_output_object_package_provider_dispatch_identity_status\":\"verified\""
+        ) && lineage_report_stdout.contains(
+            &format!(
+                "\"nsld_final_executable_output_object_package_provider_dispatch_identity_hash\":\"{provider_dispatch_identity_hash}\""
+            )
+        ) && lineage_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_api_provider_dispatch_identity_capability_contract\":\"nuis-validated-provider-dispatch-identity-capability-v1\""
+        ) && lineage_report_stdout.contains(
+            "\"nsld_final_executable_output_debugger_api_provider_dispatch_identity_status\":\"verified\""
+        ) && lineage_report_stdout.contains(
+            &format!(
+                "\"nsld_final_executable_output_debugger_api_provider_dispatch_identity_hash\":\"{provider_dispatch_identity_hash}\""
+            )
+        ) && lineage_report_stdout.contains(
+            "\"nsld_final_executable_output_provider_dispatch_identity_projection_source\":\"debugger_cursor_lineage_provider_dispatch_identity_hash\""
+        ) && lineage_report_stdout.contains(
             "\"closure_summary_debugger_cursor_lineage_ready\":true"
         ) && lineage_report_stdout.contains(
             "\"closure_summary_debugger_cursor_lineage_entry_count\":2"
         ) && lineage_report_stdout.contains(&format!(
             "\"closure_summary_debugger_cursor_lineage_latest_hash\":\"{latest_hash}\""
-        )),
-        "Nuis final-output and closure summaries should mirror the hash-checked debugger cursor lineage\n{lineage_report_stdout}"
+        )) && lineage_report_stdout.contains(
+            &format!(
+                "\"closure_summary_debugger_cursor_lineage_provider_dispatch_identity_hash\":\"{provider_dispatch_identity_hash}\""
+            )
+        ) && lineage_report_stdout.contains(
+            "\"closure_summary_object_package_provider_dispatch_identity_capability_contract\":\"nuis-validated-provider-dispatch-identity-capability-v1\""
+        ) && lineage_report_stdout.contains(
+            &format!(
+                "\"closure_summary_object_package_provider_dispatch_identity_hash\":\"{provider_dispatch_identity_hash}\""
+            )
+        ) && lineage_report_stdout.contains(
+            "\"closure_summary_debugger_api_provider_dispatch_identity_capability_contract\":\"nuis-validated-provider-dispatch-identity-capability-v1\""
+        ) && lineage_report_stdout.contains(
+            &format!(
+                "\"closure_summary_debugger_api_provider_dispatch_identity_hash\":\"{provider_dispatch_identity_hash}\""
+            )
+        ) && lineage_report_stdout.contains(
+            "\"closure_summary_provider_dispatch_identity_projection_source\":\"debugger_cursor_lineage_provider_dispatch_identity_hash\""
+        ),
+        "Nuis final-output, object-package, debugger API, and closure summaries should share the hash-checked debugger cursor lineage identity\n{lineage_report_stdout}"
     );
     fs::write(
         &lineage_path,
@@ -298,12 +352,22 @@ pub(super) fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
     );
     let repaired_lineage_source = fs::read_to_string(&lineage_path)
         .expect("read repaired cursor lineage before journal recovery smoke");
+    let repair_journal_path = output_dir.join("nuis.nsdb.replay-cursor.lineage-repairs.toml");
+    assert_file_contains(
+        &repair_journal_path,
+        "protocol = \"nsdb-yir-replay-cursor-lineage-repair-journal-v6\"",
+        "replay cursor lineage repair journal protocol",
+    );
+    assert_file_contains(
+        &repair_journal_path,
+        "provider_dispatch_identity_hash = \"0x",
+        "repair journal provider dispatch identity ancestry",
+    );
     fs::write(
         &lineage_path,
         repaired_lineage_source.replacen(latest_hash, "0x0000000000000000", 1),
     )
     .expect("damage cursor lineage before journal recovery smoke");
-    let repair_journal_path = output_dir.join("nuis.nsdb.replay-cursor.lineage-repairs.toml");
     fs::write(&repair_journal_path, "protocol = \"damaged-journal\"\n")
         .expect("damage cursor lineage repair journal");
     let recovered = run_nuis(&["debug-lineage-repair", &output_dir_text, "--json"]);

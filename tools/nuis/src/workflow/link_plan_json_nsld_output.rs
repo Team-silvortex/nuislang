@@ -3,7 +3,7 @@ use super::*;
 pub(super) fn nsld_final_output_json_fields(
     nsld_final_output: Option<&NsldFinalExecutableOutputBoundarySummary>,
 ) -> Vec<String> {
-    vec![
+    let mut fields = vec![
         json_optional_string_field(
             "nsld_final_executable_output_artifact_chain_safe_next_contract",
             nsld_final_output
@@ -484,6 +484,14 @@ pub(super) fn nsld_final_output_json_fields(
                 .and_then(|summary| summary.debugger_cursor_lineage_latest_hash.as_deref()),
         ),
         json_optional_string_field(
+            "nsld_final_executable_output_debugger_cursor_lineage_provider_dispatch_identity_hash",
+            nsld_final_output.and_then(|summary| {
+                summary
+                    .debugger_cursor_lineage_provider_dispatch_identity_hash
+                    .as_deref()
+            }),
+        ),
+        json_optional_string_field(
             "nsld_final_executable_output_debugger_cursor_lineage_first_blocker",
             nsld_final_output.and_then(|summary| {
                 summary.debugger_cursor_lineage_first_blocker.as_deref()
@@ -694,7 +702,15 @@ pub(super) fn nsld_final_output_json_fields(
             "nsld_final_executable_output_first_blocker",
             nsld_final_output.and_then(|summary| summary.first_blocker.as_deref()),
         ),
-    ]
+    ];
+    fields.extend(
+        super::link_plan_provider_dispatch_identity_json::
+            provider_dispatch_identity_capability_json_fields(
+                nsld_final_output
+                    .map(|summary| &summary.provider_dispatch_identity_capability),
+            ),
+    );
+    fields
 }
 
 fn json_optional_bool_field(name: &str, value: Option<bool>) -> String {

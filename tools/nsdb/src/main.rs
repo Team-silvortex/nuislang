@@ -69,7 +69,6 @@ mod provider_transport_receipt_payload;
 #[cfg(unix)]
 mod provider_worker_control;
 mod provider_worker_descriptor_capability;
-#[allow(dead_code)]
 mod provider_worker_image;
 #[cfg(unix)]
 mod provider_worker_lease;
@@ -212,8 +211,12 @@ fn run() -> Result<(), String> {
             let handoff = crate::handoff::read_payload_execution_handoff(output_dir);
             let proof_hash =
                 crate::handoff_binding::replay_identity_hash(&handoff.final_image_binding_proof)?;
-            let report =
-                crate::cursor_lineage::repair_cursor_lineage(output_dir, &manifest, proof_hash)?;
+            let report = crate::cursor_lineage::repair_cursor_lineage(
+                output_dir,
+                &manifest,
+                proof_hash,
+                &handoff.provider_completion_dispatch_identity,
+            )?;
             if json {
                 println!(
                     "{{\"tool\":\"nsdb\",\"kind\":\"cursor_lineage_repair\",\"contract\":\"{}\",\"status\":\"{}\",\"mutated\":{},\"lineage_mutated\":{},\"repair_journal_mutated\":{},\"cursor_path\":\"{}\",\"lineage_path\":\"{}\",\"archived_path\":{},\"repair_journal_path\":\"{}\",\"archived_repair_journal_path\":{},\"entry_count\":{},\"latest_hash\":\"{}\"}}",

@@ -114,6 +114,15 @@ The JSON surface is intentionally simple:
 * `weakest_bootstrap_task_card_handoff_action`
 * `weakest_bootstrap_task_card_handoff_command`
 * `weakest_bootstrap_task_card_handoff_expected_artifact`
+* `weakest_bootstrap_task_card_lineage_protocol`
+* `weakest_bootstrap_task_card_lineage_status`
+* `weakest_bootstrap_task_card_lineage_error_count`
+* `weakest_bootstrap_task_card_lineage_first_error`
+* `weakest_bootstrap_task_card_lineage_errors`
+* `weakest_bootstrap_task_card_task_ancestry`
+* `weakest_bootstrap_task_card_handoff_ancestry`
+* `weakest_bootstrap_task_card_common_ancestor_path`
+* `weakest_bootstrap_task_card_transition_depth`
 * `coverage_status`
 * `coverage_expected_source`
 * `coverage_expected_fallback_used`
@@ -214,8 +223,9 @@ self-hosted tooling one stable bundle to consume without reassembling many
 `weakest_bootstrap_*` fields by hand.
 
 The task-card protocol is `nuis-dev-tensor-task-card-v1`. A ready task card
-means the tensor found a weakest bootstrap-critical coordinate and coordinate
-coverage is currently clean.
+means the tensor found a weakest bootstrap-critical coordinate, coordinate
+coverage is clean, the recursive hierarchy is clean, and the task/handoff
+lineage validation is clean.
 
 Task-card selection uses the deterministic ordering
 `status_rank -> progress -> coordinate`, reported as source
@@ -231,6 +241,17 @@ Otherwise the handoff mode is `direct` and mirrors the current task-card
 coordinate. The same status/progress/path ordering chooses the non-tensor
 handoff, so a completed stable frontdoor does not hide a merely usable runtime
 lane just because it appears earlier in the source snapshot.
+
+Task and handoff coordinates are independently bound back to the recursive
+hierarchy by `nuis-dev-tensor-task-card-lineage-v1`. The validator recursively
+resolves each coordinate from the root and requires it to terminate at a
+function leaf. It publishes the complete root-to-leaf task ancestry and
+handoff ancestry, their deepest common ancestor, and the edge count needed to
+move from one leaf to the other. A `direct` handoff must retain the same
+coordinate and ancestry with transition depth zero. A
+`self-maintenance-handoff` must advance to a different reachable leaf. Missing
+leaves, invalid modes, inconsistent ancestry, or a non-clean hierarchy make
+the lineage `invalid` and keep the task card blocked.
 
 `nuis status` also prints the short tensor summary plus hierarchy protocol and
 validation state. That makes the model part of the toolchain self-orientation
@@ -954,8 +975,9 @@ adapter drift even when the sidecar remains unchanged. An explicit
 capsule boundary. Host runner now independently recomputes the table and
 selected-set hashes, verifies both required bindings, exposes all entries, and
 blocks lifecycle handoff on drift. Nsdb owns a separate final-image parser:
-launcher-less work is explicitly `pre-seal-acquisition`, while an existing
-launcher makes missing or damaged NSB state fatal. Before launching a worker,
+launcher-less or not-ready-launcher work is explicitly
+`pre-seal-acquisition`, while a ready launcher makes missing or damaged NSB
+state fatal. Before launching a worker,
 Nsdb matches package, bundle, family, actual runner/adapter identity, and the
 registered runtime adapter against the final image. The official CoreML/Metal
 route executes again after seal and proves all selected bundles were
@@ -965,10 +987,25 @@ entry and dispatch/selected-set hashes under
 `nuis-provider-completion-dispatch-authority-v1`; those fields participate in
 the signed completion-set digest. Nsdb and Nuis independently aggregate the
 same identity into replay transcripts and
-`nsdb-yir-replay-cursor-record-v2`, and both reject cursor drift. The next
-continuity boundary is binding this identity into cursor lineage and repair
-journal ancestry. Acquisition and self-contained rebuild remain explicit Nuis
-orchestration rather than linker policy.
+`nsdb-yir-replay-cursor-record-v2`, and both reject cursor drift. Cursor
+lineage v2 repeats the provider dispatch identity in its header and every
+retained entry. Repair journal v6 binds the same identity into each event hash,
+the rotated-prefix ancestry, and the canonical repair-window hash. Nsdb and
+Nuis independently reject history from another dispatch table even when the
+broader final-image proof is unchanged. Acquisition and self-contained rebuild
+remain explicit Nuis orchestration rather than linker policy.
+
+The lineage mirror is also the sole input to
+`nuis-validated-provider-dispatch-identity-capability-v1`. This capability does
+not reopen the handoff or NSB: it copies the identity already accepted as
+`debugger_cursor_lineage_provider_dispatch_identity_hash`. A ready lineage with
+an identity is `verified`; a ready CPU-only lineage without a dispatch table is
+`verified-empty`; unavailable or invalid lineage is `blocked`. Final-output and
+closure JSON/text project the same capability under
+`object_package_provider_dispatch_identity_*` and
+`debugger_api_provider_dispatch_identity_*`. These are core interfaces for
+future package-summary and debugger Galaxy APIs, not separate authority
+implementations.
 The contract keeps Nsld container table hashes in `0x<16-hex>` form and uses
 `fnv1a64:<16-hex>` for selected-set and proof hashes; independent consumers
 validate those field-specific encodings rather than conflating them.
@@ -1280,10 +1317,16 @@ aliasing and any later reuse, while cleanup synthesis removes both consumed
 inputs. The YIR merge now carries explicit `address_kind=node|buffer` and
 `nullable=true|false` metadata. Heap verification rejects kind/object mismatch;
 source may widen two live owners into an optional result but still rejects
-nullable candidates. `owned_pointer_select_demo` executes Node,
-nullable-result, and Buffer selections, reaches both `load_value` and
-`load_at`, and proves final survivor cleanup in a native binary with exit `78`.
-Projected and task-carried address results remain closed.
+nullable candidates. Selected helper leaves now encode every moved address as
+`owned_transfer address_kind=<node|buffer> nullable=false <value>`. The YIR
+parser includes kind and nullability in cross-branch equality, CPU validates
+the selected heap object, and LLVM checks Node versus Buffer helper ABI shape
+while retaining the Buffer length. `owned_pointer_select_demo` executes Node,
+nullable-result, and Buffer selections, transfers one Node plus one Buffer
+through exact-one-consuming helper leaves, reaches both `load_value` and
+`load_at`, and proves final survivor cleanup in a native binary with exit `94`.
+Projected, nullable-transfer, returned, and task-carried address results remain
+closed.
 The runtime now defines `NuisSchedulerOwnedBlobV1` as the first GLM-tokened
 dynamic leaf primitive. It deep-copies borrowed bytes and has scheduler-native
 move/drop hooks; a compiled harness covers take and cancellation. Recursive
@@ -1374,13 +1417,16 @@ An optional sibling lineage sidecar retains the latest eight replacements as a
 monotonic FNV-1a hash chain over public cursor identities. A damaged sidecar is
 preserved without invalidating the authoritative cursor. Nuis does not import
 Nsdb types: its artifact adapter mirrors lineage protocol, path,
-readiness, status, bounded depth, and latest hash through final-output and
-closure summaries. The latest hash must match the authoritative cursor bytes.
+readiness, status, bounded depth, latest hash, and the validated provider
+dispatch identity through final-output text/JSON and closure JSON. These
+surfaces copy the mirror result rather than recomputing authority. The latest
+hash must match the authoritative cursor bytes.
 Invalid lineage now carries a stable blocker, repair action, and executable
 Nsdb command. Repair validates the authoritative cursor, archives the damaged
 sidecar under a content hash, atomically rebuilds one current entry, and is
-idempotent once healthy. Nuis does not yet own a first-class repair command;
-native execution remains outside this metadata-level debugger control.
+idempotent once healthy. Nuis owns the structured `debug-lineage-repair`
+frontdoor while Nsdb remains the repair implementation owner; native execution
+remains outside this metadata-level debugger control.
 
 ## Current Role
 
@@ -1414,7 +1460,10 @@ The stable part is the coordinate idea:
 The task-card layer is intentionally small: protocol/source/status/ready,
 handoff metadata, `blocker`, `next_action`, `validation_command`, and
 `expected_artifact`. It lets the weakest bootstrap coordinate become a concrete
-work item without turning the tensor into a full issue tracker.
+work item without turning the tensor into a full issue tracker. Its recursive
+lineage adds reachability evidence rather than scheduling policy: downstream
+tools can prove where a handoff came from without coupling the tensor to a
+specific Nustar or finite backend combination.
 
 Future work should move cells from static entries toward generated readings
 from:

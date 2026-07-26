@@ -83,6 +83,7 @@ pub(crate) fn persist_replay_cursor(
         after,
         next,
         proof_hash,
+        dispatch_identity_hash,
     );
     Ok(())
 }

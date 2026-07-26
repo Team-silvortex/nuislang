@@ -2,6 +2,7 @@ use super::conditional_owned_calls::{
     lower_pure_scalar_args, moved_owned_source, owned_return_call_with_non_null_proofs,
 };
 use super::*;
+use nuis_semantics::model::{NirOwnedPointerAddressKind, NirTypeRef};
 
 enum OwnedReturnBranch<'a> {
     Owner(&'a NirExpr),
@@ -40,6 +41,8 @@ enum OwnedReturnScalarArg<'a> {
     },
     OwnedTransfer {
         value: &'a NirExpr,
+        address_kind: NirOwnedPointerAddressKind,
+        nullable: bool,
     },
 }
 
@@ -90,14 +93,16 @@ fn validate_transfer_pair(
     functions: &BTreeMap<&str, &NirFunction>,
 ) -> Result<(), String> {
     let then_transfers = owned_transfer_sources(then_branch).ok_or_else(|| {
-        "selected owned pointer transfer must move each named Node exactly once per leaf".to_owned()
+        "selected owned pointer transfer must move each named address exactly once per leaf"
+            .to_owned()
     })?;
     let else_transfers = owned_transfer_sources(else_branch).ok_or_else(|| {
-        "selected owned pointer transfer must move each named Node exactly once per leaf".to_owned()
+        "selected owned pointer transfer must move each named address exactly once per leaf"
+            .to_owned()
     })?;
     if then_transfers != else_transfers {
         return Err(
-            "selected owned pointer transfer requires the same moved Node set on every reachable leaf"
+            "selected owned pointer transfer requires the same moved address metadata set on every reachable leaf"
                 .to_owned(),
         );
     }
@@ -160,9 +165,11 @@ fn parse_owned_return_branch<'a>(
     if let [NirStmt::Return(Some(NirExpr::Call { .. }))] = tail {
         let (callee, owner, scalar_args) =
             owned_return_call_with_non_null_proofs(tail, functions, non_null_proofs)?;
+        let function = functions.get(callee)?;
         let scalar_args = scalar_args
             .iter()
-            .map(|arg| selected_leaf_scalar_arg(arg, &projections, 0))
+            .zip(function.params.iter().skip(1))
+            .map(|(arg, param)| selected_leaf_scalar_arg(arg, &projections, 0, Some(&param.ty)))
             .collect::<Option<Vec<_>>>()?;
         return Some(OwnedReturnBranch::Call {
             callee,
@@ -242,13 +249,14 @@ fn selected_leaf_scalar_arg<'a>(
     expr: &'a NirExpr,
     projections: &BTreeMap<&'a str, &'a NirExpr>,
     depth: usize,
+    expected: Option<&NirTypeRef>,
 ) -> Option<OwnedReturnScalarArg<'a>> {
     if depth >= 64 {
         return None;
     }
     match expr {
         NirExpr::Var(name) if projections.contains_key(name.as_str()) => {
-            selected_leaf_scalar_arg(projections[name.as_str()], projections, depth + 1)
+            selected_leaf_scalar_arg(projections[name.as_str()], projections, depth + 1, expected)
         }
         NirExpr::VariantFieldAccess {
             base,
@@ -261,19 +269,41 @@ fn selected_leaf_scalar_arg<'a>(
         }),
         NirExpr::FieldAccess { base, field } => Some(OwnedReturnScalarArg::StructField {
             field,
-            base: Box::new(selected_leaf_scalar_arg(base, projections, depth + 1)?),
+            base: Box::new(selected_leaf_scalar_arg(
+                base,
+                projections,
+                depth + 1,
+                expected,
+            )?),
         }),
         NirExpr::Call { callee, args }
             if callee == "__nuis_require_non_null_buffer" && args.len() == 1 =>
         {
             Some(OwnedReturnScalarArg::NonNull {
-                value: Box::new(selected_leaf_scalar_arg(&args[0], projections, depth + 1)?),
+                value: Box::new(selected_leaf_scalar_arg(
+                    &args[0],
+                    projections,
+                    depth + 1,
+                    expected,
+                )?),
             })
         }
         NirExpr::Borrow(value) => Some(OwnedReturnScalarArg::TraversalBorrow {
-            value: Box::new(selected_leaf_scalar_arg(value, projections, depth + 1)?),
+            value: Box::new(selected_leaf_scalar_arg(
+                value,
+                projections,
+                depth + 1,
+                expected,
+            )?),
         }),
-        NirExpr::Move(value) => Some(OwnedReturnScalarArg::OwnedTransfer { value }),
+        NirExpr::Move(value) => {
+            let expected = expected.filter(|ty| ty.is_ref)?;
+            Some(OwnedReturnScalarArg::OwnedTransfer {
+                value,
+                address_kind: NirOwnedPointerAddressKind::for_target(&expected.name)?,
+                nullable: expected.is_optional,
+            })
+        }
         NirExpr::CastI64ToI32(value) => selected_leaf_cast(
             yir_core::OwnedSelectScalarCast::I64ToI32,
             value,
@@ -335,7 +365,12 @@ fn selected_leaf_cast<'a>(
 ) -> Option<OwnedReturnScalarArg<'a>> {
     Some(OwnedReturnScalarArg::Cast {
         kind,
-        value: Box::new(selected_leaf_scalar_arg(value, projections, depth + 1)?),
+        value: Box::new(selected_leaf_scalar_arg(
+            value,
+            projections,
+            depth + 1,
+            None,
+        )?),
     })
 }
 
@@ -492,7 +527,9 @@ fn encode_owned_return_branch(
     Ok(())
 }
 
-fn owned_transfer_sources<'a>(branch: &'a OwnedReturnBranch<'a>) -> Option<BTreeSet<&'a str>> {
+fn owned_transfer_sources<'a>(
+    branch: &'a OwnedReturnBranch<'a>,
+) -> Option<BTreeSet<(&'a str, NirOwnedPointerAddressKind, bool)>> {
     match branch {
         OwnedReturnBranch::Owner(_) => Some(BTreeSet::new()),
         OwnedReturnBranch::Call { scalar_args, .. } => {
@@ -500,9 +537,12 @@ fn owned_transfer_sources<'a>(branch: &'a OwnedReturnBranch<'a>) -> Option<BTree
             for arg in scalar_args {
                 if let OwnedReturnScalarArg::OwnedTransfer {
                     value: NirExpr::Var(name),
+                    address_kind,
+                    nullable,
+                    ..
                 } = arg
                 {
-                    if !transfers.insert(name.as_str()) {
+                    if !transfers.insert((name.as_str(), *address_kind, *nullable)) {
                         return None;
                     }
                 } else if matches!(arg, OwnedReturnScalarArg::OwnedTransfer { .. }) {
@@ -538,13 +578,26 @@ fn validate_owned_transfer_consumers(
                 .get(callee)
                 .ok_or_else(|| format!("unknown selected helper `{callee}`"))?;
             for (param, arg) in function.params.iter().skip(1).zip(scalar_args) {
-                if matches!(arg, OwnedReturnScalarArg::OwnedTransfer { .. })
-                    && !helper_consumes_node_param_on_every_path(function, &param.name)
+                if let OwnedReturnScalarArg::OwnedTransfer {
+                    address_kind,
+                    nullable,
+                    ..
+                } = arg
                 {
-                    return Err(format!(
-                        "selected helper `{callee}` must consume transferred Node parameter `{}` with exactly one free(...) on every exit path",
-                        param.name
+                    if *nullable {
+                        return Err(format!(
+                            "selected helper `{callee}` cannot consume nullable {} transfer parameter `{}`",
+                            address_kind.as_str(),
+                            param.name
+                        ));
+                    }
+                    if !helper_consumes_address_param_on_every_path(function, &param.name) {
+                        return Err(format!(
+                            "selected helper `{callee}` must consume transferred {} parameter `{}` with exactly one free(...) on every exit path",
+                            address_kind.as_str(),
+                            param.name
                     ));
+                    }
                 }
             }
             Ok(())
@@ -565,7 +618,7 @@ struct NodeConsumeFlow {
     exited: Vec<u8>,
 }
 
-fn helper_consumes_node_param_on_every_path(function: &NirFunction, param: &str) -> bool {
+fn helper_consumes_address_param_on_every_path(function: &NirFunction, param: &str) -> bool {
     let Some(flow) = node_consume_flow(&function.body, vec![0], param) else {
         return false;
     };
@@ -653,7 +706,11 @@ fn encode_owned_scalar_arg(
             tokens.push("traversal_borrow".to_owned());
             encode_owned_scalar_arg(value, state, bindings, tokens)?;
         }
-        OwnedReturnScalarArg::OwnedTransfer { value } => {
+        OwnedReturnScalarArg::OwnedTransfer {
+            value,
+            address_kind,
+            nullable,
+        } => {
             let NirExpr::Var(name) = value else {
                 return Err(
                     "selected owned pointer transfer requires `move(<named Node binding>)`"
@@ -664,7 +721,12 @@ fn encode_owned_scalar_arg(
                 .get(name)
                 .cloned()
                 .ok_or_else(|| format!("unknown owned pointer transfer binding `{name}`"))?;
-            tokens.extend(["owned_transfer".to_owned(), source]);
+            tokens.extend([
+                "owned_transfer".to_owned(),
+                format!("address_kind={}", address_kind.as_str()),
+                format!("nullable={nullable}"),
+                source,
+            ]);
         }
     }
     Ok(())

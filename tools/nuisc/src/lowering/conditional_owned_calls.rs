@@ -181,7 +181,10 @@ fn leaf_argument_allowed(ty: &nuis_semantics::model::NirTypeRef, arg: &NirExpr) 
         || (is_borrowed_buffer_type(ty)
             && matches!(
                 arg,
-                NirExpr::Var(_) | NirExpr::FieldAccess { .. } | NirExpr::VariantFieldAccess { .. }
+                NirExpr::Var(_)
+                    | NirExpr::Move(_)
+                    | NirExpr::FieldAccess { .. }
+                    | NirExpr::VariantFieldAccess { .. }
             ))
         || (is_traversal_pointer_type(ty) && matches!(arg, NirExpr::Borrow(_) | NirExpr::Move(_)))
 }

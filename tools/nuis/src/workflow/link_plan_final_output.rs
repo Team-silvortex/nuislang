@@ -2,6 +2,7 @@ use super::{
     link_plan::{parse_bool_field, parse_string_field, parse_usize_field},
     link_plan_final_output_closure::{debugger_transcript_summary, object_package_summary},
     link_plan_final_output_summary::NsldFinalExecutableOutputBoundarySummary,
+    link_plan_provider_dispatch_identity::validated_provider_dispatch_identity_capability,
     nsld_drive_command_set_for_output_dir,
     object_identity::workflow_object_identity,
 };
@@ -122,6 +123,8 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         &Path::new(&plan.output_dir).join("nuis.build.manifest.toml"),
     );
     let debugger_cursor_lineage = read_debugger_cursor_lineage(Path::new(&plan.output_dir));
+    let provider_dispatch_identity_capability =
+        validated_provider_dispatch_identity_capability(&debugger_cursor_lineage);
     let debugger_cursor_lineage_repair = debugger_cursor_lineage.repair;
     let drive_command_set = nsld_drive_command_set_for_output_dir(Path::new(&plan.output_dir));
     let device_provider_sample_provider_bundle_registry_contract =
@@ -245,6 +248,9 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         debugger_cursor_lineage_status: debugger_cursor_lineage.status.to_owned(),
         debugger_cursor_lineage_entry_count: debugger_cursor_lineage.entry_count,
         debugger_cursor_lineage_latest_hash: debugger_cursor_lineage.latest_hash,
+        debugger_cursor_lineage_provider_dispatch_identity_hash: debugger_cursor_lineage
+            .provider_dispatch_identity_hash,
+        provider_dispatch_identity_capability,
         debugger_cursor_lineage_first_blocker: debugger_cursor_lineage
             .first_blocker
             .map(str::to_owned),

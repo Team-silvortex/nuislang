@@ -5,9 +5,10 @@ use std::{
 };
 
 use crate::cursor_lineage_repair_journal as repair_journal;
+use crate::model::NsdbProviderCompletionDispatchIdentity;
 use crate::{cursor::persist_validated_content_atomically, provider_sample_payload::fnv1a64_hex};
 
-const LINEAGE_PROTOCOL: &str = "nsdb-yir-replay-cursor-lineage-v1";
+const LINEAGE_PROTOCOL: &str = "nsdb-yir-replay-cursor-lineage-v2";
 const IDENTITY_CONTRACT: &str = "nsdb-yir-replay-identity-v1";
 const LINEAGE_LIMIT: usize = 8;
 const CURSOR_FILE_NAME: &str = "nuis.nsdb.replay-cursor.toml";
@@ -36,12 +37,14 @@ struct CursorLineageEntry {
     after_frame_id: String,
     next_frame_id: String,
     final_image_binding_proof_hash: String,
+    provider_dispatch_identity_hash: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct CursorLineage {
     cursor_path: String,
     final_image_binding_proof_hash: String,
+    provider_dispatch_identity_hash: String,
     entries: Vec<CursorLineageEntry>,
 }
 
@@ -52,6 +55,7 @@ pub(super) fn record_cursor_lineage(
     after_frame_id: &str,
     next_frame_id: &str,
     final_image_binding_proof_hash: &str,
+    provider_dispatch_identity_hash: &str,
 ) -> Result<(), String> {
     let sidecar_path = cursor_lineage_path(cursor_path)?;
     let cursor_path_text = cursor_path.display().to_string();
@@ -61,11 +65,15 @@ pub(super) fn record_cursor_lineage(
         CursorLineage {
             cursor_path: cursor_path_text.clone(),
             final_image_binding_proof_hash: final_image_binding_proof_hash.to_owned(),
+            provider_dispatch_identity_hash: provider_dispatch_identity_hash.to_owned(),
             entries: Vec::new(),
         }
     };
     if lineage.final_image_binding_proof_hash != final_image_binding_proof_hash {
         return Err("cursor lineage belongs to another final image binding proof".to_owned());
+    }
+    if lineage.provider_dispatch_identity_hash != provider_dispatch_identity_hash {
+        return Err("cursor lineage belongs to another provider dispatch identity".to_owned());
     }
     let previous_hash = previous_content
         .map(|content| fnv1a64_hex(content.as_bytes()))
@@ -90,6 +98,7 @@ pub(super) fn record_cursor_lineage(
         after_frame_id: after_frame_id.to_owned(),
         next_frame_id: next_frame_id.to_owned(),
         final_image_binding_proof_hash: final_image_binding_proof_hash.to_owned(),
+        provider_dispatch_identity_hash: provider_dispatch_identity_hash.to_owned(),
     });
     if lineage.entries.len() > LINEAGE_LIMIT {
         lineage
@@ -106,6 +115,7 @@ pub(super) fn repair_cursor_lineage(
     output_dir: &Path,
     manifest: &Path,
     final_image_binding_proof_hash: &str,
+    provider_dispatch_identity: &NsdbProviderCompletionDispatchIdentity,
 ) -> Result<CursorLineageRepairReport, String> {
     let cursor_path = output_dir.join(CURSOR_FILE_NAME);
     let cursor_content = fs::read_to_string(&cursor_path).map_err(|error| {
@@ -114,8 +124,13 @@ pub(super) fn repair_cursor_lineage(
             cursor_path.display()
         )
     })?;
-    let control =
-        crate::cursor::load_replay_cursor(&cursor_path, manifest, final_image_binding_proof_hash)?;
+    let control = crate::cursor::load_replay_cursor_with_dispatch(
+        &cursor_path,
+        manifest,
+        final_image_binding_proof_hash,
+        provider_dispatch_identity,
+    )?;
+    let provider_dispatch_identity_hash = provider_dispatch_identity.identity_hash.as_str();
     let after_frame_id = control
         .resume_after_frame_id
         .as_deref()
@@ -132,9 +147,11 @@ pub(super) fn repair_cursor_lineage(
         lineage.entries.last().is_some_and(|entry| {
             entry.current_hash == current_hash
                 && entry.final_image_binding_proof_hash == final_image_binding_proof_hash
+                && entry.provider_dispatch_identity_hash == provider_dispatch_identity_hash
         })
     });
-    let repair_preflight = repair_journal::preflight(output_dir, &lineage_path)?;
+    let repair_preflight =
+        repair_journal::preflight(output_dir, &lineage_path, provider_dispatch_identity_hash)?;
     if lineage_ready {
         if repair_preflight.archived_path.is_some() {
             repair_journal::record(
@@ -144,6 +161,7 @@ pub(super) fn repair_cursor_lineage(
                 false,
                 None,
                 &current_hash,
+                provider_dispatch_identity_hash,
             )?;
             return Ok(CursorLineageRepairReport {
                 contract: "nsdb-yir-replay-cursor-lineage-repair-v2",
@@ -195,6 +213,7 @@ pub(super) fn repair_cursor_lineage(
         after_frame_id,
         next_frame_id,
         final_image_binding_proof_hash,
+        provider_dispatch_identity_hash,
     )?;
     let rebuilt = load_cursor_lineage(&lineage_path, &expected_cursor_path)?;
     repair_journal::record(
@@ -204,6 +223,7 @@ pub(super) fn repair_cursor_lineage(
         true,
         archived_path.as_deref(),
         &current_hash,
+        provider_dispatch_identity_hash,
     )?;
     Ok(CursorLineageRepairReport {
         contract: "nsdb-yir-replay-cursor-lineage-repair-v2",
@@ -281,10 +301,12 @@ fn render_cursor_lineage(lineage: &CursorLineage) -> String {
         "protocol = \"{LINEAGE_PROTOCOL}\"\n\
          identity_contract = \"{IDENTITY_CONTRACT}\"\n\
          final_image_binding_proof_hash = \"{}\"\n\
+         provider_dispatch_identity_hash = \"{}\"\n\
          cursor_path = \"{}\"\n\
          entry_limit = {LINEAGE_LIMIT}\n\
          entry_count = {}\n",
         lineage.final_image_binding_proof_hash,
+        lineage.provider_dispatch_identity_hash,
         escape_toml(&lineage.cursor_path),
         lineage.entries.len()
     );
@@ -296,13 +318,15 @@ fn render_cursor_lineage(lineage: &CursorLineage) -> String {
              current_hash = \"{}\"\n\
              after_frame_id = \"{}\"\n\
              next_frame_id = \"{}\"\n\
-             final_image_binding_proof_hash = \"{}\"\n",
+             final_image_binding_proof_hash = \"{}\"\n\
+             provider_dispatch_identity_hash = \"{}\"\n",
             entry.sequence,
             entry.previous_hash,
             entry.current_hash,
             escape_toml(&entry.after_frame_id),
             escape_toml(&entry.next_frame_id),
             entry.final_image_binding_proof_hash,
+            entry.provider_dispatch_identity_hash,
         ));
     }
     output
@@ -355,6 +379,7 @@ fn parse_cursor_lineage(source: &str, expected_cursor_path: &str) -> Result<Curs
             "protocol",
             "identity_contract",
             "final_image_binding_proof_hash",
+            "provider_dispatch_identity_hash",
             "cursor_path",
             "entry_limit",
             "entry_count",
@@ -368,6 +393,11 @@ fn parse_cursor_lineage(source: &str, expected_cursor_path: &str) -> Result<Curs
     if !is_final_image_proof_hash(&final_image_binding_proof_hash) {
         return Err("final_image_binding_proof_hash must be an FNV-1a64 hash".to_owned());
     }
+    let provider_dispatch_identity_hash =
+        field(&header, "provider_dispatch_identity_hash")?.to_owned();
+    if !is_optional_hash(&provider_dispatch_identity_hash) {
+        return Err("provider_dispatch_identity_hash must be none or an FNV-1a64 hash".to_owned());
+    }
     require_value(&header, "entry_limit", &LINEAGE_LIMIT.to_string())?;
     let declared_count = field(&header, "entry_count")?
         .parse::<usize>()
@@ -378,10 +408,15 @@ fn parse_cursor_lineage(source: &str, expected_cursor_path: &str) -> Result<Curs
             entries.len()
         ));
     }
-    validate_lineage_entries(&entries, &final_image_binding_proof_hash)?;
+    validate_lineage_entries(
+        &entries,
+        &final_image_binding_proof_hash,
+        &provider_dispatch_identity_hash,
+    )?;
     Ok(CursorLineage {
         cursor_path: expected_cursor_path.to_owned(),
         final_image_binding_proof_hash,
+        provider_dispatch_identity_hash,
         entries,
     })
 }
@@ -396,6 +431,7 @@ fn parse_lineage_entry(fields: BTreeMap<String, String>) -> Result<CursorLineage
             "after_frame_id",
             "next_frame_id",
             "final_image_binding_proof_hash",
+            "provider_dispatch_identity_hash",
         ],
     )?;
     Ok(CursorLineageEntry {
@@ -408,12 +444,15 @@ fn parse_lineage_entry(fields: BTreeMap<String, String>) -> Result<CursorLineage
         next_frame_id: field(&fields, "next_frame_id")?.to_owned(),
         final_image_binding_proof_hash: field(&fields, "final_image_binding_proof_hash")?
             .to_owned(),
+        provider_dispatch_identity_hash: field(&fields, "provider_dispatch_identity_hash")?
+            .to_owned(),
     })
 }
 
 fn validate_lineage_entries(
     entries: &[CursorLineageEntry],
     final_image_binding_proof_hash: &str,
+    provider_dispatch_identity_hash: &str,
 ) -> Result<(), String> {
     for (index, entry) in entries.iter().enumerate() {
         if entry.previous_hash != "none" && !is_fnv1a64_hex(&entry.previous_hash) {
@@ -424,6 +463,11 @@ fn validate_lineage_entries(
         }
         if entry.final_image_binding_proof_hash != final_image_binding_proof_hash {
             return Err(format!("entry {index} belongs to another final image"));
+        }
+        if entry.provider_dispatch_identity_hash != provider_dispatch_identity_hash {
+            return Err(format!(
+                "entry {index} belongs to another provider dispatch identity"
+            ));
         }
         if let Some(previous) = index.checked_sub(1).and_then(|i| entries.get(i)) {
             if entry.sequence != previous.sequence + 1
@@ -482,6 +526,10 @@ fn is_fnv1a64_hex(value: &str) -> bool {
             .all(|character| character.is_ascii_hexdigit())
 }
 
+fn is_optional_hash(value: &str) -> bool {
+    value == "none" || is_fnv1a64_hex(value)
+}
+
 fn is_final_image_proof_hash(value: &str) -> bool {
     value.strip_prefix("fnv1a64:").is_some_and(|hex| {
         hex.len() == 16 && hex.chars().all(|character| character.is_ascii_hexdigit())
@@ -499,6 +547,17 @@ mod tests {
 
     static TEMP_ID: AtomicU64 = AtomicU64::new(0);
     const TEST_PROOF_HASH: &str = "fnv1a64:0123456789abcdef";
+    const TEST_DISPATCH_IDENTITY_HASH: &str = "0x0123456789abcdef";
+
+    fn test_dispatch_identity() -> NsdbProviderCompletionDispatchIdentity {
+        NsdbProviderCompletionDispatchIdentity {
+            contract: crate::provider_completion_dispatch::COMPLETION_AUTHORITY_CONTRACT.to_owned(),
+            status: "verified".to_owned(),
+            table_hash: "0x1111111111111111".to_owned(),
+            selected_set_hash: "fnv1a64:2222222222222222".to_owned(),
+            identity_hash: TEST_DISPATCH_IDENTITY_HASH.to_owned(),
+        }
+    }
 
     fn temp_dir(label: &str) -> PathBuf {
         let id = TEMP_ID.fetch_add(1, Ordering::Relaxed);
@@ -524,6 +583,7 @@ mod tests {
                 &format!("frame-{index}"),
                 &format!("frame-{}", index + 1),
                 TEST_PROOF_HASH,
+                TEST_DISPATCH_IDENTITY_HASH,
             )
             .unwrap();
             previous = Some(current);
@@ -554,6 +614,7 @@ mod tests {
             "frame-0",
             "frame-1",
             TEST_PROOF_HASH,
+            TEST_DISPATCH_IDENTITY_HASH,
         )
         .unwrap_err();
 
@@ -593,7 +654,15 @@ mod tests {
         let lineage = cursor_lineage_path(&cursor).unwrap();
         fs::write(&lineage, "protocol = \"damaged\"\n").unwrap();
 
-        let repaired = repair_cursor_lineage(&root, &manifest, TEST_PROOF_HASH).unwrap();
+        let dispatch_identity = NsdbProviderCompletionDispatchIdentity {
+            contract: crate::provider_completion_dispatch::COMPLETION_AUTHORITY_CONTRACT.to_owned(),
+            status: "not-applicable".to_owned(),
+            table_hash: "none".to_owned(),
+            selected_set_hash: "none".to_owned(),
+            identity_hash: "none".to_owned(),
+        };
+        let repaired =
+            repair_cursor_lineage(&root, &manifest, TEST_PROOF_HASH, &dispatch_identity).unwrap();
         assert_eq!(repaired.status, "lineage-rebuilt");
         assert!(repaired.mutated);
         assert!(repaired.lineage_mutated);
@@ -605,11 +674,16 @@ mod tests {
             .is_some_and(|path| Path::new(path).exists()));
         let journal_path = root.join(repair_journal::FILE_NAME);
         let journal_before = fs::read_to_string(&journal_path).unwrap();
-        assert!(repair_journal::journal_is_valid(&journal_path, &lineage));
+        assert!(repair_journal::journal_is_valid(
+            &journal_path,
+            &lineage,
+            "none"
+        ));
         assert!(journal_before.contains("status = \"lineage-rebuilt\""));
         assert!(journal_before.contains(&format!("rebuilt_hash = \"{}\"", repaired.latest_hash)));
 
-        let repeated = repair_cursor_lineage(&root, &manifest, TEST_PROOF_HASH).unwrap();
+        let repeated =
+            repair_cursor_lineage(&root, &manifest, TEST_PROOF_HASH, &dispatch_identity).unwrap();
         assert_eq!(repeated.status, "already-ready");
         assert!(!repeated.mutated);
         assert!(!repeated.lineage_mutated);
@@ -619,7 +693,8 @@ mod tests {
 
         let healthy_lineage = fs::read_to_string(&lineage).unwrap();
         fs::write(&journal_path, "protocol = \"journal-only-damage\"\n").unwrap();
-        let journal_only = repair_cursor_lineage(&root, &manifest, TEST_PROOF_HASH).unwrap();
+        let journal_only =
+            repair_cursor_lineage(&root, &manifest, TEST_PROOF_HASH, &dispatch_identity).unwrap();
         assert_eq!(journal_only.status, "repair-history-recovered");
         assert!(journal_only.mutated);
         assert!(!journal_only.lineage_mutated);
@@ -627,17 +702,26 @@ mod tests {
         assert_eq!(fs::read_to_string(&lineage).unwrap(), healthy_lineage);
         let journal_only_source = fs::read_to_string(&journal_path).unwrap();
         assert!(journal_only_source.contains("status = \"repair-history-recovered\""));
-        assert!(repair_journal::journal_is_valid(&journal_path, &lineage));
+        assert!(repair_journal::journal_is_valid(
+            &journal_path,
+            &lineage,
+            "none"
+        ));
 
         fs::write(&lineage, "protocol = \"damaged-again\"\n").unwrap();
         fs::write(&journal_path, "protocol = \"damaged-journal\"\n").unwrap();
-        let recovered = repair_cursor_lineage(&root, &manifest, TEST_PROOF_HASH).unwrap();
+        let recovered =
+            repair_cursor_lineage(&root, &manifest, TEST_PROOF_HASH, &dispatch_identity).unwrap();
         assert_eq!(recovered.status, "lineage-rebuilt");
         assert!(recovered
             .archived_repair_journal_path
             .as_deref()
             .is_some_and(|path| Path::new(path).exists()));
-        assert!(repair_journal::journal_is_valid(&journal_path, &lineage));
+        assert!(repair_journal::journal_is_valid(
+            &journal_path,
+            &lineage,
+            "none"
+        ));
 
         let damaged_lineage = "protocol = \"must-remain\"\n";
         let damaged_journal = "protocol = \"cannot-archive\"\n";
@@ -659,9 +743,49 @@ mod tests {
             )
             .unwrap();
         }
-        let error = repair_cursor_lineage(&root, &manifest, TEST_PROOF_HASH).unwrap_err();
+        let error = repair_cursor_lineage(&root, &manifest, TEST_PROOF_HASH, &dispatch_identity)
+            .unwrap_err();
         assert!(error.contains("failed to reserve an archive path"));
         assert_eq!(fs::read_to_string(&lineage).unwrap(), damaged_lineage);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rejects_lineage_from_another_provider_dispatch_identity() {
+        let root = temp_dir("dispatch-drift");
+        let cursor = root.join("cursor.toml");
+        record_cursor_lineage(
+            &cursor,
+            None,
+            "cursor-0",
+            "frame-0",
+            "frame-1",
+            TEST_PROOF_HASH,
+            TEST_DISPATCH_IDENTITY_HASH,
+        )
+        .unwrap();
+
+        let error = record_cursor_lineage(
+            &cursor,
+            Some("cursor-0"),
+            "cursor-1",
+            "frame-1",
+            "frame-2",
+            TEST_PROOF_HASH,
+            "0xfedcba9876543210",
+        )
+        .unwrap_err();
+        assert!(error.contains("another provider dispatch identity"));
+
+        let lineage = load_cursor_lineage(
+            &cursor_lineage_path(&cursor).unwrap(),
+            &cursor.display().to_string(),
+        )
+        .unwrap();
+        assert_eq!(
+            lineage.provider_dispatch_identity_hash,
+            test_dispatch_identity().identity_hash
+        );
         fs::remove_dir_all(root).unwrap();
     }
 }

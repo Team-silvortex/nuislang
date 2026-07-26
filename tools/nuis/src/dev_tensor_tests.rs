@@ -105,6 +105,44 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         summary.weakest_bootstrap_task_card_handoff_expected_artifact,
         "<none>"
     );
+    assert_eq!(
+        summary.weakest_bootstrap_task_card_lineage.protocol,
+        "nuis-dev-tensor-task-card-lineage-v1"
+    );
+    assert_eq!(summary.weakest_bootstrap_task_card_lineage.status, "clean");
+    assert_eq!(summary.weakest_bootstrap_task_card_lineage.error_count, 0);
+    assert!(summary
+        .weakest_bootstrap_task_card_lineage
+        .first_error
+        .is_none());
+    assert_eq!(
+        summary
+            .weakest_bootstrap_task_card_lineage
+            .task_ancestry
+            .last(),
+        Some(&summary.weakest_bootstrap_task_card_coordinate)
+    );
+    assert_eq!(
+        summary
+            .weakest_bootstrap_task_card_lineage
+            .handoff_ancestry
+            .last(),
+        Some(&summary.weakest_bootstrap_task_card_handoff_coordinate)
+    );
+    assert_eq!(
+        summary
+            .weakest_bootstrap_task_card_lineage
+            .task_ancestry
+            .first()
+            .map(String::as_str),
+        Some("nuislang")
+    );
+    assert_ne!(
+        summary
+            .weakest_bootstrap_task_card_lineage
+            .common_ancestor_path,
+        "<none>"
+    );
     assert!(summary.weakest_bootstrap_progress <= summary.bootstrap_critical_average_progress);
     let hierarchy = crate::dev_tensor_hierarchy::dev_tensor_hierarchy_summary();
     assert_eq!(
@@ -210,6 +248,16 @@ fn dev_tensor_json_exposes_coordinate_cells() {
     assert!(json.contains("\"weakest_bootstrap_task_card_handoff_action\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_handoff_command\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_handoff_expected_artifact\""));
+    assert!(json.contains(
+        "\"weakest_bootstrap_task_card_lineage_protocol\":\"nuis-dev-tensor-task-card-lineage-v1\""
+    ));
+    assert!(json.contains("\"weakest_bootstrap_task_card_lineage_status\":\"clean\""));
+    assert!(json.contains("\"weakest_bootstrap_task_card_lineage_error_count\":0"));
+    assert!(json.contains("\"weakest_bootstrap_task_card_lineage_errors\":[]"));
+    assert!(json.contains("\"weakest_bootstrap_task_card_task_ancestry\":[\"nuislang\""));
+    assert!(json.contains("\"weakest_bootstrap_task_card_handoff_ancestry\":[\"nuislang\""));
+    assert!(json.contains("\"weakest_bootstrap_task_card_common_ancestor_path\""));
+    assert!(json.contains("\"weakest_bootstrap_task_card_transition_depth\":"));
     assert!(json.contains("weakest bootstrap-critical status/progress ordering"));
     assert!(json.contains("\"blocker\""));
     assert!(json.contains("\"next_action\""));
@@ -335,6 +383,15 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("weakest_bootstrap_task_card_handoff_action:"));
     assert!(text.contains("weakest_bootstrap_task_card_handoff_command:"));
     assert!(text.contains("weakest_bootstrap_task_card_handoff_expected_artifact:"));
+    assert!(text.contains(
+        "weakest_bootstrap_task_card_lineage_protocol: nuis-dev-tensor-task-card-lineage-v1"
+    ));
+    assert!(text.contains("weakest_bootstrap_task_card_lineage_status: clean"));
+    assert!(text.contains("weakest_bootstrap_task_card_lineage_error_count: 0"));
+    assert!(text.contains("weakest_bootstrap_task_card_task_ancestor: nuislang"));
+    assert!(text.contains("weakest_bootstrap_task_card_handoff_ancestor: nuislang"));
+    assert!(text.contains("weakest_bootstrap_task_card_common_ancestor_path:"));
+    assert!(text.contains("weakest_bootstrap_task_card_transition_depth:"));
     assert!(text.contains("weakest bootstrap-critical status/progress ordering"));
     assert!(text.contains("    blocker:"));
     assert!(text.contains("    next_action:"));

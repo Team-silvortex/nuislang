@@ -2,6 +2,8 @@ use std::fmt;
 use std::path::Path;
 
 mod link_plan;
+mod link_plan_nsld_dispatch_identity;
+mod link_plan_nsld_lineage;
 mod link_plan_nsld_tail;
 mod link_plan_readiness;
 mod link_plan_text;
