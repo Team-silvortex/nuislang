@@ -2,6 +2,7 @@
 
 mod digest_sha256;
 mod handoff;
+mod handoff_binding;
 mod model;
 mod provider_adapter_binding;
 mod provider_bundle_registry;
@@ -114,6 +115,9 @@ pub struct PayloadExecutionReplaySummary {
     pub provider_completion_set_hash: Option<String>,
     pub provider_completion_set_hash_validation_status: String,
     pub provider_completions: Vec<PayloadExecutionProviderCompletion>,
+    pub final_image_binding_proof_contract: Option<String>,
+    pub final_image_binding_proof_status: String,
+    pub final_image_binding_proof_hash: Option<String>,
     pub first_blocker: Option<String>,
 }
 
@@ -223,6 +227,12 @@ pub fn payload_execution_replay_summary(
         provider_completion_set_hash_validation_status: handoff
             .provider_completion_set_hash_validation_status,
         provider_completions,
+        final_image_binding_proof_contract: (handoff.final_image_binding_proof.contract != "none")
+            .then(|| handoff.final_image_binding_proof.contract.clone()),
+        final_image_binding_proof_status: handoff.final_image_binding_proof.proof_status,
+        final_image_binding_proof_hash: (handoff.final_image_binding_proof.proof_hash_actual
+            != "none")
+            .then(|| handoff.final_image_binding_proof.proof_hash_actual.clone()),
         first_blocker,
     }
 }
@@ -315,6 +325,102 @@ next_action = "handoff-payload-trace-to-nsdb"
         assert_eq!(
             summary.first_blocker.as_deref(),
             Some("hetero-execution-closure:host-runner-backend-artifact-payload:not-observed")
+        );
+    }
+
+    #[test]
+    fn replay_rejects_tampered_final_image_binding_proof() {
+        let dir = std::env::temp_dir().join(format!(
+            "nsdb-final-image-binding-proof-{}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let table_hash = "0x1111111111111111";
+        let selected_hash = "fnv1a64:2222222222222222";
+        let proof_hash = crate::handoff_binding::proof_hash(
+            1,
+            table_hash,
+            "verified",
+            "nuis-selected-provider-bundle-set-v1",
+            2,
+            selected_hash,
+        );
+        let source = format!(
+            r#"protocol = "nuis-nsdb-payload-execution-handoff-v1"
+debugger_contract = "nsdb-yir-payload-execution-trace-v1"
+record_count = 1
+ready_record_count = 1
+first_status = "ready"
+final_image_binding_proof_contract = "nuis-final-image-binding-proof-v1"
+final_image_metadata_binding_count = 1
+final_image_metadata_binding_table_hash = "{table_hash}"
+final_image_metadata_binding_validation_status = "verified"
+final_image_selected_provider_bundle_set_contract = "nuis-selected-provider-bundle-set-v1"
+final_image_selected_provider_bundle_count = 2
+final_image_selected_provider_bundle_set_hash = "{selected_hash}"
+final_image_binding_proof_hash = "{proof_hash}"
+
+[[records]]
+trace_id = "payload-trace:container-loader:main"
+status = "ready"
+execution_phase = "container-loader-handoff"
+entry_symbol = "main"
+next_action = "handoff-payload-trace-to-nsdb"
+"#
+        );
+        let path = dir.join("nuis.nsdb.payload-execution-handoff.toml");
+        fs::write(&path, &source).unwrap();
+        let verified = payload_execution_replay_summary(&dir);
+        assert_eq!(verified.status, "replay-evidence-ready");
+        assert_eq!(
+            verified.final_image_binding_proof_contract.as_deref(),
+            Some("nuis-final-image-binding-proof-v1")
+        );
+        assert_eq!(verified.final_image_binding_proof_status, "verified");
+        assert!(verified
+            .final_image_binding_proof_hash
+            .as_deref()
+            .is_some_and(|hash| hash.starts_with("fnv1a64:")));
+
+        persist_payload_execution_handoff_record(
+            &dir,
+            "proof-preservation-test",
+            PayloadExecutionHandoffRecord {
+                trace_id: "payload-trace:container-loader:main".to_owned(),
+                status: "ready".to_owned(),
+                execution_phase: "container-loader-handoff".to_owned(),
+                target: "container-loader".to_owned(),
+                entry_symbol: "main".to_owned(),
+                entry_kind: "lifecycle-bootstrap".to_owned(),
+                entry_section_id: "sec0000.compiled-artifact".to_owned(),
+                provider_family: String::new(),
+                output_contract: String::new(),
+                output_evidence: String::new(),
+                first_blocker: String::new(),
+                next_action: "handoff-payload-trace-to-nsdb".to_owned(),
+            },
+        )
+        .unwrap();
+        let preserved_source = fs::read_to_string(&path).unwrap();
+        assert!(preserved_source.contains(
+            "final_image_binding_proof_contract = \"nuis-final-image-binding-proof-v1\""
+        ));
+        assert_eq!(
+            payload_execution_replay_summary(&dir).final_image_binding_proof_status,
+            "verified"
+        );
+
+        fs::write(
+            &path,
+            preserved_source.replace(selected_hash, "fnv1a64:3333333333333333"),
+        )
+        .unwrap();
+        let rejected = payload_execution_replay_summary(&dir);
+        fs::remove_dir_all(dir).unwrap();
+        assert_eq!(rejected.status, "blocked");
+        assert_eq!(
+            rejected.first_blocker.as_deref(),
+            Some("payload-execution-handoff:final-image-binding-proof-mismatch")
         );
     }
 

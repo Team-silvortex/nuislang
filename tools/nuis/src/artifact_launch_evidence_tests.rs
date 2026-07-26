@@ -37,7 +37,7 @@ fn ready_host_runner() -> HostRunnerJsonSurface {
         container_loader_handoff_status: Some("ready".to_owned()),
         container_loader_metadata_binding_count: Some(0),
         container_loader_metadata_binding_parsed_count: Some(0),
-        container_loader_metadata_binding_table_hash: Some("fnv1a64:cbf29ce484222325".to_owned()),
+        container_loader_metadata_binding_table_hash: Some("0xcbf29ce484222325".to_owned()),
         container_loader_metadata_binding_validation_status: Some("not-applicable".to_owned()),
         container_loader_selected_provider_bundle_set_contract: None,
         container_loader_selected_provider_bundle_count: None,
@@ -90,4 +90,40 @@ fn launch_evidence_accepts_verified_selected_provider_binding() {
         .json_fields()
         .join(",")
         .contains("\"launch_evidence_status\":\"ready\""));
+
+    let dir = std::env::temp_dir().join(format!(
+        "nuis-launch-binding-handoff-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let persisted =
+        crate::artifact_nsdb_handoff::persist_launch_evidence_nsdb_handoff(Some(&dir), &evidence);
+    assert!(persisted.persisted());
+    let path = dir.join("nuis.nsdb.payload-execution-handoff.toml");
+    let source = std::fs::read_to_string(&path).unwrap();
+    assert!(source
+        .contains("final_image_binding_proof_contract = \"nuis-final-image-binding-proof-v1\""));
+    assert!(source.contains("final_image_metadata_binding_count = 1"));
+    assert!(source.contains(
+        "final_image_selected_provider_bundle_set_contract = \
+         \"nuis-selected-provider-bundle-set-v1\""
+    ));
+    assert!(source.contains("final_image_binding_proof_hash = \"fnv1a64:"));
+    let verified = crate::artifact_nsdb_handoff::read_persisted_nsdb_handoff(Some(&dir));
+    assert_eq!(verified.error(), None);
+    assert!(verified
+        .json_fields_with_prefix("handoff")
+        .iter()
+        .any(|field| {
+            field == "\"handoff_final_image_binding_proof_verification_status\":\"verified\""
+        }));
+
+    std::fs::write(
+        &path,
+        source.replace("fnv1a64:1234567890abcdef", "fnv1a64:fedcba0987654321"),
+    )
+    .unwrap();
+    let rejected = crate::artifact_nsdb_handoff::read_persisted_nsdb_handoff(Some(&dir));
+    std::fs::remove_dir_all(dir).unwrap();
+    assert_eq!(rejected.error(), Some("final-image-binding-proof-mismatch"));
 }

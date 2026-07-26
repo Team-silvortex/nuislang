@@ -1,3 +1,4 @@
+use crate::handoff_binding::{parse_and_verify as verify_binding_proof, render_fields};
 use crate::model::{
     NsdbDeviceProviderSampleRecordInfo, NsdbPayloadExecutionEvent, NsdbPayloadExecutionHandoffInfo,
     PayloadExecutionHandoffPersistSummary, PayloadExecutionHandoffRecord,
@@ -216,6 +217,7 @@ fn render_payload_execution_handoff(
     push_toml_string(&mut out, "source", source);
     out.push_str(&format!("record_count = {}\n", events.len()));
     out.push_str(&format!("ready_record_count = {ready_count}\n"));
+    out.push_str(&render_fields(&existing.final_image_binding_proof));
     push_toml_string(
         &mut out,
         "first_trace_id",
@@ -362,6 +364,7 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
             first_next_action: "none".to_owned(),
             first_entry_symbol: "none".to_owned(),
             first_execution_phase: "none".to_owned(),
+            final_image_binding_proof: verify_binding_proof(""),
             provider_completion_claim_authority_contract: "none".to_owned(),
             provider_completion_claim_authority: "none".to_owned(),
             provider_completion_claim_authority_status: "not-applicable".to_owned(),
@@ -388,6 +391,7 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
     let record_count = parse_usize_toml_field(&source, "record_count").unwrap_or(0);
     let ready_record_count = parse_usize_toml_field(&source, "ready_record_count").unwrap_or(0);
     let events = parse_payload_execution_events(&source);
+    let final_image_binding_proof = verify_binding_proof(&source);
     let provider_completion_claim_authority_contract =
         parse_string_toml_field(&source, "provider_completion_claim_authority_contract")
             .unwrap_or_else(|| "none".to_owned());
@@ -508,6 +512,7 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
         &provider_completion_set_hash_validation_status,
         &provider_completion_claim_authority_status,
         &provider_completion_signature_status,
+        &final_image_binding_proof.proof_status,
     );
     NsdbPayloadExecutionHandoffInfo {
         available: true,
@@ -530,6 +535,7 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
         first_execution_phase: first_event
             .map(|event| event.execution_phase.clone())
             .unwrap_or_else(|| "none".to_owned()),
+        final_image_binding_proof,
         provider_completion_claim_authority_contract,
         provider_completion_claim_authority,
         provider_completion_claim_authority_status,
@@ -579,6 +585,7 @@ fn payload_handoff_status(
     provider_completion_set_hash_validation_status: &str,
     provider_completion_claim_authority_status: &str,
     provider_completion_signature_status: &str,
+    final_image_binding_proof_status: &str,
 ) -> String {
     if protocol != "nuis-nsdb-payload-execution-handoff-v1" {
         return "unsupported-protocol".to_owned();
@@ -588,6 +595,12 @@ fn payload_handoff_status(
     }
     if record_count == 0 {
         return "empty".to_owned();
+    }
+    if !matches!(
+        final_image_binding_proof_status,
+        "verified" | "verified-empty" | "legacy-unbound"
+    ) {
+        return format!("final-image-binding-proof-{final_image_binding_proof_status}");
     }
     match provider_completion_set_hash_validation_status {
         "mismatch" => return "provider-completion-set-hash-mismatch".to_owned(),
@@ -704,87 +717,5 @@ fn push_toml_string(out: &mut String, key: &str, value: &str) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::read_payload_execution_handoff;
-    use std::{
-        env, fs,
-        path::PathBuf,
-        time::{SystemTime, UNIX_EPOCH},
-    };
-
-    #[test]
-    fn reads_ready_payload_execution_handoff() {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let dir: PathBuf = env::temp_dir().join(format!("nsdb-handoff-{nonce}"));
-        fs::create_dir_all(&dir).unwrap();
-        fs::write(
-            dir.join("nuis.nsdb.payload-execution-handoff.toml"),
-            r#"
-protocol = "nuis-nsdb-payload-execution-handoff-v1"
-debugger_contract = "nsdb-yir-payload-execution-trace-v1"
-record_count = 2
-ready_record_count = 1
-hetero_execution_closure_protocol = "nuis-hetero-execution-closure-v1"
-hetero_execution_closure_status = "closed"
-hetero_execution_closure_ready = "true"
-hetero_execution_closure_next_action = "handoff-hetero-execution-evidence-to-nsdb"
-first_trace_id = "payload-trace:container-loader:nuis.bootstrap.lifecycle.v1"
-first_status = "ready"
-first_next_action = "handoff-payload-trace-to-nsdb"
-
-[[records]]
-trace_id = "payload-trace:container-loader:nuis.bootstrap.lifecycle.v1"
-status = "ready"
-execution_phase = "container-loader-handoff"
-entry_symbol = "nuis.bootstrap.lifecycle.v1"
-next_action = "handoff-payload-trace-to-nsdb"
-
-[[records]]
-trace_id = "payload-trace:shader:pixelmagic.blur"
-status = "blocked"
-execution_phase = "device-dispatch"
-target = "shader"
-entry_symbol = "pixelmagic.blur"
-entry_kind = "shader-kernel"
-entry_section_id = "sec0002.shader"
-first_blocker = "device-execution-sample-missing"
-next_action = "materialize-device-execution-trace"
-"#,
-        )
-        .unwrap();
-
-        let handoff = read_payload_execution_handoff(&dir);
-
-        assert!(handoff.available);
-        assert_eq!(handoff.status, "ready");
-        assert_eq!(handoff.record_count, 2);
-        assert_eq!(handoff.events.len(), 2);
-        assert_eq!(handoff.events[0].index, 0);
-        assert_eq!(handoff.events[0].trace_id, handoff.first_trace_id);
-        assert_eq!(
-            handoff.events[0].next_action,
-            "handoff-payload-trace-to-nsdb"
-        );
-        assert_eq!(handoff.events[1].index, 1);
-        assert_eq!(handoff.events[1].status, "blocked");
-        assert_eq!(
-            handoff.events[1].first_blocker,
-            "device-execution-sample-missing"
-        );
-        assert_eq!(handoff.first_execution_phase, "container-loader-handoff");
-        assert_eq!(handoff.first_entry_symbol, "nuis.bootstrap.lifecycle.v1");
-        assert_eq!(
-            handoff.hetero_execution_closure_protocol,
-            "nuis-hetero-execution-closure-v1"
-        );
-        assert_eq!(handoff.hetero_execution_closure_status, "closed");
-        assert_eq!(handoff.hetero_execution_closure_ready, "true");
-        assert_eq!(
-            handoff.hetero_execution_closure_next_action,
-            "handoff-hetero-execution-evidence-to-nsdb"
-        );
-    }
-}
+#[path = "handoff_tests.rs"]
+mod tests;

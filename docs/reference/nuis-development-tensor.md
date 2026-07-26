@@ -919,9 +919,15 @@ count, table hash, validation status, and selected-set contract/count/hash.
 image bytes and publishes count, parsed count, table hash, validation status,
 and selected-set identity. Nuis launch evidence requires this independently
 observed proof before reporting ready; a regression also proves that updating
-the outer NSB hash cannot hide an inner binding mutation. The next continuity
-boundary is Nsdb payload-handoff persistence and replay verification, which
-must prove that debugger evidence belongs to the same opaque provider set.
+the outer NSB hash cannot hide an inner binding mutation. Run-artifact now
+persists a canonical `nuis-final-image-binding-proof-v1` declaration. Nuis and
+Nsdb independently recompute its proof hash, Nsdb preserves it across handoff
+record merges, and replay blocks after selected-set mutation. The next
+continuity boundary is the direct Nsld final-output writer, whose proof-less
+handoffs remain readable but are classified as `legacy-unbound`.
+The contract keeps Nsld container table hashes in `0x<16-hex>` form and uses
+`fnv1a64:<16-hex>` for selected-set and proof hashes; independent consumers
+validate those field-specific encodings rather than conflating them.
 
 Return-producing `if` lowering now preserves control dependence for nested
 extern-call comparisons. The open `compare_call_result` mode of

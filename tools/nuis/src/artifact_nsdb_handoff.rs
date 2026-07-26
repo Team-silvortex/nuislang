@@ -1,5 +1,8 @@
 use crate::{
     artifact_launch_evidence::RunArtifactLaunchEvidence,
+    artifact_nsdb_handoff_binding::{
+        independently_verify as verify_final_image_binding_proof, PersistedFinalImageBindingProof,
+    },
     artifact_nsdb_handoff_integrity::{
         legacy_set_hash, record_hash, set_hash, signature_message,
         CLAIM_AUTHORITY as PROVIDER_COMPLETION_CLAIM_AUTHORITY,
@@ -9,6 +12,7 @@ use crate::{
         DIGEST_SHA256_CONTRACT as PROVIDER_COMPLETION_DIGEST_SHA256_CONTRACT,
         DIGEST_SHA256_SIGNED_CONTRACT as PROVIDER_COMPLETION_DIGEST_SHA256_SIGNED_CONTRACT,
     },
+    artifact_nsdb_handoff_render::render_launch_evidence_nsdb_handoff,
     artifact_nsdb_handoff_signature::{
         parse_and_verify as parse_and_verify_provider_completion_signature,
         validation_error as provider_completion_signature_error,
@@ -32,6 +36,13 @@ pub(crate) struct LaunchEvidenceNsdbHandoffPersistence {
     error: Option<String>,
 }
 
+#[cfg(test)]
+impl LaunchEvidenceNsdbHandoffPersistence {
+    pub(crate) fn persisted(&self) -> bool {
+        self.persisted
+    }
+}
+
 pub(crate) struct PersistedNsdbHandoffSummary {
     available: bool,
     path: PathBuf,
@@ -42,6 +53,7 @@ pub(crate) struct PersistedNsdbHandoffSummary {
     first_trace_id: Option<String>,
     first_status: Option<String>,
     first_next_action: Option<String>,
+    final_image_binding_proof: PersistedFinalImageBindingProof,
     provider_completion_count: usize,
     first_provider_family: Option<String>,
     first_provider_output_contract: Option<String>,
@@ -194,6 +206,46 @@ impl PersistedNsdbHandoffSummary {
                 &format!("{prefix}_first_next_action"),
                 self.first_next_action.as_deref(),
             ),
+            json_optional_string_field(
+                &format!("{prefix}_final_image_binding_proof_contract"),
+                self.final_image_binding_proof.contract.as_deref(),
+            ),
+            json_usize_field(
+                &format!("{prefix}_final_image_metadata_binding_count"),
+                self.final_image_binding_proof.binding_count,
+            ),
+            json_optional_string_field(
+                &format!("{prefix}_final_image_metadata_binding_table_hash"),
+                self.final_image_binding_proof.binding_table_hash.as_deref(),
+            ),
+            json_field(
+                &format!("{prefix}_final_image_metadata_binding_validation_status"),
+                &self.final_image_binding_proof.validation_status,
+            ),
+            json_optional_string_field(
+                &format!("{prefix}_final_image_selected_provider_bundle_set_contract"),
+                self.final_image_binding_proof
+                    .selected_set_contract
+                    .as_deref(),
+            ),
+            json_usize_field(
+                &format!("{prefix}_final_image_selected_provider_bundle_count"),
+                self.final_image_binding_proof
+                    .selected_set_count
+                    .unwrap_or(0),
+            ),
+            json_optional_string_field(
+                &format!("{prefix}_final_image_selected_provider_bundle_set_hash"),
+                self.final_image_binding_proof.selected_set_hash.as_deref(),
+            ),
+            json_optional_string_field(
+                &format!("{prefix}_final_image_binding_proof_hash"),
+                self.final_image_binding_proof.proof_hash.as_deref(),
+            ),
+            json_field(
+                &format!("{prefix}_final_image_binding_proof_verification_status"),
+                &self.final_image_binding_proof.verification_status,
+            ),
             json_usize_field(
                 &format!("{prefix}_provider_completion_count"),
                 self.provider_completion_count,
@@ -281,6 +333,7 @@ pub(crate) fn read_persisted_nsdb_handoff(
             first_trace_id: None,
             first_status: None,
             first_next_action: None,
+            final_image_binding_proof: verify_final_image_binding_proof(""),
             provider_completion_count: 0,
             first_provider_family: None,
             first_provider_output_contract: None,
@@ -315,6 +368,7 @@ pub(crate) fn read_persisted_nsdb_handoff(
             first_trace_id: None,
             first_status: None,
             first_next_action: None,
+            final_image_binding_proof: verify_final_image_binding_proof(""),
             provider_completion_count: 0,
             first_provider_family: None,
             first_provider_output_contract: None,
@@ -338,6 +392,7 @@ pub(crate) fn read_persisted_nsdb_handoff(
         };
     };
     let protocol = parse_string_toml_field(&source, "protocol");
+    let final_image_binding_proof = verify_final_image_binding_proof(&source);
     let record_count = parse_usize_toml_field(&source, "record_count").unwrap_or(0);
     let provider_completion_claim_authority_contract =
         parse_string_toml_field(&source, "provider_completion_claim_authority_contract")
@@ -475,21 +530,27 @@ pub(crate) fn read_persisted_nsdb_handoff(
     );
     let provider_completion_signature_status = signature.status;
     let error = match (
+        final_image_binding_proof.verification_status.as_str(),
         provider_completion_set_hash_validation_status.as_str(),
         provider_completion_claim_authority_status.as_str(),
         provider_completion_signature_status.as_str(),
     ) {
-        ("mismatch", _, _) => Some("provider-completion-set-hash-mismatch".to_owned()),
-        ("unsupported-digest-contract", _, _) => {
+        (status, _, _, _)
+            if !matches!(status, "verified" | "verified-empty" | "legacy-unbound") =>
+        {
+            Some(format!("final-image-binding-proof-{status}"))
+        }
+        (_, "mismatch", _, _) => Some("provider-completion-set-hash-mismatch".to_owned()),
+        (_, "unsupported-digest-contract", _, _) => {
             Some("provider-completion-digest-contract-unsupported".to_owned())
         }
-        (_, "authority-missing", _) => {
+        (_, _, "authority-missing", _) => {
             Some("provider-completion-claim-authority-missing".to_owned())
         }
-        (_, "unsupported-authority-contract", _) => {
+        (_, _, "unsupported-authority-contract", _) => {
             Some("provider-completion-claim-authority-contract-unsupported".to_owned())
         }
-        (_, "authority-untrusted", _) => {
+        (_, _, "authority-untrusted", _) => {
             Some("provider-completion-claim-authority-untrusted".to_owned())
         }
         _ => provider_completion_signature_error(&provider_completion_signature_status),
@@ -504,6 +565,7 @@ pub(crate) fn read_persisted_nsdb_handoff(
         first_trace_id: parse_string_toml_field(&source, "first_trace_id"),
         first_status: parse_string_toml_field(&source, "first_status"),
         first_next_action: parse_string_toml_field(&source, "first_next_action"),
+        final_image_binding_proof,
         provider_completion_count: provider_completions.len(),
         first_provider_family: first_provider_completion
             .map(|completion| completion.provider_family.clone())
@@ -665,96 +727,6 @@ pub(crate) fn persist_launch_evidence_nsdb_handoff(
             error: Some(error.to_string()),
         },
     }
-}
-
-fn render_launch_evidence_nsdb_handoff(evidence: &RunArtifactLaunchEvidence) -> String {
-    let records = evidence.payload_execution_trace_records();
-    let ready_record_count = records
-        .iter()
-        .filter(|record| record.status == "ready")
-        .count();
-    let mut out = String::new();
-    push_toml_string(&mut out, "protocol", NSDB_HANDOFF_PROTOCOL);
-    push_toml_string(
-        &mut out,
-        "debugger_contract",
-        evidence.payload_execution_trace_protocol(),
-    );
-    push_toml_string(&mut out, "source", "run-artifact-launch-evidence");
-    out.push_str(&format!("record_count = {}\n", records.len()));
-    out.push_str(&format!("ready_record_count = {ready_record_count}\n"));
-    push_toml_string(
-        &mut out,
-        "hetero_execution_closure_protocol",
-        evidence.hetero_execution_closure_protocol(),
-    );
-    push_toml_string(
-        &mut out,
-        "hetero_execution_closure_status",
-        evidence.hetero_execution_closure_status(),
-    );
-    push_toml_string(
-        &mut out,
-        "hetero_execution_closure_ready",
-        if evidence.hetero_execution_closure_ready() {
-            "true"
-        } else {
-            "false"
-        },
-    );
-    push_toml_optional_string(
-        &mut out,
-        "hetero_execution_closure_first_blocker",
-        evidence.hetero_execution_closure_first_blocker(),
-    );
-    push_toml_string(
-        &mut out,
-        "hetero_execution_closure_next_action",
-        evidence.hetero_execution_closure_next_action(),
-    );
-    if let Some(first) = records.first() {
-        push_toml_string(&mut out, "first_trace_id", &first.trace_id);
-        push_toml_string(&mut out, "first_status", &first.status);
-        push_toml_string(&mut out, "first_next_action", &first.next_action);
-    }
-    for record in records {
-        out.push_str("\n[[records]]\n");
-        push_toml_string(&mut out, "trace_id", &record.trace_id);
-        push_toml_string(&mut out, "status", &record.status);
-        push_toml_string(&mut out, "execution_phase", &record.execution_phase);
-        push_toml_optional_string(&mut out, "target", record.target.as_deref());
-        push_toml_optional_string(&mut out, "entry_symbol", record.entry_symbol.as_deref());
-        push_toml_optional_string(&mut out, "entry_kind", record.entry_kind.as_deref());
-        push_toml_optional_string(
-            &mut out,
-            "entry_section_id",
-            record.entry_section_id.as_deref(),
-        );
-        push_toml_optional_string(&mut out, "first_blocker", record.first_blocker.as_deref());
-        push_toml_string(&mut out, "next_action", &record.next_action);
-    }
-    out
-}
-
-fn push_toml_optional_string(out: &mut String, key: &str, value: Option<&str>) {
-    match value {
-        Some(value) => push_toml_string(out, key, value),
-        None => out.push_str(&format!("{key} = \"\"\n")),
-    }
-}
-
-fn push_toml_string(out: &mut String, key: &str, value: &str) {
-    out.push_str(key);
-    out.push_str(" = \"");
-    out.push_str(&toml_escape(value));
-    out.push_str("\"\n");
-}
-
-fn toml_escape(value: &str) -> String {
-    value
-        .replace('\\', "\\\\")
-        .replace('"', "\\\"")
-        .replace('\n', "\\n")
 }
 
 fn parse_usize_toml_field(source: &str, key: &str) -> Option<usize> {

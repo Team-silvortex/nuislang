@@ -70,6 +70,19 @@ requires an explicit zero-entry `not-applicable` proof or a non-empty
 `verified` proof before reporting the lifecycle handoff ready. Refreshing the
 outer NSB file hash after changing an inner binding does not bypass this gate.
 
+Run-artifact carries the observed values into the debugger handoff using
+`nuis-final-image-binding-proof-v1`. A canonical FNV hash binds the proof
+contract, binding count, binding-table hash, validation status, and optional
+selected-set contract/count/hash. Nuis and Nsdb implement separate parsers and
+hash calculations. Nsdb preserves the proof when completion records are
+merged, exposes its status through inspect/replay summaries, and blocks replay
+when any bound value drifts. Older handoffs without the declaration remain
+readable as `legacy-unbound`; they are never reported as verified.
+The embedded Nsld binding-table hash keeps the container protocol spelling
+`0x<16-hex>`, while selected-set and handoff-proof hashes use
+`fnv1a64:<16-hex>`. Consumers validate each field against its own contract
+rather than treating these wire representations as interchangeable.
+
 ## Layer Model
 
 ### 1. Build Manifest

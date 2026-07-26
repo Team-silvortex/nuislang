@@ -384,6 +384,7 @@ next_action = "execute-provider-sample"
             first_next_action: "handoff-payload-trace-to-nsdb".to_owned(),
             first_entry_symbol: "nuis.bootstrap.lifecycle.v1".to_owned(),
             first_execution_phase: "container-loader-handoff".to_owned(),
+            final_image_binding_proof: crate::handoff_binding::parse_and_verify(""),
             provider_completion_claim_authority_contract: "none".to_owned(),
             provider_completion_claim_authority: "none".to_owned(),
             provider_completion_claim_authority_status: "not-applicable".to_owned(),

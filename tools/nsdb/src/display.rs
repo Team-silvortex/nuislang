@@ -82,6 +82,34 @@ pub(crate) fn print_nsdb_inspect_report(report: &NsdbInspectReport) {
         report.payload_execution_handoff.first_entry_symbol
     );
     println!(
+        "  payload_execution_handoff_final_image_binding_proof_contract: {}",
+        report
+            .payload_execution_handoff
+            .final_image_binding_proof
+            .contract
+    );
+    println!(
+        "  payload_execution_handoff_final_image_metadata_binding_count: {}",
+        report
+            .payload_execution_handoff
+            .final_image_binding_proof
+            .binding_count
+    );
+    println!(
+        "  payload_execution_handoff_final_image_metadata_binding_table_hash: {}",
+        report
+            .payload_execution_handoff
+            .final_image_binding_proof
+            .binding_table_hash
+    );
+    println!(
+        "  payload_execution_handoff_final_image_binding_proof_status: {}",
+        report
+            .payload_execution_handoff
+            .final_image_binding_proof
+            .proof_status
+    );
+    println!(
         "  payload_execution_handoff_hetero_execution_closure_status: {}",
         report
             .payload_execution_handoff

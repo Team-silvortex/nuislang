@@ -71,9 +71,12 @@ container loader and `nuis-host-runner` read the binding table from actual
 image payload bytes, independently recompute its table hash, validate required
 records and selected-set structure, and block handoff when the final image is
 mutated. Nuis launch evidence requires the host-runner-observed proof rather
-than trusting only Nsld's handoff-ready result. The remaining continuity gap
-is debugger persistence: Nsdb payload-handoff and replay records do not yet
-carry and revalidate the same opaque binding proof.
+than trusting only Nsld's handoff-ready result. Run-artifact now persists that
+proof under `nuis-final-image-binding-proof-v1`; Nuis and Nsdb independently
+recompute its canonical hash, Nsdb preserves it while merging later completion
+records, and replay blocks on drift. The remaining continuity gap is the
+direct Nsld final-output handoff writer, whose older records remain readable
+but are honestly classified as `legacy-unbound`.
 
 It does not yet own:
 

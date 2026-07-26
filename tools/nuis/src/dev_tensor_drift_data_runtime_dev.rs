@@ -418,6 +418,36 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "nuis-final-image-binding-handoff-render",
+        path: "tools/nuis/src/artifact_nsdb_handoff_render.rs",
+        required_patterns: &[
+            "FINAL_IMAGE_BINDING_PROOF_CONTRACT",
+            "final_image_metadata_binding_count",
+            "final_image_binding_proof_hash",
+            "render_final_image_binding_proof",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-independent-final-image-binding-handoff-verifier",
+        path: "tools/nuis/src/artifact_nsdb_handoff_binding.rs",
+        required_patterns: &[
+            "independently_verify",
+            "nuis-final-image-binding-proof-v1",
+            "nuis-selected-provider-bundle-set-v1",
+            "verification_status",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsdb-final-image-binding-replay-verifier",
+        path: "tools/nsdb/src/handoff_binding.rs",
+        required_patterns: &[
+            "parse_and_verify",
+            "nuis-final-image-binding-proof-v1",
+            "proof_hash_actual",
+            "independently_verifies_and_rejects_tampered_binding_proof",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nuis-independent-provider-completion-integrity",
         path: "tools/nuis/src/artifact_nsdb_handoff_integrity.rs",
         required_patterns: &[

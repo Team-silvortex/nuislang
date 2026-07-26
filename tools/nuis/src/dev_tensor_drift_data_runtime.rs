@@ -297,8 +297,6 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
                 "launch_evidence_nsdb_handoff_record_count",
                 "launch_evidence_nsdb_handoff_ready_record_count",
                 "launch_evidence_nsdb_handoff_first_trace_id",
-                "run-artifact-launch-evidence",
-                "hetero_execution_closure_protocol",
                 "hetero_execution_closure_next_action",
             ],
         },
@@ -315,7 +313,6 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
                 "NsdbPayloadExecutionEvent",
                 "hetero_execution_closure_status",
                 "hetero_execution_closure_ready",
-                "handoff-hetero-execution-evidence-to-nsdb",
             ],
         },
     DevTensorDriftCheckSpec {

@@ -97,6 +97,41 @@ pub(crate) fn nsdb_inspect_report_json(report: &NsdbInspectReport) -> String {
             &report.payload_execution_handoff.first_execution_phase,
         ),
         json_string_field(
+            "payload_execution_handoff_final_image_binding_proof_contract",
+            &report
+                .payload_execution_handoff
+                .final_image_binding_proof
+                .contract,
+        ),
+        json_usize_field(
+            "payload_execution_handoff_final_image_metadata_binding_count",
+            report
+                .payload_execution_handoff
+                .final_image_binding_proof
+                .binding_count,
+        ),
+        json_string_field(
+            "payload_execution_handoff_final_image_metadata_binding_table_hash",
+            &report
+                .payload_execution_handoff
+                .final_image_binding_proof
+                .binding_table_hash,
+        ),
+        json_string_field(
+            "payload_execution_handoff_final_image_binding_proof_hash",
+            &report
+                .payload_execution_handoff
+                .final_image_binding_proof
+                .proof_hash_actual,
+        ),
+        json_string_field(
+            "payload_execution_handoff_final_image_binding_proof_status",
+            &report
+                .payload_execution_handoff
+                .final_image_binding_proof
+                .proof_status,
+        ),
+        json_string_field(
             "payload_execution_handoff_hetero_execution_closure_protocol",
             &report
                 .payload_execution_handoff

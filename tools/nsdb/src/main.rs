@@ -5,6 +5,7 @@ mod cursor_lineage_repair_journal;
 mod digest_sha256;
 mod display;
 mod handoff;
+mod handoff_binding;
 mod hetero_trace;
 mod json;
 mod json_replay;

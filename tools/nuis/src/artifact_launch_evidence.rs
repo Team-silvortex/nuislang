@@ -24,6 +24,7 @@ pub(crate) struct RunArtifactLaunchEvidence {
     payload_execution_trace_protocol: &'static str,
     payload_execution_trace_available: bool,
     payload_execution_trace_records: Vec<PayloadExecutionTraceRecord>,
+    final_image_binding_proof: Option<crate::artifact_launch_binding::FinalImageBindingProof>,
     backend_artifact_payload_evidence_available: bool,
     backend_artifact_payload_count: usize,
     backend_artifact_payload_present_count: usize,
@@ -102,6 +103,8 @@ impl RunArtifactLaunchEvidence {
         );
         let hetero_execution_closure =
             hetero_execution_closure_summary(host_runner, backend_evidence);
+        let final_image_binding_proof =
+            crate::artifact_launch_binding::FinalImageBindingProof::from_host_runner(host_runner);
         Self {
             protocol: "nuis-run-artifact-launch-evidence-v1",
             status: if first_blocker.is_none() {
@@ -125,6 +128,7 @@ impl RunArtifactLaunchEvidence {
             payload_execution_trace_protocol: "nsdb-yir-payload-execution-trace-v1",
             payload_execution_trace_available: !payload_execution_trace_records.is_empty(),
             payload_execution_trace_records,
+            final_image_binding_proof,
             backend_artifact_payload_evidence_available: backend_evidence.available,
             backend_artifact_payload_count: backend_evidence.count,
             backend_artifact_payload_present_count: backend_evidence.present_count,
@@ -152,6 +156,12 @@ impl RunArtifactLaunchEvidence {
 
     pub(crate) fn payload_execution_trace_records(&self) -> &[PayloadExecutionTraceRecord] {
         &self.payload_execution_trace_records
+    }
+
+    pub(crate) fn final_image_binding_proof(
+        &self,
+    ) -> Option<&crate::artifact_launch_binding::FinalImageBindingProof> {
+        self.final_image_binding_proof.as_ref()
     }
 
     pub(crate) fn hetero_execution_closure_protocol(&self) -> &'static str {
