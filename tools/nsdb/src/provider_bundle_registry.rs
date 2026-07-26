@@ -10,6 +10,8 @@ pub(crate) const PROVIDER_BUNDLE_REGISTRY_CONTRACT: &str = "nuis-provider-bundle
 pub(crate) const PROVIDER_BUNDLE_MANIFEST_CONTRACT: &str = "nuis-provider-bundle-manifest-v1";
 pub(crate) const PROVIDER_BUNDLE_MANIFEST_ENTRY_CONTRACT: &str =
     nuisc::registry::NUSTAR_PROVIDER_BUNDLE_ENTRY_CONTRACT;
+pub(crate) const SELECTED_PROVIDER_BUNDLE_SET_CONTRACT: &str =
+    "nuis-selected-provider-bundle-set-v1";
 
 #[derive(Clone, Copy)]
 pub(crate) struct ProviderBundleRegistration {
@@ -37,6 +39,12 @@ pub(crate) struct ProviderBundleEvidence {
     pub(crate) manifest_entry_count: usize,
     pub(crate) package_id: &'static str,
     pub(crate) bundle_id: &'static str,
+}
+
+pub(crate) struct SelectedProviderBundleSetEvidence {
+    pub(crate) contract: &'static str,
+    pub(crate) count: usize,
+    pub(crate) hash: String,
 }
 
 include!(concat!(
@@ -79,6 +87,33 @@ pub(crate) fn provider_bundle_evidence(provider_family: &str) -> Option<Provider
             package_id: entry.package_id,
             bundle_id: entry.bundle_id,
         })
+}
+
+pub(crate) fn selected_provider_bundle_set_evidence<'a>(
+    provider_families: impl IntoIterator<Item = &'a str>,
+) -> Option<SelectedProviderBundleSetEvidence> {
+    let mut selected = Vec::new();
+    let mut seen_bundle_ids = std::collections::BTreeSet::new();
+    for provider_family in provider_families {
+        let bundle = provider_bundle_evidence(provider_family)?;
+        if seen_bundle_ids.insert(bundle.bundle_id) {
+            selected.push((bundle.package_id, bundle.bundle_id, provider_family));
+        }
+    }
+    if selected.is_empty() {
+        return None;
+    }
+    let mut canonical = format!("{SELECTED_PROVIDER_BUNDLE_SET_CONTRACT}\n");
+    for (index, (package_id, bundle_id, provider_family)) in selected.iter().enumerate() {
+        canonical.push_str(&format!(
+            "{index}|{package_id}|{bundle_id}|{provider_family}\n"
+        ));
+    }
+    Some(SelectedProviderBundleSetEvidence {
+        contract: SELECTED_PROVIDER_BUNDLE_SET_CONTRACT,
+        count: selected.len(),
+        hash: format!("fnv1a64:{:016x}", fnv1a64(canonical.as_bytes())),
+    })
 }
 
 pub(crate) fn append_provider_bundle_evidence(out: &mut String, provider_family: &str) {
@@ -240,5 +275,23 @@ mod tests {
                 .collect::<std::collections::BTreeSet<_>>();
             assert_eq!(adapter_kinds.len(), bundles.len());
         }
+    }
+
+    #[test]
+    fn selected_bundle_set_is_unique_and_first_occurrence_ordered() {
+        let evidence = selected_provider_bundle_set_evidence([
+            "coreml:apple-ane",
+            "coreml:apple-ane",
+            "metal:apple-silicon-gpu",
+        ])
+        .unwrap();
+        let reversed =
+            selected_provider_bundle_set_evidence(["metal:apple-silicon-gpu", "coreml:apple-ane"])
+                .unwrap();
+
+        assert_eq!(evidence.contract, SELECTED_PROVIDER_BUNDLE_SET_CONTRACT);
+        assert_eq!(evidence.count, 2);
+        assert_eq!(evidence.hash, "fnv1a64:0126ed9d38f1895f");
+        assert_ne!(evidence.hash, reversed.hash);
     }
 }

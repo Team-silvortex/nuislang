@@ -154,6 +154,92 @@ pub(super) fn nsld_final_output_json_fields(
             }),
         ),
         json_optional_string_field(
+            "nsld_final_executable_output_device_provider_sample_provider_bundle_registry_contract",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_provider_bundle_registry_contract
+                    .as_str()
+            }),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_device_provider_sample_provider_bundle_manifest_contract",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_provider_bundle_manifest_contract
+                    .as_str()
+            }),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_device_provider_sample_provider_bundle_manifest_hash",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_provider_bundle_manifest_hash
+                    .as_str()
+            }),
+        ),
+        json_usize_field(
+            "nsld_final_executable_output_device_provider_sample_provider_bundle_manifest_entry_count",
+            nsld_final_output
+                .map(|summary| {
+                    summary.device_provider_sample_provider_bundle_manifest_entry_count
+                })
+                .unwrap_or(0),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_device_provider_sample_manifest_first_provider_bundle_package_id",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_manifest_first_provider_bundle_package_id
+                    .as_str()
+            }),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_device_provider_sample_manifest_first_provider_bundle_id",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_manifest_first_provider_bundle_id
+                    .as_str()
+            }),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_device_provider_sample_provider_bundle_evidence_status",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_provider_bundle_evidence_status
+                    .as_str()
+            }),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_device_provider_sample_selected_provider_bundle_set_contract",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_selected_provider_bundle_set_contract
+                    .as_str()
+            }),
+        ),
+        json_usize_field(
+            "nsld_final_executable_output_device_provider_sample_selected_provider_bundle_count",
+            nsld_final_output
+                .map(|summary| summary.device_provider_sample_selected_provider_bundle_count)
+                .unwrap_or(0),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_device_provider_sample_selected_provider_bundle_set_hash",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_selected_provider_bundle_set_hash
+                    .as_str()
+            }),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_device_provider_sample_selected_provider_bundle_set_validation_status",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_selected_provider_bundle_set_validation_status
+                    .as_str()
+            }),
+        ),
+        json_optional_string_field(
             "nsld_final_executable_output_nsdb_replay_contract",
             nsld_final_output.map(|summary| summary.nsdb_replay_contract.as_str()),
         ),
@@ -224,6 +310,92 @@ pub(super) fn nsld_final_output_json_fields(
         json_optional_string_field(
             "nsld_final_executable_output_object_package_status",
             nsld_final_output.map(|summary| summary.object_package_summary_status.as_str()),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_object_package_provider_bundle_registry_contract",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_provider_bundle_registry_contract
+                    .as_str()
+            }),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_object_package_provider_bundle_manifest_contract",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_provider_bundle_manifest_contract
+                    .as_str()
+            }),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_object_package_provider_bundle_manifest_hash",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_provider_bundle_manifest_hash
+                    .as_str()
+            }),
+        ),
+        json_usize_field(
+            "nsld_final_executable_output_object_package_provider_bundle_manifest_entry_count",
+            nsld_final_output
+                .map(|summary| {
+                    summary.device_provider_sample_provider_bundle_manifest_entry_count
+                })
+                .unwrap_or(0),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_object_package_first_provider_bundle_package_id",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_manifest_first_provider_bundle_package_id
+                    .as_str()
+            }),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_object_package_first_provider_bundle_id",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_manifest_first_provider_bundle_id
+                    .as_str()
+            }),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_object_package_provider_bundle_evidence_status",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_provider_bundle_evidence_status
+                    .as_str()
+            }),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_object_package_selected_provider_bundle_set_contract",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_selected_provider_bundle_set_contract
+                    .as_str()
+            }),
+        ),
+        json_usize_field(
+            "nsld_final_executable_output_object_package_selected_provider_bundle_count",
+            nsld_final_output
+                .map(|summary| summary.device_provider_sample_selected_provider_bundle_count)
+                .unwrap_or(0),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_object_package_selected_provider_bundle_set_hash",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_selected_provider_bundle_set_hash
+                    .as_str()
+            }),
+        ),
+        json_optional_string_field(
+            "nsld_final_executable_output_object_package_selected_provider_bundle_set_validation_status",
+            nsld_final_output.map(|summary| {
+                summary
+                    .device_provider_sample_selected_provider_bundle_set_validation_status
+                    .as_str()
+            }),
         ),
         json_optional_string_field(
             "nsld_final_executable_output_object_package_next_action",

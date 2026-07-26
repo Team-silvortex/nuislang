@@ -381,6 +381,26 @@ pub(crate) fn nsld_final_executable_output_report_json(
                 .as_deref(),
         ),
         json_optional_string_field(
+            "device_provider_sample_selected_provider_bundle_set_contract",
+            report
+                .device_provider_sample_selected_provider_bundle_set_contract
+                .as_deref(),
+        ),
+        json_optional_usize_field(
+            "device_provider_sample_selected_provider_bundle_count",
+            report.device_provider_sample_selected_provider_bundle_count,
+        ),
+        json_optional_string_field(
+            "device_provider_sample_selected_provider_bundle_set_hash",
+            report
+                .device_provider_sample_selected_provider_bundle_set_hash
+                .as_deref(),
+        ),
+        json_string_field(
+            "device_provider_sample_selected_provider_bundle_set_validation_status",
+            &report.device_provider_sample_selected_provider_bundle_set_validation_status,
+        ),
+        json_optional_string_field(
             "device_provider_sample_manifest_first_provider_family",
             report
                 .device_provider_sample_manifest_first_provider_family

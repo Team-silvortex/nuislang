@@ -111,6 +111,15 @@ materialization_status = "provider-sample-materialized"
     assert_eq!(report.first_provider_bundle_package_id, "official.data");
     assert_eq!(report.first_provider_bundle_id, "data.host.bundle.v1");
     assert_eq!(
+        report.selected_provider_bundle_set_contract,
+        "nuis-selected-provider-bundle-set-v1"
+    );
+    assert_eq!(report.selected_provider_bundle_count, 1);
+    assert_eq!(
+        report.selected_provider_bundle_set_hash,
+        "fnv1a64:d59cbb3377c76e54"
+    );
+    assert_eq!(
         report.first_provider_runner_adapter_id,
         "data.host.provider-worker-native"
     );

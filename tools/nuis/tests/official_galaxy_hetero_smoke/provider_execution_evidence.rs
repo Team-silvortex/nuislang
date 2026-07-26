@@ -1,5 +1,55 @@
 use super::*;
 
+pub(super) fn assert_provider_bundle_audit_evidence(source: &str, label: &str) {
+    for evidence in [
+        "\"artifact_device_provider_sample_manifest_provider_bundle_registry_contract\":\"nuis-provider-bundle-registry-v1\"",
+        "\"artifact_device_provider_sample_manifest_provider_bundle_manifest_hash\":\"fnv1a64:08a971e5a543be2e\"",
+        "\"artifact_device_provider_sample_manifest_first_provider_bundle_package_id\":\"official.",
+        "\"artifact_device_provider_sample_manifest_provider_bundle_evidence_status\":\"verified\"",
+        "\"nsld_final_executable_output_object_package_provider_bundle_manifest_hash\":\"fnv1a64:08a971e5a543be2e\"",
+        "\"closure_summary_object_package_provider_bundle_evidence_status\":\"verified\"",
+        "\"artifact_device_provider_sample_manifest_selected_provider_bundle_set_contract\":\"nuis-selected-provider-bundle-set-v1\"",
+        "\"artifact_device_provider_sample_manifest_selected_provider_bundle_set_validation_status\":\"verified\"",
+        "\"nsld_final_executable_output_object_package_selected_provider_bundle_set_hash\":\"fnv1a64:",
+        "\"closure_summary_object_package_selected_provider_bundle_set_validation_status\":\"verified\"",
+    ] {
+        assert!(
+            source.contains(evidence),
+            "official galaxy provider bundle audit evidence missing `{evidence}`"
+        );
+    }
+    let (count, hash) = match label {
+        "pixelmagic_pipeline_demo" => (2, "fnv1a64:0126ed9d38f1895f"),
+        "witsage_kernel_demo" => (1, "fnv1a64:e9a82b052c861b93"),
+        other => panic!("missing selected provider bundle expectation for `{other}`"),
+    };
+    for evidence in [
+        format!(
+            "\"artifact_device_provider_sample_manifest_selected_provider_bundle_count\":{count}"
+        ),
+        format!(
+            "\"artifact_device_provider_sample_manifest_selected_provider_bundle_set_hash\":\"{hash}\""
+        ),
+        format!(
+            "\"nsld_final_executable_output_object_package_selected_provider_bundle_count\":{count}"
+        ),
+        format!(
+            "\"nsld_final_executable_output_object_package_selected_provider_bundle_set_hash\":\"{hash}\""
+        ),
+        format!(
+            "\"closure_summary_object_package_selected_provider_bundle_count\":{count}"
+        ),
+        format!(
+            "\"closure_summary_object_package_selected_provider_bundle_set_hash\":\"{hash}\""
+        ),
+    ] {
+        assert!(
+            source.contains(&evidence),
+            "official galaxy selected provider bundle evidence missing `{evidence}`"
+        );
+    }
+}
+
 pub(super) fn assert_provider_execution_evidence(provider_output_payload_path: &Path) {
     for evidence in [
         "native_output_4_output_residency_contract = \"nuis-provider-output-residency-v1\"",

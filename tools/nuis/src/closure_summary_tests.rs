@@ -23,6 +23,26 @@ fn final_output_closure_becomes_ready_when_replay_evidence_is_ready() {
     final_output.nsdb_provider_completion_set_hash_claim = Some("0xset1234".to_owned());
     final_output.nsdb_provider_completion_set_hash = Some("0xset1234".to_owned());
     final_output.nsdb_provider_completion_set_hash_validation_status = "verified".to_owned();
+    final_output.device_provider_sample_manifest_available = true;
+    final_output.device_provider_sample_provider_bundle_registry_contract =
+        "nuis-provider-bundle-registry-v1".to_owned();
+    final_output.device_provider_sample_provider_bundle_manifest_contract =
+        "nuis-provider-bundle-manifest-v1".to_owned();
+    final_output.device_provider_sample_provider_bundle_manifest_hash =
+        "fnv1a64:08a971e5a543be2e".to_owned();
+    final_output.device_provider_sample_provider_bundle_manifest_entry_count = 3;
+    final_output.device_provider_sample_manifest_first_provider_bundle_package_id =
+        "official.shader".to_owned();
+    final_output.device_provider_sample_manifest_first_provider_bundle_id =
+        "metal.apple-silicon-gpu.bundle.v1".to_owned();
+    final_output.device_provider_sample_provider_bundle_evidence_status = "verified".to_owned();
+    final_output.device_provider_sample_selected_provider_bundle_set_contract =
+        "nuis-selected-provider-bundle-set-v1".to_owned();
+    final_output.device_provider_sample_selected_provider_bundle_count = 2;
+    final_output.device_provider_sample_selected_provider_bundle_set_hash =
+        "fnv1a64:0126ed9d38f1895f".to_owned();
+    final_output.device_provider_sample_selected_provider_bundle_set_validation_status =
+        "verified".to_owned();
     final_output.nsdb_provider_completions = vec![
         crate::workflow::ProviderCompletionBoundarySummary {
             trace_id: "hetero-trace:shader:metal:apple-silicon-gpu".to_owned(),
@@ -99,6 +119,29 @@ fn final_output_closure_becomes_ready_when_replay_evidence_is_ready() {
     assert_eq!(provider.records.len(), 2);
     assert_eq!(provider.records[0].record_hash, "0xrecord1234");
     assert_eq!(provider.records[1].provider_family, "coreml:apple-ane");
+    let provider_bundle = summary.provider_bundle.as_ref().unwrap();
+    assert_eq!(
+        provider_bundle.registry_contract,
+        "nuis-provider-bundle-registry-v1"
+    );
+    assert_eq!(provider_bundle.manifest_hash, "fnv1a64:08a971e5a543be2e");
+    assert_eq!(provider_bundle.manifest_entry_count, 3);
+    assert_eq!(provider_bundle.first_package_id, "official.shader");
+    assert_eq!(
+        provider_bundle.first_bundle_id,
+        "metal.apple-silicon-gpu.bundle.v1"
+    );
+    assert_eq!(provider_bundle.evidence_status, "verified");
+    assert_eq!(
+        provider_bundle.selected_set_contract,
+        "nuis-selected-provider-bundle-set-v1"
+    );
+    assert_eq!(provider_bundle.selected_count, 2);
+    assert_eq!(
+        provider_bundle.selected_set_hash,
+        "fnv1a64:0126ed9d38f1895f"
+    );
+    assert_eq!(provider_bundle.selected_set_validation_status, "verified");
     let lineage = summary.debugger_cursor_lineage.as_ref().unwrap();
     assert_eq!(lineage.repair_rotation_generation, Some(4));
     assert_eq!(
@@ -145,6 +188,22 @@ fn final_output_closure_becomes_ready_when_replay_evidence_is_ready() {
     assert!(fields
         .iter()
         .any(|field| field.starts_with("\"closure_summary_provider_completions\":[{")));
+    assert!(fields.contains(
+        &"\"closure_summary_object_package_provider_bundle_manifest_hash\":\"fnv1a64:08a971e5a543be2e\""
+            .to_owned()
+    ));
+    assert!(fields.contains(
+        &"\"closure_summary_object_package_first_provider_bundle_id\":\"metal.apple-silicon-gpu.bundle.v1\""
+            .to_owned()
+    ));
+    assert!(fields.contains(
+        &"\"closure_summary_object_package_provider_bundle_evidence_status\":\"verified\""
+            .to_owned()
+    ));
+    assert!(fields.contains(
+        &"\"closure_summary_object_package_selected_provider_bundle_set_hash\":\"fnv1a64:0126ed9d38f1895f\""
+            .to_owned()
+    ));
     assert_eq!(
         summary.debugger_transcript_status.as_deref(),
         Some("transcript-ready")
@@ -287,6 +346,18 @@ fn final_output_summary(
         device_provider_sample_manifest_blocked_record_count: 0,
         device_provider_sample_manifest_first_provider_family: "none".to_owned(),
         device_provider_sample_manifest_first_materialization_status: "none".to_owned(),
+        device_provider_sample_provider_bundle_registry_contract: "none".to_owned(),
+        device_provider_sample_provider_bundle_manifest_contract: "none".to_owned(),
+        device_provider_sample_provider_bundle_manifest_hash: "none".to_owned(),
+        device_provider_sample_provider_bundle_manifest_entry_count: 0,
+        device_provider_sample_manifest_first_provider_bundle_package_id: "none".to_owned(),
+        device_provider_sample_manifest_first_provider_bundle_id: "none".to_owned(),
+        device_provider_sample_provider_bundle_evidence_status: "not-applicable".to_owned(),
+        device_provider_sample_selected_provider_bundle_set_contract: "none".to_owned(),
+        device_provider_sample_selected_provider_bundle_count: 0,
+        device_provider_sample_selected_provider_bundle_set_hash: "none".to_owned(),
+        device_provider_sample_selected_provider_bundle_set_validation_status: "not-applicable"
+            .to_owned(),
         nsdb_replay_contract: "nsdb-payload-execution-replay-plan-v1".to_owned(),
         nsdb_replay_ready,
         nsdb_replay_status: if nsdb_replay_ready {

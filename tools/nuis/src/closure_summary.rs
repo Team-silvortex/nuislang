@@ -23,6 +23,8 @@ pub(crate) struct FrontdoorClosureSummary {
     pub(crate) debugger_cursor_next_command: Option<String>,
     pub(crate) debugger_cursor_lineage: Option<DebuggerCursorLineageClosureMirror>,
     pub(crate) provider_completion: Option<ProviderCompletionClosureMirror>,
+    pub(crate) provider_bundle:
+        Option<crate::closure_summary_provider_bundle::ProviderBundleClosureMirror>,
 }
 
 #[derive(Clone)]
@@ -239,6 +241,7 @@ impl FrontdoorClosureSummary {
             debugger_cursor_next_command: None,
             debugger_cursor_lineage: None,
             provider_completion: None,
+            provider_bundle: None,
         }
     }
 
@@ -274,6 +277,7 @@ impl FrontdoorClosureSummary {
             debugger_cursor_next_command: None,
             debugger_cursor_lineage: None,
             provider_completion: None,
+            provider_bundle: None,
         }
     }
 
@@ -333,6 +337,10 @@ impl FrontdoorClosureSummary {
                 provider_completion: ProviderCompletionClosureMirror::from_final_output(
                     final_output,
                 ),
+                provider_bundle:
+                    crate::closure_summary_provider_bundle::ProviderBundleClosureMirror::from_final_output(
+                        final_output,
+                    ),
             };
         }
         if final_output.ready && !final_output.nsdb_replay_ready {
@@ -390,6 +398,10 @@ impl FrontdoorClosureSummary {
                 provider_completion: ProviderCompletionClosureMirror::from_final_output(
                     final_output,
                 ),
+                provider_bundle:
+                    crate::closure_summary_provider_bundle::ProviderBundleClosureMirror::from_final_output(
+                        final_output,
+                    ),
             };
         }
         Self::from_nsld_next_action(source, action, command, reason)
@@ -427,6 +439,10 @@ impl FrontdoorClosureSummary {
             final_output,
         ));
         self.provider_completion = ProviderCompletionClosureMirror::from_final_output(final_output);
+        self.provider_bundle =
+            crate::closure_summary_provider_bundle::ProviderBundleClosureMirror::from_final_output(
+                final_output,
+            );
         self
     }
 
@@ -478,6 +494,7 @@ impl FrontdoorClosureSummary {
             debugger_cursor_next_command: self.debugger_cursor_next_command,
             debugger_cursor_lineage: self.debugger_cursor_lineage,
             provider_completion: self.provider_completion,
+            provider_bundle: self.provider_bundle,
         }
     }
 
@@ -726,6 +743,11 @@ impl FrontdoorClosureSummary {
             "closure_summary_provider_completions",
             &provider_records,
         ));
+        fields.extend(
+            crate::closure_summary_provider_bundle::ProviderBundleClosureMirror::json_fields(
+                self.provider_bundle.as_ref(),
+            ),
+        );
         fields.extend(
             crate::closure_summary_lineage_repair_json::lineage_repair_json_fields(
                 self.debugger_cursor_lineage.as_ref(),

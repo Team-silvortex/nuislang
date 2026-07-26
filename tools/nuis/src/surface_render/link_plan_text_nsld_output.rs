@@ -289,6 +289,61 @@ pub(super) fn write_nsld_final_output_text_fields<W: fmt::Write>(
     )?;
     writeln!(
         out,
+        "  nsld_final_executable_output_object_package_provider_bundle_registry_contract: {}",
+        final_output.device_provider_sample_provider_bundle_registry_contract
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_object_package_provider_bundle_manifest_contract: {}",
+        final_output.device_provider_sample_provider_bundle_manifest_contract
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_object_package_provider_bundle_manifest_hash: {}",
+        final_output.device_provider_sample_provider_bundle_manifest_hash
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_object_package_provider_bundle_manifest_entry_count: {}",
+        final_output.device_provider_sample_provider_bundle_manifest_entry_count
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_object_package_first_provider_bundle_package_id: {}",
+        final_output.device_provider_sample_manifest_first_provider_bundle_package_id
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_object_package_first_provider_bundle_id: {}",
+        final_output.device_provider_sample_manifest_first_provider_bundle_id
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_object_package_provider_bundle_evidence_status: {}",
+        final_output.device_provider_sample_provider_bundle_evidence_status
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_object_package_selected_provider_bundle_set_contract: {}",
+        final_output.device_provider_sample_selected_provider_bundle_set_contract
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_object_package_selected_provider_bundle_count: {}",
+        final_output.device_provider_sample_selected_provider_bundle_count
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_object_package_selected_provider_bundle_set_hash: {}",
+        final_output.device_provider_sample_selected_provider_bundle_set_hash
+    )?;
+    writeln!(
+        out,
+        "  nsld_final_executable_output_object_package_selected_provider_bundle_set_validation_status: {}",
+        final_output.device_provider_sample_selected_provider_bundle_set_validation_status
+    )?;
+    writeln!(
+        out,
         "  nsld_final_executable_output_object_package_next_action: {}",
         final_output.object_package_summary_next_action
     )?;

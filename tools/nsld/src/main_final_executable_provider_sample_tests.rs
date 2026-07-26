@@ -91,6 +91,26 @@ fn final_output_accepts_ready_device_provider_sample_manifest() {
         Some("metal.apple-silicon-gpu.bundle.v1")
     );
     assert_eq!(
+        report
+            .device_provider_sample_selected_provider_bundle_set_contract
+            .as_deref(),
+        Some("nuis-selected-provider-bundle-set-v1")
+    );
+    assert_eq!(
+        report.device_provider_sample_selected_provider_bundle_count,
+        Some(1)
+    );
+    assert_eq!(
+        report
+            .device_provider_sample_selected_provider_bundle_set_hash
+            .as_deref(),
+        Some("fnv1a64:5c7ac5158d84aa8b")
+    );
+    assert_eq!(
+        report.device_provider_sample_selected_provider_bundle_set_validation_status,
+        "verified"
+    );
+    assert_eq!(
         report.device_provider_sample_manifest_pending_record_count,
         0
     );
@@ -129,6 +149,34 @@ fn final_output_rejects_provider_sample_without_bundle_provenance() {
         .device_provider_sample_manifest_first_blocker
         .as_deref()
         .is_some_and(|blocker| blocker.contains("provider-bundle-evidence-invalid")));
+}
+
+#[test]
+fn final_output_rejects_mismatched_selected_provider_bundle_set() {
+    let dir = temp_output_dir("mismatched-bundle-set");
+    fs::create_dir_all(&dir).unwrap();
+    write_provider_sample_manifest(&dir, "provider-sample-materialized", 1, 0);
+    let path = dir.join("nuis.nsdb.device-provider-samples.toml");
+    let source = fs::read_to_string(&path).unwrap().replace(
+        "selected_provider_bundle_count = 1",
+        "selected_provider_bundle_count = 2",
+    );
+    fs::write(&path, source).unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.final_stage.output_path = dir.join("demo").display().to_string();
+
+    let report = nsld_final_executable_output_report(Path::new("manifest.toml"), &plan);
+    fs::remove_dir_all(dir).unwrap();
+
+    assert_eq!(
+        report.device_provider_sample_manifest_status,
+        "provider-bundle-evidence-invalid"
+    );
+    assert_eq!(
+        report.device_provider_sample_selected_provider_bundle_set_validation_status,
+        "mismatch"
+    );
 }
 
 #[test]
@@ -361,6 +409,9 @@ provider_bundle_registry_contract = "nuis-provider-bundle-registry-v1"
 provider_bundle_manifest_contract = "nuis-provider-bundle-manifest-v1"
 provider_bundle_manifest_hash = "fnv1a64:08a971e5a543be2e"
 provider_bundle_manifest_entry_count = 3
+selected_provider_bundle_set_contract = "nuis-selected-provider-bundle-set-v1"
+selected_provider_bundle_count = 1
+selected_provider_bundle_set_hash = "fnv1a64:5c7ac5158d84aa8b"
 
 [[device_provider_samples]]
 trace_id = "hetero-trace:shader:metal:apple-silicon-gpu"

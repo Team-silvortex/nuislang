@@ -317,6 +317,18 @@ fn run() -> Result<(), String> {
                     report.first_provider_bundle_id
                 );
                 println!(
+                    "device_provider_sample_selected_provider_bundle_set_contract: {}",
+                    report.selected_provider_bundle_set_contract
+                );
+                println!(
+                    "device_provider_sample_selected_provider_bundle_count: {}",
+                    report.selected_provider_bundle_count
+                );
+                println!(
+                    "device_provider_sample_selected_provider_bundle_set_hash: {}",
+                    report.selected_provider_bundle_set_hash
+                );
+                println!(
                     "device_provider_sample_materialized_record_count: {}",
                     report.materialized_record_count
                 );
@@ -424,6 +436,18 @@ fn run() -> Result<(), String> {
                 println!(
                     "device_provider_sample_execute_first_provider_bundle_id: {}",
                     report.first_provider_bundle_id
+                );
+                println!(
+                    "device_provider_sample_execute_selected_provider_bundle_set_contract: {}",
+                    report.selected_provider_bundle_set_contract
+                );
+                println!(
+                    "device_provider_sample_execute_selected_provider_bundle_count: {}",
+                    report.selected_provider_bundle_count
+                );
+                println!(
+                    "device_provider_sample_execute_selected_provider_bundle_set_hash: {}",
+                    report.selected_provider_bundle_set_hash
                 );
                 println!(
                     "device_provider_sample_execute_first_runner_adapter_id: {}",
@@ -553,6 +577,10 @@ mod tests {
             provider_bundle_manifest_entry_count: 3,
             first_provider_bundle_package_id: "official.shader".to_owned(),
             first_provider_bundle_id: "metal.apple-silicon-gpu.bundle.v1".to_owned(),
+            selected_provider_bundle_set_contract: "nuis-selected-provider-bundle-set-v1"
+                .to_owned(),
+            selected_provider_bundle_count: 1,
+            selected_provider_bundle_set_hash: "fnv1a64:5c7ac5158d84aa8b".to_owned(),
             materialized_record_count: 1,
             skipped_record_count: 1,
             first_provider_family: "metal:apple-silicon-gpu".to_owned(),
@@ -603,6 +631,11 @@ mod tests {
         assert!(json.contains("\"provider_bundle_manifest_hash\":\"fnv1a64:08a971e5a543be2e\""));
         assert!(json.contains("\"first_provider_bundle_package_id\":\"official.shader\""));
         assert!(json.contains("\"first_provider_bundle_id\":\"metal.apple-silicon-gpu.bundle.v1\""));
+        assert!(json.contains(
+            "\"selected_provider_bundle_set_contract\":\"nuis-selected-provider-bundle-set-v1\""
+        ));
+        assert!(json.contains("\"selected_provider_bundle_count\":1"));
+        assert!(json.contains("\"selected_provider_bundle_set_hash\":\"fnv1a64:5c7ac5158d84aa8b\""));
         assert!(json.contains("\"first_provider_runner_contract\":\"nuis-provider-runner-v1\""));
         assert!(json.contains(
             "\"first_provider_runner_adapter_contract\":\"nuis-provider-runner-adapter-v1\""
@@ -670,6 +703,10 @@ mod tests {
             provider_bundle_manifest_entry_count: 3,
             first_provider_bundle_package_id: "official.kernel".to_owned(),
             first_provider_bundle_id: "coreml.apple-ane.bundle.v1".to_owned(),
+            selected_provider_bundle_set_contract: "nuis-selected-provider-bundle-set-v1"
+                .to_owned(),
+            selected_provider_bundle_count: 1,
+            selected_provider_bundle_set_hash: "fnv1a64:e9a82b052c861b93".to_owned(),
             first_provider_runner_adapter_id: "coreml.apple-ane.real-device".to_owned(),
             first_provider_runner_adapter_capability_status: "registered-real-device".to_owned(),
             first_provider_runner_real_device_capable: true,
@@ -711,6 +748,11 @@ mod tests {
         assert!(json.contains("\"provider_bundle_manifest_entry_count\":3"));
         assert!(json.contains("\"first_provider_bundle_package_id\":\"official.kernel\""));
         assert!(json.contains("\"first_provider_bundle_id\":\"coreml.apple-ane.bundle.v1\""));
+        assert!(json.contains(
+            "\"selected_provider_bundle_set_contract\":\"nuis-selected-provider-bundle-set-v1\""
+        ));
+        assert!(json.contains("\"selected_provider_bundle_count\":1"));
+        assert!(json.contains("\"selected_provider_bundle_set_hash\":\"fnv1a64:e9a82b052c861b93\""));
         assert!(json.contains("\"first_provider_family\":\"coreml:apple-ane\""));
         assert!(
             json.contains("\"first_provider_runner_adapter_id\":\"coreml.apple-ane.real-device\"")

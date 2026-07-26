@@ -889,9 +889,21 @@ materialized sample manifests, text reports, and JSON reports. Nsld consumes
 the same provider-neutral fields and mirrors them into final heterogeneous
 output metadata. A sample cannot become `ready` when the bundle evidence is
 missing or malformed; it becomes `provider-bundle-evidence-invalid` instead.
-The next boundary is mirroring this already validated identity into Nuis
-closure and package-summary audit surfaces without teaching Nuis any concrete
-provider family.
+Nuis now independently parses and validates the same provider-neutral fields
+rather than trusting Nsld's conclusion. Device-sample final output,
+artifact-doctor mirrors, object-package audit aliases, and frontdoor closure
+JSON all expose the registry identity, manifest hash/count, opaque package and
+bundle IDs, and evidence status without naming a concrete provider family.
+Multi-provider graphs now also publish
+`nuis-selected-provider-bundle-set-v1`. Nsdb walks graph records in execution
+order, keeps each opaque bundle ID at its first occurrence, and hashes the
+ordered index/package/bundle/family tuples. Nsld and Nuis independently rebuild
+that sequence from every manifest record; a missing or mismatched contract,
+count, or FNV hash fails closed. The first-bundle fields remain compatibility
+mirrors, while package and closure audit surfaces carry the complete selected
+set identity. The next boundary is binding that verified identity into
+Nsld-owned immutable package/container bytes rather than reading it only from
+the Nsdb sidecar.
 
 Return-producing `if` lowering now preserves control dependence for nested
 extern-call comparisons. The open `compare_call_result` mode of

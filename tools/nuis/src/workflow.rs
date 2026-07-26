@@ -9,6 +9,7 @@ mod link_plan;
 mod link_plan_commands;
 mod link_plan_domain;
 mod link_plan_final_output;
+mod link_plan_final_output_closure;
 mod link_plan_final_output_summary;
 mod link_plan_json;
 mod link_plan_json_nsld_output;

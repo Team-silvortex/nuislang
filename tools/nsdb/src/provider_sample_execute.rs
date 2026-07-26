@@ -60,6 +60,9 @@ pub struct ProviderSampleExecuteReport {
     pub provider_bundle_manifest_entry_count: usize,
     pub first_provider_bundle_package_id: String,
     pub first_provider_bundle_id: String,
+    pub selected_provider_bundle_set_contract: String,
+    pub selected_provider_bundle_count: usize,
+    pub selected_provider_bundle_set_hash: String,
     pub first_provider_runner_adapter_id: String,
     pub first_provider_runner_adapter_capability_status: String,
     pub first_provider_runner_real_device_capable: bool,
@@ -152,6 +155,12 @@ pub fn execute_provider_samples(
     let first_provider_bundle = matched_records.first().and_then(|record| {
         crate::provider_bundle_registry::provider_bundle_evidence(&record.provider_family)
     });
+    let selected_provider_bundle_set =
+        crate::provider_bundle_registry::selected_provider_bundle_set_evidence(
+            matched_records
+                .iter()
+                .map(|record| record.provider_family.as_str()),
+        );
     let mut output_payloads = Vec::new();
     for record in &matched_records {
         let adapter = select_provider_runner_adapter(&record.provider_family);
@@ -264,6 +273,18 @@ pub fn execute_provider_samples(
             .map(|bundle| bundle.bundle_id)
             .unwrap_or("none")
             .to_owned(),
+        selected_provider_bundle_set_contract: selected_provider_bundle_set
+            .as_ref()
+            .map(|set| set.contract)
+            .unwrap_or("none")
+            .to_owned(),
+        selected_provider_bundle_count: selected_provider_bundle_set
+            .as_ref()
+            .map(|set| set.count)
+            .unwrap_or(0),
+        selected_provider_bundle_set_hash: selected_provider_bundle_set
+            .map(|set| set.hash)
+            .unwrap_or_else(|| "none".to_owned()),
         first_provider_runner_adapter_id: first_provider_boundary.1,
         first_provider_runner_adapter_capability_status: first_provider_boundary.2,
         first_provider_runner_real_device_capable: first_provider_boundary.3,

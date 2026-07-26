@@ -9,6 +9,9 @@ const PAYLOAD_DECODER_MANIFEST_SCHEMA: &str = "nsdb-payload-decoder-manifest-v1"
 const DEVICE_PROVIDER_SAMPLE_FILE_NAME: &str = "nuis.nsdb.device-provider-samples.toml";
 const DEVICE_PROVIDER_SAMPLE_PROTOCOL: &str = "nuis-device-provider-samples-v1";
 const DEVICE_PROVIDER_SAMPLE_SCHEMA: &str = "nsdb-yir-device-provider-sample-v1";
+const PROVIDER_BUNDLE_REGISTRY_CONTRACT: &str = "nuis-provider-bundle-registry-v1";
+const PROVIDER_BUNDLE_MANIFEST_CONTRACT: &str = "nuis-provider-bundle-manifest-v1";
+const SELECTED_PROVIDER_BUNDLE_SET_CONTRACT: &str = "nuis-selected-provider-bundle-set-v1";
 
 pub(crate) fn collect_payload_decoder_manifest_mirror(
     output_dir: Option<&Path>,
@@ -102,6 +105,50 @@ pub(crate) fn collect_device_provider_sample_manifest_mirror(
     let pending_record_count = parse_usize_toml_field(&source, "pending_record_count")
         .unwrap_or_else(|| device_provider_sample_pending_count(&records));
     let blocked_record_count = device_provider_sample_blocked_count(&records);
+    let provider_bundle_registry_contract =
+        parse_string_toml_field(&source, "provider_bundle_registry_contract")
+            .unwrap_or_else(|| "none".to_owned());
+    let provider_bundle_manifest_contract =
+        parse_string_toml_field(&source, "provider_bundle_manifest_contract")
+            .unwrap_or_else(|| "none".to_owned());
+    let provider_bundle_manifest_hash =
+        parse_string_toml_field(&source, "provider_bundle_manifest_hash")
+            .unwrap_or_else(|| "none".to_owned());
+    let provider_bundle_manifest_entry_count =
+        parse_usize_toml_field(&source, "provider_bundle_manifest_entry_count").unwrap_or(0);
+    let first_provider_bundle_package_id = records
+        .first()
+        .and_then(|record| parse_string_toml_field(record, "provider_bundle_package_id"))
+        .unwrap_or_else(|| "none".to_owned());
+    let first_provider_bundle_id = records
+        .first()
+        .and_then(|record| parse_string_toml_field(record, "provider_bundle_id"))
+        .unwrap_or_else(|| "none".to_owned());
+    let selected_provider_bundle_set_contract =
+        parse_string_toml_field(&source, "selected_provider_bundle_set_contract")
+            .unwrap_or_else(|| "none".to_owned());
+    let selected_provider_bundle_count =
+        parse_usize_toml_field(&source, "selected_provider_bundle_count").unwrap_or(0);
+    let selected_provider_bundle_set_hash =
+        parse_string_toml_field(&source, "selected_provider_bundle_set_hash")
+            .unwrap_or_else(|| "none".to_owned());
+    let selected_provider_bundle_set_validation_status =
+        selected_provider_bundle_set_validation_status(
+            &records,
+            &selected_provider_bundle_set_contract,
+            selected_provider_bundle_count,
+            &selected_provider_bundle_set_hash,
+        );
+    let provider_bundle_evidence_status = provider_bundle_evidence_status(
+        records.is_empty(),
+        &provider_bundle_registry_contract,
+        &provider_bundle_manifest_contract,
+        &provider_bundle_manifest_hash,
+        provider_bundle_manifest_entry_count,
+        &first_provider_bundle_package_id,
+        &first_provider_bundle_id,
+        &selected_provider_bundle_set_validation_status,
+    );
     DeviceProviderSampleManifestMirror {
         available: true,
         path: Some(path),
@@ -127,6 +174,17 @@ pub(crate) fn collect_device_provider_sample_manifest_mirror(
             .first()
             .and_then(|record| parse_string_toml_field(record, "materialization_status"))
             .unwrap_or_else(|| "none".to_owned()),
+        provider_bundle_registry_contract,
+        provider_bundle_manifest_contract,
+        provider_bundle_manifest_hash,
+        provider_bundle_manifest_entry_count,
+        first_provider_bundle_package_id,
+        first_provider_bundle_id,
+        provider_bundle_evidence_status,
+        selected_provider_bundle_set_contract,
+        selected_provider_bundle_count,
+        selected_provider_bundle_set_hash,
+        selected_provider_bundle_set_validation_status,
     }
 }
 
@@ -193,6 +251,17 @@ pub(crate) struct DeviceProviderSampleManifestMirror {
     pub(crate) invalid_record_count: usize,
     pub(crate) first_provider_family: String,
     pub(crate) first_materialization_status: String,
+    pub(crate) provider_bundle_registry_contract: String,
+    pub(crate) provider_bundle_manifest_contract: String,
+    pub(crate) provider_bundle_manifest_hash: String,
+    pub(crate) provider_bundle_manifest_entry_count: usize,
+    pub(crate) first_provider_bundle_package_id: String,
+    pub(crate) first_provider_bundle_id: String,
+    pub(crate) provider_bundle_evidence_status: String,
+    pub(crate) selected_provider_bundle_set_contract: String,
+    pub(crate) selected_provider_bundle_count: usize,
+    pub(crate) selected_provider_bundle_set_hash: String,
+    pub(crate) selected_provider_bundle_set_validation_status: String,
 }
 
 impl DeviceProviderSampleManifestMirror {
@@ -209,6 +278,17 @@ impl DeviceProviderSampleManifestMirror {
             invalid_record_count: 0,
             first_provider_family: "none".to_owned(),
             first_materialization_status: "none".to_owned(),
+            provider_bundle_registry_contract: "none".to_owned(),
+            provider_bundle_manifest_contract: "none".to_owned(),
+            provider_bundle_manifest_hash: "none".to_owned(),
+            provider_bundle_manifest_entry_count: 0,
+            first_provider_bundle_package_id: "none".to_owned(),
+            first_provider_bundle_id: "none".to_owned(),
+            provider_bundle_evidence_status: "not-applicable".to_owned(),
+            selected_provider_bundle_set_contract: "none".to_owned(),
+            selected_provider_bundle_count: 0,
+            selected_provider_bundle_set_hash: "none".to_owned(),
+            selected_provider_bundle_set_validation_status: "not-applicable".to_owned(),
         }
     }
 
@@ -245,6 +325,50 @@ impl DeviceProviderSampleManifestMirror {
             crate::json_field(
                 &format!("{prefix}_first_materialization_status"),
                 &self.first_materialization_status,
+            ),
+            crate::json_field(
+                &format!("{prefix}_provider_bundle_registry_contract"),
+                &self.provider_bundle_registry_contract,
+            ),
+            crate::json_field(
+                &format!("{prefix}_provider_bundle_manifest_contract"),
+                &self.provider_bundle_manifest_contract,
+            ),
+            crate::json_field(
+                &format!("{prefix}_provider_bundle_manifest_hash"),
+                &self.provider_bundle_manifest_hash,
+            ),
+            crate::json_usize_field(
+                &format!("{prefix}_provider_bundle_manifest_entry_count"),
+                self.provider_bundle_manifest_entry_count,
+            ),
+            crate::json_field(
+                &format!("{prefix}_first_provider_bundle_package_id"),
+                &self.first_provider_bundle_package_id,
+            ),
+            crate::json_field(
+                &format!("{prefix}_first_provider_bundle_id"),
+                &self.first_provider_bundle_id,
+            ),
+            crate::json_field(
+                &format!("{prefix}_provider_bundle_evidence_status"),
+                &self.provider_bundle_evidence_status,
+            ),
+            crate::json_field(
+                &format!("{prefix}_selected_provider_bundle_set_contract"),
+                &self.selected_provider_bundle_set_contract,
+            ),
+            crate::json_usize_field(
+                &format!("{prefix}_selected_provider_bundle_count"),
+                self.selected_provider_bundle_count,
+            ),
+            crate::json_field(
+                &format!("{prefix}_selected_provider_bundle_set_hash"),
+                &self.selected_provider_bundle_set_hash,
+            ),
+            crate::json_field(
+                &format!("{prefix}_selected_provider_bundle_set_validation_status"),
+                &self.selected_provider_bundle_set_validation_status,
             ),
         ]
     }
@@ -301,6 +425,89 @@ fn device_provider_sample_manifest_status(
     } else {
         "ready".to_owned()
     }
+}
+
+fn provider_bundle_evidence_status(
+    empty: bool,
+    registry_contract: &str,
+    manifest_contract: &str,
+    manifest_hash: &str,
+    manifest_entry_count: usize,
+    first_package_id: &str,
+    first_bundle_id: &str,
+    selected_provider_bundle_set_validation_status: &str,
+) -> String {
+    if empty {
+        return "not-applicable".to_owned();
+    }
+    let valid_hash = manifest_hash
+        .strip_prefix("fnv1a64:")
+        .is_some_and(|hash| hash.len() == 16 && hash.bytes().all(|byte| byte.is_ascii_hexdigit()));
+    if registry_contract == PROVIDER_BUNDLE_REGISTRY_CONTRACT
+        && manifest_contract == PROVIDER_BUNDLE_MANIFEST_CONTRACT
+        && valid_hash
+        && manifest_entry_count > 0
+        && first_package_id != "none"
+        && !first_package_id.trim().is_empty()
+        && first_bundle_id != "none"
+        && !first_bundle_id.trim().is_empty()
+        && selected_provider_bundle_set_validation_status == "verified"
+    {
+        "verified".to_owned()
+    } else {
+        "provider-bundle-evidence-invalid".to_owned()
+    }
+}
+
+fn selected_provider_bundle_set_validation_status(
+    records: &[&str],
+    contract: &str,
+    count_claim: usize,
+    hash_claim: &str,
+) -> String {
+    if records.is_empty() {
+        return "not-applicable".to_owned();
+    }
+    let mut selected = Vec::new();
+    let mut seen_bundle_ids = std::collections::BTreeSet::new();
+    for record in records {
+        let Some(package_id) = parse_string_toml_field(record, "provider_bundle_package_id") else {
+            return "mismatch".to_owned();
+        };
+        let Some(bundle_id) = parse_string_toml_field(record, "provider_bundle_id") else {
+            return "mismatch".to_owned();
+        };
+        let Some(provider_family) = parse_string_toml_field(record, "provider_family") else {
+            return "mismatch".to_owned();
+        };
+        if seen_bundle_ids.insert(bundle_id.clone()) {
+            selected.push((package_id, bundle_id, provider_family));
+        }
+    }
+    let mut canonical = format!("{SELECTED_PROVIDER_BUNDLE_SET_CONTRACT}\n");
+    for (index, (package_id, bundle_id, provider_family)) in selected.iter().enumerate() {
+        canonical.push_str(&format!(
+            "{index}|{package_id}|{bundle_id}|{provider_family}\n"
+        ));
+    }
+    let actual_hash = format!("fnv1a64:{:016x}", fnv1a64(canonical.as_bytes()));
+    if contract == SELECTED_PROVIDER_BUNDLE_SET_CONTRACT
+        && count_claim == selected.len()
+        && hash_claim == actual_hash
+    {
+        "verified".to_owned()
+    } else {
+        "mismatch".to_owned()
+    }
+}
+
+fn fnv1a64(bytes: &[u8]) -> u64 {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
 }
 
 fn device_provider_sample_pending_count(records: &[&str]) -> usize {
@@ -488,6 +695,79 @@ materialization_status = "provider-sample-blocked"
                 device_provider_sample_blocked_count(&records),
             ),
             "blocked-provider-sample"
+        );
+    }
+
+    #[test]
+    fn provider_bundle_evidence_requires_provider_neutral_provenance() {
+        assert_eq!(
+            provider_bundle_evidence_status(
+                false,
+                PROVIDER_BUNDLE_REGISTRY_CONTRACT,
+                PROVIDER_BUNDLE_MANIFEST_CONTRACT,
+                "fnv1a64:08a971e5a543be2e",
+                3,
+                "official.shader",
+                "metal.apple-silicon-gpu.bundle.v1",
+                "verified",
+            ),
+            "verified"
+        );
+        assert_eq!(
+            provider_bundle_evidence_status(
+                false,
+                PROVIDER_BUNDLE_REGISTRY_CONTRACT,
+                PROVIDER_BUNDLE_MANIFEST_CONTRACT,
+                "none",
+                0,
+                "none",
+                "none",
+                "mismatch",
+            ),
+            "provider-bundle-evidence-invalid"
+        );
+        assert_eq!(
+            provider_bundle_evidence_status(
+                true,
+                "none",
+                "none",
+                "none",
+                0,
+                "none",
+                "none",
+                "not-applicable",
+            ),
+            "not-applicable"
+        );
+    }
+
+    #[test]
+    fn selected_provider_bundle_set_is_recomputed_from_all_records() {
+        let records = vec![
+            r#"
+provider_family = "coreml:apple-ane"
+provider_bundle_package_id = "official.kernel"
+provider_bundle_id = "coreml.apple-ane.bundle.v1"
+"#,
+            r#"
+provider_family = "coreml:apple-ane"
+provider_bundle_package_id = "official.kernel"
+provider_bundle_id = "coreml.apple-ane.bundle.v1"
+"#,
+            r#"
+provider_family = "metal:apple-silicon-gpu"
+provider_bundle_package_id = "official.shader"
+provider_bundle_id = "metal.apple-silicon-gpu.bundle.v1"
+"#,
+        ];
+        assert_eq!(
+            selected_provider_bundle_set_validation_status(
+                &records,
+                SELECTED_PROVIDER_BUNDLE_SET_CONTRACT,
+                2,
+                "fnv1a64:0126ed9d38f1895f",
+            ),
+            "verified"
         );
     }
 }

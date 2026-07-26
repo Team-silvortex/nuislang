@@ -102,7 +102,9 @@ mod provider_execution_evidence;
 mod replay;
 
 use build::assert_official_galaxy_hetero_build;
-use provider_execution_evidence::assert_provider_execution_evidence;
+use provider_execution_evidence::{
+    assert_provider_bundle_audit_evidence, assert_provider_execution_evidence,
+};
 use replay::assert_multi_checkpoint_replay_resume;
 
 #[test]

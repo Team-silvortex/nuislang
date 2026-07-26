@@ -983,6 +983,7 @@ pub(super) fn assert_official_galaxy_hetero_build(
         .contains("\"artifact_device_provider_sample_manifest_status\":\"ready\""));
     assert!(doctor_after_stdout
         .contains("\"artifact_device_provider_sample_manifest_pending_record_count\":0"));
+    assert_provider_bundle_audit_evidence(&doctor_after_stdout, label);
     assert!(doctor_after_stdout.contains(
         "\"artifact_device_provider_sample_manifest_first_materialization_status\":\"provider-sample-materialized\""
     ));

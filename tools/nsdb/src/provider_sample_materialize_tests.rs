@@ -143,6 +143,15 @@ next_action = "handoff-payload-trace-to-nsdb"
     assert_eq!(report.materialized_record_count, 1);
     assert_eq!(report.skipped_record_count, 0);
     assert_eq!(
+        report.selected_provider_bundle_set_contract,
+        "nuis-selected-provider-bundle-set-v1"
+    );
+    assert_eq!(report.selected_provider_bundle_count, 1);
+    assert_eq!(
+        report.selected_provider_bundle_set_hash,
+        "fnv1a64:5c7ac5158d84aa8b"
+    );
+    assert_eq!(
         (
             report.first_provider_runner_contract.as_str(),
             report.first_provider_runner_adapter_contract.as_str(),
@@ -190,6 +199,11 @@ next_action = "handoff-payload-trace-to-nsdb"
     assert!(source.contains("source = \"nsdb-materialize-provider-samples\""));
     assert!(source.contains("ready_record_count = 1"));
     assert!(source.contains("pending_record_count = 0"));
+    assert!(source.contains(
+        "selected_provider_bundle_set_contract = \"nuis-selected-provider-bundle-set-v1\""
+    ));
+    assert!(source.contains("selected_provider_bundle_count = 1"));
+    assert!(source.contains("selected_provider_bundle_set_hash = \"fnv1a64:5c7ac5158d84aa8b\""));
     assert!(source.contains(
         "output_evidence = \"nuis.nsdb.provider-sample.metal-apple-silicon-gpu.toml:hash=0x"
     ));

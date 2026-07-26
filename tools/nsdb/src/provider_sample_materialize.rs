@@ -34,6 +34,9 @@ pub struct ProviderSampleMaterializeReport {
     pub provider_bundle_manifest_entry_count: usize,
     pub first_provider_bundle_package_id: String,
     pub first_provider_bundle_id: String,
+    pub selected_provider_bundle_set_contract: String,
+    pub selected_provider_bundle_count: usize,
+    pub selected_provider_bundle_set_hash: String,
     pub first_provider_runner_contract: String,
     pub first_provider_runner_adapter_contract: String,
     pub first_provider_runner_adapter_id: String,
@@ -120,6 +123,10 @@ pub fn materialize_provider_samples(
     let first_provider_bundle = records.first().and_then(|record| {
         crate::provider_bundle_registry::provider_bundle_evidence(&record.provider_family)
     });
+    let selected_provider_bundle_set =
+        crate::provider_bundle_registry::selected_provider_bundle_set_evidence(
+            records.iter().map(|record| record.provider_family.as_str()),
+        );
     Ok(ProviderSampleMaterializeReport {
         path: path.display().to_string(),
         provider_family_filter: provider_family_filter.map(str::to_owned),
@@ -156,6 +163,18 @@ pub fn materialize_provider_samples(
             .map(|bundle| bundle.bundle_id)
             .unwrap_or("none")
             .to_owned(),
+        selected_provider_bundle_set_contract: selected_provider_bundle_set
+            .as_ref()
+            .map(|set| set.contract)
+            .unwrap_or("none")
+            .to_owned(),
+        selected_provider_bundle_count: selected_provider_bundle_set
+            .as_ref()
+            .map(|set| set.count)
+            .unwrap_or(0),
+        selected_provider_bundle_set_hash: selected_provider_bundle_set
+            .map(|set| set.hash)
+            .unwrap_or_else(|| "none".to_owned()),
         first_provider_runner_contract: records
             .first()
             .map(|record| provider_runner_for(record).contract.to_owned())
@@ -524,6 +543,24 @@ fn render_materialized_manifest(records: &[NsdbDeviceProviderSampleRecordInfo]) 
             "provider_bundle_manifest_entry_count = {}\n",
             bundle.manifest_entry_count
         ));
+    }
+    if let Some(selected) = crate::provider_bundle_registry::selected_provider_bundle_set_evidence(
+        records.iter().map(|record| record.provider_family.as_str()),
+    ) {
+        push_toml_string(
+            &mut out,
+            "selected_provider_bundle_set_contract",
+            selected.contract,
+        );
+        out.push_str(&format!(
+            "selected_provider_bundle_count = {}\n",
+            selected.count
+        ));
+        push_toml_string(
+            &mut out,
+            "selected_provider_bundle_set_hash",
+            &selected.hash,
+        );
     }
     for record in records {
         out.push_str("\n[[device_provider_samples]]\n");

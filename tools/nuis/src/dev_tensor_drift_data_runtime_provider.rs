@@ -295,6 +295,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_PROVIDER_DRIFT_CHECKS: &[DevTensorDriftCheck
             required_patterns: &[
                 "nuis-provider-bundle-registry-v1",
                 "nuis-provider-bundle-manifest-v1",
+                "nuis-selected-provider-bundle-set-v1",
                 "ProviderBundleRegistration",
                 "ProviderBundleManifestEntry",
                 "provider_bundle_registrations",
@@ -303,6 +304,8 @@ pub(crate) const DEV_TENSOR_RUNTIME_PROVIDER_DRIFT_CHECKS: &[DevTensorDriftCheck
                 "provider_bundle_manifest_hash",
                 "ProviderBundleEvidence",
                 "provider_bundle_evidence",
+                "SelectedProviderBundleSetEvidence",
+                "selected_provider_bundle_set_evidence",
                 "select_provider_bundle_by_family",
                 "select_provider_bundle_by_adapter_kind",
                 "provider_bundles_cross_bind_unique_runner_and_execution_registrations",

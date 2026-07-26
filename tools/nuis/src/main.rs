@@ -23,6 +23,7 @@ mod build_report_runtime;
 mod cli;
 mod closure_summary;
 mod closure_summary_lineage_repair_json;
+mod closure_summary_provider_bundle;
 mod debug_lineage_repair_command;
 mod debug_resume_command;
 mod dev_tensor;

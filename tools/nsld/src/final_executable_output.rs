@@ -477,6 +477,14 @@ pub(crate) fn nsld_final_executable_output_report(
             .first_provider_bundle_package_id,
         device_provider_sample_manifest_first_provider_bundle_id: device_provider_sample
             .first_provider_bundle_id,
+        device_provider_sample_selected_provider_bundle_set_contract: device_provider_sample
+            .selected_provider_bundle_set_contract,
+        device_provider_sample_selected_provider_bundle_count: device_provider_sample
+            .selected_provider_bundle_count,
+        device_provider_sample_selected_provider_bundle_set_hash: device_provider_sample
+            .selected_provider_bundle_set_hash,
+        device_provider_sample_selected_provider_bundle_set_validation_status:
+            device_provider_sample.selected_provider_bundle_set_validation_status,
         device_provider_sample_manifest_first_provider_family: device_provider_sample
             .first_provider_family,
         device_provider_sample_manifest_first_materialization_status: device_provider_sample

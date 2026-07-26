@@ -1,5 +1,6 @@
 use super::{
     link_plan::{parse_bool_field, parse_string_field, parse_usize_field},
+    link_plan_final_output_closure::{debugger_transcript_summary, object_package_summary},
     link_plan_final_output_summary::NsldFinalExecutableOutputBoundarySummary,
     nsld_drive_command_set_for_output_dir,
     object_identity::workflow_object_identity,
@@ -106,8 +107,16 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         collect_device_provider_sample_manifest_mirror(Some(Path::new(&plan.output_dir)));
     let nsdb_replay = nsld_final_executable_output_nsdb_replay(plan);
     let object_evidence = nsld_final_executable_output_object_evidence(plan);
-    let object_package_summary = nsld_final_executable_output_object_package_summary(&nsdb_replay);
-    let debugger_transcript = nsld_final_executable_output_debugger_transcript(&nsdb_replay);
+    let object_package_summary = object_package_summary(
+        nsdb_replay.ready,
+        nsdb_replay.next_command.as_deref(),
+        nsdb_replay.first_blocker.as_deref(),
+    );
+    let debugger_transcript = debugger_transcript_summary(
+        nsdb_replay.ready,
+        nsdb_replay.next_command.as_deref(),
+        nsdb_replay.first_blocker.as_deref(),
+    );
     let debugger_cursor = read_debugger_cursor_handoff(
         Path::new(&plan.output_dir),
         &Path::new(&plan.output_dir).join("nuis.build.manifest.toml"),
@@ -115,6 +124,28 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
     let debugger_cursor_lineage = read_debugger_cursor_lineage(Path::new(&plan.output_dir));
     let debugger_cursor_lineage_repair = debugger_cursor_lineage.repair;
     let drive_command_set = nsld_drive_command_set_for_output_dir(Path::new(&plan.output_dir));
+    let device_provider_sample_provider_bundle_registry_contract =
+        provider_sample_manifest.provider_bundle_registry_contract;
+    let device_provider_sample_provider_bundle_manifest_contract =
+        provider_sample_manifest.provider_bundle_manifest_contract;
+    let device_provider_sample_provider_bundle_manifest_hash =
+        provider_sample_manifest.provider_bundle_manifest_hash;
+    let device_provider_sample_provider_bundle_manifest_entry_count =
+        provider_sample_manifest.provider_bundle_manifest_entry_count;
+    let device_provider_sample_manifest_first_provider_bundle_package_id =
+        provider_sample_manifest.first_provider_bundle_package_id;
+    let device_provider_sample_manifest_first_provider_bundle_id =
+        provider_sample_manifest.first_provider_bundle_id;
+    let device_provider_sample_provider_bundle_evidence_status =
+        provider_sample_manifest.provider_bundle_evidence_status;
+    let device_provider_sample_selected_provider_bundle_set_contract =
+        provider_sample_manifest.selected_provider_bundle_set_contract;
+    let device_provider_sample_selected_provider_bundle_count =
+        provider_sample_manifest.selected_provider_bundle_count;
+    let device_provider_sample_selected_provider_bundle_set_hash =
+        provider_sample_manifest.selected_provider_bundle_set_hash;
+    let device_provider_sample_selected_provider_bundle_set_validation_status =
+        provider_sample_manifest.selected_provider_bundle_set_validation_status;
 
     NsldFinalExecutableOutputBoundarySummary {
         artifact_chain_safe_next_contract: drive_command_set.safe_next_contract,
@@ -152,6 +183,17 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
             .first_provider_family,
         device_provider_sample_manifest_first_materialization_status: provider_sample_manifest
             .first_materialization_status,
+        device_provider_sample_provider_bundle_registry_contract,
+        device_provider_sample_provider_bundle_manifest_contract,
+        device_provider_sample_provider_bundle_manifest_hash,
+        device_provider_sample_provider_bundle_manifest_entry_count,
+        device_provider_sample_manifest_first_provider_bundle_package_id,
+        device_provider_sample_manifest_first_provider_bundle_id,
+        device_provider_sample_provider_bundle_evidence_status,
+        device_provider_sample_selected_provider_bundle_set_contract,
+        device_provider_sample_selected_provider_bundle_count,
+        device_provider_sample_selected_provider_bundle_set_hash,
+        device_provider_sample_selected_provider_bundle_set_validation_status,
         nsdb_replay_contract: nsdb_replay.contract,
         nsdb_replay_ready: nsdb_replay.ready,
         nsdb_replay_status: nsdb_replay.status,
@@ -251,73 +293,6 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         object_issues: object_evidence.issues,
         blockers,
         first_blocker,
-    }
-}
-
-struct NsldFinalExecutableOutputClosureMirror {
-    contract: String,
-    ready: bool,
-    status: String,
-    next_action: String,
-    next_command: Option<String>,
-    first_blocker: Option<String>,
-}
-
-fn nsld_final_executable_output_object_package_summary(
-    nsdb_replay: &NsldFinalExecutableOutputNsdbReplay,
-) -> NsldFinalExecutableOutputClosureMirror {
-    let ready = nsdb_replay.ready;
-    NsldFinalExecutableOutputClosureMirror {
-        contract: "nsld-object-package-summary-v1".to_owned(),
-        ready,
-        status: if ready {
-            "replay-ready"
-        } else {
-            "replay-blocked"
-        }
-        .to_owned(),
-        next_action: if ready {
-            "consume-object-package-summary"
-        } else {
-            "resolve-object-package-replay-evidence"
-        }
-        .to_owned(),
-        next_command: nsdb_replay.next_command.clone(),
-        first_blocker: (!ready).then(|| {
-            nsdb_replay
-                .first_blocker
-                .clone()
-                .unwrap_or_else(|| "payload-execution-replay:unknown".to_owned())
-        }),
-    }
-}
-
-fn nsld_final_executable_output_debugger_transcript(
-    nsdb_replay: &NsldFinalExecutableOutputNsdbReplay,
-) -> NsldFinalExecutableOutputClosureMirror {
-    let ready = nsdb_replay.ready;
-    NsldFinalExecutableOutputClosureMirror {
-        contract: "nsdb-yir-replay-transcript-v1".to_owned(),
-        ready,
-        status: if ready {
-            "transcript-ready"
-        } else {
-            "transcript-blocked"
-        }
-        .to_owned(),
-        next_action: if ready {
-            "consume-nsdb-yir-replay-transcript"
-        } else {
-            "resolve-nsdb-yir-replay-transcript"
-        }
-        .to_owned(),
-        next_command: nsdb_replay.next_command.clone(),
-        first_blocker: (!ready).then(|| {
-            nsdb_replay
-                .first_blocker
-                .clone()
-                .unwrap_or_else(|| "payload-execution-replay:unknown".to_owned())
-        }),
     }
 }
 

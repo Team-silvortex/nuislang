@@ -392,6 +392,32 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         )
     );
     println!(
+        "  device_provider_sample_selected_provider_bundle_set_contract: {}",
+        optional_string_text(
+            report
+                .device_provider_sample_selected_provider_bundle_set_contract
+                .as_deref()
+        )
+    );
+    println!(
+        "  device_provider_sample_selected_provider_bundle_count: {}",
+        report
+            .device_provider_sample_selected_provider_bundle_count
+            .map_or_else(|| "none".to_owned(), |count| count.to_string())
+    );
+    println!(
+        "  device_provider_sample_selected_provider_bundle_set_hash: {}",
+        optional_string_text(
+            report
+                .device_provider_sample_selected_provider_bundle_set_hash
+                .as_deref()
+        )
+    );
+    println!(
+        "  device_provider_sample_selected_provider_bundle_set_validation_status: {}",
+        report.device_provider_sample_selected_provider_bundle_set_validation_status
+    );
+    println!(
         "  device_provider_sample_manifest_first_provider_family: {}",
         optional_string_text(
             report
