@@ -175,7 +175,7 @@ pub(super) fn assert_official_galaxy_hetero_build(
                 && run_json_stdout.contains(
                     "provider_request_collection_contract=nuis-provider-request-collection-v1",
                 )
-                && run_json_stdout.contains("provider_request_count=5")
+                && run_json_stdout.contains("provider_request_count=7")
                 && run_json_stdout.contains(
                     "provider_output_comparison_descriptor_contract=nuis-provider-output-comparison-descriptor-v1",
                 )
@@ -198,6 +198,27 @@ pub(super) fn assert_official_galaxy_hetero_build(
                 )
                 && run_json_stdout.contains(
                     "provider_request_4_adapter_binding_provider_family=metal:apple-silicon-gpu",
+                )
+                && run_json_stdout.contains(
+                    "provider_request_4_output_comparison_profile_contract=nuis-witsage-output-comparison-profile-v1",
+                )
+                && run_json_stdout.contains(
+                    "provider_request_4_output_comparison_profile_package=nuis.witsage",
+                )
+                && run_json_stdout.contains(
+                    "provider_request_4_output_comparison_profile_id=witsage.cross-provider.f32",
+                )
+                && run_json_stdout.contains(
+                    "provider_request_4_output_comparison_expected_content_hash=0xe31371394cd0b1bd",
+                )
+                && run_json_stdout.contains(
+                    "provider_request_4_output_comparison_absolute_tolerance=0.00001",
+                )
+                && run_json_stdout.contains(
+                    "provider_request_4_output_comparison_relative_tolerance=0.000001",
+                )
+                && run_json_stdout.contains(
+                    "provider_request_4_output_comparison_non_finite_policy=reject",
                 )
                 && run_json_stdout.contains(
                     "provider_request_4_dependency_0_transport_contract=nuis-provider-edge-transport-v1",
@@ -712,12 +733,12 @@ pub(super) fn assert_official_galaxy_hetero_build(
             );
             assert_file_contains(
                 &provider_output_payload_path,
-                "native_output_count = \"5\"",
+                "native_output_count = \"7\"",
                 "official galaxy CoreML output count",
             );
             assert_file_contains(
                 &provider_output_payload_path,
-                "provider_request_order = \"witsage.feature-grid.projection,witsage.vector.affine,witsage.vector.affine.chained,witsage.vector.add,witsage.vector.metal-bias\"",
+                "provider_request_order = \"witsage.feature-grid.projection,witsage.vector.affine,witsage.vector.affine.chained,witsage.vector.add,witsage.vector.metal-bias,witsage.kmeans.centroid-score,witsage.kmeans.assignment\"",
                 "official galaxy CoreML request order",
             );
             assert_file_contains(
@@ -727,12 +748,12 @@ pub(super) fn assert_official_galaxy_hetero_build(
             );
             assert_file_contains(
                 &provider_output_payload_path,
-                "provider_request_dependency_edge_count = \"4\"",
+                "provider_request_dependency_edge_count = \"5\"",
                 "official galaxy CoreML dependency edge count",
             );
             assert_file_contains(
                 &provider_output_payload_path,
-                "provider_request_dependency_edges = \"witsage.vector.affine.output.features->witsage.vector.affine.chained.input.features,witsage.vector.affine.output.features->witsage.vector.add.input.left,witsage.vector.affine.chained.output.features->witsage.vector.add.input.right,witsage.vector.add.output.features->witsage.vector.metal-bias.input.features\"",
+                "provider_request_dependency_edges = \"witsage.vector.affine.output.features->witsage.vector.affine.chained.input.features,witsage.vector.affine.output.features->witsage.vector.add.input.left,witsage.vector.affine.chained.output.features->witsage.vector.add.input.right,witsage.vector.add.output.features->witsage.vector.metal-bias.input.features,witsage.kmeans.centroid-score.output.features->witsage.kmeans.assignment.input.scores\"",
                 "official galaxy CoreML dependency edge",
             );
             assert_file_contains(
@@ -827,7 +848,7 @@ pub(super) fn assert_official_galaxy_hetero_build(
             );
             assert_file_contains(
                 &provider_output_payload_path,
-                "provider_request_adapter_order = \"coreml:apple-ane,coreml:apple-ane,coreml:apple-ane,coreml:apple-ane,metal:apple-silicon-gpu\"",
+                "provider_request_adapter_order = \"coreml:apple-ane,coreml:apple-ane,coreml:apple-ane,coreml:apple-ane,metal:apple-silicon-gpu,coreml:apple-ane,metal:apple-silicon-gpu\"",
                 "official galaxy cross-provider adapter order",
             );
             assert_file_contains(
@@ -837,17 +858,17 @@ pub(super) fn assert_official_galaxy_hetero_build(
             );
             assert_file_contains(
                 &provider_output_payload_path,
-                "provider_edge_transport_count = \"4\"",
+                "provider_edge_transport_count = \"5\"",
                 "official galaxy cross-provider transport count",
             );
             assert_file_contains(
                 &provider_output_payload_path,
-                "provider_edge_transport_ownership_tokens = \"glm:provider-edge:witsage.vector.affine:output.features->witsage.vector.affine.chained:input.features,glm:provider-edge:witsage.vector.affine:output.features->witsage.vector.add:input.left,glm:provider-edge:witsage.vector.affine.chained:output.features->witsage.vector.add:input.right,glm:provider-edge:witsage.vector.add:output.features->witsage.vector.metal-bias:input.features\"",
+                "provider_edge_transport_ownership_tokens = \"glm:provider-edge:witsage.vector.affine:output.features->witsage.vector.affine.chained:input.features,glm:provider-edge:witsage.vector.affine:output.features->witsage.vector.add:input.left,glm:provider-edge:witsage.vector.affine.chained:output.features->witsage.vector.add:input.right,glm:provider-edge:witsage.vector.add:output.features->witsage.vector.metal-bias:input.features,glm:provider-edge:witsage.kmeans.centroid-score:output.features->witsage.kmeans.assignment:input.scores\"",
                 "official galaxy cross-provider GLM ownership token",
             );
             assert_file_contains(
                 &provider_output_payload_path,
-                "provider_edge_transport_staging_modes = \"auto,auto,auto,auto\"",
+                "provider_edge_transport_staging_modes = \"auto,auto,auto,auto,auto\"",
                 "official galaxy cross-provider staging mode",
             );
             assert_file_contains(
@@ -857,7 +878,7 @@ pub(super) fn assert_official_galaxy_hetero_build(
             );
             assert_file_contains(
                 &provider_output_payload_path,
-                "provider_edge_transport_receipt_count = \"4\"",
+                "provider_edge_transport_receipt_count = \"5\"",
                 "official galaxy cross-provider transport receipt count",
             );
             assert_file_contains(
@@ -865,7 +886,7 @@ pub(super) fn assert_official_galaxy_hetero_build(
                 "provider_edge_transport_receipt_3_staging_registry_contract = \"nuis-provider-edge-staging-registry-v1\"",
                 "official galaxy staging registry contract",
             );
-            for index in 0..4 {
+            for index in 0..5 {
                 assert_file_contains(&provider_output_payload_path, &format!(
                     "provider_edge_transport_receipt_{index}_staging_adapter_id = \"provider.output.transfer.v1\""
                 ), "official galaxy transferred output staging adapter");

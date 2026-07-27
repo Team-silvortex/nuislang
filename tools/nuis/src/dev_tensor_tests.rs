@@ -24,15 +24,24 @@ fn handoff_selection_is_status_aware_and_input_order_independent() {
 }
 
 #[test]
-fn task_selection_falls_back_to_global_incomplete_after_bootstrap_closes() {
-    let selected = select_dev_tensor_task_cell(DEV_TENSOR_CELLS).expect("select global task");
+fn task_selection_reports_none_after_every_registered_cell_closes() {
+    let mut cells = DEV_TENSOR_CELLS.to_vec();
+    for cell in &mut cells {
+        cell.status = "stable";
+        cell.progress = 100;
+    }
+    assert!(select_dev_tensor_task_cell(&cells).is_none());
+}
+
+#[test]
+fn task_selection_advances_to_linux_cuda_after_previous_cells_close() {
+    let selected = select_dev_tensor_task_cell(DEV_TENSOR_CELLS).expect("select CUDA task");
     assert_eq!(
         dev_tensor_coordinate_key(selected.architecture, selected.module, selected.function),
-        "standard-library/pixelmagic/image-processing-lane"
+        "heterogeneous-runtime/linux-cuda/cuda-provider-bringup"
     );
-    assert!(!selected.bootstrap_critical);
     assert_eq!(selected.status, "active");
-    assert_eq!(selected.progress, 78);
+    assert_eq!(selected.progress, 40);
 }
 
 #[test]
@@ -112,32 +121,21 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
     );
     assert_eq!(summary.weakest_bootstrap_task_card_status, "ready");
     assert!(summary.weakest_bootstrap_task_card_ready);
-    assert_ne!(summary.weakest_bootstrap_task_card_coordinate, "<none>");
-    assert!(summary.weakest_bootstrap_task_card_coordinate.contains('/'));
+    assert_eq!(
+        summary.weakest_bootstrap_task_card_coordinate,
+        "heterogeneous-runtime/linux-cuda/cuda-provider-bringup"
+    );
     assert!(summary
         .weakest_bootstrap_task_card_priority_reason
         .contains("all bootstrap-critical cells are stable at 100/100"));
     assert_eq!(
-        summary.weakest_bootstrap_task_card_coordinate,
-        "standard-library/pixelmagic/image-processing-lane"
-    );
-    assert_ne!(
         summary.weakest_bootstrap_task_card_handoff_coordinate,
-        "<none>"
+        "heterogeneous-runtime/linux-cuda/cuda-provider-bringup"
     );
-    let selected =
-        select_dev_tensor_task_cell(DEV_TENSOR_CELLS).expect("select current weakest handoff");
-    assert_eq!(
-        summary.weakest_bootstrap_task_card_handoff_coordinate,
-        dev_tensor_coordinate_key(selected.architecture, selected.module, selected.function)
-    );
-    assert!(summary
-        .weakest_bootstrap_task_card_handoff_coordinate
-        .contains('/'));
-    assert_ne!(summary.weakest_bootstrap_task_card_handoff_mode, "<none>");
+    assert_eq!(summary.weakest_bootstrap_task_card_handoff_mode, "direct");
     assert!(summary
         .weakest_bootstrap_task_card_handoff_reason
-        .contains("weakest"));
+        .contains("directly actionable"));
     assert_ne!(summary.weakest_bootstrap_task_card_handoff_action, "<none>");
     assert_ne!(
         summary.weakest_bootstrap_task_card_handoff_command,
@@ -161,29 +159,27 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         summary
             .weakest_bootstrap_task_card_lineage
             .task_ancestry
-            .last(),
-        Some(&summary.weakest_bootstrap_task_card_coordinate)
+            .first()
+            .map(String::as_str),
+        Some("nuislang")
     );
     assert_eq!(
         summary
             .weakest_bootstrap_task_card_lineage
             .handoff_ancestry
-            .last(),
-        Some(&summary.weakest_bootstrap_task_card_handoff_coordinate)
+            .last()
+            .map(String::as_str),
+        Some("heterogeneous-runtime/linux-cuda/cuda-provider-bringup")
     );
     assert_eq!(
         summary
             .weakest_bootstrap_task_card_lineage
-            .task_ancestry
-            .first()
-            .map(String::as_str),
-        Some("nuislang")
-    );
-    assert_ne!(
-        summary
-            .weakest_bootstrap_task_card_lineage
             .common_ancestor_path,
-        "<none>"
+        "heterogeneous-runtime/linux-cuda/cuda-provider-bringup"
+    );
+    assert_eq!(
+        summary.weakest_bootstrap_task_card_lineage.transition_depth,
+        0
     );
     assert_eq!(summary.bootstrap_critical_average_progress, 100);
     let hierarchy = crate::dev_tensor_hierarchy::dev_tensor_hierarchy_summary();
@@ -236,6 +232,29 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         coverage.milestone.milestone_coordinate_count,
         DEV_TENSOR_EXPECTED_COORDINATES.len()
     );
+}
+
+#[test]
+fn self_hosting_phase_roadmap_is_protocolized_without_claiming_completion() {
+    let cell = DEV_TENSOR_CELLS
+        .iter()
+        .find(|cell| {
+            dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function)
+                == "developer-system/dev-tensor/self-hosting-phase-roadmap"
+        })
+        .expect("self-hosting phase roadmap cell");
+
+    assert_eq!(cell.status, "stable");
+    assert_eq!(cell.progress, 100);
+    assert!(cell.bootstrap_critical);
+    assert_eq!(cell.closure_role, "self-hosting-phase-governance");
+    assert!(cell.evidence.contains("nuis-self-hosting-phase-roadmap-v1"));
+    assert!(cell.evidence.contains("beta-0.9.*"));
+    assert!(cell.evidence.contains("beta-0.10.*"));
+    assert!(cell.evidence.contains("gamma-0.5.*"));
+    assert!(cell
+        .blocker
+        .contains("self-hosting implementation intentionally remains future work"));
 }
 
 #[test]
@@ -301,12 +320,20 @@ fn dev_tensor_json_exposes_coordinate_cells() {
     assert!(json.contains("\"weakest_bootstrap_task_card_common_ancestor_path\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_transition_depth\":"));
     assert!(json.contains("all bootstrap-critical cells are stable at 100/100"));
+    assert!(json.contains("\"module\":\"linux-cuda\""));
+    assert!(json.contains("\"function\":\"cuda-provider-bringup\""));
+    assert!(json.contains("nuis-linux-cuda-host-probe-v1"));
+    assert!(json.contains("nuis-cuda-ptx-driver-smoke-v1"));
     assert!(json.contains("\"blocker\""));
     assert!(json.contains("\"next_action\""));
     assert!(json.contains("\"validation_command\""));
     assert!(json.contains("\"expected_artifact\""));
     assert!(json.contains("\"module\":\"nsld\""));
     assert!(json.contains("\"function\":\"final-output-boundary\""));
+    assert!(json.contains("\"function\":\"self-hosting-phase-roadmap\""));
+    assert!(json.contains("nuis-self-hosting-phase-roadmap-v1"));
+    assert!(json.contains("beta-0.10.*"));
+    assert!(json.contains("gamma-0.5.*"));
     assert!(json.contains("\"coverage_status\":\"clean\""));
     assert!(json.contains(
         "\"coverage_expected_source\":\"docs/reference/nuis-development-tensor.milestones.toml\""
@@ -394,6 +421,13 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains(
             "milestone_coordinate: alpha-governance:required:developer-system/dev-tensor/architecture-module-function-progress-model"
         ));
+    assert!(text.contains(
+        "milestone_coordinate: self-hosting-roadmap:required:developer-system/dev-tensor/self-hosting-phase-roadmap"
+    ));
+    assert!(text.contains(
+        "cell: architecture=developer-system module=dev-tensor function=self-hosting-phase-roadmap"
+    ));
+    assert!(text.contains("nuis-self-hosting-phase-roadmap-v1"));
     assert!(text.contains("drift_status: clean"));
     assert!(text.contains("status_protocol_version: dev-tensor-status-v1"));
     assert!(text.contains("hierarchy_root_status:"));
@@ -432,8 +466,10 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("weakest_bootstrap_task_card_lineage_error_count: 0"));
     assert!(text.contains("weakest_bootstrap_task_card_task_ancestor: nuislang"));
     assert!(text.contains("weakest_bootstrap_task_card_handoff_ancestor: nuislang"));
-    assert!(text.contains("weakest_bootstrap_task_card_common_ancestor_path:"));
-    assert!(text.contains("weakest_bootstrap_task_card_transition_depth:"));
+    assert!(text.contains(
+        "weakest_bootstrap_task_card_common_ancestor_path: heterogeneous-runtime/linux-cuda/cuda-provider-bringup"
+    ));
+    assert!(text.contains("weakest_bootstrap_task_card_transition_depth: 0"));
     assert!(text.contains("all bootstrap-critical cells are stable at 100/100"));
     assert!(text.contains("    blocker:"));
     assert!(text.contains("    next_action:"));

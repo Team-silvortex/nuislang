@@ -1,0 +1,7 @@
+# WitSage-owned floating-point comparison profile for model prediction.
+protocol=nuis-witsage-output-comparison-profile-v1
+package_id=nuis.witsage
+profile_id=witsage.model-predict.f32
+absolute_tolerance=0.00001
+relative_tolerance=0.000001
+non_finite_policy=reject

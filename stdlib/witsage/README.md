@@ -81,6 +81,10 @@ Current native execution baseline:
   plus order-sensitive graph and collection hashes
 * each model binds a versioned `f32` output comparison descriptor with shape,
   expected asset hash, absolute/relative tolerance, and non-finite policy
+* the package-owned
+  `provider-comparison-profiles/cross-provider-f32.nwcp` profile gives the
+  CoreML-to-Metal boundary non-zero absolute and relative tolerances while
+  requiring `reject` for NaN/Infinity and retaining the exact expected-asset hash
 * Nsdb independently compares all 65,536 feature-grid values and both
   four-element affine outputs before accepting the collection; the chained
   request consumes the first affine's real CoreML output and verifies
@@ -95,6 +99,17 @@ Current native execution baseline:
   independent output comparison boundary
 * per-request adapter bindings then carry the Add output into a real Metal
   `f32` bias kernel, producing and comparing `[11, 17, 23, 29]`
+* a second classical model family now executes a real CoreML `InnerProduct`
+  centroid scorer: input `[1, 2, 3, 4]` is evaluated against two KMeans
+  centroids and compared as scores `[0, 16]` through the package-owned
+  `witsage.model-predict.f32` profile
+* a dependent generic Metal `argmax` node consumes those real scores and emits
+  the exact `u32` cluster assignment `1`; the package-owned
+  `nuis-witsage-cluster-assignment-v1` evidence defines
+  `highest-centroid-score` semantics while Nsdb remains unaware of KMeans
+* the seven-request collection runs CoreML, Metal, CoreML, then Metal again;
+  the centroid scorer reuses CoreML worker sequence `4` and assignment uses
+  Metal sequence `1`, proving adapter sessions need not remain contiguous
 * `nuis-provider-edge-transport-v1` binds that CoreML-to-Metal edge to a GLM
   ownership token, host-visible staging, and producer/consumer request clocks;
   cross-provider edges without valid transport evidence fail before execution
@@ -151,16 +166,17 @@ Current native execution baseline:
 * final output summaries preserve the operation token, permit contract, permit
   status, worker dispatch status, PID, sequence, descriptor count, and payload
   hash for each CoreML and Metal request
-* all four dependency edges reuse sealed producer output carriers directly
+* all five dependency edges reuse sealed producer output carriers directly
   through `provider.output.transfer.v1`, with independent lifecycle receipts
 
-Current alpha-0.17 boundary:
+Current alpha boundary:
 
 * CoreML and Metal execution is real on the supported Apple smoke host
 * lifecycle and dispatch authorization are Nuis-owned
-* concrete provider invocation still occurs after worker authorization
-* the next step is a provider-neutral execution capsule invoked inside the
-  persistent worker, returning a verified output-carrier receipt
+* provider-neutral execution capsules invoke concrete adapters inside persistent
+  workers and return verified output-carrier receipts
+* classical inference now closes at a package-owned discrete assignment;
+  training and additional model families remain later capability work
 
 Current official surface registry:
 
@@ -171,3 +187,5 @@ Current official surface registry:
 * `contract.witsage.preprocessing.v1`
 * `contract.witsage.evaluation.v1`
 * `contract.witsage.pipeline.v1`
+* `contract.witsage.output-comparison-profile.v1`
+* `contract.witsage.cluster-assignment.v1`

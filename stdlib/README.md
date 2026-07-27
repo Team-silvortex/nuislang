@@ -74,15 +74,15 @@ At the current repo stage:
 * the live implementation focus is still on `nuis / nuisc / YIR / nustar`
 * but `stdlib` is no longer empty scaffolding; all five layers now carry real
   checked-in `.ns` assets
-* for the `alpha-0.17.*` line, `std`, PixelMagic, and WitSage are the practical
+* for the current alpha line, `std`, PixelMagic, and WitSage are the practical
   proving surfaces for buildable CLI/tooling, image/resource, and kernel-facing
   classical ML contracts before `ns-nova` grows into a larger GUI/framework
   layer
 * PixelMagic and WitSage now each have a small report-file workload under
   `examples/projects/domains/` that consumes their official package contracts
   while reusing `StdReportContracts` from `std`
-* the official heterogeneous smoke lane now drives four ordered CoreML requests
-  and one Metal request through persistent registered Nuis workers, while
+* the official heterogeneous smoke lane now drives five ordered CoreML requests
+  and two Metal requests through persistent registered Nuis workers, while
   checking fan-in descriptors, cross-provider transfer, output comparison,
   lifecycle release, and worker-issued operation permits
 * `nsdb materialize-provider-samples` replaces the old mock provider result

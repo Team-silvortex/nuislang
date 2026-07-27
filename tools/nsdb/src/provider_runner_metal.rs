@@ -137,6 +137,17 @@ pub(crate) fn prepare_f32_bias_worker_invocation(
 }
 
 #[cfg(target_os = "macos")]
+pub(crate) fn prepare_f32_argmax_worker_invocation(
+    cache: &mut ProviderProcessAdapterCache,
+) -> Result<ResolvedProviderProcessAdapter<'_>, String> {
+    prepare_metal_worker_invocation(
+        cache,
+        METAL_F32_BIAS_SOURCE,
+        "nuis-metal-f32-argmax-provider-runner-v1",
+    )
+}
+
+#[cfg(target_os = "macos")]
 fn prepare_metal_worker_invocation<'a>(
     cache: &'a mut ProviderProcessAdapterCache,
     source: &str,
@@ -175,6 +186,22 @@ pub(crate) fn execute_f32_bias_prepared_channel(
     bias: f32,
 ) -> Result<MetalProviderExecution, String> {
     execute_f32_bias_prepared_channel_platform(channel, byte_len, bias)
+}
+
+pub(crate) fn execute_f32_argmax_input(
+    input: &ProviderCarrierInput,
+) -> Result<MetalProviderExecution, String> {
+    match input {
+        ProviderCarrierInput::Path(path) => execute_f32_argmax_platform(path),
+        ProviderCarrierInput::OpaqueBytes { bytes, .. } => execute_f32_argmax_bytes_platform(bytes),
+    }
+}
+
+pub(crate) fn execute_f32_argmax_prepared_channel(
+    channel: &PreparedProviderCarrierChannel,
+    byte_len: usize,
+) -> Result<MetalProviderExecution, String> {
+    execute_f32_argmax_prepared_channel_platform(channel, byte_len)
 }
 
 #[cfg(target_os = "macos")]
@@ -231,6 +258,42 @@ fn execute_f32_bias_prepared_channel_platform(
         METAL_F32_BIAS_SOURCE,
         Some(channel),
         Some(byte_len),
+    )
+}
+
+#[cfg(target_os = "macos")]
+fn execute_f32_argmax_platform(input_path: &Path) -> Result<MetalProviderExecution, String> {
+    execute_metal_platform(
+        input_path.as_os_str(),
+        &[],
+        "nuis-metal-f32-argmax-provider-runner-v1",
+        METAL_F32_BIAS_SOURCE,
+        None,
+        Some(std::mem::size_of::<u32>()),
+    )
+}
+
+#[cfg(target_os = "macos")]
+fn execute_f32_argmax_bytes_platform(input: &[u8]) -> Result<MetalProviderExecution, String> {
+    let channel_adapter = select_provider_carrier_channel_adapter("auto")
+        .ok_or_else(|| "Metal provider carrier channel is unavailable".to_owned())?;
+    let channel = prepare_provider_carrier_channel(channel_adapter, &[input])?;
+    execute_f32_argmax_prepared_channel_platform(&channel, input.len())
+}
+
+#[cfg(target_os = "macos")]
+fn execute_f32_argmax_prepared_channel_platform(
+    channel: &PreparedProviderCarrierChannel,
+    _byte_len: usize,
+) -> Result<MetalProviderExecution, String> {
+    let argument = channel.frame_argument(0);
+    execute_metal_platform(
+        OsStr::new(&argument),
+        &[],
+        "nuis-metal-f32-argmax-provider-runner-v1",
+        METAL_F32_BIAS_SOURCE,
+        Some(channel),
+        Some(std::mem::size_of::<u32>()),
     )
 }
 
@@ -294,6 +357,24 @@ fn execute_f32_bias_prepared_channel_platform(
     _channel: &PreparedProviderCarrierChannel,
     _byte_len: usize,
     _bias: f32,
+) -> Result<MetalProviderExecution, String> {
+    Err("Metal provider runner is unavailable on this host".to_owned())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn execute_f32_argmax_platform(_input_path: &Path) -> Result<MetalProviderExecution, String> {
+    Err("Metal provider runner is unavailable on this host".to_owned())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn execute_f32_argmax_bytes_platform(_input: &[u8]) -> Result<MetalProviderExecution, String> {
+    Err("Metal provider runner is unavailable on this host".to_owned())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn execute_f32_argmax_prepared_channel_platform(
+    _channel: &PreparedProviderCarrierChannel,
+    _byte_len: usize,
 ) -> Result<MetalProviderExecution, String> {
     Err("Metal provider runner is unavailable on this host".to_owned())
 }
@@ -545,8 +626,8 @@ impl Drop for TempMetalRunnerPaths {
 #[cfg(test)]
 mod tests {
     use super::{
-        execute_f32_bias_input, execute_gray8_invert, execute_gray8_threshold,
-        parse_metal_runner_output,
+        execute_f32_argmax_input, execute_f32_bias_input, execute_gray8_invert,
+        execute_gray8_threshold, parse_metal_runner_output,
     };
     use crate::provider_carrier_input::ProviderCarrierInput;
 
@@ -619,5 +700,22 @@ mod tests {
             .map(|bytes| f32::from_le_bytes(bytes.try_into().unwrap()))
             .collect::<Vec<_>>();
         assert_eq!(values, [11.0, 17.0, 23.0, 29.0]);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn executes_f32_argmax_from_opaque_carrier_bytes() {
+        let input = ProviderCarrierInput::OpaqueBytes {
+            handle: "memory:metal-argmax-test".to_owned(),
+            bytes: [0.0f32, 16.0]
+                .into_iter()
+                .flat_map(f32::to_le_bytes)
+                .collect(),
+        };
+        let execution = execute_f32_argmax_input(&input).expect("opaque Metal argmax input");
+        assert_eq!(
+            u32::from_le_bytes(execution.output_payload.as_bytes().try_into().unwrap()),
+            1
+        );
     }
 }

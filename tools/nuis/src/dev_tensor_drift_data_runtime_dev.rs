@@ -694,9 +694,10 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         path: "tools/nuis/src/dev_tensor_tests.rs",
         required_patterns: &[
             "handoff_selection_is_status_aware_and_input_order_independent",
-            "task_selection_falls_back_to_global_incomplete_after_bootstrap_closes",
+            "task_selection_reports_none_after_every_registered_cell_closes",
+            "task_selection_advances_to_linux_cuda_after_previous_cells_close",
             "task_selection_keeps_bootstrap_priority_until_critical_cells_close",
-            "select current weakest handoff",
+            "heterogeneous-runtime/linux-cuda/cuda-provider-bringup",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -720,8 +721,10 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "nuis-dev-tensor-milestones-v1",
             "alpha-governance",
             "alpha-official-galaxy",
+            "self-hosting-roadmap",
             "required = false",
             "developer-system/dev-tensor/architecture-module-function-progress-model",
+            "developer-system/dev-tensor/self-hosting-phase-roadmap",
             "standard-library/std/host-io-filesystem-text",
             "linker-toolchain/nsld/final-output-boundary",
         ],

@@ -24,6 +24,19 @@ pub(crate) fn validate_dev_tensor_task_card_lineage(
     handoff_coordinate: &str,
     handoff_mode: &str,
 ) -> DevTensorTaskCardLineage {
+    if task_coordinate == "<none>" && handoff_coordinate == "<none>" && handoff_mode == "direct" {
+        return DevTensorTaskCardLineage {
+            protocol: DEV_TENSOR_TASK_CARD_LINEAGE_PROTOCOL,
+            status: "clean",
+            error_count: 0,
+            first_error: None,
+            errors: Vec::new(),
+            task_ancestry: Vec::new(),
+            handoff_ancestry: Vec::new(),
+            common_ancestor_path: "<none>".to_owned(),
+            transition_depth: 0,
+        };
+    }
     let mut errors = Vec::new();
     if hierarchy_status != "clean" {
         errors.push(format!(

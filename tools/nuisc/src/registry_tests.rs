@@ -700,6 +700,10 @@ fn execution_summary_derives_minimum_execution_skeleton() {
     assert_eq!(summary.default_time_mode, "logical");
     assert_eq!(summary.contract_family, "nustar.kernel");
     assert!(summary.lowering_targets.contains(&"coreml".to_owned()));
+    assert!(summary.lowering_targets.contains(&"cuda".to_owned()));
+    assert!(manifest
+        .abi_profiles
+        .contains(&"kernel.cuda.ptx8_0.v1".to_owned()));
 }
 
 #[test]
@@ -916,6 +920,29 @@ fn load_registered_domains_covers_all_indexed_nustar_modules() {
         .extension_groups
         .contains(&NUSTAR_DOMAIN_CONTRACT_GROUP_STD_NET.to_owned()));
     assert!(!network.ops.is_empty());
+}
+
+#[test]
+fn kernel_cuda_abi_resolves_through_registered_contract_only() {
+    let manifest = load_manifest_for_domain(Path::new("nustar-packages"), "kernel").unwrap();
+    let target = registered_abi_target(&manifest, "kernel.cuda.ptx8_0.v1").unwrap();
+
+    assert_eq!(target.machine_arch, "x86_64");
+    assert_eq!(target.machine_os, "linux");
+    assert_eq!(target.object_format, "elf");
+    assert_eq!(target.calling_abi, "sysv64");
+    assert_eq!(target.backend_family.as_deref(), Some("cuda"));
+    assert_eq!(target.vendor.as_deref(), Some("nvidia"));
+    assert_eq!(target.device_class.as_deref(), Some("nvidia-gpu"));
+    assert_eq!(
+        crate::project::selected_lowering_target_for_registered_abi_target(
+            "kernel",
+            &target,
+            &manifest.lowering_targets,
+        )
+        .as_deref(),
+        Some("cuda.nvidia-gpu")
+    );
 }
 
 #[path = "registry_validation_tests.rs"]

@@ -75,6 +75,11 @@ fn prepare_worker_adapter(
             crate::provider_runner_metal::prepare_f32_bias_worker_invocation(cache)?,
             vec![format!("literal:{bias}")],
         )
+    } else if is_f32_argmax(request) {
+        (
+            crate::provider_runner_metal::prepare_f32_argmax_worker_invocation(cache)?,
+            Vec::new(),
+        )
     } else {
         return Ok(None);
     };
@@ -160,6 +165,21 @@ fn execute(
         } else {
             crate::provider_runner_metal::execute_f32_bias_input(inputs[0].input(), bias)?
         }
+    } else if is_f32_argmax(request) {
+        if uses_process_adapter(worker_receipt) {
+            crate::provider_runner_metal::parse_metal_worker_output(
+                &worker_receipt.worker_output_payload,
+                "nuis-metal-f32-argmax-provider-runner-v1",
+                worker_receipt.worker_output_result.take(),
+            )?
+        } else if let Some(channel) = inputs[0].direct_channel() {
+            crate::provider_runner_metal::execute_f32_argmax_prepared_channel(
+                channel,
+                request.input_bindings[0].byte_length,
+            )?
+        } else {
+            crate::provider_runner_metal::execute_f32_argmax_input(inputs[0].input())?
+        }
     } else {
         return Err(format!(
             "Metal provider adapter does not support buffer `{}` operation `{}`",
@@ -171,6 +191,13 @@ fn execute(
             metal_native_output_summary(
                 request.kernel.id.clone(),
                 "pixelmagic-image-bytes",
+                &execution,
+                None,
+            )
+        } else if is_f32_argmax(request) {
+            metal_native_output_summary(
+                request.kernel.id.clone(),
+                "provider-scalar-u32",
                 &execution,
                 None,
             )
@@ -205,6 +232,15 @@ fn is_f32_bias(request: &ProviderRequest) -> bool {
     request.buffer.element_type == "f32"
         && request.buffer.layout == "tensor-contiguous"
         && request.kernel.operation == "bias"
+}
+
+fn is_f32_argmax(request: &ProviderRequest) -> bool {
+    request.buffer.element_type == "f32"
+        && request.buffer.layout == "tensor-contiguous"
+        && request.kernel.operation == "argmax"
+        && request.output_bindings.len() == 1
+        && request.output_bindings[0].element_type == "u32"
+        && request.output_bindings[0].shape == [1]
 }
 
 fn uses_process_adapter(receipt: &ProviderWorkerDispatchReceipt) -> bool {

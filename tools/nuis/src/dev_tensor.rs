@@ -150,7 +150,9 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
     let task_card_coordinate = task_cell
         .map(|cell| dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function))
         .unwrap_or_else(|| "<none>".to_owned());
-    let task_card_source = if bootstrap_closed {
+    let task_card_source = if bootstrap_closed && task_cell.is_none() {
+        "all-cells-complete"
+    } else if bootstrap_closed {
         "weakest-global-incomplete-status-progress-path"
     } else {
         "weakest-bootstrap-status-progress-path"
@@ -213,11 +215,12 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
                 cell.progress
             )
         })
-        .unwrap_or_else(|| {
-            format!(
+        .unwrap_or_else(|| match task_cell {
+            Some(_) => format!(
                 "weakest task card is directly actionable at {}",
                 task_card_coordinate
-            )
+            ),
+            None => "all registered tensor cells are complete; no handoff is required".to_owned(),
         });
     DevTensorSummary {
         hierarchy_protocol_version: hierarchy.hierarchy_protocol_version,

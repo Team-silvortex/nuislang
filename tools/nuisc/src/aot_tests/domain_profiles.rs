@@ -312,6 +312,32 @@ fn kernel_vulkan_sidecar_emits_grid_and_indirect_dispatch_templates() {
 }
 
 #[test]
+fn kernel_cuda_sidecar_emits_hash_bound_ptx_grid_template() {
+    let kernel_unit = sample_domain_unit(
+        "kernel",
+        "official.kernel",
+        "cuda",
+        "nvidia",
+        "nvidia-gpu",
+        "cuda.nvidia-gpu",
+    );
+    let sidecar = super::render_domain_build_unit_kernel_ir_sidecar(&kernel_unit);
+    let repeated = super::render_domain_build_unit_kernel_ir_sidecar(&kernel_unit);
+
+    assert_eq!(sidecar, repeated);
+    assert!(sidecar.contains("supported_dispatch_kinds = [\"grid\", \"batch\", \"stream\"]"));
+    assert!(sidecar.contains("native_ir = \"ptx8.0\""));
+    assert!(sidecar.contains("dispatch_lowering = \"grid-block-thread\""));
+    assert!(sidecar.contains("memory_lowering = \"cuda-device-buffer\""));
+    assert!(sidecar.contains("execution_route = \"cuda-compute-stream\""));
+    assert!(sidecar.contains("submission_adapter = \"cuda-driver-submit\""));
+    assert!(sidecar.contains("wake_adapter = \"cuda-event-completion\""));
+    assert!(sidecar.contains("source_fnv1a64 = \"0x"));
+    assert!(sidecar.contains("virtual_arch = \"sm_80\""));
+    assert!(sidecar.contains(".visible .entry nuis_kernel_vector_add_f32"));
+}
+
+#[test]
 fn kernel_cpu_fallback_sidecar_emits_range_and_tile_dispatch_templates() {
     let kernel_unit = sample_domain_unit(
         "kernel",

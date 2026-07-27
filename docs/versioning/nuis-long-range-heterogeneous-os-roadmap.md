@@ -183,10 +183,13 @@ The current long-range version posture is:
   stabilize enough of that base that compiler/tooling self-use can stop being
   a sketch and become a repeated engineering pressure
 * around `beta-0.10.0`
-  treat self-hosting as a serious central gate rather than a distant direction
-* late `beta` into `gamma`
-  begin substantial Vulpoya and Yalivia work, mature Nsld/Nsdb/Nsbdr-style
-  toolchain coordination, and grow native framework surfaces
+  start formal staged self-hosting after the foundation-readiness period
+* `beta-0.10.*` through roughly `gamma-0.5.*`
+  migrate from the Rust-hosted stage0 toward stage1 and stage2-equivalent
+  compiler ownership while Nsld/Nsdb/Nsbdr coordination continues to mature
+* around `gamma-0.5.*`
+  target completed compiler self-hosting; Vulpoya, Yalivia, and native
+  framework work may evolve alongside it but do not replace that gate
 * `gamma`
   absorb whole-stack coordination, analyzer/runtime cooperation, and
   native-framework maturity so `1.0.0` is delayed until the ecosystem shape is

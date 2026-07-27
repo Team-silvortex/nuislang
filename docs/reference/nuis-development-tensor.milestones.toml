@@ -25,6 +25,13 @@ coordinates = [
 ]
 
 [[milestones]]
+id = "alpha-linux-cuda"
+required = false
+coordinates = [
+  "heterogeneous-runtime/linux-cuda/cuda-provider-bringup",
+]
+
+[[milestones]]
 id = "alpha-stdlib"
 required = true
 coordinates = [
@@ -58,4 +65,11 @@ id = "alpha-governance"
 required = true
 coordinates = [
   "developer-system/dev-tensor/architecture-module-function-progress-model",
+]
+
+[[milestones]]
+id = "self-hosting-roadmap"
+required = true
+coordinates = [
+  "developer-system/dev-tensor/self-hosting-phase-roadmap",
 ]

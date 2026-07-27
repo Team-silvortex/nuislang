@@ -284,6 +284,22 @@ impl KernelStageContract {
                         "Portable Vulkan compute artifact".to_owned(),
                     ));
                 }
+                if matches!(preferred_backend, Some("cuda")) {
+                    variants.push(kernel_backend_variant(
+                        "cuda",
+                        "gpu",
+                        "linux",
+                        "nvidia-gpu",
+                        "ptx8.0",
+                        "cuda-driver-launch",
+                        "ptx-source",
+                        25,
+                        "planned",
+                        stage_id.clone(),
+                        format!("cuda/{stage_id}.ptx"),
+                        "NVIDIA CUDA PTX compute artifact".to_owned(),
+                    ));
+                }
                 variants.push(kernel_backend_variant(
                     "cpu-fallback",
                     "cpu",
@@ -369,6 +385,22 @@ impl KernelComputeGraphContract {
                         entry.clone(),
                         format!("vulkan/{}.spv", self.id),
                         "Fused Vulkan compute graph artifact".to_owned(),
+                    ));
+                }
+                if matches!(preferred_backend, Some("cuda")) {
+                    variants.push(kernel_backend_variant(
+                        "cuda",
+                        "gpu",
+                        "linux",
+                        "nvidia-gpu",
+                        "ptx8.0",
+                        "cuda-driver-launch",
+                        "ptx-source",
+                        25,
+                        "planned",
+                        entry.clone(),
+                        format!("cuda/{}.ptx", self.id),
+                        "Fused NVIDIA CUDA PTX compute graph artifact".to_owned(),
                     ));
                 }
                 variants.push(kernel_backend_variant(

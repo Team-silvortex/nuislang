@@ -112,6 +112,10 @@ pub(crate) fn backend_features_for_registered_abi_target(
                     features.insert("spirv".to_owned());
                     features.insert("compute-queue".to_owned());
                 }
+                Some("cuda") => {
+                    features.insert("ptx".to_owned());
+                    features.insert("cuda-stream".to_owned());
+                }
                 Some("cpu-fallback") => {
                     features.insert("host-kernel-fallback".to_owned());
                 }

@@ -55,6 +55,11 @@ pub(crate) fn derived_lowering_profile_for_unit<'a>(
                 "vulkan-compute-submit",
                 "vulkan-timeline-semaphore",
             ),
+            ("kernel", "cuda.nvidia-gpu") => (
+                "cuda-compute-stream",
+                "cuda-driver-submit",
+                "cuda-event-completion",
+            ),
             ("kernel", "cpu-fallback.cpu-host") => (
                 "host-kernel-fallback",
                 "cpu-threadpool-dispatch",
@@ -151,6 +156,12 @@ pub(crate) fn render_target_specific_backend_fields(
             out.push_str("queue_binding_model = \"compute-queue\"\n");
             out.push_str("resource_binding_model = \"descriptor-set-layout\"\n");
         }
+        ("kernel", "cuda.nvidia-gpu") => {
+            out.push_str("kernel_ir = \"ptx8.0\"\n");
+            out.push_str("kernel_entry_model = \"ptx-visible-entry\"\n");
+            out.push_str("queue_binding_model = \"cuda-stream\"\n");
+            out.push_str("resource_binding_model = \"cuda-parameter-buffer\"\n");
+        }
         ("kernel", "cpu-fallback.cpu-host") => {
             out.push_str("kernel_ir = \"host-simd\"\n");
             out.push_str("kernel_entry_model = \"threadpool-kernel\"\n");
@@ -221,6 +232,12 @@ pub(crate) fn render_target_specific_lowering_fields(
             out.push_str("shader_stage_model = \"cpu-raster-pipeline\"\n");
             out.push_str("stage_binding_model = \"host-buffer-slices\"\n");
             out.push_str("dispatch_encoding_model = \"threadpool-tile-dispatch\"\n");
+        }
+        ("kernel", "cuda.nvidia-gpu") => {
+            out.push_str("lowering_ir = \"ptx8.0\"\n");
+            out.push_str("kernel_stage_model = \"ptx-visible-entry\"\n");
+            out.push_str("stage_binding_model = \"cuda-parameter-buffer\"\n");
+            out.push_str("dispatch_encoding_model = \"grid-block-thread\"\n");
         }
         ("network", "urlsession.socket-io") => {
             out.push_str("lowering_ir = \"foundation-url-request\"\n");
@@ -315,6 +332,7 @@ pub(crate) fn kernel_supported_dispatch_kinds_for_profile(
     match (unit.domain_family.as_str(), profile.profile_key) {
         ("kernel", "coreml.apple-ane") => Some(&["graph", "batch", "tile"]),
         ("kernel", "vulkan.discrete-or-integrated-gpu") => Some(&["grid", "indirect", "batch"]),
+        ("kernel", "cuda.nvidia-gpu") => Some(&["grid", "batch", "stream"]),
         ("kernel", "cpu-fallback.cpu-host") => Some(&["range", "tile", "batch"]),
         ("kernel", _) => Some(&["graph"]),
         _ => None,
@@ -444,5 +462,19 @@ mod tests {
         assert!(rendered.contains("submission_adapter = \"vulkan-compute-submit\""));
         assert!(rendered.contains("wake_adapter = \"vulkan-timeline-semaphore\""));
         assert!(rendered.contains("clock_contract = \"global-time-partial-order\""));
+    }
+
+    #[test]
+    fn cuda_kernel_profile_keeps_driver_owned_schedule_contract() {
+        let unit = domain_unit("kernel", "cuda.nvidia-gpu");
+        let profile = derived_lowering_profile_for_unit(&unit);
+
+        assert_eq!(profile.execution_route, "cuda-compute-stream");
+        assert_eq!(profile.submission_adapter, "cuda-driver-submit");
+        assert_eq!(profile.wake_adapter, "cuda-event-completion");
+        assert_eq!(
+            kernel_supported_dispatch_kinds_for_profile(&unit, &profile),
+            Some(&["grid", "batch", "stream"][..])
+        );
     }
 }

@@ -307,6 +307,10 @@ fn classify_kernel_backend_eligibility(
             KernelLoweringMode::BackendEligible,
             "stage fits the current Vulkan compute lowering subset",
         ),
+        "cuda" => (
+            KernelLoweringMode::BackendEligible,
+            "stage fits the current CUDA PTX lowering subset",
+        ),
         _ => (
             KernelLoweringMode::CpuFallbackOnly,
             "runtime is outside the current portable kernel lowering subset",

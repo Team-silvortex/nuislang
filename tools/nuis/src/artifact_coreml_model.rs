@@ -86,6 +86,37 @@ pub(crate) fn witsage_vector_add_model() -> Vec<u8> {
     model(description, network)
 }
 
+pub(crate) fn witsage_kmeans_centroid_score_model() -> Vec<u8> {
+    let input = feature_description(INPUT_FEATURE, &[1, 1, 4]);
+    let output = feature_description(OUTPUT_FEATURE, &[1, 1, 2]);
+
+    let mut description = Vec::new();
+    push_message(&mut description, 1, &input);
+    push_message(&mut description, 10, &output);
+
+    // Maximizing 2c*x - ||c||^2 is equivalent to selecting the nearest centroid.
+    let mut inner_product = Vec::new();
+    push_varint_field(&mut inner_product, 1, 4);
+    push_varint_field(&mut inner_product, 2, 2);
+    push_varint_field(&mut inner_product, 10, 1);
+    push_message(
+        &mut inner_product,
+        20,
+        &weight_params(&[0.0, 0.0, 0.0, 0.0, 8.0, 8.0, 8.0, 8.0]),
+    );
+    push_message(&mut inner_product, 21, &weight_params(&[0.0, -64.0]));
+
+    let mut layer = Vec::new();
+    push_string(&mut layer, 1, "witsage.kmeans.centroid-score");
+    push_string(&mut layer, 2, INPUT_FEATURE);
+    push_string(&mut layer, 3, OUTPUT_FEATURE);
+    push_message(&mut layer, 140, &inner_product);
+
+    let mut network = Vec::new();
+    push_message(&mut network, 1, &layer);
+    model(description, network)
+}
+
 fn model(description: Vec<u8>, network: Vec<u8>) -> Vec<u8> {
     let mut model = Vec::new();
     push_varint_field(&mut model, 1, 1);
@@ -156,7 +187,8 @@ fn push_varint(out: &mut Vec<u8>, mut value: u64) {
 #[cfg(test)]
 mod tests {
     use super::{
-        witsage_dense_transform_model, witsage_vector_add_model, witsage_vector_affine_model,
+        witsage_dense_transform_model, witsage_kmeans_centroid_score_model,
+        witsage_vector_add_model, witsage_vector_affine_model,
     };
 
     #[test]
@@ -179,6 +211,14 @@ mod tests {
     fn emits_a_stable_multi_input_add_coreml_specification() {
         let first = witsage_vector_add_model();
         assert_eq!(first, witsage_vector_add_model());
+        assert!(first.len() > 100);
+        assert_eq!(first.first(), Some(&8));
+    }
+
+    #[test]
+    fn emits_a_stable_kmeans_centroid_score_coreml_specification() {
+        let first = witsage_kmeans_centroid_score_model();
+        assert_eq!(first, witsage_kmeans_centroid_score_model());
         assert!(first.len() > 100);
         assert_eq!(first.first(), Some(&8));
     }
@@ -313,6 +353,26 @@ mod tests {
         assert!(
             add_stdout.contains("output_hex=0000004100005041000090410000b841"),
             "{add_stdout}"
+        );
+
+        let kmeans_model = root.join("kmeans-centroid-score.mlmodel");
+        fs::write(&kmeans_model, witsage_kmeans_centroid_score_model()).unwrap();
+        let kmeans = Command::new(&binary)
+            .args([&kmeans_model])
+            .args(["--multi", "output.features", "1x1x2", "input.features"])
+            .arg(&affine_input)
+            .arg("1x1x4")
+            .output()
+            .unwrap();
+        let kmeans_stdout = String::from_utf8_lossy(&kmeans.stdout);
+        assert!(
+            kmeans.status.success(),
+            "{}",
+            String::from_utf8_lossy(&kmeans.stderr)
+        );
+        assert!(
+            kmeans_stdout.contains("output_hex=0000000000008041"),
+            "{kmeans_stdout}"
         );
         let _ = fs::remove_dir_all(root);
     }

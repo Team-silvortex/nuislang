@@ -3,6 +3,7 @@ mod artifact_device_sample;
 mod artifact_device_sample_pixelmagic;
 mod artifact_device_sample_pixelmagic_plan;
 mod artifact_device_sample_registration;
+mod artifact_device_sample_witsage;
 mod artifact_doctor;
 mod artifact_doctor_mirrors;
 mod artifact_doctor_render;

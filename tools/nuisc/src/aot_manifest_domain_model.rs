@@ -233,6 +233,7 @@ fn backend_target_device(backend: &str) -> Option<&'static str> {
         "metal" | "mps-graph" => Some("apple-gpu"),
         "coreml" => Some("apple-ane"),
         "vulkan" => Some("vulkan-device"),
+        "cuda" => Some("nvidia-gpu"),
         "directx" => Some("d3d12-device"),
         "webgpu" => Some("webgpu-device"),
         "opengl" => Some("opengl-device"),
@@ -268,6 +269,7 @@ fn kernel_artifact_metadata(
         ),
         "mps-graph" => ("mps-graph-json", "mps-graph-dispatch", 20),
         "vulkan" => ("spirv", "vulkan-compute-pipeline", 30),
+        "cuda" => ("ptx8.0", "cuda-driver-launch", 25),
         "cpu-fallback" => ("llvm-bitcode", "nuis-host-call", 900),
         _ => ("unknown", "unknown", 900),
     }

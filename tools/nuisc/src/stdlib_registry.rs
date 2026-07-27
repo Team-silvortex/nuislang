@@ -241,6 +241,8 @@ mod tests {
                 "contract.pixelmagic.texture-handoff.v1".to_owned(),
                 "contract.pixelmagic.shader-facing-image-prep.v1".to_owned(),
                 "contract.pixelmagic.render-plan.v1".to_owned(),
+                "contract.pixelmagic.provider-sample-input-registration.v1".to_owned(),
+                "contract.pixelmagic.filter-plan.v1".to_owned(),
                 "surface.pixelmagic.shader.contracts.v1".to_owned(),
                 "surface.pixelmagic.shader.packet-bridge.v1".to_owned(),
                 "surface.pixelmagic.shader.render.v1".to_owned(),

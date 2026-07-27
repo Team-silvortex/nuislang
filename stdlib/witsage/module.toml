@@ -12,7 +12,9 @@ surfaces = [
   "contract.witsage.kernel-plan.v1",
   "contract.witsage.preprocessing.v1",
   "contract.witsage.evaluation.v1",
-  "contract.witsage.pipeline.v1"
+  "contract.witsage.pipeline.v1",
+  "contract.witsage.output-comparison-profile.v1",
+  "contract.witsage.cluster-assignment.v1"
 ]
 
 library_modules = [
@@ -21,6 +23,11 @@ library_modules = [
 ]
 
 library_import_policy = "project-auto"
+
+provider_comparison_profiles = [
+  "provider-comparison-profiles/cross-provider-f32.nwcp",
+  "provider-comparison-profiles/model-predict-f32.nwcp"
+]
 
 source_modules = [
   "core/dataset_recipe.ns",

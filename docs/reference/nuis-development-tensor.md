@@ -240,7 +240,8 @@ Task-card selection uses the deterministic ordering
 `weakest-bootstrap-status-progress-path`; after closure it becomes
 `weakest-global-incomplete-status-progress-path`. Lower status maturity is
 weaker, progress breaks status ties, and the full coordinate makes selection
-stable when input registration order changes.
+stable when input registration order changes. When no incomplete coordinate
+remains, the source becomes `all-cells-complete` and lineage is clean but empty.
 
 The task-card also exposes a handoff bundle. When the weakest coordinate is the
 tensor itself, `weakest_bootstrap_task_card_handoff_mode` becomes
@@ -494,6 +495,16 @@ tampered expected assets, invalid policies, NaN/Inf under `reject`, and values
 outside tolerance all fail closed. The official M2 lane compares 65,536 dense
 elements plus both four-element affine outputs with zero mismatches.
 
+The cross-provider Metal request now sources its comparison policy from
+WitSage's checked-in
+`provider-comparison-profiles/cross-provider-f32.nwcp`. The
+`nuis-witsage-output-comparison-profile-v1` parser requires package identity,
+strictly positive finite absolute and relative tolerances, and
+`non_finite_policy=reject`. The request still carries the exact expected asset
+length and FNV hash, so tolerance applies only after the expected baseline has
+been authenticated. The deterministic M2 result remains an exact zero-error
+match, while the protocol can now safely admit bounded backend variance.
+
 `nuis-provider-request-dependency-v1` now binds a producer request/output
 buffer to a consumer input buffer. Nsdb validates request identity, unique
 edges, buffer names, acyclicity, and producer-before-consumer topology before
@@ -513,6 +524,18 @@ two-input Add request fans affine and chained-affine outputs into
 each request while leaving adapter choice to the registry. The official graph
 executes four CoreML requests, then transports Add output into a Metal `f32`
 bias kernel and compares `[11, 17, 23, 29]`.
+
+A sixth request adds a second classical model family without changing Nsdb or
+the CoreML runner. WitSage emits an `InnerProduct` model whose two outputs are
+nearest-centroid-equivalent scores `2c*x - ||c||^2`. For input
+`[1, 2, 3, 4]` and centroids `[0, 0, 0, 0]` / `[4, 4, 4, 4]`, real CoreML
+returns `[0, 16]`. Its `1x1x4` input and `1x1x2` output use the existing
+multi-input-shape runner protocol, while
+`witsage.model-predict.f32` independently supplies a hash-identified non-zero
+tolerance profile with `reject` non-finite policy. The request follows the
+Metal node, so the collection also proves CoreML worker reuse across the
+non-contiguous `CoreML -> Metal -> CoreML` order.
+
 `nuis-provider-edge-transport-v1` now binds that cross-adapter edge to an exact
 GLM ownership token, `host-visible-owned-file` staging mode, producer-completed
 clock, and consumer-dispatch-ready clock. Cross-provider dependencies without
@@ -716,15 +739,15 @@ capacity-bearing `NUISPWUH3` reply, with bounded socket I/O. Content cache
 entries remain shared, while each live adapter gets a
 separate transient restored executable directory; this avoids rewriting a
 running Mach-O image when a second backend starts, and all transient copies are
-removed after close. The five-request official WitSage/PixelMagic graph now
-proves CoreML worker order `0..3`, Metal worker order `0`, two-descriptor fan-in,
+removed after close. The seven-request official WitSage graph now proves CoreML
+worker order `0..4`, Metal worker order `0..1`, two-descriptor fan-in,
 cross-provider descriptor transfer, successful native comparisons, and one
-worker-owned output descriptor per request. The registered PixelMagic gray8 and
-WitSage f32 bias Metal adapters now cross that boundary: Nsdb materializes and
-hash-binds their adapter images, while persistent Nuis workers launch them with
-`path-fd` or `carrier-fd` input descriptors and return the real adapter protocol
-output. At that integration stage, CoreML model execution still used a
-parent-side compatibility path.
+worker-owned output descriptor per request. The registered PixelMagic gray8,
+WitSage f32 bias, and generic f32 argmax Metal adapters cross that boundary:
+Nsdb materializes and hash-binds their adapter images, while persistent Nuis
+workers launch them with `path-fd` or `carrier-fd` input descriptors and return
+the real adapter protocol output. At that integration stage, CoreML model
+execution still used a parent-side compatibility path.
 
 That earlier parent-side compatibility stage was fail-closed behind
 `nuis-provider-worker-dispatch-permit-v1`.
@@ -761,7 +784,7 @@ the frame layout, stored payload hash, computed payload hash, and whole-packet
 hash before restoring mmap-backed transferable ownership. The CoreML model path
 is independently FNV-verified before `execv`. Ordered feature/carrier/shape
 triples now also move two-input CoreML fan-in beneath the same worker lease, so
-all five official nodes execute through process-adapter v4. The next practical
+all seven official nodes execute through the worker process adapter. The next practical
 boundary was eliminating repeated clang compilation of identical adapter
 images.
 
@@ -770,8 +793,8 @@ adapter source, runner contract, ordered framework manifest, operating system,
 and architecture. The cache is graph-scoped: images are immutable while any
 request can execute them, then their source and executable files are removed at
 graph close instead of accumulating on disk. Official evidence requires the
-four CoreML requests to report `compiled,hit,hit,hit`; the distinct Metal
-source and contract report an independent `compiled` identity. Cache identity
+five CoreML requests to report `compiled,hit,hit,hit,hit`; the bias and argmax
+Metal contracts each report an independent `compiled` identity. Cache identity
 and status remain local Nsdb evidence rather than being copied into the worker
 request. This preserved the bounded worker frame after a real fan-in regression
 showed that extra line-oriented metadata could cross the macOS Unix datagram
@@ -1451,6 +1474,59 @@ idempotent once healthy. Nuis owns the structured `debug-lineage-repair`
 frontdoor while Nsdb remains the repair implementation owner; native execution
 remains outside this metadata-level debugger control.
 
+## Self-Hosting Phase Roadmap
+
+The tensor owns one required governance coordinate:
+
+`developer-system/dev-tensor/self-hosting-phase-roadmap`
+
+Its protocol is `nuis-self-hosting-phase-roadmap-v1`. It fixes three phase
+boundaries:
+
+* `foundation-readiness`
+  the remaining alpha line through `beta-0.9.*`; mainline work remains
+  foundation closure, bug fixing, performance optimization, and stability
+* `self-hosting-migration`
+  starts at `beta-0.10.*`; staged `stage0 -> stage1` compiler replacement
+  becomes a formal mainline objective
+* `self-hosting-completion`
+  targets `gamma-0.5.*`; `stage2` equivalence and a Nuis-owned compiler
+  mainline close the roughly fifteen-minor migration horizon
+
+The coordinate is `stable/100` because the roadmap and its boundaries are
+agreed and machine-visible. That score does not claim that compiler
+self-hosting has already started or completed. Until `beta-0.10.*`, concrete
+work continues to be selected from the existing language, std, binary,
+linker, runtime, and developer-system coordinates.
+
+## Linux CUDA Provider Bring-Up
+
+The next heterogeneous coordinate is:
+
+`heterogeneous-runtime/linux-cuda/cuda-provider-bringup`
+
+Its first protocol is `nuis-linux-cuda-host-probe-v1`. The repository-owned
+probe separates PTX compiler readiness from driver/device launch readiness.
+The first x86_64 Linux host emits PTX 8.0 for an `sm_89` vector-add kernel. A
+maintenance reboot repaired the discovered driver mismatch, and the independent
+`nuis-cuda-runtime-smoke-v1` fixture now proves real allocation, transfer,
+launch, synchronization, readback, and `[11,22,33,44]` comparison.
+
+The coordinate is `active/40`, not device-provider-ready. Kernel Nustar now
+registers `kernel.cuda.ptx8_0.v1`, YIR emits a CUDA backend variant, and AOT
+produces deterministic PTX 8.0 with both an internal source hash and the
+existing payload/artifact hash envelope. The exact sidecar PTX assembles and
+executes through the CUDA Driver API on the real device with
+`[11,22,33,44]` output.
+
+Its next slice is a manifest-owned CUDA provider bundle and persistent-worker
+runner. Provider-managed device memory, completion clocks, GLM release, and
+Nsld payload closure remain explicit subsequent slices.
+
+See
+[linux-cuda-provider-bringup.md](linux-cuda-provider-bringup.md)
+for the host-neutral probe command and bring-up order.
+
 ## Current Role
 
 The first implementation is static and intentionally conservative. It is not a
@@ -1470,6 +1546,9 @@ The first useful jobs are:
   a human to reread the whole roadmap
 * give alpha milestones a structured progress vocabulary before beta
   self-hosting pressure grows
+* preserve the foundation-through-`beta-0.9.*`, migration-from-`beta-0.10.*`,
+  and completion-at-`gamma-0.5.*` self-hosting route without confusing roadmap
+  agreement with implementation completion
 
 ## Current Honesty Boundary
 

@@ -5,7 +5,47 @@ use crate::aot_domain_profile::{
     kernel_registered_lane_groups_for_profile, kernel_supported_dispatch_kinds_for_profile,
     render_schedule_contract_fields, render_target_specific_backend_fields,
 };
+use crate::aot_encoding::fnv1a64_hex;
 use crate::aot_toml::{escape_toml_string, render_string_array};
+
+const CUDA_PTX_VECTOR_ADD_F32: &str = r#".version 8.0
+.target sm_80
+.address_size 64
+
+.visible .entry nuis_kernel_vector_add_f32(
+    .param .u64 input_lhs,
+    .param .u64 input_rhs,
+    .param .u64 output,
+    .param .u32 element_count
+)
+{
+    .reg .pred %p<2>;
+    .reg .b32 %r<6>;
+    .reg .b64 %rd<8>;
+    .reg .f32 %f<4>;
+
+    ld.param.u64 %rd1, [input_lhs];
+    ld.param.u64 %rd2, [input_rhs];
+    ld.param.u64 %rd3, [output];
+    ld.param.u32 %r1, [element_count];
+    mov.u32 %r2, %ctaid.x;
+    mov.u32 %r3, %ntid.x;
+    mov.u32 %r4, %tid.x;
+    mad.lo.s32 %r5, %r2, %r3, %r4;
+    setp.ge.u32 %p1, %r5, %r1;
+    @%p1 bra DONE;
+    mul.wide.u32 %rd4, %r5, 4;
+    add.s64 %rd5, %rd1, %rd4;
+    add.s64 %rd6, %rd2, %rd4;
+    add.s64 %rd7, %rd3, %rd4;
+    ld.global.f32 %f1, [%rd5];
+    ld.global.f32 %f2, [%rd6];
+    add.rn.f32 %f3, %f1, %f2;
+    st.global.f32 [%rd7], %f3;
+DONE:
+    ret;
+}
+"#;
 
 pub(crate) fn render_domain_build_unit_kernel_ir_sidecar(
     unit: &BuildManifestDomainBuildUnit,
@@ -115,6 +155,17 @@ pub(crate) fn render_domain_build_unit_kernel_ir_sidecar(
                 "validation_contracts = [\"glm.buffer-lifetime\", \"time.compute-fence\", \"spirv.compute-layout\"]\n",
             );
         }
+        "cuda.nvidia-gpu" => {
+            out.push_str("frontend_ir = \"nuis-yir.kernel\"\n");
+            out.push_str("native_ir = \"ptx8.0\"\n");
+            out.push_str("tensor_lowering = \"global-memory-tensor-view\"\n");
+            out.push_str("dispatch_lowering = \"grid-block-thread\"\n");
+            out.push_str("memory_lowering = \"cuda-device-buffer\"\n");
+            out.push_str("result_lowering = \"device-buffer-result\"\n");
+            out.push_str(
+                "validation_contracts = [\"glm.device-buffer-lifetime\", \"time.cuda-event\", \"ptx.address-space\"]\n",
+            );
+        }
         "cpu-fallback.cpu-host" => {
             out.push_str("frontend_ir = \"nuis-yir.kernel\"\n");
             out.push_str("native_ir = \"host-simd\"\n");
@@ -167,6 +218,28 @@ pub(crate) fn render_domain_build_unit_kernel_ir_sidecar(
             out.push_str(
                 "indirect_body = \"OpEntryPoint GLCompute %main_indirect \\\"main_indirect\\\"\"\n",
             );
+        }
+        "cuda.nvidia-gpu" => {
+            out.push_str("primary = \"grid\"\n");
+            out.push_str("fallback = \"batch\"\n");
+            out.push_str("[resource_bindings]\n");
+            out.push_str("binding_table = \"param.input_lhs, param.input_rhs, param.output\"\n");
+            out.push_str("argument_model = \"cuda-parameter-buffer\"\n");
+            out.push_str("[entry_points]\n");
+            out.push_str("grid = \"nuis_kernel_vector_add_f32\"\n");
+            out.push_str("batch = \"nuis_kernel_vector_add_f32\"\n");
+            out.push_str("[source_stub]\n");
+            out.push_str("language = \"ptx\"\n");
+            out.push_str("version = \"8.0\"\n");
+            out.push_str("virtual_arch = \"sm_80\"\n");
+            out.push_str(&format!(
+                "source_fnv1a64 = \"{}\"\n",
+                fnv1a64_hex(CUDA_PTX_VECTOR_ADD_F32.as_bytes())
+            ));
+            out.push_str(&format!(
+                "ptx_body = \"{}\"\n",
+                escape_toml_string(CUDA_PTX_VECTOR_ADD_F32)
+            ));
         }
         "cpu-fallback.cpu-host" => {
             out.push_str("primary = \"range\"\n");

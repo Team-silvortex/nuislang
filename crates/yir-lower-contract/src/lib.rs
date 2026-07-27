@@ -365,6 +365,31 @@ kernel.print trace kernel0 top_rows
     }
 
     #[test]
+    fn kernel_contract_exposes_cuda_ptx_variant_without_provider_coupling() {
+        let module = parse_module(
+            r#"yir 0.1
+
+resource kernel0 kernel.cuda
+
+kernel.target_config profile kernel0 nvidia_gpu cuda 256
+kernel.tensor lhs kernel0 1 4 1,2,3,4
+kernel.tensor rhs kernel0 1 4 10,20,30,40
+kernel.add output kernel0 lhs rhs
+"#,
+        );
+
+        let contract = analyze_kernel_lowering(&module);
+        assert!(contract.has_backend_eligible_work());
+        assert!(!contract.requires_cpu_fallback());
+        let manifest = contract.render_package_manifest();
+        assert!(manifest.contains("backend = \"cuda\""));
+        assert!(manifest.contains("target_device = \"nvidia-gpu\""));
+        assert!(manifest.contains("ir_format = \"ptx8.0\""));
+        assert!(manifest.contains("dispatch_abi = \"cuda-driver-launch\""));
+        assert!(manifest.contains("artifact = \"cuda/"));
+    }
+
+    #[test]
     fn shader_contract_extracts_fragment_shader_ir() {
         let module = parse_module(
             r#"yir 0.1
