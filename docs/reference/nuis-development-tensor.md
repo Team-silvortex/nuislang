@@ -1512,16 +1512,39 @@ maintenance reboot repaired the discovered driver mismatch, and the independent
 `nuis-cuda-runtime-smoke-v1` fixture now proves real allocation, transfer,
 launch, synchronization, readback, and `[11,22,33,44]` comparison.
 
-The coordinate is `active/40`, not device-provider-ready. Kernel Nustar now
+The coordinate is `active/75`, not final-image-provider-ready. Kernel Nustar now
 registers `kernel.cuda.ptx8_0.v1`, YIR emits a CUDA backend variant, and AOT
 produces deterministic PTX 8.0 with both an internal source hash and the
 existing payload/artifact hash envelope. The exact sidecar PTX assembles and
 executes through the CUDA Driver API on the real device with
 `[11,22,33,44]` output.
 
-Its next slice is a manifest-owned CUDA provider bundle and persistent-worker
-runner. Provider-managed device memory, completion clocks, GLM release, and
-Nsld payload closure remain explicit subsequent slices.
+Kernel Nustar also owns `cuda.nvidia-gpu.bundle.v1`. The generated provider
+manifest now contains four sorted bundles and cross-binds the CUDA family,
+runner profile, execution adapter, and Rust static registration without adding
+CUDA branches to either generic selector. The execution registration now
+materializes a content-addressed 64-bit Linux Driver ABI adapter only on a
+probe-ready CUDA host.
+
+The provider-neutral `nuis-provider-code-asset-descriptor-v1` now carries
+format, target, visible entry, package-relative path, byte length, digest
+contract, and content hash through both single and collection requests.
+Partial descriptors, absolute or traversing paths, and malformed FNV bindings
+fail closed. `nuis-kernel-code-asset-registry-v1` is now the single authority
+for the CUDA PTX bytes, target, entry, package-relative file name, and digest
+contract. AOT materializes the pure PTX file without an external compiler.
+The `official.kernel` input registration verifies those emitted bytes and
+produces an Nsdb-validated vector-add request with two ordered f32 artifact
+inputs, one compared output, and an explicit CUDA adapter binding. The Linux
+runner now executes that request beneath the normal persistent Nuis worker,
+dynamically resolves `libcuda.so.1` without CUDA headers or SDK linkage, loads
+the hash-bound PTX, launches vector-add on a real RTX 4050, writes the result
+into the worker-owned `NUISPFD1` descriptor, passes exact output comparison,
+and closes the graph-owned result. Remaining work is to promote CUDA
+clock/GLM release evidence into independent records and carry this provider
+identity through the Nsld final-image closure. NVIDIA
+`nvcc`/`ptxas` remain optional differential-validation tools and must not become
+build, packaging, deployment, or runtime requirements.
 
 See
 [linux-cuda-provider-bringup.md](linux-cuda-provider-bringup.md)

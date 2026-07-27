@@ -1,4 +1,5 @@
 use crate::{
+    provider_code_asset::PROVIDER_CODE_ASSET_DESCRIPTOR_CONTRACT,
     provider_edge_transport::PROVIDER_EDGE_TRANSPORT_CONTRACT,
     provider_request::{
         provider_request_collection_from_evidence, provider_request_from_evidence, ProviderRequest,
@@ -297,6 +298,24 @@ fn push_provider_request_summary(out: &mut String, request: &ProviderRequest) {
             "provider_model_asset_output_feature",
             &model.output_feature,
         );
+    }
+    if let Some(asset) = &request.code_asset {
+        for (name, value) in [
+            (
+                "descriptor_contract",
+                PROVIDER_CODE_ASSET_DESCRIPTOR_CONTRACT.to_owned(),
+            ),
+            ("id", asset.id.clone()),
+            ("format", asset.format.clone()),
+            ("target", asset.target.clone()),
+            ("entry", asset.entry.clone()),
+            ("path", asset.path.clone()),
+            ("byte_length", asset.byte_length.to_string()),
+            ("digest_contract", asset.digest_contract.clone()),
+            ("content_hash", asset.content_hash.clone()),
+        ] {
+            push_toml_string(out, &format!("provider_code_asset_{name}"), &value);
+        }
     }
     if !request.output_comparisons.is_empty() {
         push_toml_string(

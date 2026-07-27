@@ -20,6 +20,7 @@ mod provider_carrier_channel_registry;
 #[cfg(unix)]
 mod provider_carrier_channel_unix;
 mod provider_carrier_input;
+mod provider_code_asset;
 mod provider_completion_dispatch;
 mod provider_completion_integrity;
 mod provider_completion_signature;
@@ -32,6 +33,8 @@ mod provider_execution_adapter;
 mod provider_execution_capsule;
 #[cfg(unix)]
 mod provider_execution_coreml;
+#[cfg(unix)]
+mod provider_execution_cuda;
 #[cfg(unix)]
 mod provider_execution_metal;
 #[cfg(unix)]
@@ -49,6 +52,7 @@ mod provider_process_adapter;
 mod provider_request;
 mod provider_request_payload;
 mod provider_runner_coreml;
+mod provider_runner_cuda;
 mod provider_runner_metal;
 mod provider_runner_native;
 mod provider_runner_registry;
@@ -561,7 +565,6 @@ fn run() -> Result<(), String> {
     }
     Ok(())
 }
-
 #[cfg(test)]
 mod tests {
     use super::{provider_sample_execute_json, provider_sample_materialize_json};
@@ -569,7 +572,6 @@ mod tests {
         provider_sample_execute::ProviderSampleExecuteReport,
         provider_sample_materialize::ProviderSampleMaterializeReport,
     };
-
     #[test]
     fn materialize_provider_samples_json_exposes_provider_family_discovery() {
         let report = ProviderSampleMaterializeReport {
@@ -629,9 +631,7 @@ mod tests {
             return_command: "nsld check out --json".to_owned(),
             final_output_replay_contract: "nsdb-payload-execution-replay-plan-v1".to_owned(),
         };
-
         let json = provider_sample_materialize_json(&report);
-
         assert!(json.contains("\"provider_family_filter\":\"metal:apple-silicon-gpu\""));
         assert!(json
             .contains("\"provider_families\":[\"metal:apple-silicon-gpu\",\"spirv:vulkan-gpu\"]"));
@@ -696,7 +696,6 @@ mod tests {
             "\"final_output_replay_contract\":\"nsdb-payload-execution-replay-plan-v1\""
         ));
     }
-
     #[test]
     fn execute_provider_samples_json_exposes_runner_boundary() {
         let report = ProviderSampleExecuteReport {

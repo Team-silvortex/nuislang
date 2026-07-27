@@ -112,7 +112,7 @@ materialization_status = "provider-sample-materialized"
         report.provider_bundle_manifest_contract,
         "nuis-provider-bundle-manifest-v1"
     );
-    assert_eq!(report.provider_bundle_manifest_entry_count, 3);
+    assert_eq!(report.provider_bundle_manifest_entry_count, 4);
     assert_eq!(report.first_provider_bundle_package_id, "official.data");
     assert_eq!(report.first_provider_bundle_id, "data.host.bundle.v1");
     assert_eq!(
@@ -140,7 +140,7 @@ materialization_status = "provider-sample-materialized"
         .contains("provider_bundle_registry_contract = \"nuis-provider-bundle-registry-v1\""));
     assert!(payload
         .contains("provider_bundle_manifest_contract = \"nuis-provider-bundle-manifest-v1\""));
-    assert!(payload.contains("provider_bundle_manifest_entry_count = 3"));
+    assert!(payload.contains("provider_bundle_manifest_entry_count = 4"));
     assert!(payload.contains("provider_bundle_package_id = \"official.data\""));
     assert!(payload.contains("provider_bundle_id = \"data.host.bundle.v1\""));
     assert!(payload.contains(
@@ -198,6 +198,169 @@ materialization_status = "provider-sample-materialized"
                 "native_output_graph_output_release_roles = \"output.primary,output.audit\""
             )
     );
+
+    fs::remove_dir_all(output_dir).unwrap();
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn executes_registered_cuda_ptx_through_persistent_worker() {
+    if (crate::provider_runner_cuda::RUNNER_PROFILE.probe_status)()
+        != crate::provider_runner_cuda::RUNNER_PROFILE.available_probe_status
+    {
+        return;
+    }
+    let nonce = TEST_NONCE.fetch_add(1, Ordering::Relaxed);
+    let output_dir = env::temp_dir().join(format!(
+        "nsdb-provider-cuda-frontdoor-{}-{nonce}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&output_dir).unwrap();
+    let left = [
+        0x00, 0x00, 0x80, 0x3f, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x40, 0x40, 0x00, 0x00, 0x80,
+        0x40,
+    ];
+    let right = [
+        0x00, 0x00, 0x20, 0x41, 0x00, 0x00, 0xa0, 0x41, 0x00, 0x00, 0xf0, 0x41, 0x00, 0x00, 0x20,
+        0x42,
+    ];
+    let expected = [
+        0x00, 0x00, 0x30, 0x41, 0x00, 0x00, 0xb0, 0x41, 0x00, 0x00, 0x04, 0x42, 0x00, 0x00, 0x30,
+        0x42,
+    ];
+    let asset = nuisc::kernel_code_asset::select_kernel_code_asset("cuda.nvidia-gpu").unwrap();
+    fs::write(output_dir.join("left.f32.bin"), left).unwrap();
+    fs::write(output_dir.join("right.f32.bin"), right).unwrap();
+    fs::write(output_dir.join("expected.f32.bin"), expected).unwrap();
+    fs::write(output_dir.join(asset.file_name), asset.bytes).unwrap();
+    let evidence = format!(
+        "provider_buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;\
+provider_buffer_id=input.left;\
+provider_buffer_element_type=f32;\
+provider_buffer_layout=tensor-contiguous;\
+provider_buffer_shape=4;\
+provider_buffer_row_stride_bytes=16;\
+provider_buffer_byte_length=16;\
+provider_buffer_payload_path=left.f32.bin;\
+provider_buffer_content_hash={};\
+provider_kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;\
+provider_kernel_id=kernel.cuda.vector-add.f32;\
+provider_kernel_operation=vector-add;\
+provider_kernel_input_buffer=input.left;\
+provider_kernel_input_buffers=input.left,input.right;\
+provider_kernel_output_buffer=output.values;\
+provider_kernel_dispatch=4x1x1;\
+provider_kernel_scalar_bindings=element_count:u32:4;\
+provider_code_asset_descriptor_contract=nuis-provider-code-asset-descriptor-v1;\
+provider_code_asset_id={};\
+provider_code_asset_format={};\
+provider_code_asset_target={};\
+provider_code_asset_entry={};\
+provider_code_asset_path={};\
+provider_code_asset_byte_length={};\
+provider_code_asset_digest_contract={};\
+provider_code_asset_content_hash={};\
+provider_output_binding_contract=nuis-provider-output-binding-v1;\
+provider_output_binding_count=1;\
+provider_output_binding_0_role=output.result;\
+provider_output_binding_0_buffer=output.values;\
+provider_output_binding_0_element_type=f32;\
+provider_output_binding_0_shape=4;\
+provider_output_binding_0_byte_length=16;\
+provider_output_binding_0_comparison_id=comparison.output;\
+provider_output_comparison_id=comparison.output;\
+provider_output_comparison_descriptor_contract=nuis-provider-output-comparison-descriptor-v1;\
+provider_output_comparison_output_buffer=output.values;\
+provider_output_comparison_element_type=f32;\
+provider_output_comparison_shape=4;\
+provider_output_comparison_expected_path=expected.f32.bin;\
+provider_output_comparison_expected_byte_length=16;\
+provider_output_comparison_expected_content_hash={};\
+provider_output_comparison_absolute_tolerance=0;\
+provider_output_comparison_relative_tolerance=0;\
+provider_output_comparison_non_finite_policy=reject;\
+provider_input_binding_contract=nuis-provider-input-binding-v1;\
+provider_input_binding_count=2;\
+provider_input_binding_0_name=input.left;\
+provider_input_binding_0_source=artifact;\
+provider_input_binding_0_element_type=f32;\
+provider_input_binding_0_shape=4;\
+provider_input_binding_0_byte_length=16;\
+provider_input_binding_0_content_hash={};\
+provider_input_binding_0_payload_path=left.f32.bin;\
+provider_input_binding_0_producer_request_id=none;\
+provider_input_binding_0_producer_output_buffer=none;\
+provider_input_binding_1_name=input.right;\
+provider_input_binding_1_source=artifact;\
+provider_input_binding_1_element_type=f32;\
+provider_input_binding_1_shape=4;\
+provider_input_binding_1_byte_length=16;\
+provider_input_binding_1_content_hash={};\
+provider_input_binding_1_payload_path=right.f32.bin;\
+provider_input_binding_1_producer_request_id=none;\
+provider_input_binding_1_producer_output_buffer=none;\
+provider_adapter_binding_contract=nuis-provider-request-adapter-binding-v1;\
+provider_adapter_binding_provider_family=cuda:nvidia-gpu;\
+provider_adapter_binding_execution_requirement=real-device",
+        fnv1a64_hex(&left),
+        asset.id,
+        asset.format,
+        asset.target,
+        asset.entry,
+        asset.file_name,
+        asset.bytes.len(),
+        asset.digest_contract,
+        fnv1a64_hex(asset.bytes),
+        fnv1a64_hex(&expected),
+        fnv1a64_hex(&left),
+        fnv1a64_hex(&right),
+    );
+    let manifest = format!(
+        r#"protocol = "nuis-device-provider-samples-v1"
+schema = "nsdb-yir-device-provider-sample-v1"
+source = "provider-cuda-frontdoor-test"
+status = "ready"
+record_count = 1
+ready_record_count = 1
+pending_record_count = 0
+
+[[device_provider_samples]]
+trace_id = "hetero-trace:kernel:cuda:nvidia-gpu"
+provider = "kernel-cuda-worker-test"
+provider_family = "cuda:nvidia-gpu"
+provider_runner_adapter_id = "cuda.nvidia-gpu.real-device"
+input_evidence = "{evidence}"
+materialization_status = "provider-sample-materialized"
+"#
+    );
+    fs::write(
+        output_dir.join("nuis.nsdb.device-provider-samples.toml"),
+        manifest,
+    )
+    .unwrap();
+
+    let report = execute_provider_samples(&output_dir, Some("cuda:nvidia-gpu")).unwrap();
+    let payload =
+        fs::read_to_string(output_dir.join("nuis.nsdb.provider-output.cuda-nvidia-gpu.toml"))
+            .unwrap();
+    assert_eq!(report.output_payload_count, 1);
+    assert_eq!(
+        report.first_output_payload_native_execution_contract,
+        "nuis-cuda-ptx-driver-provider-execution-v1"
+    );
+    assert_eq!(
+        report.first_output_payload_native_execution_status,
+        "cuda-driver-kernel-completed"
+    );
+    assert_eq!(
+        report.first_output_payload_native_output_hash,
+        fnv1a64_hex(&expected)
+    );
+    assert!(payload.contains(
+        "native_output_worker_execution_capsule_invocation_mode = \"nuis-provider-worker-process-adapter-v5\""
+    ));
+    assert!(payload.contains("native_output_comparison_status = \"comparison-passed\""));
+    assert!(payload.contains("native_output_graph_output_release_count = \"1\""));
 
     fs::remove_dir_all(output_dir).unwrap();
 }

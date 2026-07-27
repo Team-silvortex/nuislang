@@ -58,11 +58,31 @@ impl ProviderProcessAdapterCache {
         source: &str,
         contract: &'static str,
     ) -> Result<ResolvedProviderProcessAdapter<'_>, String> {
-        let identity = process_adapter_cache_identity(source, contract, &["abi:c"]);
+        self.resolve_c_with_libraries(stem, source, contract, &[])
+    }
+
+    pub(crate) fn resolve_c_with_libraries(
+        &mut self,
+        stem: &str,
+        source: &str,
+        contract: &'static str,
+        libraries: &[&str],
+    ) -> Result<ResolvedProviderProcessAdapter<'_>, String> {
+        if libraries.iter().any(|library| {
+            library.is_empty()
+                || !library
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+        }) {
+            return Err("C ABI provider adapter library name is invalid".to_owned());
+        }
+        let mut identity_features = vec!["abi:c"];
+        identity_features.extend(libraries.iter().copied());
+        let identity = process_adapter_cache_identity(source, contract, &identity_features);
         let cache_status = if self.images.contains_key(&identity) {
             "hit"
         } else {
-            let image = compile_c_process_adapter(stem, source, contract)?;
+            let image = compile_c_process_adapter(stem, source, contract, libraries)?;
             self.images.insert(identity.clone(), image);
             "compiled"
         };
@@ -160,6 +180,7 @@ fn compile_c_process_adapter(
     stem: &str,
     source: &str,
     contract: &'static str,
+    libraries: &[&str],
 ) -> Result<PreparedProviderProcessAdapter, String> {
     let nonce = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
@@ -172,10 +193,12 @@ fn compile_c_process_adapter(
     fs::write(&source_path, source)
         .map_err(|error| format!("failed to materialize provider adapter source: {error}"))?;
     let compiler = std::env::var_os("CC").unwrap_or_else(|| "cc".into());
-    let compile = Command::new(compiler)
-        .arg(&source_path)
-        .arg("-o")
-        .arg(&executable_path)
+    let mut command = Command::new(compiler);
+    command.arg(&source_path).arg("-o").arg(&executable_path);
+    for library in libraries {
+        command.arg(format!("-l{library}"));
+    }
+    let compile = command
         .output()
         .map_err(|error| format!("failed to launch C ABI adapter compiler: {error}"))?;
     if !compile.status.success() {
@@ -241,6 +264,28 @@ mod tests {
         assert_eq!(second.cache_status, "hit");
         assert_eq!(second.cache_identity, first_identity);
     }
+
+    #[test]
+    fn portable_c_adapter_cache_binds_declared_system_libraries() {
+        let plain =
+            process_adapter_cache_identity("int main(void) { return 0; }", "contract", &["abi:c"]);
+        let with_dl = process_adapter_cache_identity(
+            "int main(void) { return 0; }",
+            "contract",
+            &["abi:c", "dl"],
+        );
+        assert_ne!(plain, with_dl);
+
+        let mut cache = ProviderProcessAdapterCache::default();
+        assert!(cache
+            .resolve_c_with_libraries(
+                "invalid-library",
+                "int main(void) { return 0; }",
+                "contract",
+                &["../dl"],
+            )
+            .is_err());
+    }
 }
 
 impl Drop for PreparedProviderProcessAdapter {
@@ -250,7 +295,7 @@ impl Drop for PreparedProviderProcessAdapter {
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(unix)]
 pub(crate) fn worker_descriptor_argument(
     input: &PreparedProviderInput,
     descriptor_index: usize,
@@ -334,6 +379,28 @@ pub(crate) fn validate_provider_model_asset(
         return Err("provider model asset size/hash evidence mismatch".to_owned());
     }
     Ok(model_path)
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) fn validate_provider_code_asset(
+    output_dir: &Path,
+    request: &ProviderRequest,
+) -> Result<PathBuf, String> {
+    let asset = request
+        .code_asset
+        .as_ref()
+        .ok_or_else(|| "provider request is missing a code asset descriptor".to_owned())?;
+    let asset_path = resolve_provider_payload_path(output_dir, &asset.path)?;
+    let asset_bytes = fs::read(&asset_path).map_err(|error| {
+        format!(
+            "failed to read provider code asset `{}`: {error}",
+            asset_path.display()
+        )
+    })?;
+    if asset_bytes.len() != asset.byte_length || fnv1a64_hex(&asset_bytes) != asset.content_hash {
+        return Err("provider code asset size/hash evidence mismatch".to_owned());
+    }
+    Ok(asset_path)
 }
 
 pub(crate) fn provider_output_manifest(request: &ProviderRequest) -> (Vec<String>, Vec<usize>) {

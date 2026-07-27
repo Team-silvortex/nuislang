@@ -377,6 +377,7 @@ fn requested_provider_runner_for(provider_family: &str) -> RequestedProviderRunn
     let adapter_id = match provider_family {
         "metal:apple-silicon-gpu" => "metal.apple-silicon-gpu.host-simulated",
         "coreml:apple-ane" => "coreml.apple-ane.host-simulated",
+        "cuda:nvidia-gpu" => "cuda.nvidia-gpu.host-simulated",
         _ => "generic.device.host-simulated",
     };
     RequestedProviderRunner {

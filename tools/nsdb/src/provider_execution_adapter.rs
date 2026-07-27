@@ -77,7 +77,7 @@ mod tests {
             .iter()
             .map(|bundle| &bundle.execution_adapter)
             .collect::<Vec<_>>();
-        assert!(registrations.len() >= 3);
+        assert!(registrations.len() >= 4);
         assert!(registrations.iter().all(|registration| {
             registration.registry_contract == PROVIDER_EXECUTION_ADAPTER_REGISTRY_CONTRACT
         }));
@@ -87,6 +87,7 @@ mod tests {
             .collect::<std::collections::BTreeSet<_>>();
         assert_eq!(kinds.len(), registrations.len());
         assert!(select_provider_execution_adapter("metal-real-device-runner").is_some());
+        assert!(select_provider_execution_adapter("cuda-ptx-real-device-runner").is_some());
         assert!(select_provider_execution_adapter("missing-runner").is_none());
     }
 

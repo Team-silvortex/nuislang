@@ -242,7 +242,7 @@ mod tests {
             PROVIDER_BUNDLE_MANIFEST_HASH
         );
         let bundles = provider_bundle_registrations();
-        assert!(bundles.len() >= 3);
+        assert!(bundles.len() >= 4);
         assert!(bundles.iter().all(|bundle| {
             bundle.registry_contract == PROVIDER_BUNDLE_REGISTRY_CONTRACT
                 && bundle.runner_profile.registry_contract
@@ -293,5 +293,24 @@ mod tests {
         assert_eq!(evidence.count, 2);
         assert_eq!(evidence.hash, "fnv1a64:0126ed9d38f1895f");
         assert_ne!(evidence.hash, reversed.hash);
+    }
+
+    #[test]
+    fn cuda_bundle_is_manifest_owned_and_cross_bound() {
+        let bundle = select_provider_bundle_by_family("cuda:nvidia-gpu").unwrap();
+        let evidence = provider_bundle_evidence("cuda:nvidia-gpu").unwrap();
+
+        assert_eq!(bundle.bundle_id, "cuda.nvidia-gpu.bundle.v1");
+        assert_eq!(
+            bundle.runner_profile.available_adapter.adapter_id,
+            "cuda.nvidia-gpu.real-device"
+        );
+        assert_eq!(evidence.package_id, "official.kernel");
+        assert_eq!(evidence.bundle_id, bundle.bundle_id);
+        #[cfg(unix)]
+        assert_eq!(
+            bundle.execution_adapter.adapter_kind,
+            "cuda-ptx-real-device-runner"
+        );
     }
 }

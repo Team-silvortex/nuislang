@@ -1,5 +1,6 @@
 mod artifact_coreml_model;
 mod artifact_device_sample;
+mod artifact_device_sample_kernel;
 mod artifact_device_sample_pixelmagic;
 mod artifact_device_sample_pixelmagic_plan;
 mod artifact_device_sample_registration;
@@ -44,6 +45,7 @@ mod dev_tensor_drift;
 mod dev_tensor_drift_data;
 mod dev_tensor_drift_data_core;
 mod dev_tensor_drift_data_runtime;
+mod dev_tensor_drift_data_runtime_cuda;
 mod dev_tensor_drift_data_runtime_dev;
 mod dev_tensor_drift_data_runtime_dev_lineage;
 mod dev_tensor_drift_data_runtime_dispatch_capability;

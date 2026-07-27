@@ -98,6 +98,58 @@ pub(crate) fn write_domain_build_unit_stubs(
                 ir_sidecar_path,
             ));
         }
+        if let Some(code_asset) = write_registered_domain_code_asset(
+            output_dir,
+            &unit.domain_family,
+            unit.selected_lowering_target.as_deref(),
+        )? {
+            artifacts.push(code_asset);
+        }
     }
     Ok(artifacts)
+}
+
+fn write_registered_domain_code_asset(
+    output_dir: &Path,
+    domain_family: &str,
+    lowering_target: Option<&str>,
+) -> Result<Option<(String, PathBuf)>, String> {
+    if domain_family != "kernel" {
+        return Ok(None);
+    }
+    let Some(asset) = lowering_target.and_then(crate::kernel_code_asset::select_kernel_code_asset)
+    else {
+        return Ok(None);
+    };
+    let path = output_dir.join(asset.file_name);
+    fs::write(&path, asset.bytes)
+        .map_err(|error| format!("failed to write `{}`: {error}", path.display()))?;
+    Ok(Some((format!("domain_code_asset_{domain_family}"), path)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn materializes_registered_cuda_ptx_without_external_compiler() {
+        let output_dir =
+            std::env::temp_dir().join(format!("nuisc-kernel-code-asset-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&output_dir);
+        fs::create_dir_all(&output_dir).unwrap();
+        let (kind, path) =
+            write_registered_domain_code_asset(&output_dir, "kernel", Some("cuda.nvidia-gpu"))
+                .unwrap()
+                .expect("CUDA code asset");
+        let asset = crate::kernel_code_asset::select_kernel_code_asset("cuda.nvidia-gpu").unwrap();
+        assert_eq!(kind, "domain_code_asset_kernel");
+        assert_eq!(path.file_name().unwrap(), asset.file_name);
+        assert_eq!(fs::read(&path).unwrap(), asset.bytes);
+        assert!(
+            write_registered_domain_code_asset(&output_dir, "shader", Some("cuda.nvidia-gpu"))
+                .unwrap()
+                .is_none()
+        );
+        fs::remove_dir_all(output_dir).unwrap();
+    }
 }

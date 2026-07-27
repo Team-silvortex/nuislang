@@ -24,9 +24,10 @@ use crate::provider_runner_registry::{
     framework_probe_status, ProviderRunnerAdapter, ProviderRunnerProfile,
     PROVIDER_RUNNER_PROFILE_REGISTRY_CONTRACT,
 };
-use std::{ffi::OsStr, path::Path};
+use std::path::Path;
 #[cfg(target_os = "macos")]
 use std::{
+    ffi::OsStr,
     fs,
     path::PathBuf,
     process::{Command, Stdio},
@@ -625,10 +626,13 @@ impl Drop for TempMetalRunnerPaths {
 
 #[cfg(test)]
 mod tests {
+    use super::parse_metal_runner_output;
+    #[cfg(target_os = "macos")]
     use super::{
         execute_f32_argmax_input, execute_f32_bias_input, execute_gray8_invert,
-        execute_gray8_threshold, parse_metal_runner_output,
+        execute_gray8_threshold,
     };
+    #[cfg(target_os = "macos")]
     use crate::provider_carrier_input::ProviderCarrierInput;
 
     #[test]

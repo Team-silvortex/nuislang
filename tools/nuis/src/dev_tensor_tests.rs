@@ -41,7 +41,7 @@ fn task_selection_advances_to_linux_cuda_after_previous_cells_close() {
         "heterogeneous-runtime/linux-cuda/cuda-provider-bringup"
     );
     assert_eq!(selected.status, "active");
-    assert_eq!(selected.progress, 40);
+    assert_eq!(selected.progress, 75);
 }
 
 #[test]

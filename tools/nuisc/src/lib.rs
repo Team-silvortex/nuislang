@@ -90,6 +90,7 @@ pub mod frontend;
 mod host_ffi_index;
 mod inspect_report;
 mod json_report;
+pub mod kernel_code_asset;
 #[cfg(test)]
 mod lib_tests;
 mod link_report;

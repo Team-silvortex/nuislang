@@ -72,6 +72,32 @@ fn parses_hash_bound_model_asset_descriptor() {
 }
 
 #[test]
+fn parses_hash_bound_provider_code_asset_descriptor() {
+    let evidence = format!(
+        "{REGISTERED};provider_code_asset_descriptor_contract={};provider_code_asset_id=kernel.vector-add;provider_code_asset_format=ptx;provider_code_asset_target=sm_80;provider_code_asset_entry=nuis_kernel_vector_add_f32;provider_code_asset_path=payload/kernel.ptx;provider_code_asset_byte_length=512;provider_code_asset_digest_contract={};provider_code_asset_content_hash=0x0123456789abcdef",
+        crate::provider_code_asset::PROVIDER_CODE_ASSET_DESCRIPTOR_CONTRACT,
+        crate::provider_code_asset::CODE_ASSET_FNV1A64_DIGEST_CONTRACT,
+    );
+    let asset = provider_request_from_evidence(&evidence)
+        .expect("request with code asset")
+        .code_asset
+        .expect("code asset");
+    assert_eq!(asset.path, "payload/kernel.ptx");
+    assert_eq!(asset.entry, "nuis_kernel_vector_add_f32");
+    let rendered = crate::provider_request_payload::render_provider_request_evidence(&evidence);
+    assert!(rendered.contains(
+        "provider_code_asset_descriptor_contract = \"nuis-provider-code-asset-descriptor-v1\""
+    ));
+    assert!(rendered.contains("provider_code_asset_entry = \"nuis_kernel_vector_add_f32\""));
+}
+
+#[test]
+fn rejects_partial_provider_code_asset_descriptor() {
+    let evidence = format!("{REGISTERED};provider_code_asset_id=kernel.vector-add");
+    assert!(provider_request_from_evidence(&evidence).is_none());
+}
+
+#[test]
 fn accepts_model_request_without_scalar_bindings() {
     let evidence = REGISTERED
         .replace(

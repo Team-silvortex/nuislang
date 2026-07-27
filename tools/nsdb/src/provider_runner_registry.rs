@@ -1,4 +1,6 @@
+#[cfg(target_os = "macos")]
 use std::path::PathBuf;
+#[cfg(target_os = "macos")]
 use std::process::Command;
 
 use crate::provider_worker_descriptor_capability::{
@@ -256,7 +258,7 @@ mod tests {
             .iter()
             .map(|bundle| &bundle.runner_profile)
             .collect::<Vec<_>>();
-        assert!(profiles.len() >= 3);
+        assert!(profiles.len() >= 4);
         assert!(profiles.iter().all(|profile| {
             profile.registry_contract == PROVIDER_RUNNER_PROFILE_REGISTRY_CONTRACT
         }));
@@ -279,6 +281,7 @@ mod tests {
         assert!(!selector.contains("data:host"));
         assert!(!selector.contains("metal:apple-silicon-gpu"));
         assert!(!selector.contains("coreml:apple-ane"));
+        assert!(!selector.contains("cuda:nvidia-gpu"));
     }
 
     #[test]

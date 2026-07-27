@@ -1,4 +1,5 @@
 use crate::provider_adapter_binding::{parse_adapter_binding, ProviderAdapterBinding};
+use crate::provider_code_asset::{parse_code_asset, ProviderCodeAssetDescriptor};
 use crate::provider_edge_transport::{
     parse_edge_transport, validate_dependency_transport, ProviderEdgeTransportDescriptor,
 };
@@ -104,6 +105,7 @@ pub(crate) struct ProviderRequest {
     pub(crate) kernel: ProviderKernelDescriptor,
     pub(crate) output_bindings: Vec<ProviderOutputBinding>,
     pub(crate) model_asset: Option<ProviderModelAssetDescriptor>,
+    pub(crate) code_asset: Option<ProviderCodeAssetDescriptor>,
     pub(crate) output_comparison: Option<ProviderOutputComparisonDescriptor>,
     pub(crate) output_comparisons: Vec<ProviderOutputComparisonDescriptor>,
     pub(crate) dependencies: Vec<ProviderRequestDependency>,
@@ -123,6 +125,17 @@ impl ProviderRequest {
             .scalar_bindings
             .iter()
             .find(|binding| binding.name == name && binding.value_type == "u8")?
+            .value
+            .parse()
+            .ok()
+    }
+
+    #[cfg(target_os = "linux")]
+    pub(crate) fn scalar_u32(&self, name: &str) -> Option<u32> {
+        self.kernel
+            .scalar_bindings
+            .iter()
+            .find(|binding| binding.name == name && binding.value_type == "u32")?
             .value
             .parse()
             .ok()
@@ -177,6 +190,7 @@ fn parse_registered_collection(input_evidence: &str) -> Option<ProviderRequestCo
                 &format!("provider_request_{index}_kernel_"),
                 &format!("provider_request_{index}_output_binding_"),
                 &format!("provider_request_{index}_model_asset_"),
+                &format!("provider_request_{index}_code_asset_"),
                 &format!("provider_request_{index}_output_comparison_"),
                 &format!("provider_request_{index}_dependency_"),
                 &format!("provider_request_{index}_input_binding_"),
@@ -205,6 +219,7 @@ fn parse_registered_request(input_evidence: &str) -> Option<ProviderRequest> {
         "provider_kernel_",
         "provider_output_binding_",
         "provider_model_asset_",
+        "provider_code_asset_",
         "provider_output_comparison_",
         "provider_dependency_",
         "provider_input_binding_",
@@ -256,6 +271,7 @@ fn parse_legacy_pixelmagic_request(input_evidence: &str) -> Option<ProviderReque
             comparison_id: "none".to_owned(),
         }],
         model_asset: None,
+        code_asset: None,
         output_comparison: None,
         output_comparisons: Vec::new(),
         dependencies: Vec::new(),
@@ -281,6 +297,7 @@ fn build_request(
     kernel_prefix: &str,
     output_binding_prefix: &str,
     model_prefix: &str,
+    code_asset_prefix: &str,
     comparison_prefix: &str,
     dependency_prefix: &str,
     input_binding_prefix: &str,
@@ -315,6 +332,7 @@ fn build_request(
         },
     };
     let model_asset = parse_model_asset(fields, model_prefix)?;
+    let code_asset = parse_code_asset(fields, code_asset_prefix)?;
     let output_comparisons = parse_output_comparisons(fields, comparison_prefix)?;
     let output_comparison = output_comparisons
         .iter()
@@ -337,6 +355,7 @@ fn build_request(
         kernel,
         output_bindings,
         model_asset,
+        code_asset,
         output_comparison,
         output_comparisons,
         dependencies,

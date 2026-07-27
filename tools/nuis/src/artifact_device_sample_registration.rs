@@ -45,8 +45,11 @@ pub(crate) fn persist_registered_input_payloads(
     Ok(())
 }
 
-fn registrations() -> [DeviceSampleInputRegistration; 1] {
-    [crate::artifact_device_sample_pixelmagic::registration()]
+fn registrations() -> [DeviceSampleInputRegistration; 2] {
+    [
+        crate::artifact_device_sample_pixelmagic::registration(),
+        crate::artifact_device_sample_kernel::registration(),
+    ]
 }
 
 #[cfg(test)]
@@ -61,6 +64,9 @@ mod tests {
         assert!(evidence.contains(DEVICE_SAMPLE_INPUT_REGISTRATION_CONTRACT));
         assert!(evidence.contains("provider_sample_registration_package=nuis.pixelmagic"));
         assert!(evidence.contains("provider_buffer_descriptor_contract="));
+        let cuda = enrich_registered_input_evidence("cuda", "nvidia-gpu", "base").unwrap();
+        assert!(cuda.contains("provider_sample_registration_package=official.kernel"));
+        assert!(cuda.contains("provider_code_asset_descriptor_contract="));
         assert!(
             enrich_registered_input_evidence("unknown", "unknown", "base").is_none(),
             "unregistered backends must remain generic"

@@ -12,6 +12,7 @@ mod provider_carrier_channel_registry;
 #[cfg(unix)]
 mod provider_carrier_channel_unix;
 mod provider_carrier_input;
+mod provider_code_asset;
 mod provider_completion_dispatch;
 mod provider_completion_integrity;
 mod provider_completion_signature;
@@ -24,6 +25,8 @@ mod provider_execution_adapter;
 mod provider_execution_capsule;
 #[cfg(unix)]
 mod provider_execution_coreml;
+#[cfg(unix)]
+mod provider_execution_cuda;
 #[cfg(unix)]
 mod provider_execution_metal;
 #[cfg(unix)]
@@ -41,6 +44,7 @@ mod provider_process_adapter;
 mod provider_request;
 mod provider_request_payload;
 mod provider_runner_coreml;
+mod provider_runner_cuda;
 mod provider_runner_metal;
 mod provider_runner_native;
 mod provider_runner_registry;
@@ -87,6 +91,10 @@ pub use provider_sample_execute::{execute_provider_samples, ProviderSampleExecut
 pub use provider_sample_materialize::{
     materialize_provider_samples, ProviderSampleMaterializeReport,
 };
+
+pub fn validate_provider_request_evidence(input_evidence: &str) -> bool {
+    provider_request::provider_request_collection_from_evidence(input_evidence).is_some()
+}
 
 pub fn persist_payload_execution_handoff_record(
     output_dir: &std::path::Path,

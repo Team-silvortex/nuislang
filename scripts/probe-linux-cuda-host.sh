@@ -14,6 +14,7 @@ else
   printf 'nvcc_status=missing\n'
   printf 'nvcc_release=none\n'
 fi
+printf 'nvcc_role=development-validation-oracle-only\n'
 
 loaded_driver_version="$(
   awk '/Kernel Module/{for (i = 1; i <= NF; i++) if ($i == "Module") {print $(i + 1); exit}}' \
@@ -66,13 +67,16 @@ else
   printf 'ptx_requested_arch=%s\n' "$ptx_arch"
 fi
 
-if [[ "$nvidia_smi_rc" -eq 0 && "$ptx_rc" -eq 0 ]]; then
+if [[ "$nvidia_smi_rc" -eq 0 ]]; then
+  printf 'cuda_runtime_status=launch-candidate\n'
   printf 'cuda_host_status=launch-candidate\n'
   printf 'cuda_host_next_action=run-provider-kernel-smoke\n'
 elif [[ "$ptx_rc" -eq 0 ]]; then
+  printf 'cuda_runtime_status=blocked\n'
   printf 'cuda_host_status=ptx-ready-launch-blocked\n'
   printf 'cuda_host_next_action=restore-driver-library-consistency\n'
 else
+  printf 'cuda_runtime_status=blocked\n'
   printf 'cuda_host_status=blocked\n'
-  printf 'cuda_host_next_action=restore-cuda-toolchain\n'
+  printf 'cuda_host_next_action=restore-driver-runtime\n'
 fi

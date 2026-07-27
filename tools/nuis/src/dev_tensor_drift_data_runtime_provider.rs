@@ -463,7 +463,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_PROVIDER_DRIFT_CHECKS: &[DevTensorDriftCheck
                 "nuis-provider-process-adapter-cache-v1",
                 "nuis-provider-bundle-registry-v1",
                 "nuis-provider-bundle-manifest-v1",
-                "provider_bundle_manifest_entry_count = 3",
+                "provider_bundle_manifest_entry_count = 4",
                 "provider_bundle_package_id = \\\"official.data\\\"",
                 "provider_bundle_id = \\\"data.host.bundle.v1\\\"",
                 "transferable-carrier",

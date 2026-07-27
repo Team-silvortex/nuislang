@@ -45,7 +45,7 @@ fn registered_provider_bundles_are_manifest_owned_and_deterministic() {
         .collect::<Vec<_>>();
     registrations.sort_by(|lhs, rhs| lhs.bundle_id.cmp(&rhs.bundle_id));
 
-    assert_eq!(registrations.len(), 3);
+    assert_eq!(registrations.len(), 4);
     assert_eq!(
         registrations
             .iter()
@@ -53,6 +53,7 @@ fn registered_provider_bundles_are_manifest_owned_and_deterministic() {
             .collect::<Vec<_>>(),
         vec![
             "coreml.apple-ane.bundle.v1",
+            "cuda.nvidia-gpu.bundle.v1",
             "data.host.bundle.v1",
             "metal.apple-silicon-gpu.bundle.v1",
         ]
