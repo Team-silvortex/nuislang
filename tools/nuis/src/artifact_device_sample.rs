@@ -1,6 +1,9 @@
 use crate::{json_field, json_string_array_field, json_usize_field};
 use std::{collections::BTreeSet, fs, path::Path};
 
+#[cfg(test)]
+mod scoped_metadata_tests;
+
 pub(crate) const DEVICE_SAMPLE_SCHEMA: &str = "nsdb-yir-device-execution-sample-v1";
 pub(crate) const DEFERRED_DEVICE_SAMPLE_PROVIDER: &str = "nustar-deferred-device-sample-v1";
 pub(crate) const DEVICE_SAMPLE_HANDOFF_PROTOCOL: &str = "nuis-device-sample-provider-handoff-v1";
@@ -62,10 +65,13 @@ pub(crate) struct DeviceSampleSummary {
 pub(crate) fn device_sample_contract_for_trace(
     trace_role: &str,
     status: &str,
+    domain_family: &str,
+    trace_id: &str,
     backend_family: Option<&str>,
     target_device: Option<&str>,
     payload_format: Option<&str>,
     payload_path: Option<&str>,
+    artifact_provider_metadata: &[String],
 ) -> DeviceSampleContract {
     if trace_role != "backend-artifact" {
         return DeviceSampleContract {
@@ -102,7 +108,15 @@ pub(crate) fn device_sample_contract_for_trace(
         sample_kind: "deferred-provider-sample-descriptor".to_owned(),
         status: sample_status.to_owned(),
         schema: DEVICE_SAMPLE_SCHEMA.to_owned(),
-        input_evidence: input_evidence(backend_family, target_device, payload_format, payload_path),
+        input_evidence: input_evidence(
+            domain_family,
+            trace_id,
+            backend_family,
+            target_device,
+            payload_format,
+            payload_path,
+            artifact_provider_metadata,
+        ),
         output_evidence: "not-materialized".to_owned(),
         validation_status: validation_status(sample_status),
         handoff_target: provider_family(backend_family, target_device),
@@ -464,17 +478,28 @@ fn provider_family(backend_family: Option<&str>, target_device: Option<&str>) ->
 }
 
 fn input_evidence(
+    domain_family: &str,
+    trace_id: &str,
     backend_family: Option<&str>,
     target_device: Option<&str>,
     payload_format: Option<&str>,
     payload_path: Option<&str>,
+    artifact_provider_metadata: &[String],
 ) -> String {
-    let base = match (payload_format, payload_path) {
+    let payload = match (payload_format, payload_path) {
         (Some(format), Some(path)) => format!("{format}:{path}"),
         (Some(format), None) => format!("{format}:payload-path-missing"),
         (None, Some(path)) => format!("payload-format-missing:{path}"),
         (None, None) => "payload-evidence-missing".to_owned(),
     };
+    let base = format!(
+        "{payload};{}",
+        crate::artifact_provider_metadata::render_metadata_for_trace(
+            artifact_provider_metadata,
+            domain_family,
+            trace_id,
+        )
+    );
     if let (Some(backend_family), Some(target_device)) = (backend_family, target_device) {
         if let Some(registered) =
             crate::artifact_device_sample_registration::enrich_registered_input_evidence(

@@ -1,0 +1,80 @@
+use cpu PixelMagicContracts;
+use data FabricPlane;
+use shader PixelMagicRenderSurface;
+
+mod cpu Main {
+  type FabricBindings = HandleTable<FabricPlaneBindings>;
+  type ShaderPacketWindow = Window<PixelMagicRenderSurfacePacket>;
+  type HostFrameWindow = Window<Frame>;
+  type FrameStatus = ShaderResult<Frame>;
+
+  fn lower_threshold_packet(
+    source_handle: i64,
+    width: i64,
+    height: i64,
+    op_kind: i64,
+    amount: i64,
+    flags: i64
+  ) -> PixelMagicRenderSurfacePacket {
+    let color_seed: i64 = shader_profile_color_seed(
+      "PixelMagicRenderSurface",
+      PixelMagicContracts.shader_color_seed_base(source_handle, op_kind, flags),
+      0
+    );
+    let speed_seed: i64 = shader_profile_speed_seed(
+      "PixelMagicRenderSurface",
+      flags,
+      2,
+      PixelMagicContracts.shader_speed_seed_base(width, amount)
+    );
+    let radius_seed: i64 = shader_profile_radius_seed(
+      "PixelMagicRenderSurface",
+      PixelMagicContracts.shader_radius_seed_base(height, flags, op_kind),
+      0
+    );
+    return shader_profile_packet("PixelMagicRenderSurface", color_seed, speed_seed, radius_seed);
+  }
+
+  fn main() {
+    cpu_bind_core(0);
+    cpu_window(320, 200, "pixelmagic_threshold_provider_demo");
+
+    let source_handle: i64 = 5101;
+    let width: i64 = 160;
+    let height: i64 = 120;
+    let op_kind: i64 = PixelMagicContracts.threshold_op_kind();
+    let amount: i64 = 8;
+    let flags: i64 = 1;
+    let image_packet_total: i64 =
+      PixelMagicContracts.filter_packet_total(source_handle, width, height, op_kind, amount);
+    let lowered: PixelMagicRenderSurfacePacket =
+      lower_threshold_packet(source_handle, width, height, op_kind, amount, flags);
+
+    data_profile_bind_core("FabricPlane");
+    let fabric_handles: FabricBindings = data_profile_handle_table("FabricPlane");
+    let gpu_packet: ShaderPacketWindow =
+      data_profile_send_uplink("FabricPlane", lowered);
+    let render_result: FrameStatus =
+      shader_result(shader_profile_render("PixelMagicRenderSurface", gpu_packet));
+    let render_ready: bool = shader_frame_ready(render_result);
+    let host_frame: HostFrameWindow =
+      data_profile_send_downlink("FabricPlane", shader_value(render_result));
+
+    print(
+      image_packet_total +
+        PixelMagicContracts.shader_packet_total(
+          source_handle,
+          width,
+          height,
+          op_kind,
+          0,
+          amount,
+          flags,
+          0
+        )
+    );
+    print(render_ready);
+
+    cpu_present_frame(host_frame);
+  }
+}

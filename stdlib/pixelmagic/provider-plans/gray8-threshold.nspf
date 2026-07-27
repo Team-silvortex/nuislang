@@ -1,0 +1,23 @@
+# PixelMagic-owned single-stage threshold provider filter plan.
+protocol=nuis-pixelmagic-filter-plan-v1
+package_id=nuis.pixelmagic
+plan_id=pixelmagic.gray8.threshold-only
+backend_family=metal
+target_device=apple-silicon-gpu
+buffer.id=input.pixels
+buffer.element_type=u8
+buffer.layout=image-2d-row-major:pixel-format=gray8
+buffer.shape=2x2
+buffer.row_stride_bytes=2
+buffer.payload_path=nuis.pixelmagic.std-preprocessed.gray8.bin
+buffer.payload_bytes=0,4,9,8
+stage_order=threshold
+stage.threshold.request_id=pixelmagic.gray8.threshold-only
+stage.threshold.operation=threshold
+stage.threshold.scalar_bindings=threshold:u8:8,max_value:u8:15
+stage.threshold.output_buffer=output.pixels.threshold
+stage.threshold.expected_path=nuis.pixelmagic.std-preprocessed.gray8-threshold-only.expected.bin
+stage.threshold.expected_bytes=0,0,15,15
+stage.threshold.input_source=artifact
+stage.threshold.producer_request_id=none
+stage.threshold.producer_output_buffer=none

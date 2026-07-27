@@ -11,6 +11,7 @@ surfaces = [
   "contract.pixelmagic.shader-facing-image-prep.v1",
   "contract.pixelmagic.render-plan.v1",
   "contract.pixelmagic.provider-sample-input-registration.v1",
+  "contract.pixelmagic.filter-plan.v1",
   "surface.pixelmagic.shader.contracts.v1",
   "surface.pixelmagic.shader.packet-bridge.v1",
   "surface.pixelmagic.shader.render.v1",
@@ -28,6 +29,13 @@ library_modules = [
 ]
 
 library_import_policy = "project-auto"
+
+provider_plan_catalog_contract = "nuis-pixelmagic-filter-plan-catalog-v1"
+provider_plan_default = "pixelmagic.gray8.invert-threshold"
+provider_plans = [
+  "provider-plans/gray8-invert-threshold.nspf",
+  "provider-plans/gray8-threshold.nspf"
+]
 
 source_modules = [
   "core/image_packet_recipe.ns",

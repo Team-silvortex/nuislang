@@ -57,6 +57,7 @@ pub(crate) fn empty_link_plan() -> LinkPlan {
         host_bridge_plan_index_path: None,
         lowering_plan_index_path: None,
         lowering_plan_index_source: "unavailable".to_owned(),
+        artifact_provider_metadata: vec![],
         host_ffi: LinkPlanHostFfiFootprint {
             index_path: None,
             symbol_count: 0,

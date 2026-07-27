@@ -306,6 +306,7 @@ fn domain_build_unit_verification_verdict_marks_cpu_unit_consistent() {
         doc_index_checked: 0,
         project_text_handle_rewrite_helper_hits: 0,
         project_text_handle_rewrite_local_hits: 0,
+        artifact_provider_metadata: vec![],
         project_plan_index: None,
         project_docs_index: None,
         project_docs_module_count: 0,

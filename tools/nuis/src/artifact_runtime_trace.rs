@@ -94,7 +94,9 @@ impl HeteroRuntimeTraceSummary {
             .count();
         let records = hetero_units
             .iter()
-            .map(|unit| trace_record_for_unit(unit, payload_evidence))
+            .map(|unit| {
+                trace_record_for_unit(unit, payload_evidence, &plan.artifact_provider_metadata)
+            })
             .collect::<Vec<_>>();
         let trace_record_count = records.len();
         let trace_ready_record_count = records
@@ -563,6 +565,7 @@ impl HeteroRuntimeTraceRecord {
 fn trace_record_for_unit(
     unit: &nuisc::linker::LinkPlanDomainUnit,
     payload_evidence: &BackendArtifactPayloadEvidence,
+    artifact_provider_metadata: &[String],
 ) -> HeteroRuntimeTraceRecord {
     let missing_signals = backend_artifact_missing_signals(unit);
     let trace_role = if is_backend_artifact_unit(unit) {
@@ -586,17 +589,21 @@ fn trace_record_for_unit(
         _ => "resolve-domain-trace-blocker",
     };
     let backend_artifact_key = backend_artifact_key(unit);
+    let trace_id = format!("hetero-trace:{backend_artifact_key}");
     let device_sample = device_sample_contract_for_trace(
         trace_role,
         status,
+        &unit.domain_family,
+        &trace_id,
         unit.backend_family.as_deref(),
         unit.target_device.as_deref(),
         unit.artifact_payload_format.as_deref(),
         unit.artifact_payload_blob_path.as_deref(),
+        artifact_provider_metadata,
     );
 
     HeteroRuntimeTraceRecord {
-        trace_id: format!("hetero-trace:{backend_artifact_key}"),
+        trace_id,
         trace_role: trace_role.to_owned(),
         status: status.to_owned(),
         domain_family: unit.domain_family.clone(),

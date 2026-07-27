@@ -14,6 +14,7 @@ pub struct LinkPlan {
     pub host_bridge_plan_index_path: Option<String>,
     pub lowering_plan_index_path: Option<String>,
     pub lowering_plan_index_source: String,
+    pub artifact_provider_metadata: Vec<String>,
     pub host_ffi: LinkPlanHostFfiFootprint,
     pub domain_units: Vec<LinkPlanDomainUnit>,
     pub artifact_lowering_alignment: ArtifactLoweringAlignmentSummary,

@@ -66,6 +66,7 @@ mod aot_symbol_anchor;
 mod aot_toml;
 mod aot_vcs_info;
 mod aot_verify_report;
+pub mod artifact_provider_metadata;
 mod artifact_report;
 pub mod cache;
 pub mod cli;

@@ -198,6 +198,7 @@ pub(crate) fn run_compile(
                     } else {
                         "auto-recommended".to_owned()
                     },
+                    artifact_provider_metadata: project.manifest.artifact_provider_metadata.clone(),
                     abi_graph_summary: Some(project::render_project_abi_graph_line(
                         &plan.abi_resolution,
                     )),

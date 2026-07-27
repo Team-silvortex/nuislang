@@ -52,6 +52,7 @@ pub struct BuildManifestVerifyReport {
     pub doc_index_checked: usize,
     pub project_text_handle_rewrite_helper_hits: usize,
     pub project_text_handle_rewrite_local_hits: usize,
+    pub artifact_provider_metadata: Vec<String>,
     pub project_plan_index: Option<String>,
     pub project_docs_index: Option<String>,
     pub project_docs_module_count: usize,

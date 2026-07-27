@@ -13,6 +13,9 @@ pub(super) fn parse_project_manifest(
     let name = parse_required_string(source, "name", path)?;
     let entry = parse_required_string(source, "entry", path)?;
     let packaging_mode = parse_optional_string(source, "packaging_mode");
+    let artifact_provider_metadata =
+        parse_optional_string_array(source, "artifact_provider_metadata").unwrap_or_default();
+    validate_artifact_provider_metadata(&artifact_provider_metadata, path)?;
     let modules = parse_optional_string_array(source, "modules").unwrap_or_default();
     let tests = parse_optional_string_array(source, "tests").unwrap_or_default();
     let links = parse_optional_link_array(source, "links").unwrap_or_default();
@@ -26,6 +29,7 @@ pub(super) fn parse_project_manifest(
         name,
         entry,
         packaging_mode,
+        artifact_provider_metadata,
         modules,
         tests,
         links,
@@ -33,6 +37,11 @@ pub(super) fn parse_project_manifest(
         galaxy_dependencies,
         galaxy_imports,
     })
+}
+
+fn validate_artifact_provider_metadata(values: &[String], path: &Path) -> Result<(), String> {
+    crate::artifact_provider_metadata::validate_artifact_provider_metadata(values)
+        .map_err(|error| format!("project manifest `{}` {error}", path.display()))
 }
 
 fn validate_unique_galaxy_imports(
@@ -252,5 +261,45 @@ mod tests {
             manifest.packaging_mode.as_deref(),
             Some("nuis-self-contained-image")
         );
+    }
+
+    #[test]
+    fn project_manifest_preserves_open_artifact_provider_metadata() {
+        let manifest = parse_project_manifest(
+            "name = \"demo\"\nentry = \"main.ns\"\nartifact_provider_metadata = [\"@scope(domain=shader,trace=hetero-trace:shader:metal:apple-silicon-gpu)|nuis.pixelmagic:filter-plan=pixelmagic.gray8.threshold-only\", \"nuis.other:key=value\"]\n",
+            Path::new("nuis.toml"),
+        )
+        .expect("project manifest should parse");
+
+        assert_eq!(
+            manifest.artifact_provider_metadata,
+            [
+                "@scope(domain=shader,trace=hetero-trace:shader:metal:apple-silicon-gpu)|nuis.pixelmagic:filter-plan=pixelmagic.gray8.threshold-only",
+                "nuis.other:key=value",
+            ]
+        );
+    }
+
+    #[test]
+    fn project_manifest_rejects_duplicate_artifact_provider_metadata() {
+        let error = parse_project_manifest(
+            "name = \"demo\"\nentry = \"main.ns\"\nartifact_provider_metadata = [\"nuis.pixelmagic:key=value\", \"nuis.pixelmagic:key=value\"]\n",
+            Path::new("nuis.toml"),
+        )
+        .unwrap_err();
+
+        assert!(error.contains("duplicate artifact_provider_metadata"));
+    }
+
+    #[test]
+    fn project_manifest_rejects_malformed_artifact_provider_metadata_scope() {
+        let error = parse_project_manifest(
+            "name = \"demo\"\nentry = \"main.ns\"\nartifact_provider_metadata = [\"@scope(domain=shader|nuis.pixelmagic:key=value\"]\n",
+            Path::new("nuis.toml"),
+        )
+        .unwrap_err();
+
+        assert!(error.contains("invalid artifact_provider_metadata"));
+        assert!(error.contains("missing `)|`"));
     }
 }

@@ -12,6 +12,7 @@ pub struct CompileArtifacts {
 pub struct BuildManifestProjectInfo {
     pub name: String,
     pub abi_mode: String,
+    pub artifact_provider_metadata: Vec<String>,
     pub abi_graph_summary: Option<String>,
     pub abi_entries: Vec<(String, String)>,
     pub plan_summary: Option<String>,

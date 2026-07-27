@@ -20,6 +20,7 @@ pub(super) fn assert_provider_bundle_audit_evidence(source: &str, label: &str) {
     }
     let (count, hash) = match label {
         "pixelmagic_pipeline_demo" => (2, "fnv1a64:0126ed9d38f1895f"),
+        "pixelmagic_threshold_provider_demo" => (1, "fnv1a64:5c7ac5158d84aa8b"),
         "witsage_kernel_demo" => (1, "fnv1a64:e9a82b052c861b93"),
         other => panic!("missing selected provider bundle expectation for `{other}`"),
     };
@@ -130,30 +131,128 @@ pub(super) fn assert_provider_execution_evidence(provider_output_payload_path: &
     }
 }
 
-pub(super) fn assert_pixelmagic_unary_execution(provider_output_payload_path: &Path) {
+pub(super) fn assert_pixelmagic_trace_evidence(label: &str, source: &str, output_dir: &Path) {
     for evidence in [
+        "std-preprocessed-pgm:input_bytes=20",
+        "provider_sample_registration_contract=nuis-device-sample-input-registration-v1",
+        "provider_filter_plan_contract=nuis-pixelmagic-filter-plan-v1",
+        "provider_filter_plan_package=nuis.pixelmagic",
+        "provider_filter_plan_validation_status=verified",
+        "provider_buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1",
+        "provider_kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1",
+        "provider_buffer_id=input.pixels",
+        "pixel_format=gray8",
+        "pixel_width=2",
+        "pixel_height=2",
+        "pixel_payload_path=nuis.pixelmagic.std-preprocessed.gray8.bin",
+    ] {
+        assert!(
+            source.contains(evidence),
+            "PixelMagic trace for {label} is missing `{evidence}`"
+        );
+    }
+    let plan_evidence: &[&str] = match label {
+        "pixelmagic_pipeline_demo" => &[
+            "provider_filter_plan_id=pixelmagic.gray8.invert-threshold",
+            "provider_filter_plan_stage_order=pixelmagic.gray8.invert,pixelmagic.gray8.threshold",
+            "provider_kernel_id=pixelmagic.gray8.invert",
+            "provider_request_1_kernel_id=pixelmagic.gray8.threshold",
+        ],
+        "pixelmagic_threshold_provider_demo" => &[
+            "provider_filter_plan_id=pixelmagic.gray8.threshold-only",
+            "provider_filter_plan_stage_order=pixelmagic.gray8.threshold-only",
+            "provider_kernel_id=pixelmagic.gray8.threshold-only",
+            "provider_request_count=1",
+        ],
+        other => panic!("missing PixelMagic trace expectation for `{other}`"),
+    };
+    for evidence in plan_evidence {
+        assert!(
+            source.contains(evidence),
+            "PixelMagic trace for {label} is missing plan evidence `{evidence}`"
+        );
+    }
+    assert_eq!(
+        fs::read(output_dir.join("nuis.pixelmagic.std-preprocessed.gray8.bin"))
+            .expect("read persisted PixelMagic input payload"),
+        [0, 4, 9, 8]
+    );
+}
+
+pub(super) fn assert_pixelmagic_execution(provider_output_payload_path: &Path, label: &str) {
+    for evidence in [
+        "artifact_provider_metadata_contract=nuis-artifact-provider-metadata-v1",
+        "artifact_provider_metadata_scope_contract=nuis-artifact-provider-metadata-scope-v1",
+        "artifact_provider_metadata_scope_status=verified",
+        "artifact_provider_metadata_scope_domain=shader",
+        "artifact_provider_metadata_scope_trace=hetero-trace:shader:metal:apple-silicon-gpu",
+        "artifact_provider_metadata_source_count=1",
+        "artifact_provider_metadata_count=1",
+        "provider_filter_plan_catalog_contract=nuis-pixelmagic-filter-plan-catalog-v1",
+        "provider_filter_plan_catalog_count=2",
+        "provider_filter_plan_catalog_hash=0x",
+        "provider_filter_plan_catalog_default_id=pixelmagic.gray8.invert-threshold",
+        "provider_filter_plan_catalog_selection_status=artifact-request-selected",
+        "provider_filter_plan_contract=nuis-pixelmagic-filter-plan-v1",
+        "provider_filter_plan_package=nuis.pixelmagic",
+        "provider_filter_plan_hash=0x",
+        "provider_filter_plan_validation_status=verified",
         "provider_request_source = \"registered-collection\"",
-        "native_output_count = \"2\"",
-        "provider_request_dependency_edge_count = \"1\"",
-        "provider_request_dependency_edges = \"pixelmagic.gray8.invert.output.pixels.invert->pixelmagic.gray8.threshold.input.pixels\"",
-        "provider_edge_transport_count = \"1\"",
-        "provider_edge_transport_receipt_count = \"1\"",
-        "provider_edge_transport_receipt_0_staging_adapter_id = \"provider.output.transfer.v1\"",
-        "provider_edge_transport_receipt_0_consume_status = \"consumed\"",
-        "provider_edge_transport_receipt_0_release_status = \"released\"",
-        "native_output_0_request_id = \"pixelmagic.gray8.invert\"",
         "native_output_0_comparison_status = \"comparison-passed\"",
-        "native_output_1_request_id = \"pixelmagic.gray8.threshold\"",
-        "native_output_1_execution_contract = \"nuis-metal-gray8-threshold-provider-runner-v1\"",
-        "native_output_1_comparison_status = \"comparison-passed\"",
-        "native_output_1_comparison_element_count = \"4\"",
-        "native_output_1_comparison_mismatch_count = \"0\"",
-        "native_output_1_hash = \"0xfc6f93a90d12d41b\"",
     ] {
         assert_file_contains(
             provider_output_payload_path,
             evidence,
             "official PixelMagic unary execution",
+        );
+    }
+    let plan_evidence: &[&str] = match label {
+        "pixelmagic_pipeline_demo" => &[
+            "artifact_provider_metadata_0=nuis.pixelmagic:filter-plan=pixelmagic.gray8.invert-threshold",
+            "provider_filter_plan_catalog_selected_path=provider-plans/gray8-invert-threshold.nspf",
+            "provider_filter_plan_artifact_request_id=pixelmagic.gray8.invert-threshold",
+            "provider_filter_plan_id=pixelmagic.gray8.invert-threshold",
+            "provider_filter_plan_stage_count=2",
+            "provider_filter_plan_stage_order=pixelmagic.gray8.invert,pixelmagic.gray8.threshold",
+            "native_output_count = \"2\"",
+            "provider_request_dependency_edge_count = \"1\"",
+            "provider_request_dependency_edges = \"pixelmagic.gray8.invert.output.pixels.invert->pixelmagic.gray8.threshold.input.pixels\"",
+            "provider_edge_transport_count = \"1\"",
+            "provider_edge_transport_receipt_count = \"1\"",
+            "provider_edge_transport_receipt_0_staging_adapter_id = \"provider.output.transfer.v1\"",
+            "provider_edge_transport_receipt_0_consume_status = \"consumed\"",
+            "provider_edge_transport_receipt_0_release_status = \"released\"",
+            "native_output_0_request_id = \"pixelmagic.gray8.invert\"",
+            "native_output_1_request_id = \"pixelmagic.gray8.threshold\"",
+            "native_output_1_execution_contract = \"nuis-metal-gray8-threshold-provider-runner-v1\"",
+            "native_output_1_comparison_status = \"comparison-passed\"",
+            "native_output_1_comparison_element_count = \"4\"",
+            "native_output_1_comparison_mismatch_count = \"0\"",
+            "native_output_1_hash = \"0xfc6f93a90d12d41b\"",
+        ],
+        "pixelmagic_threshold_provider_demo" => &[
+            "artifact_provider_metadata_0=nuis.pixelmagic:filter-plan=pixelmagic.gray8.threshold-only",
+            "provider_filter_plan_catalog_selected_path=provider-plans/gray8-threshold.nspf",
+            "provider_filter_plan_artifact_request_id=pixelmagic.gray8.threshold-only",
+            "provider_filter_plan_id=pixelmagic.gray8.threshold-only",
+            "provider_filter_plan_stage_count=1",
+            "provider_filter_plan_stage_order=pixelmagic.gray8.threshold-only",
+            "native_output_count = \"1\"",
+            "provider_request_dependency_edge_count = \"0\"",
+            "provider_edge_transport_count = \"0\"",
+            "native_output_0_request_id = \"pixelmagic.gray8.threshold-only\"",
+            "native_output_0_execution_contract = \"nuis-metal-gray8-threshold-provider-runner-v1\"",
+            "native_output_0_comparison_element_count = \"4\"",
+            "native_output_0_comparison_mismatch_count = \"0\"",
+            "native_output_0_hash = \"0x4d00177f9dae564b\"",
+        ],
+        other => panic!("missing PixelMagic execution expectation for `{other}`"),
+    };
+    for evidence in plan_evidence {
+        assert_file_contains(
+            provider_output_payload_path,
+            evidence,
+            "official PixelMagic selected plan execution",
         );
     }
 }

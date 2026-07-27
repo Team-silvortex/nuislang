@@ -1,0 +1,18 @@
+name = "pixelmagic_threshold_provider_demo"
+version = "0.1.0"
+entry = "main.ns"
+packaging_mode = "nuis-self-contained-image"
+artifact_provider_metadata = [
+  "nuis.pixelmagic:filter-plan=pixelmagic.gray8.threshold-only"
+]
+modules = ["main.ns", "fabric_plane.ns"]
+galaxy = ["pixelmagic=workspace"]
+links = [
+  "cpu.Main -> shader.PixelMagicRenderSurface via data.FabricPlane",
+  "shader.PixelMagicRenderSurface -> cpu.Main via data.FabricPlane"
+]
+abi = [
+  "cpu=cpu.arm64.apple_aapcs64",
+  "data=data.fabric.macos.arm64.v1",
+  "shader=shader.metal.msl2_4",
+]

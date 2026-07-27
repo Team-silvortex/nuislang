@@ -15,6 +15,10 @@ pub(crate) fn append_project_manifest_section(
         "abi_mode = \"{}\"\n",
         escape_toml_string(&project.abi_mode)
     ));
+    out.push_str(&format!(
+        "artifact_provider_metadata = {}\n",
+        render_string_array(&project.artifact_provider_metadata)
+    ));
     if let Some(value) = &project.abi_graph_summary {
         out.push_str(&format!("abi_graph = \"{}\"\n", escape_toml_string(value)));
     }

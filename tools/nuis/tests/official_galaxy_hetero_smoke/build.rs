@@ -156,32 +156,7 @@ pub(super) fn assert_official_galaxy_hetero_build(
         "run-artifact json did not expose expected official galaxy hetero trace for {label}\n{run_json_stdout}"
     );
     if expects_std_pgm_marker {
-        assert!(
-            run_json_stdout.contains("std-preprocessed-pgm:input_bytes=20")
-                && run_json_stdout.contains("provider_sample_registration_contract=nuis-device-sample-input-registration-v1")
-                && run_json_stdout.contains(
-                    "provider_buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1",
-                )
-                && run_json_stdout.contains(
-                    "provider_kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1",
-                )
-                && run_json_stdout.contains("provider_buffer_id=input.pixels")
-                && run_json_stdout.contains("provider_kernel_id=pixelmagic.gray8.invert")
-                && run_json_stdout
-                    .contains("provider_request_1_kernel_id=pixelmagic.gray8.threshold")
-                && run_json_stdout.contains("pixel_format=gray8")
-                && run_json_stdout.contains("pixel_width=2")
-                && run_json_stdout.contains("pixel_height=2")
-                && run_json_stdout.contains(
-                    "pixel_payload_path=nuis.pixelmagic.std-preprocessed.gray8.bin",
-                ),
-            "PixelMagic shader trace did not carry std-preprocessed PGM evidence\n{run_json_stdout}"
-        );
-        assert_eq!(
-            fs::read(output_dir.join("nuis.pixelmagic.std-preprocessed.gray8.bin"))
-                .expect("read persisted PixelMagic input payload"),
-            [0, 4, 9, 8]
-        );
+        assert_pixelmagic_trace_evidence(label, &run_json_stdout, &output_dir);
     }
     let expects_coreml_vector = backend_family == "coreml" && target_device == "apple-ane";
     if expects_coreml_vector {
@@ -363,13 +338,18 @@ pub(super) fn assert_official_galaxy_hetero_build(
             "pixelmagic-image-bytes"
         );
         if executed.first_provider_execution_mode == "real-device-provider-runner" {
+            let expected_contract = if label == "pixelmagic_threshold_provider_demo" {
+                "nuis-metal-gray8-threshold-provider-runner-v1"
+            } else {
+                "nuis-metal-gray8-provider-runner-v1"
+            };
             assert_eq!(
                 executed.first_output_payload_native_output_status,
                 "metal-api-output-ready"
             );
             assert_eq!(
                 executed.first_output_payload_native_execution_contract,
-                "nuis-metal-gray8-provider-runner-v1"
+                expected_contract
             );
             assert_eq!(
                 executed.first_output_payload_native_execution_status,
@@ -607,7 +587,7 @@ pub(super) fn assert_official_galaxy_hetero_build(
         "official galaxy provider output payload input evidence hash",
     );
     if expects_std_pgm_marker {
-        assert_pixelmagic_unary_execution(&provider_output_payload_path);
+        assert_pixelmagic_execution(&provider_output_payload_path, label);
         assert_file_contains(
             &provider_output_payload_path,
             "provider_buffer_descriptor_contract = \"nuis-provider-buffer-descriptor-v1\"",
@@ -622,11 +602,6 @@ pub(super) fn assert_official_galaxy_hetero_build(
             &provider_output_payload_path,
             "provider_kernel_descriptor_contract = \"nuis-provider-kernel-descriptor-v1\"",
             "official galaxy provider kernel descriptor contract",
-        );
-        assert_file_contains(
-            &provider_output_payload_path,
-            "provider_kernel_id = \"pixelmagic.gray8.invert\"",
-            "official galaxy provider kernel id",
         );
         assert_file_contains(
             &provider_output_payload_path,

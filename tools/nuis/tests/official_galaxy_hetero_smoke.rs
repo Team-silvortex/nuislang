@@ -99,12 +99,39 @@ mod replay;
 use build::assert_official_galaxy_hetero_build;
 use final_image::finalize_official_hetero;
 use provider_execution_evidence::{
-    assert_pixelmagic_unary_execution, assert_provider_bundle_audit_evidence,
-    assert_provider_execution_evidence,
+    assert_pixelmagic_execution, assert_pixelmagic_trace_evidence,
+    assert_provider_bundle_audit_evidence, assert_provider_execution_evidence,
 };
 
 #[test]
 fn official_galaxy_hetero_projects_emit_shader_and_kernel_artifacts() {
+    assert_official_galaxy_hetero_build(
+        "pixelmagic_threshold_provider_demo",
+        "../../examples/projects/domains/pixelmagic_threshold_provider_demo",
+        "shader",
+        "metal",
+        "apple-silicon-gpu",
+        2,
+        "hetero-trace:shader:metal:apple-silicon-gpu",
+        &[
+            "shader.begin_pass",
+            "shader.draw_instanced",
+            "PixelMagicContracts.filter_packet_total",
+            "PixelMagicContracts.threshold_op_kind",
+        ],
+        &[
+            "shader_stage_model = \"metal-render-pipeline\"",
+            "lowering_capabilities",
+            "pipeline_lowering = \"metal-render-pipeline-state\"",
+            "execution_route = \"unified-render-graph\"",
+        ],
+        &[
+            "backend_family = \"metal\"",
+            "target_device = \"apple-silicon-gpu\"",
+            "shader.profile.render",
+        ],
+    );
+
     assert_official_galaxy_hetero_build(
         "pixelmagic_pipeline_demo",
         "../../examples/projects/domains/pixelmagic_pipeline_demo",

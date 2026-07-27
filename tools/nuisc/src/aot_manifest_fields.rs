@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use crate::aot_toml::{
-    parse_optional_toml_string, parse_optional_toml_usize, parse_required_toml_bool,
-    parse_required_toml_string, parse_required_toml_string_array,
+    parse_optional_toml_string, parse_optional_toml_string_array, parse_optional_toml_usize,
+    parse_required_toml_bool, parse_required_toml_string, parse_required_toml_string_array,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,6 +23,7 @@ pub(crate) struct ManifestFieldVerification {
     pub doc_index_documented_item_count: usize,
     pub project_text_handle_rewrite_helper_hits: usize,
     pub project_text_handle_rewrite_local_hits: usize,
+    pub artifact_provider_metadata: Vec<String>,
     pub project_plan_index: Option<String>,
     pub project_plan_summary: Option<String>,
     pub project_docs_index: Option<String>,
@@ -68,6 +69,22 @@ pub(crate) fn verify_manifest_fields(
     source: &str,
     path: &Path,
 ) -> Result<ManifestFieldVerification, String> {
+    let artifact_provider_metadata =
+        match parse_optional_toml_string_array(source, "artifact_provider_metadata") {
+            Some(values) => values,
+            None if source.lines().any(|line| {
+                line.trim_start()
+                    .starts_with("artifact_provider_metadata =")
+            }) =>
+            {
+                return Err(format!(
+                    "`{}` has malformed artifact_provider_metadata",
+                    path.display()
+                ));
+            }
+            None => Vec::new(),
+        };
+    validate_artifact_provider_metadata(&artifact_provider_metadata, path)?;
     Ok(ManifestFieldVerification {
         cpu_target_abi: parse_required_toml_string(source, "cpu_target_abi", path)?,
         cpu_target_machine_arch: parse_required_toml_string(
@@ -106,6 +123,7 @@ pub(crate) fn verify_manifest_fields(
             "text_handle_rewrite_local_hits",
         )
         .unwrap_or(0),
+        artifact_provider_metadata,
         project_plan_index: parse_optional_toml_string(source, "plan_index"),
         project_plan_summary: parse_optional_toml_string(source, "plan_summary"),
         project_docs_index: parse_optional_toml_string(source, "docs_index"),
@@ -215,4 +233,9 @@ pub(crate) fn verify_manifest_fields(
             "hetero_calculate_plan_inline",
         ),
     })
+}
+
+fn validate_artifact_provider_metadata(values: &[String], path: &Path) -> Result<(), String> {
+    crate::artifact_provider_metadata::validate_artifact_provider_metadata(values)
+        .map_err(|error| format!("`{}` {error}", path.display()))
 }

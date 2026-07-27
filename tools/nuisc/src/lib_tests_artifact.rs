@@ -430,6 +430,7 @@ fn artifact_report_summary_lines_expose_compact_overview() {
         host_bridge_plan_index_path: None,
         lowering_plan_index_path: None,
         lowering_plan_index_source: "unavailable".to_owned(),
+        artifact_provider_metadata: vec![],
         host_ffi: linker::LinkPlanHostFfiFootprint {
             index_path: None,
             symbol_count: 0,

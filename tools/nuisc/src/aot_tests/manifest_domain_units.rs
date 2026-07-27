@@ -48,6 +48,7 @@ fn build_manifest_tracks_heterogeneous_domain_build_units() {
             project: Some(BuildManifestProjectInfo {
                 name: "hetero".to_owned(),
                 abi_mode: "explicit".to_owned(),
+                artifact_provider_metadata: vec![],
                 abi_graph_summary: None,
                 abi_entries: vec![
                     ("cpu".to_owned(), cpu_target.abi.clone()),

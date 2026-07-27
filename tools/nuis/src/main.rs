@@ -1,6 +1,7 @@
 mod artifact_coreml_model;
 mod artifact_device_sample;
 mod artifact_device_sample_pixelmagic;
+mod artifact_device_sample_pixelmagic_plan;
 mod artifact_device_sample_registration;
 mod artifact_doctor;
 mod artifact_doctor_mirrors;
@@ -20,6 +21,7 @@ mod artifact_nsdb_handoff_trust_registry;
 mod artifact_nsdb_replay_cursor;
 mod artifact_nsdb_replay_cursor_lineage;
 mod artifact_nsdb_replay_cursor_lineage_repair;
+mod artifact_provider_metadata;
 mod artifact_runtime_command;
 mod artifact_runtime_persistence;
 mod artifact_runtime_trace;

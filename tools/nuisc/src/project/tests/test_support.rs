@@ -59,6 +59,7 @@ pub(super) fn loaded_project_fixture(
             name: name.to_owned(),
             entry: "main.ns".to_owned(),
             packaging_mode: None,
+            artifact_provider_metadata: vec![],
             modules: modules.iter().map(|(path, _)| (*path).to_owned()).collect(),
             tests: vec![],
             links: vec![],

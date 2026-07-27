@@ -147,6 +147,7 @@ pub fn build_link_plan(
         host_bridge_plan_index_path: report.host_bridge_plan_index_path.clone(),
         lowering_plan_index_path: report.lowering_plan_index_path.clone(),
         lowering_plan_index_source,
+        artifact_provider_metadata: report.artifact_provider_metadata.clone(),
         host_ffi,
         domain_units,
         artifact_lowering_alignment,

@@ -117,7 +117,7 @@ pub(crate) fn parse_optional_toml_string_array(source: &str, key: &str) -> Optio
                 return Some(Vec::new());
             }
             let mut items = Vec::new();
-            for part in inner.split(',') {
+            for part in split_toml_string_array_items(inner)? {
                 let item = part.trim();
                 if !item.starts_with('"') || !item.ends_with('"') || item.len() < 2 {
                     return None;
@@ -128,6 +128,33 @@ pub(crate) fn parse_optional_toml_string_array(source: &str, key: &str) -> Optio
         }
     }
     None
+}
+
+fn split_toml_string_array_items(inner: &str) -> Option<Vec<&str>> {
+    let mut items = Vec::new();
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut start = 0;
+    for (index, ch) in inner.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match ch {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            ',' if !in_string => {
+                items.push(&inner[start..index]);
+                start = index + ch.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    if in_string || escaped {
+        return None;
+    }
+    items.push(&inner[start..]);
+    Some(items)
 }
 
 pub(crate) fn parse_required_map_string(
@@ -224,6 +251,8 @@ mod tests {
             "alpha".to_owned(),
             "b\"c".to_owned(),
             "line\nend".to_owned(),
+            "@scope(domain=shader,trace=hetero-trace:shader:metal)|nuis.package:key=value"
+                .to_owned(),
         ];
         let source = format!("items = {}\nempty = []\n", render_string_array(&values));
 

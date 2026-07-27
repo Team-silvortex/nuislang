@@ -121,6 +121,27 @@ Current first responsibility:
   collection, and persistence metadata through the provider-neutral
   `nuis-device-sample-input-registration-v1` table; std only supplies the host
   preprocessing evidence and does not construct image requests
+* own the checked-in
+  [gray8-invert-threshold.nspf](provider-plans/gray8-invert-threshold.nspf)
+  through `nuis-pixelmagic-filter-plan-v1`; the plan declares input bytes,
+  ordered stages, scalar bindings, expected outputs, and dependency references,
+  while its AOT parser derives only provider-neutral request contracts
+* declare a `nuis-pixelmagic-filter-plan-catalog-v1` in `module.toml`, with the
+  two-stage graph as the deterministic default and
+  [gray8-threshold.nspf](provider-plans/gray8-threshold.nspf) as a second
+  independently validated package plan
+* consume optional `nuis.pixelmagic:filter-plan=<declared-plan-id>` requests
+  carried by the generic `nuis-artifact-provider-metadata-v1` table; the
+  compiler and provider registry preserve opaque entries, while PixelMagic
+  alone authorizes the requested catalog identity
+* consume trace-projected requests from the generic
+  `nuis-artifact-provider-metadata-scope-v1` envelope, allowing one artifact
+  metadata table to select different plans for different domain/trace pairs
+  while legacy unscoped entries remain global
+* execute both catalog entries in official native fixtures: the existing
+  dependency graph retains two exact outputs and one GLM/time-bound transfer,
+  while `pixelmagic_threshold_provider_demo` runs threshold-only as one Metal
+  request with output `[0,0,15,15]` and zero dependency edges
 * connect invert to threshold through package-authored provider dependency,
   input-binding, GLM ownership, and clock evidence while Nsdb remains unaware of
   PixelMagic operation names
@@ -144,6 +165,7 @@ Current official surface registry:
 * `contract.pixelmagic.shader-facing-image-prep.v1`
 * `contract.pixelmagic.render-plan.v1`
 * `contract.pixelmagic.provider-sample-input-registration.v1`
+* `contract.pixelmagic.filter-plan.v1`
 * `surface.pixelmagic.shader.contracts.v1`
 * `surface.pixelmagic.shader.packet-bridge.v1`
 * `surface.pixelmagic.shader.render.v1`

@@ -71,6 +71,7 @@ pub(crate) fn build_manifest_verify_report(
         doc_index_checked: project_metadata_report.doc_index_checked,
         project_text_handle_rewrite_helper_hits: fields.project_text_handle_rewrite_helper_hits,
         project_text_handle_rewrite_local_hits: fields.project_text_handle_rewrite_local_hits,
+        artifact_provider_metadata: fields.artifact_provider_metadata,
         project_plan_index: fields.project_plan_index,
         project_docs_index: fields.project_docs_index,
         project_docs_module_count: fields.project_docs_module_count,

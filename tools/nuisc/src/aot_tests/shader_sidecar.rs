@@ -44,6 +44,7 @@ fn build_manifest_emits_shader_ir_sidecar() {
             project: Some(BuildManifestProjectInfo {
                 name: "shader".to_owned(),
                 abi_mode: "explicit".to_owned(),
+                artifact_provider_metadata: vec![],
                 abi_graph_summary: None,
                 abi_entries: vec![
                     ("cpu".to_owned(), cpu_target.abi.clone()),
