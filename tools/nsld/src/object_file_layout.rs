@@ -26,6 +26,9 @@ pub(crate) fn nsld_object_file_layout_report(
             &byte_layout.sections,
             object_plan.relocation_seed_count,
         ),
+        "elf-amd64" => {
+            elf_amd64_file_layout_records(&byte_layout.sections, &object_plan.relocation_seeds)
+        }
         _ => generic_unknown_file_layout_records(),
     };
     let total_file_size_bytes = records
@@ -242,6 +245,112 @@ fn mach_o_arm64_file_layout_records(
     ));
 
     records
+}
+
+fn elf_amd64_file_layout_records(
+    sections: &[super::reports::NsldObjectByteSectionDiagnostic],
+    relocation_seeds: &[super::reports::NsldObjectRelocationSeedDiagnostic],
+) -> Vec<NsldObjectFileLayoutRecordDiagnostic> {
+    let mut records = vec![layout_record(0, "elf.header", "elf-header", 0, 64, 8)];
+    let mut cursor = 64usize;
+    for section in sections {
+        cursor = align_to(cursor, section.alignment.max(1));
+        records.push(layout_record(
+            records.len(),
+            &format!("section.{}", section.source_section_id),
+            "section-payload",
+            cursor,
+            section.size_bytes,
+            section.alignment.max(1),
+        ));
+        cursor = cursor.saturating_add(section.size_bytes);
+    }
+    for section in sections {
+        let count = relocation_seeds
+            .iter()
+            .filter(|seed| seed.source_section_id == section.source_section_id)
+            .count();
+        if count == 0 {
+            continue;
+        }
+        cursor = align_to(cursor, 8);
+        records.push(layout_record(
+            records.len(),
+            &format!("elf.relocations.{}", section.source_section_id),
+            "elf-relocation-table",
+            cursor,
+            count.saturating_mul(24),
+            8,
+        ));
+        cursor = cursor.saturating_add(count.saturating_mul(24));
+    }
+    cursor = align_to(cursor, 8);
+    let symbol_count = sections.len().saturating_add(2);
+    records.push(layout_record(
+        records.len(),
+        "elf.symbols",
+        "elf-symbol-table",
+        cursor,
+        symbol_count.saturating_mul(24),
+        8,
+    ));
+    cursor = cursor.saturating_add(symbol_count.saturating_mul(24));
+    records.push(layout_record(
+        records.len(),
+        "elf.strings",
+        "elf-string-table",
+        cursor,
+        1 + "__nuis_entry".len() + 1,
+        1,
+    ));
+    cursor = cursor.saturating_add(1 + "__nuis_entry".len() + 1);
+    let section_name_table_size = elf_section_names(sections, relocation_seeds)
+        .iter()
+        .map(|name| name.len() + 1)
+        .sum::<usize>()
+        .saturating_add(1);
+    records.push(layout_record(
+        records.len(),
+        "elf.section-names",
+        "elf-section-name-table",
+        cursor,
+        section_name_table_size,
+        1,
+    ));
+    cursor = cursor.saturating_add(section_name_table_size);
+    cursor = align_to(cursor, 8);
+    let section_count = records.len();
+    records.push(layout_record(
+        records.len(),
+        "elf.section-headers",
+        "elf-section-header-table",
+        cursor,
+        section_count.saturating_mul(64),
+        8,
+    ));
+    records
+}
+
+fn elf_section_names(
+    sections: &[super::reports::NsldObjectByteSectionDiagnostic],
+    relocation_seeds: &[super::reports::NsldObjectRelocationSeedDiagnostic],
+) -> Vec<String> {
+    let mut names = sections
+        .iter()
+        .map(|section| section.object_section_name.clone())
+        .collect::<Vec<_>>();
+    names.extend(sections.iter().filter_map(|section| {
+        relocation_seeds
+            .iter()
+            .any(|seed| seed.source_section_id == section.source_section_id)
+            .then(|| format!(".rela{}", section.object_section_name))
+    }));
+    names.extend([
+        ".symtab".to_owned(),
+        ".strtab".to_owned(),
+        ".shstrtab".to_owned(),
+    ]);
+    names
 }
 
 fn generic_unknown_file_layout_records() -> Vec<NsldObjectFileLayoutRecordDiagnostic> {
@@ -494,6 +603,35 @@ mod tests {
         assert!(rendered.contains("object_family = \"mach-o\""));
         assert!(json.contains("\"writer_backend_kind\":\"mach-o-arm64\""));
         assert!(json.contains("\"object_family\":\"mach-o\""));
+    }
+
+    #[test]
+    fn elf_amd64_file_layout_reserves_relocations_and_linker_tables() {
+        let mut plan = empty_link_plan();
+        plan.cpu_target.machine_arch = "x86_64".to_owned();
+        plan.cpu_target.machine_os = "linux".to_owned();
+        plan.cpu_target.object_format = "elf".to_owned();
+        let report = nsld_object_file_layout_report(Path::new("manifest.toml"), &plan);
+
+        assert_eq!(report.writer_backend_kind, "elf-amd64");
+        assert_eq!(report.object_family, "elf");
+        assert_eq!(report.records[0].record_kind, "elf-header");
+        assert!(report
+            .records
+            .iter()
+            .any(|record| record.record_kind == "elf-relocation-table"));
+        assert!(report
+            .records
+            .iter()
+            .any(|record| record.record_kind == "elf-symbol-table"));
+        assert!(report
+            .records
+            .iter()
+            .any(|record| record.record_kind == "elf-section-name-table"));
+        assert_eq!(
+            report.records.last().unwrap().record_kind,
+            "elf-section-header-table"
+        );
     }
 
     #[test]

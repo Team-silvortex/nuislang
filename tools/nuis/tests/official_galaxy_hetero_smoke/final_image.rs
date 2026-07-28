@@ -103,5 +103,52 @@ fn assemble_provider_complete_final_image(
         completion.dispatch_authority_status == "verified"
             && completion.dispatch_id != "none"
             && completion.dispatch_runner_adapter_id != "none"
+            && completion.completion_evidence_contract
+                == "nuis-provider-completion-evidence-collection-v1"
+            && completion.completion_evidence_status == "verified"
+            && completion.completion_evidence_count > 0
+            && completion
+                .completion_clock_evidence
+                .starts_with("nuis-provider-completion-clock-v1:")
+            && completion
+                .completion_tokens
+                .starts_with("provider-completion:0x")
+            && completion.glm_release_contract == "nuis-provider-glm-release-evidence-v1"
+            && completion.glm_release_tokens.starts_with("glm-release:0x")
+            && completion.glm_release_status == "released-at-graph-close"
     }));
+    for completion in &replay.provider_completions {
+        assert_provider_output_evidence_hash(output_dir, &completion.output_evidence);
+    }
+    let final_output = run_nsld(&["final-executable-output", &output_dir_text, "--json"]);
+    assert_success(
+        &final_output,
+        "Nsld consumes provider completion and GLM evidence",
+    );
+    let final_output_stdout = String::from_utf8_lossy(&final_output.stdout);
+    assert!(
+        final_output_stdout.contains(
+            "\"completion_evidence_contract\":\"nuis-provider-completion-evidence-collection-v1\""
+        ) && final_output_stdout.contains("\"completion_evidence_status\":\"verified\"")
+            && final_output_stdout.contains("\"completion_tokens\":\"provider-completion:0x")
+            && final_output_stdout
+                .contains("\"glm_release_contract\":\"nuis-provider-glm-release-evidence-v1\"")
+            && final_output_stdout.contains("\"glm_release_tokens\":\"glm-release:0x"),
+        "Nsld final output omitted verified provider completion evidence\n{final_output_stdout}"
+    );
+}
+
+fn assert_provider_output_evidence_hash(output_dir: &Path, evidence: &str) {
+    let mut parts = evidence.split(':');
+    let file_name = parts.next().expect("provider output evidence file");
+    let hash_claim = parts
+        .find_map(|part| part.strip_prefix("hash="))
+        .expect("provider output evidence hash");
+    let bytes = fs::read(output_dir.join(file_name)).expect("provider output payload");
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in bytes {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    assert_eq!(hash_claim, format!("0x{hash:016x}"));
 }

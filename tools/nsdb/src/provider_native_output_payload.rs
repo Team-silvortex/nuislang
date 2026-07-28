@@ -255,6 +255,22 @@ pub(crate) fn push_native_output_summary(
             summary.graph_output_release_roles.as_str(),
         ),
         (
+            "completion_evidence_contract",
+            summary.completion_evidence_contract.as_str(),
+        ),
+        (
+            "completion_clock_evidence",
+            summary.completion_clock_evidence.as_str(),
+        ),
+        ("completion_token", summary.completion_token.as_str()),
+        ("completion_status", summary.completion_status.as_str()),
+        (
+            "glm_release_contract",
+            summary.glm_release_contract.as_str(),
+        ),
+        ("glm_release_token", summary.glm_release_token.as_str()),
+        ("glm_release_status", summary.glm_release_status.as_str()),
+        (
             "output_binding_contract",
             summary.output_binding_contract.as_str(),
         ),
@@ -623,6 +639,22 @@ pub(crate) fn push_indexed_native_output(
             summary.graph_output_release_roles.as_str(),
         ),
         (
+            "completion_evidence_contract",
+            summary.completion_evidence_contract.as_str(),
+        ),
+        (
+            "completion_clock_evidence",
+            summary.completion_clock_evidence.as_str(),
+        ),
+        ("completion_token", summary.completion_token.as_str()),
+        ("completion_status", summary.completion_status.as_str()),
+        (
+            "glm_release_contract",
+            summary.glm_release_contract.as_str(),
+        ),
+        ("glm_release_token", summary.glm_release_token.as_str()),
+        ("glm_release_status", summary.glm_release_status.as_str()),
+        (
             "output_binding_contract",
             summary.output_binding_contract.as_str(),
         ),
@@ -732,7 +764,7 @@ pub(crate) fn native_output_collection_hash(outputs: &[PixelMagicNativeOutputSum
         .enumerate()
         .map(|(index, output)| {
             format!(
-                "{index}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{};",
+                "{index}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{};",
                 output.request_id,
                 output.hash,
                 output.output_carrier_adapter_id,
@@ -743,6 +775,8 @@ pub(crate) fn native_output_collection_hash(outputs: &[PixelMagicNativeOutputSum
                 output.session_lease_id,
                 output.output_handle_id,
                 output.output_handle_ownership_token,
+                output.completion_token,
+                output.glm_release_token,
                 output.comparison_contract,
                 output.comparison_status
             )

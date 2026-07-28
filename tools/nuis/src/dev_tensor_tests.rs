@@ -41,7 +41,7 @@ fn task_selection_advances_to_linux_cuda_after_previous_cells_close() {
         "heterogeneous-runtime/linux-cuda/cuda-provider-bringup"
     );
     assert_eq!(selected.status, "active");
-    assert_eq!(selected.progress, 75);
+    assert_eq!(selected.progress, 99);
 }
 
 #[test]
@@ -323,7 +323,8 @@ fn dev_tensor_json_exposes_coordinate_cells() {
     assert!(json.contains("\"module\":\"linux-cuda\""));
     assert!(json.contains("\"function\":\"cuda-provider-bringup\""));
     assert!(json.contains("nuis-linux-cuda-host-probe-v1"));
-    assert!(json.contains("nuis-cuda-ptx-driver-smoke-v1"));
+    assert!(json.contains("nuis-cuda-device-inventory-v1"));
+    assert!(json.contains("capability-ranked-lowest-ordinal"));
     assert!(json.contains("\"blocker\""));
     assert!(json.contains("\"next_action\""));
     assert!(json.contains("\"validation_command\""));

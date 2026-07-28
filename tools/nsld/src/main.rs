@@ -186,6 +186,7 @@ mod main_tests;
 #[cfg(test)]
 mod main_toml_tests;
 mod object_byte_layout;
+mod object_elf_image;
 mod object_emit;
 mod object_emit_render;
 mod object_file_layout;

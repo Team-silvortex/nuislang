@@ -8,8 +8,8 @@ use crate::model::{
     PayloadExecutionHandoffRecord,
 };
 use crate::provider_completion_dispatch::{
-    authority_for_record, bind_events_from_final_image, completion_identity,
-    parse_event_fields as parse_dispatch_fields, render_event_fields as render_dispatch_fields,
+    bind_events_from_final_image, completion_identity, parse_event_fields as parse_dispatch_fields,
+    render_event_fields as render_dispatch_fields,
 };
 use crate::provider_completion_integrity::{
     legacy_set_hash as legacy_provider_completion_set_hash,
@@ -45,7 +45,9 @@ pub(crate) fn persist_provider_completion_handoff(
                 && record.sample_status == "provider-execution-ready"
                 && record.validation_status == "provider-execution-validated"
         })
-        .map(|record| provider_completion_event(record, &final_image))
+        .map(|record| {
+            crate::provider_completion_evidence::event_from_record(output_dir, record, &final_image)
+        })
         .collect::<Result<Vec<_>, _>>()?;
     if completions.is_empty() {
         return Ok(0);
@@ -220,45 +222,11 @@ fn internal_handoff_event(record: PayloadExecutionHandoffRecord) -> NsdbPayloadE
         provider_family: record.provider_family,
         output_contract: record.output_contract,
         output_evidence: record.output_evidence,
+        provider_completion_evidence: Default::default(),
         provider_completion_dispatch: Default::default(),
         first_blocker: record.first_blocker,
         next_action: record.next_action,
     }
-}
-
-fn provider_completion_event(
-    record: &NsdbDeviceProviderSampleRecordInfo,
-    final_image: &crate::final_image_provider_dispatch::FinalImageProviderDispatchAuthority,
-) -> Result<NsdbPayloadExecutionEvent, String> {
-    let output_evidence = if !matches!(
-        record.provider_output_payload_evidence.as_str(),
-        "none" | "not-materialized"
-    ) {
-        record.provider_output_payload_evidence.clone()
-    } else {
-        record.output_evidence.clone()
-    };
-    let output_contract = if record.provider_output_payload_contract == "none" {
-        "nsdb-yir-provider-sample-artifact-v1".to_owned()
-    } else {
-        record.provider_output_payload_contract.clone()
-    };
-    Ok(NsdbPayloadExecutionEvent {
-        index: 0,
-        trace_id: record.trace_id.clone(),
-        status: "ready".to_owned(),
-        execution_phase: "provider-device-completion".to_owned(),
-        target: record.provider_family.clone(),
-        entry_symbol: record.provider.clone(),
-        entry_kind: output_contract.clone(),
-        entry_section_id: output_evidence.clone(),
-        provider_family: record.provider_family.clone(),
-        output_contract,
-        output_evidence,
-        provider_completion_dispatch: authority_for_record(final_image, record)?,
-        first_blocker: "none".to_owned(),
-        next_action: "replay-provider-completion".to_owned(),
-    })
 }
 
 fn render_payload_execution_handoff(
@@ -395,6 +363,10 @@ fn render_payload_execution_handoff(
         push_toml_string(&mut out, "provider_family", &event.provider_family);
         push_toml_string(&mut out, "output_contract", &event.output_contract);
         push_toml_string(&mut out, "output_evidence", &event.output_evidence);
+        crate::provider_completion_evidence::render_event_fields(
+            &mut out,
+            &event.provider_completion_evidence,
+        );
         render_dispatch_fields(&mut out, &event.provider_completion_dispatch);
         push_toml_string(
             &mut out,
@@ -727,6 +699,9 @@ fn parse_payload_execution_events(source: &str) -> Vec<NsdbPayloadExecutionEvent
                 .unwrap_or_else(|| "none".to_owned()),
             output_evidence: parse_string_toml_field(record, "output_evidence")
                 .unwrap_or_else(|| "none".to_owned()),
+            provider_completion_evidence: crate::provider_completion_evidence::parse_event_fields(
+                record,
+            ),
             provider_completion_dispatch: parse_dispatch_fields(record),
             first_blocker: parse_string_toml_field(record, "first_blocker")
                 .filter(|value| !value.is_empty())

@@ -1,4 +1,8 @@
 use super::{
+    object_elf_image::{
+        elf_amd64_relocation_lowering_rules, elf_amd64_relocation_records,
+        elf_amd64_relocation_resolution_issues, encode_elf_amd64_image,
+    },
     object_macho_image::encode_mach_o_arm64_image,
     object_macho_relocations::{
         mach_o_arm64_relocation_lowering_rule_count, mach_o_arm64_relocation_lowering_rules,
@@ -89,7 +93,12 @@ pub(crate) fn object_image_backend_capabilities(
             backend_capability("relocation-lowering", "ready"),
             backend_capability("object-image-encoder", "ready"),
         ],
-        "elf-aarch64" | "elf-amd64" => vec![
+        "elf-amd64" => vec![
+            backend_capability("file-layout-consumer", "ready"),
+            backend_capability("relocation-lowering", "ready"),
+            backend_capability("object-image-encoder", "ready"),
+        ],
+        "elf-aarch64" => vec![
             backend_capability("file-layout-consumer", "ready"),
             backend_capability("relocation-lowering", "not-implemented"),
             backend_capability("object-image-encoder", "not-implemented"),
@@ -106,6 +115,7 @@ pub(crate) fn object_image_backend_capabilities(
 pub(crate) fn object_image_backend_relocation_lowering_rule_count(backend_kind: &str) -> usize {
     match backend_kind {
         "mach-o-arm64" => mach_o_arm64_relocation_lowering_rule_count(),
+        "elf-amd64" => elf_amd64_relocation_lowering_rules().len(),
         _ => 0,
     }
 }
@@ -126,6 +136,7 @@ pub(crate) fn object_image_backend_relocation_lowering_rules(
 ) -> Vec<NsldRelocationLoweringRuleDiagnostic> {
     match backend_kind {
         "mach-o-arm64" => mach_o_arm64_relocation_lowering_rules(),
+        "elf-amd64" => elf_amd64_relocation_lowering_rules(),
         _ => Vec::new(),
     }
 }
@@ -138,6 +149,7 @@ pub(crate) fn object_image_backend_relocation_records(
 ) -> Vec<NsldObjectImageRelocationRecordDiagnostic> {
     match backend_kind {
         "mach-o-arm64" => mach_o_arm64_relocation_records(manifest, plan, file_layout),
+        "elf-amd64" => elf_amd64_relocation_records(manifest, plan, file_layout),
         _ => Vec::new(),
     }
 }
@@ -165,8 +177,8 @@ fn object_image_backend_entries() -> Vec<ObjectImageBackendEntry> {
         ObjectImageBackendEntry {
             backend_kind: "elf-amd64",
             object_family: "elf",
-            status: "not-implemented",
-            encoder: None,
+            status: "ready",
+            encoder: Some(encode_elf_amd64_image),
         },
         ObjectImageBackendEntry {
             backend_kind: "coff-amd64",
@@ -185,6 +197,7 @@ fn object_image_backend_resolution_issues(
 ) -> Vec<String> {
     match backend_kind {
         "mach-o-arm64" => mach_o_arm64_relocation_resolution_issues(manifest, plan, file_layout),
+        "elf-amd64" => elf_amd64_relocation_resolution_issues(manifest, plan, file_layout),
         _ => Vec::new(),
     }
 }
@@ -216,12 +229,12 @@ mod tests {
     }
 
     #[test]
-    fn image_backend_registry_reserves_elf_and_coff_slots() {
+    fn image_backend_registry_enables_amd64_elf_and_reserves_other_slots() {
         assert_eq!(
             object_image_backend_status("elf-aarch64"),
             "not-implemented"
         );
-        assert_eq!(object_image_backend_status("elf-amd64"), "not-implemented");
+        assert_eq!(object_image_backend_status("elf-amd64"), "ready");
         assert_eq!(object_image_backend_status("coff-amd64"), "not-implemented");
         assert_eq!(object_image_backend_family("elf-amd64"), "elf");
         assert_eq!(object_image_backend_family("coff-amd64"), "coff");
@@ -229,7 +242,7 @@ mod tests {
             .iter()
             .any(
                 |capability| capability.capability_id == "object-image-encoder"
-                    && capability.status == "not-implemented"
+                    && capability.status == "ready"
             ));
     }
 

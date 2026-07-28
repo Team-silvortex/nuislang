@@ -11,6 +11,11 @@ use std::collections::BTreeMap;
 
 pub(crate) const PROVIDER_GRAPH_OUTPUT_OWNERSHIP_CONTRACT: &str =
     "nuis-provider-graph-output-ownership-v1";
+pub(crate) const PROVIDER_COMPLETION_EVIDENCE_CONTRACT: &str =
+    "nuis-provider-completion-evidence-v1";
+pub(crate) const PROVIDER_COMPLETION_CLOCK_CONTRACT: &str = "nuis-provider-completion-clock-v1";
+pub(crate) const PROVIDER_GLM_RELEASE_EVIDENCE_CONTRACT: &str =
+    "nuis-provider-glm-release-evidence-v1";
 
 pub(crate) fn bind_output_binding_summary(
     summary: &mut PixelMagicNativeOutputSummary,
@@ -79,6 +84,13 @@ pub(crate) struct ProviderGraphOutputCloseReceipt {
     pub(crate) contract: &'static str,
     pub(crate) released_output_count: usize,
     pub(crate) released_output_roles: String,
+    released_outputs: Vec<ReleasedProviderOutput>,
+}
+
+struct ReleasedProviderOutput {
+    request_id: String,
+    role: String,
+    buffer: String,
 }
 
 impl CompletedProviderOutputs {
@@ -114,13 +126,109 @@ impl CompletedProviderOutputs {
             .map(|output| output.role.as_str())
             .collect::<Vec<_>>()
             .join(",");
+        let released_outputs = self
+            .outputs
+            .iter()
+            .map(|(key, output)| ReleasedProviderOutput {
+                request_id: key.request_id.clone(),
+                role: output.role.clone(),
+                buffer: output.buffer.clone(),
+            })
+            .collect();
         self.outputs.clear();
         ProviderGraphOutputCloseReceipt {
             contract: PROVIDER_GRAPH_OUTPUT_OWNERSHIP_CONTRACT,
             released_output_count,
             released_output_roles,
+            released_outputs,
         }
     }
+}
+
+pub(crate) fn bind_provider_completion_evidence(
+    summary: &mut PixelMagicNativeOutputSummary,
+    close: &ProviderGraphOutputCloseReceipt,
+) -> Result<(), String> {
+    let session_sequence = summary
+        .session_request_sequence
+        .parse::<usize>()
+        .map_err(|_| "provider completion has no valid session sequence".to_owned())?;
+    let worker_sequence = summary
+        .worker_request_sequence
+        .parse::<usize>()
+        .map_err(|_| "provider completion has no valid worker sequence".to_owned())?;
+    if session_sequence != worker_sequence {
+        return Err("provider completion session and worker clocks diverged".to_owned());
+    }
+    let dispatch_status = summary
+        .worker_dispatch_status
+        .parse::<i64>()
+        .map_err(|_| "provider completion has no valid worker dispatch status".to_owned())?;
+    if summary.worker_output_receipt_status != "verified" || dispatch_status <= 0 {
+        return Err("provider completion has no successful verified worker receipt".to_owned());
+    }
+    let releases = close
+        .released_outputs
+        .iter()
+        .filter(|output| output.request_id == summary.request_id)
+        .collect::<Vec<_>>();
+    let expected_count = summary
+        .output_binding_count
+        .parse::<usize>()
+        .map_err(|_| "provider completion has no valid output binding count".to_owned())?;
+    let released_roles = releases
+        .iter()
+        .map(|output| output.role.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    let handle_roles = summary
+        .output_handle_roles
+        .split(',')
+        .collect::<std::collections::BTreeSet<_>>();
+    if releases.len() != expected_count || released_roles != handle_roles {
+        return Err("provider completion release set does not match GLM output handles".to_owned());
+    }
+
+    let completion_clock = format!(
+        "{PROVIDER_COMPLETION_CLOCK_CONTRACT}:domain={}:session={session_sequence}:worker={worker_sequence}",
+        summary.session_lease_id
+    );
+    let completion_hash = fnv1a64_hex(
+        format!(
+            "{completion_clock}:{}:{}:{}:{}:{}",
+            summary.worker_operation_token,
+            summary.worker_execution_capsule_token,
+            summary.worker_output_descriptor_roles,
+            summary.worker_output_descriptor_hash,
+            summary.worker_additional_output_hashes
+        )
+        .as_bytes(),
+    );
+    let completion_token = format!("provider-completion:{completion_hash}");
+    let release_manifest = releases
+        .iter()
+        .map(|output| format!("{}={}", output.role, output.buffer))
+        .collect::<Vec<_>>()
+        .join(",");
+    let release_hash = fnv1a64_hex(
+        format!(
+            "{completion_token}:{}:{}:{release_manifest}",
+            close.contract, summary.output_handle_ownership_tokens
+        )
+        .as_bytes(),
+    );
+
+    summary.output_handle_release_status = "released-at-graph-close".to_owned();
+    summary.graph_output_ownership_contract = close.contract.to_owned();
+    summary.graph_output_release_count = close.released_output_count.to_string();
+    summary.graph_output_release_roles = close.released_output_roles.clone();
+    summary.completion_evidence_contract = PROVIDER_COMPLETION_EVIDENCE_CONTRACT.to_owned();
+    summary.completion_clock_evidence = completion_clock;
+    summary.completion_token = completion_token;
+    summary.completion_status = "worker-output-verified".to_owned();
+    summary.glm_release_contract = PROVIDER_GLM_RELEASE_EVIDENCE_CONTRACT.to_owned();
+    summary.glm_release_token = format!("glm-release:{release_hash}");
+    summary.glm_release_status = "released-at-graph-close".to_owned();
+    Ok(())
 }
 
 #[cfg(unix)]

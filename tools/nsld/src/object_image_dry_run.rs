@@ -39,7 +39,9 @@ pub(crate) fn nsld_object_image_dry_run_report(
     blockers.extend(image_result.blockers);
     let relocation_lowering_issues = blockers
         .iter()
-        .filter(|blocker| blocker.starts_with("mach-o-relocation:"))
+        .filter(|blocker| {
+            blocker.starts_with("mach-o-relocation:") || blocker.starts_with("elf-relocation:")
+        })
         .cloned()
         .collect::<Vec<_>>();
     let relocation_lowering_valid = relocation_lowering_issues.is_empty();

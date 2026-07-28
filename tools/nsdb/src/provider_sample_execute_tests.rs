@@ -191,6 +191,17 @@ materialization_status = "provider-sample-materialized"
         "native_output_graph_output_ownership_contract = \"nuis-provider-graph-output-ownership-v1\""
     ));
     assert!(payload.contains("native_output_graph_output_release_count = \"2\""));
+    assert!(payload.contains(
+        "native_output_completion_evidence_contract = \"nuis-provider-completion-evidence-v1\""
+    ));
+    assert!(payload.contains(
+        "native_output_completion_clock_evidence = \"nuis-provider-completion-clock-v1:"
+    ));
+    assert!(payload.contains("native_output_completion_status = \"worker-output-verified\""));
+    assert!(payload.contains(
+        "native_output_glm_release_contract = \"nuis-provider-glm-release-evidence-v1\""
+    ));
+    assert!(payload.contains("native_output_glm_release_status = \"released-at-graph-close\""));
     assert!(
         payload
             .contains("native_output_graph_output_release_roles = \"output.audit,output.primary\"")
@@ -198,6 +209,46 @@ materialization_status = "provider-sample-materialized"
                 "native_output_graph_output_release_roles = \"output.primary,output.audit\""
             )
     );
+    let completion = crate::provider_completion_evidence::from_output_payload(
+        &output_dir,
+        &format!(
+            "nuis.nsdb.provider-output.data-host.toml:hash={}:status=written",
+            fnv1a64_hex(payload.as_bytes())
+        ),
+    )
+    .expect("verified completion evidence");
+    assert_eq!(completion.count, 1);
+    assert_eq!(completion.status, "verified");
+    assert!(completion
+        .completion_tokens
+        .starts_with("provider-completion:0x"));
+    assert!(completion.glm_release_tokens.starts_with("glm-release:0x"));
+    let tampered = payload
+        .lines()
+        .map(|line| {
+            if line.starts_with("native_output_0_completion_token = ") {
+                "native_output_0_completion_token = \"provider-completion:0x0000000000000000\""
+            } else {
+                line
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    fs::write(
+        output_dir.join("nuis.nsdb.provider-output.data-host.toml"),
+        &tampered,
+    )
+    .unwrap();
+    let tampered_evidence = format!(
+        "nuis.nsdb.provider-output.data-host.toml:hash={}:status=written",
+        fnv1a64_hex(tampered.as_bytes())
+    );
+    assert!(crate::provider_completion_evidence::from_output_payload(
+        &output_dir,
+        &tampered_evidence
+    )
+    .unwrap_err()
+    .contains("completion token mismatch"));
 
     fs::remove_dir_all(output_dir).unwrap();
 }
@@ -250,7 +301,7 @@ provider_kernel_input_buffer=input.left;\
 provider_kernel_input_buffers=input.left,input.right;\
 provider_kernel_output_buffer=output.values;\
 provider_kernel_dispatch=4x1x1;\
-provider_kernel_scalar_bindings=element_count:u32:4;\
+provider_kernel_scalar_bindings=element_count:u32:4,device_selection_policy:u32:1,minimum_compute_capability:u32:80;\
 provider_code_asset_descriptor_contract=nuis-provider-code-asset-descriptor-v1;\
 provider_code_asset_id={};\
 provider_code_asset_format={};\
@@ -361,6 +412,27 @@ materialization_status = "provider-sample-materialized"
     ));
     assert!(payload.contains("native_output_comparison_status = \"comparison-passed\""));
     assert!(payload.contains("native_output_graph_output_release_count = \"1\""));
+    assert!(payload.contains(
+        "native_output_completion_evidence_contract = \"nuis-provider-completion-evidence-v1\""
+    ));
+    assert!(payload.contains("native_output_completion_token = \"provider-completion:0x"));
+    assert!(payload.contains(
+        "native_output_glm_release_contract = \"nuis-provider-glm-release-evidence-v1\""
+    ));
+    assert!(payload.contains("native_output_glm_release_token = \"glm-release:0x"));
+    let completion = crate::provider_completion_evidence::from_output_payload(
+        &output_dir,
+        &format!(
+            "nuis.nsdb.provider-output.cuda-nvidia-gpu.toml:hash={}:status=written",
+            fnv1a64_hex(payload.as_bytes())
+        ),
+    )
+    .expect("verified CUDA completion evidence");
+    assert_eq!(completion.count, 1);
+    assert_eq!(completion.status, "verified");
+    assert!(completion
+        .clock_evidence
+        .starts_with("nuis-provider-completion-clock-v1:"));
 
     fs::remove_dir_all(output_dir).unwrap();
 }

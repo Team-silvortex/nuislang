@@ -14,7 +14,8 @@ use crate::{
     },
     provider_edge_transport::ProviderEdgeTransportReceipt,
     provider_graph_output::{
-        bind_output_binding_summary, CompletedProviderOutput, CompletedProviderOutputs,
+        bind_output_binding_summary, bind_provider_completion_evidence, CompletedProviderOutput,
+        CompletedProviderOutputs,
     },
     provider_output_comparison::{
         bind_output_comparison_collection, compare_provider_output_collection,
@@ -187,16 +188,21 @@ pub fn execute_provider_samples(
                 .iter()
                 .map(|record| record.provider_family.as_str()),
         );
+    let mut completion_records = Vec::new();
     let mut output_payloads = Vec::new();
     for record in &matched_records {
         let adapter = select_provider_runner_adapter(&record.provider_family);
         if !adapter.real_device_capable {
             continue;
         }
-        output_payloads.push(write_provider_output_payload(output_dir, record, &adapter)?);
+        let output = write_provider_output_payload(output_dir, record, &adapter)?;
+        let mut completion = (**record).clone();
+        completion.provider_output_payload_evidence = output.evidence.clone();
+        completion_records.push(completion);
+        output_payloads.push(output);
     }
     if final_image_dispatch.available {
-        crate::handoff::persist_provider_completion_handoff(output_dir, &manifest.records)?;
+        crate::handoff::persist_provider_completion_handoff(output_dir, &completion_records)?;
     }
     let first_native_output = output_payloads
         .first()
@@ -531,10 +537,7 @@ fn execute_native_provider_outputs(
     #[cfg(unix)]
     worker_leases.close()?;
     for summary in &mut summaries {
-        summary.output_handle_release_status = "released-at-graph-close".to_owned();
-        summary.graph_output_ownership_contract = graph_output_close.contract.to_owned();
-        summary.graph_output_release_count = graph_output_close.released_output_count.to_string();
-        summary.graph_output_release_roles = graph_output_close.released_output_roles.clone();
+        bind_provider_completion_evidence(summary, &graph_output_close)?;
     }
     Ok(NativeProviderOutputs {
         native_outputs: summaries,

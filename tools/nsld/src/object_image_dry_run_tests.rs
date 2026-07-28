@@ -89,7 +89,7 @@ fn object_image_dry_run_serializes_writer_identity() {
 }
 
 #[test]
-fn reports_elf_image_backend_capabilities_as_blocked() {
+fn reports_ready_elf_amd64_image_backend_capabilities() {
     let mut plan = empty_link_plan();
     plan.cpu_target.machine_arch = "x86_64".to_owned();
     plan.cpu_target.machine_os = "linux".to_owned();
@@ -100,19 +100,20 @@ fn reports_elf_image_backend_capabilities_as_blocked() {
 
     assert_eq!(report.writer_backend_kind, "elf-amd64");
     assert_eq!(report.backend_family, "elf");
-    assert_eq!(report.backend_status, "not-implemented");
-    assert!(!report.image_constructed);
+    assert_eq!(report.backend_status, "ready");
+    assert!(report.image_constructed);
     assert!(!report.image_ready);
     assert!(report.backend_capabilities.iter().any(|capability| {
-        capability.capability_id == "object-image-encoder" && capability.status == "not-implemented"
+        capability.capability_id == "object-image-encoder" && capability.status == "ready"
     }));
-    assert!(report
+    assert!(!report
         .blockers
-        .contains(&"object-image-backend:elf-amd64:not-implemented".to_owned()));
-    assert!(rendered.contains("backend_status = \"not-implemented\""));
+        .iter()
+        .any(|blocker| blocker.starts_with("object-image-backend:elf-amd64:")));
+    assert!(rendered.contains("backend_status = \"ready\""));
     assert!(rendered.contains("capability_id = \"object-image-encoder\""));
-    assert!(rendered.contains("status = \"not-implemented\""));
-    assert!(json.contains("\"backend_status\":\"not-implemented\""));
+    assert!(rendered.contains("status = \"ready\""));
+    assert!(json.contains("\"backend_status\":\"ready\""));
     assert!(json.contains("\"capability_id\":\"object-image-encoder\""));
 }
 

@@ -91,6 +91,9 @@ fn provider_family_artifact_component(provider_family: &str) -> String {
 mod build;
 #[path = "official_galaxy_hetero_smoke/final_image.rs"]
 mod final_image;
+#[cfg(target_os = "linux")]
+#[path = "official_galaxy_hetero_smoke/linux_cuda.rs"]
+mod linux_cuda;
 #[path = "official_galaxy_hetero_smoke/provider_execution_evidence.rs"]
 mod provider_execution_evidence;
 #[path = "official_galaxy_hetero_smoke/replay.rs"]

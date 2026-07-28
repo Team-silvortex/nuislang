@@ -17,6 +17,7 @@ pub(crate) fn record_hash(
         "{}\0{}\0{}\0{}",
         event.trace_id, event.provider_family, event.output_contract, event.output_evidence
     );
+    crate::provider_completion_evidence::append_hash_material(&mut material, event);
     if event.provider_completion_dispatch.contract
         == crate::provider_completion_dispatch::COMPLETION_AUTHORITY_CONTRACT
         && event.provider_completion_dispatch.status != "not-applicable"

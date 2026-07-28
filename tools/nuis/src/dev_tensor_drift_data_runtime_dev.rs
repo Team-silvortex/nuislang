@@ -290,7 +290,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "persist_payload_execution_handoff_record",
             "persist_provider_completion_handoff",
             "provider-device-completion",
-            "replay-provider-completion",
+            "event_from_record",
             "nsdb-provider-sample-materialization",
             "provider_family",
             "output_contract",

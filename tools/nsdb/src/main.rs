@@ -22,6 +22,7 @@ mod provider_carrier_channel_unix;
 mod provider_carrier_input;
 mod provider_code_asset;
 mod provider_completion_dispatch;
+mod provider_completion_evidence;
 mod provider_completion_integrity;
 mod provider_completion_signature;
 mod provider_completion_trust_anchor;

@@ -138,7 +138,7 @@ fn canonical_object_format(object_format: &str) -> &str {
 
 fn object_writer_backend_status(backend_kind: &str) -> &'static str {
     match backend_kind {
-        "mach-o-arm64" => "ready",
+        "mach-o-arm64" | "elf-amd64" => "ready",
         "unknown-object-writer" => "unsupported-target",
         _ => "recognized-blocked",
     }
@@ -184,7 +184,7 @@ fn object_writer_stage_ids(backend_kind: &str) -> Vec<String> {
 
 fn object_writer_unsupported_features(backend_kind: &str) -> Vec<String> {
     match backend_kind {
-        "mach-o-arm64" => Vec::new(),
+        "mach-o-arm64" | "elf-amd64" => Vec::new(),
         "unknown-object-writer" => vec!["object-writer-target".to_owned()],
         _ => vec![
             "object-byte-emitter".to_owned(),
@@ -202,6 +202,14 @@ fn object_writer_stage_status(backend_kind: &str, stage_id: &str) -> &'static st
             | "macho-symbol-table"
             | "macho-relocation-table"
             | "macho-byte-emission",
+        ) => "ready",
+        (
+            "elf-amd64",
+            "elf-header"
+            | "elf-section-table"
+            | "elf-symbol-table"
+            | "elf-relocation-table"
+            | "elf-byte-emission",
         ) => "ready",
         _ => "not-implemented",
     }

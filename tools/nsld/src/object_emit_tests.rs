@@ -43,7 +43,7 @@ fn object_writer_readiness_allows_minimal_mach_o_emit() {
 }
 
 #[test]
-fn object_writer_readiness_reports_blocked_elf_stages() {
+fn object_writer_readiness_allows_elf_amd64_emit() {
     let dir = std::env::temp_dir().join(format!(
         "nsld-object-writer-readiness-elf-{}",
         std::process::id()
@@ -61,19 +61,21 @@ fn object_writer_readiness_reports_blocked_elf_stages() {
     let report_json = crate::json::nsld_object_writer_readiness_report_json(&report);
     fs::remove_dir_all(dir).unwrap();
 
-    assert!(!report.can_emit_object);
-    assert_eq!(report.writer_status, "recognized-blocked");
+    assert!(report.can_emit_object);
+    assert_eq!(report.writer_status, "ready");
     assert!(report
         .writer_stages
         .iter()
-        .any(|stage| stage.stage_id == "elf-header" && stage.status == "not-implemented"));
+        .any(|stage| stage.stage_id == "elf-header" && stage.status == "ready"));
     assert!(report
-        .blockers
+        .writer_stages
         .iter()
-        .any(|blocker| { blocker == "object-writer-stage:elf-byte-emission:not-implemented" }));
+        .all(|stage| stage.required && stage.status == "ready"));
+    assert!(report.unsupported_features.is_empty());
+    assert!(report.blockers.is_empty());
     assert!(report_json.contains("\"writer_stages\":[{"));
     assert!(report_json.contains("\"stage_id\":\"elf-header\""));
-    assert!(report_json.contains("\"status\":\"not-implemented\""));
+    assert!(report_json.contains("\"status\":\"ready\""));
 }
 
 #[test]
@@ -165,6 +167,46 @@ fn emit_object_writes_minimal_mach_o_bytes() {
     assert_eq!(report.writer_backend_kind, "mach-o-arm64");
     assert_eq!(report.object_family, "mach-o");
     assert!(blocked_report.contains("emitted = true"));
+    assert!(report.blockers.is_empty());
+}
+
+#[test]
+fn emit_object_writes_elf64_amd64_bytes() {
+    let dir =
+        std::env::temp_dir().join(format!("nsld-object-emit-elf-amd64-{}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    let mut plan = empty_link_plan();
+    plan.output_dir = dir.display().to_string();
+    plan.compiled_artifact.path = dir.join("nuis.compiled.artifact").display().to_string();
+    plan.cpu_target.machine_arch = "x86_64".to_owned();
+    plan.cpu_target.machine_os = "linux".to_owned();
+    plan.cpu_target.object_format = "elf".to_owned();
+    fs::write(&plan.compiled_artifact.path, b"compiled-artifact").unwrap();
+    emit_object_prerequisites(Path::new("manifest.toml"), &plan);
+
+    let report = nsld_emit_object_report(Path::new("manifest.toml"), &plan).unwrap();
+    let dry_run_bytes = fs::read(dir.join("nuis.nsld.object-image-dry-run.bin")).unwrap();
+    let object_bytes = fs::read(dir.join("nuis.nsld.elf")).unwrap();
+    let dry_run_report =
+        fs::read_to_string(dir.join("nuis.nsld.object-image-dry-run.toml")).unwrap();
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(report.emitted);
+    assert!(report.can_emit_object);
+    assert_eq!(report.writer_backend_kind, "elf-amd64");
+    assert_eq!(report.object_family, "elf");
+    assert!(report.output_path.ends_with("nuis.nsld.elf"));
+    assert_eq!(object_bytes, dry_run_bytes);
+    assert_eq!(&object_bytes[..4], b"\x7fELF");
+    assert_eq!(
+        u16::from_le_bytes(object_bytes[18..20].try_into().unwrap()),
+        62
+    );
+    assert!(object_bytes
+        .windows("__nuis_entry".len())
+        .any(|window| window == b"__nuis_entry"));
+    assert!(dry_run_report.contains("backend_status = \"ready\""));
+    assert!(dry_run_report.contains("backend_family = \"elf\""));
     assert!(report.blockers.is_empty());
 }
 

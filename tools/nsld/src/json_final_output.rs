@@ -672,11 +672,31 @@ fn provider_completion_records_json(report: &NsldFinalExecutableOutputReport) ->
         .iter()
         .map(|completion| {
             format!(
-                "{{{},{},{},{},{}}}",
+                "{{{},{},{},{},{},{},{},{},{},{},{},{},{}}}",
                 json_string_field("trace_id", &completion.trace_id),
                 json_string_field("provider_family", &completion.provider_family),
                 json_string_field("output_contract", &completion.output_contract),
                 json_string_field("output_evidence", &completion.output_evidence),
+                json_string_field(
+                    "completion_evidence_contract",
+                    &completion.completion_evidence_contract,
+                ),
+                json_string_field(
+                    "completion_evidence_status",
+                    &completion.completion_evidence_status,
+                ),
+                json_usize_field(
+                    "completion_evidence_count",
+                    completion.completion_evidence_count,
+                ),
+                json_string_field(
+                    "completion_clock_evidence",
+                    &completion.completion_clock_evidence,
+                ),
+                json_string_field("completion_tokens", &completion.completion_tokens),
+                json_string_field("glm_release_contract", &completion.glm_release_contract),
+                json_string_field("glm_release_tokens", &completion.glm_release_tokens),
+                json_string_field("glm_release_status", &completion.glm_release_status),
                 json_string_field("record_hash", &completion.record_hash),
             )
         })

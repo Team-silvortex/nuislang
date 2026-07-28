@@ -483,6 +483,25 @@ next_action = "execute-provider-sample"
         .entry_section_id
         .contains("nuis.nsdb.provider-output.metal-apple-silicon-gpu.toml:hash=0x"));
 
+    let first_evidence = report.first_provider_output_payload_evidence;
+    let second_execute = execute_provider_samples(&output_dir, None).unwrap();
+    let second_evidence = second_execute.first_output_payload_evidence;
+    assert_ne!(second_evidence, first_evidence);
+
+    let refreshed = materialize_provider_samples(&output_dir, None).unwrap();
+    let refreshed_source =
+        fs::read_to_string(output_dir.join("nuis.nsdb.device-provider-samples.toml")).unwrap();
+
+    assert_eq!(refreshed.materialized_record_count, 1);
+    assert_eq!(
+        refreshed.first_provider_output_payload_evidence,
+        second_evidence.replace(":status=written", ":status=attached")
+    );
+    assert!(refreshed_source.contains(&format!(
+        "provider_output_payload_evidence = \"{}\"",
+        refreshed.first_provider_output_payload_evidence
+    )));
+
     fs::remove_dir_all(output_dir).unwrap();
 }
 

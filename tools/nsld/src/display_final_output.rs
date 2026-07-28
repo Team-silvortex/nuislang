@@ -399,11 +399,19 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
     );
     for completion in &report.final_output_nsdb_provider_completions {
         println!(
-            "  final_output_nsdb_provider_completion: {} {} {} {} {}",
+            "  final_output_nsdb_provider_completion: {} {} {} {} {} {} {} {} {} {} {} {} {}",
             completion.trace_id,
             completion.provider_family,
             completion.output_contract,
             completion.output_evidence,
+            completion.completion_evidence_contract,
+            completion.completion_evidence_status,
+            completion.completion_evidence_count,
+            completion.completion_clock_evidence,
+            completion.completion_tokens,
+            completion.glm_release_contract,
+            completion.glm_release_tokens,
+            completion.glm_release_status,
             completion.record_hash
         );
     }

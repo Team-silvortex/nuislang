@@ -1512,7 +1512,7 @@ maintenance reboot repaired the discovered driver mismatch, and the independent
 `nuis-cuda-runtime-smoke-v1` fixture now proves real allocation, transfer,
 launch, synchronization, readback, and `[11,22,33,44]` comparison.
 
-The coordinate is `active/75`, not final-image-provider-ready. Kernel Nustar now
+The coordinate is `active/99`. Kernel Nustar now
 registers `kernel.cuda.ptx8_0.v1`, YIR emits a CUDA backend variant, and AOT
 produces deterministic PTX 8.0 with both an internal source hash and the
 existing payload/artifact hash envelope. The exact sidecar PTX assembles and
@@ -1532,19 +1532,63 @@ contract, and content hash through both single and collection requests.
 Partial descriptors, absolute or traversing paths, and malformed FNV bindings
 fail closed. `nuis-kernel-code-asset-registry-v1` is now the single authority
 for the CUDA PTX bytes, target, entry, package-relative file name, and digest
-contract. AOT materializes the pure PTX file without an external compiler.
+contract. The asset also owns its minimum compute capability. The bytes are
+now produced by `nuis-kernel-ptx-emitter-registry-v1`, which consumes
+`nuis-kernel-yir-codegen-function-v1` functions represented by YIR
+`Node`/`Operation` values. Registered `kernel.add_f32` and `kernel.mul_f32`
+nodes lower into parameter ABI, thread indexing, bounds guards, global
+loads/stores, and PTX arithmetic; unsupported instructions fail closed. AOT
+caches and materializes the generated PTX without an external compiler. An
+optional `ptxas -arch=sm_89` differential check and the real CUDA Driver route
+both accept the same bytes.
 The `official.kernel` input registration verifies those emitted bytes and
-produces an Nsdb-validated vector-add request with two ordered f32 artifact
-inputs, one compared output, and an explicit CUDA adapter binding. The Linux
-runner now executes that request beneath the normal persistent Nuis worker,
+produces an Nsdb-validated two-request graph. Vector-add consumes two ordered
+f32 artifact inputs; scale consumes its transferable output through a
+GLM/time-bound dependency edge. The Linux runner executes both entries beneath
+the normal persistent Nuis worker,
 dynamically resolves `libcuda.so.1` without CUDA headers or SDK linkage, loads
 the hash-bound PTX, launches vector-add on a real RTX 4050, writes the result
 into the worker-owned `NUISPFD1` descriptor, passes exact output comparison,
-and closes the graph-owned result. Remaining work is to promote CUDA
-clock/GLM release evidence into independent records and carry this provider
-identity through the Nsld final-image closure. NVIDIA
-`nvcc`/`ptxas` remain optional differential-validation tools and must not become
-build, packaging, deployment, or runtime requirements.
+and closes the graph-owned result. The graph close now validates equal session
+and persistent-worker sequence clocks, a positive Nuis dispatch receipt, the
+request's complete output-role set, and its GLM ownership tokens before it
+emits hash-bound `nuis-provider-completion-evidence-v1` and
+`nuis-provider-glm-release-evidence-v1` records. Nsdb now rereads the actual
+post-execution payload, verifies its evidence and collection hashes, recomputes
+every completion and release token, and persists those structured fields in
+the completion handoff. Nsld final-output replay carries them beneath the
+existing final-image binding proof and immutable dispatch authority. The
+official post-seal heterogeneous smoke seals the image first, executes only
+after dispatch authorization, verifies the newly written payload hash, and
+then observes the same completion/GLM evidence through Nsld.
+
+`nuis-cuda-device-selection-registry-v1` now keeps selection policy inside the
+CUDA provider registration. Both requests carry the
+`capability-ranked-lowest-ordinal` policy plus the asset-owned `sm_80` floor,
+not a concrete ordinal. The adapter enumerates a
+`nuis-cuda-device-inventory-v1` inventory, chooses the highest capable device
+with the lowest ordinal as a deterministic tie-breaker, and emits
+`nuis-cuda-device-selection-v1`; Nsdb independently verifies the inventory
+count and request-bound policy/capability values. Synthetic multi-device tests
+prove ordering while the real host continues to record
+`cuda:nvidia-gpu:ordinal-0:sm_89` in both native outputs. The compiler
+frontdoor, request parser, Nsld object writer, and replay logic gained no CUDA
+branch.
+
+Runtime completion is deliberately not represented as immutable compile-time
+image data. It is append-bound to the sealed image lineage after execution.
+Nsld now writes a real ELF64-amd64 relocatable object that Linux `file` and
+`readelf` accept, including 16 sections, `__nuis_entry`, and six
+`R_X86_64_64` relocations. The generic seal path produces a self-contained
+CUDA NSB, verifies its immutable dispatch table, authorizes post-seal execution
+on a real RTX 4050, receives exact hashes `0xdc51cb8047a381e1` and
+`0x40372e9bd3b02048`, proves one direct-transfer receipt and two completion
+records, refreshes repeated materialization evidence, and replays verified
+completion and GLM release tokens through Nsdb and Nsld. Remaining work is
+breadth: inventory-backed multi-device policy, additional kernel shapes, CUDA
+graphs, and native device-code evolution. NVIDIA `nvcc`/`ptxas` remain optional
+differential-validation tools and must not become build, packaging, deployment,
+or runtime requirements.
 
 See
 [linux-cuda-provider-bringup.md](linux-cuda-provider-bringup.md)

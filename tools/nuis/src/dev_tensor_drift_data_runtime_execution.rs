@@ -542,9 +542,8 @@ pub(crate) const DEV_TENSOR_RUNTIME_EXECUTION_DRIFT_CHECKS: &[DevTensorDriftChec
                 "begin_request_with_output_roles",
                 "complete_request",
                 "bind_session_output",
-                "released-at-graph-close",
                 "graph_output_close",
-                "graph_output_release_count",
+                "bind_provider_completion_evidence",
             ],
         },
         DevTensorDriftCheckSpec {

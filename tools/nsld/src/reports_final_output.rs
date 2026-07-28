@@ -4,6 +4,14 @@ pub(crate) struct NsldProviderCompletionSummary {
     pub(crate) provider_family: String,
     pub(crate) output_contract: String,
     pub(crate) output_evidence: String,
+    pub(crate) completion_evidence_contract: String,
+    pub(crate) completion_evidence_status: String,
+    pub(crate) completion_evidence_count: usize,
+    pub(crate) completion_clock_evidence: String,
+    pub(crate) completion_tokens: String,
+    pub(crate) glm_release_contract: String,
+    pub(crate) glm_release_tokens: String,
+    pub(crate) glm_release_status: String,
     pub(crate) record_hash: String,
 }
 

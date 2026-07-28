@@ -14,6 +14,7 @@ mod provider_carrier_channel_unix;
 mod provider_carrier_input;
 mod provider_code_asset;
 mod provider_completion_dispatch;
+mod provider_completion_evidence;
 mod provider_completion_integrity;
 mod provider_completion_signature;
 mod provider_completion_trust_anchor;
@@ -168,6 +169,23 @@ pub fn payload_execution_replay_summary(
             provider_family: event.provider_family.clone(),
             output_contract: event.output_contract.clone(),
             output_evidence: event.output_evidence.clone(),
+            completion_evidence_contract: event.provider_completion_evidence.contract.clone(),
+            completion_evidence_status: event.provider_completion_evidence.status.clone(),
+            completion_evidence_count: event.provider_completion_evidence.count,
+            completion_clock_evidence: event.provider_completion_evidence.clock_evidence.clone(),
+            completion_tokens: event.provider_completion_evidence.completion_tokens.clone(),
+            glm_release_contract: event
+                .provider_completion_evidence
+                .glm_release_contract
+                .clone(),
+            glm_release_tokens: event
+                .provider_completion_evidence
+                .glm_release_tokens
+                .clone(),
+            glm_release_status: event
+                .provider_completion_evidence
+                .glm_release_status
+                .clone(),
             dispatch_authority_contract: event.provider_completion_dispatch.contract.clone(),
             dispatch_authority_status: event.provider_completion_dispatch.status.clone(),
             dispatch_table_hash: event.provider_completion_dispatch.table_hash.clone(),

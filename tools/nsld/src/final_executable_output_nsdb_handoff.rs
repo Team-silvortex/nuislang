@@ -78,6 +78,14 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
             provider_family: completion.provider_family,
             output_contract: completion.output_contract,
             output_evidence: completion.output_evidence,
+            completion_evidence_contract: completion.completion_evidence_contract,
+            completion_evidence_status: completion.completion_evidence_status,
+            completion_evidence_count: completion.completion_evidence_count,
+            completion_clock_evidence: completion.completion_clock_evidence,
+            completion_tokens: completion.completion_tokens,
+            glm_release_contract: completion.glm_release_contract,
+            glm_release_tokens: completion.glm_release_tokens,
+            glm_release_status: completion.glm_release_status,
             record_hash: completion.record_hash,
         })
         .collect();

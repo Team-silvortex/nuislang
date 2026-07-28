@@ -1,0 +1,10 @@
+name = "kernel_cuda_provider_demo"
+version = "0.1.0"
+entry = "main.ns"
+packaging_mode = "nuis-self-contained-image"
+modules = ["main.ns"]
+galaxy = ["witsage=workspace"]
+abi = [
+  "cpu=cpu.x86_64.sysv64",
+  "kernel=kernel.cuda.ptx8_0.v1",
+]

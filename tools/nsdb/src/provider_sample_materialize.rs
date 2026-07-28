@@ -93,7 +93,7 @@ pub fn materialize_provider_samples(
         .records
         .iter()
         .map(|record| {
-            if should_materialize_record(record, provider_family_filter) {
+            if should_refresh_record(record, provider_family_filter) {
                 let record = materialized_record(output_dir, record);
                 if record.materialization_status == "provider-sample-materialized" {
                     materialized += 1;
@@ -299,12 +299,15 @@ fn provider_family_match_count(
         .count()
 }
 
-fn should_materialize_record(
+fn should_refresh_record(
     record: &NsdbDeviceProviderSampleRecordInfo,
     provider_family_filter: Option<&str>,
 ) -> bool {
-    record.materialization_status == "provider-sample-pending"
-        && provider_family_filter.is_none_or(|family| record.provider_family == family)
+    provider_family_filter.is_none_or(|family| record.provider_family == family)
+        && matches!(
+            record.materialization_status.as_str(),
+            "provider-sample-pending" | "provider-sample-materialized" | "provider-sample-blocked"
+        )
 }
 
 fn materialized_record(

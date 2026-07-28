@@ -11,16 +11,104 @@ use crate::provider_runner_registry::{
 #[cfg(target_os = "linux")]
 use std::path::Path;
 
-#[cfg(target_os = "linux")]
-const CUDA_VECTOR_ADD_SOURCE: &str = include_str!("../provider-runners/cuda_vector_add.c");
+#[cfg(any(target_os = "linux", test))]
+pub(crate) const CUDA_DEVICE_SELECTION_REGISTRY_CONTRACT: &str =
+    "nuis-cuda-device-selection-registry-v1";
+#[cfg(any(target_os = "linux", test))]
+pub(crate) const CUDA_DEVICE_SELECTION_CONTRACT: &str = "nuis-cuda-device-selection-v1";
+#[cfg(any(target_os = "linux", test))]
+pub(crate) const CUDA_DEVICE_INVENTORY_CONTRACT: &str = "nuis-cuda-device-inventory-v1";
+#[cfg(any(target_os = "linux", test))]
+pub(crate) const CUDA_CAPABILITY_RANKED_POLICY_CODE: u32 = 1;
+
+#[cfg(any(target_os = "linux", test))]
+pub(crate) struct CudaDeviceSelectionProfile {
+    pub(crate) registry_contract: &'static str,
+    pub(crate) selection_contract: &'static str,
+    pub(crate) inventory_contract: &'static str,
+    pub(crate) provider_family: &'static str,
+    pub(crate) policy: &'static str,
+    pub(crate) policy_code: u32,
+    pub(crate) capability_query: &'static str,
+}
+
+#[cfg(any(target_os = "linux", test))]
+pub(crate) const DEVICE_SELECTION_PROFILE: CudaDeviceSelectionProfile =
+    CudaDeviceSelectionProfile {
+        registry_contract: CUDA_DEVICE_SELECTION_REGISTRY_CONTRACT,
+        selection_contract: CUDA_DEVICE_SELECTION_CONTRACT,
+        inventory_contract: CUDA_DEVICE_INVENTORY_CONTRACT,
+        provider_family: "cuda:nvidia-gpu",
+        policy: "capability-ranked-lowest-ordinal",
+        policy_code: CUDA_CAPABILITY_RANKED_POLICY_CODE,
+        capability_query: "cuda-driver-device-compute-capability",
+    };
+
+#[cfg(any(target_os = "linux", test))]
+pub(crate) fn validates_device_selection(
+    policy_code: u32,
+    minimum_compute_capability: u32,
+) -> bool {
+    DEVICE_SELECTION_PROFILE.registry_contract == CUDA_DEVICE_SELECTION_REGISTRY_CONTRACT
+        && DEVICE_SELECTION_PROFILE.selection_contract == CUDA_DEVICE_SELECTION_CONTRACT
+        && DEVICE_SELECTION_PROFILE.inventory_contract == CUDA_DEVICE_INVENTORY_CONTRACT
+        && DEVICE_SELECTION_PROFILE.provider_family == RUNNER_PROFILE.provider_family
+        && DEVICE_SELECTION_PROFILE.policy == "capability-ranked-lowest-ordinal"
+        && DEVICE_SELECTION_PROFILE.policy_code == policy_code
+        && DEVICE_SELECTION_PROFILE.capability_query == "cuda-driver-device-compute-capability"
+        && minimum_compute_capability > 0
+}
+
+#[cfg(any(target_os = "linux", test))]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct CudaDeviceInventoryEntry {
+    pub(crate) ordinal: u32,
+    pub(crate) compute_capability: u32,
+}
+
+#[cfg(any(target_os = "linux", test))]
+pub(crate) fn select_cuda_device(
+    inventory: &[CudaDeviceInventoryEntry],
+    policy_code: u32,
+    minimum_compute_capability: u32,
+) -> Option<CudaDeviceInventoryEntry> {
+    if !validates_device_selection(policy_code, minimum_compute_capability) {
+        return None;
+    }
+    let mut selected: Option<CudaDeviceInventoryEntry> = None;
+    for (index, candidate) in inventory.iter().copied().enumerate() {
+        if candidate.ordinal > i32::MAX as u32
+            || candidate.compute_capability == 0
+            || inventory[..index]
+                .iter()
+                .any(|entry| entry.ordinal == candidate.ordinal)
+        {
+            return None;
+        }
+        if candidate.compute_capability < minimum_compute_capability {
+            continue;
+        }
+        if selected.is_none_or(|current| {
+            candidate.compute_capability > current.compute_capability
+                || (candidate.compute_capability == current.compute_capability
+                    && candidate.ordinal < current.ordinal)
+        }) {
+            selected = Some(candidate);
+        }
+    }
+    selected
+}
 
 #[cfg(target_os = "linux")]
-pub(crate) fn prepare_vector_add_worker_invocation(
+const CUDA_PTX_DISPATCH_SOURCE: &str = include_str!("../provider-runners/cuda_ptx_dispatch.c");
+
+#[cfg(target_os = "linux")]
+pub(crate) fn prepare_cuda_worker_invocation(
     cache: &mut ProviderProcessAdapterCache,
 ) -> Result<ResolvedProviderProcessAdapter<'_>, String> {
     cache.resolve_c_with_libraries(
-        "cuda-vector-add-adapter",
-        CUDA_VECTOR_ADD_SOURCE,
+        "cuda-ptx-dispatch-adapter",
+        CUDA_PTX_DISPATCH_SOURCE,
         "nuis-cuda-ptx-driver-provider-runner-v1",
         &["dl"],
     )
@@ -93,10 +181,66 @@ mod tests {
             RUNNER_PROFILE.available_adapter.kind,
             "cuda-ptx-real-device-runner"
         );
+        assert!(validates_device_selection(
+            CUDA_CAPABILITY_RANKED_POLICY_CODE,
+            80
+        ));
+        assert!(!validates_device_selection(
+            CUDA_CAPABILITY_RANKED_POLICY_CODE,
+            0
+        ));
         #[cfg(not(target_os = "linux"))]
         assert_eq!(
             (RUNNER_PROFILE.probe_status)(),
             "cuda-launch-candidate-unavailable"
+        );
+    }
+
+    #[test]
+    fn cuda_inventory_selection_is_capability_ranked_and_deterministic() {
+        let inventory = [
+            CudaDeviceInventoryEntry {
+                ordinal: 2,
+                compute_capability: 80,
+            },
+            CudaDeviceInventoryEntry {
+                ordinal: 1,
+                compute_capability: 89,
+            },
+            CudaDeviceInventoryEntry {
+                ordinal: 0,
+                compute_capability: 89,
+            },
+        ];
+        assert_eq!(
+            select_cuda_device(&inventory, CUDA_CAPABILITY_RANKED_POLICY_CODE, 80),
+            Some(CudaDeviceInventoryEntry {
+                ordinal: 0,
+                compute_capability: 89,
+            })
+        );
+        assert_eq!(
+            select_cuda_device(&inventory, CUDA_CAPABILITY_RANKED_POLICY_CODE, 90),
+            None
+        );
+        assert_eq!(select_cuda_device(&inventory, 99, 80), None);
+    }
+
+    #[test]
+    fn cuda_inventory_rejects_duplicate_ordinals() {
+        let inventory = [
+            CudaDeviceInventoryEntry {
+                ordinal: 0,
+                compute_capability: 80,
+            },
+            CudaDeviceInventoryEntry {
+                ordinal: 0,
+                compute_capability: 89,
+            },
+        ];
+        assert_eq!(
+            select_cuda_device(&inventory, CUDA_CAPABILITY_RANKED_POLICY_CODE, 80),
+            None
         );
     }
 }
