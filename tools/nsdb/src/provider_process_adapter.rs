@@ -381,7 +381,6 @@ pub(crate) fn validate_provider_model_asset(
     Ok(model_path)
 }
 
-#[cfg(target_os = "linux")]
 pub(crate) fn validate_provider_code_asset(
     output_dir: &Path,
     request: &ProviderRequest,

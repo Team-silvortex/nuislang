@@ -1,6 +1,8 @@
 use crate::provider_adapter_binding::{parse_adapter_binding, ProviderAdapterBinding};
 use crate::provider_code_asset::{parse_code_asset, ProviderCodeAssetDescriptor};
-use crate::provider_code_asset_identity::validate_project_code_asset_identity;
+use crate::provider_code_asset_identity::{
+    verified_code_asset_identity_collection, ProviderCodeAssetIdentity,
+};
 use crate::provider_edge_transport::{
     parse_edge_transport, validate_dependency_transport, ProviderEdgeTransportDescriptor,
 };
@@ -118,6 +120,7 @@ pub(crate) struct ProviderRequest {
 pub(crate) struct ProviderRequestCollection {
     pub(crate) source: &'static str,
     pub(crate) requests: Vec<ProviderRequest>,
+    pub(crate) code_asset_identity: Option<ProviderCodeAssetIdentity>,
 }
 
 impl ProviderRequest {
@@ -183,6 +186,7 @@ pub(crate) fn provider_request_collection_from_evidence(
         .map(|request| ProviderRequestCollection {
             source: "single-request-compatibility",
             requests: vec![request],
+            code_asset_identity: None,
         })
 }
 
@@ -212,11 +216,12 @@ fn parse_registered_collection(input_evidence: &str) -> Option<ProviderRequestCo
             )
         })
         .collect::<Option<Vec<_>>>()?;
-    (validate_collection_dependencies(&requests)
-        && validate_project_code_asset_identity(&fields, &requests))
-    .then_some(ProviderRequestCollection {
+    validate_collection_dependencies(&requests).then_some(())?;
+    let code_asset_identity = verified_code_asset_identity_collection(&fields, &requests)?;
+    Some(ProviderRequestCollection {
         source: "registered-collection",
         requests,
+        code_asset_identity,
     })
 }
 

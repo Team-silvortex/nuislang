@@ -188,6 +188,37 @@ pub fn payload_execution_replay_summary(
                 .provider_completion_evidence
                 .glm_release_status
                 .clone(),
+            code_asset_identity_contract: event
+                .provider_completion_evidence
+                .code_asset_identity_contract
+                .clone(),
+            code_asset_identity_status: event
+                .provider_completion_evidence
+                .code_asset_identity_status
+                .clone(),
+            code_asset_identity_asset_id: event
+                .provider_completion_evidence
+                .code_asset_identity_asset_id
+                .clone(),
+            code_asset_identity_hash: event
+                .provider_completion_evidence
+                .code_asset_identity_hash
+                .clone(),
+            code_asset_identity_set_contract: event
+                .provider_completion_evidence
+                .code_asset_identity_set_contract
+                .clone(),
+            code_asset_identity_set_status: event
+                .provider_completion_evidence
+                .code_asset_identity_set_status
+                .clone(),
+            code_asset_identity_set_count: event
+                .provider_completion_evidence
+                .code_asset_identity_set_count,
+            code_asset_identity_set_root_hash: event
+                .provider_completion_evidence
+                .code_asset_identity_set_root_hash
+                .clone(),
             dispatch_authority_contract: event.provider_completion_dispatch.contract.clone(),
             dispatch_authority_status: event.provider_completion_dispatch.status.clone(),
             dispatch_table_hash: event.provider_completion_dispatch.table_hash.clone(),

@@ -22,7 +22,7 @@ use crate::{
     },
     provider_prepared_input::PreparedProviderInput,
     provider_process_adapter::{
-        provider_output_manifest, ProviderProcessAdapterCache,
+        provider_output_manifest, validate_provider_code_asset, ProviderProcessAdapterCache,
         PROVIDER_PROCESS_ADAPTER_CACHE_CONTRACT,
     },
     provider_request::{provider_request_collection_from_evidence, ProviderRequest},
@@ -398,6 +398,7 @@ fn write_provider_output_payload(
         &execution.native_outputs,
         &execution.transport_receipts,
         &result_projection_evidence,
+        execution.code_asset_identity.as_ref(),
     );
     let hash = fnv1a64_hex(content.as_bytes());
     fs::write(output_dir.join(&file_name), content).map_err(|error| {
@@ -412,6 +413,7 @@ fn write_provider_output_payload(
 struct NativeProviderOutputs {
     native_outputs: Vec<ProviderNativeOutputSummary>,
     transport_receipts: Vec<ProviderEdgeTransportReceipt>,
+    code_asset_identity: Option<crate::provider_code_asset_identity::ProviderCodeAssetIdentity>,
 }
 
 fn execute_native_provider_outputs(
@@ -424,19 +426,23 @@ fn execute_native_provider_outputs(
         return Ok(NativeProviderOutputs {
             native_outputs: Vec::new(),
             transport_receipts: Vec::new(),
+            code_asset_identity: None,
         });
     }
     #[cfg(not(unix))]
     return Ok(NativeProviderOutputs {
         native_outputs: Vec::new(),
         transport_receipts: Vec::new(),
+        code_asset_identity: None,
     });
     let Some(collection) = provider_request_collection_from_evidence(&record.input_evidence) else {
         return Ok(NativeProviderOutputs {
             native_outputs: Vec::new(),
             transport_receipts: Vec::new(),
+            code_asset_identity: None,
         });
     };
+    let code_asset_identity = collection.code_asset_identity.clone();
     let mut completed = CompletedProviderOutputs::new();
     let mut sessions = BTreeMap::<String, ProviderSessionLease>::new();
     #[cfg(unix)]
@@ -446,6 +452,9 @@ fn execute_native_provider_outputs(
     let mut summaries = Vec::with_capacity(collection.requests.len());
     let mut transport_receipts = Vec::new();
     for request in &collection.requests {
+        if request.code_asset.is_some() {
+            validate_provider_code_asset(output_dir, request)?;
+        }
         let request_adapter = request
             .adapter_binding
             .as_ref()
@@ -548,6 +557,7 @@ fn execute_native_provider_outputs(
     Ok(NativeProviderOutputs {
         native_outputs: summaries,
         transport_receipts,
+        code_asset_identity,
     })
 }
 

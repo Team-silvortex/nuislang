@@ -9,6 +9,7 @@ const CODEGEN_TABLE_CONTRACT: &str = "nuis-kernel-yir-codegen-table-v1";
 const REQUEST_PROJECTION_CONTRACT: &str = "nuis-kernel-source-request-projection-v1";
 const SOURCE_RESULT_PROJECTION_CONTRACT: &str = "nuis-kernel-source-result-projection-v1";
 const PROJECT_CODE_ASSET_IDENTITY_CONTRACT: &str = "nuis-kernel-project-code-asset-identity-v1";
+const CODE_ASSET_IDENTITY_SET_CONTRACT: &str = "nuis-provider-code-asset-identity-set-v1";
 const PROVIDER_RESULT_PROJECTION_COLLECTION_CONTRACT: &str =
     "nuis-provider-result-projection-collection-v1";
 const PROVIDER_RESULT_PROJECTION_CONTRACT: &str = "nuis-provider-result-projection-v1";
@@ -39,6 +40,7 @@ struct ProjectKernelCodeAssetIdentity {
     lowering_target: String,
     entries: Vec<String>,
     identity_hash: String,
+    identity_set_root_hash: String,
 }
 
 pub(crate) fn augment_evidence(
@@ -293,8 +295,28 @@ fn load_project_code_asset_identity(
         project_code_asset_identity_hash(&source_fnv1a64, &lowering_target, &projected_entries);
     let asset_id = required_string(&source, "project_code_asset_id")?;
     let expected_id = format!("kernel.cuda.project.{}", &expected_hash[2..]);
+    let identity_set_asset_ids =
+        string_array_field(&source, "project_code_asset_identity_set_asset_ids")?;
+    let identity_set_contracts =
+        string_array_field(&source, "project_code_asset_identity_set_contracts")?;
+    let identity_set_hashes =
+        string_array_field(&source, "project_code_asset_identity_set_hashes")?;
+    let identity_set_root_hash =
+        required_string(&source, "project_code_asset_identity_set_root_hash")?;
+    let expected_set_root_hash = code_asset_identity_set_root_hash(&[(
+        &asset_id,
+        PROJECT_CODE_ASSET_IDENTITY_CONTRACT,
+        &identity_hash,
+    )]);
     if string_field(&source, "project_code_asset_identity_contract").as_deref()
         != Some(PROJECT_CODE_ASSET_IDENTITY_CONTRACT)
+        || string_field(&source, "project_code_asset_identity_set_contract").as_deref()
+            != Some(CODE_ASSET_IDENTITY_SET_CONTRACT)
+        || integer_field(&source, "project_code_asset_identity_set_count")? != 1
+        || identity_set_asset_ids != [asset_id.as_str()]
+        || identity_set_contracts != [PROJECT_CODE_ASSET_IDENTITY_CONTRACT]
+        || identity_set_hashes != [identity_hash.as_str()]
+        || identity_set_root_hash != expected_set_root_hash
         || !valid_fnv1a64(&source_fnv1a64)
         || identity_source_fnv1a64 != source_fnv1a64
         || lowering_target != "cuda.nvidia-gpu"
@@ -313,18 +335,26 @@ fn load_project_code_asset_identity(
         lowering_target,
         entries,
         identity_hash,
+        identity_set_root_hash,
     })
 }
 
 fn render_project_code_asset_identity(identity: &ProjectKernelCodeAssetIdentity) -> String {
     format!(
-        "provider_code_asset_identity_contract={PROJECT_CODE_ASSET_IDENTITY_CONTRACT};provider_code_asset_identity_asset_id={};provider_code_asset_identity_source_fnv1a64={};provider_code_asset_identity_lowering_target={};provider_code_asset_identity_entry_count={};provider_code_asset_identity_entries={};provider_code_asset_identity_hash={}",
+        "provider_code_asset_identity_contract={PROJECT_CODE_ASSET_IDENTITY_CONTRACT};provider_code_asset_identity_asset_id={};provider_code_asset_identity_source_fnv1a64={};provider_code_asset_identity_lowering_target={};provider_code_asset_identity_entry_count={};provider_code_asset_identity_entries={};provider_code_asset_identity_hash={};provider_code_asset_identity_set_contract={CODE_ASSET_IDENTITY_SET_CONTRACT};provider_code_asset_identity_set_count=1;provider_code_asset_identity_set_root_hash={};provider_code_asset_identity_item_0_asset_id={};provider_code_asset_identity_item_0_contract={PROJECT_CODE_ASSET_IDENTITY_CONTRACT};provider_code_asset_identity_item_0_hash={};provider_code_asset_identity_item_0_source_fnv1a64={};provider_code_asset_identity_item_0_lowering_target={};provider_code_asset_identity_item_0_entry_count={};provider_code_asset_identity_item_0_entries={}",
         identity.asset_id,
         identity.source_fnv1a64,
         identity.lowering_target,
         identity.entries.len(),
         identity.entries.join(","),
         identity.identity_hash,
+        identity.identity_set_root_hash,
+        identity.asset_id,
+        identity.identity_hash,
+        identity.source_fnv1a64,
+        identity.lowering_target,
+        identity.entries.len(),
+        identity.entries.join(","),
     )
 }
 
@@ -338,6 +368,23 @@ fn project_code_asset_identity_hash(
             "{PROJECT_CODE_ASSET_IDENTITY_CONTRACT}\n{source_fnv1a64}\n{lowering_target}\n{}\n{}",
             entries.len(),
             entries.join("\n")
+        )
+        .as_bytes(),
+    )
+}
+
+fn code_asset_identity_set_root_hash(items: &[(&str, &str, &str)]) -> String {
+    let ordered_items = items
+        .iter()
+        .map(|(asset_id, contract, identity_hash)| {
+            format!("{asset_id}\n{contract}\n{identity_hash}")
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    fnv1a64_hex(
+        format!(
+            "{CODE_ASSET_IDENTITY_SET_CONTRACT}\n{}\n{ordered_items}",
+            items.len()
         )
         .as_bytes(),
     )

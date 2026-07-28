@@ -18,6 +18,14 @@ pub(crate) struct ProviderCompletionEvidence {
     pub(crate) glm_release_contract: String,
     pub(crate) glm_release_tokens: String,
     pub(crate) glm_release_status: String,
+    pub(crate) code_asset_identity_contract: String,
+    pub(crate) code_asset_identity_status: String,
+    pub(crate) code_asset_identity_asset_id: String,
+    pub(crate) code_asset_identity_hash: String,
+    pub(crate) code_asset_identity_set_contract: String,
+    pub(crate) code_asset_identity_set_status: String,
+    pub(crate) code_asset_identity_set_count: usize,
+    pub(crate) code_asset_identity_set_root_hash: String,
 }
 
 impl Default for ProviderCompletionEvidence {
@@ -31,6 +39,16 @@ impl Default for ProviderCompletionEvidence {
             glm_release_contract: "none".to_owned(),
             glm_release_tokens: "none".to_owned(),
             glm_release_status: "not-applicable".to_owned(),
+            code_asset_identity_contract:
+                crate::provider_code_asset_identity::PROJECT_CODE_ASSET_IDENTITY_CONTRACT.to_owned(),
+            code_asset_identity_status: "not-applicable".to_owned(),
+            code_asset_identity_asset_id: "none".to_owned(),
+            code_asset_identity_hash: "none".to_owned(),
+            code_asset_identity_set_contract:
+                crate::provider_code_asset_identity::CODE_ASSET_IDENTITY_SET_CONTRACT.to_owned(),
+            code_asset_identity_set_status: "not-applicable".to_owned(),
+            code_asset_identity_set_count: 0,
+            code_asset_identity_set_root_hash: "none".to_owned(),
         }
     }
 }
@@ -124,6 +142,8 @@ pub(crate) fn from_output_payload(
     if fnv1a64_hex(collection_material.as_bytes()) != collection_hash {
         return Err("provider completion native-output collection hash mismatch".to_owned());
     }
+    let code_asset_identity = validate_code_asset_identity(source)?;
+    let code_asset_identity_set = validate_code_asset_identity_set(source, &code_asset_identity.1)?;
     Ok(ProviderCompletionEvidence {
         contract: COMPLETION_EVIDENCE_COLLECTION_CONTRACT.to_owned(),
         status: "verified".to_owned(),
@@ -133,7 +153,101 @@ pub(crate) fn from_output_payload(
         glm_release_contract: GLM_RELEASE_CONTRACT.to_owned(),
         glm_release_tokens: release_tokens.join(","),
         glm_release_status: "released-at-graph-close".to_owned(),
+        code_asset_identity_contract: code_asset_identity.0,
+        code_asset_identity_status: code_asset_identity.1,
+        code_asset_identity_asset_id: code_asset_identity.2,
+        code_asset_identity_hash: code_asset_identity.3,
+        code_asset_identity_set_contract: code_asset_identity_set.0,
+        code_asset_identity_set_status: code_asset_identity_set.1,
+        code_asset_identity_set_count: code_asset_identity_set.2,
+        code_asset_identity_set_root_hash: code_asset_identity_set.3,
     })
+}
+
+fn validate_code_asset_identity(source: &str) -> Result<(String, String, String, String), String> {
+    let default = ProviderCompletionEvidence::default();
+    let Some(status) = string_field(source, "provider_code_asset_identity_status") else {
+        return Ok((
+            default.code_asset_identity_contract,
+            default.code_asset_identity_status,
+            default.code_asset_identity_asset_id,
+            default.code_asset_identity_hash,
+        ));
+    };
+    let contract = string_field(source, "provider_code_asset_identity_contract")
+        .ok_or_else(|| "provider completion code-asset identity contract is missing".to_owned())?;
+    let asset_id = string_field(source, "provider_code_asset_identity_asset_id")
+        .ok_or_else(|| "provider completion code-asset identity asset id is missing".to_owned())?;
+    let identity_hash = string_field(source, "provider_code_asset_identity_hash")
+        .ok_or_else(|| "provider completion code-asset identity hash is missing".to_owned())?;
+    if status == "not-applicable"
+        && contract == crate::provider_code_asset_identity::PROJECT_CODE_ASSET_IDENTITY_CONTRACT
+        && asset_id == "none"
+        && identity_hash == "none"
+    {
+        return Ok((contract, status, asset_id, identity_hash));
+    }
+    if status != "verified" || !valid_hash(&identity_hash) {
+        return Err("provider completion code-asset identity is invalid".to_owned());
+    }
+    let contract_valid =
+        if contract == crate::provider_code_asset_identity::PROJECT_CODE_ASSET_IDENTITY_CONTRACT {
+            asset_id.starts_with("kernel.cuda.project.")
+                && asset_id == format!("kernel.cuda.project.{}", &identity_hash[2..])
+        } else if contract
+            == crate::provider_code_asset_identity::DESCRIPTOR_CODE_ASSET_IDENTITY_CONTRACT
+        {
+            valid_identity_token(&asset_id)
+        } else {
+            false
+        };
+    if !contract_valid {
+        return Err("provider completion code-asset identity is invalid".to_owned());
+    }
+    Ok((contract, status, asset_id, identity_hash))
+}
+
+fn validate_code_asset_identity_set(
+    source: &str,
+    identity_status: &str,
+) -> Result<(String, String, usize, String), String> {
+    let default = ProviderCompletionEvidence::default();
+    let Some(status) = string_field(source, "provider_code_asset_identity_set_status") else {
+        if identity_status == "verified" {
+            return Err("provider completion code-asset identity set is missing".to_owned());
+        }
+        return Ok((
+            default.code_asset_identity_set_contract,
+            default.code_asset_identity_set_status,
+            default.code_asset_identity_set_count,
+            default.code_asset_identity_set_root_hash,
+        ));
+    };
+    let contract =
+        string_field(source, "provider_code_asset_identity_set_contract").ok_or_else(|| {
+            "provider completion code-asset identity set contract is missing".to_owned()
+        })?;
+    let count = usize_field(source, "provider_code_asset_identity_set_count")
+        .ok_or_else(|| "provider completion code-asset identity set count is missing".to_owned())?;
+    let root_hash = string_field(source, "provider_code_asset_identity_set_root_hash")
+        .ok_or_else(|| "provider completion code-asset identity set root is missing".to_owned())?;
+    if status == "not-applicable"
+        && identity_status == "not-applicable"
+        && contract == crate::provider_code_asset_identity::CODE_ASSET_IDENTITY_SET_CONTRACT
+        && count == 0
+        && root_hash == "none"
+    {
+        return Ok((contract, status, count, root_hash));
+    }
+    if status != "verified"
+        || identity_status != "verified"
+        || contract != crate::provider_code_asset_identity::CODE_ASSET_IDENTITY_SET_CONTRACT
+        || count == 0
+        || !valid_hash(&root_hash)
+    {
+        return Err("provider completion code-asset identity set is invalid".to_owned());
+    }
+    Ok((contract, status, count, root_hash))
 }
 
 struct ValidatedOutput {
@@ -266,6 +380,38 @@ pub(crate) fn render_event_fields(out: &mut String, event: &ProviderCompletionEv
         ("glm_release_contract", event.glm_release_contract.as_str()),
         ("glm_release_tokens", event.glm_release_tokens.as_str()),
         ("glm_release_status", event.glm_release_status.as_str()),
+        (
+            "code_asset_identity_contract",
+            event.code_asset_identity_contract.as_str(),
+        ),
+        (
+            "code_asset_identity_status",
+            event.code_asset_identity_status.as_str(),
+        ),
+        (
+            "code_asset_identity_asset_id",
+            event.code_asset_identity_asset_id.as_str(),
+        ),
+        (
+            "code_asset_identity_hash",
+            event.code_asset_identity_hash.as_str(),
+        ),
+        (
+            "code_asset_identity_set_contract",
+            event.code_asset_identity_set_contract.as_str(),
+        ),
+        (
+            "code_asset_identity_set_status",
+            event.code_asset_identity_set_status.as_str(),
+        ),
+        (
+            "code_asset_identity_set_count",
+            &event.code_asset_identity_set_count.to_string(),
+        ),
+        (
+            "code_asset_identity_set_root_hash",
+            event.code_asset_identity_set_root_hash.as_str(),
+        ),
     ] {
         push_toml_string(out, key, value);
     }
@@ -281,6 +427,35 @@ pub(crate) fn parse_event_fields(source: &str) -> ProviderCompletionEvidence {
         glm_release_contract: field_or(source, "glm_release_contract", "none"),
         glm_release_tokens: field_or(source, "glm_release_tokens", "none"),
         glm_release_status: field_or(source, "glm_release_status", "not-applicable"),
+        code_asset_identity_contract: field_or(
+            source,
+            "code_asset_identity_contract",
+            crate::provider_code_asset_identity::PROJECT_CODE_ASSET_IDENTITY_CONTRACT,
+        ),
+        code_asset_identity_status: field_or(
+            source,
+            "code_asset_identity_status",
+            "not-applicable",
+        ),
+        code_asset_identity_asset_id: field_or(source, "code_asset_identity_asset_id", "none"),
+        code_asset_identity_hash: field_or(source, "code_asset_identity_hash", "none"),
+        code_asset_identity_set_contract: field_or(
+            source,
+            "code_asset_identity_set_contract",
+            crate::provider_code_asset_identity::CODE_ASSET_IDENTITY_SET_CONTRACT,
+        ),
+        code_asset_identity_set_status: field_or(
+            source,
+            "code_asset_identity_set_status",
+            "not-applicable",
+        ),
+        code_asset_identity_set_count: usize_field(source, "code_asset_identity_set_count")
+            .unwrap_or(0),
+        code_asset_identity_set_root_hash: field_or(
+            source,
+            "code_asset_identity_set_root_hash",
+            "none",
+        ),
     }
 }
 
@@ -289,7 +464,7 @@ pub(crate) fn append_hash_material(material: &mut String, event: &NsdbPayloadExe
     if evidence.contract == COMPLETION_EVIDENCE_COLLECTION_CONTRACT && evidence.status == "verified"
     {
         material.push_str(&format!(
-            "\0{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}",
+            "\0{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}\0{}",
             evidence.contract,
             evidence.status,
             evidence.count,
@@ -297,7 +472,15 @@ pub(crate) fn append_hash_material(material: &mut String, event: &NsdbPayloadExe
             evidence.completion_tokens,
             evidence.glm_release_contract,
             evidence.glm_release_tokens,
-            evidence.glm_release_status
+            evidence.glm_release_status,
+            evidence.code_asset_identity_contract,
+            evidence.code_asset_identity_status,
+            evidence.code_asset_identity_asset_id,
+            evidence.code_asset_identity_hash,
+            evidence.code_asset_identity_set_contract,
+            evidence.code_asset_identity_set_status,
+            evidence.code_asset_identity_set_count,
+            evidence.code_asset_identity_set_root_hash
         ));
     }
 }
@@ -360,6 +543,13 @@ fn valid_hash(value: &str) -> bool {
         .is_some_and(|hex| hex.len() == 16 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
 }
 
+fn valid_identity_token(value: &str) -> bool {
+    !value.is_empty()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+}
+
 fn fnv1a64_hex(bytes: &[u8]) -> String {
     let mut hash = 0xcbf29ce484222325u64;
     for byte in bytes {
@@ -374,4 +564,41 @@ fn push_toml_string(out: &mut String, key: &str, value: &str) {
         "{key} = \"{}\"\n",
         value.replace('\\', "\\\\").replace('"', "\\\"")
     ));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{validate_code_asset_identity, validate_code_asset_identity_set};
+
+    #[test]
+    fn validates_project_identity_and_explicit_not_applicable_state() {
+        let hash = "0x0123456789abcdef";
+        let verified = format!(
+            "provider_code_asset_identity_contract = \"nuis-kernel-project-code-asset-identity-v1\"\nprovider_code_asset_identity_status = \"verified\"\nprovider_code_asset_identity_asset_id = \"kernel.cuda.project.{}\"\nprovider_code_asset_identity_hash = \"{hash}\"\n",
+            &hash[2..]
+        );
+        assert!(validate_code_asset_identity(&verified).is_ok());
+        assert!(validate_code_asset_identity(
+            "provider_code_asset_identity_contract = \"nuis-kernel-project-code-asset-identity-v1\"\nprovider_code_asset_identity_status = \"not-applicable\"\nprovider_code_asset_identity_asset_id = \"none\"\nprovider_code_asset_identity_hash = \"none\"\n"
+        )
+        .is_ok());
+        assert!(validate_code_asset_identity(
+            &verified.replace("kernel.cuda.project.0123", "kernel.cuda.project.ffff")
+        )
+        .is_err());
+        let descriptor = "provider_code_asset_identity_contract = \"nuis-provider-code-asset-descriptor-identity-v1\"\nprovider_code_asset_identity_status = \"verified\"\nprovider_code_asset_identity_asset_id = \"shader.witsage.vector-bias.metal\"\nprovider_code_asset_identity_hash = \"0x0123456789abcdef\"\n";
+        assert!(validate_code_asset_identity(descriptor).is_ok());
+        assert!(validate_code_asset_identity(
+            &descriptor.replace("shader.witsage.vector-bias.metal", "../bad")
+        )
+        .is_err());
+        let verified_set = "provider_code_asset_identity_set_contract = \"nuis-provider-code-asset-identity-set-v1\"\nprovider_code_asset_identity_set_status = \"verified\"\nprovider_code_asset_identity_set_count = \"1\"\nprovider_code_asset_identity_set_root_hash = \"0x0123456789abcdef\"\n";
+        assert!(validate_code_asset_identity_set(verified_set, "verified").is_ok());
+        assert!(validate_code_asset_identity_set("", "verified").is_err());
+        assert!(validate_code_asset_identity_set(
+            "provider_code_asset_identity_set_contract = \"nuis-provider-code-asset-identity-set-v1\"\nprovider_code_asset_identity_set_status = \"not-applicable\"\nprovider_code_asset_identity_set_count = \"0\"\nprovider_code_asset_identity_set_root_hash = \"none\"\n",
+            "not-applicable"
+        )
+        .is_ok());
+    }
 }

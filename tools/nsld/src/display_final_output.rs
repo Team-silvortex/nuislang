@@ -399,7 +399,7 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
     );
     for completion in &report.final_output_nsdb_provider_completions {
         println!(
-            "  final_output_nsdb_provider_completion: {} {} {} {} {} {} {} {} {} {} {} {} {}",
+            "  final_output_nsdb_provider_completion: {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
             completion.trace_id,
             completion.provider_family,
             completion.output_contract,
@@ -412,6 +412,14 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
             completion.glm_release_contract,
             completion.glm_release_tokens,
             completion.glm_release_status,
+            completion.code_asset_identity_contract,
+            completion.code_asset_identity_status,
+            completion.code_asset_identity_asset_id,
+            completion.code_asset_identity_hash,
+            completion.code_asset_identity_set_contract,
+            completion.code_asset_identity_set_status,
+            completion.code_asset_identity_set_count,
+            completion.code_asset_identity_set_root_hash,
             completion.record_hash
         );
     }

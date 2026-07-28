@@ -40,7 +40,15 @@ fn sealed_linux_cuda_image_executes_and_replays_completion() {
                 .and_then(|value| value.strip_suffix('"'))
         })
         .expect("project code asset identity");
+    let project_identity_set_root = codegen_table
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("project_code_asset_identity_set_root_hash = \"")
+                .and_then(|value| value.strip_suffix('"'))
+        })
+        .expect("project code asset identity set root");
     assert!(project_asset_id.starts_with("kernel.cuda.project."));
+    assert!(project_identity_set_root.starts_with("0x"));
     let run = run_nuis(&["run-artifact", &output_dir_text, "--json"]);
     assert_success(&run, "materialize Linux CUDA provider request");
     let provider_samples =
@@ -55,6 +63,12 @@ fn sealed_linux_cuda_image_executes_and_replays_completion() {
         "provider_code_asset_identity_entries=nuis_project_main_kernel_map_axis_2_i64,nuis_project_main_kernel_reduce_sum_axis_3_i64"
     ));
     assert!(provider_samples.contains("provider_code_asset_identity_hash=0x"));
+    assert!(provider_samples.contains(
+        "provider_code_asset_identity_set_contract=nuis-provider-code-asset-identity-set-v1"
+    ));
+    assert!(provider_samples.contains(&format!(
+        "provider_code_asset_identity_set_root_hash={project_identity_set_root}"
+    )));
     assert!(!provider_samples.contains("kernel.vector-arithmetic.f32.cuda.ptx"));
 
     let pre_seal = run_nsdb(&[
@@ -118,6 +132,28 @@ fn sealed_linux_cuda_image_executes_and_replays_completion() {
         (
             "provider_request_order = \"kernel.cuda.source.main.kernel_map_axis_2.i64,kernel.cuda.source.main.kernel_reduce_sum_axis_3.i64\"",
             "ordered CUDA request graph",
+        ),
+        (
+            "provider_code_asset_identity_status = \"verified\"",
+            "verified CUDA project code-asset identity",
+        ),
+        (
+            &format!("provider_code_asset_identity_asset_id = \"{project_asset_id}\""),
+            "CUDA project code-asset identity lineage",
+        ),
+        (
+            "provider_code_asset_identity_set_status = \"verified\"",
+            "verified CUDA project code-asset identity set",
+        ),
+        (
+            "provider_code_asset_identity_set_count = \"1\"",
+            "CUDA project code-asset identity set count",
+        ),
+        (
+            &format!(
+                "provider_code_asset_identity_set_root_hash = \"{project_identity_set_root}\""
+            ),
+            "CUDA project code-asset identity set root",
         ),
         ("native_output_count = \"2\"", "CUDA output count"),
         (
@@ -232,6 +268,16 @@ fn sealed_linux_cuda_image_executes_and_replays_completion() {
     assert!(final_output_text.contains("\"final_output_nsdb_replay_ready\":true"));
     assert!(final_output_text.contains("\"completion_evidence_status\":\"verified\""));
     assert!(final_output_text.contains("\"completion_evidence_count\":2"));
+    assert!(final_output_text.contains("\"code_asset_identity_status\":\"verified\""));
+    assert!(final_output_text.contains(&format!(
+        "\"code_asset_identity_asset_id\":\"{project_asset_id}\""
+    )));
+    assert!(final_output_text.contains("\"code_asset_identity_hash\":\"0x"));
+    assert!(final_output_text.contains("\"code_asset_identity_set_status\":\"verified\""));
+    assert!(final_output_text.contains("\"code_asset_identity_set_count\":1"));
+    assert!(final_output_text.contains(&format!(
+        "\"code_asset_identity_set_root_hash\":\"{project_identity_set_root}\""
+    )));
     assert!(final_output_text.contains("\"completion_tokens\":\"provider-completion:0x"));
     assert!(final_output_text.contains("\"glm_release_tokens\":\"glm-release:0x"));
 

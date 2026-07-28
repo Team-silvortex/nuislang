@@ -86,6 +86,14 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
             glm_release_contract: completion.glm_release_contract,
             glm_release_tokens: completion.glm_release_tokens,
             glm_release_status: completion.glm_release_status,
+            code_asset_identity_contract: completion.code_asset_identity_contract,
+            code_asset_identity_status: completion.code_asset_identity_status,
+            code_asset_identity_asset_id: completion.code_asset_identity_asset_id,
+            code_asset_identity_hash: completion.code_asset_identity_hash,
+            code_asset_identity_set_contract: completion.code_asset_identity_set_contract,
+            code_asset_identity_set_status: completion.code_asset_identity_set_status,
+            code_asset_identity_set_count: completion.code_asset_identity_set_count,
+            code_asset_identity_set_root_hash: completion.code_asset_identity_set_root_hash,
             record_hash: completion.record_hash,
         })
         .collect();

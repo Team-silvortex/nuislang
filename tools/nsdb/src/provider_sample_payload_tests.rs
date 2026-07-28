@@ -70,11 +70,14 @@ fn real_device_payload_carries_pixelmagic_output_bytes() {
         kind: "metal-real-device-runner",
         execution_mode: "real-device-provider-runner",
     };
-    let payload = render_real_device_provider_output_payload(&record, &adapter, &[], &[], "");
+    let payload = render_real_device_provider_output_payload(&record, &adapter, &[], &[], "", None);
     assert!(payload.contains("comparison_input_kind = \"std-preprocessed-pgm\""));
     assert!(payload.contains("native_output_kind = \"pixelmagic-image-bytes\""));
     assert!(payload.contains("native_output_bytes = \"4\""));
     assert!(payload.contains("native_output_hash = \"0x"));
+    assert!(payload.contains("provider_code_asset_identity_status = \"not-applicable\""));
+    assert!(payload.contains("provider_code_asset_identity_set_status = \"not-applicable\""));
+    assert!(payload.contains("provider_code_asset_identity_set_count = \"0\""));
 }
 
 #[test]
@@ -112,7 +115,7 @@ fn real_device_payload_carries_released_transport_receipt() {
         release_payload_hash: "0xabcd".to_owned(),
     };
     let payload =
-        render_real_device_provider_output_payload(&record, &adapter, &[], &[receipt], "");
+        render_real_device_provider_output_payload(&record, &adapter, &[], &[receipt], "", None);
     assert!(payload.contains("nuis-provider-edge-transport-receipt-v1"));
     assert!(payload.contains("nuis-provider-edge-staging-registry-v1"));
     assert!(payload.contains("nuis-provider-carrier-channel-v1"));

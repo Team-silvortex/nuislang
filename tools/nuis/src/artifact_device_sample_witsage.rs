@@ -15,6 +15,8 @@ const WITSAGE_DENSE_MODEL_FILE_NAME: &str = "nuis.witsage.feature-grid-projectio
 const WITSAGE_ADD_MODEL_FILE_NAME: &str = "nuis.witsage.vector-add.mlmodel";
 const WITSAGE_ADD_EXPECTED_FILE_NAME: &str = "nuis.witsage.vector-add.expected.f32.bin";
 const WITSAGE_METAL_EXPECTED_FILE_NAME: &str = "nuis.witsage.vector-metal-bias.expected.f32.bin";
+const WITSAGE_METAL_BIAS_SOURCE_FILE_NAME: &str = "nuis.witsage.vector-bias.metal";
+const WITSAGE_METAL_ARGMAX_SOURCE_FILE_NAME: &str = "nuis.witsage.argmax.metal";
 const WITSAGE_KMEANS_MODEL_FILE_NAME: &str = "nuis.witsage.kmeans-centroid-score.mlmodel";
 const WITSAGE_KMEANS_EXPECTED_FILE_NAME: &str =
     "nuis.witsage.kmeans-centroid-score.expected.f32.bin";
@@ -37,6 +39,24 @@ const WITSAGE_METAL_EXPECTED: &[u8] = &[
 ];
 const WITSAGE_KMEANS_EXPECTED: &[u8] = &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x41];
 const WITSAGE_KMEANS_ASSIGNMENT_EXPECTED: &[u8] = &[0x01, 0x00, 0x00, 0x00];
+const WITSAGE_METAL_BIAS_SOURCE: &[u8] = br#"#include <metal_stdlib>
+using namespace metal;
+kernel void nuis_witsage_vector_bias_f32(
+    device const float* input [[buffer(0)]],
+    device float* output [[buffer(1)]],
+    constant float& bias [[buffer(2)]],
+    uint index [[thread_position_in_grid]]) {
+    output[index] = input[index] + bias;
+}
+"#;
+const WITSAGE_METAL_ARGMAX_SOURCE: &[u8] = br#"#include <metal_stdlib>
+using namespace metal;
+kernel void nuis_witsage_argmax_f32(
+    device const float* input [[buffer(0)]],
+    device uint* output [[buffer(1)]]) {
+    output[0] = input[1] > input[0] ? 1u : 0u;
+}
+"#;
 
 struct ComparisonProfile {
     package_id: String,
@@ -75,12 +95,58 @@ pub(super) fn input_evidence(base: &str) -> String {
     let chained = chained_affine_collection_request(2, &affine_model);
     let add_model = crate::artifact_coreml_model::witsage_vector_add_model();
     let add = add_collection_request(3, &add_model);
-    let metal = metal_bias_collection_request(4, &cross_provider_profile);
+    let code_assets = witsage_code_asset_identity()
+        .expect("registered Shader Nustar code asset assembly must remain valid");
+    let metal = metal_bias_collection_request(
+        4,
+        &cross_provider_profile,
+        code_assets
+            .descriptor_for(4)
+            .expect("Metal bias descriptor"),
+    );
     let kmeans_model = crate::artifact_coreml_model::witsage_kmeans_centroid_score_model();
     let kmeans = kmeans_collection_request(5, &kmeans_model, &model_predict_profile);
-    let assignment = kmeans_assignment_collection_request(6);
+    let assignment = kmeans_assignment_collection_request(
+        6,
+        code_assets
+            .descriptor_for(6)
+            .expect("Metal argmax descriptor"),
+    );
     format!(
-        "{singular};provider_request_collection_contract=nuis-provider-request-collection-v1;provider_request_count=7;{dense};{affine};{chained};{add};{metal};{kmeans};{assignment}"
+        "{singular};provider_request_collection_contract=nuis-provider-request-collection-v1;provider_request_count=7;{dense};{affine};{chained};{add};{metal};{kmeans};{assignment};{}",
+        code_assets.identity_evidence
+    )
+}
+
+fn witsage_code_asset_identity(
+) -> Result<crate::artifact_code_asset_identity::AssembledCodeAssetIdentity, String> {
+    use crate::artifact_code_asset_identity::NustarCodeAssetContribution;
+    crate::artifact_code_asset_identity::assemble_nustar_code_asset_identity(
+        Path::new("nustar-packages"),
+        &[
+            NustarCodeAssetContribution {
+                request_index: 4,
+                owner_package_id: "official.shader",
+                provider_family: "metal:apple-silicon-gpu",
+                asset_id: "shader.witsage.vector-bias.metal",
+                format: "metal-source",
+                target: "metal.apple-silicon-gpu",
+                entry: "nuis_witsage_vector_bias_f32",
+                path: WITSAGE_METAL_BIAS_SOURCE_FILE_NAME,
+                bytes: WITSAGE_METAL_BIAS_SOURCE,
+            },
+            NustarCodeAssetContribution {
+                request_index: 6,
+                owner_package_id: "official.shader",
+                provider_family: "metal:apple-silicon-gpu",
+                asset_id: "shader.witsage.argmax.metal",
+                format: "metal-source",
+                target: "metal.apple-silicon-gpu",
+                entry: "nuis_witsage_argmax_f32",
+                path: WITSAGE_METAL_ARGMAX_SOURCE_FILE_NAME,
+                bytes: WITSAGE_METAL_ARGMAX_SOURCE,
+            },
+        ],
     )
 }
 
@@ -139,6 +205,16 @@ pub(super) fn persist_assets_if_requested(
             WITSAGE_METAL_EXPECTED_FILE_NAME,
             WITSAGE_METAL_EXPECTED.to_vec(),
             "Metal expected output",
+        ),
+        (
+            WITSAGE_METAL_BIAS_SOURCE_FILE_NAME,
+            WITSAGE_METAL_BIAS_SOURCE.to_vec(),
+            "Metal bias code asset",
+        ),
+        (
+            WITSAGE_METAL_ARGMAX_SOURCE_FILE_NAME,
+            WITSAGE_METAL_ARGMAX_SOURCE.to_vec(),
+            "Metal argmax code asset",
         ),
         (
             WITSAGE_KMEANS_MODEL_FILE_NAME,
@@ -366,7 +442,11 @@ fn add_collection_request(index: usize, model: &[u8]) -> String {
     )
 }
 
-fn metal_bias_collection_request(index: usize, profile: &ComparisonProfile) -> String {
+fn metal_bias_collection_request(
+    index: usize,
+    profile: &ComparisonProfile,
+    code_asset: &str,
+) -> String {
     let prefix = format!("provider_request_{index}_");
     format!(
         "{prefix}buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;{prefix}buffer_id=input.features;{prefix}buffer_element_type=f32;{prefix}buffer_layout=tensor-contiguous;{prefix}buffer_shape=1x1x4;{prefix}buffer_row_stride_bytes=16;{prefix}buffer_byte_length={};{prefix}buffer_payload_path={WITSAGE_ADD_EXPECTED_FILE_NAME};{prefix}buffer_content_hash={};{prefix}kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;{prefix}kernel_id=witsage.vector.metal-bias;{prefix}kernel_operation=bias;{prefix}kernel_input_buffer=input.features;{prefix}kernel_output_buffer=output.features;{prefix}kernel_dispatch=1x1x4;{prefix}kernel_scalar_bindings=bias:f32:1;{prefix}output_comparison_profile_contract={COMPARISON_PROFILE_CONTRACT};{prefix}output_comparison_profile_package={};{prefix}output_comparison_profile_id={};{prefix}output_comparison_profile_source_hash={};{prefix}output_comparison_descriptor_contract=nuis-provider-output-comparison-descriptor-v1;{prefix}output_comparison_output_buffer=output.features;{prefix}output_comparison_element_type=f32;{prefix}output_comparison_shape=1x1x4;{prefix}output_comparison_expected_path={WITSAGE_METAL_EXPECTED_FILE_NAME};{prefix}output_comparison_expected_byte_length={};{prefix}output_comparison_expected_content_hash={};{prefix}output_comparison_absolute_tolerance={};{prefix}output_comparison_relative_tolerance={};{prefix}output_comparison_non_finite_policy={};{prefix}dependency_contract=nuis-provider-request-dependency-v1;{prefix}dependency_count=1;{prefix}dependency_0_producer_request_id=witsage.vector.add;{prefix}dependency_0_producer_output_buffer=output.features;{prefix}dependency_0_consumer_input_buffer=input.features;{prefix}dependency_0_transport_contract=nuis-provider-edge-transport-v1;{prefix}dependency_0_transport_ownership_token=glm:provider-edge:witsage.vector.add:output.features->witsage.vector.metal-bias:input.features;{prefix}dependency_0_transport_staging_mode=auto;{prefix}dependency_0_transport_producer_clock_evidence=provider-clock:request-3:completed;{prefix}dependency_0_transport_consumer_clock_evidence=provider-clock:request-4:dispatch-ready;{prefix}input_binding_contract=nuis-provider-input-binding-v1;{prefix}input_binding_count=1;{prefix}input_binding_0_name=input.features;{prefix}input_binding_0_source=dependency;{prefix}input_binding_0_element_type=f32;{prefix}input_binding_0_shape=1x1x4;{prefix}input_binding_0_byte_length={};{prefix}input_binding_0_content_hash={};{prefix}input_binding_0_payload_path=none;{prefix}input_binding_0_producer_request_id=witsage.vector.add;{prefix}input_binding_0_producer_output_buffer=output.features;{prefix}adapter_binding_contract=nuis-provider-request-adapter-binding-v1;{prefix}adapter_binding_provider_family=metal:apple-silicon-gpu;{prefix}adapter_binding_execution_requirement=real-device",
@@ -382,7 +462,7 @@ fn metal_bias_collection_request(index: usize, profile: &ComparisonProfile) -> S
         profile.non_finite_policy,
         WITSAGE_ADD_EXPECTED.len(),
         fnv1a64_hex(WITSAGE_ADD_EXPECTED),
-    )
+    ) + ";" + code_asset
 }
 
 fn kmeans_collection_request(index: usize, model: &[u8], profile: &ComparisonProfile) -> String {
@@ -417,7 +497,7 @@ fn kmeans_collection_request(index: usize, model: &[u8], profile: &ComparisonPro
     )
 }
 
-fn kmeans_assignment_collection_request(index: usize) -> String {
+fn kmeans_assignment_collection_request(index: usize, code_asset: &str) -> String {
     let prefix = format!("provider_request_{index}_");
     let request = format!(
         "{prefix}buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;{prefix}buffer_id=input.scores;{prefix}buffer_element_type=f32;{prefix}buffer_layout=tensor-contiguous;{prefix}buffer_shape=1x1x2;{prefix}buffer_row_stride_bytes=8;{prefix}buffer_byte_length={};{prefix}buffer_payload_path={WITSAGE_KMEANS_EXPECTED_FILE_NAME};{prefix}buffer_content_hash={};{prefix}kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;{prefix}kernel_id=witsage.kmeans.assignment;{prefix}kernel_operation=argmax;{prefix}kernel_input_buffer=input.scores;{prefix}kernel_output_buffer=output.assignment;{prefix}kernel_dispatch=1x1x1;{prefix}output_binding_contract=nuis-provider-output-binding-v1;{prefix}output_binding_count=1;{prefix}output_binding_0_role=output.assignment;{prefix}output_binding_0_buffer=output.assignment;{prefix}output_binding_0_element_type=u32;{prefix}output_binding_0_shape=1;{prefix}output_binding_0_byte_length={};{prefix}output_binding_0_comparison_id=comparison.output.assignment;{prefix}output_comparison_id=comparison.output.assignment;{prefix}output_comparison_descriptor_contract=nuis-provider-output-comparison-descriptor-v1;{prefix}output_comparison_output_buffer=output.assignment;{prefix}output_comparison_element_type=u32;{prefix}output_comparison_shape=1;{prefix}output_comparison_expected_path={WITSAGE_KMEANS_ASSIGNMENT_EXPECTED_FILE_NAME};{prefix}output_comparison_expected_byte_length={};{prefix}output_comparison_expected_content_hash={};{prefix}output_comparison_absolute_tolerance=0;{prefix}output_comparison_relative_tolerance=0;{prefix}output_comparison_non_finite_policy=reject;{prefix}dependency_contract=nuis-provider-request-dependency-v1;{prefix}dependency_count=1;{prefix}dependency_0_producer_request_id=witsage.kmeans.centroid-score;{prefix}dependency_0_producer_output_buffer=output.features;{prefix}dependency_0_consumer_input_buffer=input.scores;{prefix}input_binding_contract=nuis-provider-input-binding-v1;{prefix}input_binding_count=1;{prefix}input_binding_0_name=input.scores;{prefix}input_binding_0_source=dependency;{prefix}input_binding_0_element_type=f32;{prefix}input_binding_0_shape=1x1x2;{prefix}input_binding_0_byte_length={};{prefix}input_binding_0_content_hash={};{prefix}input_binding_0_payload_path=none;{prefix}input_binding_0_producer_request_id=witsage.kmeans.centroid-score;{prefix}input_binding_0_producer_output_buffer=output.features;{prefix}adapter_binding_contract=nuis-provider-request-adapter-binding-v1;{prefix}adapter_binding_provider_family=metal:apple-silicon-gpu;{prefix}adapter_binding_execution_requirement=real-device;{prefix}assignment_contract=nuis-witsage-cluster-assignment-v1;{prefix}assignment_package=nuis.witsage;{prefix}assignment_policy=highest-centroid-score;{prefix}assignment_output_buffer=output.assignment;{prefix}assignment_element_type=u32",
@@ -429,14 +509,15 @@ fn kmeans_assignment_collection_request(index: usize) -> String {
         WITSAGE_KMEANS_EXPECTED.len(),
         fnv1a64_hex(WITSAGE_KMEANS_EXPECTED),
     );
-    with_dependency_transport(
+    let request = with_dependency_transport(
         request,
         index,
         0,
         "input.scores",
         "glm:provider-edge:witsage.kmeans.centroid-score:output.features->witsage.kmeans.assignment:input.scores",
         5,
-    )
+    );
+    request + ";" + code_asset
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -538,6 +619,16 @@ mod tests {
         assert!(evidence.contains("provider_request_5_output_comparison_non_finite_policy=reject"));
         assert!(evidence.contains("provider_request_6_kernel_id=witsage.kmeans.assignment"));
         assert!(evidence.contains("provider_request_6_kernel_operation=argmax"));
+        assert!(
+            evidence.contains("provider_request_4_code_asset_id=shader.witsage.vector-bias.metal")
+        );
+        assert!(evidence.contains("provider_request_6_code_asset_id=shader.witsage.argmax.metal"));
+        assert!(evidence.contains("provider_code_asset_identity_set_count=2"));
+        assert!(evidence
+            .contains("provider_code_asset_identity_item_0_owner_package_id=official.shader"));
+        assert!(evidence.contains(
+            "provider_code_asset_identity_item_1_provider_family=metal:apple-silicon-gpu"
+        ));
         assert!(evidence
             .contains("provider_request_6_assignment_contract=nuis-witsage-cluster-assignment-v1"));
         assert!(evidence.contains("provider_request_6_output_binding_0_element_type=u32"));

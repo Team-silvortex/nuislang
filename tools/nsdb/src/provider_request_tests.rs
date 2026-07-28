@@ -34,12 +34,66 @@ fn project_asset_collection() -> String {
         &entries,
     );
     let asset_id = format!("kernel.cuda.project.{}", &identity_hash[2..]);
+    let identity_set_root_hash =
+        crate::provider_code_asset_identity::code_asset_identity_set_root_hash(&[(
+            &asset_id,
+            crate::provider_code_asset_identity::PROJECT_CODE_ASSET_IDENTITY_CONTRACT,
+            &identity_hash,
+        )]);
     format!(
-        "provider_request_collection_contract={PROVIDER_REQUEST_COLLECTION_CONTRACT};provider_request_count=2;provider_code_asset_identity_contract={};provider_code_asset_identity_asset_id={asset_id};provider_code_asset_identity_source_fnv1a64={source_fnv1a64};provider_code_asset_identity_lowering_target={lowering_target};provider_code_asset_identity_entry_count=2;provider_code_asset_identity_entries={};provider_code_asset_identity_hash={identity_hash};{};{}",
+        "provider_request_collection_contract={PROVIDER_REQUEST_COLLECTION_CONTRACT};provider_request_count=2;provider_code_asset_identity_contract={};provider_code_asset_identity_asset_id={asset_id};provider_code_asset_identity_source_fnv1a64={source_fnv1a64};provider_code_asset_identity_lowering_target={lowering_target};provider_code_asset_identity_entry_count=2;provider_code_asset_identity_entries={};provider_code_asset_identity_hash={identity_hash};provider_code_asset_identity_set_contract={};provider_code_asset_identity_set_count=1;provider_code_asset_identity_set_root_hash={identity_set_root_hash};provider_code_asset_identity_item_0_asset_id={asset_id};provider_code_asset_identity_item_0_contract={};provider_code_asset_identity_item_0_hash={identity_hash};provider_code_asset_identity_item_0_source_fnv1a64={source_fnv1a64};provider_code_asset_identity_item_0_lowering_target={lowering_target};provider_code_asset_identity_item_0_entry_count=2;provider_code_asset_identity_item_0_entries={};{};{}",
+        crate::provider_code_asset_identity::PROJECT_CODE_ASSET_IDENTITY_CONTRACT,
+        entries.join(","),
+        crate::provider_code_asset_identity::CODE_ASSET_IDENTITY_SET_CONTRACT,
         crate::provider_code_asset_identity::PROJECT_CODE_ASSET_IDENTITY_CONTRACT,
         entries.join(","),
         project_asset_request(0, "project.map", entries[0], &asset_id),
         project_asset_request(1, "project.reduce", entries[1], &asset_id),
+    )
+}
+
+fn mixed_asset_collection() -> String {
+    let project_entry = "project_map";
+    let source_hash = "0x1111111111111111";
+    let target = "cuda.nvidia-gpu";
+    let project_hash = crate::provider_code_asset_identity::project_code_asset_identity_hash(
+        source_hash,
+        target,
+        &[project_entry],
+    );
+    let project_id = format!("kernel.cuda.project.{}", &project_hash[2..]);
+    let descriptor_id = "shader.future.descriptor";
+    let descriptor_entry = "future_entry";
+    let descriptor_hash = crate::provider_code_asset_identity::descriptor_code_asset_identity_hash(
+        descriptor_id,
+        "ptx",
+        "sm_80",
+        "kernel.ptx",
+        512,
+        crate::provider_code_asset::CODE_ASSET_FNV1A64_DIGEST_CONTRACT,
+        "0x0123456789abcdef",
+        &[descriptor_entry],
+    );
+    let set_root = crate::provider_code_asset_identity::code_asset_identity_set_root_hash(&[
+        (
+            &project_id,
+            crate::provider_code_asset_identity::PROJECT_CODE_ASSET_IDENTITY_CONTRACT,
+            &project_hash,
+        ),
+        (
+            descriptor_id,
+            crate::provider_code_asset_identity::DESCRIPTOR_CODE_ASSET_IDENTITY_CONTRACT,
+            &descriptor_hash,
+        ),
+    ]);
+    format!(
+        "provider_request_collection_contract={PROVIDER_REQUEST_COLLECTION_CONTRACT};provider_request_count=2;provider_code_asset_identity_contract={};provider_code_asset_identity_asset_id={project_id};provider_code_asset_identity_source_fnv1a64={source_hash};provider_code_asset_identity_lowering_target={target};provider_code_asset_identity_entry_count=1;provider_code_asset_identity_entries={project_entry};provider_code_asset_identity_hash={project_hash};provider_code_asset_identity_set_contract={};provider_code_asset_identity_set_count=2;provider_code_asset_identity_set_root_hash={set_root};provider_code_asset_identity_item_0_asset_id={project_id};provider_code_asset_identity_item_0_contract={};provider_code_asset_identity_item_0_hash={project_hash};provider_code_asset_identity_item_0_source_fnv1a64={source_hash};provider_code_asset_identity_item_0_lowering_target={target};provider_code_asset_identity_item_0_entry_count=1;provider_code_asset_identity_item_0_entries={project_entry};provider_code_asset_identity_item_1_asset_id={descriptor_id};provider_code_asset_identity_item_1_contract={};provider_code_asset_identity_item_1_hash={descriptor_hash};{};{}",
+        crate::provider_code_asset_identity::PROJECT_CODE_ASSET_IDENTITY_CONTRACT,
+        crate::provider_code_asset_identity::CODE_ASSET_IDENTITY_SET_CONTRACT,
+        crate::provider_code_asset_identity::PROJECT_CODE_ASSET_IDENTITY_CONTRACT,
+        crate::provider_code_asset_identity::DESCRIPTOR_CODE_ASSET_IDENTITY_CONTRACT,
+        project_asset_request(0, "project.map", project_entry, &project_id),
+        project_asset_request(1, "future.map", descriptor_entry, descriptor_id),
     )
 }
 
@@ -225,6 +279,43 @@ fn verifies_project_code_asset_identity_across_ordered_collection() {
         .next()
         .unwrap()
         .starts_with("kernel.cuda.project."));
+    let identity = collection.code_asset_identity.expect("verified identity");
+    assert_eq!(identity.status, "verified");
+    assert_eq!(
+        identity.contract,
+        "nuis-kernel-project-code-asset-identity-v1"
+    );
+    assert!(identity.asset_id.starts_with("kernel.cuda.project."));
+    assert!(identity.identity_hash.starts_with("0x"));
+    assert_eq!(identity.identity_set.asset_ids, [identity.asset_id]);
+    assert!(identity.identity_set.root_hash.starts_with("0x"));
+}
+
+#[test]
+fn validates_ordered_mixed_asset_identity_partitions() {
+    let evidence = mixed_asset_collection();
+    let collection =
+        provider_request_collection_from_evidence(&evidence).expect("mixed identity set");
+    let identity = collection.code_asset_identity.expect("identity set");
+    assert_eq!(identity.identity_set.asset_ids.len(), 2);
+    assert_eq!(
+        identity.identity_set.contracts[1],
+        crate::provider_code_asset_identity::DESCRIPTOR_CODE_ASSET_IDENTITY_CONTRACT
+    );
+    assert_eq!(identity.identity_set.identity_hashes.len(), 2);
+    for drifted in [
+        evidence
+            .replace(
+                "provider_code_asset_identity_item_0_asset_id=kernel.cuda.project.",
+                "provider_code_asset_identity_item_0_asset_id=shader.future.descriptor;ignored=kernel.cuda.project.",
+            ),
+        evidence.replace(
+            "provider_request_1_code_asset_id=shader.future.descriptor",
+            "provider_request_1_code_asset_id=kernel.cuda.project.invalid",
+        ),
+    ] {
+        assert!(provider_request_collection_from_evidence(&drifted).is_none());
+    }
 }
 
 #[test]
@@ -250,6 +341,10 @@ fn rejects_missing_or_drifting_project_code_asset_identity() {
             "provider_request_1_code_asset_id=kernel.cuda.project.",
             "provider_request_1_code_asset_id=kernel.cuda.project.drift.",
             1,
+        ),
+        evidence.replace(
+            "provider_code_asset_identity_set_root_hash=0x",
+            "provider_code_asset_identity_set_root_hash=0f",
         ),
     ] {
         assert!(provider_request_collection_from_evidence(&drifted).is_none());

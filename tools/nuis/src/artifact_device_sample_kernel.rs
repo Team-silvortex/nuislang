@@ -337,6 +337,12 @@ project_code_asset_lowering_target = "cuda.nvidia-gpu"
 project_code_asset_entry_count = 2
 project_code_asset_entries = ["nuis_project_main_mapped_i64", "nuis_project_main_reduced_i64"]
 project_code_asset_identity_hash = "0x7519a228f04318e8"
+project_code_asset_identity_set_contract = "nuis-provider-code-asset-identity-set-v1"
+project_code_asset_identity_set_count = 1
+project_code_asset_identity_set_asset_ids = ["kernel.cuda.project.7519a228f04318e8"]
+project_code_asset_identity_set_contracts = ["nuis-kernel-project-code-asset-identity-v1"]
+project_code_asset_identity_set_hashes = ["0x7519a228f04318e8"]
+project_code_asset_identity_set_root_hash = "0x7724b43039b33d4a"
 
 [[source_adaptation]]
 contract = "nuis-kernel-yir-source-adapter-v1"
@@ -409,6 +415,11 @@ diagnostic = "verified result"
             .contains("provider_request_0_code_asset_id=kernel.cuda.project.7519a228f04318e8"));
         assert!(resolved
             .contains("provider_request_1_code_asset_id=kernel.cuda.project.7519a228f04318e8"));
+        assert!(resolved.contains(
+            "provider_code_asset_identity_set_contract=nuis-provider-code-asset-identity-set-v1"
+        ));
+        assert!(resolved.contains("provider_code_asset_identity_set_count=1"));
+        assert!(resolved.contains("provider_code_asset_identity_set_root_hash=0x7724b43039b33d4a"));
         assert!(!resolved.contains("provider_kernel_id="));
         assert!(!resolved.contains("provider_code_asset_entry="));
         assert!(!resolved.contains("provider_request_0_kernel_operation=vector-add"));

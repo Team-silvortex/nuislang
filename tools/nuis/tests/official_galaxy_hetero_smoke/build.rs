@@ -228,6 +228,10 @@ pub(super) fn assert_official_galaxy_hetero_build(
                 )
                 && run_json_stdout.contains(
                     "provider_request_4_dependency_0_transport_consumer_clock_evidence=provider-clock:request-4:dispatch-ready",
+                )
+                && run_json_stdout.contains("provider_code_asset_identity_set_count=2")
+                && run_json_stdout.contains(
+                    "provider_code_asset_identity_item_0_owner_package_id=official.shader",
                 ),
             "WitSage kernel trace did not carry the registered CoreML request\n{run_json_stdout}"
         );

@@ -275,6 +275,11 @@ kernel.target_config target kernel0 x86_64 cuda 1 ptx\n";
         assert!(sidecar.contains("project_code_asset_id = \"kernel.cuda.project."));
         assert!(sidecar.contains("project_code_asset_entries = [\"nuis_project_main_mapped_i64\"]"));
         assert!(sidecar.contains("project_code_asset_identity_hash = \"0x"));
+        assert!(sidecar.contains(
+            "project_code_asset_identity_set_contract = \"nuis-provider-code-asset-identity-set-v1\""
+        ));
+        assert!(sidecar.contains("project_code_asset_identity_set_count = 1"));
+        assert!(sidecar.contains("project_code_asset_identity_set_root_hash = \"0x"));
         assert!(sidecar.contains("[[source_function]]"));
         assert!(sidecar.contains("[[source_adaptation]]"));
         assert!(sidecar.contains("generated_entry = \"nuis_project_main_mapped_i64\""));

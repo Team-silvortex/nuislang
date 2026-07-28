@@ -212,6 +212,7 @@ pub(crate) fn render_real_device_provider_output_payload(
     native_outputs: &[PixelMagicNativeOutputSummary],
     transport_receipts: &[ProviderEdgeTransportReceipt],
     result_projection_evidence: &str,
+    code_asset_identity: Option<&crate::provider_code_asset_identity::ProviderCodeAssetIdentity>,
 ) -> String {
     let mut out = render_provider_output_payload_header(
         record,
@@ -252,6 +253,10 @@ pub(crate) fn render_real_device_provider_output_payload(
     push_toml_string(&mut out, "comparison_status", comparison_status);
     push_transport_receipts(&mut out, transport_receipts);
     out.push_str(result_projection_evidence);
+    crate::provider_code_asset_identity::append_provider_output_identity(
+        &mut out,
+        code_asset_identity,
+    );
     if let Some(summary) = native_outputs.first() {
         push_native_output_summary(&mut out, summary);
         push_toml_string(

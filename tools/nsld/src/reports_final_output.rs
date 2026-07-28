@@ -12,6 +12,14 @@ pub(crate) struct NsldProviderCompletionSummary {
     pub(crate) glm_release_contract: String,
     pub(crate) glm_release_tokens: String,
     pub(crate) glm_release_status: String,
+    pub(crate) code_asset_identity_contract: String,
+    pub(crate) code_asset_identity_status: String,
+    pub(crate) code_asset_identity_asset_id: String,
+    pub(crate) code_asset_identity_hash: String,
+    pub(crate) code_asset_identity_set_contract: String,
+    pub(crate) code_asset_identity_set_status: String,
+    pub(crate) code_asset_identity_set_count: usize,
+    pub(crate) code_asset_identity_set_root_hash: String,
     pub(crate) record_hash: String,
 }
 

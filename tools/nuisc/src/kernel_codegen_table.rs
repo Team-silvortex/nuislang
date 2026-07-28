@@ -13,6 +13,8 @@ pub(crate) const KERNEL_YIR_CODEGEN_TABLE_CONTRACT: &str = "nuis-kernel-yir-code
 pub(crate) const KERNEL_YIR_CODEGEN_FUNCTION_CONTRACT: &str = "nuis-kernel-yir-codegen-function-v1";
 pub(crate) const KERNEL_PROJECT_CODE_ASSET_IDENTITY_CONTRACT: &str =
     "nuis-kernel-project-code-asset-identity-v1";
+pub(crate) const KERNEL_CODE_ASSET_IDENTITY_SET_CONTRACT: &str =
+    "nuis-provider-code-asset-identity-set-v1";
 const PROJECT_YIR_BINDING_CONTRACT: &str = "compiled-project-yir";
 const REGISTERED_BINDING_CONTRACT: &str = "registered-provider-kernel-yir";
 
@@ -326,9 +328,14 @@ pub(crate) fn render_codegen_table(table: &KernelYirCodegenTable) -> Result<Stri
             table.lowering_target,
             &entries,
         );
+        let asset_id = format!("kernel.cuda.project.{}", &identity_hash[2..]);
+        let identity_set_root_hash = code_asset_identity_set_root_hash(&[(
+            &asset_id,
+            KERNEL_PROJECT_CODE_ASSET_IDENTITY_CONTRACT,
+            &identity_hash,
+        )]);
         out.push_str(&format!(
-            "project_code_asset_identity_contract = \"{KERNEL_PROJECT_CODE_ASSET_IDENTITY_CONTRACT}\"\nproject_code_asset_id = \"kernel.cuda.project.{}\"\nproject_code_asset_source_fnv1a64 = \"{}\"\nproject_code_asset_lowering_target = \"{}\"\nproject_code_asset_entry_count = {}\nproject_code_asset_entries = [{}]\nproject_code_asset_identity_hash = \"{}\"\n",
-            &identity_hash[2..],
+            "project_code_asset_identity_contract = \"{KERNEL_PROJECT_CODE_ASSET_IDENTITY_CONTRACT}\"\nproject_code_asset_id = \"{asset_id}\"\nproject_code_asset_source_fnv1a64 = \"{}\"\nproject_code_asset_lowering_target = \"{}\"\nproject_code_asset_entry_count = {}\nproject_code_asset_entries = [{}]\nproject_code_asset_identity_hash = \"{}\"\nproject_code_asset_identity_set_contract = \"{KERNEL_CODE_ASSET_IDENTITY_SET_CONTRACT}\"\nproject_code_asset_identity_set_count = 1\nproject_code_asset_identity_set_asset_ids = [\"{asset_id}\"]\nproject_code_asset_identity_set_contracts = [\"{KERNEL_PROJECT_CODE_ASSET_IDENTITY_CONTRACT}\"]\nproject_code_asset_identity_set_hashes = [\"{identity_hash}\"]\nproject_code_asset_identity_set_root_hash = \"{identity_set_root_hash}\"\n",
             table.source_fnv1a64,
             table.lowering_target,
             entries.len(),
@@ -475,6 +482,23 @@ fn project_code_asset_identity_hash(
             "{KERNEL_PROJECT_CODE_ASSET_IDENTITY_CONTRACT}\n{source_fnv1a64}\n{lowering_target}\n{}\n{}",
             entries.len(),
             entries.join("\n")
+        )
+        .as_bytes(),
+    )
+}
+
+pub(crate) fn code_asset_identity_set_root_hash(items: &[(&str, &str, &str)]) -> String {
+    let ordered_items = items
+        .iter()
+        .map(|(asset_id, contract, identity_hash)| {
+            format!("{asset_id}\n{contract}\n{identity_hash}")
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    fnv1a64_hex(
+        format!(
+            "{KERNEL_CODE_ASSET_IDENTITY_SET_CONTRACT}\n{}\n{ordered_items}",
+            items.len()
         )
         .as_bytes(),
     )
@@ -641,6 +665,11 @@ kernel.target_config target kernel0 x86_64 cuda 1 ptx\n";
             "project_code_asset_entries = [\"nuis_project_main_mapped_i64\", \"nuis_project_main_reduced_i64\"]"
         ));
         assert!(rendered.contains("project_code_asset_identity_hash = \"0x"));
+        assert!(rendered.contains(
+            "project_code_asset_identity_set_contract = \"nuis-provider-code-asset-identity-set-v1\""
+        ));
+        assert!(rendered.contains("project_code_asset_identity_set_count = 1"));
+        assert!(rendered.contains("project_code_asset_identity_set_root_hash = \"0x"));
         assert!(rendered.contains("status = \"unsupported\""));
         assert!(rendered.contains("status = \"adapted\""));
         assert!(rendered.contains("generated_entry = \"nuis_project_main_mapped_i64\""));

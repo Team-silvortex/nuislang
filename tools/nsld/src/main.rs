@@ -103,6 +103,7 @@ mod json_final_image;
 mod json_final_launcher;
 mod json_final_layout;
 mod json_final_output;
+mod json_final_output_provider_completion;
 mod json_final_pipeline;
 mod json_final_stage;
 mod json_fragments;
