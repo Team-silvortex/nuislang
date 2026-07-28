@@ -15,6 +15,34 @@ fn indexed_request(index: usize, kernel_id: &str) -> String {
         .replace("pixelmagic.gray8.invert", kernel_id)
 }
 
+fn project_asset_request(index: usize, kernel_id: &str, entry: &str, asset_id: &str) -> String {
+    format!(
+        "{};provider_request_{index}_code_asset_descriptor_contract={};provider_request_{index}_code_asset_id={asset_id};provider_request_{index}_code_asset_format=ptx;provider_request_{index}_code_asset_target=sm_80;provider_request_{index}_code_asset_entry={entry};provider_request_{index}_code_asset_path=kernel.ptx;provider_request_{index}_code_asset_byte_length=512;provider_request_{index}_code_asset_digest_contract={};provider_request_{index}_code_asset_content_hash=0x0123456789abcdef",
+        indexed_request(index, kernel_id),
+        crate::provider_code_asset::PROVIDER_CODE_ASSET_DESCRIPTOR_CONTRACT,
+        crate::provider_code_asset::CODE_ASSET_FNV1A64_DIGEST_CONTRACT,
+    )
+}
+
+fn project_asset_collection() -> String {
+    let entries = ["project_map", "project_reduce"];
+    let source_fnv1a64 = "0x1111111111111111";
+    let lowering_target = "cuda.nvidia-gpu";
+    let identity_hash = crate::provider_code_asset_identity::project_code_asset_identity_hash(
+        source_fnv1a64,
+        lowering_target,
+        &entries,
+    );
+    let asset_id = format!("kernel.cuda.project.{}", &identity_hash[2..]);
+    format!(
+        "provider_request_collection_contract={PROVIDER_REQUEST_COLLECTION_CONTRACT};provider_request_count=2;provider_code_asset_identity_contract={};provider_code_asset_identity_asset_id={asset_id};provider_code_asset_identity_source_fnv1a64={source_fnv1a64};provider_code_asset_identity_lowering_target={lowering_target};provider_code_asset_identity_entry_count=2;provider_code_asset_identity_entries={};provider_code_asset_identity_hash={identity_hash};{};{}",
+        crate::provider_code_asset_identity::PROJECT_CODE_ASSET_IDENTITY_CONTRACT,
+        entries.join(","),
+        project_asset_request(0, "project.map", entries[0], &asset_id),
+        project_asset_request(1, "project.reduce", entries[1], &asset_id),
+    )
+}
+
 #[test]
 fn parses_registered_buffer_and_kernel_descriptors() {
     let request = provider_request_from_evidence(REGISTERED).expect("registered request");
@@ -179,6 +207,53 @@ fn parses_ordered_provider_request_collection() {
     assert_eq!(collection.requests.len(), 2);
     assert_eq!(collection.requests[0].kernel.id, "first");
     assert_eq!(collection.requests[1].kernel.id, "second");
+}
+
+#[test]
+fn verifies_project_code_asset_identity_across_ordered_collection() {
+    let evidence = project_asset_collection();
+    let collection =
+        provider_request_collection_from_evidence(&evidence).expect("project code asset identity");
+    let asset_ids = collection
+        .requests
+        .iter()
+        .map(|request| request.code_asset.as_ref().unwrap().id.as_str())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(asset_ids.len(), 1);
+    assert!(asset_ids
+        .into_iter()
+        .next()
+        .unwrap()
+        .starts_with("kernel.cuda.project."));
+}
+
+#[test]
+fn rejects_missing_or_drifting_project_code_asset_identity() {
+    let evidence = project_asset_collection();
+    let without_identity = evidence
+        .split(';')
+        .filter(|field| !field.starts_with("provider_code_asset_identity_"))
+        .collect::<Vec<_>>()
+        .join(";");
+    assert!(provider_request_collection_from_evidence(&without_identity).is_none());
+    for drifted in [
+        evidence.replace("0x1111111111111111", "0x1111111111111112"),
+        evidence.replace(
+            "provider_code_asset_identity_entries=project_map,project_reduce",
+            "provider_code_asset_identity_entries=project_reduce,project_map",
+        ),
+        evidence.replace(
+            "provider_code_asset_identity_hash=0x",
+            "provider_code_asset_identity_hash=0f",
+        ),
+        evidence.replacen(
+            "provider_request_1_code_asset_id=kernel.cuda.project.",
+            "provider_request_1_code_asset_id=kernel.cuda.project.drift.",
+            1,
+        ),
+    ] {
+        assert!(provider_request_collection_from_evidence(&drifted).is_none());
+    }
 }
 
 #[test]

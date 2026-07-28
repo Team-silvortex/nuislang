@@ -9,10 +9,13 @@ use crate::kernel_codegen_table::{
 pub(crate) const KERNEL_YIR_SOURCE_ADAPTER_CONTRACT: &str = "nuis-kernel-yir-source-adapter-v1";
 pub(crate) const KERNEL_SOURCE_REQUEST_PROJECTION_CONTRACT: &str =
     "nuis-kernel-source-request-projection-v1";
+pub(crate) const KERNEL_SOURCE_RESULT_PROJECTION_CONTRACT: &str =
+    "nuis-kernel-source-result-projection-v1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum KernelSourceAdaptationStatus {
     Adapted,
+    Projected,
     Unsupported,
 }
 
@@ -20,6 +23,7 @@ impl KernelSourceAdaptationStatus {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::Adapted => "adapted",
+            Self::Projected => "projected",
             Self::Unsupported => "unsupported",
         }
     }
@@ -34,6 +38,7 @@ pub(crate) struct KernelSourceAdaptation {
     pub(crate) status: KernelSourceAdaptationStatus,
     pub(crate) generated_entry: Option<String>,
     pub(crate) request_projection: Option<KernelSourceRequestProjection>,
+    pub(crate) result_projection: Option<KernelSourceResultProjection>,
     pub(crate) diagnostic: String,
 }
 
@@ -50,9 +55,23 @@ pub(crate) struct KernelSourceRequestProjection {
     pub(crate) expected_values: Vec<i64>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct KernelSourceResultProjection {
+    pub(crate) contract: &'static str,
+    pub(crate) element_type: &'static str,
+    pub(crate) input_source_node: String,
+    pub(crate) row: usize,
+    pub(crate) col: usize,
+    pub(crate) expected_i64: i64,
+}
+
 impl KernelSourceAdaptation {
     pub(crate) fn is_adapted(&self) -> bool {
         self.status == KernelSourceAdaptationStatus::Adapted
+    }
+
+    pub(crate) fn is_projected(&self) -> bool {
+        self.status == KernelSourceAdaptationStatus::Projected
     }
 }
 
@@ -79,6 +98,12 @@ pub(crate) fn adapt_project_kernel_functions(
             if node.op.module != "kernel" {
                 continue;
             }
+            if let Some(adaptation) =
+                adapt_element_at_result(function, node, &body, &nodes, &projections)
+            {
+                adaptations.push(adaptation);
+                continue;
+            }
             let adapted = adapt_add_scalar_axis(function, node, &body, &nodes)?
                 .or_else(|| adapt_reduce_sum_axis(function, node, &body, &projections));
             match adapted {
@@ -98,6 +123,65 @@ pub(crate) fn adapt_project_kernel_functions(
         }
     }
     Ok((adaptations, functions))
+}
+
+fn adapt_element_at_result(
+    function: &YirFunction,
+    node: &Node,
+    body: &BTreeSet<String>,
+    nodes: &BTreeMap<&str, &Node>,
+    projections: &BTreeMap<String, KernelSourceRequestProjection>,
+) -> Option<KernelSourceAdaptation> {
+    if node.op.instruction != "element_at" {
+        return None;
+    }
+    let [input, row, col] = node.op.args.as_slice() else {
+        return None;
+    };
+    let input_projection = projections.get(input)?;
+    let row = const_i64_index(row, body, nodes)?;
+    let col = const_i64_index(col, body, nodes)?;
+    if input_projection.element_type != "i64"
+        || input_projection.output_shape != [1, 1]
+        || input_projection.expected_values.len() != 1
+        || row != 0
+        || col != 0
+    {
+        return None;
+    }
+    Some(KernelSourceAdaptation {
+        contract: KERNEL_YIR_SOURCE_ADAPTER_CONTRACT,
+        source_function: function.name.clone(),
+        source_node: node.name.clone(),
+        source_instruction: node.op.instruction.clone(),
+        status: KernelSourceAdaptationStatus::Projected,
+        generated_entry: None,
+        request_projection: None,
+        result_projection: Some(KernelSourceResultProjection {
+            contract: KERNEL_SOURCE_RESULT_PROJECTION_CONTRACT,
+            element_type: "i64",
+            input_source_node: input.clone(),
+            row,
+            col,
+            expected_i64: input_projection.expected_values[0],
+        }),
+        diagnostic: "projected verified 1x1 i64 provider output as a host-visible scalar"
+            .to_owned(),
+    })
+}
+
+fn const_i64_index(
+    node_name: &str,
+    body: &BTreeSet<String>,
+    nodes: &BTreeMap<&str, &Node>,
+) -> Option<usize> {
+    let node = nodes.get(node_name).copied()?;
+    let [value] = node.op.args.as_slice() else {
+        return None;
+    };
+    (body.contains(node_name) && node.op.module == "cpu" && node.op.instruction == "const_i64")
+        .then(|| value.parse::<usize>().ok())
+        .flatten()
 }
 
 fn adapt_reduce_sum_axis(
@@ -177,6 +261,7 @@ fn adapt_reduce_sum_axis(
                 input_source_node: Some(input.clone()),
                 expected_values: vec![sum],
             }),
+            result_projection: None,
             diagnostic: format!(
                 "selected verified `{axis}` i64 scalar reduction with a project-request dependency"
             ),
@@ -266,6 +351,7 @@ fn adapt_add_scalar_axis(
             status: KernelSourceAdaptationStatus::Adapted,
             generated_entry: Some(entry),
             request_projection: Some(request_projection),
+            result_projection: None,
             diagnostic: format!(
                 "selected verified `{axis}` i64 scalar-map node with function-owned input and scalar operands"
             ),
@@ -283,6 +369,7 @@ fn unsupported_adaptation(function: &YirFunction, node: &Node) -> KernelSourceAd
         status: KernelSourceAdaptationStatus::Unsupported,
         generated_entry: None,
         request_projection: None,
+        result_projection: None,
         diagnostic: format!(
             "Kernel/YIR instruction `{}` has no registered source adapter for CUDA",
             node.op.instruction

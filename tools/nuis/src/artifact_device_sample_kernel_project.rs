@@ -1,8 +1,17 @@
-use std::{collections::BTreeMap, fs, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs,
+    path::Path,
+};
 
 const CODEGEN_TABLE_FILE_NAME: &str = "nuis.domain.kernel.codegen-table.toml";
 const CODEGEN_TABLE_CONTRACT: &str = "nuis-kernel-yir-codegen-table-v1";
 const REQUEST_PROJECTION_CONTRACT: &str = "nuis-kernel-source-request-projection-v1";
+const SOURCE_RESULT_PROJECTION_CONTRACT: &str = "nuis-kernel-source-result-projection-v1";
+const PROJECT_CODE_ASSET_IDENTITY_CONTRACT: &str = "nuis-kernel-project-code-asset-identity-v1";
+const PROVIDER_RESULT_PROJECTION_COLLECTION_CONTRACT: &str =
+    "nuis-provider-result-projection-collection-v1";
+const PROVIDER_RESULT_PROJECTION_CONTRACT: &str = "nuis-provider-result-projection-v1";
 
 pub(crate) struct ProjectKernelRequestProjection {
     source_function: String,
@@ -17,6 +26,21 @@ pub(crate) struct ProjectKernelRequestProjection {
     expected_values: Vec<i64>,
 }
 
+struct ProjectKernelResultProjection {
+    source_function: String,
+    source_node: String,
+    input_source_node: String,
+    expected_i64: i64,
+}
+
+struct ProjectKernelCodeAssetIdentity {
+    asset_id: String,
+    source_fnv1a64: String,
+    lowering_target: String,
+    entries: Vec<String>,
+    identity_hash: String,
+}
+
 pub(crate) fn augment_evidence(
     output_dir: &Path,
     evidence: &str,
@@ -24,40 +48,72 @@ pub(crate) fn augment_evidence(
     asset_bytes: &[u8],
 ) -> Result<String, String> {
     let projections = load_projections(output_dir)?;
-    if projections.is_empty() {
+    let result_projections = load_result_projections(output_dir)?;
+    if projections.is_empty() && result_projections.is_empty() {
         return Ok(evidence.to_owned());
     }
-    let old_count = "provider_request_count=2";
-    if evidence.matches(old_count).count() != 1 {
+    if projections.is_empty() {
         return Err(
-            "Kernel provider request collection has an invalid compatibility count".to_owned(),
+            "project Kernel result projections require a project request collection".to_owned(),
         );
     }
-    let mut resolved = evidence.replace(
-        old_count,
-        &format!("provider_request_count={}", 2 + projections.len()),
-    );
+    let project_asset_identity = load_project_code_asset_identity(output_dir, &projections)?;
+    let mut resolved = replace_compatibility_collection(evidence, projections.len())?;
+    resolved.push(';');
+    resolved.push_str(&render_project_code_asset_identity(&project_asset_identity));
     let projection_indices = projections
         .iter()
         .enumerate()
-        .map(|(offset, projection)| (projection.source_node.as_str(), 2 + offset))
+        .map(|(index, projection)| (projection.source_node.as_str(), index))
         .collect::<BTreeMap<_, _>>();
     let projection_by_node = projections
         .iter()
         .map(|projection| (projection.source_node.as_str(), projection))
         .collect::<BTreeMap<_, _>>();
-    for (offset, projection) in projections.iter().enumerate() {
+    for (index, projection) in projections.iter().enumerate() {
         resolved.push(';');
         resolved.push_str(&render_request(
-            2 + offset,
+            index,
             projection,
             &projection_indices,
             &projection_by_node,
+            &project_asset_identity.asset_id,
             asset,
             asset_bytes,
         )?);
     }
+    if !result_projections.is_empty() {
+        resolved.push_str(&format!(
+            ";provider_result_projection_collection_contract={PROVIDER_RESULT_PROJECTION_COLLECTION_CONTRACT};provider_result_projection_count={}",
+            result_projections.len()
+        ));
+        for (index, result) in result_projections.iter().enumerate() {
+            let producer = projection_by_node
+                .get(result.input_source_node.as_str())
+                .ok_or_else(|| {
+                    format!(
+                        "project Kernel result `{}` has unknown input source `{}`",
+                        result.source_node, result.input_source_node
+                    )
+                })?;
+            if producer.source_function != result.source_function
+                || producer.output_shape != [1, 1]
+                || producer.expected_values != [result.expected_i64]
+            {
+                return Err(format!(
+                    "project Kernel result `{}` does not match its producer",
+                    result.source_node
+                ));
+            }
+            resolved.push(';');
+            resolved.push_str(&render_result_projection(index, result, producer));
+        }
+    }
     Ok(resolved)
+}
+
+pub(crate) fn uses_project_request_collection(output_dir: &Path) -> Result<bool, String> {
+    Ok(!load_projections(output_dir)?.is_empty())
 }
 
 pub(crate) fn persist_payloads(output_dir: &Path) -> Result<(), String> {
@@ -78,11 +134,130 @@ pub(crate) fn persist_payloads(output_dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn replace_compatibility_collection(
+    evidence: &str,
+    project_count: usize,
+) -> Result<String, String> {
+    let mut compatibility_count = None;
+    for field in evidence.split(';') {
+        let Some((key, value)) = field.split_once('=') else {
+            continue;
+        };
+        if key == "provider_request_count" {
+            if compatibility_count.is_some() {
+                return Err(
+                    "Kernel provider request collection has duplicate count evidence".to_owned(),
+                );
+            }
+            compatibility_count = Some(value.parse::<usize>().map_err(|_| {
+                "Kernel provider request collection has an invalid compatibility count".to_owned()
+            })?);
+        }
+    }
+    let compatibility_count = compatibility_count.ok_or_else(|| {
+        "Kernel provider request collection has no compatibility count".to_owned()
+    })?;
+    if compatibility_count == 0 {
+        return Err(
+            "Kernel provider request collection has an empty compatibility graph".to_owned(),
+        );
+    }
+
+    let mut removed_indices = BTreeSet::new();
+    let compatibility_suffixes = evidence
+        .split(';')
+        .filter_map(|field| field.split_once('=').map(|(key, _)| key))
+        .filter_map(|key| {
+            let suffix = key.strip_prefix("provider_request_")?;
+            let (index, suffix) = suffix.split_once('_')?;
+            (index.parse::<usize>().ok()? < compatibility_count).then_some(suffix)
+        })
+        .collect::<BTreeSet<_>>();
+    let mut fields = Vec::new();
+    for field in evidence.split(';') {
+        let Some((key, value)) = field.split_once('=') else {
+            fields.push(field.to_owned());
+            continue;
+        };
+        if key == "provider_request_count" {
+            fields.push(format!("{key}={project_count}"));
+            continue;
+        }
+        let indexed_request = key
+            .strip_prefix("provider_request_")
+            .and_then(|suffix| suffix.split_once('_'))
+            .and_then(|(index, _)| index.parse::<usize>().ok());
+        if indexed_request.is_some_and(|index| index < compatibility_count) {
+            removed_indices.insert(indexed_request.expect("checked indexed request"));
+            continue;
+        }
+        if key
+            .strip_prefix("provider_")
+            .is_some_and(|suffix| compatibility_suffixes.contains(suffix))
+        {
+            continue;
+        }
+        fields.push(format!("{key}={value}"));
+    }
+    if removed_indices.len() != compatibility_count {
+        return Err(
+            "Kernel provider request collection has incomplete compatibility requests".to_owned(),
+        );
+    }
+    Ok(fields.join(";"))
+}
+
 fn load_projections(output_dir: &Path) -> Result<Vec<ProjectKernelRequestProjection>, String> {
+    let Some(source) = load_codegen_table_source(output_dir)? else {
+        return Ok(Vec::new());
+    };
+    source
+        .split("[[source_adaptation]]")
+        .skip(1)
+        .filter(|record| {
+            string_field(record, "request_projection_contract").as_deref()
+                == Some(REQUEST_PROJECTION_CONTRACT)
+        })
+        .map(parse_projection)
+        .collect()
+}
+
+fn load_result_projections(
+    output_dir: &Path,
+) -> Result<Vec<ProjectKernelResultProjection>, String> {
+    let Some(source) = load_codegen_table_source(output_dir)? else {
+        return Ok(Vec::new());
+    };
+    source
+        .split("[[source_adaptation]]")
+        .skip(1)
+        .filter(|record| {
+            string_field(record, "result_projection_contract").as_deref()
+                == Some(SOURCE_RESULT_PROJECTION_CONTRACT)
+        })
+        .map(|record| {
+            if string_field(record, "status").as_deref() != Some("projected")
+                || string_field(record, "result_element_type").as_deref() != Some("i64")
+                || integer_field(record, "result_row")? != 0
+                || integer_field(record, "result_col")? != 0
+            {
+                return Err("project Kernel result projection is inconsistent".to_owned());
+            }
+            Ok(ProjectKernelResultProjection {
+                source_function: required_string(record, "source_function")?,
+                source_node: required_string(record, "source_node")?,
+                input_source_node: required_string(record, "result_input_source_node")?,
+                expected_i64: integer_field(record, "result_expected_i64")?,
+            })
+        })
+        .collect()
+}
+
+fn load_codegen_table_source(output_dir: &Path) -> Result<Option<String>, String> {
     let path = output_dir.join(CODEGEN_TABLE_FILE_NAME);
     let source = match fs::read_to_string(&path) {
         Ok(source) => source,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => {
             return Err(format!(
                 "failed to read project Kernel codegen table `{}`: {error}",
@@ -93,15 +268,79 @@ fn load_projections(output_dir: &Path) -> Result<Vec<ProjectKernelRequestProject
     if string_field(&source, "schema").as_deref() != Some(CODEGEN_TABLE_CONTRACT) {
         return Err("project Kernel codegen table contract is invalid".to_owned());
     }
-    source
-        .split("[[source_adaptation]]")
-        .skip(1)
-        .filter(|record| {
-            string_field(record, "request_projection_contract").as_deref()
-                == Some(REQUEST_PROJECTION_CONTRACT)
-        })
-        .map(parse_projection)
-        .collect()
+    Ok(Some(source))
+}
+
+fn load_project_code_asset_identity(
+    output_dir: &Path,
+    projections: &[ProjectKernelRequestProjection],
+) -> Result<ProjectKernelCodeAssetIdentity, String> {
+    let source = load_codegen_table_source(output_dir)?
+        .ok_or_else(|| "project Kernel code asset identity has no codegen table".to_owned())?;
+    let source_fnv1a64 = required_string(&source, "source_fnv1a64")?;
+    let identity_source_fnv1a64 = required_string(&source, "project_code_asset_source_fnv1a64")?;
+    let lowering_target = required_string(&source, "lowering_target")?;
+    let identity_target = required_string(&source, "project_code_asset_lowering_target")?;
+    let entries = string_array_field(&source, "project_code_asset_entries")?;
+    let projected_entries = projections
+        .iter()
+        .map(|projection| projection.entry.as_str())
+        .collect::<Vec<_>>();
+    let entry_count = integer_field(&source, "project_code_asset_entry_count")?;
+    let function_count = integer_field(&source, "function_count")?;
+    let identity_hash = required_string(&source, "project_code_asset_identity_hash")?;
+    let expected_hash =
+        project_code_asset_identity_hash(&source_fnv1a64, &lowering_target, &projected_entries);
+    let asset_id = required_string(&source, "project_code_asset_id")?;
+    let expected_id = format!("kernel.cuda.project.{}", &expected_hash[2..]);
+    if string_field(&source, "project_code_asset_identity_contract").as_deref()
+        != Some(PROJECT_CODE_ASSET_IDENTITY_CONTRACT)
+        || !valid_fnv1a64(&source_fnv1a64)
+        || identity_source_fnv1a64 != source_fnv1a64
+        || lowering_target != "cuda.nvidia-gpu"
+        || identity_target != lowering_target
+        || entries != projected_entries
+        || entry_count != projected_entries.len() as i64
+        || function_count != entry_count
+        || identity_hash != expected_hash
+        || asset_id != expected_id
+    {
+        return Err("project Kernel code asset identity is inconsistent".to_owned());
+    }
+    Ok(ProjectKernelCodeAssetIdentity {
+        asset_id,
+        source_fnv1a64,
+        lowering_target,
+        entries,
+        identity_hash,
+    })
+}
+
+fn render_project_code_asset_identity(identity: &ProjectKernelCodeAssetIdentity) -> String {
+    format!(
+        "provider_code_asset_identity_contract={PROJECT_CODE_ASSET_IDENTITY_CONTRACT};provider_code_asset_identity_asset_id={};provider_code_asset_identity_source_fnv1a64={};provider_code_asset_identity_lowering_target={};provider_code_asset_identity_entry_count={};provider_code_asset_identity_entries={};provider_code_asset_identity_hash={}",
+        identity.asset_id,
+        identity.source_fnv1a64,
+        identity.lowering_target,
+        identity.entries.len(),
+        identity.entries.join(","),
+        identity.identity_hash,
+    )
+}
+
+fn project_code_asset_identity_hash(
+    source_fnv1a64: &str,
+    lowering_target: &str,
+    entries: &[&str],
+) -> String {
+    fnv1a64_hex(
+        format!(
+            "{PROJECT_CODE_ASSET_IDENTITY_CONTRACT}\n{source_fnv1a64}\n{lowering_target}\n{}\n{}",
+            entries.len(),
+            entries.join("\n")
+        )
+        .as_bytes(),
+    )
 }
 
 fn parse_projection(record: &str) -> Result<ProjectKernelRequestProjection, String> {
@@ -155,6 +394,7 @@ fn render_request(
     projection: &ProjectKernelRequestProjection,
     projection_indices: &BTreeMap<&str, usize>,
     projection_by_node: &BTreeMap<&str, &ProjectKernelRequestProjection>,
+    project_asset_id: &str,
     asset: &nuisc::kernel_code_asset::RegisteredKernelCodeAsset,
     asset_bytes: &[u8],
 ) -> Result<String, String> {
@@ -244,7 +484,7 @@ fn render_request(
         projection.request_id(),
         projection.operation,
         projection.output_buffer(),
-        asset.id,
+        project_asset_id,
         asset.format,
         asset.target,
         projection.entry,
@@ -258,6 +498,26 @@ fn render_request(
         fnv1a64_hex(&expected),
         fnv1a64_hex(&input),
     ))
+}
+
+fn render_result_projection(
+    index: usize,
+    result: &ProjectKernelResultProjection,
+    producer: &ProjectKernelRequestProjection,
+) -> String {
+    let prefix = format!("provider_result_projection_{index}_");
+    let expected = result.expected_i64.to_le_bytes();
+    debug_assert_eq!(producer.output_shape, [1, 1]);
+    debug_assert_eq!(producer.expected_values, [result.expected_i64]);
+    format!(
+        "{prefix}contract={PROVIDER_RESULT_PROJECTION_CONTRACT};{prefix}source_function={};{prefix}source_node={};{prefix}value_type=i64;{prefix}producer_request_id={};{prefix}producer_output_buffer={};{prefix}byte_offset=0;{prefix}byte_length=8;{prefix}expected_i64={};{prefix}expected_content_hash={};{prefix}completion_requirement=nuis-provider-completion-evidence-v1;{prefix}glm_release_requirement=nuis-provider-glm-release-evidence-v1",
+        result.source_function,
+        result.source_node,
+        producer.request_id(),
+        producer.output_buffer(),
+        result.expected_i64,
+        fnv1a64_hex(&expected)
+    )
 }
 
 impl ProjectKernelRequestProjection {
@@ -365,6 +625,11 @@ fn optional_integer_field(source: &str, key: &str) -> Result<Option<i64>, String
         .unwrap_or(Ok(None))
 }
 
+fn integer_field(source: &str, key: &str) -> Result<i64, String> {
+    optional_integer_field(source, key)?
+        .ok_or_else(|| format!("project Kernel request projection is missing `{key}`"))
+}
+
 fn usize_array_field(source: &str, key: &str) -> Result<Vec<usize>, String> {
     array_field(source, key)?
         .into_iter()
@@ -376,6 +641,19 @@ fn i64_array_field(source: &str, key: &str) -> Result<Vec<i64>, String> {
     array_field(source, key)?
         .into_iter()
         .map(|value| value.parse().map_err(|_| format!("invalid `{key}` item")))
+        .collect()
+}
+
+fn string_array_field(source: &str, key: &str) -> Result<Vec<String>, String> {
+    array_field(source, key)?
+        .into_iter()
+        .map(|value| {
+            value
+                .strip_prefix('"')
+                .and_then(|value| value.strip_suffix('"'))
+                .map(str::to_owned)
+                .ok_or_else(|| format!("invalid `{key}` item"))
+        })
         .collect()
 }
 
@@ -412,6 +690,12 @@ fn valid_identifier(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+}
+
+fn valid_fnv1a64(value: &str) -> bool {
+    value.len() == 18
+        && value.starts_with("0x")
+        && value[2..].bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn fnv1a64_hex(bytes: &[u8]) -> String {

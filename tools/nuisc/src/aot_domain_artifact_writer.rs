@@ -153,17 +153,6 @@ fn write_registered_domain_code_asset(
         if table.contract != KERNEL_YIR_CODEGEN_TABLE_CONTRACT {
             return Err("AOT received an invalid Kernel/YIR codegen table contract".to_owned());
         }
-        let entries = table
-            .functions
-            .iter()
-            .map(|function| function.entry.as_str())
-            .collect::<Vec<_>>();
-        if !entries.starts_with(asset.visible_entries) {
-            return Err(format!(
-                "Kernel/YIR codegen entries {:?} do not preserve registered code asset entry prefix {:?}",
-                entries, asset.visible_entries
-            ));
-        }
         Some(crate::kernel_ptx_emitter::lower_cuda_ptx(table)?.into_bytes())
     } else {
         None
@@ -280,6 +269,12 @@ kernel.target_config target kernel0 x86_64 cuda 1 ptx\n";
         assert!(sidecar.contains("source_binding = \"compiled-project-yir\""));
         assert!(sidecar.contains("source_function_count = 1"));
         assert!(sidecar.contains("source_adapted_count = 1"));
+        assert!(sidecar.contains(
+            "project_code_asset_identity_contract = \"nuis-kernel-project-code-asset-identity-v1\""
+        ));
+        assert!(sidecar.contains("project_code_asset_id = \"kernel.cuda.project."));
+        assert!(sidecar.contains("project_code_asset_entries = [\"nuis_project_main_mapped_i64\"]"));
+        assert!(sidecar.contains("project_code_asset_identity_hash = \"0x"));
         assert!(sidecar.contains("[[source_function]]"));
         assert!(sidecar.contains("[[source_adaptation]]"));
         assert!(sidecar.contains("generated_entry = \"nuis_project_main_mapped_i64\""));
@@ -289,8 +284,8 @@ kernel.target_config target kernel0 x86_64 cuda 1 ptx\n";
         )));
         let ptx = fs::read(output_dir.join("nuis.domain.kernel.cuda.ptx")).unwrap();
         let ptx = std::str::from_utf8(&ptx).unwrap();
-        assert!(ptx.contains(".visible .entry nuis_kernel_vector_add_f32"));
-        assert!(ptx.contains(".visible .entry nuis_kernel_scale_f32"));
+        assert!(!ptx.contains(".visible .entry nuis_kernel_vector_add_f32"));
+        assert!(!ptx.contains(".visible .entry nuis_kernel_scale_f32"));
         assert!(ptx.contains(".visible .entry nuis_project_main_mapped_i64"));
         assert!(ptx.contains("add.s64"));
         fs::remove_dir_all(output_dir).unwrap();

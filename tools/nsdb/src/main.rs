@@ -21,6 +21,7 @@ mod provider_carrier_channel_registry;
 mod provider_carrier_channel_unix;
 mod provider_carrier_input;
 mod provider_code_asset;
+mod provider_code_asset_identity;
 mod provider_completion_dispatch;
 mod provider_completion_evidence;
 mod provider_completion_integrity;
@@ -52,6 +53,7 @@ mod provider_prepared_input;
 mod provider_process_adapter;
 mod provider_request;
 mod provider_request_payload;
+mod provider_result_projection;
 mod provider_runner_coreml;
 mod provider_runner_cuda;
 mod provider_runner_metal;
@@ -94,7 +96,6 @@ mod replay_tests;
 mod report;
 mod sidecar;
 mod transcript;
-
 use crate::{
     cli::{parse_args, resolve_manifest_input, Command},
     display::{
@@ -754,7 +755,6 @@ mod tests {
         };
 
         let json = provider_sample_execute_json(&report);
-
         assert!(json.contains("\"matched_record_count\":1"));
         assert!(json.contains(
             "\"provider_bundle_registry_contract\":\"nuis-provider-bundle-registry-v1\""

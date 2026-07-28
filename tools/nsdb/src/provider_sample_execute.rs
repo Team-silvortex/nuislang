@@ -387,11 +387,17 @@ fn write_provider_output_payload(
 ) -> Result<WrittenProviderOutput, String> {
     let file_name = provider_output_payload_file_name(&record.provider_family);
     let execution = execute_native_provider_outputs(output_dir, record, adapter)?;
+    let result_projection_evidence =
+        crate::provider_result_projection::validate_and_render_result_projections(
+            &record.input_evidence,
+            &execution.native_outputs,
+        )?;
     let content = render_real_device_provider_output_payload(
         record,
         adapter,
         &execution.native_outputs,
         &execution.transport_receipts,
+        &result_projection_evidence,
     );
     let hash = fnv1a64_hex(content.as_bytes());
     fs::write(output_dir.join(&file_name), content).map_err(|error| {

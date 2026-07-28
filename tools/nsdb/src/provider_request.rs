@@ -1,5 +1,6 @@
 use crate::provider_adapter_binding::{parse_adapter_binding, ProviderAdapterBinding};
 use crate::provider_code_asset::{parse_code_asset, ProviderCodeAssetDescriptor};
+use crate::provider_code_asset_identity::validate_project_code_asset_identity;
 use crate::provider_edge_transport::{
     parse_edge_transport, validate_dependency_transport, ProviderEdgeTransportDescriptor,
 };
@@ -211,7 +212,9 @@ fn parse_registered_collection(input_evidence: &str) -> Option<ProviderRequestCo
             )
         })
         .collect::<Option<Vec<_>>>()?;
-    validate_collection_dependencies(&requests).then_some(ProviderRequestCollection {
+    (validate_collection_dependencies(&requests)
+        && validate_project_code_asset_identity(&fields, &requests))
+    .then_some(ProviderRequestCollection {
         source: "registered-collection",
         requests,
     })

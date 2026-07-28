@@ -4,12 +4,15 @@ use yir_core::{Node, Operation, YirFunction};
 
 use crate::aot_encoding::fnv1a64_hex;
 use crate::kernel_source_adapter::{
-    adapt_project_kernel_functions, KernelSourceAdaptation,
-    KERNEL_SOURCE_REQUEST_PROJECTION_CONTRACT, KERNEL_YIR_SOURCE_ADAPTER_CONTRACT,
+    adapt_project_kernel_functions, KernelSourceAdaptation, KernelSourceAdaptationStatus,
+    KERNEL_SOURCE_REQUEST_PROJECTION_CONTRACT, KERNEL_SOURCE_RESULT_PROJECTION_CONTRACT,
+    KERNEL_YIR_SOURCE_ADAPTER_CONTRACT,
 };
 
 pub(crate) const KERNEL_YIR_CODEGEN_TABLE_CONTRACT: &str = "nuis-kernel-yir-codegen-table-v1";
 pub(crate) const KERNEL_YIR_CODEGEN_FUNCTION_CONTRACT: &str = "nuis-kernel-yir-codegen-function-v1";
+pub(crate) const KERNEL_PROJECT_CODE_ASSET_IDENTITY_CONTRACT: &str =
+    "nuis-kernel-project-code-asset-identity-v1";
 const PROJECT_YIR_BINDING_CONTRACT: &str = "compiled-project-yir";
 const REGISTERED_BINDING_CONTRACT: &str = "registered-provider-kernel-yir";
 
@@ -139,8 +142,6 @@ pub(crate) fn table_from_compiled_project_yir(
     }
     let (source_adaptations, adapted_functions) =
         adapt_project_kernel_functions(&module, &source_functions)?;
-    let mut functions = registered_provider_functions();
-    functions.extend(adapted_functions);
 
     let table = KernelYirCodegenTable {
         contract: KERNEL_YIR_CODEGEN_TABLE_CONTRACT,
@@ -152,7 +153,7 @@ pub(crate) fn table_from_compiled_project_yir(
         lowering_target: "cuda.nvidia-gpu",
         source_functions,
         source_adaptations,
-        functions,
+        functions: adapted_functions,
     };
     validate_codegen_table(&table)?;
     Ok(table)
@@ -201,27 +202,32 @@ pub(crate) fn validate_codegen_table(table: &KernelYirCodegenTable) -> Result<()
                 .source_adaptations
                 .iter()
                 .any(KernelSourceAdaptation::is_adapted)
-            || table.source_adaptations.iter().any(|adaptation| {
-                adaptation.is_adapted()
-                    != (adaptation.generated_entry.is_some()
-                        && adaptation
-                            .request_projection
-                            .as_ref()
-                            .is_some_and(|projection| {
-                                projection.contract == KERNEL_SOURCE_REQUEST_PROJECTION_CONTRACT
-                                    && projection.element_type == "i64"
-                                    && !projection.input_shape.is_empty()
-                                    && !projection.output_shape.is_empty()
-                                    && projection.input_shape.iter().product::<usize>()
-                                        == projection.input_values.len()
-                                    && projection.output_shape.iter().product::<usize>()
-                                        == projection.expected_values.len()
-                            }))
-            }))
+            || table
+                .source_adaptations
+                .iter()
+                .any(|adaptation| !valid_source_adaptation(adaptation)))
     {
         return Err(
             "project Kernel/YIR codegen table has no complete source adaptation map".to_owned(),
         );
+    }
+    if table.source_binding == PROJECT_YIR_BINDING_CONTRACT {
+        let projected_entries = table
+            .source_adaptations
+            .iter()
+            .filter_map(|adaptation| adaptation.generated_entry.as_deref())
+            .collect::<Vec<_>>();
+        let function_entries = table
+            .functions
+            .iter()
+            .map(|function| function.entry.as_str())
+            .collect::<Vec<_>>();
+        if projected_entries != function_entries {
+            return Err(
+                "project Kernel/YIR codegen functions do not match source request projections"
+                    .to_owned(),
+            );
+        }
     }
     let mut entries = BTreeSet::new();
     for function in &table.functions {
@@ -244,10 +250,49 @@ pub(crate) fn validate_codegen_table(table: &KernelYirCodegenTable) -> Result<()
     Ok(())
 }
 
+fn valid_source_adaptation(adaptation: &KernelSourceAdaptation) -> bool {
+    match adaptation.status {
+        KernelSourceAdaptationStatus::Adapted => {
+            adaptation.generated_entry.is_some()
+                && adaptation.result_projection.is_none()
+                && adaptation
+                    .request_projection
+                    .as_ref()
+                    .is_some_and(|projection| {
+                        projection.contract == KERNEL_SOURCE_REQUEST_PROJECTION_CONTRACT
+                            && projection.element_type == "i64"
+                            && !projection.input_shape.is_empty()
+                            && !projection.output_shape.is_empty()
+                            && projection.input_shape.iter().product::<usize>()
+                                == projection.input_values.len()
+                            && projection.output_shape.iter().product::<usize>()
+                                == projection.expected_values.len()
+                    })
+        }
+        KernelSourceAdaptationStatus::Projected => {
+            adaptation.generated_entry.is_none()
+                && adaptation.request_projection.is_none()
+                && adaptation
+                    .result_projection
+                    .as_ref()
+                    .is_some_and(|projection| {
+                        projection.contract == KERNEL_SOURCE_RESULT_PROJECTION_CONTRACT
+                            && projection.element_type == "i64"
+                            && !projection.input_source_node.is_empty()
+                    })
+        }
+        KernelSourceAdaptationStatus::Unsupported => {
+            adaptation.generated_entry.is_none()
+                && adaptation.request_projection.is_none()
+                && adaptation.result_projection.is_none()
+        }
+    }
+}
+
 pub(crate) fn render_codegen_table(table: &KernelYirCodegenTable) -> Result<String, String> {
     validate_codegen_table(table)?;
     let mut out = format!(
-        "schema = \"{}\"\nsource_binding = \"{}\"\nsource_yir_version = \"{}\"\nsource_fnv1a64 = \"{}\"\nsource_kernel_node_count = {}\nsource_kernel_body_node_count = {}\nsource_function_count = {}\nsource_adaptation_contract = \"{}\"\nsource_adaptation_count = {}\nsource_adapted_count = {}\nlowering_target = \"{}\"\nfunction_count = {}\n",
+        "schema = \"{}\"\nsource_binding = \"{}\"\nsource_yir_version = \"{}\"\nsource_fnv1a64 = \"{}\"\nsource_kernel_node_count = {}\nsource_kernel_body_node_count = {}\nsource_function_count = {}\nsource_adaptation_contract = \"{}\"\nsource_adaptation_count = {}\nsource_adapted_count = {}\nsource_projected_count = {}\nlowering_target = \"{}\"\nfunction_count = {}\n",
         table.contract,
         table.source_binding,
         table.source_yir_version,
@@ -262,9 +307,39 @@ pub(crate) fn render_codegen_table(table: &KernelYirCodegenTable) -> Result<Stri
             .iter()
             .filter(|adaptation| adaptation.is_adapted())
             .count(),
+        table
+            .source_adaptations
+            .iter()
+            .filter(|adaptation| adaptation.is_projected())
+            .count(),
         table.lowering_target,
         table.functions.len()
     );
+    if table.source_binding == PROJECT_YIR_BINDING_CONTRACT {
+        let entries = table
+            .functions
+            .iter()
+            .map(|function| function.entry.as_str())
+            .collect::<Vec<_>>();
+        let identity_hash = project_code_asset_identity_hash(
+            &table.source_fnv1a64,
+            table.lowering_target,
+            &entries,
+        );
+        out.push_str(&format!(
+            "project_code_asset_identity_contract = \"{KERNEL_PROJECT_CODE_ASSET_IDENTITY_CONTRACT}\"\nproject_code_asset_id = \"kernel.cuda.project.{}\"\nproject_code_asset_source_fnv1a64 = \"{}\"\nproject_code_asset_lowering_target = \"{}\"\nproject_code_asset_entry_count = {}\nproject_code_asset_entries = [{}]\nproject_code_asset_identity_hash = \"{}\"\n",
+            &identity_hash[2..],
+            table.source_fnv1a64,
+            table.lowering_target,
+            entries.len(),
+            entries
+                .iter()
+                .map(|entry| format!("\"{entry}\""))
+                .collect::<Vec<_>>()
+                .join(", "),
+            identity_hash,
+        ));
+    }
     for function in &table.source_functions {
         out.push_str("\n[[source_function]]\n");
         out.push_str(&format!(
@@ -340,6 +415,17 @@ pub(crate) fn render_codegen_table(table: &KernelYirCodegenTable) -> Result<Stri
                 &projection.expected_values,
             );
         }
+        if let Some(projection) = &adaptation.result_projection {
+            out.push_str(&format!(
+                "result_projection_contract = \"{}\"\nresult_element_type = \"{}\"\nresult_input_source_node = \"{}\"\nresult_row = {}\nresult_col = {}\nresult_expected_i64 = {}\n",
+                projection.contract,
+                projection.element_type,
+                projection.input_source_node,
+                projection.row,
+                projection.col,
+                projection.expected_i64
+            ));
+        }
         out.push_str(&format!("diagnostic = \"{}\"\n", adaptation.diagnostic));
     }
     for function in &table.functions {
@@ -377,6 +463,21 @@ pub(crate) fn render_codegen_table(table: &KernelYirCodegenTable) -> Result<Stri
         out.push_str("]\n");
     }
     Ok(out)
+}
+
+fn project_code_asset_identity_hash(
+    source_fnv1a64: &str,
+    lowering_target: &str,
+    entries: &[&str],
+) -> String {
+    fnv1a64_hex(
+        format!(
+            "{KERNEL_PROJECT_CODE_ASSET_IDENTITY_CONTRACT}\n{source_fnv1a64}\n{lowering_target}\n{}\n{}",
+            entries.len(),
+            entries.join("\n")
+        )
+        .as_bytes(),
+    )
 }
 
 fn render_usize_array(out: &mut String, key: &str, values: &[usize]) {
@@ -474,25 +575,31 @@ mod tests {
 resource cpu0 cpu.arm64\n\
 resource kernel0 kernel.cuda\n\
 function main cpu entry\n\
-function-result main i64 value scalar\n\
+function-result main i64 value selected\n\
 function-node main input\n\
 function-node main scalar\n\
 function-node main mapped\n\
 function-node main reduced\n\
+function-node main row\n\
+function-node main col\n\
+function-node main selected\n\
 kernel.tensor input kernel0 1 4 1,2,3,4\n\
 cpu.const_i64 scalar cpu0 10\n\
 kernel.add_scalar_axis mapped kernel0 input cols scalar\n\
 kernel.reduce_sum_axis reduced kernel0 mapped cols\n\
+cpu.const_i64 row cpu0 0\n\
+cpu.const_i64 col cpu0 0\n\
+kernel.element_at selected kernel0 reduced row col\n\
 kernel.target_config target kernel0 x86_64 cuda 1 ptx\n";
 
     #[test]
     fn compiled_project_yir_builds_verified_backend_neutral_table() {
         let table = table_from_compiled_project_yir(PROJECT_YIR, "cuda.nvidia-gpu").unwrap();
         assert_eq!(table.source_binding, PROJECT_YIR_BINDING_CONTRACT);
-        assert_eq!(table.source_kernel_node_count, 4);
-        assert_eq!(table.source_kernel_body_node_count, 3);
+        assert_eq!(table.source_kernel_node_count, 5);
+        assert_eq!(table.source_kernel_body_node_count, 4);
         assert_eq!(table.source_functions.len(), 1);
-        assert_eq!(table.source_adaptations.len(), 3);
+        assert_eq!(table.source_adaptations.len(), 4);
         assert_eq!(
             table
                 .source_adaptations
@@ -501,16 +608,39 @@ kernel.target_config target kernel0 x86_64 cuda 1 ptx\n";
                 .count(),
             2
         );
-        assert_eq!(table.functions.len(), 4);
+        assert_eq!(
+            table
+                .source_adaptations
+                .iter()
+                .filter(|adaptation| adaptation.is_projected())
+                .count(),
+            1
+        );
+        assert_eq!(table.functions.len(), 2);
         let rendered = render_codegen_table(&table).unwrap();
         assert!(rendered.contains("schema = \"nuis-kernel-yir-codegen-table-v1\""));
         assert!(rendered.contains("source_binding = \"compiled-project-yir\""));
         assert!(rendered.contains("[[source_function]]"));
-        assert!(rendered.contains("body_nodes = [\"input\", \"scalar\", \"mapped\", \"reduced\"]"));
+        assert!(rendered.contains(
+            "body_nodes = [\"input\", \"scalar\", \"mapped\", \"reduced\", \"row\", \"col\", \"selected\"]"
+        ));
         assert!(
             rendered.contains("source_adaptation_contract = \"nuis-kernel-yir-source-adapter-v1\"")
         );
         assert!(rendered.contains("source_adapted_count = 2"));
+        assert!(rendered.contains("source_projected_count = 1"));
+        assert!(rendered.contains(
+            "project_code_asset_identity_contract = \"nuis-kernel-project-code-asset-identity-v1\""
+        ));
+        assert!(rendered.contains("project_code_asset_id = \"kernel.cuda.project."));
+        assert!(rendered.contains(&format!(
+            "project_code_asset_source_fnv1a64 = \"{}\"",
+            table.source_fnv1a64
+        )));
+        assert!(rendered.contains(
+            "project_code_asset_entries = [\"nuis_project_main_mapped_i64\", \"nuis_project_main_reduced_i64\"]"
+        ));
+        assert!(rendered.contains("project_code_asset_identity_hash = \"0x"));
         assert!(rendered.contains("status = \"unsupported\""));
         assert!(rendered.contains("status = \"adapted\""));
         assert!(rendered.contains("generated_entry = \"nuis_project_main_mapped_i64\""));
@@ -529,11 +659,18 @@ kernel.target_config target kernel0 x86_64 cuda 1 ptx\n";
         assert!(rendered.contains("request_input_source_node = \"mapped\""));
         assert!(rendered.contains("request_output_shape = [1, 1]"));
         assert!(rendered.contains("request_expected_values = [50]"));
-        assert!(rendered.contains("kernel.add_f32"));
-        assert!(rendered.contains("kernel.mul_f32"));
+        assert!(rendered.contains("status = \"projected\""));
+        assert!(rendered
+            .contains("result_projection_contract = \"nuis-kernel-source-result-projection-v1\""));
+        assert!(rendered.contains("result_input_source_node = \"reduced\""));
+        assert!(rendered.contains("result_expected_i64 = 50"));
+        assert!(!rendered.contains("kernel.add_f32"));
+        assert!(!rendered.contains("kernel.mul_f32"));
         assert!(rendered.contains("kernel.add_i64"));
         assert!(rendered.contains("kernel.reduce_sum_i64"));
         let ptx = crate::kernel_ptx_emitter::lower_cuda_ptx(&table).unwrap();
+        assert!(!ptx.contains(".visible .entry nuis_kernel_vector_add_f32"));
+        assert!(!ptx.contains(".visible .entry nuis_kernel_scale_f32"));
         assert!(ptx.contains(".visible .entry nuis_project_main_mapped_i64"));
         assert!(ptx.contains("ld.global.s64"));
         assert!(ptx.contains("add.s64"));

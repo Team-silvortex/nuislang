@@ -24,8 +24,38 @@ fn sealed_linux_cuda_image_executes_and_replays_completion() {
 
     let build = run_nuis(&["build", &project_text, &output_dir_text]);
     assert_success(&build, "build Linux CUDA provider project");
+    let project_ptx =
+        fs::read_to_string(output_dir.join("nuis.domain.kernel.cuda.ptx")).expect("project PTX");
+    assert!(project_ptx.contains(".visible .entry nuis_project_main_kernel_map_axis_2_i64"));
+    assert!(project_ptx.contains(".visible .entry nuis_project_main_kernel_reduce_sum_axis_3_i64"));
+    assert!(!project_ptx.contains(".visible .entry nuis_kernel_vector_add_f32"));
+    assert!(!project_ptx.contains(".visible .entry nuis_kernel_scale_f32"));
+    let codegen_table =
+        fs::read_to_string(output_dir.join("nuis.domain.kernel.codegen-table.toml"))
+            .expect("project codegen table");
+    let project_asset_id = codegen_table
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("project_code_asset_id = \"")
+                .and_then(|value| value.strip_suffix('"'))
+        })
+        .expect("project code asset identity");
+    assert!(project_asset_id.starts_with("kernel.cuda.project."));
     let run = run_nuis(&["run-artifact", &output_dir_text, "--json"]);
     assert_success(&run, "materialize Linux CUDA provider request");
+    let provider_samples =
+        fs::read_to_string(output_dir.join("nuis.nsdb.device-provider-samples.toml"))
+            .expect("provider sample manifest");
+    assert!(provider_samples.matches(project_asset_id).count() >= 2);
+    assert!(provider_samples.contains(
+        "provider_code_asset_identity_contract=nuis-kernel-project-code-asset-identity-v1"
+    ));
+    assert!(provider_samples.contains("provider_code_asset_identity_source_fnv1a64=0x"));
+    assert!(provider_samples.contains(
+        "provider_code_asset_identity_entries=nuis_project_main_kernel_map_axis_2_i64,nuis_project_main_kernel_reduce_sum_axis_3_i64"
+    ));
+    assert!(provider_samples.contains("provider_code_asset_identity_hash=0x"));
+    assert!(!provider_samples.contains("kernel.vector-arithmetic.f32.cuda.ptx"));
 
     let pre_seal = run_nsdb(&[
         "execute-provider-samples",
@@ -39,7 +69,7 @@ fn sealed_linux_cuda_image_executes_and_replays_completion() {
     assert!(pre_seal_text
         .contains("\"final_image_dispatch_authority_status\":\"pre-seal-acquisition\""));
     assert!(pre_seal_text
-        .contains("\"first_output_payload_native_output_hash\":\"0xdc51cb8047a381e1\""));
+        .contains("\"first_output_payload_native_output_hash\":\"0xbdf4a47186386b21\""));
 
     let materialize = run_nsdb(&[
         "materialize-provider-samples",
@@ -82,14 +112,14 @@ fn sealed_linux_cuda_image_executes_and_replays_completion() {
         "\"first_output_payload_native_execution_status\":\"cuda-driver-kernel-completed\""
     ));
     assert!(post_seal_text
-        .contains("\"first_output_payload_native_output_hash\":\"0xdc51cb8047a381e1\""));
+        .contains("\"first_output_payload_native_output_hash\":\"0xbdf4a47186386b21\""));
     let provider_output = output_dir.join("nuis.nsdb.provider-output.cuda-nvidia-gpu.toml");
     for (needle, context) in [
         (
-            "provider_request_order = \"kernel.cuda.vector-add.f32,kernel.cuda.scale.f32,kernel.cuda.source.main.kernel_map_axis_2.i64,kernel.cuda.source.main.kernel_reduce_sum_axis_3.i64\"",
+            "provider_request_order = \"kernel.cuda.source.main.kernel_map_axis_2.i64,kernel.cuda.source.main.kernel_reduce_sum_axis_3.i64\"",
             "ordered CUDA request graph",
         ),
-        ("native_output_count = \"4\"", "CUDA output count"),
+        ("native_output_count = \"2\"", "CUDA output count"),
         (
             "cuda_device_inventory_contract=nuis-cuda-device-inventory-v1",
             "CUDA request device-inventory contract",
@@ -103,55 +133,63 @@ fn sealed_linux_cuda_image_executes_and_replays_completion() {
             "CUDA deterministic device-selection policy",
         ),
         (
-            "native_output_0_request_id = \"kernel.cuda.vector-add.f32\"",
-            "CUDA vector-add output identity",
-        ),
-        (
-            "native_output_0_hash = \"0xdc51cb8047a381e1\"",
-            "CUDA vector-add output hash",
-        ),
-        (
-            "native_output_0_device = \"cuda:nvidia-gpu:ordinal-0:sm_",
-            "CUDA vector-add selected device",
-        ),
-        (
-            "native_output_1_request_id = \"kernel.cuda.scale.f32\"",
-            "CUDA scale output identity",
-        ),
-        (
-            "native_output_1_hash = \"0x40372e9bd3b02048\"",
-            "CUDA scale output hash",
-        ),
-        (
-            "native_output_1_device = \"cuda:nvidia-gpu:ordinal-0:sm_",
-            "CUDA scale selected device",
-        ),
-        (
-            "native_output_2_request_id = \"kernel.cuda.source.main.kernel_map_axis_2.i64\"",
+            "native_output_0_request_id = \"kernel.cuda.source.main.kernel_map_axis_2.i64\"",
             "CUDA project-derived i64 output identity",
         ),
         (
-            "native_output_2_hash = \"0xbdf4a47186386b21\"",
+            "native_output_0_hash = \"0xbdf4a47186386b21\"",
             "CUDA project-derived i64 output hash",
         ),
         (
-            "native_output_2_device = \"cuda:nvidia-gpu:ordinal-0:sm_",
+            "native_output_0_device = \"cuda:nvidia-gpu:ordinal-0:sm_",
             "CUDA project-derived i64 selected device",
         ),
         (
-            "native_output_3_request_id = \"kernel.cuda.source.main.kernel_reduce_sum_axis_3.i64\"",
+            "native_output_1_request_id = \"kernel.cuda.source.main.kernel_reduce_sum_axis_3.i64\"",
             "CUDA project-derived reduction output identity",
         ),
         (
-            "native_output_3_hash = \"0xf71115b38f042bf7\"",
+            "native_output_1_hash = \"0xf71115b38f042bf7\"",
             "CUDA project-derived reduction output hash",
         ),
         (
-            "native_output_3_device = \"cuda:nvidia-gpu:ordinal-0:sm_",
+            "native_output_1_device = \"cuda:nvidia-gpu:ordinal-0:sm_",
             "CUDA project-derived reduction selected device",
         ),
         (
-            "provider_edge_transport_receipt_count = \"2\"",
+            "provider_result_projection_collection_contract = \"nuis-provider-result-projection-collection-v1\"",
+            "CUDA project result projection collection",
+        ),
+        (
+            "provider_result_projection_count = \"1\"",
+            "CUDA project result projection count",
+        ),
+        (
+            "provider_result_projection_status = \"verified\"",
+            "CUDA project result projection status",
+        ),
+        (
+            "provider_result_projection_0_producer_request_id = \"kernel.cuda.source.main.kernel_reduce_sum_axis_3.i64\"",
+            "CUDA project result producer",
+        ),
+        (
+            "provider_result_projection_0_value_i64 = \"50\"",
+            "CUDA project scalar result",
+        ),
+        (
+            "provider_result_projection_0_output_hash = \"0xf71115b38f042bf7\"",
+            "CUDA project result hash",
+        ),
+        (
+            "provider_result_projection_0_completion_token = \"provider-completion:0x",
+            "CUDA project result completion binding",
+        ),
+        (
+            "provider_result_projection_0_glm_release_token = \"glm-release:0x",
+            "CUDA project result GLM binding",
+        ),
+        (
+            "provider_edge_transport_receipt_count = \"1\"",
             "CUDA dependency receipt count",
         ),
         (
@@ -193,7 +231,7 @@ fn sealed_linux_cuda_image_executes_and_replays_completion() {
     assert!(final_output_text.contains("\"object_output_magic\":\"0x7f454c46\""));
     assert!(final_output_text.contains("\"final_output_nsdb_replay_ready\":true"));
     assert!(final_output_text.contains("\"completion_evidence_status\":\"verified\""));
-    assert!(final_output_text.contains("\"completion_evidence_count\":4"));
+    assert!(final_output_text.contains("\"completion_evidence_count\":2"));
     assert!(final_output_text.contains("\"completion_tokens\":\"provider-completion:0x"));
     assert!(final_output_text.contains("\"glm_release_tokens\":\"glm-release:0x"));
 

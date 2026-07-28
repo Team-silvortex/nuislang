@@ -114,15 +114,19 @@ fn persist_cuda_vector_add_payloads(output_dir: &Path, evidence: &[&str]) -> Res
         .ok_or_else(|| "Kernel Nustar CUDA code asset is not registered".to_owned())?;
     let actual = fs::read(output_dir.join(asset.file_name))
         .map_err(|error| format!("failed to read Nuis-emitted CUDA PTX asset: {error}"))?;
-    validate_cuda_code_asset(asset, &actual)?;
-    for (name, bytes) in [
-        (LEFT_FILE_NAME, LEFT),
-        (RIGHT_FILE_NAME, RIGHT),
-        (EXPECTED_FILE_NAME, EXPECTED),
-        (SCALED_EXPECTED_FILE_NAME, SCALED_EXPECTED),
-    ] {
-        fs::write(output_dir.join(name), bytes)
-            .map_err(|error| format!("failed to persist CUDA vector-add payload: {error}"))?;
+    let uses_project_collection =
+        crate::artifact_device_sample_kernel_project::uses_project_request_collection(output_dir)?;
+    validate_cuda_code_asset(asset, &actual, !uses_project_collection)?;
+    if !uses_project_collection {
+        for (name, bytes) in [
+            (LEFT_FILE_NAME, LEFT),
+            (RIGHT_FILE_NAME, RIGHT),
+            (EXPECTED_FILE_NAME, EXPECTED),
+            (SCALED_EXPECTED_FILE_NAME, SCALED_EXPECTED),
+        ] {
+            fs::write(output_dir.join(name), bytes)
+                .map_err(|error| format!("failed to persist CUDA vector-add payload: {error}"))?;
+        }
     }
     crate::artifact_device_sample_kernel_project::persist_payloads(output_dir)?;
     Ok(())
@@ -133,7 +137,9 @@ fn resolve_cuda_code_asset_evidence(output_dir: &Path, evidence: &str) -> Result
         .ok_or_else(|| "Kernel Nustar CUDA code asset is not registered".to_owned())?;
     let actual = fs::read(output_dir.join(asset.file_name))
         .map_err(|error| format!("failed to read Nuis-emitted CUDA PTX asset: {error}"))?;
-    validate_cuda_code_asset(asset, &actual)?;
+    let uses_project_collection =
+        crate::artifact_device_sample_kernel_project::uses_project_request_collection(output_dir)?;
+    validate_cuda_code_asset(asset, &actual, !uses_project_collection)?;
     let evidence = crate::artifact_device_sample_kernel_project::augment_evidence(
         output_dir, evidence, asset, &actual,
     )?;
@@ -200,6 +206,7 @@ fn validate_cuda_request_asset_evidence(
 fn validate_cuda_code_asset(
     asset: &nuisc::kernel_code_asset::RegisteredKernelCodeAsset,
     bytes: &[u8],
+    require_registered_entries: bool,
 ) -> Result<(), String> {
     let ptx = std::str::from_utf8(bytes)
         .map_err(|_| "Nuis-emitted CUDA PTX asset is not UTF-8".to_owned())?;
@@ -215,12 +222,14 @@ fn validate_cuda_code_asset(
             asset.target
         ));
     }
-    for entry in asset.visible_entries {
-        let declaration = format!(".visible .entry {entry}(");
-        if !ptx.contains(&declaration) {
-            return Err(format!(
-                "Nuis-emitted CUDA PTX asset is missing registered entry `{entry}`"
-            ));
+    if require_registered_entries {
+        for entry in asset.visible_entries {
+            let declaration = format!(".visible .entry {entry}(");
+            if !ptx.contains(&declaration) {
+                return Err(format!(
+                    "Nuis-emitted CUDA PTX asset is missing registered entry `{entry}`"
+                ));
+            }
         }
     }
     Ok(())
@@ -248,6 +257,7 @@ mod tests {
         assert!((registration.supports)("cuda", "nvidia-gpu"));
         assert!(evidence.contains("provider_kernel_input_buffers=input.left,input.right"));
         assert!(evidence.contains("provider_code_asset_format=ptx"));
+        assert!(evidence.contains("provider_code_asset_id=kernel.vector-arithmetic.f32.cuda.ptx"));
         assert!(evidence.contains("provider_code_asset_entry=nuis_kernel_vector_add_f32"));
         assert!(evidence.contains("provider_request_count=2"));
         assert!(evidence.contains("cuda_device_inventory_contract=nuis-cuda-device-inventory-v1"));
@@ -290,6 +300,13 @@ mod tests {
             fs::read(output_dir.join(SCALED_EXPECTED_FILE_NAME)).unwrap(),
             SCALED_EXPECTED
         );
+        let missing_registered_entry = std::str::from_utf8(asset.bytes)
+            .unwrap()
+            .replace("nuis_kernel_scale_f32", "nuis_kernel_scale_missing");
+        fs::write(output_dir.join(asset.file_name), missing_registered_entry).unwrap();
+        assert!(persist_cuda_vector_add_payloads(&output_dir, &[&evidence])
+            .unwrap_err()
+            .contains("missing registered entry `nuis_kernel_scale_f32`"));
         fs::remove_dir_all(output_dir).unwrap();
     }
 
@@ -302,15 +319,24 @@ mod tests {
         let _ = fs::remove_dir_all(&output_dir);
         fs::create_dir_all(&output_dir).unwrap();
         let asset = nuisc::kernel_code_asset::select_kernel_code_asset("cuda.nvidia-gpu").unwrap();
-        let mut derived = asset.bytes.to_vec();
-        derived.extend_from_slice(
-            b"\n.visible .entry nuis_project_main_mapped_i64()\n{\n    ret;\n}\n\
-.visible .entry nuis_project_main_reduced_i64()\n{\n    ret;\n}\n",
-        );
+        let derived = b".version 8.0\n.target sm_80\n.address_size 64\n\n\
+.visible .entry nuis_project_main_mapped_i64()\n{\n    ret;\n}\n\
+.visible .entry nuis_project_main_reduced_i64()\n{\n    ret;\n}\n"
+            .to_vec();
         fs::write(output_dir.join(asset.file_name), &derived).unwrap();
         fs::write(
             output_dir.join("nuis.domain.kernel.codegen-table.toml"),
             r#"schema = "nuis-kernel-yir-codegen-table-v1"
+source_fnv1a64 = "0x0123456789abcdef"
+lowering_target = "cuda.nvidia-gpu"
+function_count = 2
+project_code_asset_identity_contract = "nuis-kernel-project-code-asset-identity-v1"
+project_code_asset_id = "kernel.cuda.project.7519a228f04318e8"
+project_code_asset_source_fnv1a64 = "0x0123456789abcdef"
+project_code_asset_lowering_target = "cuda.nvidia-gpu"
+project_code_asset_entry_count = 2
+project_code_asset_entries = ["nuis_project_main_mapped_i64", "nuis_project_main_reduced_i64"]
+project_code_asset_identity_hash = "0x7519a228f04318e8"
 
 [[source_adaptation]]
 contract = "nuis-kernel-yir-source-adapter-v1"
@@ -345,6 +371,20 @@ request_input_values = [11, 12, 13, 14]
 request_input_source_node = "mapped"
 request_expected_values = [50]
 diagnostic = "verified dependency"
+
+[[source_adaptation]]
+contract = "nuis-kernel-yir-source-adapter-v1"
+source_function = "main"
+source_node = "selected"
+source_instruction = "element_at"
+status = "projected"
+result_projection_contract = "nuis-kernel-source-result-projection-v1"
+result_element_type = "i64"
+result_input_source_node = "reduced"
+result_row = 0
+result_col = 0
+result_expected_i64 = 50
+diagnostic = "verified result"
 "#,
         )
         .unwrap();
@@ -356,27 +396,59 @@ diagnostic = "verified dependency"
         )
         .unwrap();
         let resolved = resolve_cuda_code_asset_evidence(&output_dir, &evidence).unwrap();
-        let expected_length = format!("provider_code_asset_byte_length={}", derived.len());
-        let expected_hash = format!("provider_code_asset_content_hash={}", fnv1a64_hex(&derived));
-        assert!(resolved.contains("provider_request_count=4"));
-        assert!(
-            resolved.contains("provider_request_2_code_asset_entry=nuis_project_main_mapped_i64")
+        let expected_length = format!(
+            "provider_request_0_code_asset_byte_length={}",
+            derived.len()
         );
-        assert!(resolved.contains("provider_request_2_kernel_operation=add-scalar-i64"));
-        assert!(resolved.contains("provider_request_2_buffer_element_type=i64"));
+        let expected_hash = format!(
+            "provider_request_0_code_asset_content_hash={}",
+            fnv1a64_hex(&derived)
+        );
+        assert!(resolved.contains("provider_request_count=2"));
+        assert!(resolved
+            .contains("provider_request_0_code_asset_id=kernel.cuda.project.7519a228f04318e8"));
+        assert!(resolved
+            .contains("provider_request_1_code_asset_id=kernel.cuda.project.7519a228f04318e8"));
+        assert!(!resolved.contains("provider_kernel_id="));
+        assert!(!resolved.contains("provider_code_asset_entry="));
+        assert!(!resolved.contains("provider_request_0_kernel_operation=vector-add"));
+        assert!(!resolved.contains("provider_request_1_kernel_operation=scale"));
+        assert!(
+            resolved.contains("provider_request_0_code_asset_entry=nuis_project_main_mapped_i64")
+        );
+        assert!(resolved.contains("provider_request_0_kernel_operation=add-scalar-i64"));
+        assert!(resolved.contains("provider_request_0_buffer_element_type=i64"));
         assert!(resolved.contains(
-            "provider_request_2_kernel_scalar_bindings=element_count:u32:4,scalar:i64:10"
+            "provider_request_0_kernel_scalar_bindings=element_count:u32:4,scalar:i64:10"
         ));
         assert!(
-            resolved.contains("provider_request_3_code_asset_entry=nuis_project_main_reduced_i64")
+            resolved.contains("provider_request_1_code_asset_entry=nuis_project_main_reduced_i64")
         );
-        assert!(resolved.contains("provider_request_3_kernel_operation=reduce-sum-i64"));
-        assert!(resolved.contains("provider_request_3_kernel_dispatch=1x1x1"));
-        assert!(resolved.contains("provider_request_3_dependency_count=1"));
+        assert!(resolved.contains("provider_request_1_kernel_operation=reduce-sum-i64"));
+        assert!(resolved.contains("provider_request_1_kernel_dispatch=1x1x1"));
+        assert!(resolved.contains("provider_request_1_dependency_count=1"));
         assert!(resolved.contains(
-            "provider_request_3_dependency_0_producer_request_id=kernel.cuda.source.main.mapped.i64"
+            "provider_request_1_dependency_0_producer_request_id=kernel.cuda.source.main.mapped.i64"
         ));
-        assert!(resolved.contains("provider_request_3_input_binding_0_source=dependency"));
+        assert!(resolved.contains("provider_request_1_input_binding_0_source=dependency"));
+        assert!(resolved.contains(
+            "provider_request_1_dependency_0_transport_producer_clock_evidence=provider-clock:request-0:completed"
+        ));
+        assert!(resolved.contains(
+            "provider_request_1_dependency_0_transport_consumer_clock_evidence=provider-clock:request-1:dispatch-ready"
+        ));
+        assert!(resolved.contains(
+            "provider_result_projection_collection_contract=nuis-provider-result-projection-collection-v1"
+        ));
+        assert!(resolved.contains("provider_result_projection_count=1"));
+        assert!(resolved.contains(
+            "provider_result_projection_0_producer_request_id=kernel.cuda.source.main.reduced.i64"
+        ));
+        assert!(resolved
+            .contains("provider_result_projection_0_producer_output_buffer=output.main.reduced"));
+        assert!(resolved.contains("provider_result_projection_0_expected_i64=50"));
+        assert!(resolved
+            .contains("provider_result_projection_0_expected_content_hash=0xf71115b38f042bf7"));
         assert!(resolved.contains(&expected_length));
         assert!(resolved.contains(&expected_hash));
         assert!(resolved.contains(&format!(
@@ -384,6 +456,10 @@ diagnostic = "verified dependency"
             derived.len()
         )));
         assert!(nsdb::validate_provider_request_evidence(&resolved));
+        assert!(!output_dir.join(LEFT_FILE_NAME).exists());
+        assert!(!output_dir.join(RIGHT_FILE_NAME).exists());
+        assert!(!output_dir.join(EXPECTED_FILE_NAME).exists());
+        assert!(!output_dir.join(SCALED_EXPECTED_FILE_NAME).exists());
         assert_eq!(
             fs::read(output_dir.join("nuis.kernel.cuda.source.main.mapped.input.i64.bin")).unwrap(),
             [1i64, 2, 3, 4]
@@ -408,6 +484,18 @@ diagnostic = "verified dependency"
             .join("nuis.kernel.cuda.source.main.reduced.input.i64.bin")
             .exists());
 
+        let codegen_table_path = output_dir.join("nuis.domain.kernel.codegen-table.toml");
+        let codegen_table = fs::read_to_string(&codegen_table_path).unwrap();
+        fs::write(
+            &codegen_table_path,
+            codegen_table.replace("0x7519a228f04318e8", "0x7519a228f04318e9"),
+        )
+        .unwrap();
+        assert!(resolve_cuda_code_asset_evidence(&output_dir, &evidence)
+            .unwrap_err()
+            .contains("code asset identity is inconsistent"));
+        fs::write(&codegen_table_path, codegen_table).unwrap();
+
         let missing_project_entry = String::from_utf8(derived.clone()).unwrap().replace(
             "nuis_project_main_mapped_i64",
             "nuis_project_main_missing_i64",
@@ -417,13 +505,6 @@ diagnostic = "verified dependency"
             .unwrap_err()
             .contains("missing requested entry `nuis_project_main_mapped_i64`"));
 
-        let missing_registered_entry = String::from_utf8(derived)
-            .unwrap()
-            .replace("nuis_kernel_scale_f32", "nuis_kernel_scale_missing");
-        fs::write(output_dir.join(asset.file_name), missing_registered_entry).unwrap();
-        assert!(resolve_cuda_code_asset_evidence(&output_dir, &evidence)
-            .unwrap_err()
-            .contains("missing registered entry `nuis_kernel_scale_f32`"));
         fs::remove_dir_all(output_dir).unwrap();
     }
 }
