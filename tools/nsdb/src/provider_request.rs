@@ -150,6 +150,17 @@ impl ProviderRequest {
             .parse()
             .ok()
     }
+
+    #[cfg(target_os = "linux")]
+    pub(crate) fn scalar_i64(&self, name: &str) -> Option<i64> {
+        self.kernel
+            .scalar_bindings
+            .iter()
+            .find(|binding| binding.name == name && binding.value_type == "i64")?
+            .value
+            .parse()
+            .ok()
+    }
 }
 
 pub(crate) fn provider_request_from_evidence(input_evidence: &str) -> Option<ProviderRequest> {
@@ -162,14 +173,16 @@ pub(crate) fn provider_request_from_evidence(input_evidence: &str) -> Option<Pro
 pub(crate) fn provider_request_collection_from_evidence(
     input_evidence: &str,
 ) -> Option<ProviderRequestCollection> {
-    parse_registered_collection(input_evidence).or_else(|| {
-        parse_registered_request(input_evidence)
-            .or_else(|| parse_legacy_pixelmagic_request(input_evidence))
-            .map(|request| ProviderRequestCollection {
-                source: "single-request-compatibility",
-                requests: vec![request],
-            })
-    })
+    let fields = evidence_fields(input_evidence);
+    if fields.contains_key("provider_request_collection_contract") {
+        return parse_registered_collection(input_evidence);
+    }
+    parse_registered_request(input_evidence)
+        .or_else(|| parse_legacy_pixelmagic_request(input_evidence))
+        .map(|request| ProviderRequestCollection {
+            source: "single-request-compatibility",
+            requests: vec![request],
+        })
 }
 
 fn parse_registered_collection(input_evidence: &str) -> Option<ProviderRequestCollection> {
@@ -558,7 +571,8 @@ fn dependency_graph_is_acyclic(
 fn validate_request(request: ProviderRequest) -> Option<ProviderRequest> {
     let element_width = match request.buffer.element_type.as_str() {
         "u8" => 1,
-        "f32" => 4,
+        "f32" | "u32" | "i32" => 4,
+        "u64" | "i64" | "f64" => 8,
         _ => return None,
     };
     let element_count = request

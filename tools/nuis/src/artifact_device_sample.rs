@@ -289,8 +289,9 @@ pub(crate) fn push_device_sample_handoff_queue_toml<'a>(
 }
 
 pub(crate) fn render_device_provider_sample_manifest_toml<'a>(
+    output_dir: &Path,
     samples: impl Iterator<Item = (&'a str, &'a DeviceSampleContract)>,
-) -> (String, usize) {
+) -> Result<(String, usize), String> {
     let records = samples
         .filter(|(_, sample)| sample.is_provider_handoff_pending())
         .collect::<Vec<_>>();
@@ -307,6 +308,11 @@ pub(crate) fn render_device_provider_sample_manifest_toml<'a>(
     out.push_str("ready_record_count = 0\n");
     out.push_str(&format!("pending_record_count = {}\n", records.len()));
     for (trace_id, sample) in &records {
+        let input_evidence =
+            crate::artifact_device_sample_registration::resolve_registered_input_evidence(
+                output_dir,
+                &sample.input_evidence,
+            )?;
         out.push_str("\n[[device_provider_samples]]\n");
         push_toml_string(&mut out, "trace_id", trace_id);
         push_toml_string(&mut out, "provider", &sample.provider);
@@ -335,7 +341,7 @@ pub(crate) fn render_device_provider_sample_manifest_toml<'a>(
         push_toml_string(&mut out, "handoff_target", &sample.handoff_target);
         push_toml_string(&mut out, "sample_status", "pending-provider-execution");
         push_toml_string(&mut out, "validation_status", &sample.validation_status);
-        push_toml_string(&mut out, "input_evidence", &sample.input_evidence);
+        push_toml_string(&mut out, "input_evidence", &input_evidence);
         push_toml_string(&mut out, "output_evidence", &sample.output_evidence);
         push_toml_string(
             &mut out,
@@ -349,7 +355,7 @@ pub(crate) fn render_device_provider_sample_manifest_toml<'a>(
         );
         push_toml_string(&mut out, "next_action", "execute-provider-sample");
     }
-    (out, records.len())
+    Ok((out, records.len()))
 }
 
 pub(crate) fn persist_device_sample_input_payloads<'a>(

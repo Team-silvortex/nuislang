@@ -72,6 +72,13 @@ fn prepare_worker_adapter(
                 .scalar_f32("scale")
                 .expect("validated CUDA scale request must own scale")
         ),
+        "add-scalar-i64" => format!(
+            "literal:{}",
+            request
+                .scalar_i64("scalar")
+                .expect("validated CUDA i64 scalar request must own scalar")
+        ),
+        "reduce-sum-i64" => "literal:0".to_owned(),
         _ => unreachable!("validated CUDA operation"),
     };
     Ok(Some(PreparedProviderExecutionAdapter {
@@ -83,6 +90,7 @@ fn prepare_worker_adapter(
         arguments: vec![
             format!("verified-path:{}:{asset_path}", asset.content_hash),
             format!("literal:{}", asset.entry),
+            format!("literal:{}", request.kernel.operation),
             worker_descriptor_argument(&inputs[0], 0)?,
             operation_argument,
             format!("literal:{element_count}"),
@@ -162,10 +170,6 @@ fn validate_cuda_request(
     let element_count = request
         .scalar_u32("element_count")
         .ok_or_else(|| "CUDA vector-add request is missing u32 `element_count`".to_owned())?;
-    let byte_length = usize::try_from(element_count)
-        .ok()
-        .and_then(|count| count.checked_mul(std::mem::size_of::<f32>()))
-        .ok_or_else(|| "CUDA vector-add element count overflows host size".to_owned())?;
     let binding = request
         .adapter_binding
         .as_ref()
@@ -176,28 +180,58 @@ fn validate_cuda_request(
         .target
         .strip_prefix("sm_")
         .and_then(|value| value.parse::<u32>().ok());
-    let operation_valid = match request.kernel.operation.as_str() {
-        "vector-add" => {
-            asset.entry == "nuis_kernel_vector_add_f32"
-                && inputs.len() == 2
-                && request.input_bindings.len() == 2
-        }
-        "scale" => {
-            asset.entry == "nuis_kernel_scale_f32"
-                && inputs.len() == 1
-                && request.input_bindings.len() == 1
-                && request.scalar_f32("scale").is_some_and(f32::is_finite)
-        }
-        _ => false,
-    };
+    let (element_type, element_width, output_element_count, operation_valid) =
+        match request.kernel.operation.as_str() {
+            "vector-add" => (
+                "f32",
+                std::mem::size_of::<f32>(),
+                element_count,
+                asset.entry == "nuis_kernel_vector_add_f32"
+                    && inputs.len() == 2
+                    && request.input_bindings.len() == 2,
+            ),
+            "scale" => (
+                "f32",
+                std::mem::size_of::<f32>(),
+                element_count,
+                asset.entry == "nuis_kernel_scale_f32"
+                    && inputs.len() == 1
+                    && request.input_bindings.len() == 1
+                    && request.scalar_f32("scale").is_some_and(f32::is_finite),
+            ),
+            "add-scalar-i64" => (
+                "i64",
+                std::mem::size_of::<i64>(),
+                element_count,
+                inputs.len() == 1
+                    && request.input_bindings.len() == 1
+                    && request.scalar_i64("scalar").is_some(),
+            ),
+            "reduce-sum-i64" => (
+                "i64",
+                std::mem::size_of::<i64>(),
+                1,
+                inputs.len() == 1
+                    && request.input_bindings.len() == 1
+                    && request.kernel.dispatch == [1, 1, 1],
+            ),
+            _ => ("none", 0, 0, false),
+        };
+    let input_byte_length = usize::try_from(element_count)
+        .ok()
+        .and_then(|count| count.checked_mul(element_width))
+        .ok_or_else(|| "CUDA provider element count overflows host size".to_owned())?;
+    let output_byte_length = usize::try_from(output_element_count)
+        .ok()
+        .and_then(|count| count.checked_mul(element_width))
+        .ok_or_else(|| "CUDA provider output count overflows host size".to_owned())?;
     if !operation_valid
         || request.output_bindings.len() != 1
-        || request
-            .input_bindings
-            .iter()
-            .any(|input| input.element_type != "f32" || input.byte_length != byte_length)
-        || request.output_bindings[0].element_type != "f32"
-        || request.output_bindings[0].byte_length != byte_length
+        || request.input_bindings.iter().any(|input| {
+            input.element_type != element_type || input.byte_length != input_byte_length
+        })
+        || request.output_bindings[0].element_type != element_type
+        || request.output_bindings[0].byte_length != output_byte_length
         || asset.format != "ptx"
         || !asset.target.starts_with("sm_")
         || !device_selection_policy

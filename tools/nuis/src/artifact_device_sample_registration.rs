@@ -7,6 +7,7 @@ pub(crate) struct DeviceSampleInputRegistration {
     pub(crate) package_id: &'static str,
     pub(crate) supports: fn(&str, &str) -> bool,
     pub(crate) enrich_evidence: fn(&str) -> String,
+    pub(crate) resolve_evidence: Option<fn(&Path, &str) -> Result<String, String>>,
     pub(crate) persist_payloads: fn(&Path, &[&str]) -> Result<(), String>,
 }
 
@@ -43,6 +44,24 @@ pub(crate) fn persist_registered_input_payloads(
         }
     }
     Ok(())
+}
+
+pub(crate) fn resolve_registered_input_evidence(
+    output_dir: &Path,
+    evidence: &str,
+) -> Result<String, String> {
+    let mut resolved = evidence.to_owned();
+    for registration in registrations() {
+        if resolved.contains(&format!(
+            "provider_sample_registration_package={}",
+            registration.package_id
+        )) {
+            if let Some(resolve) = registration.resolve_evidence {
+                resolved = resolve(output_dir, &resolved)?;
+            }
+        }
+    }
+    Ok(resolved)
 }
 
 fn registrations() -> [DeviceSampleInputRegistration; 2] {

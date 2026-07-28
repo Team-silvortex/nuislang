@@ -1,6 +1,7 @@
 mod artifact_coreml_model;
 mod artifact_device_sample;
 mod artifact_device_sample_kernel;
+mod artifact_device_sample_kernel_project;
 mod artifact_device_sample_pixelmagic;
 mod artifact_device_sample_pixelmagic_plan;
 mod artifact_device_sample_registration;

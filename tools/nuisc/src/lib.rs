@@ -93,6 +93,7 @@ mod json_report;
 pub mod kernel_code_asset;
 mod kernel_codegen_table;
 mod kernel_ptx_emitter;
+mod kernel_source_adapter;
 #[cfg(test)]
 mod lib_tests;
 mod link_report;

@@ -156,11 +156,11 @@ fn write_registered_domain_code_asset(
         let entries = table
             .functions
             .iter()
-            .map(|function| function.entry)
+            .map(|function| function.entry.as_str())
             .collect::<Vec<_>>();
-        if entries != asset.visible_entries {
+        if !entries.starts_with(asset.visible_entries) {
             return Err(format!(
-                "Kernel/YIR codegen entries {:?} disagree with registered code asset entries {:?}",
+                "Kernel/YIR codegen entries {:?} do not preserve registered code asset entry prefix {:?}",
                 entries, asset.visible_entries
             ));
         }
@@ -250,10 +250,13 @@ mod tests {
 resource cpu0 cpu.arm64\n\
 resource kernel0 kernel.cuda\n\
 function main cpu entry\n\
-function-result main f32 value input\n\
+function-result main i64 value scalar\n\
 function-node main input\n\
-function-node main target\n\
-kernel.const_f32 input kernel0 1.0\n\
+function-node main scalar\n\
+function-node main mapped\n\
+kernel.tensor input kernel0 1 4 1,2,3,4\n\
+cpu.const_i64 scalar cpu0 10\n\
+kernel.add_scalar_axis mapped kernel0 input cols scalar\n\
 kernel.target_config target kernel0 x86_64 cuda 1 ptx\n";
         let table =
             crate::kernel_codegen_table::table_from_compiled_project_yir(source, "cuda.nvidia-gpu")
@@ -276,18 +279,20 @@ kernel.target_config target kernel0 x86_64 cuda 1 ptx\n";
             fs::read_to_string(output_dir.join("nuis.domain.kernel.codegen-table.toml")).unwrap();
         assert!(sidecar.contains("source_binding = \"compiled-project-yir\""));
         assert!(sidecar.contains("source_function_count = 1"));
+        assert!(sidecar.contains("source_adapted_count = 1"));
         assert!(sidecar.contains("[[source_function]]"));
+        assert!(sidecar.contains("[[source_adaptation]]"));
+        assert!(sidecar.contains("generated_entry = \"nuis_project_main_mapped_i64\""));
         assert!(sidecar.contains(&format!(
             "source_fnv1a64 = \"{}\"",
             crate::aot_encoding::fnv1a64_hex(source.as_bytes())
         )));
         let ptx = fs::read(output_dir.join("nuis.domain.kernel.cuda.ptx")).unwrap();
-        assert_eq!(
-            ptx,
-            crate::kernel_code_asset::select_kernel_code_asset("cuda.nvidia-gpu")
-                .unwrap()
-                .bytes
-        );
+        let ptx = std::str::from_utf8(&ptx).unwrap();
+        assert!(ptx.contains(".visible .entry nuis_kernel_vector_add_f32"));
+        assert!(ptx.contains(".visible .entry nuis_kernel_scale_f32"));
+        assert!(ptx.contains(".visible .entry nuis_project_main_mapped_i64"));
+        assert!(ptx.contains("add.s64"));
         fs::remove_dir_all(output_dir).unwrap();
     }
 }

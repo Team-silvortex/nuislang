@@ -59,6 +59,14 @@ fn rejects_registered_descriptor_with_mismatched_buffer_binding() {
 }
 
 #[test]
+fn declared_collection_never_falls_back_to_singular_request() {
+    let evidence = format!(
+        "{REGISTERED};provider_request_collection_contract={PROVIDER_REQUEST_COLLECTION_CONTRACT};provider_request_count=1"
+    );
+    assert!(provider_request_collection_from_evidence(&evidence).is_none());
+}
+
+#[test]
 fn parses_hash_bound_model_asset_descriptor() {
     let evidence = format!(
         "{REGISTERED};provider_model_asset_descriptor_contract={PROVIDER_MODEL_ASSET_DESCRIPTOR_CONTRACT};provider_model_asset_id=model;provider_model_asset_format=coreml-specification;provider_model_asset_path=model.mlmodel;provider_model_asset_byte_length=128;provider_model_asset_content_hash=0xabcd;provider_model_asset_input_feature=input.pixels;provider_model_asset_output_feature=output.pixels"

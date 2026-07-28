@@ -6,6 +6,7 @@ pub(crate) fn registration() -> DeviceSampleInputRegistration {
         package_id: "nuis.pixelmagic",
         supports: supports_filter_plan,
         enrich_evidence: pixelmagic_filter_plan_evidence,
+        resolve_evidence: None,
         persist_payloads: persist_pixelmagic_payloads,
     }
 }

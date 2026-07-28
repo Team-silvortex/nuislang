@@ -86,10 +86,10 @@ fn sealed_linux_cuda_image_executes_and_replays_completion() {
     let provider_output = output_dir.join("nuis.nsdb.provider-output.cuda-nvidia-gpu.toml");
     for (needle, context) in [
         (
-            "provider_request_order = \"kernel.cuda.vector-add.f32,kernel.cuda.scale.f32\"",
+            "provider_request_order = \"kernel.cuda.vector-add.f32,kernel.cuda.scale.f32,kernel.cuda.source.main.kernel_map_axis_2.i64,kernel.cuda.source.main.kernel_reduce_sum_axis_3.i64\"",
             "ordered CUDA request graph",
         ),
-        ("native_output_count = \"2\"", "CUDA output count"),
+        ("native_output_count = \"4\"", "CUDA output count"),
         (
             "cuda_device_inventory_contract=nuis-cuda-device-inventory-v1",
             "CUDA request device-inventory contract",
@@ -127,7 +127,31 @@ fn sealed_linux_cuda_image_executes_and_replays_completion() {
             "CUDA scale selected device",
         ),
         (
-            "provider_edge_transport_receipt_count = \"1\"",
+            "native_output_2_request_id = \"kernel.cuda.source.main.kernel_map_axis_2.i64\"",
+            "CUDA project-derived i64 output identity",
+        ),
+        (
+            "native_output_2_hash = \"0xbdf4a47186386b21\"",
+            "CUDA project-derived i64 output hash",
+        ),
+        (
+            "native_output_2_device = \"cuda:nvidia-gpu:ordinal-0:sm_",
+            "CUDA project-derived i64 selected device",
+        ),
+        (
+            "native_output_3_request_id = \"kernel.cuda.source.main.kernel_reduce_sum_axis_3.i64\"",
+            "CUDA project-derived reduction output identity",
+        ),
+        (
+            "native_output_3_hash = \"0xf71115b38f042bf7\"",
+            "CUDA project-derived reduction output hash",
+        ),
+        (
+            "native_output_3_device = \"cuda:nvidia-gpu:ordinal-0:sm_",
+            "CUDA project-derived reduction selected device",
+        ),
+        (
+            "provider_edge_transport_receipt_count = \"2\"",
             "CUDA dependency receipt count",
         ),
         (
@@ -169,7 +193,7 @@ fn sealed_linux_cuda_image_executes_and_replays_completion() {
     assert!(final_output_text.contains("\"object_output_magic\":\"0x7f454c46\""));
     assert!(final_output_text.contains("\"final_output_nsdb_replay_ready\":true"));
     assert!(final_output_text.contains("\"completion_evidence_status\":\"verified\""));
-    assert!(final_output_text.contains("\"completion_evidence_count\":2"));
+    assert!(final_output_text.contains("\"completion_evidence_count\":4"));
     assert!(final_output_text.contains("\"completion_tokens\":\"provider-completion:0x"));
     assert!(final_output_text.contains("\"glm_release_tokens\":\"glm-release:0x"));
 

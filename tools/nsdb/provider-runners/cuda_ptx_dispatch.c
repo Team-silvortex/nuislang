@@ -311,31 +311,43 @@ static void release_cuda(
 }
 
 int main(int argc, char** argv) {
-    if (argc != 8) return 2;
-    int vector_add = strcmp(argv[2], "nuis_kernel_vector_add_f32") == 0;
-    int scale = strcmp(argv[2], "nuis_kernel_scale_f32") == 0;
+    if (argc != 9) return 2;
+    int vector_add = strcmp(argv[3], "vector-add") == 0;
+    int scale = strcmp(argv[3], "scale") == 0;
+    int add_scalar_i64 = strcmp(argv[3], "add-scalar-i64") == 0;
+    int reduce_sum_i64 = strcmp(argv[3], "reduce-sum-i64") == 0;
     char* scale_end = NULL;
-    float scale_value = scale ? strtof(argv[4], &scale_end) : 0.0f;
+    float scale_value = scale ? strtof(argv[5], &scale_end) : 0.0f;
+    char* scalar_i64_end = NULL;
+    int64_t scalar_i64_value =
+        add_scalar_i64 ? strtoll(argv[5], &scalar_i64_end, 10) : 0;
     uint32_t element_count = 0;
     uint32_t device_selection_policy = 0;
     uint32_t minimum_compute_capability = 0;
     OutputDescriptor output_descriptor = {0};
-    if ((!vector_add && !scale)
-        || (scale && (argv[4] == scale_end || *scale_end != '\0'))
-        || !parse_element_count(argv[5], &element_count)
-        || !parse_u32(argv[6], &device_selection_policy)
+    if ((!vector_add && !scale && !add_scalar_i64 && !reduce_sum_i64)
+        || (scale && (argv[5] == scale_end || *scale_end != '\0'))
+        || (add_scalar_i64
+            && (argv[5] == scalar_i64_end || *scalar_i64_end != '\0'))
+        || !parse_element_count(argv[6], &element_count)
+        || !parse_u32(argv[7], &device_selection_policy)
         || device_selection_policy != CUDA_CAPABILITY_RANKED_POLICY_CODE
-        || !parse_element_count(argv[7], &minimum_compute_capability)
+        || !parse_element_count(argv[8], &minimum_compute_capability)
         || !parse_output_descriptor(&output_descriptor)) return 3;
-    size_t byte_length = (size_t)element_count * sizeof(float);
-    if (output_descriptor.payload_length != byte_length) return 4;
+    size_t element_width =
+        (add_scalar_i64 || reduce_sum_i64) ? sizeof(int64_t) : sizeof(float);
+    if ((size_t)element_count > SIZE_MAX / element_width) return 4;
+    size_t input_byte_length = (size_t)element_count * element_width;
+    size_t output_byte_length =
+        reduce_sum_i64 ? sizeof(int64_t) : input_byte_length;
+    if (output_descriptor.payload_length != output_byte_length) return 4;
 
-    unsigned char* left = malloc(byte_length);
-    unsigned char* right = vector_add ? malloc(byte_length) : NULL;
-    unsigned char* output = malloc(byte_length);
+    unsigned char* left = malloc(input_byte_length);
+    unsigned char* right = vector_add ? malloc(input_byte_length) : NULL;
+    unsigned char* output = malloc(output_byte_length);
     if (left == NULL || (vector_add && right == NULL) || output == NULL
-        || !read_input(argv[3], left, byte_length)
-        || (vector_add && !read_input(argv[4], right, byte_length))) {
+        || !read_input(argv[4], left, input_byte_length)
+        || (vector_add && !read_input(argv[5], right, input_byte_length))) {
         free(left);
         free(right);
         free(output);
@@ -361,14 +373,20 @@ int main(int argc, char** argv) {
         && driver.context_create(&context, 0, selection.device) == 0
         && driver.module_load(&module, argv[1]) == 0
         && driver.module_get_function(&function, module, argv[2]) == 0
-        && driver.memory_allocate(&device_left, byte_length) == 0
-        && (!vector_add || driver.memory_allocate(&device_right, byte_length) == 0)
-        && driver.memory_allocate(&device_output, byte_length) == 0
-        && driver.copy_host_to_device(device_left, left, byte_length) == 0
+        && driver.memory_allocate(&device_left, input_byte_length) == 0
         && (!vector_add
-            || driver.copy_host_to_device(device_right, right, byte_length) == 0);
+            || driver.memory_allocate(&device_right, input_byte_length) == 0)
+        && driver.memory_allocate(&device_output, output_byte_length) == 0
+        && driver.copy_host_to_device(device_left, left, input_byte_length) == 0
+        && (!vector_add
+            || driver.copy_host_to_device(
+                device_right,
+                right,
+                input_byte_length) == 0);
     unsigned int block_size = 256;
-    unsigned int grid_size = (element_count + block_size - 1) / block_size;
+    unsigned int grid_size = reduce_sum_i64
+        ? 1
+        : (element_count + block_size - 1) / block_size;
     void* vector_add_parameters[] = {
         &device_left,
         &device_right,
@@ -381,6 +399,24 @@ int main(int argc, char** argv) {
         &element_count,
         &scale_value,
     };
+    void* add_scalar_i64_parameters[] = {
+        &device_left,
+        &device_output,
+        &element_count,
+        &scalar_i64_value,
+    };
+    void* reduce_sum_i64_parameters[] = {
+        &device_left,
+        &device_output,
+        &element_count,
+    };
+    void** parameters = vector_add
+        ? vector_add_parameters
+        : (scale
+            ? scale_parameters
+            : (add_scalar_i64
+                ? add_scalar_i64_parameters
+                : reduce_sum_i64_parameters));
     ready = ready
         && driver.launch_kernel(
                function,
@@ -392,10 +428,13 @@ int main(int argc, char** argv) {
                1,
                0,
                NULL,
-               vector_add ? vector_add_parameters : scale_parameters,
+               parameters,
                NULL) == 0
         && driver.context_synchronize() == 0
-        && driver.copy_device_to_host(output, device_output, byte_length) == 0;
+        && driver.copy_device_to_host(
+            output,
+            device_output,
+            output_byte_length) == 0;
     if (!ready) {
         release_cuda(
             &driver,
@@ -410,13 +449,14 @@ int main(int argc, char** argv) {
         return 6;
     }
 
-    uint64_t hash = fnv1a64(output, byte_length);
+    uint64_t hash = fnv1a64(output, output_byte_length);
     int persisted =
         pwrite(
             output_descriptor.fd,
             output,
-            byte_length,
-            (off_t)output_descriptor.payload_offset) == (ssize_t)byte_length
+            output_byte_length,
+            (off_t)output_descriptor.payload_offset)
+            == (ssize_t)output_byte_length
         && pwrite(
             output_descriptor.fd,
             &hash,
@@ -452,7 +492,7 @@ int main(int argc, char** argv) {
         selection.ordinal,
         minimum_compute_capability,
         selection.compute_capability,
-        byte_length,
+        output_byte_length,
         hash);
     return fflush(stdout) == 0 ? 0 : 8;
 }

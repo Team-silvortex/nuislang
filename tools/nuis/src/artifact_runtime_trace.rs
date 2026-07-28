@@ -311,16 +311,19 @@ impl HeteroRuntimeTraceSummary {
             Ok(()) => {
                 let decoder_manifest_source = self.render_payload_decoder_manifest_toml();
                 let decoder_manifest_record_count = payload_decoder_manifest_record_count(self);
-                let (provider_sample_source, provider_sample_record_count) =
-                    self.render_device_provider_sample_manifest_toml();
                 let provider_sample_result = persist_device_sample_input_payloads(
                     output_dir,
                     self.records.iter().map(|record| &record.device_sample),
                 )
                 .and_then(|()| {
-                    fs::write(&provider_sample_manifest_path, provider_sample_source)
-                        .map_err(|error| error.to_string())
+                    self.render_device_provider_sample_manifest_toml(output_dir)
+                        .and_then(|(source, _)| {
+                            fs::write(&provider_sample_manifest_path, source)
+                                .map_err(|error| error.to_string())
+                        })
                 });
+                let provider_sample_record_count =
+                    self.device_sample_summary.pending_validation_count;
                 match fs::write(&decoder_manifest_path, decoder_manifest_source) {
                     Ok(()) => HeteroRuntimeTracePersistence {
                         persisted: true,
@@ -435,8 +438,12 @@ impl HeteroRuntimeTraceSummary {
         out
     }
 
-    fn render_device_provider_sample_manifest_toml(&self) -> (String, usize) {
+    fn render_device_provider_sample_manifest_toml(
+        &self,
+        output_dir: &Path,
+    ) -> Result<(String, usize), String> {
         render_device_provider_sample_manifest_toml(
+            output_dir,
             self.records
                 .iter()
                 .map(|record| (record.trace_id.as_str(), &record.device_sample)),

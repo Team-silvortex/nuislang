@@ -3,6 +3,10 @@ use std::collections::BTreeSet;
 use yir_core::{Node, Operation, YirFunction};
 
 use crate::aot_encoding::fnv1a64_hex;
+use crate::kernel_source_adapter::{
+    adapt_project_kernel_functions, KernelSourceAdaptation,
+    KERNEL_SOURCE_REQUEST_PROJECTION_CONTRACT, KERNEL_YIR_SOURCE_ADAPTER_CONTRACT,
+};
 
 pub(crate) const KERNEL_YIR_CODEGEN_TABLE_CONTRACT: &str = "nuis-kernel-yir-codegen-table-v1";
 pub(crate) const KERNEL_YIR_CODEGEN_FUNCTION_CONTRACT: &str = "nuis-kernel-yir-codegen-function-v1";
@@ -15,6 +19,9 @@ pub(crate) enum KernelParameterKind {
     OutputF32,
     ElementCountU32,
     ScalarF32,
+    InputI64,
+    OutputI64,
+    ScalarI64,
 }
 
 impl KernelParameterKind {
@@ -24,23 +31,26 @@ impl KernelParameterKind {
             Self::OutputF32 => "output-f32",
             Self::ElementCountU32 => "element-count-u32",
             Self::ScalarF32 => "scalar-f32",
+            Self::InputI64 => "input-i64",
+            Self::OutputI64 => "output-i64",
+            Self::ScalarI64 => "scalar-i64",
         }
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct KernelParameter {
-    pub(crate) name: &'static str,
+    pub(crate) name: String,
     pub(crate) kind: KernelParameterKind,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct KernelYirCodegenFunction {
     pub(crate) contract: &'static str,
-    pub(crate) entry: &'static str,
-    pub(crate) parameters: &'static [KernelParameter],
+    pub(crate) entry: String,
+    pub(crate) parameters: Vec<KernelParameter>,
     pub(crate) nodes: Vec<Node>,
-    pub(crate) output_node: &'static str,
+    pub(crate) output_node: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -53,46 +63,9 @@ pub(crate) struct KernelYirCodegenTable {
     pub(crate) source_kernel_body_node_count: usize,
     pub(crate) lowering_target: &'static str,
     pub(crate) source_functions: Vec<YirFunction>,
+    pub(crate) source_adaptations: Vec<KernelSourceAdaptation>,
     pub(crate) functions: Vec<KernelYirCodegenFunction>,
 }
-
-const VECTOR_ADD_PARAMETERS: &[KernelParameter] = &[
-    KernelParameter {
-        name: "input_lhs",
-        kind: KernelParameterKind::InputF32,
-    },
-    KernelParameter {
-        name: "input_rhs",
-        kind: KernelParameterKind::InputF32,
-    },
-    KernelParameter {
-        name: "output",
-        kind: KernelParameterKind::OutputF32,
-    },
-    KernelParameter {
-        name: "element_count",
-        kind: KernelParameterKind::ElementCountU32,
-    },
-];
-
-const SCALE_PARAMETERS: &[KernelParameter] = &[
-    KernelParameter {
-        name: "input",
-        kind: KernelParameterKind::InputF32,
-    },
-    KernelParameter {
-        name: "output",
-        kind: KernelParameterKind::OutputF32,
-    },
-    KernelParameter {
-        name: "element_count",
-        kind: KernelParameterKind::ElementCountU32,
-    },
-    KernelParameter {
-        name: "scale",
-        kind: KernelParameterKind::ScalarF32,
-    },
-];
 
 pub(crate) fn table_from_compiled_project_yir(
     source: &str,
@@ -164,6 +137,10 @@ pub(crate) fn table_from_compiled_project_yir(
             "compiled project YIR does not bind its Kernel target_config to CUDA".to_owned(),
         );
     }
+    let (source_adaptations, adapted_functions) =
+        adapt_project_kernel_functions(&module, &source_functions)?;
+    let mut functions = registered_provider_functions();
+    functions.extend(adapted_functions);
 
     let table = KernelYirCodegenTable {
         contract: KERNEL_YIR_CODEGEN_TABLE_CONTRACT,
@@ -174,7 +151,8 @@ pub(crate) fn table_from_compiled_project_yir(
         source_kernel_body_node_count,
         lowering_target: "cuda.nvidia-gpu",
         source_functions,
-        functions: registered_provider_functions(),
+        source_adaptations,
+        functions,
     };
     validate_codegen_table(&table)?;
     Ok(table)
@@ -190,6 +168,7 @@ pub(crate) fn registered_provider_codegen_table() -> KernelYirCodegenTable {
         source_kernel_body_node_count: 2,
         lowering_target: "cuda.nvidia-gpu",
         source_functions: Vec::new(),
+        source_adaptations: Vec::new(),
         functions: registered_provider_functions(),
     };
     validate_codegen_table(&table).expect("registered Kernel/YIR table must remain valid");
@@ -216,11 +195,39 @@ pub(crate) fn validate_codegen_table(table: &KernelYirCodegenTable) -> Result<()
             "project Kernel/YIR codegen table has no source function boundaries".to_owned(),
         );
     }
+    if table.source_binding == PROJECT_YIR_BINDING_CONTRACT
+        && (table.source_adaptations.len() != table.source_kernel_body_node_count
+            || !table
+                .source_adaptations
+                .iter()
+                .any(KernelSourceAdaptation::is_adapted)
+            || table.source_adaptations.iter().any(|adaptation| {
+                adaptation.is_adapted()
+                    != (adaptation.generated_entry.is_some()
+                        && adaptation
+                            .request_projection
+                            .as_ref()
+                            .is_some_and(|projection| {
+                                projection.contract == KERNEL_SOURCE_REQUEST_PROJECTION_CONTRACT
+                                    && projection.element_type == "i64"
+                                    && !projection.input_shape.is_empty()
+                                    && !projection.output_shape.is_empty()
+                                    && projection.input_shape.iter().product::<usize>()
+                                        == projection.input_values.len()
+                                    && projection.output_shape.iter().product::<usize>()
+                                        == projection.expected_values.len()
+                            }))
+            }))
+    {
+        return Err(
+            "project Kernel/YIR codegen table has no complete source adaptation map".to_owned(),
+        );
+    }
     let mut entries = BTreeSet::new();
     for function in &table.functions {
         if function.contract != KERNEL_YIR_CODEGEN_FUNCTION_CONTRACT
-            || !valid_identifier(function.entry)
-            || !entries.insert(function.entry)
+            || !valid_identifier(&function.entry)
+            || !entries.insert(function.entry.as_str())
             || function.parameters.is_empty()
             || function.nodes.is_empty()
             || !function
@@ -240,7 +247,7 @@ pub(crate) fn validate_codegen_table(table: &KernelYirCodegenTable) -> Result<()
 pub(crate) fn render_codegen_table(table: &KernelYirCodegenTable) -> Result<String, String> {
     validate_codegen_table(table)?;
     let mut out = format!(
-        "schema = \"{}\"\nsource_binding = \"{}\"\nsource_yir_version = \"{}\"\nsource_fnv1a64 = \"{}\"\nsource_kernel_node_count = {}\nsource_kernel_body_node_count = {}\nsource_function_count = {}\nlowering_target = \"{}\"\nfunction_count = {}\n",
+        "schema = \"{}\"\nsource_binding = \"{}\"\nsource_yir_version = \"{}\"\nsource_fnv1a64 = \"{}\"\nsource_kernel_node_count = {}\nsource_kernel_body_node_count = {}\nsource_function_count = {}\nsource_adaptation_contract = \"{}\"\nsource_adaptation_count = {}\nsource_adapted_count = {}\nlowering_target = \"{}\"\nfunction_count = {}\n",
         table.contract,
         table.source_binding,
         table.source_yir_version,
@@ -248,6 +255,13 @@ pub(crate) fn render_codegen_table(table: &KernelYirCodegenTable) -> Result<Stri
         table.source_kernel_node_count,
         table.source_kernel_body_node_count,
         table.source_functions.len(),
+        KERNEL_YIR_SOURCE_ADAPTER_CONTRACT,
+        table.source_adaptations.len(),
+        table
+            .source_adaptations
+            .iter()
+            .filter(|adaptation| adaptation.is_adapted())
+            .count(),
         table.lowering_target,
         table.functions.len()
     );
@@ -291,6 +305,43 @@ pub(crate) fn render_codegen_table(table: &KernelYirCodegenTable) -> Result<Stri
                 .join(", ")
         ));
     }
+    for adaptation in &table.source_adaptations {
+        out.push_str("\n[[source_adaptation]]\n");
+        out.push_str(&format!(
+            "contract = \"{}\"\nsource_function = \"{}\"\nsource_node = \"{}\"\nsource_instruction = \"{}\"\nstatus = \"{}\"\n",
+            adaptation.contract,
+            adaptation.source_function,
+            adaptation.source_node,
+            adaptation.source_instruction,
+            adaptation.status.as_str()
+        ));
+        if let Some(entry) = &adaptation.generated_entry {
+            out.push_str(&format!("generated_entry = \"{entry}\"\n"));
+        }
+        if let Some(projection) = &adaptation.request_projection {
+            out.push_str(&format!(
+                "request_projection_contract = \"{}\"\nrequest_operation = \"{}\"\nrequest_element_type = \"{}\"\n",
+                projection.contract, projection.operation, projection.element_type
+            ));
+            render_usize_array(&mut out, "request_input_shape", &projection.input_shape);
+            render_usize_array(&mut out, "request_output_shape", &projection.output_shape);
+            render_i64_array(&mut out, "request_input_values", &projection.input_values);
+            if let Some(scalar) = projection.scalar {
+                out.push_str(&format!("request_scalar = {scalar}\n"));
+            }
+            if let Some(input_source_node) = &projection.input_source_node {
+                out.push_str(&format!(
+                    "request_input_source_node = \"{input_source_node}\"\n"
+                ));
+            }
+            render_i64_array(
+                &mut out,
+                "request_expected_values",
+                &projection.expected_values,
+            );
+        }
+        out.push_str(&format!("diagnostic = \"{}\"\n", adaptation.diagnostic));
+    }
     for function in &table.functions {
         out.push_str("\n[[function]]\n");
         out.push_str(&format!(
@@ -328,27 +379,66 @@ pub(crate) fn render_codegen_table(table: &KernelYirCodegenTable) -> Result<Stri
     Ok(out)
 }
 
+fn render_usize_array(out: &mut String, key: &str, values: &[usize]) {
+    out.push_str(&format!(
+        "{key} = [{}]\n",
+        values
+            .iter()
+            .map(usize::to_string)
+            .collect::<Vec<_>>()
+            .join(", ")
+    ));
+}
+
+fn render_i64_array(out: &mut String, key: &str, values: &[i64]) {
+    out.push_str(&format!(
+        "{key} = [{}]\n",
+        values
+            .iter()
+            .map(i64::to_string)
+            .collect::<Vec<_>>()
+            .join(", ")
+    ));
+}
+
 fn registered_provider_functions() -> Vec<KernelYirCodegenFunction> {
     vec![
         KernelYirCodegenFunction {
             contract: KERNEL_YIR_CODEGEN_FUNCTION_CONTRACT,
-            entry: "nuis_kernel_vector_add_f32",
-            parameters: VECTOR_ADD_PARAMETERS,
+            entry: "nuis_kernel_vector_add_f32".to_owned(),
+            parameters: vec![
+                parameter("input_lhs", KernelParameterKind::InputF32),
+                parameter("input_rhs", KernelParameterKind::InputF32),
+                parameter("output", KernelParameterKind::OutputF32),
+                parameter("element_count", KernelParameterKind::ElementCountU32),
+            ],
             nodes: vec![arithmetic_node(
                 "sum",
                 "add_f32",
                 &["input_lhs", "input_rhs"],
             )],
-            output_node: "sum",
+            output_node: "sum".to_owned(),
         },
         KernelYirCodegenFunction {
             contract: KERNEL_YIR_CODEGEN_FUNCTION_CONTRACT,
-            entry: "nuis_kernel_scale_f32",
-            parameters: SCALE_PARAMETERS,
+            entry: "nuis_kernel_scale_f32".to_owned(),
+            parameters: vec![
+                parameter("input", KernelParameterKind::InputF32),
+                parameter("output", KernelParameterKind::OutputF32),
+                parameter("element_count", KernelParameterKind::ElementCountU32),
+                parameter("scale", KernelParameterKind::ScalarF32),
+            ],
             nodes: vec![arithmetic_node("scaled", "mul_f32", &["input", "scale"])],
-            output_node: "scaled",
+            output_node: "scaled".to_owned(),
         },
     ]
+}
+
+pub(crate) fn parameter(name: &str, kind: KernelParameterKind) -> KernelParameter {
+    KernelParameter {
+        name: name.to_owned(),
+        kind,
+    }
 }
 
 fn arithmetic_node(name: &str, instruction: &str, args: &[&str]) -> Node {
@@ -384,27 +474,72 @@ mod tests {
 resource cpu0 cpu.arm64\n\
 resource kernel0 kernel.cuda\n\
 function main cpu entry\n\
-function-result main f32 value input\n\
+function-result main i64 value scalar\n\
 function-node main input\n\
-function-node main target\n\
-kernel.const_f32 input kernel0 1.0\n\
+function-node main scalar\n\
+function-node main mapped\n\
+function-node main reduced\n\
+kernel.tensor input kernel0 1 4 1,2,3,4\n\
+cpu.const_i64 scalar cpu0 10\n\
+kernel.add_scalar_axis mapped kernel0 input cols scalar\n\
+kernel.reduce_sum_axis reduced kernel0 mapped cols\n\
 kernel.target_config target kernel0 x86_64 cuda 1 ptx\n";
 
     #[test]
     fn compiled_project_yir_builds_verified_backend_neutral_table() {
         let table = table_from_compiled_project_yir(PROJECT_YIR, "cuda.nvidia-gpu").unwrap();
         assert_eq!(table.source_binding, PROJECT_YIR_BINDING_CONTRACT);
-        assert_eq!(table.source_kernel_node_count, 2);
-        assert_eq!(table.source_kernel_body_node_count, 2);
+        assert_eq!(table.source_kernel_node_count, 4);
+        assert_eq!(table.source_kernel_body_node_count, 3);
         assert_eq!(table.source_functions.len(), 1);
-        assert_eq!(table.functions.len(), 2);
+        assert_eq!(table.source_adaptations.len(), 3);
+        assert_eq!(
+            table
+                .source_adaptations
+                .iter()
+                .filter(|adaptation| adaptation.is_adapted())
+                .count(),
+            2
+        );
+        assert_eq!(table.functions.len(), 4);
         let rendered = render_codegen_table(&table).unwrap();
         assert!(rendered.contains("schema = \"nuis-kernel-yir-codegen-table-v1\""));
         assert!(rendered.contains("source_binding = \"compiled-project-yir\""));
         assert!(rendered.contains("[[source_function]]"));
-        assert!(rendered.contains("body_nodes = [\"input\", \"target\"]"));
+        assert!(rendered.contains("body_nodes = [\"input\", \"scalar\", \"mapped\", \"reduced\"]"));
+        assert!(
+            rendered.contains("source_adaptation_contract = \"nuis-kernel-yir-source-adapter-v1\"")
+        );
+        assert!(rendered.contains("source_adapted_count = 2"));
+        assert!(rendered.contains("status = \"unsupported\""));
+        assert!(rendered.contains("status = \"adapted\""));
+        assert!(rendered.contains("generated_entry = \"nuis_project_main_mapped_i64\""));
+        assert!(rendered.contains(
+            "request_projection_contract = \"nuis-kernel-source-request-projection-v1\""
+        ));
+        assert!(rendered.contains("request_element_type = \"i64\""));
+        assert!(rendered.contains("request_operation = \"add-scalar-i64\""));
+        assert!(rendered.contains("request_input_shape = [1, 4]"));
+        assert!(rendered.contains("request_output_shape = [1, 4]"));
+        assert!(rendered.contains("request_input_values = [1, 2, 3, 4]"));
+        assert!(rendered.contains("request_scalar = 10"));
+        assert!(rendered.contains("request_expected_values = [11, 12, 13, 14]"));
+        assert!(rendered.contains("generated_entry = \"nuis_project_main_reduced_i64\""));
+        assert!(rendered.contains("request_operation = \"reduce-sum-i64\""));
+        assert!(rendered.contains("request_input_source_node = \"mapped\""));
+        assert!(rendered.contains("request_output_shape = [1, 1]"));
+        assert!(rendered.contains("request_expected_values = [50]"));
         assert!(rendered.contains("kernel.add_f32"));
         assert!(rendered.contains("kernel.mul_f32"));
+        assert!(rendered.contains("kernel.add_i64"));
+        assert!(rendered.contains("kernel.reduce_sum_i64"));
+        let ptx = crate::kernel_ptx_emitter::lower_cuda_ptx(&table).unwrap();
+        assert!(ptx.contains(".visible .entry nuis_project_main_mapped_i64"));
+        assert!(ptx.contains("ld.global.s64"));
+        assert!(ptx.contains("add.s64"));
+        assert!(ptx.contains("st.global.s64"));
+        assert!(ptx.contains(".visible .entry nuis_project_main_reduced_i64"));
+        assert!(ptx.contains("REDUCE_LOOP_"));
     }
 
     #[test]
