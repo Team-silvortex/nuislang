@@ -114,6 +114,34 @@ fn infers_missing_function_return_types_from_explicit_returns() {
 }
 
 #[test]
+fn infers_explicit_empty_return_as_standard_unit_type() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() {
+            return;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+
+    assert!(main
+        .return_type
+        .as_ref()
+        .is_some_and(|ty| ty.is_unit_scalar()));
+    assert_eq!(
+        main.return_type.as_ref().map(|ty| ty.render()).as_deref(),
+        Some("Unit")
+    );
+}
+
+#[test]
 fn infers_missing_function_return_types_from_total_if_and_match_branches() {
     let module = parse_nuis_module(
         r#"

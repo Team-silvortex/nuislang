@@ -27,6 +27,7 @@ fn lowering_contract_nodes_validate_cpu_target_config() {
             "lowering_cpu_target_config",
         )],
         node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -59,6 +60,7 @@ fn lowering_contract_nodes_reject_cpu_target_vector_mismatch() {
             "lowering_cpu_target_config",
         )],
         node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();

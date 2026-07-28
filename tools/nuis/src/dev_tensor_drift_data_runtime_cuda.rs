@@ -2,6 +2,68 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(crate) const DEV_TENSOR_RUNTIME_CUDA_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "yir-backend-neutral-function-table",
+        path: "crates/yir-core/src/module_graph.rs",
+        required_patterns: &[
+            "nuis-yir-function-table-v1",
+            "pub functions: Vec<YirFunction>",
+            "pub enum YirFunctionRole",
+            "pub enum YirValueOwnership",
+            "pub struct YirFunctionParameter",
+            "pub struct YirFunctionResult",
+            "pub struct YirFunction",
+            "pub body_nodes: Vec<String>",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "yir-function-table-syntax",
+        path: "crates/yir-syntax/src/lib.rs",
+        required_patterns: &[
+            "function-param",
+            "function-result",
+            "function-node",
+            "parse_function_parameter",
+            "parse_function_result",
+            "parse_function_node",
+            "parses_typed_function_boundaries_and_body_membership",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "yir-function-table-verification",
+        path: "crates/yir-verify/src/function_contracts.rs",
+        required_patterns: &[
+            "verify_function_table",
+            "invalid or duplicate function boundary",
+            "references unknown body node",
+            "belongs to both",
+            "has invalid parameter",
+            "has an invalid result boundary",
+            "expected at most one",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuisc-yir-function-membership-lowering",
+        path: "tools/nuisc/src/lowering/bootstrap.rs",
+        required_patterns: &[
+            "main_start_index",
+            "main_body_nodes",
+            "main_returns_unit",
+            "is_unit_scalar",
+            "YirFunctionRole::Entry",
+            "YirFunctionResult",
+            "structured_return",
+            "entry function",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuisc-unit-return-type-canonicalization",
+        path: "tools/nuisc/src/frontend/return_inference.rs",
+        required_patterns: &[
+            "AstStmt::Return(None)",
+            "returns.push(ast_named_type(\"Unit\"))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nuisc-kernel-code-asset-registry",
         path: "tools/nuisc/src/kernel_code_asset.rs",
         required_patterns: &[
@@ -12,7 +74,26 @@ pub(crate) const DEV_TENSOR_RUNTIME_CUDA_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
             "nuis_kernel_scale_f32",
             "visible_entries",
             "registered_kernel_code_assets",
-            "lower_registered_cuda_ptx",
+            "lower_cuda_ptx",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuisc-kernel-yir-codegen-table",
+        path: "tools/nuisc/src/kernel_codegen_table.rs",
+        required_patterns: &[
+            "nuis-kernel-yir-codegen-table-v1",
+            "nuis-kernel-yir-codegen-function-v1",
+            "compiled-project-yir",
+            "source_fnv1a64",
+            "source_kernel_node_count",
+            "source_kernel_body_node_count",
+            "source_functions",
+            "YirFunction",
+            "yir_syntax::parse_module",
+            "yir_verify::verify_module",
+            "kernel.add_f32",
+            "kernel.mul_f32",
+            "render_codegen_table",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -20,8 +101,9 @@ pub(crate) const DEV_TENSOR_RUNTIME_CUDA_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
         path: "tools/nuisc/src/kernel_ptx_emitter.rs",
         required_patterns: &[
             "nuis-kernel-ptx-emitter-registry-v1",
-            "nuis-kernel-yir-codegen-function-v1",
-            "yir_core::{Node, Operation}",
+            "KernelYirCodegenTable",
+            "validate_codegen_table",
+            "lower_cuda_ptx",
             "add_f32",
             "mul_f32",
             "add.rn.f32",
@@ -51,6 +133,9 @@ pub(crate) const DEV_TENSOR_RUNTIME_CUDA_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
             "write_registered_domain_code_asset",
             "domain_code_asset_",
             "materializes_registered_cuda_ptx_without_external_compiler",
+            "write_domain_build_unit_stubs_with_kernel_codegen_table",
+            "nuis.domain.kernel.codegen-table.toml",
+            "project_yir_table_materializes_hashed_sidecar_and_ptx",
         ],
     },
     DevTensorDriftCheckSpec {

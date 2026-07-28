@@ -27,6 +27,7 @@ fn rejects_invalid_project_bridge_stage_contract() {
             "project_profile_data_FabricPlane_uplink_window_policy",
         )],
         node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -69,6 +70,7 @@ fn rejects_nested_data_window_values() {
             dep("window0", "window1"),
         ],
         node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -106,6 +108,7 @@ fn rejects_mutable_window_payload_across_data_pipe() {
             dep("window0", "pipe"),
         ],
         node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -145,6 +148,7 @@ fn accepts_frozen_window_payload_across_data_pipe() {
             dep("frozen", "pipe"),
         ],
         node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -187,6 +191,7 @@ fn rejects_write_window_on_immutable_input() {
             dep("value", "updated"),
         ],
         node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
     };
 
     verify_module(&module).unwrap_err();
@@ -223,6 +228,7 @@ fn accepts_read_window_on_immutable_input() {
             dep("window0", "read"),
         ],
         node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -267,6 +273,7 @@ fn rejects_bridge_payload_shape_mismatch() {
             ),
         ],
         node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();

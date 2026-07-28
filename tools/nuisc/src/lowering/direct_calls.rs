@@ -630,6 +630,7 @@ pub(super) fn lower_direct_call_helper_function(
     let start_index = state.yir.nodes.len();
     let lane = format!("fn:{}", function.name);
     let mut bindings = BTreeMap::<String, String>::new();
+    let mut function_parameters = Vec::new();
     for (index, param) in function.params.iter().enumerate() {
         let node_name = format!("__fn_{}_param_{}", function.name, index);
         let instruction = match direct_call_scalar_kind(&param.ty).ok_or_else(|| {
@@ -656,6 +657,12 @@ pub(super) fn lower_direct_call_helper_function(
                 instruction: instruction.to_owned(),
                 args: vec![index.to_string()],
             },
+        });
+        function_parameters.push(YirFunctionParameter {
+            name: param.name.clone(),
+            ty: param.ty.render(),
+            ownership: yir_value_ownership(&param.ty),
+            node: node_name.clone(),
         });
         bindings.insert(param.name.clone(), node_name);
     }
@@ -698,11 +705,31 @@ pub(super) fn lower_direct_call_helper_function(
     state.yir.edges.push(Edge {
         kind: EdgeKind::Effect,
         from: returned,
-        to: return_name,
+        to: return_name.clone(),
     });
+    let body_nodes = state.yir.nodes[start_index..]
+        .iter()
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
     for node in &state.yir.nodes[start_index..] {
         state.yir.node_lanes.insert(node.name.clone(), lane.clone());
     }
+    let return_type = function
+        .return_type
+        .as_ref()
+        .expect("direct-call helper lowering requires a return type");
+    state.yir.functions.push(YirFunction {
+        name: function.name.clone(),
+        domain: "cpu".to_owned(),
+        role: YirFunctionRole::Helper,
+        parameters: function_parameters,
+        result: Some(YirFunctionResult {
+            ty: return_type.render(),
+            ownership: yir_value_ownership(return_type),
+            node: return_name,
+        }),
+        body_nodes,
+    });
     Ok(())
 }
 

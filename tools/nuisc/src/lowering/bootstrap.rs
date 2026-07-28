@@ -170,7 +170,8 @@ pub(super) fn lower_nir_to_yir_builtin_cpu_with_registry(
         lower_direct_call_helper_function(function, &mut state)?;
     }
 
-    if direct_call_functions.contains("main") {
+    let main_start_index = state.yir.nodes.len();
+    let main_result_node = if direct_call_functions.contains("main") {
         let entry = push_direct_call_node(main, &[], &mut state)?;
         let entry_return = next_name(&mut state, "entry_return");
         state.yir.nodes.push(Node {
@@ -186,12 +187,19 @@ pub(super) fn lower_nir_to_yir_builtin_cpu_with_registry(
         state.yir.edges.push(Edge {
             kind: EdgeKind::Effect,
             from: entry,
-            to: entry_return,
+            to: entry_return.clone(),
         });
+        entry_return
     } else {
         let mut bindings = BTreeMap::<String, String>::new();
         let returned = lower_function_body(main, &mut state, &mut bindings, true)?;
-        if returned.is_none() && main.return_type.is_none() {
+        if let Some(returned) = returned {
+            returned
+        } else if main
+            .return_type
+            .as_ref()
+            .is_none_or(NirTypeRef::is_unit_scalar)
+        {
             let value = next_name(&mut state, "implicit_main_return_value");
             state.yir.nodes.push(Node {
                 name: value.clone(),
@@ -213,8 +221,61 @@ pub(super) fn lower_nir_to_yir_builtin_cpu_with_registry(
                 },
             });
             push_dep_edges(&mut state, &value, &name);
+            name
+        } else if let Some(structured_return) = state.yir.nodes[main_start_index..]
+            .iter()
+            .rev()
+            .find(|node| {
+                node.op.instruction.starts_with("return")
+                    || node.op.instruction.ends_with("_return")
+            })
+            .map(|node| node.name.clone())
+        {
+            structured_return
+        } else {
+            return Err(format!(
+                "entry function `{}` has a return type but produced no result node",
+                main.name
+            ));
         }
-    }
+    };
+    let main_body_nodes = state.yir.nodes[main_start_index..]
+        .iter()
+        .map(|node| node.name.clone())
+        .collect::<Vec<_>>();
+    let main_returns_unit = main
+        .return_type
+        .as_ref()
+        .is_none_or(NirTypeRef::is_unit_scalar);
+    let main_result_type = if main_returns_unit {
+        "i64".to_owned()
+    } else {
+        main.return_type
+            .as_ref()
+            .expect("non-unit entry result type")
+            .render()
+    };
+    let main_result_ownership = if main_returns_unit {
+        YirValueOwnership::Value
+    } else {
+        yir_value_ownership(
+            main.return_type
+                .as_ref()
+                .expect("non-unit entry result ownership"),
+        )
+    };
+    state.yir.functions.push(YirFunction {
+        name: main.name.clone(),
+        domain: module.domain.clone(),
+        role: YirFunctionRole::Entry,
+        parameters: Vec::new(),
+        result: Some(YirFunctionResult {
+            ty: main_result_type,
+            ownership: main_result_ownership,
+            node: main_result_node,
+        }),
+        body_nodes: main_body_nodes,
+    });
     materialize_doc_contract_nodes(&mut yir, module);
     assign_default_lanes(&mut yir);
     materialize_registered_scheduler_contract_nodes(&mut yir);

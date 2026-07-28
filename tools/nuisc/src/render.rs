@@ -382,6 +382,39 @@ pub fn render_yir(module: &YirModule) -> String {
     if !module.resources.is_empty() {
         out.push('\n');
     }
+    for function in &module.functions {
+        out.push_str(&format!(
+            "function {} {} {}\n",
+            function.name,
+            function.domain,
+            function.role.as_str()
+        ));
+        for parameter in &function.parameters {
+            out.push_str(&format!(
+                "function-param {} {} {} {} {}\n",
+                function.name,
+                parameter.name,
+                parameter.ty,
+                parameter.ownership.as_str(),
+                parameter.node
+            ));
+        }
+        if let Some(result) = &function.result {
+            out.push_str(&format!(
+                "function-result {} {} {} {}\n",
+                function.name,
+                result.ty,
+                result.ownership.as_str(),
+                result.node
+            ));
+        }
+        for node in &function.body_nodes {
+            out.push_str(&format!("function-node {} {}\n", function.name, node));
+        }
+    }
+    if !module.functions.is_empty() {
+        out.push('\n');
+    }
     for node in &module.nodes {
         let lane_suffix = module
             .node_lanes

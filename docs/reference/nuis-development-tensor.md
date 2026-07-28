@@ -1533,14 +1533,38 @@ Partial descriptors, absolute or traversing paths, and malformed FNV bindings
 fail closed. `nuis-kernel-code-asset-registry-v1` is now the single authority
 for the CUDA PTX bytes, target, entry, package-relative file name, and digest
 contract. The asset also owns its minimum compute capability. The bytes are
-now produced by `nuis-kernel-ptx-emitter-registry-v1`, which consumes
-`nuis-kernel-yir-codegen-function-v1` functions represented by YIR
-`Node`/`Operation` values. Registered `kernel.add_f32` and `kernel.mul_f32`
-nodes lower into parameter ABI, thread indexing, bounds guards, global
-loads/stores, and PTX arithmetic; unsupported instructions fail closed. AOT
-caches and materializes the generated PTX without an external compiler. An
-optional `ptxas -arch=sm_89` differential check and the real CUDA Driver route
-both accept the same bytes.
+now produced by `nuis-kernel-ptx-emitter-registry-v1`, which consumes a
+`nuis-kernel-yir-codegen-table-v1`. Normal AOT reparses and verifies its
+emitted project YIR, requires its CUDA target contract, and records source
+version/hash, total and function-owned Kernel node counts, target, extracted
+source functions, entries, typed parameters/results, and
+`nuis-kernel-yir-codegen-function-v1` bodies represented by YIR
+`Node`/`Operation` values. The table is emitted as
+`nuis.domain.kernel.codegen-table.toml`, participates in artifact hashing, and
+is passed explicitly to the PTX emitter. Registered `kernel.add_f32` and
+`kernel.mul_f32` nodes lower into parameter ABI, thread indexing, bounds
+guards, global loads/stores, and PTX arithmetic; unsupported instructions fail
+closed. A real x86_64 project binds five Kernel source nodes, and both optional
+`ptxas -arch=sm_89` differential assembly and the real CUDA Driver route accept
+the table-produced bytes.
+
+`nuis-yir-function-table-v1` now provides that missing backend-neutral
+boundary. Functions carry entry/helper/provider roles, typed parameter nodes,
+typed value/borrowed/owned results, and ordered body membership. Syntax
+round-trips all records, verification rejects unknown or multiply owned nodes,
+and lowering preserves `main`, direct-call helpers, structured returns, and
+profile-ref rewrites. Empty returns infer canonical `Unit`, and a `Unit` entry
+receives a deterministic `i64 0` executable ABI boundary. The real CUDA
+project reports one `main` entry, five total Kernel nodes, four function-owned
+Kernel nodes, and an i64 value result.
+
+The coordinate remains active because the extracted project body uses tensor,
+add-scalar-axis, reduce, and element operations while the first PTX ABI
+accepts vector add/mul provider entries. The two emitted workload bodies are
+still selected from the provider-neutral Kernel registration. The next step is
+to select verified reachable source nodes and adapt the first supported
+project arithmetic shape into an exact provider codegen entry, rejecting
+unsupported shapes explicitly.
 The `official.kernel` input registration verifies those emitted bytes and
 produces an Nsdb-validated two-request graph. Vector-add consumes two ordered
 f32 artifact inputs; scale consumes its transferable output through a

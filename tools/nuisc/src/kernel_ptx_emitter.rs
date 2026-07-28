@@ -1,32 +1,12 @@
 use std::collections::BTreeMap;
 
-use yir_core::{Node, Operation};
+use yir_core::Node;
+
+use crate::kernel_codegen_table::{
+    validate_codegen_table, KernelParameterKind, KernelYirCodegenFunction, KernelYirCodegenTable,
+};
 
 pub(crate) const KERNEL_PTX_EMITTER_REGISTRY_CONTRACT: &str = "nuis-kernel-ptx-emitter-registry-v1";
-pub(crate) const KERNEL_YIR_CODEGEN_FUNCTION_CONTRACT: &str = "nuis-kernel-yir-codegen-function-v1";
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum KernelParameterKind {
-    InputF32,
-    OutputF32,
-    ElementCountU32,
-    ScalarF32,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct KernelParameter {
-    name: &'static str,
-    kind: KernelParameterKind,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct KernelYirCodegenFunction {
-    contract: &'static str,
-    entry: &'static str,
-    parameters: &'static [KernelParameter],
-    nodes: Vec<Node>,
-    output_node: &'static str,
-}
 
 struct KernelPtxEmitterRegistration {
     registry_contract: &'static str,
@@ -36,44 +16,6 @@ struct KernelPtxEmitterRegistration {
     emit: fn(&[KernelYirCodegenFunction]) -> Result<String, String>,
 }
 
-const VECTOR_ADD_PARAMETERS: &[KernelParameter] = &[
-    KernelParameter {
-        name: "input_lhs",
-        kind: KernelParameterKind::InputF32,
-    },
-    KernelParameter {
-        name: "input_rhs",
-        kind: KernelParameterKind::InputF32,
-    },
-    KernelParameter {
-        name: "output",
-        kind: KernelParameterKind::OutputF32,
-    },
-    KernelParameter {
-        name: "element_count",
-        kind: KernelParameterKind::ElementCountU32,
-    },
-];
-
-const SCALE_PARAMETERS: &[KernelParameter] = &[
-    KernelParameter {
-        name: "input",
-        kind: KernelParameterKind::InputF32,
-    },
-    KernelParameter {
-        name: "output",
-        kind: KernelParameterKind::OutputF32,
-    },
-    KernelParameter {
-        name: "element_count",
-        kind: KernelParameterKind::ElementCountU32,
-    },
-    KernelParameter {
-        name: "scale",
-        kind: KernelParameterKind::ScalarF32,
-    },
-];
-
 const CUDA_PTX_EMITTER: KernelPtxEmitterRegistration = KernelPtxEmitterRegistration {
     registry_contract: KERNEL_PTX_EMITTER_REGISTRY_CONTRACT,
     target: "cuda.nvidia-gpu",
@@ -82,52 +24,25 @@ const CUDA_PTX_EMITTER: KernelPtxEmitterRegistration = KernelPtxEmitterRegistrat
     emit: emit_ptx_module,
 };
 
-pub(crate) fn lower_registered_cuda_ptx() -> Result<String, String> {
+pub(crate) fn lower_cuda_ptx(table: &KernelYirCodegenTable) -> Result<String, String> {
     validate_registration(&CUDA_PTX_EMITTER)?;
-    (CUDA_PTX_EMITTER.emit)(&registered_functions())
+    validate_codegen_table(table)?;
+    if table.lowering_target != CUDA_PTX_EMITTER.target {
+        return Err(format!(
+            "Kernel/YIR codegen table targets `{}` instead of `{}`",
+            table.lowering_target, CUDA_PTX_EMITTER.target
+        ));
+    }
+    (CUDA_PTX_EMITTER.emit)(&table.functions)
 }
 
 #[cfg(test)]
-pub(crate) fn registered_cuda_yir_entries() -> Vec<&'static str> {
-    registered_functions()
-        .into_iter()
+pub(crate) fn cuda_yir_entries(table: &KernelYirCodegenTable) -> Vec<&'static str> {
+    table
+        .functions
+        .iter()
         .map(|function| function.entry)
         .collect()
-}
-
-fn registered_functions() -> Vec<KernelYirCodegenFunction> {
-    vec![
-        KernelYirCodegenFunction {
-            contract: KERNEL_YIR_CODEGEN_FUNCTION_CONTRACT,
-            entry: "nuis_kernel_vector_add_f32",
-            parameters: VECTOR_ADD_PARAMETERS,
-            nodes: vec![arithmetic_node(
-                "sum",
-                "add_f32",
-                &["input_lhs", "input_rhs"],
-            )],
-            output_node: "sum",
-        },
-        KernelYirCodegenFunction {
-            contract: KERNEL_YIR_CODEGEN_FUNCTION_CONTRACT,
-            entry: "nuis_kernel_scale_f32",
-            parameters: SCALE_PARAMETERS,
-            nodes: vec![arithmetic_node("scaled", "mul_f32", &["input", "scale"])],
-            output_node: "scaled",
-        },
-    ]
-}
-
-fn arithmetic_node(name: &str, instruction: &str, args: &[&str]) -> Node {
-    Node {
-        name: name.to_owned(),
-        resource: "kernel0".to_owned(),
-        op: Operation {
-            module: "kernel".to_owned(),
-            instruction: instruction.to_owned(),
-            args: args.iter().map(|arg| (*arg).to_owned()).collect(),
-        },
-    }
 }
 
 fn validate_registration(registration: &KernelPtxEmitterRegistration) -> Result<(), String> {
@@ -256,8 +171,7 @@ fn emit_ptx_function(
 }
 
 fn validate_function(function: &KernelYirCodegenFunction) -> Result<(), String> {
-    if function.contract != KERNEL_YIR_CODEGEN_FUNCTION_CONTRACT
-        || !valid_identifier(function.entry)
+    if !valid_identifier(function.entry)
         || function.nodes.is_empty()
         || function
             .parameters
@@ -336,9 +250,10 @@ mod tests {
 
     #[test]
     fn registered_cuda_emitter_lowers_kernel_yir_arithmetic() {
-        let ptx = lower_registered_cuda_ptx().expect("registered CUDA PTX");
+        let table = crate::kernel_codegen_table::registered_provider_codegen_table();
+        let ptx = lower_cuda_ptx(&table).expect("registered CUDA PTX");
         assert_eq!(
-            registered_cuda_yir_entries(),
+            cuda_yir_entries(&table),
             ["nuis_kernel_vector_add_f32", "nuis_kernel_scale_f32"]
         );
         assert!(ptx.contains(".visible .entry nuis_kernel_vector_add_f32"));
@@ -351,7 +266,9 @@ mod tests {
 
     #[test]
     fn emitter_rejects_unregistered_kernel_yir_instruction() {
-        let mut function = registered_functions().remove(0);
+        let mut function = crate::kernel_codegen_table::registered_provider_codegen_table()
+            .functions
+            .remove(0);
         function.nodes[0].op.instruction = "div_f32".to_owned();
         assert!(emit_ptx_function(&function, 0)
             .unwrap_err()

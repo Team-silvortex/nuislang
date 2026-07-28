@@ -45,6 +45,22 @@ fn lowers_kernel_tensor_inspect_primitives_into_kernel_nodes() {
         .nodes
         .iter()
         .any(|node| node.op.module == "kernel" && node.op.instruction == "element_at"));
+    let main = yir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("entry function boundary");
+    assert_eq!(main.role.as_str(), "entry");
+    assert!(main.body_nodes.iter().any(|name| {
+        yir.nodes
+            .iter()
+            .find(|node| node.name == *name)
+            .is_some_and(|node| node.op.module == "kernel")
+    }));
+    assert!(main
+        .result
+        .as_ref()
+        .is_some_and(|result| main.body_nodes.contains(&result.node)));
 }
 
 #[test]

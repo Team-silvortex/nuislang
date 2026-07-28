@@ -24,9 +24,11 @@ pub fn registered_kernel_code_assets() -> &'static [RegisteredKernelCodeAsset] {
     REGISTERED_KERNEL_CODE_ASSETS.get_or_init(|| {
         let bytes = CUDA_PTX_BYTES
             .get_or_init(|| {
-                crate::kernel_ptx_emitter::lower_registered_cuda_ptx()
-                    .expect("registered Kernel/YIR CUDA lowering must remain valid")
-                    .into_bytes()
+                crate::kernel_ptx_emitter::lower_cuda_ptx(
+                    &crate::kernel_codegen_table::registered_provider_codegen_table(),
+                )
+                .expect("registered Kernel/YIR CUDA lowering must remain valid")
+                .into_bytes()
             })
             .as_slice();
         vec![RegisteredKernelCodeAsset {
@@ -65,7 +67,9 @@ mod tests {
         assert_eq!(asset.minimum_compute_capability, 80);
         assert_eq!(
             asset.visible_entries,
-            crate::kernel_ptx_emitter::registered_cuda_yir_entries()
+            crate::kernel_ptx_emitter::cuda_yir_entries(
+                &crate::kernel_codegen_table::registered_provider_codegen_table()
+            )
         );
         assert!(asset.visible_entries.iter().all(|entry| asset
             .bytes

@@ -2,13 +2,14 @@ use std::path::{Path, PathBuf};
 
 use nuis_artifact::{BuildManifestDomainBuildUnit, NuisLifecycleContract};
 
-use crate::aot_domain_artifact_writer::write_domain_build_unit_stubs;
+use crate::aot_domain_artifact_writer::write_domain_build_unit_stubs_with_kernel_codegen_table;
 use crate::aot_domain_index_render::{
     render_domain_bridge_registry, render_domain_lowering_plan_index,
     render_host_bridge_plan_index, write_domain_bridge_registry, write_domain_lowering_plan_index,
     write_host_bridge_plan_index,
 };
 use crate::aot_manifest_types::CompileArtifacts;
+use crate::kernel_codegen_table::{table_from_compiled_project_yir, KernelYirCodegenTable};
 use crate::linker::{self, LinkPlanDomainUnit, LinkPlanLifecycle};
 
 pub(crate) struct BuildManifestArtifactSet {
@@ -38,9 +39,11 @@ pub(crate) fn prepare_build_manifest_artifacts(
         ("llvm_ir".to_owned(), PathBuf::from(&written.llvm_ir_path)),
         ("binary".to_owned(), PathBuf::from(&written.binary_path)),
     ];
-    artifacts.extend(write_domain_build_unit_stubs(
+    let kernel_codegen_table = load_project_kernel_codegen_table(written, domain_build_units)?;
+    artifacts.extend(write_domain_build_unit_stubs_with_kernel_codegen_table(
         output_dir,
         domain_build_units,
+        kernel_codegen_table.as_ref(),
     )?);
 
     let hetero_units = domain_build_units
@@ -113,6 +116,25 @@ pub(crate) fn prepare_build_manifest_artifacts(
         hetero_calculate_plan_path,
         hetero_calculate_plan_inline,
     })
+}
+
+fn load_project_kernel_codegen_table(
+    written: &CompileArtifacts,
+    domain_build_units: &[BuildManifestDomainBuildUnit],
+) -> Result<Option<KernelYirCodegenTable>, String> {
+    let Some(lowering_target) = domain_build_units
+        .iter()
+        .find(|unit| {
+            unit.domain_family == "kernel"
+                && unit.selected_lowering_target.as_deref() == Some("cuda.nvidia-gpu")
+        })
+        .and_then(|unit| unit.selected_lowering_target.as_deref())
+    else {
+        return Ok(None);
+    };
+    let source = std::fs::read_to_string(&written.yir_path)
+        .map_err(|error| format!("failed to read `{}`: {error}", written.yir_path))?;
+    table_from_compiled_project_yir(&source, lowering_target).map(Some)
 }
 
 fn render_clock_protocol(

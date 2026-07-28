@@ -196,7 +196,7 @@ fn collect_inferred_return_types_from_block(
                 return Ok(true);
             }
             AstStmt::Return(None) => {
-                returns.push(ast_named_type("unit"));
+                returns.push(ast_named_type("Unit"));
                 return Ok(true);
             }
             AstStmt::Expr(AstExpr::Call { .. })

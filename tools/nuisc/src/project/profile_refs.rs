@@ -34,6 +34,28 @@ pub(super) fn resolve_project_profile_refs(module: &mut YirModule) -> Result<(),
 
     let replacement_sources = replacements.keys().cloned().collect::<BTreeSet<_>>();
 
+    for function in &mut module.functions {
+        function
+            .body_nodes
+            .retain(|node| !replacement_sources.contains(node));
+        for parameter in &mut function.parameters {
+            if let Some(target) = replacements.get(&parameter.node) {
+                parameter.node = target.clone();
+                if !function.body_nodes.contains(target) {
+                    function.body_nodes.push(target.clone());
+                }
+            }
+        }
+        if let Some(result) = &mut function.result {
+            if let Some(target) = replacements.get(&result.node) {
+                result.node = target.clone();
+                if !function.body_nodes.contains(target) {
+                    function.body_nodes.push(target.clone());
+                }
+            }
+        }
+    }
+
     for node in &mut module.nodes {
         if node.op.is_cpu_semantic_op(SemanticOp::CpuProjectProfileRef) {
             continue;

@@ -14,12 +14,24 @@ use crate::aot_encoding::hex_encode_bytes;
 use crate::aot_kernel_sidecar::render_domain_build_unit_kernel_ir_sidecar;
 use crate::aot_network_sidecar::render_domain_build_unit_network_ir_sidecar;
 use crate::aot_shader_sidecar::render_domain_build_unit_shader_ir_sidecar;
+use crate::kernel_codegen_table::{
+    render_codegen_table, KernelYirCodegenTable, KERNEL_YIR_CODEGEN_TABLE_CONTRACT,
+};
 
 pub(crate) fn write_domain_build_unit_stubs(
     output_dir: &Path,
     units: &mut [BuildManifestDomainBuildUnit],
 ) -> Result<Vec<(String, PathBuf)>, String> {
+    write_domain_build_unit_stubs_with_kernel_codegen_table(output_dir, units, None)
+}
+
+pub(crate) fn write_domain_build_unit_stubs_with_kernel_codegen_table(
+    output_dir: &Path,
+    units: &mut [BuildManifestDomainBuildUnit],
+    kernel_codegen_table: Option<&KernelYirCodegenTable>,
+) -> Result<Vec<(String, PathBuf)>, String> {
     let mut artifacts = Vec::new();
+    let mut wrote_kernel_codegen_table = false;
     for unit in units {
         if unit.domain_family == "cpu" {
             continue;
@@ -102,8 +114,22 @@ pub(crate) fn write_domain_build_unit_stubs(
             output_dir,
             &unit.domain_family,
             unit.selected_lowering_target.as_deref(),
+            kernel_codegen_table,
         )? {
             artifacts.push(code_asset);
+        }
+        if unit.domain_family == "kernel"
+            && unit.selected_lowering_target.as_deref() == Some("cuda.nvidia-gpu")
+            && !wrote_kernel_codegen_table
+        {
+            if let Some(table) = kernel_codegen_table {
+                let table_path = output_dir.join("nuis.domain.kernel.codegen-table.toml");
+                fs::write(&table_path, render_codegen_table(table)?).map_err(|error| {
+                    format!("failed to write `{}`: {error}", table_path.display())
+                })?;
+                artifacts.push(("domain_codegen_table_kernel".to_owned(), table_path));
+                wrote_kernel_codegen_table = true;
+            }
         }
     }
     Ok(artifacts)
@@ -113,6 +139,7 @@ fn write_registered_domain_code_asset(
     output_dir: &Path,
     domain_family: &str,
     lowering_target: Option<&str>,
+    kernel_codegen_table: Option<&KernelYirCodegenTable>,
 ) -> Result<Option<(String, PathBuf)>, String> {
     if domain_family != "kernel" {
         return Ok(None);
@@ -122,7 +149,27 @@ fn write_registered_domain_code_asset(
         return Ok(None);
     };
     let path = output_dir.join(asset.file_name);
-    fs::write(&path, asset.bytes)
+    let generated_bytes = if let Some(table) = kernel_codegen_table {
+        if table.contract != KERNEL_YIR_CODEGEN_TABLE_CONTRACT {
+            return Err("AOT received an invalid Kernel/YIR codegen table contract".to_owned());
+        }
+        let entries = table
+            .functions
+            .iter()
+            .map(|function| function.entry)
+            .collect::<Vec<_>>();
+        if entries != asset.visible_entries {
+            return Err(format!(
+                "Kernel/YIR codegen entries {:?} disagree with registered code asset entries {:?}",
+                entries, asset.visible_entries
+            ));
+        }
+        Some(crate::kernel_ptx_emitter::lower_cuda_ptx(table)?.into_bytes())
+    } else {
+        None
+    };
+    let bytes = generated_bytes.as_deref().unwrap_or(asset.bytes);
+    fs::write(&path, bytes)
         .map_err(|error| format!("failed to write `{}`: {error}", path.display()))?;
     Ok(Some((format!("domain_code_asset_{domain_family}"), path)))
 }
@@ -131,24 +178,115 @@ fn write_registered_domain_code_asset(
 mod tests {
     use super::*;
 
+    fn cuda_kernel_unit() -> BuildManifestDomainBuildUnit {
+        BuildManifestDomainBuildUnit {
+            package_id: "official.kernel".to_owned(),
+            domain_family: "kernel".to_owned(),
+            abi: Some("kernel.cuda.ptx8_0.v1".to_owned()),
+            machine_arch: Some("x86_64".to_owned()),
+            machine_os: Some("linux".to_owned()),
+            backend_family: Some("cuda".to_owned()),
+            vendor: Some("nvidia".to_owned()),
+            device_class: Some("nvidia-gpu".to_owned()),
+            target_device: Some("nvidia-gpu".to_owned()),
+            ir_format: Some("ptx8.0".to_owned()),
+            dispatch_abi: Some("cuda-driver".to_owned()),
+            backend_priority: Some(100),
+            verification: Some("verified".to_owned()),
+            selected_lowering_target: Some("cuda.nvidia-gpu".to_owned()),
+            artifact_stub_path: None,
+            artifact_stub_inline: None,
+            artifact_payload_path: None,
+            artifact_bridge_stub_path: None,
+            artifact_ir_sidecar_path: None,
+            artifact_bridge_stub_inline: None,
+            artifact_payload_blob_path: None,
+            artifact_payload_blob_bytes: None,
+            artifact_payload_format: None,
+            artifact_payload_blob_inline: None,
+            contract_family: "nustar.kernel".to_owned(),
+            packaging_role: "hetero-contract".to_owned(),
+        }
+    }
+
     #[test]
     fn materializes_registered_cuda_ptx_without_external_compiler() {
         let output_dir =
             std::env::temp_dir().join(format!("nuisc-kernel-code-asset-{}", std::process::id()));
         let _ = fs::remove_dir_all(&output_dir);
         fs::create_dir_all(&output_dir).unwrap();
-        let (kind, path) =
-            write_registered_domain_code_asset(&output_dir, "kernel", Some("cuda.nvidia-gpu"))
-                .unwrap()
-                .expect("CUDA code asset");
+        let (kind, path) = write_registered_domain_code_asset(
+            &output_dir,
+            "kernel",
+            Some("cuda.nvidia-gpu"),
+            None,
+        )
+        .unwrap()
+        .expect("CUDA code asset");
         let asset = crate::kernel_code_asset::select_kernel_code_asset("cuda.nvidia-gpu").unwrap();
         assert_eq!(kind, "domain_code_asset_kernel");
         assert_eq!(path.file_name().unwrap(), asset.file_name);
         assert_eq!(fs::read(&path).unwrap(), asset.bytes);
-        assert!(
-            write_registered_domain_code_asset(&output_dir, "shader", Some("cuda.nvidia-gpu"))
+        assert!(write_registered_domain_code_asset(
+            &output_dir,
+            "shader",
+            Some("cuda.nvidia-gpu"),
+            None,
+        )
+        .unwrap()
+        .is_none());
+        fs::remove_dir_all(output_dir).unwrap();
+    }
+
+    #[test]
+    fn project_yir_table_materializes_hashed_sidecar_and_ptx() {
+        let output_dir = std::env::temp_dir().join(format!(
+            "nuisc-project-kernel-codegen-table-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&output_dir);
+        fs::create_dir_all(&output_dir).unwrap();
+        let source = "yir 0.1\n\
+resource cpu0 cpu.arm64\n\
+resource kernel0 kernel.cuda\n\
+function main cpu entry\n\
+function-result main f32 value input\n\
+function-node main input\n\
+function-node main target\n\
+kernel.const_f32 input kernel0 1.0\n\
+kernel.target_config target kernel0 x86_64 cuda 1 ptx\n";
+        let table =
+            crate::kernel_codegen_table::table_from_compiled_project_yir(source, "cuda.nvidia-gpu")
+                .unwrap();
+        let mut units = [cuda_kernel_unit()];
+        let artifacts = write_domain_build_unit_stubs_with_kernel_codegen_table(
+            &output_dir,
+            &mut units,
+            Some(&table),
+        )
+        .unwrap();
+
+        assert!(artifacts
+            .iter()
+            .any(|(kind, _)| kind == "domain_codegen_table_kernel"));
+        assert!(artifacts
+            .iter()
+            .any(|(kind, _)| kind == "domain_code_asset_kernel"));
+        let sidecar =
+            fs::read_to_string(output_dir.join("nuis.domain.kernel.codegen-table.toml")).unwrap();
+        assert!(sidecar.contains("source_binding = \"compiled-project-yir\""));
+        assert!(sidecar.contains("source_function_count = 1"));
+        assert!(sidecar.contains("[[source_function]]"));
+        assert!(sidecar.contains(&format!(
+            "source_fnv1a64 = \"{}\"",
+            crate::aot_encoding::fnv1a64_hex(source.as_bytes())
+        )));
+        let ptx = fs::read(output_dir.join("nuis.domain.kernel.cuda.ptx")).unwrap();
+        assert_eq!(
+            ptx,
+            crate::kernel_code_asset::select_kernel_code_asset("cuda.nvidia-gpu")
                 .unwrap()
-                .is_none()
+                .bytes
         );
         fs::remove_dir_all(output_dir).unwrap();
     }

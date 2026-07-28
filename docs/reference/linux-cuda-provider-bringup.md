@@ -91,16 +91,53 @@ provider frontdoor.
 
 `nuis-kernel-code-asset-registry-v1` is now the single authority for the PTX
 bytes, `sm_80` target, visible entry, package-relative file name, and digest
-contract. Its bytes are no longer a handwritten PTX module:
+contract.
+
+`nuis-yir-function-table-v1` now preserves the function abstraction before
+backend selection. A YIR function has an `entry`, `helper`, or `provider` role,
+typed parameter nodes, an optional typed result with `value`, `borrowed`, or
+`owned` ownership, and an ordered body-node membership list. The text syntax
+round-trips `function`, `function-param`, `function-result`, and
+`function-node` records. YIR verification rejects duplicate boundaries,
+unknown or multiply owned body nodes, invalid parameter/result references, and
+multiple entries. Nuis lowering records `main` and direct-call helpers, while
+project profile replacement updates membership when temporary profile nodes
+are resolved. An explicit empty `return;` infers the canonical `Unit` type;
+an entry function returning `Unit` is normalized to a deterministic `i64 0`
+executable ABI result without changing source-level unit semantics.
+
+The PTX bytes are no longer a handwritten module:
 `nuis-kernel-ptx-emitter-registry-v1` consumes
-`nuis-kernel-yir-codegen-function-v1` functions built from ordinary YIR
-`Node`/`Operation` values. The registered vector-add and scale bodies contain
+`nuis-kernel-yir-codegen-table-v1`, whose
+`nuis-kernel-yir-codegen-function-v1` functions use ordinary YIR
+`Node`/`Operation` values. During normal AOT, the compiler reparses and verifies
+its own emitted project YIR, requires the selected CUDA `kernel.target_config`,
+and binds the source YIR version, FNV identity, Kernel node count, lowering
+target, extracted source functions, typed parameter/result metadata, entries,
+and bodies into
+`nuis.domain.kernel.codegen-table.toml`. The emitter receives that table
+explicitly; it no longer constructs workload functions itself. The vector-add
+and scale bodies contain
 `kernel.add_f32` and `kernel.mul_f32`; the CUDA emitter supplies parameter ABI,
 thread indexing, bounds checks, global loads/stores, and PTX arithmetic.
 Unknown instructions fail closed. AOT caches and writes the generated
-`nuis.domain.kernel.cuda.ptx` without invoking an external compiler. The
-optional server-side `ptxas -arch=sm_89` differential check accepts this
-module, but neither build nor execution depends on its cubin.
+`nuis.domain.kernel.cuda.ptx` and includes both the table and PTX in its
+artifact hash set without invoking an external compiler. Relocation keeps a
+same-contract registered-table reconstruction path because it intentionally
+does not depend on project source files. A real x86_64 project compile binds
+one `main` entry function, five total Kernel source nodes, four Kernel nodes
+owned by that function body, and its i64 value result. The optional server-side
+`ptxas -arch=sm_89` differential check accepts the table-produced module, but
+neither build nor execution depends on its cubin.
+
+The remaining table gap is narrower and explicit. AOT now extracts real
+project source functions, but the first project body contains tensor,
+add-scalar-axis, reduce, and element operations while the first PTX ABI accepts
+vector add/mul provider entries. The vector-add and scale codegen bodies
+therefore still come from the provider-neutral Kernel registration. The next
+step is a backend-neutral source-function selection and adaptation contract
+that derives a supported provider entry from verified reachable project nodes
+and reports unsupported shapes instead of silently substituting a workload.
 
 The `official.kernel` device-sample registration verifies the emitted bytes
 before persisting two f32 input payloads and one expected output. Its generated

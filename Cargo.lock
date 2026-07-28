@@ -220,6 +220,7 @@ dependencies = [
  "nuis-semantics",
  "yir-core",
  "yir-lower-llvm",
+ "yir-syntax",
  "yir-verify",
 ]
 

@@ -32,6 +32,7 @@ fn owner_write_after_last_borrow_use_is_allowed() {
             lifetime("head", "write_head"),
         ],
         node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -69,6 +70,7 @@ fn owner_free_after_last_borrow_use_is_allowed() {
             lifetime("buf", "drop_buf"),
         ],
         node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -106,6 +108,7 @@ fn explicit_borrow_end_allows_owner_write() {
             lifetime("head", "write_head"),
         ],
         node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -138,6 +141,7 @@ fn alloc_node_with_borrowed_next_is_rejected() {
             dep("tail_ref", "head_raw"),
         ],
         node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -178,6 +182,7 @@ fn store_next_with_borrowed_pointer_is_rejected() {
             lifetime("head", "link_tail"),
         ],
         node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -210,6 +215,7 @@ fn freeing_live_link_target_is_rejected() {
             lifetime("tail", "drop_tail"),
         ],
         node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
     };
 
     let error = verify_module(&module).unwrap_err();
@@ -247,6 +253,7 @@ fn freeing_detached_link_target_is_allowed() {
             lifetime("tail", "drop_tail"),
         ],
         node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
     };
 
     verify_module(&module).unwrap();
@@ -308,6 +315,7 @@ fn owned_pointer_branch_requires_matching_owner_sets() {
             dep("third", "selected"),
         ],
         node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
     };
 
     let error = crate::cpu_heap::verify_cpu_heap_protocol(&module).unwrap_err();
@@ -368,6 +376,7 @@ fn owned_pointer_branch_rejects_mismatched_address_kind() {
             dep("right", "selected"),
         ],
         node_lanes: BTreeMap::new(),
+        functions: Vec::new(),
     };
 
     let error = crate::cpu_heap::verify_cpu_heap_protocol(&module).unwrap_err();

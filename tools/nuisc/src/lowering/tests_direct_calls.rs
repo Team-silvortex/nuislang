@@ -48,6 +48,42 @@ fn lowers_void_main_print_into_explicit_zero_entry_return() {
 }
 
 #[test]
+fn lowers_explicit_unit_main_return_into_i64_entry_boundary() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() {
+            print(42);
+            return;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+    let entry = yir
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .expect("main entry function boundary");
+    let result = entry.result.as_ref().expect("main entry ABI result");
+
+    assert_eq!(result.ty, "i64");
+    assert_eq!(result.ownership.as_str(), "value");
+    assert!(entry.body_nodes.contains(&result.node));
+    assert!(yir.nodes.iter().any(|node| {
+        node.name == result.node
+            && node.op.instruction == "return_i64"
+            && node
+                .op
+                .args
+                .first()
+                .is_some_and(|arg| arg.starts_with("implicit_main_return_value_"))
+    }));
+}
+
+#[test]
 fn lowers_ordinary_self_recursive_function_into_helper_lane_and_call_i64() {
     let module = parse_nuis_module(
         r#"
@@ -81,6 +117,17 @@ fn lowers_ordinary_self_recursive_function_into_helper_lane_and_call_i64() {
         .iter()
         .any(|node| node.op.module == "cpu" && node.op.instruction == "return_i64"));
     assert!(yir.node_lanes.values().any(|lane| lane == "fn:fact"));
+    let helper = yir
+        .functions
+        .iter()
+        .find(|function| function.name == "fact")
+        .expect("helper function boundary");
+    assert_eq!(helper.role.as_str(), "helper");
+    assert_eq!(helper.parameters.len(), 1);
+    assert!(helper
+        .result
+        .as_ref()
+        .is_some_and(|result| helper.body_nodes.contains(&result.node)));
 }
 
 #[test]

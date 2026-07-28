@@ -5,11 +5,12 @@ use std::{
 
 use nuis_semantics::model::{
     nir_expr_effect_class, NirBinaryOp, NirExpr, NirExprEffectClass, NirFunction, NirKernelMapOp,
-    NirModule, NirStmt, NirStructDef,
+    NirModule, NirStmt, NirStructDef, NirTypeRef,
 };
 use yir_core::{
     Edge, EdgeKind, ModRegistry, Node, Operation, Resource, ResourceKind, SemanticOp,
-    TaskLifecycleState, YirModule, YirResultRole, YirResultState,
+    TaskLifecycleState, YirFunction, YirFunctionParameter, YirFunctionResult, YirFunctionRole,
+    YirModule, YirResultRole, YirResultState, YirValueOwnership,
 };
 
 use crate::registry::NustarPackageManifest;
@@ -201,6 +202,16 @@ pub fn lower_nir_to_yir(
     target_config: Option<&LoweringTargetConfig>,
 ) -> Result<YirModule, String> {
     dispatch_nustar_lowering(module, nustar_manifest, target_config)
+}
+
+fn yir_value_ownership(ty: &NirTypeRef) -> YirValueOwnership {
+    if ty.is_ref {
+        YirValueOwnership::Borrowed
+    } else if ty.scalar_kind().is_some() {
+        YirValueOwnership::Value
+    } else {
+        YirValueOwnership::Owned
+    }
 }
 
 fn lower_expr(

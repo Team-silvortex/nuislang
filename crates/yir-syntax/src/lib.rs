@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
 
-use yir_core::{Edge, EdgeKind, Node, Operation, Resource, ResourceKind, YirModule};
+use yir_core::{
+    Edge, EdgeKind, Node, Operation, Resource, ResourceKind, YirFunction, YirFunctionParameter,
+    YirFunctionResult, YirFunctionRole, YirModule, YirValueOwnership,
+};
 
 pub fn parse_module(input: &str) -> Result<YirModule, String> {
     let mut module = YirModule::new("0.1");
@@ -17,6 +20,10 @@ pub fn parse_module(input: &str) -> Result<YirModule, String> {
         match tokens.first().copied() {
             Some("yir") => parse_header(&mut module, &tokens, line_no)?,
             Some("resource") => parse_resource(&mut module, &tokens, line_no)?,
+            Some("function") => parse_function(&mut module, &tokens, line_no)?,
+            Some("function-param") => parse_function_parameter(&mut module, &tokens, line_no)?,
+            Some("function-result") => parse_function_result(&mut module, &tokens, line_no)?,
+            Some("function-node") => parse_function_node(&mut module, &tokens, line_no)?,
             Some("edge") => parse_edge(&mut module, &tokens, line_no)?,
             Some("node") => parse_shorthand_node(&mut module, &tokens, line_no)?,
             Some(opcode) => parse_node(&mut module, opcode, &tokens, line_no)?,
@@ -29,6 +36,101 @@ pub fn parse_module(input: &str) -> Result<YirModule, String> {
     synthesize_lane_effect_edges(&mut module);
 
     Ok(module)
+}
+
+fn parse_function(module: &mut YirModule, tokens: &[&str], line_no: usize) -> Result<(), String> {
+    if tokens.len() != 4 {
+        return Err(format!(
+            "line {line_no}: expected `function <name> <domain> <entry|helper|provider>`"
+        ));
+    }
+    module.functions.push(YirFunction {
+        name: tokens[1].to_owned(),
+        domain: tokens[2].to_owned(),
+        role: YirFunctionRole::parse(tokens[3])
+            .map_err(|error| format!("line {line_no}: {error}"))?,
+        parameters: Vec::new(),
+        result: None,
+        body_nodes: Vec::new(),
+    });
+    Ok(())
+}
+
+fn parse_function_parameter(
+    module: &mut YirModule,
+    tokens: &[&str],
+    line_no: usize,
+) -> Result<(), String> {
+    if tokens.len() != 6 {
+        return Err(format!(
+            "line {line_no}: expected `function-param <function> <name> <type> <value|borrowed|owned> <node>`"
+        ));
+    }
+    let function = find_function_mut(module, tokens[1], line_no)?;
+    function.parameters.push(YirFunctionParameter {
+        name: tokens[2].to_owned(),
+        ty: tokens[3].to_owned(),
+        ownership: YirValueOwnership::parse(tokens[4])
+            .map_err(|error| format!("line {line_no}: {error}"))?,
+        node: tokens[5].to_owned(),
+    });
+    Ok(())
+}
+
+fn parse_function_result(
+    module: &mut YirModule,
+    tokens: &[&str],
+    line_no: usize,
+) -> Result<(), String> {
+    if tokens.len() != 5 {
+        return Err(format!(
+            "line {line_no}: expected `function-result <function> <type> <value|borrowed|owned> <node>`"
+        ));
+    }
+    let function = find_function_mut(module, tokens[1], line_no)?;
+    if function.result.is_some() {
+        return Err(format!(
+            "line {line_no}: function `{}` has multiple result records",
+            tokens[1]
+        ));
+    }
+    function.result = Some(YirFunctionResult {
+        ty: tokens[2].to_owned(),
+        ownership: YirValueOwnership::parse(tokens[3])
+            .map_err(|error| format!("line {line_no}: {error}"))?,
+        node: tokens[4].to_owned(),
+    });
+    Ok(())
+}
+
+fn parse_function_node(
+    module: &mut YirModule,
+    tokens: &[&str],
+    line_no: usize,
+) -> Result<(), String> {
+    if tokens.len() != 3 {
+        return Err(format!(
+            "line {line_no}: expected `function-node <function> <node>`"
+        ));
+    }
+    find_function_mut(module, tokens[1], line_no)?
+        .body_nodes
+        .push(tokens[2].to_owned());
+    Ok(())
+}
+
+fn find_function_mut<'a>(
+    module: &'a mut YirModule,
+    name: &str,
+    line_no: usize,
+) -> Result<&'a mut YirFunction, String> {
+    module
+        .functions
+        .iter_mut()
+        .find(|function| function.name == name)
+        .ok_or_else(|| {
+            format!("line {line_no}: function metadata references unknown function `{name}`")
+        })
 }
 
 fn parse_header(module: &mut YirModule, tokens: &[&str], line_no: usize) -> Result<(), String> {
@@ -526,6 +628,36 @@ node print out cpu0@main seed
             .edges
             .iter()
             .any(|edge| edge.kind == EdgeKind::Dep && edge.from == "seed" && edge.to == "out"));
+    }
+
+    #[test]
+    fn parses_typed_function_boundaries_and_body_membership() {
+        let module = parse_module(
+            r#"
+resource cpu0 cpu.arm64
+
+function main cpu entry
+function-param main input i64 value input_node
+function-result main i64 value output_node
+function-node main input_node
+function-node main output_node
+
+cpu.param_i64 input_node cpu0 0
+cpu.add output_node cpu0 input_node input_node
+"#,
+        )
+        .unwrap();
+
+        let function = &module.functions[0];
+        assert_eq!(function.name, "main");
+        assert_eq!(function.role.as_str(), "entry");
+        assert_eq!(function.parameters[0].name, "input");
+        assert_eq!(function.parameters[0].ownership.as_str(), "value");
+        assert_eq!(
+            function.result.as_ref().map(|result| result.node.as_str()),
+            Some("output_node")
+        );
+        assert_eq!(function.body_nodes, ["input_node", "output_node"]);
     }
 
     #[test]

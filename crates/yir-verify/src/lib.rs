@@ -8,6 +8,7 @@ use yir_core::{
 mod cpu_heap;
 mod cpu_heap_checks;
 mod cpu_heap_state;
+mod function_contracts;
 mod graph;
 mod nustar_provider;
 mod project_abi_contracts;
@@ -19,6 +20,7 @@ mod scheduler_lane_contracts;
 mod scheduler_observer_contracts;
 
 use cpu_heap::verify_cpu_heap_protocol;
+use function_contracts::verify_function_table;
 use graph::{ensure_acyclic, path_exists, topological_order};
 use project_contracts::{verify_lowering_contract_nodes, verify_project_type_contract_nodes};
 use result_state::verify_result_state_nodes;
@@ -98,6 +100,8 @@ pub fn verify_module_with_registry(
             ));
         }
     }
+
+    verify_function_table(module, &nodes)?;
 
     for node in &module.nodes {
         let resource = resources.get(&node.resource).copied().ok_or_else(|| {
