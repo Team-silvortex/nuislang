@@ -1,0 +1,8 @@
+#include <metal_stdlib>
+using namespace metal;
+
+kernel void nuis_witsage_argmax_f32(
+    device const float* input [[buffer(0)]],
+    device uint* output [[buffer(1)]]) {
+    output[0] = input[1] > input[0] ? 1u : 0u;
+}

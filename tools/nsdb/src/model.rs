@@ -33,6 +33,35 @@ pub struct PayloadExecutionHandoffPersistSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompiledCodeAssetSelectionEvidence {
+    pub contract: String,
+    pub status: String,
+    pub table_contract: String,
+    pub table_hash: String,
+    pub contribution_count: usize,
+    pub identity_set_root_hash: String,
+    pub contribution_index: usize,
+    pub asset_id: String,
+    pub identity_hash: String,
+}
+
+impl Default for CompiledCodeAssetSelectionEvidence {
+    fn default() -> Self {
+        Self {
+            contract: "nuis-provider-code-asset-contribution-selection-v1".to_owned(),
+            status: "not-applicable".to_owned(),
+            table_contract: "nuis-domain-code-asset-contribution-table-v1".to_owned(),
+            table_hash: "none".to_owned(),
+            contribution_count: 0,
+            identity_set_root_hash: "none".to_owned(),
+            contribution_index: 0,
+            asset_id: "none".to_owned(),
+            identity_hash: "none".to_owned(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(dead_code)]
 pub struct PayloadExecutionProviderCompletion {
     pub trace_id: String,
@@ -55,6 +84,7 @@ pub struct PayloadExecutionProviderCompletion {
     pub code_asset_identity_set_status: String,
     pub code_asset_identity_set_count: usize,
     pub code_asset_identity_set_root_hash: String,
+    pub compiled_code_asset_selection: CompiledCodeAssetSelectionEvidence,
     pub dispatch_authority_contract: String,
     pub dispatch_authority_status: String,
     pub dispatch_table_hash: String,

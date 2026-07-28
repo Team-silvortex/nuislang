@@ -121,6 +121,8 @@ pub(crate) struct ProviderRequestCollection {
     pub(crate) source: &'static str,
     pub(crate) requests: Vec<ProviderRequest>,
     pub(crate) code_asset_identity: Option<ProviderCodeAssetIdentity>,
+    pub(crate) compiled_code_asset_selection:
+        Option<crate::model::CompiledCodeAssetSelectionEvidence>,
 }
 
 impl ProviderRequest {
@@ -187,6 +189,7 @@ pub(crate) fn provider_request_collection_from_evidence(
             source: "single-request-compatibility",
             requests: vec![request],
             code_asset_identity: None,
+            compiled_code_asset_selection: None,
         })
 }
 
@@ -222,6 +225,7 @@ fn parse_registered_collection(input_evidence: &str) -> Option<ProviderRequestCo
         source: "registered-collection",
         requests,
         code_asset_identity,
+        compiled_code_asset_selection: None,
     })
 }
 

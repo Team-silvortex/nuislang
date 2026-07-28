@@ -6,8 +6,8 @@ use std::{
 use nuis_artifact::BuildManifestDomainBuildUnit;
 
 use crate::aot_code_asset_contribution::{
-    kernel_asset_contribution, render_code_asset_contribution_table, shader_sidecar_contribution,
-    DomainCodeAssetContribution,
+    kernel_asset_contribution, registered_asset_contribution, render_code_asset_contribution_table,
+    shader_sidecar_contribution, DomainCodeAssetContribution,
 };
 use crate::aot_domain_payload_blob::encode_domain_build_unit_payload_blob;
 use crate::aot_domain_render::render_domain_build_unit_host_bridge_stub;
@@ -138,6 +138,14 @@ pub(crate) fn write_domain_build_unit_stubs_with_kernel_codegen_table(
             }
             artifacts.push(code_asset);
         }
+        for (kind, path, registration) in write_registered_nustar_code_assets(output_dir, unit)? {
+            code_asset_contributions.push(registered_asset_contribution(
+                unit,
+                &registration,
+                &path,
+            )?);
+            artifacts.push((kind, path));
+        }
         if unit.domain_family == "kernel"
             && unit.selected_lowering_target.as_deref() == Some("cuda.nvidia-gpu")
             && !wrote_kernel_codegen_table
@@ -162,6 +170,44 @@ pub(crate) fn write_domain_build_unit_stubs_with_kernel_codegen_table(
         artifacts.push(("domain_code_asset_contribution_table".to_owned(), path));
     }
     Ok(artifacts)
+}
+
+fn write_registered_nustar_code_assets(
+    output_dir: &Path,
+    unit: &BuildManifestDomainBuildUnit,
+) -> Result<
+    Vec<(
+        String,
+        PathBuf,
+        crate::registry::NustarCodeAssetRegistration,
+    )>,
+    String,
+> {
+    let Some(lowering_target) = unit.selected_lowering_target.as_deref() else {
+        return Ok(Vec::new());
+    };
+    let manifest = crate::registry::load_manifest_for_domain(
+        Path::new(crate::NUSTAR_REGISTRY_ROOT),
+        &unit.domain_family,
+    )?;
+    let registrations = crate::registry::code_asset_registrations(
+        Path::new(crate::NUSTAR_REGISTRY_ROOT),
+        &manifest,
+    )?;
+    registrations
+        .into_iter()
+        .filter(|asset| asset.lowering_target == lowering_target)
+        .map(|asset| {
+            let path = output_dir.join(&asset.file_name);
+            fs::write(&path, &asset.bytes)
+                .map_err(|error| format!("failed to write `{}`: {error}", path.display()))?;
+            Ok((
+                format!("domain_code_asset_{}", unit.domain_family),
+                path,
+                asset,
+            ))
+        })
+        .collect()
 }
 
 fn write_registered_domain_code_asset(
@@ -386,11 +432,14 @@ kernel.target_config target kernel0 x86_64 cuda 1 ptx\n";
             fs::read_to_string(output_dir.join("nuis.domain.code-asset-contributions.toml"))
                 .unwrap();
         assert!(table.contains("protocol = \"nuis-domain-code-asset-contribution-table-v1\""));
-        assert!(table.contains("contribution_count = 2"));
+        assert!(table.contains("contribution_count = 4"));
         assert!(table.contains("owner_package_id = \"official.kernel\""));
         assert!(table.contains("owner_package_id = \"official.shader\""));
         assert!(table.contains("path = \"nuis.domain.kernel.cuda.ptx\""));
         assert!(table.contains("path = \"nuis.domain.shader.lowering.ir.txt\""));
+        assert!(table.contains("asset_id = \"shader.witsage.vector-bias.metal\""));
+        assert!(table.contains("path = \"nuis.witsage.vector-bias.metal\""));
+        assert!(table.contains("entries = [\"nuis_witsage_argmax_f32\"]"));
         assert!(
             table.find("domain_family = \"kernel\"").unwrap()
                 < table.find("domain_family = \"shader\"").unwrap()

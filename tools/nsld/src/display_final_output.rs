@@ -397,32 +397,7 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         "  final_output_nsdb_provider_completion_set_hash_validation_status: {}",
         report.final_output_nsdb_provider_completion_set_hash_validation_status
     );
-    for completion in &report.final_output_nsdb_provider_completions {
-        println!(
-            "  final_output_nsdb_provider_completion: {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
-            completion.trace_id,
-            completion.provider_family,
-            completion.output_contract,
-            completion.output_evidence,
-            completion.completion_evidence_contract,
-            completion.completion_evidence_status,
-            completion.completion_evidence_count,
-            completion.completion_clock_evidence,
-            completion.completion_tokens,
-            completion.glm_release_contract,
-            completion.glm_release_tokens,
-            completion.glm_release_status,
-            completion.code_asset_identity_contract,
-            completion.code_asset_identity_status,
-            completion.code_asset_identity_asset_id,
-            completion.code_asset_identity_hash,
-            completion.code_asset_identity_set_contract,
-            completion.code_asset_identity_set_status,
-            completion.code_asset_identity_set_count,
-            completion.code_asset_identity_set_root_hash,
-            completion.record_hash
-        );
-    }
+    crate::display_final_output_provider_completion::display_provider_completions(report);
     println!(
         "  final_output_nsdb_replay_first_blocker: {}",
         optional_string_text(report.final_output_nsdb_replay_first_blocker.as_deref())

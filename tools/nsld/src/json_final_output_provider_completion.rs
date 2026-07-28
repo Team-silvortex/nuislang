@@ -62,6 +62,44 @@ pub(crate) fn provider_completion_records_json(report: &NsldFinalExecutableOutpu
                     "code_asset_identity_set_root_hash",
                     &completion.code_asset_identity_set_root_hash,
                 ),
+                json_string_field(
+                    "compiled_code_asset_selection_contract",
+                    &completion.compiled_code_asset_selection.contract,
+                ),
+                json_string_field(
+                    "compiled_code_asset_selection_status",
+                    &completion.compiled_code_asset_selection.status,
+                ),
+                json_string_field(
+                    "compiled_code_asset_table_contract",
+                    &completion.compiled_code_asset_selection.table_contract,
+                ),
+                json_string_field(
+                    "compiled_code_asset_table_hash",
+                    &completion.compiled_code_asset_selection.table_hash,
+                ),
+                json_usize_field(
+                    "compiled_code_asset_contribution_count",
+                    completion.compiled_code_asset_selection.contribution_count,
+                ),
+                json_string_field(
+                    "compiled_code_asset_identity_set_root_hash",
+                    &completion
+                        .compiled_code_asset_selection
+                        .identity_set_root_hash,
+                ),
+                json_usize_field(
+                    "compiled_code_asset_contribution_index",
+                    completion.compiled_code_asset_selection.contribution_index,
+                ),
+                json_string_field(
+                    "compiled_code_asset_asset_id",
+                    &completion.compiled_code_asset_selection.asset_id,
+                ),
+                json_string_field(
+                    "compiled_code_asset_identity_hash",
+                    &completion.compiled_code_asset_selection.identity_hash,
+                ),
                 json_string_field("record_hash", &completion.record_hash),
             ];
             format!("{{{}}}", fields.join(","))

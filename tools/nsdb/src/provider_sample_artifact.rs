@@ -26,3 +26,10 @@ fn sanitize_artifact_component(value: &str) -> String {
         })
         .collect()
 }
+
+pub(crate) fn push_toml_string(out: &mut String, key: &str, value: &str) {
+    out.push_str(key);
+    out.push_str(" = \"");
+    out.push_str(&value.replace('\\', "\\\\").replace('"', "\\\""));
+    out.push_str("\"\n");
+}

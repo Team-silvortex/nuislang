@@ -1,0 +1,156 @@
+use std::{
+    fs,
+    path::{Component, Path},
+};
+
+use crate::registry::NustarPackageManifest;
+
+pub const NUSTAR_CODE_ASSET_REGISTRATION_CONTRACT: &str = "nuis-nustar-code-asset-registration-v1";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NustarCodeAssetRegistration {
+    pub package_id: String,
+    pub domain_family: String,
+    pub asset_id: String,
+    pub format: String,
+    pub lowering_target: String,
+    pub target: String,
+    pub entry: String,
+    pub file_name: String,
+    pub source_path: String,
+    pub bytes: Vec<u8>,
+}
+
+pub fn code_asset_registrations(
+    registry_root: &Path,
+    manifest: &NustarPackageManifest,
+) -> Result<Vec<NustarCodeAssetRegistration>, String> {
+    let registry_root = crate::registry_load::resolve_registry_root(registry_root);
+    let mut registrations = manifest
+        .code_assets
+        .iter()
+        .map(|entry| parse_registration(&registry_root, manifest, entry))
+        .collect::<Result<Vec<_>, _>>()?;
+    registrations.sort_by(|lhs, rhs| lhs.asset_id.cmp(&rhs.asset_id));
+    Ok(registrations)
+}
+
+fn parse_registration(
+    registry_root: &Path,
+    manifest: &NustarPackageManifest,
+    entry: &str,
+) -> Result<NustarCodeAssetRegistration, String> {
+    let fields = entry.split('|').collect::<Vec<_>>();
+    if fields.len() != 8 || fields[0] != NUSTAR_CODE_ASSET_REGISTRATION_CONTRACT {
+        return Err(format!(
+            "nustar package `{}` code asset entry `{entry}` has an invalid registration contract",
+            manifest.package_id
+        ));
+    }
+    for (label, value) in [
+        ("asset id", fields[1]),
+        ("format", fields[2]),
+        ("lowering target", fields[3]),
+        ("target", fields[4]),
+    ] {
+        if !token_is_valid(value) {
+            return Err(format!(
+                "nustar package `{}` code asset {label} `{value}` is invalid",
+                manifest.package_id
+            ));
+        }
+    }
+    if !manifest
+        .lowering_targets
+        .iter()
+        .any(|target| target == fields[3])
+    {
+        return Err(format!(
+            "nustar package `{}` code asset `{}` references undeclared lowering target `{}`",
+            manifest.package_id, fields[1], fields[3]
+        ));
+    }
+    if !symbol_is_valid(fields[5])
+        || !relative_path_is_valid(fields[6])
+        || !relative_path_is_valid(fields[7])
+    {
+        return Err(format!(
+            "nustar package `{}` code asset `{}` has an invalid entry or path",
+            manifest.package_id, fields[1]
+        ));
+    }
+    let source_path = registry_root.join(fields[7]);
+    let bytes = fs::read(&source_path).map_err(|error| {
+        format!(
+            "failed to read Nustar code asset `{}` from `{}`: {error}",
+            fields[1],
+            source_path.display()
+        )
+    })?;
+    if bytes.is_empty() {
+        return Err(format!(
+            "nustar package `{}` code asset `{}` is empty",
+            manifest.package_id, fields[1]
+        ));
+    }
+    Ok(NustarCodeAssetRegistration {
+        package_id: manifest.package_id.clone(),
+        domain_family: manifest.domain_family.clone(),
+        asset_id: fields[1].to_owned(),
+        format: fields[2].to_owned(),
+        lowering_target: fields[3].to_owned(),
+        target: fields[4].to_owned(),
+        entry: fields[5].to_owned(),
+        file_name: fields[6].to_owned(),
+        source_path: fields[7].to_owned(),
+        bytes,
+    })
+}
+
+fn token_is_valid(value: &str) -> bool {
+    !value.is_empty()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+}
+
+fn symbol_is_valid(value: &str) -> bool {
+    value
+        .bytes()
+        .next()
+        .is_some_and(|byte| byte.is_ascii_alphabetic() || byte == b'_')
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'.' | b'$'))
+}
+
+fn relative_path_is_valid(value: &str) -> bool {
+    let path = Path::new(value);
+    !value.is_empty()
+        && !value.contains(['\\', ':'])
+        && !path.is_absolute()
+        && path
+            .components()
+            .all(|component| matches!(component, Component::Normal(_)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shader_code_assets_are_manifest_owned_and_loadable() {
+        let root = Path::new("nustar-packages");
+        let manifest = crate::registry::load_manifest_for_domain(root, "shader").unwrap();
+        let assets = code_asset_registrations(root, &manifest).unwrap();
+
+        assert_eq!(assets.len(), 2);
+        assert!(assets
+            .iter()
+            .all(|asset| asset.package_id == "official.shader"));
+        assert!(assets
+            .iter()
+            .all(|asset| asset.lowering_target == "metal.apple-silicon-gpu"));
+        assert!(assets.iter().all(|asset| !asset.bytes.is_empty()));
+    }
+}

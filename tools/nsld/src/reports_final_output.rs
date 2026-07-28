@@ -20,6 +20,7 @@ pub(crate) struct NsldProviderCompletionSummary {
     pub(crate) code_asset_identity_set_status: String,
     pub(crate) code_asset_identity_set_count: usize,
     pub(crate) code_asset_identity_set_root_hash: String,
+    pub(crate) compiled_code_asset_selection: nsdb::CompiledCodeAssetSelectionEvidence,
     pub(crate) record_hash: String,
 }
 

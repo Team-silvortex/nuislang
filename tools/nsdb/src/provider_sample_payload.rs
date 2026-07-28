@@ -1,3 +1,4 @@
+pub(crate) use crate::provider_sample_artifact::push_toml_string;
 pub(crate) use crate::provider_sample_artifact::{fnv1a64_hex, provider_output_payload_file_name};
 pub(crate) use crate::provider_sample_output_model::PixelMagicNativeOutputSummary;
 pub(crate) type ProviderNativeOutputSummary = PixelMagicNativeOutputSummary;
@@ -213,6 +214,7 @@ pub(crate) fn render_real_device_provider_output_payload(
     transport_receipts: &[ProviderEdgeTransportReceipt],
     result_projection_evidence: &str,
     code_asset_identity: Option<&crate::provider_code_asset_identity::ProviderCodeAssetIdentity>,
+    compiled_code_asset_selection: Option<&crate::model::CompiledCodeAssetSelectionEvidence>,
 ) -> String {
     let mut out = render_provider_output_payload_header(
         record,
@@ -256,6 +258,10 @@ pub(crate) fn render_real_device_provider_output_payload(
     crate::provider_code_asset_identity::append_provider_output_identity(
         &mut out,
         code_asset_identity,
+    );
+    crate::provider_code_asset::contribution::append_provider_output_selection(
+        &mut out,
+        compiled_code_asset_selection,
     );
     if let Some(summary) = native_outputs.first() {
         push_native_output_summary(&mut out, summary);
@@ -790,11 +796,4 @@ fn render_provider_output_payload_header(
         &crate::provider_request_payload::render_provider_request_evidence(&record.input_evidence),
     );
     out
-}
-
-pub(crate) fn push_toml_string(out: &mut String, key: &str, value: &str) {
-    out.push_str(key);
-    out.push_str(" = \"");
-    out.push_str(&value.replace('\\', "\\\\").replace('"', "\\\""));
-    out.push_str("\"\n");
 }

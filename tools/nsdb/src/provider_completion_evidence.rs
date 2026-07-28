@@ -26,6 +26,7 @@ pub(crate) struct ProviderCompletionEvidence {
     pub(crate) code_asset_identity_set_status: String,
     pub(crate) code_asset_identity_set_count: usize,
     pub(crate) code_asset_identity_set_root_hash: String,
+    pub(crate) compiled_code_asset_selection: crate::model::CompiledCodeAssetSelectionEvidence,
 }
 
 impl Default for ProviderCompletionEvidence {
@@ -49,6 +50,8 @@ impl Default for ProviderCompletionEvidence {
             code_asset_identity_set_status: "not-applicable".to_owned(),
             code_asset_identity_set_count: 0,
             code_asset_identity_set_root_hash: "none".to_owned(),
+            compiled_code_asset_selection:
+                crate::model::CompiledCodeAssetSelectionEvidence::default(),
         }
     }
 }
@@ -144,6 +147,8 @@ pub(crate) fn from_output_payload(
     }
     let code_asset_identity = validate_code_asset_identity(source)?;
     let code_asset_identity_set = validate_code_asset_identity_set(source, &code_asset_identity.1)?;
+    let compiled_code_asset_selection =
+        crate::provider_code_asset::contribution::validate_provider_output_selection(source)?;
     Ok(ProviderCompletionEvidence {
         contract: COMPLETION_EVIDENCE_COLLECTION_CONTRACT.to_owned(),
         status: "verified".to_owned(),
@@ -161,6 +166,7 @@ pub(crate) fn from_output_payload(
         code_asset_identity_set_status: code_asset_identity_set.1,
         code_asset_identity_set_count: code_asset_identity_set.2,
         code_asset_identity_set_root_hash: code_asset_identity_set.3,
+        compiled_code_asset_selection,
     })
 }
 
@@ -415,6 +421,10 @@ pub(crate) fn render_event_fields(out: &mut String, event: &ProviderCompletionEv
     ] {
         push_toml_string(out, key, value);
     }
+    crate::provider_code_asset::contribution::render_completion_event_fields(
+        out,
+        &event.compiled_code_asset_selection,
+    );
 }
 
 pub(crate) fn parse_event_fields(source: &str) -> ProviderCompletionEvidence {
@@ -456,6 +466,8 @@ pub(crate) fn parse_event_fields(source: &str) -> ProviderCompletionEvidence {
             "code_asset_identity_set_root_hash",
             "none",
         ),
+        compiled_code_asset_selection:
+            crate::provider_code_asset::contribution::parse_completion_event_fields(source),
     }
 }
 
@@ -482,6 +494,10 @@ pub(crate) fn append_hash_material(material: &mut String, event: &NsdbPayloadExe
             evidence.code_asset_identity_set_count,
             evidence.code_asset_identity_set_root_hash
         ));
+        crate::provider_code_asset::contribution::append_selection_hash_material(
+            material,
+            &evidence.compiled_code_asset_selection,
+        );
     }
 }
 

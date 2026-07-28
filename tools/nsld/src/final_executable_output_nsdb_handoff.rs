@@ -70,6 +70,11 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
         replay_summary.provider_completion_set_hash;
     report.final_output_nsdb_provider_completion_set_hash_validation_status =
         replay_summary.provider_completion_set_hash_validation_status;
+    let compiled_selection_error =
+        crate::final_executable_output_code_asset::validate_compiled_code_asset_selections(
+            &replay_summary.provider_completions,
+        )
+        .err();
     report.final_output_nsdb_provider_completions = replay_summary
         .provider_completions
         .into_iter()
@@ -94,9 +99,14 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
             code_asset_identity_set_status: completion.code_asset_identity_set_status,
             code_asset_identity_set_count: completion.code_asset_identity_set_count,
             code_asset_identity_set_root_hash: completion.code_asset_identity_set_root_hash,
+            compiled_code_asset_selection: completion.compiled_code_asset_selection,
             record_hash: completion.record_hash,
         })
         .collect();
+    if compiled_selection_error.is_some() {
+        report.final_output_nsdb_replay_ready = false;
+        report.final_output_nsdb_replay_status = "compiled-code-asset-selection-invalid".to_owned();
+    }
     report.final_output_nsdb_replay_command = report.final_output_nsdb_replay_ready.then(|| {
         format!(
             "nsdb replay {} --json",
@@ -125,6 +135,7 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
     } else {
         replay_summary
             .first_blocker
+            .or(compiled_selection_error)
             .or_else(|| report.final_output_nsdb_handoff_error.clone())
             .or_else(|| Some("final-output-nsdb-replay-not-ready".to_owned()))
     };

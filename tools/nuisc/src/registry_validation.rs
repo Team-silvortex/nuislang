@@ -101,6 +101,8 @@ pub fn validate_registered_domains(root: &Path) -> Result<Vec<NustarRegistryIssu
     let mut seen_provider_families = BTreeSet::new();
     let mut seen_provider_adapter_kinds = BTreeSet::new();
     let mut seen_provider_rust_consts = BTreeSet::new();
+    let mut seen_code_asset_ids = BTreeSet::new();
+    let mut seen_code_asset_paths = BTreeSet::new();
     for entry in &index {
         let manifest_path = manifest_path(&root, entry);
         if !seen_packages.insert(entry.package_id.clone()) {
@@ -162,6 +164,43 @@ pub fn validate_registered_domains(root: &Path) -> Result<Vec<NustarRegistryIssu
             }
             Err(error) => issues.push(NustarRegistryIssue {
                 kind: NustarRegistryIssueKind::ProviderBundleContractMismatch,
+                package: Some(manifest.package_id.clone()),
+                domain: Some(manifest.domain_family.clone()),
+                manifest_path: Some(manifest_path.display().to_string()),
+                message: error,
+            }),
+        }
+        match crate::registry::code_asset_registrations(&root, &manifest) {
+            Ok(registrations) => {
+                for registration in registrations {
+                    for (label, value, inserted) in [
+                        (
+                            "asset id",
+                            registration.asset_id.as_str(),
+                            seen_code_asset_ids.insert(registration.asset_id.clone()),
+                        ),
+                        (
+                            "output path",
+                            registration.file_name.as_str(),
+                            seen_code_asset_paths.insert(registration.file_name.clone()),
+                        ),
+                    ] {
+                        if !inserted {
+                            issues.push(NustarRegistryIssue {
+                                kind: NustarRegistryIssueKind::CodeAssetContractMismatch,
+                                package: Some(manifest.package_id.clone()),
+                                domain: Some(manifest.domain_family.clone()),
+                                manifest_path: Some(manifest_path.display().to_string()),
+                                message: format!(
+                                    "code asset {label} `{value}` is duplicated across the registry"
+                                ),
+                            });
+                        }
+                    }
+                }
+            }
+            Err(error) => issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::CodeAssetContractMismatch,
                 package: Some(manifest.package_id.clone()),
                 domain: Some(manifest.domain_family.clone()),
                 manifest_path: Some(manifest_path.display().to_string()),

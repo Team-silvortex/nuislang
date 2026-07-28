@@ -91,6 +91,7 @@ fn make_manifest(domain: &str) -> NustarPackageManifest {
         capability_tags: Vec::new(),
         default_lanes: Vec::new(),
         provider_bundles: Vec::new(),
+        code_assets: Vec::new(),
         clock_domain_id: format!("{domain}.clock.local.v1"),
         clock_kind: "local-monotonic".to_owned(),
         clock_epoch_kind: "domain-epoch".to_owned(),
@@ -134,6 +135,20 @@ fn binary_manifest_round_trip_preserves_provider_bundle_registrations() {
     let decoded = decode(&encoded, Path::new("provider-bundle-round-trip.nustar"))
         .expect("provider bundle binary");
     assert_eq!(decoded.manifest.provider_bundles, manifest.provider_bundles);
+}
+
+#[test]
+fn binary_manifest_round_trip_preserves_code_asset_registrations() {
+    let mut manifest = make_manifest("shader");
+    manifest.abi_capabilities = vec!["shader.abi.v1:op:shader.*".to_owned()];
+    manifest.code_assets = vec![
+        "nuis-nustar-code-asset-registration-v1|shader.sample.metal|metal-source|metal|metal.generic|sample_main|sample.metal|assets/shader/sample.metal"
+            .to_owned(),
+    ];
+    let binary = default_binary(manifest.clone(), vec![1, 2, 3]);
+    let decoded = decode(&encode(&binary), Path::new("code-asset-round-trip.nustar"))
+        .expect("code asset binary");
+    assert_eq!(decoded.manifest.code_assets, manifest.code_assets);
 }
 
 #[test]

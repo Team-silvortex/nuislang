@@ -33,14 +33,14 @@ pub(crate) fn validate_compiled_contribution_selection(
     output_dir: &Path,
     evidence: &str,
     requests: &[ProviderRequest],
-) -> Result<(), String> {
+) -> Result<Option<crate::model::CompiledCodeAssetSelectionEvidence>, String> {
     let evidence = parse_evidence_fields(evidence)?;
     let selection_fields = evidence
         .keys()
         .any(|key| key.starts_with("provider_code_asset_contribution_"));
     let Some(contract) = evidence.get("provider_code_asset_contribution_selection_contract") else {
         return (!selection_fields)
-            .then_some(())
+            .then_some(None)
             .ok_or_else(|| "provider code asset contribution selection is partial".to_owned());
     };
     if contract != SELECTION_CONTRACT
@@ -120,7 +120,18 @@ pub(crate) fn validate_compiled_contribution_selection(
     {
         return Err("compiled code asset contribution count drifted".to_owned());
     }
-    validate_requests(row, requests)
+    validate_requests(row, requests)?;
+    Ok(Some(crate::model::CompiledCodeAssetSelectionEvidence {
+        contract: SELECTION_CONTRACT.to_owned(),
+        status: "verified".to_owned(),
+        table_contract: TABLE_CONTRACT.to_owned(),
+        table_hash: string_field(&header, "table_hash")?,
+        contribution_count: rows.len(),
+        identity_set_root_hash: string_field(&header, "identity_set_root_hash")?,
+        contribution_index: index,
+        asset_id: row.asset_id.clone(),
+        identity_hash: row.identity_hash.clone(),
+    }))
 }
 
 fn parse_table(source: &str) -> Result<(BTreeMap<String, String>, Vec<ContributionRow>), String> {
@@ -415,6 +426,12 @@ fn relative_path_is_valid(value: &str) -> bool {
             .all(|component| matches!(component, Component::Normal(_)))
 }
 
+fn valid_hash(value: &str) -> bool {
+    value
+        .strip_prefix("0x")
+        .is_some_and(|hex| hex.len() == 16 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
+}
+
 fn fnv1a64_hex(bytes: &[u8]) -> String {
     let mut hash = 0xcbf29ce484222325u64;
     for byte in bytes {
@@ -422,6 +439,165 @@ fn fnv1a64_hex(bytes: &[u8]) -> String {
         hash = hash.wrapping_mul(0x100000001b3);
     }
     format!("0x{hash:016x}")
+}
+
+pub(crate) fn append_provider_output_selection(
+    out: &mut String,
+    selection: Option<&crate::model::CompiledCodeAssetSelectionEvidence>,
+) {
+    let default = crate::model::CompiledCodeAssetSelectionEvidence::default();
+    let selection = selection.unwrap_or(&default);
+    for (key, value) in selection_fields(selection) {
+        crate::provider_sample_artifact::push_toml_string(out, key, &value);
+    }
+}
+
+pub(crate) fn validate_provider_output_selection(
+    source: &str,
+) -> Result<crate::model::CompiledCodeAssetSelectionEvidence, String> {
+    parse_serialized_selection(source)
+}
+
+pub(crate) fn render_completion_event_fields(
+    out: &mut String,
+    selection: &crate::model::CompiledCodeAssetSelectionEvidence,
+) {
+    for (key, value) in selection_fields(selection) {
+        push_toml_string(out, key, &value);
+    }
+}
+
+pub(crate) fn parse_completion_event_fields(
+    source: &str,
+) -> crate::model::CompiledCodeAssetSelectionEvidence {
+    parse_serialized_selection(source).unwrap_or_else(|_| {
+        let mut invalid = crate::model::CompiledCodeAssetSelectionEvidence::default();
+        invalid.status = "invalid".to_owned();
+        invalid
+    })
+}
+
+pub(crate) fn append_selection_hash_material(
+    material: &mut String,
+    selection: &crate::model::CompiledCodeAssetSelectionEvidence,
+) {
+    if selection.status == "verified" {
+        for (_, value) in selection_fields(selection) {
+            material.push('\0');
+            material.push_str(&value);
+        }
+    }
+}
+
+fn selection_fields(
+    selection: &crate::model::CompiledCodeAssetSelectionEvidence,
+) -> [(&'static str, String); 9] {
+    [
+        (
+            "compiled_code_asset_selection_contract",
+            selection.contract.clone(),
+        ),
+        (
+            "compiled_code_asset_selection_status",
+            selection.status.clone(),
+        ),
+        (
+            "compiled_code_asset_table_contract",
+            selection.table_contract.clone(),
+        ),
+        (
+            "compiled_code_asset_table_hash",
+            selection.table_hash.clone(),
+        ),
+        (
+            "compiled_code_asset_contribution_count",
+            selection.contribution_count.to_string(),
+        ),
+        (
+            "compiled_code_asset_identity_set_root_hash",
+            selection.identity_set_root_hash.clone(),
+        ),
+        (
+            "compiled_code_asset_contribution_index",
+            selection.contribution_index.to_string(),
+        ),
+        ("compiled_code_asset_asset_id", selection.asset_id.clone()),
+        (
+            "compiled_code_asset_identity_hash",
+            selection.identity_hash.clone(),
+        ),
+    ]
+}
+
+fn parse_serialized_selection(
+    source: &str,
+) -> Result<crate::model::CompiledCodeAssetSelectionEvidence, String> {
+    let has_fields = source
+        .lines()
+        .any(|line| line.trim().starts_with("compiled_code_asset_"));
+    let Some(status) = toml_string_field(source, "compiled_code_asset_selection_status") else {
+        return (!has_fields)
+            .then(crate::model::CompiledCodeAssetSelectionEvidence::default)
+            .ok_or_else(|| "compiled code asset selection output is partial".to_owned());
+    };
+    let selection = crate::model::CompiledCodeAssetSelectionEvidence {
+        contract: required_toml_string(source, "compiled_code_asset_selection_contract")?,
+        status,
+        table_contract: required_toml_string(source, "compiled_code_asset_table_contract")?,
+        table_hash: required_toml_string(source, "compiled_code_asset_table_hash")?,
+        contribution_count: toml_usize_field(source, "compiled_code_asset_contribution_count")
+            .ok_or_else(|| "compiled code asset contribution count is missing".to_owned())?,
+        identity_set_root_hash: required_toml_string(
+            source,
+            "compiled_code_asset_identity_set_root_hash",
+        )?,
+        contribution_index: toml_usize_field(source, "compiled_code_asset_contribution_index")
+            .ok_or_else(|| "compiled code asset contribution index is missing".to_owned())?,
+        asset_id: required_toml_string(source, "compiled_code_asset_asset_id")?,
+        identity_hash: required_toml_string(source, "compiled_code_asset_identity_hash")?,
+    };
+    if selection == crate::model::CompiledCodeAssetSelectionEvidence::default() {
+        return Ok(selection);
+    }
+    if selection.contract != SELECTION_CONTRACT
+        || selection.status != "verified"
+        || selection.table_contract != TABLE_CONTRACT
+        || selection.contribution_count == 0
+        || selection.contribution_count > 64
+        || selection.contribution_index >= selection.contribution_count
+        || !valid_hash(&selection.table_hash)
+        || !valid_hash(&selection.identity_set_root_hash)
+        || !token_is_valid(&selection.asset_id)
+        || !valid_hash(&selection.identity_hash)
+    {
+        return Err("compiled code asset selection output is invalid".to_owned());
+    }
+    Ok(selection)
+}
+
+fn required_toml_string(source: &str, key: &str) -> Result<String, String> {
+    toml_string_field(source, key)
+        .ok_or_else(|| format!("compiled code asset selection field `{key}` is missing"))
+}
+
+fn toml_string_field(source: &str, key: &str) -> Option<String> {
+    let prefix = format!("{key} = ");
+    source.lines().find_map(|line| {
+        line.trim()
+            .strip_prefix(&prefix)?
+            .trim()
+            .strip_prefix('"')?
+            .strip_suffix('"')
+            .map(str::to_owned)
+    })
+}
+
+fn toml_usize_field(source: &str, key: &str) -> Option<usize> {
+    toml_string_field(source, key)?.parse().ok()
+}
+
+fn push_toml_string(out: &mut String, key: &str, value: &str) {
+    crate::provider_sample_artifact::push_toml_string(out, key, value);
 }
 
 #[cfg(test)]
@@ -492,7 +668,21 @@ mod tests {
         let (evidence, row) = fixture(&dir);
         let collection =
             crate::provider_request::provider_request_collection_from_evidence(&evidence).unwrap();
-        validate_compiled_contribution_selection(&dir, &evidence, &collection.requests).unwrap();
+        let selection =
+            validate_compiled_contribution_selection(&dir, &evidence, &collection.requests)
+                .unwrap()
+                .unwrap();
+        let mut output = String::new();
+        append_provider_output_selection(&mut output, Some(&selection));
+        assert_eq!(
+            validate_provider_output_selection(&output).unwrap(),
+            selection
+        );
+        assert!(validate_provider_output_selection(&output.replace(
+            "compiled_code_asset_selection_status = \"verified\"",
+            "compiled_code_asset_selection_status = \"unverified\"",
+        ))
+        .is_err());
         fs::write(dir.join(&row.path), b"tampered").unwrap();
         assert!(
             validate_compiled_contribution_selection(&dir, &evidence, &collection.requests)

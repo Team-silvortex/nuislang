@@ -9,6 +9,7 @@ use crate::{
     aot_encoding::fnv1a64_hex,
     aot_toml::{escape_toml_string, render_string_array},
     kernel_codegen_table::KernelYirCodegenTable,
+    registry::NustarCodeAssetRegistration,
 };
 
 pub(crate) const DOMAIN_CODE_ASSET_CONTRIBUTION_TABLE_CONTRACT: &str =
@@ -103,6 +104,31 @@ pub(crate) fn kernel_asset_contribution(
         bytes,
     )
     .map(Some)
+}
+
+pub(crate) fn registered_asset_contribution(
+    unit: &BuildManifestDomainBuildUnit,
+    asset: &NustarCodeAssetRegistration,
+    path: &Path,
+) -> Result<DomainCodeAssetContribution, String> {
+    if unit.package_id != asset.package_id
+        || unit.domain_family != asset.domain_family
+        || unit.selected_lowering_target.as_deref() != Some(asset.lowering_target.as_str())
+    {
+        return Err(format!(
+            "registered code asset `{}` does not belong to AOT unit `{}`",
+            asset.asset_id, unit.package_id
+        ));
+    }
+    contribution(
+        unit,
+        asset.asset_id.clone(),
+        &asset.format,
+        &asset.target,
+        path,
+        vec![asset.entry.clone()],
+        &asset.bytes,
+    )
 }
 
 pub(crate) fn render_code_asset_contribution_table(

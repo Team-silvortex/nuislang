@@ -15,8 +15,8 @@ const WITSAGE_DENSE_MODEL_FILE_NAME: &str = "nuis.witsage.feature-grid-projectio
 const WITSAGE_ADD_MODEL_FILE_NAME: &str = "nuis.witsage.vector-add.mlmodel";
 const WITSAGE_ADD_EXPECTED_FILE_NAME: &str = "nuis.witsage.vector-add.expected.f32.bin";
 const WITSAGE_METAL_EXPECTED_FILE_NAME: &str = "nuis.witsage.vector-metal-bias.expected.f32.bin";
-const WITSAGE_METAL_BIAS_SOURCE_FILE_NAME: &str = "nuis.witsage.vector-bias.metal";
-const WITSAGE_METAL_ARGMAX_SOURCE_FILE_NAME: &str = "nuis.witsage.argmax.metal";
+const WITSAGE_METAL_BIAS_ASSET_ID: &str = "shader.witsage.vector-bias.metal";
+const WITSAGE_METAL_ARGMAX_ASSET_ID: &str = "shader.witsage.argmax.metal";
 const WITSAGE_KMEANS_MODEL_FILE_NAME: &str = "nuis.witsage.kmeans-centroid-score.mlmodel";
 const WITSAGE_KMEANS_EXPECTED_FILE_NAME: &str =
     "nuis.witsage.kmeans-centroid-score.expected.f32.bin";
@@ -39,25 +39,6 @@ const WITSAGE_METAL_EXPECTED: &[u8] = &[
 ];
 const WITSAGE_KMEANS_EXPECTED: &[u8] = &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x41];
 const WITSAGE_KMEANS_ASSIGNMENT_EXPECTED: &[u8] = &[0x01, 0x00, 0x00, 0x00];
-const WITSAGE_METAL_BIAS_SOURCE: &[u8] = br#"#include <metal_stdlib>
-using namespace metal;
-kernel void nuis_witsage_vector_bias_f32(
-    device const float* input [[buffer(0)]],
-    device float* output [[buffer(1)]],
-    constant float& bias [[buffer(2)]],
-    uint index [[thread_position_in_grid]]) {
-    output[index] = input[index] + bias;
-}
-"#;
-const WITSAGE_METAL_ARGMAX_SOURCE: &[u8] = br#"#include <metal_stdlib>
-using namespace metal;
-kernel void nuis_witsage_argmax_f32(
-    device const float* input [[buffer(0)]],
-    device uint* output [[buffer(1)]]) {
-    output[0] = input[1] > input[0] ? 1u : 0u;
-}
-"#;
-
 struct ComparisonProfile {
     package_id: String,
     profile_id: String,
@@ -121,33 +102,57 @@ pub(super) fn input_evidence(base: &str) -> String {
 fn witsage_code_asset_identity(
 ) -> Result<crate::artifact_code_asset_identity::AssembledCodeAssetIdentity, String> {
     use crate::artifact_code_asset_identity::NustarCodeAssetContribution;
+    let assets = witsage_shader_code_assets()?;
+    let bias = registered_asset(&assets, WITSAGE_METAL_BIAS_ASSET_ID)?;
+    let argmax = registered_asset(&assets, WITSAGE_METAL_ARGMAX_ASSET_ID)?;
     crate::artifact_code_asset_identity::assemble_nustar_code_asset_identity(
         Path::new("nustar-packages"),
         &[
             NustarCodeAssetContribution {
                 request_index: 4,
-                owner_package_id: "official.shader",
+                owner_package_id: &bias.package_id,
                 provider_family: "metal:apple-silicon-gpu",
-                asset_id: "shader.witsage.vector-bias.metal",
-                format: "metal-source",
-                target: "metal.apple-silicon-gpu",
-                entry: "nuis_witsage_vector_bias_f32",
-                path: WITSAGE_METAL_BIAS_SOURCE_FILE_NAME,
-                bytes: WITSAGE_METAL_BIAS_SOURCE,
+                asset_id: &bias.asset_id,
+                format: &bias.format,
+                target: &bias.target,
+                entry: &bias.entry,
+                path: &bias.file_name,
+                bytes: &bias.bytes,
             },
             NustarCodeAssetContribution {
                 request_index: 6,
-                owner_package_id: "official.shader",
+                owner_package_id: &argmax.package_id,
                 provider_family: "metal:apple-silicon-gpu",
-                asset_id: "shader.witsage.argmax.metal",
-                format: "metal-source",
-                target: "metal.apple-silicon-gpu",
-                entry: "nuis_witsage_argmax_f32",
-                path: WITSAGE_METAL_ARGMAX_SOURCE_FILE_NAME,
-                bytes: WITSAGE_METAL_ARGMAX_SOURCE,
+                asset_id: &argmax.asset_id,
+                format: &argmax.format,
+                target: &argmax.target,
+                entry: &argmax.entry,
+                path: &argmax.file_name,
+                bytes: &argmax.bytes,
             },
         ],
     )
+}
+
+fn witsage_shader_code_assets() -> Result<Vec<nuisc::registry::NustarCodeAssetRegistration>, String>
+{
+    let root = Path::new("nustar-packages");
+    let manifest = nuisc::registry::load_manifest_for_domain(root, "shader")?;
+    let assets = nuisc::registry::code_asset_registrations(root, &manifest)?;
+    for id in [WITSAGE_METAL_BIAS_ASSET_ID, WITSAGE_METAL_ARGMAX_ASSET_ID] {
+        registered_asset(&assets, id)?;
+    }
+    Ok(assets)
+}
+
+fn registered_asset<'a>(
+    assets: &'a [nuisc::registry::NustarCodeAssetRegistration],
+    id: &str,
+) -> Result<&'a nuisc::registry::NustarCodeAssetRegistration, String> {
+    assets
+        .iter()
+        .find(|asset| asset.asset_id == id)
+        .ok_or_else(|| format!("Shader Nustar code asset `{id}` is not registered"))
 }
 
 pub(super) fn persist_assets_if_requested(
@@ -207,16 +212,6 @@ pub(super) fn persist_assets_if_requested(
             "Metal expected output",
         ),
         (
-            WITSAGE_METAL_BIAS_SOURCE_FILE_NAME,
-            WITSAGE_METAL_BIAS_SOURCE.to_vec(),
-            "Metal bias code asset",
-        ),
-        (
-            WITSAGE_METAL_ARGMAX_SOURCE_FILE_NAME,
-            WITSAGE_METAL_ARGMAX_SOURCE.to_vec(),
-            "Metal argmax code asset",
-        ),
-        (
             WITSAGE_KMEANS_MODEL_FILE_NAME,
             crate::artifact_coreml_model::witsage_kmeans_centroid_score_model(),
             "KMeans centroid-score CoreML model",
@@ -234,6 +229,14 @@ pub(super) fn persist_assets_if_requested(
     ] {
         fs::write(output_dir.join(name), bytes)
             .map_err(|error| format!("failed to persist WitSage {detail}: {error}"))?;
+    }
+    for asset in witsage_shader_code_assets()? {
+        fs::write(output_dir.join(&asset.file_name), &asset.bytes).map_err(|error| {
+            format!(
+                "failed to persist registered Shader code asset `{}`: {error}",
+                asset.asset_id
+            )
+        })?;
     }
     Ok(())
 }

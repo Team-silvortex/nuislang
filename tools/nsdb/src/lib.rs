@@ -87,8 +87,9 @@ mod provider_worker_transport;
 mod provider_worker_transport_unix;
 
 pub use model::{
-    FinalImageBindingProofClaim, PayloadExecutionHandoffPersistSummary,
-    PayloadExecutionHandoffRecord, PayloadExecutionProviderCompletion,
+    CompiledCodeAssetSelectionEvidence, FinalImageBindingProofClaim,
+    PayloadExecutionHandoffPersistSummary, PayloadExecutionHandoffRecord,
+    PayloadExecutionProviderCompletion,
 };
 pub use provider_sample_execute::{execute_provider_samples, ProviderSampleExecuteReport};
 pub use provider_sample_materialize::{
@@ -218,6 +219,10 @@ pub fn payload_execution_replay_summary(
             code_asset_identity_set_root_hash: event
                 .provider_completion_evidence
                 .code_asset_identity_set_root_hash
+                .clone(),
+            compiled_code_asset_selection: event
+                .provider_completion_evidence
+                .compiled_code_asset_selection
                 .clone(),
             dispatch_authority_contract: event.provider_completion_dispatch.contract.clone(),
             dispatch_authority_status: event.provider_completion_dispatch.status.clone(),

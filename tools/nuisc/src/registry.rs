@@ -9,6 +9,9 @@ pub use crate::registry_build_contract_summary::{
     NustarDomainBackendStubSummary, NustarDomainBridgePlanSummary,
     NustarDomainBuildContractSummary, NustarDomainLoweringPlanSummary, NustarHostBridgeSpecSummary,
 };
+pub use crate::registry_code_asset::{
+    code_asset_registrations, NustarCodeAssetRegistration, NUSTAR_CODE_ASSET_REGISTRATION_CONTRACT,
+};
 pub use crate::registry_contract::{
     capability_summary, dispatch_readiness_summary, domain_contract, execution_summary,
     load_domain_contract_for_domain, missing_domain_contract_groups,

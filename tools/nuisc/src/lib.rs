@@ -115,6 +115,7 @@ mod registry_abi_target;
 mod registry_binding_plan;
 mod registry_build_contract_preset;
 mod registry_build_contract_summary;
+mod registry_code_asset;
 mod registry_contract;
 mod registry_domain_contract_validate;
 mod registry_domain_json;
