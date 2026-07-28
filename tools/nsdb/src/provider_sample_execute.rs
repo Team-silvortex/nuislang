@@ -442,6 +442,11 @@ fn execute_native_provider_outputs(
             code_asset_identity: None,
         });
     };
+    crate::provider_code_asset::contribution::validate_compiled_contribution_selection(
+        output_dir,
+        &record.input_evidence,
+        &collection.requests,
+    )?;
     let code_asset_identity = collection.code_asset_identity.clone();
     let mut completed = CompletedProviderOutputs::new();
     let mut sessions = BTreeMap::<String, ProviderSessionLease>::new();

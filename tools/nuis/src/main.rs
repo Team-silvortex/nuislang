@@ -1,3 +1,4 @@
+mod artifact_code_asset_contribution_table;
 mod artifact_code_asset_identity;
 mod artifact_coreml_model;
 mod artifact_device_sample;

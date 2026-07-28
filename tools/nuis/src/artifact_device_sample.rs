@@ -292,6 +292,14 @@ pub(crate) fn render_device_provider_sample_manifest_toml<'a>(
     output_dir: &Path,
     samples: impl Iterator<Item = (&'a str, &'a DeviceSampleContract)>,
 ) -> Result<(String, usize), String> {
+    let code_asset_table =
+        crate::artifact_code_asset_contribution_table::verify_compiled_code_asset_contribution_table(
+            output_dir,
+        )?;
+    let code_asset_table_evidence =
+        crate::artifact_code_asset_contribution_table::render_verified_table_evidence(
+            code_asset_table.as_ref(),
+        );
     let records = samples
         .filter(|(_, sample)| sample.is_provider_handoff_pending())
         .collect::<Vec<_>>();
@@ -308,11 +316,12 @@ pub(crate) fn render_device_provider_sample_manifest_toml<'a>(
     out.push_str("ready_record_count = 0\n");
     out.push_str(&format!("pending_record_count = {}\n", records.len()));
     for (trace_id, sample) in &records {
-        let input_evidence =
+        let mut input_evidence =
             crate::artifact_device_sample_registration::resolve_registered_input_evidence(
                 output_dir,
                 &sample.input_evidence,
             )?;
+        input_evidence.push_str(&code_asset_table_evidence);
         out.push_str("\n[[device_provider_samples]]\n");
         push_toml_string(&mut out, "trace_id", trace_id);
         push_toml_string(&mut out, "provider", &sample.provider);
@@ -362,6 +371,9 @@ pub(crate) fn persist_device_sample_input_payloads<'a>(
     output_dir: &Path,
     samples: impl Iterator<Item = &'a DeviceSampleContract>,
 ) -> Result<(), String> {
+    crate::artifact_code_asset_contribution_table::verify_compiled_code_asset_contribution_table(
+        output_dir,
+    )?;
     let evidence = samples
         .map(|sample| sample.input_evidence.as_str())
         .collect::<Vec<_>>();

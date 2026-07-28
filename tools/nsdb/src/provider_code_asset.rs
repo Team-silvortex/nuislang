@@ -3,6 +3,9 @@ use std::{
     path::{Component, Path},
 };
 
+#[path = "provider_code_asset_contribution.rs"]
+pub(crate) mod contribution;
+
 pub(crate) const PROVIDER_CODE_ASSET_DESCRIPTOR_CONTRACT: &str =
     "nuis-provider-code-asset-descriptor-v1";
 pub(crate) const CODE_ASSET_FNV1A64_DIGEST_CONTRACT: &str = "nuis-code-asset-digest-fnv1a64-v1";

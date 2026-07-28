@@ -144,9 +144,29 @@ fn resolve_cuda_code_asset_evidence(output_dir: &Path, evidence: &str) -> Result
         output_dir, evidence, asset, &actual,
     )?;
     validate_cuda_request_asset_evidence(asset, &actual, &evidence)?;
+    let requested_entries = code_asset_entries(&evidence);
+    let selection =
+        crate::artifact_code_asset_contribution_table::select_compiled_code_asset_contribution(
+            output_dir,
+            "official.kernel",
+            "kernel",
+            "cuda.nvidia-gpu",
+            asset.format,
+            asset.target,
+            &requested_entries,
+        )?;
+    let selection_evidence = selection
+        .as_ref()
+        .map(|selection| -> Result<String, String> {
+            validate_cuda_contribution_selection(selection, &evidence)?;
+            Ok(crate::artifact_code_asset_contribution_table::render_selected_contribution_evidence(
+                selection,
+            ))
+        })
+        .transpose()?;
     let byte_length = actual.len().to_string();
     let content_hash = fnv1a64_hex(&actual);
-    Ok(evidence
+    let mut resolved = evidence
         .split(';')
         .map(|field| {
             let Some((key, value)) = field.split_once('=') else {
@@ -161,7 +181,66 @@ fn resolve_cuda_code_asset_evidence(output_dir: &Path, evidence: &str) -> Result
             }
         })
         .collect::<Vec<_>>()
-        .join(";"))
+        .join(";");
+    if let Some(selection_evidence) = selection_evidence {
+        resolved.push(';');
+        resolved.push_str(&selection_evidence);
+    }
+    Ok(resolved)
+}
+
+fn code_asset_entries(evidence: &str) -> Vec<String> {
+    let indexed = evidence
+        .split(';')
+        .filter_map(|field| field.split_once('='))
+        .filter(|(key, _)| {
+            key.starts_with("provider_request_") && key.ends_with("_code_asset_entry")
+        })
+        .map(|(_, value)| value.to_owned())
+        .collect::<Vec<_>>();
+    if indexed.is_empty() {
+        evidence
+            .split(';')
+            .filter_map(|field| field.split_once('='))
+            .filter(|(key, _)| *key == "provider_code_asset_entry")
+            .map(|(_, value)| value.to_owned())
+            .collect()
+    } else {
+        indexed
+    }
+}
+
+fn validate_cuda_contribution_selection(
+    selection: &crate::artifact_code_asset_contribution_table::SelectedCodeAssetContribution,
+    evidence: &str,
+) -> Result<(), String> {
+    let request_fields = evidence
+        .split(';')
+        .filter_map(|field| field.split_once('='))
+        .filter(|(key, _)| key.contains("_code_asset_"))
+        .collect::<Vec<_>>();
+    for (suffix, expected) in [
+        ("_code_asset_id", selection.asset_id.as_str()),
+        ("_code_asset_format", selection.format.as_str()),
+        ("_code_asset_target", selection.target.as_str()),
+        ("_code_asset_path", selection.path.as_str()),
+        (
+            "_code_asset_byte_length",
+            &selection.byte_length.to_string(),
+        ),
+        ("_code_asset_content_hash", selection.content_hash.as_str()),
+    ] {
+        if request_fields
+            .iter()
+            .filter(|(key, _)| key.ends_with(suffix))
+            .any(|(_, value)| *value != expected)
+        {
+            return Err(format!(
+                "CUDA provider request does not match compiled contribution field `{suffix}`"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn validate_cuda_request_asset_evidence(

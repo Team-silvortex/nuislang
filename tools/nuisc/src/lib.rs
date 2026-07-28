@@ -25,6 +25,7 @@ mod aot_c_shim_serialization_runtime;
 mod aot_c_shim_source;
 mod aot_c_shim_text_runtime;
 mod aot_c_shim_time_debug_runtime;
+mod aot_code_asset_contribution;
 mod aot_compile_driver;
 mod aot_compiled_artifact_builder;
 mod aot_compiled_artifact_verify;

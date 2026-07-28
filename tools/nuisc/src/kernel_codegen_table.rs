@@ -72,6 +72,24 @@ pub(crate) struct KernelYirCodegenTable {
     pub(crate) functions: Vec<KernelYirCodegenFunction>,
 }
 
+impl KernelYirCodegenTable {
+    pub(crate) fn compiled_project_code_asset_id(&self) -> Option<String> {
+        (self.source_binding == PROJECT_YIR_BINDING_CONTRACT).then(|| {
+            let entries = self
+                .functions
+                .iter()
+                .map(|function| function.entry.as_str())
+                .collect::<Vec<_>>();
+            let identity_hash = project_code_asset_identity_hash(
+                &self.source_fnv1a64,
+                self.lowering_target,
+                &entries,
+            );
+            format!("kernel.cuda.project.{}", &identity_hash[2..])
+        })
+    }
+}
+
 pub(crate) fn table_from_compiled_project_yir(
     source: &str,
     lowering_target: &str,
