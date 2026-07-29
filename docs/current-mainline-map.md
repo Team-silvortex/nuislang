@@ -7,37 +7,38 @@ local README for the area you are actively touching.
 
 ## Fast Reading Order
 
-If you only need the shortest current `alpha-0.17.*` reading route, use this order:
+If you only need the shortest current `alpha-0.20.*` reading route, use this order:
 
-1. [versioning/nuis-alpha-0.17-mainline-entry.md](versioning/nuis-alpha-0.17-mainline-entry.md)
+1. [versioning/nuis-alpha-0.20-mainline-entry.md](versioning/nuis-alpha-0.20-mainline-entry.md)
 2. [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
-3. [versioning/nuis-alpha-0.16-mainline-entry.md](versioning/nuis-alpha-0.16-mainline-entry.md)
-4. [versioning/nuis-alpha-0.10-mainline-entry.md](versioning/nuis-alpha-0.10-mainline-entry.md)
-5. [versioning/nuis-alpha-0.8-mainline-entry.md](versioning/nuis-alpha-0.8-mainline-entry.md)
-6. [versioning/nuis-alpha-0.8-doc-sync-inventory.md](versioning/nuis-alpha-0.8-doc-sync-inventory.md)
-7. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
-8. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
-9. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
+3. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
+4. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
+5. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
+6. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
+7. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
+8. [reference/nsdb-yir-debugger-frontdoor.md](reference/nsdb-yir-debugger-frontdoor.md)
+9. [reference/provider-completion-trust-registry.md](reference/provider-completion-trust-registry.md)
 10. [reference/linux-cuda-provider-bringup.md](reference/linux-cuda-provider-bringup.md)
 11. [reference/toolchain-galaxy-core-boundary.md](reference/toolchain-galaxy-core-boundary.md)
 12. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
-13. [versioning/nuis-alpha-0.7-mainline-entry.md](versioning/nuis-alpha-0.7-mainline-entry.md)
-14. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
-15. [versioning/nuis-alpha-0.6-mainline-entry.md](versioning/nuis-alpha-0.6-mainline-entry.md)
-16. [versioning/nuis-alpha-0.4-system-inventory.md](versioning/nuis-alpha-0.4-system-inventory.md)
-17. [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
-18. [versioning/nuis-alpha-0.4-doc-sync-inventory.md](versioning/nuis-alpha-0.4-doc-sync-inventory.md)
-19. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
-20. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
-21. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
-22. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
-23. [reference/ffi-pointer-safety-boundary.md](reference/ffi-pointer-safety-boundary.md)
-24. [reference/nustar-capability-split-boundary.md](reference/nustar-capability-split-boundary.md)
-25. [versioning/nuis-long-range-heterogeneous-os-roadmap.md](versioning/nuis-long-range-heterogeneous-os-roadmap.md)
-26. [versioning/nuis-alpha-0.1-mainline-status.md](versioning/nuis-alpha-0.1-mainline-status.md)
-27. [versioning/nuis-0.20.0-abi-compile-vocabulary.md](versioning/nuis-0.20.0-abi-compile-vocabulary.md)
-28. [versioning/nuis-0.20.0-std-refactor-frontdoor.md](versioning/nuis-0.20.0-std-refactor-frontdoor.md)
-29. [versioning/nuis-0.20.0-compile-gap-checklist.md](versioning/nuis-0.20.0-compile-gap-checklist.md)
+13. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
+14. [versioning/nuis-alpha-0.17-mainline-entry.md](versioning/nuis-alpha-0.17-mainline-entry.md)
+15. [versioning/nuis-alpha-0.16-mainline-entry.md](versioning/nuis-alpha-0.16-mainline-entry.md)
+16. [versioning/nuis-alpha-0.10-mainline-entry.md](versioning/nuis-alpha-0.10-mainline-entry.md)
+17. [versioning/nuis-alpha-0.8-mainline-entry.md](versioning/nuis-alpha-0.8-mainline-entry.md)
+18. [versioning/nuis-alpha-0.7-mainline-entry.md](versioning/nuis-alpha-0.7-mainline-entry.md)
+19. [versioning/nuis-alpha-0.6-mainline-entry.md](versioning/nuis-alpha-0.6-mainline-entry.md)
+20. [versioning/nuis-alpha-0.4-system-inventory.md](versioning/nuis-alpha-0.4-system-inventory.md)
+21. [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
+22. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
+23. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
+24. [reference/ffi-pointer-safety-boundary.md](reference/ffi-pointer-safety-boundary.md)
+25. [reference/nustar-capability-split-boundary.md](reference/nustar-capability-split-boundary.md)
+26. [versioning/nuis-long-range-heterogeneous-os-roadmap.md](versioning/nuis-long-range-heterogeneous-os-roadmap.md)
+27. [versioning/nuis-alpha-0.1-mainline-status.md](versioning/nuis-alpha-0.1-mainline-status.md)
+28. [versioning/nuis-0.20.0-abi-compile-vocabulary.md](versioning/nuis-0.20.0-abi-compile-vocabulary.md)
+29. [versioning/nuis-0.20.0-std-refactor-frontdoor.md](versioning/nuis-0.20.0-std-refactor-frontdoor.md)
+30. [versioning/nuis-0.20.0-compile-gap-checklist.md](versioning/nuis-0.20.0-compile-gap-checklist.md)
 
 Short rule:
 
@@ -49,7 +50,9 @@ Short rule:
   [README.md](../README.md)
 * current development tensor progress model:
   [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
-* current `alpha-0.17.*` entry:
+* current `alpha-0.20.*` entry:
+  [versioning/nuis-alpha-0.20-mainline-entry.md](versioning/nuis-alpha-0.20-mainline-entry.md)
+* predecessor `alpha-0.17.*` registered worker entry:
   [versioning/nuis-alpha-0.17-mainline-entry.md](versioning/nuis-alpha-0.17-mainline-entry.md)
 * predecessor `alpha-0.16.*` tensor-guided closure entry:
   [versioning/nuis-alpha-0.16-mainline-entry.md](versioning/nuis-alpha-0.16-mainline-entry.md)
@@ -81,7 +84,7 @@ Short rule:
   [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
 * CFFI / classic von-Neumann domain contract:
   [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
-* predecessor ABI vocabulary bridge into `0.20.*`:
+* predecessor ABI vocabulary bridge into pre-alpha `0.20.*`:
   [versioning/nuis-0.20.0-abi-compile-vocabulary.md](versioning/nuis-0.20.0-abi-compile-vocabulary.md)
 * immediate predecessor alpha closeout set:
   [versioning/nuis-alpha-0.0.1-preflight-report.md](versioning/nuis-alpha-0.0.1-preflight-report.md),

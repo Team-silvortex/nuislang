@@ -1,12 +1,14 @@
 # Alpha Mainline Boundary Index
 
-This file is the shortest predecessor index for the mainline boundaries that
-mattered most before `alpha-0.0.1`.
+This file is the shortest index for the mainline boundaries that still matter
+during the alpha closeout line.
 
-For present-tense `alpha-0.17.*` work, start with:
+For present-tense `alpha-0.20.*` work, start with:
 
+* [../versioning/nuis-alpha-0.20-mainline-entry.md](../../docs/versioning/nuis-alpha-0.20-mainline-entry.md)
 * [../versioning/nuis-alpha-0.17-mainline-entry.md](../../docs/versioning/nuis-alpha-0.17-mainline-entry.md)
 * [../versioning/nuis-alpha-0.16-mainline-entry.md](../../docs/versioning/nuis-alpha-0.16-mainline-entry.md)
+* [../versioning/nuis-alpha-0.13-mainline-entry.md](../../docs/versioning/nuis-alpha-0.13-mainline-entry.md)
 * [../versioning/nuis-alpha-0.10-mainline-entry.md](../../docs/versioning/nuis-alpha-0.10-mainline-entry.md)
 * [../versioning/nuis-alpha-0.8-mainline-entry.md](../../docs/versioning/nuis-alpha-0.8-mainline-entry.md)
 * [../versioning/nuis-alpha-0.7-mainline-entry.md](../../docs/versioning/nuis-alpha-0.7-mainline-entry.md)
@@ -14,7 +16,8 @@ For present-tense `alpha-0.17.*` work, start with:
 * [../versioning/nuis-alpha-0.4-system-inventory.md](../../docs/versioning/nuis-alpha-0.4-system-inventory.md)
 * [../versioning/nuis-alpha-0.4-mainline-hardening-plan.md](../../docs/versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
 
-Treat `alpha-0.16.*` as the direct tensor-guided predecessor. Treat
+Treat `alpha-0.17.*` as the direct registered heterogeneous worker predecessor.
+Treat `alpha-0.16.*` and `alpha-0.13.*` as tensor-guided predecessors. Treat
 `alpha-0.10.*` and earlier files as older predecessor context, and the
 `alpha-0.4.*` files as the hardening baseline rather than the present line.
 
@@ -22,7 +25,7 @@ It is not a full architecture manual.
 
 It is the reading page for:
 
-`if I need to understand what nuis already treats as real before alpha, where should I look first?`
+`if I need to understand what nuis already treats as real during alpha closeout, where should I look first?`
 
 If you want the earlier post-closeout line, use:
 
@@ -32,7 +35,7 @@ If you want the earlier post-closeout line, use:
 
 ## Short Rule
 
-Before `alpha-0.0.1`, the mainline was best read through a small set of
+During alpha closeout, the mainline is best read through a small set of
 explicit boundaries:
 
 * source compile truth
@@ -167,7 +170,7 @@ Short rule:
 * use invalid anchors to understand the real boundary
 * use project demos when you need the wider facade/workflow shape
 
-## Practical Reading Order Before `alpha-0.0.1`
+## Practical Reading Order During Alpha Closeout
 
 If you need the shortest full route, use this order:
 
@@ -179,7 +182,7 @@ If you need the shortest full route, use this order:
 
 ## Why This Exists
 
-Before `alpha`, the repository needed to stop making people reconstruct the
+During alpha, the repository needed to stop making people reconstruct the
 mainline from memory.
 
 This index exists so the current line can be read as:

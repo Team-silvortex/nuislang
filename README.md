@@ -7,9 +7,10 @@
 
 ## Current Status
 
-The repository is entering the `alpha-0.17.*` line. This is still an architecture
-building line, not a beta-stability line, but the project now has one connected
-compiler/toolchain spine instead of separate experimental islands.
+The repository is entering the `alpha-0.20.*` line, the last alpha minor before
+the beta foundation line. This is still an architecture-building line, not a
+beta-stability line, but the project now has one connected compiler/toolchain
+spine instead of separate experimental islands.
 
 Current spine:
 
@@ -23,9 +24,9 @@ nuis source / nuis.toml project
   -> nsld binary-linking convergence
 ```
 
-The current `alpha-0.17.*` goal is to turn the registered heterogeneous worker
-boundary into a real execution closure while preserving the tensor-guided
-minimal executable-artifact loop:
+The current `alpha-0.20.*` goal is to close alpha by keeping the registered
+compiler, std, Nustar, Nsld, Nsdb, heterogeneous-provider, and development
+tensor surfaces aligned on one beta-prep foundation:
 
 ```text
 project
@@ -35,22 +36,24 @@ project
   -> closure snapshot
   -> final-stage plan
   -> executable writer input
-  -> self-contained Nsld image output or host-assisted finalization boundary
-  -> registered Nuis worker / Nustar execution capsule
-  -> verified heterogeneous output carrier
-  -> run-artifact / trace readiness evidence
+  -> self-contained Nsld/NSB image output or host-assisted finalization boundary
+  -> registered Nuis worker / Nustar execution capsule / backend artifact
+  -> verified heterogeneous output carrier or explicit blocked boundary
+  -> run-artifact / Nsdb trace and replay readiness evidence
   -> development tensor status update
 ```
 
 This does not yet mean final self-hosting, final std API stability, or a fully
 self-owned OS-native linker. Safe current wording is `binary-linking
 convergence`, `executable-artifact closure`, `Nsld-owned self-contained image`,
+`registered heterogeneous provider closure`, `shared Shader body contract`,
 `minimal runnable route`, and `host-assisted finalization` where applicable.
 
 Start here for the current line:
 
 * [docs/current-mainline-map.md](docs/current-mainline-map.md)
 * [docs/reference/nuis-development-tensor.md](docs/reference/nuis-development-tensor.md)
+* [docs/versioning/nuis-alpha-0.20-mainline-entry.md](docs/versioning/nuis-alpha-0.20-mainline-entry.md)
 * [docs/versioning/nuis-alpha-0.17-mainline-entry.md](docs/versioning/nuis-alpha-0.17-mainline-entry.md)
 * [docs/versioning/nuis-alpha-0.16-mainline-entry.md](docs/versioning/nuis-alpha-0.16-mainline-entry.md)
 * [docs/versioning/nuis-alpha-0.10-mainline-entry.md](docs/versioning/nuis-alpha-0.10-mainline-entry.md)

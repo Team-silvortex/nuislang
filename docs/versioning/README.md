@@ -9,8 +9,10 @@ workflow/history checkpoints, and policy notes.
 
 If you want the current line instead of historical backfill, start with:
 
+* [nuis-alpha-0.20-mainline-entry.md](nuis-alpha-0.20-mainline-entry.md)
 * [nuis-alpha-0.17-mainline-entry.md](nuis-alpha-0.17-mainline-entry.md)
 * [nuis-alpha-0.16-mainline-entry.md](nuis-alpha-0.16-mainline-entry.md)
+* [nuis-alpha-0.13-mainline-entry.md](nuis-alpha-0.13-mainline-entry.md)
 * [nuis-alpha-0.10-mainline-entry.md](nuis-alpha-0.10-mainline-entry.md)
 * [nuis-alpha-0.8-mainline-entry.md](nuis-alpha-0.8-mainline-entry.md)
 * [nuis-alpha-0.8-doc-sync-inventory.md](nuis-alpha-0.8-doc-sync-inventory.md)
@@ -23,10 +25,14 @@ If you want the current line instead of historical backfill, start with:
 
 Use this first when the question is:
 
-* what the current `alpha-0.17.*` line adds by making registered heterogeneous
-  worker execution the active integration gate
+* what the current `alpha-0.20.*` line adds by closing alpha around a
+  beta-prep compiler/std/Nustar/Nsld/Nsdb/tensor foundation
+* what the predecessor `alpha-0.17.*` line added by making registered
+  heterogeneous worker execution the active integration gate
 * what the predecessor `alpha-0.16.*` line added by making development tensor
   evidence the main steering surface
+* what the predecessor `alpha-0.13.*` line added by widening tensor-guided
+  hardening
 * what the predecessor `alpha-0.10.*` line added on top of binary-linking
   convergence
 * why executable-artifact closure is now the first-read Nsld/toolchain pressure
@@ -37,10 +43,10 @@ Use this first when the question is:
 * what the predecessor `alpha-0.7.*` line established for std-backed tooling smoke
 * what the predecessor `alpha-0.6.*` line established for Nsld
 * what exists and what is still soft in the `alpha-0.4.*` hardening baseline
-* what the current mainline should optimize during `alpha-0.17.*`
-* which documentation routes and wording are current after the alpha-0.17
+* what the current mainline should optimize during `alpha-0.20.*`
+* which documentation routes and wording are current after the alpha-0.20
   entry refresh
-* which broad README surfaces were refreshed for alpha-0.17
+* which broad README surfaces were refreshed for alpha-0.20
 * what the `alpha-0.1.*` mainline established before this hardening pass
 * what should count as present-tense repo truth
 * which older files should now be treated as predecessor anchors
@@ -55,7 +61,7 @@ If you want the line that handed off into the current one, read:
 
 Use this set when the question is:
 
-* how the closeout-era `0.20.* -> alpha-0.0.1` transition led into the current
+* how the closeout-era `0.20.* -> alpha-0.0.1` transition led into the first
   `alpha-0.1.*` line
 * which closeout-era lanes were still active versus already boundary-shaped
 
@@ -151,8 +157,10 @@ Read:
 
 Practical rule:
 
-* start at `alpha-0.17.*` mainline entry first
-* use `alpha-0.16.*` for the direct tensor-guided closure predecessor
+* start at `alpha-0.20.*` mainline entry first
+* use `alpha-0.17.*` for the direct registered-worker predecessor
+* use `alpha-0.16.*` for the tensor-guided closure predecessor
+* use `alpha-0.13.*` for the broader tensor-guided hardening predecessor
 * use `alpha-0.7.*` for the predecessor std/tooling smoke entry
 * use `alpha-0.6.*` for the predecessor Nsld/frontdoor entry
 * use `alpha-0.4.*` inventory and hardening as the current baseline context
