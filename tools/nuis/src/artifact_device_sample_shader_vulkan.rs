@@ -16,6 +16,7 @@ const EXPECTED: &[u8] = INPUT;
 pub(crate) fn registration() -> DeviceSampleInputRegistration {
     DeviceSampleInputRegistration {
         package_id: PACKAGE_ID,
+        provider_family: "spirv:vulkan-gpu",
         supports: supports_vulkan,
         enrich_evidence: vulkan_copy_u32_evidence,
         resolve_evidence: Some(resolve_vulkan_code_asset_evidence),
@@ -94,9 +95,9 @@ fn resolve_vulkan_code_asset_evidence(output_dir: &Path, evidence: &str) -> Resu
         .as_ref()
         .map(|selection| -> Result<String, String> {
             validate_vulkan_contribution_selection(selection, evidence)?;
-            Ok(crate::artifact_code_asset_contribution_table::render_selected_contribution_evidence(
-                selection,
-            ))
+            crate::artifact_code_asset_contribution_table::render_selected_contribution_set_evidence(
+                std::slice::from_ref(selection),
+            )
         })
         .transpose()?;
     let byte_length = actual.len().to_string();

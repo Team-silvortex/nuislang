@@ -1,6 +1,10 @@
 use crate::provider_bundle_registry::{
     ProviderBundleRegistration, PROVIDER_BUNDLE_REGISTRY_CONTRACT,
 };
+#[cfg(target_os = "linux")]
+use crate::provider_process_adapter::{
+    ProviderProcessAdapterCache, ResolvedProviderProcessAdapter,
+};
 use crate::provider_runner_registry::{
     ProviderRunnerAdapter, ProviderRunnerProfile, PROVIDER_RUNNER_PROFILE_REGISTRY_CONTRACT,
 };
@@ -31,11 +35,11 @@ pub(crate) const RUNNER_PROFILE: ProviderRunnerProfile = ProviderRunnerProfile {
     probe_status: vulkan_probe_status,
     available_probe_status: VULKAN_AVAILABLE_STATUS,
     available_adapter: ProviderRunnerAdapter {
-        adapter_id: "spirv.vulkan.device-probe",
-        capability_status: "registered-device-probe",
-        real_device_capable: false,
-        kind: "vulkan-device-probe-runner",
-        execution_mode: "probe-only-provider-runner",
+        adapter_id: "spirv.vulkan.real-device",
+        capability_status: "registered-real-device",
+        real_device_capable: true,
+        kind: "vulkan-spirv-real-device-runner",
+        execution_mode: "real-device-provider-runner",
     },
     fallback_adapter: ProviderRunnerAdapter {
         adapter_id: "spirv.vulkan.host-unavailable",
@@ -45,6 +49,22 @@ pub(crate) const RUNNER_PROFILE: ProviderRunnerProfile = ProviderRunnerProfile {
         execution_mode: "unavailable-provider-runner",
     },
 };
+
+#[cfg(target_os = "linux")]
+const VULKAN_SPIRV_DISPATCH_SOURCE: &str =
+    include_str!("../provider-runners/vulkan_spirv_dispatch.c");
+
+#[cfg(target_os = "linux")]
+pub(crate) fn prepare_vulkan_worker_invocation(
+    cache: &mut ProviderProcessAdapterCache,
+) -> Result<ResolvedProviderProcessAdapter<'_>, String> {
+    cache.resolve_c_with_libraries(
+        "vulkan-spirv-dispatch-adapter",
+        VULKAN_SPIRV_DISPATCH_SOURCE,
+        "nuis-vulkan-spirv-provider-runner-v1",
+        &["dl"],
+    )
+}
 
 fn vulkan_probe_status() -> &'static str {
     probe_vulkan_host().status
@@ -235,17 +255,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn vulkan_bundle_is_static_and_probe_only() {
+    fn vulkan_bundle_is_static_and_real_device_when_probe_available() {
         assert_eq!(PROVIDER_BUNDLE.bundle_id, "spirv.vulkan-gpu.bundle.v1");
         assert_eq!(RUNNER_PROFILE.provider_family, "spirv:vulkan-gpu");
         assert_eq!(
             RUNNER_PROFILE.available_adapter.kind,
-            "vulkan-device-probe-runner"
+            "vulkan-spirv-real-device-runner"
         );
-        assert!(!RUNNER_PROFILE.available_adapter.real_device_capable);
+        assert!(RUNNER_PROFILE.available_adapter.real_device_capable);
         assert_eq!(
             RUNNER_PROFILE.available_adapter.execution_mode,
-            "probe-only-provider-runner"
+            "real-device-provider-runner"
         );
     }
 

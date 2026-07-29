@@ -177,7 +177,8 @@ fn validate_selection(selection: &CompiledCodeAssetSelectionEvidence) -> Result<
         return Ok(());
     }
     let count = selection.selections.len();
-    let contract_matches = (count == 1 && selection.contract == SINGLE_CONTRACT)
+    let contract_matches = (count == 1
+        && matches!(selection.contract.as_str(), SINGLE_CONTRACT | SET_CONTRACT))
         || (count > 1 && selection.contract == SET_CONTRACT);
     let unique = selection
         .selections
@@ -294,6 +295,21 @@ mod tests {
         assert_eq!(actual, expected);
         assert_eq!(actual.selections[0].contribution_index, 1);
         assert_eq!(actual.selections[1].contribution_index, 0);
+    }
+
+    #[test]
+    fn single_item_selection_set_round_trips_as_base_case() {
+        let mut expected = selection_set();
+        expected.selections.truncate(1);
+        expected.contribution_count = 2;
+        let mut rendered = String::new();
+        render_fields(&mut rendered, &expected);
+
+        let actual = parse_serialized_selection(&rendered).unwrap();
+
+        assert_eq!(actual, expected);
+        assert_eq!(actual.contract, SET_CONTRACT);
+        assert_eq!(actual.selections.len(), 1);
     }
 
     #[test]

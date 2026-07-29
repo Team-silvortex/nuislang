@@ -5,6 +5,7 @@ pub(crate) const DEVICE_SAMPLE_INPUT_REGISTRATION_CONTRACT: &str =
 
 pub(crate) struct DeviceSampleInputRegistration {
     pub(crate) package_id: &'static str,
+    pub(crate) provider_family: &'static str,
     pub(crate) supports: fn(&str, &str) -> bool,
     pub(crate) enrich_evidence: fn(&str) -> String,
     pub(crate) resolve_evidence: Option<fn(&Path, &str) -> Result<String, String>>,
@@ -27,6 +28,16 @@ pub(crate) fn enrich_registered_input_evidence(
                 (registration.enrich_evidence)(base)
             )
         })
+}
+
+pub(crate) fn registered_provider_family(
+    backend_family: &str,
+    target_device: &str,
+) -> Option<&'static str> {
+    registrations()
+        .iter()
+        .find(|registration| (registration.supports)(backend_family, target_device))
+        .map(|registration| registration.provider_family)
 }
 
 pub(crate) fn persist_registered_input_payloads(
@@ -84,15 +95,27 @@ mod tests {
         assert!(evidence.contains(DEVICE_SAMPLE_INPUT_REGISTRATION_CONTRACT));
         assert!(evidence.contains("provider_sample_registration_package=nuis.pixelmagic"));
         assert!(evidence.contains("provider_buffer_descriptor_contract="));
+        assert_eq!(
+            registered_provider_family("metal", "apple-silicon-gpu"),
+            Some("metal:apple-silicon-gpu")
+        );
         let cuda = enrich_registered_input_evidence("cuda", "nvidia-gpu", "base").unwrap();
         assert!(cuda.contains("provider_sample_registration_package=official.kernel"));
         assert!(cuda.contains("provider_code_asset_descriptor_contract="));
+        assert_eq!(
+            registered_provider_family("cuda", "nvidia-gpu"),
+            Some("cuda:nvidia-gpu")
+        );
         let vulkan =
             enrich_registered_input_evidence("vulkan", "discrete-or-integrated-gpu", "base")
                 .unwrap();
         assert!(vulkan.contains("provider_sample_registration_package=official.shader"));
         assert!(vulkan.contains("provider_code_asset_format=spirv-binary"));
         assert!(vulkan.contains("provider_adapter_binding_provider_family=spirv:vulkan-gpu"));
+        assert_eq!(
+            registered_provider_family("vulkan", "discrete-or-integrated-gpu"),
+            Some("spirv:vulkan-gpu")
+        );
         assert!(
             enrich_registered_input_evidence("unknown", "unknown", "base").is_none(),
             "unregistered backends must remain generic"

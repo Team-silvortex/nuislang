@@ -285,7 +285,7 @@ mod tests {
     }
 
     #[test]
-    fn reports_registered_vulkan_probe_without_claiming_execution() {
+    fn reports_registered_vulkan_probe_before_execution_selection() {
         let status = provider_runner_real_device_probe_status("spirv:vulkan-gpu");
         assert!(matches!(
             status,
@@ -294,14 +294,19 @@ mod tests {
     }
 
     #[test]
-    fn registered_vulkan_provider_uses_a_probe_only_or_unavailable_adapter() {
+    fn registered_vulkan_provider_uses_real_device_or_unavailable_adapter() {
         let adapter = select_provider_runner_adapter("spirv:vulkan-gpu");
-        assert!(!adapter.real_device_capable);
-        assert_eq!(adapter.kind, "vulkan-device-probe-runner");
-        assert!(matches!(
-            adapter.execution_mode,
-            "probe-only-provider-runner" | "unavailable-provider-runner"
-        ));
+        if provider_runner_real_device_probe_status("spirv:vulkan-gpu")
+            == "vulkan-device-probe-available"
+        {
+            assert!(adapter.real_device_capable);
+            assert_eq!(adapter.kind, "vulkan-spirv-real-device-runner");
+            assert_eq!(adapter.execution_mode, "real-device-provider-runner");
+        } else {
+            assert!(!adapter.real_device_capable);
+            assert_eq!(adapter.kind, "vulkan-device-probe-runner");
+            assert_eq!(adapter.execution_mode, "unavailable-provider-runner");
+        }
     }
 
     #[test]

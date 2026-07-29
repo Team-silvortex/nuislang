@@ -149,14 +149,14 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         .contains("weakest task card is directly actionable"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_action
-        .contains("real execution session"));
+        .contains("Nsld final-image"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_handoff_command,
-        "cargo test -q -p nuisc shader_spirv_emitter && cargo test -q -p nuis artifact_device_sample_shader_vulkan && cargo test -q -p nsdb vulkan && cargo test -q -p nuis dev_tensor"
+        "cargo test -q -p nuisc shader_spirv_emitter && cargo test -q -p nuis artifact_device_sample_shader_vulkan && cargo test -q -p nsdb vulkan && cargo test -q -p nsdb single_item_selection_set_round_trips_as_base_case && cargo test -q -p nuis dev_tensor; remote linux: cargo test -q -p nuis --test official_galaxy_hetero_smoke linux_vulkan_shader_sample_executes_provider_output -- --nocapture"
     );
     assert!(summary
         .weakest_bootstrap_task_card_handoff_expected_artifact
-        .contains("real-device Vulkan u32 buffer roundtrip"));
+        .contains("Nsld final-image replay"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.protocol,
         "nuis-dev-tensor-task-card-lineage-v1"

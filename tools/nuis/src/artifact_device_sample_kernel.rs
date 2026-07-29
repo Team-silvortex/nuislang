@@ -29,6 +29,7 @@ const SCALED_EXPECTED: &[u8] = &[
 pub(crate) fn registration() -> DeviceSampleInputRegistration {
     DeviceSampleInputRegistration {
         package_id: "official.kernel",
+        provider_family: "cuda:nvidia-gpu",
         supports: supports_cuda,
         enrich_evidence: cuda_vector_add_evidence,
         resolve_evidence: Some(resolve_cuda_code_asset_evidence),

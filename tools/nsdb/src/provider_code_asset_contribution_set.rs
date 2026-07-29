@@ -63,7 +63,7 @@ pub(super) fn validate_compiled_contribution_set(
         return Err("compiled code asset contribution count drifted".to_owned());
     }
     let count = usize_field(evidence, "provider_code_asset_contribution_selection_count")?;
-    if !(2..=64).contains(&count) {
+    if !(1..=64).contains(&count) {
         return Err("compiled contribution selection set count is invalid".to_owned());
     }
     let mut items = Vec::with_capacity(count);
@@ -99,7 +99,7 @@ pub(super) fn validate_compiled_contribution_set(
     validate_requests(&selected_rows, requests)?;
     let first = items
         .first()
-        .expect("validated selection set contains at least two items");
+        .expect("validated selection set contains at least one item");
     Ok(CompiledCodeAssetSelectionEvidence {
         contract: SET_CONTRACT.to_owned(),
         status: "verified".to_owned(),

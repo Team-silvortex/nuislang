@@ -400,6 +400,7 @@ fn requested_provider_runner_for(provider_family: &str) -> RequestedProviderRunn
         "metal:apple-silicon-gpu" => "metal.apple-silicon-gpu.host-simulated",
         "coreml:apple-ane" => "coreml.apple-ane.host-simulated",
         "cuda:nvidia-gpu" => "cuda.nvidia-gpu.host-simulated",
+        "spirv:vulkan-gpu" => "spirv.vulkan-gpu.host-simulated",
         _ => "generic.device.host-simulated",
     };
     RequestedProviderRunner {
@@ -419,6 +420,16 @@ fn provider_sample_manifest_status(record_count: usize) -> &'static str {
 }
 
 fn provider_family(backend_family: Option<&str>, target_device: Option<&str>) -> String {
+    if let (Some(backend_family), Some(target_device)) = (backend_family, target_device) {
+        if let Some(provider_family) =
+            crate::artifact_device_sample_registration::registered_provider_family(
+                backend_family,
+                target_device,
+            )
+        {
+            return provider_family.to_owned();
+        }
+    }
     format!(
         "{}:{}",
         backend_family.unwrap_or("unknown-backend"),

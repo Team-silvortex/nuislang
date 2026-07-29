@@ -3,10 +3,10 @@ use super::*;
 pub(super) fn assert_provider_bundle_audit_evidence(source: &str, label: &str) {
     for evidence in [
         "\"artifact_device_provider_sample_manifest_provider_bundle_registry_contract\":\"nuis-provider-bundle-registry-v1\"",
-        "\"artifact_device_provider_sample_manifest_provider_bundle_manifest_hash\":\"fnv1a64:b6a8b4562408c563\"",
+        "\"artifact_device_provider_sample_manifest_provider_bundle_manifest_hash\":\"fnv1a64:9831a33035211556\"",
         "\"artifact_device_provider_sample_manifest_first_provider_bundle_package_id\":\"official.",
         "\"artifact_device_provider_sample_manifest_provider_bundle_evidence_status\":\"verified\"",
-        "\"nsld_final_executable_output_object_package_provider_bundle_manifest_hash\":\"fnv1a64:b6a8b4562408c563\"",
+        "\"nsld_final_executable_output_object_package_provider_bundle_manifest_hash\":\"fnv1a64:9831a33035211556\"",
         "\"closure_summary_object_package_provider_bundle_evidence_status\":\"verified\"",
         "\"artifact_device_provider_sample_manifest_selected_provider_bundle_set_contract\":\"nuis-selected-provider-bundle-set-v1\"",
         "\"artifact_device_provider_sample_manifest_selected_provider_bundle_set_validation_status\":\"verified\"",
