@@ -1,0 +1,8 @@
+contract = "nuis-spirv-compute-source-v1"
+spirv_version = "1.6"
+operation = "copy-u32"
+entry = "nuis_vulkan_copy_u32"
+local_size = "1x1x1"
+descriptor_set = 0
+input_binding = 0
+output_binding = 1

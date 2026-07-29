@@ -125,3 +125,108 @@ fn json_string_array(values: &[String]) -> String {
         .join(",");
     format!("[{values}]")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn execute_provider_samples_json_exposes_runner_boundary() {
+        let report = ProviderSampleExecuteReport {
+            status: "provider-output-payloads-ready".to_owned(),
+            provider_family_filter: Some("coreml:apple-ane".to_owned()),
+            provider_families: vec!["coreml:apple-ane".to_owned()],
+            record_count: 1,
+            matched_record_count: 1,
+            executable_record_count: 1,
+            output_payload_count: 1,
+            first_provider_family: "coreml:apple-ane".to_owned(),
+            provider_bundle_registry_contract: "nuis-provider-bundle-registry-v1".to_owned(),
+            provider_bundle_manifest_contract: "nuis-provider-bundle-manifest-v1".to_owned(),
+            provider_bundle_manifest_hash: "fnv1a64:08a971e5a543be2e".to_owned(),
+            provider_bundle_manifest_entry_count: 3,
+            first_provider_bundle_package_id: "official.kernel".to_owned(),
+            first_provider_bundle_id: "coreml.apple-ane.bundle.v1".to_owned(),
+            selected_provider_bundle_set_contract: "nuis-selected-provider-bundle-set-v1"
+                .to_owned(),
+            selected_provider_bundle_count: 1,
+            selected_provider_bundle_set_hash: "fnv1a64:e9a82b052c861b93".to_owned(),
+            final_image_dispatch_authority_status: "verified".to_owned(),
+            final_image_dispatch_image_path: "out/nuis-app.nsb".to_owned(),
+            final_image_dispatch_count: 1,
+            final_image_dispatch_matched_count: 1,
+            final_image_dispatch_table_hash: "0x1234567890abcdef".to_owned(),
+            final_image_dispatch_selected_set_hash: "fnv1a64:e9a82b052c861b93".to_owned(),
+            first_provider_runner_adapter_id: "coreml.apple-ane.real-device".to_owned(),
+            first_provider_runner_adapter_capability_status: "registered-real-device".to_owned(),
+            first_provider_runner_real_device_capable: true,
+            first_provider_runner_real_device_probe_status: "real-device-candidate-available"
+                .to_owned(),
+            first_provider_execution_mode: "real-device-provider-runner".to_owned(),
+            first_output_payload_evidence:
+                "nuis.nsdb.provider-output.coreml-apple-ane.toml:hash=0x1:status=written".to_owned(),
+            first_output_payload_comparison_contract: "nuis-provider-execution-comparison-v1"
+                .to_owned(),
+            first_output_payload_comparison_status: "ready-for-comparison".to_owned(),
+            first_output_payload_input_evidence: "tensor:shape=1x4".to_owned(),
+            first_output_payload_input_evidence_hash: "0x1234".to_owned(),
+            first_output_payload_native_output_kind: "none".to_owned(),
+            first_output_payload_native_output_status: "none".to_owned(),
+            first_output_payload_native_output_bytes: "none".to_owned(),
+            first_output_payload_native_output_hash: "none".to_owned(),
+            first_output_payload_native_execution_contract: "none".to_owned(),
+            first_output_payload_native_execution_status: "none".to_owned(),
+            first_output_payload_native_device: "none".to_owned(),
+            first_output_payload_native_compute_plan_contract: "none".to_owned(),
+            first_output_payload_native_compute_plan_status: "none".to_owned(),
+            first_output_payload_native_compute_plan_layer_count: "0".to_owned(),
+            first_output_payload_native_compute_plan_preferred_devices: "none".to_owned(),
+            first_output_payload_native_compute_plan_supported_devices: "none".to_owned(),
+            next_action: "materialize-provider-samples".to_owned(),
+            next_command: "nsdb materialize-provider-samples out --json".to_owned(),
+        };
+
+        let json = provider_sample_execute_json(&report);
+        assert!(json.contains("\"matched_record_count\":1"));
+        assert!(json.contains(
+            "\"provider_bundle_registry_contract\":\"nuis-provider-bundle-registry-v1\""
+        ));
+        assert!(json.contains(
+            "\"provider_bundle_manifest_contract\":\"nuis-provider-bundle-manifest-v1\""
+        ));
+        assert!(json.contains("\"provider_bundle_manifest_entry_count\":3"));
+        assert!(json.contains("\"first_provider_bundle_package_id\":\"official.kernel\""));
+        assert!(json.contains("\"first_provider_bundle_id\":\"coreml.apple-ane.bundle.v1\""));
+        assert!(json.contains(
+            "\"selected_provider_bundle_set_contract\":\"nuis-selected-provider-bundle-set-v1\""
+        ));
+        assert!(json.contains("\"selected_provider_bundle_count\":1"));
+        assert!(json.contains("\"selected_provider_bundle_set_hash\":\"fnv1a64:e9a82b052c861b93\""));
+        assert!(json.contains("\"first_provider_family\":\"coreml:apple-ane\""));
+        assert!(
+            json.contains("\"first_provider_runner_adapter_id\":\"coreml.apple-ane.real-device\"")
+        );
+        assert!(json.contains(
+            "\"first_provider_runner_adapter_capability_status\":\"registered-real-device\""
+        ));
+        assert!(json.contains("\"first_provider_runner_real_device_capable\":true"));
+        assert!(json.contains(
+            "\"first_provider_runner_real_device_probe_status\":\"real-device-candidate-available\""
+        ));
+        assert!(json.contains("\"first_provider_execution_mode\":\"real-device-provider-runner\""));
+        assert!(json.contains(
+            "\"first_output_payload_comparison_contract\":\"nuis-provider-execution-comparison-v1\""
+        ));
+        assert!(
+            json.contains("\"first_output_payload_comparison_status\":\"ready-for-comparison\"")
+        );
+        assert!(json.contains("\"first_output_payload_input_evidence\":\"tensor:shape=1x4\""));
+        assert!(json.contains("\"first_output_payload_input_evidence_hash\":\"0x1234\""));
+        assert!(json.contains("\"first_output_payload_native_output_kind\":\"none\""));
+        assert!(json.contains("\"first_output_payload_native_output_hash\":\"none\""));
+        assert!(json.contains("\"first_output_payload_native_execution_contract\":\"none\""));
+        assert!(json.contains("\"first_output_payload_native_execution_status\":\"none\""));
+        assert!(json.contains("\"first_output_payload_native_device\":\"none\""));
+        assert!(json.contains("\"first_output_payload_native_compute_plan_status\":\"none\""));
+    }
+}

@@ -285,19 +285,23 @@ mod tests {
     }
 
     #[test]
-    fn reports_unknown_provider_family_as_unsupported() {
-        assert_eq!(
-            provider_runner_real_device_probe_status("spirv:vulkan-gpu"),
-            "real-device-candidate-unsupported"
-        );
+    fn reports_registered_vulkan_probe_without_claiming_execution() {
+        let status = provider_runner_real_device_probe_status("spirv:vulkan-gpu");
+        assert!(matches!(
+            status,
+            "vulkan-device-probe-available" | "vulkan-device-probe-unavailable"
+        ));
     }
 
     #[test]
-    fn unknown_provider_family_uses_host_simulated_fallback() {
+    fn registered_vulkan_provider_uses_a_probe_only_or_unavailable_adapter() {
         let adapter = select_provider_runner_adapter("spirv:vulkan-gpu");
-        assert_eq!(adapter.adapter_id, "generic.device.host-simulated");
-        assert_eq!(adapter.capability_status, "registered-host-simulated");
         assert!(!adapter.real_device_capable);
+        assert_eq!(adapter.kind, "vulkan-device-probe-runner");
+        assert!(matches!(
+            adapter.execution_mode,
+            "probe-only-provider-runner" | "unavailable-provider-runner"
+        ));
     }
 
     #[test]

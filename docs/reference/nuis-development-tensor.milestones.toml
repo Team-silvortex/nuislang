@@ -32,6 +32,13 @@ coordinates = [
 ]
 
 [[milestones]]
+id = "alpha-linux-vulkan"
+required = false
+coordinates = [
+  "heterogeneous-runtime/linux-vulkan/vulkan-provider-bringup",
+]
+
+[[milestones]]
 id = "alpha-stdlib"
 required = true
 coordinates = [

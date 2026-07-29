@@ -80,13 +80,24 @@ fn parse_registration(
         ));
     }
     let source_path = registry_root.join(fields[7]);
-    let bytes = fs::read(&source_path).map_err(|error| {
+    let source_bytes = fs::read(&source_path).map_err(|error| {
         format!(
             "failed to read Nustar code asset `{}` from `{}`: {error}",
             fields[1],
             source_path.display()
         )
     })?;
+    let bytes = if fields[2] == "spirv-binary" {
+        crate::shader_spirv_emitter::lower_registered_compute_source(&source_bytes, fields[5])
+            .map_err(|error| {
+                format!(
+                    "failed to lower Nustar SPIR-V code asset `{}`: {error}",
+                    fields[1]
+                )
+            })?
+    } else {
+        source_bytes
+    };
     if bytes.is_empty() {
         return Err(format!(
             "nustar package `{}` code asset `{}` is empty",
@@ -137,6 +148,7 @@ fn relative_path_is_valid(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{env, fs, process::Command};
 
     #[test]
     fn shader_code_assets_are_manifest_owned_and_loadable() {
@@ -144,13 +156,59 @@ mod tests {
         let manifest = crate::registry::load_manifest_for_domain(root, "shader").unwrap();
         let assets = code_asset_registrations(root, &manifest).unwrap();
 
-        assert_eq!(assets.len(), 2);
+        assert_eq!(assets.len(), 3);
         assert!(assets
             .iter()
             .all(|asset| asset.package_id == "official.shader"));
-        assert!(assets
+        assert_eq!(
+            assets
+                .iter()
+                .filter(|asset| asset.lowering_target == "metal.apple-silicon-gpu")
+                .count(),
+            2
+        );
+        let vulkan = assets
             .iter()
-            .all(|asset| asset.lowering_target == "metal.apple-silicon-gpu"));
+            .find(|asset| asset.asset_id == "shader.vulkan.copy-u32.spirv")
+            .expect("registered Vulkan SPIR-V asset");
+        assert_eq!(vulkan.format, "spirv-binary");
+        assert_eq!(vulkan.target, "vulkan1.3-spirv1.6");
+        assert_eq!(vulkan.entry, "nuis_vulkan_copy_u32");
+        assert_eq!(
+            u32::from_le_bytes(vulkan.bytes[0..4].try_into().unwrap()),
+            0x0723_0203
+        );
         assert!(assets.iter().all(|asset| !asset.bytes.is_empty()));
+    }
+
+    #[test]
+    fn registered_vulkan_spirv_passes_external_validator_when_configured() {
+        let Ok(validator) = env::var("NUIS_SPIRV_VAL") else {
+            return;
+        };
+        let root = Path::new("nustar-packages");
+        let manifest = crate::registry::load_manifest_for_domain(root, "shader").unwrap();
+        let assets = code_asset_registrations(root, &manifest).unwrap();
+        let vulkan = assets
+            .iter()
+            .find(|asset| asset.asset_id == "shader.vulkan.copy-u32.spirv")
+            .expect("registered Vulkan SPIR-V asset");
+        let output_dir = env::temp_dir().join(format!("nuisc-spirv-val-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&output_dir);
+        fs::create_dir_all(&output_dir).unwrap();
+        let path = output_dir.join(&vulkan.file_name);
+        fs::write(&path, &vulkan.bytes).unwrap();
+        let status = Command::new(&validator)
+            .arg("--target-env")
+            .arg("vulkan1.3")
+            .arg(&path)
+            .status()
+            .unwrap_or_else(|error| panic!("failed to run `{validator}`: {error}"));
+        fs::remove_dir_all(output_dir).unwrap();
+
+        assert!(
+            status.success(),
+            "`{validator}` rejected registered Vulkan SPIR-V"
+        );
     }
 }

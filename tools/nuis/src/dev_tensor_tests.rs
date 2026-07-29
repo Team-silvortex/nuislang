@@ -35,7 +35,18 @@ fn task_selection_reports_none_after_every_registered_cell_closes() {
 
 #[test]
 fn task_selection_advances_to_linux_cuda_after_previous_cells_close() {
-    let selected = select_dev_tensor_task_cell(DEV_TENSOR_CELLS).expect("select CUDA task");
+    let mut cells = DEV_TENSOR_CELLS.to_vec();
+    for cell in &mut cells {
+        cell.status = "stable";
+        cell.progress = 100;
+    }
+    let cuda = cells
+        .iter_mut()
+        .find(|cell| cell.function == "cuda-provider-bringup")
+        .expect("CUDA cell");
+    cuda.status = "active";
+    cuda.progress = 99;
+    let selected = select_dev_tensor_task_cell(&cells).expect("select CUDA task");
     assert_eq!(
         dev_tensor_coordinate_key(selected.architecture, selected.module, selected.function),
         "heterogeneous-runtime/linux-cuda/cuda-provider-bringup"
@@ -123,28 +134,29 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
     assert!(summary.weakest_bootstrap_task_card_ready);
     assert_eq!(
         summary.weakest_bootstrap_task_card_coordinate,
-        "heterogeneous-runtime/linux-cuda/cuda-provider-bringup"
+        "heterogeneous-runtime/linux-vulkan/vulkan-provider-bringup"
     );
     assert!(summary
         .weakest_bootstrap_task_card_priority_reason
         .contains("all bootstrap-critical cells are stable at 100/100"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_handoff_coordinate,
-        "heterogeneous-runtime/linux-cuda/cuda-provider-bringup"
+        "heterogeneous-runtime/linux-vulkan/vulkan-provider-bringup"
     );
     assert_eq!(summary.weakest_bootstrap_task_card_handoff_mode, "direct");
     assert!(summary
         .weakest_bootstrap_task_card_handoff_reason
-        .contains("directly actionable"));
-    assert_ne!(summary.weakest_bootstrap_task_card_handoff_action, "<none>");
-    assert_ne!(
+        .contains("weakest task card is directly actionable"));
+    assert!(summary
+        .weakest_bootstrap_task_card_handoff_action
+        .contains("real execution session"));
+    assert_eq!(
         summary.weakest_bootstrap_task_card_handoff_command,
-        "<none>"
+        "cargo test -q -p nuisc shader_spirv_emitter && cargo test -q -p nuis artifact_device_sample_shader_vulkan && cargo test -q -p nsdb vulkan && cargo test -q -p nuis dev_tensor"
     );
-    assert_ne!(
-        summary.weakest_bootstrap_task_card_handoff_expected_artifact,
-        "<none>"
-    );
+    assert!(summary
+        .weakest_bootstrap_task_card_handoff_expected_artifact
+        .contains("real-device Vulkan u32 buffer roundtrip"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.protocol,
         "nuis-dev-tensor-task-card-lineage-v1"
@@ -164,18 +176,14 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         Some("nuislang")
     );
     assert_eq!(
-        summary
-            .weakest_bootstrap_task_card_lineage
-            .handoff_ancestry
-            .last()
-            .map(String::as_str),
-        Some("heterogeneous-runtime/linux-cuda/cuda-provider-bringup")
+        summary.weakest_bootstrap_task_card_lineage.task_ancestry,
+        summary.weakest_bootstrap_task_card_lineage.handoff_ancestry
     );
     assert_eq!(
         summary
             .weakest_bootstrap_task_card_lineage
             .common_ancestor_path,
-        "heterogeneous-runtime/linux-cuda/cuda-provider-bringup"
+        "heterogeneous-runtime/linux-vulkan/vulkan-provider-bringup"
     );
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.transition_depth,
@@ -315,8 +323,12 @@ fn dev_tensor_json_exposes_coordinate_cells() {
     assert!(json.contains("\"weakest_bootstrap_task_card_lineage_status\":\"clean\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_lineage_error_count\":0"));
     assert!(json.contains("\"weakest_bootstrap_task_card_lineage_errors\":[]"));
-    assert!(json.contains("\"weakest_bootstrap_task_card_task_ancestry\":[\"nuislang\""));
-    assert!(json.contains("\"weakest_bootstrap_task_card_handoff_ancestry\":[\"nuislang\""));
+    assert!(json.contains(
+        "\"weakest_bootstrap_task_card_task_ancestry\":[\"nuislang\",\"heterogeneous-runtime\""
+    ));
+    assert!(json.contains(
+        "\"weakest_bootstrap_task_card_handoff_ancestry\":[\"nuislang\",\"heterogeneous-runtime\""
+    ));
     assert!(json.contains("\"weakest_bootstrap_task_card_common_ancestor_path\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_transition_depth\":"));
     assert!(json.contains("all bootstrap-critical cells are stable at 100/100"));
@@ -325,6 +337,10 @@ fn dev_tensor_json_exposes_coordinate_cells() {
     assert!(json.contains("nuis-linux-cuda-host-probe-v1"));
     assert!(json.contains("nuis-cuda-device-inventory-v1"));
     assert!(json.contains("capability-ranked-lowest-ordinal"));
+    assert!(json.contains("\"module\":\"linux-vulkan\""));
+    assert!(json.contains("\"function\":\"vulkan-provider-bringup\""));
+    assert!(json.contains("nuis-vulkan-host-probe-v1"));
+    assert!(json.contains("spirv.vulkan-gpu.bundle.v1"));
     assert!(json.contains("\"blocker\""));
     assert!(json.contains("\"next_action\""));
     assert!(json.contains("\"validation_command\""));
@@ -465,13 +481,15 @@ fn dev_tensor_text_exposes_drift_status() {
     ));
     assert!(text.contains("weakest_bootstrap_task_card_lineage_status: clean"));
     assert!(text.contains("weakest_bootstrap_task_card_lineage_error_count: 0"));
-    assert!(text.contains("weakest_bootstrap_task_card_task_ancestor: nuislang"));
-    assert!(text.contains("weakest_bootstrap_task_card_handoff_ancestor: nuislang"));
     assert!(text.contains(
-        "weakest_bootstrap_task_card_common_ancestor_path: heterogeneous-runtime/linux-cuda/cuda-provider-bringup"
+        "weakest_bootstrap_task_card_common_ancestor_path: heterogeneous-runtime/linux-vulkan/vulkan-provider-bringup"
     ));
     assert!(text.contains("weakest_bootstrap_task_card_transition_depth: 0"));
     assert!(text.contains("all bootstrap-critical cells are stable at 100/100"));
+    assert!(text.contains(
+        "cell: architecture=heterogeneous-runtime module=linux-vulkan function=vulkan-provider-bringup"
+    ));
+    assert!(text.contains("nuis-vulkan-host-probe-v1"));
     assert!(text.contains("    blocker:"));
     assert!(text.contains("    next_action:"));
     assert!(text.contains("    validation_command:"));

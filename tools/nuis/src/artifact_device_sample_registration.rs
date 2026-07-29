@@ -64,10 +64,11 @@ pub(crate) fn resolve_registered_input_evidence(
     Ok(resolved)
 }
 
-fn registrations() -> [DeviceSampleInputRegistration; 2] {
+fn registrations() -> [DeviceSampleInputRegistration; 3] {
     [
         crate::artifact_device_sample_pixelmagic::registration(),
         crate::artifact_device_sample_kernel::registration(),
+        crate::artifact_device_sample_shader_vulkan::registration(),
     ]
 }
 
@@ -86,6 +87,12 @@ mod tests {
         let cuda = enrich_registered_input_evidence("cuda", "nvidia-gpu", "base").unwrap();
         assert!(cuda.contains("provider_sample_registration_package=official.kernel"));
         assert!(cuda.contains("provider_code_asset_descriptor_contract="));
+        let vulkan =
+            enrich_registered_input_evidence("vulkan", "discrete-or-integrated-gpu", "base")
+                .unwrap();
+        assert!(vulkan.contains("provider_sample_registration_package=official.shader"));
+        assert!(vulkan.contains("provider_code_asset_format=spirv-binary"));
+        assert!(vulkan.contains("provider_adapter_binding_provider_family=spirv:vulkan-gpu"));
         assert!(
             enrich_registered_input_evidence("unknown", "unknown", "base").is_none(),
             "unregistered backends must remain generic"

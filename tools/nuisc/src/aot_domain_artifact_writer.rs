@@ -310,6 +310,79 @@ mod tests {
         }
     }
 
+    fn vulkan_shader_unit() -> BuildManifestDomainBuildUnit {
+        BuildManifestDomainBuildUnit {
+            package_id: "official.shader".to_owned(),
+            domain_family: "shader".to_owned(),
+            abi: Some("shader.vulkan.spv1_6".to_owned()),
+            machine_arch: Some("x86_64".to_owned()),
+            machine_os: Some("linux".to_owned()),
+            backend_family: Some("vulkan".to_owned()),
+            vendor: Some("cross-vendor".to_owned()),
+            device_class: Some("discrete-or-integrated-gpu".to_owned()),
+            target_device: Some("discrete-or-integrated-gpu".to_owned()),
+            ir_format: Some("spirv1.6".to_owned()),
+            dispatch_abi: Some("vulkan-compute-pipeline".to_owned()),
+            backend_priority: Some(90),
+            verification: Some("verified".to_owned()),
+            selected_lowering_target: Some("vulkan.discrete-or-integrated-gpu".to_owned()),
+            artifact_stub_path: None,
+            artifact_stub_inline: None,
+            artifact_payload_path: None,
+            artifact_bridge_stub_path: None,
+            artifact_ir_sidecar_path: None,
+            artifact_bridge_stub_inline: None,
+            artifact_payload_blob_path: None,
+            artifact_payload_blob_bytes: None,
+            artifact_payload_format: None,
+            artifact_payload_blob_inline: None,
+            contract_family: "nustar.shader".to_owned(),
+            packaging_role: "hetero-contract".to_owned(),
+        }
+    }
+
+    #[test]
+    fn materializes_registered_vulkan_spirv_and_contribution_table() {
+        let output_dir =
+            std::env::temp_dir().join(format!("nuisc-shader-spirv-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&output_dir);
+        fs::create_dir_all(&output_dir).unwrap();
+        let mut units = [vulkan_shader_unit()];
+        let artifacts = write_domain_build_unit_stubs_with_kernel_codegen_table(
+            &output_dir,
+            &mut units,
+            None,
+            &[],
+        )
+        .unwrap();
+
+        let spirv_path = output_dir.join("nuis.shader.vulkan.copy-u32.spv");
+        assert!(artifacts
+            .iter()
+            .any(|(kind, path)| kind == "domain_code_asset_shader" && path == &spirv_path));
+        let spirv = fs::read(&spirv_path).unwrap();
+        assert_eq!(
+            u32::from_le_bytes(spirv[0..4].try_into().unwrap()),
+            0x0723_0203
+        );
+        assert_eq!(
+            u32::from_le_bytes(spirv[4..8].try_into().unwrap()),
+            0x0001_0600
+        );
+        let table =
+            fs::read_to_string(output_dir.join("nuis.domain.code-asset-contributions.toml"))
+                .unwrap();
+        assert!(table.contains("contribution_count = 2"));
+        assert!(table.contains("owner_package_id = \"official.shader\""));
+        assert!(table.contains("asset_id = \"shader.vulkan.copy-u32.spirv\""));
+        assert!(table.contains("format = \"spirv-binary\""));
+        assert!(table.contains("lowering_target = \"vulkan.discrete-or-integrated-gpu\""));
+        assert!(table.contains("target = \"vulkan1.3-spirv1.6\""));
+        assert!(table.contains("entries = [\"nuis_vulkan_copy_u32\"]"));
+        assert!(table.contains("path = \"nuis.shader.vulkan.copy-u32.spv\""));
+        fs::remove_dir_all(output_dir).unwrap();
+    }
+
     #[test]
     fn materializes_registered_cuda_ptx_without_external_compiler() {
         let output_dir =

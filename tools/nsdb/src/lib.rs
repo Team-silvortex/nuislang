@@ -33,6 +33,8 @@ mod provider_execution_cuda;
 mod provider_execution_metal;
 #[cfg(unix)]
 mod provider_execution_native;
+#[cfg(unix)]
+mod provider_execution_vulkan;
 mod provider_graph_output;
 mod provider_input_binding;
 mod provider_native_output_payload;
@@ -51,6 +53,7 @@ mod provider_runner_cuda;
 mod provider_runner_metal;
 mod provider_runner_native;
 mod provider_runner_registry;
+mod provider_runner_vulkan;
 mod provider_sample;
 mod provider_sample_artifact;
 mod provider_sample_execute;

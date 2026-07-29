@@ -131,6 +131,7 @@ mod registry_types;
 mod registry_validation;
 pub mod render;
 pub mod shader_source;
+mod shader_spirv_emitter;
 pub mod stdlib_registry;
 
 pub use cli::CommandKind;

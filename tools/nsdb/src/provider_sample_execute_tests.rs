@@ -1,6 +1,7 @@
 #![cfg(unix)]
 
 use crate::{
+    provider_bundle_registry::provider_bundle_registrations,
     provider_sample_execute::execute_provider_samples, provider_sample_payload::fnv1a64_hex,
 };
 use std::{
@@ -96,6 +97,7 @@ materialization_status = "provider-sample-materialized"
     let report = execute_provider_samples(&output_dir, Some("data:host")).unwrap();
     let payload =
         fs::read_to_string(output_dir.join("nuis.nsdb.provider-output.data-host.toml")).unwrap();
+    let bundle_count = provider_bundle_registrations().len();
 
     assert_eq!(report.status, "provider-output-payloads-ready");
     assert_eq!(
@@ -112,7 +114,7 @@ materialization_status = "provider-sample-materialized"
         report.provider_bundle_manifest_contract,
         "nuis-provider-bundle-manifest-v1"
     );
-    assert_eq!(report.provider_bundle_manifest_entry_count, 4);
+    assert_eq!(report.provider_bundle_manifest_entry_count, bundle_count);
     assert_eq!(report.first_provider_bundle_package_id, "official.data");
     assert_eq!(report.first_provider_bundle_id, "data.host.bundle.v1");
     assert_eq!(
@@ -140,7 +142,9 @@ materialization_status = "provider-sample-materialized"
         .contains("provider_bundle_registry_contract = \"nuis-provider-bundle-registry-v1\""));
     assert!(payload
         .contains("provider_bundle_manifest_contract = \"nuis-provider-bundle-manifest-v1\""));
-    assert!(payload.contains("provider_bundle_manifest_entry_count = 4"));
+    assert!(payload.contains(&format!(
+        "provider_bundle_manifest_entry_count = {bundle_count}"
+    )));
     assert!(payload.contains("provider_bundle_package_id = \"official.data\""));
     assert!(payload.contains("provider_bundle_id = \"data.host.bundle.v1\""));
     assert!(payload.contains(
