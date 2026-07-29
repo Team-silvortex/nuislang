@@ -70,10 +70,74 @@ pub(crate) const DEV_TENSOR_RUNTIME_VULKAN_DRIFT_CHECKS: &[DevTensorDriftCheckSp
         required_patterns: &[
             "nuis-spirv-compute-source-v1",
             "lower_registered_compute_source",
-            "emit_copy_u32_module",
+            "parse_canonical_inline_wgsl_u32_compute",
+            "emit_u32_module",
+            "spirv_u32_binary_opcode",
+            "CanonicalU32Operation::AddU32",
+            "CanonicalU32Operation::SubU32",
+            "CanonicalU32Operation::MulU32",
             "SPIRV_MAGIC",
             "SPIRV_VERSION_1_6",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuisc-shader-canonical-compute-contract",
+        path: "tools/nuisc/src/shader_canonical_compute.rs",
+        required_patterns: &[
+            "CanonicalU32Compute",
+            "parse_canonical_inline_wgsl_u32_compute",
+            "parse_u32_operation",
+            "U32_OPERATION_PATTERNS",
+            "CanonicalU32Operation::AddU32",
+            "CanonicalU32Operation::SubU32",
+            "CanonicalU32Operation::MulU32",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuisc-shader-msl-emitter",
+        path: "tools/nuisc/src/shader_msl_emitter.rs",
+        required_patterns: &[
+            "lower_canonical_inline_wgsl_u32_for_profile",
+            "parse_canonical_inline_wgsl_u32_compute",
+            "metal.apple-silicon-gpu",
+            "metal.mac-discrete-or-integrated-gpu",
+            "kernel void",
+            "CanonicalU32Operation::AddU32",
+            "CanonicalU32Operation::SubU32",
+            "CanonicalU32Operation::MulU32",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuisc-shader-spirv-emitter-tests",
+        path: "tools/nuisc/src/shader_spirv_emitter_tests.rs",
+        required_patterns: &[
             "rejects_entry_or_binding_drift",
+            "emits_binary_u32_modules_from_canonical_wgsl_body",
+            "nuis_vulkan_add_u32",
+            "nuis_vulkan_sub_u32",
+            "nuis_vulkan_mul_u32",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuisc-shader-msl-emitter-tests",
+        path: "tools/nuisc/src/shader_msl_emitter_tests.rs",
+        required_patterns: &[
+            "emits_msl_copy_module_from_canonical_wgsl_body",
+            "emits_binary_u32_msl_from_shared_canonical_body_contract",
+            "nuis_metal_add_u32",
+            "nuis_metal_sub_u32",
+            "nuis_metal_mul_u32",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "shader-nustar-metal-canonical-source",
+        path: "nustar-packages/assets/shader/metal_copy_u32.wgsl",
+        required_patterns: &[
+            "binding(0, 0)",
+            "binding(0, 1)",
+            "stage compute",
+            "nuis_metal_copy_u32",
+            "output_values[idx] = input_values[idx];",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -88,6 +152,18 @@ pub(crate) const DEV_TENSOR_RUNTIME_VULKAN_DRIFT_CHECKS: &[DevTensorDriftCheckSp
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "shader-nustar-metal-canonical-code-asset-registration",
+        path: "nustar-packages/shader.toml",
+        required_patterns: &[
+            "shader.metal.copy-u32.msl",
+            "metal-source",
+            "metal.apple-silicon-gpu",
+            "msl2.4",
+            "nuis_metal_copy_u32",
+            "assets/shader/metal_copy_u32.wgsl",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nuisc-vulkan-spirv-aot-materialization",
         path: "tools/nuisc/src/aot_domain_artifact_writer.rs",
         required_patterns: &[
@@ -97,6 +173,17 @@ pub(crate) const DEV_TENSOR_RUNTIME_VULKAN_DRIFT_CHECKS: &[DevTensorDriftCheckSp
             "spirv-binary",
             "vulkan.discrete-or-integrated-gpu",
             "nuis_vulkan_copy_u32",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuisc-metal-msl-aot-materialization",
+        path: "tools/nuisc/src/aot_domain_artifact_writer.rs",
+        required_patterns: &[
+            "materializes_registered_msl_from_canonical_wgsl_source",
+            "shader.metal.copy-u32.msl",
+            "nuis.shader.metal.copy-u32.metal",
+            "nuis_metal_copy_u32",
+            "metal-source",
         ],
     },
     DevTensorDriftCheckSpec {

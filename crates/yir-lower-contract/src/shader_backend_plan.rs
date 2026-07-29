@@ -22,6 +22,8 @@ struct ShaderBackendLoweringSpec {
 enum ShaderStageModel {
     Spirv,
     Msl,
+    Dxil,
+    Glsl,
     HostSimd,
 }
 
@@ -29,6 +31,8 @@ enum ShaderStageModel {
 enum ShaderBindingModel {
     DescriptorSetBinding,
     MetalArgumentBuffer,
+    RootSignatureSlot,
+    UniformBindingSlot,
     HostTupleSlot,
 }
 
@@ -50,6 +54,24 @@ const SHADER_BACKEND_LOWERING_SPECS: &[ShaderBackendLoweringSpec] = &[
         entry_prefix: "",
         stage_model: ShaderStageModel::Msl,
         binding_model: ShaderBindingModel::MetalArgumentBuffer,
+    },
+    ShaderBackendLoweringSpec {
+        backend: "dxil",
+        target: "directx-gpu",
+        lowering_target: "dxil:directx-gpu",
+        native_ir: "dxil6.8",
+        entry_prefix: "",
+        stage_model: ShaderStageModel::Dxil,
+        binding_model: ShaderBindingModel::RootSignatureSlot,
+    },
+    ShaderBackendLoweringSpec {
+        backend: "glsl",
+        target: "opengl-gpu",
+        lowering_target: "glsl:opengl-gpu",
+        native_ir: "glsl460",
+        entry_prefix: "",
+        stage_model: ShaderStageModel::Glsl,
+        binding_model: ShaderBindingModel::UniformBindingSlot,
     },
     ShaderBackendLoweringSpec {
         backend: "host-simd",
@@ -134,6 +156,18 @@ fn execution_model_for_stage(stage: &str, model: ShaderStageModel) -> String {
             "compute" => "kernel".to_owned(),
             other => format!("user({other})"),
         },
+        ShaderStageModel::Dxil => match stage {
+            "vertex" => "vs".to_owned(),
+            "fragment" => "ps".to_owned(),
+            "compute" => "cs".to_owned(),
+            other => format!("lib({other})"),
+        },
+        ShaderStageModel::Glsl => match stage {
+            "vertex" => "vertex".to_owned(),
+            "fragment" => "fragment".to_owned(),
+            "compute" => "compute".to_owned(),
+            other => format!("shader({other})"),
+        },
         ShaderStageModel::HostSimd => format!("host-{stage}"),
     }
 }
@@ -148,6 +182,12 @@ fn target_slot_for_binding(
         }
         ShaderBindingModel::MetalArgumentBuffer => {
             format!("argument-buffer[{}].slot{}", binding.group, binding.binding)
+        }
+        ShaderBindingModel::RootSignatureSlot => {
+            format!("root-signature[{}].slot{}", binding.group, binding.binding)
+        }
+        ShaderBindingModel::UniformBindingSlot => {
+            format!("uniform-binding[{}:{}]", binding.group, binding.binding)
         }
         ShaderBindingModel::HostTupleSlot => {
             format!("host.bind[{}:{}]", binding.group, binding.binding)

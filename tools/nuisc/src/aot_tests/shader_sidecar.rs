@@ -115,6 +115,12 @@ fn build_manifest_emits_shader_ir_sidecar() {
     assert!(shader_sidecar_text.contains("clock_contract = \"global-time-partial-order\""));
     assert!(shader_sidecar_text.contains("[lowering_capabilities]"));
     assert!(shader_sidecar_text.contains("capability_owner = \"shader-nustar\""));
+    assert!(shader_sidecar_text.contains("[module_lowering_plan]"));
+    assert!(shader_sidecar_text.contains("contract = \"nuis-yir.shader.backend-lowering-plan.v1\""));
+    assert!(shader_sidecar_text.contains("source_schema = \"nuis-yir.shader.module-summary.v1\""));
+    assert!(shader_sidecar_text.contains("lowering_target = \"msl:metal-gpu\""));
+    assert!(shader_sidecar_text.contains("binding_slot_model = \"argument-buffer-slot\""));
+    assert!(shader_sidecar_text.contains("execution_model = \"kernel\""));
     assert!(shader_sidecar_text.contains("pipeline_lowering = \"metal-render-pipeline-state\""));
     assert!(shader_sidecar_text.contains("entry_symbol = \"main0\""));
     assert!(shader_sidecar_text.contains("[pipeline_layout]"));

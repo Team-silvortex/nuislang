@@ -341,6 +341,37 @@ mod tests {
         }
     }
 
+    fn metal_shader_unit() -> BuildManifestDomainBuildUnit {
+        BuildManifestDomainBuildUnit {
+            package_id: "official.shader".to_owned(),
+            domain_family: "shader".to_owned(),
+            abi: Some("shader.metal.msl2_4".to_owned()),
+            machine_arch: Some("arm64".to_owned()),
+            machine_os: Some("darwin".to_owned()),
+            backend_family: Some("metal".to_owned()),
+            vendor: Some("apple".to_owned()),
+            device_class: Some("apple-silicon-gpu".to_owned()),
+            target_device: Some("apple-silicon-gpu".to_owned()),
+            ir_format: Some("msl2.4".to_owned()),
+            dispatch_abi: Some("metal-render-pipeline".to_owned()),
+            backend_priority: Some(100),
+            verification: Some("verified".to_owned()),
+            selected_lowering_target: Some("metal.apple-silicon-gpu".to_owned()),
+            artifact_stub_path: None,
+            artifact_stub_inline: None,
+            artifact_payload_path: None,
+            artifact_bridge_stub_path: None,
+            artifact_ir_sidecar_path: None,
+            artifact_bridge_stub_inline: None,
+            artifact_payload_blob_path: None,
+            artifact_payload_blob_bytes: None,
+            artifact_payload_format: None,
+            artifact_payload_blob_inline: None,
+            contract_family: "nustar.shader".to_owned(),
+            packaging_role: "hetero-contract".to_owned(),
+        }
+    }
+
     #[test]
     fn materializes_registered_vulkan_spirv_and_contribution_table() {
         let output_dir =
@@ -380,6 +411,38 @@ mod tests {
         assert!(table.contains("target = \"vulkan1.3-spirv1.6\""));
         assert!(table.contains("entries = [\"nuis_vulkan_copy_u32\"]"));
         assert!(table.contains("path = \"nuis.shader.vulkan.copy-u32.spv\""));
+        fs::remove_dir_all(output_dir).unwrap();
+    }
+
+    #[test]
+    fn materializes_registered_msl_from_canonical_wgsl_source() {
+        let output_dir =
+            std::env::temp_dir().join(format!("nuisc-shader-msl-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&output_dir);
+        fs::create_dir_all(&output_dir).unwrap();
+        let mut units = [metal_shader_unit()];
+        let artifacts = write_domain_build_unit_stubs_with_kernel_codegen_table(
+            &output_dir,
+            &mut units,
+            None,
+            &[],
+        )
+        .unwrap();
+
+        let msl_path = output_dir.join("nuis.shader.metal.copy-u32.metal");
+        assert!(artifacts
+            .iter()
+            .any(|(kind, path)| kind == "domain_code_asset_shader" && path == &msl_path));
+        let msl = fs::read_to_string(&msl_path).unwrap();
+        assert!(msl.contains("kernel void nuis_metal_copy_u32("));
+        assert!(msl.contains("output_values[gid] = value;"));
+        let table =
+            fs::read_to_string(output_dir.join("nuis.domain.code-asset-contributions.toml"))
+                .unwrap();
+        assert!(table.contains("asset_id = \"shader.metal.copy-u32.msl\""));
+        assert!(table.contains("format = \"metal-source\""));
+        assert!(table.contains("target = \"msl2.4\""));
+        assert!(table.contains("entries = [\"nuis_metal_copy_u32\"]"));
         fs::remove_dir_all(output_dir).unwrap();
     }
 

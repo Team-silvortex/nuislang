@@ -161,7 +161,10 @@ fn classify_binding_kind(address_space: Option<&str>, ty: &str) -> String {
         "texture".to_owned()
     } else if matches!(address_space, Some("uniform")) {
         "uniform".to_owned()
-    } else if matches!(address_space, Some("storage") | Some("storage, read")) {
+    } else if matches!(
+        address_space,
+        Some("storage") | Some("storage, read") | Some("storage, read_write")
+    ) {
         "storage".to_owned()
     } else {
         "var".to_owned()

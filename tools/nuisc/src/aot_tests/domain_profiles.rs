@@ -125,6 +125,14 @@ fn shader_lowering_and_stub_include_profile_aware_fields() {
     assert!(sidecar.contains("registered_lane_groups = [\"setup\", \"resource\", \"render\"]"));
     assert!(sidecar.contains("[lowering_capabilities]"));
     assert!(sidecar.contains("capability_owner = \"shader-nustar\""));
+    assert!(sidecar.contains("[module_lowering_plan]"));
+    assert!(sidecar.contains("contract = \"nuis-yir.shader.backend-lowering-plan.v1\""));
+    assert!(sidecar.contains("source_schema = \"nuis-yir.shader.module-summary.v1\""));
+    assert!(sidecar.contains("profile_lowering_target = \"metal.apple-silicon-gpu\""));
+    assert!(sidecar.contains("lowering_target = \"msl:metal-gpu\""));
+    assert!(sidecar.contains("binding_slot_model = \"argument-buffer-slot\""));
+    assert!(sidecar.contains("accepted_stage_kinds = [\"vertex\", \"fragment\", \"compute\"]"));
+    assert!(sidecar.contains("execution_model = \"kernel\""));
     assert!(sidecar.contains("native_ir = \"msl2.4\""));
     assert!(sidecar.contains("resource_lowering = \"argument-buffer-table\""));
     assert!(sidecar.contains("texture_lowering = \"texture2d-sampler-argument\""));
@@ -192,6 +200,13 @@ fn shader_vulkan_lowering_plan_switches_to_spirv_pipeline_profile() {
     assert!(sidecar.contains("threadgroup_topology = \"quad-fragment\""));
     assert!(sidecar.contains("[resource_bindings]"));
     assert!(sidecar.contains("binding_table = \"set0.binding0.texture, set0.binding1.sampler\""));
+    assert!(sidecar.contains("[module_lowering_plan]"));
+    assert!(sidecar.contains("contract = \"nuis-yir.shader.backend-lowering-plan.v1\""));
+    assert!(sidecar.contains("source_schema = \"nuis-yir.shader.module-summary.v1\""));
+    assert!(sidecar.contains("profile_lowering_target = \"vulkan.discrete-or-integrated-gpu\""));
+    assert!(sidecar.contains("lowering_target = \"spirv:vulkan-gpu\""));
+    assert!(sidecar.contains("binding_slot_model = \"descriptor-set-binding\""));
+    assert!(sidecar.contains("execution_model = \"GLCompute\""));
     assert!(sidecar.contains("[entry_points]"));
     assert!(sidecar.contains("vertex = \"vs_main\""));
     assert!(sidecar.contains("fragment = \"main\""));

@@ -5,6 +5,7 @@ use crate::aot_domain_profile::{
     render_target_specific_lowering_fields, shader_registered_feature_surfaces_for_profile,
     shader_registered_lane_groups_for_profile, shader_supported_stages_for_profile,
 };
+use crate::aot_shader_module_plan::render_shader_module_lowering_plan;
 use crate::aot_toml::{escape_toml_string, render_string_array};
 
 pub(crate) fn render_domain_build_unit_shader_ir_sidecar(
@@ -90,6 +91,11 @@ pub(crate) fn render_domain_build_unit_shader_ir_sidecar(
     }
     out.push_str(&render_target_specific_lowering_fields(unit, &profile));
     out.push_str(&render_schedule_contract_fields(&profile));
+    out.push_str(&render_shader_module_lowering_plan(
+        unit,
+        &profile,
+        supported_stages,
+    ));
     out.push_str("[lowering_capabilities]\n");
     out.push_str("binary_role = \"linker-input-sidecar\"\n");
     out.push_str("capability_owner = \"shader-nustar\"\n");

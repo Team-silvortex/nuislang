@@ -139,6 +139,9 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
     assert!(summary
         .weakest_bootstrap_task_card_priority_reason
         .contains("all bootstrap-critical cells are stable at 100/100"));
+    assert!(summary
+        .weakest_bootstrap_task_card_priority_reason
+        .contains("status `usable` rank 3"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_handoff_coordinate,
         "heterogeneous-runtime/linux-vulkan/vulkan-provider-bringup"
@@ -152,7 +155,7 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         .contains("spirv:vulkan-gpu"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_handoff_command,
-        "cargo test -q -p nuis link_plan_provider_dispatch_identity && cargo test -q -p nsld final_image_loader_verifies_vulkan_provider_dispatch_without_backend_branch && cargo test -q -p nsdb vulkan_completion_authority && cargo test -q -p nsld validates_verified_or_not_applicable_selection && cargo test -q -p nuis dev_tensor; remote linux: cargo test -q -p nuis --test official_galaxy_hetero_smoke linux_vulkan_shader_sample_executes_provider_output -- --nocapture"
+        "cargo test -q -p nuisc shader_spirv_emitter && cargo test -q -p nuisc shader_msl_emitter && cargo test -q -p nuisc materializes_registered_msl_from_canonical_wgsl_source && cargo test -q -p nuis link_plan_provider_dispatch_identity && cargo test -q -p nsld final_image_loader_verifies_vulkan_provider_dispatch_without_backend_branch && cargo test -q -p nsdb vulkan_completion_authority && cargo test -q -p nsld validates_verified_or_not_applicable_selection && cargo test -q -p nuis dev_tensor; remote linux: cargo test -q -p nuis --test official_galaxy_hetero_smoke linux_vulkan_shader_sample_executes_provider_output -- --nocapture"
     );
     assert!(summary
         .weakest_bootstrap_task_card_handoff_expected_artifact

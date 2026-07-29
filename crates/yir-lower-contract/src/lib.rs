@@ -529,7 +529,7 @@ shader.draw_instanced frame shader0 main_pass lit_pipe 4 1 material_bindings
                 && binding.name == "albedo_texture"
                 && binding.kind == "texture"
         }));
-        assert_eq!(stage.shader_module_lowering_plans.len(), 3);
+        assert_eq!(stage.shader_module_lowering_plans.len(), 5);
         let spirv_plan = stage
             .shader_module_lowering_plans
             .iter()
@@ -566,6 +566,22 @@ shader.draw_instanced frame shader0 main_pass lit_pipe 4 1 material_bindings
             .stage_entries
             .iter()
             .any(|entry| entry.target_entry == "host_vs_main"));
+        let dxil_plan = stage
+            .shader_module_lowering_plans
+            .iter()
+            .find(|plan| plan.lowering_target == "dxil:directx-gpu")
+            .expect("DXIL lowering plan should exist");
+        assert!(dxil_plan.resource_bindings.iter().any(|binding| {
+            binding.name == "albedo_texture" && binding.target_slot == "root-signature[0].slot1"
+        }));
+        let glsl_plan = stage
+            .shader_module_lowering_plans
+            .iter()
+            .find(|plan| plan.lowering_target == "glsl:opengl-gpu")
+            .expect("GLSL lowering plan should exist");
+        assert!(glsl_plan.resource_bindings.iter().any(|binding| {
+            binding.name == "albedo_texture" && binding.target_slot == "uniform-binding[0:1]"
+        }));
         assert!(stage
             .shader_ir_stages
             .iter()

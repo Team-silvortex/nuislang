@@ -9,7 +9,7 @@ mod shader_source_syntax;
 mod shader_source_tests;
 
 pub(crate) use shader_source_normalize::normalize_inline_wgsl_source;
-pub(crate) use shader_source_summary::summarize_inline_wgsl_source;
+pub(crate) use shader_source_summary::{summarize_inline_wgsl_source, InlineWgslBindingSummary};
 
 use shader_source_syntax::{
     is_attribute_position, parse_binding_metadata, parse_parenthesized_args, parse_stage_metadata,

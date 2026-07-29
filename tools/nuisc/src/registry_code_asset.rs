@@ -87,14 +87,43 @@ fn parse_registration(
             source_path.display()
         )
     })?;
-    let bytes = if fields[2] == "spirv-binary" {
-        crate::shader_spirv_emitter::lower_registered_compute_source(&source_bytes, fields[5])
-            .map_err(|error| {
-                format!(
-                    "failed to lower Nustar SPIR-V code asset `{}`: {error}",
-                    fields[1]
-                )
-            })?
+    let source_extension = source_path.extension().and_then(|ext| ext.to_str());
+    let bytes = if fields[2] == "metal-source" && source_extension == Some("wgsl") {
+        crate::shader_msl_emitter::lower_canonical_inline_wgsl_u32_for_profile(
+            &source_bytes,
+            fields[5],
+            fields[3],
+        )
+        .map_err(|error| {
+            format!(
+                "failed to lower Nustar MSL WGSL code asset `{}`: {error}",
+                fields[1]
+            )
+        })?
+    } else if fields[2] == "spirv-binary" && source_extension == Some("wgsl") {
+        crate::shader_spirv_emitter::lower_canonical_inline_wgsl_u32_for_profile(
+            &source_bytes,
+            fields[5],
+            fields[3],
+        )
+        .map_err(|error| {
+            format!(
+                "failed to lower Nustar SPIR-V WGSL code asset `{}`: {error}",
+                fields[1]
+            )
+        })?
+    } else if fields[2] == "spirv-binary" {
+        crate::shader_spirv_emitter::lower_registered_compute_source_for_profile(
+            &source_bytes,
+            fields[5],
+            fields[3],
+        )
+        .map_err(|error| {
+            format!(
+                "failed to lower Nustar SPIR-V code asset `{}`: {error}",
+                fields[1]
+            )
+        })?
     } else {
         source_bytes
     };
@@ -156,7 +185,7 @@ mod tests {
         let manifest = crate::registry::load_manifest_for_domain(root, "shader").unwrap();
         let assets = code_asset_registrations(root, &manifest).unwrap();
 
-        assert_eq!(assets.len(), 3);
+        assert_eq!(assets.len(), 4);
         assert!(assets
             .iter()
             .all(|asset| asset.package_id == "official.shader"));
@@ -165,8 +194,18 @@ mod tests {
                 .iter()
                 .filter(|asset| asset.lowering_target == "metal.apple-silicon-gpu")
                 .count(),
-            2
+            3
         );
+        let metal = assets
+            .iter()
+            .find(|asset| asset.asset_id == "shader.metal.copy-u32.msl")
+            .expect("registered canonical Metal MSL asset");
+        assert_eq!(metal.format, "metal-source");
+        assert_eq!(metal.target, "msl2.4");
+        assert_eq!(metal.entry, "nuis_metal_copy_u32");
+        let metal_text = std::str::from_utf8(&metal.bytes).unwrap();
+        assert!(metal_text.contains("kernel void nuis_metal_copy_u32("));
+        assert!(metal_text.contains("output_values[gid] = value;"));
         let vulkan = assets
             .iter()
             .find(|asset| asset.asset_id == "shader.vulkan.copy-u32.spirv")

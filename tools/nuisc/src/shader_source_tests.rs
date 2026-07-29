@@ -225,6 +225,7 @@ stage fragment {
 binding(0, 0) var color_sampler: sampler;
 binding(0, 1) var color_tex: texture_2d<f32>;
 binding(1, 0) var<uniform> globals: Globals;
+binding(1, 1) var<storage, read_write> pixels: array<u32>;
 
 stage vertex {
   fn vs_main() -> VsOut {
@@ -267,7 +268,7 @@ stage compute(workgroup_size(8, 4, 1)) {
                 .and_then(|stage| stage.return_type.as_deref()),
             Some("vec4<f32>")
         );
-        assert_eq!(summary.bindings.len(), 3);
+        assert_eq!(summary.bindings.len(), 4);
         assert!(summary.bindings.iter().any(|binding| {
             binding.group == 0
                 && binding.binding == 0
@@ -280,6 +281,13 @@ stage compute(workgroup_size(8, 4, 1)) {
                 && binding.name == "globals"
                 && binding.address_space.as_deref() == Some("uniform")
                 && binding.kind == "uniform"
+        }));
+        assert!(summary.bindings.iter().any(|binding| {
+            binding.group == 1
+                && binding.binding == 1
+                && binding.name == "pixels"
+                && binding.address_space.as_deref() == Some("storage, read_write")
+                && binding.kind == "storage"
         }));
     }
 

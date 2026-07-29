@@ -1,31 +1,33 @@
 use std::collections::BTreeMap;
 
+use crate::shader_canonical_compute::{
+    parse_canonical_inline_wgsl_u32_compute, parse_u32_operation, CanonicalU32Compute,
+    CanonicalU32Operation,
+};
+
 pub(crate) const SPIRV_COMPUTE_SOURCE_CONTRACT: &str = "nuis-spirv-compute-source-v1";
+const SHADER_MODULE_BACKEND_PLAN_CONTRACT: &str = "nuis-yir.shader.backend-lowering-plan.v1";
+const SHADER_MODULE_SUMMARY_SCHEMA: &str = "nuis-yir.shader.module-summary.v1";
+const SHADER_MODULE_LOWERING_BOUNDARY: &str = "module-summary-to-native-ir";
+const SPIRV_VULKAN_LOWERING_TARGET: &str = "spirv:vulkan-gpu";
 const SPIRV_MAGIC: u32 = 0x0723_0203;
 const SPIRV_VERSION_1_6: u32 = 0x0001_0600;
 
-struct ComputeSource {
-    entry: String,
-    local_size: [u32; 3],
-    descriptor_set: u32,
-    input_binding: u32,
-    output_binding: u32,
-}
-
-pub(crate) fn lower_registered_compute_source(
+pub(crate) fn lower_registered_compute_source_for_profile(
     source: &[u8],
     expected_entry: &str,
+    expected_profile_lowering_target: &str,
 ) -> Result<Vec<u8>, String> {
     let source = std::str::from_utf8(source)
         .map_err(|_| "Nuis SPIR-V compute source must be UTF-8".to_owned())?;
-    let source = parse_compute_source(source)?;
+    let source = parse_compute_source(source, expected_profile_lowering_target)?;
     if source.entry != expected_entry {
         return Err(format!(
             "Nuis SPIR-V source entry `{}` does not match registered entry `{expected_entry}`",
             source.entry
         ));
     }
-    let words = emit_copy_u32_module(&source);
+    let words = emit_u32_module(&source);
     validate_module_shape(&words, expected_entry)?;
     Ok(words
         .into_iter()
@@ -33,7 +35,28 @@ pub(crate) fn lower_registered_compute_source(
         .collect::<Vec<_>>())
 }
 
-fn parse_compute_source(source: &str) -> Result<ComputeSource, String> {
+pub(crate) fn lower_canonical_inline_wgsl_u32_for_profile(
+    source: &[u8],
+    expected_entry: &str,
+    expected_profile_lowering_target: &str,
+) -> Result<Vec<u8>, String> {
+    let source = std::str::from_utf8(source)
+        .map_err(|_| "canonical inline WGSL SPIR-V source must be UTF-8".to_owned())?;
+    let plan = canonical_spirv_compute_plan(expected_profile_lowering_target);
+    validate_module_lowering_plan(&plan, expected_profile_lowering_target)?;
+    let compute = parse_canonical_inline_wgsl_u32_compute(source, expected_entry)?;
+    let words = emit_u32_module(&compute);
+    validate_module_shape(&words, expected_entry)?;
+    Ok(words
+        .into_iter()
+        .flat_map(u32::to_le_bytes)
+        .collect::<Vec<_>>())
+}
+
+fn parse_compute_source(
+    source: &str,
+    expected_profile_lowering_target: &str,
+) -> Result<CanonicalU32Compute, String> {
     let mut fields = BTreeMap::new();
     for line in source.lines().map(str::trim) {
         if line.is_empty() || line.starts_with('#') {
@@ -50,10 +73,12 @@ fn parse_compute_source(source: &str) -> Result<ComputeSource, String> {
     }
     if required_field(&fields, "contract")? != SPIRV_COMPUTE_SOURCE_CONTRACT
         || required_field(&fields, "spirv_version")? != "1.6"
-        || required_field(&fields, "operation")? != "copy-u32"
     {
-        return Err("unsupported Nuis SPIR-V compute source contract or operation".to_owned());
+        return Err("unsupported Nuis SPIR-V compute source contract".to_owned());
     }
+    let operation = parse_u32_operation(required_field(&fields, "operation")?)?;
+    let plan = module_lowering_plan_from_fields(&fields)?;
+    validate_module_lowering_plan(&plan, expected_profile_lowering_target)?;
     let entry = required_field(&fields, "entry")?;
     if !symbol_is_valid(entry) {
         return Err(format!("invalid Nuis SPIR-V entry `{entry}`"));
@@ -65,7 +90,8 @@ fn parse_compute_source(source: &str) -> Result<ComputeSource, String> {
     if input_binding == output_binding {
         return Err("Nuis SPIR-V input and output bindings must differ".to_owned());
     }
-    Ok(ComputeSource {
+    Ok(CanonicalU32Compute {
+        operation,
         entry: entry.to_owned(),
         local_size,
         descriptor_set,
@@ -74,47 +100,102 @@ fn parse_compute_source(source: &str) -> Result<ComputeSource, String> {
     })
 }
 
-fn required_field<'a>(fields: &BTreeMap<&'a str, &'a str>, key: &str) -> Result<&'a str, String> {
-    fields
-        .get(key)
-        .copied()
-        .ok_or_else(|| format!("missing Nuis SPIR-V source field `{key}`"))
+struct ModuleLoweringPlan {
+    contract: String,
+    source_schema: String,
+    lowering_boundary: String,
+    profile_lowering_target: String,
+    lowering_target: String,
+    native_ir: String,
+    stage_kind: String,
+    execution_model: String,
+    binding_slot_model: String,
 }
 
-fn parse_u32(fields: &BTreeMap<&str, &str>, key: &str) -> Result<u32, String> {
-    required_field(fields, key)?
-        .parse()
-        .map_err(|_| format!("Nuis SPIR-V source field `{key}` must be u32"))
+fn module_lowering_plan_from_fields(
+    fields: &BTreeMap<&str, &str>,
+) -> Result<ModuleLoweringPlan, String> {
+    Ok(ModuleLoweringPlan {
+        contract: required_field(fields, "module_lowering_plan_contract")?.to_owned(),
+        source_schema: required_field(fields, "module_source_schema")?.to_owned(),
+        lowering_boundary: required_field(fields, "module_lowering_boundary")?.to_owned(),
+        profile_lowering_target: required_field(fields, "module_profile_lowering_target")?
+            .to_owned(),
+        lowering_target: required_field(fields, "module_lowering_target")?.to_owned(),
+        native_ir: required_field(fields, "module_native_ir")?.to_owned(),
+        stage_kind: required_field(fields, "module_stage_kind")?.to_owned(),
+        execution_model: required_field(fields, "module_execution_model")?.to_owned(),
+        binding_slot_model: required_field(fields, "module_binding_slot_model")?.to_owned(),
+    })
 }
 
-fn parse_local_size(value: &str) -> Result<[u32; 3], String> {
-    let values = value
-        .split('x')
-        .map(str::parse::<u32>)
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|_| "Nuis SPIR-V local_size must use positive u32 dimensions".to_owned())?;
-    let [x, y, z] = values.as_slice() else {
-        return Err("Nuis SPIR-V local_size must contain three dimensions".to_owned());
-    };
-    if [x, y, z].into_iter().any(|value| *value == 0)
-        || u64::from(*x) * u64::from(*y) * u64::from(*z) > 1024
-    {
-        return Err("Nuis SPIR-V local_size exceeds the portable compute limit".to_owned());
+fn canonical_spirv_compute_plan(expected_profile_lowering_target: &str) -> ModuleLoweringPlan {
+    ModuleLoweringPlan {
+        contract: SHADER_MODULE_BACKEND_PLAN_CONTRACT.to_owned(),
+        source_schema: SHADER_MODULE_SUMMARY_SCHEMA.to_owned(),
+        lowering_boundary: SHADER_MODULE_LOWERING_BOUNDARY.to_owned(),
+        profile_lowering_target: expected_profile_lowering_target.to_owned(),
+        lowering_target: SPIRV_VULKAN_LOWERING_TARGET.to_owned(),
+        native_ir: "spirv1.6".to_owned(),
+        stage_kind: "compute".to_owned(),
+        execution_model: "GLCompute".to_owned(),
+        binding_slot_model: "descriptor-set-binding".to_owned(),
     }
-    Ok([*x, *y, *z])
 }
 
-fn symbol_is_valid(value: &str) -> bool {
-    value
-        .bytes()
-        .next()
-        .is_some_and(|byte| byte.is_ascii_alphabetic() || byte == b'_')
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+fn validate_module_lowering_plan(
+    plan: &ModuleLoweringPlan,
+    expected_profile_lowering_target: &str,
+) -> Result<(), String> {
+    for (field, actual, expected) in [
+        (
+            "module_lowering_plan_contract",
+            plan.contract.as_str(),
+            SHADER_MODULE_BACKEND_PLAN_CONTRACT,
+        ),
+        (
+            "module_source_schema",
+            plan.source_schema.as_str(),
+            SHADER_MODULE_SUMMARY_SCHEMA,
+        ),
+        (
+            "module_lowering_boundary",
+            plan.lowering_boundary.as_str(),
+            SHADER_MODULE_LOWERING_BOUNDARY,
+        ),
+        (
+            "module_profile_lowering_target",
+            plan.profile_lowering_target.as_str(),
+            expected_profile_lowering_target,
+        ),
+        (
+            "module_lowering_target",
+            plan.lowering_target.as_str(),
+            SPIRV_VULKAN_LOWERING_TARGET,
+        ),
+        ("module_native_ir", plan.native_ir.as_str(), "spirv1.6"),
+        ("module_stage_kind", plan.stage_kind.as_str(), "compute"),
+        (
+            "module_execution_model",
+            plan.execution_model.as_str(),
+            "GLCompute",
+        ),
+        (
+            "module_binding_slot_model",
+            plan.binding_slot_model.as_str(),
+            "descriptor-set-binding",
+        ),
+    ] {
+        if actual != expected {
+            return Err(format!(
+                "Nuis SPIR-V module lowering plan field `{field}` is `{actual}`, expected `{expected}`"
+            ));
+        }
+    }
+    Ok(())
 }
 
-fn emit_copy_u32_module(source: &ComputeSource) -> Vec<u32> {
+fn emit_u32_module(source: &CanonicalU32Compute) -> Vec<u32> {
     const VOID: u32 = 1;
     const FUNCTION_TYPE: u32 = 2;
     const U32_TYPE: u32 = 3;
@@ -135,8 +216,14 @@ fn emit_copy_u32_module(source: &ComputeSource) -> Vec<u32> {
     const INPUT_ELEMENT: u32 = 18;
     const VALUE: u32 = 19;
     const OUTPUT_ELEMENT: u32 = 20;
+    const COMPUTED_VALUE: u32 = 21;
 
-    let mut words = vec![SPIRV_MAGIC, SPIRV_VERSION_1_6, 0, 21, 0];
+    let id_bound = if spirv_u32_binary_opcode(source.operation).is_some() {
+        22
+    } else {
+        21
+    };
+    let mut words = vec![SPIRV_MAGIC, SPIRV_VERSION_1_6, 0, id_bound, 0];
     instruction(&mut words, 17, &[1]);
     instruction(&mut words, 14, &[0, 1]);
     let mut entry_operands = vec![5, MAIN];
@@ -224,10 +311,69 @@ fn emit_copy_u32_module(source: &ComputeSource) -> Vec<u32> {
             INDEX,
         ],
     );
-    instruction(&mut words, 62, &[OUTPUT_ELEMENT, VALUE]);
+    match spirv_u32_binary_opcode(source.operation) {
+        None => instruction(&mut words, 62, &[OUTPUT_ELEMENT, VALUE]),
+        Some(opcode) => {
+            instruction(
+                &mut words,
+                opcode,
+                &[U32_TYPE, COMPUTED_VALUE, VALUE, VALUE],
+            );
+            instruction(&mut words, 62, &[OUTPUT_ELEMENT, COMPUTED_VALUE]);
+        }
+    }
     instruction(&mut words, 253, &[]);
     instruction(&mut words, 56, &[]);
     words
+}
+
+fn spirv_u32_binary_opcode(operation: CanonicalU32Operation) -> Option<u16> {
+    match operation {
+        CanonicalU32Operation::CopyU32 => None,
+        CanonicalU32Operation::AddU32 => Some(128),
+        CanonicalU32Operation::SubU32 => Some(130),
+        CanonicalU32Operation::MulU32 => Some(132),
+    }
+}
+
+fn required_field<'a>(fields: &BTreeMap<&'a str, &'a str>, key: &str) -> Result<&'a str, String> {
+    fields
+        .get(key)
+        .copied()
+        .ok_or_else(|| format!("missing Nuis SPIR-V source field `{key}`"))
+}
+
+fn parse_u32(fields: &BTreeMap<&str, &str>, key: &str) -> Result<u32, String> {
+    required_field(fields, key)?
+        .parse()
+        .map_err(|_| format!("Nuis SPIR-V source field `{key}` must be u32"))
+}
+
+fn parse_local_size(value: &str) -> Result<[u32; 3], String> {
+    let values = value
+        .split('x')
+        .map(str::parse::<u32>)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| "Nuis SPIR-V local_size must use positive u32 dimensions".to_owned())?;
+    let [x, y, z] = values.as_slice() else {
+        return Err("Nuis SPIR-V local_size must contain three dimensions".to_owned());
+    };
+    if [x, y, z].into_iter().any(|value| *value == 0)
+        || u64::from(*x) * u64::from(*y) * u64::from(*z) > 1024
+    {
+        return Err("Nuis SPIR-V local_size exceeds the portable compute limit".to_owned());
+    }
+    Ok([*x, *y, *z])
+}
+
+fn symbol_is_valid(value: &str) -> bool {
+    value
+        .bytes()
+        .next()
+        .is_some_and(|byte| byte.is_ascii_alphabetic() || byte == b'_')
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
 }
 
 fn instruction(words: &mut Vec<u32>, opcode: u16, operands: &[u32]) {
@@ -247,7 +393,7 @@ fn encode_string(value: &str) -> Vec<u32> {
 }
 
 fn validate_module_shape(words: &[u32], entry: &str) -> Result<(), String> {
-    if words.len() < 6 || words[0] != SPIRV_MAGIC || words[1] != SPIRV_VERSION_1_6 || words[3] != 21
+    if words.len() < 6 || words[0] != SPIRV_MAGIC || words[1] != SPIRV_VERSION_1_6 || words[3] < 21
     {
         return Err("Nuis SPIR-V emitter produced an invalid module header".to_owned());
     }
@@ -278,49 +424,5 @@ fn validate_module_shape(words: &[u32], entry: &str) -> Result<(), String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    const SOURCE: &str = r#"
-contract = "nuis-spirv-compute-source-v1"
-spirv_version = "1.6"
-operation = "copy-u32"
-entry = "nuis_vulkan_copy_u32"
-local_size = "1x1x1"
-descriptor_set = 0
-input_binding = 0
-output_binding = 1
-"#;
-
-    #[test]
-    fn emits_deterministic_spirv_copy_module_without_external_tools() {
-        let first =
-            lower_registered_compute_source(SOURCE.as_bytes(), "nuis_vulkan_copy_u32").unwrap();
-        let repeated =
-            lower_registered_compute_source(SOURCE.as_bytes(), "nuis_vulkan_copy_u32").unwrap();
-        assert_eq!(first, repeated);
-        assert_eq!(first.len() % 4, 0);
-        assert_eq!(
-            u32::from_le_bytes(first[0..4].try_into().unwrap()),
-            SPIRV_MAGIC
-        );
-        assert_eq!(
-            u32::from_le_bytes(first[4..8].try_into().unwrap()),
-            SPIRV_VERSION_1_6
-        );
-        assert!(first
-            .windows("nuis_vulkan_copy_u32".len())
-            .any(|window| window == b"nuis_vulkan_copy_u32"));
-    }
-
-    #[test]
-    fn rejects_entry_or_binding_drift() {
-        assert!(lower_registered_compute_source(SOURCE.as_bytes(), "other_entry").is_err());
-        let duplicate_binding = SOURCE.replace("output_binding = 1", "output_binding = 0");
-        assert!(lower_registered_compute_source(
-            duplicate_binding.as_bytes(),
-            "nuis_vulkan_copy_u32"
-        )
-        .is_err());
-    }
-}
+#[path = "shader_spirv_emitter_tests.rs"]
+mod tests;
