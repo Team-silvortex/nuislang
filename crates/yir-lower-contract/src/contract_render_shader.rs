@@ -60,6 +60,69 @@ impl ShaderLoweringContract {
             if let Some(source) = &stage.wgsl_source {
                 lines.push(format!("  wgsl_source_lines={}", source.lines().count()));
             }
+            if let Some(module) = &stage.shader_module {
+                lines.push(format!("  shader_module_schema={}", module.schema));
+                lines.push(format!("  shader_module_entry={}", module.entry));
+                lines.push(format!(
+                    "  shader_module_source_language={}",
+                    module.source_language
+                ));
+                lines.push(format!(
+                    "  shader_module_stage_count={}",
+                    module.stages.len()
+                ));
+                lines.push(format!(
+                    "  shader_module_binding_count={}",
+                    module.bindings.len()
+                ));
+                for module_stage in &module.stages {
+                    lines.push(format!(
+                        "  shader_module_stage kind={} entry={}",
+                        module_stage.stage, module_stage.entry
+                    ));
+                    if let Some(workgroup_size) = &module_stage.workgroup_size {
+                        lines.push(format!("    workgroup_size={workgroup_size}"));
+                    }
+                    if let Some(return_type) = &module_stage.return_type {
+                        lines.push(format!("    return_type={return_type}"));
+                    }
+                }
+                for binding in &module.bindings {
+                    lines.push(format!(
+                        "  shader_module_binding group={} binding={} name={} kind={} type={}",
+                        binding.group, binding.binding, binding.name, binding.kind, binding.ty
+                    ));
+                    if let Some(address_space) = &binding.address_space {
+                        lines.push(format!("    address_space={address_space}"));
+                    }
+                }
+            }
+            for plan in &stage.shader_module_lowering_plans {
+                lines.push(format!(
+                    "  shader_module_lowering_plan contract={} lowering_target={} native_ir={} source_schema={}",
+                    plan.contract, plan.lowering_target, plan.native_ir, plan.source_schema
+                ));
+                lines.push(format!(
+                    "    backend={} target={} source_language={} boundary={} requires_translation={}",
+                    plan.backend,
+                    plan.target,
+                    plan.source_language,
+                    plan.lowering_boundary,
+                    plan.requires_translation
+                ));
+                for entry in &plan.stage_entries {
+                    lines.push(format!(
+                        "    lowering_stage kind={} source_entry={} target_entry={} model={}",
+                        entry.stage, entry.source_entry, entry.target_entry, entry.execution_model
+                    ));
+                }
+                for binding in &plan.resource_bindings {
+                    lines.push(format!(
+                        "    lowering_binding group={} binding={} name={} target_slot={}",
+                        binding.group, binding.binding, binding.name, binding.target_slot
+                    ));
+                }
+            }
             for shader_ir in &stage.shader_ir_stages {
                 lines.push(format!("  shader_ir_stage={}", shader_ir.stage));
                 lines.push(format!("  shader_ir_function={}", shader_ir.function));
@@ -221,6 +284,108 @@ impl ShaderLoweringContract {
             }
             if let Some(source) = &stage.wgsl_source {
                 out.push_str(&format!("wgsl_source = \"{}\"\n", escape_toml(source)));
+            }
+            if let Some(module) = &stage.shader_module {
+                out.push_str(&format!(
+                    "shader_module_schema = \"{}\"\nshader_module_resource = \"{}\"\nshader_module_entry = \"{}\"\nshader_module_source_language = \"{}\"\nshader_module_stage_count = {}\nshader_module_binding_count = {}\n",
+                    escape_toml(&module.schema),
+                    escape_toml(&module.resource),
+                    escape_toml(&module.entry),
+                    escape_toml(&module.source_language),
+                    module.stages.len(),
+                    module.bindings.len()
+                ));
+                for module_stage in &module.stages {
+                    out.push_str("\n[[stage.shader_module_stage]]\n");
+                    out.push_str(&format!(
+                        "kind = \"{}\"\nentry = \"{}\"\n",
+                        escape_toml(&module_stage.stage),
+                        escape_toml(&module_stage.entry)
+                    ));
+                    if let Some(workgroup_size) = &module_stage.workgroup_size {
+                        out.push_str(&format!(
+                            "workgroup_size = \"{}\"\n",
+                            escape_toml(workgroup_size)
+                        ));
+                    }
+                    if let Some(return_type) = &module_stage.return_type {
+                        out.push_str(&format!("return_type = \"{}\"\n", escape_toml(return_type)));
+                    }
+                    for attr in &module_stage.attributes {
+                        out.push_str("\n[[stage.shader_module_stage.attribute]]\n");
+                        out.push_str(&format!("value = \"{}\"\n", escape_toml(attr)));
+                    }
+                }
+                for binding in &module.bindings {
+                    out.push_str("\n[[stage.shader_module_binding]]\n");
+                    out.push_str(&format!(
+                        "group = {}\nbinding = {}\nname = \"{}\"\nkind = \"{}\"\nty = \"{}\"\n",
+                        binding.group,
+                        binding.binding,
+                        escape_toml(&binding.name),
+                        escape_toml(&binding.kind),
+                        escape_toml(&binding.ty)
+                    ));
+                    if let Some(address_space) = &binding.address_space {
+                        out.push_str(&format!(
+                            "address_space = \"{}\"\n",
+                            escape_toml(address_space)
+                        ));
+                    }
+                }
+            }
+            for plan in &stage.shader_module_lowering_plans {
+                out.push_str("\n[[stage.shader_module_lowering_plan]]\n");
+                out.push_str(&format!("contract = \"{}\"\n", escape_toml(&plan.contract)));
+                out.push_str(&format!("backend = \"{}\"\n", escape_toml(&plan.backend)));
+                out.push_str(&format!("target = \"{}\"\n", escape_toml(&plan.target)));
+                out.push_str(&format!(
+                    "lowering_target = \"{}\"\n",
+                    escape_toml(&plan.lowering_target)
+                ));
+                out.push_str(&format!(
+                    "native_ir = \"{}\"\nsource_schema = \"{}\"\nsource_language = \"{}\"\nresource = \"{}\"\nentry = \"{}\"\n",
+                    escape_toml(&plan.native_ir),
+                    escape_toml(&plan.source_schema),
+                    escape_toml(&plan.source_language),
+                    escape_toml(&plan.resource),
+                    escape_toml(&plan.entry)
+                ));
+                out.push_str(&format!(
+                    "requires_translation = {}\nlowering_boundary = \"{}\"\nstage_count = {}\nbinding_count = {}\n",
+                    plan.requires_translation,
+                    escape_toml(&plan.lowering_boundary),
+                    plan.stage_entries.len(),
+                    plan.resource_bindings.len()
+                ));
+                for entry in &plan.stage_entries {
+                    out.push_str("\n[[stage.shader_module_lowering_plan.stage]]\n");
+                    out.push_str(&format!(
+                        "kind = \"{}\"\nsource_entry = \"{}\"\ntarget_entry = \"{}\"\nexecution_model = \"{}\"\n",
+                        escape_toml(&entry.stage),
+                        escape_toml(&entry.source_entry),
+                        escape_toml(&entry.target_entry),
+                        escape_toml(&entry.execution_model)
+                    ));
+                }
+                for binding in &plan.resource_bindings {
+                    out.push_str("\n[[stage.shader_module_lowering_plan.binding]]\n");
+                    out.push_str(&format!(
+                        "group = {}\nbinding = {}\nname = \"{}\"\nkind = \"{}\"\nty = \"{}\"\ntarget_slot = \"{}\"\n",
+                        binding.group,
+                        binding.binding,
+                        escape_toml(&binding.name),
+                        escape_toml(&binding.kind),
+                        escape_toml(&binding.ty),
+                        escape_toml(&binding.target_slot)
+                    ));
+                    if let Some(address_space) = &binding.address_space {
+                        out.push_str(&format!(
+                            "address_space = \"{}\"\n",
+                            escape_toml(address_space)
+                        ));
+                    }
+                }
             }
             for shader_ir in &stage.shader_ir_stages {
                 out.push_str(&format!(

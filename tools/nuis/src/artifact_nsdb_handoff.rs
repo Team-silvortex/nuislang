@@ -174,6 +174,7 @@ impl PersistedNsdbHandoffSummary {
             self.hetero_execution_closure_ready.as_deref(),
         ) {
             (None, _) => true,
+            (Some("none"), _) => true,
             (Some("closed"), Some("true")) => true,
             _ => false,
         }

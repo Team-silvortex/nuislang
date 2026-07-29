@@ -3,6 +3,8 @@ use std::collections::BTreeSet;
 
 const AUTHORITY_CONTRACT: &str = "nuis-provider-completion-dispatch-authority-v1";
 const FINAL_IMAGE_DISPATCH_CONTRACT: &str = "nuis-final-image-provider-dispatch-v1";
+const COMPLETION_EVIDENCE_COLLECTION_CONTRACT: &str =
+    "nuis-provider-completion-evidence-collection-v1";
 
 #[derive(Clone)]
 pub(crate) struct PersistedProviderCompletion {
@@ -138,6 +140,7 @@ fn parse_completion(record: &str, digest_contract: &str) -> PersistedProviderCom
     let dispatch_runner_adapter_id = field(record, "dispatch_runner_adapter_id");
     let mut material =
         format!("{trace_id}\0{provider_family}\0{output_contract}\0{output_evidence}");
+    append_completion_evidence_hash_material(&mut material, record);
     if dispatch_authority_contract == AUTHORITY_CONTRACT
         && dispatch_authority_status != "not-applicable"
     {
@@ -191,6 +194,73 @@ fn identity(
         selected_set_hash: selected_set_hash.to_owned(),
         identity_hash,
     }
+}
+
+fn append_completion_evidence_hash_material(material: &mut String, record: &str) {
+    if field(record, "completion_evidence_contract") != COMPLETION_EVIDENCE_COLLECTION_CONTRACT
+        || field(record, "completion_evidence_status") != "verified"
+    {
+        return;
+    }
+    for key in [
+        "completion_evidence_contract",
+        "completion_evidence_status",
+        "completion_evidence_count",
+        "completion_clock_evidence",
+        "completion_tokens",
+        "glm_release_contract",
+        "glm_release_tokens",
+        "glm_release_status",
+        "code_asset_identity_contract",
+        "code_asset_identity_status",
+        "code_asset_identity_asset_id",
+        "code_asset_identity_hash",
+        "code_asset_identity_set_contract",
+        "code_asset_identity_set_status",
+        "code_asset_identity_set_count",
+        "code_asset_identity_set_root_hash",
+    ] {
+        material.push('\0');
+        material.push_str(&field(record, key));
+    }
+    append_compiled_code_asset_selection_hash_material(material, record);
+}
+
+fn append_compiled_code_asset_selection_hash_material(material: &mut String, record: &str) {
+    if field(record, "compiled_code_asset_selection_status") != "verified" {
+        return;
+    }
+    for key in [
+        "compiled_code_asset_selection_contract",
+        "compiled_code_asset_selection_status",
+        "compiled_code_asset_table_contract",
+        "compiled_code_asset_table_hash",
+        "compiled_code_asset_contribution_count",
+        "compiled_code_asset_identity_set_root_hash",
+        "compiled_code_asset_contribution_index",
+        "compiled_code_asset_asset_id",
+        "compiled_code_asset_identity_hash",
+        "compiled_code_asset_selection_count",
+    ] {
+        append_rendered_toml_hash_line(material, key, &field(record, key));
+    }
+    let selection_count = field(record, "compiled_code_asset_selection_count")
+        .parse::<usize>()
+        .unwrap_or(0);
+    for index in 0..selection_count {
+        for suffix in ["contribution_index", "asset_id", "identity_hash"] {
+            let key = format!("compiled_code_asset_selection_{index}_{suffix}");
+            append_rendered_toml_hash_line(material, &key, &field(record, &key));
+        }
+    }
+}
+
+fn append_rendered_toml_hash_line(material: &mut String, key: &str, value: &str) {
+    material.push('\0');
+    material.push_str(key);
+    material.push_str(" = \"");
+    material.push_str(&value.replace('\\', "\\\\").replace('"', "\\\""));
+    material.push('"');
 }
 
 fn field(source: &str, key: &str) -> String {

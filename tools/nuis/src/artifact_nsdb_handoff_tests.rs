@@ -227,3 +227,41 @@ output_evidence = "coreml-output.toml:hash=0x5678"
         Some("provider-completion-set-hash-mismatch")
     );
 }
+
+#[test]
+fn treats_absent_hetero_execution_closure_as_non_blocking() {
+    let dir = env::temp_dir().join(format!(
+        "nuis-provider-handoff-closure-none-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(
+        dir.join("nuis.nsdb.payload-execution-handoff.toml"),
+        r#"
+protocol = "nuis-nsdb-payload-execution-handoff-v1"
+debugger_contract = "nsdb-yir-payload-execution-trace-v1"
+record_count = 1
+ready_record_count = 1
+hetero_execution_closure_protocol = "none"
+hetero_execution_closure_status = "none"
+hetero_execution_closure_ready = "false"
+hetero_execution_closure_first_blocker = "none"
+hetero_execution_closure_next_action = "none"
+
+[[records]]
+trace_id = "hetero-trace:shader:vulkan:discrete-or-integrated-gpu"
+status = "ready"
+execution_phase = "provider-device-completion"
+provider_family = "spirv:vulkan-gpu"
+output_contract = "nuis-provider-output-payload-handoff-v1"
+output_evidence = "provider-output.toml:hash=0x1234"
+"#,
+    )
+    .unwrap();
+
+    let summary = read_persisted_nsdb_handoff(Some(&dir));
+    fs::remove_dir_all(dir).unwrap();
+
+    assert!(summary.hetero_execution_closure_ready());
+    assert_eq!(summary.hetero_execution_closure_blocker(), None);
+}

@@ -676,13 +676,10 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
                 "selected_set_validation_status",
             ],
         },
-    DevTensorDriftCheckSpec {
+        DevTensorDriftCheckSpec {
             id: "nuis-provider-bundle-workflow-closure-render",
             path: "tools/nuis/src/workflow/link_plan_json.rs",
-            required_patterns: &[
-                "ProviderBundleClosureMirror::json_fields",
-                "closure_summary.provider_bundle.as_ref()",
-            ],
+            required_patterns: &["append_projection_json_fields"],
         },
     DevTensorDriftCheckSpec {
             id: "nsdb-provider-sample-materializer-cli",

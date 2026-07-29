@@ -13,11 +13,11 @@ pub(super) fn finalize_official_hetero(
     super::replay::assert_multi_checkpoint_replay_resume(output_dir);
 }
 
-fn assemble_provider_complete_final_image(
+pub(super) fn assemble_provider_complete_final_image(
     project: &str,
     output_dir: &Path,
     provider_record_count: usize,
-) {
+) -> String {
     let output_dir_text = output_dir.display().to_string();
     let before_seal = run_nsdb(&["replay", &output_dir_text, "--json"]);
     assert_success(&before_seal, "nsdb inspects provider-complete intermediate");
@@ -136,6 +136,63 @@ fn assemble_provider_complete_final_image(
             && final_output_stdout.contains("\"glm_release_tokens\":\"glm-release:0x"),
         "Nsld final output omitted verified provider completion evidence\n{final_output_stdout}"
     );
+
+    let frontdoor = run_nuis(&["build-report", "--json", &output_dir_text]);
+    assert_success(
+        &frontdoor,
+        "Nuis mirrors sealed final-image replay into package/debugger frontdoors",
+    );
+    let frontdoor_stdout = String::from_utf8_lossy(&frontdoor.stdout);
+    assert!(
+        frontdoor_stdout
+            .contains("\"nsld_final_executable_output_nsdb_replay_ready\":true")
+            && frontdoor_stdout.contains(
+                "\"nsld_final_executable_output_object_package_ready\":true"
+            )
+            && frontdoor_stdout.contains(
+                "\"nsld_final_executable_output_object_package_status\":\"replay-ready\""
+            )
+            && frontdoor_stdout.contains(
+                "\"nsld_final_executable_output_object_package_replay_vocabulary_contract\":\"nuis-final-output-replay-vocabulary-v1\""
+            )
+            && frontdoor_stdout.contains(
+                "\"nsld_final_executable_output_debugger_transcript_ready\":true"
+            )
+            && frontdoor_stdout.contains(
+                "\"nsld_final_executable_output_debugger_transcript_status\":\"transcript-ready\""
+            )
+            && frontdoor_stdout.contains(
+                "\"nsld_final_executable_output_debugger_transcript_replay_vocabulary_contract\":\"nuis-final-output-replay-vocabulary-v1\""
+            )
+            && frontdoor_stdout.contains(
+                "\"nsld_final_executable_output_object_package_provider_dispatch_identity_status\":\"verified\""
+            )
+            && frontdoor_stdout.contains(
+                "\"nsld_final_executable_output_debugger_api_provider_dispatch_identity_status\":\"verified\""
+            )
+            && frontdoor_stdout.contains(
+                "\"nsld_final_executable_output_provider_dispatch_identity_projection_source\":\"final_output_provider_completion_dispatch_identity_hash\""
+            )
+            && frontdoor_stdout.contains(&format!(
+                "\"nsld_final_executable_output_object_package_selected_provider_bundle_count\":{provider_record_count}"
+            ))
+            && frontdoor_stdout.contains(&format!(
+                "\"closure_summary_provider_completion_count\":{provider_record_count}"
+            ))
+            && frontdoor_stdout.contains("\"closure_summary_object_package_ready\":true")
+            && frontdoor_stdout.contains(
+                "\"closure_summary_object_package_status\":\"replay-ready\""
+            )
+            && frontdoor_stdout.contains("\"closure_summary_debugger_transcript_ready\":true")
+            && frontdoor_stdout.contains(
+                "\"closure_summary_debugger_transcript_status\":\"transcript-ready\""
+            )
+            && frontdoor_stdout.contains(
+                "\"closure_summary_provider_dispatch_identity_projection_source\":\"final_output_provider_completion_dispatch_identity_hash\""
+            ),
+        "Nuis frontdoor omitted sealed final-image package/debugger replay projection\n{frontdoor_stdout}"
+    );
+    frontdoor_stdout.into_owned()
 }
 
 fn assert_provider_output_evidence_hash(output_dir: &Path, evidence: &str) {

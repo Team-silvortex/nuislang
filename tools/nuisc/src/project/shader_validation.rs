@@ -342,7 +342,16 @@ pub(super) fn validate_shader_profile_flow(module: &YirModule, unit: &str) -> Re
                 unit, node_name
             ));
         }
-        if !source.contains("@vertex") || !source.contains("@fragment") {
+        let summary = match crate::shader_source::summarize_inline_wgsl_source(source) {
+            Ok(summary) => summary,
+            Err(err) => {
+                return Err(format!(
+                    "project shader unit `shader.{}` has malformed inline WGSL source in node `{}`: {}",
+                    unit, node_name, err
+                ));
+            }
+        };
+        if !summary.has_stage("vertex") || !summary.has_stage("fragment") {
             return Err(format!(
                 "project shader unit `shader.{}` inline WGSL node `{}` must contain both @vertex and @fragment stages",
                 unit, node_name

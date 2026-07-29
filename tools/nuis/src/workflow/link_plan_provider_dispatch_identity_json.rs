@@ -42,7 +42,9 @@ pub(super) fn provider_dispatch_identity_capability_json_fields(
     }
     fields.push(json_field(
         "nsld_final_executable_output_provider_dispatch_identity_projection_source",
-        "debugger_cursor_lineage_provider_dispatch_identity_hash",
+        capability
+            .map(|capability| capability.projection_source)
+            .unwrap_or("debugger_cursor_lineage_provider_dispatch_identity_hash"),
     ));
     fields
 }
@@ -57,6 +59,7 @@ mod tests {
             contract: "nuis-validated-provider-dispatch-identity-capability-v1",
             source_contract: "nuis-debugger-cursor-lineage-mirror-v1".to_owned(),
             source_status: "lineage-ready".to_owned(),
+            projection_source: "debugger_cursor_lineage_provider_dispatch_identity_hash",
             ready: true,
             status: "verified",
             identity_hash: Some("0x0123456789abcdef".to_owned()),
@@ -68,5 +71,25 @@ mod tests {
         assert!(fields.contains(&"\"nsld_final_executable_output_object_package_provider_dispatch_identity_hash\":\"0x0123456789abcdef\"".to_owned()));
         assert!(fields.contains(&"\"nsld_final_executable_output_debugger_api_provider_dispatch_identity_hash\":\"0x0123456789abcdef\"".to_owned()));
         assert!(fields.contains(&"\"nsld_final_executable_output_provider_dispatch_identity_projection_source\":\"debugger_cursor_lineage_provider_dispatch_identity_hash\"".to_owned()));
+    }
+
+    #[test]
+    fn projections_can_name_final_output_dispatch_identity_source() {
+        let capability = ValidatedProviderDispatchIdentityCapability {
+            contract: "nuis-validated-provider-dispatch-identity-capability-v1",
+            source_contract: "nuis-provider-completion-dispatch-authority-v1".to_owned(),
+            source_status: "verified".to_owned(),
+            projection_source: "final_output_provider_completion_dispatch_identity_hash",
+            ready: true,
+            status: "verified",
+            identity_hash: Some("0xfedcba9876543210".to_owned()),
+            first_blocker: None,
+        };
+
+        let fields = provider_dispatch_identity_capability_json_fields(Some(&capability));
+
+        assert!(fields.contains(&"\"nsld_final_executable_output_provider_dispatch_identity_projection_source\":\"final_output_provider_completion_dispatch_identity_hash\"".to_owned()));
+        assert!(fields.contains(&"\"nsld_final_executable_output_object_package_provider_dispatch_identity_hash\":\"0xfedcba9876543210\"".to_owned()));
+        assert!(fields.contains(&"\"nsld_final_executable_output_debugger_api_provider_dispatch_identity_hash\":\"0xfedcba9876543210\"".to_owned()));
     }
 }

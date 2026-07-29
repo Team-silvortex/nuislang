@@ -5,6 +5,7 @@ mod contract_render;
 mod contract_render_shader;
 mod kernel_analysis;
 mod shader_analysis;
+mod shader_backend_plan;
 mod shader_ir;
 
 pub use kernel_analysis::analyze_kernel_lowering;
@@ -46,7 +47,74 @@ pub struct ShaderStageContract {
     pub depth_write_enabled: Option<bool>,
     pub cull_mode: Option<String>,
     pub front_face: Option<String>,
+    pub shader_module: Option<ShaderModuleContract>,
+    pub shader_module_lowering_plans: Vec<ShaderModuleBackendLoweringPlan>,
     pub shader_ir_stages: Vec<ShaderIrStageContract>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShaderModuleContract {
+    pub schema: String,
+    pub resource: String,
+    pub entry: String,
+    pub source_language: String,
+    pub stages: Vec<ShaderModuleStageContract>,
+    pub bindings: Vec<ShaderModuleBindingContract>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShaderModuleStageContract {
+    pub stage: String,
+    pub entry: String,
+    pub attributes: Vec<String>,
+    pub workgroup_size: Option<String>,
+    pub return_type: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShaderModuleBindingContract {
+    pub group: u32,
+    pub binding: u32,
+    pub name: String,
+    pub kind: String,
+    pub address_space: Option<String>,
+    pub ty: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShaderModuleBackendLoweringPlan {
+    pub contract: String,
+    pub backend: String,
+    pub target: String,
+    pub lowering_target: String,
+    pub native_ir: String,
+    pub source_schema: String,
+    pub source_language: String,
+    pub resource: String,
+    pub entry: String,
+    pub requires_translation: bool,
+    pub lowering_boundary: String,
+    pub stage_entries: Vec<ShaderModuleBackendStageEntry>,
+    pub resource_bindings: Vec<ShaderModuleBackendBindingEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShaderModuleBackendStageEntry {
+    pub stage: String,
+    pub source_entry: String,
+    pub target_entry: String,
+    pub execution_model: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShaderModuleBackendBindingEntry {
+    pub group: u32,
+    pub binding: u32,
+    pub name: String,
+    pub kind: String,
+    pub address_space: Option<String>,
+    pub ty: String,
+    pub target_slot: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -399,7 +467,7 @@ resource shader0 shader.render
 shader.target main_target shader0 rgba8_unorm 40 24
 shader.viewport main_view shader0 40 24
 shader.pipeline lit_pipe shader0 lit_sphere triangle_strip
-shader.inline_wgsl lit_pipe_wgsl shader0 lit_sphere "struct VsOut {\n  @builtin(position) pos: vec4<f32>,\n  @location(0) uv: vec2<f32>,\n};\n\n@vertex\nfn vs_main(@builtin(vertex_index) vid: u32) -> VsOut {\n  var out: VsOut;\n  out.pos = vec4<f32>(0.0, 0.0, 0.0, 1.0);\n  out.uv = vec2<f32>(0.0, 0.0);\n  return out;\n}\n\n@fragment\nfn fs_main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {\n  let uv2: vec2<f32> = clamp(uv, vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 1.0));\n  let sampled: vec4<f32> = textureSample(albedo_texture, albedo_sampler, uv2);\n  let mixed: vec3<f32> = mix(sampled.xyz, vec3<f32>(uv2.xy, 1.0), 0.35);\n  return vec4<f32>(mixed.xyz, sampled.w);\n}"
+shader.inline_wgsl lit_pipe_wgsl shader0 lit_sphere "@group(0)\n@binding(0)\nvar albedo_sampler: sampler;\n@group(0)\n@binding(1)\nvar albedo_texture: texture_2d<f32>;\nstruct VsOut {\n  @builtin(position) pos: vec4<f32>,\n  @location(0) uv: vec2<f32>,\n};\n\n@vertex\nfn vs_main(@builtin(vertex_index) vid: u32) -> VsOut {\n  var out: VsOut;\n  out.pos = vec4<f32>(0.0, 0.0, 0.0, 1.0);\n  out.uv = vec2<f32>(0.0, 0.0);\n  return out;\n}\n\n@fragment\nfn fs_main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {\n  let uv2: vec2<f32> = clamp(uv, vec2<f32>(0.0, 0.0), vec2<f32>(1.0, 1.0));\n  let sampled: vec4<f32> = textureSample(albedo_texture, albedo_sampler, uv2);\n  let mixed: vec3<f32> = mix(sampled.xyz, vec3<f32>(uv2.xy, 1.0), 0.35);\n  return vec4<f32>(mixed.xyz, sampled.w);\n}"
 shader.texture2d checker shader0 r8_unorm 2 2 8,16,24,32
 shader.sampler clamp_sampler shader0 nearest clamp
 shader.uniform material_uniform shader0 0 lit_pipe
@@ -436,11 +504,85 @@ shader.draw_instanced frame shader0 main_pass lit_pipe 4 1 material_bindings
         assert_eq!(shader_ir.instructions[0].op, "clamp");
         assert_eq!(shader_ir.instructions[1].op, "sample_texture");
         assert_eq!(shader_ir.terminator.op, "return");
+        let shader_module = stage
+            .shader_module
+            .as_ref()
+            .expect("shader module summary should exist");
+        assert_eq!(shader_module.schema, "nuis-yir.shader.module-summary.v1");
+        assert_eq!(shader_module.entry, "lit_sphere");
+        assert_eq!(shader_module.source_language, "wgsl");
+        assert_eq!(shader_module.stages.len(), 2);
+        assert_eq!(shader_module.bindings.len(), 2);
+        assert!(shader_module
+            .stages
+            .iter()
+            .any(|stage| stage.stage == "vertex" && stage.entry == "vs_main"));
+        assert!(shader_module.bindings.iter().any(|binding| {
+            binding.group == 0
+                && binding.binding == 0
+                && binding.name == "albedo_sampler"
+                && binding.kind == "sampler"
+        }));
+        assert!(shader_module.bindings.iter().any(|binding| {
+            binding.group == 0
+                && binding.binding == 1
+                && binding.name == "albedo_texture"
+                && binding.kind == "texture"
+        }));
+        assert_eq!(stage.shader_module_lowering_plans.len(), 3);
+        let spirv_plan = stage
+            .shader_module_lowering_plans
+            .iter()
+            .find(|plan| plan.lowering_target == "spirv:vulkan-gpu")
+            .expect("SPIR-V lowering plan should exist");
+        assert_eq!(
+            spirv_plan.contract,
+            "nuis-yir.shader.backend-lowering-plan.v1"
+        );
+        assert_eq!(spirv_plan.native_ir, "spirv1.6");
+        assert_eq!(spirv_plan.source_schema, shader_module.schema);
+        assert!(spirv_plan.stage_entries.iter().any(|entry| {
+            entry.stage == "fragment"
+                && entry.source_entry == "fs_main"
+                && entry.execution_model == "Fragment"
+        }));
+        assert!(spirv_plan.resource_bindings.iter().any(|binding| {
+            binding.name == "albedo_texture" && binding.target_slot == "set0.binding1"
+        }));
+        let msl_plan = stage
+            .shader_module_lowering_plans
+            .iter()
+            .find(|plan| plan.lowering_target == "msl:metal-gpu")
+            .expect("MSL lowering plan should exist");
+        assert!(msl_plan.resource_bindings.iter().any(|binding| {
+            binding.name == "albedo_texture" && binding.target_slot == "argument-buffer[0].slot1"
+        }));
+        let host_plan = stage
+            .shader_module_lowering_plans
+            .iter()
+            .find(|plan| plan.lowering_target == "host-simd:cpu-fallback")
+            .expect("host SIMD fallback lowering plan should exist");
+        assert!(host_plan
+            .stage_entries
+            .iter()
+            .any(|entry| entry.target_entry == "host_vs_main"));
         assert!(stage
             .shader_ir_stages
             .iter()
             .any(|shader_ir| shader_ir.stage == "vertex"));
         assert!(contract.render_text().contains("shader_ir_stage=fragment"));
+        assert!(contract
+            .render_text()
+            .contains("shader_module_schema=nuis-yir.shader.module-summary.v1"));
+        assert!(contract
+            .render_text()
+            .contains("shader_module_binding group=0 binding=1 name=albedo_texture"));
+        assert!(contract
+            .render_text()
+            .contains("shader_module_lowering_plan contract=nuis-yir.shader.backend-lowering-plan.v1 lowering_target=spirv:vulkan-gpu"));
+        assert!(contract.render_text().contains(
+            "lowering_binding group=0 binding=1 name=albedo_texture target_slot=set0.binding1"
+        ));
         assert!(contract
             .render_text()
             .contains("shader_ir_function=shader.fragment"));
@@ -449,6 +591,14 @@ shader.draw_instanced frame shader0 main_pass lit_pipe 4 1 material_bindings
             .contains("shader_ir_contract_family=nustar.shader"));
         let manifest = contract.render_package_manifest();
         assert!(manifest.contains("shader_ir_instruction_count = 3"));
+        assert!(manifest.contains("shader_module_schema = \"nuis-yir.shader.module-summary.v1\""));
+        assert!(manifest.contains("shader_module_stage_count = 2"));
+        assert!(manifest.contains("shader_module_binding_count = 2"));
+        assert!(manifest.contains("[[stage.shader_module_binding]]"));
+        assert!(manifest.contains("[[stage.shader_module_lowering_plan]]"));
+        assert!(manifest.contains("contract = \"nuis-yir.shader.backend-lowering-plan.v1\""));
+        assert!(manifest.contains("lowering_target = \"spirv:vulkan-gpu\""));
+        assert!(manifest.contains("target_slot = \"argument-buffer[0].slot1\""));
         assert!(manifest.contains("shader_ir_execution_domain = \"shader\""));
         assert!(manifest.contains("shader_ir_time_domain = \"shader.stage.fragment\""));
         assert!(manifest.contains("backend = \"webgpu\""));
@@ -458,5 +608,86 @@ shader.draw_instanced frame shader0 main_pass lit_pipe 4 1 material_bindings
         assert!(manifest.contains("dispatch_abi = \"webgpu-render-pipeline\""));
         assert!(manifest.contains("priority = 40"));
         assert!(manifest.contains("verification = \"contract-only\""));
+    }
+
+    #[test]
+    fn shader_contract_extracts_compute_shader_ir_stage() {
+        let module = parse_module(
+            r#"yir 0.1
+
+resource shader0 shader.render
+
+shader.target main_target shader0 rgba8_unorm 40 24
+shader.viewport main_view shader0 40 24
+shader.pipeline lit_pipe shader0 lit_sphere triangle_strip
+shader.inline_wgsl lit_pipe_wgsl shader0 lit_sphere "// @compute\n// fn fake_cs() {}\n@vertex\nfn vs_main(@builtin(vertex_index) vid: u32) -> vec4<f32> {\n  return vec4<f32>(f32(vid), 0.0, 0.0, 1.0);\n}\n\n@fragment\nfn fs_main() -> @location(0) vec4<f32> {\n  return vec4<f32>(1.0, 1.0, 1.0, 1.0);\n}\n\n@compute @workgroup_size(8, 1, 1)\nfn cs_main(@builtin(global_invocation_id) gid: vec3<u32>) {\n  let idx: u32 = gid.x;\n}"
+shader.begin_pass main_pass shader0 main_target lit_pipe main_view
+shader.draw_instanced frame shader0 main_pass lit_pipe 4 1 lit_pipe
+"#,
+        );
+
+        let contract = analyze_shader_lowering(&module);
+        let stage = contract
+            .stages
+            .iter()
+            .find(|stage| stage.node == "frame")
+            .expect("frame stage should be present");
+        let compute_ir = stage
+            .shader_ir_stages
+            .iter()
+            .find(|shader_ir| shader_ir.stage == "compute")
+            .expect("compute shader ir should exist");
+
+        assert_eq!(
+            stage
+                .shader_ir_stages
+                .iter()
+                .filter(|shader_ir| shader_ir.stage == "compute")
+                .count(),
+            1
+        );
+        assert_eq!(compute_ir.function, "shader.compute");
+        assert_eq!(compute_ir.time_domain, "shader.stage.compute");
+        assert_eq!(compute_ir.glm_scope, "shader::compute");
+        assert_eq!(compute_ir.instructions.len(), 1);
+        assert_eq!(compute_ir.instructions[0].result, "idx");
+        assert_eq!(compute_ir.terminator.op, "end");
+        assert_eq!(compute_ir.terminator.expr, "void");
+        let shader_module = stage
+            .shader_module
+            .as_ref()
+            .expect("shader module summary should exist");
+        assert_eq!(shader_module.stages.len(), 3);
+        assert!(shader_module.stages.iter().any(|stage| {
+            stage.stage == "compute"
+                && stage.entry == "cs_main"
+                && stage.workgroup_size.as_deref() == Some("8, 1, 1")
+        }));
+        let spirv_plan = stage
+            .shader_module_lowering_plans
+            .iter()
+            .find(|plan| plan.lowering_target == "spirv:vulkan-gpu")
+            .expect("SPIR-V lowering plan should exist");
+        assert!(spirv_plan.stage_entries.iter().any(|entry| {
+            entry.stage == "compute"
+                && entry.source_entry == "cs_main"
+                && entry.execution_model == "GLCompute"
+        }));
+        let msl_plan = stage
+            .shader_module_lowering_plans
+            .iter()
+            .find(|plan| plan.lowering_target == "msl:metal-gpu")
+            .expect("MSL lowering plan should exist");
+        assert!(msl_plan.stage_entries.iter().any(|entry| {
+            entry.stage == "compute"
+                && entry.source_entry == "cs_main"
+                && entry.execution_model == "kernel"
+        }));
+        assert!(contract.render_text().contains("shader_ir_stage=compute"));
+        let manifest = contract.render_package_manifest();
+        assert!(manifest.contains("shader_ir_stage = \"compute\""));
+        assert!(manifest.contains("kind = \"compute\""));
+        assert!(manifest.contains("workgroup_size = \"8, 1, 1\""));
+        assert!(manifest.contains("shader_ir_terminator_op = \"end\""));
     }
 }

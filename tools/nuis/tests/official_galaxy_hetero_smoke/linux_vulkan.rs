@@ -115,5 +115,28 @@ fn linux_vulkan_shader_sample_executes_provider_output() {
         materialized_text.contains("\"first_provider_output_payload_attach_status\":\"attached\"")
     );
 
+    let frontdoor =
+        super::final_image::assemble_provider_complete_final_image(&project_text, &output_dir, 1);
+    assert!(
+        frontdoor.contains("\"nsld_final_executable_output_nsdb_first_provider_family\":\"spirv:vulkan-gpu\"")
+            && frontdoor.contains("\"closure_summary_first_provider_family\":\"spirv:vulkan-gpu\"")
+            && frontdoor.contains(
+                "\"nsld_final_executable_output_object_package_first_provider_bundle_id\":\"spirv.vulkan-gpu.bundle.v1\""
+            )
+            && frontdoor.contains(
+                "\"closure_summary_object_package_first_provider_bundle_id\":\"spirv.vulkan-gpu.bundle.v1\""
+            )
+            && frontdoor.contains(
+                "\"nsld_final_executable_output_nsdb_first_provider_output_contract\":\"nuis-provider-output-payload-handoff-v1\""
+            )
+            && frontdoor.contains(
+                "\"nsld_final_executable_output_object_package_provider_dispatch_identity_status\":\"verified\""
+            )
+            && frontdoor.contains(
+                "\"nsld_final_executable_output_debugger_api_provider_dispatch_identity_status\":\"verified\""
+            ),
+        "Vulkan sealed final image should project through Nuis object-package/debugger frontdoors without a cursor lineage prerequisite\n{frontdoor}"
+    );
+
     fs::remove_dir_all(output_dir).unwrap();
 }

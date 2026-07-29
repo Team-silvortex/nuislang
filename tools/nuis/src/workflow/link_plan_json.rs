@@ -743,21 +743,7 @@ fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -
         ),
     ];
     fields.extend(nsld_final_output_json_fields(nsld_final_output.as_ref()));
-    fields.extend(
-        crate::closure_summary_provider_bundle::ProviderBundleClosureMirror::json_fields(
-            closure_summary.provider_bundle.as_ref(),
-        ),
-    );
-    fields.extend(
-        crate::closure_summary_dispatch_identity::ProviderDispatchIdentityClosureMirror::json_fields(
-            closure_summary.provider_dispatch_identity.as_ref(),
-        ),
-    );
-    fields.extend(
-        crate::closure_summary_lineage_repair_json::lineage_repair_json_fields(
-            closure_summary.debugger_cursor_lineage.as_ref(),
-        ),
-    );
+    closure_summary.append_projection_json_fields(&mut fields);
     if let Some(evidence) = workflow_launch_evidence {
         fields.extend(evidence.json_fields_with_prefix("workflow_launch_evidence"));
     }

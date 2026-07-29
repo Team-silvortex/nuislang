@@ -5,6 +5,7 @@ pub(crate) struct ProviderDispatchIdentityClosureMirror {
     contract: &'static str,
     source_contract: String,
     source_status: String,
+    projection_source: &'static str,
     ready: bool,
     status: &'static str,
     identity_hash: Option<String>,
@@ -20,6 +21,7 @@ impl ProviderDispatchIdentityClosureMirror {
             contract: capability.contract,
             source_contract: capability.source_contract.clone(),
             source_status: capability.source_status.clone(),
+            projection_source: capability.projection_source,
             ready: capability.ready,
             status: capability.status,
             identity_hash: capability.identity_hash.clone(),
@@ -66,7 +68,9 @@ impl ProviderDispatchIdentityClosureMirror {
         }
         fields.push(crate::json_field(
             "closure_summary_provider_dispatch_identity_projection_source",
-            "debugger_cursor_lineage_provider_dispatch_identity_hash",
+            mirror
+                .map(|mirror| mirror.projection_source)
+                .unwrap_or("debugger_cursor_lineage_provider_dispatch_identity_hash"),
         ));
         fields
     }

@@ -129,8 +129,12 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         &Path::new(&plan.output_dir).join("nuis.build.manifest.toml"),
     );
     let debugger_cursor_lineage = read_debugger_cursor_lineage(Path::new(&plan.output_dir));
-    let provider_dispatch_identity_capability =
-        validated_provider_dispatch_identity_capability(&debugger_cursor_lineage);
+    let provider_dispatch_identity =
+        read_persisted_nsdb_handoff(Some(Path::new(&plan.output_dir))).provider_dispatch_identity();
+    let provider_dispatch_identity_capability = validated_provider_dispatch_identity_capability(
+        &debugger_cursor_lineage,
+        &provider_dispatch_identity,
+    );
     let debugger_cursor_lineage_repair = debugger_cursor_lineage.repair;
     let drive_command_set = nsld_drive_command_set_for_output_dir(Path::new(&plan.output_dir));
     let device_provider_sample_provider_bundle_registry_contract =

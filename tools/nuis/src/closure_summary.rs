@@ -503,88 +503,6 @@ impl FrontdoorClosureSummary {
                 "closure_summary_debugger_transcript_first_blocker",
                 self.debugger_transcript_first_blocker.as_deref(),
             ),
-            json_optional_usize_field(
-                "closure_summary_provider_completion_count",
-                self.provider_completion.as_ref().map(|mirror| mirror.count),
-            ),
-            crate::json_optional_string_field(
-                "closure_summary_first_provider_family",
-                self.provider_completion
-                    .as_ref()
-                    .and_then(|mirror| mirror.family.as_deref()),
-            ),
-            crate::json_optional_string_field(
-                "closure_summary_first_provider_output_contract",
-                self.provider_completion
-                    .as_ref()
-                    .and_then(|mirror| mirror.output_contract.as_deref()),
-            ),
-            crate::json_optional_string_field(
-                "closure_summary_first_provider_output_evidence",
-                self.provider_completion
-                    .as_ref()
-                    .and_then(|mirror| mirror.output_evidence.as_deref()),
-            ),
-            crate::json_optional_string_field(
-                "closure_summary_provider_completion_claim_authority_contract",
-                self.provider_completion
-                    .as_ref()
-                    .and_then(|mirror| mirror.claim_authority_contract.as_deref()),
-            ),
-            crate::json_optional_string_field(
-                "closure_summary_provider_completion_claim_authority",
-                self.provider_completion
-                    .as_ref()
-                    .and_then(|mirror| mirror.claim_authority.as_deref()),
-            ),
-            crate::json_optional_string_field(
-                "closure_summary_provider_completion_claim_authority_status",
-                self.provider_completion
-                    .as_ref()
-                    .map(|mirror| mirror.claim_authority_status.as_str()),
-            ),
-            crate::json_optional_string_field(
-                "closure_summary_provider_completion_signature_contract",
-                self.provider_completion
-                    .as_ref()
-                    .and_then(|mirror| mirror.signature_contract.as_deref()),
-            ),
-            crate::json_optional_string_field(
-                "closure_summary_provider_completion_signature_public_key_id",
-                self.provider_completion
-                    .as_ref()
-                    .and_then(|mirror| mirror.signature_public_key_id.as_deref()),
-            ),
-            crate::json_optional_string_field(
-                "closure_summary_provider_completion_signature_status",
-                self.provider_completion
-                    .as_ref()
-                    .map(|mirror| mirror.signature_status.as_str()),
-            ),
-            crate::json_optional_string_field(
-                "closure_summary_provider_completion_digest_contract",
-                self.provider_completion
-                    .as_ref()
-                    .and_then(|mirror| mirror.digest_contract.as_deref()),
-            ),
-            crate::json_optional_string_field(
-                "closure_summary_provider_completion_set_hash_claim",
-                self.provider_completion
-                    .as_ref()
-                    .and_then(|mirror| mirror.set_hash_claim.as_deref()),
-            ),
-            crate::json_optional_string_field(
-                "closure_summary_provider_completion_set_hash",
-                self.provider_completion
-                    .as_ref()
-                    .and_then(|mirror| mirror.set_hash.as_deref()),
-            ),
-            crate::json_optional_string_field(
-                "closure_summary_provider_completion_set_hash_validation_status",
-                self.provider_completion
-                    .as_ref()
-                    .map(|mirror| mirror.set_hash_validation_status.as_str()),
-            ),
             crate::json_optional_string_field(
                 "closure_summary_debugger_cursor_handoff_contract",
                 self.debugger_cursor_handoff_contract.as_deref(),
@@ -672,30 +590,16 @@ impl FrontdoorClosureSummary {
                     .and_then(|mirror| mirror.next_command.as_deref()),
             ),
         ];
-        let provider_records = self
-            .provider_completion
-            .as_ref()
-            .map(|mirror| {
-                mirror
-                    .records
-                    .iter()
-                    .map(|record| {
-                        format!(
-                            "{{{},{},{},{},{}}}",
-                            crate::json_field("trace_id", &record.trace_id),
-                            crate::json_field("provider_family", &record.provider_family),
-                            crate::json_field("output_contract", &record.output_contract),
-                            crate::json_field("output_evidence", &record.output_evidence),
-                            crate::json_field("record_hash", &record.record_hash),
-                        )
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-        fields.push(crate::json_object_array_field(
-            "closure_summary_provider_completions",
-            &provider_records,
-        ));
+        self.append_projection_json_fields(&mut fields);
+        fields
+    }
+
+    pub(crate) fn append_projection_json_fields(&self, fields: &mut Vec<String>) {
+        fields.extend(
+            crate::closure_summary_provider_completion::provider_completion_json_fields(
+                self.provider_completion.as_ref(),
+            ),
+        );
         fields.extend(
             crate::closure_summary_provider_bundle::ProviderBundleClosureMirror::json_fields(
                 self.provider_bundle.as_ref(),
@@ -711,7 +615,6 @@ impl FrontdoorClosureSummary {
                 self.debugger_cursor_lineage.as_ref(),
             ),
         );
-        fields
     }
 }
 

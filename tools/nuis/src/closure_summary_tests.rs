@@ -532,6 +532,7 @@ fn final_output_summary(
                 contract: "nuis-validated-provider-dispatch-identity-capability-v1",
                 source_contract: "nuis-debugger-cursor-lineage-mirror-v1".to_owned(),
                 source_status: "lineage-unavailable".to_owned(),
+                projection_source: "debugger_cursor_lineage_provider_dispatch_identity_hash",
                 ready: false,
                 status: "blocked",
                 identity_hash: None,

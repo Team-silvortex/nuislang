@@ -324,3 +324,118 @@ fn unescape_toml(value: &str) -> String {
     }
     output
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::final_image_provider_dispatch::{
+        FinalImageProviderDispatch, FinalImageProviderDispatchAuthority,
+    };
+
+    #[test]
+    fn vulkan_completion_authority_is_bound_from_open_final_image_dispatch() {
+        let authority = vulkan_final_image_authority();
+        let record = vulkan_record("spirv.vulkan.real-device");
+
+        let bound = authority_for_record(&authority, &record).unwrap();
+        assert_eq!(bound.status, "verified");
+        assert_eq!(bound.provider_family, "spirv:vulkan-gpu");
+        assert_eq!(bound.bundle_id, "spirv.vulkan-gpu.bundle.v1");
+        assert_eq!(bound.runner_adapter_id, "spirv.vulkan.real-device");
+        let event = provider_completion_event(bound);
+        let identity = completion_identity(&[event], "verified");
+
+        assert_eq!(identity.status, "verified");
+        assert_eq!(identity.selected_set_hash, "fnv1a64:f8efa211643f7bcd");
+        assert!(identity.identity_hash.starts_with("0x"));
+    }
+
+    #[test]
+    fn vulkan_completion_authority_rejects_runner_identity_drift() {
+        let authority = vulkan_final_image_authority();
+        let record = vulkan_record("spirv.vulkan.host-unavailable");
+
+        let error = authority_for_record(&authority, &record).unwrap_err();
+
+        assert_eq!(
+            error,
+            "provider-completion-dispatch:runner-drift:dispatch0000"
+        );
+    }
+
+    fn vulkan_final_image_authority() -> FinalImageProviderDispatchAuthority {
+        FinalImageProviderDispatchAuthority {
+            available: true,
+            status: "verified".to_owned(),
+            image_path: Some("nuis-app.nsb".to_owned()),
+            table_hash: Some("0x1111111111111111".to_owned()),
+            selected_set_hash: Some("fnv1a64:f8efa211643f7bcd".to_owned()),
+            entries: vec![FinalImageProviderDispatch {
+                dispatch_id: "dispatch0000".to_owned(),
+                package_id: "official.shader".to_owned(),
+                bundle_id: "spirv.vulkan-gpu.bundle.v1".to_owned(),
+                provider_family: "spirv:vulkan-gpu".to_owned(),
+                runner_contract: "nuis-provider-runner-v1".to_owned(),
+                runner_adapter_contract: "nuis-provider-runner-adapter-v1".to_owned(),
+                runner_adapter_id: "spirv.vulkan.real-device".to_owned(),
+            }],
+            blockers: Vec::new(),
+        }
+    }
+
+    fn vulkan_record(adapter_id: &str) -> NsdbDeviceProviderSampleRecordInfo {
+        NsdbDeviceProviderSampleRecordInfo {
+            index: 0,
+            valid: true,
+            trace_id: "hetero-trace:shader:spirv:vulkan-gpu".to_owned(),
+            provider: "registered".to_owned(),
+            provider_family: "spirv:vulkan-gpu".to_owned(),
+            provider_bundle_package_id: "official.shader".to_owned(),
+            provider_bundle_id: "spirv.vulkan-gpu.bundle.v1".to_owned(),
+            requested_runner_contract: "nuis-provider-runner-v1".to_owned(),
+            requested_runner_adapter_contract: "nuis-provider-runner-adapter-v1".to_owned(),
+            requested_runner_adapter_id: adapter_id.to_owned(),
+            requested_runner_adapter_capability_status: "registered-real-device".to_owned(),
+            provider_runner_contract: "nuis-provider-runner-v1".to_owned(),
+            provider_runner_adapter_contract: "nuis-provider-runner-adapter-v1".to_owned(),
+            provider_runner_adapter_id: adapter_id.to_owned(),
+            handoff_target: "device-provider-sample".to_owned(),
+            sample_status: "ready".to_owned(),
+            validation_status: "verified".to_owned(),
+            input_evidence: "input".to_owned(),
+            output_evidence: "output".to_owned(),
+            provider_output_payload_contract: "nuis-provider-output-payload-handoff-v1".to_owned(),
+            provider_output_payload_status: "provider-sample-ready".to_owned(),
+            provider_output_payload_evidence_status: "verified".to_owned(),
+            provider_output_payload_evidence: "vulkan-output.toml:hash=0x1234".to_owned(),
+            provider_output_payload_detail: "comparison-passed".to_owned(),
+            provider_output_payload_next_action: "replay-device-sample".to_owned(),
+            materialization_status: "provider-sample-materialized".to_owned(),
+            materialization_detail: "ready".to_owned(),
+            next_action: "replay".to_owned(),
+            diagnostic: "loaded".to_owned(),
+        }
+    }
+
+    fn provider_completion_event(
+        dispatch: NsdbProviderCompletionDispatchAuthority,
+    ) -> NsdbPayloadExecutionEvent {
+        NsdbPayloadExecutionEvent {
+            index: 0,
+            trace_id: "hetero-trace:shader:spirv:vulkan-gpu".to_owned(),
+            status: "ready".to_owned(),
+            execution_phase: "provider-device-completion".to_owned(),
+            target: "spirv:vulkan-gpu".to_owned(),
+            entry_symbol: "nustar-deferred-device-sample-v1".to_owned(),
+            entry_kind: "nuis-provider-output-payload-handoff-v1".to_owned(),
+            entry_section_id: "vulkan-output.toml:hash=0x1234".to_owned(),
+            provider_family: "spirv:vulkan-gpu".to_owned(),
+            output_contract: "nuis-provider-output-payload-handoff-v1".to_owned(),
+            output_evidence: "vulkan-output.toml:hash=0x1234".to_owned(),
+            provider_completion_evidence: Default::default(),
+            provider_completion_dispatch: dispatch,
+            first_blocker: "none".to_owned(),
+            next_action: "replay-provider-completion".to_owned(),
+        }
+    }
+}

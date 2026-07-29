@@ -2,7 +2,11 @@ use std::collections::BTreeMap;
 
 use yir_core::{EdgeKind, Node, YirModule};
 
-use super::shader_ir::{build_shader_ir_stage_contracts, decode_inline_shader_source};
+use super::shader_backend_plan::build_shader_module_backend_lowering_plans;
+use super::shader_ir::{
+    build_inline_shader_module_contract, build_shader_ir_stage_contracts,
+    decode_inline_shader_source,
+};
 use super::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -119,6 +123,8 @@ pub fn analyze_shader_lowering(module: &YirModule) -> ShaderLoweringContract {
                 depth_write_enabled: None,
                 cull_mode: None,
                 front_face: None,
+                shader_module: None,
+                shader_module_lowering_plans: Vec::new(),
                 shader_ir_stages: Vec::new(),
             }),
             "dispatch" => stages.push(ShaderStageContract {
@@ -141,6 +147,8 @@ pub fn analyze_shader_lowering(module: &YirModule) -> ShaderLoweringContract {
                 depth_write_enabled: None,
                 cull_mode: None,
                 front_face: None,
+                shader_module: None,
+                shader_module_lowering_plans: Vec::new(),
                 shader_ir_stages: Vec::new(),
             }),
             _ => {}
@@ -182,6 +190,8 @@ fn analyze_draw_instanced(
             depth_write_enabled: None,
             cull_mode: None,
             front_face: None,
+            shader_module: None,
+            shader_module_lowering_plans: Vec::new(),
             shader_ir_stages: Vec::new(),
         };
     };
@@ -207,6 +217,8 @@ fn analyze_draw_instanced(
             depth_write_enabled: None,
             cull_mode: None,
             front_face: None,
+            shader_module: None,
+            shader_module_lowering_plans: Vec::new(),
             shader_ir_stages: Vec::new(),
         };
     };
@@ -232,6 +244,8 @@ fn analyze_draw_instanced(
             depth_write_enabled: None,
             cull_mode: None,
             front_face: None,
+            shader_module: None,
+            shader_module_lowering_plans: Vec::new(),
             shader_ir_stages: Vec::new(),
         };
     }
@@ -243,13 +257,14 @@ fn analyze_draw_instanced(
     let (pipeline_name, topology) = pipeline_node
         .and_then(parse_pipeline_signature)
         .unwrap_or((None, None));
-    let (wgsl_entry, wgsl_source) = find_matching_inline_wgsl(
+    let inline_wgsl = find_matching_inline_wgsl(
         &node.resource,
         pipeline_name.as_deref(),
         inline_wgsl_modules,
-    )
-    .map(|module| (Some(module.entry.clone()), Some(module.source.clone())))
-    .unwrap_or((None, None));
+    );
+    let (wgsl_entry, wgsl_source) = inline_wgsl
+        .map(|module| (Some(module.entry.clone()), Some(module.source.clone())))
+        .unwrap_or((None, None));
 
     let (lowering, reason) = classify_backend_eligibility(
         target_format.as_deref(),
@@ -290,6 +305,13 @@ fn analyze_draw_instanced(
         .as_deref()
         .map(build_shader_ir_stage_contracts)
         .unwrap_or_default();
+    let shader_module = inline_wgsl.map(|module| {
+        build_inline_shader_module_contract(&module.resource, &module.entry, &module.source)
+    });
+    let shader_module_lowering_plans = shader_module
+        .as_ref()
+        .map(build_shader_module_backend_lowering_plans)
+        .unwrap_or_default();
 
     ShaderStageContract {
         node: node.name.clone(),
@@ -311,6 +333,8 @@ fn analyze_draw_instanced(
         depth_write_enabled: render_state.depth_write_enabled,
         cull_mode: render_state.cull_mode,
         front_face: render_state.front_face,
+        shader_module,
+        shader_module_lowering_plans,
         shader_ir_stages,
     }
 }

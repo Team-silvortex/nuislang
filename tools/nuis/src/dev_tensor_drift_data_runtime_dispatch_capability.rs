@@ -12,8 +12,10 @@ pub(crate) const DEV_TENSOR_RUNTIME_DISPATCH_CAPABILITY_DRIFT_CHECKS: &[DevTenso
                 "\"verified\"",
                 "\"verified-empty\"",
                 "\"blocked\"",
+                "final_output_provider_completion_dispatch_identity_hash",
                 "capability_preserves_verified_identity_without_recomputing_it",
                 "capability_distinguishes_verified_empty_from_blocked",
+                "capability_can_fallback_to_verified_final_output_dispatch_before_cursor_lineage_exists",
             ],
         },
         DevTensorDriftCheckSpec {
@@ -25,6 +27,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DISPATCH_CAPABILITY_DRIFT_CHECKS: &[DevTenso
                 "provider_dispatch_identity_capability_contract",
                 "provider_dispatch_identity_hash",
                 "debugger_cursor_lineage_provider_dispatch_identity_hash",
+                "final_output_provider_completion_dispatch_identity_hash",
                 "package_and_debugger_projections_share_one_validated_identity",
             ],
         },
@@ -37,15 +40,13 @@ pub(crate) const DEV_TENSOR_RUNTIME_DISPATCH_CAPABILITY_DRIFT_CHECKS: &[DevTenso
                 "closure_summary_debugger_api",
                 "provider_dispatch_identity_capability_contract",
                 "debugger_cursor_lineage_provider_dispatch_identity_hash",
+                "projection_source",
             ],
         },
         DevTensorDriftCheckSpec {
             id: "provider-dispatch-identity-workflow-closure-integration",
             path: "tools/nuis/src/workflow/link_plan_json.rs",
-            required_patterns: &[
-                "ProviderDispatchIdentityClosureMirror::json_fields",
-                "closure_summary.provider_dispatch_identity.as_ref()",
-            ],
+            required_patterns: &["append_projection_json_fields"],
         },
         DevTensorDriftCheckSpec {
             id: "provider-dispatch-identity-closure-regression",

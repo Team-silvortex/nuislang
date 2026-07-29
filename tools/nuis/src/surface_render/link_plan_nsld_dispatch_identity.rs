@@ -58,6 +58,9 @@ pub(super) fn write_provider_dispatch_identity_capability<W: fmt::Write>(
     }
     writeln!(
         out,
-        "  nsld_final_executable_output_provider_dispatch_identity_projection_source: debugger_cursor_lineage_provider_dispatch_identity_hash"
+        "  nsld_final_executable_output_provider_dispatch_identity_projection_source: {}",
+        capability
+            .map(|capability| capability.projection_source)
+            .unwrap_or("debugger_cursor_lineage_provider_dispatch_identity_hash")
     )
 }

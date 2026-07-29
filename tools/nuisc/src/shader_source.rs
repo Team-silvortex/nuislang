@@ -1,5 +1,7 @@
 #[path = "shader_source_normalize.rs"]
 mod shader_source_normalize;
+#[path = "shader_source_summary.rs"]
+mod shader_source_summary;
 #[path = "shader_source_syntax.rs"]
 mod shader_source_syntax;
 #[cfg(test)]
@@ -7,6 +9,7 @@ mod shader_source_syntax;
 mod shader_source_tests;
 
 pub(crate) use shader_source_normalize::normalize_inline_wgsl_source;
+pub(crate) use shader_source_summary::summarize_inline_wgsl_source;
 
 use shader_source_syntax::{
     is_attribute_position, parse_binding_metadata, parse_parenthesized_args, parse_stage_metadata,

@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use super::super::normalize_inline_wgsl_source;
+    use super::super::{normalize_inline_wgsl_source, summarize_inline_wgsl_source};
 
     #[test]
     fn normalizes_top_level_stage_blocks_into_standard_wgsl_attributes() {
@@ -216,5 +216,88 @@ stage fragment {
             !normalized.contains("\n  interpolate(flat) location(0)"),
             "{normalized}"
         );
+    }
+
+    #[test]
+    fn summarizes_inline_wgsl_stages_and_bindings_after_normalization() {
+        let summary = summarize_inline_wgsl_source(
+            r#"
+binding(0, 0) var color_sampler: sampler;
+binding(0, 1) var color_tex: texture_2d<f32>;
+binding(1, 0) var<uniform> globals: Globals;
+
+stage vertex {
+  fn vs_main() -> VsOut {
+    var out: VsOut;
+    return out;
+  }
+}
+
+stage fragment {
+  fn fs_main(location(0) uv: vec2<f32>) -> location(0) vec4<f32> {
+    return vec4<f32>(uv.x, uv.y, 1.0, 1.0);
+  }
+}
+
+stage compute(workgroup_size(8, 4, 1)) {
+  fn cs_main() {
+  }
+}
+"#,
+        )
+        .expect("summary should parse normalized inline wgsl");
+
+        assert_eq!(summary.schema, "nuis-inline-wgsl-summary-v1");
+        assert!(summary.has_stage("vertex"));
+        assert!(summary.has_stage("fragment"));
+        assert!(summary.has_stage("compute"));
+        assert_eq!(
+            summary
+                .stages
+                .iter()
+                .find(|stage| stage.stage == "compute")
+                .and_then(|stage| stage.workgroup_size.as_deref()),
+            Some("8, 4, 1")
+        );
+        assert_eq!(
+            summary
+                .stages
+                .iter()
+                .find(|stage| stage.stage == "fragment")
+                .and_then(|stage| stage.return_type.as_deref()),
+            Some("vec4<f32>")
+        );
+        assert_eq!(summary.bindings.len(), 3);
+        assert!(summary.bindings.iter().any(|binding| {
+            binding.group == 0
+                && binding.binding == 0
+                && binding.name == "color_sampler"
+                && binding.kind == "sampler"
+        }));
+        assert!(summary.bindings.iter().any(|binding| {
+            binding.group == 1
+                && binding.binding == 0
+                && binding.name == "globals"
+                && binding.address_space.as_deref() == Some("uniform")
+                && binding.kind == "uniform"
+        }));
+    }
+
+    #[test]
+    fn summary_ignores_stage_markers_inside_comments() {
+        let summary = summarize_inline_wgsl_source(
+            r#"
+// @vertex fn fake_vs() {}
+/*
+@fragment
+fn fake_fs() -> @location(0) vec4<f32> { return vec4<f32>(1.0); }
+*/
+"#,
+        )
+        .expect("comment-only source should still parse");
+
+        assert!(!summary.has_stage("vertex"));
+        assert!(!summary.has_stage("fragment"));
+        assert!(summary.stages.is_empty());
     }
 }

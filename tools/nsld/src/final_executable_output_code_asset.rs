@@ -7,10 +7,16 @@ pub(crate) fn validate_compiled_code_asset_selections(
             continue;
         }
         let selected_count = selection.selections.len();
-        let contract_valid = (selected_count == 1
-            && selection.contract == "nuis-provider-code-asset-contribution-selection-v1")
-            || (selected_count > 1
-                && selection.contract == "nuis-provider-code-asset-contribution-selection-set-v1");
+        let contract_valid = if selected_count == 1 {
+            matches!(
+                selection.contract.as_str(),
+                "nuis-provider-code-asset-contribution-selection-v1"
+                    | "nuis-provider-code-asset-contribution-selection-set-v1"
+            )
+        } else {
+            selected_count > 1
+                && selection.contract == "nuis-provider-code-asset-contribution-selection-set-v1"
+        };
         let unique = selection
             .selections
             .iter()
@@ -71,6 +77,9 @@ mod tests {
     #[test]
     fn validates_verified_or_not_applicable_selection() {
         let mut completion = completion();
+        assert!(validate_compiled_code_asset_selections(&[completion.clone()]).is_ok());
+        completion.compiled_code_asset_selection.contract =
+            "nuis-provider-code-asset-contribution-selection-set-v1".to_owned();
         assert!(validate_compiled_code_asset_selections(&[completion.clone()]).is_ok());
         completion.compiled_code_asset_selection =
             nsdb::CompiledCodeAssetSelectionEvidence::default();
