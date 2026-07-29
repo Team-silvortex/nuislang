@@ -29,6 +29,11 @@ provider_comparison_profiles = [
   "provider-comparison-profiles/model-predict-f32.nwcp"
 ]
 
+code_assets = [
+  "shader.witsage.vector-bias.metal",
+  "shader.witsage.argmax.metal"
+]
+
 source_modules = [
   "core/dataset_recipe.ns",
   "core/feature_stats_recipe.ns",

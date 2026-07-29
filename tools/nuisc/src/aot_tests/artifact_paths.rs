@@ -49,6 +49,7 @@ fn verify_compiled_artifact_preserves_heterogeneous_domain_unit_paths() {
                 name: "hetero_artifact".to_owned(),
                 abi_mode: "explicit".to_owned(),
                 artifact_provider_metadata: vec![],
+                code_asset_requirements: vec![],
                 abi_graph_summary: None,
                 abi_entries: vec![
                     ("cpu".to_owned(), cpu_target.abi.clone()),

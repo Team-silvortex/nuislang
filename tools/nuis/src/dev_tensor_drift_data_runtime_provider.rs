@@ -686,7 +686,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_PROVIDER_DRIFT_CHECKS: &[DevTensorDriftCheck
             id: "nsdb-metal-f32-provider-runner-source",
             path: "tools/nsdb/provider-runners/metal_f32_bias.m",
             required_patterns: &[
-                "nuis_f32_bias",
+                "newFunctionWithName:entry",
                 "nuis-metal-f32-bias-provider-runner-v1",
                 "newBufferWithBytes",
                 "dispatchThreads",

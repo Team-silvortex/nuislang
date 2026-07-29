@@ -49,6 +49,7 @@ fn build_manifest_round_trips_cpu_target_metadata() {
                     name: "demo".to_owned(),
                     abi_mode: "explicit".to_owned(),
                     artifact_provider_metadata: vec![],
+                    code_asset_requirements: vec![],
                     abi_graph_summary: Some(
                         "graph\tmode=explicit\tdomains=cpu\tcpu_summary=present\tdata_summary=absent\tkernel_target=absent\tshader_target=absent\tnetwork_target=absent"
                             .to_owned(),

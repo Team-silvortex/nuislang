@@ -87,9 +87,9 @@ mod provider_worker_transport;
 mod provider_worker_transport_unix;
 
 pub use model::{
-    CompiledCodeAssetSelectionEvidence, FinalImageBindingProofClaim,
-    PayloadExecutionHandoffPersistSummary, PayloadExecutionHandoffRecord,
-    PayloadExecutionProviderCompletion,
+    CompiledCodeAssetSelectionEvidence, CompiledCodeAssetSelectionItem,
+    FinalImageBindingProofClaim, PayloadExecutionHandoffPersistSummary,
+    PayloadExecutionHandoffRecord, PayloadExecutionProviderCompletion,
 };
 pub use provider_sample_execute::{execute_provider_samples, ProviderSampleExecuteReport};
 pub use provider_sample_materialize::{

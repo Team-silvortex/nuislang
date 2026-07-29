@@ -30,7 +30,7 @@ pub(crate) const REGISTRATION: ProviderExecutionAdapterRegistration =
 #[cfg(target_os = "macos")]
 fn prepare_worker_adapter(
     cache: &mut ProviderProcessAdapterCache,
-    _output_dir: &Path,
+    output_dir: &Path,
     request: &ProviderRequest,
     inputs: &[PreparedProviderInput],
 ) -> Result<Option<PreparedProviderExecutionAdapter>, String> {
@@ -71,14 +71,16 @@ fn prepare_worker_adapter(
         let bias = request
             .scalar_f32("bias")
             .ok_or_else(|| "Metal provider request is missing f32 scalar `bias`".to_owned())?;
+        let mut arguments = metal_code_asset_arguments(output_dir, request)?;
+        arguments.push(format!("literal:{bias}"));
         (
             crate::provider_runner_metal::prepare_f32_bias_worker_invocation(cache)?,
-            vec![format!("literal:{bias}")],
+            arguments,
         )
     } else if is_f32_argmax(request) {
         (
             crate::provider_runner_metal::prepare_f32_argmax_worker_invocation(cache)?,
-            Vec::new(),
+            metal_code_asset_arguments(output_dir, request)?,
         )
     } else {
         return Ok(None);
@@ -147,6 +149,7 @@ fn execute(
             crate::provider_runner_metal::execute_gray8_threshold(path, threshold, max_value)?
         }
     } else if is_f32_bias(request) {
+        let (code_asset_path, entry) = validated_metal_code_asset(_output_dir, request)?;
         let bias = request
             .scalar_f32("bias")
             .ok_or_else(|| "Metal provider request is missing f32 scalar `bias`".to_owned())?;
@@ -161,11 +164,19 @@ fn execute(
                 channel,
                 request.input_bindings[0].byte_length,
                 bias,
+                &code_asset_path,
+                &entry,
             )?
         } else {
-            crate::provider_runner_metal::execute_f32_bias_input(inputs[0].input(), bias)?
+            crate::provider_runner_metal::execute_f32_bias_input(
+                inputs[0].input(),
+                bias,
+                &code_asset_path,
+                &entry,
+            )?
         }
     } else if is_f32_argmax(request) {
+        let (code_asset_path, entry) = validated_metal_code_asset(_output_dir, request)?;
         if uses_process_adapter(worker_receipt) {
             crate::provider_runner_metal::parse_metal_worker_output(
                 &worker_receipt.worker_output_payload,
@@ -176,9 +187,15 @@ fn execute(
             crate::provider_runner_metal::execute_f32_argmax_prepared_channel(
                 channel,
                 request.input_bindings[0].byte_length,
+                &code_asset_path,
+                &entry,
             )?
         } else {
-            crate::provider_runner_metal::execute_f32_argmax_input(inputs[0].input())?
+            crate::provider_runner_metal::execute_f32_argmax_input(
+                inputs[0].input(),
+                &code_asset_path,
+                &entry,
+            )?
         }
     } else {
         return Err(format!(
@@ -214,6 +231,41 @@ fn execute(
         additional_outputs: Vec::new(),
         transport_receipts: Vec::new(),
     })
+}
+
+#[cfg(target_os = "macos")]
+fn metal_code_asset_arguments(
+    output_dir: &Path,
+    request: &ProviderRequest,
+) -> Result<Vec<String>, String> {
+    let (path, entry) = validated_metal_code_asset(output_dir, request)?;
+    let hash = &request
+        .code_asset
+        .as_ref()
+        .expect("validated Metal code asset")
+        .content_hash;
+    Ok(vec![
+        format!("verified-path:{hash}:{}", path.display()),
+        format!("literal:{entry}"),
+    ])
+}
+
+fn validated_metal_code_asset(
+    output_dir: &Path,
+    request: &ProviderRequest,
+) -> Result<(std::path::PathBuf, String), String> {
+    let asset = request
+        .code_asset
+        .as_ref()
+        .ok_or_else(|| "Metal f32 request is missing its code asset".to_owned())?;
+    if asset.format != "metal-source"
+        || asset.target != "metal.apple-silicon-gpu"
+        || asset.entry.is_empty()
+    {
+        return Err("Metal f32 request code asset descriptor is incompatible".to_owned());
+    }
+    let path = crate::provider_process_adapter::validate_provider_code_asset(output_dir, request)?;
+    Ok((path, asset.entry.clone()))
 }
 
 fn is_gray8_invert(request: &ProviderRequest) -> bool {

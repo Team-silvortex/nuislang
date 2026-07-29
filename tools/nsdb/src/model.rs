@@ -33,6 +33,13 @@ pub struct PayloadExecutionHandoffPersistSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompiledCodeAssetSelectionItem {
+    pub contribution_index: usize,
+    pub asset_id: String,
+    pub identity_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompiledCodeAssetSelectionEvidence {
     pub contract: String,
     pub status: String,
@@ -43,6 +50,7 @@ pub struct CompiledCodeAssetSelectionEvidence {
     pub contribution_index: usize,
     pub asset_id: String,
     pub identity_hash: String,
+    pub selections: Vec<CompiledCodeAssetSelectionItem>,
 }
 
 impl Default for CompiledCodeAssetSelectionEvidence {
@@ -57,6 +65,7 @@ impl Default for CompiledCodeAssetSelectionEvidence {
             contribution_index: 0,
             asset_id: "none".to_owned(),
             identity_hash: "none".to_owned(),
+            selections: Vec::new(),
         }
     }
 }

@@ -160,36 +160,29 @@ static NSData *carrierFrame(const char *argument) {
 
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
-        BOOL argmax = argc == 2;
-        if (!argmax && argc != 3) {
-            return fail(@"usage: metal_f32_bias <input-path|frame:0> [bias]");
+        BOOL argmax = argc == 4;
+        if (!argmax && argc != 5) {
+            return fail(@"usage: metal_f32_bias <input> <metal-source> <entry> [bias]");
         }
         NSData *input = carrierFrame(argv[1]);
         if (input == nil || input.length == 0 || input.length % sizeof(float) != 0) {
             return fail(@"Metal f32 input unavailable or misaligned");
         }
-        float bias = argmax ? 0.0f : strtof(argv[2], NULL);
+        NSString *sourcePath = [NSString stringWithUTF8String:argv[2]];
+        NSString *entry = [NSString stringWithUTF8String:argv[3]];
+        NSError *error = nil;
+        NSString *source = [NSString stringWithContentsOfFile:sourcePath
+                                                    encoding:NSUTF8StringEncoding
+                                                       error:&error];
+        if (source == nil || entry.length == 0) {
+            return fail([NSString stringWithFormat:@"Metal code asset unavailable: %@", error]);
+        }
+        float bias = argmax ? 0.0f : strtof(argv[4], NULL);
         uint32_t count = (uint32_t)(input.length / sizeof(float));
         id<MTLDevice> device = MTLCreateSystemDefaultDevice();
         if (device == nil) return fail(@"Metal device unavailable");
-        NSString *source = argmax
-            ? @"#include <metal_stdlib>\nusing namespace metal;\n"
-               "kernel void nuis_f32_argmax(device const float *input [[buffer(0)]], "
-               "device uint *output [[buffer(1)]], constant uint &count [[buffer(2)]], "
-               "uint gid [[thread_position_in_grid]]) { if (gid != 0) return; "
-               "uint best = 0; float bestValue = input[0]; "
-               "for (uint index = 1; index < count; index++) { "
-               "if (input[index] > bestValue) { best = index; bestValue = input[index]; } } "
-               "output[0] = best; }\n"
-            : @"#include <metal_stdlib>\nusing namespace metal;\n"
-               "kernel void nuis_f32_bias(device const float *input [[buffer(0)]], "
-               "device float *output [[buffer(1)]], constant float &bias [[buffer(2)]], "
-               "constant uint &count [[buffer(3)]], uint gid [[thread_position_in_grid]]) { "
-               "if (gid < count) output[gid] = input[gid] + bias; }\n";
-        NSError *error = nil;
         id<MTLLibrary> library = [device newLibraryWithSource:source options:nil error:&error];
-        id<MTLFunction> function =
-            [library newFunctionWithName:argmax ? @"nuis_f32_argmax" : @"nuis_f32_bias"];
+        id<MTLFunction> function = [library newFunctionWithName:entry];
         id<MTLComputePipelineState> pipeline =
             [device newComputePipelineStateWithFunction:function error:&error];
         if (library == nil || function == nil || pipeline == nil) {
@@ -205,23 +198,18 @@ int main(int argc, const char *argv[]) {
         NSUInteger outputLength = argmax ? sizeof(uint32_t) : input.length;
         id<MTLBuffer> outputBuffer = [device newBufferWithLength:outputLength options:options];
         id<MTLBuffer> biasBuffer = [device newBufferWithBytes:&bias length:sizeof(bias) options:options];
-        id<MTLBuffer> countBuffer =
-            [device newBufferWithBytes:&count length:sizeof(count) options:options];
         id<MTLCommandQueue> queue = [device newCommandQueue];
         id<MTLCommandBuffer> command = [queue commandBuffer];
         id<MTLComputeCommandEncoder> encoder = [command computeCommandEncoder];
-        if (inputBuffer == nil || outputBuffer == nil || biasBuffer == nil || countBuffer == nil ||
+        if (inputBuffer == nil || outputBuffer == nil || biasBuffer == nil ||
             queue == nil || command == nil || encoder == nil) {
             return fail(@"Metal f32 command resources unavailable");
         }
         [encoder setComputePipelineState:pipeline];
         [encoder setBuffer:inputBuffer offset:0 atIndex:0];
         [encoder setBuffer:outputBuffer offset:0 atIndex:1];
-        if (argmax) {
-            [encoder setBuffer:countBuffer offset:0 atIndex:2];
-        } else {
+        if (!argmax) {
             [encoder setBuffer:biasBuffer offset:0 atIndex:2];
-            [encoder setBuffer:countBuffer offset:0 atIndex:3];
         }
         NSUInteger dispatchCount = argmax ? 1 : count;
         NSUInteger width = MIN(pipeline.maxTotalThreadsPerThreadgroup, dispatchCount);

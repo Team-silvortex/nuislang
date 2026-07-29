@@ -199,6 +199,13 @@ pub(crate) fn run_compile(
                         "auto-recommended".to_owned()
                     },
                     artifact_provider_metadata: project.manifest.artifact_provider_metadata.clone(),
+                    code_asset_requirements: project
+                        .resolved_galaxies
+                        .iter()
+                        .flat_map(|galaxy| galaxy.code_assets.iter().cloned())
+                        .collect::<std::collections::BTreeSet<_>>()
+                        .into_iter()
+                        .collect(),
                     abi_graph_summary: Some(project::render_project_abi_graph_line(
                         &plan.abi_resolution,
                     )),

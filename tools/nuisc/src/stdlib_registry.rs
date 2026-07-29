@@ -77,6 +77,7 @@ pub fn load_stdlib_module_manifest(
         depends_on: parse_optional_string_array(&source, "depends_on").unwrap_or_default(),
         summary: parse_required_string(&source, "summary", &path)?,
         surfaces: parse_optional_string_array(&source, "surfaces").unwrap_or_default(),
+        code_assets: parse_optional_string_array(&source, "code_assets").unwrap_or_default(),
         source_modules: parse_optional_string_array(&source, "source_modules").unwrap_or_default(),
         library_modules: parse_optional_string_array(&source, "library_modules")
             .unwrap_or_default(),
@@ -145,6 +146,7 @@ pub fn resolve_galaxy_dependencies(
                 manifest_path: module_dir.join("module.toml"),
                 depends_on: manifest.depends_on.clone(),
                 surfaces: manifest.surfaces.clone(),
+                code_assets: manifest.code_assets.clone(),
                 source_modules: manifest.source_modules.clone(),
                 resolved_source_paths,
                 library_modules: manifest.library_modules.clone(),
@@ -259,6 +261,20 @@ mod tests {
                 "lib/render_surface.ns".to_owned(),
                 "lib/texture_surface.ns".to_owned(),
                 "lib/pipeline_surface.ns".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn witsage_manifest_exposes_cross_domain_code_asset_requirements() {
+        let stdlib_root = resolve_stdlib_root().expect("resolve stdlib root");
+        let manifest = load_stdlib_module_manifest(&stdlib_root, "witsage").expect("load witsage");
+
+        assert_eq!(
+            manifest.code_assets,
+            vec![
+                "shader.witsage.vector-bias.metal".to_owned(),
+                "shader.witsage.argmax.metal".to_owned(),
             ]
         );
     }

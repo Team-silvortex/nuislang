@@ -321,6 +321,10 @@ pub(crate) fn render_device_provider_sample_manifest_toml<'a>(
                 output_dir,
                 &sample.input_evidence,
             )?;
+        input_evidence = crate::artifact_device_sample_witsage::resolve_code_asset_evidence(
+            output_dir,
+            &input_evidence,
+        )?;
         input_evidence.push_str(&code_asset_table_evidence);
         out.push_str("\n[[device_provider_samples]]\n");
         push_toml_string(&mut out, "trace_id", trace_id);

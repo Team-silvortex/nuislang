@@ -5,6 +5,10 @@ use std::{
 
 #[path = "provider_code_asset_contribution.rs"]
 pub(crate) mod contribution;
+#[path = "provider_code_asset_contribution_set.rs"]
+mod contribution_set;
+#[path = "provider_code_asset_selection_payload.rs"]
+pub(crate) mod selection_payload;
 
 pub(crate) const PROVIDER_CODE_ASSET_DESCRIPTOR_CONTRACT: &str =
     "nuis-provider-code-asset-descriptor-v1";

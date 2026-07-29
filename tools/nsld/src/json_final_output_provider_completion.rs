@@ -100,6 +100,25 @@ pub(crate) fn provider_completion_records_json(report: &NsldFinalExecutableOutpu
                     "compiled_code_asset_identity_hash",
                     &completion.compiled_code_asset_selection.identity_hash,
                 ),
+                json_usize_field(
+                    "compiled_code_asset_selection_count",
+                    completion.compiled_code_asset_selection.selections.len(),
+                ),
+                format!(
+                    "\"compiled_code_asset_selections\":[{}]",
+                    completion
+                        .compiled_code_asset_selection
+                        .selections
+                        .iter()
+                        .map(|item| format!(
+                            "{{{},{},{}}}",
+                            json_usize_field("contribution_index", item.contribution_index),
+                            json_string_field("asset_id", &item.asset_id),
+                            json_string_field("identity_hash", &item.identity_hash),
+                        ))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
                 json_string_field("record_hash", &completion.record_hash),
             ];
             format!("{{{}}}", fields.join(","))

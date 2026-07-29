@@ -155,6 +155,50 @@ fn registered_asset<'a>(
         .ok_or_else(|| format!("Shader Nustar code asset `{id}` is not registered"))
 }
 
+pub(super) fn resolve_code_asset_evidence(
+    output_dir: &Path,
+    evidence: &str,
+) -> Result<String, String> {
+    let assets = witsage_shader_code_assets()?;
+    let selected_assets = assets
+        .iter()
+        .filter(|asset| evidence.contains(&format!("_code_asset_id={}", asset.asset_id)))
+        .collect::<Vec<_>>();
+    if selected_assets.is_empty() {
+        return Ok(evidence.to_owned());
+    }
+    let mut selections = Vec::with_capacity(selected_assets.len());
+    for asset in selected_assets {
+        let selection =
+            crate::artifact_code_asset_contribution_table::select_compiled_code_asset_contribution(
+                output_dir,
+                &asset.package_id,
+                &asset.domain_family,
+                &asset.lowering_target,
+                &asset.format,
+                &asset.target,
+                &[asset.entry.clone()],
+            )?
+            .ok_or_else(|| {
+                format!(
+                    "compiled Shader contribution for `{}` is unavailable",
+                    asset.asset_id
+                )
+            })?;
+        selections.push(selection);
+    }
+    selections.sort_by_key(|selection| {
+        evidence
+            .find(&format!("_code_asset_id={}", selection.asset_id))
+            .unwrap_or(usize::MAX)
+    });
+    let set =
+        crate::artifact_code_asset_contribution_table::render_selected_contribution_set_evidence(
+            &selections,
+        )?;
+    Ok(format!("{evidence};{set}"))
+}
+
 pub(super) fn persist_assets_if_requested(
     output_dir: &Path,
     evidence: &[&str],

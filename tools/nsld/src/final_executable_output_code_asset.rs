@@ -6,12 +6,37 @@ pub(crate) fn validate_compiled_code_asset_selections(
         if selection == &nsdb::CompiledCodeAssetSelectionEvidence::default() {
             continue;
         }
-        if selection.contract != "nuis-provider-code-asset-contribution-selection-v1"
+        let selected_count = selection.selections.len();
+        let contract_valid = (selected_count == 1
+            && selection.contract == "nuis-provider-code-asset-contribution-selection-v1")
+            || (selected_count > 1
+                && selection.contract == "nuis-provider-code-asset-contribution-selection-set-v1");
+        let unique = selection
+            .selections
+            .iter()
+            .map(|item| item.contribution_index)
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+            == selected_count;
+        let alias_valid = selection.selections.first().is_some_and(|first| {
+            first.contribution_index == selection.contribution_index
+                && first.asset_id == selection.asset_id
+                && first.identity_hash == selection.identity_hash
+        });
+        if !contract_valid
             || selection.status != "verified"
             || selection.table_contract != "nuis-domain-code-asset-contribution-table-v1"
             || selection.contribution_count == 0
             || selection.contribution_count > 64
             || selection.contribution_index >= selection.contribution_count
+            || !(1..=64).contains(&selected_count)
+            || !unique
+            || !alias_valid
+            || selection.selections.iter().any(|item| {
+                item.contribution_index >= selection.contribution_count
+                    || !valid_token(&item.asset_id)
+                    || !valid_hash(&item.identity_hash)
+            })
             || !valid_hash(&selection.table_hash)
             || !valid_hash(&selection.identity_set_root_hash)
             || !valid_token(&selection.asset_id)
@@ -86,6 +111,11 @@ mod tests {
                 contribution_index: 0,
                 asset_id: "kernel.cuda.project.test".to_owned(),
                 identity_hash: "0x3333333333333333".to_owned(),
+                selections: vec![nsdb::CompiledCodeAssetSelectionItem {
+                    contribution_index: 0,
+                    asset_id: "kernel.cuda.project.test".to_owned(),
+                    identity_hash: "0x3333333333333333".to_owned(),
+                }],
             },
             dispatch_authority_contract: "dispatch".to_owned(),
             dispatch_authority_status: "verified".to_owned(),

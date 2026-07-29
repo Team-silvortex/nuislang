@@ -11,6 +11,7 @@ const DESCRIPTOR_IDENTITY_CONTRACT: &str = "nuis-provider-code-asset-descriptor-
 const IDENTITY_SET_CONTRACT: &str = "nuis-provider-code-asset-identity-set-v1";
 const DIGEST_CONTRACT: &str = "nuis-code-asset-digest-fnv1a64-v1";
 const SELECTION_CONTRACT: &str = "nuis-provider-code-asset-contribution-selection-v1";
+const SELECTION_SET_CONTRACT: &str = "nuis-provider-code-asset-contribution-selection-set-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct VerifiedCodeAssetContributionTable {
@@ -140,6 +141,46 @@ pub(super) fn render_selected_contribution_evidence(
         selection.asset_id,
         selection.identity_hash,
     )
+}
+
+pub(super) fn render_selected_contribution_set_evidence(
+    selections: &[SelectedCodeAssetContribution],
+) -> Result<String, String> {
+    let Some(first) = selections.first() else {
+        return Err("compiled code asset contribution selection set is empty".to_owned());
+    };
+    if selections.len() > 64
+        || selections.iter().any(|selection| {
+            selection.table_hash != first.table_hash
+                || selection.identity_set_root_hash != first.identity_set_root_hash
+        })
+        || selections
+            .iter()
+            .map(|selection| selection.index)
+            .collect::<BTreeSet<_>>()
+            .len()
+            != selections.len()
+    {
+        return Err("compiled code asset contribution selection set is invalid".to_owned());
+    }
+    let mut out = format!(
+        "provider_code_asset_contribution_selection_set_contract={SELECTION_SET_CONTRACT};provider_code_asset_contribution_table_contract={TABLE_CONTRACT};provider_code_asset_contribution_table_hash={};provider_code_asset_contribution_identity_set_root_hash={};provider_code_asset_contribution_selection_count={}",
+        first.table_hash,
+        first.identity_set_root_hash,
+        selections.len()
+    );
+    for (index, selection) in selections.iter().enumerate() {
+        out.push_str(&format!(
+            ";provider_code_asset_contribution_selection_{index}_index={};provider_code_asset_contribution_selection_{index}_owner_package_id={};provider_code_asset_contribution_selection_{index}_domain_family={};provider_code_asset_contribution_selection_{index}_lowering_target={};provider_code_asset_contribution_selection_{index}_asset_id={};provider_code_asset_contribution_selection_{index}_identity_contract={DESCRIPTOR_IDENTITY_CONTRACT};provider_code_asset_contribution_selection_{index}_identity_hash={}",
+            selection.index,
+            selection.owner_package_id,
+            selection.domain_family,
+            selection.lowering_target,
+            selection.asset_id,
+            selection.identity_hash,
+        ));
+    }
+    Ok(out)
 }
 
 fn verify_source(

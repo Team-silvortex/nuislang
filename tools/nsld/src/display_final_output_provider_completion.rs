@@ -4,7 +4,7 @@ pub(crate) fn display_provider_completions(report: &NsldFinalExecutableOutputRep
     for completion in &report.final_output_nsdb_provider_completions {
         let compiled = &completion.compiled_code_asset_selection;
         println!(
-            "  final_output_nsdb_provider_completion: {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
+            "  final_output_nsdb_provider_completion: {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
             completion.trace_id,
             completion.provider_family,
             completion.output_contract,
@@ -34,6 +34,13 @@ pub(crate) fn display_provider_completions(report: &NsldFinalExecutableOutputRep
             compiled.contribution_index,
             compiled.asset_id,
             compiled.identity_hash,
+            compiled.selections.len(),
+            compiled
+                .selections
+                .iter()
+                .map(|item| item.asset_id.as_str())
+                .collect::<Vec<_>>()
+                .join(","),
             completion.record_hash
         );
     }

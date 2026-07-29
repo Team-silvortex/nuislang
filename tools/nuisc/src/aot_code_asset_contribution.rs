@@ -131,6 +131,37 @@ pub(crate) fn registered_asset_contribution(
     )
 }
 
+pub(crate) fn required_registered_asset_contribution(
+    asset: &NustarCodeAssetRegistration,
+    path: &Path,
+) -> Result<DomainCodeAssetContribution, String> {
+    let path = relative_file_name(path)?;
+    let content_hash = fnv1a64_hex(&asset.bytes);
+    let entries = vec![asset.entry.clone()];
+    let identity_hash = descriptor_identity_hash(
+        &asset.asset_id,
+        &asset.format,
+        &asset.target,
+        &path,
+        asset.bytes.len(),
+        &content_hash,
+        &entries,
+    );
+    Ok(DomainCodeAssetContribution {
+        owner_package_id: asset.package_id.clone(),
+        domain_family: asset.domain_family.clone(),
+        asset_id: asset.asset_id.clone(),
+        format: asset.format.clone(),
+        lowering_target: asset.lowering_target.clone(),
+        target: asset.target.clone(),
+        path,
+        entries,
+        byte_length: asset.bytes.len(),
+        content_hash,
+        identity_hash,
+    })
+}
+
 pub(crate) fn render_code_asset_contribution_table(
     contributions: &[DomainCodeAssetContribution],
 ) -> Result<String, String> {

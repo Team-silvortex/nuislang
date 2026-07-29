@@ -4,7 +4,7 @@ use nuis_artifact::{
     parse_domain_build_unit_blocks as shared_parse_domain_build_unit_blocks, NuisCompiledArtifact,
 };
 
-use crate::aot_domain_artifact_writer::write_domain_build_unit_stubs;
+use crate::aot_domain_artifact_writer::write_domain_build_unit_stubs_with_kernel_codegen_table;
 use crate::aot_domain_index_render::{
     append_relocated_bridge_registry_manifest_section,
     append_relocated_domain_lowering_plan_index_manifest_section,
@@ -13,6 +13,7 @@ use crate::aot_domain_index_render::{
 };
 use crate::aot_domain_unit_render::render_domain_build_unit_manifest_block;
 use crate::aot_encoding::fnv1a64_hex;
+use crate::aot_toml::parse_optional_toml_string_array;
 use crate::aot_toml::{escape_toml_string, render_string_array};
 
 pub fn render_relocated_unpacked_build_manifest(
@@ -27,7 +28,14 @@ pub fn render_relocated_unpacked_build_manifest(
     let mut domain_build_units =
         shared_parse_domain_build_unit_blocks(source, Path::new("<artifact>"))
             .map_err(|error| error.to_string())?;
-    write_domain_build_unit_stubs(output_dir, &mut domain_build_units)?;
+    let required_code_assets =
+        parse_optional_toml_string_array(source, "code_asset_requirements").unwrap_or_default();
+    write_domain_build_unit_stubs_with_kernel_codegen_table(
+        output_dir,
+        &mut domain_build_units,
+        None,
+        &required_code_assets,
+    )?;
     let bridge_registry_path = write_domain_bridge_registry(output_dir, &domain_build_units)?;
     let host_bridge_plan_index_path =
         write_host_bridge_plan_index(output_dir, &domain_build_units)?;

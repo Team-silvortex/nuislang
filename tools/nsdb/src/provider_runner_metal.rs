@@ -165,50 +165,63 @@ fn prepare_metal_worker_invocation<'a>(
 pub(crate) fn execute_f32_bias(
     input_path: &Path,
     bias: f32,
+    code_asset_path: &Path,
+    entry: &str,
 ) -> Result<MetalProviderExecution, String> {
-    execute_f32_bias_platform(input_path, bias)
+    execute_f32_bias_platform(input_path, bias, code_asset_path, entry)
 }
 
 pub(crate) fn execute_f32_bias_input(
     input: &ProviderCarrierInput,
     bias: f32,
+    code_asset_path: &Path,
+    entry: &str,
 ) -> Result<MetalProviderExecution, String> {
     match input {
-        ProviderCarrierInput::Path(path) => execute_f32_bias(path, bias),
+        ProviderCarrierInput::Path(path) => execute_f32_bias(path, bias, code_asset_path, entry),
         ProviderCarrierInput::OpaqueBytes { bytes, .. } => {
-            execute_f32_bias_bytes_platform(bytes, bias)
+            execute_f32_bias_bytes_platform(bytes, bias, code_asset_path, entry)
         }
     }
 }
-
 pub(crate) fn execute_f32_bias_prepared_channel(
     channel: &PreparedProviderCarrierChannel,
     byte_len: usize,
     bias: f32,
+    code_asset_path: &Path,
+    entry: &str,
 ) -> Result<MetalProviderExecution, String> {
-    execute_f32_bias_prepared_channel_platform(channel, byte_len, bias)
+    execute_f32_bias_prepared_channel_platform(channel, byte_len, bias, code_asset_path, entry)
 }
-
 pub(crate) fn execute_f32_argmax_input(
     input: &ProviderCarrierInput,
+    code_asset_path: &Path,
+    entry: &str,
 ) -> Result<MetalProviderExecution, String> {
     match input {
-        ProviderCarrierInput::Path(path) => execute_f32_argmax_platform(path),
-        ProviderCarrierInput::OpaqueBytes { bytes, .. } => execute_f32_argmax_bytes_platform(bytes),
+        ProviderCarrierInput::Path(path) => {
+            execute_f32_argmax_platform(path, code_asset_path, entry)
+        }
+        ProviderCarrierInput::OpaqueBytes { bytes, .. } => {
+            execute_f32_argmax_bytes_platform(bytes, code_asset_path, entry)
+        }
     }
 }
-
 pub(crate) fn execute_f32_argmax_prepared_channel(
     channel: &PreparedProviderCarrierChannel,
     byte_len: usize,
+    code_asset_path: &Path,
+    entry: &str,
 ) -> Result<MetalProviderExecution, String> {
-    execute_f32_argmax_prepared_channel_platform(channel, byte_len)
+    execute_f32_argmax_prepared_channel_platform(channel, byte_len, code_asset_path, entry)
 }
 
 #[cfg(target_os = "macos")]
 fn execute_f32_bias_platform(
     input_path: &Path,
     bias: f32,
+    code_asset_path: &Path,
+    entry: &str,
 ) -> Result<MetalProviderExecution, String> {
     let output_byte_len = usize::try_from(
         fs::metadata(input_path)
@@ -218,7 +231,11 @@ fn execute_f32_bias_platform(
     .map_err(|_| "Metal f32 input length overflow".to_owned())?;
     execute_metal_platform(
         input_path.as_os_str(),
-        &[bias.to_string()],
+        &[
+            code_asset_path.display().to_string(),
+            entry.to_owned(),
+            bias.to_string(),
+        ],
         "nuis-metal-f32-bias-provider-runner-v1",
         METAL_F32_BIAS_SOURCE,
         None,
@@ -230,6 +247,8 @@ fn execute_f32_bias_platform(
 fn execute_f32_bias_bytes_platform(
     input: &[u8],
     bias: f32,
+    code_asset_path: &Path,
+    entry: &str,
 ) -> Result<MetalProviderExecution, String> {
     let channel_adapter = select_provider_carrier_channel_adapter("auto")
         .ok_or_else(|| "Metal provider carrier channel is unavailable".to_owned())?;
@@ -237,7 +256,11 @@ fn execute_f32_bias_bytes_platform(
     let argument = channel.frame_argument(0);
     execute_metal_platform(
         OsStr::new(&argument),
-        &[bias.to_string()],
+        &[
+            code_asset_path.display().to_string(),
+            entry.to_owned(),
+            bias.to_string(),
+        ],
         "nuis-metal-f32-bias-provider-runner-v1",
         METAL_F32_BIAS_SOURCE,
         Some(&channel),
@@ -250,11 +273,17 @@ fn execute_f32_bias_prepared_channel_platform(
     channel: &PreparedProviderCarrierChannel,
     byte_len: usize,
     bias: f32,
+    code_asset_path: &Path,
+    entry: &str,
 ) -> Result<MetalProviderExecution, String> {
     let argument = channel.frame_argument(0);
     execute_metal_platform(
         OsStr::new(&argument),
-        &[bias.to_string()],
+        &[
+            code_asset_path.display().to_string(),
+            entry.to_owned(),
+            bias.to_string(),
+        ],
         "nuis-metal-f32-bias-provider-runner-v1",
         METAL_F32_BIAS_SOURCE,
         Some(channel),
@@ -263,10 +292,14 @@ fn execute_f32_bias_prepared_channel_platform(
 }
 
 #[cfg(target_os = "macos")]
-fn execute_f32_argmax_platform(input_path: &Path) -> Result<MetalProviderExecution, String> {
+fn execute_f32_argmax_platform(
+    input_path: &Path,
+    code_asset_path: &Path,
+    entry: &str,
+) -> Result<MetalProviderExecution, String> {
     execute_metal_platform(
         input_path.as_os_str(),
-        &[],
+        &[code_asset_path.display().to_string(), entry.to_owned()],
         "nuis-metal-f32-argmax-provider-runner-v1",
         METAL_F32_BIAS_SOURCE,
         None,
@@ -275,22 +308,28 @@ fn execute_f32_argmax_platform(input_path: &Path) -> Result<MetalProviderExecuti
 }
 
 #[cfg(target_os = "macos")]
-fn execute_f32_argmax_bytes_platform(input: &[u8]) -> Result<MetalProviderExecution, String> {
+fn execute_f32_argmax_bytes_platform(
+    input: &[u8],
+    code_asset_path: &Path,
+    entry: &str,
+) -> Result<MetalProviderExecution, String> {
     let channel_adapter = select_provider_carrier_channel_adapter("auto")
         .ok_or_else(|| "Metal provider carrier channel is unavailable".to_owned())?;
     let channel = prepare_provider_carrier_channel(channel_adapter, &[input])?;
-    execute_f32_argmax_prepared_channel_platform(&channel, input.len())
+    execute_f32_argmax_prepared_channel_platform(&channel, input.len(), code_asset_path, entry)
 }
 
 #[cfg(target_os = "macos")]
 fn execute_f32_argmax_prepared_channel_platform(
     channel: &PreparedProviderCarrierChannel,
     _byte_len: usize,
+    code_asset_path: &Path,
+    entry: &str,
 ) -> Result<MetalProviderExecution, String> {
     let argument = channel.frame_argument(0);
     execute_metal_platform(
         OsStr::new(&argument),
-        &[],
+        &[code_asset_path.display().to_string(), entry.to_owned()],
         "nuis-metal-f32-argmax-provider-runner-v1",
         METAL_F32_BIAS_SOURCE,
         Some(channel),
@@ -341,6 +380,8 @@ fn execute_gray8_threshold_platform(
 fn execute_f32_bias_platform(
     _input_path: &Path,
     _bias: f32,
+    _code_asset_path: &Path,
+    _entry: &str,
 ) -> Result<MetalProviderExecution, String> {
     Err("Metal provider runner is unavailable on this host".to_owned())
 }
@@ -349,6 +390,8 @@ fn execute_f32_bias_platform(
 fn execute_f32_bias_bytes_platform(
     _input: &[u8],
     _bias: f32,
+    _code_asset_path: &Path,
+    _entry: &str,
 ) -> Result<MetalProviderExecution, String> {
     Err("Metal provider runner is unavailable on this host".to_owned())
 }
@@ -358,17 +401,27 @@ fn execute_f32_bias_prepared_channel_platform(
     _channel: &PreparedProviderCarrierChannel,
     _byte_len: usize,
     _bias: f32,
+    _code_asset_path: &Path,
+    _entry: &str,
 ) -> Result<MetalProviderExecution, String> {
     Err("Metal provider runner is unavailable on this host".to_owned())
 }
 
 #[cfg(not(target_os = "macos"))]
-fn execute_f32_argmax_platform(_input_path: &Path) -> Result<MetalProviderExecution, String> {
+fn execute_f32_argmax_platform(
+    _input_path: &Path,
+    _code_asset_path: &Path,
+    _entry: &str,
+) -> Result<MetalProviderExecution, String> {
     Err("Metal provider runner is unavailable on this host".to_owned())
 }
 
 #[cfg(not(target_os = "macos"))]
-fn execute_f32_argmax_bytes_platform(_input: &[u8]) -> Result<MetalProviderExecution, String> {
+fn execute_f32_argmax_bytes_platform(
+    _input: &[u8],
+    _code_asset_path: &Path,
+    _entry: &str,
+) -> Result<MetalProviderExecution, String> {
     Err("Metal provider runner is unavailable on this host".to_owned())
 }
 
@@ -376,6 +429,8 @@ fn execute_f32_argmax_bytes_platform(_input: &[u8]) -> Result<MetalProviderExecu
 fn execute_f32_argmax_prepared_channel_platform(
     _channel: &PreparedProviderCarrierChannel,
     _byte_len: usize,
+    _code_asset_path: &Path,
+    _entry: &str,
 ) -> Result<MetalProviderExecution, String> {
     Err("Metal provider runner is unavailable on this host".to_owned())
 }
@@ -634,6 +689,15 @@ mod tests {
     };
     #[cfg(target_os = "macos")]
     use crate::provider_carrier_input::ProviderCarrierInput;
+    #[cfg(target_os = "macos")]
+    use std::path::PathBuf;
+
+    #[cfg(target_os = "macos")]
+    fn shader_asset(name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../nustar-packages/assets/shader")
+            .join(name)
+    }
 
     #[test]
     fn parses_ready_metal_runner_output() {
@@ -696,7 +760,13 @@ mod tests {
                 .flat_map(f32::to_le_bytes)
                 .collect(),
         };
-        let execution = execute_f32_bias_input(&input, 1.0).expect("opaque Metal input");
+        let execution = execute_f32_bias_input(
+            &input,
+            1.0,
+            &shader_asset("witsage_vector_bias.metal"),
+            "nuis_witsage_vector_bias_f32",
+        )
+        .expect("opaque Metal input");
         let values = execution
             .output_payload
             .as_bytes()
@@ -716,7 +786,12 @@ mod tests {
                 .flat_map(f32::to_le_bytes)
                 .collect(),
         };
-        let execution = execute_f32_argmax_input(&input).expect("opaque Metal argmax input");
+        let execution = execute_f32_argmax_input(
+            &input,
+            &shader_asset("witsage_argmax.metal"),
+            "nuis_witsage_argmax_f32",
+        )
+        .expect("opaque Metal argmax input");
         assert_eq!(
             u32::from_le_bytes(execution.output_payload.as_bytes().try_into().unwrap()),
             1

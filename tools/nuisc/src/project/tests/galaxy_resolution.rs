@@ -893,6 +893,7 @@ mod cpu Main {
             manifest_path: PathBuf::from("stdlib/manual/module.toml"),
             depends_on: vec![],
             surfaces: vec!["surface.manual.contracts.v1".to_owned()],
+            code_assets: vec![],
             source_modules: vec![],
             resolved_source_paths: vec![],
             library_modules: vec!["lib/manual_contracts.ns".to_owned()],

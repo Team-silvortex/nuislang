@@ -31,6 +31,7 @@ pub(crate) fn prepare_build_manifest_artifacts(
     written: &CompileArtifacts,
     lifecycle: &NuisLifecycleContract,
     domain_build_units: &mut [BuildManifestDomainBuildUnit],
+    required_code_assets: &[String],
 ) -> Result<BuildManifestArtifactSet, String> {
     let mut artifacts = vec![
         ("ast".to_owned(), PathBuf::from(&written.ast_path)),
@@ -44,6 +45,7 @@ pub(crate) fn prepare_build_manifest_artifacts(
         output_dir,
         domain_build_units,
         kernel_codegen_table.as_ref(),
+        required_code_assets,
     )?);
 
     let hetero_units = domain_build_units

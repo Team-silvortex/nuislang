@@ -46,8 +46,18 @@ pub fn write_build_manifest(
         .map_err(|error| format!("failed to stat `{}`: {error}", written.binary_path))?
         .len() as usize;
 
-    let artifact_set =
-        prepare_build_manifest_artifacts(output_dir, written, &lifecycle, &mut domain_build_units)?;
+    let required_code_assets = context
+        .project
+        .as_ref()
+        .map(|project| project.code_asset_requirements.as_slice())
+        .unwrap_or_default();
+    let artifact_set = prepare_build_manifest_artifacts(
+        output_dir,
+        written,
+        &lifecycle,
+        &mut domain_build_units,
+        required_code_assets,
+    )?;
 
     write_nuis_executable_envelope(&envelope_path, &envelope)?;
     let out = render_build_manifest_source(

@@ -1,4 +1,5 @@
 use std::{
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
 };
@@ -7,7 +8,8 @@ use nuis_artifact::BuildManifestDomainBuildUnit;
 
 use crate::aot_code_asset_contribution::{
     kernel_asset_contribution, registered_asset_contribution, render_code_asset_contribution_table,
-    shader_sidecar_contribution, DomainCodeAssetContribution,
+    required_registered_asset_contribution, shader_sidecar_contribution,
+    DomainCodeAssetContribution,
 };
 use crate::aot_domain_payload_blob::encode_domain_build_unit_payload_blob;
 use crate::aot_domain_render::render_domain_build_unit_host_bridge_stub;
@@ -22,17 +24,11 @@ use crate::kernel_codegen_table::{
     render_codegen_table, KernelYirCodegenTable, KERNEL_YIR_CODEGEN_TABLE_CONTRACT,
 };
 
-pub(crate) fn write_domain_build_unit_stubs(
-    output_dir: &Path,
-    units: &mut [BuildManifestDomainBuildUnit],
-) -> Result<Vec<(String, PathBuf)>, String> {
-    write_domain_build_unit_stubs_with_kernel_codegen_table(output_dir, units, None)
-}
-
 pub(crate) fn write_domain_build_unit_stubs_with_kernel_codegen_table(
     output_dir: &Path,
     units: &mut [BuildManifestDomainBuildUnit],
     kernel_codegen_table: Option<&KernelYirCodegenTable>,
+    required_code_assets: &[String],
 ) -> Result<Vec<(String, PathBuf)>, String> {
     let mut artifacts = Vec::new();
     let mut code_asset_contributions = Vec::<DomainCodeAssetContribution>::new();
@@ -160,6 +156,12 @@ pub(crate) fn write_domain_build_unit_stubs_with_kernel_codegen_table(
             }
         }
     }
+    write_required_nustar_code_assets(
+        output_dir,
+        required_code_assets,
+        &mut code_asset_contributions,
+        &mut artifacts,
+    )?;
     if !code_asset_contributions.is_empty() {
         let path = output_dir.join("nuis.domain.code-asset-contributions.toml");
         fs::write(
@@ -170,6 +172,41 @@ pub(crate) fn write_domain_build_unit_stubs_with_kernel_codegen_table(
         artifacts.push(("domain_code_asset_contribution_table".to_owned(), path));
     }
     Ok(artifacts)
+}
+
+fn write_required_nustar_code_assets(
+    output_dir: &Path,
+    required_ids: &[String],
+    contributions: &mut Vec<DomainCodeAssetContribution>,
+    artifacts: &mut Vec<(String, PathBuf)>,
+) -> Result<(), String> {
+    let root = Path::new(crate::NUSTAR_REGISTRY_ROOT);
+    let mut available = BTreeMap::new();
+    for manifest in crate::registry::load_all_manifests(root)? {
+        for asset in crate::registry::code_asset_registrations(root, &manifest)? {
+            if available.insert(asset.asset_id.clone(), asset).is_some() {
+                return Err("Nustar code asset registry contains duplicate asset IDs".to_owned());
+            }
+        }
+    }
+    let existing = contributions
+        .iter()
+        .map(|row| row.asset_id.clone())
+        .collect::<BTreeSet<_>>();
+    for id in required_ids.iter().collect::<BTreeSet<_>>() {
+        if existing.contains(id) {
+            continue;
+        }
+        let asset = available
+            .get(id)
+            .ok_or_else(|| format!("Galaxy requires unknown Nustar code asset `{id}`"))?;
+        let path = output_dir.join(&asset.file_name);
+        fs::write(&path, &asset.bytes)
+            .map_err(|error| format!("failed to write `{}`: {error}", path.display()))?;
+        contributions.push(required_registered_asset_contribution(asset, &path)?);
+        artifacts.push((format!("domain_code_asset_{}", asset.domain_family), path));
+    }
+    Ok(())
 }
 
 fn write_registered_nustar_code_assets(
@@ -273,37 +310,6 @@ mod tests {
         }
     }
 
-    fn metal_shader_unit() -> BuildManifestDomainBuildUnit {
-        BuildManifestDomainBuildUnit {
-            package_id: "official.shader".to_owned(),
-            domain_family: "shader".to_owned(),
-            abi: Some("shader.metal.msl2_4".to_owned()),
-            machine_arch: Some("arm64".to_owned()),
-            machine_os: Some("macos".to_owned()),
-            backend_family: Some("metal".to_owned()),
-            vendor: Some("apple".to_owned()),
-            device_class: Some("apple-silicon-gpu".to_owned()),
-            target_device: Some("apple-silicon-gpu".to_owned()),
-            ir_format: Some("msl2.4".to_owned()),
-            dispatch_abi: Some("metal-command-encoder".to_owned()),
-            backend_priority: Some(100),
-            verification: Some("verified".to_owned()),
-            selected_lowering_target: Some("metal.apple-silicon-gpu".to_owned()),
-            artifact_stub_path: None,
-            artifact_stub_inline: None,
-            artifact_payload_path: None,
-            artifact_bridge_stub_path: None,
-            artifact_ir_sidecar_path: None,
-            artifact_bridge_stub_inline: None,
-            artifact_payload_blob_path: None,
-            artifact_payload_blob_bytes: None,
-            artifact_payload_format: None,
-            artifact_payload_blob_inline: None,
-            contract_family: "nustar.shader".to_owned(),
-            packaging_role: "hetero-contract".to_owned(),
-        }
-    }
-
     #[test]
     fn materializes_registered_cuda_ptx_without_external_compiler() {
         let output_dir =
@@ -361,6 +367,7 @@ kernel.target_config target kernel0 x86_64 cuda 1 ptx\n";
             &output_dir,
             &mut units,
             Some(&table),
+            &[],
         )
         .unwrap();
 
@@ -416,15 +423,24 @@ kernel.target_config target kernel0 x86_64 cuda 1 ptx\n";
     }
 
     #[test]
-    fn writes_one_table_for_independently_owned_shader_and_kernel_assets() {
+    fn writes_one_table_for_cross_domain_galaxy_assets() {
         let output_dir = std::env::temp_dir().join(format!(
             "nuisc-domain-code-asset-contributions-{}",
             std::process::id()
         ));
         let _ = fs::remove_dir_all(&output_dir);
         fs::create_dir_all(&output_dir).unwrap();
-        let mut units = [metal_shader_unit(), cuda_kernel_unit()];
-        let artifacts = write_domain_build_unit_stubs(&output_dir, &mut units).unwrap();
+        let mut units = [cuda_kernel_unit()];
+        let artifacts = write_domain_build_unit_stubs_with_kernel_codegen_table(
+            &output_dir,
+            &mut units,
+            None,
+            &[
+                "shader.witsage.vector-bias.metal".to_owned(),
+                "shader.witsage.argmax.metal".to_owned(),
+            ],
+        )
+        .unwrap();
         assert!(artifacts
             .iter()
             .any(|(kind, _)| kind == "domain_code_asset_contribution_table"));
@@ -432,11 +448,10 @@ kernel.target_config target kernel0 x86_64 cuda 1 ptx\n";
             fs::read_to_string(output_dir.join("nuis.domain.code-asset-contributions.toml"))
                 .unwrap();
         assert!(table.contains("protocol = \"nuis-domain-code-asset-contribution-table-v1\""));
-        assert!(table.contains("contribution_count = 4"));
+        assert!(table.contains("contribution_count = 3"));
         assert!(table.contains("owner_package_id = \"official.kernel\""));
         assert!(table.contains("owner_package_id = \"official.shader\""));
         assert!(table.contains("path = \"nuis.domain.kernel.cuda.ptx\""));
-        assert!(table.contains("path = \"nuis.domain.shader.lowering.ir.txt\""));
         assert!(table.contains("asset_id = \"shader.witsage.vector-bias.metal\""));
         assert!(table.contains("path = \"nuis.witsage.vector-bias.metal\""));
         assert!(table.contains("entries = [\"nuis_witsage_argmax_f32\"]"));

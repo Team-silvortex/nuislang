@@ -397,6 +397,7 @@ fn categorizes_project_compilation_dependencies() {
         manifest_path: PathBuf::from("stdlib/demo.dep/module.toml"),
         depends_on: vec![],
         surfaces: vec!["surface.demo.dep.contracts.v1".to_owned()],
+        code_assets: vec![],
         source_modules: vec![],
         resolved_source_paths: vec![],
         library_modules: vec!["lib/demo_dep.ns".to_owned()],
@@ -405,7 +406,6 @@ fn categorizes_project_compilation_dependencies() {
         auto_injectable: true,
         auto_inject_blockers: vec![],
     }];
-
     let plan = build_project_compilation_plan(&project).unwrap();
     assert_eq!(plan.dependencies.len(), 1);
     assert_eq!(plan.dependencies[0].category, "stdlib-galaxy-direct");

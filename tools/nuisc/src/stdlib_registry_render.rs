@@ -82,6 +82,14 @@ pub fn write_resolved_galaxy_index<W: fmt::Write>(
         }
         out.write_str("\n")?;
 
+        out.write_str("  code_assets=")?;
+        if item.code_assets.is_empty() {
+            out.write_str("<none>")?;
+        } else {
+            write_joined_items(out, &item.code_assets, ", ")?;
+        }
+        out.write_str("\n")?;
+
         writeln!(
             out,
             "  library_import_policy={}",
