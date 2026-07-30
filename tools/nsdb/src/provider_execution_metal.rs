@@ -82,6 +82,13 @@ fn prepare_worker_adapter(
             crate::provider_runner_metal::prepare_f32_argmax_worker_invocation(cache)?,
             metal_code_asset_arguments(output_dir, request)?,
         )
+    } else if is_u32_copy(request) {
+        let mut arguments = metal_code_asset_arguments(output_dir, request)?;
+        arguments.push("literal:copy-u32".to_owned());
+        (
+            crate::provider_runner_metal::prepare_u32_copy_worker_invocation(cache)?,
+            arguments,
+        )
     } else {
         return Ok(None);
     };
@@ -197,6 +204,28 @@ fn execute(
                 &entry,
             )?
         }
+    } else if is_u32_copy(request) {
+        let (code_asset_path, entry) = validated_metal_code_asset(_output_dir, request)?;
+        if uses_process_adapter(worker_receipt) {
+            crate::provider_runner_metal::parse_metal_worker_output(
+                &worker_receipt.worker_output_payload,
+                "nuis-metal-u32-copy-provider-runner-v1",
+                worker_receipt.worker_output_result.take(),
+            )?
+        } else if let Some(channel) = inputs[0].direct_channel() {
+            crate::provider_runner_metal::execute_u32_copy_prepared_channel(
+                channel,
+                request.input_bindings[0].byte_length,
+                &code_asset_path,
+                &entry,
+            )?
+        } else {
+            crate::provider_runner_metal::execute_u32_copy_input(
+                inputs[0].input(),
+                &code_asset_path,
+                &entry,
+            )?
+        }
     } else {
         return Err(format!(
             "Metal provider adapter does not support buffer `{}` operation `{}`",
@@ -215,6 +244,13 @@ fn execute(
             metal_native_output_summary(
                 request.kernel.id.clone(),
                 "provider-scalar-u32",
+                &execution,
+                None,
+            )
+        } else if is_u32_copy(request) {
+            metal_native_output_summary(
+                request.kernel.id.clone(),
+                "provider-tensor-u32",
                 &execution,
                 None,
             )
@@ -259,10 +295,13 @@ fn validated_metal_code_asset(
         .as_ref()
         .ok_or_else(|| "Metal f32 request is missing its code asset".to_owned())?;
     if asset.format != "metal-source"
-        || asset.target != "metal.apple-silicon-gpu"
+        || !matches!(
+            asset.target.as_str(),
+            "metal.apple-silicon-gpu" | "metal.mac-discrete-or-integrated-gpu" | "msl2.4"
+        )
         || asset.entry.is_empty()
     {
-        return Err("Metal f32 request code asset descriptor is incompatible".to_owned());
+        return Err("Metal request code asset descriptor is incompatible".to_owned());
     }
     let path = crate::provider_process_adapter::validate_provider_code_asset(output_dir, request)?;
     Ok((path, asset.entry.clone()))
@@ -293,6 +332,15 @@ fn is_f32_argmax(request: &ProviderRequest) -> bool {
         && request.output_bindings.len() == 1
         && request.output_bindings[0].element_type == "u32"
         && request.output_bindings[0].shape == [1]
+}
+
+fn is_u32_copy(request: &ProviderRequest) -> bool {
+    request.buffer.element_type == "u32"
+        && request.buffer.layout == "tensor-contiguous"
+        && request.kernel.operation == "copy-u32"
+        && request.output_bindings.len() == 1
+        && request.output_bindings[0].element_type == "u32"
+        && request.output_bindings[0].byte_length == request.buffer.byte_length
 }
 
 fn uses_process_adapter(receipt: &ProviderWorkerDispatchReceipt) -> bool {

@@ -30,6 +30,20 @@ stage compute(workgroup_size(1, 1, 1)) {{
     )
 }
 
+fn assert_msl_plan_proof(text: &str, profile: &str) {
+    assert!(text.contains(
+        "// nuis-module-lowering-plan contract=nuis-yir.shader.backend-lowering-plan.v1"
+    ));
+    assert!(text.contains("// nuis-module-source-schema nuis-yir.shader.module-summary.v1"));
+    assert!(text.contains("// nuis-module-lowering-boundary module-summary-to-native-ir"));
+    assert!(text.contains(&format!("// nuis-module-profile-lowering-target {profile}")));
+    assert!(text.contains("// nuis-module-lowering-target msl:metal-gpu"));
+    assert!(text.contains("// nuis-module-native-ir msl2.4"));
+    assert!(text.contains(
+        "// nuis-module-stage kind=compute execution_model=kernel binding_slot_model=argument-buffer-slot"
+    ));
+}
+
 #[test]
 fn emits_msl_copy_module_from_canonical_wgsl_body() {
     let lowered = lower_canonical_inline_wgsl_u32_for_profile(
@@ -40,6 +54,7 @@ fn emits_msl_copy_module_from_canonical_wgsl_body() {
     .unwrap();
     let text = String::from_utf8(lowered).unwrap();
 
+    assert_msl_plan_proof(&text, "metal.apple-silicon-gpu");
     assert!(text.contains("#include <metal_stdlib>"));
     assert!(text.contains("kernel void nuis_metal_copy_u32("));
     assert!(text.contains("device const uint* input_values [[buffer(0)]]"));
@@ -63,6 +78,7 @@ fn emits_binary_u32_msl_from_shared_canonical_body_contract() {
         .unwrap();
         let text = String::from_utf8(lowered).unwrap();
 
+        assert_msl_plan_proof(&text, "metal.mac-discrete-or-integrated-gpu");
         assert!(text.contains(&format!("kernel void {entry}(")));
         assert!(text.contains(&format!("output_values[gid] = {expression};")));
     }
@@ -87,4 +103,20 @@ fn rejects_non_metal_target_or_body_drift() {
         "metal.apple-silicon-gpu",
     )
     .is_err());
+}
+
+#[test]
+fn rejects_msl_module_lowering_plan_drift() {
+    let mut plan = canonical_msl_compute_plan("metal.apple-silicon-gpu");
+    plan.lowering_target = "spirv:vulkan-gpu";
+    assert!(validate_msl_module_lowering_plan(&plan, "metal.apple-silicon-gpu").is_err());
+
+    let mut plan = canonical_msl_compute_plan("metal.apple-silicon-gpu");
+    plan.binding_slot_model = "descriptor-set-binding";
+    assert!(validate_msl_module_lowering_plan(&plan, "metal.apple-silicon-gpu").is_err());
+
+    let plan = canonical_msl_compute_plan("metal.apple-silicon-gpu");
+    assert!(
+        validate_msl_module_lowering_plan(&plan, "metal.mac-discrete-or-integrated-gpu").is_err()
+    );
 }

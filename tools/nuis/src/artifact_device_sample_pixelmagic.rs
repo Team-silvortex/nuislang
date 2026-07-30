@@ -4,8 +4,10 @@ use std::{collections::BTreeSet, path::Path};
 pub(crate) fn registration() -> DeviceSampleInputRegistration {
     DeviceSampleInputRegistration {
         package_id: "nuis.pixelmagic",
+        registration_id: "nuis.pixelmagic.gray8-filter",
         provider_family: "metal:apple-silicon-gpu",
         supports: supports_filter_plan,
+        metadata_selector: None,
         enrich_evidence: pixelmagic_filter_plan_evidence,
         resolve_evidence: None,
         persist_payloads: persist_pixelmagic_payloads,

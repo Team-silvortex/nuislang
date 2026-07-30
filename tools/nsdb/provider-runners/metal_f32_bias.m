@@ -161,12 +161,16 @@ static NSData *carrierFrame(const char *argument) {
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
         BOOL argmax = argc == 4;
-        if (!argmax && argc != 5) {
-            return fail(@"usage: metal_f32_bias <input> <metal-source> <entry> [bias]");
+        BOOL copyU32 = argc == 5 && strcmp(argv[4], "copy-u32") == 0;
+        BOOL biasMode = argc == 5 && !copyU32;
+        if (!argmax && !copyU32 && !biasMode) {
+            return fail(@"usage: metal_f32_bias <input> <metal-source> <entry> [bias|copy-u32]");
         }
         NSData *input = carrierFrame(argv[1]);
-        if (input == nil || input.length == 0 || input.length % sizeof(float) != 0) {
-            return fail(@"Metal f32 input unavailable or misaligned");
+        NSUInteger elementSize = copyU32 ? sizeof(uint32_t) : sizeof(float);
+        if (input == nil || input.length == 0 || input.length % elementSize != 0) {
+            return fail(copyU32 ? @"Metal u32 input unavailable or misaligned"
+                                : @"Metal f32 input unavailable or misaligned");
         }
         NSString *sourcePath = [NSString stringWithUTF8String:argv[2]];
         NSString *entry = [NSString stringWithUTF8String:argv[3]];
@@ -177,8 +181,8 @@ int main(int argc, const char *argv[]) {
         if (source == nil || entry.length == 0) {
             return fail([NSString stringWithFormat:@"Metal code asset unavailable: %@", error]);
         }
-        float bias = argmax ? 0.0f : strtof(argv[4], NULL);
-        uint32_t count = (uint32_t)(input.length / sizeof(float));
+        float bias = biasMode ? strtof(argv[4], NULL) : 0.0f;
+        uint32_t count = (uint32_t)(input.length / elementSize);
         id<MTLDevice> device = MTLCreateSystemDefaultDevice();
         if (device == nil) return fail(@"Metal device unavailable");
         id<MTLLibrary> library = [device newLibraryWithSource:source options:nil error:&error];
@@ -208,7 +212,7 @@ int main(int argc, const char *argv[]) {
         [encoder setComputePipelineState:pipeline];
         [encoder setBuffer:inputBuffer offset:0 atIndex:0];
         [encoder setBuffer:outputBuffer offset:0 atIndex:1];
-        if (!argmax) {
+        if (biasMode) {
             [encoder setBuffer:biasBuffer offset:0 atIndex:2];
         }
         NSUInteger dispatchCount = argmax ? 1 : count;
@@ -219,11 +223,13 @@ int main(int argc, const char *argv[]) {
         [command commit];
         [command waitUntilCompleted];
         if (command.status != MTLCommandBufferStatusCompleted) {
-            return fail([NSString stringWithFormat:@"Metal f32 command failed: %@", command.error]);
+            return fail([NSString stringWithFormat:@"Metal command failed: %@", command.error]);
         }
-        printf("protocol=%s\nstatus=ready\n", argmax
-            ? "nuis-metal-f32-argmax-provider-runner-v1"
-            : "nuis-metal-f32-bias-provider-runner-v1");
+        const char *protocol = copyU32
+            ? "nuis-metal-u32-copy-provider-runner-v1"
+            : (argmax ? "nuis-metal-f32-argmax-provider-runner-v1"
+                      : "nuis-metal-f32-bias-provider-runner-v1");
+        printf("protocol=%s\nstatus=ready\n", protocol);
         printf("device=%s\n", device.name.UTF8String);
         printf("output_bytes=%lu\n", (unsigned long)outputLength);
         if (!emitOutput(outputBuffer.contents, outputLength)) {

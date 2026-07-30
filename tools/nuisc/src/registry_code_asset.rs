@@ -204,6 +204,11 @@ mod tests {
         assert_eq!(metal.target, "msl2.4");
         assert_eq!(metal.entry, "nuis_metal_copy_u32");
         let metal_text = std::str::from_utf8(&metal.bytes).unwrap();
+        assert!(metal_text.contains(
+            "// nuis-module-lowering-plan contract=nuis-yir.shader.backend-lowering-plan.v1"
+        ));
+        assert!(metal_text.contains("// nuis-module-lowering-target msl:metal-gpu"));
+        assert!(metal_text.contains("// nuis-module-native-ir msl2.4"));
         assert!(metal_text.contains("kernel void nuis_metal_copy_u32("));
         assert!(metal_text.contains("output_values[gid] = value;"));
         let vulkan = assets

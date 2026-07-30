@@ -101,6 +101,9 @@ mod linux_vulkan;
 mod provider_execution_evidence;
 #[path = "official_galaxy_hetero_smoke/replay.rs"]
 mod replay;
+#[cfg(target_os = "macos")]
+#[path = "official_galaxy_hetero_smoke/shader_metal.rs"]
+mod shader_metal;
 
 use build::assert_official_galaxy_hetero_build;
 use final_image::finalize_official_hetero;

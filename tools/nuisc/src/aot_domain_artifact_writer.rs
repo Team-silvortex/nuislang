@@ -434,6 +434,14 @@ mod tests {
             .iter()
             .any(|(kind, path)| kind == "domain_code_asset_shader" && path == &msl_path));
         let msl = fs::read_to_string(&msl_path).unwrap();
+        assert!(msl.contains(
+            "// nuis-module-lowering-plan contract=nuis-yir.shader.backend-lowering-plan.v1"
+        ));
+        assert!(msl.contains("// nuis-module-lowering-target msl:metal-gpu"));
+        assert!(msl.contains("// nuis-module-native-ir msl2.4"));
+        assert!(msl.contains(
+            "// nuis-module-stage kind=compute execution_model=kernel binding_slot_model=argument-buffer-slot"
+        ));
         assert!(msl.contains("kernel void nuis_metal_copy_u32("));
         assert!(msl.contains("output_values[gid] = value;"));
         let table =

@@ -16,8 +16,10 @@ const EXPECTED: &[u8] = INPUT;
 pub(crate) fn registration() -> DeviceSampleInputRegistration {
     DeviceSampleInputRegistration {
         package_id: PACKAGE_ID,
+        registration_id: "official.shader.vulkan-copy-u32",
         provider_family: "spirv:vulkan-gpu",
         supports: supports_vulkan,
+        metadata_selector: None,
         enrich_evidence: vulkan_copy_u32_evidence,
         resolve_evidence: Some(resolve_vulkan_code_asset_evidence),
         persist_payloads: persist_vulkan_copy_payloads,
