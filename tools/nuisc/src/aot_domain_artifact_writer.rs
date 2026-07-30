@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeSet,
     fs,
     path::{Path, PathBuf},
 };
@@ -181,14 +181,7 @@ fn write_required_nustar_code_assets(
     artifacts: &mut Vec<(String, PathBuf)>,
 ) -> Result<(), String> {
     let root = Path::new(crate::NUSTAR_REGISTRY_ROOT);
-    let mut available = BTreeMap::new();
-    for manifest in crate::registry::load_all_manifests(root)? {
-        for asset in crate::registry::code_asset_registrations(root, &manifest)? {
-            if available.insert(asset.asset_id.clone(), asset).is_some() {
-                return Err("Nustar code asset registry contains duplicate asset IDs".to_owned());
-            }
-        }
-    }
+    let manifests = crate::registry::load_all_manifests(root)?;
     let existing = contributions
         .iter()
         .map(|row| row.asset_id.clone())
@@ -197,16 +190,33 @@ fn write_required_nustar_code_assets(
         if existing.contains(id) {
             continue;
         }
-        let asset = available
-            .get(id)
-            .ok_or_else(|| format!("Galaxy requires unknown Nustar code asset `{id}`"))?;
+        let asset = required_nustar_code_asset(root, &manifests, id)?;
         let path = output_dir.join(&asset.file_name);
         fs::write(&path, &asset.bytes)
             .map_err(|error| format!("failed to write `{}`: {error}", path.display()))?;
-        contributions.push(required_registered_asset_contribution(asset, &path)?);
+        contributions.push(required_registered_asset_contribution(&asset, &path)?);
         artifacts.push((format!("domain_code_asset_{}", asset.domain_family), path));
     }
     Ok(())
+}
+
+fn required_nustar_code_asset(
+    root: &Path,
+    manifests: &[crate::registry::NustarPackageManifest],
+    asset_id: &str,
+) -> Result<crate::registry::NustarCodeAssetRegistration, String> {
+    let mut selected = None;
+    for manifest in manifests {
+        let Some(asset) = crate::registry::code_asset_registration_by_id(root, manifest, asset_id)?
+        else {
+            continue;
+        };
+        if selected.is_some() {
+            return Err("Nustar code asset registry contains duplicate asset IDs".to_owned());
+        }
+        selected = Some(asset);
+    }
+    selected.ok_or_else(|| format!("Galaxy requires unknown Nustar code asset `{asset_id}`"))
 }
 
 fn write_registered_nustar_code_assets(
@@ -227,13 +237,13 @@ fn write_registered_nustar_code_assets(
         Path::new(crate::NUSTAR_REGISTRY_ROOT),
         &unit.domain_family,
     )?;
-    let registrations = crate::registry::code_asset_registrations(
+    let registrations = crate::registry::code_asset_registrations_for_lowering_target(
         Path::new(crate::NUSTAR_REGISTRY_ROOT),
         &manifest,
+        lowering_target,
     )?;
     registrations
         .into_iter()
-        .filter(|asset| asset.lowering_target == lowering_target)
         .map(|asset| {
             let path = output_dir.join(&asset.file_name);
             fs::write(&path, &asset.bytes)
@@ -444,13 +454,40 @@ mod tests {
         ));
         assert!(msl.contains("kernel void nuis_metal_copy_u32("));
         assert!(msl.contains("output_values[gid] = value;"));
+        let add_msl_path = output_dir.join("nuis.shader.metal.add-u32.metal");
+        assert!(artifacts
+            .iter()
+            .any(|(kind, path)| kind == "domain_code_asset_shader" && path == &add_msl_path));
+        let add_msl = fs::read_to_string(&add_msl_path).unwrap();
+        assert!(add_msl.contains("kernel void nuis_metal_add_u32("));
+        assert!(add_msl.contains("output_values[gid] = value + value;"));
+        let sub_msl_path = output_dir.join("nuis.shader.metal.sub-u32.metal");
+        assert!(artifacts
+            .iter()
+            .any(|(kind, path)| kind == "domain_code_asset_shader" && path == &sub_msl_path));
+        let sub_msl = fs::read_to_string(&sub_msl_path).unwrap();
+        assert!(sub_msl.contains("kernel void nuis_metal_sub_u32("));
+        assert!(sub_msl.contains("output_values[gid] = value - value;"));
+        let mul_msl_path = output_dir.join("nuis.shader.metal.mul-u32.metal");
+        assert!(artifacts
+            .iter()
+            .any(|(kind, path)| kind == "domain_code_asset_shader" && path == &mul_msl_path));
+        let mul_msl = fs::read_to_string(&mul_msl_path).unwrap();
+        assert!(mul_msl.contains("kernel void nuis_metal_mul_u32("));
+        assert!(mul_msl.contains("output_values[gid] = value * value;"));
         let table =
             fs::read_to_string(output_dir.join("nuis.domain.code-asset-contributions.toml"))
                 .unwrap();
         assert!(table.contains("asset_id = \"shader.metal.copy-u32.msl\""));
+        assert!(table.contains("asset_id = \"shader.metal.add-u32.msl\""));
+        assert!(table.contains("asset_id = \"shader.metal.sub-u32.msl\""));
+        assert!(table.contains("asset_id = \"shader.metal.mul-u32.msl\""));
         assert!(table.contains("format = \"metal-source\""));
         assert!(table.contains("target = \"msl2.4\""));
         assert!(table.contains("entries = [\"nuis_metal_copy_u32\"]"));
+        assert!(table.contains("entries = [\"nuis_metal_add_u32\"]"));
+        assert!(table.contains("entries = [\"nuis_metal_sub_u32\"]"));
+        assert!(table.contains("entries = [\"nuis_metal_mul_u32\"]"));
         fs::remove_dir_all(output_dir).unwrap();
     }
 

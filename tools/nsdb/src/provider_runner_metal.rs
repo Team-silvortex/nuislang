@@ -68,6 +68,18 @@ pub(crate) const RUNNER_PROFILE: ProviderRunnerProfile = ProviderRunnerProfile {
     },
 };
 
+#[cfg(test)]
+pub(crate) use crate::provider_runner_metal_u32::execute_u32_copy_input;
+#[allow(unused_imports)]
+pub(crate) use crate::provider_runner_metal_u32::{
+    execute_u32_canonical_input, execute_u32_canonical_prepared_channel,
+    u32_compute_runner_contract,
+};
+#[cfg(target_os = "macos")]
+pub(crate) use crate::provider_runner_metal_u32::{
+    prepare_u32_canonical_worker_invocation, prepare_u32_copy_worker_invocation,
+};
+
 fn metal_probe_status() -> &'static str {
     framework_probe_status("Metal.framework")
 }
@@ -149,18 +161,7 @@ pub(crate) fn prepare_f32_argmax_worker_invocation(
 }
 
 #[cfg(target_os = "macos")]
-pub(crate) fn prepare_u32_copy_worker_invocation(
-    cache: &mut ProviderProcessAdapterCache,
-) -> Result<ResolvedProviderProcessAdapter<'_>, String> {
-    prepare_metal_worker_invocation(
-        cache,
-        METAL_F32_BIAS_SOURCE,
-        "nuis-metal-u32-copy-provider-runner-v1",
-    )
-}
-
-#[cfg(target_os = "macos")]
-fn prepare_metal_worker_invocation<'a>(
+pub(crate) fn prepare_metal_worker_invocation<'a>(
     cache: &'a mut ProviderProcessAdapterCache,
     source: &str,
     contract: &'static str,
@@ -225,28 +226,6 @@ pub(crate) fn execute_f32_argmax_prepared_channel(
     entry: &str,
 ) -> Result<MetalProviderExecution, String> {
     execute_f32_argmax_prepared_channel_platform(channel, byte_len, code_asset_path, entry)
-}
-
-pub(crate) fn execute_u32_copy_input(
-    input: &ProviderCarrierInput,
-    code_asset_path: &Path,
-    entry: &str,
-) -> Result<MetalProviderExecution, String> {
-    match input {
-        ProviderCarrierInput::Path(path) => execute_u32_copy_platform(path, code_asset_path, entry),
-        ProviderCarrierInput::OpaqueBytes { bytes, .. } => {
-            execute_u32_copy_bytes_platform(bytes, code_asset_path, entry)
-        }
-    }
-}
-
-pub(crate) fn execute_u32_copy_prepared_channel(
-    channel: &PreparedProviderCarrierChannel,
-    byte_len: usize,
-    code_asset_path: &Path,
-    entry: &str,
-) -> Result<MetalProviderExecution, String> {
-    execute_u32_copy_prepared_channel_platform(channel, byte_len, code_asset_path, entry)
 }
 
 #[cfg(target_os = "macos")]
@@ -371,66 +350,6 @@ fn execute_f32_argmax_prepared_channel_platform(
 }
 
 #[cfg(target_os = "macos")]
-fn execute_u32_copy_platform(
-    input_path: &Path,
-    code_asset_path: &Path,
-    entry: &str,
-) -> Result<MetalProviderExecution, String> {
-    let output_byte_len = usize::try_from(
-        fs::metadata(input_path)
-            .map_err(|error| format!("failed to inspect Metal u32 input: {error}"))?
-            .len(),
-    )
-    .map_err(|_| "Metal u32 input length overflow".to_owned())?;
-    execute_metal_platform(
-        input_path.as_os_str(),
-        &[
-            code_asset_path.display().to_string(),
-            entry.to_owned(),
-            "copy-u32".to_owned(),
-        ],
-        "nuis-metal-u32-copy-provider-runner-v1",
-        METAL_F32_BIAS_SOURCE,
-        None,
-        Some(output_byte_len),
-    )
-}
-
-#[cfg(target_os = "macos")]
-fn execute_u32_copy_bytes_platform(
-    input: &[u8],
-    code_asset_path: &Path,
-    entry: &str,
-) -> Result<MetalProviderExecution, String> {
-    let channel_adapter = select_provider_carrier_channel_adapter("auto")
-        .ok_or_else(|| "Metal provider carrier channel is unavailable".to_owned())?;
-    let channel = prepare_provider_carrier_channel(channel_adapter, &[input])?;
-    execute_u32_copy_prepared_channel_platform(&channel, input.len(), code_asset_path, entry)
-}
-
-#[cfg(target_os = "macos")]
-fn execute_u32_copy_prepared_channel_platform(
-    channel: &PreparedProviderCarrierChannel,
-    byte_len: usize,
-    code_asset_path: &Path,
-    entry: &str,
-) -> Result<MetalProviderExecution, String> {
-    let argument = channel.frame_argument(0);
-    execute_metal_platform(
-        OsStr::new(&argument),
-        &[
-            code_asset_path.display().to_string(),
-            entry.to_owned(),
-            "copy-u32".to_owned(),
-        ],
-        "nuis-metal-u32-copy-provider-runner-v1",
-        METAL_F32_BIAS_SOURCE,
-        Some(channel),
-        Some(byte_len),
-    )
-}
-
-#[cfg(target_os = "macos")]
 fn execute_gray8_invert_platform(
     input_path: &Path,
     max_value: u8,
@@ -528,36 +447,8 @@ fn execute_f32_argmax_prepared_channel_platform(
     Err("Metal provider runner is unavailable on this host".to_owned())
 }
 
-#[cfg(not(target_os = "macos"))]
-fn execute_u32_copy_platform(
-    _input_path: &Path,
-    _code_asset_path: &Path,
-    _entry: &str,
-) -> Result<MetalProviderExecution, String> {
-    Err("Metal provider runner is unavailable on this host".to_owned())
-}
-
-#[cfg(not(target_os = "macos"))]
-fn execute_u32_copy_bytes_platform(
-    _input: &[u8],
-    _code_asset_path: &Path,
-    _entry: &str,
-) -> Result<MetalProviderExecution, String> {
-    Err("Metal provider runner is unavailable on this host".to_owned())
-}
-
-#[cfg(not(target_os = "macos"))]
-fn execute_u32_copy_prepared_channel_platform(
-    _channel: &PreparedProviderCarrierChannel,
-    _byte_len: usize,
-    _code_asset_path: &Path,
-    _entry: &str,
-) -> Result<MetalProviderExecution, String> {
-    Err("Metal provider runner is unavailable on this host".to_owned())
-}
-
 #[cfg(target_os = "macos")]
-fn execute_metal_platform(
+pub(crate) fn execute_metal_platform(
     input_argument: &OsStr,
     arguments: &[String],
     contract: &'static str,

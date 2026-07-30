@@ -82,11 +82,15 @@ fn prepare_worker_adapter(
             crate::provider_runner_metal::prepare_f32_argmax_worker_invocation(cache)?,
             metal_code_asset_arguments(output_dir, request)?,
         )
-    } else if is_u32_copy(request) {
+    } else if is_u32_compute(request) {
         let mut arguments = metal_code_asset_arguments(output_dir, request)?;
-        arguments.push("literal:copy-u32".to_owned());
+        arguments.push(format!("literal:{}", request.kernel.operation));
         (
-            crate::provider_runner_metal::prepare_u32_copy_worker_invocation(cache)?,
+            if is_u32_copy(request) {
+                crate::provider_runner_metal::prepare_u32_copy_worker_invocation(cache)?
+            } else {
+                crate::provider_runner_metal::prepare_u32_canonical_worker_invocation(cache)?
+            },
             arguments,
         )
     } else {
@@ -204,26 +208,30 @@ fn execute(
                 &entry,
             )?
         }
-    } else if is_u32_copy(request) {
+    } else if is_u32_compute(request) {
         let (code_asset_path, entry) = validated_metal_code_asset(_output_dir, request)?;
+        let runner_contract =
+            crate::provider_runner_metal::u32_compute_runner_contract(&request.kernel.operation);
         if uses_process_adapter(worker_receipt) {
             crate::provider_runner_metal::parse_metal_worker_output(
                 &worker_receipt.worker_output_payload,
-                "nuis-metal-u32-copy-provider-runner-v1",
+                runner_contract,
                 worker_receipt.worker_output_result.take(),
             )?
         } else if let Some(channel) = inputs[0].direct_channel() {
-            crate::provider_runner_metal::execute_u32_copy_prepared_channel(
+            crate::provider_runner_metal::execute_u32_canonical_prepared_channel(
                 channel,
                 request.input_bindings[0].byte_length,
                 &code_asset_path,
                 &entry,
+                &request.kernel.operation,
             )?
         } else {
-            crate::provider_runner_metal::execute_u32_copy_input(
+            crate::provider_runner_metal::execute_u32_canonical_input(
                 inputs[0].input(),
                 &code_asset_path,
                 &entry,
+                &request.kernel.operation,
             )?
         }
     } else {
@@ -247,7 +255,7 @@ fn execute(
                 &execution,
                 None,
             )
-        } else if is_u32_copy(request) {
+        } else if is_u32_compute(request) {
             metal_native_output_summary(
                 request.kernel.id.clone(),
                 "provider-tensor-u32",
@@ -335,9 +343,16 @@ fn is_f32_argmax(request: &ProviderRequest) -> bool {
 }
 
 fn is_u32_copy(request: &ProviderRequest) -> bool {
+    is_u32_compute(request) && request.kernel.operation == "copy-u32"
+}
+
+fn is_u32_compute(request: &ProviderRequest) -> bool {
     request.buffer.element_type == "u32"
         && request.buffer.layout == "tensor-contiguous"
-        && request.kernel.operation == "copy-u32"
+        && matches!(
+            request.kernel.operation.as_str(),
+            "copy-u32" | "add-u32" | "sub-u32" | "mul-u32"
+        )
         && request.output_bindings.len() == 1
         && request.output_bindings[0].element_type == "u32"
         && request.output_bindings[0].byte_length == request.buffer.byte_length

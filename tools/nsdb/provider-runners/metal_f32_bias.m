@@ -29,6 +29,13 @@ static uint64_t fnv1a64(NSData *data) {
     return hash;
 }
 
+static BOOL endsWith(const char *value, const char *suffix) {
+    size_t valueLength = strlen(value);
+    size_t suffixLength = strlen(suffix);
+    return valueLength >= suffixLength &&
+           strcmp(value + valueLength - suffixLength, suffix) == 0;
+}
+
 static BOOL emitOutput(const void *bytes, NSUInteger length) {
     NSData *output = [NSData dataWithBytesNoCopy:(void *)bytes length:length freeWhenDone:NO];
     const char *descriptorText = getenv("NUIS_PROVIDER_OUTPUT_FD");
@@ -162,14 +169,15 @@ int main(int argc, const char *argv[]) {
     @autoreleasepool {
         BOOL argmax = argc == 4;
         BOOL copyU32 = argc == 5 && strcmp(argv[4], "copy-u32") == 0;
-        BOOL biasMode = argc == 5 && !copyU32;
-        if (!argmax && !copyU32 && !biasMode) {
-            return fail(@"usage: metal_f32_bias <input> <metal-source> <entry> [bias|copy-u32]");
+        BOOL u32Mode = argc == 5 && endsWith(argv[4], "-u32");
+        BOOL biasMode = argc == 5 && !u32Mode;
+        if (!argmax && !u32Mode && !biasMode) {
+            return fail(@"usage: metal_f32_bias <input> <metal-source> <entry> [bias|*-u32]");
         }
         NSData *input = carrierFrame(argv[1]);
-        NSUInteger elementSize = copyU32 ? sizeof(uint32_t) : sizeof(float);
+        NSUInteger elementSize = u32Mode ? sizeof(uint32_t) : sizeof(float);
         if (input == nil || input.length == 0 || input.length % elementSize != 0) {
-            return fail(copyU32 ? @"Metal u32 input unavailable or misaligned"
+            return fail(u32Mode ? @"Metal u32 input unavailable or misaligned"
                                 : @"Metal f32 input unavailable or misaligned");
         }
         NSString *sourcePath = [NSString stringWithUTF8String:argv[2]];
@@ -227,8 +235,9 @@ int main(int argc, const char *argv[]) {
         }
         const char *protocol = copyU32
             ? "nuis-metal-u32-copy-provider-runner-v1"
-            : (argmax ? "nuis-metal-f32-argmax-provider-runner-v1"
-                      : "nuis-metal-f32-bias-provider-runner-v1");
+            : (u32Mode ? "nuis-metal-u32-canonical-provider-runner-v1"
+                       : (argmax ? "nuis-metal-f32-argmax-provider-runner-v1"
+                                 : "nuis-metal-f32-bias-provider-runner-v1"));
         printf("protocol=%s\nstatus=ready\n", protocol);
         printf("device=%s\n", device.name.UTF8String);
         printf("output_bytes=%lu\n", (unsigned long)outputLength);

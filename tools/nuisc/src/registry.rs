@@ -10,7 +10,9 @@ pub use crate::registry_build_contract_summary::{
     NustarDomainBuildContractSummary, NustarDomainLoweringPlanSummary, NustarHostBridgeSpecSummary,
 };
 pub use crate::registry_code_asset::{
-    code_asset_registrations, NustarCodeAssetRegistration, NUSTAR_CODE_ASSET_REGISTRATION_CONTRACT,
+    code_asset_registration_by_id, code_asset_registrations,
+    code_asset_registrations_for_lowering_target, NustarCodeAssetRegistration,
+    NUSTAR_CODE_ASSET_REGISTRATION_CONTRACT,
 };
 pub use crate::registry_contract::{
     capability_summary, dispatch_readiness_summary, domain_contract, execution_summary,

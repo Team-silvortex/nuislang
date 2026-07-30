@@ -113,11 +113,14 @@ fn evidence_matches_registration(
         .unwrap_or_else(|| registration.metadata_selector.is_none())
 }
 
-fn registrations() -> [DeviceSampleInputRegistration; 4] {
+fn registrations() -> [DeviceSampleInputRegistration; 7] {
     [
         crate::artifact_device_sample_pixelmagic::registration(),
         crate::artifact_device_sample_kernel::registration(),
         crate::artifact_device_sample_shader_metal::registration(),
+        crate::artifact_device_sample_shader_metal::add_registration(),
+        crate::artifact_device_sample_shader_metal::sub_registration(),
+        crate::artifact_device_sample_shader_metal::mul_registration(),
         crate::artifact_device_sample_shader_vulkan::registration(),
     ]
 }
@@ -179,5 +182,35 @@ mod tests {
         assert!(selected.contains("provider_sample_registration_package=official.shader"));
         assert!(selected.contains("provider_sample_registration_id=official.shader.metal-copy-u32"));
         assert!(selected.contains("provider_code_asset_id=shader.metal.copy-u32.msl"));
+
+        let add = enrich_registered_input_evidence(
+            "metal",
+            "apple-silicon-gpu",
+            "artifact_provider_metadata_0=official.shader:provider-sample=metal-add-u32",
+        )
+        .unwrap();
+        assert!(add.contains("provider_sample_registration_id=official.shader.metal-add-u32"));
+        assert!(add.contains("provider_code_asset_id=shader.metal.add-u32.msl"));
+        assert!(add.contains("provider_kernel_operation=add-u32"));
+
+        let sub = enrich_registered_input_evidence(
+            "metal",
+            "apple-silicon-gpu",
+            "artifact_provider_metadata_0=official.shader:provider-sample=metal-sub-u32",
+        )
+        .unwrap();
+        assert!(sub.contains("provider_sample_registration_id=official.shader.metal-sub-u32"));
+        assert!(sub.contains("provider_code_asset_id=shader.metal.sub-u32.msl"));
+        assert!(sub.contains("provider_kernel_operation=sub-u32"));
+
+        let mul = enrich_registered_input_evidence(
+            "metal",
+            "apple-silicon-gpu",
+            "artifact_provider_metadata_0=official.shader:provider-sample=metal-mul-u32",
+        )
+        .unwrap();
+        assert!(mul.contains("provider_sample_registration_id=official.shader.metal-mul-u32"));
+        assert!(mul.contains("provider_code_asset_id=shader.metal.mul-u32.msl"));
+        assert!(mul.contains("provider_kernel_operation=mul-u32"));
     }
 }

@@ -138,10 +138,12 @@ fn witsage_shader_code_assets() -> Result<Vec<nuisc::registry::NustarCodeAssetRe
 {
     let root = Path::new("nustar-packages");
     let manifest = nuisc::registry::load_manifest_for_domain(root, "shader")?;
-    let assets = nuisc::registry::code_asset_registrations(root, &manifest)?;
     [WITSAGE_METAL_BIAS_ASSET_ID, WITSAGE_METAL_ARGMAX_ASSET_ID]
         .into_iter()
-        .map(|id| registered_asset(&assets, id).cloned())
+        .map(|id| {
+            nuisc::registry::code_asset_registration_by_id(root, &manifest, id)?
+                .ok_or_else(|| format!("Shader Nustar code asset `{id}` is not registered"))
+        })
         .collect()
 }
 

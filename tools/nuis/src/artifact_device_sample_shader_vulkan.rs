@@ -214,9 +214,8 @@ fn validate_vulkan_code_asset(
 fn vulkan_asset() -> Result<nuisc::registry::NustarCodeAssetRegistration, String> {
     let root = Path::new("nustar-packages");
     let manifest = nuisc::registry::load_manifest_for_domain(root, "shader")?;
-    nuisc::registry::code_asset_registrations(root, &manifest)?
-        .into_iter()
-        .find(|asset| {
+    nuisc::registry::code_asset_registration_by_id(root, &manifest, ASSET_ID)?
+        .filter(|asset| {
             asset.asset_id == ASSET_ID
                 && asset.package_id == PACKAGE_ID
                 && asset.lowering_target == LOWERING_TARGET

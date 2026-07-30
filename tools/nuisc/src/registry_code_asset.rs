@@ -25,21 +25,71 @@ pub fn code_asset_registrations(
     registry_root: &Path,
     manifest: &NustarPackageManifest,
 ) -> Result<Vec<NustarCodeAssetRegistration>, String> {
+    code_asset_registrations_filtered(registry_root, manifest, |_| true)
+}
+
+pub fn code_asset_registrations_for_lowering_target(
+    registry_root: &Path,
+    manifest: &NustarPackageManifest,
+    lowering_target: &str,
+) -> Result<Vec<NustarCodeAssetRegistration>, String> {
+    code_asset_registrations_filtered(registry_root, manifest, |fields| {
+        fields[3] == lowering_target
+    })
+}
+
+pub fn code_asset_registration_by_id(
+    registry_root: &Path,
+    manifest: &NustarPackageManifest,
+    asset_id: &str,
+) -> Result<Option<NustarCodeAssetRegistration>, String> {
     let registry_root = crate::registry_load::resolve_registry_root(registry_root);
-    let mut registrations = manifest
-        .code_assets
-        .iter()
-        .map(|entry| parse_registration(&registry_root, manifest, entry))
-        .collect::<Result<Vec<_>, _>>()?;
+    let mut selected = None;
+    for entry in &manifest.code_assets {
+        let fields = parse_registration_fields(manifest, entry)?;
+        if fields[1] != asset_id {
+            continue;
+        }
+        if selected.is_some() {
+            return Err(format!(
+                "nustar package `{}` contains duplicate code asset `{asset_id}`",
+                manifest.package_id
+            ));
+        }
+        selected = Some(parse_registration_fields_into(
+            &registry_root,
+            manifest,
+            &fields,
+        )?);
+    }
+    Ok(selected)
+}
+
+fn code_asset_registrations_filtered(
+    registry_root: &Path,
+    manifest: &NustarPackageManifest,
+    keep: impl Fn(&[&str]) -> bool,
+) -> Result<Vec<NustarCodeAssetRegistration>, String> {
+    let registry_root = crate::registry_load::resolve_registry_root(registry_root);
+    let mut registrations = Vec::new();
+    for entry in &manifest.code_assets {
+        let fields = parse_registration_fields(manifest, entry)?;
+        if keep(&fields) {
+            registrations.push(parse_registration_fields_into(
+                &registry_root,
+                manifest,
+                &fields,
+            )?);
+        }
+    }
     registrations.sort_by(|lhs, rhs| lhs.asset_id.cmp(&rhs.asset_id));
     Ok(registrations)
 }
 
-fn parse_registration(
-    registry_root: &Path,
+fn parse_registration_fields<'a>(
     manifest: &NustarPackageManifest,
-    entry: &str,
-) -> Result<NustarCodeAssetRegistration, String> {
+    entry: &'a str,
+) -> Result<Vec<&'a str>, String> {
     let fields = entry.split('|').collect::<Vec<_>>();
     if fields.len() != 8 || fields[0] != NUSTAR_CODE_ASSET_REGISTRATION_CONTRACT {
         return Err(format!(
@@ -79,6 +129,14 @@ fn parse_registration(
             manifest.package_id, fields[1]
         ));
     }
+    Ok(fields)
+}
+
+fn parse_registration_fields_into(
+    registry_root: &Path,
+    manifest: &NustarPackageManifest,
+    fields: &[&str],
+) -> Result<NustarCodeAssetRegistration, String> {
     let source_path = registry_root.join(fields[7]);
     let source_bytes = fs::read(&source_path).map_err(|error| {
         format!(
@@ -185,7 +243,7 @@ mod tests {
         let manifest = crate::registry::load_manifest_for_domain(root, "shader").unwrap();
         let assets = code_asset_registrations(root, &manifest).unwrap();
 
-        assert_eq!(assets.len(), 4);
+        assert_eq!(assets.len(), 7);
         assert!(assets
             .iter()
             .all(|asset| asset.package_id == "official.shader"));
@@ -194,7 +252,7 @@ mod tests {
                 .iter()
                 .filter(|asset| asset.lowering_target == "metal.apple-silicon-gpu")
                 .count(),
-            3
+            6
         );
         let metal = assets
             .iter()
@@ -211,6 +269,36 @@ mod tests {
         assert!(metal_text.contains("// nuis-module-native-ir msl2.4"));
         assert!(metal_text.contains("kernel void nuis_metal_copy_u32("));
         assert!(metal_text.contains("output_values[gid] = value;"));
+        let metal_add = assets
+            .iter()
+            .find(|asset| asset.asset_id == "shader.metal.add-u32.msl")
+            .expect("registered canonical Metal add MSL asset");
+        assert_eq!(metal_add.format, "metal-source");
+        assert_eq!(metal_add.target, "msl2.4");
+        assert_eq!(metal_add.entry, "nuis_metal_add_u32");
+        let metal_add_text = std::str::from_utf8(&metal_add.bytes).unwrap();
+        assert!(metal_add_text.contains("kernel void nuis_metal_add_u32("));
+        assert!(metal_add_text.contains("output_values[gid] = value + value;"));
+        let metal_sub = assets
+            .iter()
+            .find(|asset| asset.asset_id == "shader.metal.sub-u32.msl")
+            .expect("registered canonical Metal sub MSL asset");
+        assert_eq!(metal_sub.format, "metal-source");
+        assert_eq!(metal_sub.target, "msl2.4");
+        assert_eq!(metal_sub.entry, "nuis_metal_sub_u32");
+        let metal_sub_text = std::str::from_utf8(&metal_sub.bytes).unwrap();
+        assert!(metal_sub_text.contains("kernel void nuis_metal_sub_u32("));
+        assert!(metal_sub_text.contains("output_values[gid] = value - value;"));
+        let metal_mul = assets
+            .iter()
+            .find(|asset| asset.asset_id == "shader.metal.mul-u32.msl")
+            .expect("registered canonical Metal mul MSL asset");
+        assert_eq!(metal_mul.format, "metal-source");
+        assert_eq!(metal_mul.target, "msl2.4");
+        assert_eq!(metal_mul.entry, "nuis_metal_mul_u32");
+        let metal_mul_text = std::str::from_utf8(&metal_mul.bytes).unwrap();
+        assert!(metal_mul_text.contains("kernel void nuis_metal_mul_u32("));
+        assert!(metal_mul_text.contains("output_values[gid] = value * value;"));
         let vulkan = assets
             .iter()
             .find(|asset| asset.asset_id == "shader.vulkan.copy-u32.spirv")
@@ -254,5 +342,43 @@ mod tests {
             status.success(),
             "`{validator}` rejected registered Vulkan SPIR-V"
         );
+    }
+
+    #[test]
+    fn filtered_code_asset_lookup_does_not_materialize_unselected_entries() {
+        let root =
+            env::temp_dir().join(format!("nuisc-code-asset-filtered-{}", std::process::id()));
+        let asset_dir = root.join("assets");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&asset_dir).unwrap();
+        fs::write(asset_dir.join("selected.bin"), b"selected").unwrap();
+        let mut manifest =
+            crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), "shader")
+                .unwrap();
+        manifest.lowering_targets = vec!["target.keep".to_owned(), "target.skip".to_owned()];
+        manifest.code_assets = vec![
+            format!(
+                "{NUSTAR_CODE_ASSET_REGISTRATION_CONTRACT}|selected.asset|raw-bytes|target.keep|native|nuis_selected|selected.out|assets/selected.bin"
+            ),
+            format!(
+                "{NUSTAR_CODE_ASSET_REGISTRATION_CONTRACT}|missing.asset|raw-bytes|target.skip|native|nuis_missing|missing.out|assets/missing.bin"
+            ),
+        ];
+
+        let assets =
+            code_asset_registrations_for_lowering_target(&root, &manifest, "target.keep").unwrap();
+        assert_eq!(assets.len(), 1);
+        assert_eq!(assets[0].asset_id, "selected.asset");
+        assert_eq!(assets[0].bytes, b"selected");
+        assert!(
+            code_asset_registration_by_id(&root, &manifest, "absent.asset")
+                .unwrap()
+                .is_none()
+        );
+        let selected = code_asset_registration_by_id(&root, &manifest, "selected.asset")
+            .unwrap()
+            .expect("selected asset");
+        assert_eq!(selected.bytes, b"selected");
+        fs::remove_dir_all(root).unwrap();
     }
 }

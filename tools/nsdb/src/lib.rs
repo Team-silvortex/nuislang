@@ -51,6 +51,7 @@ mod provider_result_projection;
 mod provider_runner_coreml;
 mod provider_runner_cuda;
 mod provider_runner_metal;
+mod provider_runner_metal_u32;
 mod provider_runner_native;
 mod provider_runner_registry;
 mod provider_runner_vulkan;
