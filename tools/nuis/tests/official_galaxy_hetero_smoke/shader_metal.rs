@@ -95,6 +95,23 @@ fn shader_metal_generated_mul_msl_sample_executes_provider_output() {
 }
 
 #[test]
+fn shader_metal_generated_xor_msl_sample_executes_provider_output() {
+    run_metal_sample_smoke(MetalSampleSmoke {
+        project_name: "shader_metal_xor_provider_demo",
+        assets: &[MetalGeneratedAsset {
+            asset_id: "shader.metal.xor-u32.msl",
+            generated_file: "nuis.shader.metal.xor-u32.metal",
+            operation: "xor-u32",
+            entry: "nuis_metal_xor_u32",
+        }],
+        registration_id: "official.shader.metal-xor-u32",
+        execution_contract: "nuis-metal-u32-canonical-provider-runner-v1",
+        expected_hash: "0x88201fb960ff6465",
+        graph: None,
+    });
+}
+
+#[test]
 fn shader_metal_generated_chain_msl_sample_executes_provider_graph() {
     run_metal_sample_smoke(MetalSampleSmoke {
         project_name: "shader_metal_chain_provider_demo",
@@ -106,20 +123,20 @@ fn shader_metal_generated_chain_msl_sample_executes_provider_graph() {
                 entry: "nuis_metal_add_u32",
             },
             MetalGeneratedAsset {
-                asset_id: "shader.metal.mul-u32.msl",
-                generated_file: "nuis.shader.metal.mul-u32.metal",
-                operation: "mul-u32",
-                entry: "nuis_metal_mul_u32",
+                asset_id: "shader.metal.xor-u32.msl",
+                generated_file: "nuis.shader.metal.xor-u32.metal",
+                operation: "xor-u32",
+                entry: "nuis_metal_xor_u32",
             },
         ],
         registration_id: "official.shader.metal-u32-chain",
         execution_contract: "nuis-metal-u32-canonical-provider-runner-v1",
         expected_hash: "0xdce2c1aca0f32707",
         graph: Some(MetalGraphSmoke {
-            final_request_id: "shader.metal.chain.mul-u32",
-            final_expected_hash: "0x2f8b5a975ff42d9a",
+            final_request_id: "shader.metal.chain.xor-u32",
+            final_expected_hash: "0x88201fb960ff6465",
             transport_token:
-                "glm:provider-edge:shader.metal.chain.add-u32:output.values->shader.metal.chain.mul-u32:input.values",
+                "glm:provider-edge:shader.metal.chain.add-u32:output.values->shader.metal.chain.xor-u32:input.values",
         }),
     });
 }

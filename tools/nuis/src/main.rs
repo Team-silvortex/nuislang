@@ -7,6 +7,7 @@ mod artifact_device_sample_kernel_project;
 mod artifact_device_sample_pixelmagic;
 mod artifact_device_sample_pixelmagic_plan;
 mod artifact_device_sample_registration;
+mod artifact_device_sample_shader_common;
 mod artifact_device_sample_shader_metal;
 mod artifact_device_sample_shader_vulkan;
 mod artifact_device_sample_witsage;

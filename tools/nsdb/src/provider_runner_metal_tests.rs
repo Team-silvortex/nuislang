@@ -11,13 +11,6 @@ use crate::provider_carrier_input::ProviderCarrierInput;
 use std::path::PathBuf;
 
 #[cfg(target_os = "macos")]
-fn shader_asset(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../nustar-packages/assets/shader")
-        .join(name)
-}
-
-#[cfg(target_os = "macos")]
 fn registered_shader_asset(asset_id: &str) -> (Vec<u8>, String) {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../nustar-packages");
     let manifest = nuisc::registry::load_manifest_for_domain(&root, "shader").unwrap();
@@ -88,13 +81,11 @@ fn executes_f32_bias_from_opaque_carrier_bytes() {
             .flat_map(f32::to_le_bytes)
             .collect(),
     };
-    let execution = execute_f32_bias_input(
-        &input,
-        1.0,
-        &shader_asset("witsage_vector_bias.metal"),
-        "nuis_witsage_vector_bias_f32",
-    )
-    .expect("opaque Metal input");
+    let (source_path, entry) =
+        registered_shader_source_path("shader.witsage.vector-bias.metal", "witsage-vector-bias");
+    let execution =
+        execute_f32_bias_input(&input, 1.0, &source_path, &entry).expect("opaque Metal input");
+    let _ = std::fs::remove_file(source_path);
     let values = execution
         .output_payload
         .as_bytes()
@@ -114,12 +105,11 @@ fn executes_f32_argmax_from_opaque_carrier_bytes() {
             .flat_map(f32::to_le_bytes)
             .collect(),
     };
-    let execution = execute_f32_argmax_input(
-        &input,
-        &shader_asset("witsage_argmax.metal"),
-        "nuis_witsage_argmax_f32",
-    )
-    .expect("opaque Metal argmax input");
+    let (source_path, entry) =
+        registered_shader_source_path("shader.witsage.argmax.metal", "witsage-argmax");
+    let execution =
+        execute_f32_argmax_input(&input, &source_path, &entry).expect("opaque Metal argmax input");
+    let _ = std::fs::remove_file(source_path);
     assert_eq!(
         u32::from_le_bytes(execution.output_payload.as_bytes().try_into().unwrap()),
         1
@@ -180,13 +170,8 @@ fn executes_generated_u32_xor_msl_from_opaque_carrier_bytes() {
 
 #[cfg(target_os = "macos")]
 fn execute_registered_u32_msl(asset_id: &str, operation: &str) -> super::MetalProviderExecution {
-    let (metal_source, entry) = registered_shader_asset(asset_id);
-    let source_path = std::env::temp_dir().join(format!(
-        "nuis-metal-u32-{operation}-source-{}-{}.metal",
-        std::process::id(),
-        std::thread::current().name().unwrap_or("test")
-    ));
-    std::fs::write(&source_path, metal_source).unwrap();
+    let (source_path, entry) =
+        registered_shader_source_path(asset_id, &format!("metal-u32-{operation}"));
     let input = ProviderCarrierInput::OpaqueBytes {
         handle: format!("memory:metal-u32-{operation}-test"),
         bytes: [1u32, 8, 13, 21]
@@ -202,6 +187,18 @@ fn execute_registered_u32_msl(asset_id: &str, operation: &str) -> super::MetalPr
     .expect("generated Metal u32 operation");
     let _ = std::fs::remove_file(source_path);
     execution
+}
+
+#[cfg(target_os = "macos")]
+fn registered_shader_source_path(asset_id: &str, label: &str) -> (PathBuf, String) {
+    let (metal_source, entry) = registered_shader_asset(asset_id);
+    let source_path = std::env::temp_dir().join(format!(
+        "nuis-{label}-source-{}-{}.metal",
+        std::process::id(),
+        std::thread::current().name().unwrap_or("test")
+    ));
+    std::fs::write(&source_path, metal_source).unwrap();
+    (source_path, entry)
 }
 
 #[cfg(target_os = "macos")]

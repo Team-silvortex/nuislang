@@ -508,6 +508,41 @@ mod tests {
         fs::remove_dir_all(output_dir).unwrap();
     }
 
+    #[test]
+    fn vulkan_session_plan_rejects_fan_in_until_adapter_can_materialize_aux_buffers() {
+        let output_dir =
+            env::temp_dir().join(format!("nsdb-vulkan-session-fan-in-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&output_dir);
+        fs::create_dir_all(&output_dir).unwrap();
+        let spirv = spirv_fixture("nuis_vulkan_add_u32");
+        fs::write(output_dir.join("nuis.shader.vulkan.add-u32.spv"), &spirv).unwrap();
+        let mut request = u32_request(
+            "add-u32",
+            "nuis_vulkan_add_u32",
+            "shader.vulkan.add-u32.spirv",
+            "nuis.shader.vulkan.add-u32.spv",
+            &spirv,
+        );
+        request.kernel.input_buffers.push("input.aux".to_owned());
+        let mut aux = request.input_bindings[0].clone();
+        aux.name = "input.aux".to_owned();
+        aux.source = "dependency".to_owned();
+        aux.payload_path = "none".to_owned();
+        aux.producer_request_id = "shader.vulkan.chain.copy-u32".to_owned();
+        aux.producer_output_buffer = "output.values".to_owned();
+        request.input_bindings.push(aux);
+
+        assert!(validate_vulkan_execution_session_plan(
+            &output_dir,
+            VULKAN_PROVIDER_FAMILY,
+            &request,
+            2,
+        )
+        .unwrap_err()
+        .contains("registered SPIR-V ABI"));
+        fs::remove_dir_all(output_dir).unwrap();
+    }
+
     fn u32_request(
         operation: &str,
         entry: &str,

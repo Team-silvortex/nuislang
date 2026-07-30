@@ -129,6 +129,7 @@ fn parse_registration_fields<'a>(
             manifest.package_id, fields[1]
         ));
     }
+    validate_shader_code_asset_source_path(manifest, fields[1], fields[2], fields[7])?;
     Ok(fields)
 }
 
@@ -148,13 +149,36 @@ fn parse_registration_fields_into(
     let source_extension = source_path.extension().and_then(|ext| ext.to_str());
     let inline_wgsl_source =
         if source_extension == Some("ns") && matches!(fields[2], "metal-source" | "spirv-binary") {
-            Some(extract_single_inline_wgsl_source(&source_bytes, fields[1])?)
+            extract_optional_single_inline_shader_source(&source_bytes, fields[1], "wgsl")?
         } else {
             None
         };
+    let inline_metal_source = if source_extension == Some("ns") && fields[2] == "metal-source" {
+        extract_optional_single_inline_shader_source(&source_bytes, fields[1], "metal")?
+    } else {
+        None
+    };
+    if inline_wgsl_source.is_some() && inline_metal_source.is_some() {
+        return Err(format!(
+            "Nustar code asset `{}` .ns source must not mix `wgsl {{ ... }}` and `metal {{ ... }}` blocks",
+            fields[1]
+        ));
+    }
+    if source_extension == Some("ns")
+        && matches!(fields[2], "metal-source" | "spirv-binary")
+        && inline_wgsl_source.is_none()
+        && inline_metal_source.is_none()
+    {
+        return Err(format!(
+            "Nustar code asset `{}` .ns source must contain one inline shader block",
+            fields[1]
+        ));
+    }
     let lowering_source = inline_wgsl_source.as_deref().unwrap_or(&source_bytes);
     let source_is_inline_wgsl = source_extension == Some("wgsl") || inline_wgsl_source.is_some();
-    let bytes = if fields[2] == "metal-source" && source_is_inline_wgsl {
+    let bytes = if fields[2] == "metal-source" && inline_metal_source.is_some() {
+        inline_metal_source.expect("checked inline Metal source")
+    } else if fields[2] == "metal-source" && source_is_inline_wgsl {
         crate::shader_msl_emitter::lower_canonical_inline_wgsl_u32_for_profile(
             lowering_source,
             fields[5],
@@ -213,45 +237,120 @@ fn parse_registration_fields_into(
     })
 }
 
+#[cfg(test)]
 fn extract_single_inline_wgsl_source(source: &[u8], asset_id: &str) -> Result<Vec<u8>, String> {
+    extract_optional_single_inline_shader_source(source, asset_id, "wgsl")?.ok_or_else(|| {
+        format!("Nustar code asset `{asset_id}` .ns source must contain one `wgsl {{ ... }}` block")
+    })
+}
+
+#[cfg(test)]
+fn extract_single_inline_metal_source(source: &[u8], asset_id: &str) -> Result<Vec<u8>, String> {
+    extract_optional_single_inline_shader_source(source, asset_id, "metal")?.ok_or_else(|| {
+        format!(
+            "Nustar code asset `{asset_id}` .ns source must contain one `metal {{ ... }}` block"
+        )
+    })
+}
+
+fn extract_optional_single_inline_shader_source(
+    source: &[u8],
+    asset_id: &str,
+    block_keyword: &str,
+) -> Result<Option<Vec<u8>>, String> {
     let source = std::str::from_utf8(source)
         .map_err(|_| format!("Nustar code asset `{asset_id}` .ns source must be UTF-8"))?;
     let mut blocks = Vec::new();
     let mut index = 0usize;
-    while let Some(relative) = source[index..].find("wgsl") {
-        let keyword = index + relative;
-        let after_keyword = keyword + "wgsl".len();
-        if !is_identifier_boundary(source.as_bytes(), keyword, after_keyword) {
-            index = after_keyword;
-            continue;
-        }
-        let mut cursor = after_keyword;
-        while source
-            .as_bytes()
-            .get(cursor)
-            .is_some_and(u8::is_ascii_whitespace)
-        {
-            cursor += 1;
-        }
-        if source.as_bytes().get(cursor) != Some(&b'{') {
-            index = after_keyword;
-            continue;
-        }
+    while let Some((_, cursor)) = find_next_inline_shader_block(source, block_keyword, index) {
         let end = find_matching_brace(source, cursor).ok_or_else(|| {
-            format!("Nustar code asset `{asset_id}` contains an unterminated inline wgsl block")
+            format!(
+                "Nustar code asset `{asset_id}` contains an unterminated inline {block_keyword} block"
+            )
         })?;
         blocks.push(source[cursor + 1..end].trim().as_bytes().to_vec());
         index = end + 1;
     }
     match blocks.len() {
-        1 => Ok(blocks.remove(0)),
-        0 => Err(format!(
-            "Nustar code asset `{asset_id}` .ns source must contain one `wgsl {{ ... }}` block"
-        )),
+        1 => Ok(Some(blocks.remove(0))),
+        0 => Ok(None),
         count => Err(format!(
-            "Nustar code asset `{asset_id}` .ns source contains {count} inline wgsl blocks; registered code assets must be single-entry"
+            "Nustar code asset `{asset_id}` .ns source contains {count} inline {block_keyword} blocks; registered code assets must be single-entry"
         )),
     }
+}
+
+fn find_next_inline_shader_block(
+    source: &str,
+    block_keyword: &str,
+    mut index: usize,
+) -> Option<(usize, usize)> {
+    let bytes = source.as_bytes();
+    let keyword = block_keyword.as_bytes();
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut in_line_comment = false;
+    let mut block_comment_depth = 0usize;
+    while index < bytes.len() {
+        let byte = bytes[index];
+        if in_line_comment {
+            if byte == b'\n' {
+                in_line_comment = false;
+            }
+            index += 1;
+            continue;
+        }
+        if block_comment_depth > 0 {
+            if byte == b'/' && bytes.get(index + 1) == Some(&b'*') {
+                block_comment_depth += 1;
+                index += 2;
+            } else if byte == b'*' && bytes.get(index + 1) == Some(&b'/') {
+                block_comment_depth -= 1;
+                index += 2;
+            } else {
+                index += 1;
+            }
+            continue;
+        }
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_string = false;
+            }
+            index += 1;
+            continue;
+        }
+        if byte == b'/' && bytes.get(index + 1) == Some(&b'/') {
+            in_line_comment = true;
+            index += 2;
+        } else if byte == b'/' && bytes.get(index + 1) == Some(&b'*') {
+            block_comment_depth = 1;
+            index += 2;
+        } else if byte == b'"' {
+            in_string = true;
+            index += 1;
+        } else if bytes[index..].starts_with(keyword) {
+            let after_keyword = index + keyword.len();
+            if !is_identifier_boundary(bytes, index, after_keyword) {
+                index = after_keyword;
+                continue;
+            }
+            let mut cursor = after_keyword;
+            while bytes.get(cursor).is_some_and(u8::is_ascii_whitespace) {
+                cursor += 1;
+            }
+            if bytes.get(cursor) == Some(&b'{') {
+                return Some((index, cursor));
+            }
+            index = after_keyword;
+        } else {
+            index += 1;
+        }
+    }
+    None
 }
 
 fn is_identifier_boundary(bytes: &[u8], start: usize, end: usize) -> bool {
@@ -359,6 +458,27 @@ fn relative_path_is_valid(value: &str) -> bool {
             .all(|component| matches!(component, Component::Normal(_)))
 }
 
+fn validate_shader_code_asset_source_path(
+    manifest: &NustarPackageManifest,
+    asset_id: &str,
+    format: &str,
+    source_path: &str,
+) -> Result<(), String> {
+    if manifest.domain_family == "shader"
+        && matches!(format, "metal-source" | "spirv-binary")
+        && Path::new(source_path)
+            .extension()
+            .and_then(|ext| ext.to_str())
+            != Some("ns")
+    {
+        return Err(format!(
+            "nustar package `{}` shader code asset `{asset_id}` source path `{source_path}` must be a .ns source container",
+            manifest.package_id
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -381,6 +501,28 @@ mod tests {
                 .count(),
             7
         );
+        let witsage_bias = assets
+            .iter()
+            .find(|asset| asset.asset_id == "shader.witsage.vector-bias.metal")
+            .expect("registered WitSage vector bias Metal asset");
+        assert_eq!(
+            witsage_bias.source_path,
+            "assets/shader/witsage_vector_bias.ns"
+        );
+        let witsage_bias_text = std::str::from_utf8(&witsage_bias.bytes).unwrap();
+        assert!(witsage_bias_text.contains("kernel void nuis_witsage_vector_bias_f32("));
+        assert!(!witsage_bias_text.contains("shader_inline_metal"));
+        let witsage_argmax = assets
+            .iter()
+            .find(|asset| asset.asset_id == "shader.witsage.argmax.metal")
+            .expect("registered WitSage argmax Metal asset");
+        assert_eq!(
+            witsage_argmax.source_path,
+            "assets/shader/witsage_argmax.ns"
+        );
+        let witsage_argmax_text = std::str::from_utf8(&witsage_argmax.bytes).unwrap();
+        assert!(witsage_argmax_text.contains("kernel void nuis_witsage_argmax_f32("));
+        assert!(!witsage_argmax_text.contains("shader_inline_metal"));
         let metal = assets
             .iter()
             .find(|asset| asset.asset_id == "shader.metal.copy-u32.msl")
@@ -473,6 +615,27 @@ mod tests {
     }
 
     #[test]
+    fn shader_code_asset_source_path_must_be_ns_container() {
+        let root = Path::new("nustar-packages");
+        let mut manifest = crate::registry::load_manifest_for_domain(root, "shader").unwrap();
+        manifest.code_assets = vec![format!(
+            "{NUSTAR_CODE_ASSET_REGISTRATION_CONTRACT}|shader.bad.metal|metal-source|metal.apple-silicon-gpu|msl2.4|nuis_bad|bad.metal|assets/shader/bad.metal"
+        )];
+
+        let error = code_asset_registrations(root, &manifest).unwrap_err();
+
+        assert!(error.contains("must be a .ns source container"));
+
+        manifest.code_assets = vec![format!(
+            "{NUSTAR_CODE_ASSET_REGISTRATION_CONTRACT}|shader.bad.generated|metal-source|metal.apple-silicon-gpu|msl2.4|nuis_bad|bad.metal|assets/generated/bad.metal"
+        )];
+
+        let error = code_asset_registrations(root, &manifest).unwrap_err();
+
+        assert!(error.contains("must be a .ns source container"));
+    }
+
+    #[test]
     fn extracts_single_inline_wgsl_from_ns_code_asset_source() {
         let source = br#"
 mod shader ExampleCodeAsset {
@@ -494,6 +657,59 @@ mod shader ExampleCodeAsset {
         assert!(text.contains("binding(0, 0)"));
         assert!(text.contains("fn demo("));
         assert!(!text.contains("shader_inline_wgsl"));
+    }
+
+    #[test]
+    fn inline_shader_source_extractor_ignores_comments_and_strings() {
+        let source = br#"
+mod shader ExampleCodeAsset {
+  fn source() {
+    // This fake block must not count: wgsl { fn fake() {} }
+    let note: Text = "Nor should this string: metal { kernel void nope() {} }";
+    /*
+      Nested comment fake:
+      wgsl {
+        fn also_fake() {
+        }
+      }
+    */
+    let module: ShaderModule = shader_inline_wgsl("demo", wgsl {
+      binding(0, 0) var<storage, read> input_values: array<u32>;
+
+      stage compute(workgroup_size(1, 1, 1)) {
+        fn demo(@builtin(global_invocation_id) gid: vec3<u32>) {
+          let idx: u32 = gid.x;
+        }
+      }
+    });
+  }
+}
+"#;
+        let extracted = extract_single_inline_wgsl_source(source, "shader.demo").unwrap();
+        let text = std::str::from_utf8(&extracted).unwrap();
+        assert!(text.contains("fn demo("));
+        assert!(!text.contains("fake"));
+    }
+
+    #[test]
+    fn extracts_single_inline_metal_from_ns_code_asset_source() {
+        let source = br#"
+mod shader ExampleMetalCodeAsset {
+  fn source() {
+    let module: ShaderModule = shader_inline_metal("demo", metal {
+      #include <metal_stdlib>
+      using namespace metal;
+
+      kernel void demo(device const float* input [[buffer(0)]]) {
+      }
+    });
+  }
+}
+"#;
+        let extracted = extract_single_inline_metal_source(source, "shader.demo").unwrap();
+        let text = std::str::from_utf8(&extracted).unwrap();
+        assert!(text.contains("kernel void demo("));
+        assert!(!text.contains("shader_inline_metal"));
     }
 
     #[test]

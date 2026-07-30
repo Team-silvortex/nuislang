@@ -92,6 +92,21 @@ fn linux_vulkan_mul_shader_sample_executes_provider_output() {
 }
 
 #[test]
+fn linux_vulkan_xor_shader_sample_executes_provider_output() {
+    run_vulkan_sample_smoke(VulkanSampleSmoke {
+        project_name: "shader_vulkan_xor_provider_demo",
+        assets: &[VulkanGeneratedAsset {
+            asset_id: "shader.vulkan.xor-u32.spirv",
+            generated_file: "nuis.shader.vulkan.xor-u32.spv",
+            entry: "nuis_vulkan_xor_u32",
+        }],
+        registration_id: "official.shader.vulkan-xor-u32",
+        expected_hash: "0x88201fb960ff6465",
+        graph: None,
+    });
+}
+
+#[test]
 fn linux_vulkan_chain_shader_sample_executes_provider_graph() {
     run_vulkan_sample_smoke(VulkanSampleSmoke {
         project_name: "shader_vulkan_chain_provider_demo",
@@ -102,18 +117,18 @@ fn linux_vulkan_chain_shader_sample_executes_provider_graph() {
                 entry: "nuis_vulkan_add_u32",
             },
             VulkanGeneratedAsset {
-                asset_id: "shader.vulkan.mul-u32.spirv",
-                generated_file: "nuis.shader.vulkan.mul-u32.spv",
-                entry: "nuis_vulkan_mul_u32",
+                asset_id: "shader.vulkan.xor-u32.spirv",
+                generated_file: "nuis.shader.vulkan.xor-u32.spv",
+                entry: "nuis_vulkan_xor_u32",
             },
         ],
         registration_id: "official.shader.vulkan-u32-chain",
         expected_hash: "0xdce2c1aca0f32707",
         graph: Some(VulkanGraphSmoke {
-            final_request_id: "shader.vulkan.chain.mul-u32",
-            final_expected_hash: "0x2f8b5a975ff42d9a",
+            final_request_id: "shader.vulkan.chain.xor-u32",
+            final_expected_hash: "0x88201fb960ff6465",
             transport_token:
-                "glm:provider-edge:shader.vulkan.chain.add-u32:output.values->shader.vulkan.chain.mul-u32:input.values",
+                "glm:provider-edge:shader.vulkan.chain.add-u32:output.values->shader.vulkan.chain.xor-u32:input.values",
         }),
     });
 }

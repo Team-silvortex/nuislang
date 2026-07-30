@@ -142,7 +142,7 @@ fn binary_manifest_round_trip_preserves_code_asset_registrations() {
     let mut manifest = make_manifest("shader");
     manifest.abi_capabilities = vec!["shader.abi.v1:op:shader.*".to_owned()];
     manifest.code_assets = vec![
-        "nuis-nustar-code-asset-registration-v1|shader.sample.metal|metal-source|metal|metal.generic|sample_main|sample.metal|assets/shader/sample.metal"
+        "nuis-nustar-code-asset-registration-v1|shader.sample.metal|metal-source|metal|metal.generic|sample_main|sample.metal|assets/shader/sample.ns"
             .to_owned(),
     ];
     let binary = default_binary(manifest.clone(), vec![1, 2, 3]);
