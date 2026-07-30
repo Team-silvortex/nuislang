@@ -1,0 +1,32 @@
+mod shader SurfaceShader {
+  fn profile() {
+    const vertex_count: i64 = 4;
+    const instance_count: i64 = 1;
+    const packet_tag: i64 = 47;
+
+    let profile_target: Target = shader_target("rgba8_unorm", 64, 64);
+    let profile_view: Viewport = shader_viewport(64, 64);
+    let profile_pipe: Pipeline = shader_pipeline("nuis_shader_vulkan_add_provider", "compute_add");
+    let profile_wgsl: ShaderModule = shader_inline_wgsl("nuis_shader_vulkan_add_provider", wgsl {
+      struct VsOut {
+        builtin(position) pos: vec4<f32>,
+      };
+
+      stage vertex {
+        fn vs_main(builtin(vertex_index) vid: u32) -> VsOut {
+          var out: VsOut;
+          let x: f32 = f32((vid << 1u) & 2u);
+          let y: f32 = f32(vid & 2u);
+          out.pos = vec4<f32>(x * 2.0 - 1.0, y * -2.0 + 1.0, 0.0, 1.0);
+          return out;
+        }
+      }
+
+      stage fragment {
+        fn fs_main() -> location(0) vec4<f32> {
+          return vec4<f32>(0.22, 0.48, 0.70, 1.0);
+        }
+      }
+    });
+  }
+}

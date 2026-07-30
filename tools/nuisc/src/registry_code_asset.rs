@@ -243,7 +243,7 @@ mod tests {
         let manifest = crate::registry::load_manifest_for_domain(root, "shader").unwrap();
         let assets = code_asset_registrations(root, &manifest).unwrap();
 
-        assert_eq!(assets.len(), 7);
+        assert_eq!(assets.len(), 10);
         assert!(assets
             .iter()
             .all(|asset| asset.package_id == "official.shader"));
@@ -310,6 +310,23 @@ mod tests {
             u32::from_le_bytes(vulkan.bytes[0..4].try_into().unwrap()),
             0x0723_0203
         );
+        for (asset_id, entry) in [
+            ("shader.vulkan.add-u32.spirv", "nuis_vulkan_add_u32"),
+            ("shader.vulkan.sub-u32.spirv", "nuis_vulkan_sub_u32"),
+            ("shader.vulkan.mul-u32.spirv", "nuis_vulkan_mul_u32"),
+        ] {
+            let asset = assets
+                .iter()
+                .find(|asset| asset.asset_id == asset_id)
+                .expect("registered Vulkan SPIR-V u32 asset");
+            assert_eq!(asset.format, "spirv-binary");
+            assert_eq!(asset.target, "vulkan1.3-spirv1.6");
+            assert_eq!(asset.entry, entry);
+            assert_eq!(
+                u32::from_le_bytes(asset.bytes[0..4].try_into().unwrap()),
+                0x0723_0203
+            );
+        }
         assert!(assets.iter().all(|asset| !asset.bytes.is_empty()));
     }
 

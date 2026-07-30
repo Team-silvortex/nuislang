@@ -405,6 +405,13 @@ static int parse_u32(const char* text, uint32_t* value) {
     return 1;
 }
 
+static int valid_u32_entry(const char* entry) {
+    return strcmp(entry, "nuis_vulkan_copy_u32") == 0
+        || strcmp(entry, "nuis_vulkan_add_u32") == 0
+        || strcmp(entry, "nuis_vulkan_sub_u32") == 0
+        || strcmp(entry, "nuis_vulkan_mul_u32") == 0;
+}
+
 static int read_exact_file(const char* path, unsigned char* output, size_t length) {
     FILE* file = fopen(path, "rb");
     if (file == NULL) return 0;
@@ -548,7 +555,7 @@ static int load_device_api(VulkanApi* vk, VkDevice device) {
 }
 
 int main(int argc, char** argv) {
-    if (argc != 5 || strcmp(argv[2], "nuis_vulkan_copy_u32") != 0) return 2;
+    if (argc != 5 || !valid_u32_entry(argv[2])) return 2;
     uint32_t element_count = 0;
     OutputDescriptor output_descriptor = {0};
     if (!parse_u32(argv[4], &element_count) || !parse_output_descriptor(&output_descriptor)) return 3;

@@ -20,8 +20,6 @@ pub(crate) const VULKAN_EXECUTION_SESSION_PLAN_CONTRACT: &str =
     "nuis-vulkan-spirv-execution-session-plan-v1";
 const VULKAN_EXECUTION_SESSION_PLAN_STATUS: &str = "dispatch-readback-pending";
 const VULKAN_PROVIDER_FAMILY: &str = "spirv:vulkan-gpu";
-const VULKAN_COPY_U32_OPERATION: &str = "copy-u32";
-const VULKAN_COPY_U32_ENTRY: &str = "nuis_vulkan_copy_u32";
 const VULKAN_SPIRV_FORMAT: &str = "spirv-binary";
 const VULKAN_SPIRV_TARGET: &str = "vulkan1.3-spirv1.6";
 const SPIRV_MAGIC: u32 = 0x0723_0203;
@@ -159,21 +157,21 @@ fn validate_vulkan_execution_session_plan(
         .as_ref()
         .ok_or_else(|| "Vulkan provider request is missing its adapter binding".to_owned())?;
     let element_count = u32_scalar(request, "element_count")
-        .ok_or_else(|| "Vulkan copy-u32 request is missing u32 `element_count`".to_owned())?;
+        .ok_or_else(|| "Vulkan u32 request is missing u32 `element_count`".to_owned())?;
     let expected_bytes = usize::try_from(element_count)
         .ok()
         .and_then(|count| count.checked_mul(std::mem::size_of::<u32>()))
-        .ok_or_else(|| "Vulkan copy-u32 byte length overflows host size".to_owned())?;
+        .ok_or_else(|| "Vulkan u32 byte length overflows host size".to_owned())?;
     let dispatch = request
         .kernel
         .dispatch
         .as_slice()
         .try_into()
-        .map_err(|_| "Vulkan copy-u32 dispatch must have three dimensions".to_owned())?;
+        .map_err(|_| "Vulkan u32 dispatch must have three dimensions".to_owned())?;
     if request.buffer.element_type != "u32"
         || request.buffer.layout != "tensor-contiguous"
         || request.buffer.byte_length != expected_bytes
-        || request.kernel.operation != VULKAN_COPY_U32_OPERATION
+        || !is_vulkan_u32_operation(&request.kernel.operation)
         || request.kernel.input_buffers != [request.buffer.id.clone()]
         || request.kernel.output_buffer != "output.values"
         || dispatch != [usize::try_from(element_count).unwrap_or(0), 1, 1]
@@ -187,7 +185,7 @@ fn validate_vulkan_execution_session_plan(
         || request.output_bindings[0].byte_length != expected_bytes
         || binding.provider_family != VULKAN_PROVIDER_FAMILY
         || binding.execution_requirement != "real-device"
-        || !asset_descriptor_matches_vulkan_copy_u32(asset)
+        || !asset_descriptor_matches_vulkan_u32(asset, &request.kernel.operation)
     {
         return Err("Vulkan provider request does not match the registered SPIR-V ABI".to_owned());
     }
@@ -199,7 +197,7 @@ fn validate_vulkan_execution_session_plan(
             asset_path.display()
         )
     })?;
-    validate_spirv_copy_u32_module(asset, &bytes)?;
+    validate_spirv_u32_module(asset, &bytes)?;
     Ok(VulkanExecutionSessionPlan {
         contract: VULKAN_EXECUTION_SESSION_PLAN_CONTRACT,
         status: VULKAN_EXECUTION_SESSION_PLAN_STATUS,
@@ -213,10 +211,27 @@ fn validate_vulkan_execution_session_plan(
     })
 }
 
-fn asset_descriptor_matches_vulkan_copy_u32(asset: &ProviderCodeAssetDescriptor) -> bool {
+fn asset_descriptor_matches_vulkan_u32(
+    asset: &ProviderCodeAssetDescriptor,
+    operation: &str,
+) -> bool {
     asset.format == VULKAN_SPIRV_FORMAT
         && asset.target == VULKAN_SPIRV_TARGET
-        && asset.entry == VULKAN_COPY_U32_ENTRY
+        && vulkan_u32_entry_for_operation(operation).is_some_and(|entry| asset.entry == entry)
+}
+
+fn is_vulkan_u32_operation(operation: &str) -> bool {
+    vulkan_u32_entry_for_operation(operation).is_some()
+}
+
+fn vulkan_u32_entry_for_operation(operation: &str) -> Option<&'static str> {
+    match operation {
+        "copy-u32" => Some("nuis_vulkan_copy_u32"),
+        "add-u32" => Some("nuis_vulkan_add_u32"),
+        "sub-u32" => Some("nuis_vulkan_sub_u32"),
+        "mul-u32" => Some("nuis_vulkan_mul_u32"),
+        _ => None,
+    }
 }
 
 fn u32_scalar(request: &ProviderRequest, name: &str) -> Option<u32> {
@@ -230,7 +245,7 @@ fn u32_scalar(request: &ProviderRequest, name: &str) -> Option<u32> {
         .ok()
 }
 
-fn validate_spirv_copy_u32_module(
+fn validate_spirv_u32_module(
     asset: &ProviderCodeAssetDescriptor,
     bytes: &[u8],
 ) -> Result<(), String> {
@@ -339,31 +354,58 @@ mod tests {
     }
 
     #[test]
-    fn vulkan_session_plan_accepts_registered_copy_u32_shape() {
+    fn vulkan_session_plan_accepts_registered_u32_shapes() {
         let output_dir =
             env::temp_dir().join(format!("nsdb-vulkan-session-plan-{}", std::process::id()));
         let _ = fs::remove_dir_all(&output_dir);
         fs::create_dir_all(&output_dir).unwrap();
-        let spirv = spirv_fixture();
-        fs::write(output_dir.join("nuis.shader.vulkan.copy-u32.spv"), &spirv).unwrap();
-        let request = copy_u32_request(&spirv);
-        let plan = validate_vulkan_execution_session_plan(
-            &output_dir,
-            VULKAN_PROVIDER_FAMILY,
-            &request,
-            1,
-        )
-        .expect("validated Vulkan execution plan");
-        fs::remove_dir_all(output_dir).unwrap();
+        for (operation, entry, asset_id, path) in [
+            (
+                "copy-u32",
+                "nuis_vulkan_copy_u32",
+                "shader.vulkan.copy-u32.spirv",
+                "nuis.shader.vulkan.copy-u32.spv",
+            ),
+            (
+                "add-u32",
+                "nuis_vulkan_add_u32",
+                "shader.vulkan.add-u32.spirv",
+                "nuis.shader.vulkan.add-u32.spv",
+            ),
+            (
+                "sub-u32",
+                "nuis_vulkan_sub_u32",
+                "shader.vulkan.sub-u32.spirv",
+                "nuis.shader.vulkan.sub-u32.spv",
+            ),
+            (
+                "mul-u32",
+                "nuis_vulkan_mul_u32",
+                "shader.vulkan.mul-u32.spirv",
+                "nuis.shader.vulkan.mul-u32.spv",
+            ),
+        ] {
+            let spirv = spirv_fixture(entry);
+            fs::write(output_dir.join(path), &spirv).unwrap();
+            let request = u32_request(operation, entry, asset_id, path, &spirv);
+            let plan = validate_vulkan_execution_session_plan(
+                &output_dir,
+                VULKAN_PROVIDER_FAMILY,
+                &request,
+                1,
+            )
+            .expect("validated Vulkan execution plan");
 
-        assert_eq!(plan.contract, VULKAN_EXECUTION_SESSION_PLAN_CONTRACT);
-        assert_eq!(plan.status, VULKAN_EXECUTION_SESSION_PLAN_STATUS);
-        assert_eq!(plan.asset_id, "shader.vulkan.copy-u32.spirv");
-        assert_eq!(plan.entry, VULKAN_COPY_U32_ENTRY);
-        assert_eq!(plan.element_count, 4);
-        assert_eq!(plan.input_byte_length, 16);
-        assert_eq!(plan.output_byte_length, 16);
-        assert_eq!(plan.dispatch, [4, 1, 1]);
+            assert_eq!(plan.contract, VULKAN_EXECUTION_SESSION_PLAN_CONTRACT);
+            assert_eq!(plan.status, VULKAN_EXECUTION_SESSION_PLAN_STATUS);
+            assert_eq!(plan.asset_id, asset_id);
+            assert_eq!(plan.entry, entry);
+            assert_eq!(plan.element_count, 4);
+            assert_eq!(plan.input_byte_length, 16);
+            assert_eq!(plan.output_byte_length, 16);
+            assert_eq!(plan.dispatch, [4, 1, 1]);
+        }
+        fs::remove_dir_all(output_dir).unwrap();
     }
 
     #[test]
@@ -372,9 +414,15 @@ mod tests {
             env::temp_dir().join(format!("nsdb-vulkan-session-drift-{}", std::process::id()));
         let _ = fs::remove_dir_all(&output_dir);
         fs::create_dir_all(&output_dir).unwrap();
-        let spirv = spirv_fixture();
+        let spirv = spirv_fixture("nuis_vulkan_copy_u32");
         fs::write(output_dir.join("nuis.shader.vulkan.copy-u32.spv"), &spirv).unwrap();
-        let mut request = copy_u32_request(&spirv);
+        let mut request = u32_request(
+            "copy-u32",
+            "nuis_vulkan_copy_u32",
+            "shader.vulkan.copy-u32.spirv",
+            "nuis.shader.vulkan.copy-u32.spv",
+            &spirv,
+        );
         request.code_asset.as_mut().expect("code asset").format = "metal-source".to_owned();
         assert!(validate_vulkan_execution_session_plan(
             &output_dir,
@@ -384,7 +432,13 @@ mod tests {
         )
         .unwrap_err()
         .contains("registered SPIR-V ABI"));
-        let mut request = copy_u32_request(&spirv);
+        let mut request = u32_request(
+            "copy-u32",
+            "nuis_vulkan_copy_u32",
+            "shader.vulkan.copy-u32.spirv",
+            "nuis.shader.vulkan.copy-u32.spv",
+            &spirv,
+        );
         request
             .adapter_binding
             .as_mut()
@@ -401,7 +455,13 @@ mod tests {
         fs::remove_dir_all(output_dir).unwrap();
     }
 
-    fn copy_u32_request(spirv: &[u8]) -> ProviderRequest {
+    fn u32_request(
+        operation: &str,
+        entry: &str,
+        asset_id: &str,
+        path: &str,
+        spirv: &[u8],
+    ) -> ProviderRequest {
         ProviderRequest {
             source: "test",
             buffer: ProviderBufferDescriptor {
@@ -415,8 +475,8 @@ mod tests {
                 content_hash: "0x1111111111111111".to_owned(),
             },
             kernel: ProviderKernelDescriptor {
-                id: "shader.vulkan.copy-u32".to_owned(),
-                operation: VULKAN_COPY_U32_OPERATION.to_owned(),
+                id: format!("shader.vulkan.{operation}"),
+                operation: operation.to_owned(),
                 input_buffer: "input.values".to_owned(),
                 input_buffers: vec!["input.values".to_owned()],
                 output_buffer: "output.values".to_owned(),
@@ -437,11 +497,11 @@ mod tests {
             }],
             model_asset: None,
             code_asset: Some(ProviderCodeAssetDescriptor {
-                id: "shader.vulkan.copy-u32.spirv".to_owned(),
+                id: asset_id.to_owned(),
                 format: VULKAN_SPIRV_FORMAT.to_owned(),
                 target: VULKAN_SPIRV_TARGET.to_owned(),
-                entry: VULKAN_COPY_U32_ENTRY.to_owned(),
-                path: "nuis.shader.vulkan.copy-u32.spv".to_owned(),
+                entry: entry.to_owned(),
+                path: path.to_owned(),
                 byte_length: spirv.len(),
                 digest_contract: CODE_ASSET_FNV1A64_DIGEST_CONTRACT.to_owned(),
                 content_hash: fnv1a64_hex(spirv),
@@ -478,12 +538,12 @@ mod tests {
         }
     }
 
-    fn spirv_fixture() -> Vec<u8> {
+    fn spirv_fixture(entry: &str) -> Vec<u8> {
         let mut bytes = [SPIRV_MAGIC, SPIRV_VERSION_1_6, 0, 21, 0]
             .into_iter()
             .flat_map(u32::to_le_bytes)
             .collect::<Vec<_>>();
-        bytes.extend_from_slice(VULKAN_COPY_U32_ENTRY.as_bytes());
+        bytes.extend_from_slice(entry.as_bytes());
         while bytes.len() % 4 != 0 {
             bytes.push(0);
         }

@@ -11,14 +11,76 @@ fn output_text(output: &std::process::Output) -> String {
     String::from_utf8_lossy(&output.stdout).into_owned()
 }
 
+struct VulkanSampleSmoke<'a> {
+    project_name: &'a str,
+    asset_id: &'a str,
+    generated_file: &'a str,
+    registration_id: &'a str,
+    operation: &'a str,
+    entry: &'a str,
+    expected_hash: &'a str,
+}
+
 #[test]
 fn linux_vulkan_shader_sample_executes_provider_output() {
+    run_vulkan_sample_smoke(VulkanSampleSmoke {
+        project_name: "shader_vulkan_provider_demo",
+        asset_id: "shader.vulkan.copy-u32.spirv",
+        generated_file: "nuis.shader.vulkan.copy-u32.spv",
+        registration_id: "official.shader.vulkan-copy-u32",
+        operation: "copy-u32",
+        entry: "nuis_vulkan_copy_u32",
+        expected_hash: "0x6ebcdd244b594ee4",
+    });
+}
+
+#[test]
+fn linux_vulkan_add_shader_sample_executes_provider_output() {
+    run_vulkan_sample_smoke(VulkanSampleSmoke {
+        project_name: "shader_vulkan_add_provider_demo",
+        asset_id: "shader.vulkan.add-u32.spirv",
+        generated_file: "nuis.shader.vulkan.add-u32.spv",
+        registration_id: "official.shader.vulkan-add-u32",
+        operation: "add-u32",
+        entry: "nuis_vulkan_add_u32",
+        expected_hash: "0xdce2c1aca0f32707",
+    });
+}
+
+#[test]
+fn linux_vulkan_sub_shader_sample_executes_provider_output() {
+    run_vulkan_sample_smoke(VulkanSampleSmoke {
+        project_name: "shader_vulkan_sub_provider_demo",
+        asset_id: "shader.vulkan.sub-u32.spirv",
+        generated_file: "nuis.shader.vulkan.sub-u32.spv",
+        registration_id: "official.shader.vulkan-sub-u32",
+        operation: "sub-u32",
+        entry: "nuis_vulkan_sub_u32",
+        expected_hash: "0x88201fb960ff6465",
+    });
+}
+
+#[test]
+fn linux_vulkan_mul_shader_sample_executes_provider_output() {
+    run_vulkan_sample_smoke(VulkanSampleSmoke {
+        project_name: "shader_vulkan_mul_provider_demo",
+        asset_id: "shader.vulkan.mul-u32.spirv",
+        generated_file: "nuis.shader.vulkan.mul-u32.spv",
+        registration_id: "official.shader.vulkan-mul-u32",
+        operation: "mul-u32",
+        entry: "nuis_vulkan_mul_u32",
+        expected_hash: "0x02f6f7f591bff68f",
+    });
+}
+
+fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
     if !vulkan_host_available() {
         return;
     }
-    let output_dir = temp_dir("linux_vulkan_shader_provider");
+    let output_dir = temp_dir(sample.project_name);
     let project = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../examples/projects/domains/shader_vulkan_provider_demo");
+    let project = project.with_file_name(sample.project_name);
     let project_text = project.display().to_string();
     let output_dir_text = output_dir.display().to_string();
 
@@ -26,7 +88,7 @@ fn linux_vulkan_shader_sample_executes_provider_output() {
     assert_success(&build, "build Linux Vulkan shader provider project");
     assert_file_contains(
         &output_dir.join("nuis.domain.code-asset-contributions.toml"),
-        "shader.vulkan.copy-u32.spirv",
+        sample.asset_id,
         "Vulkan code asset contribution table",
     );
     assert_file_contains(
@@ -34,11 +96,10 @@ fn linux_vulkan_shader_sample_executes_provider_output() {
         "vulkan.discrete-or-integrated-gpu",
         "Vulkan lowering target contribution",
     );
-    let spirv = fs::read(output_dir.join("nuis.shader.vulkan.copy-u32.spv"))
-        .expect("Vulkan SPIR-V code asset");
+    let spirv = fs::read(output_dir.join(sample.generated_file)).expect("Vulkan SPIR-V code asset");
     assert!(spirv
-        .windows(b"nuis_vulkan_copy_u32".len())
-        .any(|window| window == b"nuis_vulkan_copy_u32"));
+        .windows(sample.entry.len())
+        .any(|window| window == sample.entry.as_bytes()));
 
     let run = run_nuis(&["run-artifact", &output_dir_text, "--json"]);
     assert_success(&run, "materialize Linux Vulkan provider request");
@@ -46,6 +107,12 @@ fn linux_vulkan_shader_sample_executes_provider_output() {
         fs::read_to_string(output_dir.join("nuis.nsdb.device-provider-samples.toml"))
             .expect("provider sample manifest");
     assert!(provider_samples.contains("provider_family = \"spirv:vulkan-gpu\""));
+    assert!(provider_samples.contains(&format!(
+        "provider_sample_registration_id={}",
+        sample.registration_id
+    )));
+    assert!(provider_samples.contains(&format!("provider_kernel_operation={}", sample.operation)));
+    assert!(provider_samples.contains(&format!("provider_code_asset_id={}", sample.asset_id)));
     assert!(provider_samples.contains("provider_adapter_binding_provider_family=spirv:vulkan-gpu"));
     assert!(provider_samples.contains(
         "provider_code_asset_contribution_selection_set_contract=nuis-provider-code-asset-contribution-selection-set-v1"
@@ -72,8 +139,10 @@ fn linux_vulkan_shader_sample_executes_provider_output() {
     assert!(
         executed_text.contains("\"first_output_payload_comparison_status\":\"comparison-passed\"")
     );
-    assert!(executed_text
-        .contains("\"first_output_payload_native_output_hash\":\"0x6ebcdd244b594ee4\""));
+    assert!(executed_text.contains(&format!(
+        "\"first_output_payload_native_output_hash\":\"{}\"",
+        sample.expected_hash
+    )));
 
     let provider_output = output_dir.join("nuis.nsdb.provider-output.spirv-vulkan-gpu.toml");
     assert_file_contains(

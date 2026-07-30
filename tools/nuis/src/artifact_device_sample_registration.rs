@@ -113,7 +113,7 @@ fn evidence_matches_registration(
         .unwrap_or_else(|| registration.metadata_selector.is_none())
 }
 
-fn registrations() -> [DeviceSampleInputRegistration; 7] {
+fn registrations() -> [DeviceSampleInputRegistration; 10] {
     [
         crate::artifact_device_sample_pixelmagic::registration(),
         crate::artifact_device_sample_kernel::registration(),
@@ -122,6 +122,9 @@ fn registrations() -> [DeviceSampleInputRegistration; 7] {
         crate::artifact_device_sample_shader_metal::sub_registration(),
         crate::artifact_device_sample_shader_metal::mul_registration(),
         crate::artifact_device_sample_shader_vulkan::registration(),
+        crate::artifact_device_sample_shader_vulkan::add_registration(),
+        crate::artifact_device_sample_shader_vulkan::sub_registration(),
+        crate::artifact_device_sample_shader_vulkan::mul_registration(),
     ]
 }
 
@@ -161,6 +164,39 @@ mod tests {
             registered_provider_family("vulkan", "discrete-or-integrated-gpu"),
             Some("spirv:vulkan-gpu")
         );
+        let vulkan_add = enrich_registered_input_evidence(
+            "vulkan",
+            "discrete-or-integrated-gpu",
+            "artifact_provider_metadata_0=official.shader:provider-sample=vulkan-add-u32",
+        )
+        .unwrap();
+        assert!(
+            vulkan_add.contains("provider_sample_registration_id=official.shader.vulkan-add-u32")
+        );
+        assert!(vulkan_add.contains("provider_code_asset_id=shader.vulkan.add-u32.spirv"));
+        assert!(vulkan_add.contains("provider_kernel_operation=add-u32"));
+        let vulkan_sub = enrich_registered_input_evidence(
+            "vulkan",
+            "discrete-or-integrated-gpu",
+            "artifact_provider_metadata_0=official.shader:provider-sample=vulkan-sub-u32",
+        )
+        .unwrap();
+        assert!(
+            vulkan_sub.contains("provider_sample_registration_id=official.shader.vulkan-sub-u32")
+        );
+        assert!(vulkan_sub.contains("provider_code_asset_id=shader.vulkan.sub-u32.spirv"));
+        assert!(vulkan_sub.contains("provider_kernel_operation=sub-u32"));
+        let vulkan_mul = enrich_registered_input_evidence(
+            "vulkan",
+            "discrete-or-integrated-gpu",
+            "artifact_provider_metadata_0=official.shader:provider-sample=vulkan-mul-u32",
+        )
+        .unwrap();
+        assert!(
+            vulkan_mul.contains("provider_sample_registration_id=official.shader.vulkan-mul-u32")
+        );
+        assert!(vulkan_mul.contains("provider_code_asset_id=shader.vulkan.mul-u32.spirv"));
+        assert!(vulkan_mul.contains("provider_kernel_operation=mul-u32"));
         assert!(
             enrich_registered_input_evidence("unknown", "unknown", "base").is_none(),
             "unregistered backends must remain generic"
