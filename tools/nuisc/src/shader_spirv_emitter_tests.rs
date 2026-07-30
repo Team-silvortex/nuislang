@@ -153,6 +153,7 @@ fn emits_binary_u32_modules_from_canonical_wgsl_body() {
         ("nuis_vulkan_add_u32", "+", 128_u16),
         ("nuis_vulkan_sub_u32", "-", 130_u16),
         ("nuis_vulkan_mul_u32", "*", 132_u16),
+        ("nuis_vulkan_xor_u32", "^", 198_u16),
     ] {
         let source = canonical_binary_wgsl(entry, operator);
         let lowered = lower_canonical_inline_wgsl_u32_for_profile(

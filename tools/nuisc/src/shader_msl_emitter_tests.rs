@@ -68,6 +68,7 @@ fn emits_binary_u32_msl_from_shared_canonical_body_contract() {
         ("nuis_metal_add_u32", "+", "value + value"),
         ("nuis_metal_sub_u32", "-", "value - value"),
         ("nuis_metal_mul_u32", "*", "value * value"),
+        ("nuis_metal_xor_u32", "^", "value ^ value"),
     ] {
         let source = canonical_binary_wgsl(entry, operator);
         let lowered = lower_canonical_inline_wgsl_u32_for_profile(

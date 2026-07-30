@@ -409,7 +409,92 @@ static int valid_u32_entry(const char* entry) {
     return strcmp(entry, "nuis_vulkan_copy_u32") == 0
         || strcmp(entry, "nuis_vulkan_add_u32") == 0
         || strcmp(entry, "nuis_vulkan_sub_u32") == 0
-        || strcmp(entry, "nuis_vulkan_mul_u32") == 0;
+        || strcmp(entry, "nuis_vulkan_mul_u32") == 0
+        || strcmp(entry, "nuis_vulkan_xor_u32") == 0;
+}
+
+static uint32_t read_u32_le(const unsigned char* bytes) {
+    uint32_t value = 0;
+    for (size_t index = 0; index < 4; index++) {
+        value |= (uint32_t)bytes[index] << (index * 8);
+    }
+    return value;
+}
+
+static uint64_t read_u64_le(const unsigned char* bytes) {
+    uint64_t value = 0;
+    for (size_t index = 0; index < 8; index++) {
+        value |= (uint64_t)bytes[index] << (index * 8);
+    }
+    return value;
+}
+
+static int pread_exact(int fd, unsigned char* output, size_t length, size_t offset) {
+    size_t read = 0;
+    while (read < length) {
+        ssize_t count = pread(fd, output + read, length - read, (off_t)(offset + read));
+        if (count <= 0) return 0;
+        read += (size_t)count;
+    }
+    return 1;
+}
+
+static int read_carrier_frame(
+    const char* descriptor,
+    unsigned char* output,
+    size_t output_length) {
+    int fd = -1;
+    unsigned long long frame = 0;
+    unsigned long long packet_length_raw = 0;
+    unsigned long long packet_hash = 0;
+    char tail = '\0';
+    if (sscanf(
+            descriptor,
+            "fd:%d:%llu:%llu:%llu%c",
+            &fd,
+            &frame,
+            &packet_length_raw,
+            &packet_hash,
+            &tail) != 4
+        || fd < 0
+        || frame > UINT32_MAX
+        || packet_length_raw > SIZE_MAX) return 0;
+    size_t packet_length = (size_t)packet_length_raw;
+    if (packet_length < 56) return 0;
+    unsigned char* packet = malloc(packet_length);
+    if (packet == NULL || !pread_exact(fd, packet, packet_length, 0)) {
+        free(packet);
+        return 0;
+    }
+    uint32_t frame_count = read_u32_le(packet + 8);
+    uint32_t page_size = read_u32_le(packet + 12);
+    uint32_t frame_index = read_u32_le(packet + 16);
+    uint64_t payload_offset_raw = read_u64_le(packet + 24);
+    uint64_t payload_length_raw = read_u64_le(packet + 32);
+    uint64_t mapped_length_raw = read_u64_le(packet + 40);
+    uint64_t payload_hash = read_u64_le(packet + 48);
+    int valid = memcmp(packet, "NUISPFD1", 8) == 0
+        && fnv1a64(packet, packet_length) == (uint64_t)packet_hash
+        && frame_count == 1
+        && page_size != 0
+        && (page_size & (page_size - 1)) == 0
+        && frame_index == (uint32_t)frame
+        && payload_offset_raw <= SIZE_MAX
+        && payload_length_raw == output_length
+        && mapped_length_raw <= SIZE_MAX;
+    size_t payload_offset = valid ? (size_t)payload_offset_raw : 0;
+    size_t mapped_length = valid ? (size_t)mapped_length_raw : 0;
+    valid = valid
+        && payload_offset >= 56
+        && payload_offset % page_size == 0
+        && mapped_length % page_size == 0
+        && mapped_length >= output_length
+        && payload_offset <= packet_length
+        && mapped_length <= packet_length - payload_offset
+        && fnv1a64(packet + payload_offset, output_length) == payload_hash;
+    if (valid) memcpy(output, packet + payload_offset, output_length);
+    free(packet);
+    return valid;
 }
 
 static int read_exact_file(const char* path, unsigned char* output, size_t length) {
@@ -419,6 +504,12 @@ static int read_exact_file(const char* path, unsigned char* output, size_t lengt
     int trailing = fgetc(file);
     int closed = fclose(file);
     return read == length && trailing == EOF && closed == 0;
+}
+
+static int read_input(const char* source, unsigned char* output, size_t length) {
+    return strncmp(source, "fd:", 3) == 0
+        ? read_carrier_frame(source, output, length)
+        : read_exact_file(source, output, length);
 }
 
 static int read_file_alloc(const char* path, unsigned char** output, size_t* length) {
@@ -564,7 +655,7 @@ int main(int argc, char** argv) {
     unsigned char* input = malloc(byte_length);
     unsigned char* spirv = NULL;
     size_t spirv_length = 0;
-    if (input == NULL || !read_exact_file(argv[3], input, byte_length) || !read_file_alloc(argv[1], &spirv, &spirv_length) || spirv_length % 4 != 0) return 5;
+    if (input == NULL || !read_input(argv[3], input, byte_length) || !read_file_alloc(argv[1], &spirv, &spirv_length) || spirv_length % 4 != 0) return 5;
 
     VulkanApi vk;
     VkInstance instance = NULL;

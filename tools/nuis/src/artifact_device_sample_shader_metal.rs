@@ -8,6 +8,12 @@ const INPUT: &[u8] = &[1, 0, 0, 0, 8, 0, 0, 0, 13, 0, 0, 0, 21, 0, 0, 0];
 const ADD_EXPECTED: &[u8] = &[2, 0, 0, 0, 16, 0, 0, 0, 26, 0, 0, 0, 42, 0, 0, 0];
 const SUB_EXPECTED: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 const MUL_EXPECTED: &[u8] = &[1, 0, 0, 0, 64, 0, 0, 0, 169, 0, 0, 0, 185, 1, 0, 0];
+const CHAIN_EXPECTED: &[u8] = &[4, 0, 0, 0, 0, 1, 0, 0, 164, 2, 0, 0, 228, 6, 0, 0];
+const CHAIN_REGISTRATION_ID: &str = "official.shader.metal-u32-chain";
+const CHAIN_METADATA_SELECTOR: &str = "official.shader:provider-sample=metal-u32-chain";
+const CHAIN_INPUT_FILE_NAME: &str = "nuis.shader.metal.chain.input.u32.bin";
+const CHAIN_ADD_EXPECTED_FILE_NAME: &str = "nuis.shader.metal.chain.add.expected.u32.bin";
+const CHAIN_EXPECTED_FILE_NAME: &str = "nuis.shader.metal.chain.expected.u32.bin";
 
 #[derive(Clone, Copy)]
 struct MetalSampleSpec {
@@ -92,6 +98,19 @@ pub(crate) fn mul_registration() -> DeviceSampleInputRegistration {
     registration_for(MUL_SAMPLE, selects_shader_metal_mul, metal_mul_u32_evidence)
 }
 
+pub(crate) fn chain_registration() -> DeviceSampleInputRegistration {
+    DeviceSampleInputRegistration {
+        package_id: PACKAGE_ID,
+        registration_id: CHAIN_REGISTRATION_ID,
+        provider_family: "metal:apple-silicon-gpu",
+        supports: supports_metal,
+        metadata_selector: Some(selects_shader_metal_chain),
+        enrich_evidence: metal_chain_u32_evidence,
+        resolve_evidence: Some(resolve_metal_code_asset_evidence),
+        persist_payloads: persist_metal_payloads,
+    }
+}
+
 fn registration_for(
     sample: MetalSampleSpec,
     metadata_selector: fn(&str) -> bool,
@@ -129,6 +148,10 @@ fn selects_shader_metal_mul(base: &str) -> bool {
     selects_metadata(base, MUL_SAMPLE.metadata_selector)
 }
 
+fn selects_shader_metal_chain(base: &str) -> bool {
+    selects_metadata(base, CHAIN_METADATA_SELECTOR)
+}
+
 fn selects_metadata(base: &str, selector: &str) -> bool {
     base.split(';')
         .filter_map(|field| field.split_once('='))
@@ -151,9 +174,56 @@ fn metal_mul_u32_evidence(_base: &str) -> String {
     metal_sample_evidence(MUL_SAMPLE)
 }
 
+fn metal_chain_u32_evidence(_base: &str) -> String {
+    let add = metal_asset(ADD_SAMPLE).expect("Shader Nustar Metal add asset must be registered");
+    let mul = metal_asset(MUL_SAMPLE).expect("Shader Nustar Metal mul asset must be registered");
+    let identity = metal_chain_code_asset_identity(&add, &mul)
+        .expect("Shader Nustar Metal chain identity must assemble");
+    format!(
+        "provider_request_collection_contract=nuis-provider-request-collection-v1;provider_request_count=2;{};{};{}",
+        render_chain_artifact_request(0, ADD_SAMPLE, &add, &add.bytes),
+        render_chain_dependency_request(1, MUL_SAMPLE, &mul, &mul.bytes),
+        identity.identity_evidence,
+    )
+}
+
 fn metal_sample_evidence(sample: MetalSampleSpec) -> String {
     let asset = metal_asset(sample).expect("Shader Nustar Metal MSL asset must be registered");
     render_request_evidence(sample, &asset, &asset.bytes)
+}
+
+fn metal_chain_code_asset_identity(
+    add: &nuisc::registry::NustarCodeAssetRegistration,
+    mul: &nuisc::registry::NustarCodeAssetRegistration,
+) -> Result<crate::artifact_code_asset_identity::AssembledCodeAssetIdentity, String> {
+    use crate::artifact_code_asset_identity::NustarCodeAssetContribution;
+    crate::artifact_code_asset_identity::assemble_nustar_code_asset_identity(
+        Path::new("nustar-packages"),
+        &[
+            NustarCodeAssetContribution {
+                request_index: 0,
+                owner_package_id: &add.package_id,
+                provider_family: "metal:apple-silicon-gpu",
+                asset_id: &add.asset_id,
+                format: &add.format,
+                target: &add.target,
+                entry: &add.entry,
+                path: &add.file_name,
+                bytes: &add.bytes,
+            },
+            NustarCodeAssetContribution {
+                request_index: 1,
+                owner_package_id: &mul.package_id,
+                provider_family: "metal:apple-silicon-gpu",
+                asset_id: &mul.asset_id,
+                format: &mul.format,
+                target: &mul.target,
+                entry: &mul.entry,
+                path: &mul.file_name,
+                bytes: &mul.bytes,
+            },
+        ],
+    )
 }
 
 fn render_request_evidence(
@@ -185,7 +255,125 @@ fn render_request_evidence(
     )
 }
 
+fn render_chain_artifact_request(
+    index: usize,
+    sample: MetalSampleSpec,
+    asset: &nuisc::registry::NustarCodeAssetRegistration,
+    bytes: &[u8],
+) -> String {
+    let prefix = format!("provider_request_{index}_");
+    render_prefixed_request_evidence(
+        &prefix,
+        sample,
+        asset,
+        bytes,
+        "shader.metal.chain.add-u32",
+        CHAIN_INPUT_FILE_NAME,
+        fnv1a64_hex(INPUT),
+        CHAIN_ADD_EXPECTED_FILE_NAME,
+        ADD_EXPECTED,
+        render_artifact_binding(&prefix, CHAIN_INPUT_FILE_NAME, &fnv1a64_hex(INPUT)),
+        render_dependency_count_zero(&prefix),
+    )
+}
+
+fn render_chain_dependency_request(
+    index: usize,
+    sample: MetalSampleSpec,
+    asset: &nuisc::registry::NustarCodeAssetRegistration,
+    bytes: &[u8],
+) -> String {
+    let prefix = format!("provider_request_{index}_");
+    render_prefixed_request_evidence(
+        &prefix,
+        sample,
+        asset,
+        bytes,
+        "shader.metal.chain.mul-u32",
+        "none",
+        fnv1a64_hex(ADD_EXPECTED),
+        CHAIN_EXPECTED_FILE_NAME,
+        CHAIN_EXPECTED,
+        render_dependency_binding(&prefix, &fnv1a64_hex(ADD_EXPECTED)),
+        render_chain_dependency(&prefix),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_prefixed_request_evidence(
+    prefix: &str,
+    sample: MetalSampleSpec,
+    asset: &nuisc::registry::NustarCodeAssetRegistration,
+    bytes: &[u8],
+    kernel_id: &str,
+    input_file_name: &str,
+    input_hash: String,
+    expected_file_name: &str,
+    expected: &[u8],
+    input_binding: String,
+    dependency: String,
+) -> String {
+    format!(
+        "{prefix}buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;{prefix}buffer_id=input.values;{prefix}buffer_element_type=u32;{prefix}buffer_layout=tensor-contiguous;{prefix}buffer_shape=4;{prefix}buffer_row_stride_bytes=16;{prefix}buffer_byte_length={};{prefix}buffer_payload_path={input_file_name};{prefix}buffer_content_hash={input_hash};{prefix}kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;{prefix}kernel_id={kernel_id};{prefix}kernel_operation={};{prefix}kernel_input_buffer=input.values;{prefix}kernel_input_buffers=input.values;{prefix}kernel_output_buffer=output.values;{prefix}kernel_dispatch=4x1x1;{prefix}kernel_scalar_bindings=element_count:u32:4;{prefix}code_asset_descriptor_contract=nuis-provider-code-asset-descriptor-v1;{prefix}code_asset_id={};{prefix}code_asset_format={};{prefix}code_asset_target={};{prefix}code_asset_entry={};{prefix}code_asset_path={};{prefix}code_asset_byte_length={};{prefix}code_asset_digest_contract={DIGEST_CONTRACT};{prefix}code_asset_content_hash={};{prefix}output_binding_contract=nuis-provider-output-binding-v1;{prefix}output_binding_count=1;{prefix}output_binding_0_role=output.result;{prefix}output_binding_0_buffer=output.values;{prefix}output_binding_0_element_type=u32;{prefix}output_binding_0_shape=4;{prefix}output_binding_0_byte_length={};{prefix}output_binding_0_comparison_id=comparison.output.values;{prefix}output_comparison_id=comparison.output.values;{prefix}output_comparison_descriptor_contract=nuis-provider-output-comparison-descriptor-v1;{prefix}output_comparison_output_buffer=output.values;{prefix}output_comparison_element_type=u32;{prefix}output_comparison_shape=4;{prefix}output_comparison_expected_path={expected_file_name};{prefix}output_comparison_expected_byte_length={};{prefix}output_comparison_expected_content_hash={};{prefix}output_comparison_absolute_tolerance=0;{prefix}output_comparison_relative_tolerance=0;{prefix}output_comparison_non_finite_policy=reject;{dependency};{input_binding};{prefix}adapter_binding_contract=nuis-provider-request-adapter-binding-v1;{prefix}adapter_binding_provider_family=metal:apple-silicon-gpu;{prefix}adapter_binding_execution_requirement=real-device",
+        INPUT.len(),
+        sample.operation,
+        asset.asset_id,
+        asset.format,
+        asset.target,
+        asset.entry,
+        asset.file_name,
+        bytes.len(),
+        fnv1a64_hex(bytes),
+        expected.len(),
+        expected.len(),
+        fnv1a64_hex(expected),
+    )
+}
+
+fn render_dependency_count_zero(prefix: &str) -> String {
+    format!(
+        "{prefix}dependency_contract=nuis-provider-request-dependency-v1;{prefix}dependency_count=0"
+    )
+}
+
+fn render_chain_dependency(prefix: &str) -> String {
+    format!(
+        "{prefix}dependency_contract=nuis-provider-request-dependency-v1;{prefix}dependency_count=1;{prefix}dependency_0_producer_request_id=shader.metal.chain.add-u32;{prefix}dependency_0_producer_output_buffer=output.values;{prefix}dependency_0_consumer_input_buffer=input.values;{prefix}dependency_0_transport_contract=nuis-provider-edge-transport-v1;{prefix}dependency_0_transport_ownership_token=glm:provider-edge:shader.metal.chain.add-u32:output.values->shader.metal.chain.mul-u32:input.values;{prefix}dependency_0_transport_staging_mode=auto;{prefix}dependency_0_transport_producer_clock_evidence=provider-clock:request-0:completed;{prefix}dependency_0_transport_consumer_clock_evidence=provider-clock:request-1:dispatch-ready"
+    )
+}
+
+fn render_artifact_binding(prefix: &str, input_file_name: &str, input_hash: &str) -> String {
+    format!(
+        "{prefix}input_binding_contract=nuis-provider-input-binding-v1;{prefix}input_binding_count=1;{prefix}input_binding_0_name=input.values;{prefix}input_binding_0_source=artifact;{prefix}input_binding_0_element_type=u32;{prefix}input_binding_0_shape=4;{prefix}input_binding_0_byte_length={};{prefix}input_binding_0_content_hash={input_hash};{prefix}input_binding_0_payload_path={input_file_name};{prefix}input_binding_0_producer_request_id=none;{prefix}input_binding_0_producer_output_buffer=none",
+        INPUT.len()
+    )
+}
+
+fn render_dependency_binding(prefix: &str, input_hash: &str) -> String {
+    format!(
+        "{prefix}input_binding_contract=nuis-provider-input-binding-v1;{prefix}input_binding_count=1;{prefix}input_binding_0_name=input.values;{prefix}input_binding_0_source=dependency;{prefix}input_binding_0_element_type=u32;{prefix}input_binding_0_shape=4;{prefix}input_binding_0_byte_length={};{prefix}input_binding_0_content_hash={input_hash};{prefix}input_binding_0_payload_path=none;{prefix}input_binding_0_producer_request_id=shader.metal.chain.add-u32;{prefix}input_binding_0_producer_output_buffer=output.values",
+        ADD_EXPECTED.len()
+    )
+}
+
 fn persist_metal_payloads(output_dir: &Path, evidence: &[&str]) -> Result<(), String> {
+    if evidence.iter().any(|item| evidence_is_chain(item)) {
+        for sample in [ADD_SAMPLE, MUL_SAMPLE] {
+            let asset = metal_asset(sample)?;
+            let actual = fs::read(output_dir.join(&asset.file_name))
+                .map_err(|error| format!("failed to read Nuis-emitted Metal MSL asset: {error}"))?;
+            validate_metal_code_asset(sample, &asset, &actual)?;
+        }
+        for (name, bytes) in [
+            (CHAIN_INPUT_FILE_NAME, INPUT),
+            (CHAIN_ADD_EXPECTED_FILE_NAME, ADD_EXPECTED),
+            (CHAIN_EXPECTED_FILE_NAME, CHAIN_EXPECTED),
+        ] {
+            fs::write(output_dir.join(name), bytes)
+                .map_err(|error| format!("failed to persist Metal u32 graph payload: {error}"))?;
+        }
+        return Ok(());
+    }
     let Some(sample) = sample_from_evidence_items(evidence) else {
         return Ok(());
     };
@@ -204,13 +392,16 @@ fn persist_metal_payloads(output_dir: &Path, evidence: &[&str]) -> Result<(), St
 }
 
 fn resolve_metal_code_asset_evidence(output_dir: &Path, evidence: &str) -> Result<String, String> {
+    if evidence_is_chain(evidence) {
+        return resolve_metal_chain_code_asset_evidence(output_dir, evidence);
+    }
     let sample = sample_from_evidence(evidence)
         .ok_or_else(|| "Metal provider sample evidence is missing registration ID".to_owned())?;
     let asset = metal_asset(sample)?;
     let actual = fs::read(output_dir.join(&asset.file_name))
         .map_err(|error| format!("failed to read Nuis-emitted Metal MSL asset: {error}"))?;
     validate_metal_code_asset(sample, &asset, &actual)?;
-    validate_metal_request_asset_evidence(&asset, &actual, evidence)?;
+    validate_metal_request_asset_evidence(&asset, &actual, evidence, "provider_")?;
     let selection =
         crate::artifact_code_asset_contribution_table::select_compiled_code_asset_contribution(
             output_dir,
@@ -224,30 +415,16 @@ fn resolve_metal_code_asset_evidence(output_dir: &Path, evidence: &str) -> Resul
     let selection_evidence = selection
         .as_ref()
         .map(|selection| -> Result<String, String> {
-            validate_metal_contribution_selection(selection, evidence)?;
+            validate_metal_contribution_selection(selection, evidence, "provider_")?;
             crate::artifact_code_asset_contribution_table::render_selected_contribution_set_evidence(
                 std::slice::from_ref(selection),
             )
         })
         .transpose()?;
-    let byte_length = actual.len().to_string();
-    let content_hash = fnv1a64_hex(&actual);
-    let mut resolved = evidence
-        .split(';')
-        .map(|field| {
-            let Some((key, value)) = field.split_once('=') else {
-                return field.to_owned();
-            };
-            if key.ends_with("_code_asset_byte_length") {
-                format!("{key}={byte_length}")
-            } else if key.ends_with("_code_asset_content_hash") {
-                format!("{key}={content_hash}")
-            } else {
-                format!("{key}={value}")
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(";");
+    let mut resolved = replace_code_asset_identity_fields(
+        evidence,
+        &[("provider_".to_owned(), actual.len(), fnv1a64_hex(&actual))],
+    );
     if let Some(selection_evidence) = selection_evidence {
         resolved.push(';');
         resolved.push_str(&selection_evidence);
@@ -255,28 +432,96 @@ fn resolve_metal_code_asset_evidence(output_dir: &Path, evidence: &str) -> Resul
     Ok(resolved)
 }
 
+fn resolve_metal_chain_code_asset_evidence(
+    output_dir: &Path,
+    evidence: &str,
+) -> Result<String, String> {
+    let mut selections = Vec::new();
+    let mut replacements = Vec::new();
+    for (index, sample) in [(0usize, ADD_SAMPLE), (1, MUL_SAMPLE)] {
+        let prefix = format!("provider_request_{index}_");
+        let asset = metal_asset(sample)?;
+        let actual = fs::read(output_dir.join(&asset.file_name))
+            .map_err(|error| format!("failed to read Nuis-emitted Metal MSL asset: {error}"))?;
+        validate_metal_code_asset(sample, &asset, &actual)?;
+        validate_metal_request_asset_evidence(&asset, &actual, evidence, &prefix)?;
+        let selection =
+            crate::artifact_code_asset_contribution_table::select_compiled_code_asset_contribution(
+                output_dir,
+                PACKAGE_ID,
+                "shader",
+                LOWERING_TARGET,
+                &asset.format,
+                &asset.target,
+                std::slice::from_ref(&asset.entry),
+            )?
+            .ok_or_else(|| {
+                format!(
+                    "compiled Metal contribution for `{}` is unavailable",
+                    asset.asset_id
+                )
+            })?;
+        validate_metal_contribution_selection(&selection, evidence, &prefix)?;
+        selections.push(selection);
+        replacements.push((prefix, actual.len(), fnv1a64_hex(&actual)));
+    }
+    let mut resolved = replace_code_asset_identity_fields(evidence, &replacements);
+    resolved.push(';');
+    resolved.push_str(
+        &crate::artifact_code_asset_contribution_table::render_selected_contribution_set_evidence(
+            &selections,
+        )?,
+    );
+    Ok(resolved)
+}
+
+fn replace_code_asset_identity_fields(
+    evidence: &str,
+    replacements: &[(String, usize, String)],
+) -> String {
+    evidence
+        .split(';')
+        .map(|field| {
+            let Some((key, value)) = field.split_once('=') else {
+                return field.to_owned();
+            };
+            for (prefix, byte_length, content_hash) in replacements {
+                if key == format!("{prefix}code_asset_byte_length") {
+                    return format!("{key}={byte_length}");
+                }
+                if key == format!("{prefix}code_asset_content_hash") {
+                    return format!("{key}={content_hash}");
+                }
+            }
+            format!("{key}={value}")
+        })
+        .collect::<Vec<_>>()
+        .join(";")
+}
+
 fn validate_metal_request_asset_evidence(
     asset: &nuisc::registry::NustarCodeAssetRegistration,
     bytes: &[u8],
     evidence: &str,
+    prefix: &str,
 ) -> Result<(), String> {
     for (field, expected) in [
-        ("provider_code_asset_id", asset.asset_id.as_str()),
-        ("provider_code_asset_format", asset.format.as_str()),
-        ("provider_code_asset_target", asset.target.as_str()),
-        ("provider_code_asset_entry", asset.entry.as_str()),
-        ("provider_code_asset_path", asset.file_name.as_str()),
-        ("provider_code_asset_digest_contract", DIGEST_CONTRACT),
+        ("code_asset_id", asset.asset_id.as_str()),
+        ("code_asset_format", asset.format.as_str()),
+        ("code_asset_target", asset.target.as_str()),
+        ("code_asset_entry", asset.entry.as_str()),
+        ("code_asset_path", asset.file_name.as_str()),
+        ("code_asset_digest_contract", DIGEST_CONTRACT),
     ] {
-        let needle = format!("{field}={expected}");
+        let needle = format!("{prefix}{field}={expected}");
         if !evidence.split(';').any(|item| item == needle) {
             return Err(format!(
                 "Metal provider request code asset field `{field}` does not match `{expected}`"
             ));
         }
     }
-    let expected_length = format!("provider_code_asset_byte_length={}", bytes.len());
-    let expected_hash = format!("provider_code_asset_content_hash={}", fnv1a64_hex(bytes));
+    let expected_length = format!("{prefix}code_asset_byte_length={}", bytes.len());
+    let expected_hash = format!("{prefix}code_asset_content_hash={}", fnv1a64_hex(bytes));
     if !evidence.split(';').any(|item| item == expected_length)
         || !evidence.split(';').any(|item| item == expected_hash)
     {
@@ -288,18 +533,16 @@ fn validate_metal_request_asset_evidence(
 fn validate_metal_contribution_selection(
     selection: &crate::artifact_code_asset_contribution_table::SelectedCodeAssetContribution,
     evidence: &str,
+    prefix: &str,
 ) -> Result<(), String> {
     for (field, expected) in [
-        ("provider_code_asset_id", selection.asset_id.as_str()),
-        ("provider_code_asset_format", selection.format.as_str()),
-        ("provider_code_asset_target", selection.target.as_str()),
-        ("provider_code_asset_path", selection.path.as_str()),
-        (
-            "provider_code_asset_content_hash",
-            selection.content_hash.as_str(),
-        ),
+        ("code_asset_id", selection.asset_id.as_str()),
+        ("code_asset_format", selection.format.as_str()),
+        ("code_asset_target", selection.target.as_str()),
+        ("code_asset_path", selection.path.as_str()),
+        ("code_asset_content_hash", selection.content_hash.as_str()),
     ] {
-        let needle = format!("{field}={expected}");
+        let needle = format!("{prefix}{field}={expected}");
         if !evidence.split(';').any(|item| item == needle) {
             return Err(format!(
                 "Metal provider request does not match compiled contribution field `{field}`"
@@ -351,6 +594,12 @@ fn metal_asset(
 
 fn sample_from_evidence_items(evidence: &[&str]) -> Option<MetalSampleSpec> {
     evidence.iter().find_map(|item| sample_from_evidence(item))
+}
+
+fn evidence_is_chain(evidence: &str) -> bool {
+    evidence
+        .split(';')
+        .any(|field| field == format!("provider_sample_registration_id={CHAIN_REGISTRATION_ID}"))
 }
 
 fn sample_from_evidence(evidence: &str) -> Option<MetalSampleSpec> {
@@ -412,6 +661,28 @@ mod tests {
                 .contains("provider_adapter_binding_provider_family=metal:apple-silicon-gpu"));
             assert!(nsdb::validate_provider_request_evidence(&evidence));
         }
+
+        let chain = chain_registration();
+        let evidence = (chain.enrich_evidence)("ignored");
+        assert_eq!(chain.package_id, PACKAGE_ID);
+        assert_eq!(chain.registration_id, CHAIN_REGISTRATION_ID);
+        assert!((chain.supports)("metal", "apple-silicon-gpu"));
+        assert!((chain.metadata_selector.unwrap())(&format!(
+            "artifact_provider_metadata_0={CHAIN_METADATA_SELECTOR}"
+        )));
+        assert!(evidence.contains("provider_request_collection_contract="));
+        assert!(evidence.contains("provider_request_count=2"));
+        assert!(evidence.contains("provider_request_0_kernel_operation=add-u32"));
+        assert!(evidence.contains("provider_request_1_kernel_operation=mul-u32"));
+        assert!(evidence.contains(
+            "provider_request_1_dependency_0_producer_request_id=shader.metal.chain.add-u32"
+        ));
+        assert!(evidence.contains(
+            "provider_request_1_dependency_0_transport_contract=nuis-provider-edge-transport-v1"
+        ));
+        assert!(evidence.contains("provider_request_1_input_binding_0_source=dependency"));
+        assert!(evidence.contains("provider_code_asset_identity_set_count=2"));
+        assert!(nsdb::validate_provider_request_evidence(&evidence));
     }
 
     #[test]
@@ -444,6 +715,49 @@ mod tests {
         assert!(persist_metal_payloads(
             &output_dir,
             &["provider_sample_registration_id=official.shader.metal-add-u32"]
+        )
+        .unwrap_err()
+        .contains("registry ownership"));
+        fs::remove_dir_all(output_dir).unwrap();
+    }
+
+    #[test]
+    fn graph_registration_persists_chained_payloads_and_rejects_msl_drift() {
+        let output_dir = env::temp_dir().join(format!(
+            "nuis-shader-metal-provider-chain-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&output_dir);
+        fs::create_dir_all(&output_dir).unwrap();
+        for sample in [ADD_SAMPLE, MUL_SAMPLE] {
+            let asset = metal_asset(sample).unwrap();
+            fs::write(output_dir.join(&asset.file_name), &asset.bytes).unwrap();
+        }
+        persist_metal_payloads(
+            &output_dir,
+            &["provider_sample_registration_id=official.shader.metal-u32-chain"],
+        )
+        .unwrap();
+        assert_eq!(
+            fs::read(output_dir.join(CHAIN_INPUT_FILE_NAME)).unwrap(),
+            INPUT
+        );
+        assert_eq!(
+            fs::read(output_dir.join(CHAIN_ADD_EXPECTED_FILE_NAME)).unwrap(),
+            ADD_EXPECTED
+        );
+        assert_eq!(
+            fs::read(output_dir.join(CHAIN_EXPECTED_FILE_NAME)).unwrap(),
+            CHAIN_EXPECTED
+        );
+        let asset = metal_asset(ADD_SAMPLE).unwrap();
+        let tampered = String::from_utf8(asset.bytes.clone())
+            .unwrap()
+            .replace("nuis-module-lowering-plan", "nuis-module-lowering-drift");
+        fs::write(output_dir.join(&asset.file_name), tampered).unwrap();
+        assert!(persist_metal_payloads(
+            &output_dir,
+            &["provider_sample_registration_id=official.shader.metal-u32-chain"]
         )
         .unwrap_err()
         .contains("registry ownership"));

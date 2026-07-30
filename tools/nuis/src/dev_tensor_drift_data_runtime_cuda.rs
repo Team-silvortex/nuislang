@@ -198,6 +198,8 @@ pub(crate) const DEV_TENSOR_RUNTIME_CUDA_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
             "source_path",
             "file_name",
             "shader_code_assets_are_manifest_owned_and_loadable",
+            "extract_single_inline_wgsl_source",
+            "extracts_single_inline_wgsl_from_ns_code_asset_source",
         ],
     },
     DevTensorDriftCheckSpec {

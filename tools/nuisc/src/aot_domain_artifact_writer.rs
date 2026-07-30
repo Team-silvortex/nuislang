@@ -414,6 +414,7 @@ mod tests {
             ("nuis.shader.vulkan.add-u32.spv", "nuis_vulkan_add_u32"),
             ("nuis.shader.vulkan.sub-u32.spv", "nuis_vulkan_sub_u32"),
             ("nuis.shader.vulkan.mul-u32.spv", "nuis_vulkan_mul_u32"),
+            ("nuis.shader.vulkan.xor-u32.spv", "nuis_vulkan_xor_u32"),
         ] {
             let path = output_dir.join(file_name);
             assert!(artifacts
@@ -432,12 +433,13 @@ mod tests {
         let table =
             fs::read_to_string(output_dir.join("nuis.domain.code-asset-contributions.toml"))
                 .unwrap();
-        assert!(table.contains("contribution_count = 5"));
+        assert!(table.contains("contribution_count = 6"));
         assert!(table.contains("owner_package_id = \"official.shader\""));
         assert!(table.contains("asset_id = \"shader.vulkan.copy-u32.spirv\""));
         assert!(table.contains("asset_id = \"shader.vulkan.add-u32.spirv\""));
         assert!(table.contains("asset_id = \"shader.vulkan.sub-u32.spirv\""));
         assert!(table.contains("asset_id = \"shader.vulkan.mul-u32.spirv\""));
+        assert!(table.contains("asset_id = \"shader.vulkan.xor-u32.spirv\""));
         assert!(table.contains("format = \"spirv-binary\""));
         assert!(table.contains("lowering_target = \"vulkan.discrete-or-integrated-gpu\""));
         assert!(table.contains("target = \"vulkan1.3-spirv1.6\""));
@@ -445,10 +447,12 @@ mod tests {
         assert!(table.contains("entries = [\"nuis_vulkan_add_u32\"]"));
         assert!(table.contains("entries = [\"nuis_vulkan_sub_u32\"]"));
         assert!(table.contains("entries = [\"nuis_vulkan_mul_u32\"]"));
+        assert!(table.contains("entries = [\"nuis_vulkan_xor_u32\"]"));
         assert!(table.contains("path = \"nuis.shader.vulkan.copy-u32.spv\""));
         assert!(table.contains("path = \"nuis.shader.vulkan.add-u32.spv\""));
         assert!(table.contains("path = \"nuis.shader.vulkan.sub-u32.spv\""));
         assert!(table.contains("path = \"nuis.shader.vulkan.mul-u32.spv\""));
+        assert!(table.contains("path = \"nuis.shader.vulkan.xor-u32.spv\""));
         fs::remove_dir_all(output_dir).unwrap();
     }
 
@@ -503,6 +507,13 @@ mod tests {
         let mul_msl = fs::read_to_string(&mul_msl_path).unwrap();
         assert!(mul_msl.contains("kernel void nuis_metal_mul_u32("));
         assert!(mul_msl.contains("output_values[gid] = value * value;"));
+        let xor_msl_path = output_dir.join("nuis.shader.metal.xor-u32.metal");
+        assert!(artifacts
+            .iter()
+            .any(|(kind, path)| kind == "domain_code_asset_shader" && path == &xor_msl_path));
+        let xor_msl = fs::read_to_string(&xor_msl_path).unwrap();
+        assert!(xor_msl.contains("kernel void nuis_metal_xor_u32("));
+        assert!(xor_msl.contains("output_values[gid] = value ^ value;"));
         let table =
             fs::read_to_string(output_dir.join("nuis.domain.code-asset-contributions.toml"))
                 .unwrap();
@@ -510,12 +521,14 @@ mod tests {
         assert!(table.contains("asset_id = \"shader.metal.add-u32.msl\""));
         assert!(table.contains("asset_id = \"shader.metal.sub-u32.msl\""));
         assert!(table.contains("asset_id = \"shader.metal.mul-u32.msl\""));
+        assert!(table.contains("asset_id = \"shader.metal.xor-u32.msl\""));
         assert!(table.contains("format = \"metal-source\""));
         assert!(table.contains("target = \"msl2.4\""));
         assert!(table.contains("entries = [\"nuis_metal_copy_u32\"]"));
         assert!(table.contains("entries = [\"nuis_metal_add_u32\"]"));
         assert!(table.contains("entries = [\"nuis_metal_sub_u32\"]"));
         assert!(table.contains("entries = [\"nuis_metal_mul_u32\"]"));
+        assert!(table.contains("entries = [\"nuis_metal_xor_u32\"]"));
         fs::remove_dir_all(output_dir).unwrap();
     }
 

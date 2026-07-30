@@ -351,7 +351,7 @@ fn is_u32_compute(request: &ProviderRequest) -> bool {
         && request.buffer.layout == "tensor-contiguous"
         && matches!(
             request.kernel.operation.as_str(),
-            "copy-u32" | "add-u32" | "sub-u32" | "mul-u32"
+            "copy-u32" | "add-u32" | "sub-u32" | "mul-u32" | "xor-u32"
         )
         && request.output_bindings.len() == 1
         && request.output_bindings[0].element_type == "u32"

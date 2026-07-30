@@ -168,6 +168,17 @@ fn executes_generated_u32_mul_msl_from_opaque_carrier_bytes() {
 }
 
 #[cfg(target_os = "macos")]
+#[test]
+fn executes_generated_u32_xor_msl_from_opaque_carrier_bytes() {
+    let execution = execute_registered_u32_msl("shader.metal.xor-u32.msl", "xor-u32");
+    assert_eq!(
+        execution.contract,
+        "nuis-metal-u32-canonical-provider-runner-v1"
+    );
+    assert_eq!(u32_values(&execution.output_payload), [0, 0, 0, 0]);
+}
+
+#[cfg(target_os = "macos")]
 fn execute_registered_u32_msl(asset_id: &str, operation: &str) -> super::MetalProviderExecution {
     let (metal_source, entry) = registered_shader_asset(asset_id);
     let source_path = std::env::temp_dir().join(format!(

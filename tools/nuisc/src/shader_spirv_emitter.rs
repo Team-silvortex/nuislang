@@ -333,6 +333,7 @@ fn spirv_u32_binary_opcode(operation: CanonicalU32Operation) -> Option<u16> {
         CanonicalU32Operation::AddU32 => Some(128),
         CanonicalU32Operation::SubU32 => Some(130),
         CanonicalU32Operation::MulU32 => Some(132),
+        CanonicalU32Operation::XorU32 => Some(198),
     }
 }
 

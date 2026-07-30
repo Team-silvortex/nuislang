@@ -146,6 +146,7 @@ fn msl_u32_expression(operation: CanonicalU32Operation) -> &'static str {
         CanonicalU32Operation::AddU32 => "value + value",
         CanonicalU32Operation::SubU32 => "value - value",
         CanonicalU32Operation::MulU32 => "value * value",
+        CanonicalU32Operation::XorU32 => "value ^ value",
     }
 }
 

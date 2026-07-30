@@ -2,13 +2,24 @@ use super::*;
 
 struct MetalSampleSmoke<'a> {
     project_name: &'a str,
-    asset_id: &'a str,
-    generated_file: &'a str,
+    assets: &'a [MetalGeneratedAsset<'a>],
     registration_id: &'a str,
-    operation: &'a str,
-    entry: &'a str,
     execution_contract: &'a str,
     expected_hash: &'a str,
+    graph: Option<MetalGraphSmoke<'a>>,
+}
+
+struct MetalGeneratedAsset<'a> {
+    asset_id: &'a str,
+    generated_file: &'a str,
+    operation: &'a str,
+    entry: &'a str,
+}
+
+struct MetalGraphSmoke<'a> {
+    final_request_id: &'a str,
+    final_expected_hash: &'a str,
+    transport_token: &'a str,
 }
 
 fn output_text(output: &std::process::Output) -> String {
@@ -19,13 +30,16 @@ fn output_text(output: &std::process::Output) -> String {
 fn shader_metal_generated_msl_sample_executes_provider_output() {
     run_metal_sample_smoke(MetalSampleSmoke {
         project_name: "shader_metal_provider_demo",
-        asset_id: "shader.metal.copy-u32.msl",
-        generated_file: "nuis.shader.metal.copy-u32.metal",
+        assets: &[MetalGeneratedAsset {
+            asset_id: "shader.metal.copy-u32.msl",
+            generated_file: "nuis.shader.metal.copy-u32.metal",
+            operation: "copy-u32",
+            entry: "nuis_metal_copy_u32",
+        }],
         registration_id: "official.shader.metal-copy-u32",
-        operation: "copy-u32",
-        entry: "nuis_metal_copy_u32",
         execution_contract: "nuis-metal-u32-copy-provider-runner-v1",
         expected_hash: "0x6ebcdd244b594ee4",
+        graph: None,
     });
 }
 
@@ -33,13 +47,16 @@ fn shader_metal_generated_msl_sample_executes_provider_output() {
 fn shader_metal_generated_add_msl_sample_executes_provider_output() {
     run_metal_sample_smoke(MetalSampleSmoke {
         project_name: "shader_metal_add_provider_demo",
-        asset_id: "shader.metal.add-u32.msl",
-        generated_file: "nuis.shader.metal.add-u32.metal",
+        assets: &[MetalGeneratedAsset {
+            asset_id: "shader.metal.add-u32.msl",
+            generated_file: "nuis.shader.metal.add-u32.metal",
+            operation: "add-u32",
+            entry: "nuis_metal_add_u32",
+        }],
         registration_id: "official.shader.metal-add-u32",
-        operation: "add-u32",
-        entry: "nuis_metal_add_u32",
         execution_contract: "nuis-metal-u32-canonical-provider-runner-v1",
         expected_hash: "0xdce2c1aca0f32707",
+        graph: None,
     });
 }
 
@@ -47,13 +64,16 @@ fn shader_metal_generated_add_msl_sample_executes_provider_output() {
 fn shader_metal_generated_sub_msl_sample_executes_provider_output() {
     run_metal_sample_smoke(MetalSampleSmoke {
         project_name: "shader_metal_sub_provider_demo",
-        asset_id: "shader.metal.sub-u32.msl",
-        generated_file: "nuis.shader.metal.sub-u32.metal",
+        assets: &[MetalGeneratedAsset {
+            asset_id: "shader.metal.sub-u32.msl",
+            generated_file: "nuis.shader.metal.sub-u32.metal",
+            operation: "sub-u32",
+            entry: "nuis_metal_sub_u32",
+        }],
         registration_id: "official.shader.metal-sub-u32",
-        operation: "sub-u32",
-        entry: "nuis_metal_sub_u32",
         execution_contract: "nuis-metal-u32-canonical-provider-runner-v1",
         expected_hash: "0x88201fb960ff6465",
+        graph: None,
     });
 }
 
@@ -61,13 +81,46 @@ fn shader_metal_generated_sub_msl_sample_executes_provider_output() {
 fn shader_metal_generated_mul_msl_sample_executes_provider_output() {
     run_metal_sample_smoke(MetalSampleSmoke {
         project_name: "shader_metal_mul_provider_demo",
-        asset_id: "shader.metal.mul-u32.msl",
-        generated_file: "nuis.shader.metal.mul-u32.metal",
+        assets: &[MetalGeneratedAsset {
+            asset_id: "shader.metal.mul-u32.msl",
+            generated_file: "nuis.shader.metal.mul-u32.metal",
+            operation: "mul-u32",
+            entry: "nuis_metal_mul_u32",
+        }],
         registration_id: "official.shader.metal-mul-u32",
-        operation: "mul-u32",
-        entry: "nuis_metal_mul_u32",
         execution_contract: "nuis-metal-u32-canonical-provider-runner-v1",
         expected_hash: "0x02f6f7f591bff68f",
+        graph: None,
+    });
+}
+
+#[test]
+fn shader_metal_generated_chain_msl_sample_executes_provider_graph() {
+    run_metal_sample_smoke(MetalSampleSmoke {
+        project_name: "shader_metal_chain_provider_demo",
+        assets: &[
+            MetalGeneratedAsset {
+                asset_id: "shader.metal.add-u32.msl",
+                generated_file: "nuis.shader.metal.add-u32.metal",
+                operation: "add-u32",
+                entry: "nuis_metal_add_u32",
+            },
+            MetalGeneratedAsset {
+                asset_id: "shader.metal.mul-u32.msl",
+                generated_file: "nuis.shader.metal.mul-u32.metal",
+                operation: "mul-u32",
+                entry: "nuis_metal_mul_u32",
+            },
+        ],
+        registration_id: "official.shader.metal-u32-chain",
+        execution_contract: "nuis-metal-u32-canonical-provider-runner-v1",
+        expected_hash: "0xdce2c1aca0f32707",
+        graph: Some(MetalGraphSmoke {
+            final_request_id: "shader.metal.chain.mul-u32",
+            final_expected_hash: "0x2f8b5a975ff42d9a",
+            transport_token:
+                "glm:provider-edge:shader.metal.chain.add-u32:output.values->shader.metal.chain.mul-u32:input.values",
+        }),
     });
 }
 
@@ -82,21 +135,25 @@ fn run_metal_sample_smoke(sample: MetalSampleSmoke<'_>) {
     let build = run_nuis(&["build", &project_text, &output_dir_text]);
     assert_success(&build, "build generated Metal shader provider project");
     let contribution_table = output_dir.join("nuis.domain.code-asset-contributions.toml");
-    assert_file_contains(
-        &contribution_table,
-        sample.asset_id,
-        "Metal code asset contribution table",
-    );
+    for asset in sample.assets {
+        assert_file_contains(
+            &contribution_table,
+            asset.asset_id,
+            "Metal code asset contribution table",
+        );
+    }
     assert_file_contains(
         &contribution_table,
         "target = \"msl2.4\"",
         "Metal native IR contribution target",
     );
-    let msl = fs::read_to_string(output_dir.join(sample.generated_file))
-        .expect("generated Metal MSL code asset");
-    assert!(msl.contains("nuis-module-lowering-plan"));
-    assert!(msl.contains("msl:metal-gpu"));
-    assert!(msl.contains(&format!("kernel void {}(", sample.entry)));
+    for asset in sample.assets {
+        let msl = fs::read_to_string(output_dir.join(asset.generated_file))
+            .expect("generated Metal MSL code asset");
+        assert!(msl.contains("nuis-module-lowering-plan"));
+        assert!(msl.contains("msl:metal-gpu"));
+        assert!(msl.contains(&format!("kernel void {}(", asset.entry)));
+    }
 
     let run = run_nuis(&["run-artifact", &output_dir_text, "--json"]);
     assert_success(&run, "materialize generated Metal provider request");
@@ -109,11 +166,12 @@ fn run_metal_sample_smoke(sample: MetalSampleSmoke<'_>) {
         "provider_sample_registration_id={}",
         sample.registration_id
     )));
-    assert!(provider_samples.contains(&format!("provider_kernel_operation={}", sample.operation)));
-    assert!(provider_samples.contains(&format!("provider_code_asset_id={}", sample.asset_id)));
-    assert!(provider_samples.contains("provider_code_asset_target=msl2.4"));
-    assert!(provider_samples
-        .contains("provider_adapter_binding_provider_family=metal:apple-silicon-gpu"));
+    for asset in sample.assets {
+        assert!(provider_samples.contains(&format!("kernel_operation={}", asset.operation)));
+        assert!(provider_samples.contains(&format!("code_asset_id={}", asset.asset_id)));
+    }
+    assert!(provider_samples.contains("code_asset_target=msl2.4"));
+    assert!(provider_samples.contains("adapter_binding_provider_family=metal:apple-silicon-gpu"));
     assert!(provider_samples.contains(
         "provider_code_asset_contribution_selection_set_contract=nuis-provider-code-asset-contribution-selection-set-v1"
     ));
@@ -161,11 +219,51 @@ fn run_metal_sample_smoke(sample: MetalSampleSmoke<'_>) {
         "compiled_code_asset_selection_status = \"verified\"",
         "generated Metal compiled code asset selection",
     );
-    assert_file_contains(
-        &provider_output,
-        &format!("compiled_code_asset_asset_id = \"{}\"", sample.asset_id),
-        "generated Metal compiled code asset identity",
-    );
+    if let Some(first_asset) = sample.assets.first() {
+        assert_file_contains(
+            &provider_output,
+            &format!(
+                "compiled_code_asset_asset_id = \"{}\"",
+                first_asset.asset_id
+            ),
+            "generated Metal compiled code asset identity",
+        );
+    }
+    if let Some(graph) = &sample.graph {
+        assert_file_contains(
+            &provider_output,
+            "native_output_count = \"2\"",
+            "Metal graph native output count",
+        );
+        assert_file_contains(
+            &provider_output,
+            &format!(
+                "native_output_1_request_id = \"{}\"",
+                graph.final_request_id
+            ),
+            "Metal graph final request",
+        );
+        assert_file_contains(
+            &provider_output,
+            &format!("native_output_1_hash = \"{}\"", graph.final_expected_hash),
+            "Metal graph final output hash",
+        );
+        assert_file_contains(
+            &provider_output,
+            "provider_edge_transport_receipt_count = \"1\"",
+            "Metal graph transport receipt",
+        );
+        assert_file_contains(
+            &provider_output,
+            graph.transport_token,
+            "Metal graph GLM transport token",
+        );
+        assert_file_contains(
+            &provider_output,
+            "compiled_code_asset_selection_count = \"2\"",
+            "Metal graph code asset selection set",
+        );
+    }
 
     let materialized = run_nsdb(&[
         "materialize-provider-samples",

@@ -177,7 +177,7 @@ fn validate_vulkan_execution_session_plan(
         || dispatch != [usize::try_from(element_count).unwrap_or(0), 1, 1]
         || input_count != 1
         || request.input_bindings.len() != 1
-        || request.input_bindings[0].source != "artifact"
+        || !vulkan_input_source_is_supported(&request.input_bindings[0].source)
         || request.input_bindings[0].element_type != "u32"
         || request.input_bindings[0].byte_length != expected_bytes
         || request.output_bindings.len() != 1
@@ -230,8 +230,13 @@ fn vulkan_u32_entry_for_operation(operation: &str) -> Option<&'static str> {
         "add-u32" => Some("nuis_vulkan_add_u32"),
         "sub-u32" => Some("nuis_vulkan_sub_u32"),
         "mul-u32" => Some("nuis_vulkan_mul_u32"),
+        "xor-u32" => Some("nuis_vulkan_xor_u32"),
         _ => None,
     }
+}
+
+fn vulkan_input_source_is_supported(source: &str) -> bool {
+    matches!(source, "artifact" | "dependency")
 }
 
 fn u32_scalar(request: &ProviderRequest, name: &str) -> Option<u32> {
@@ -384,6 +389,12 @@ mod tests {
                 "shader.vulkan.mul-u32.spirv",
                 "nuis.shader.vulkan.mul-u32.spv",
             ),
+            (
+                "xor-u32",
+                "nuis_vulkan_xor_u32",
+                "shader.vulkan.xor-u32.spirv",
+                "nuis.shader.vulkan.xor-u32.spv",
+            ),
         ] {
             let spirv = spirv_fixture(entry);
             fs::write(output_dir.join(path), &spirv).unwrap();
@@ -444,6 +455,48 @@ mod tests {
             .as_mut()
             .expect("adapter binding")
             .provider_family = "cuda:nvidia-gpu".to_owned();
+        assert!(validate_vulkan_execution_session_plan(
+            &output_dir,
+            VULKAN_PROVIDER_FAMILY,
+            &request,
+            1,
+        )
+        .unwrap_err()
+        .contains("registered SPIR-V ABI"));
+        fs::remove_dir_all(output_dir).unwrap();
+    }
+
+    #[test]
+    fn vulkan_session_plan_accepts_verified_dependency_input() {
+        let output_dir = env::temp_dir().join(format!(
+            "nsdb-vulkan-session-dependency-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&output_dir);
+        fs::create_dir_all(&output_dir).unwrap();
+        let spirv = spirv_fixture("nuis_vulkan_mul_u32");
+        fs::write(output_dir.join("nuis.shader.vulkan.mul-u32.spv"), &spirv).unwrap();
+        let mut request = u32_request(
+            "mul-u32",
+            "nuis_vulkan_mul_u32",
+            "shader.vulkan.mul-u32.spirv",
+            "nuis.shader.vulkan.mul-u32.spv",
+            &spirv,
+        );
+        request.input_bindings[0].source = "dependency".to_owned();
+        request.input_bindings[0].payload_path = "none".to_owned();
+        request.input_bindings[0].producer_request_id = "shader.vulkan.chain.add-u32".to_owned();
+        request.input_bindings[0].producer_output_buffer = "output.values".to_owned();
+        let plan = validate_vulkan_execution_session_plan(
+            &output_dir,
+            VULKAN_PROVIDER_FAMILY,
+            &request,
+            1,
+        )
+        .expect("dependency-backed Vulkan plan");
+        assert_eq!(plan.asset_id, "shader.vulkan.mul-u32.spirv");
+
+        request.input_bindings[0].source = "ambient".to_owned();
         assert!(validate_vulkan_execution_session_plan(
             &output_dir,
             VULKAN_PROVIDER_FAMILY,

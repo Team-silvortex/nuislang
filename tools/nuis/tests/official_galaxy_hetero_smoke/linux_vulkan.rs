@@ -13,24 +13,36 @@ fn output_text(output: &std::process::Output) -> String {
 
 struct VulkanSampleSmoke<'a> {
     project_name: &'a str,
+    assets: &'a [VulkanGeneratedAsset<'a>],
+    registration_id: &'a str,
+    expected_hash: &'a str,
+    graph: Option<VulkanGraphSmoke<'a>>,
+}
+
+struct VulkanGeneratedAsset<'a> {
     asset_id: &'a str,
     generated_file: &'a str,
-    registration_id: &'a str,
-    operation: &'a str,
     entry: &'a str,
-    expected_hash: &'a str,
+}
+
+struct VulkanGraphSmoke<'a> {
+    final_request_id: &'a str,
+    final_expected_hash: &'a str,
+    transport_token: &'a str,
 }
 
 #[test]
 fn linux_vulkan_shader_sample_executes_provider_output() {
     run_vulkan_sample_smoke(VulkanSampleSmoke {
         project_name: "shader_vulkan_provider_demo",
-        asset_id: "shader.vulkan.copy-u32.spirv",
-        generated_file: "nuis.shader.vulkan.copy-u32.spv",
+        assets: &[VulkanGeneratedAsset {
+            asset_id: "shader.vulkan.copy-u32.spirv",
+            generated_file: "nuis.shader.vulkan.copy-u32.spv",
+            entry: "nuis_vulkan_copy_u32",
+        }],
         registration_id: "official.shader.vulkan-copy-u32",
-        operation: "copy-u32",
-        entry: "nuis_vulkan_copy_u32",
         expected_hash: "0x6ebcdd244b594ee4",
+        graph: None,
     });
 }
 
@@ -38,12 +50,14 @@ fn linux_vulkan_shader_sample_executes_provider_output() {
 fn linux_vulkan_add_shader_sample_executes_provider_output() {
     run_vulkan_sample_smoke(VulkanSampleSmoke {
         project_name: "shader_vulkan_add_provider_demo",
-        asset_id: "shader.vulkan.add-u32.spirv",
-        generated_file: "nuis.shader.vulkan.add-u32.spv",
+        assets: &[VulkanGeneratedAsset {
+            asset_id: "shader.vulkan.add-u32.spirv",
+            generated_file: "nuis.shader.vulkan.add-u32.spv",
+            entry: "nuis_vulkan_add_u32",
+        }],
         registration_id: "official.shader.vulkan-add-u32",
-        operation: "add-u32",
-        entry: "nuis_vulkan_add_u32",
         expected_hash: "0xdce2c1aca0f32707",
+        graph: None,
     });
 }
 
@@ -51,12 +65,14 @@ fn linux_vulkan_add_shader_sample_executes_provider_output() {
 fn linux_vulkan_sub_shader_sample_executes_provider_output() {
     run_vulkan_sample_smoke(VulkanSampleSmoke {
         project_name: "shader_vulkan_sub_provider_demo",
-        asset_id: "shader.vulkan.sub-u32.spirv",
-        generated_file: "nuis.shader.vulkan.sub-u32.spv",
+        assets: &[VulkanGeneratedAsset {
+            asset_id: "shader.vulkan.sub-u32.spirv",
+            generated_file: "nuis.shader.vulkan.sub-u32.spv",
+            entry: "nuis_vulkan_sub_u32",
+        }],
         registration_id: "official.shader.vulkan-sub-u32",
-        operation: "sub-u32",
-        entry: "nuis_vulkan_sub_u32",
         expected_hash: "0x88201fb960ff6465",
+        graph: None,
     });
 }
 
@@ -64,12 +80,41 @@ fn linux_vulkan_sub_shader_sample_executes_provider_output() {
 fn linux_vulkan_mul_shader_sample_executes_provider_output() {
     run_vulkan_sample_smoke(VulkanSampleSmoke {
         project_name: "shader_vulkan_mul_provider_demo",
-        asset_id: "shader.vulkan.mul-u32.spirv",
-        generated_file: "nuis.shader.vulkan.mul-u32.spv",
+        assets: &[VulkanGeneratedAsset {
+            asset_id: "shader.vulkan.mul-u32.spirv",
+            generated_file: "nuis.shader.vulkan.mul-u32.spv",
+            entry: "nuis_vulkan_mul_u32",
+        }],
         registration_id: "official.shader.vulkan-mul-u32",
-        operation: "mul-u32",
-        entry: "nuis_vulkan_mul_u32",
         expected_hash: "0x02f6f7f591bff68f",
+        graph: None,
+    });
+}
+
+#[test]
+fn linux_vulkan_chain_shader_sample_executes_provider_graph() {
+    run_vulkan_sample_smoke(VulkanSampleSmoke {
+        project_name: "shader_vulkan_chain_provider_demo",
+        assets: &[
+            VulkanGeneratedAsset {
+                asset_id: "shader.vulkan.add-u32.spirv",
+                generated_file: "nuis.shader.vulkan.add-u32.spv",
+                entry: "nuis_vulkan_add_u32",
+            },
+            VulkanGeneratedAsset {
+                asset_id: "shader.vulkan.mul-u32.spirv",
+                generated_file: "nuis.shader.vulkan.mul-u32.spv",
+                entry: "nuis_vulkan_mul_u32",
+            },
+        ],
+        registration_id: "official.shader.vulkan-u32-chain",
+        expected_hash: "0xdce2c1aca0f32707",
+        graph: Some(VulkanGraphSmoke {
+            final_request_id: "shader.vulkan.chain.mul-u32",
+            final_expected_hash: "0x2f8b5a975ff42d9a",
+            transport_token:
+                "glm:provider-edge:shader.vulkan.chain.add-u32:output.values->shader.vulkan.chain.mul-u32:input.values",
+        }),
     });
 }
 
@@ -86,20 +131,25 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
 
     let build = run_nuis(&["build", &project_text, &output_dir_text]);
     assert_success(&build, "build Linux Vulkan shader provider project");
-    assert_file_contains(
-        &output_dir.join("nuis.domain.code-asset-contributions.toml"),
-        sample.asset_id,
-        "Vulkan code asset contribution table",
-    );
+    for asset in sample.assets {
+        assert_file_contains(
+            &output_dir.join("nuis.domain.code-asset-contributions.toml"),
+            asset.asset_id,
+            "Vulkan code asset contribution table",
+        );
+    }
     assert_file_contains(
         &output_dir.join("nuis.domain.code-asset-contributions.toml"),
         "vulkan.discrete-or-integrated-gpu",
         "Vulkan lowering target contribution",
     );
-    let spirv = fs::read(output_dir.join(sample.generated_file)).expect("Vulkan SPIR-V code asset");
-    assert!(spirv
-        .windows(sample.entry.len())
-        .any(|window| window == sample.entry.as_bytes()));
+    for asset in sample.assets {
+        let spirv =
+            fs::read(output_dir.join(asset.generated_file)).expect("Vulkan SPIR-V code asset");
+        assert!(spirv
+            .windows(asset.entry.len())
+            .any(|window| window == asset.entry.as_bytes()));
+    }
 
     let run = run_nuis(&["run-artifact", &output_dir_text, "--json"]);
     assert_success(&run, "materialize Linux Vulkan provider request");
@@ -111,9 +161,10 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
         "provider_sample_registration_id={}",
         sample.registration_id
     )));
-    assert!(provider_samples.contains(&format!("provider_kernel_operation={}", sample.operation)));
-    assert!(provider_samples.contains(&format!("provider_code_asset_id={}", sample.asset_id)));
-    assert!(provider_samples.contains("provider_adapter_binding_provider_family=spirv:vulkan-gpu"));
+    for asset in sample.assets {
+        assert!(provider_samples.contains(&format!("code_asset_id={}", asset.asset_id)));
+    }
+    assert!(provider_samples.contains("adapter_binding_provider_family=spirv:vulkan-gpu"));
     assert!(provider_samples.contains(
         "provider_code_asset_contribution_selection_set_contract=nuis-provider-code-asset-contribution-selection-set-v1"
     ));
@@ -165,6 +216,41 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
         "compiled_code_asset_selection_status = \"verified\"",
         "Vulkan compiled code asset selection",
     );
+    if let Some(graph) = &sample.graph {
+        assert_file_contains(
+            &provider_output,
+            "native_output_count = \"2\"",
+            "Vulkan graph native output count",
+        );
+        assert_file_contains(
+            &provider_output,
+            &format!(
+                "native_output_1_request_id = \"{}\"",
+                graph.final_request_id
+            ),
+            "Vulkan graph final request",
+        );
+        assert_file_contains(
+            &provider_output,
+            &format!("native_output_1_hash = \"{}\"", graph.final_expected_hash),
+            "Vulkan graph final output hash",
+        );
+        assert_file_contains(
+            &provider_output,
+            "provider_edge_transport_receipt_count = \"1\"",
+            "Vulkan graph transport receipt",
+        );
+        assert_file_contains(
+            &provider_output,
+            graph.transport_token,
+            "Vulkan graph GLM transport token",
+        );
+        assert_file_contains(
+            &provider_output,
+            "compiled_code_asset_selection_count = \"2\"",
+            "Vulkan graph code asset selection set",
+        );
+    }
 
     let materialized = run_nsdb(&[
         "materialize-provider-samples",

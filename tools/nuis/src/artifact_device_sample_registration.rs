@@ -113,7 +113,7 @@ fn evidence_matches_registration(
         .unwrap_or_else(|| registration.metadata_selector.is_none())
 }
 
-fn registrations() -> [DeviceSampleInputRegistration; 10] {
+fn registrations() -> [DeviceSampleInputRegistration; 12] {
     [
         crate::artifact_device_sample_pixelmagic::registration(),
         crate::artifact_device_sample_kernel::registration(),
@@ -121,10 +121,12 @@ fn registrations() -> [DeviceSampleInputRegistration; 10] {
         crate::artifact_device_sample_shader_metal::add_registration(),
         crate::artifact_device_sample_shader_metal::sub_registration(),
         crate::artifact_device_sample_shader_metal::mul_registration(),
+        crate::artifact_device_sample_shader_metal::chain_registration(),
         crate::artifact_device_sample_shader_vulkan::registration(),
         crate::artifact_device_sample_shader_vulkan::add_registration(),
         crate::artifact_device_sample_shader_vulkan::sub_registration(),
         crate::artifact_device_sample_shader_vulkan::mul_registration(),
+        crate::artifact_device_sample_shader_vulkan::chain_registration(),
     ]
 }
 
@@ -197,6 +199,26 @@ mod tests {
         );
         assert!(vulkan_mul.contains("provider_code_asset_id=shader.vulkan.mul-u32.spirv"));
         assert!(vulkan_mul.contains("provider_kernel_operation=mul-u32"));
+        let vulkan_chain = enrich_registered_input_evidence(
+            "vulkan",
+            "discrete-or-integrated-gpu",
+            "artifact_provider_metadata_0=official.shader:provider-sample=vulkan-u32-chain",
+        )
+        .unwrap();
+        assert!(vulkan_chain
+            .contains("provider_sample_registration_id=official.shader.vulkan-u32-chain"));
+        assert!(vulkan_chain.contains("provider_request_collection_contract="));
+        assert!(vulkan_chain.contains("provider_request_count=2"));
+        assert!(
+            vulkan_chain.contains("provider_request_0_code_asset_id=shader.vulkan.add-u32.spirv")
+        );
+        assert!(
+            vulkan_chain.contains("provider_request_1_code_asset_id=shader.vulkan.mul-u32.spirv")
+        );
+        assert!(vulkan_chain.contains(
+            "provider_request_1_dependency_0_transport_contract=nuis-provider-edge-transport-v1"
+        ));
+        assert!(vulkan_chain.contains("provider_code_asset_identity_set_count=2"));
         assert!(
             enrich_registered_input_evidence("unknown", "unknown", "base").is_none(),
             "unregistered backends must remain generic"
@@ -248,5 +270,17 @@ mod tests {
         assert!(mul.contains("provider_sample_registration_id=official.shader.metal-mul-u32"));
         assert!(mul.contains("provider_code_asset_id=shader.metal.mul-u32.msl"));
         assert!(mul.contains("provider_kernel_operation=mul-u32"));
+
+        let chain = enrich_registered_input_evidence(
+            "metal",
+            "apple-silicon-gpu",
+            "artifact_provider_metadata_0=official.shader:provider-sample=metal-u32-chain",
+        )
+        .unwrap();
+        assert!(chain.contains("provider_sample_registration_id=official.shader.metal-u32-chain"));
+        assert!(chain.contains("provider_request_collection_contract="));
+        assert!(chain.contains("provider_request_count=2"));
+        assert!(chain.contains("provider_request_1_input_binding_0_source=dependency"));
+        assert!(chain.contains("provider_code_asset_identity_set_count=2"));
     }
 }

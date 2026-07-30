@@ -14,6 +14,7 @@ pub(crate) enum CanonicalU32Operation {
     AddU32,
     SubU32,
     MulU32,
+    XorU32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,6 +56,11 @@ const U32_OPERATION_PATTERNS: &[U32OperationPattern] = &[
         operation: CanonicalU32Operation::MulU32,
         name: "mul-u32",
         body_operator: Some("*"),
+    },
+    U32OperationPattern {
+        operation: CanonicalU32Operation::XorU32,
+        name: "xor-u32",
+        body_operator: Some("^"),
     },
 ];
 
