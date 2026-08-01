@@ -51,8 +51,11 @@ pub(crate) const RUNNER_PROFILE: ProviderRunnerProfile = ProviderRunnerProfile {
 };
 
 #[cfg(any(target_os = "linux", test))]
-const VULKAN_SPIRV_DISPATCH_SOURCE: &str =
-    include_str!("../provider-runners/vulkan_spirv_dispatch.c");
+const VULKAN_SPIRV_DISPATCH_SOURCE: &str = concat!(
+    include_str!("../provider-runners/vulkan_spirv_dispatch_io.c"),
+    "\n",
+    include_str!("../provider-runners/vulkan_spirv_dispatch.c")
+);
 
 #[cfg(target_os = "linux")]
 pub(crate) fn prepare_vulkan_worker_invocation(
@@ -288,14 +291,17 @@ mod tests {
     }
 
     #[test]
-    fn vulkan_dispatch_source_keeps_dynamic_one_or_two_input_descriptor_abi() {
+    fn vulkan_dispatch_source_keeps_dynamic_input_and_output_descriptor_abi() {
         for required in [
             "argc != 5 && argc != 6",
             "int input_count = argc == 6 ? 2 : 1",
-            "uint32_t descriptor_count = (uint32_t)(input_count + 1)",
-            "VkDescriptorSetLayoutBinding bindings[3]",
-            "VkBuffer buffers[3]",
-            "VkDeviceMemory memories[3]",
+            "NUIS_VULKAN_MAX_OUTPUTS 8",
+            "NUIS_PROVIDER_OUTPUT_FDS",
+            "buffer_count = (size_t)input_count + output_count",
+            "VkDescriptorSetLayoutBinding bindings[2 + NUIS_VULKAN_MAX_OUTPUTS]",
+            "VkBuffer buffers[2 + NUIS_VULKAN_MAX_OUTPUTS]",
+            "VkDeviceMemory memories[2 + NUIS_VULKAN_MAX_OUTPUTS]",
+            "output_hashes=",
             "valid_spirv_entry",
         ] {
             assert!(VULKAN_SPIRV_DISPATCH_SOURCE.contains(required));

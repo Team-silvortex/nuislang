@@ -35,37 +35,76 @@ static BOOL endsWith(const char *value, const char *suffix) {
            strcmp(value + valueLength - suffixLength, suffix) == 0;
 }
 
-static BOOL emitOutput(const void *bytes, NSUInteger length) {
+static BOOL writeOutputDescriptor(const void *bytes, NSUInteger length,
+                                  NSString *descriptorText, uint64_t *hashOut) {
     NSData *output = [NSData dataWithBytesNoCopy:(void *)bytes length:length freeWhenDone:NO];
-    const char *descriptorText = getenv("NUIS_PROVIDER_OUTPUT_FD");
-    if (descriptorText != NULL) {
-        NSArray<NSString *> *parts = [@(descriptorText) componentsSeparatedByString:@":"];
-        if (parts.count != 5 || ![parts[0] isEqualToString:@"fd"]) return NO;
-        unsigned long long values[4] = {0};
-        for (NSUInteger index = 0; index < 4; index++) {
-            NSScanner *scanner = [NSScanner scannerWithString:parts[index + 1]];
-            if (![scanner scanUnsignedLongLong:&values[index]] || !scanner.isAtEnd) return NO;
+    NSArray<NSString *> *parts = [descriptorText componentsSeparatedByString:@":"];
+    if (parts.count != 5 || ![parts[0] isEqualToString:@"fd"]) return NO;
+    unsigned long long values[4] = {0};
+    for (NSUInteger index = 0; index < 4; index++) {
+        NSScanner *scanner = [NSScanner scannerWithString:parts[index + 1]];
+        if (![scanner scanUnsignedLongLong:&values[index]] || !scanner.isAtEnd) return NO;
+    }
+    if (values[0] > INT_MAX || values[2] != length) return NO;
+    NSUInteger written = 0;
+    while (written < length) {
+        ssize_t count = pwrite((int)values[0], (const uint8_t *)bytes + written,
+                               length - written, (off_t)(values[1] + written));
+        if (count <= 0) return NO;
+        written += (NSUInteger)count;
+    }
+    *hashOut = fnv1a64(output);
+    uint8_t littleHash[8];
+    for (NSUInteger index = 0; index < 8; index++) littleHash[index] = *hashOut >> (index * 8);
+    return pwrite((int)values[0], littleHash, 8, (off_t)values[3]) == 8;
+}
+
+static NSArray<NSString *> *outputDescriptors(void) {
+    const char *manifestText = getenv("NUIS_PROVIDER_OUTPUT_FDS");
+    if (manifestText != NULL) {
+        NSMutableArray<NSString *> *descriptors = [NSMutableArray array];
+        for (NSString *field in [@(manifestText) componentsSeparatedByString:@","]) {
+            NSRange separator = [field rangeOfString:@"="];
+            if (separator.location == NSNotFound || separator.location == 0) return nil;
+            [descriptors addObject:[field substringFromIndex:separator.location + 1]];
         }
-        if (values[0] > INT_MAX || values[2] != length) return NO;
-        NSUInteger written = 0;
-        while (written < length) {
-            ssize_t count = pwrite((int)values[0], (const uint8_t *)bytes + written,
-                                   length - written, (off_t)(values[1] + written));
-            if (count <= 0) return NO;
-            written += (NSUInteger)count;
+        return descriptors.count > 0 ? descriptors : nil;
+    }
+    const char *single = getenv("NUIS_PROVIDER_OUTPUT_FD");
+    return single == NULL ? @[] : @[@(single)];
+}
+
+static BOOL emitOutputs(NSArray<id<MTLBuffer>> *buffers, NSUInteger length,
+                        NSArray<NSString *> *descriptors) {
+    if (descriptors.count == 0) {
+        if (buffers.count != 1) return NO;
+        const uint8_t *bytes = buffers[0].contents;
+        NSMutableString *hex = [NSMutableString stringWithCapacity:length * 2];
+        for (NSUInteger index = 0; index < length; index++) {
+            [hex appendFormat:@"%02x", bytes[index]];
         }
-        uint64_t hash = fnv1a64(output);
-        uint8_t littleHash[8];
-        for (NSUInteger index = 0; index < 8; index++) littleHash[index] = hash >> (index * 8);
-        if (pwrite((int)values[0], littleHash, 8, (off_t)values[3]) != 8) return NO;
-        printf("output_channel=inherited-fd\noutput_hash=%llu\n", hash);
+        printf("output_channel=hex-stdout\noutput_hex=%s\n", hex.UTF8String);
         return YES;
     }
-    NSMutableString *hex = [NSMutableString stringWithCapacity:length * 2];
-    for (NSUInteger index = 0; index < length; index++) {
-        [hex appendFormat:@"%02x", ((const uint8_t *)bytes)[index]];
+    if (descriptors.count != buffers.count) return NO;
+    NSMutableArray<NSNumber *> *hashes = [NSMutableArray arrayWithCapacity:buffers.count];
+    for (NSUInteger index = 0; index < buffers.count; index++) {
+        uint64_t hash = 0;
+        if (!writeOutputDescriptor(buffers[index].contents, length, descriptors[index], &hash)) {
+            return NO;
+        }
+        [hashes addObject:@(hash)];
     }
-    printf("output_channel=hex-stdout\noutput_hex=%s\n", hex.UTF8String);
+    if (hashes.count == 1) {
+        printf("output_channel=inherited-fd\noutput_hash=%llu\n",
+               hashes[0].unsignedLongLongValue);
+    } else {
+        printf("output_channel=inherited-fds\noutput_hashes=");
+        for (NSUInteger index = 0; index < hashes.count; index++) {
+            printf("%s%llu", index == 0 ? "" : ",", hashes[index].unsignedLongLongValue);
+        }
+        printf("\n");
+    }
     return YES;
 }
 
@@ -230,21 +269,32 @@ int main(int argc, const char *argv[]) {
             if (buffer == nil) return fail(@"Metal input buffer unavailable");
             [inputBuffers addObject:buffer];
         }
+        NSArray<NSString *> *outputDescriptorList = outputDescriptors();
+        if (outputDescriptorList == nil) return fail(@"Metal output descriptor manifest is invalid");
+        NSUInteger outputCount = outputDescriptorList.count > 0 ? outputDescriptorList.count : 1;
+        if (!u32Mode && outputCount != 1) return fail(@"Metal scalar kernels require one output");
         NSUInteger outputLength = argmax ? sizeof(uint32_t) : inputLength;
-        id<MTLBuffer> outputBuffer = [device newBufferWithLength:outputLength options:options];
+        NSMutableArray<id<MTLBuffer>> *outputBuffers =
+            [NSMutableArray arrayWithCapacity:outputCount];
+        for (NSUInteger index = 0; index < outputCount; index++) {
+            id<MTLBuffer> buffer = [device newBufferWithLength:outputLength options:options];
+            if (buffer == nil) return fail(@"Metal output buffer unavailable");
+            [outputBuffers addObject:buffer];
+        }
         id<MTLBuffer> biasBuffer = [device newBufferWithBytes:&bias length:sizeof(bias) options:options];
         id<MTLCommandQueue> queue = [device newCommandQueue];
         id<MTLCommandBuffer> command = [queue commandBuffer];
         id<MTLComputeCommandEncoder> encoder = [command computeCommandEncoder];
-        if (outputBuffer == nil || biasBuffer == nil || queue == nil ||
-            command == nil || encoder == nil) {
+        if (biasBuffer == nil || queue == nil || command == nil || encoder == nil) {
             return fail(@"Metal f32 command resources unavailable");
         }
         [encoder setComputePipelineState:pipeline];
         for (NSUInteger index = 0; index < inputCount; index++) {
             [encoder setBuffer:inputBuffers[index] offset:0 atIndex:index];
         }
-        [encoder setBuffer:outputBuffer offset:0 atIndex:inputCount];
+        for (NSUInteger index = 0; index < outputCount; index++) {
+            [encoder setBuffer:outputBuffers[index] offset:0 atIndex:inputCount + index];
+        }
         if (biasMode) {
             [encoder setBuffer:biasBuffer offset:0 atIndex:2];
         }
@@ -266,7 +316,7 @@ int main(int argc, const char *argv[]) {
         printf("protocol=%s\nstatus=ready\n", protocol);
         printf("device=%s\n", device.name.UTF8String);
         printf("output_bytes=%lu\n", (unsigned long)outputLength);
-        if (!emitOutput(outputBuffer.contents, outputLength)) {
+        if (!emitOutputs(outputBuffers, outputLength, outputDescriptorList)) {
             return fail(@"Metal f32 output carrier write failed");
         }
         return 0;

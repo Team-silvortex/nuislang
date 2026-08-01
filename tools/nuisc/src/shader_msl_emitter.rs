@@ -107,7 +107,6 @@ fn validate_msl_module_lowering_plan(
 
 fn render_u32_msl(source: &CanonicalU32Compute, plan: &ModuleLoweringPlan) -> String {
     let input_binding = source.input_binding;
-    let output_binding = source.output_binding;
     let aux_parameter = source
         .aux_input_binding
         .map(|binding| format!("    device const uint* right_values [[buffer({binding})]],\n"))
@@ -116,8 +115,31 @@ fn render_u32_msl(source: &CanonicalU32Compute, plan: &ModuleLoweringPlan) -> St
         .aux_input_binding
         .map(|_| "    uint rhs = right_values[gid];\n")
         .unwrap_or_default();
+    let output_parameters = source
+        .outputs
+        .iter()
+        .enumerate()
+        .map(|(index, output)| {
+            format!(
+                "    device uint* {} [[buffer({})]],\n",
+                msl_output_name(index),
+                output.binding
+            )
+        })
+        .collect::<String>();
+    let output_stores = source
+        .outputs
+        .iter()
+        .enumerate()
+        .map(|(index, output)| {
+            format!(
+                "    {}[gid] = {};\n",
+                msl_output_name(index),
+                msl_u32_expression(output.operation)
+            )
+        })
+        .collect::<String>();
     let entry = &source.entry;
-    let expression = msl_u32_expression(source.operation);
     format!(
         "// nuis-module-lowering-plan contract={}\n\
          // nuis-module-source-schema {}\n\
@@ -132,11 +154,11 @@ fn render_u32_msl(source: &CanonicalU32Compute, plan: &ModuleLoweringPlan) -> St
          kernel void {entry}(\n\
              device const uint* input_values [[buffer({input_binding})]],\n\
 {aux_parameter}\
-             device uint* output_values [[buffer({output_binding})]],\n\
+{output_parameters}\
              uint gid [[thread_position_in_grid]]) {{\n\
              uint value = input_values[gid];\n\
 {aux_load}\
-             output_values[gid] = {expression};\n\
+{output_stores}\
          }}\n",
         plan.contract,
         plan.source_schema,
@@ -150,6 +172,14 @@ fn render_u32_msl(source: &CanonicalU32Compute, plan: &ModuleLoweringPlan) -> St
     )
 }
 
+fn msl_output_name(index: usize) -> String {
+    if index == 0 {
+        "output_values".to_owned()
+    } else {
+        format!("output_values_{index}")
+    }
+}
+
 fn msl_u32_expression(operation: CanonicalU32Operation) -> &'static str {
     match operation {
         CanonicalU32Operation::CopyU32 => "value",
@@ -158,6 +188,7 @@ fn msl_u32_expression(operation: CanonicalU32Operation) -> &'static str {
         CanonicalU32Operation::MulU32 => "value * value",
         CanonicalU32Operation::XorU32 => "value ^ value",
         CanonicalU32Operation::AddPairU32 => "value + rhs",
+        CanonicalU32Operation::XorPairU32 => "value ^ rhs",
     }
 }
 

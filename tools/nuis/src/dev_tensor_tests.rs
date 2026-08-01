@@ -152,24 +152,23 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         .contains("weakest task card is directly actionable"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_action
-        .contains("two ordered output bindings"));
+        .contains("generalize Vulkan output planning"));
     let handoff_command = &summary.weakest_bootstrap_task_card_handoff_command;
     for required in [
         "CARGO_INCREMENTAL=0 cargo check -q -p nsdb",
-        "cargo test -q -p nsdb provider_request",
-        "cargo test -q -p nsdb vulkan_session_plan",
-        "cargo test -q -p nuis artifact_device_sample_shader_metal",
-        "cargo test -q -p nuis artifact_device_sample_shader_vulkan",
-        "linux_vulkan_add_pair_shader_sample_executes_provider_output",
+        "cargo test -q -p nuisc shader_spirv_emitter",
+        "cargo test -q -p nsdb provider_execution_vulkan",
+        "fan_out_registration_owns_two_output_request",
+        "linux_vulkan_fan_out_shader_writes_two_provider_outputs",
     ] {
         assert!(handoff_command.contains(required));
     }
     assert!(summary
         .weakest_bootstrap_task_card_handoff_expected_artifact
-        .contains("input-binding-v2 and output-binding-v2"));
+        .contains("one canonical Nuis Shader node"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_expected_artifact
-        .contains("input-binding-v2"));
+        .contains("padded row-major"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.protocol,
         "nuis-dev-tensor-task-card-lineage-v1"

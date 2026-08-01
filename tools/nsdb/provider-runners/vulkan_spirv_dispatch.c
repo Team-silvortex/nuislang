@@ -1,14 +1,4 @@
-#define _POSIX_C_SOURCE 200809L
-
 /* Thin Vulkan compute adapter; Nuis owns request shape and SPIR-V identity. */
-#include <dlfcn.h>
-#include <inttypes.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 typedef uint32_t VkBool32;
 typedef uint32_t VkFlags;
@@ -58,13 +48,6 @@ enum {
     VK_COMMAND_BUFFER_LEVEL_PRIMARY = 0,
     VK_SHARING_MODE_EXCLUSIVE = 0,
 };
-
-typedef struct {
-    int fd;
-    size_t payload_offset;
-    size_t payload_length;
-    size_t hash_offset;
-} OutputDescriptor;
 
 typedef struct {
     uint32_t s_type;
@@ -374,168 +357,10 @@ typedef struct {
     vk_queue_wait_idle_fn queue_wait_idle;
 } VulkanApi;
 
-static uint64_t fnv1a64(const unsigned char* bytes, size_t length) {
-    uint64_t hash = UINT64_C(0xcbf29ce484222325);
-    for (size_t index = 0; index < length; index++) {
-        hash ^= bytes[index];
-        hash *= UINT64_C(0x100000001b3);
-    }
-    return hash;
-}
-
 static int load_symbol(void* library, const char* name, void* output, size_t size) {
     void* symbol = dlsym(library, name);
     if (symbol == NULL || size != sizeof(symbol)) return 0;
     memcpy(output, &symbol, size);
-    return 1;
-}
-
-static int parse_output_descriptor(OutputDescriptor* output) {
-    const char* text = getenv("NUIS_PROVIDER_OUTPUT_FD");
-    char tail = '\0';
-    return text != NULL
-        && sscanf(text, "fd:%d:%zu:%zu:%zu%c", &output->fd, &output->payload_offset, &output->payload_length, &output->hash_offset, &tail) == 4;
-}
-
-static int parse_u32(const char* text, uint32_t* value) {
-    char* end = NULL;
-    unsigned long parsed = strtoul(text, &end, 10);
-    if (text == end || *end != '\0' || parsed == 0 || parsed > UINT32_MAX) return 0;
-    *value = (uint32_t)parsed;
-    return 1;
-}
-
-static int valid_spirv_entry(const char* entry) {
-    if (entry == NULL || entry[0] == '\0') return 0;
-    size_t length = strlen(entry);
-    if (length > 127 || !((entry[0] >= 'A' && entry[0] <= 'Z') || (entry[0] >= 'a' && entry[0] <= 'z') || entry[0] == '_')) return 0;
-    for (size_t index = 1; index < length; index++) {
-        char byte = entry[index];
-        if (!((byte >= 'A' && byte <= 'Z') || (byte >= 'a' && byte <= 'z') || (byte >= '0' && byte <= '9') || byte == '_')) return 0;
-    }
-    return 1;
-}
-
-static uint32_t read_u32_le(const unsigned char* bytes) {
-    uint32_t value = 0;
-    for (size_t index = 0; index < 4; index++) {
-        value |= (uint32_t)bytes[index] << (index * 8);
-    }
-    return value;
-}
-
-static uint64_t read_u64_le(const unsigned char* bytes) {
-    uint64_t value = 0;
-    for (size_t index = 0; index < 8; index++) {
-        value |= (uint64_t)bytes[index] << (index * 8);
-    }
-    return value;
-}
-
-static int pread_exact(int fd, unsigned char* output, size_t length, size_t offset) {
-    size_t read = 0;
-    while (read < length) {
-        ssize_t count = pread(fd, output + read, length - read, (off_t)(offset + read));
-        if (count <= 0) return 0;
-        read += (size_t)count;
-    }
-    return 1;
-}
-
-static int read_carrier_frame(
-    const char* descriptor,
-    unsigned char* output,
-    size_t output_length) {
-    int fd = -1;
-    unsigned long long frame = 0;
-    unsigned long long packet_length_raw = 0;
-    unsigned long long packet_hash = 0;
-    char tail = '\0';
-    if (sscanf(
-            descriptor,
-            "fd:%d:%llu:%llu:%llu%c",
-            &fd,
-            &frame,
-            &packet_length_raw,
-            &packet_hash,
-            &tail) != 4
-        || fd < 0
-        || frame > UINT32_MAX
-        || packet_length_raw > SIZE_MAX) return 0;
-    size_t packet_length = (size_t)packet_length_raw;
-    if (packet_length < 56) return 0;
-    unsigned char* packet = malloc(packet_length);
-    if (packet == NULL || !pread_exact(fd, packet, packet_length, 0)) {
-        free(packet);
-        return 0;
-    }
-    uint32_t frame_count = read_u32_le(packet + 8);
-    uint32_t page_size = read_u32_le(packet + 12);
-    uint32_t frame_index = read_u32_le(packet + 16);
-    uint64_t payload_offset_raw = read_u64_le(packet + 24);
-    uint64_t payload_length_raw = read_u64_le(packet + 32);
-    uint64_t mapped_length_raw = read_u64_le(packet + 40);
-    uint64_t payload_hash = read_u64_le(packet + 48);
-    int valid = memcmp(packet, "NUISPFD1", 8) == 0
-        && fnv1a64(packet, packet_length) == (uint64_t)packet_hash
-        && frame_count == 1
-        && page_size != 0
-        && (page_size & (page_size - 1)) == 0
-        && frame_index == (uint32_t)frame
-        && payload_offset_raw <= SIZE_MAX
-        && payload_length_raw == output_length
-        && mapped_length_raw <= SIZE_MAX;
-    size_t payload_offset = valid ? (size_t)payload_offset_raw : 0;
-    size_t mapped_length = valid ? (size_t)mapped_length_raw : 0;
-    valid = valid
-        && payload_offset >= 56
-        && payload_offset % page_size == 0
-        && mapped_length % page_size == 0
-        && mapped_length >= output_length
-        && payload_offset <= packet_length
-        && mapped_length <= packet_length - payload_offset
-        && fnv1a64(packet + payload_offset, output_length) == payload_hash;
-    if (valid) memcpy(output, packet + payload_offset, output_length);
-    free(packet);
-    return valid;
-}
-
-static int read_exact_file(const char* path, unsigned char* output, size_t length) {
-    FILE* file = fopen(path, "rb");
-    if (file == NULL) return 0;
-    size_t read = fread(output, 1, length, file);
-    int trailing = fgetc(file);
-    int closed = fclose(file);
-    return read == length && trailing == EOF && closed == 0;
-}
-
-static int read_input(const char* source, unsigned char* output, size_t length) {
-    return strncmp(source, "fd:", 3) == 0
-        ? read_carrier_frame(source, output, length)
-        : read_exact_file(source, output, length);
-}
-
-static int read_file_alloc(const char* path, unsigned char** output, size_t* length) {
-    FILE* file = fopen(path, "rb");
-    if (file == NULL || fseek(file, 0, SEEK_END) != 0) return 0;
-    long end = ftell(file);
-    if (end <= 0 || fseek(file, 0, SEEK_SET) != 0) {
-        fclose(file);
-        return 0;
-    }
-    unsigned char* bytes = malloc((size_t)end);
-    if (bytes == NULL) {
-        fclose(file);
-        return 0;
-    }
-    size_t read = fread(bytes, 1, (size_t)end, file);
-    int closed = fclose(file);
-    if (read != (size_t)end || closed != 0) {
-        free(bytes);
-        return 0;
-    }
-    *output = bytes;
-    *length = (size_t)end;
     return 1;
 }
 
@@ -651,12 +476,17 @@ static int load_device_api(VulkanApi* vk, VkDevice device) {
 int main(int argc, char** argv) {
     if ((argc != 5 && argc != 6) || !valid_spirv_entry(argv[2])) return 2;
     int input_count = argc == 6 ? 2 : 1;
-    int output_index = input_count;
     uint32_t element_count = 0;
-    OutputDescriptor output_descriptor = {0};
-    if (!parse_u32(argv[3 + input_count], &element_count) || !parse_output_descriptor(&output_descriptor)) return 3;
+    OutputDescriptor output_descriptors[NUIS_VULKAN_MAX_OUTPUTS] = {{0}};
+    size_t output_count = 0;
+    if (!parse_u32(argv[3 + input_count], &element_count)
+        || !parse_output_descriptors(output_descriptors, &output_count)) return 3;
     size_t byte_length = (size_t)element_count * sizeof(uint32_t);
-    if (element_count > SIZE_MAX / sizeof(uint32_t) || output_descriptor.payload_length != byte_length) return 4;
+    if (byte_length / sizeof(uint32_t) != element_count) return 4;
+    for (size_t i = 0; i < output_count; i++) {
+        if (output_descriptors[i].payload_length != byte_length) return 4;
+    }
+    size_t buffer_count = (size_t)input_count + output_count;
     unsigned char* inputs[2] = {malloc(byte_length), input_count == 2 ? malloc(byte_length) : NULL};
     unsigned char* spirv = NULL;
     size_t spirv_length = 0;
@@ -672,8 +502,8 @@ int main(int argc, char** argv) {
     uint32_t device_count = 0;
     VkDevice device = NULL;
     VkQueue queue = NULL;
-    VkBuffer buffers[3] = {NULL, NULL, NULL};
-    VkDeviceMemory memories[3] = {NULL, NULL, NULL};
+    VkBuffer buffers[2 + NUIS_VULKAN_MAX_OUTPUTS] = {NULL};
+    VkDeviceMemory memories[2 + NUIS_VULKAN_MAX_OUTPUTS] = {NULL};
     VkDescriptorSetLayout set_layout = NULL;
     VkDescriptorPool pool = NULL;
     VkDescriptorSet set = NULL;
@@ -690,7 +520,7 @@ int main(int argc, char** argv) {
     VkDeviceCreateInfo device_info = {VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO, NULL, 0, 1, &queue_info, 0, NULL, 0, NULL, NULL};
     ready = ready && vk.create_device(physical, &device_info, NULL, &device) == VK_SUCCESS && load_device_api(&vk, device);
     if (ready) vk.get_device_queue(device, queue_family, 0, &queue);
-    for (int i = 0; ready && i <= output_index; i++) ready = create_host_buffer(&vk, physical, device, byte_length, &buffers[i], &memories[i]);
+    for (size_t i = 0; ready && i < buffer_count; i++) ready = create_host_buffer(&vk, physical, device, byte_length, &buffers[i], &memories[i]);
     void* mapped = NULL;
     for (int i = 0; ready && i < input_count; i++) {
         ready = vk.map_memory(device, memories[i], 0, byte_length, 0, &mapped) == VK_SUCCESS;
@@ -699,12 +529,11 @@ int main(int argc, char** argv) {
             vk.unmap_memory(device, memories[i]);
         }
     }
-    VkDescriptorSetLayoutBinding bindings[3] = {
-        {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
-        {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
-        {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
-    };
-    uint32_t descriptor_count = (uint32_t)(input_count + 1);
+    VkDescriptorSetLayoutBinding bindings[2 + NUIS_VULKAN_MAX_OUTPUTS];
+    uint32_t descriptor_count = (uint32_t)buffer_count;
+    for (uint32_t i = 0; i < descriptor_count; i++) {
+        bindings[i] = (VkDescriptorSetLayoutBinding){i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL};
+    }
     VkDescriptorSetLayoutCreateInfo set_layout_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, NULL, 0, descriptor_count, bindings};
     VkDescriptorPoolSize pool_size = {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, descriptor_count};
     VkDescriptorPoolCreateInfo pool_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, NULL, 0, 1, 1, &pool_size};
@@ -713,10 +542,13 @@ int main(int argc, char** argv) {
         && vk.create_descriptor_pool(device, &pool_info, NULL, &pool) == VK_SUCCESS;
     VkDescriptorSetAllocateInfo set_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, NULL, pool, 1, &set_layout};
     ready = ready && vk.allocate_descriptor_sets(device, &set_info, &set) == VK_SUCCESS;
-    VkDescriptorBufferInfo infos[3] = {{buffers[0], 0, byte_length}, {buffers[1], 0, byte_length}, {buffers[output_index], 0, byte_length}};
-    VkWriteDescriptorSet writes[3];
+    VkDescriptorBufferInfo infos[2 + NUIS_VULKAN_MAX_OUTPUTS];
+    VkWriteDescriptorSet writes[2 + NUIS_VULKAN_MAX_OUTPUTS];
     memset(writes, 0, sizeof(writes));
-    for (uint32_t i = 0; i < descriptor_count; i++) writes[i] = (VkWriteDescriptorSet){VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, set, i, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, NULL, &infos[i], NULL};
+    for (uint32_t i = 0; i < descriptor_count; i++) {
+        infos[i] = (VkDescriptorBufferInfo){buffers[i], 0, byte_length};
+        writes[i] = (VkWriteDescriptorSet){VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, set, i, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, NULL, &infos[i], NULL};
+    }
     if (ready) vk.update_descriptor_sets(device, descriptor_count, writes, 0, NULL);
     VkShaderModuleCreateInfo shader_info = {VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, NULL, 0, spirv_length, (const uint32_t*)spirv};
     VkPipelineLayoutCreateInfo layout_info = {VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, NULL, 0, 1, &set_layout, 0, NULL};
@@ -741,15 +573,18 @@ int main(int argc, char** argv) {
     ready = ready
         && vk.end_command_buffer(command) == VK_SUCCESS
         && vk.queue_submit(queue, 1, &submit, NULL) == VK_SUCCESS
-        && vk.queue_wait_idle(queue) == VK_SUCCESS
-        && vk.map_memory(device, memories[output_index], 0, byte_length, 0, &mapped) == VK_SUCCESS;
-    uint64_t hash = 0;
-    int persisted = 0;
-    if (ready) {
-        hash = fnv1a64(mapped, byte_length);
-        persisted = pwrite(output_descriptor.fd, mapped, byte_length, (off_t)output_descriptor.payload_offset) == (ssize_t)byte_length
-            && pwrite(output_descriptor.fd, &hash, sizeof(hash), (off_t)output_descriptor.hash_offset) == (ssize_t)sizeof(hash);
-        vk.unmap_memory(device, memories[output_index]);
+        && vk.queue_wait_idle(queue) == VK_SUCCESS;
+    uint64_t hashes[NUIS_VULKAN_MAX_OUTPUTS] = {0};
+    int persisted = ready;
+    for (size_t i = 0; persisted && i < output_count; i++) {
+        size_t buffer_index = (size_t)input_count + i;
+        persisted = vk.map_memory(device, memories[buffer_index], 0, byte_length, 0, &mapped) == VK_SUCCESS;
+        if (persisted) {
+            hashes[i] = fnv1a64(mapped, byte_length);
+            persisted = pwrite(output_descriptors[i].fd, mapped, byte_length, (off_t)output_descriptors[i].payload_offset) == (ssize_t)byte_length
+                && pwrite(output_descriptors[i].fd, &hashes[i], sizeof(hashes[i]), (off_t)output_descriptors[i].hash_offset) == (ssize_t)sizeof(hashes[i]);
+            vk.unmap_memory(device, memories[buffer_index]);
+        }
     }
     if (command_pool) vk.destroy_command_pool(device, command_pool, NULL);
     if (pipeline) vk.destroy_pipeline(device, pipeline, NULL);
@@ -757,8 +592,8 @@ int main(int argc, char** argv) {
     if (shader) vk.destroy_shader_module(device, shader, NULL);
     if (pool) vk.destroy_descriptor_pool(device, pool, NULL);
     if (set_layout) vk.destroy_descriptor_set_layout(device, set_layout, NULL);
-    for (int i = 0; i <= output_index; i++) if (memories[i]) vk.free_memory(device, memories[i], NULL);
-    for (int i = 0; i <= output_index; i++) if (buffers[i]) vk.destroy_buffer(device, buffers[i], NULL);
+    for (size_t i = 0; i < buffer_count; i++) if (memories[i]) vk.free_memory(device, memories[i], NULL);
+    for (size_t i = 0; i < buffer_count; i++) if (buffers[i]) vk.destroy_buffer(device, buffers[i], NULL);
     if (device) vk.destroy_device(device, NULL);
     if (instance) vk.destroy_instance(instance, NULL);
     if (vk.library) dlclose(vk.library);
@@ -776,12 +611,21 @@ int main(int argc, char** argv) {
         "selected_device_index=0\n"
         "selected_queue_family_index=%" PRIu32 "\n"
         "instance_api_version=%" PRIu32 "\n"
-        "output_bytes=%zu\n"
-        "output_hash=%" PRIu64 "\n",
+        "output_count=%zu\n"
+        "output_bytes=%zu\n",
         device_count,
         queue_family,
         api_version,
-        byte_length,
-        hash);
+        output_count,
+        byte_length);
+    if (output_count == 1) {
+        printf("output_hash=%" PRIu64 "\n", hashes[0]);
+    } else {
+        printf("output_hashes=");
+        for (size_t i = 0; i < output_count; i++) {
+            printf(i == 0 ? "%" PRIu64 : ",%" PRIu64, hashes[i]);
+        }
+        printf("\n");
+    }
     return fflush(stdout) == 0 ? 0 : 7;
 }

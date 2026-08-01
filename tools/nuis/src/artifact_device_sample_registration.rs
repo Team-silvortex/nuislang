@@ -113,13 +113,14 @@ fn evidence_matches_registration(
         .unwrap_or_else(|| registration.metadata_selector.is_none())
 }
 
-fn registrations() -> [DeviceSampleInputRegistration; 16] {
+fn registrations() -> [DeviceSampleInputRegistration; 18] {
     [
         crate::artifact_device_sample_pixelmagic::registration(),
         crate::artifact_device_sample_kernel::registration(),
         crate::artifact_device_sample_shader_metal::registration(),
         crate::artifact_device_sample_shader_metal::add_registration(),
         crate::artifact_device_sample_shader_metal::add_pair_registration(),
+        crate::artifact_device_sample_shader_metal_fan_out::registration(),
         crate::artifact_device_sample_shader_metal::sub_registration(),
         crate::artifact_device_sample_shader_metal::mul_registration(),
         crate::artifact_device_sample_shader_metal::xor_registration(),
@@ -127,6 +128,7 @@ fn registrations() -> [DeviceSampleInputRegistration; 16] {
         crate::artifact_device_sample_shader_vulkan::registration(),
         crate::artifact_device_sample_shader_vulkan::add_registration(),
         crate::artifact_device_sample_shader_vulkan::add_pair_registration(),
+        crate::artifact_device_sample_shader_vulkan_fan_out::registration(),
         crate::artifact_device_sample_shader_vulkan::sub_registration(),
         crate::artifact_device_sample_shader_vulkan::mul_registration(),
         crate::artifact_device_sample_shader_vulkan::xor_registration(),

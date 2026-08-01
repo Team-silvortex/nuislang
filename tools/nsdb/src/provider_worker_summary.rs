@@ -76,7 +76,7 @@ pub(crate) fn bind_worker_output(
     summary.worker_additional_output_hashes = receipt
         .additional_worker_outputs
         .iter()
-        .map(|output| output.payload_hash.as_str())
+        .map(|output| output.semantic_payload_hash())
         .collect::<Vec<_>>()
         .join(",");
     summary.worker_additional_output_retention_statuses = receipt

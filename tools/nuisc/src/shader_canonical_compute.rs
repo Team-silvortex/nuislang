@@ -1,12 +1,17 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CanonicalU32Compute {
-    pub(crate) operation: CanonicalU32Operation,
     pub(crate) entry: String,
     pub(crate) local_size: [u32; 3],
     pub(crate) descriptor_set: u32,
     pub(crate) input_binding: u32,
     pub(crate) aux_input_binding: Option<u32>,
-    pub(crate) output_binding: u32,
+    pub(crate) outputs: Vec<CanonicalU32Output>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct CanonicalU32Output {
+    pub(crate) binding: u32,
+    pub(crate) operation: CanonicalU32Operation,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,12 +22,13 @@ pub(crate) enum CanonicalU32Operation {
     MulU32,
     XorU32,
     AddPairU32,
+    XorPairU32,
 }
 
 impl CanonicalU32Operation {
     pub(crate) fn input_count(self) -> usize {
         match self {
-            Self::AddPairU32 => 2,
+            Self::AddPairU32 | Self::XorPairU32 => 2,
             Self::CopyU32 | Self::AddU32 | Self::SubU32 | Self::MulU32 | Self::XorU32 => 1,
         }
     }
@@ -85,6 +91,12 @@ const U32_OPERATION_PATTERNS: &[U32OperationPattern] = &[
         body_operator: Some("+"),
         input_count: 2,
     },
+    U32OperationPattern {
+        operation: CanonicalU32Operation::XorPairU32,
+        name: "xor-pair-u32",
+        body_operator: Some("^"),
+        input_count: 2,
+    },
 ];
 
 pub(crate) fn parse_u32_operation(value: &str) -> Result<CanonicalU32Operation, String> {
@@ -131,50 +143,65 @@ pub(crate) fn parse_canonical_inline_wgsl_u32_compute(
                 .to_owned(),
         );
     }
-    let outputs = storage_bindings
+    let mut outputs = storage_bindings
         .iter()
         .filter(|binding| binding.access == StorageAccess::Write)
         .collect::<Vec<_>>();
-    let [output] = outputs.as_slice() else {
+    outputs.sort_by_key(|binding| binding.binding);
+    if outputs.is_empty() || outputs.len() > 8 {
         return Err(
-            "canonical inline WGSL u32 compute requires exactly one writable storage output"
+            "canonical inline WGSL u32 compute requires one to eight writable storage outputs"
                 .to_owned(),
         );
-    };
-    if inputs.iter().any(|input| input.group != output.group) {
+    }
+    let descriptor_set = outputs[0].group;
+    if inputs.iter().any(|input| input.group != descriptor_set)
+        || outputs.iter().any(|output| output.group != descriptor_set)
+    {
         return Err(
             "canonical inline WGSL u32 compute requires input/output in one descriptor set"
                 .to_owned(),
         );
     }
-    if inputs.iter().any(|input| input.binding == output.binding)
-        || inputs
-            .windows(2)
-            .any(|pair| pair[0].binding == pair[1].binding)
-    {
+    let mut bindings = inputs
+        .iter()
+        .map(|binding| binding.binding)
+        .chain(outputs.iter().map(|binding| binding.binding))
+        .collect::<Vec<_>>();
+    bindings.sort_unstable();
+    if bindings.windows(2).any(|pair| pair[0] == pair[1]) {
         return Err("canonical inline WGSL u32 compute bindings must be distinct".to_owned());
     }
     let input_names = inputs
         .iter()
         .map(|binding| binding.name)
         .collect::<Vec<_>>();
-    let operation =
-        detect_canonical_body_operation(source, expected_entry, &input_names, output.name)?;
-    if operation.input_count() != inputs.len() {
-        return Err(format!(
-            "canonical inline WGSL u32 operation expects {} input binding(s), found {}",
-            operation.input_count(),
-            inputs.len()
-        ));
-    }
+    let outputs = outputs
+        .iter()
+        .map(|output| {
+            let operation =
+                detect_canonical_body_operation(source, expected_entry, &input_names, output.name)?;
+            if operation.input_count() != inputs.len() {
+                return Err(format!(
+                    "canonical inline WGSL u32 operation for output `{}` expects {} input binding(s), found {}",
+                    output.name,
+                    operation.input_count(),
+                    inputs.len()
+                ));
+            }
+            Ok(CanonicalU32Output {
+                binding: output.binding,
+                operation,
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
     Ok(CanonicalU32Compute {
-        operation,
         entry: expected_entry.to_owned(),
         local_size,
-        descriptor_set: output.group,
+        descriptor_set,
         input_binding: inputs[0].binding,
         aux_input_binding: inputs.get(1).map(|input| input.binding),
-        output_binding: output.binding,
+        outputs,
     })
 }
 
@@ -284,17 +311,24 @@ fn detect_two_input_body_operation(
                 .to_owned(),
         );
     };
-    for index in ["idx", "gid.x"] {
-        let left_right =
-            format!("{output_name}[{index}]={left_name}[{index}]+{right_name}[{index}];");
-        let right_left =
-            format!("{output_name}[{index}]={right_name}[{index}]+{left_name}[{index}];");
-        if compact.contains(&left_right) || compact.contains(&right_left) {
-            return Ok(CanonicalU32Operation::AddPairU32);
+    for (operator, operation) in [
+        ("+", CanonicalU32Operation::AddPairU32),
+        ("^", CanonicalU32Operation::XorPairU32),
+    ] {
+        for index in ["idx", "gid.x"] {
+            let left_right = format!(
+                "{output_name}[{index}]={left_name}[{index}]{operator}{right_name}[{index}];"
+            );
+            let right_left = format!(
+                "{output_name}[{index}]={right_name}[{index}]{operator}{left_name}[{index}];"
+            );
+            if compact.contains(&left_right) || compact.contains(&right_left) {
+                return Ok(operation);
+            }
         }
     }
     Err(
-        "canonical inline WGSL two-input u32 body must add both input buffers into output[idx]"
+        "canonical inline WGSL two-input u32 body must apply a registered pair operation to both input buffers"
             .to_owned(),
     )
 }

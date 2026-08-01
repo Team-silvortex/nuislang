@@ -27,6 +27,18 @@ pub(crate) struct U32RequestEvidence<'a> {
     pub(crate) bytes: &'a [u8],
     pub(crate) input_binding: String,
     pub(crate) dependency: String,
+    pub(crate) output_evidence: Option<String>,
+}
+
+pub(crate) struct U32OutputEvidence<'a> {
+    pub(crate) role: &'a str,
+    pub(crate) buffer: &'a str,
+    pub(crate) layout: &'a str,
+    pub(crate) shape: &'a str,
+    pub(crate) row_stride_bytes: usize,
+    pub(crate) comparison_id: &'a str,
+    pub(crate) expected_file_name: &'a str,
+    pub(crate) expected: &'a [u8],
 }
 
 pub(crate) fn render_u32_sample_request_evidence(
@@ -59,12 +71,28 @@ pub(crate) fn render_u32_sample_request_evidence(
         bytes,
         input_binding: render_u32_artifact_binding("provider_", input_file_name, input),
         dependency: render_dependency_count_zero("provider_"),
+        output_evidence: None,
     })
 }
 
 pub(crate) fn render_u32_prefixed_request_evidence(args: U32RequestEvidence<'_>) -> String {
+    let output_evidence = args.output_evidence.unwrap_or_else(|| {
+        render_u32_output_evidence(
+            args.prefix,
+            &[U32OutputEvidence {
+                role: "output.result",
+                buffer: "output.values",
+                layout: args.buffer_layout,
+                shape: args.buffer_shape,
+                row_stride_bytes: args.row_stride_bytes,
+                comparison_id: "comparison.output.values",
+                expected_file_name: args.expected_file_name,
+                expected: args.expected,
+            }],
+        )
+    });
     format!(
-        "{prefix}buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;{prefix}buffer_id=input.values;{prefix}buffer_element_type=u32;{prefix}buffer_layout={};{prefix}buffer_shape={};{prefix}buffer_row_stride_bytes={};{prefix}buffer_byte_length={};{prefix}buffer_payload_path={};{prefix}buffer_content_hash={};{prefix}kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;{prefix}kernel_id={};{prefix}kernel_operation={};{prefix}kernel_input_buffer=input.values;{prefix}kernel_input_buffers={};{prefix}kernel_output_buffer=output.values;{prefix}kernel_dispatch={};{prefix}kernel_scalar_bindings=element_count:u32:{U32_ELEMENT_COUNT};{prefix}code_asset_descriptor_contract=nuis-provider-code-asset-descriptor-v1;{prefix}code_asset_id={};{prefix}code_asset_format={};{prefix}code_asset_target={};{prefix}code_asset_entry={};{prefix}code_asset_path={};{prefix}code_asset_byte_length={};{prefix}code_asset_digest_contract={DIGEST_CONTRACT};{prefix}code_asset_content_hash={};{prefix}output_binding_contract=nuis-provider-output-binding-v2;{prefix}output_binding_count=1;{prefix}output_binding_0_role=output.result;{prefix}output_binding_0_buffer=output.values;{prefix}output_binding_0_element_type=u32;{prefix}output_binding_0_layout={};{prefix}output_binding_0_shape={};{prefix}output_binding_0_row_stride_bytes={};{prefix}output_binding_0_byte_length={};{prefix}output_binding_0_comparison_id=comparison.output.values;{prefix}output_comparison_id=comparison.output.values;{prefix}output_comparison_descriptor_contract=nuis-provider-output-comparison-descriptor-v1;{prefix}output_comparison_output_buffer=output.values;{prefix}output_comparison_element_type=u32;{prefix}output_comparison_shape={};{prefix}output_comparison_expected_path={};{prefix}output_comparison_expected_byte_length={};{prefix}output_comparison_expected_content_hash={};{prefix}output_comparison_absolute_tolerance=0;{prefix}output_comparison_relative_tolerance=0;{prefix}output_comparison_non_finite_policy=reject;{};{};{prefix}adapter_binding_contract=nuis-provider-request-adapter-binding-v1;{prefix}adapter_binding_provider_family={};{prefix}adapter_binding_execution_requirement=real-device",
+        "{prefix}buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;{prefix}buffer_id=input.values;{prefix}buffer_element_type=u32;{prefix}buffer_layout={};{prefix}buffer_shape={};{prefix}buffer_row_stride_bytes={};{prefix}buffer_byte_length={};{prefix}buffer_payload_path={};{prefix}buffer_content_hash={};{prefix}kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;{prefix}kernel_id={};{prefix}kernel_operation={};{prefix}kernel_input_buffer=input.values;{prefix}kernel_input_buffers={};{prefix}kernel_output_buffer=output.values;{prefix}kernel_dispatch={};{prefix}kernel_scalar_bindings=element_count:u32:{U32_ELEMENT_COUNT};{prefix}code_asset_descriptor_contract=nuis-provider-code-asset-descriptor-v1;{prefix}code_asset_id={};{prefix}code_asset_format={};{prefix}code_asset_target={};{prefix}code_asset_entry={};{prefix}code_asset_path={};{prefix}code_asset_byte_length={};{prefix}code_asset_digest_contract={DIGEST_CONTRACT};{prefix}code_asset_content_hash={};{};{};{};{prefix}adapter_binding_contract=nuis-provider-request-adapter-binding-v1;{prefix}adapter_binding_provider_family={};{prefix}adapter_binding_execution_requirement=real-device",
         args.buffer_layout,
         args.buffer_shape,
         args.row_stride_bytes,
@@ -82,19 +110,80 @@ pub(crate) fn render_u32_prefixed_request_evidence(args: U32RequestEvidence<'_>)
         args.asset.file_name,
         args.bytes.len(),
         fnv1a64_hex(args.bytes),
-        args.buffer_layout,
-        args.buffer_shape,
-        args.row_stride_bytes,
-        args.expected.len(),
-        args.buffer_shape,
-        args.expected_file_name,
-        args.expected.len(),
-        fnv1a64_hex(args.expected),
+        output_evidence,
         args.dependency,
         args.input_binding,
         args.provider_family,
         prefix = args.prefix,
     )
+}
+
+pub(crate) fn render_u32_output_evidence(
+    prefix: &str,
+    outputs: &[U32OutputEvidence<'_>],
+) -> String {
+    let mut fields = vec![
+        format!("{prefix}output_binding_contract=nuis-provider-output-binding-v2"),
+        format!("{prefix}output_binding_count={}", outputs.len()),
+    ];
+    for (index, output) in outputs.iter().enumerate() {
+        fields.extend([
+            format!("{prefix}output_binding_{index}_role={}", output.role),
+            format!("{prefix}output_binding_{index}_buffer={}", output.buffer),
+            format!("{prefix}output_binding_{index}_element_type=u32"),
+            format!("{prefix}output_binding_{index}_layout={}", output.layout),
+            format!("{prefix}output_binding_{index}_shape={}", output.shape),
+            format!(
+                "{prefix}output_binding_{index}_row_stride_bytes={}",
+                output.row_stride_bytes
+            ),
+            format!(
+                "{prefix}output_binding_{index}_byte_length={}",
+                output.expected.len()
+            ),
+            format!(
+                "{prefix}output_binding_{index}_comparison_id={}",
+                output.comparison_id
+            ),
+        ]);
+    }
+    if outputs.len() == 1 {
+        let output = &outputs[0];
+        fields.extend([
+            format!("{prefix}output_comparison_id={}", output.comparison_id),
+            format!("{prefix}output_comparison_descriptor_contract=nuis-provider-output-comparison-descriptor-v1"),
+            format!("{prefix}output_comparison_output_buffer={}", output.buffer),
+            format!("{prefix}output_comparison_element_type=u32"),
+            format!("{prefix}output_comparison_shape={}", output.shape),
+            format!("{prefix}output_comparison_expected_path={}", output.expected_file_name),
+            format!("{prefix}output_comparison_expected_byte_length={}", output.expected.len()),
+            format!("{prefix}output_comparison_expected_content_hash={}", fnv1a64_hex(output.expected)),
+            format!("{prefix}output_comparison_absolute_tolerance=0"),
+            format!("{prefix}output_comparison_relative_tolerance=0"),
+            format!("{prefix}output_comparison_non_finite_policy=reject"),
+        ]);
+    } else {
+        fields.extend([
+            format!("{prefix}output_comparison_collection_contract=nuis-provider-output-comparison-collection-v1"),
+            format!("{prefix}output_comparison_collection_count={}", outputs.len()),
+        ]);
+        for (index, output) in outputs.iter().enumerate() {
+            fields.extend([
+                format!("{prefix}output_comparison_item_{index}_id={}", output.comparison_id),
+                format!("{prefix}output_comparison_item_{index}_descriptor_contract=nuis-provider-output-comparison-descriptor-v1"),
+                format!("{prefix}output_comparison_item_{index}_output_buffer={}", output.buffer),
+                format!("{prefix}output_comparison_item_{index}_element_type=u32"),
+                format!("{prefix}output_comparison_item_{index}_shape={}", output.shape),
+                format!("{prefix}output_comparison_item_{index}_expected_path={}", output.expected_file_name),
+                format!("{prefix}output_comparison_item_{index}_expected_byte_length={}", output.expected.len()),
+                format!("{prefix}output_comparison_item_{index}_expected_content_hash={}", fnv1a64_hex(output.expected)),
+                format!("{prefix}output_comparison_item_{index}_absolute_tolerance=0"),
+                format!("{prefix}output_comparison_item_{index}_relative_tolerance=0"),
+                format!("{prefix}output_comparison_item_{index}_non_finite_policy=reject"),
+            ]);
+        }
+    }
+    fields.join(";")
 }
 
 pub(crate) fn render_dependency_count_zero(prefix: &str) -> String {

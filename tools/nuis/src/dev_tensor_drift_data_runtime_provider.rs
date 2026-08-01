@@ -486,7 +486,9 @@ pub(crate) const DEV_TENSOR_RUNTIME_PROVIDER_DRIFT_CHECKS: &[DevTensorDriftCheck
                 "worker_adapter_control_contract",
                 "worker_adapter_control_mode",
                 "worker_additional_output_roles",
+                "worker_additional_output_hashes",
                 "worker_additional_output_retention_statuses",
+                "semantic_payload_hash",
             ],
         },
         DevTensorDriftCheckSpec {

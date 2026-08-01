@@ -10,7 +10,7 @@ const SPIRV_VERSION_1_6: u32 = 0x0001_0600;
 pub(crate) struct VulkanStorageBufferLayout {
     pub(crate) descriptor_set: u32,
     pub(crate) input_bindings: Vec<u32>,
-    pub(crate) output_binding: u32,
+    pub(crate) output_bindings: Vec<u32>,
 }
 
 #[derive(Default)]
@@ -108,14 +108,16 @@ fn storage_buffer_layout_from_decorations(
     }
     input_bindings.sort_unstable();
     output_bindings.sort_unstable();
-    if input_bindings.is_empty() || output_bindings.len() != 1 {
-        return Err("Vulkan SPIR-V asset must expose inputs and one output descriptor".to_owned());
+    if input_bindings.is_empty() || !(1..=8).contains(&output_bindings.len()) {
+        return Err(
+            "Vulkan SPIR-V asset must expose inputs and one to eight output descriptors".to_owned(),
+        );
     }
     Ok(VulkanStorageBufferLayout {
         descriptor_set: descriptor_set
             .ok_or_else(|| "Vulkan SPIR-V asset has no descriptor set".to_owned())?,
         input_bindings,
-        output_binding: output_bindings[0],
+        output_bindings,
     })
 }
 
@@ -128,3 +130,7 @@ fn set_unique_decoration(slot: &mut Option<u32>, value: u32, name: &str) -> Resu
     *slot = Some(value);
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "provider_execution_vulkan_spirv_tests.rs"]
+mod tests;

@@ -86,7 +86,7 @@ fn execute(
     inputs: &[PreparedProviderInput],
     worker_receipt: &mut ProviderWorkerDispatchReceipt,
 ) -> Result<ProviderRequestExecution, String> {
-    let _plan =
+    let plan =
         validate_vulkan_execution_session_plan(output_dir, provider_family, request, inputs.len())?;
     if worker_receipt.execution_capsule_invocation_mode
         != crate::provider_worker_lease::PROVIDER_WORKER_PROCESS_ADAPTER_CONTRACT
@@ -94,6 +94,11 @@ fn execute(
         return Err("Vulkan SPIR-V provider requires its registered process adapter".to_owned());
     }
     let selection = parse_vulkan_worker_protocol(&worker_receipt.worker_output_payload)?;
+    if selection.output_count != plan.output_bindings.len()
+        || selection.output_bytes != plan.output_byte_length
+    {
+        return Err("Vulkan adapter protocol outputs do not match the execution plan".to_owned());
+    }
     let (mut summary, output_payload, transferable_output) =
         crate::provider_worker_native_execution::take_provider_worker_native_output(
             input_evidence,
@@ -130,7 +135,7 @@ struct VulkanExecutionSessionPlan {
     output_byte_length: usize,
     descriptor_set: u32,
     input_bindings: Vec<u32>,
-    output_binding: u32,
+    output_bindings: Vec<u32>,
     dispatch: [usize; 3],
 }
 
@@ -140,6 +145,7 @@ struct VulkanWorkerProtocol {
     selected_device_index: u32,
     selected_queue_family_index: u32,
     instance_api_version: u32,
+    output_count: usize,
     output_bytes: usize,
 }
 
@@ -190,7 +196,8 @@ fn validate_vulkan_execution_session_plan(
             .iter()
             .map(String::as_str)
             .ne(request_input_names.iter().copied())
-        || request.kernel.output_buffer != "output.values"
+        || request.output_bindings.is_empty()
+        || request.kernel.output_buffer != request.output_bindings[0].buffer
         || dispatch != [usize::try_from(element_count).unwrap_or(0), 1, 1]
         || !(1..=2).contains(&input_count)
         || request.input_bindings.len() != input_count
@@ -201,11 +208,10 @@ fn validate_vulkan_execution_session_plan(
                     &request.buffer,
                 )
         })
-        || request.output_bindings.len() != 1
-        || !crate::provider_output_binding::output_binding_matches_buffer(
-            &request.output_bindings[0],
-            &request.buffer,
-        )
+        || request.output_bindings.len() > 8
+        || request.output_bindings.iter().any(|output| {
+            !crate::provider_output_binding::output_binding_matches_buffer(output, &request.buffer)
+        })
         || binding.provider_family != VULKAN_PROVIDER_FAMILY
         || binding.execution_requirement != "real-device"
         || !asset_descriptor_matches_vulkan_u32(asset, &request.kernel.operation)
@@ -222,9 +228,12 @@ fn validate_vulkan_execution_session_plan(
     })?;
     let layout = validate_spirv_u32_module(asset, &bytes)?;
     let expected_input_bindings = (0..u32::try_from(input_count).unwrap_or(0)).collect::<Vec<_>>();
+    let expected_output_bindings = (u32::try_from(input_count).unwrap_or(0)
+        ..u32::try_from(input_count + request.output_bindings.len()).unwrap_or(0))
+        .collect::<Vec<_>>();
     if layout.descriptor_set != 0
         || layout.input_bindings != expected_input_bindings
-        || layout.output_binding != u32::try_from(input_count).unwrap_or(0)
+        || layout.output_bindings != expected_output_bindings
     {
         return Err(
             "Vulkan SPIR-V descriptor layout does not match the registered runner ABI".to_owned(),
@@ -241,7 +250,7 @@ fn validate_vulkan_execution_session_plan(
         output_byte_length: expected_bytes,
         descriptor_set: layout.descriptor_set,
         input_bindings: layout.input_bindings,
-        output_binding: layout.output_binding,
+        output_bindings: layout.output_bindings,
         dispatch,
     })
 }
@@ -330,6 +339,9 @@ fn parse_vulkan_worker_protocol(protocol: &[u8]) -> Result<VulkanWorkerProtocol,
             .parse::<u32>()
             .map_err(|error| format!("Vulkan adapter protocol `{key}` is invalid: {error}"))
     };
+    let output_count = required("output_count")?
+        .parse::<usize>()
+        .map_err(|error| format!("Vulkan adapter protocol `output_count` is invalid: {error}"))?;
     let output_bytes = required("output_bytes")?
         .parse::<usize>()
         .map_err(|error| format!("Vulkan adapter protocol `output_bytes` is invalid: {error}"))?;
@@ -338,11 +350,13 @@ fn parse_vulkan_worker_protocol(protocol: &[u8]) -> Result<VulkanWorkerProtocol,
         selected_device_index: parse_u32("selected_device_index")?,
         selected_queue_family_index: parse_u32("selected_queue_family_index")?,
         instance_api_version: parse_u32("instance_api_version")?,
+        output_count,
         output_bytes,
     };
     if evidence.device_inventory_count == 0
         || evidence.selected_device_index >= evidence.device_inventory_count
         || evidence.instance_api_version < (1 << 22)
+        || !(1..=8).contains(&evidence.output_count)
         || evidence.output_bytes == 0
     {
         return Err(
@@ -456,7 +470,7 @@ mod tests {
                 plan.input_bindings,
                 (0..input_count as u32).collect::<Vec<_>>()
             );
-            assert_eq!(plan.output_binding, input_count as u32);
+            assert_eq!(plan.output_bindings, vec![input_count as u32]);
             assert_eq!(plan.dispatch, [4, 1, 1]);
         }
         fs::remove_dir_all(output_dir).unwrap();
@@ -581,7 +595,7 @@ mod tests {
         )
         .expect("registered pair fan-in plan");
         assert_eq!(plan.input_bindings, vec![0, 1]);
-        assert_eq!(plan.output_binding, 2);
+        assert_eq!(plan.output_bindings, vec![2]);
 
         request.input_bindings[1].row_stride_bytes = 4;
         assert!(validate_vulkan_execution_session_plan(
@@ -735,11 +749,12 @@ mod tests {
 
     #[test]
     fn vulkan_worker_protocol_is_request_bound() {
-        let protocol = b"protocol=nuis-vulkan-spirv-provider-runner-v1\nstatus=ready\ndevice_inventory_contract=nuis-vulkan-device-inventory-v1\ndevice_inventory_count=2\ndevice_selection_contract=nuis-vulkan-device-selection-v1\ndevice_selection_status=verified\nselected_device_index=0\nselected_queue_family_index=3\ninstance_api_version=4206592\noutput_bytes=16\noutput_hash=1\n";
+        let protocol = b"protocol=nuis-vulkan-spirv-provider-runner-v1\nstatus=ready\ndevice_inventory_contract=nuis-vulkan-device-inventory-v1\ndevice_inventory_count=2\ndevice_selection_contract=nuis-vulkan-device-selection-v1\ndevice_selection_status=verified\nselected_device_index=0\nselected_queue_family_index=3\ninstance_api_version=4206592\noutput_count=1\noutput_bytes=16\noutput_hash=1\n";
         let evidence = parse_vulkan_worker_protocol(protocol).expect("selection evidence");
         assert_eq!(evidence.device_inventory_count, 2);
         assert_eq!(evidence.selected_device_index, 0);
         assert_eq!(evidence.selected_queue_family_index, 3);
+        assert_eq!(evidence.output_count, 1);
         assert_eq!(evidence.output_bytes, 16);
         let drifted = String::from_utf8_lossy(protocol).replace("status=ready", "status=drift");
         assert!(parse_vulkan_worker_protocol(drifted.as_bytes()).is_err());

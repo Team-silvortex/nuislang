@@ -300,6 +300,7 @@ fn vulkan_sample_evidence(sample: VulkanSampleSpec) -> String {
                 right,
             ),
             dependency: render_dependency_count_zero("provider_"),
+            output_evidence: None,
         });
     }
     render_u32_sample_request_evidence(
@@ -375,6 +376,7 @@ fn render_chain_artifact_request(
         bytes,
         input_binding: render_u32_artifact_binding(&prefix, CHAIN_INPUT_FILE_NAME, INPUT),
         dependency: render_dependency_count_zero(&prefix),
+        output_evidence: None,
     })
 }
 
@@ -417,6 +419,7 @@ fn render_chain_dependency_request(
             "input.values",
             "glm:provider-edge:shader.vulkan.chain.add-u32:output.values->shader.vulkan.chain.xor-u32:input.values",
         ),
+        output_evidence: None,
     })
 }
 

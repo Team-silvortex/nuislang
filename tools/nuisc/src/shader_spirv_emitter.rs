@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::shader_canonical_compute::{
     parse_canonical_inline_wgsl_u32_compute, parse_u32_operation, CanonicalU32Compute,
-    CanonicalU32Operation,
+    CanonicalU32Operation, CanonicalU32Output,
 };
 
 pub(crate) const SPIRV_COMPUTE_SOURCE_CONTRACT: &str = "nuis-spirv-compute-source-v1";
@@ -90,13 +90,15 @@ fn parse_compute_source(
     let output_binding = parse_u32(&fields, "output_binding")?;
     validate_u32_compute_bindings(operation, input_binding, aux_input_binding, output_binding)?;
     Ok(CanonicalU32Compute {
-        operation,
         entry: entry.to_owned(),
         local_size,
         descriptor_set,
         input_binding,
         aux_input_binding,
-        output_binding,
+        outputs: vec![CanonicalU32Output {
+            binding: output_binding,
+            operation,
+        }],
     })
 }
 
@@ -231,38 +233,41 @@ fn emit_u32_module(source: &CanonicalU32Compute) -> Vec<u32> {
     const BUFFER_BLOCK: u32 = 9;
     const STORAGE_BUFFER_BLOCK_POINTER: u32 = 10;
     const INPUT_BUFFER: u32 = 11;
-    const OUTPUT_BUFFER: u32 = 12;
-    const STORAGE_BUFFER_U32_POINTER: u32 = 13;
-    const MAIN: u32 = 14;
-    const LABEL: u32 = 15;
-    const INVOCATION: u32 = 16;
-    const INDEX: u32 = 17;
-    const INPUT_ELEMENT: u32 = 18;
-    const VALUE: u32 = 19;
-    const OUTPUT_ELEMENT: u32 = 20;
-    const COMPUTED_VALUE: u32 = 21;
-    const AUX_INPUT_BUFFER: u32 = 22;
-    const AUX_INPUT_ELEMENT: u32 = 23;
-    const AUX_VALUE: u32 = 24;
+    const STORAGE_BUFFER_U32_POINTER: u32 = 12;
+    const MAIN: u32 = 13;
+    const LABEL: u32 = 14;
+    const INVOCATION: u32 = 15;
+    const INDEX: u32 = 16;
+    const INPUT_ELEMENT: u32 = 17;
+    const VALUE: u32 = 18;
 
-    let has_aux_input = source.aux_input_binding.is_some();
-    let id_bound = if has_aux_input {
-        25
-    } else if spirv_u32_binary_opcode(source.operation).is_some() {
-        22
-    } else {
-        21
-    };
+    let mut next_id = 19;
+    let aux_ids = source.aux_input_binding.map(|_| SpirvInputIds {
+        variable: allocate_spirv_id(&mut next_id),
+        element: allocate_spirv_id(&mut next_id),
+        value: allocate_spirv_id(&mut next_id),
+    });
+    let output_ids = source
+        .outputs
+        .iter()
+        .map(|output| SpirvOutputIds {
+            variable: allocate_spirv_id(&mut next_id),
+            element: allocate_spirv_id(&mut next_id),
+            computed: spirv_u32_binary_opcode(output.operation)
+                .map(|_| allocate_spirv_id(&mut next_id)),
+        })
+        .collect::<Vec<_>>();
+    let id_bound = next_id;
     let mut words = vec![SPIRV_MAGIC, SPIRV_VERSION_1_6, 0, id_bound, 0];
     instruction(&mut words, 17, &[1]);
     instruction(&mut words, 14, &[0, 1]);
     let mut entry_operands = vec![5, MAIN];
     entry_operands.extend(encode_string(&source.entry));
     entry_operands.extend([GLOBAL_INVOCATION_ID, INPUT_BUFFER]);
-    if has_aux_input {
-        entry_operands.push(AUX_INPUT_BUFFER);
+    if let Some(aux) = &aux_ids {
+        entry_operands.push(aux.variable);
     }
-    entry_operands.push(OUTPUT_BUFFER);
+    entry_operands.extend(output_ids.iter().map(|output| output.variable));
     instruction(&mut words, 15, &entry_operands);
     instruction(
         &mut words,
@@ -282,18 +287,16 @@ fn emit_u32_module(source: &CanonicalU32Compute) -> Vec<u32> {
     instruction(&mut words, 71, &[INPUT_BUFFER, 34, source.descriptor_set]);
     instruction(&mut words, 71, &[INPUT_BUFFER, 33, source.input_binding]);
     instruction(&mut words, 71, &[INPUT_BUFFER, 24]);
-    if let Some(aux_input_binding) = source.aux_input_binding {
-        instruction(
-            &mut words,
-            71,
-            &[AUX_INPUT_BUFFER, 34, source.descriptor_set],
-        );
-        instruction(&mut words, 71, &[AUX_INPUT_BUFFER, 33, aux_input_binding]);
-        instruction(&mut words, 71, &[AUX_INPUT_BUFFER, 24]);
+    if let (Some(aux_input_binding), Some(aux)) = (source.aux_input_binding, &aux_ids) {
+        instruction(&mut words, 71, &[aux.variable, 34, source.descriptor_set]);
+        instruction(&mut words, 71, &[aux.variable, 33, aux_input_binding]);
+        instruction(&mut words, 71, &[aux.variable, 24]);
     }
-    instruction(&mut words, 71, &[OUTPUT_BUFFER, 34, source.descriptor_set]);
-    instruction(&mut words, 71, &[OUTPUT_BUFFER, 33, source.output_binding]);
-    instruction(&mut words, 71, &[OUTPUT_BUFFER, 25]);
+    for (output, ids) in source.outputs.iter().zip(&output_ids) {
+        instruction(&mut words, 71, &[ids.variable, 34, source.descriptor_set]);
+        instruction(&mut words, 71, &[ids.variable, 33, output.binding]);
+        instruction(&mut words, 71, &[ids.variable, 25]);
+    }
     instruction(&mut words, 19, &[VOID]);
     instruction(&mut words, 33, &[FUNCTION_TYPE, VOID]);
     instruction(&mut words, 21, &[U32_TYPE, 32, 0]);
@@ -317,18 +320,20 @@ fn emit_u32_module(source: &CanonicalU32Compute) -> Vec<u32> {
         59,
         &[STORAGE_BUFFER_BLOCK_POINTER, INPUT_BUFFER, 12],
     );
-    if has_aux_input {
+    if let Some(aux) = &aux_ids {
         instruction(
             &mut words,
             59,
-            &[STORAGE_BUFFER_BLOCK_POINTER, AUX_INPUT_BUFFER, 12],
+            &[STORAGE_BUFFER_BLOCK_POINTER, aux.variable, 12],
         );
     }
-    instruction(
-        &mut words,
-        59,
-        &[STORAGE_BUFFER_BLOCK_POINTER, OUTPUT_BUFFER, 12],
-    );
+    for output in &output_ids {
+        instruction(
+            &mut words,
+            59,
+            &[STORAGE_BUFFER_BLOCK_POINTER, output.variable, 12],
+        );
+    }
     instruction(&mut words, 32, &[STORAGE_BUFFER_U32_POINTER, 12, U32_TYPE]);
     instruction(&mut words, 54, &[VOID, MAIN, 0, FUNCTION_TYPE]);
     instruction(&mut words, 248, &[LABEL]);
@@ -350,42 +355,63 @@ fn emit_u32_module(source: &CanonicalU32Compute) -> Vec<u32> {
         ],
     );
     instruction(&mut words, 61, &[U32_TYPE, VALUE, INPUT_ELEMENT]);
-    if has_aux_input {
+    if let Some(aux) = &aux_ids {
         instruction(
             &mut words,
             65,
             &[
                 STORAGE_BUFFER_U32_POINTER,
-                AUX_INPUT_ELEMENT,
-                AUX_INPUT_BUFFER,
+                aux.element,
+                aux.variable,
                 U32_ZERO,
                 INDEX,
             ],
         );
-        instruction(&mut words, 61, &[U32_TYPE, AUX_VALUE, AUX_INPUT_ELEMENT]);
+        instruction(&mut words, 61, &[U32_TYPE, aux.value, aux.element]);
     }
-    instruction(
-        &mut words,
-        65,
-        &[
-            STORAGE_BUFFER_U32_POINTER,
-            OUTPUT_ELEMENT,
-            OUTPUT_BUFFER,
-            U32_ZERO,
-            INDEX,
-        ],
-    );
-    match spirv_u32_binary_opcode(source.operation) {
-        None => instruction(&mut words, 62, &[OUTPUT_ELEMENT, VALUE]),
-        Some(opcode) => {
-            let rhs = if has_aux_input { AUX_VALUE } else { VALUE };
-            instruction(&mut words, opcode, &[U32_TYPE, COMPUTED_VALUE, VALUE, rhs]);
-            instruction(&mut words, 62, &[OUTPUT_ELEMENT, COMPUTED_VALUE]);
+    for (output, ids) in source.outputs.iter().zip(&output_ids) {
+        instruction(
+            &mut words,
+            65,
+            &[
+                STORAGE_BUFFER_U32_POINTER,
+                ids.element,
+                ids.variable,
+                U32_ZERO,
+                INDEX,
+            ],
+        );
+        match (spirv_u32_binary_opcode(output.operation), ids.computed) {
+            (None, None) => instruction(&mut words, 62, &[ids.element, VALUE]),
+            (Some(opcode), Some(computed)) => {
+                let rhs = aux_ids.as_ref().map(|aux| aux.value).unwrap_or(VALUE);
+                instruction(&mut words, opcode, &[U32_TYPE, computed, VALUE, rhs]);
+                instruction(&mut words, 62, &[ids.element, computed]);
+            }
+            _ => unreachable!("SPIR-V output IDs follow the registered operation"),
         }
     }
     instruction(&mut words, 253, &[]);
     instruction(&mut words, 56, &[]);
     words
+}
+
+struct SpirvInputIds {
+    variable: u32,
+    element: u32,
+    value: u32,
+}
+
+struct SpirvOutputIds {
+    variable: u32,
+    element: u32,
+    computed: Option<u32>,
+}
+
+fn allocate_spirv_id(next: &mut u32) -> u32 {
+    let id = *next;
+    *next += 1;
+    id
 }
 
 fn spirv_u32_binary_opcode(operation: CanonicalU32Operation) -> Option<u16> {
@@ -396,6 +422,7 @@ fn spirv_u32_binary_opcode(operation: CanonicalU32Operation) -> Option<u16> {
         CanonicalU32Operation::MulU32 => Some(132),
         CanonicalU32Operation::XorU32 => Some(198),
         CanonicalU32Operation::AddPairU32 => Some(128),
+        CanonicalU32Operation::XorPairU32 => Some(198),
     }
 }
 
@@ -484,7 +511,8 @@ fn validate_module_shape(words: &[u32], entry: &str) -> Result<(), String> {
         if opcode == 15
             && word_count >= 3 + encoded_entry.len()
             && words[cursor + 1] == 5
-            && words[cursor + 2] == 14
+            && words[cursor + 2] > 0
+            && words[cursor + 2] < words[3]
             && words[cursor + 3..cursor + 3 + encoded_entry.len()] == encoded_entry
         {
             found_entry = true;

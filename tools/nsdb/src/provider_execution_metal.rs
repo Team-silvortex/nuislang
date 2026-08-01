@@ -216,9 +216,9 @@ fn execute(
                 runner_contract,
                 worker_receipt.worker_output_result.take(),
             )?
-        } else if inputs.len() != 1 {
+        } else if inputs.len() != 1 || request.output_bindings.len() != 1 {
             return Err(format!(
-                "Metal multi-input kernel `{}` requires the process adapter",
+                "Metal multi-input or multi-output kernel `{}` requires the process adapter",
                 request.kernel.id
             ));
         } else if let Some(channel) = inputs[0].direct_channel() {
@@ -353,11 +353,10 @@ fn is_u32_compute(request: &ProviderRequest) -> bool {
     request.buffer.element_type == "u32"
         && metal_dense_u32_layout(request)
         && request.kernel.operation.ends_with("-u32")
-        && request.output_bindings.len() == 1
-        && crate::provider_output_binding::output_binding_matches_buffer(
-            &request.output_bindings[0],
-            &request.buffer,
-        )
+        && !request.output_bindings.is_empty()
+        && request.output_bindings.iter().all(|binding| {
+            crate::provider_output_binding::output_binding_matches_buffer(binding, &request.buffer)
+        })
 }
 
 fn metal_dense_u32_layout(request: &ProviderRequest) -> bool {
@@ -382,19 +381,28 @@ fn validate_metal_input_count(
 ) -> Result<(), String> {
     if is_u32_compute(request) {
         let (path, entry) = validated_metal_code_asset(output_dir, request)?;
-        let expected = metal_u32_input_count(&path, &entry)?;
-        if input_count != expected || request.input_bindings.len() != expected {
+        let (expected_inputs, expected_outputs) = metal_u32_buffer_counts(&path, &entry)?;
+        if input_count != expected_inputs || request.input_bindings.len() != expected_inputs {
             return Err(format!(
-                "Metal kernel `{}` declares {expected} input buffer(s), but the request carries {} binding(s) and {input_count} prepared input(s)",
+                "Metal kernel `{}` declares {expected_inputs} input buffer(s), but the request carries {} binding(s) and {input_count} prepared input(s)",
                 request.kernel.id,
                 request.input_bindings.len()
             ));
         }
+        if request.output_bindings.len() != expected_outputs {
+            return Err(format!(
+                "Metal kernel `{}` declares {expected_outputs} output buffer(s), but the request carries {} binding(s)",
+                request.kernel.id,
+                request.output_bindings.len()
+            ));
+        }
         if request.input_bindings.iter().any(|binding| {
             !crate::provider_input_binding::input_binding_matches_buffer(binding, &request.buffer)
+        }) || request.output_bindings.iter().any(|binding| {
+            !crate::provider_output_binding::output_binding_matches_buffer(binding, &request.buffer)
         }) {
             return Err(format!(
-                "Metal kernel `{}` input layouts do not match its primary typed buffer",
+                "Metal kernel `{}` input/output layouts do not match its primary typed buffer",
                 request.kernel.id
             ));
         }
@@ -410,7 +418,7 @@ fn validate_metal_input_count(
     }
 }
 
-fn metal_u32_input_count(path: &Path, entry: &str) -> Result<usize, String> {
+fn metal_u32_buffer_counts(path: &Path, entry: &str) -> Result<(usize, usize), String> {
     let source = std::fs::read_to_string(path)
         .map_err(|error| format!("failed to read verified Metal code asset: {error}"))?;
     let marker = format!("kernel void {entry}(");
@@ -434,12 +442,17 @@ fn metal_u32_input_count(path: &Path, entry: &str) -> Result<usize, String> {
         }
     }
     let expected_inputs: Vec<usize> = (0..inputs.len()).collect();
-    if inputs.is_empty() || inputs != expected_inputs || outputs != [inputs.len()] {
+    let expected_outputs = (inputs.len()..inputs.len() + outputs.len()).collect::<Vec<_>>();
+    if inputs.is_empty()
+        || outputs.is_empty()
+        || inputs != expected_inputs
+        || outputs != expected_outputs
+    {
         return Err(format!(
-            "Metal entry `{entry}` must declare contiguous read-only u32 inputs followed by one writable u32 output"
+            "Metal entry `{entry}` must declare contiguous read-only u32 inputs followed by contiguous writable u32 outputs"
         ));
     }
-    Ok(inputs.len())
+    Ok((inputs.len(), outputs.len()))
 }
 
 fn metal_buffer_slot(line: &str) -> Option<usize> {
@@ -454,7 +467,7 @@ fn uses_process_adapter(receipt: &ProviderWorkerDispatchReceipt) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::metal_u32_input_count;
+    use super::metal_u32_buffer_counts;
     use std::{env, fs};
 
     #[test]
@@ -472,7 +485,27 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(metal_u32_input_count(&path, "pair").unwrap(), 2);
+        assert_eq!(metal_u32_buffer_counts(&path, "pair").unwrap(), (2, 1));
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn metal_layout_accepts_contiguous_multiple_outputs() {
+        let path = env::temp_dir().join(format!(
+            "nuis-metal-layout-{}-{}.metal",
+            std::process::id(),
+            "fan-out"
+        ));
+        fs::write(
+            &path,
+            "kernel void fan_out(device const uint* left [[buffer(0)]],\n\
+             device const uint* right [[buffer(1)]],\n\
+             device uint* sum [[buffer(2)]],\n\
+             device uint* audit [[buffer(3)]]) { }\n",
+        )
+        .unwrap();
+
+        assert_eq!(metal_u32_buffer_counts(&path, "fan_out").unwrap(), (2, 2));
         fs::remove_file(path).unwrap();
     }
 
@@ -490,7 +523,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(metal_u32_input_count(&path, "gap")
+        assert!(metal_u32_buffer_counts(&path, "gap")
             .unwrap_err()
             .contains("contiguous read-only u32 inputs"));
         fs::remove_file(path).unwrap();

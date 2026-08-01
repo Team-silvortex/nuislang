@@ -90,6 +90,25 @@ stage compute(workgroup_size(1, 1, 1)) {{
     )
 }
 
+fn canonical_pair_fan_out_wgsl(entry: &str) -> String {
+    format!(
+        r#"
+binding(0, 0) var<storage, read> left_values: array<u32>;
+binding(0, 1) var<storage, read> right_values: array<u32>;
+binding(0, 2) var<storage, read_write> sum_values: array<u32>;
+binding(0, 3) var<storage, read_write> xor_values: array<u32>;
+
+stage compute(workgroup_size(1, 1, 1)) {{
+  fn {entry}(@builtin(global_invocation_id) gid: vec3<u32>) {{
+    let idx: u32 = gid.x;
+    sum_values[idx] = left_values[idx] + right_values[idx];
+    xor_values[idx] = left_values[idx] ^ right_values[idx];
+  }}
+}}
+"#
+    )
+}
+
 fn spirv_words(bytes: &[u8]) -> Vec<u32> {
     bytes
         .chunks_exact(4)
@@ -156,9 +175,9 @@ fn emits_registered_add_pair_module_with_aux_input_binding() {
     let words = spirv_words(&lowered);
 
     assert_eq!(words[3], 25);
-    assert!(has_instruction(&words, 71, &[22, 33, 1]));
-    assert!(has_instruction(&words, 71, &[12, 33, 2]));
-    assert!(has_instruction(&words, 128, &[3, 21, 19, 24]));
+    assert!(has_instruction(&words, 71, &[19, 33, 1]));
+    assert!(has_instruction(&words, 71, &[22, 33, 2]));
+    assert!(has_instruction(&words, 128, &[3, 24, 18, 21]));
 }
 
 #[test]
@@ -175,6 +194,28 @@ fn rejects_add_pair_source_without_aux_input_binding() {
         "vulkan.discrete-or-integrated-gpu"
     )
     .is_err());
+}
+
+#[test]
+fn emits_canonical_multi_output_spirv() {
+    let entry = "nuis_vulkan_add_xor_pair_u32";
+    let lowered = lower_canonical_inline_wgsl_u32_for_profile(
+        canonical_pair_fan_out_wgsl(entry).as_bytes(),
+        entry,
+        "vulkan.discrete-or-integrated-gpu",
+    )
+    .unwrap();
+    let words = spirv_words(&lowered);
+
+    assert_eq!(words[3], 28);
+    assert!(has_instruction(&words, 71, &[22, 33, 2]));
+    assert!(has_instruction(&words, 71, &[25, 33, 3]));
+    assert!(has_instruction(&words, 71, &[22, 25]));
+    assert!(has_instruction(&words, 71, &[25, 25]));
+    assert!(has_instruction(&words, 128, &[3, 24, 18, 21]));
+    assert!(has_instruction(&words, 198, &[3, 27, 18, 21]));
+    assert!(has_instruction(&words, 62, &[23, 24]));
+    assert!(has_instruction(&words, 62, &[26, 27]));
 }
 
 #[test]
@@ -275,9 +316,9 @@ fn emits_pair_add_u32_module_from_canonical_wgsl_body() {
     .unwrap();
     let words = spirv_words(&lowered);
 
-    assert!(has_instruction(&words, 71, &[22, 33, 1]));
-    assert!(has_instruction(&words, 71, &[12, 33, 2]));
-    assert!(has_instruction(&words, 128, &[3, 21, 19, 24]));
+    assert!(has_instruction(&words, 71, &[19, 33, 1]));
+    assert!(has_instruction(&words, 71, &[22, 33, 2]));
+    assert!(has_instruction(&words, 128, &[3, 24, 18, 21]));
     assert!(lowered
         .windows(entry.len())
         .any(|window| window == entry.as_bytes()));

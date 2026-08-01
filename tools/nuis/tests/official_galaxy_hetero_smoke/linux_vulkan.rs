@@ -77,6 +77,21 @@ fn linux_vulkan_add_pair_shader_sample_executes_provider_output() {
 }
 
 #[test]
+fn linux_vulkan_fan_out_shader_writes_two_provider_outputs() {
+    run_vulkan_sample_smoke(VulkanSampleSmoke {
+        project_name: "shader_vulkan_fan_out_provider_demo",
+        assets: &[VulkanGeneratedAsset {
+            asset_id: "shader.vulkan.add-xor-pair-u32.spirv",
+            generated_file: "nuis.shader.vulkan.add-xor-pair-u32.spv",
+            entry: "nuis_vulkan_add_xor_pair_u32",
+        }],
+        registration_id: "official.shader.vulkan-add-xor-pair-u32",
+        expected_hash: "0xbada6f73928b9f42",
+        graph: None,
+    });
+}
+
+#[test]
 fn linux_vulkan_sub_shader_sample_executes_provider_output() {
     run_vulkan_sample_smoke(VulkanSampleSmoke {
         project_name: "shader_vulkan_sub_provider_demo",
@@ -198,7 +213,10 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
     assert!(provider_samples.contains(
         "provider_code_asset_contribution_selection_set_contract=nuis-provider-code-asset-contribution-selection-set-v1"
     ));
-    if sample.registration_id == "official.shader.vulkan-add-pair-u32" {
+    if matches!(
+        sample.registration_id,
+        "official.shader.vulkan-add-pair-u32" | "official.shader.vulkan-add-xor-pair-u32"
+    ) {
         assert!(provider_samples.contains("input_binding_contract=nuis-provider-input-binding-v2"));
         assert!(provider_samples.contains("buffer_layout=tensor-row-major"));
         assert!(provider_samples.contains("buffer_shape=2x2"));
@@ -253,6 +271,28 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
         "compiled_code_asset_selection_status = \"verified\"",
         "Vulkan compiled code asset selection",
     );
+    if sample.registration_id == "official.shader.vulkan-add-xor-pair-u32" {
+        assert_file_contains(
+            &provider_output,
+            "native_output_0_output_binding_count = \"2\"",
+            "Vulkan fan-out output binding count",
+        );
+        assert_file_contains(
+            &provider_output,
+            "native_output_0_output_binding_buffers = \"output.values,output.xor\"",
+            "Vulkan fan-out output buffers",
+        );
+        assert_file_contains(
+            &provider_output,
+            "native_output_0_comparison_collection_statuses = \"comparison-passed,comparison-passed\"",
+            "Vulkan fan-out comparison collection",
+        );
+        assert_file_contains(
+            &provider_output,
+            "native_output_0_worker_additional_output_hashes = \"0x73bb5b39fe3ab738\"",
+            "Vulkan fan-out secondary output hash",
+        );
+    }
     if let Some(graph) = &sample.graph {
         assert_file_contains(
             &provider_output,

@@ -78,6 +78,23 @@ fn shader_metal_generated_add_pair_msl_sample_executes_provider_output() {
 }
 
 #[test]
+fn shader_metal_generated_fan_out_msl_writes_two_provider_outputs() {
+    run_metal_sample_smoke(MetalSampleSmoke {
+        project_name: "shader_metal_fan_out_provider_demo",
+        assets: &[MetalGeneratedAsset {
+            asset_id: "shader.metal.add-xor-pair-u32.msl",
+            generated_file: "nuis.shader.metal.add-xor-pair-u32.metal",
+            operation: "add-xor-pair-u32",
+            entry: "nuis_metal_add_xor_pair_u32",
+        }],
+        registration_id: "official.shader.metal-add-xor-pair-u32",
+        execution_contract: "nuis-metal-u32-canonical-provider-runner-v1",
+        expected_hash: "0xbada6f73928b9f42",
+        graph: None,
+    });
+}
+
+#[test]
 fn shader_metal_generated_sub_msl_sample_executes_provider_output() {
     run_metal_sample_smoke(MetalSampleSmoke {
         project_name: "shader_metal_sub_provider_demo",
@@ -209,7 +226,10 @@ fn run_metal_sample_smoke(sample: MetalSampleSmoke<'_>) {
     assert!(provider_samples.contains(
         "provider_code_asset_contribution_selection_set_contract=nuis-provider-code-asset-contribution-selection-set-v1"
     ));
-    if sample.registration_id == "official.shader.metal-add-pair-u32" {
+    if matches!(
+        sample.registration_id,
+        "official.shader.metal-add-pair-u32" | "official.shader.metal-add-xor-pair-u32"
+    ) {
         assert!(provider_samples.contains("input_binding_contract=nuis-provider-input-binding-v2"));
         assert!(provider_samples.contains("buffer_layout=tensor-row-major"));
         assert!(provider_samples.contains("buffer_shape=2x2"));
@@ -303,6 +323,28 @@ fn run_metal_sample_smoke(sample: MetalSampleSmoke<'_>) {
             &provider_output,
             "compiled_code_asset_selection_count = \"2\"",
             "Metal graph code asset selection set",
+        );
+    }
+    if sample.registration_id == "official.shader.metal-add-xor-pair-u32" {
+        assert_file_contains(
+            &provider_output,
+            "native_output_0_output_binding_count = \"2\"",
+            "Metal fan-out output binding count",
+        );
+        assert_file_contains(
+            &provider_output,
+            "native_output_0_output_binding_buffers = \"output.values,output.xor\"",
+            "Metal fan-out output buffers",
+        );
+        assert_file_contains(
+            &provider_output,
+            "native_output_0_comparison_collection_statuses = \"comparison-passed,comparison-passed\"",
+            "Metal fan-out comparison collection",
+        );
+        assert_file_contains(
+            &provider_output,
+            "native_output_0_worker_additional_output_hashes = \"0x73bb5b39fe3ab738\"",
+            "Metal fan-out secondary output hash",
         );
     }
 

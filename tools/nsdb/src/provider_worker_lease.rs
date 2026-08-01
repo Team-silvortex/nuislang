@@ -112,6 +112,14 @@ impl ProviderWorkerOutput {
             "empty"
         }
     }
+
+    pub(crate) fn semantic_payload_hash(&self) -> String {
+        self.result
+            .as_ref()
+            .and_then(|result| result.payload.as_ref())
+            .map(|payload| fnv1a64_hex(payload.as_bytes()))
+            .unwrap_or_else(|| fnv1a64_hex(&self.payload))
+    }
 }
 
 struct ProviderWorkerLease {
