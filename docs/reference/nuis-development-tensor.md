@@ -1,7 +1,6 @@
 # Nuis Development Tensor
 
-This file defines the first lightweight development-progress model for the
-alpha line.
+This file defines the repository's lightweight development-progress model.
 
 It answers one narrow question:
 
@@ -25,7 +24,7 @@ Each tensor cell carries:
   protocol-owned maturity label. In `dev-tensor-status-v1`, valid values are
   `stable`, `usable`, `active`, and `early`
 * `progress`
-  current alpha-era progress score from `0` to `100`
+  current progress score from `0` to `100`
 * `bootstrap_critical`
   whether Nuis should treat this cell as important before self-hosting
 * `closure_role`
@@ -275,7 +274,7 @@ source is:
 
 `docs/reference/nuis-development-tensor.milestones.toml`
 
-That manifest lists the coordinates that the alpha line expects to see in the
+That manifest lists the coordinates that the current mainline expects to see in the
 tensor:
 
 `expected architecture/module/function coordinates`
@@ -314,7 +313,9 @@ This is not yet automatic repository discovery. It is the first guardrail that
 prevents the tensor from becoming only a hand-written status list. Future
 versions can derive additional coordinates from galaxy manifests, Nustar
 registries, and std module manifests, while the milestone file remains the
-human-owned alpha planning map.
+human-owned phase planning map. Existing `alpha-*` milestone IDs retain the
+line that first established each coordinate; they are provenance, not a claim
+that alpha is still current.
 
 ## Manifest-Backed Coordinate Coverage
 
@@ -328,7 +329,7 @@ current `standard-library/*/*` tensor cells, and reports:
 * `manifest_missing_modules`
 * `manifest_untracked_modules`
 
-This is intentionally advisory for alpha. A manifest module such as `core` or
+This is intentionally advisory during early beta. A manifest module such as `core` or
 `ns-nova` can be reported as untracked without failing coverage, because not
 every official galaxy is ready to become a tensor cell at the same time.
 
@@ -344,7 +345,7 @@ The tensor now also has a milestone-owned expected-coordinate manifest:
 
 `docs/reference/nuis-development-tensor.milestones.toml`
 
-This file groups expected tensor coordinates by alpha milestone, marks whether
+This file groups expected tensor coordinates by their establishing milestone, marks whether
 the milestone is bootstrap-required or optional, and gives the tensor a
 project-owned source of truth outside the Rust constant table.
 
@@ -1487,7 +1488,7 @@ Its protocol is `nuis-self-hosting-phase-roadmap-v1`. It fixes three phase
 boundaries:
 
 * `foundation-readiness`
-  the remaining alpha line through `beta-0.9.*`; mainline work remains
+  `beta-0.0.1` through `beta-0.9.*`; mainline work remains
   foundation closure, bug fixing, performance optimization, and stability
 * `self-hosting-migration`
   starts at `beta-0.10.*`; staged `stage0 -> stage1` compiler replacement
@@ -1638,8 +1639,8 @@ The first useful jobs are:
   as different functions instead of one overloaded "binary works" claim
 * let `nuis` name the weakest bootstrap-critical coordinate without requiring
   a human to reread the whole roadmap
-* give alpha milestones a structured progress vocabulary before beta
-  self-hosting pressure grows
+* preserve alpha milestone provenance while early-beta foundation and later
+  self-hosting pressure grow
 * preserve the foundation-through-`beta-0.9.*`, migration-from-`beta-0.10.*`,
   and completion-at-`gamma-0.5.*` self-hosting route without confusing roadmap
   agreement with implementation completion
@@ -1648,8 +1649,8 @@ The first useful jobs are:
 
 The tensor is a progress model, not a contract freeze.
 
-In alpha it may change cell names aggressively when the architecture changes.
-The stable part is the coordinate idea:
+In early beta it may still change cell names through explicit protocol
+updates when the architecture changes. The stable part is the coordinate idea:
 
 `architecture x module x function -> status/progress/evidence/next_step/task-card`
 

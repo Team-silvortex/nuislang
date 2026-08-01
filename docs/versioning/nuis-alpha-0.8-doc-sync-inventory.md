@@ -4,7 +4,11 @@ This file records the alpha-0.8 documentation refresh that made the top-level
 entry points match the binary-linking and standard-library mainline of that
 predecessor line.
 
-It does not replace the current alpha entry:
+It does not replace the current beta entry:
+
+* [nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md)
+
+The following files are historical alpha routes:
 
 * [nuis-alpha-0.17-mainline-entry.md](nuis-alpha-0.17-mainline-entry.md)
 * [nuis-alpha-0.16-mainline-entry.md](nuis-alpha-0.16-mainline-entry.md)
@@ -29,7 +33,7 @@ The intended order is:
 
 1. top-level README for the current repo shape
 2. current mainline map for detailed routing
-3. alpha-0.17 mainline entry for current line wording
+3. beta-0.0.1 mainline entry for current line wording
 4. alpha-0.8 mainline entry for predecessor binary-convergence wording
 5. reference docs for implementation truth
 6. examples and stdlib READMEs for local routes

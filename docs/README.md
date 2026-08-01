@@ -22,6 +22,8 @@ There is also a practical split inside the current tree:
 If you want to understand the repository as it exists today, start here:
 
 * [current-mainline-map.md](current-mainline-map.md)
+* [versioning/nuis-beta-0.0.1-mainline-entry.md](versioning/nuis-beta-0.0.1-mainline-entry.md)
+* [versioning/nuis-beta-0.0.1-doc-sync-inventory.md](versioning/nuis-beta-0.0.1-doc-sync-inventory.md)
 * [versioning/nuis-alpha-0.20-mainline-entry.md](versioning/nuis-alpha-0.20-mainline-entry.md)
 * [versioning/nuis-alpha-0.17-mainline-entry.md](versioning/nuis-alpha-0.17-mainline-entry.md)
 * [versioning/nuis-alpha-0.16-mainline-entry.md](versioning/nuis-alpha-0.16-mainline-entry.md)
@@ -41,13 +43,14 @@ If you want to understand the repository as it exists today, start here:
 * [repo-layout.md](repo-layout.md)
 
 If your immediate question is “what is the canonical compile route today?”,
-start with the `alpha-0.20.*` mainline entry, then the development tensor,
+start with the `beta-0.0.1` mainline entry, then the development tensor,
 Nsld linker/frontdoor, and binary assembly references before drilling into
 deeper reference material.
 
 If your immediate question is “which docs are current, which are predecessor
-anchors, and what wording is safe?”, read the `alpha-0.20.*` mainline entry
-first, then the `alpha-0.17.*` entry as its direct predecessor and the
+anchors, and what wording is safe?”, read the `beta-0.0.1` mainline entry
+first, then the `alpha-0.20.*` entry as its direct predecessor and the
+`alpha-0.17.*` entry as an earlier predecessor and the
 `alpha-0.10.*` entry as earlier
 executable-artifact context, then the `alpha-0.8.*` documentation sync
 inventory for predecessor binary-linking convergence context. Use the
@@ -55,7 +58,8 @@ inventory for predecessor binary-linking convergence context. Use the
 hardening baseline.
 
 If your immediate question is “what is the current minor-line history anchor?”,
-start with the `alpha-0.20.*` mainline entry, then use `alpha-0.17.*` for
+start with the `beta-0.0.1` mainline entry, then use `alpha-0.20.*` for alpha
+closeout, `alpha-0.17.*` for
 registered heterogeneous worker execution, `alpha-0.16.*` for tensor-guided
 closure, `alpha-0.10.*` for executable-artifact closure,
 `alpha-0.8.*` for binary convergence,
@@ -67,8 +71,8 @@ If your immediate question is “what long-range hardware/OS shape should curren
 architecture avoid foreclosing?”, read the long-range heterogeneous OS roadmap.
 
 If your immediate question is “which ABI words came from the final pre-alpha
-`0.20.0` line before current alpha closeout work broadened the surface
-further?”, read the `0.20.0` ABI compile vocabulary file as predecessor
+`0.20.0` line before alpha closeout broadened the surface further?”, read the
+`0.20.0` ABI compile vocabulary file as predecessor
 context.
 
 Then branch by the kind of truth you want:

@@ -7,7 +7,7 @@ packaging plans such as macOS `.app`/`.dmg`, Windows MSIX, Linux AppImage, and
 future Nuis OS native packages. It does not own linker graph construction,
 section/container assembly, or core binary emission.
 
-Current alpha commands:
+Current early-beta commands:
 
 ```sh
 cargo run -p nsbdr -- status

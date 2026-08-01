@@ -1,6 +1,6 @@
 # Nuis Long-Range Heterogeneous OS Roadmap
 
-This file records the long-range direction behind the current alpha work.
+This file records the long-range direction behind the current early-beta work.
 
 It is intentionally not a current feature checklist.
 
@@ -195,7 +195,7 @@ The current long-range version posture is:
   native-framework maturity so `1.0.0` is delayed until the ecosystem shape is
   honest, not merely until the compiler can emit binaries
 
-Current alpha work should keep prioritizing:
+Current early-beta work should keep prioritizing:
 
 * source-to-YIR-to-AOT repeatability
 * standard library contract surfaces

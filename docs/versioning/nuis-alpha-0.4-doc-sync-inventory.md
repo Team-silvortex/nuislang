@@ -1,7 +1,10 @@
 # `nuis` `alpha-0.4.*` Documentation Sync Inventory
 
-This file records the current documentation synchronization point for the
+This file records the historical documentation synchronization point for the
 `alpha-0.4.*` line.
+
+For present-tense work, start with
+[nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md).
 
 It is intentionally practical: it says which docs are the current front doors,
 which claims are implementation-backed, and which areas should still use
@@ -148,4 +151,3 @@ When updating docs during `alpha-0.4.*`:
    sidecar, reference executor path, or true runtime path
 4. update examples and stdlib docs together when a library surface changes
 5. update this file when the repo-wide interpretation changes
-

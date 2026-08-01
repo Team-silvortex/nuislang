@@ -1,6 +1,8 @@
 # `nuis` `alpha-0.20.*` Mainline Entry
 
-This file is the current short entry point for the `alpha-0.20.*` line.
+This file is the direct predecessor entry for the completed `alpha-0.20.*`
+line. For present-tense work, start with
+[nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md).
 
 `alpha-0.20.0` is the last alpha minor line. It is an alpha closeout and beta
 foundation-readiness line, not a beta-stability claim.
@@ -12,7 +14,7 @@ tensor in one honest reading path.
 
 Do not confuse this line with the historical pre-alpha `0.20.0` documents.
 Files named `nuis-0.20.0-*` describe the final pre-alpha bootstrap transition.
-Files named `nuis-alpha-0.20-*` describe the current alpha closeout mainline.
+Files named `nuis-alpha-0.20-*` describe the completed alpha closeout mainline.
 
 The direct predecessor is:
 
@@ -51,9 +53,9 @@ Read the alpha progression as:
   integration gate
 * `alpha-0.20.*` is the final alpha closeout line before beta foundation work
 
-Current docs should use `alpha-0.20.*` for present-tense work. Older alpha
-entries are predecessor or baseline context rather than competing current
-routes.
+Current docs should use `beta-0.0.1` for present-tense work. This entry and
+older alpha entries are predecessor or baseline context rather than competing
+current routes.
 
 ## Canonical Reading Order
 

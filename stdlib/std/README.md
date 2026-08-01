@@ -9,9 +9,9 @@ Canonical short map:
   persistence, and filesystem surfaces. Use this README for local detail only.
 * [docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md](../../docs/versioning/nuis-0.20.0-std-refactor-frontdoor.md)
   Use that historical file for the refactor order inherited by the current
-  alpha line.
-* [docs/versioning/nuis-alpha-0.20-mainline-entry.md](../../docs/versioning/nuis-alpha-0.20-mainline-entry.md)
-  Use that file for the current alpha closeout pressure across std, Nustar,
+  mainline.
+* [docs/versioning/nuis-beta-0.0.1-mainline-entry.md](../../docs/versioning/nuis-beta-0.0.1-mainline-entry.md)
+  Use that file for the current early-beta pressure across std, Nustar,
   Nsld, Nsdb, and the development tensor.
 * [docs/versioning/nuis-alpha-0.17-mainline-entry.md](../../docs/versioning/nuis-alpha-0.17-mainline-entry.md)
   Use that file for the direct registered heterogeneous execution predecessor.
@@ -25,7 +25,7 @@ Current source-style rule:
 
 ## Current Refactor Frontdoor
 
-For the current `alpha-0.20.*` line, do not read `std` as one flat bucket first.
+For the current `beta-0.0.1` line, do not read `std` as one flat bucket first.
 
 Read it in this order:
 

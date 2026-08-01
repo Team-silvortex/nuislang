@@ -1,7 +1,7 @@
 # FFI Pointer Safety Boundary
 
 This file records the current `FFI` pointer and text boundary as it exists in
-the alpha mainline.
+the current mainline.
 
 The short rule is:
 
@@ -52,7 +52,7 @@ The signature families remain intentionally coarse as a staging guard. When a
 symbol has a `ffi_symbol:` entry, that symbol is checked against its registered
 signature first and cannot fall back to the wider family allowlist.
 
-The alpha mainline also keeps the source-facing `host_*` facade set used by
+The current mainline also keeps the source-facing `host_*` facade set used by
 `std` and curated examples in exact `ffi_symbol:` registration. This includes
 the current CLI/text/filesystem/process/diagnostic/result/network facade
 symbols. The broad `i64(*)` family remains only as a compatibility staging

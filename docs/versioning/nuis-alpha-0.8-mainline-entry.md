@@ -2,6 +2,9 @@
 
 This file is the predecessor short entry point for the `alpha-0.8.*` line.
 
+For present-tense work, start with
+[nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md).
+
 It does not replace the `alpha-0.7.*` std/tooling smoke entry, the
 `alpha-0.6.*` Nsld entry, or the `alpha-0.4.*` hardening baseline. Those remain
 predecessor and baseline context. This file records the line where current work
@@ -21,7 +24,7 @@ Read the current line as:
 * `alpha-0.6.*` introduced the named Nsld linker frontdoor
 * `alpha-0.7.*` made std-backed tooling examples the default smoke surface
 * `alpha-0.8.*` made binary linking convergence the default toolchain pressure
-* current docs should say `alpha-0.17.*` for present-tense work and link
+* current docs should say `beta-0.0.1` for present-tense work and link
   `alpha-0.8.*` as predecessor binary-linking convergence context
 
 ## Current Front Doors

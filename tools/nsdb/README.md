@@ -34,7 +34,7 @@ Future `nsdb-core` or equivalent galaxy-style capability should own:
 The CLI should format those capabilities for humans and scripts, but it should
 not be the only way to access them.
 
-## Current Alpha Rule
+## Current Early-Beta Rule
 
 When adding debugger behavior, prefer structured metadata and query-shaped
 helpers before terminal formatting. This keeps `nsdb` usable later from IDE
@@ -59,7 +59,7 @@ time-travel yet.
 consumes that trace file for replay-plan sample resolution rather than
 embedding runtime values in replay plans.
 
-During `alpha-0.17.*`, Nsdb also coordinates provider graph/session execution
+Since `alpha-0.17.*`, Nsdb also coordinates provider graph/session execution
 without owning backend policy. Persistent Nuis workers authorize registered
 provider/adapter/operation identities and return status-bound permits; native
 output records preserve worker PID, sequence, descriptor count, payload hash,

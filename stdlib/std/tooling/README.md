@@ -278,7 +278,7 @@ Short rule:
 
 ## Current Refactor Meaning
 
-For the current `alpha-0.20.*` line, this router retains the `0.20.*` refactor
+For the current `beta-0.0.1` line, this router retains the `0.20.*` refactor
 baseline and means:
 
 * the tooling lane is now treated as one owned `std` cluster

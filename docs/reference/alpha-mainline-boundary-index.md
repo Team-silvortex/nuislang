@@ -1,9 +1,13 @@
-# Alpha Mainline Boundary Index
+# Alpha Mainline Boundary Index (Historical)
 
-This file is the shortest index for the mainline boundaries that still matter
+This file is the shortest historical index for the boundaries established
 during the alpha closeout line.
 
-For present-tense `alpha-0.20.*` work, start with:
+For present-tense `beta-0.0.1` work, start with:
+
+* [../versioning/nuis-beta-0.0.1-mainline-entry.md](../../docs/versioning/nuis-beta-0.0.1-mainline-entry.md)
+
+For the alpha progression that led into beta, continue with:
 
 * [../versioning/nuis-alpha-0.20-mainline-entry.md](../../docs/versioning/nuis-alpha-0.20-mainline-entry.md)
 * [../versioning/nuis-alpha-0.17-mainline-entry.md](../../docs/versioning/nuis-alpha-0.17-mainline-entry.md)
@@ -23,9 +27,9 @@ Treat `alpha-0.16.*` and `alpha-0.13.*` as tensor-guided predecessors. Treat
 
 It is not a full architecture manual.
 
-It is the reading page for:
+It is now the history reading page for:
 
-`if I need to understand what nuis already treats as real during alpha closeout, where should I look first?`
+`if I need to understand which boundaries beta inherited from alpha closeout, where should I look first?`
 
 If you want the earlier post-closeout line, use:
 
@@ -170,22 +174,24 @@ Short rule:
 * use invalid anchors to understand the real boundary
 * use project demos when you need the wider facade/workflow shape
 
-## Practical Reading Order During Alpha Closeout
+## Practical Historical Reading Order
 
 If you need the shortest full route, use this order:
 
 1. [docs/current-mainline-map.md](../../docs/current-mainline-map.md)
-2. [alpha-mainline-boundary-index.md](alpha-mainline-boundary-index.md)
-3. the one specific boundary doc that matches the feature you are touching
-4. the nearest positive and negative example anchors
-5. the matching regression test file
+2. [nuis-beta-0.0.1-mainline-entry.md](../../docs/versioning/nuis-beta-0.0.1-mainline-entry.md)
+3. [alpha-mainline-boundary-index.md](alpha-mainline-boundary-index.md)
+4. the one specific boundary doc that matches the feature you are touching
+5. the nearest positive and negative example anchors
+6. the matching regression test file
 
 ## Why This Exists
 
 During alpha, the repository needed to stop making people reconstruct the
-mainline from memory.
+mainline from memory. Beta keeps this index as provenance rather than using it
+as the current release entry.
 
-This index exists so the current line can be read as:
+This index exists so the alpha inheritance can be read as:
 
 * one toolchain
 * a small number of explicit boundaries

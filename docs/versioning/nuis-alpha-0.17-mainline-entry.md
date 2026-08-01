@@ -1,10 +1,12 @@
 # `nuis` `alpha-0.17.*` Mainline Entry
 
-This file is the current short entry point for the `alpha-0.17.*` line.
+This file is a historical entry point for the `alpha-0.17.*` line. For the
+current release, start with
+[nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md).
 
 Do not confuse this line with the historical pre-alpha `0.17.0` documents.
 Files named `nuis-0.17.0-*` describe an earlier compiler phase. Files named
-`nuis-alpha-0.17-*` describe the current alpha mainline.
+`nuis-alpha-0.17-*` describe that historical alpha mainline.
 
 The direct predecessor is:
 
@@ -39,9 +41,8 @@ Read the current progression as:
 * `alpha-0.17.*` makes registered heterogeneous worker execution the weakest
   closure boundary to cross
 
-Current docs should use `alpha-0.17.*` for present-tense work. Older alpha
-entries are predecessor or baseline context rather than competing current
-routes.
+Current docs should use `beta-0.0.1` for present-tense work. Alpha entries are
+predecessor or baseline context rather than competing current routes.
 
 ## Canonical Reading Order
 

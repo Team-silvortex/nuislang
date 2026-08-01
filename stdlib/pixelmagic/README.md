@@ -149,7 +149,7 @@ Current first responsibility:
   provider/adapter/operation identity, worker-issued dispatch permit, inherited
   input carrier, verified output carrier, and graph-close release evidence
 
-Current alpha-0.17 execution boundary:
+Current early-beta execution boundary:
 
 * real Metal upload, dispatch, and readback are regression-backed on supported
   Apple hosts

@@ -1,9 +1,9 @@
 # `nuis` `alpha-0.16.*` Mainline Entry
 
-This file is the direct predecessor entry point for the `alpha-0.16.*` line.
+This file is a historical predecessor entry point for the `alpha-0.16.*` line.
 
 For present-tense work, start with
-[nuis-alpha-0.17-mainline-entry.md](nuis-alpha-0.17-mainline-entry.md).
+[nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md).
 
 It does not replace the `alpha-0.10.*` executable-artifact closure entry, the
 `alpha-0.8.*` binary-linking convergence entry, the `alpha-0.7.*` std/tooling
@@ -27,7 +27,7 @@ Read the current line as:
 * `alpha-0.8.*` made binary-linking convergence the default toolchain pressure
 * `alpha-0.10.*` made executable-artifact closure the active integration gate
 * `alpha-0.16.*` makes tensor-guided closure hardening the current working mode
-* current docs should say `alpha-0.17.*` for present-tense work and treat this
+* current docs should say `beta-0.0.1` for present-tense work and treat this
   file as the tensor-guided closure predecessor
 
 ## Current Front Doors

@@ -79,7 +79,7 @@ Use these rules when evolving linker/debugger code:
   should not receive special linker/debugger semantics outside the core
   contract.
 
-## Current Alpha Boundary
+## Current Early-Beta Boundary
 
 Today this is a design boundary, not a full implementation split.
 
@@ -90,7 +90,7 @@ Current reality:
 * `nuisc` still owns much of the practical compiler/linker implementation
   surface.
 
-The important alpha rule is that new linker/debugger features should be shaped
+The important current rule is that new linker/debugger features should be shaped
 as future core capability data first and CLI output second.
 
 ## Related

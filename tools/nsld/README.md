@@ -2,7 +2,7 @@
 
 `nsld` is the Nuis linker front-door.
 
-In the current `alpha-0.17.*` line it is still a CLI wrapper over repository-owned
+In the current `beta-0.0.1` line it is still a CLI wrapper over repository-owned
 linker contract logic, including `nuisc::linker` helpers. That is intentional:
 the tool exists before the final self-owned linker core so the toolchain can
 start exercising linker plans, clock ordering, section/container metadata, and
@@ -50,7 +50,7 @@ Future `nsld-core` or equivalent galaxy-style capability should own:
 
 Current `prepare`, `check`, `closure`, `container`, and `verify-container`
 reports expose this host-compat domain metadata as compatibility-domain
-summary fields. JSON output keeps flat fields for alpha compatibility and also
+summary fields. JSON output keeps legacy flat fields for compatibility and also
 provides object-shaped summaries such as `compatibility_domain_summary`,
 `container_compatibility_domain_summary`, and verify-container
 expected/actual summaries. Treat those fields as linker protocol, not as
@@ -58,7 +58,7 @@ cosmetic CLI output.
 
 The CLI should remain a human and script entry point for those capabilities.
 
-Current alpha-0.17 pressure is not to special-case Metal, CoreML, CUDA, or
+Current early-beta pressure is not to special-case Metal, CoreML, CUDA, or
 other providers in the linker. Nsld should consume registered heterogeneous
 payload and execution-capsule metadata after the worker boundary verifies it,
 then place those records according to the existing lifecycle, clock, and
@@ -66,7 +66,7 @@ deterministic data-layout contracts.
 
 ## Current Module Map
 
-The alpha final executable pipeline is split by protocol boundary rather than
+The current final executable pipeline is split by protocol boundary rather than
 by terminal command formatting:
 
 * `final_stage.rs` owns only the final-stage plan report, emitter, and verifier.
@@ -85,7 +85,7 @@ Keep future linker execution work behind the same stage boundaries so Mach-O,
 ELF, PE/COFF, and future Nuis-native writers can evolve without coupling the
 front-door plan to one backend.
 
-## Current Alpha Rule
+## Current Early-Beta Rule
 
 Do not add new linker semantics only as formatted command output. If a command
 needs to expose new information, add or preserve a structured representation so

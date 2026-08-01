@@ -1,6 +1,8 @@
 # `nuis` `alpha-0.4.*` Mainline Hardening Plan
 
-This file is the short current-state anchor for the `alpha-0.4.*` line.
+This file is the historical hardening anchor for the `alpha-0.4.*` line. For
+present-tense work, start with
+[nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md).
 
 It is not a broad feature wishlist.
 

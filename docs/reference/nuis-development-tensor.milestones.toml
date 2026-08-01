@@ -1,6 +1,9 @@
 schema = "nuis-dev-tensor-milestones-v1"
 source = "docs/reference/nuis-development-tensor.milestones.toml"
 
+# alpha-* IDs preserve the line that established each foundation coordinate.
+# They remain provenance under beta-0.0.1 rather than claiming alpha is current.
+
 [[milestones]]
 id = "alpha-frontdoor"
 required = true

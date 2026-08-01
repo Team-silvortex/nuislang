@@ -9,6 +9,11 @@ workflow/history checkpoints, and policy notes.
 
 If you want the current line instead of historical backfill, start with:
 
+* [nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md)
+* [nuis-beta-0.0.1-doc-sync-inventory.md](nuis-beta-0.0.1-doc-sync-inventory.md)
+
+The direct predecessor and earlier alpha anchors are:
+
 * [nuis-alpha-0.20-mainline-entry.md](nuis-alpha-0.20-mainline-entry.md)
 * [nuis-alpha-0.17-mainline-entry.md](nuis-alpha-0.17-mainline-entry.md)
 * [nuis-alpha-0.16-mainline-entry.md](nuis-alpha-0.16-mainline-entry.md)
@@ -23,10 +28,11 @@ If you want the current line instead of historical backfill, start with:
 * [nuis-alpha-0.4-doc-sync-inventory.md](nuis-alpha-0.4-doc-sync-inventory.md)
 * [nuis-alpha-0.1-mainline-status.md](nuis-alpha-0.1-mainline-status.md)
 
-Use this first when the question is:
+Use this section when the question is:
 
-* what the current `alpha-0.20.*` line adds by closing alpha around a
-  beta-prep compiler/std/Nustar/Nsld/Nsdb/tensor foundation
+* what the current `beta-0.0.1` line inherits and hardens after alpha closeout
+* what `alpha-0.20.*` added by closing alpha around a beta-prep
+  compiler/std/Nustar/Nsld/Nsdb/tensor foundation
 * what the predecessor `alpha-0.17.*` line added by making registered
   heterogeneous worker execution the active integration gate
 * what the predecessor `alpha-0.16.*` line added by making development tensor
@@ -43,17 +49,17 @@ Use this first when the question is:
 * what the predecessor `alpha-0.7.*` line established for std-backed tooling smoke
 * what the predecessor `alpha-0.6.*` line established for Nsld
 * what exists and what is still soft in the `alpha-0.4.*` hardening baseline
-* what the current mainline should optimize during `alpha-0.20.*`
-* which documentation routes and wording are current after the alpha-0.20
-  entry refresh
-* which broad README surfaces were refreshed for alpha-0.20
+* what the current mainline should optimize during `beta-0.0.1`
+* which documentation routes and wording are current after the beta entry
+  refresh
+* which broad README surfaces were refreshed for beta-0.0.1
 * what the `alpha-0.1.*` mainline established before this hardening pass
 * what should count as present-tense repo truth
 * which older files should now be treated as predecessor anchors
 
-### Immediate Predecessor Alpha Transition
+### Earlier Alpha Transition
 
-If you want the line that handed off into the current one, read:
+If you want the first transition into alpha, read:
 
 * [nuis-alpha-0.0.1-preflight-report.md](nuis-alpha-0.0.1-preflight-report.md)
 * [nuis-alpha-0.0.1-closeout-board.md](nuis-alpha-0.0.1-closeout-board.md)
@@ -157,13 +163,14 @@ Read:
 
 Practical rule:
 
-* start at `alpha-0.20.*` mainline entry first
+* start at the `beta-0.0.1` mainline entry first
+* use `alpha-0.20.*` for the direct alpha closeout predecessor
 * use `alpha-0.17.*` for the direct registered-worker predecessor
 * use `alpha-0.16.*` for the tensor-guided closure predecessor
 * use `alpha-0.13.*` for the broader tensor-guided hardening predecessor
 * use `alpha-0.7.*` for the predecessor std/tooling smoke entry
 * use `alpha-0.6.*` for the predecessor Nsld/frontdoor entry
-* use `alpha-0.4.*` inventory and hardening as the current baseline context
+* use `alpha-0.4.*` inventory and hardening as historical baseline context
 * use `alpha-0.1.*` for the first post-closeout alpha consolidation line
 * then use `0.20.*` and `0.19.*` only when you are intentionally
   reconstructing the line that led here

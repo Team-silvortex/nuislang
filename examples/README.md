@@ -75,7 +75,7 @@ That means:
 * probe routes can stay in-tree when they still support active design or host
   validation docs, even if they are not current onboarding material
 
-Current alpha-0.8 reading rule:
+Current example reading rule, inherited from the alpha-0.8 cleanup:
 
 * use project examples first when testing the toolchain path
 * use source-level `.ns` examples when checking one language feature

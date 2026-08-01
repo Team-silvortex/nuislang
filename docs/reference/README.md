@@ -14,6 +14,7 @@ task/pointer rules?", read:
 If you want a short current phase summary before drilling into individual
 contracts, start with:
 
+* [../versioning/nuis-beta-0.0.1-mainline-entry.md](../../docs/versioning/nuis-beta-0.0.1-mainline-entry.md)
 * [../versioning/nuis-alpha-0.20-mainline-entry.md](../../docs/versioning/nuis-alpha-0.20-mainline-entry.md)
 * [../versioning/nuis-alpha-0.17-mainline-entry.md](../../docs/versioning/nuis-alpha-0.17-mainline-entry.md)
 * [../versioning/nuis-alpha-0.16-mainline-entry.md](../../docs/versioning/nuis-alpha-0.16-mainline-entry.md)
@@ -99,8 +100,12 @@ If your question is specifically “what remains between the current Nsld
 container and a runnable Nuis-owned heterogeneous executable?”, start with
 [nsld-binary-assembly-gap-map.md](nsld-binary-assembly-gap-map.md).
 
-If your question is specifically “what is the current alpha closeout target and
+If your question is specifically “what is the current early-beta target and
 what wording is safe?”, start with
+[../versioning/nuis-beta-0.0.1-mainline-entry.md](../../docs/versioning/nuis-beta-0.0.1-mainline-entry.md).
+
+If your question is specifically “what did the alpha-0.20 closeout establish?”,
+read
 [../versioning/nuis-alpha-0.20-mainline-entry.md](../../docs/versioning/nuis-alpha-0.20-mainline-entry.md).
 
 If your question is specifically “what did the alpha-0.17 registered

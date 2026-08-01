@@ -1,7 +1,7 @@
 # CFFI / Von Neumann Domain Contract
 
 This note records a long-range architecture rule that already matters to
-current `alpha-0.20.*` linker, FFI, standard-library, and heterogeneous-worker
+current `beta-0.0.1` linker, FFI, standard-library, and heterogeneous-worker
 work.
 
 ## Short Rule
@@ -69,7 +69,7 @@ Future Nsld work should preserve this direction:
 
 The CFFI / host domain should stay conservative by default.
 
-For alpha work, prefer:
+For current work, prefer:
 
 * explicit host-symbol declarations
 * hash-registered ABI signatures
@@ -91,7 +91,7 @@ building its own linker, binary format, runtime contracts, and future OS path.
 
 Planning posture:
 
-* near-term alpha: expect host-compat calls and wrapper paths to be slower than
+* near-term bootstrap: expect host-compat calls and wrapper paths to be slower than
   equivalent hand-written C/C++ when they cross the CFFI boundary frequently
 * medium-term Nuis OS: move more compatibility work below the process-level
   wrapper into kernel/runtime-owned compatibility services
@@ -129,7 +129,7 @@ Short rule:
 
 `host compatibility is a domain adapter; it is not the root of the universe`
 
-## Current Alpha Reading
+## Current Beta Reading
 
 This contract is not a claim that the repository already has a finished
 self-owned linker, complete CFFI Nustar, or native Nuis OS loader.

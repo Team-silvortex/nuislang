@@ -7,10 +7,10 @@
 
 ## Current Status
 
-The repository is entering the `alpha-0.20.*` line, the last alpha minor before
-the beta foundation line. This is still an architecture-building line, not a
-beta-stability line, but the project now has one connected compiler/toolchain
-spine instead of separate experimental islands.
+The repository is now on `beta-0.0.1`, the first beta foundation line. This is
+an early-beta hardening line, not an API-stability claim, but the project now
+has one connected compiler/toolchain spine instead of separate experimental
+islands.
 
 Current spine:
 
@@ -24,9 +24,9 @@ nuis source / nuis.toml project
   -> nsld binary-linking convergence
 ```
 
-The current `alpha-0.20.*` goal is to close alpha by keeping the registered
-compiler, std, Nustar, Nsld, Nsdb, heterogeneous-provider, and development
-tensor surfaces aligned on one beta-prep foundation:
+The current `beta-0.0.1` goal is to harden the registered compiler, std,
+Nustar, Nsld, Nsdb, heterogeneous-provider, and development-tensor surfaces as
+one repeatable foundation:
 
 ```text
 project
@@ -43,7 +43,7 @@ project
   -> development tensor status update
 ```
 
-This does not yet mean final self-hosting, final std API stability, or a fully
+This does not yet mean final self-hosting, stable std APIs, or a fully
 self-owned OS-native linker. Safe current wording is `binary-linking
 convergence`, `executable-artifact closure`, `Nsld-owned self-contained image`,
 `registered heterogeneous provider closure`, `shared Shader body contract`,
@@ -53,6 +53,8 @@ Start here for the current line:
 
 * [docs/current-mainline-map.md](docs/current-mainline-map.md)
 * [docs/reference/nuis-development-tensor.md](docs/reference/nuis-development-tensor.md)
+* [docs/versioning/nuis-beta-0.0.1-mainline-entry.md](docs/versioning/nuis-beta-0.0.1-mainline-entry.md)
+* [docs/versioning/nuis-beta-0.0.1-doc-sync-inventory.md](docs/versioning/nuis-beta-0.0.1-doc-sync-inventory.md)
 * [docs/versioning/nuis-alpha-0.20-mainline-entry.md](docs/versioning/nuis-alpha-0.20-mainline-entry.md)
 * [docs/versioning/nuis-alpha-0.17-mainline-entry.md](docs/versioning/nuis-alpha-0.17-mainline-entry.md)
 * [docs/versioning/nuis-alpha-0.16-mainline-entry.md](docs/versioning/nuis-alpha-0.16-mainline-entry.md)
@@ -88,7 +90,7 @@ Implemented or actively usable surfaces:
 * `nsdb` as the YIR-level debugger metadata frontdoor.
 * Persistent registered provider workers with Nuis-owned lifecycle/ingress,
   PID and sequence binding, descriptor transfer, operation permits, and real
-  Metal/CoreML smoke execution.
+  Metal/CoreML plus checked Linux CUDA/Vulkan execution evidence.
 * `nsbdr` as the future OS bundle/distribution frontdoor over final `nsld`
   outputs.
 * Standard-library source assets under `stdlib/core`, `stdlib/std`,
@@ -103,8 +105,9 @@ Still incomplete or intentionally soft:
 * final host-shell / OS-native executable linking
 * stable std import/autoinjection semantics
 * complete unsafe/raw-pointer policy
-* provider-neutral worker-side execution capsules and final GPU/NPU maturity
-* beta-level public API stability
+* provider-neutral multi-node graph execution across every backend and final
+  GPU/NPU maturity
+* stable public API and package compatibility policy
 * self-hosting
 
 ## Quick Start

@@ -3,6 +3,9 @@
 This file is now the predecessor short entry point for the `alpha-0.10.*`
 line.
 
+For present-tense work, start with
+[nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md).
+
 It does not replace the `alpha-0.8.*` binary-linking convergence entry, the
 `alpha-0.7.*` std/tooling smoke entry, the `alpha-0.6.*` Nsld entry, or the
 `alpha-0.4.*` hardening baseline. Those remain predecessor and baseline
@@ -25,7 +28,7 @@ Read the current line as:
 * `alpha-0.7.*` made std-backed tooling examples the default smoke surface
 * `alpha-0.8.*` made binary-linking convergence the default toolchain pressure
 * `alpha-0.10.*` makes executable-artifact closure the active integration gate
-* current docs should say `alpha-0.17.*` for present-tense work and link this
+* current docs should say `beta-0.0.1` for present-tense work and link this
   file as predecessor executable-artifact context
 
 ## Current Front Doors

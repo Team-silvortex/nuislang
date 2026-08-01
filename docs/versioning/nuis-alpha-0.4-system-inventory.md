@@ -1,6 +1,8 @@
 # `nuis` `alpha-0.4.*` System Inventory
 
-This file is the current system-level inventory for the `alpha-0.4.*` line.
+This file is the historical system-level inventory for the `alpha-0.4.*` line.
+For present-tense work, start with
+[nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md).
 
 It complements the hardening plan:
 
@@ -189,7 +191,7 @@ The best next work during `alpha-0.7.*` is:
 
 When documents conflict:
 
-1. prefer `nuis-alpha-0.17-mainline-entry.md` for current alpha line intent
+1. prefer `nuis-beta-0.0.1-mainline-entry.md` for current line intent
 2. use this file and the hardening plan as the `alpha-0.4.*` baseline
 3. prefer reference docs and tests for exact implementation truth
 4. treat `alpha-0.1.*`, `alpha-0.0.1`, and `0.20.*` docs as predecessor

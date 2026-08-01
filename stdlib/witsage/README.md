@@ -169,7 +169,7 @@ Current native execution baseline:
 * all five dependency edges reuse sealed producer output carriers directly
   through `provider.output.transfer.v1`, with independent lifecycle receipts
 
-Current alpha boundary:
+Current early-beta boundary:
 
 * CoreML and Metal execution is real on the supported Apple smoke host
 * lifecycle and dispatch authorization are Nuis-owned

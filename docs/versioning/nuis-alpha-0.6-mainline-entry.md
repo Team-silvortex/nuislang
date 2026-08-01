@@ -2,11 +2,13 @@
 
 This file is the predecessor short entry point for the `alpha-0.6.*` line.
 
+For present-tense work, start with
+[nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md).
+
 It does not replace the `alpha-0.4.*` inventory and hardening documents. Those
 remain the baseline for the current hardening philosophy. This file records what
 changed enough in `alpha-0.6.*` that first-read docs at the time stopped calling
-`alpha-0.4.*` the current line. Present-tense work should now start with the
-`alpha-0.17.*` entry.
+`alpha-0.4.*` the current line at that time.
 
 Short rule:
 
@@ -19,7 +21,7 @@ Read this predecessor line as:
 * `alpha-0.4.*` hardening baseline still applies
 * `alpha-0.6.*` adds the first dedicated Nsld linker frontdoor
 * std filesystem examples now include build/run-backed contract consumers
-* current docs should say `alpha-0.17.*` for present-tense work and link this
+* current docs should say `beta-0.0.1` for present-tense work and link this
   file as predecessor context
 
 ## Predecessor Front Doors

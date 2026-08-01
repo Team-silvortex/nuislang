@@ -7,9 +7,9 @@ local README for the area you are actively touching.
 
 ## Fast Reading Order
 
-If you only need the shortest current `alpha-0.20.*` reading route, use this order:
+If you only need the shortest current `beta-0.0.1` reading route, use this order:
 
-1. [versioning/nuis-alpha-0.20-mainline-entry.md](versioning/nuis-alpha-0.20-mainline-entry.md)
+1. [versioning/nuis-beta-0.0.1-mainline-entry.md](versioning/nuis-beta-0.0.1-mainline-entry.md)
 2. [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
 3. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
 4. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
@@ -50,7 +50,9 @@ Short rule:
   [README.md](../README.md)
 * current development tensor progress model:
   [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
-* current `alpha-0.20.*` entry:
+* current `beta-0.0.1` entry:
+  [versioning/nuis-beta-0.0.1-mainline-entry.md](versioning/nuis-beta-0.0.1-mainline-entry.md)
+* direct predecessor `alpha-0.20.*` closeout entry:
   [versioning/nuis-alpha-0.20-mainline-entry.md](versioning/nuis-alpha-0.20-mainline-entry.md)
 * predecessor `alpha-0.17.*` registered worker entry:
   [versioning/nuis-alpha-0.17-mainline-entry.md](versioning/nuis-alpha-0.17-mainline-entry.md)
@@ -90,19 +92,19 @@ Short rule:
   [versioning/nuis-alpha-0.0.1-preflight-report.md](versioning/nuis-alpha-0.0.1-preflight-report.md),
   [versioning/nuis-alpha-0.0.1-closeout-board.md](versioning/nuis-alpha-0.0.1-closeout-board.md),
   [versioning/nuis-alpha-0.0.1-closeout-checklist.md](versioning/nuis-alpha-0.0.1-closeout-checklist.md)
-* current alpha mainline boundary index:
+* predecessor alpha mainline boundary index:
   [reference/alpha-mainline-boundary-index.md](reference/alpha-mainline-boundary-index.md)
-* current frontend-vs-CLI boundary note:
+* predecessor frontend-vs-CLI boundary note:
   [versioning/nuis-0.20.0-frontend-cli-boundaries.md](versioning/nuis-0.20.0-frontend-cli-boundaries.md)
-* current branch-runtime lowering matrix:
+* predecessor branch-runtime lowering matrix:
   [versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md](versioning/nuis-0.20.0-branch-runtime-lowering-matrix.md)
-* current generic-validation regression matrix:
+* predecessor generic-validation regression matrix:
   [versioning/nuis-0.20.0-generic-validation-regression-matrix.md](versioning/nuis-0.20.0-generic-validation-regression-matrix.md)
-* current receiver-generic regression matrix:
+* predecessor receiver-generic regression matrix:
   [versioning/nuis-0.20.0-receiver-generic-regression-matrix.md](versioning/nuis-0.20.0-receiver-generic-regression-matrix.md)
-* current `std` refactor frontdoor:
+* predecessor `std` refactor frontdoor:
   [versioning/nuis-0.20.0-std-refactor-frontdoor.md](versioning/nuis-0.20.0-std-refactor-frontdoor.md)
-* current compile-gap checklist:
+* predecessor compile-gap checklist:
   [versioning/nuis-0.20.0-compile-gap-checklist.md](versioning/nuis-0.20.0-compile-gap-checklist.md)
 * previous minor-line anchors still worth keeping nearby:
   [versioning/nuis-0.19.0-snapshot.md](versioning/nuis-0.19.0-snapshot.md),
