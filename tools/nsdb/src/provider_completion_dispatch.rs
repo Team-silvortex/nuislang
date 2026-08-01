@@ -111,6 +111,11 @@ pub(crate) fn bind_events_from_final_image(
                 )
             })?;
         event.provider_completion_dispatch = authority_for_record(&final_image, record)?;
+        crate::provider_request_completion::bind_final_image_dispatch(
+            &mut event.provider_completion_evidence.request_completions,
+            &final_image,
+            &record.provider_family,
+        )?;
         bound += 1;
     }
     Ok(bound)

@@ -626,6 +626,48 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
         1,
         expected_dispatch_count,
     );
+    if expected_dispatch_count == 2 {
+        let replay = nsdb::payload_execution_replay_summary(&output_dir);
+        let completion = &replay.provider_completions[0];
+        assert_eq!(completion.request_completion_count, 3);
+        let handoff =
+            fs::read_to_string(output_dir.join("nuis.nsdb.payload-execution-handoff.toml"))
+                .unwrap();
+        for (index, request_id, family, dispatch_id) in [
+            (
+                0,
+                "shader.vulkan-cuda-fan-out.add-xor-pair-u32",
+                "spirv:vulkan-gpu",
+                "dispatch0000",
+            ),
+            (
+                1,
+                "kernel.cuda.fan-out.copy-sum-u32",
+                "cuda:nvidia-gpu",
+                "dispatch0001",
+            ),
+            (
+                2,
+                "shader.vulkan-cuda-fan-out.xor-reduced-u32",
+                "spirv:vulkan-gpu",
+                "dispatch0000",
+            ),
+        ] {
+            assert!(handoff.contains(&format!(
+                "request_completion_{index}_request_id = \"{request_id}\""
+            )));
+            assert!(handoff.contains(&format!(
+                "request_completion_{index}_provider_family = \"{family}\""
+            )));
+            assert!(handoff.contains(&format!(
+                "request_completion_{index}_dispatch_id = \"{dispatch_id}\""
+            )));
+            assert!(handoff.contains(&format!(
+                "request_completion_{index}_selected_set_hash = \"{}\"",
+                completion.dispatch_selected_set_hash
+            )));
+        }
+    }
     assert!(
         frontdoor.contains("\"nsld_final_executable_output_nsdb_first_provider_family\":\"spirv:vulkan-gpu\"")
             && frontdoor.contains("\"closure_summary_first_provider_family\":\"spirv:vulkan-gpu\"")

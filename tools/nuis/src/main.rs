@@ -26,6 +26,7 @@ mod artifact_nsdb_handoff_binding;
 mod artifact_nsdb_handoff_dispatch;
 mod artifact_nsdb_handoff_integrity;
 mod artifact_nsdb_handoff_render;
+mod artifact_nsdb_handoff_request_completion;
 mod artifact_nsdb_handoff_signature;
 mod artifact_nsdb_handoff_trust_anchor;
 mod artifact_nsdb_handoff_trust_registry;

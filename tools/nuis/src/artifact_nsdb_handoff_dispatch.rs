@@ -23,6 +23,7 @@ pub(crate) struct PersistedProviderCompletion {
     pub(crate) dispatch_runner_contract: String,
     pub(crate) dispatch_runner_adapter_contract: String,
     pub(crate) dispatch_runner_adapter_id: String,
+    pub(crate) request_completion_validation_status: String,
     pub(crate) record_hash: String,
 }
 
@@ -67,7 +68,10 @@ pub(crate) fn dispatch_identity(
         return identity(status, "none", "none");
     }
     if completions.iter().any(|completion| {
-        completion.dispatch_authority_contract != AUTHORITY_CONTRACT
+        matches!(
+            completion.request_completion_validation_status.as_str(),
+            "mismatch" | "pre-seal-acquisition"
+        ) || completion.dispatch_authority_contract != AUTHORITY_CONTRACT
             || completion.dispatch_authority_contract != first.dispatch_authority_contract
             || completion.dispatch_table_hash != first.dispatch_table_hash
             || completion.dispatch_selected_set_hash != first.dispatch_selected_set_hash
@@ -141,6 +145,8 @@ fn parse_completion(record: &str, digest_contract: &str) -> PersistedProviderCom
     let mut material =
         format!("{trace_id}\0{provider_family}\0{output_contract}\0{output_evidence}");
     append_completion_evidence_hash_material(&mut material, record);
+    let request_completion =
+        crate::artifact_nsdb_handoff_request_completion::parse_and_append(&mut material, record);
     if dispatch_authority_contract == AUTHORITY_CONTRACT
         && dispatch_authority_status != "not-applicable"
     {
@@ -164,6 +170,7 @@ fn parse_completion(record: &str, digest_contract: &str) -> PersistedProviderCom
         dispatch_runner_contract,
         dispatch_runner_adapter_contract,
         dispatch_runner_adapter_id,
+        request_completion_validation_status: request_completion.validation_status,
         record_hash: record_hash(digest_contract, material.as_bytes())
             .unwrap_or_else(|| "none".to_owned()),
     }

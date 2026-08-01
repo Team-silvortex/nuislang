@@ -152,20 +152,21 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         .contains("weakest task card is directly actionable"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_action
-        .contains("ordered request completion receipts"));
+        .contains("provider-neutral typed request-completion projection"));
     let handoff_command = &summary.weakest_bootstrap_task_card_handoff_command;
     for required in [
         "CARGO_INCREMENTAL=0 cargo check -q -p nuisc -p nsdb",
         "cargo check -q -p nuisc -p nsdb -p nsld -p nuis",
-        "one_sample_can_seal_multiple_request_provider_dispatches",
+        "cargo test -q -p nsdb provider_request_completion",
+        "cargo test -q -p nuis artifact_nsdb_handoff_request_completion",
         "linux_vulkan_producer_fans_out_to_cuda_and_vulkan_consumers",
-        "sealed_linux_cuda_image_executes_and_replays_completion",
+        "cargo test -q -p nuis dev_tensor",
     ] {
         assert!(handoff_command.contains(required));
     }
     assert!(summary
         .weakest_bootstrap_task_card_handoff_expected_artifact
-        .contains("three ordered request-completion receipts"));
+        .contains("three typed request-completion receipts"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_expected_artifact
         .contains("shared selected-set root"));

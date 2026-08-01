@@ -57,6 +57,7 @@ mod provider_output_comparison_descriptor;
 mod provider_prepared_input;
 mod provider_process_adapter;
 mod provider_request;
+mod provider_request_completion;
 mod provider_request_payload;
 mod provider_result_projection;
 mod provider_runner_coreml;

@@ -17,6 +17,7 @@ mod provider_code_asset_identity;
 mod provider_completion_dispatch;
 mod provider_completion_evidence;
 mod provider_completion_integrity;
+mod provider_completion_projection;
 mod provider_completion_signature;
 mod provider_completion_trust_anchor;
 mod provider_completion_trust_registry;
@@ -49,6 +50,7 @@ mod provider_output_comparison_descriptor;
 mod provider_prepared_input;
 mod provider_process_adapter;
 mod provider_request;
+mod provider_request_completion;
 mod provider_request_payload;
 mod provider_result_projection;
 mod provider_runner_coreml;
@@ -174,78 +176,8 @@ pub fn payload_execution_replay_summary(
         .events
         .iter()
         .filter(|event| event.execution_phase == "provider-device-completion")
-        .map(|event| PayloadExecutionProviderCompletion {
-            trace_id: event.trace_id.clone(),
-            provider_family: event.provider_family.clone(),
-            output_contract: event.output_contract.clone(),
-            output_evidence: event.output_evidence.clone(),
-            completion_evidence_contract: event.provider_completion_evidence.contract.clone(),
-            completion_evidence_status: event.provider_completion_evidence.status.clone(),
-            completion_evidence_count: event.provider_completion_evidence.count,
-            completion_clock_evidence: event.provider_completion_evidence.clock_evidence.clone(),
-            completion_tokens: event.provider_completion_evidence.completion_tokens.clone(),
-            glm_release_contract: event
-                .provider_completion_evidence
-                .glm_release_contract
-                .clone(),
-            glm_release_tokens: event
-                .provider_completion_evidence
-                .glm_release_tokens
-                .clone(),
-            glm_release_status: event
-                .provider_completion_evidence
-                .glm_release_status
-                .clone(),
-            code_asset_identity_contract: event
-                .provider_completion_evidence
-                .code_asset_identity_contract
-                .clone(),
-            code_asset_identity_status: event
-                .provider_completion_evidence
-                .code_asset_identity_status
-                .clone(),
-            code_asset_identity_asset_id: event
-                .provider_completion_evidence
-                .code_asset_identity_asset_id
-                .clone(),
-            code_asset_identity_hash: event
-                .provider_completion_evidence
-                .code_asset_identity_hash
-                .clone(),
-            code_asset_identity_set_contract: event
-                .provider_completion_evidence
-                .code_asset_identity_set_contract
-                .clone(),
-            code_asset_identity_set_status: event
-                .provider_completion_evidence
-                .code_asset_identity_set_status
-                .clone(),
-            code_asset_identity_set_count: event
-                .provider_completion_evidence
-                .code_asset_identity_set_count,
-            code_asset_identity_set_root_hash: event
-                .provider_completion_evidence
-                .code_asset_identity_set_root_hash
-                .clone(),
-            compiled_code_asset_selection: event
-                .provider_completion_evidence
-                .compiled_code_asset_selection
-                .clone(),
-            dispatch_authority_contract: event.provider_completion_dispatch.contract.clone(),
-            dispatch_authority_status: event.provider_completion_dispatch.status.clone(),
-            dispatch_table_hash: event.provider_completion_dispatch.table_hash.clone(),
-            dispatch_selected_set_hash: event
-                .provider_completion_dispatch
-                .selected_set_hash
-                .clone(),
-            dispatch_id: event.provider_completion_dispatch.dispatch_id.clone(),
-            dispatch_package_id: event.provider_completion_dispatch.package_id.clone(),
-            dispatch_bundle_id: event.provider_completion_dispatch.bundle_id.clone(),
-            dispatch_runner_adapter_id: event
-                .provider_completion_dispatch
-                .runner_adapter_id
-                .clone(),
-            record_hash: provider_completion_integrity::record_hash(
+        .map(|event| {
+            provider_completion_projection::public_completion(
                 event,
                 if handoff.provider_completion_digest_contract == "none" {
                     "nuis-provider-completion-digest-fnv1a64-v1"
@@ -253,7 +185,6 @@ pub fn payload_execution_replay_summary(
                     &handoff.provider_completion_digest_contract
                 },
             )
-            .unwrap_or_else(|| "none".to_owned()),
         })
         .collect::<Vec<_>>();
     let first_provider_completion = provider_completions.first();

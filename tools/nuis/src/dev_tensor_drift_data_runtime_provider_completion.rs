@@ -36,4 +36,35 @@ pub(crate) const DEV_TENSOR_RUNTIME_PROVIDER_COMPLETION_DRIFT_CHECKS: &[DevTenso
             path: "tools/nuis/src/workflow/link_plan_json.rs",
             required_patterns: &["append_projection_json_fields"],
         },
+        DevTensorDriftCheckSpec {
+            id: "nsdb-provider-request-completion-receipts",
+            path: "tools/nsdb/src/provider_request_completion.rs",
+            required_patterns: &[
+                "nuis-provider-request-completion-receipt-collection-v1",
+                "bind_final_image_dispatch",
+                "request_completion_root_hash",
+                "request-completion-dispatch:entry-missing",
+            ],
+        },
+        DevTensorDriftCheckSpec {
+            id: "nuis-independent-request-completion-audit",
+            path: "tools/nuis/src/artifact_nsdb_handoff_request_completion.rs",
+            required_patterns: &[
+                "parse_and_append",
+                "receipt_root_hash",
+                "receipts_verified",
+                "legacy-unavailable",
+            ],
+        },
+        DevTensorDriftCheckSpec {
+            id: "provider-request-completion-real-mixed-smoke",
+            path: "tools/nuis/tests/official_galaxy_hetero_smoke/linux_vulkan.rs",
+            required_patterns: &[
+                "request_completion_count",
+                "request_completion_{index}_request_id",
+                "request_completion_{index}_provider_family",
+                "request_completion_{index}_dispatch_id",
+                "request_completion_{index}_selected_set_hash",
+            ],
+        },
     ];

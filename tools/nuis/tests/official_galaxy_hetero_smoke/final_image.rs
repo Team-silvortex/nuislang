@@ -122,6 +122,11 @@ pub(super) fn assemble_provider_complete_final_image(
             && completion.glm_release_contract == "nuis-provider-glm-release-evidence-v1"
             && completion.glm_release_tokens.starts_with("glm-release:0x")
             && completion.glm_release_status == "released-at-graph-close"
+            && completion.request_completion_contract
+                == "nuis-provider-request-completion-receipt-collection-v1"
+            && completion.request_completion_status == "verified"
+            && completion.request_completion_count == completion.completion_evidence_count
+            && completion.request_completion_root_hash.starts_with("0x")
     }));
     for completion in &replay.provider_completions {
         assert_provider_output_evidence_hash(output_dir, &completion.output_evidence);
