@@ -81,6 +81,7 @@ fn sample_evidence(_base: &str) -> String {
         buffer_shape: "2x2",
         row_stride_bytes: 8,
         dispatch: "4x1x1",
+        element_count: 4,
         input_file_name: INPUT_FILE,
         input_hash: fnv1a64_hex(INPUT),
         input_byte_length: INPUT.len(),

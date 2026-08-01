@@ -104,8 +104,14 @@ pub fn materialize_provider_samples(
             }
         })
         .collect::<Vec<_>>();
+    let selected_provider_bundle_set =
+        crate::provider_bundle_registry::selected_provider_bundle_set_for_records(&records)?;
     let path = output_dir.join(DEVICE_PROVIDER_SAMPLE_FILE_NAME);
-    fs::write(&path, render_materialized_manifest(&records)).map_err(|error| {
+    fs::write(
+        &path,
+        render_materialized_manifest(&records, selected_provider_bundle_set.as_ref()),
+    )
+    .map_err(|error| {
         format!(
             "failed to write device provider sample manifest `{}`: {error}",
             path.display()
@@ -123,10 +129,6 @@ pub fn materialize_provider_samples(
     let first_provider_bundle = records.first().and_then(|record| {
         crate::provider_bundle_registry::provider_bundle_evidence(&record.provider_family)
     });
-    let selected_provider_bundle_set =
-        crate::provider_bundle_registry::selected_provider_bundle_set_evidence(
-            records.iter().map(|record| record.provider_family.as_str()),
-        );
     Ok(ProviderSampleMaterializeReport {
         path: path.display().to_string(),
         provider_family_filter: provider_family_filter.map(str::to_owned),
@@ -513,7 +515,12 @@ fn sanitize_artifact_component(value: &str) -> String {
         .collect()
 }
 
-fn render_materialized_manifest(records: &[NsdbDeviceProviderSampleRecordInfo]) -> String {
+fn render_materialized_manifest(
+    records: &[NsdbDeviceProviderSampleRecordInfo],
+    selected_provider_bundle_set: Option<
+        &crate::provider_bundle_registry::SelectedProviderBundleSetEvidence,
+    >,
+) -> String {
     let mut out = String::new();
     let ready_count = provider_sample_ready_count(records);
     let pending_count = provider_sample_pending_count(records);
@@ -547,9 +554,7 @@ fn render_materialized_manifest(records: &[NsdbDeviceProviderSampleRecordInfo]) 
             bundle.manifest_entry_count
         ));
     }
-    if let Some(selected) = crate::provider_bundle_registry::selected_provider_bundle_set_evidence(
-        records.iter().map(|record| record.provider_family.as_str()),
-    ) {
+    if let Some(selected) = selected_provider_bundle_set {
         push_toml_string(
             &mut out,
             "selected_provider_bundle_set_contract",
@@ -564,6 +569,22 @@ fn render_materialized_manifest(records: &[NsdbDeviceProviderSampleRecordInfo]) 
             "selected_provider_bundle_set_hash",
             &selected.hash,
         );
+    }
+    if let Some(selected) = selected_provider_bundle_set {
+        for (index, entry) in selected.entries.iter().enumerate() {
+            out.push_str("\n[[provider_dispatch]]\n");
+            push_toml_string(&mut out, "dispatch_id", &format!("dispatch{index:04}"));
+            push_toml_string(&mut out, "provider_bundle_package_id", entry.package_id);
+            push_toml_string(&mut out, "provider_bundle_id", entry.bundle_id);
+            push_toml_string(&mut out, "provider_family", &entry.provider_family);
+            push_toml_string(&mut out, "runner_contract", entry.runner_contract);
+            push_toml_string(
+                &mut out,
+                "runner_adapter_contract",
+                entry.runner_adapter_contract,
+            );
+            push_toml_string(&mut out, "runner_adapter_id", entry.runner_adapter_id);
+        }
     }
     for record in records {
         out.push_str("\n[[device_provider_samples]]\n");

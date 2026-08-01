@@ -18,6 +18,7 @@ pub(crate) struct U32RequestEvidence<'a> {
     pub(crate) buffer_shape: &'a str,
     pub(crate) row_stride_bytes: usize,
     pub(crate) dispatch: &'a str,
+    pub(crate) element_count: usize,
     pub(crate) input_file_name: &'a str,
     pub(crate) input_hash: String,
     pub(crate) input_byte_length: usize,
@@ -62,6 +63,7 @@ pub(crate) fn render_u32_sample_request_evidence(
         buffer_shape: "4",
         row_stride_bytes: input.len(),
         dispatch: "4x1x1",
+        element_count: U32_ELEMENT_COUNT,
         input_file_name,
         input_hash: fnv1a64_hex(input),
         input_byte_length: input.len(),
@@ -76,6 +78,13 @@ pub(crate) fn render_u32_sample_request_evidence(
 }
 
 pub(crate) fn render_u32_prefixed_request_evidence(args: U32RequestEvidence<'_>) -> String {
+    render_u32_prefixed_request_evidence_with_scalars(args, "")
+}
+
+pub(crate) fn render_u32_prefixed_request_evidence_with_scalars(
+    args: U32RequestEvidence<'_>,
+    additional_scalar_bindings: &str,
+) -> String {
     let output_evidence = args.output_evidence.unwrap_or_else(|| {
         render_u32_output_evidence(
             args.prefix,
@@ -91,8 +100,16 @@ pub(crate) fn render_u32_prefixed_request_evidence(args: U32RequestEvidence<'_>)
             }],
         )
     });
+    let scalar_bindings = if additional_scalar_bindings.is_empty() {
+        format!("element_count:u32:{}", args.element_count)
+    } else {
+        format!(
+            "element_count:u32:{},{}",
+            args.element_count, additional_scalar_bindings
+        )
+    };
     format!(
-        "{prefix}buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;{prefix}buffer_id=input.values;{prefix}buffer_element_type=u32;{prefix}buffer_layout={};{prefix}buffer_shape={};{prefix}buffer_row_stride_bytes={};{prefix}buffer_byte_length={};{prefix}buffer_payload_path={};{prefix}buffer_content_hash={};{prefix}kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;{prefix}kernel_id={};{prefix}kernel_operation={};{prefix}kernel_input_buffer=input.values;{prefix}kernel_input_buffers={};{prefix}kernel_output_buffer=output.values;{prefix}kernel_dispatch={};{prefix}kernel_scalar_bindings=element_count:u32:{U32_ELEMENT_COUNT};{prefix}code_asset_descriptor_contract=nuis-provider-code-asset-descriptor-v1;{prefix}code_asset_id={};{prefix}code_asset_format={};{prefix}code_asset_target={};{prefix}code_asset_entry={};{prefix}code_asset_path={};{prefix}code_asset_byte_length={};{prefix}code_asset_digest_contract={DIGEST_CONTRACT};{prefix}code_asset_content_hash={};{};{};{};{prefix}adapter_binding_contract=nuis-provider-request-adapter-binding-v1;{prefix}adapter_binding_provider_family={};{prefix}adapter_binding_execution_requirement=real-device",
+        "{prefix}buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;{prefix}buffer_id=input.values;{prefix}buffer_element_type=u32;{prefix}buffer_layout={};{prefix}buffer_shape={};{prefix}buffer_row_stride_bytes={};{prefix}buffer_byte_length={};{prefix}buffer_payload_path={};{prefix}buffer_content_hash={};{prefix}kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;{prefix}kernel_id={};{prefix}kernel_operation={};{prefix}kernel_input_buffer=input.values;{prefix}kernel_input_buffers={};{prefix}kernel_output_buffer=output.values;{prefix}kernel_dispatch={};{prefix}kernel_scalar_bindings={};{prefix}code_asset_descriptor_contract=nuis-provider-code-asset-descriptor-v1;{prefix}code_asset_id={};{prefix}code_asset_format={};{prefix}code_asset_target={};{prefix}code_asset_entry={};{prefix}code_asset_path={};{prefix}code_asset_byte_length={};{prefix}code_asset_digest_contract={DIGEST_CONTRACT};{prefix}code_asset_content_hash={};{};{};{};{prefix}adapter_binding_contract=nuis-provider-request-adapter-binding-v1;{prefix}adapter_binding_provider_family={};{prefix}adapter_binding_execution_requirement=real-device",
         args.buffer_layout,
         args.buffer_shape,
         args.row_stride_bytes,
@@ -103,6 +120,7 @@ pub(crate) fn render_u32_prefixed_request_evidence(args: U32RequestEvidence<'_>)
         args.operation,
         args.kernel_input_buffers,
         args.dispatch,
+        scalar_bindings,
         args.asset.asset_id,
         args.asset.format,
         args.asset.target,
@@ -194,13 +212,15 @@ pub(crate) fn render_dependency_count_zero(prefix: &str) -> String {
 
 pub(crate) fn render_u32_dependency_edge(
     prefix: &str,
+    producer_request_index: usize,
+    consumer_request_index: usize,
     producer_request_id: &str,
     producer_output_buffer: &str,
     consumer_input_buffer: &str,
     ownership_token: &str,
 ) -> String {
     format!(
-        "{prefix}dependency_contract=nuis-provider-request-dependency-v1;{prefix}dependency_count=1;{prefix}dependency_0_producer_request_id={producer_request_id};{prefix}dependency_0_producer_output_buffer={producer_output_buffer};{prefix}dependency_0_consumer_input_buffer={consumer_input_buffer};{prefix}dependency_0_transport_contract=nuis-provider-edge-transport-v1;{prefix}dependency_0_transport_ownership_token={ownership_token};{prefix}dependency_0_transport_staging_mode=auto;{prefix}dependency_0_transport_producer_clock_evidence=provider-clock:request-0:completed;{prefix}dependency_0_transport_consumer_clock_evidence=provider-clock:request-1:dispatch-ready"
+        "{prefix}dependency_contract=nuis-provider-request-dependency-v1;{prefix}dependency_count=1;{prefix}dependency_0_producer_request_id={producer_request_id};{prefix}dependency_0_producer_output_buffer={producer_output_buffer};{prefix}dependency_0_consumer_input_buffer={consumer_input_buffer};{prefix}dependency_0_transport_contract=nuis-provider-edge-transport-v1;{prefix}dependency_0_transport_ownership_token={ownership_token};{prefix}dependency_0_transport_staging_mode=auto;{prefix}dependency_0_transport_producer_clock_evidence=provider-clock:request-{producer_request_index}:completed;{prefix}dependency_0_transport_consumer_clock_evidence=provider-clock:request-{consumer_request_index}:dispatch-ready"
     )
 }
 
@@ -237,13 +257,16 @@ pub(crate) fn render_u32_pair_artifact_binding(
 
 pub(crate) fn render_u32_dependency_binding(
     prefix: &str,
+    layout: &str,
+    shape: &str,
+    row_stride_bytes: usize,
     input_hash: &str,
     input_byte_length: usize,
     producer_request_id: &str,
     producer_output_buffer: &str,
 ) -> String {
     format!(
-        "{prefix}input_binding_contract=nuis-provider-input-binding-v1;{prefix}input_binding_count=1;{prefix}input_binding_0_name=input.values;{prefix}input_binding_0_source=dependency;{prefix}input_binding_0_element_type=u32;{prefix}input_binding_0_shape={U32_ELEMENT_COUNT};{prefix}input_binding_0_byte_length={input_byte_length};{prefix}input_binding_0_content_hash={input_hash};{prefix}input_binding_0_payload_path=none;{prefix}input_binding_0_producer_request_id={producer_request_id};{prefix}input_binding_0_producer_output_buffer={producer_output_buffer}"
+        "{prefix}input_binding_contract=nuis-provider-input-binding-v2;{prefix}input_binding_count=1;{prefix}input_binding_0_name=input.values;{prefix}input_binding_0_source=dependency;{prefix}input_binding_0_element_type=u32;{prefix}input_binding_0_layout={layout};{prefix}input_binding_0_shape={shape};{prefix}input_binding_0_row_stride_bytes={row_stride_bytes};{prefix}input_binding_0_byte_length={input_byte_length};{prefix}input_binding_0_content_hash={input_hash};{prefix}input_binding_0_payload_path=none;{prefix}input_binding_0_producer_request_id={producer_request_id};{prefix}input_binding_0_producer_output_buffer={producer_output_buffer}"
     )
 }
 

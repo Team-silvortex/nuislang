@@ -16,6 +16,8 @@ pub(super) fn parse_project_manifest(
     let artifact_provider_metadata =
         parse_optional_string_array(source, "artifact_provider_metadata").unwrap_or_default();
     validate_artifact_provider_metadata(&artifact_provider_metadata, path)?;
+    let code_assets = parse_optional_string_array(source, "code_assets").unwrap_or_default();
+    validate_unique_code_assets(&code_assets, path)?;
     let modules = parse_optional_string_array(source, "modules").unwrap_or_default();
     let tests = parse_optional_string_array(source, "tests").unwrap_or_default();
     let links = parse_optional_link_array(source, "links").unwrap_or_default();
@@ -30,6 +32,7 @@ pub(super) fn parse_project_manifest(
         entry,
         packaging_mode,
         artifact_provider_metadata,
+        code_assets,
         modules,
         tests,
         links,
@@ -37,6 +40,25 @@ pub(super) fn parse_project_manifest(
         galaxy_dependencies,
         galaxy_imports,
     })
+}
+
+fn validate_unique_code_assets(values: &[String], path: &Path) -> Result<(), String> {
+    let mut seen = BTreeSet::new();
+    if values.len() > 64
+        || values.iter().any(|value| {
+            value.is_empty()
+                || !value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'_'))
+                || !seen.insert(value)
+        })
+    {
+        return Err(format!(
+            "project manifest `{}` has invalid or duplicate code_assets",
+            path.display()
+        ));
+    }
+    Ok(())
 }
 
 fn validate_artifact_provider_metadata(values: &[String], path: &Path) -> Result<(), String> {
@@ -278,6 +300,17 @@ mod tests {
                 "nuis.other:key=value",
             ]
         );
+    }
+
+    #[test]
+    fn project_manifest_preserves_static_code_asset_requirements() {
+        let manifest = parse_project_manifest(
+            "name = \"demo\"\nentry = \"main.ns\"\ncode_assets = [\"kernel.cuda.copy-u32.ptx\"]\n",
+            Path::new("nuis.toml"),
+        )
+        .expect("project manifest should parse code assets");
+
+        assert_eq!(manifest.code_assets, ["kernel.cuda.copy-u32.ptx"]);
     }
 
     #[test]

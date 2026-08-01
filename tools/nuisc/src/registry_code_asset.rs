@@ -129,7 +129,7 @@ fn parse_registration_fields<'a>(
             manifest.package_id, fields[1]
         ));
     }
-    validate_shader_code_asset_source_path(manifest, fields[1], fields[2], fields[7])?;
+    validate_code_asset_source_path(manifest, fields[1], fields[2], fields[7])?;
     Ok(fields)
 }
 
@@ -214,6 +214,23 @@ fn parse_registration_fields_into(
                 fields[1]
             )
         })?
+    } else if fields[2] == "ptx" && source_extension == Some("ns") {
+        let source = std::str::from_utf8(&source_bytes).map_err(|_| {
+            format!(
+                "Kernel Nustar PTX code asset `{}` .ns source must be UTF-8",
+                fields[1]
+            )
+        })?;
+        if !source.contains(fields[5]) {
+            return Err(format!(
+                "Kernel Nustar PTX code asset `{}` source does not declare entry `{}`",
+                fields[1], fields[5]
+            ));
+        }
+        let table = crate::kernel_codegen_table::registered_provider_codegen_table_for_entries(&[
+            fields[5],
+        ])?;
+        crate::kernel_ptx_emitter::lower_cuda_ptx(&table)?.into_bytes()
     } else {
         source_bytes
     };
@@ -458,7 +475,7 @@ fn relative_path_is_valid(value: &str) -> bool {
             .all(|component| matches!(component, Component::Normal(_)))
 }
 
-fn validate_shader_code_asset_source_path(
+fn validate_code_asset_source_path(
     manifest: &NustarPackageManifest,
     asset_id: &str,
     format: &str,
@@ -473,6 +490,18 @@ fn validate_shader_code_asset_source_path(
     {
         return Err(format!(
             "nustar package `{}` shader code asset `{asset_id}` source path `{source_path}` must be a .ns source container",
+            manifest.package_id
+        ));
+    }
+    if manifest.domain_family == "kernel"
+        && format == "ptx"
+        && Path::new(source_path)
+            .extension()
+            .and_then(|ext| ext.to_str())
+            != Some("ns")
+    {
+        return Err(format!(
+            "nustar package `{}` Kernel PTX code asset `{asset_id}` source path `{source_path}` must be a .ns source container",
             manifest.package_id
         ));
     }

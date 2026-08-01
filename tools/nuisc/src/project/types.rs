@@ -10,6 +10,7 @@ pub struct NuisProjectManifest {
     pub entry: String,
     pub packaging_mode: Option<String>,
     pub artifact_provider_metadata: Vec<String>,
+    pub code_assets: Vec<String>,
     pub modules: Vec<String>,
     pub tests: Vec<String>,
     pub links: Vec<ProjectLink>,

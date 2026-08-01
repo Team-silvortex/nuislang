@@ -22,6 +22,8 @@ const REGISTERED_BINDING_CONTRACT: &str = "registered-provider-kernel-yir";
 pub(crate) enum KernelParameterKind {
     InputF32,
     OutputF32,
+    InputU32,
+    OutputU32,
     ElementCountU32,
     ScalarF32,
     InputI64,
@@ -34,6 +36,8 @@ impl KernelParameterKind {
         match self {
             Self::InputF32 => "input-f32",
             Self::OutputF32 => "output-f32",
+            Self::InputU32 => "input-u32",
+            Self::OutputU32 => "output-u32",
             Self::ElementCountU32 => "element-count-u32",
             Self::ScalarF32 => "scalar-f32",
             Self::InputI64 => "input-i64",
@@ -185,8 +189,8 @@ pub(crate) fn registered_provider_codegen_table() -> KernelYirCodegenTable {
         source_binding: REGISTERED_BINDING_CONTRACT,
         source_yir_version: "0.1".to_owned(),
         source_fnv1a64: fnv1a64_hex(b"nuis-kernel-registered-arithmetic-v1"),
-        source_kernel_node_count: 2,
-        source_kernel_body_node_count: 2,
+        source_kernel_node_count: 3,
+        source_kernel_body_node_count: 3,
         lowering_target: "cuda.nvidia-gpu",
         source_functions: Vec::new(),
         source_adaptations: Vec::new(),
@@ -194,6 +198,23 @@ pub(crate) fn registered_provider_codegen_table() -> KernelYirCodegenTable {
     };
     validate_codegen_table(&table).expect("registered Kernel/YIR table must remain valid");
     table
+}
+
+pub(crate) fn registered_provider_codegen_table_for_entries(
+    entries: &[&str],
+) -> Result<KernelYirCodegenTable, String> {
+    let mut table = registered_provider_codegen_table();
+    table
+        .functions
+        .retain(|function| entries.contains(&function.entry.as_str()));
+    if table.functions.len() != entries.len() {
+        return Err("registered Kernel/YIR code asset references an unknown entry".to_owned());
+    }
+    table.source_fnv1a64 = fnv1a64_hex(entries.join("\n").as_bytes());
+    table.source_kernel_node_count = table.functions.iter().map(|item| item.nodes.len()).sum();
+    table.source_kernel_body_node_count = table.source_kernel_node_count;
+    validate_codegen_table(&table)?;
+    Ok(table)
 }
 
 pub(crate) fn validate_codegen_table(table: &KernelYirCodegenTable) -> Result<(), String> {
@@ -573,6 +594,17 @@ fn registered_provider_functions() -> Vec<KernelYirCodegenFunction> {
             ],
             nodes: vec![arithmetic_node("scaled", "mul_f32", &["input", "scale"])],
             output_node: "scaled".to_owned(),
+        },
+        KernelYirCodegenFunction {
+            contract: KERNEL_YIR_CODEGEN_FUNCTION_CONTRACT,
+            entry: "nuis_kernel_copy_u32".to_owned(),
+            parameters: vec![
+                parameter("input", KernelParameterKind::InputU32),
+                parameter("output", KernelParameterKind::OutputU32),
+                parameter("element_count", KernelParameterKind::ElementCountU32),
+            ],
+            nodes: vec![arithmetic_node("copied", "copy_u32", &["input"])],
+            output_node: "copied".to_owned(),
         },
     ]
 }

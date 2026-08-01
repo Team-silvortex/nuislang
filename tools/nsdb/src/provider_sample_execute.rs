@@ -10,7 +10,7 @@ use crate::provider_worker_lease::{ProviderWorkerAdapterLaunch, ProviderWorkerLe
 use crate::provider_worker_summary::bind_worker_output;
 use crate::{
     final_image_provider_dispatch::{
-        final_image_provider_dispatch_authority, validate_provider_records_against_final_image,
+        final_image_provider_dispatch_authority, validate_provider_families_against_final_image,
     },
     provider_edge_transport::ProviderEdgeTransportReceipt,
     provider_graph_output::{
@@ -43,11 +43,7 @@ use crate::{
     },
     provider_session_summary::bind_session_output,
 };
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    fs,
-    path::Path,
-};
+use std::{collections::BTreeMap, fs, path::Path};
 
 pub struct ProviderSampleExecuteReport {
     pub status: String,
@@ -118,13 +114,8 @@ pub fn execute_provider_samples(
             manifest.protocol, manifest.schema
         ));
     }
-    let provider_families = manifest
-        .records
-        .iter()
-        .map(|record| record.provider_family.clone())
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect::<Vec<_>>();
+    let provider_families =
+        crate::provider_bundle_registry::provider_families_for_records(&manifest.records)?;
     let matched_records = manifest
         .records
         .iter()
@@ -136,8 +127,16 @@ pub fn execute_provider_samples(
     if !final_image_dispatch.blockers.is_empty() {
         return Err(final_image_dispatch.blockers.join(", "));
     }
-    let final_image_dispatch_matched_count =
-        validate_provider_records_against_final_image(&final_image_dispatch, &matched_records)?;
+    let matched_record_values = matched_records
+        .iter()
+        .map(|record| (*record).clone())
+        .collect::<Vec<_>>();
+    let matched_provider_families =
+        crate::provider_bundle_registry::provider_families_for_records(&matched_record_values)?;
+    let final_image_dispatch_matched_count = validate_provider_families_against_final_image(
+        &final_image_dispatch,
+        &matched_provider_families,
+    )?;
     if final_image_dispatch.available {
         for record in &matched_records {
             let registered = select_provider_runner_adapter(&record.provider_family);
@@ -183,11 +182,9 @@ pub fn execute_provider_samples(
         crate::provider_bundle_registry::provider_bundle_evidence(&record.provider_family)
     });
     let selected_provider_bundle_set =
-        crate::provider_bundle_registry::selected_provider_bundle_set_evidence(
-            matched_records
-                .iter()
-                .map(|record| record.provider_family.as_str()),
-        );
+        crate::provider_bundle_registry::selected_provider_bundle_set_for_records(
+            &matched_record_values,
+        )?;
     let mut completion_records = Vec::new();
     let mut output_payloads = Vec::new();
     for record in &matched_records {

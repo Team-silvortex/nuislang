@@ -1,12 +1,12 @@
 use crate::{
     artifact_device_sample_registration::DeviceSampleInputRegistration,
     artifact_device_sample_shader_common::{
-        fnv1a64_hex, render_dependency_count_zero, render_u32_output_evidence,
-        render_u32_pair_artifact_binding, render_u32_prefixed_request_evidence,
-        replace_code_asset_identity_fields, validate_code_asset_contribution_selection,
-        validate_code_asset_request_evidence, U32OutputEvidence, U32RequestEvidence,
-        U32_INPUT as INPUT, U32_PAIR_ADD_EXPECTED as SUM_EXPECTED,
-        U32_PAIR_RIGHT_INPUT as RIGHT_INPUT,
+        fnv1a64_hex, render_dependency_count_zero, render_u32_dependency_binding,
+        render_u32_dependency_edge, render_u32_output_evidence, render_u32_pair_artifact_binding,
+        render_u32_prefixed_request_evidence, replace_code_asset_identity_fields,
+        validate_code_asset_contribution_selection, validate_code_asset_request_evidence,
+        U32OutputEvidence, U32RequestEvidence, U32_INPUT as INPUT,
+        U32_PAIR_ADD_EXPECTED as SUM_EXPECTED, U32_PAIR_RIGHT_INPUT as RIGHT_INPUT,
     },
 };
 use std::{fs, path::Path};
@@ -20,19 +20,35 @@ const PADDED_METADATA_SELECTOR: &str =
 const REDUCED_REGISTRATION_ID: &str = "official.shader.vulkan-add-xor-pair-reduced-u32";
 const REDUCED_METADATA_SELECTOR: &str =
     "official.shader:provider-sample=vulkan-add-xor-pair-reduced-u32";
+const REDUCED_GRAPH_REGISTRATION_ID: &str = "official.shader.vulkan-reduced-output-fan-out-u32";
+const REDUCED_GRAPH_METADATA_SELECTOR: &str =
+    "official.shader:provider-sample=vulkan-reduced-output-fan-out-u32";
 const ASSET_ID: &str = "shader.vulkan.add-xor-pair-u32.spirv";
 const ENTRY: &str = "nuis_vulkan_add_xor_pair_u32";
-const REDUCED_ASSET_ID: &str = "shader.vulkan.add-xor-pair-reduced-u32.spirv";
-const REDUCED_ENTRY: &str = "nuis_vulkan_add_xor_pair_reduced_u32";
+pub(super) const REDUCED_ASSET_ID: &str = "shader.vulkan.add-xor-pair-reduced-u32.spirv";
+pub(super) const REDUCED_ENTRY: &str = "nuis_vulkan_add_xor_pair_reduced_u32";
+const COPY_ASSET_ID: &str = "shader.vulkan.copy-u32.spirv";
+const COPY_ENTRY: &str = "nuis_vulkan_copy_u32";
+pub(super) const XOR_ASSET_ID: &str = "shader.vulkan.xor-u32.spirv";
+pub(super) const XOR_ENTRY: &str = "nuis_vulkan_xor_u32";
 const LOWERING_TARGET: &str = "vulkan.discrete-or-integrated-gpu";
-const INPUT_FILE: &str = "nuis.shader.vulkan.add-xor-pair-u32.left.u32.bin";
-const RIGHT_FILE: &str = "nuis.shader.vulkan.add-xor-pair-u32.right.u32.bin";
-const SUM_FILE: &str = "nuis.shader.vulkan.add-xor-pair-u32.sum.expected.u32.bin";
+pub(super) const INPUT_FILE: &str = "nuis.shader.vulkan.add-xor-pair-u32.left.u32.bin";
+pub(super) const RIGHT_FILE: &str = "nuis.shader.vulkan.add-xor-pair-u32.right.u32.bin";
+pub(super) const SUM_FILE: &str = "nuis.shader.vulkan.add-xor-pair-u32.sum.expected.u32.bin";
 const XOR_FILE: &str = "nuis.shader.vulkan.add-xor-pair-u32.xor.expected.u32.bin";
 const PADDED_XOR_FILE: &str = "nuis.shader.vulkan.add-xor-pair-u32.xor-padded.expected.u32.bin";
-const REDUCED_XOR_FILE: &str = "nuis.shader.vulkan.add-xor-pair-reduced-u32.xor.expected.u32.bin";
+pub(super) const REDUCED_XOR_FILE: &str =
+    "nuis.shader.vulkan.add-xor-pair-reduced-u32.xor.expected.u32.bin";
+pub(super) const REDUCED_ZERO_FILE: &str =
+    "nuis.shader.vulkan.reduced-output-fan-out.zero.expected.u32.bin";
 const XOR_EXPECTED: &[u8] = &[3, 0, 0, 0, 11, 0, 0, 0, 8, 0, 0, 0, 29, 0, 0, 0];
-const REDUCED_XOR_EXPECTED: &[u8] = &[3, 0, 0, 0, 11, 0, 0, 0];
+pub(super) const REDUCED_XOR_EXPECTED: &[u8] = &[3, 0, 0, 0, 11, 0, 0, 0];
+pub(super) const REDUCED_ZERO_EXPECTED: &[u8] = &[0; 8];
+const REDUCED_GRAPH_PRODUCER_ID: &str = "shader.vulkan.reduced-fan-out.add-xor-pair-u32";
+const REDUCED_GRAPH_SUM_CONSUMER_ID: &str = "shader.vulkan.reduced-fan-out.copy-sum-u32";
+const REDUCED_GRAPH_XOR_CONSUMER_ID: &str = "shader.vulkan.reduced-fan-out.xor-reduced-u32";
+const REDUCED_GRAPH_SUM_TRANSPORT_TOKEN: &str = "glm:provider-edge:shader.vulkan.reduced-fan-out.add-xor-pair-u32:output.values->shader.vulkan.reduced-fan-out.copy-sum-u32:input.values";
+const REDUCED_GRAPH_XOR_TRANSPORT_TOKEN: &str = "glm:provider-edge:shader.vulkan.reduced-fan-out.add-xor-pair-u32:output.xor->shader.vulkan.reduced-fan-out.xor-reduced-u32:input.values";
 const PADDED_XOR_EXPECTED: &[u8] = &[
     3, 0, 0, 0, 11, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 29, 0, 0, 0, 0, 0, 0, 0,
 ];
@@ -76,6 +92,19 @@ pub(crate) fn reduced_registration() -> DeviceSampleInputRegistration {
     }
 }
 
+pub(crate) fn reduced_graph_registration() -> DeviceSampleInputRegistration {
+    DeviceSampleInputRegistration {
+        package_id: PACKAGE_ID,
+        registration_id: REDUCED_GRAPH_REGISTRATION_ID,
+        provider_family: "spirv:vulkan-gpu",
+        supports: |backend, device| backend == "vulkan" && device == "discrete-or-integrated-gpu",
+        metadata_selector: Some(selects_reduced_graph_sample),
+        enrich_evidence: reduced_graph_evidence,
+        resolve_evidence: Some(resolve_reduced_graph_code_asset_evidence),
+        persist_payloads,
+    }
+}
+
 fn selects_sample(base: &str) -> bool {
     selects_metadata(base, METADATA_SELECTOR)
 }
@@ -88,6 +117,10 @@ fn selects_reduced_sample(base: &str) -> bool {
     selects_metadata(base, REDUCED_METADATA_SELECTOR)
 }
 
+fn selects_reduced_graph_sample(base: &str) -> bool {
+    selects_metadata(base, REDUCED_GRAPH_METADATA_SELECTOR)
+}
+
 fn selects_metadata(base: &str, selector: &str) -> bool {
     base.split(';')
         .filter_map(|field| field.split_once('='))
@@ -96,6 +129,7 @@ fn selects_metadata(base: &str, selector: &str) -> bool {
 
 fn sample_evidence(_base: &str) -> String {
     render_sample_evidence(
+        "provider_",
         ASSET_ID,
         ENTRY,
         "shader.vulkan.add-xor-pair-u32",
@@ -109,6 +143,7 @@ fn sample_evidence(_base: &str) -> String {
 
 fn padded_sample_evidence(_base: &str) -> String {
     render_sample_evidence(
+        "provider_",
         ASSET_ID,
         ENTRY,
         "shader.vulkan.add-xor-pair-u32",
@@ -122,6 +157,7 @@ fn padded_sample_evidence(_base: &str) -> String {
 
 fn reduced_sample_evidence(_base: &str) -> String {
     render_sample_evidence(
+        "provider_",
         REDUCED_ASSET_ID,
         REDUCED_ENTRY,
         "shader.vulkan.add-xor-pair-reduced-u32",
@@ -133,7 +169,8 @@ fn reduced_sample_evidence(_base: &str) -> String {
     )
 }
 
-fn render_sample_evidence(
+pub(super) fn render_sample_evidence(
+    prefix: &str,
     asset_id: &'static str,
     entry: &'static str,
     kernel_id: &'static str,
@@ -146,7 +183,7 @@ fn render_sample_evidence(
     let asset =
         asset(asset_id, entry).expect("Shader Nustar Vulkan fan-out asset must be registered");
     let output_evidence = render_u32_output_evidence(
-        "provider_",
+        prefix,
         &[
             U32OutputEvidence {
                 role: "output.sum",
@@ -171,7 +208,7 @@ fn render_sample_evidence(
         ],
     );
     render_u32_prefixed_request_evidence(U32RequestEvidence {
-        prefix: "provider_",
+        prefix,
         provider_family: "spirv:vulkan-gpu",
         kernel_id,
         operation,
@@ -180,6 +217,7 @@ fn render_sample_evidence(
         buffer_shape: "2x2",
         row_stride_bytes: 8,
         dispatch: "4x1x1",
+        element_count: 4,
         input_file_name: INPUT_FILE,
         input_hash: fnv1a64_hex(INPUT),
         input_byte_length: INPUT.len(),
@@ -188,7 +226,7 @@ fn render_sample_evidence(
         asset: &asset,
         bytes: &asset.bytes,
         input_binding: render_u32_pair_artifact_binding(
-            "provider_",
+            prefix,
             "tensor-row-major",
             "2x2",
             8,
@@ -197,9 +235,171 @@ fn render_sample_evidence(
             RIGHT_FILE,
             RIGHT_INPUT,
         ),
-        dependency: render_dependency_count_zero("provider_"),
+        dependency: render_dependency_count_zero(prefix),
         output_evidence: Some(output_evidence),
     })
+}
+
+fn reduced_graph_evidence(_base: &str) -> String {
+    let producer = asset(REDUCED_ASSET_ID, REDUCED_ENTRY)
+        .expect("Shader Nustar reduced Vulkan fan-out asset must be registered");
+    let sum_consumer = asset(COPY_ASSET_ID, COPY_ENTRY)
+        .expect("Shader Nustar Vulkan copy asset must be registered");
+    let xor_consumer =
+        asset(XOR_ASSET_ID, XOR_ENTRY).expect("Shader Nustar Vulkan xor asset must be registered");
+    let identity = reduced_graph_code_asset_identity(&producer, &sum_consumer, &xor_consumer)
+        .expect("Shader Nustar reduced Vulkan graph identity must assemble");
+    format!(
+        "provider_request_collection_contract=nuis-provider-request-collection-v1;provider_request_count=3;{};{};{};{}",
+        render_sample_evidence(
+            "provider_request_0_",
+            REDUCED_ASSET_ID,
+            REDUCED_ENTRY,
+            REDUCED_GRAPH_PRODUCER_ID,
+            "add-xor-pair-reduced-u32",
+            REDUCED_XOR_FILE,
+            REDUCED_XOR_EXPECTED,
+            "2x1",
+            8,
+        ),
+        render_reduced_graph_consumer(ReducedGraphConsumer {
+            request_index: 1,
+            asset: &sum_consumer,
+            kernel_id: REDUCED_GRAPH_SUM_CONSUMER_ID,
+            operation: "copy-u32",
+            producer_output_buffer: "output.values",
+            shape: "2x2",
+            row_stride_bytes: 8,
+            input: SUM_EXPECTED,
+            expected_file_name: SUM_FILE,
+            expected: SUM_EXPECTED,
+            dispatch: "4x1x1",
+            element_count: 4,
+            ownership_token: REDUCED_GRAPH_SUM_TRANSPORT_TOKEN,
+        }),
+        render_reduced_graph_consumer(ReducedGraphConsumer {
+            request_index: 2,
+            asset: &xor_consumer,
+            kernel_id: REDUCED_GRAPH_XOR_CONSUMER_ID,
+            operation: "xor-u32",
+            producer_output_buffer: "output.xor",
+            shape: "2x1",
+            row_stride_bytes: 8,
+            input: REDUCED_XOR_EXPECTED,
+            expected_file_name: REDUCED_ZERO_FILE,
+            expected: REDUCED_ZERO_EXPECTED,
+            dispatch: "2x1x1",
+            element_count: 2,
+            ownership_token: REDUCED_GRAPH_XOR_TRANSPORT_TOKEN,
+        }),
+        identity.identity_evidence,
+    )
+}
+
+struct ReducedGraphConsumer<'a> {
+    request_index: usize,
+    asset: &'a nuisc::registry::NustarCodeAssetRegistration,
+    kernel_id: &'a str,
+    operation: &'a str,
+    producer_output_buffer: &'a str,
+    shape: &'a str,
+    row_stride_bytes: usize,
+    input: &'a [u8],
+    expected_file_name: &'a str,
+    expected: &'a [u8],
+    dispatch: &'a str,
+    element_count: usize,
+    ownership_token: &'a str,
+}
+
+fn render_reduced_graph_consumer(args: ReducedGraphConsumer<'_>) -> String {
+    let prefix = format!("provider_request_{}_", args.request_index);
+    let input_hash = fnv1a64_hex(args.input);
+    render_u32_prefixed_request_evidence(U32RequestEvidence {
+        prefix: &prefix,
+        provider_family: "spirv:vulkan-gpu",
+        kernel_id: args.kernel_id,
+        operation: args.operation,
+        kernel_input_buffers: "input.values",
+        buffer_layout: "tensor-row-major",
+        buffer_shape: args.shape,
+        row_stride_bytes: args.row_stride_bytes,
+        dispatch: args.dispatch,
+        element_count: args.element_count,
+        input_file_name: "none",
+        input_hash: input_hash.clone(),
+        input_byte_length: args.input.len(),
+        expected_file_name: args.expected_file_name,
+        expected: args.expected,
+        asset: args.asset,
+        bytes: &args.asset.bytes,
+        input_binding: render_u32_dependency_binding(
+            &prefix,
+            "tensor-row-major",
+            args.shape,
+            args.row_stride_bytes,
+            &input_hash,
+            args.input.len(),
+            REDUCED_GRAPH_PRODUCER_ID,
+            args.producer_output_buffer,
+        ),
+        dependency: render_u32_dependency_edge(
+            &prefix,
+            0,
+            args.request_index,
+            REDUCED_GRAPH_PRODUCER_ID,
+            args.producer_output_buffer,
+            "input.values",
+            args.ownership_token,
+        ),
+        output_evidence: None,
+    })
+}
+
+fn reduced_graph_code_asset_identity(
+    producer: &nuisc::registry::NustarCodeAssetRegistration,
+    sum_consumer: &nuisc::registry::NustarCodeAssetRegistration,
+    xor_consumer: &nuisc::registry::NustarCodeAssetRegistration,
+) -> Result<crate::artifact_code_asset_identity::AssembledCodeAssetIdentity, String> {
+    use crate::artifact_code_asset_identity::NustarCodeAssetContribution;
+    crate::artifact_code_asset_identity::assemble_nustar_code_asset_identity(
+        Path::new("nustar-packages"),
+        &[
+            NustarCodeAssetContribution {
+                request_index: 0,
+                owner_package_id: &producer.package_id,
+                provider_family: "spirv:vulkan-gpu",
+                asset_id: &producer.asset_id,
+                format: &producer.format,
+                target: &producer.target,
+                entry: &producer.entry,
+                path: &producer.file_name,
+                bytes: &producer.bytes,
+            },
+            NustarCodeAssetContribution {
+                request_index: 1,
+                owner_package_id: &sum_consumer.package_id,
+                provider_family: "spirv:vulkan-gpu",
+                asset_id: &sum_consumer.asset_id,
+                format: &sum_consumer.format,
+                target: &sum_consumer.target,
+                entry: &sum_consumer.entry,
+                path: &sum_consumer.file_name,
+                bytes: &sum_consumer.bytes,
+            },
+            NustarCodeAssetContribution {
+                request_index: 2,
+                owner_package_id: &xor_consumer.package_id,
+                provider_family: "spirv:vulkan-gpu",
+                asset_id: &xor_consumer.asset_id,
+                format: &xor_consumer.format,
+                target: &xor_consumer.target,
+                entry: &xor_consumer.entry,
+                path: &xor_consumer.file_name,
+                bytes: &xor_consumer.bytes,
+            },
+        ],
+    )
 }
 
 fn persist_payloads(output_dir: &Path, evidence: &[&str]) -> Result<(), String> {
@@ -212,12 +412,15 @@ fn persist_payloads(output_dir: &Path, evidence: &[&str]) -> Result<(), String> 
     let standard = owns(REGISTRATION_ID);
     let padded = owns(PADDED_REGISTRATION_ID);
     let reduced = owns(REDUCED_REGISTRATION_ID);
-    if !standard && !padded && !reduced {
+    let reduced_graph = owns(REDUCED_GRAPH_REGISTRATION_ID);
+    if !standard && !padded && !reduced && !reduced_graph {
         return Ok(());
     }
     for (enabled, asset_id, entry) in [
         (standard || padded, ASSET_ID, ENTRY),
-        (reduced, REDUCED_ASSET_ID, REDUCED_ENTRY),
+        (reduced || reduced_graph, REDUCED_ASSET_ID, REDUCED_ENTRY),
+        (reduced_graph, COPY_ASSET_ID, COPY_ENTRY),
+        (reduced_graph, XOR_ASSET_ID, XOR_ENTRY),
     ] {
         if enabled {
             let asset = asset(asset_id, entry)?;
@@ -238,7 +441,12 @@ fn persist_payloads(output_dir: &Path, evidence: &[&str]) -> Result<(), String> 
     for (enabled, name, bytes) in [
         (standard, XOR_FILE, XOR_EXPECTED),
         (padded, PADDED_XOR_FILE, PADDED_XOR_EXPECTED),
-        (reduced, REDUCED_XOR_FILE, REDUCED_XOR_EXPECTED),
+        (
+            reduced || reduced_graph,
+            REDUCED_XOR_FILE,
+            REDUCED_XOR_EXPECTED,
+        ),
+        (reduced_graph, REDUCED_ZERO_FILE, REDUCED_ZERO_EXPECTED),
     ] {
         if enabled {
             fs::write(output_dir.join(name), bytes)
@@ -257,6 +465,65 @@ fn resolve_reduced_code_asset_evidence(
     evidence: &str,
 ) -> Result<String, String> {
     resolve_code_asset_evidence_for(output_dir, evidence, REDUCED_ASSET_ID, REDUCED_ENTRY)
+}
+
+fn resolve_reduced_graph_code_asset_evidence(
+    output_dir: &Path,
+    evidence: &str,
+) -> Result<String, String> {
+    let mut selections = Vec::new();
+    let mut replacements = Vec::new();
+    for (index, asset_id, entry) in [
+        (0usize, REDUCED_ASSET_ID, REDUCED_ENTRY),
+        (1, COPY_ASSET_ID, COPY_ENTRY),
+        (2, XOR_ASSET_ID, XOR_ENTRY),
+    ] {
+        let prefix = format!("provider_request_{index}_");
+        let asset = asset(asset_id, entry)?;
+        let actual = fs::read(output_dir.join(&asset.file_name)).map_err(|error| {
+            format!("failed to read Nuis-emitted reduced Vulkan graph asset: {error}")
+        })?;
+        validate_asset(&asset, &actual, entry)?;
+        validate_code_asset_request_evidence(
+            "Vulkan reduced fan-out graph",
+            &asset,
+            &actual,
+            evidence,
+            &prefix,
+        )?;
+        let selection =
+            crate::artifact_code_asset_contribution_table::select_compiled_code_asset_contribution(
+                output_dir,
+                PACKAGE_ID,
+                "shader",
+                LOWERING_TARGET,
+                &asset.format,
+                &asset.target,
+                std::slice::from_ref(&asset.entry),
+            )?
+            .ok_or_else(|| {
+                format!(
+                    "compiled reduced Vulkan graph contribution for `{}` is unavailable",
+                    asset.asset_id
+                )
+            })?;
+        validate_code_asset_contribution_selection(
+            "Vulkan reduced fan-out graph",
+            &selection,
+            evidence,
+            &prefix,
+        )?;
+        selections.push(selection);
+        replacements.push((prefix, actual.len(), fnv1a64_hex(&actual)));
+    }
+    let mut resolved = replace_code_asset_identity_fields(evidence, &replacements);
+    resolved.push(';');
+    resolved.push_str(
+        &crate::artifact_code_asset_contribution_table::render_selected_contribution_set_evidence(
+            &selections,
+        )?,
+    );
+    Ok(resolved)
 }
 
 fn resolve_code_asset_evidence_for(
@@ -301,7 +568,7 @@ fn resolve_code_asset_evidence_for(
     Ok(resolved)
 }
 
-fn validate_asset(
+pub(super) fn validate_asset(
     asset: &nuisc::registry::NustarCodeAssetRegistration,
     bytes: &[u8],
     entry: &str,
@@ -322,7 +589,7 @@ fn validate_asset(
     Ok(())
 }
 
-fn asset(
+pub(super) fn asset(
     asset_id: &str,
     entry: &str,
 ) -> Result<nuisc::registry::NustarCodeAssetRegistration, String> {
@@ -369,5 +636,32 @@ mod tests {
         assert!(reduced_evidence.contains("provider_kernel_operation=add-xor-pair-reduced-u32"));
         assert_eq!(fnv1a64_hex(REDUCED_XOR_EXPECTED), "0x279d73758e81abdd");
         assert!(nsdb::validate_provider_request_evidence(&reduced_evidence));
+
+        let graph = reduced_graph_registration();
+        let graph_evidence = (graph.enrich_evidence)("ignored");
+        assert!(graph_evidence.contains("provider_request_count=3"));
+        assert!(
+            graph_evidence.contains("provider_request_1_input_binding_0_layout=tensor-row-major")
+        );
+        assert!(graph_evidence.contains("provider_request_1_input_binding_0_shape=2x2"));
+        assert!(graph_evidence.contains("provider_request_1_input_binding_0_byte_length=16"));
+        assert!(graph_evidence
+            .contains("provider_request_1_dependency_0_producer_output_buffer=output.values"));
+        assert!(graph_evidence.contains("provider_request_1_kernel_dispatch=4x1x1"));
+        assert!(graph_evidence
+            .contains("provider_request_1_kernel_scalar_bindings=element_count:u32:4"));
+        assert!(graph_evidence.contains("provider_request_2_input_binding_0_shape=2x1"));
+        assert!(graph_evidence.contains("provider_request_2_input_binding_0_byte_length=8"));
+        assert!(graph_evidence
+            .contains("provider_request_2_dependency_0_producer_output_buffer=output.xor"));
+        assert!(graph_evidence.contains("provider_request_2_kernel_dispatch=2x1x1"));
+        assert!(graph_evidence
+            .contains("provider_request_2_kernel_scalar_bindings=element_count:u32:2"));
+        assert!(graph_evidence.contains(
+            "provider_request_2_dependency_0_transport_consumer_clock_evidence=provider-clock:request-2:dispatch-ready"
+        ));
+        assert!(graph_evidence.contains("provider_code_asset_identity_set_count=3"));
+        assert_eq!(fnv1a64_hex(REDUCED_ZERO_EXPECTED), "0xa8c7f832281a39c5");
+        assert!(nsdb::validate_provider_request_evidence(&graph_evidence));
     }
 }

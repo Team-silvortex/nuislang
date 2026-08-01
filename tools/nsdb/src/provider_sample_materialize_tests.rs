@@ -204,6 +204,9 @@ next_action = "handoff-payload-trace-to-nsdb"
     ));
     assert!(source.contains("selected_provider_bundle_count = 1"));
     assert!(source.contains("selected_provider_bundle_set_hash = \"fnv1a64:5c7ac5158d84aa8b\""));
+    assert!(source.contains("[[provider_dispatch]]"));
+    assert!(source.contains("dispatch_id = \"dispatch0000\""));
+    assert!(source.contains("runner_adapter_id = \"metal.apple-silicon-gpu.real-device\""));
     assert!(source.contains(
         "output_evidence = \"nuis.nsdb.provider-sample.metal-apple-silicon-gpu.toml:hash=0x"
     ));

@@ -314,6 +314,7 @@ int main(int argc, char** argv) {
     if (argc != 9) return 2;
     int vector_add = strcmp(argv[3], "vector-add") == 0;
     int scale = strcmp(argv[3], "scale") == 0;
+    int copy_u32 = strcmp(argv[3], "copy-u32") == 0;
     int add_scalar_i64 = strcmp(argv[3], "add-scalar-i64") == 0;
     int reduce_sum_i64 = strcmp(argv[3], "reduce-sum-i64") == 0;
     char* scale_end = NULL;
@@ -325,7 +326,7 @@ int main(int argc, char** argv) {
     uint32_t device_selection_policy = 0;
     uint32_t minimum_compute_capability = 0;
     OutputDescriptor output_descriptor = {0};
-    if ((!vector_add && !scale && !add_scalar_i64 && !reduce_sum_i64)
+    if ((!vector_add && !scale && !copy_u32 && !add_scalar_i64 && !reduce_sum_i64)
         || (scale && (argv[5] == scale_end || *scale_end != '\0'))
         || (add_scalar_i64
             && (argv[5] == scalar_i64_end || *scalar_i64_end != '\0'))
@@ -334,8 +335,9 @@ int main(int argc, char** argv) {
         || device_selection_policy != CUDA_CAPABILITY_RANKED_POLICY_CODE
         || !parse_element_count(argv[8], &minimum_compute_capability)
         || !parse_output_descriptor(&output_descriptor)) return 3;
-    size_t element_width =
-        (add_scalar_i64 || reduce_sum_i64) ? sizeof(int64_t) : sizeof(float);
+    size_t element_width = (add_scalar_i64 || reduce_sum_i64)
+        ? sizeof(int64_t)
+        : (copy_u32 ? sizeof(uint32_t) : sizeof(float));
     if ((size_t)element_count > SIZE_MAX / element_width) return 4;
     size_t input_byte_length = (size_t)element_count * element_width;
     size_t output_byte_length =
@@ -399,6 +401,11 @@ int main(int argc, char** argv) {
         &element_count,
         &scale_value,
     };
+    void* copy_u32_parameters[] = {
+        &device_left,
+        &device_output,
+        &element_count,
+    };
     void* add_scalar_i64_parameters[] = {
         &device_left,
         &device_output,
@@ -414,9 +421,11 @@ int main(int argc, char** argv) {
         ? vector_add_parameters
         : (scale
             ? scale_parameters
-            : (add_scalar_i64
-                ? add_scalar_i64_parameters
-                : reduce_sum_i64_parameters));
+            : (copy_u32
+                ? copy_u32_parameters
+                : (add_scalar_i64
+                    ? add_scalar_i64_parameters
+                    : reduce_sum_i64_parameters)));
     ready = ready
         && driver.launch_kernel(
                function,

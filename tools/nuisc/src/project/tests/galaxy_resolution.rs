@@ -848,6 +848,7 @@ fn import_index_reports_manual_only_library_as_not_visible() {
             entry: "main.ns".to_owned(),
             packaging_mode: None,
             artifact_provider_metadata: vec![],
+            code_assets: vec![],
             modules: vec!["main.ns".to_owned()],
             tests: vec![],
             links: vec![],

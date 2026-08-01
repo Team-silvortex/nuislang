@@ -11,6 +11,7 @@ mod artifact_device_sample_shader_common;
 mod artifact_device_sample_shader_metal;
 mod artifact_device_sample_shader_metal_fan_out;
 mod artifact_device_sample_shader_vulkan;
+mod artifact_device_sample_shader_vulkan_cuda_fan_out;
 mod artifact_device_sample_shader_vulkan_fan_out;
 mod artifact_device_sample_witsage;
 mod artifact_doctor;

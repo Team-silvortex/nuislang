@@ -1,3 +1,4 @@
+#[cfg(test)]
 use crate::model::NsdbDeviceProviderSampleRecordInfo;
 use std::{collections::BTreeSet, fs, path::Path};
 
@@ -134,6 +135,7 @@ pub(crate) fn final_image_provider_dispatch_authority(
     }
 }
 
+#[cfg(test)]
 pub(crate) fn validate_provider_records_against_final_image(
     authority: &FinalImageProviderDispatchAuthority,
     records: &[&NsdbDeviceProviderSampleRecordInfo],
@@ -165,6 +167,46 @@ pub(crate) fn validate_provider_records_against_final_image(
         {
             return Err(format!(
                 "final-image-dispatch:sidecar-runner-drift:{}",
+                entry.dispatch_id
+            ));
+        }
+        matched += 1;
+    }
+    Ok(matched)
+}
+
+pub(crate) fn validate_provider_families_against_final_image(
+    authority: &FinalImageProviderDispatchAuthority,
+    provider_families: &[String],
+) -> Result<usize, String> {
+    if !authority.available {
+        return Ok(0);
+    }
+    if !authority.blockers.is_empty() {
+        return Err(authority.blockers.join(", "));
+    }
+    let mut matched = 0usize;
+    for family in provider_families {
+        let bundle = crate::provider_bundle_registry::provider_bundle_evidence(family)
+            .ok_or_else(|| format!("final-image-dispatch:bundle-unregistered:{family}"))?;
+        let adapter = crate::provider_runner_registry::select_provider_runner_adapter(family);
+        let entry = authority.entries.iter().find(|entry| {
+            entry.package_id == bundle.package_id
+                && entry.bundle_id == bundle.bundle_id
+                && entry.provider_family == *family
+        });
+        let Some(entry) = entry else {
+            return Err(format!(
+                "final-image-dispatch:request-family-entry-missing:{}:{}:{family}",
+                bundle.package_id, bundle.bundle_id
+            ));
+        };
+        if entry.runner_contract != "nuis-provider-runner-v1"
+            || entry.runner_adapter_contract != "nuis-provider-runner-adapter-v1"
+            || entry.runner_adapter_id != adapter.adapter_id
+        {
+            return Err(format!(
+                "final-image-dispatch:request-family-runner-drift:{}",
                 entry.dispatch_id
             ));
         }

@@ -623,6 +623,9 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
                 "selected_provider_bundle_set_contract",
                 "selected_provider_bundle_count",
                 "selected_provider_bundle_set_hash",
+                "SelectedProviderBundleSetEvidence",
+                "[[provider_dispatch]]",
+                "runner_adapter_id",
             ],
         },
     DevTensorDriftCheckSpec {
@@ -639,6 +642,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
                 "provider_bundle_evidence_is_valid",
                 "selected_provider_bundle_set_validation_status",
                 "nuis-selected-provider-bundle-set-v1",
+                "[[provider_dispatch]]",
             ],
         },
     DevTensorDriftCheckSpec {

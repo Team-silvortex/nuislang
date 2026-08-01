@@ -366,8 +366,12 @@ fn run_metal_sample_smoke(sample: MetalSampleSmoke<'_>) {
         materialized_text.contains("\"first_provider_output_payload_attach_status\":\"attached\"")
     );
 
-    let frontdoor =
-        super::final_image::assemble_provider_complete_final_image(&project_text, &output_dir, 1);
+    let frontdoor = super::final_image::assemble_provider_complete_final_image(
+        &project_text,
+        &output_dir,
+        1,
+        1,
+    );
     assert!(
         frontdoor.contains("\"nsld_final_executable_output_nsdb_first_provider_family\":\"metal:apple-silicon-gpu\"")
             && frontdoor.contains("\"closure_summary_first_provider_family\":\"metal:apple-silicon-gpu\"")

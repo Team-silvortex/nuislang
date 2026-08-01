@@ -1,0 +1,13 @@
+name = "shader_vulkan_cuda_fan_out_provider_demo"
+version = "0.1.0"
+entry = "main.ns"
+packaging_mode = "nuis-self-contained-image"
+artifact_provider_metadata = [
+  "official.shader:provider-sample=vulkan-cuda-reduced-output-fan-out-u32"
+]
+code_assets = ["kernel.cuda.copy-u32.ptx"]
+modules = ["main.ns", "surface_shader.ns"]
+abi = [
+  "cpu=cpu.x86_64.sysv64",
+  "shader=shader.vulkan.spv1_6",
+]

@@ -197,7 +197,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_CUDA_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
             "lowering_targets",
             "source_path",
             "file_name",
-            "validate_shader_code_asset_source_path",
+            "validate_code_asset_source_path",
             "shader_code_asset_source_path_must_be_ns_container",
             "extract_single_inline_wgsl_source",
             "extract_single_inline_metal_source",

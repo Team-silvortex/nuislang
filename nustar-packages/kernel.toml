@@ -63,6 +63,7 @@ clock_epoch_kind = "dispatch-epoch"
 clock_resolution = "kernel-queue-step"
 clock_bridge_default = "global->dispatch:bridge"
 provider_bundles = ["nuis-provider-bundle-manifest-entry-v1|coreml.apple-ane.bundle.v1|coreml:apple-ane|coreml.apple-ane.real-device|coreml-real-device-runner|provider_runner_coreml::PROVIDER_BUNDLE", "nuis-provider-bundle-manifest-entry-v1|cuda.nvidia-gpu.bundle.v1|cuda:nvidia-gpu|cuda.nvidia-gpu.real-device|cuda-ptx-real-device-runner|provider_runner_cuda::PROVIDER_BUNDLE"]
+code_assets = ["nuis-nustar-code-asset-registration-v1|kernel.cuda.copy-u32.ptx|ptx|cuda.nvidia-gpu|sm_80|nuis_kernel_copy_u32|nuis.domain.kernel.copy-u32.cuda.ptx|assets/kernel/cuda_copy_u32.ns"]
 profiles = ["aot"]
 resource_families = ["kernel", "kernel.apple", "npu", "npu.apple"]
 unit_types = ["KernelUnit", "TensorProgram", "ComputeGraph"]

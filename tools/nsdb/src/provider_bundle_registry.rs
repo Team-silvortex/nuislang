@@ -45,6 +45,16 @@ pub(crate) struct SelectedProviderBundleSetEvidence {
     pub(crate) contract: &'static str,
     pub(crate) count: usize,
     pub(crate) hash: String,
+    pub(crate) entries: Vec<SelectedProviderBundleIdentity>,
+}
+
+pub(crate) struct SelectedProviderBundleIdentity {
+    pub(crate) package_id: &'static str,
+    pub(crate) bundle_id: &'static str,
+    pub(crate) provider_family: String,
+    pub(crate) runner_contract: &'static str,
+    pub(crate) runner_adapter_contract: &'static str,
+    pub(crate) runner_adapter_id: &'static str,
 }
 
 include!(concat!(
@@ -97,23 +107,98 @@ pub(crate) fn selected_provider_bundle_set_evidence<'a>(
     for provider_family in provider_families {
         let bundle = provider_bundle_evidence(provider_family)?;
         if seen_bundle_ids.insert(bundle.bundle_id) {
-            selected.push((bundle.package_id, bundle.bundle_id, provider_family));
+            let registration = select_provider_bundle_by_family(provider_family)?;
+            selected.push(SelectedProviderBundleIdentity {
+                package_id: bundle.package_id,
+                bundle_id: bundle.bundle_id,
+                provider_family: provider_family.to_owned(),
+                runner_contract: "nuis-provider-runner-v1",
+                runner_adapter_contract: "nuis-provider-runner-adapter-v1",
+                runner_adapter_id: registration.runner_profile.available_adapter.adapter_id,
+            });
         }
     }
     if selected.is_empty() {
         return None;
     }
     let mut canonical = format!("{SELECTED_PROVIDER_BUNDLE_SET_CONTRACT}\n");
-    for (index, (package_id, bundle_id, provider_family)) in selected.iter().enumerate() {
+    for (index, entry) in selected.iter().enumerate() {
         canonical.push_str(&format!(
-            "{index}|{package_id}|{bundle_id}|{provider_family}\n"
+            "{index}|{}|{}|{}\n",
+            entry.package_id, entry.bundle_id, entry.provider_family
         ));
     }
     Some(SelectedProviderBundleSetEvidence {
         contract: SELECTED_PROVIDER_BUNDLE_SET_CONTRACT,
         count: selected.len(),
         hash: format!("fnv1a64:{:016x}", fnv1a64(canonical.as_bytes())),
+        entries: selected,
     })
+}
+
+pub(crate) fn provider_families_for_records(
+    records: &[crate::model::NsdbDeviceProviderSampleRecordInfo],
+) -> Result<Vec<String>, String> {
+    let mut families = Vec::new();
+    let mut seen = std::collections::BTreeSet::new();
+    for record in records {
+        let collection = crate::provider_request::provider_request_collection_from_evidence(
+            &record.input_evidence,
+        );
+        let request_families = collection
+            .as_ref()
+            .map(|collection| {
+                collection
+                    .requests
+                    .iter()
+                    .map(|request| {
+                        request
+                            .adapter_binding
+                            .as_ref()
+                            .map(|binding| binding.provider_family.as_str())
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let has_binding = request_families.iter().any(Option::is_some);
+        if has_binding && request_families.iter().any(Option::is_none) {
+            return Err(format!(
+                "provider-bundle-selection:request-adapter-binding-missing:{}",
+                record.trace_id
+            ));
+        }
+        let record_families = if has_binding {
+            request_families.into_iter().flatten().collect::<Vec<_>>()
+        } else {
+            vec![record.provider_family.as_str()]
+        };
+        if record_families.first().copied() != Some(record.provider_family.as_str()) {
+            return Err(format!(
+                "provider-bundle-selection:record-family-drift:{}",
+                record.trace_id
+            ));
+        }
+        for family in record_families {
+            if provider_bundle_evidence(family).is_none() {
+                return Err(format!(
+                    "provider-bundle-selection:unregistered-provider-family:{family}"
+                ));
+            }
+            if seen.insert(family.to_owned()) {
+                families.push(family.to_owned());
+            }
+        }
+    }
+    Ok(families)
+}
+
+pub(crate) fn selected_provider_bundle_set_for_records(
+    records: &[crate::model::NsdbDeviceProviderSampleRecordInfo],
+) -> Result<Option<SelectedProviderBundleSetEvidence>, String> {
+    let families = provider_families_for_records(records)?;
+    Ok(selected_provider_bundle_set_evidence(
+        families.iter().map(String::as_str),
+    ))
 }
 
 pub(crate) fn append_provider_bundle_evidence(out: &mut String, provider_family: &str) {

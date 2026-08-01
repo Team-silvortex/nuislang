@@ -134,6 +134,7 @@ pub(crate) fn collect_device_provider_sample_manifest_mirror(
             .unwrap_or_else(|| "none".to_owned());
     let selected_provider_bundle_set_validation_status =
         selected_provider_bundle_set_validation_status(
+            &source,
             &records,
             &selected_provider_bundle_set_contract,
             selected_provider_bundle_count,
@@ -460,6 +461,7 @@ fn provider_bundle_evidence_status(
 }
 
 fn selected_provider_bundle_set_validation_status(
+    source: &str,
     records: &[&str],
     contract: &str,
     count_claim: usize,
@@ -470,7 +472,16 @@ fn selected_provider_bundle_set_validation_status(
     }
     let mut selected = Vec::new();
     let mut seen_bundle_ids = std::collections::BTreeSet::new();
-    for record in records {
+    let dispatch = source
+        .split("[[provider_dispatch]]")
+        .skip(1)
+        .collect::<Vec<_>>();
+    let identities = if dispatch.is_empty() {
+        records
+    } else {
+        &dispatch
+    };
+    for record in identities {
         let Some(package_id) = parse_string_toml_field(record, "provider_bundle_package_id") else {
             return "mismatch".to_owned();
         };
@@ -762,6 +773,7 @@ provider_bundle_id = "metal.apple-silicon-gpu.bundle.v1"
         ];
         assert_eq!(
             selected_provider_bundle_set_validation_status(
+                "",
                 &records,
                 SELECTED_PROVIDER_BUNDLE_SET_CONTRACT,
                 2,

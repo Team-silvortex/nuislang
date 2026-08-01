@@ -152,24 +152,23 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         .contains("weakest task card is directly actionable"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_action
-        .contains("consume the reduced output.xor"));
+        .contains("ordered request completion receipts"));
     let handoff_command = &summary.weakest_bootstrap_task_card_handoff_command;
     for required in [
         "CARGO_INCREMENTAL=0 cargo check -q -p nuisc -p nsdb",
-        "cargo test -q -p nuisc shader_spirv_emitter",
-        "cargo test -q -p nuisc shader_msl_emitter",
-        "cargo test -q -p nsdb provider_execution_vulkan",
-        "fan_out_registration_owns_two_output_request",
-        "linux_vulkan_reduced_fan_out_shader_bounds_secondary_output",
+        "cargo check -q -p nuisc -p nsdb -p nsld -p nuis",
+        "one_sample_can_seal_multiple_request_provider_dispatches",
+        "linux_vulkan_producer_fans_out_to_cuda_and_vulkan_consumers",
+        "sealed_linux_cuda_image_executes_and_replays_completion",
     ] {
         assert!(handoff_command.contains(required));
     }
     assert!(summary
         .weakest_bootstrap_task_card_handoff_expected_artifact
-        .contains("one two-node Vulkan graph"));
+        .contains("three ordered request-completion receipts"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_expected_artifact
-        .contains("8-byte dependency input"));
+        .contains("shared selected-set root"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.protocol,
         "nuis-dev-tensor-task-card-lineage-v1"

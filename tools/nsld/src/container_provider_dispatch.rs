@@ -166,9 +166,14 @@ fn provider_dispatch_table_hash_bytes(bytes: &[u8]) -> String {
 }
 
 fn parse_dispatch_entries(source: &str) -> Vec<NsldContainerProviderDispatch> {
-    table_blocks(source, "device_provider_samples")
+    let explicit = table_blocks(source, "provider_dispatch");
+    let blocks = if explicit.is_empty() {
+        table_blocks(source, "device_provider_samples")
+    } else {
+        explicit
+    };
+    blocks
         .into_iter()
-        .chain(table_blocks(source, "provider_dispatch"))
         .enumerate()
         .filter_map(|(index, block)| {
             let package_id = toml::string_value(&block, "provider_bundle_package_id")?;
@@ -427,6 +432,66 @@ mod tests {
             Some(selected_hash.as_str())
         );
         assert!(evidence.blockers.is_empty());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn one_sample_can_seal_multiple_request_provider_dispatches() {
+        let dir = env::temp_dir().join(format!(
+            "nsld-provider-dispatch-mixed-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let entries = dispatch_entries();
+        let selected_hash = selected_provider_set_hash(&entries);
+        let mut source = format!(
+            "protocol = \"nuis-device-provider-samples-v1\"\n\
+             schema = \"nsdb-yir-device-provider-sample-v1\"\n\
+             status = \"ready\"\n\
+             record_count = 1\n\
+             ready_record_count = 1\n\
+             pending_record_count = 0\n\
+             provider_bundle_registry_contract = \"nuis-provider-bundle-registry-v1\"\n\
+             provider_bundle_manifest_contract = \"nuis-provider-bundle-manifest-v1\"\n\
+             provider_bundle_manifest_hash = \"fnv1a64:1111111111111111\"\n\
+             provider_bundle_manifest_entry_count = 2\n\
+             selected_provider_bundle_set_contract = \"{SELECTED_SET_CONTRACT}\"\n\
+             selected_provider_bundle_count = 2\n\
+             selected_provider_bundle_set_hash = \"{selected_hash}\"\n"
+        );
+        source.push_str(&render_dispatch_records(&entries, "unused"));
+        source.push_str(&format!(
+            "\n[[device_provider_samples]]\n\
+             trace_id = \"trace-mixed\"\n\
+             provider = \"registered-provider\"\n\
+             provider_family = \"{}\"\n\
+             provider_bundle_package_id = \"{}\"\n\
+             provider_bundle_id = \"{}\"\n\
+             requested_runner_contract = \"{}\"\n\
+             requested_runner_adapter_contract = \"{}\"\n\
+             requested_runner_adapter_id = \"{}\"\n\
+             materialization_status = \"provider-sample-materialized\"\n",
+            entries[0].provider_family,
+            entries[0].package_id,
+            entries[0].bundle_id,
+            entries[0].runner_contract,
+            entries[0].runner_adapter_contract,
+            entries[0].runner_adapter_id
+        ));
+        fs::write(dir.join(PROVIDER_SAMPLE_FILE_NAME), source).unwrap();
+
+        let sample = nsld_device_provider_sample_evidence(&dir.display().to_string());
+        let dispatch = provider_dispatch_evidence(&dir.display().to_string());
+
+        assert_eq!(sample.status, "ready");
+        assert_eq!(sample.selected_provider_bundle_count, Some(2));
+        assert_eq!(dispatch.status, "verified");
+        assert_eq!(dispatch.entries, entries);
+        assert_eq!(
+            dispatch.selected_set_hash.as_deref(),
+            Some(selected_hash.as_str())
+        );
         fs::remove_dir_all(dir).unwrap();
     }
 }

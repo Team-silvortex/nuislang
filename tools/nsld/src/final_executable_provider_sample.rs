@@ -96,6 +96,7 @@ pub(crate) fn nsld_device_provider_sample_evidence(
         toml::string_value(&source, "selected_provider_bundle_set_hash");
     let selected_provider_bundle_set_validation_status =
         selected_provider_bundle_set_validation_status(
+            &source,
             &records,
             selected_provider_bundle_set_contract.as_deref(),
             selected_provider_bundle_count,
@@ -197,6 +198,7 @@ fn provider_sample_status(
 }
 
 fn selected_provider_bundle_set_validation_status(
+    source: &str,
     records: &[&str],
     contract: Option<&str>,
     count_claim: Option<usize>,
@@ -207,7 +209,16 @@ fn selected_provider_bundle_set_validation_status(
     }
     let mut selected = Vec::new();
     let mut seen_bundle_ids = std::collections::BTreeSet::new();
-    for record in records {
+    let dispatch = source
+        .split("[[provider_dispatch]]")
+        .skip(1)
+        .collect::<Vec<_>>();
+    let identities = if dispatch.is_empty() {
+        records
+    } else {
+        dispatch.as_slice()
+    };
+    for record in identities {
         let Some(package_id) = toml::string_value(record, "provider_bundle_package_id") else {
             return "mismatch".to_owned();
         };

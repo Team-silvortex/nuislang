@@ -1,0 +1,6 @@
+/// Canonical Kernel Nustar declaration for the registered CUDA u32 copy asset.
+mod kernel CudaCopyU32CodeAsset {
+  fn profile() {
+    const entry: Text = "nuis_kernel_copy_u32";
+  }
+}

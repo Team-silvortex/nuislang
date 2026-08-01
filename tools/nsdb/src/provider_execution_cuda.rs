@@ -72,6 +72,7 @@ fn prepare_worker_adapter(
                 .scalar_f32("scale")
                 .expect("validated CUDA scale request must own scale")
         ),
+        "copy-u32" => "literal:0".to_owned(),
         "add-scalar-i64" => format!(
             "literal:{}",
             request
@@ -198,6 +199,14 @@ fn validate_cuda_request(
                     && inputs.len() == 1
                     && request.input_bindings.len() == 1
                     && request.scalar_f32("scale").is_some_and(f32::is_finite),
+            ),
+            "copy-u32" => (
+                "u32",
+                std::mem::size_of::<u32>(),
+                element_count,
+                asset.entry == "nuis_kernel_copy_u32"
+                    && inputs.len() == 1
+                    && request.input_bindings.len() == 1,
             ),
             "add-scalar-i64" => (
                 "i64",

@@ -26,9 +26,20 @@ struct VulkanGeneratedAsset<'a> {
 }
 
 struct VulkanGraphSmoke<'a> {
+    native_output_count: usize,
+    final_output_index: usize,
     final_request_id: &'a str,
     final_expected_hash: &'a str,
+    compiled_selection_count: usize,
+    edges: &'a [VulkanGraphEdgeSmoke<'a>],
+}
+
+struct VulkanGraphEdgeSmoke<'a> {
+    consumer_request_index: usize,
     transport_token: &'a str,
+    dependency_output_buffer: &'a str,
+    dependency_input_shape: &'a str,
+    dependency_byte_length: usize,
 }
 
 #[test]
@@ -122,6 +133,104 @@ fn linux_vulkan_reduced_fan_out_shader_bounds_secondary_output() {
 }
 
 #[test]
+fn linux_vulkan_reduced_fan_out_shader_feeds_independent_typed_downstream_inputs() {
+    run_vulkan_sample_smoke(VulkanSampleSmoke {
+        project_name: "shader_vulkan_reduced_output_fan_out_provider_demo",
+        assets: &[
+            VulkanGeneratedAsset {
+                asset_id: "shader.vulkan.add-xor-pair-reduced-u32.spirv",
+                generated_file: "nuis.shader.vulkan.add-xor-pair-reduced-u32.spv",
+                entry: "nuis_vulkan_add_xor_pair_reduced_u32",
+            },
+            VulkanGeneratedAsset {
+                asset_id: "shader.vulkan.copy-u32.spirv",
+                generated_file: "nuis.shader.vulkan.copy-u32.spv",
+                entry: "nuis_vulkan_copy_u32",
+            },
+            VulkanGeneratedAsset {
+                asset_id: "shader.vulkan.xor-u32.spirv",
+                generated_file: "nuis.shader.vulkan.xor-u32.spv",
+                entry: "nuis_vulkan_xor_u32",
+            },
+        ],
+        registration_id: "official.shader.vulkan-reduced-output-fan-out-u32",
+        expected_hash: "0xbada6f73928b9f42",
+        graph: Some(VulkanGraphSmoke {
+            native_output_count: 3,
+            final_output_index: 2,
+            final_request_id: "shader.vulkan.reduced-fan-out.xor-reduced-u32",
+            final_expected_hash: "0xa8c7f832281a39c5",
+            compiled_selection_count: 3,
+            edges: &[
+                VulkanGraphEdgeSmoke {
+                    consumer_request_index: 1,
+                    transport_token: "glm:provider-edge:shader.vulkan.reduced-fan-out.add-xor-pair-u32:output.values->shader.vulkan.reduced-fan-out.copy-sum-u32:input.values",
+                    dependency_output_buffer: "output.values",
+                    dependency_input_shape: "2x2",
+                    dependency_byte_length: 16,
+                },
+                VulkanGraphEdgeSmoke {
+                    consumer_request_index: 2,
+                    transport_token: "glm:provider-edge:shader.vulkan.reduced-fan-out.add-xor-pair-u32:output.xor->shader.vulkan.reduced-fan-out.xor-reduced-u32:input.values",
+                    dependency_output_buffer: "output.xor",
+                    dependency_input_shape: "2x1",
+                    dependency_byte_length: 8,
+                },
+            ],
+        }),
+    });
+}
+
+#[test]
+fn linux_vulkan_producer_fans_out_to_cuda_and_vulkan_consumers() {
+    run_vulkan_sample_smoke(VulkanSampleSmoke {
+        project_name: "shader_vulkan_cuda_fan_out_provider_demo",
+        assets: &[
+            VulkanGeneratedAsset {
+                asset_id: "shader.vulkan.add-xor-pair-reduced-u32.spirv",
+                generated_file: "nuis.shader.vulkan.add-xor-pair-reduced-u32.spv",
+                entry: "nuis_vulkan_add_xor_pair_reduced_u32",
+            },
+            VulkanGeneratedAsset {
+                asset_id: "kernel.cuda.copy-u32.ptx",
+                generated_file: "nuis.domain.kernel.copy-u32.cuda.ptx",
+                entry: "nuis_kernel_copy_u32",
+            },
+            VulkanGeneratedAsset {
+                asset_id: "shader.vulkan.xor-u32.spirv",
+                generated_file: "nuis.shader.vulkan.xor-u32.spv",
+                entry: "nuis_vulkan_xor_u32",
+            },
+        ],
+        registration_id: "official.shader.vulkan-cuda-reduced-output-fan-out-u32",
+        expected_hash: "0xbada6f73928b9f42",
+        graph: Some(VulkanGraphSmoke {
+            native_output_count: 3,
+            final_output_index: 2,
+            final_request_id: "shader.vulkan-cuda-fan-out.xor-reduced-u32",
+            final_expected_hash: "0xa8c7f832281a39c5",
+            compiled_selection_count: 3,
+            edges: &[
+                VulkanGraphEdgeSmoke {
+                    consumer_request_index: 1,
+                    transport_token: "glm:provider-edge:shader.vulkan-cuda-fan-out.add-xor-pair-u32:output.values->kernel.cuda.fan-out.copy-sum-u32:input.values",
+                    dependency_output_buffer: "output.values",
+                    dependency_input_shape: "2x2",
+                    dependency_byte_length: 16,
+                },
+                VulkanGraphEdgeSmoke {
+                    consumer_request_index: 2,
+                    transport_token: "glm:provider-edge:shader.vulkan-cuda-fan-out.add-xor-pair-u32:output.xor->shader.vulkan-cuda-fan-out.xor-reduced-u32:input.values",
+                    dependency_output_buffer: "output.xor",
+                    dependency_input_shape: "2x1",
+                    dependency_byte_length: 8,
+                },
+            ],
+        }),
+    });
+}
+
+#[test]
 fn linux_vulkan_sub_shader_sample_executes_provider_output() {
     run_vulkan_sample_smoke(VulkanSampleSmoke {
         project_name: "shader_vulkan_sub_provider_demo",
@@ -185,10 +294,19 @@ fn linux_vulkan_chain_shader_sample_executes_provider_graph() {
         registration_id: "official.shader.vulkan-u32-chain",
         expected_hash: "0xdce2c1aca0f32707",
         graph: Some(VulkanGraphSmoke {
+            native_output_count: 2,
+            final_output_index: 1,
             final_request_id: "shader.vulkan.chain.xor-u32",
             final_expected_hash: "0x88201fb960ff6465",
-            transport_token:
-                "glm:provider-edge:shader.vulkan.chain.add-u32:output.values->shader.vulkan.chain.xor-u32:input.values",
+            compiled_selection_count: 2,
+            edges: &[VulkanGraphEdgeSmoke {
+                consumer_request_index: 1,
+                transport_token:
+                    "glm:provider-edge:shader.vulkan.chain.add-u32:output.values->shader.vulkan.chain.xor-u32:input.values",
+                dependency_output_buffer: "output.values",
+                dependency_input_shape: "4",
+                dependency_byte_length: 16,
+            }],
         }),
     });
 }
@@ -249,6 +367,8 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
             | "official.shader.vulkan-add-xor-pair-u32"
             | "official.shader.vulkan-add-xor-pair-padded-u32"
             | "official.shader.vulkan-add-xor-pair-reduced-u32"
+            | "official.shader.vulkan-reduced-output-fan-out-u32"
+            | "official.shader.vulkan-cuda-reduced-output-fan-out-u32"
     ) {
         assert!(provider_samples.contains("input_binding_contract=nuis-provider-input-binding-v2"));
         assert!(provider_samples.contains("buffer_layout=tensor-row-major"));
@@ -260,7 +380,12 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
         assert!(provider_samples.contains("output_binding_1_row_stride_bytes=12"));
         assert!(provider_samples.contains("output_binding_1_byte_length=24"));
     }
-    if sample.registration_id == "official.shader.vulkan-add-xor-pair-reduced-u32" {
+    if matches!(
+        sample.registration_id,
+        "official.shader.vulkan-add-xor-pair-reduced-u32"
+            | "official.shader.vulkan-reduced-output-fan-out-u32"
+            | "official.shader.vulkan-cuda-reduced-output-fan-out-u32"
+    ) {
         assert!(provider_samples.contains("output_binding_1_shape=2x1"));
         assert!(provider_samples.contains("output_binding_1_row_stride_bytes=8"));
         assert!(provider_samples.contains("output_binding_1_byte_length=8"));
@@ -318,6 +443,8 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
         "official.shader.vulkan-add-xor-pair-u32"
             | "official.shader.vulkan-add-xor-pair-padded-u32"
             | "official.shader.vulkan-add-xor-pair-reduced-u32"
+            | "official.shader.vulkan-reduced-output-fan-out-u32"
+            | "official.shader.vulkan-cuda-reduced-output-fan-out-u32"
     ) {
         assert_file_contains(
             &provider_output,
@@ -340,7 +467,11 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
                 "native_output_0_worker_additional_output_hashes = \"{}\"",
                 match sample.registration_id {
                     "official.shader.vulkan-add-xor-pair-padded-u32" => "0x9adad3c97291d1e8",
-                    "official.shader.vulkan-add-xor-pair-reduced-u32" => "0x279d73758e81abdd",
+                    "official.shader.vulkan-add-xor-pair-reduced-u32"
+                    | "official.shader.vulkan-reduced-output-fan-out-u32"
+                    | "official.shader.vulkan-cuda-reduced-output-fan-out-u32" => {
+                        "0x279d73758e81abdd"
+                    }
                     _ => "0x73bb5b39fe3ab738",
                 }
             ),
@@ -350,37 +481,102 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
     if let Some(graph) = &sample.graph {
         assert_file_contains(
             &provider_output,
-            "native_output_count = \"2\"",
+            &format!("native_output_count = \"{}\"", graph.native_output_count),
             "Vulkan graph native output count",
         );
         assert_file_contains(
             &provider_output,
             &format!(
-                "native_output_1_request_id = \"{}\"",
-                graph.final_request_id
+                "native_output_{}_request_id = \"{}\"",
+                graph.final_output_index, graph.final_request_id
             ),
             "Vulkan graph final request",
         );
         assert_file_contains(
             &provider_output,
-            &format!("native_output_1_hash = \"{}\"", graph.final_expected_hash),
+            &format!(
+                "native_output_{}_hash = \"{}\"",
+                graph.final_output_index, graph.final_expected_hash
+            ),
             "Vulkan graph final output hash",
         );
         assert_file_contains(
             &provider_output,
-            "provider_edge_transport_receipt_count = \"1\"",
+            &format!(
+                "provider_edge_transport_receipt_count = \"{}\"",
+                graph.edges.len()
+            ),
             "Vulkan graph transport receipt",
         );
+        for (receipt_index, edge) in graph.edges.iter().enumerate() {
+            assert_file_contains(
+                &provider_output,
+                edge.transport_token,
+                "Vulkan graph GLM transport token",
+            );
+            assert!(provider_samples.contains(&format!(
+                "provider_request_{}_dependency_0_producer_output_buffer={}",
+                edge.consumer_request_index, edge.dependency_output_buffer
+            )));
+            assert!(provider_samples.contains(&format!(
+                "provider_request_{}_input_binding_0_shape={}",
+                edge.consumer_request_index, edge.dependency_input_shape
+            )));
+            assert!(provider_samples.contains(&format!(
+                "provider_request_{}_input_binding_0_byte_length={}",
+                edge.consumer_request_index, edge.dependency_byte_length
+            )));
+            assert_file_contains(
+                &provider_output,
+                &format!(
+                    "provider_edge_transport_receipt_{receipt_index}_byte_length = \"{}\"",
+                    edge.dependency_byte_length
+                ),
+                "Vulkan graph transport byte length",
+            );
+            assert_file_contains(
+                &provider_output,
+                &format!(
+                    "native_output_{}_output_binding_shapes = \"{}\"",
+                    edge.consumer_request_index, edge.dependency_input_shape
+                ),
+                "Vulkan graph typed consumer output shape",
+            );
+        }
         assert_file_contains(
             &provider_output,
-            graph.transport_token,
-            "Vulkan graph GLM transport token",
-        );
-        assert_file_contains(
-            &provider_output,
-            "compiled_code_asset_selection_count = \"2\"",
+            &format!(
+                "compiled_code_asset_selection_count = \"{}\"",
+                graph.compiled_selection_count
+            ),
             "Vulkan graph code asset selection set",
         );
+        if sample.registration_id == "official.shader.vulkan-cuda-reduced-output-fan-out-u32" {
+            assert!(provider_samples
+                .contains("provider_request_1_adapter_binding_provider_family=cuda:nvidia-gpu"));
+            assert!(provider_samples
+                .contains("provider_request_2_adapter_binding_provider_family=spirv:vulkan-gpu"));
+            assert_file_contains(
+                &provider_output,
+                "native_output_1_execution_contract = \"nuis-cuda-ptx-driver-provider-execution-v1\"",
+                "cross-provider CUDA consumer execution",
+            );
+            assert_file_contains(
+                &provider_output,
+                "native_output_1_device = \"cuda:nvidia-gpu:ordinal-",
+                "cross-provider CUDA selected device",
+            );
+            assert_file_contains(
+                &provider_output,
+                "native_output_2_execution_contract = \"nuis-vulkan-spirv-provider-execution-v1\"",
+                "cross-provider Vulkan consumer execution",
+            );
+            assert_file_contains(
+                &provider_output,
+                "provider_edge_transport_receipt_0_staging_adapter_id = \"provider.output.transfer.v1\"",
+                "cross-provider transferable staging adapter",
+            );
+        }
     }
 
     let materialized = run_nsdb(&[
@@ -400,9 +596,36 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
     assert!(
         materialized_text.contains("\"first_provider_output_payload_attach_status\":\"attached\"")
     );
+    let materialized_provider_samples =
+        fs::read_to_string(output_dir.join("nuis.nsdb.device-provider-samples.toml")).unwrap();
+    let expected_dispatch_count =
+        if sample.registration_id == "official.shader.vulkan-cuda-reduced-output-fan-out-u32" {
+            2
+        } else {
+            1
+        };
+    assert_eq!(
+        materialized_provider_samples
+            .matches("[[provider_dispatch]]")
+            .count(),
+        expected_dispatch_count
+    );
+    assert!(materialized_provider_samples.contains(&format!(
+        "selected_provider_bundle_count = {expected_dispatch_count}"
+    )));
+    if expected_dispatch_count == 2 {
+        assert!(materialized_provider_samples
+            .contains("provider_bundle_id = \"cuda.nvidia-gpu.bundle.v1\""));
+        assert!(materialized_provider_samples
+            .contains("runner_adapter_id = \"cuda.nvidia-gpu.real-device\""));
+    }
 
-    let frontdoor =
-        super::final_image::assemble_provider_complete_final_image(&project_text, &output_dir, 1);
+    let frontdoor = super::final_image::assemble_provider_complete_final_image(
+        &project_text,
+        &output_dir,
+        1,
+        expected_dispatch_count,
+    );
     assert!(
         frontdoor.contains("\"nsld_final_executable_output_nsdb_first_provider_family\":\"spirv:vulkan-gpu\"")
             && frontdoor.contains("\"closure_summary_first_provider_family\":\"spirv:vulkan-gpu\"")

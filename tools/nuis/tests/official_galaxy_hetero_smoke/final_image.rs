@@ -9,7 +9,12 @@ pub(super) fn finalize_official_hetero(
     if label != "pixelmagic_pipeline_demo" {
         return;
     }
-    assemble_provider_complete_final_image(project, output_dir, provider_record_count);
+    assemble_provider_complete_final_image(
+        project,
+        output_dir,
+        provider_record_count,
+        provider_record_count,
+    );
     super::replay::assert_multi_checkpoint_replay_resume(output_dir);
 }
 
@@ -17,6 +22,7 @@ pub(super) fn assemble_provider_complete_final_image(
     project: &str,
     output_dir: &Path,
     provider_record_count: usize,
+    provider_dispatch_count: usize,
 ) -> String {
     let output_dir_text = output_dir.display().to_string();
     let before_seal = run_nsdb(&["replay", &output_dir_text, "--json"]);
@@ -59,12 +65,12 @@ pub(super) fn assemble_provider_complete_final_image(
             && seal_stdout.contains("\"replay_status\":\"replay-evidence-ready\"")
             && seal_stdout.contains("\"loader_provider_dispatch_status\":\"verified\"")
             && seal_stdout.contains(&format!(
-                "\"loader_provider_dispatch_count\":{provider_record_count}"
+                "\"loader_provider_dispatch_count\":{provider_dispatch_count}"
             ))
             && seal_stdout.contains("\"loader_provider_dispatch_table_hash\":\"0x")
             && seal_stdout.contains("\"completed\":true")
             && seal_stdout.contains(&format!(
-                "\"loader_selected_provider_bundle_count\":{provider_record_count}"
+                "\"loader_selected_provider_bundle_count\":{provider_dispatch_count}"
             )),
         "provider-complete final output did not complete bounded sealing\n{seal_stdout}"
     );
@@ -72,10 +78,10 @@ pub(super) fn assemble_provider_complete_final_image(
     let executed = nsdb::execute_provider_samples(output_dir, None)
         .expect("sealed final image authorizes provider execution");
     assert_eq!(executed.final_image_dispatch_authority_status, "verified");
-    assert_eq!(executed.final_image_dispatch_count, provider_record_count);
+    assert_eq!(executed.final_image_dispatch_count, provider_dispatch_count);
     assert_eq!(
         executed.final_image_dispatch_matched_count,
-        provider_record_count
+        provider_dispatch_count
     );
     assert!(executed.final_image_dispatch_table_hash.starts_with("0x"));
     assert_eq!(
@@ -174,7 +180,7 @@ pub(super) fn assemble_provider_complete_final_image(
                 "\"nsld_final_executable_output_provider_dispatch_identity_projection_source\":\"final_output_provider_completion_dispatch_identity_hash\""
             )
             && frontdoor_stdout.contains(&format!(
-                "\"nsld_final_executable_output_object_package_selected_provider_bundle_count\":{provider_record_count}"
+                "\"nsld_final_executable_output_object_package_selected_provider_bundle_count\":{provider_dispatch_count}"
             ))
             && frontdoor_stdout.contains(&format!(
                 "\"closure_summary_provider_completion_count\":{provider_record_count}"

@@ -38,7 +38,11 @@ pub fn registered_kernel_code_assets() -> &'static [RegisteredKernelCodeAsset] {
             target: "sm_80",
             minimum_compute_capability: 80,
             entry: "nuis_kernel_vector_add_f32",
-            visible_entries: &["nuis_kernel_vector_add_f32", "nuis_kernel_scale_f32"],
+            visible_entries: &[
+                "nuis_kernel_vector_add_f32",
+                "nuis_kernel_scale_f32",
+                "nuis_kernel_copy_u32",
+            ],
             file_name: "nuis.domain.kernel.cuda.ptx",
             digest_contract: CODE_ASSET_FNV1A64_DIGEST_CONTRACT,
             bytes,
@@ -78,6 +82,29 @@ mod tests {
         let ptx = std::str::from_utf8(asset.bytes).expect("generated PTX is UTF-8");
         assert!(ptx.contains("add.rn.f32"));
         assert!(ptx.contains("mul.rn.f32"));
+        assert!(ptx.contains("st.global.u32"));
         assert!(select_kernel_code_asset("missing.target").is_none());
+    }
+
+    #[test]
+    fn kernel_manifest_owns_filtered_cuda_u32_copy_asset() {
+        let root = std::path::Path::new("nustar-packages");
+        let manifest = crate::registry::load_manifest_for_domain(root, "kernel").unwrap();
+        let asset = crate::registry::code_asset_registration_by_id(
+            root,
+            &manifest,
+            "kernel.cuda.copy-u32.ptx",
+        )
+        .unwrap()
+        .expect("registered CUDA u32 copy asset");
+        let ptx = std::str::from_utf8(&asset.bytes).expect("generated PTX is UTF-8");
+
+        assert_eq!(asset.package_id, "official.kernel");
+        assert_eq!(asset.lowering_target, "cuda.nvidia-gpu");
+        assert_eq!(asset.entry, "nuis_kernel_copy_u32");
+        assert!(ptx.contains(".visible .entry nuis_kernel_copy_u32"));
+        assert!(!ptx.contains("nuis_kernel_vector_add_f32"));
+        assert!(ptx.contains("ld.global.u32"));
+        assert!(ptx.contains("st.global.u32"));
     }
 }

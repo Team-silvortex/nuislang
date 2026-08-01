@@ -163,6 +163,7 @@ mod tests {
                 entry: "main.ns".to_owned(),
                 packaging_mode: None,
                 artifact_provider_metadata: vec![],
+                code_assets: vec![],
                 modules: vec![],
                 tests: vec![],
                 links: vec![],

@@ -20,7 +20,13 @@ const CUDA_PTX_EMITTER: KernelPtxEmitterRegistration = KernelPtxEmitterRegistrat
     registry_contract: KERNEL_PTX_EMITTER_REGISTRY_CONTRACT,
     target: "cuda.nvidia-gpu",
     module: "kernel",
-    supported_instructions: &["add_f32", "mul_f32", "add_i64", "reduce_sum_i64"],
+    supported_instructions: &[
+        "add_f32",
+        "mul_f32",
+        "copy_u32",
+        "add_i64",
+        "reduce_sum_i64",
+    ],
     emit: emit_ptx_module,
 };
 
@@ -99,12 +105,14 @@ fn emit_ptx_function(
     let mut pointer_registers = BTreeMap::new();
     let mut value_registers = BTreeMap::new();
     let mut next_pointer = 1usize;
-    let mut next_value = 1usize;
+    let mut next_value = 6usize;
     let mut output_parameter = None;
     for parameter in &function.parameters {
         match parameter.kind {
             KernelParameterKind::InputF32
             | KernelParameterKind::OutputF32
+            | KernelParameterKind::InputU32
+            | KernelParameterKind::OutputU32
             | KernelParameterKind::InputI64
             | KernelParameterKind::OutputI64 => {
                 output.push_str(&format!(
@@ -114,7 +122,9 @@ fn emit_ptx_function(
                 pointer_registers.insert(parameter.name.as_str(), next_pointer);
                 if matches!(
                     parameter.kind,
-                    KernelParameterKind::OutputF32 | KernelParameterKind::OutputI64
+                    KernelParameterKind::OutputF32
+                        | KernelParameterKind::OutputU32
+                        | KernelParameterKind::OutputI64
                 ) {
                     output_parameter = Some(parameter.name.as_str());
                 }
@@ -145,24 +155,33 @@ fn emit_ptx_function(
         "    mov.u32 %r2, %ctaid.x;\n    mov.u32 %r3, %ntid.x;\n    mov.u32 %r4, %tid.x;\n    mad.lo.s32 %r5, %r2, %r3, %r4;\n    setp.ge.u32 %p1, %r5, %r1;\n",
     );
     output.push_str(&format!("    @%p1 bra DONE_{function_index};\n"));
-    let integer_function = function
+    let i64_function = function
         .parameters
         .iter()
         .any(|parameter| is_i64_parameter(parameter.kind));
-    let element_size = if integer_function { 8 } else { 4 };
+    let u32_function = function
+        .parameters
+        .iter()
+        .any(|parameter| is_u32_parameter(parameter.kind));
+    let element_size = if i64_function { 8 } else { 4 };
     output.push_str(&format!("    mul.wide.u32 %rd8, %r5, {element_size};\n"));
 
     let mut next_address = 9usize;
     for parameter in function.parameters.iter().filter(|parameter| {
         matches!(
             parameter.kind,
-            KernelParameterKind::InputF32 | KernelParameterKind::InputI64
+            KernelParameterKind::InputF32
+                | KernelParameterKind::InputU32
+                | KernelParameterKind::InputI64
         )
     }) {
         let pointer = pointer_registers[parameter.name.as_str()];
         let load = match parameter.kind {
             KernelParameterKind::InputF32 => {
                 format!("ld.global.f32 %f{next_value}, [%rd{next_address}];")
+            }
+            KernelParameterKind::InputU32 => {
+                format!("ld.global.u32 %r{next_value}, [%rd{next_address}];")
             }
             KernelParameterKind::InputI64 => {
                 format!("ld.global.s64 %l{next_value}, [%rd{next_address}];")
@@ -179,6 +198,16 @@ fn emit_ptx_function(
 
     for node in &function.nodes {
         let lhs = value_register(node, 0, &value_registers)?;
+        if node.op.instruction == "copy_u32" {
+            if node.op.args.len() != 1 || !u32_function {
+                return Err(format!(
+                    "CUDA Kernel/YIR copy node `{}` does not match the registered u32 ABI",
+                    node.name
+                ));
+            }
+            value_registers.insert(node.name.as_str(), lhs);
+            continue;
+        }
         let rhs = value_register(node, 1, &value_registers)?;
         let (instruction, register) = match node.op.instruction.as_str() {
             "add_f32" => ("add.rn.f32", "%f"),
@@ -205,8 +234,10 @@ fn emit_ptx_function(
                 function.entry, function.output_node
             )
         })?;
-    let store = if integer_function {
+    let store = if i64_function {
         format!("st.global.s64 [%rd{next_address}], %l{output_value};")
+    } else if u32_function {
+        format!("st.global.u32 [%rd{next_address}], %r{output_value};")
     } else {
         format!("st.global.f32 [%rd{next_address}], %f{output_value};")
     };
@@ -286,13 +317,20 @@ fn validate_function(function: &KernelYirCodegenFunction) -> Result<(), String> 
         .parameters
         .iter()
         .any(|parameter| is_i64_parameter(parameter.kind));
+    let has_u32_parameters = function
+        .parameters
+        .iter()
+        .any(|parameter| is_u32_parameter(parameter.kind));
     if !valid_identifier(&function.entry)
         || function.nodes.is_empty()
         || function
             .parameters
             .iter()
             .any(|parameter| !valid_identifier(&parameter.name))
-        || has_f32_parameters == has_i64_parameters
+        || usize::from(has_f32_parameters)
+            + usize::from(has_u32_parameters)
+            + usize::from(has_i64_parameters)
+            != 1
         || function
             .nodes
             .iter()
@@ -312,7 +350,9 @@ fn validate_function(function: &KernelYirCodegenFunction) -> Result<(), String> 
             .filter(|parameter| {
                 matches!(
                     parameter.kind,
-                    KernelParameterKind::OutputF32 | KernelParameterKind::OutputI64
+                    KernelParameterKind::OutputF32
+                        | KernelParameterKind::OutputU32
+                        | KernelParameterKind::OutputI64
                 )
             })
             .count()
@@ -354,6 +394,8 @@ fn ptx_parameter_type(kind: KernelParameterKind) -> &'static str {
     match kind {
         KernelParameterKind::InputF32
         | KernelParameterKind::OutputF32
+        | KernelParameterKind::InputU32
+        | KernelParameterKind::OutputU32
         | KernelParameterKind::InputI64
         | KernelParameterKind::OutputI64 => "u64",
         KernelParameterKind::ElementCountU32 => "u32",
@@ -380,6 +422,13 @@ fn is_i64_parameter(kind: KernelParameterKind) -> bool {
     )
 }
 
+fn is_u32_parameter(kind: KernelParameterKind) -> bool {
+    matches!(
+        kind,
+        KernelParameterKind::InputU32 | KernelParameterKind::OutputU32
+    )
+}
+
 fn valid_identifier(value: &str) -> bool {
     !value.is_empty()
         && value
@@ -397,13 +446,20 @@ mod tests {
         let ptx = lower_cuda_ptx(&table).expect("registered CUDA PTX");
         assert_eq!(
             cuda_yir_entries(&table),
-            ["nuis_kernel_vector_add_f32", "nuis_kernel_scale_f32"]
+            [
+                "nuis_kernel_vector_add_f32",
+                "nuis_kernel_scale_f32",
+                "nuis_kernel_copy_u32"
+            ]
         );
         assert!(ptx.contains(".visible .entry nuis_kernel_vector_add_f32"));
         assert!(ptx.contains(".visible .entry nuis_kernel_scale_f32"));
+        assert!(ptx.contains(".visible .entry nuis_kernel_copy_u32"));
         assert!(ptx.contains("add.rn.f32"));
         assert!(ptx.contains("mul.rn.f32"));
         assert!(ptx.contains("st.global.f32"));
+        assert!(ptx.contains("ld.global.u32"));
+        assert!(ptx.contains("st.global.u32"));
         assert!(!ptx.contains("nvcc"));
     }
 
