@@ -50,7 +50,7 @@ pub(crate) const RUNNER_PROFILE: ProviderRunnerProfile = ProviderRunnerProfile {
     },
 };
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", test))]
 const VULKAN_SPIRV_DISPATCH_SOURCE: &str =
     include_str!("../provider-runners/vulkan_spirv_dispatch.c");
 
@@ -284,6 +284,21 @@ mod tests {
         if std::env::var("NUIS_REQUIRE_VULKAN_DEVICE_PROBE").as_deref() == Ok("1") {
             assert_eq!(evidence.status, VULKAN_AVAILABLE_STATUS);
             assert!(evidence.physical_device_count > 0);
+        }
+    }
+
+    #[test]
+    fn vulkan_dispatch_source_keeps_dynamic_one_or_two_input_descriptor_abi() {
+        for required in [
+            "argc != 5 && argc != 6",
+            "int input_count = argc == 6 ? 2 : 1",
+            "uint32_t descriptor_count = (uint32_t)(input_count + 1)",
+            "VkDescriptorSetLayoutBinding bindings[3]",
+            "VkBuffer buffers[3]",
+            "VkDeviceMemory memories[3]",
+            "valid_spirv_entry",
+        ] {
+            assert!(VULKAN_SPIRV_DISPATCH_SOURCE.contains(required));
         }
     }
 }

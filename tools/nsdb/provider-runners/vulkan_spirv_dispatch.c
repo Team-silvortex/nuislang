@@ -405,12 +405,15 @@ static int parse_u32(const char* text, uint32_t* value) {
     return 1;
 }
 
-static int valid_u32_entry(const char* entry) {
-    return strcmp(entry, "nuis_vulkan_copy_u32") == 0
-        || strcmp(entry, "nuis_vulkan_add_u32") == 0
-        || strcmp(entry, "nuis_vulkan_sub_u32") == 0
-        || strcmp(entry, "nuis_vulkan_mul_u32") == 0
-        || strcmp(entry, "nuis_vulkan_xor_u32") == 0;
+static int valid_spirv_entry(const char* entry) {
+    if (entry == NULL || entry[0] == '\0') return 0;
+    size_t length = strlen(entry);
+    if (length > 127 || !((entry[0] >= 'A' && entry[0] <= 'Z') || (entry[0] >= 'a' && entry[0] <= 'z') || entry[0] == '_')) return 0;
+    for (size_t index = 1; index < length; index++) {
+        char byte = entry[index];
+        if (!((byte >= 'A' && byte <= 'Z') || (byte >= 'a' && byte <= 'z') || (byte >= '0' && byte <= '9') || byte == '_')) return 0;
+    }
+    return 1;
 }
 
 static uint32_t read_u32_le(const unsigned char* bytes) {
@@ -646,16 +649,20 @@ static int load_device_api(VulkanApi* vk, VkDevice device) {
 }
 
 int main(int argc, char** argv) {
-    if (argc != 5 || !valid_u32_entry(argv[2])) return 2;
+    if ((argc != 5 && argc != 6) || !valid_spirv_entry(argv[2])) return 2;
+    int input_count = argc == 6 ? 2 : 1;
+    int output_index = input_count;
     uint32_t element_count = 0;
     OutputDescriptor output_descriptor = {0};
-    if (!parse_u32(argv[4], &element_count) || !parse_output_descriptor(&output_descriptor)) return 3;
+    if (!parse_u32(argv[3 + input_count], &element_count) || !parse_output_descriptor(&output_descriptor)) return 3;
     size_t byte_length = (size_t)element_count * sizeof(uint32_t);
     if (element_count > SIZE_MAX / sizeof(uint32_t) || output_descriptor.payload_length != byte_length) return 4;
-    unsigned char* input = malloc(byte_length);
+    unsigned char* inputs[2] = {malloc(byte_length), input_count == 2 ? malloc(byte_length) : NULL};
     unsigned char* spirv = NULL;
     size_t spirv_length = 0;
-    if (input == NULL || !read_input(argv[3], input, byte_length) || !read_file_alloc(argv[1], &spirv, &spirv_length) || spirv_length % 4 != 0) return 5;
+    int input_ready = inputs[0] != NULL && (input_count == 1 || inputs[1] != NULL);
+    for (int i = 0; input_ready && i < input_count; i++) input_ready = read_input(argv[3 + i], inputs[i], byte_length);
+    if (!input_ready || !read_file_alloc(argv[1], &spirv, &spirv_length) || spirv_length % 4 != 0) return 5;
 
     VulkanApi vk;
     VkInstance instance = NULL;
@@ -665,8 +672,8 @@ int main(int argc, char** argv) {
     uint32_t device_count = 0;
     VkDevice device = NULL;
     VkQueue queue = NULL;
-    VkBuffer input_buffer = NULL, output_buffer = NULL;
-    VkDeviceMemory input_memory = NULL, output_memory = NULL;
+    VkBuffer buffers[3] = {NULL, NULL, NULL};
+    VkDeviceMemory memories[3] = {NULL, NULL, NULL};
     VkDescriptorSetLayout set_layout = NULL;
     VkDescriptorPool pool = NULL;
     VkDescriptorSet set = NULL;
@@ -683,34 +690,34 @@ int main(int argc, char** argv) {
     VkDeviceCreateInfo device_info = {VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO, NULL, 0, 1, &queue_info, 0, NULL, 0, NULL, NULL};
     ready = ready && vk.create_device(physical, &device_info, NULL, &device) == VK_SUCCESS && load_device_api(&vk, device);
     if (ready) vk.get_device_queue(device, queue_family, 0, &queue);
-    ready = ready
-        && create_host_buffer(&vk, physical, device, byte_length, &input_buffer, &input_memory)
-        && create_host_buffer(&vk, physical, device, byte_length, &output_buffer, &output_memory);
+    for (int i = 0; ready && i <= output_index; i++) ready = create_host_buffer(&vk, physical, device, byte_length, &buffers[i], &memories[i]);
     void* mapped = NULL;
-    ready = ready && vk.map_memory(device, input_memory, 0, byte_length, 0, &mapped) == VK_SUCCESS;
-    if (ready) {
-        memcpy(mapped, input, byte_length);
-        vk.unmap_memory(device, input_memory);
+    for (int i = 0; ready && i < input_count; i++) {
+        ready = vk.map_memory(device, memories[i], 0, byte_length, 0, &mapped) == VK_SUCCESS;
+        if (ready) {
+            memcpy(mapped, inputs[i], byte_length);
+            vk.unmap_memory(device, memories[i]);
+        }
     }
-    VkDescriptorSetLayoutBinding bindings[2] = {
+    VkDescriptorSetLayoutBinding bindings[3] = {
         {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
         {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
+        {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
     };
-    VkDescriptorSetLayoutCreateInfo set_layout_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, NULL, 0, 2, bindings};
-    VkDescriptorPoolSize pool_size = {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2};
+    uint32_t descriptor_count = (uint32_t)(input_count + 1);
+    VkDescriptorSetLayoutCreateInfo set_layout_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, NULL, 0, descriptor_count, bindings};
+    VkDescriptorPoolSize pool_size = {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, descriptor_count};
     VkDescriptorPoolCreateInfo pool_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, NULL, 0, 1, 1, &pool_size};
     ready = ready
         && vk.create_descriptor_set_layout(device, &set_layout_info, NULL, &set_layout) == VK_SUCCESS
         && vk.create_descriptor_pool(device, &pool_info, NULL, &pool) == VK_SUCCESS;
     VkDescriptorSetAllocateInfo set_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, NULL, pool, 1, &set_layout};
     ready = ready && vk.allocate_descriptor_sets(device, &set_info, &set) == VK_SUCCESS;
-    VkDescriptorBufferInfo input_info = {input_buffer, 0, byte_length};
-    VkDescriptorBufferInfo output_info = {output_buffer, 0, byte_length};
-    VkWriteDescriptorSet writes[2] = {
-        {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, set, 0, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, NULL, &input_info, NULL},
-        {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, set, 1, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, NULL, &output_info, NULL},
-    };
-    if (ready) vk.update_descriptor_sets(device, 2, writes, 0, NULL);
+    VkDescriptorBufferInfo infos[3] = {{buffers[0], 0, byte_length}, {buffers[1], 0, byte_length}, {buffers[output_index], 0, byte_length}};
+    VkWriteDescriptorSet writes[3];
+    memset(writes, 0, sizeof(writes));
+    for (uint32_t i = 0; i < descriptor_count; i++) writes[i] = (VkWriteDescriptorSet){VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, set, i, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, NULL, &infos[i], NULL};
+    if (ready) vk.update_descriptor_sets(device, descriptor_count, writes, 0, NULL);
     VkShaderModuleCreateInfo shader_info = {VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO, NULL, 0, spirv_length, (const uint32_t*)spirv};
     VkPipelineLayoutCreateInfo layout_info = {VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, NULL, 0, 1, &set_layout, 0, NULL};
     ready = ready
@@ -735,14 +742,14 @@ int main(int argc, char** argv) {
         && vk.end_command_buffer(command) == VK_SUCCESS
         && vk.queue_submit(queue, 1, &submit, NULL) == VK_SUCCESS
         && vk.queue_wait_idle(queue) == VK_SUCCESS
-        && vk.map_memory(device, output_memory, 0, byte_length, 0, &mapped) == VK_SUCCESS;
+        && vk.map_memory(device, memories[output_index], 0, byte_length, 0, &mapped) == VK_SUCCESS;
     uint64_t hash = 0;
     int persisted = 0;
     if (ready) {
         hash = fnv1a64(mapped, byte_length);
         persisted = pwrite(output_descriptor.fd, mapped, byte_length, (off_t)output_descriptor.payload_offset) == (ssize_t)byte_length
             && pwrite(output_descriptor.fd, &hash, sizeof(hash), (off_t)output_descriptor.hash_offset) == (ssize_t)sizeof(hash);
-        vk.unmap_memory(device, output_memory);
+        vk.unmap_memory(device, memories[output_index]);
     }
     if (command_pool) vk.destroy_command_pool(device, command_pool, NULL);
     if (pipeline) vk.destroy_pipeline(device, pipeline, NULL);
@@ -750,14 +757,13 @@ int main(int argc, char** argv) {
     if (shader) vk.destroy_shader_module(device, shader, NULL);
     if (pool) vk.destroy_descriptor_pool(device, pool, NULL);
     if (set_layout) vk.destroy_descriptor_set_layout(device, set_layout, NULL);
-    if (input_memory) vk.free_memory(device, input_memory, NULL);
-    if (output_memory) vk.free_memory(device, output_memory, NULL);
-    if (input_buffer) vk.destroy_buffer(device, input_buffer, NULL);
-    if (output_buffer) vk.destroy_buffer(device, output_buffer, NULL);
+    for (int i = 0; i <= output_index; i++) if (memories[i]) vk.free_memory(device, memories[i], NULL);
+    for (int i = 0; i <= output_index; i++) if (buffers[i]) vk.destroy_buffer(device, buffers[i], NULL);
     if (device) vk.destroy_device(device, NULL);
     if (instance) vk.destroy_instance(instance, NULL);
     if (vk.library) dlclose(vk.library);
-    free(input);
+    free(inputs[0]);
+    free(inputs[1]);
     free(spirv);
     if (!ready || !persisted) return 6;
     printf(

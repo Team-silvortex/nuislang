@@ -3,10 +3,12 @@ use crate::{
     artifact_device_sample_shader_common::{
         fnv1a64_hex, render_dependency_count_zero, render_u32_artifact_binding,
         render_u32_dependency_binding, render_u32_dependency_edge,
-        render_u32_prefixed_request_evidence, render_u32_sample_request_evidence,
-        replace_code_asset_identity_fields, validate_code_asset_contribution_selection,
-        validate_code_asset_request_evidence, U32RequestEvidence, U32_ADD_EXPECTED as ADD_EXPECTED,
-        U32_INPUT as INPUT, U32_MUL_EXPECTED as MUL_EXPECTED, U32_ZERO_EXPECTED as SUB_EXPECTED,
+        render_u32_pair_artifact_binding, render_u32_prefixed_request_evidence,
+        render_u32_sample_request_evidence, replace_code_asset_identity_fields,
+        validate_code_asset_contribution_selection, validate_code_asset_request_evidence,
+        U32RequestEvidence, U32_ADD_EXPECTED as ADD_EXPECTED, U32_INPUT as INPUT,
+        U32_MUL_EXPECTED as MUL_EXPECTED, U32_PAIR_ADD_EXPECTED as PAIR_ADD_EXPECTED,
+        U32_PAIR_RIGHT_INPUT as PAIR_RIGHT_INPUT, U32_ZERO_EXPECTED as SUB_EXPECTED,
     },
 };
 use std::{fs, path::Path};
@@ -30,6 +32,7 @@ struct VulkanSampleSpec {
     kernel_id: &'static str,
     operation: &'static str,
     input_file_name: &'static str,
+    aux_input: Option<(&'static str, &'static [u8])>,
     expected_file_name: &'static str,
     expected: &'static [u8],
 }
@@ -41,6 +44,7 @@ const COPY_SAMPLE: VulkanSampleSpec = VulkanSampleSpec {
     kernel_id: "shader.vulkan.copy-u32",
     operation: "copy-u32",
     input_file_name: "nuis.shader.vulkan.copy-u32.input.u32.bin",
+    aux_input: None,
     expected_file_name: "nuis.shader.vulkan.copy-u32.expected.u32.bin",
     expected: INPUT,
 };
@@ -52,8 +56,24 @@ const ADD_SAMPLE: VulkanSampleSpec = VulkanSampleSpec {
     kernel_id: "shader.vulkan.add-u32",
     operation: "add-u32",
     input_file_name: "nuis.shader.vulkan.add-u32.input.u32.bin",
+    aux_input: None,
     expected_file_name: "nuis.shader.vulkan.add-u32.expected.u32.bin",
     expected: ADD_EXPECTED,
+};
+
+const ADD_PAIR_SAMPLE: VulkanSampleSpec = VulkanSampleSpec {
+    registration_id: "official.shader.vulkan-add-pair-u32",
+    metadata_selector: Some("official.shader:provider-sample=vulkan-add-pair-u32"),
+    asset_id: "shader.vulkan.add-pair-u32.spirv",
+    kernel_id: "shader.vulkan.add-pair-u32",
+    operation: "add-pair-u32",
+    input_file_name: "nuis.shader.vulkan.add-pair-u32.left.u32.bin",
+    aux_input: Some((
+        "nuis.shader.vulkan.add-pair-u32.right.u32.bin",
+        PAIR_RIGHT_INPUT,
+    )),
+    expected_file_name: "nuis.shader.vulkan.add-pair-u32.expected.u32.bin",
+    expected: PAIR_ADD_EXPECTED,
 };
 
 const SUB_SAMPLE: VulkanSampleSpec = VulkanSampleSpec {
@@ -63,6 +83,7 @@ const SUB_SAMPLE: VulkanSampleSpec = VulkanSampleSpec {
     kernel_id: "shader.vulkan.sub-u32",
     operation: "sub-u32",
     input_file_name: "nuis.shader.vulkan.sub-u32.input.u32.bin",
+    aux_input: None,
     expected_file_name: "nuis.shader.vulkan.sub-u32.expected.u32.bin",
     expected: SUB_EXPECTED,
 };
@@ -74,6 +95,7 @@ const MUL_SAMPLE: VulkanSampleSpec = VulkanSampleSpec {
     kernel_id: "shader.vulkan.mul-u32",
     operation: "mul-u32",
     input_file_name: "nuis.shader.vulkan.mul-u32.input.u32.bin",
+    aux_input: None,
     expected_file_name: "nuis.shader.vulkan.mul-u32.expected.u32.bin",
     expected: MUL_EXPECTED,
 };
@@ -85,11 +107,19 @@ const XOR_SAMPLE: VulkanSampleSpec = VulkanSampleSpec {
     kernel_id: "shader.vulkan.xor-u32",
     operation: "xor-u32",
     input_file_name: "nuis.shader.vulkan.xor-u32.input.u32.bin",
+    aux_input: None,
     expected_file_name: "nuis.shader.vulkan.xor-u32.expected.u32.bin",
     expected: SUB_EXPECTED,
 };
 
-const SAMPLES: &[VulkanSampleSpec] = &[COPY_SAMPLE, ADD_SAMPLE, SUB_SAMPLE, MUL_SAMPLE, XOR_SAMPLE];
+const SAMPLES: &[VulkanSampleSpec] = &[
+    COPY_SAMPLE,
+    ADD_SAMPLE,
+    ADD_PAIR_SAMPLE,
+    SUB_SAMPLE,
+    MUL_SAMPLE,
+    XOR_SAMPLE,
+];
 
 pub(crate) fn registration() -> DeviceSampleInputRegistration {
     registration_for(COPY_SAMPLE, None, vulkan_copy_u32_evidence)
@@ -100,6 +130,14 @@ pub(crate) fn add_registration() -> DeviceSampleInputRegistration {
         ADD_SAMPLE,
         Some(selects_shader_vulkan_add),
         vulkan_add_u32_evidence,
+    )
+}
+
+pub(crate) fn add_pair_registration() -> DeviceSampleInputRegistration {
+    registration_for(
+        ADD_PAIR_SAMPLE,
+        Some(selects_shader_vulkan_add_pair),
+        vulkan_add_pair_u32_evidence,
     )
 }
 
@@ -165,6 +203,13 @@ fn selects_shader_vulkan_add(base: &str) -> bool {
     selects_metadata(base, ADD_SAMPLE.metadata_selector.expect("selector"))
 }
 
+fn selects_shader_vulkan_add_pair(base: &str) -> bool {
+    selects_metadata(
+        base,
+        ADD_PAIR_SAMPLE.metadata_selector.expect("pair selector"),
+    )
+}
+
 fn selects_shader_vulkan_sub(base: &str) -> bool {
     selects_metadata(base, SUB_SAMPLE.metadata_selector.expect("selector"))
 }
@@ -195,6 +240,10 @@ fn vulkan_add_u32_evidence(_base: &str) -> String {
     vulkan_sample_evidence(ADD_SAMPLE)
 }
 
+fn vulkan_add_pair_u32_evidence(_base: &str) -> String {
+    vulkan_sample_evidence(ADD_PAIR_SAMPLE)
+}
+
 fn vulkan_sub_u32_evidence(_base: &str) -> String {
     vulkan_sample_evidence(SUB_SAMPLE)
 }
@@ -222,6 +271,30 @@ fn vulkan_chain_u32_evidence(_base: &str) -> String {
 
 fn vulkan_sample_evidence(sample: VulkanSampleSpec) -> String {
     let asset = vulkan_asset(sample).expect("Shader Nustar Vulkan SPIR-V asset must be registered");
+    if let Some((right_file_name, right)) = sample.aux_input {
+        return render_u32_prefixed_request_evidence(U32RequestEvidence {
+            prefix: "provider_",
+            provider_family: "spirv:vulkan-gpu",
+            kernel_id: sample.kernel_id,
+            operation: sample.operation,
+            kernel_input_buffers: "input.values,input.right",
+            input_file_name: sample.input_file_name,
+            input_hash: fnv1a64_hex(INPUT),
+            input_byte_length: INPUT.len(),
+            expected_file_name: sample.expected_file_name,
+            expected: sample.expected,
+            asset: &asset,
+            bytes: &asset.bytes,
+            input_binding: render_u32_pair_artifact_binding(
+                "provider_",
+                sample.input_file_name,
+                INPUT,
+                right_file_name,
+                right,
+            ),
+            dependency: render_dependency_count_zero("provider_"),
+        });
+    }
     render_u32_sample_request_evidence(
         "spirv:vulkan-gpu",
         sample.kernel_id,
@@ -281,6 +354,7 @@ fn render_chain_artifact_request(
         provider_family: "spirv:vulkan-gpu",
         kernel_id: "shader.vulkan.chain.add-u32",
         operation: sample.operation,
+        kernel_input_buffers: "input.values",
         input_file_name: CHAIN_INPUT_FILE_NAME,
         input_hash: fnv1a64_hex(INPUT),
         input_byte_length: INPUT.len(),
@@ -306,6 +380,7 @@ fn render_chain_dependency_request(
         provider_family: "spirv:vulkan-gpu",
         kernel_id: "shader.vulkan.chain.xor-u32",
         operation: sample.operation,
+        kernel_input_buffers: "input.values",
         input_file_name: "none",
         input_hash: input_hash.clone(),
         input_byte_length: ADD_EXPECTED.len(),
@@ -363,6 +438,10 @@ fn persist_vulkan_payloads(output_dir: &Path, evidence: &[&str]) -> Result<(), S
     ] {
         fs::write(output_dir.join(name), bytes)
             .map_err(|error| format!("failed to persist Vulkan u32 payload: {error}"))?;
+    }
+    if let Some((name, bytes)) = sample.aux_input {
+        fs::write(output_dir.join(name), bytes)
+            .map_err(|error| format!("failed to persist Vulkan u32 pair payload: {error}"))?;
     }
     Ok(())
 }
@@ -529,6 +608,7 @@ mod tests {
         for (registration, sample) in [
             (registration(), COPY_SAMPLE),
             (add_registration(), ADD_SAMPLE),
+            (add_pair_registration(), ADD_PAIR_SAMPLE),
             (sub_registration(), SUB_SAMPLE),
             (mul_registration(), MUL_SAMPLE),
             (xor_registration(), XOR_SAMPLE),

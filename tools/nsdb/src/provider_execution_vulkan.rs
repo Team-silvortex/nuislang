@@ -1,3 +1,6 @@
+use crate::provider_execution_vulkan_spirv::validate_spirv_u32_module;
+#[cfg(test)]
+use crate::provider_sample_payload::fnv1a64_hex;
 use crate::{
     provider_code_asset::ProviderCodeAssetDescriptor,
     provider_execution_adapter::{
@@ -6,7 +9,6 @@ use crate::{
     },
     provider_prepared_input::PreparedProviderInput,
     provider_request::ProviderRequest,
-    provider_sample_payload::fnv1a64_hex,
     provider_worker_lease::ProviderWorkerDispatchReceipt,
 };
 #[cfg(target_os = "linux")]
@@ -22,8 +24,6 @@ const VULKAN_EXECUTION_SESSION_PLAN_STATUS: &str = "dispatch-readback-pending";
 const VULKAN_PROVIDER_FAMILY: &str = "spirv:vulkan-gpu";
 const VULKAN_SPIRV_FORMAT: &str = "spirv-binary";
 const VULKAN_SPIRV_TARGET: &str = "vulkan1.3-spirv1.6";
-const SPIRV_MAGIC: u32 = 0x0723_0203;
-const SPIRV_VERSION_1_6: u32 = 0x0001_0600;
 
 pub(crate) const REGISTRATION: ProviderExecutionAdapterRegistration =
     ProviderExecutionAdapterRegistration {
@@ -60,18 +60,21 @@ fn prepare_worker_adapter(
         .to_str()
         .ok_or_else(|| "Vulkan SPIR-V asset path is not UTF-8".to_owned())?;
     let prepared = crate::provider_runner_vulkan::prepare_vulkan_worker_invocation(cache)?;
+    let mut arguments = vec![
+        format!("verified-path:{}:{asset_path}", asset.content_hash),
+        format!("literal:{}", asset.entry),
+    ];
+    for (index, input) in inputs.iter().enumerate() {
+        arguments.push(worker_descriptor_argument(input, index)?);
+    }
+    arguments.push(format!("literal:{}", plan.element_count));
     Ok(Some(PreparedProviderExecutionAdapter {
         executable_path: prepared.executable_path().to_owned(),
         executable_hash: prepared.executable_hash().to_owned(),
         runner_contract: prepared.contract(),
         cache_identity: prepared.cache_identity.to_owned(),
         cache_status: prepared.cache_status,
-        arguments: vec![
-            format!("verified-path:{}:{asset_path}", asset.content_hash),
-            format!("literal:{}", asset.entry),
-            worker_descriptor_argument(&inputs[0], 0)?,
-            format!("literal:{}", plan.element_count),
-        ],
+        arguments,
     }))
 }
 
@@ -125,6 +128,9 @@ struct VulkanExecutionSessionPlan {
     element_count: u32,
     input_byte_length: usize,
     output_byte_length: usize,
+    descriptor_set: u32,
+    input_bindings: Vec<u32>,
+    output_binding: u32,
     dispatch: [usize; 3],
 }
 
@@ -168,18 +174,31 @@ fn validate_vulkan_execution_session_plan(
         .as_slice()
         .try_into()
         .map_err(|_| "Vulkan u32 dispatch must have three dimensions".to_owned())?;
+    let request_input_names = request
+        .input_bindings
+        .iter()
+        .map(|binding| binding.name.as_str())
+        .collect::<Vec<_>>();
     if request.buffer.element_type != "u32"
         || request.buffer.layout != "tensor-contiguous"
         || request.buffer.byte_length != expected_bytes
-        || !is_vulkan_u32_operation(&request.kernel.operation)
-        || request.kernel.input_buffers != [request.buffer.id.clone()]
+        || request.kernel.input_buffer != request.buffer.id
+        || request.kernel.input_buffers.len() != request_input_names.len()
+        || request
+            .kernel
+            .input_buffers
+            .iter()
+            .map(String::as_str)
+            .ne(request_input_names.iter().copied())
         || request.kernel.output_buffer != "output.values"
         || dispatch != [usize::try_from(element_count).unwrap_or(0), 1, 1]
-        || input_count != 1
-        || request.input_bindings.len() != 1
-        || !vulkan_input_source_is_supported(&request.input_bindings[0].source)
-        || request.input_bindings[0].element_type != "u32"
-        || request.input_bindings[0].byte_length != expected_bytes
+        || !(1..=2).contains(&input_count)
+        || request.input_bindings.len() != input_count
+        || request.input_bindings.iter().any(|input| {
+            !vulkan_input_source_is_supported(&input.source)
+                || input.element_type != "u32"
+                || input.byte_length != expected_bytes
+        })
         || request.output_bindings.len() != 1
         || request.output_bindings[0].element_type != "u32"
         || request.output_bindings[0].byte_length != expected_bytes
@@ -197,7 +216,16 @@ fn validate_vulkan_execution_session_plan(
             asset_path.display()
         )
     })?;
-    validate_spirv_u32_module(asset, &bytes)?;
+    let layout = validate_spirv_u32_module(asset, &bytes)?;
+    let expected_input_bindings = (0..u32::try_from(input_count).unwrap_or(0)).collect::<Vec<_>>();
+    if layout.descriptor_set != 0
+        || layout.input_bindings != expected_input_bindings
+        || layout.output_binding != u32::try_from(input_count).unwrap_or(0)
+    {
+        return Err(
+            "Vulkan SPIR-V descriptor layout does not match the registered runner ABI".to_owned(),
+        );
+    }
     Ok(VulkanExecutionSessionPlan {
         contract: VULKAN_EXECUTION_SESSION_PLAN_CONTRACT,
         status: VULKAN_EXECUTION_SESSION_PLAN_STATUS,
@@ -207,6 +235,9 @@ fn validate_vulkan_execution_session_plan(
         element_count,
         input_byte_length: expected_bytes,
         output_byte_length: expected_bytes,
+        descriptor_set: layout.descriptor_set,
+        input_bindings: layout.input_bindings,
+        output_binding: layout.output_binding,
         dispatch,
     })
 }
@@ -220,19 +251,18 @@ fn asset_descriptor_matches_vulkan_u32(
         && vulkan_u32_entry_for_operation(operation).is_some_and(|entry| asset.entry == entry)
 }
 
-fn is_vulkan_u32_operation(operation: &str) -> bool {
-    vulkan_u32_entry_for_operation(operation).is_some()
-}
-
-fn vulkan_u32_entry_for_operation(operation: &str) -> Option<&'static str> {
-    match operation {
-        "copy-u32" => Some("nuis_vulkan_copy_u32"),
-        "add-u32" => Some("nuis_vulkan_add_u32"),
-        "sub-u32" => Some("nuis_vulkan_sub_u32"),
-        "mul-u32" => Some("nuis_vulkan_mul_u32"),
-        "xor-u32" => Some("nuis_vulkan_xor_u32"),
-        _ => None,
+fn vulkan_u32_entry_for_operation(operation: &str) -> Option<String> {
+    let stem = operation.strip_suffix("-u32")?;
+    if stem.is_empty()
+        || stem.starts_with('-')
+        || stem.ends_with('-')
+        || !stem
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+    {
+        return None;
     }
+    Some(format!("nuis_vulkan_{}", operation.replace('-', "_")))
 }
 
 fn vulkan_input_source_is_supported(source: &str) -> bool {
@@ -248,33 +278,6 @@ fn u32_scalar(request: &ProviderRequest, name: &str) -> Option<u32> {
         .value
         .parse()
         .ok()
-}
-
-fn validate_spirv_u32_module(
-    asset: &ProviderCodeAssetDescriptor,
-    bytes: &[u8],
-) -> Result<(), String> {
-    if bytes.len() < 20 || bytes.len() % 4 != 0 {
-        return Err("Vulkan SPIR-V asset has invalid word alignment".to_owned());
-    }
-    let magic = u32::from_le_bytes(bytes[0..4].try_into().unwrap());
-    let version = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
-    if magic != SPIRV_MAGIC || version != SPIRV_VERSION_1_6 {
-        return Err("Vulkan SPIR-V asset has invalid module header".to_owned());
-    }
-    if fnv1a64_hex(bytes) != asset.content_hash {
-        return Err("Vulkan SPIR-V asset hash evidence drifted".to_owned());
-    }
-    if !bytes
-        .windows(asset.entry.len())
-        .any(|window| window == asset.entry.as_bytes())
-    {
-        return Err(format!(
-            "Vulkan SPIR-V asset is missing requested entry `{}`",
-            asset.entry
-        ));
-    }
-    Ok(())
 }
 
 fn parse_vulkan_worker_protocol(protocol: &[u8]) -> Result<VulkanWorkerProtocol, String> {
@@ -364,46 +367,61 @@ mod tests {
             env::temp_dir().join(format!("nsdb-vulkan-session-plan-{}", std::process::id()));
         let _ = fs::remove_dir_all(&output_dir);
         fs::create_dir_all(&output_dir).unwrap();
-        for (operation, entry, asset_id, path) in [
+        for (operation, entry, asset_id, path, input_count) in [
             (
                 "copy-u32",
                 "nuis_vulkan_copy_u32",
                 "shader.vulkan.copy-u32.spirv",
                 "nuis.shader.vulkan.copy-u32.spv",
+                1,
             ),
             (
                 "add-u32",
                 "nuis_vulkan_add_u32",
                 "shader.vulkan.add-u32.spirv",
                 "nuis.shader.vulkan.add-u32.spv",
+                1,
+            ),
+            (
+                "add-pair-u32",
+                "nuis_vulkan_add_pair_u32",
+                "shader.vulkan.add-pair-u32.spirv",
+                "nuis.shader.vulkan.add-pair-u32.spv",
+                2,
             ),
             (
                 "sub-u32",
                 "nuis_vulkan_sub_u32",
                 "shader.vulkan.sub-u32.spirv",
                 "nuis.shader.vulkan.sub-u32.spv",
+                1,
             ),
             (
                 "mul-u32",
                 "nuis_vulkan_mul_u32",
                 "shader.vulkan.mul-u32.spirv",
                 "nuis.shader.vulkan.mul-u32.spv",
+                1,
             ),
             (
                 "xor-u32",
                 "nuis_vulkan_xor_u32",
                 "shader.vulkan.xor-u32.spirv",
                 "nuis.shader.vulkan.xor-u32.spv",
+                1,
             ),
         ] {
-            let spirv = spirv_fixture(entry);
+            let spirv = registered_spirv_fixture(asset_id);
             fs::write(output_dir.join(path), &spirv).unwrap();
-            let request = u32_request(operation, entry, asset_id, path, &spirv);
+            let mut request = u32_request(operation, entry, asset_id, path, &spirv);
+            if input_count == 2 {
+                push_aux_u32_input(&mut request, "artifact");
+            }
             let plan = validate_vulkan_execution_session_plan(
                 &output_dir,
                 VULKAN_PROVIDER_FAMILY,
                 &request,
-                1,
+                input_count,
             )
             .expect("validated Vulkan execution plan");
 
@@ -414,6 +432,12 @@ mod tests {
             assert_eq!(plan.element_count, 4);
             assert_eq!(plan.input_byte_length, 16);
             assert_eq!(plan.output_byte_length, 16);
+            assert_eq!(plan.descriptor_set, 0);
+            assert_eq!(
+                plan.input_bindings,
+                (0..input_count as u32).collect::<Vec<_>>()
+            );
+            assert_eq!(plan.output_binding, input_count as u32);
             assert_eq!(plan.dispatch, [4, 1, 1]);
         }
         fs::remove_dir_all(output_dir).unwrap();
@@ -425,7 +449,7 @@ mod tests {
             env::temp_dir().join(format!("nsdb-vulkan-session-drift-{}", std::process::id()));
         let _ = fs::remove_dir_all(&output_dir);
         fs::create_dir_all(&output_dir).unwrap();
-        let spirv = spirv_fixture("nuis_vulkan_copy_u32");
+        let spirv = registered_spirv_fixture("shader.vulkan.copy-u32.spirv");
         fs::write(output_dir.join("nuis.shader.vulkan.copy-u32.spv"), &spirv).unwrap();
         let mut request = u32_request(
             "copy-u32",
@@ -474,7 +498,7 @@ mod tests {
         ));
         let _ = fs::remove_dir_all(&output_dir);
         fs::create_dir_all(&output_dir).unwrap();
-        let spirv = spirv_fixture("nuis_vulkan_mul_u32");
+        let spirv = registered_spirv_fixture("shader.vulkan.mul-u32.spirv");
         fs::write(output_dir.join("nuis.shader.vulkan.mul-u32.spv"), &spirv).unwrap();
         let mut request = u32_request(
             "mul-u32",
@@ -509,37 +533,46 @@ mod tests {
     }
 
     #[test]
-    fn vulkan_session_plan_rejects_fan_in_until_adapter_can_materialize_aux_buffers() {
+    fn vulkan_session_plan_accepts_registered_pair_fan_in() {
         let output_dir =
             env::temp_dir().join(format!("nsdb-vulkan-session-fan-in-{}", std::process::id()));
         let _ = fs::remove_dir_all(&output_dir);
         fs::create_dir_all(&output_dir).unwrap();
-        let spirv = spirv_fixture("nuis_vulkan_add_u32");
-        fs::write(output_dir.join("nuis.shader.vulkan.add-u32.spv"), &spirv).unwrap();
+        let spirv = registered_spirv_fixture("shader.vulkan.add-pair-u32.spirv");
+        fs::write(
+            output_dir.join("nuis.shader.vulkan.add-pair-u32.spv"),
+            &spirv,
+        )
+        .unwrap();
         let mut request = u32_request(
-            "add-u32",
-            "nuis_vulkan_add_u32",
-            "shader.vulkan.add-u32.spirv",
-            "nuis.shader.vulkan.add-u32.spv",
+            "add-pair-u32",
+            "nuis_vulkan_add_pair_u32",
+            "shader.vulkan.add-pair-u32.spirv",
+            "nuis.shader.vulkan.add-pair-u32.spv",
             &spirv,
         );
-        request.kernel.input_buffers.push("input.aux".to_owned());
-        let mut aux = request.input_bindings[0].clone();
-        aux.name = "input.aux".to_owned();
-        aux.source = "dependency".to_owned();
-        aux.payload_path = "none".to_owned();
-        aux.producer_request_id = "shader.vulkan.chain.copy-u32".to_owned();
-        aux.producer_output_buffer = "output.values".to_owned();
-        request.input_bindings.push(aux);
+        push_aux_u32_input(&mut request, "dependency");
 
-        assert!(validate_vulkan_execution_session_plan(
+        let plan = validate_vulkan_execution_session_plan(
             &output_dir,
             VULKAN_PROVIDER_FAMILY,
             &request,
             2,
         )
+        .expect("registered pair fan-in plan");
+        assert_eq!(plan.input_bindings, vec![0, 1]);
+        assert_eq!(plan.output_binding, 2);
+
+        request.input_bindings.pop();
+        request.kernel.input_buffers.pop();
+        assert!(validate_vulkan_execution_session_plan(
+            &output_dir,
+            VULKAN_PROVIDER_FAMILY,
+            &request,
+            1,
+        )
         .unwrap_err()
-        .contains("registered SPIR-V ABI"));
+        .contains("descriptor layout"));
         fs::remove_dir_all(output_dir).unwrap();
     }
 
@@ -626,16 +659,26 @@ mod tests {
         }
     }
 
-    fn spirv_fixture(entry: &str) -> Vec<u8> {
-        let mut bytes = [SPIRV_MAGIC, SPIRV_VERSION_1_6, 0, 21, 0]
-            .into_iter()
-            .flat_map(u32::to_le_bytes)
-            .collect::<Vec<_>>();
-        bytes.extend_from_slice(entry.as_bytes());
-        while bytes.len() % 4 != 0 {
-            bytes.push(0);
+    fn push_aux_u32_input(request: &mut ProviderRequest, source: &str) {
+        request.kernel.input_buffers.push("input.right".to_owned());
+        let mut aux = request.input_bindings[0].clone();
+        aux.name = "input.right".to_owned();
+        aux.source = source.to_owned();
+        if source == "dependency" {
+            aux.payload_path = "none".to_owned();
+            aux.producer_request_id = "shader.vulkan.chain.copy-u32".to_owned();
+            aux.producer_output_buffer = "output.values".to_owned();
         }
-        bytes
+        request.input_bindings.push(aux);
+    }
+
+    fn registered_spirv_fixture(asset_id: &str) -> Vec<u8> {
+        let root = Path::new("nustar-packages");
+        let manifest = nuisc::registry::load_manifest_for_domain(root, "shader").unwrap();
+        nuisc::registry::code_asset_registration_by_id(root, &manifest, asset_id)
+            .unwrap()
+            .expect("registered Shader SPIR-V fixture")
+            .bytes
     }
 
     #[test]

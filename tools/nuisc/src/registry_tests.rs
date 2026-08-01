@@ -81,6 +81,21 @@ fn string_array_parser_preserves_commas_inside_quoted_ffi_signatures() {
     );
 }
 
+#[test]
+fn string_array_parser_accepts_multiline_manifest_arrays() {
+    let values = parse_optional_string_array(
+        r#"code_assets = [
+          "asset.one",
+          "asset.two",
+        ]
+        profiles = ["aot"]"#,
+        "code_assets",
+    )
+    .expect("multiline array should parse");
+
+    assert_eq!(values, vec!["asset.one", "asset.two"]);
+}
+
 fn binding_plan_from_source(source: &str) -> NustarBindingPlan {
     let artifacts = pipeline::compile_source(source).expect("source should compile");
     let declared_used_units = artifacts

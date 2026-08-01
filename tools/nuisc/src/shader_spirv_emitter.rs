@@ -86,18 +86,42 @@ fn parse_compute_source(
     let local_size = parse_local_size(required_field(&fields, "local_size")?)?;
     let descriptor_set = parse_u32(&fields, "descriptor_set")?;
     let input_binding = parse_u32(&fields, "input_binding")?;
+    let aux_input_binding = parse_optional_u32(&fields, "aux_input_binding")?;
     let output_binding = parse_u32(&fields, "output_binding")?;
-    if input_binding == output_binding {
-        return Err("Nuis SPIR-V input and output bindings must differ".to_owned());
-    }
+    validate_u32_compute_bindings(operation, input_binding, aux_input_binding, output_binding)?;
     Ok(CanonicalU32Compute {
         operation,
         entry: entry.to_owned(),
         local_size,
         descriptor_set,
         input_binding,
+        aux_input_binding,
         output_binding,
     })
+}
+
+fn validate_u32_compute_bindings(
+    operation: CanonicalU32Operation,
+    input_binding: u32,
+    aux_input_binding: Option<u32>,
+    output_binding: u32,
+) -> Result<(), String> {
+    if operation.input_count() == 2 && aux_input_binding.is_none() {
+        return Err("Nuis SPIR-V two-input u32 operation requires aux_input_binding".to_owned());
+    }
+    if operation.input_count() == 1 && aux_input_binding.is_some() {
+        return Err(
+            "Nuis SPIR-V one-input u32 operation must not declare aux_input_binding".to_owned(),
+        );
+    }
+    if input_binding == output_binding
+        || aux_input_binding.is_some_and(|aux| aux == input_binding || aux == output_binding)
+    {
+        return Err(
+            "Nuis SPIR-V input, auxiliary input, and output bindings must differ".to_owned(),
+        );
+    }
+    Ok(())
 }
 
 struct ModuleLoweringPlan {
@@ -217,8 +241,14 @@ fn emit_u32_module(source: &CanonicalU32Compute) -> Vec<u32> {
     const VALUE: u32 = 19;
     const OUTPUT_ELEMENT: u32 = 20;
     const COMPUTED_VALUE: u32 = 21;
+    const AUX_INPUT_BUFFER: u32 = 22;
+    const AUX_INPUT_ELEMENT: u32 = 23;
+    const AUX_VALUE: u32 = 24;
 
-    let id_bound = if spirv_u32_binary_opcode(source.operation).is_some() {
+    let has_aux_input = source.aux_input_binding.is_some();
+    let id_bound = if has_aux_input {
+        25
+    } else if spirv_u32_binary_opcode(source.operation).is_some() {
         22
     } else {
         21
@@ -228,7 +258,11 @@ fn emit_u32_module(source: &CanonicalU32Compute) -> Vec<u32> {
     instruction(&mut words, 14, &[0, 1]);
     let mut entry_operands = vec![5, MAIN];
     entry_operands.extend(encode_string(&source.entry));
-    entry_operands.extend([GLOBAL_INVOCATION_ID, INPUT_BUFFER, OUTPUT_BUFFER]);
+    entry_operands.extend([GLOBAL_INVOCATION_ID, INPUT_BUFFER]);
+    if has_aux_input {
+        entry_operands.push(AUX_INPUT_BUFFER);
+    }
+    entry_operands.push(OUTPUT_BUFFER);
     instruction(&mut words, 15, &entry_operands);
     instruction(
         &mut words,
@@ -248,6 +282,15 @@ fn emit_u32_module(source: &CanonicalU32Compute) -> Vec<u32> {
     instruction(&mut words, 71, &[INPUT_BUFFER, 34, source.descriptor_set]);
     instruction(&mut words, 71, &[INPUT_BUFFER, 33, source.input_binding]);
     instruction(&mut words, 71, &[INPUT_BUFFER, 24]);
+    if let Some(aux_input_binding) = source.aux_input_binding {
+        instruction(
+            &mut words,
+            71,
+            &[AUX_INPUT_BUFFER, 34, source.descriptor_set],
+        );
+        instruction(&mut words, 71, &[AUX_INPUT_BUFFER, 33, aux_input_binding]);
+        instruction(&mut words, 71, &[AUX_INPUT_BUFFER, 24]);
+    }
     instruction(&mut words, 71, &[OUTPUT_BUFFER, 34, source.descriptor_set]);
     instruction(&mut words, 71, &[OUTPUT_BUFFER, 33, source.output_binding]);
     instruction(&mut words, 71, &[OUTPUT_BUFFER, 25]);
@@ -274,6 +317,13 @@ fn emit_u32_module(source: &CanonicalU32Compute) -> Vec<u32> {
         59,
         &[STORAGE_BUFFER_BLOCK_POINTER, INPUT_BUFFER, 12],
     );
+    if has_aux_input {
+        instruction(
+            &mut words,
+            59,
+            &[STORAGE_BUFFER_BLOCK_POINTER, AUX_INPUT_BUFFER, 12],
+        );
+    }
     instruction(
         &mut words,
         59,
@@ -300,6 +350,20 @@ fn emit_u32_module(source: &CanonicalU32Compute) -> Vec<u32> {
         ],
     );
     instruction(&mut words, 61, &[U32_TYPE, VALUE, INPUT_ELEMENT]);
+    if has_aux_input {
+        instruction(
+            &mut words,
+            65,
+            &[
+                STORAGE_BUFFER_U32_POINTER,
+                AUX_INPUT_ELEMENT,
+                AUX_INPUT_BUFFER,
+                U32_ZERO,
+                INDEX,
+            ],
+        );
+        instruction(&mut words, 61, &[U32_TYPE, AUX_VALUE, AUX_INPUT_ELEMENT]);
+    }
     instruction(
         &mut words,
         65,
@@ -314,11 +378,8 @@ fn emit_u32_module(source: &CanonicalU32Compute) -> Vec<u32> {
     match spirv_u32_binary_opcode(source.operation) {
         None => instruction(&mut words, 62, &[OUTPUT_ELEMENT, VALUE]),
         Some(opcode) => {
-            instruction(
-                &mut words,
-                opcode,
-                &[U32_TYPE, COMPUTED_VALUE, VALUE, VALUE],
-            );
+            let rhs = if has_aux_input { AUX_VALUE } else { VALUE };
+            instruction(&mut words, opcode, &[U32_TYPE, COMPUTED_VALUE, VALUE, rhs]);
             instruction(&mut words, 62, &[OUTPUT_ELEMENT, COMPUTED_VALUE]);
         }
     }
@@ -334,6 +395,7 @@ fn spirv_u32_binary_opcode(operation: CanonicalU32Operation) -> Option<u16> {
         CanonicalU32Operation::SubU32 => Some(130),
         CanonicalU32Operation::MulU32 => Some(132),
         CanonicalU32Operation::XorU32 => Some(198),
+        CanonicalU32Operation::AddPairU32 => Some(128),
     }
 }
 
@@ -348,6 +410,17 @@ fn parse_u32(fields: &BTreeMap<&str, &str>, key: &str) -> Result<u32, String> {
     required_field(fields, key)?
         .parse()
         .map_err(|_| format!("Nuis SPIR-V source field `{key}` must be u32"))
+}
+
+fn parse_optional_u32(fields: &BTreeMap<&str, &str>, key: &str) -> Result<Option<u32>, String> {
+    fields
+        .get(key)
+        .map(|value| {
+            value
+                .parse()
+                .map_err(|_| format!("Nuis SPIR-V source field `{key}` must be u32"))
+        })
+        .transpose()
 }
 
 fn parse_local_size(value: &str) -> Result<[u32; 3], String> {

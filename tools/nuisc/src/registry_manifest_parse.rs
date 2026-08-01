@@ -326,17 +326,13 @@ fn parse_required_string(source: &str, key: &str, path: &Path) -> Result<String,
 }
 
 fn parse_string_array(source: &str, key: &str, path: &Path) -> Result<Vec<String>, String> {
-    let prefix = format!("{key} = ");
-    for raw_line in source.lines() {
-        let line = raw_line.trim();
-        if let Some(rest) = line.strip_prefix(&prefix) {
-            return parse_array(rest).ok_or_else(|| {
-                format!(
-                    "manifest `{}` has invalid array value for `{key}`",
-                    path.display()
-                )
-            });
-        }
+    if let Some(raw) = find_array_value(source, key) {
+        return parse_array(raw).ok_or_else(|| {
+            format!(
+                "manifest `{}` has invalid array value for `{key}`",
+                path.display()
+            )
+        });
     }
 
     Err(format!(
@@ -356,11 +352,38 @@ fn parse_optional_string_array(source: &str, key: &str) -> Option<Vec<String>> {
 }
 
 fn parse_optional_string_array_impl(source: &str, key: &str) -> Option<Vec<String>> {
+    find_array_value(source, key).and_then(parse_array)
+}
+
+fn find_array_value<'a>(source: &'a str, key: &str) -> Option<&'a str> {
     let prefix = format!("{key} = ");
     for raw_line in source.lines() {
         let line = raw_line.trim();
         if let Some(rest) = line.strip_prefix(&prefix) {
-            return parse_array(rest);
+            let offset = rest.as_ptr() as usize - source.as_ptr() as usize;
+            return complete_array_prefix(&source[offset..]);
+        }
+    }
+    None
+}
+
+fn complete_array_prefix(raw: &str) -> Option<&str> {
+    let trimmed = raw.trim_start();
+    if !trimmed.starts_with('[') {
+        return None;
+    }
+    let mut in_string = false;
+    let mut escaped = false;
+    for (index, ch) in trimmed.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match ch {
+            '\\' if in_string => escaped = true,
+            '"' => in_string = !in_string,
+            ']' if !in_string => return Some(&trimmed[..=index]),
+            _ => {}
         }
     }
     None
@@ -386,9 +409,14 @@ fn parse_array(raw: &str) -> Option<Vec<String>> {
         return Some(Vec::new());
     }
 
+    let parts = split_quoted_array_items(inner)?;
     let mut items = Vec::new();
-    for part in split_quoted_array_items(inner)? {
-        items.push(parse_quoted(part.trim())?);
+    for (index, part) in parts.iter().enumerate() {
+        let part = part.trim();
+        if part.is_empty() && index + 1 == parts.len() {
+            continue;
+        }
+        items.push(parse_quoted(part)?);
     }
     Some(items)
 }

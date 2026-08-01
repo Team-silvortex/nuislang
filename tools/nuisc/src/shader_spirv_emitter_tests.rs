@@ -33,6 +33,27 @@ stage compute(workgroup_size(1, 1, 1)) {
 }
 "#;
 
+const PAIR_ADD_SOURCE: &str = r#"
+contract = "nuis-spirv-compute-source-v1"
+module_lowering_plan_contract = "nuis-yir.shader.backend-lowering-plan.v1"
+module_source_schema = "nuis-yir.shader.module-summary.v1"
+module_lowering_boundary = "module-summary-to-native-ir"
+module_profile_lowering_target = "vulkan.discrete-or-integrated-gpu"
+module_lowering_target = "spirv:vulkan-gpu"
+module_native_ir = "spirv1.6"
+module_stage_kind = "compute"
+module_execution_model = "GLCompute"
+module_binding_slot_model = "descriptor-set-binding"
+spirv_version = "1.6"
+operation = "add-pair-u32"
+entry = "nuis_vulkan_add_pair_u32"
+local_size = "1x1x1"
+descriptor_set = 0
+input_binding = 0
+aux_input_binding = 1
+output_binding = 2
+"#;
+
 fn canonical_binary_wgsl(entry: &str, operator: &str) -> String {
     format!(
         r#"
@@ -50,11 +71,49 @@ stage compute(workgroup_size(1, 1, 1)) {{
     )
 }
 
+fn canonical_pair_add_wgsl(entry: &str) -> String {
+    format!(
+        r#"
+binding(0, 0) var<storage, read> left_values: array<u32>;
+
+binding(0, 1) var<storage, read> right_values: array<u32>;
+
+binding(0, 2) var<storage, read_write> output_values: array<u32>;
+
+stage compute(workgroup_size(1, 1, 1)) {{
+  fn {entry}(@builtin(global_invocation_id) gid: vec3<u32>) {{
+    let idx: u32 = gid.x;
+    output_values[idx] = left_values[idx] + right_values[idx];
+  }}
+}}
+"#
+    )
+}
+
 fn spirv_words(bytes: &[u8]) -> Vec<u32> {
     bytes
         .chunks_exact(4)
         .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
         .collect()
+}
+
+fn has_instruction(words: &[u32], opcode: u16, operands: &[u32]) -> bool {
+    let mut cursor = 5;
+    while cursor < words.len() {
+        let instruction = words[cursor];
+        let word_count = usize::try_from(instruction >> 16).unwrap_or(0);
+        if word_count == operands.len() + 1
+            && instruction as u16 == opcode
+            && &words[cursor + 1..cursor + word_count] == operands
+        {
+            return true;
+        }
+        if word_count == 0 {
+            return false;
+        }
+        cursor += word_count;
+    }
+    false
 }
 
 #[test]
@@ -84,6 +143,38 @@ fn emits_deterministic_spirv_copy_module_without_external_tools() {
     assert!(first
         .windows("nuis_vulkan_copy_u32".len())
         .any(|window| window == b"nuis_vulkan_copy_u32"));
+}
+
+#[test]
+fn emits_registered_add_pair_module_with_aux_input_binding() {
+    let lowered = lower_registered_compute_source_for_profile(
+        PAIR_ADD_SOURCE.as_bytes(),
+        "nuis_vulkan_add_pair_u32",
+        "vulkan.discrete-or-integrated-gpu",
+    )
+    .unwrap();
+    let words = spirv_words(&lowered);
+
+    assert_eq!(words[3], 25);
+    assert!(has_instruction(&words, 71, &[22, 33, 1]));
+    assert!(has_instruction(&words, 71, &[12, 33, 2]));
+    assert!(has_instruction(&words, 128, &[3, 21, 19, 24]));
+}
+
+#[test]
+fn rejects_add_pair_source_without_aux_input_binding() {
+    let missing_aux = PAIR_ADD_SOURCE
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("aux_input_binding"))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(lower_registered_compute_source_for_profile(
+        missing_aux.as_bytes(),
+        "nuis_vulkan_add_pair_u32",
+        "vulkan.discrete-or-integrated-gpu"
+    )
+    .is_err());
 }
 
 #[test]
@@ -170,6 +261,26 @@ fn emits_binary_u32_modules_from_canonical_wgsl_body() {
             .windows(entry.len())
             .any(|window| window == entry.as_bytes()));
     }
+}
+
+#[test]
+fn emits_pair_add_u32_module_from_canonical_wgsl_body() {
+    let entry = "nuis_vulkan_add_pair_u32";
+    let source = canonical_pair_add_wgsl(entry);
+    let lowered = lower_canonical_inline_wgsl_u32_for_profile(
+        source.as_bytes(),
+        entry,
+        "vulkan.discrete-or-integrated-gpu",
+    )
+    .unwrap();
+    let words = spirv_words(&lowered);
+
+    assert!(has_instruction(&words, 71, &[22, 33, 1]));
+    assert!(has_instruction(&words, 71, &[12, 33, 2]));
+    assert!(has_instruction(&words, 128, &[3, 21, 19, 24]));
+    assert!(lowered
+        .windows(entry.len())
+        .any(|window| window == entry.as_bytes()));
 }
 
 #[test]

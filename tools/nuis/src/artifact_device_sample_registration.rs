@@ -113,7 +113,7 @@ fn evidence_matches_registration(
         .unwrap_or_else(|| registration.metadata_selector.is_none())
 }
 
-fn registrations() -> [DeviceSampleInputRegistration; 14] {
+fn registrations() -> [DeviceSampleInputRegistration; 15] {
     [
         crate::artifact_device_sample_pixelmagic::registration(),
         crate::artifact_device_sample_kernel::registration(),
@@ -125,6 +125,7 @@ fn registrations() -> [DeviceSampleInputRegistration; 14] {
         crate::artifact_device_sample_shader_metal::chain_registration(),
         crate::artifact_device_sample_shader_vulkan::registration(),
         crate::artifact_device_sample_shader_vulkan::add_registration(),
+        crate::artifact_device_sample_shader_vulkan::add_pair_registration(),
         crate::artifact_device_sample_shader_vulkan::sub_registration(),
         crate::artifact_device_sample_shader_vulkan::mul_registration(),
         crate::artifact_device_sample_shader_vulkan::xor_registration(),
@@ -179,6 +180,17 @@ mod tests {
         );
         assert!(vulkan_add.contains("provider_code_asset_id=shader.vulkan.add-u32.spirv"));
         assert!(vulkan_add.contains("provider_kernel_operation=add-u32"));
+        let vulkan_add_pair = enrich_registered_input_evidence(
+            "vulkan",
+            "discrete-or-integrated-gpu",
+            "artifact_provider_metadata_0=official.shader:provider-sample=vulkan-add-pair-u32",
+        )
+        .unwrap();
+        assert!(vulkan_add_pair
+            .contains("provider_sample_registration_id=official.shader.vulkan-add-pair-u32"));
+        assert!(vulkan_add_pair.contains("provider_code_asset_id=shader.vulkan.add-pair-u32.spirv"));
+        assert!(vulkan_add_pair.contains("provider_kernel_operation=add-pair-u32"));
+        assert!(vulkan_add_pair.contains("provider_input_binding_count=2"));
         let vulkan_sub = enrich_registered_input_evidence(
             "vulkan",
             "discrete-or-integrated-gpu",

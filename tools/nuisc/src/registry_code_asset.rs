@@ -490,7 +490,7 @@ mod tests {
         let manifest = crate::registry::load_manifest_for_domain(root, "shader").unwrap();
         let assets = code_asset_registrations(root, &manifest).unwrap();
 
-        assert_eq!(assets.len(), 12);
+        assert_eq!(assets.len(), 14);
         assert!(assets
             .iter()
             .all(|asset| asset.package_id == "official.shader"));
@@ -499,7 +499,7 @@ mod tests {
                 .iter()
                 .filter(|asset| asset.lowering_target == "metal.apple-silicon-gpu")
                 .count(),
-            7
+            8
         );
         let witsage_bias = assets
             .iter()
@@ -550,6 +550,19 @@ mod tests {
         let metal_add_text = std::str::from_utf8(&metal_add.bytes).unwrap();
         assert!(metal_add_text.contains("kernel void nuis_metal_add_u32("));
         assert!(metal_add_text.contains("output_values[gid] = value + value;"));
+        let metal_add_pair = assets
+            .iter()
+            .find(|asset| asset.asset_id == "shader.metal.add-pair-u32.msl")
+            .expect("registered canonical Metal pair add MSL asset");
+        assert_eq!(metal_add_pair.entry, "nuis_metal_add_pair_u32");
+        assert_eq!(
+            metal_add_pair.source_path,
+            "assets/shader/metal_add_pair_u32.ns"
+        );
+        let metal_add_pair_text = std::str::from_utf8(&metal_add_pair.bytes).unwrap();
+        assert!(metal_add_pair_text.contains("kernel void nuis_metal_add_pair_u32("));
+        assert!(metal_add_pair_text.contains("device const uint* right_values [[buffer(1)]]"));
+        assert!(metal_add_pair_text.contains("output_values[gid] = value + rhs;"));
         let metal_sub = assets
             .iter()
             .find(|asset| asset.asset_id == "shader.metal.sub-u32.msl")
@@ -594,6 +607,10 @@ mod tests {
         );
         for (asset_id, entry) in [
             ("shader.vulkan.add-u32.spirv", "nuis_vulkan_add_u32"),
+            (
+                "shader.vulkan.add-pair-u32.spirv",
+                "nuis_vulkan_add_pair_u32",
+            ),
             ("shader.vulkan.sub-u32.spirv", "nuis_vulkan_sub_u32"),
             ("shader.vulkan.mul-u32.spirv", "nuis_vulkan_mul_u32"),
             ("shader.vulkan.xor-u32.spirv", "nuis_vulkan_xor_u32"),

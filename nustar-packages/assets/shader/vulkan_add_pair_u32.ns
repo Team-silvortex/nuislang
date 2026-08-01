@@ -1,0 +1,18 @@
+mod shader VulkanAddPairU32CodeAsset {
+  fn source() {
+    let module: ShaderModule = shader_inline_wgsl("nuis_vulkan_add_pair_u32", wgsl {
+      binding(0, 0) var<storage, read> left_values: array<u32>;
+
+      binding(0, 1) var<storage, read> right_values: array<u32>;
+
+      binding(0, 2) var<storage, read_write> output_values: array<u32>;
+
+      stage compute(workgroup_size(1, 1, 1)) {
+        fn nuis_vulkan_add_pair_u32(@builtin(global_invocation_id) gid: vec3<u32>) {
+          let idx: u32 = gid.x;
+          output_values[idx] = left_values[idx] + right_values[idx];
+        }
+      }
+    });
+  }
+}

@@ -108,6 +108,14 @@ fn validate_msl_module_lowering_plan(
 fn render_u32_msl(source: &CanonicalU32Compute, plan: &ModuleLoweringPlan) -> String {
     let input_binding = source.input_binding;
     let output_binding = source.output_binding;
+    let aux_parameter = source
+        .aux_input_binding
+        .map(|binding| format!("    device const uint* right_values [[buffer({binding})]],\n"))
+        .unwrap_or_default();
+    let aux_load = source
+        .aux_input_binding
+        .map(|_| "    uint rhs = right_values[gid];\n")
+        .unwrap_or_default();
     let entry = &source.entry;
     let expression = msl_u32_expression(source.operation);
     format!(
@@ -123,9 +131,11 @@ fn render_u32_msl(source: &CanonicalU32Compute, plan: &ModuleLoweringPlan) -> St
          \n\
          kernel void {entry}(\n\
              device const uint* input_values [[buffer({input_binding})]],\n\
+{aux_parameter}\
              device uint* output_values [[buffer({output_binding})]],\n\
              uint gid [[thread_position_in_grid]]) {{\n\
              uint value = input_values[gid];\n\
+{aux_load}\
              output_values[gid] = {expression};\n\
          }}\n",
         plan.contract,
@@ -147,6 +157,7 @@ fn msl_u32_expression(operation: CanonicalU32Operation) -> &'static str {
         CanonicalU32Operation::SubU32 => "value - value",
         CanonicalU32Operation::MulU32 => "value * value",
         CanonicalU32Operation::XorU32 => "value ^ value",
+        CanonicalU32Operation::AddPairU32 => "value + rhs",
     }
 }
 

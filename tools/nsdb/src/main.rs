@@ -43,6 +43,8 @@ mod provider_execution_metal;
 mod provider_execution_native;
 #[cfg(unix)]
 mod provider_execution_vulkan;
+#[cfg(unix)]
+mod provider_execution_vulkan_spirv;
 mod provider_graph_output;
 mod provider_input_binding;
 mod provider_native_output_payload;

@@ -62,6 +62,21 @@ fn linux_vulkan_add_shader_sample_executes_provider_output() {
 }
 
 #[test]
+fn linux_vulkan_add_pair_shader_sample_executes_provider_output() {
+    run_vulkan_sample_smoke(VulkanSampleSmoke {
+        project_name: "shader_vulkan_add_pair_provider_demo",
+        assets: &[VulkanGeneratedAsset {
+            asset_id: "shader.vulkan.add-pair-u32.spirv",
+            generated_file: "nuis.shader.vulkan.add-pair-u32.spv",
+            entry: "nuis_vulkan_add_pair_u32",
+        }],
+        registration_id: "official.shader.vulkan-add-pair-u32",
+        expected_hash: "0xbada6f73928b9f42",
+        graph: None,
+    });
+}
+
+#[test]
 fn linux_vulkan_sub_shader_sample_executes_provider_output() {
     run_vulkan_sample_smoke(VulkanSampleSmoke {
         project_name: "shader_vulkan_sub_provider_demo",

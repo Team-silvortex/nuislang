@@ -412,6 +412,10 @@ mod tests {
         );
         for (file_name, entry) in [
             ("nuis.shader.vulkan.add-u32.spv", "nuis_vulkan_add_u32"),
+            (
+                "nuis.shader.vulkan.add-pair-u32.spv",
+                "nuis_vulkan_add_pair_u32",
+            ),
             ("nuis.shader.vulkan.sub-u32.spv", "nuis_vulkan_sub_u32"),
             ("nuis.shader.vulkan.mul-u32.spv", "nuis_vulkan_mul_u32"),
             ("nuis.shader.vulkan.xor-u32.spv", "nuis_vulkan_xor_u32"),
@@ -433,10 +437,11 @@ mod tests {
         let table =
             fs::read_to_string(output_dir.join("nuis.domain.code-asset-contributions.toml"))
                 .unwrap();
-        assert!(table.contains("contribution_count = 6"));
+        assert!(table.contains("contribution_count = 7"));
         assert!(table.contains("owner_package_id = \"official.shader\""));
         assert!(table.contains("asset_id = \"shader.vulkan.copy-u32.spirv\""));
         assert!(table.contains("asset_id = \"shader.vulkan.add-u32.spirv\""));
+        assert!(table.contains("asset_id = \"shader.vulkan.add-pair-u32.spirv\""));
         assert!(table.contains("asset_id = \"shader.vulkan.sub-u32.spirv\""));
         assert!(table.contains("asset_id = \"shader.vulkan.mul-u32.spirv\""));
         assert!(table.contains("asset_id = \"shader.vulkan.xor-u32.spirv\""));
@@ -445,11 +450,13 @@ mod tests {
         assert!(table.contains("target = \"vulkan1.3-spirv1.6\""));
         assert!(table.contains("entries = [\"nuis_vulkan_copy_u32\"]"));
         assert!(table.contains("entries = [\"nuis_vulkan_add_u32\"]"));
+        assert!(table.contains("entries = [\"nuis_vulkan_add_pair_u32\"]"));
         assert!(table.contains("entries = [\"nuis_vulkan_sub_u32\"]"));
         assert!(table.contains("entries = [\"nuis_vulkan_mul_u32\"]"));
         assert!(table.contains("entries = [\"nuis_vulkan_xor_u32\"]"));
         assert!(table.contains("path = \"nuis.shader.vulkan.copy-u32.spv\""));
         assert!(table.contains("path = \"nuis.shader.vulkan.add-u32.spv\""));
+        assert!(table.contains("path = \"nuis.shader.vulkan.add-pair-u32.spv\""));
         assert!(table.contains("path = \"nuis.shader.vulkan.sub-u32.spv\""));
         assert!(table.contains("path = \"nuis.shader.vulkan.mul-u32.spv\""));
         assert!(table.contains("path = \"nuis.shader.vulkan.xor-u32.spv\""));
@@ -493,6 +500,14 @@ mod tests {
         let add_msl = fs::read_to_string(&add_msl_path).unwrap();
         assert!(add_msl.contains("kernel void nuis_metal_add_u32("));
         assert!(add_msl.contains("output_values[gid] = value + value;"));
+        let add_pair_msl_path = output_dir.join("nuis.shader.metal.add-pair-u32.metal");
+        assert!(artifacts.iter().any(|(kind, path)| {
+            kind == "domain_code_asset_shader" && path == &add_pair_msl_path
+        }));
+        let add_pair_msl = fs::read_to_string(&add_pair_msl_path).unwrap();
+        assert!(add_pair_msl.contains("kernel void nuis_metal_add_pair_u32("));
+        assert!(add_pair_msl.contains("device const uint* right_values [[buffer(1)]]"));
+        assert!(add_pair_msl.contains("output_values[gid] = value + rhs;"));
         let sub_msl_path = output_dir.join("nuis.shader.metal.sub-u32.metal");
         assert!(artifacts
             .iter()
@@ -519,6 +534,7 @@ mod tests {
                 .unwrap();
         assert!(table.contains("asset_id = \"shader.metal.copy-u32.msl\""));
         assert!(table.contains("asset_id = \"shader.metal.add-u32.msl\""));
+        assert!(table.contains("asset_id = \"shader.metal.add-pair-u32.msl\""));
         assert!(table.contains("asset_id = \"shader.metal.sub-u32.msl\""));
         assert!(table.contains("asset_id = \"shader.metal.mul-u32.msl\""));
         assert!(table.contains("asset_id = \"shader.metal.xor-u32.msl\""));
@@ -526,6 +542,7 @@ mod tests {
         assert!(table.contains("target = \"msl2.4\""));
         assert!(table.contains("entries = [\"nuis_metal_copy_u32\"]"));
         assert!(table.contains("entries = [\"nuis_metal_add_u32\"]"));
+        assert!(table.contains("entries = [\"nuis_metal_add_pair_u32\"]"));
         assert!(table.contains("entries = [\"nuis_metal_sub_u32\"]"));
         assert!(table.contains("entries = [\"nuis_metal_mul_u32\"]"));
         assert!(table.contains("entries = [\"nuis_metal_xor_u32\"]"));

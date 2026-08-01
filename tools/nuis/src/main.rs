@@ -59,6 +59,7 @@ mod dev_tensor_drift_data_runtime_execution;
 mod dev_tensor_drift_data_runtime_nsld;
 mod dev_tensor_drift_data_runtime_provider;
 mod dev_tensor_drift_data_runtime_provider_completion;
+mod dev_tensor_drift_data_runtime_shader_graph;
 mod dev_tensor_drift_data_runtime_std;
 mod dev_tensor_drift_data_runtime_vulkan;
 mod dev_tensor_hierarchy;
