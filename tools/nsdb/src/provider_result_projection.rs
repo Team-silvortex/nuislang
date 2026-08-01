@@ -22,7 +22,9 @@ struct ProviderResultObservation<'a> {
     request_id: &'a str,
     output_buffer: &'a str,
     element_type: &'a str,
+    layout: &'a str,
     shape: &'a str,
+    row_stride_bytes: &'a str,
     byte_length: &'a str,
     output_hash: &'a str,
     comparison_status: &'a str,
@@ -47,7 +49,9 @@ pub(crate) fn validate_and_render_result_projections(
             request_id: &output.request_id,
             output_buffer: &output.output_binding_buffers,
             element_type: &output.output_binding_element_types,
+            layout: &output.output_binding_layouts,
             shape: &output.output_binding_shapes,
+            row_stride_bytes: &output.output_binding_row_stride_bytes,
             byte_length: &output.output_binding_byte_lengths,
             output_hash: &output.hash,
             comparison_status: &output.comparison_status,
@@ -137,7 +141,9 @@ fn validate_and_render(
             })?;
         if observation.output_buffer != projection.producer_output_buffer
             || observation.element_type != "i64"
+            || observation.layout != "tensor-contiguous"
             || observation.shape != "1x1"
+            || observation.row_stride_bytes != "8"
             || observation.byte_length != "8"
             || observation.output_hash != projection.expected_content_hash
             || observation.comparison_status != "comparison-passed"
@@ -169,6 +175,8 @@ fn validate_and_render(
                 "producer_output_buffer",
                 projection.producer_output_buffer.as_str(),
             ),
+            ("output_layout", observation.layout),
+            ("output_row_stride_bytes", observation.row_stride_bytes),
             ("value_i64", &projection.expected_i64.to_string()),
             ("output_hash", projection.expected_content_hash.as_str()),
             ("completion_token", observation.completion_token),
@@ -260,7 +268,9 @@ provider_result_projection_0_glm_release_requirement=nuis-provider-glm-release-e
             request_id: "kernel.reduce",
             output_buffer: "output.reduce",
             element_type: "i64",
+            layout: "tensor-contiguous",
             shape: "1x1",
+            row_stride_bytes: "8",
             byte_length: "8",
             output_hash: hash,
             comparison_status: "comparison-passed",
@@ -282,6 +292,10 @@ provider_result_projection_0_glm_release_requirement=nuis-provider-glm-release-e
             validate_and_render(&projections, &[observation("0xf71115b38f042bf7")]).unwrap();
         assert!(rendered.contains("provider_result_projection_status = \"verified\""));
         assert!(rendered.contains("provider_result_projection_0_value_i64 = \"50\""));
+        assert!(
+            rendered.contains("provider_result_projection_0_output_layout = \"tensor-contiguous\"")
+        );
+        assert!(rendered.contains("provider_result_projection_0_output_row_stride_bytes = \"8\""));
         assert!(rendered.contains(
             "provider_result_projection_0_completion_token = \"provider-completion:0x1234\""
         ));
@@ -295,6 +309,9 @@ provider_result_projection_0_glm_release_requirement=nuis-provider-glm-release-e
             .unwrap()
             .expect("declared result projection");
         assert!(validate_and_render(&projections, &[observation("0xdead")]).is_err());
+        let mut invalid_layout = observation("0xf71115b38f042bf7");
+        invalid_layout.row_stride_bytes = "16";
+        assert!(validate_and_render(&projections, &[invalid_layout]).is_err());
         assert!(
             parse_result_projections(&EVIDENCE.replace("0xf71115b38f042bf7", "0xdead")).is_err()
         );

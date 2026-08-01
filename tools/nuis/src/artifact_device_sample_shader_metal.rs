@@ -3,10 +3,12 @@ use crate::{
     artifact_device_sample_shader_common::{
         fnv1a64_hex, render_dependency_count_zero, render_u32_artifact_binding,
         render_u32_dependency_binding, render_u32_dependency_edge,
-        render_u32_prefixed_request_evidence, render_u32_sample_request_evidence,
-        replace_code_asset_identity_fields, validate_code_asset_contribution_selection,
-        validate_code_asset_request_evidence, U32RequestEvidence, U32_ADD_EXPECTED as ADD_EXPECTED,
-        U32_INPUT as INPUT, U32_MUL_EXPECTED as MUL_EXPECTED, U32_ZERO_EXPECTED as SUB_EXPECTED,
+        render_u32_pair_artifact_binding, render_u32_prefixed_request_evidence,
+        render_u32_sample_request_evidence, replace_code_asset_identity_fields,
+        validate_code_asset_contribution_selection, validate_code_asset_request_evidence,
+        U32RequestEvidence, U32_ADD_EXPECTED as ADD_EXPECTED, U32_INPUT as INPUT,
+        U32_MUL_EXPECTED as MUL_EXPECTED, U32_PAIR_ADD_EXPECTED as PAIR_ADD_EXPECTED,
+        U32_PAIR_RIGHT_INPUT as PAIR_RIGHT_INPUT, U32_ZERO_EXPECTED as SUB_EXPECTED,
     },
 };
 use std::{fs, path::Path};
@@ -29,6 +31,7 @@ struct MetalSampleSpec {
     kernel_id: &'static str,
     operation: &'static str,
     input_file_name: &'static str,
+    aux_input: Option<(&'static str, &'static [u8])>,
     expected_file_name: &'static str,
     entry_proof: &'static str,
     expected: &'static [u8],
@@ -41,6 +44,7 @@ const COPY_SAMPLE: MetalSampleSpec = MetalSampleSpec {
     kernel_id: "shader.metal.copy-u32",
     operation: "copy-u32",
     input_file_name: "nuis.shader.metal.copy-u32.input.u32.bin",
+    aux_input: None,
     expected_file_name: "nuis.shader.metal.copy-u32.expected.u32.bin",
     entry_proof: "kernel void nuis_metal_copy_u32",
     expected: INPUT,
@@ -53,9 +57,26 @@ const ADD_SAMPLE: MetalSampleSpec = MetalSampleSpec {
     kernel_id: "shader.metal.add-u32",
     operation: "add-u32",
     input_file_name: "nuis.shader.metal.add-u32.input.u32.bin",
+    aux_input: None,
     expected_file_name: "nuis.shader.metal.add-u32.expected.u32.bin",
     entry_proof: "kernel void nuis_metal_add_u32",
     expected: ADD_EXPECTED,
+};
+
+const ADD_PAIR_SAMPLE: MetalSampleSpec = MetalSampleSpec {
+    registration_id: "official.shader.metal-add-pair-u32",
+    metadata_selector: "official.shader:provider-sample=metal-add-pair-u32",
+    asset_id: "shader.metal.add-pair-u32.msl",
+    kernel_id: "shader.metal.add-pair-u32",
+    operation: "add-pair-u32",
+    input_file_name: "nuis.shader.metal.add-pair-u32.left.u32.bin",
+    aux_input: Some((
+        "nuis.shader.metal.add-pair-u32.right.u32.bin",
+        PAIR_RIGHT_INPUT,
+    )),
+    expected_file_name: "nuis.shader.metal.add-pair-u32.expected.u32.bin",
+    entry_proof: "kernel void nuis_metal_add_pair_u32",
+    expected: PAIR_ADD_EXPECTED,
 };
 
 const SUB_SAMPLE: MetalSampleSpec = MetalSampleSpec {
@@ -65,6 +86,7 @@ const SUB_SAMPLE: MetalSampleSpec = MetalSampleSpec {
     kernel_id: "shader.metal.sub-u32",
     operation: "sub-u32",
     input_file_name: "nuis.shader.metal.sub-u32.input.u32.bin",
+    aux_input: None,
     expected_file_name: "nuis.shader.metal.sub-u32.expected.u32.bin",
     entry_proof: "kernel void nuis_metal_sub_u32",
     expected: SUB_EXPECTED,
@@ -77,6 +99,7 @@ const MUL_SAMPLE: MetalSampleSpec = MetalSampleSpec {
     kernel_id: "shader.metal.mul-u32",
     operation: "mul-u32",
     input_file_name: "nuis.shader.metal.mul-u32.input.u32.bin",
+    aux_input: None,
     expected_file_name: "nuis.shader.metal.mul-u32.expected.u32.bin",
     entry_proof: "kernel void nuis_metal_mul_u32",
     expected: MUL_EXPECTED,
@@ -89,12 +112,20 @@ const XOR_SAMPLE: MetalSampleSpec = MetalSampleSpec {
     kernel_id: "shader.metal.xor-u32",
     operation: "xor-u32",
     input_file_name: "nuis.shader.metal.xor-u32.input.u32.bin",
+    aux_input: None,
     expected_file_name: "nuis.shader.metal.xor-u32.expected.u32.bin",
     entry_proof: "kernel void nuis_metal_xor_u32",
     expected: XOR_EXPECTED,
 };
 
-const SAMPLES: &[MetalSampleSpec] = &[COPY_SAMPLE, ADD_SAMPLE, SUB_SAMPLE, MUL_SAMPLE, XOR_SAMPLE];
+const SAMPLES: &[MetalSampleSpec] = &[
+    COPY_SAMPLE,
+    ADD_SAMPLE,
+    ADD_PAIR_SAMPLE,
+    SUB_SAMPLE,
+    MUL_SAMPLE,
+    XOR_SAMPLE,
+];
 
 pub(crate) fn registration() -> DeviceSampleInputRegistration {
     registration_for(
@@ -106,6 +137,14 @@ pub(crate) fn registration() -> DeviceSampleInputRegistration {
 
 pub(crate) fn add_registration() -> DeviceSampleInputRegistration {
     registration_for(ADD_SAMPLE, selects_shader_metal_add, metal_add_u32_evidence)
+}
+
+pub(crate) fn add_pair_registration() -> DeviceSampleInputRegistration {
+    registration_for(
+        ADD_PAIR_SAMPLE,
+        selects_shader_metal_add_pair,
+        metal_add_pair_u32_evidence,
+    )
 }
 
 pub(crate) fn sub_registration() -> DeviceSampleInputRegistration {
@@ -162,6 +201,10 @@ fn selects_shader_metal_add(base: &str) -> bool {
     selects_metadata(base, ADD_SAMPLE.metadata_selector)
 }
 
+fn selects_shader_metal_add_pair(base: &str) -> bool {
+    selects_metadata(base, ADD_PAIR_SAMPLE.metadata_selector)
+}
+
 fn selects_shader_metal_sub(base: &str) -> bool {
     selects_metadata(base, SUB_SAMPLE.metadata_selector)
 }
@@ -192,6 +235,10 @@ fn metal_add_u32_evidence(_base: &str) -> String {
     metal_sample_evidence(ADD_SAMPLE)
 }
 
+fn metal_add_pair_u32_evidence(_base: &str) -> String {
+    metal_sample_evidence(ADD_PAIR_SAMPLE)
+}
+
 fn metal_sub_u32_evidence(_base: &str) -> String {
     metal_sample_evidence(SUB_SAMPLE)
 }
@@ -219,6 +266,37 @@ fn metal_chain_u32_evidence(_base: &str) -> String {
 
 fn metal_sample_evidence(sample: MetalSampleSpec) -> String {
     let asset = metal_asset(sample).expect("Shader Nustar Metal MSL asset must be registered");
+    if let Some((right_file_name, right)) = sample.aux_input {
+        return render_u32_prefixed_request_evidence(U32RequestEvidence {
+            prefix: "provider_",
+            provider_family: "metal:apple-silicon-gpu",
+            kernel_id: sample.kernel_id,
+            operation: sample.operation,
+            kernel_input_buffers: "input.values,input.right",
+            buffer_layout: "tensor-row-major",
+            buffer_shape: "2x2",
+            row_stride_bytes: 8,
+            dispatch: "4x1x1",
+            input_file_name: sample.input_file_name,
+            input_hash: fnv1a64_hex(INPUT),
+            input_byte_length: INPUT.len(),
+            expected_file_name: sample.expected_file_name,
+            expected: sample.expected,
+            asset: &asset,
+            bytes: &asset.bytes,
+            input_binding: render_u32_pair_artifact_binding(
+                "provider_",
+                "tensor-row-major",
+                "2x2",
+                8,
+                sample.input_file_name,
+                INPUT,
+                right_file_name,
+                right,
+            ),
+            dependency: render_dependency_count_zero("provider_"),
+        });
+    }
     render_u32_sample_request_evidence(
         "metal:apple-silicon-gpu",
         sample.kernel_id,
@@ -279,6 +357,10 @@ fn render_chain_artifact_request(
         kernel_id: "shader.metal.chain.add-u32",
         operation: sample.operation,
         kernel_input_buffers: "input.values",
+        buffer_layout: "tensor-contiguous",
+        buffer_shape: "4",
+        row_stride_bytes: INPUT.len(),
+        dispatch: "4x1x1",
         input_file_name: CHAIN_INPUT_FILE_NAME,
         input_hash: fnv1a64_hex(INPUT),
         input_byte_length: INPUT.len(),
@@ -305,6 +387,10 @@ fn render_chain_dependency_request(
         kernel_id: "shader.metal.chain.xor-u32",
         operation: sample.operation,
         kernel_input_buffers: "input.values",
+        buffer_layout: "tensor-contiguous",
+        buffer_shape: "4",
+        row_stride_bytes: ADD_EXPECTED.len(),
+        dispatch: "4x1x1",
         input_file_name: "none",
         input_hash: input_hash.clone(),
         input_byte_length: ADD_EXPECTED.len(),
@@ -360,6 +446,10 @@ fn persist_metal_payloads(output_dir: &Path, evidence: &[&str]) -> Result<(), St
     ] {
         fs::write(output_dir.join(name), bytes)
             .map_err(|error| format!("failed to persist Metal u32 payload: {error}"))?;
+    }
+    if let Some((name, bytes)) = sample.aux_input {
+        fs::write(output_dir.join(name), bytes)
+            .map_err(|error| format!("failed to persist Metal u32 pair payload: {error}"))?;
     }
     Ok(())
 }
@@ -523,6 +613,7 @@ mod tests {
         for (registration, sample) in [
             (registration(), COPY_SAMPLE),
             (add_registration(), ADD_SAMPLE),
+            (add_pair_registration(), ADD_PAIR_SAMPLE),
             (sub_registration(), SUB_SAMPLE),
             (mul_registration(), MUL_SAMPLE),
             (xor_registration(), XOR_SAMPLE),
@@ -547,6 +638,13 @@ mod tests {
             assert!(evidence.contains("provider_output_comparison_expected_content_hash="));
             assert!(evidence
                 .contains("provider_adapter_binding_provider_family=metal:apple-silicon-gpu"));
+            if sample.aux_input.is_some() {
+                assert!(evidence
+                    .contains("provider_input_binding_contract=nuis-provider-input-binding-v2"));
+                assert!(evidence.contains("provider_buffer_layout=tensor-row-major"));
+                assert!(evidence.contains("provider_buffer_shape=2x2"));
+                assert!(evidence.contains("provider_input_binding_1_row_stride_bytes=8"));
+            }
             assert!(nsdb::validate_provider_request_evidence(&evidence));
         }
 
@@ -581,20 +679,24 @@ mod tests {
         ));
         let _ = fs::remove_dir_all(&output_dir);
         fs::create_dir_all(&output_dir).unwrap();
-        let asset = metal_asset(ADD_SAMPLE).unwrap();
+        let asset = metal_asset(ADD_PAIR_SAMPLE).unwrap();
         fs::write(output_dir.join(&asset.file_name), &asset.bytes).unwrap();
         persist_metal_payloads(
             &output_dir,
-            &["provider_sample_registration_id=official.shader.metal-add-u32"],
+            &["provider_sample_registration_id=official.shader.metal-add-pair-u32"],
         )
         .unwrap();
         assert_eq!(
-            fs::read(output_dir.join(ADD_SAMPLE.input_file_name)).unwrap(),
+            fs::read(output_dir.join(ADD_PAIR_SAMPLE.input_file_name)).unwrap(),
             INPUT
         );
         assert_eq!(
-            fs::read(output_dir.join(ADD_SAMPLE.expected_file_name)).unwrap(),
-            ADD_EXPECTED
+            fs::read(output_dir.join(ADD_PAIR_SAMPLE.aux_input.unwrap().0)).unwrap(),
+            PAIR_RIGHT_INPUT
+        );
+        assert_eq!(
+            fs::read(output_dir.join(ADD_PAIR_SAMPLE.expected_file_name)).unwrap(),
+            PAIR_ADD_EXPECTED
         );
         let tampered = String::from_utf8(asset.bytes.clone())
             .unwrap()
@@ -602,7 +704,7 @@ mod tests {
         fs::write(output_dir.join(&asset.file_name), tampered).unwrap();
         assert!(persist_metal_payloads(
             &output_dir,
-            &["provider_sample_registration_id=official.shader.metal-add-u32"]
+            &["provider_sample_registration_id=official.shader.metal-add-pair-u32"]
         )
         .unwrap_err()
         .contains("registry ownership"));

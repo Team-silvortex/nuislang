@@ -5,8 +5,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-static NSData *carrierPacketOwner = nil;
-static NSUInteger carrierMappedLength = 0;
+static NSMutableArray<NSData *> *carrierPacketOwners = nil;
 
 static int fail(NSString *message) {
     fprintf(stderr, "%s\n", message.UTF8String);
@@ -99,11 +98,12 @@ static NSData *mappedCarrierPacket(int fd, uint64_t length, uint64_t expectedHas
                     munmap(bytes, mappedLength);
                 }];
     if (fnv1a64(packet) != expectedHash) return nil;
-    carrierPacketOwner = packet;
+    [carrierPacketOwners addObject:packet];
     return packet;
 }
 
-static NSData *alignedCarrierFrame(NSData *packet, uint64_t requestedFrame) {
+static NSData *alignedCarrierFrame(NSData *packet, uint64_t requestedFrame,
+                                   NSUInteger *mappedLengthOut) {
     const uint8_t *bytes = packet.bytes;
     if (packet.length < 56 || memcmp(bytes, "NUISPFD1", 8) != 0) return nil;
     uint64_t frameCount = readLittle(bytes + 8, 4);
@@ -123,11 +123,12 @@ static NSData *alignedCarrierFrame(NSData *packet, uint64_t requestedFrame) {
                                            length:(NSUInteger)length
                                      freeWhenDone:NO];
     if (fnv1a64(payload) != expectedHash) return nil;
-    carrierMappedLength = (NSUInteger)mappedLength;
+    *mappedLengthOut = (NSUInteger)mappedLength;
     return payload;
 }
 
-static NSData *carrierFrame(const char *argument) {
+static NSData *carrierFrame(const char *argument, NSUInteger *mappedLengthOut) {
+    *mappedLengthOut = 0;
     NSString *value = @(argument);
     if (![value hasPrefix:@"frame:"] && ![value hasPrefix:@"fd:"]) {
         return [NSData dataWithContentsOfFile:value];
@@ -144,7 +145,7 @@ static NSData *carrierFrame(const char *argument) {
         if (packet == nil) return nil;
         mappedPacket = YES;
         if (packet.length >= 8 && memcmp(packet.bytes, "NUISPFD1", 8) == 0) {
-            return alignedCarrierFrame(packet, frame);
+            return alignedCarrierFrame(packet, frame, mappedLengthOut);
         }
     } else {
         if (![value isEqualToString:@"frame:0"]) return nil;
@@ -167,21 +168,34 @@ static NSData *carrierFrame(const char *argument) {
 
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
+        carrierPacketOwners = [NSMutableArray array];
         BOOL argmax = argc == 4;
-        BOOL copyU32 = argc == 5 && strcmp(argv[4], "copy-u32") == 0;
-        BOOL u32Mode = argc == 5 && endsWith(argv[4], "-u32");
+        BOOL u32Mode = argc >= 5 && endsWith(argv[argc - 1], "-u32");
+        BOOL copyU32 = u32Mode && strcmp(argv[argc - 1], "copy-u32") == 0;
         BOOL biasMode = argc == 5 && !u32Mode;
         if (!argmax && !u32Mode && !biasMode) {
-            return fail(@"usage: metal_f32_bias <input> <metal-source> <entry> [bias|*-u32]");
+            return fail(@"usage: metal_f32_bias <input>... <metal-source> <entry> [bias|*-u32]");
         }
-        NSData *input = carrierFrame(argv[1]);
+        NSUInteger inputCount = u32Mode ? (NSUInteger)argc - 4 : 1;
+        NSMutableArray<NSData *> *inputs = [NSMutableArray arrayWithCapacity:inputCount];
+        NSMutableArray<NSNumber *> *mappedLengths = [NSMutableArray arrayWithCapacity:inputCount];
         NSUInteger elementSize = u32Mode ? sizeof(uint32_t) : sizeof(float);
-        if (input == nil || input.length == 0 || input.length % elementSize != 0) {
-            return fail(u32Mode ? @"Metal u32 input unavailable or misaligned"
-                                : @"Metal f32 input unavailable or misaligned");
+        NSUInteger inputLength = 0;
+        for (NSUInteger index = 0; index < inputCount; index++) {
+            NSUInteger mappedLength = 0;
+            NSData *input = carrierFrame(argv[index + 1], &mappedLength);
+            if (input == nil || input.length == 0 || input.length % elementSize != 0 ||
+                (index > 0 && input.length != inputLength)) {
+                return fail(u32Mode ? @"Metal u32 inputs are unavailable, misaligned, or unequal"
+                                    : @"Metal f32 input unavailable or misaligned");
+            }
+            if (index == 0) inputLength = input.length;
+            [inputs addObject:input];
+            [mappedLengths addObject:@(mappedLength)];
         }
-        NSString *sourcePath = [NSString stringWithUTF8String:argv[2]];
-        NSString *entry = [NSString stringWithUTF8String:argv[3]];
+        NSUInteger sourceIndex = inputCount + 1;
+        NSString *sourcePath = [NSString stringWithUTF8String:argv[sourceIndex]];
+        NSString *entry = [NSString stringWithUTF8String:argv[sourceIndex + 1]];
         NSError *error = nil;
         NSString *source = [NSString stringWithContentsOfFile:sourcePath
                                                     encoding:NSUTF8StringEncoding
@@ -189,8 +203,9 @@ int main(int argc, const char *argv[]) {
         if (source == nil || entry.length == 0) {
             return fail([NSString stringWithFormat:@"Metal code asset unavailable: %@", error]);
         }
-        float bias = biasMode ? strtof(argv[4], NULL) : 0.0f;
-        uint32_t count = (uint32_t)(input.length / elementSize);
+        float bias = biasMode ? strtof(argv[argc - 1], NULL) : 0.0f;
+        if (inputLength / elementSize > UINT32_MAX) return fail(@"Metal input is too large");
+        uint32_t count = (uint32_t)(inputLength / elementSize);
         id<MTLDevice> device = MTLCreateSystemDefaultDevice();
         if (device == nil) return fail(@"Metal device unavailable");
         id<MTLLibrary> library = [device newLibraryWithSource:source options:nil error:&error];
@@ -201,25 +216,35 @@ int main(int argc, const char *argv[]) {
             return fail([NSString stringWithFormat:@"Metal f32 pipeline unavailable: %@", error]);
         }
         MTLResourceOptions options = MTLResourceStorageModeShared;
-        id<MTLBuffer> inputBuffer = carrierMappedLength > 0
-            ? [device newBufferWithBytesNoCopy:(void *)input.bytes
-                                         length:carrierMappedLength
-                                        options:options
-                                    deallocator:nil]
-            : [device newBufferWithBytes:input.bytes length:input.length options:options];
-        NSUInteger outputLength = argmax ? sizeof(uint32_t) : input.length;
+        NSMutableArray<id<MTLBuffer>> *inputBuffers =
+            [NSMutableArray arrayWithCapacity:inputCount];
+        for (NSUInteger index = 0; index < inputCount; index++) {
+            NSData *input = inputs[index];
+            NSUInteger mappedLength = mappedLengths[index].unsignedIntegerValue;
+            id<MTLBuffer> buffer = mappedLength > 0
+                ? [device newBufferWithBytesNoCopy:(void *)input.bytes
+                                             length:mappedLength
+                                            options:options
+                                        deallocator:nil]
+                : [device newBufferWithBytes:input.bytes length:input.length options:options];
+            if (buffer == nil) return fail(@"Metal input buffer unavailable");
+            [inputBuffers addObject:buffer];
+        }
+        NSUInteger outputLength = argmax ? sizeof(uint32_t) : inputLength;
         id<MTLBuffer> outputBuffer = [device newBufferWithLength:outputLength options:options];
         id<MTLBuffer> biasBuffer = [device newBufferWithBytes:&bias length:sizeof(bias) options:options];
         id<MTLCommandQueue> queue = [device newCommandQueue];
         id<MTLCommandBuffer> command = [queue commandBuffer];
         id<MTLComputeCommandEncoder> encoder = [command computeCommandEncoder];
-        if (inputBuffer == nil || outputBuffer == nil || biasBuffer == nil ||
-            queue == nil || command == nil || encoder == nil) {
+        if (outputBuffer == nil || biasBuffer == nil || queue == nil ||
+            command == nil || encoder == nil) {
             return fail(@"Metal f32 command resources unavailable");
         }
         [encoder setComputePipelineState:pipeline];
-        [encoder setBuffer:inputBuffer offset:0 atIndex:0];
-        [encoder setBuffer:outputBuffer offset:0 atIndex:1];
+        for (NSUInteger index = 0; index < inputCount; index++) {
+            [encoder setBuffer:inputBuffers[index] offset:0 atIndex:index];
+        }
+        [encoder setBuffer:outputBuffer offset:0 atIndex:inputCount];
         if (biasMode) {
             [encoder setBuffer:biasBuffer offset:0 atIndex:2];
         }

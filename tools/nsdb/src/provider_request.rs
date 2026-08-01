@@ -10,6 +10,10 @@ use crate::provider_input_binding::{
     parse_input_bindings, validate_dependency_binding, validate_input_bindings,
     ProviderInputBinding,
 };
+use crate::provider_output_binding::{parse_output_bindings, validate_output_bindings};
+pub(crate) use crate::provider_output_binding::{
+    ProviderOutputBinding, PROVIDER_OUTPUT_BINDING_CONTRACT,
+};
 use crate::provider_output_comparison_descriptor::{
     parse_output_comparisons, validate_output_comparisons,
 };
@@ -23,7 +27,6 @@ pub(crate) const PROVIDER_OUTPUT_COMPARISON_DESCRIPTOR_CONTRACT: &str =
     "nuis-provider-output-comparison-descriptor-v1";
 pub(crate) const PROVIDER_OUTPUT_COMPARISON_COLLECTION_CONTRACT: &str =
     "nuis-provider-output-comparison-collection-v1";
-pub(crate) const PROVIDER_OUTPUT_BINDING_CONTRACT: &str = "nuis-provider-output-binding-v1";
 pub(crate) const PROVIDER_REQUEST_DEPENDENCY_CONTRACT: &str = "nuis-provider-request-dependency-v1";
 pub(crate) const PROVIDER_REQUEST_COLLECTION_CONTRACT: &str = "nuis-provider-request-collection-v1";
 
@@ -89,16 +92,6 @@ pub(crate) struct ProviderRequestDependency {
     pub(crate) producer_output_buffer: String,
     pub(crate) consumer_input_buffer: String,
     pub(crate) transport: Option<ProviderEdgeTransportDescriptor>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ProviderOutputBinding {
-    pub(crate) role: String,
-    pub(crate) buffer: String,
-    pub(crate) element_type: String,
-    pub(crate) shape: Vec<usize>,
-    pub(crate) byte_length: usize,
-    pub(crate) comparison_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -291,7 +284,12 @@ fn parse_legacy_pixelmagic_request(input_evidence: &str) -> Option<ProviderReque
             role: "output.result".to_owned(),
             buffer: "output.pixels".to_owned(),
             element_type: "u8".to_owned(),
+            layout: format!(
+                "image-2d-row-major:pixel-format={}",
+                fields.get("pixel_format")?
+            ),
             shape: vec![width, height],
+            row_stride_bytes: stride,
             byte_length,
             comparison_id: "none".to_owned(),
         }],
@@ -304,7 +302,12 @@ fn parse_legacy_pixelmagic_request(input_evidence: &str) -> Option<ProviderReque
             name: "input.pixels".to_owned(),
             source: "artifact".to_owned(),
             element_type: "u8".to_owned(),
+            layout: format!(
+                "image-2d-row-major:pixel-format={}",
+                fields.get("pixel_format")?
+            ),
             shape: vec![width, height],
+            row_stride_bytes: stride,
             byte_length,
             content_hash: fields.get("pixel_payload_hash")?.clone(),
             payload_path: fields.get("pixel_payload_path")?.clone(),
@@ -387,68 +390,6 @@ fn build_request(
         input_bindings,
         adapter_binding,
     })
-}
-
-fn parse_output_bindings(
-    fields: &BTreeMap<String, String>,
-    prefix: &str,
-    compatibility_output_buffer: &str,
-    buffer: &ProviderBufferDescriptor,
-    comparison: Option<&ProviderOutputComparisonDescriptor>,
-) -> Option<Vec<ProviderOutputBinding>> {
-    let compatibility_element_type = comparison
-        .map(|value| value.element_type.as_str())
-        .unwrap_or(&buffer.element_type);
-    let compatibility_shape = comparison
-        .map(|value| value.shape.as_slice())
-        .unwrap_or(&buffer.shape);
-    let compatibility_byte_length = comparison
-        .map(|value| value.expected_byte_length)
-        .unwrap_or(buffer.byte_length);
-    let compatibility_comparison_id = comparison
-        .map(|value| format!("comparison.{}", value.output_buffer))
-        .unwrap_or_else(|| "none".to_owned());
-    let Some(contract) = field(fields, prefix, "contract") else {
-        return Some(vec![ProviderOutputBinding {
-            role: "output.result".to_owned(),
-            buffer: compatibility_output_buffer.to_owned(),
-            element_type: compatibility_element_type.to_owned(),
-            shape: compatibility_shape.to_vec(),
-            byte_length: compatibility_byte_length,
-            comparison_id: compatibility_comparison_id,
-        }]);
-    };
-    (contract == PROVIDER_OUTPUT_BINDING_CONTRACT).then_some(())?;
-    let count = field(fields, prefix, "count")?.parse::<usize>().ok()?;
-    (1..=8).contains(&count).then_some(())?;
-    (0..count)
-        .map(|index| {
-            let item_prefix = format!("{prefix}{index}_");
-            Some(ProviderOutputBinding {
-                role: field(fields, &item_prefix, "role")?.clone(),
-                buffer: field(fields, &item_prefix, "buffer")?.clone(),
-                element_type: field(fields, &item_prefix, "element_type")
-                    .map(String::as_str)
-                    .unwrap_or(compatibility_element_type)
-                    .to_owned(),
-                shape: field(fields, &item_prefix, "shape")
-                    .map(|value| parse_dimensions(value))
-                    .unwrap_or_else(|| Some(compatibility_shape.to_vec()))?,
-                byte_length: field(fields, &item_prefix, "byte_length")
-                    .map(|value| value.parse().ok())
-                    .unwrap_or(Some(compatibility_byte_length))?,
-                comparison_id: field(fields, &item_prefix, "comparison_id")
-                    .cloned()
-                    .unwrap_or_else(|| {
-                        if index == 0 {
-                            compatibility_comparison_id.clone()
-                        } else {
-                            "none".to_owned()
-                        }
-                    }),
-            })
-        })
-        .collect()
 }
 
 fn parse_model_asset(
@@ -592,7 +533,9 @@ fn validate_request(request: ProviderRequest) -> Option<ProviderRequest> {
         .shape
         .iter()
         .try_fold(1usize, |count, dimension| count.checked_mul(*dimension))?;
-    let expected_bytes = if request.buffer.layout.starts_with("image-2d-row-major") {
+    let expected_bytes = if request.buffer.layout.starts_with("image-2d-row-major")
+        || request.buffer.layout == "tensor-row-major"
+    {
         let [width, height] = request.buffer.shape.as_slice() else {
             return None;
         };
@@ -615,20 +558,7 @@ fn validate_request(request: ProviderRequest) -> Option<ProviderRequest> {
             && asset.input_features == request.kernel.input_buffers
             && asset.output_feature == request.kernel.output_buffer
     });
-    let output_bindings_valid = {
-        let mut roles = BTreeSet::new();
-        let mut buffers = BTreeSet::new();
-        !request.output_bindings.is_empty()
-            && request.output_bindings.len() <= 8
-            && request.output_bindings[0].buffer == request.kernel.output_buffer
-            && request.output_bindings.iter().all(|binding| {
-                is_output_role(&binding.role)
-                    && !binding.buffer.is_empty()
-                    && output_binding_semantics_are_valid(binding)
-                    && roles.insert(binding.role.as_str())
-                    && buffers.insert(binding.buffer.as_str())
-            })
-    };
+    let output_bindings_valid = validate_output_bindings(&request);
     (request.buffer.id == request.kernel.input_buffer
         && !request.kernel.output_buffer.is_empty()
         && request.buffer.shape.iter().all(|dimension| *dimension > 0)
@@ -647,32 +577,6 @@ fn validate_request(request: ProviderRequest) -> Option<ProviderRequest> {
         && validate_output_comparisons(&request.output_comparisons, &request.output_bindings)
         && validate_input_bindings(&request))
     .then_some(request)
-}
-
-fn output_binding_semantics_are_valid(binding: &ProviderOutputBinding) -> bool {
-    let element_width = match binding.element_type.as_str() {
-        "u8" => 1usize,
-        "f32" | "u32" | "i32" => 4usize,
-        "u64" | "i64" | "f64" => 8usize,
-        _ => return false,
-    };
-    let expected_bytes = binding
-        .shape
-        .iter()
-        .try_fold(element_width, |bytes, dimension| {
-            bytes.checked_mul(*dimension)
-        });
-    !binding.shape.is_empty()
-        && binding.shape.iter().all(|dimension| *dimension > 0)
-        && expected_bytes == Some(binding.byte_length)
-        && (binding.comparison_id == "none" || binding.comparison_id.starts_with("comparison."))
-}
-
-fn is_output_role(value: &str) -> bool {
-    value.starts_with("output.")
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
 }
 
 fn evidence_fields(input_evidence: &str) -> BTreeMap<String, String> {

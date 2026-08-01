@@ -152,12 +152,13 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         .contains("weakest task card is directly actionable"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_action
-        .contains("spirv:vulkan-gpu"));
+        .contains("two ordered output bindings"));
     let handoff_command = &summary.weakest_bootstrap_task_card_handoff_command;
     for required in [
         "CARGO_INCREMENTAL=0 cargo check -q -p nsdb",
-        "cargo test -q -p nuisc shader_spirv_emitter",
+        "cargo test -q -p nsdb provider_request",
         "cargo test -q -p nsdb vulkan_session_plan",
+        "cargo test -q -p nuis artifact_device_sample_shader_metal",
         "cargo test -q -p nuis artifact_device_sample_shader_vulkan",
         "linux_vulkan_add_pair_shader_sample_executes_provider_output",
     ] {
@@ -165,7 +166,10 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
     }
     assert!(summary
         .weakest_bootstrap_task_card_handoff_expected_artifact
-        .contains("Nsld final-image replay"));
+        .contains("input-binding-v2 and output-binding-v2"));
+    assert!(summary
+        .weakest_bootstrap_task_card_handoff_expected_artifact
+        .contains("input-binding-v2"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.protocol,
         "nuis-dev-tensor-task-card-lineage-v1"

@@ -859,7 +859,7 @@ combines three semantic inputs, one control descriptor, and two output roles,
 then verifies two distinct 24-byte carriers with different hashes. Existing
 Metal/CoreML adapters remain valid single-output consumers of slot zero.
 
-`nuis-provider-output-binding-v1` now lifts that ordered fan-out into
+`nuis-provider-output-binding-v1` first lifted that ordered fan-out into
 `ProviderRequest`: each output has a distinct role and buffer identity while
 the first binding remains the compatibility `kernel.output_buffer`.
 `ProviderWorkerLease` consumes and verifies every returned descriptor instead
@@ -877,11 +877,14 @@ and graph close reports the released output count and roles. Worker additional
 outputs are also converted through their registered bindings before
 publication.
 
-Each output binding now also carries `element_type`, `shape`, `byte_length`,
-and an optional `comparison_id`. Compatibility requests derive those fields
-from the primary buffer or comparison descriptor, while explicit fan-out may
-declare different semantics per role. Dependency validation resolves the
-selected producer output before checking consumer type, shape, and length.
+`nuis-provider-output-binding-v2` additionally carries `layout` and
+`row_stride_bytes` beside `element_type`, `shape`, `byte_length`, and the
+optional `comparison_id`. V1 remains readable and infers buffer-compatible or
+contiguous semantics, while normalized request payloads always write v2.
+Dependency validation resolves the selected producer output before checking
+consumer type, layout, shape, stride, and length. Completion summaries retain
+the same ordered layout and stride manifests instead of claiming v2 while
+dropping those fields.
 Lease consumption compares the unpacked semantic payload length rather than a
 wrapped `NUISPFD1` carrier length. The provider-neutral Nuis worker now proves
 the complete shortest route with two distinct `u64[3]` outputs: both

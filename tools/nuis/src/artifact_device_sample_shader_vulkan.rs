@@ -278,6 +278,10 @@ fn vulkan_sample_evidence(sample: VulkanSampleSpec) -> String {
             kernel_id: sample.kernel_id,
             operation: sample.operation,
             kernel_input_buffers: "input.values,input.right",
+            buffer_layout: "tensor-row-major",
+            buffer_shape: "2x2",
+            row_stride_bytes: 8,
+            dispatch: "4x1x1",
             input_file_name: sample.input_file_name,
             input_hash: fnv1a64_hex(INPUT),
             input_byte_length: INPUT.len(),
@@ -287,6 +291,9 @@ fn vulkan_sample_evidence(sample: VulkanSampleSpec) -> String {
             bytes: &asset.bytes,
             input_binding: render_u32_pair_artifact_binding(
                 "provider_",
+                "tensor-row-major",
+                "2x2",
+                8,
                 sample.input_file_name,
                 INPUT,
                 right_file_name,
@@ -355,6 +362,10 @@ fn render_chain_artifact_request(
         kernel_id: "shader.vulkan.chain.add-u32",
         operation: sample.operation,
         kernel_input_buffers: "input.values",
+        buffer_layout: "tensor-contiguous",
+        buffer_shape: "4",
+        row_stride_bytes: INPUT.len(),
+        dispatch: "4x1x1",
         input_file_name: CHAIN_INPUT_FILE_NAME,
         input_hash: fnv1a64_hex(INPUT),
         input_byte_length: INPUT.len(),
@@ -381,6 +392,10 @@ fn render_chain_dependency_request(
         kernel_id: "shader.vulkan.chain.xor-u32",
         operation: sample.operation,
         kernel_input_buffers: "input.values",
+        buffer_layout: "tensor-contiguous",
+        buffer_shape: "4",
+        row_stride_bytes: ADD_EXPECTED.len(),
+        dispatch: "4x1x1",
         input_file_name: "none",
         input_hash: input_hash.clone(),
         input_byte_length: ADD_EXPECTED.len(),
@@ -636,6 +651,13 @@ mod tests {
             assert!(evidence.contains("provider_code_asset_entry=nuis_vulkan_"));
             assert!(evidence.contains("provider_adapter_binding_provider_family=spirv:vulkan-gpu"));
             assert!(evidence.contains("provider_output_binding_0_element_type=u32"));
+            if sample.aux_input.is_some() {
+                assert!(evidence
+                    .contains("provider_input_binding_contract=nuis-provider-input-binding-v2"));
+                assert!(evidence.contains("provider_buffer_layout=tensor-row-major"));
+                assert!(evidence.contains("provider_buffer_shape=2x2"));
+                assert!(evidence.contains("provider_input_binding_1_row_stride_bytes=8"));
+            }
             assert!(nsdb::validate_provider_request_evidence(&evidence));
         }
 

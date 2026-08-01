@@ -198,6 +198,13 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
     assert!(provider_samples.contains(
         "provider_code_asset_contribution_selection_set_contract=nuis-provider-code-asset-contribution-selection-set-v1"
     ));
+    if sample.registration_id == "official.shader.vulkan-add-pair-u32" {
+        assert!(provider_samples.contains("input_binding_contract=nuis-provider-input-binding-v2"));
+        assert!(provider_samples.contains("buffer_layout=tensor-row-major"));
+        assert!(provider_samples.contains("buffer_shape=2x2"));
+        assert!(provider_samples.contains("input_binding_1_layout=tensor-row-major"));
+        assert!(provider_samples.contains("input_binding_1_row_stride_bytes=8"));
+    }
 
     let executed = run_nsdb(&[
         "execute-provider-samples",

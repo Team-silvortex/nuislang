@@ -203,6 +203,11 @@ fn push_provider_request_summary(out: &mut String, request: &ProviderRequest) {
         );
         push_toml_string(
             out,
+            &format!("provider_output_binding_{index}_layout"),
+            &binding.layout,
+        );
+        push_toml_string(
+            out,
             &format!("provider_output_binding_{index}_shape"),
             &binding
                 .shape
@@ -210,6 +215,11 @@ fn push_provider_request_summary(out: &mut String, request: &ProviderRequest) {
                 .map(usize::to_string)
                 .collect::<Vec<_>>()
                 .join("x"),
+        );
+        push_toml_string(
+            out,
+            &format!("provider_output_binding_{index}_row_stride_bytes"),
+            &binding.row_stride_bytes.to_string(),
         );
         push_toml_string(
             out,
@@ -238,6 +248,7 @@ fn push_provider_request_summary(out: &mut String, request: &ProviderRequest) {
             ("name", binding.name.as_str()),
             ("source", binding.source.as_str()),
             ("element_type", binding.element_type.as_str()),
+            ("layout", binding.layout.as_str()),
             ("content_hash", binding.content_hash.as_str()),
             ("payload_path", binding.payload_path.as_str()),
             ("producer_request_id", binding.producer_request_id.as_str()),
@@ -262,6 +273,11 @@ fn push_provider_request_summary(out: &mut String, request: &ProviderRequest) {
             out,
             &format!("{prefix}byte_length"),
             &binding.byte_length.to_string(),
+        );
+        push_toml_string(
+            out,
+            &format!("{prefix}row_stride_bytes"),
+            &binding.row_stride_bytes.to_string(),
         );
     }
     if let Some(model) = &request.model_asset {

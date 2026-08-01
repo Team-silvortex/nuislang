@@ -13,24 +13,20 @@ use crate::{
     provider_transport_receipt_payload::push_transport_receipts,
 };
 use std::{fs, path::Path};
-
 pub(crate) struct ProviderOutputPayload {
     pub(crate) evidence: String,
     pub(crate) detail: String,
     pub(crate) status: String,
     pub(crate) evidence_status: String,
 }
-
 pub(crate) struct ProviderOutputPayloadSummary {
     pub(crate) path: String,
     pub(crate) hash: String,
     pub(crate) attach_status: String,
 }
-
 const PROVIDER_OUTPUT_PAYLOAD_PROTOCOL: &str = "nuis-provider-output-payload-v1";
 const PROVIDER_OUTPUT_PAYLOAD_SCHEMA: &str = "nsdb-provider-output-payload-v1";
 const PROVIDER_SAMPLE_EXECUTION_CONTRACT: &str = "nuis-provider-sample-execution-v1";
-
 pub(crate) fn provider_output_payload_summary(
     payload: Option<&ProviderOutputPayload>,
 ) -> ProviderOutputPayloadSummary {
@@ -42,7 +38,6 @@ pub(crate) fn provider_output_payload_summary(
             attach_status: "none".to_owned(),
         })
 }
-
 fn provider_output_payload_summary_from_evidence(evidence: &str) -> ProviderOutputPayloadSummary {
     let mut parts = evidence.split(':');
     let path = parts.next().unwrap_or("none").to_owned();
@@ -61,7 +56,6 @@ fn provider_output_payload_summary_from_evidence(evidence: &str) -> ProviderOutp
         attach_status,
     }
 }
-
 pub(crate) fn provider_output_payload(
     output_dir: &Path,
     record: &NsdbDeviceProviderSampleRecordInfo,
@@ -414,7 +408,9 @@ pub(crate) fn pixelmagic_native_output_summary(
         output_binding_roles: "none".to_owned(),
         output_binding_buffers: "none".to_owned(),
         output_binding_element_types: "none".to_owned(),
+        output_binding_layouts: "none".to_owned(),
         output_binding_shapes: "none".to_owned(),
+        output_binding_row_stride_bytes: "none".to_owned(),
         output_binding_byte_lengths: "none".to_owned(),
         output_binding_comparison_ids: "none".to_owned(),
         comparison_collection_contract: "none".to_owned(),
@@ -538,7 +534,9 @@ pub(crate) fn metal_native_output_summary(
         output_binding_roles: "pending".to_owned(),
         output_binding_buffers: "pending".to_owned(),
         output_binding_element_types: "pending".to_owned(),
+        output_binding_layouts: "pending".to_owned(),
         output_binding_shapes: "pending".to_owned(),
+        output_binding_row_stride_bytes: "pending".to_owned(),
         output_binding_byte_lengths: "pending".to_owned(),
         output_binding_comparison_ids: "pending".to_owned(),
         comparison_collection_contract: "pending".to_owned(),
@@ -675,7 +673,9 @@ pub(crate) fn coreml_native_output_summary(
         output_binding_roles: "pending".to_owned(),
         output_binding_buffers: "pending".to_owned(),
         output_binding_element_types: "pending".to_owned(),
+        output_binding_layouts: "pending".to_owned(),
         output_binding_shapes: "pending".to_owned(),
+        output_binding_row_stride_bytes: "pending".to_owned(),
         output_binding_byte_lengths: "pending".to_owned(),
         output_binding_comparison_ids: "pending".to_owned(),
         comparison_collection_contract: "pending".to_owned(),

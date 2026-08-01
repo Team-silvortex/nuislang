@@ -28,6 +28,8 @@ pub(crate) fn bind_output_binding_summary(
         output_binding_manifest(request, |binding| binding.buffer.clone());
     summary.output_binding_element_types =
         output_binding_manifest(request, |binding| binding.element_type.clone());
+    summary.output_binding_layouts =
+        output_binding_manifest(request, |binding| binding.layout.clone());
     summary.output_binding_shapes = output_binding_manifest(request, |binding| {
         binding
             .shape
@@ -36,6 +38,8 @@ pub(crate) fn bind_output_binding_summary(
             .collect::<Vec<_>>()
             .join("x")
     });
+    summary.output_binding_row_stride_bytes =
+        output_binding_manifest(request, |binding| binding.row_stride_bytes.to_string());
     summary.output_binding_byte_lengths =
         output_binding_manifest(request, |binding| binding.byte_length.to_string());
     summary.output_binding_comparison_ids =

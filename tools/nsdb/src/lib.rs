@@ -40,6 +40,7 @@ mod provider_execution_vulkan_spirv;
 mod provider_graph_output;
 mod provider_input_binding;
 mod provider_native_output_payload;
+mod provider_output_binding;
 mod provider_output_carrier_registry;
 #[cfg(unix)]
 mod provider_output_carrier_unix;

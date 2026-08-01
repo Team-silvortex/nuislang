@@ -113,12 +113,13 @@ fn evidence_matches_registration(
         .unwrap_or_else(|| registration.metadata_selector.is_none())
 }
 
-fn registrations() -> [DeviceSampleInputRegistration; 15] {
+fn registrations() -> [DeviceSampleInputRegistration; 16] {
     [
         crate::artifact_device_sample_pixelmagic::registration(),
         crate::artifact_device_sample_kernel::registration(),
         crate::artifact_device_sample_shader_metal::registration(),
         crate::artifact_device_sample_shader_metal::add_registration(),
+        crate::artifact_device_sample_shader_metal::add_pair_registration(),
         crate::artifact_device_sample_shader_metal::sub_registration(),
         crate::artifact_device_sample_shader_metal::mul_registration(),
         crate::artifact_device_sample_shader_metal::xor_registration(),
@@ -275,6 +276,19 @@ mod tests {
         assert!(add.contains("provider_sample_registration_id=official.shader.metal-add-u32"));
         assert!(add.contains("provider_code_asset_id=shader.metal.add-u32.msl"));
         assert!(add.contains("provider_kernel_operation=add-u32"));
+
+        let add_pair = enrich_registered_input_evidence(
+            "metal",
+            "apple-silicon-gpu",
+            "artifact_provider_metadata_0=official.shader:provider-sample=metal-add-pair-u32",
+        )
+        .unwrap();
+        assert!(
+            add_pair.contains("provider_sample_registration_id=official.shader.metal-add-pair-u32")
+        );
+        assert!(add_pair.contains("provider_code_asset_id=shader.metal.add-pair-u32.msl"));
+        assert!(add_pair.contains("provider_kernel_operation=add-pair-u32"));
+        assert!(add_pair.contains("provider_input_binding_count=2"));
 
         let sub = enrich_registered_input_evidence(
             "metal",

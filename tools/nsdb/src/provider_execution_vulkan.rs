@@ -180,7 +180,7 @@ fn validate_vulkan_execution_session_plan(
         .map(|binding| binding.name.as_str())
         .collect::<Vec<_>>();
     if request.buffer.element_type != "u32"
-        || request.buffer.layout != "tensor-contiguous"
+        || !vulkan_dense_u32_layout(request)
         || request.buffer.byte_length != expected_bytes
         || request.kernel.input_buffer != request.buffer.id
         || request.kernel.input_buffers.len() != request_input_names.len()
@@ -196,12 +196,16 @@ fn validate_vulkan_execution_session_plan(
         || request.input_bindings.len() != input_count
         || request.input_bindings.iter().any(|input| {
             !vulkan_input_source_is_supported(&input.source)
-                || input.element_type != "u32"
-                || input.byte_length != expected_bytes
+                || !crate::provider_input_binding::input_binding_matches_buffer(
+                    input,
+                    &request.buffer,
+                )
         })
         || request.output_bindings.len() != 1
-        || request.output_bindings[0].element_type != "u32"
-        || request.output_bindings[0].byte_length != expected_bytes
+        || !crate::provider_output_binding::output_binding_matches_buffer(
+            &request.output_bindings[0],
+            &request.buffer,
+        )
         || binding.provider_family != VULKAN_PROVIDER_FAMILY
         || binding.execution_requirement != "real-device"
         || !asset_descriptor_matches_vulkan_u32(asset, &request.kernel.operation)
@@ -240,6 +244,21 @@ fn validate_vulkan_execution_session_plan(
         output_binding: layout.output_binding,
         dispatch,
     })
+}
+
+fn vulkan_dense_u32_layout(request: &ProviderRequest) -> bool {
+    match request.buffer.layout.as_str() {
+        "tensor-contiguous" => request.buffer.row_stride_bytes == request.buffer.byte_length,
+        "tensor-row-major" => {
+            let [width, height] = request.buffer.shape.as_slice() else {
+                return false;
+            };
+            width.checked_mul(std::mem::size_of::<u32>()) == Some(request.buffer.row_stride_bytes)
+                && request.buffer.row_stride_bytes.checked_mul(*height)
+                    == Some(request.buffer.byte_length)
+        }
+        _ => false,
+    }
 }
 
 fn asset_descriptor_matches_vulkan_u32(
@@ -551,6 +570,7 @@ mod tests {
             "nuis.shader.vulkan.add-pair-u32.spv",
             &spirv,
         );
+        use_row_major_2x2(&mut request);
         push_aux_u32_input(&mut request, "dependency");
 
         let plan = validate_vulkan_execution_session_plan(
@@ -562,6 +582,17 @@ mod tests {
         .expect("registered pair fan-in plan");
         assert_eq!(plan.input_bindings, vec![0, 1]);
         assert_eq!(plan.output_binding, 2);
+
+        request.input_bindings[1].row_stride_bytes = 4;
+        assert!(validate_vulkan_execution_session_plan(
+            &output_dir,
+            VULKAN_PROVIDER_FAMILY,
+            &request,
+            2,
+        )
+        .unwrap_err()
+        .contains("registered SPIR-V ABI"));
+        request.input_bindings[1].row_stride_bytes = 8;
 
         request.input_bindings.pop();
         request.kernel.input_buffers.pop();
@@ -612,7 +643,9 @@ mod tests {
                 role: "output.result".to_owned(),
                 buffer: "output.values".to_owned(),
                 element_type: "u32".to_owned(),
+                layout: "tensor-contiguous".to_owned(),
                 shape: vec![4],
+                row_stride_bytes: 16,
                 byte_length: 16,
                 comparison_id: "comparison.output.values".to_owned(),
             }],
@@ -645,7 +678,9 @@ mod tests {
                 name: "input.values".to_owned(),
                 source: "artifact".to_owned(),
                 element_type: "u32".to_owned(),
+                layout: "tensor-contiguous".to_owned(),
                 shape: vec![4],
+                row_stride_bytes: 16,
                 byte_length: 16,
                 content_hash: "0x1111111111111111".to_owned(),
                 payload_path: "input.bin".to_owned(),
@@ -670,6 +705,23 @@ mod tests {
             aux.producer_output_buffer = "output.values".to_owned();
         }
         request.input_bindings.push(aux);
+    }
+
+    fn use_row_major_2x2(request: &mut ProviderRequest) {
+        request.buffer.layout = "tensor-row-major".to_owned();
+        request.buffer.shape = vec![2, 2];
+        request.buffer.row_stride_bytes = 8;
+        request.output_bindings[0].layout = "tensor-row-major".to_owned();
+        request.output_bindings[0].shape = vec![2, 2];
+        request.output_bindings[0].row_stride_bytes = 8;
+        request
+            .output_comparison
+            .as_mut()
+            .expect("output comparison")
+            .shape = vec![2, 2];
+        request.input_bindings[0].layout = "tensor-row-major".to_owned();
+        request.input_bindings[0].shape = vec![2, 2];
+        request.input_bindings[0].row_stride_bytes = 8;
     }
 
     fn registered_spirv_fixture(asset_id: &str) -> Vec<u8> {

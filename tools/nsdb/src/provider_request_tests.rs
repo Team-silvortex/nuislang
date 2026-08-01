@@ -1,4 +1,5 @@
 use super::*;
+use crate::provider_output_binding::LEGACY_PROVIDER_OUTPUT_BINDING_CONTRACT;
 
 const REGISTERED: &str = "provider_buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;provider_buffer_id=input.pixels;provider_buffer_element_type=u8;provider_buffer_layout=image-2d-row-major:pixel-format=gray8;provider_buffer_shape=2x2;provider_buffer_row_stride_bytes=2;provider_buffer_byte_length=4;provider_buffer_payload_path=pixels.bin;provider_buffer_content_hash=0x1234;provider_kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;provider_kernel_id=pixelmagic.gray8.invert;provider_kernel_operation=invert;provider_kernel_input_buffer=input.pixels;provider_kernel_output_buffer=output.pixels;provider_kernel_dispatch=2x2x1;provider_kernel_scalar_bindings=max_value:u8:15";
 
@@ -104,12 +105,17 @@ fn parses_registered_buffer_and_kernel_descriptors() {
     assert_eq!(request.buffer.shape, [2, 2]);
     assert_eq!(request.kernel.dispatch, [2, 2, 1]);
     assert_eq!(request.scalar_u8("max_value"), Some(15));
+    assert_eq!(
+        request.input_bindings[0].layout,
+        "image-2d-row-major:pixel-format=gray8"
+    );
+    assert_eq!(request.input_bindings[0].row_stride_bytes, 2);
 }
 
 #[test]
 fn parses_ordered_multi_output_bindings_with_compatibility_primary() {
     let evidence = format!(
-        "{REGISTERED};provider_output_binding_contract={PROVIDER_OUTPUT_BINDING_CONTRACT};provider_output_binding_count=2;provider_output_binding_0_role=output.primary;provider_output_binding_0_buffer=output.pixels;provider_output_binding_0_element_type=u8;provider_output_binding_0_shape=2x2;provider_output_binding_0_byte_length=4;provider_output_binding_0_comparison_id=none;provider_output_binding_1_role=output.audit;provider_output_binding_1_buffer=output.audit;provider_output_binding_1_element_type=u64;provider_output_binding_1_shape=3;provider_output_binding_1_byte_length=24;provider_output_binding_1_comparison_id=none"
+        "{REGISTERED};provider_output_binding_contract={LEGACY_PROVIDER_OUTPUT_BINDING_CONTRACT};provider_output_binding_count=2;provider_output_binding_0_role=output.primary;provider_output_binding_0_buffer=output.pixels;provider_output_binding_0_element_type=u8;provider_output_binding_0_shape=2x2;provider_output_binding_0_byte_length=4;provider_output_binding_0_comparison_id=none;provider_output_binding_1_role=output.audit;provider_output_binding_1_buffer=output.audit;provider_output_binding_1_element_type=u64;provider_output_binding_1_shape=3;provider_output_binding_1_byte_length=24;provider_output_binding_1_comparison_id=none"
     );
     let request = provider_request_from_evidence(&evidence).expect("multi-output request");
     assert_eq!(
@@ -124,11 +130,34 @@ fn parses_ordered_multi_output_bindings_with_compatibility_primary() {
         ]
     );
     assert_eq!(request.output_bindings[0].element_type, "u8");
+    assert_eq!(
+        request.output_bindings[0].layout,
+        "image-2d-row-major:pixel-format=gray8"
+    );
     assert_eq!(request.output_bindings[0].shape, [2, 2]);
+    assert_eq!(request.output_bindings[0].row_stride_bytes, 2);
     assert_eq!(request.output_bindings[0].byte_length, 4);
     assert_eq!(request.output_bindings[1].element_type, "u64");
+    assert_eq!(request.output_bindings[1].layout, "tensor-contiguous");
     assert_eq!(request.output_bindings[1].shape, [3]);
+    assert_eq!(request.output_bindings[1].row_stride_bytes, 24);
     assert_eq!(request.output_bindings[1].byte_length, 24);
+}
+
+#[test]
+fn parses_typed_output_binding_and_rejects_short_row_stride() {
+    let evidence = format!(
+        "{REGISTERED};provider_output_binding_contract={PROVIDER_OUTPUT_BINDING_CONTRACT};provider_output_binding_count=1;provider_output_binding_0_role=output.primary;provider_output_binding_0_buffer=output.pixels;provider_output_binding_0_element_type=u8;provider_output_binding_0_layout=tensor-row-major;provider_output_binding_0_shape=2x2;provider_output_binding_0_row_stride_bytes=2;provider_output_binding_0_byte_length=4;provider_output_binding_0_comparison_id=none"
+    );
+    let request = provider_request_from_evidence(&evidence).expect("typed output binding");
+    assert_eq!(request.output_bindings[0].layout, "tensor-row-major");
+    assert_eq!(request.output_bindings[0].row_stride_bytes, 2);
+
+    let invalid = evidence.replace(
+        "provider_output_binding_0_row_stride_bytes=2",
+        "provider_output_binding_0_row_stride_bytes=1",
+    );
+    assert!(provider_request_from_evidence(&invalid).is_none());
 }
 
 #[test]
@@ -179,6 +208,18 @@ fn parses_hash_bound_provider_code_asset_descriptor() {
         "provider_code_asset_descriptor_contract = \"nuis-provider-code-asset-descriptor-v1\""
     ));
     assert!(rendered.contains("provider_code_asset_entry = \"nuis_kernel_vector_add_f32\""));
+    assert!(
+        rendered.contains("provider_input_binding_contract = \"nuis-provider-input-binding-v2\"")
+    );
+    assert!(rendered
+        .contains("provider_input_binding_0_layout = \"image-2d-row-major:pixel-format=gray8\""));
+    assert!(rendered.contains("provider_input_binding_0_row_stride_bytes = \"2\""));
+    assert!(
+        rendered.contains("provider_output_binding_contract = \"nuis-provider-output-binding-v2\"")
+    );
+    assert!(rendered
+        .contains("provider_output_binding_0_layout = \"image-2d-row-major:pixel-format=gray8\""));
+    assert!(rendered.contains("provider_output_binding_0_row_stride_bytes = \"2\""));
 }
 
 #[test]
@@ -217,7 +258,7 @@ fn parses_hash_bound_output_comparison_descriptor() {
 #[test]
 fn parses_output_comparison_collection_bound_to_distinct_outputs() {
     let evidence = format!(
-        "{REGISTERED};provider_output_binding_contract={PROVIDER_OUTPUT_BINDING_CONTRACT};provider_output_binding_count=2;provider_output_binding_0_role=output.primary;provider_output_binding_0_buffer=output.pixels;provider_output_binding_0_element_type=u64;provider_output_binding_0_shape=3;provider_output_binding_0_byte_length=24;provider_output_binding_0_comparison_id=comparison.primary;provider_output_binding_1_role=output.audit;provider_output_binding_1_buffer=output.audit;provider_output_binding_1_element_type=u64;provider_output_binding_1_shape=3;provider_output_binding_1_byte_length=24;provider_output_binding_1_comparison_id=comparison.audit;provider_output_comparison_collection_contract={PROVIDER_OUTPUT_COMPARISON_COLLECTION_CONTRACT};provider_output_comparison_collection_count=2;provider_output_comparison_item_0_id=comparison.primary;provider_output_comparison_item_0_descriptor_contract={PROVIDER_OUTPUT_COMPARISON_DESCRIPTOR_CONTRACT};provider_output_comparison_item_0_output_buffer=output.pixels;provider_output_comparison_item_0_element_type=u64;provider_output_comparison_item_0_shape=3;provider_output_comparison_item_0_expected_path=primary.bin;provider_output_comparison_item_0_expected_byte_length=24;provider_output_comparison_item_0_expected_content_hash=0xprimary;provider_output_comparison_item_0_absolute_tolerance=0;provider_output_comparison_item_0_relative_tolerance=0;provider_output_comparison_item_0_non_finite_policy=reject;provider_output_comparison_item_1_id=comparison.audit;provider_output_comparison_item_1_descriptor_contract={PROVIDER_OUTPUT_COMPARISON_DESCRIPTOR_CONTRACT};provider_output_comparison_item_1_output_buffer=output.audit;provider_output_comparison_item_1_element_type=u64;provider_output_comparison_item_1_shape=3;provider_output_comparison_item_1_expected_path=audit.bin;provider_output_comparison_item_1_expected_byte_length=24;provider_output_comparison_item_1_expected_content_hash=0xaudit;provider_output_comparison_item_1_absolute_tolerance=0;provider_output_comparison_item_1_relative_tolerance=0;provider_output_comparison_item_1_non_finite_policy=reject"
+        "{REGISTERED};provider_output_binding_contract={LEGACY_PROVIDER_OUTPUT_BINDING_CONTRACT};provider_output_binding_count=2;provider_output_binding_0_role=output.primary;provider_output_binding_0_buffer=output.pixels;provider_output_binding_0_element_type=u64;provider_output_binding_0_shape=3;provider_output_binding_0_byte_length=24;provider_output_binding_0_comparison_id=comparison.primary;provider_output_binding_1_role=output.audit;provider_output_binding_1_buffer=output.audit;provider_output_binding_1_element_type=u64;provider_output_binding_1_shape=3;provider_output_binding_1_byte_length=24;provider_output_binding_1_comparison_id=comparison.audit;provider_output_comparison_collection_contract={PROVIDER_OUTPUT_COMPARISON_COLLECTION_CONTRACT};provider_output_comparison_collection_count=2;provider_output_comparison_item_0_id=comparison.primary;provider_output_comparison_item_0_descriptor_contract={PROVIDER_OUTPUT_COMPARISON_DESCRIPTOR_CONTRACT};provider_output_comparison_item_0_output_buffer=output.pixels;provider_output_comparison_item_0_element_type=u64;provider_output_comparison_item_0_shape=3;provider_output_comparison_item_0_expected_path=primary.bin;provider_output_comparison_item_0_expected_byte_length=24;provider_output_comparison_item_0_expected_content_hash=0xprimary;provider_output_comparison_item_0_absolute_tolerance=0;provider_output_comparison_item_0_relative_tolerance=0;provider_output_comparison_item_0_non_finite_policy=reject;provider_output_comparison_item_1_id=comparison.audit;provider_output_comparison_item_1_descriptor_contract={PROVIDER_OUTPUT_COMPARISON_DESCRIPTOR_CONTRACT};provider_output_comparison_item_1_output_buffer=output.audit;provider_output_comparison_item_1_element_type=u64;provider_output_comparison_item_1_shape=3;provider_output_comparison_item_1_expected_path=audit.bin;provider_output_comparison_item_1_expected_byte_length=24;provider_output_comparison_item_1_expected_content_hash=0xaudit;provider_output_comparison_item_1_absolute_tolerance=0;provider_output_comparison_item_1_relative_tolerance=0;provider_output_comparison_item_1_non_finite_policy=reject"
     );
     let request = provider_request_from_evidence(&evidence).expect("comparison collection");
     assert_eq!(request.output_comparisons.len(), 2);
@@ -423,7 +464,7 @@ fn rejects_cyclic_dependency_graph() {
 
 fn fan_in_bindings(second_name: &str) -> String {
     format!(
-        "provider_request_1_input_binding_contract={};provider_request_1_input_binding_count=2;provider_request_1_input_binding_0_name=input.pixels;provider_request_1_input_binding_0_source=artifact;provider_request_1_input_binding_0_element_type=u8;provider_request_1_input_binding_0_shape=2x2;provider_request_1_input_binding_0_byte_length=4;provider_request_1_input_binding_0_content_hash=0x1234;provider_request_1_input_binding_0_payload_path=pixels.bin;provider_request_1_input_binding_0_producer_request_id=none;provider_request_1_input_binding_0_producer_output_buffer=none;provider_request_1_input_binding_1_name={second_name};provider_request_1_input_binding_1_source=dependency;provider_request_1_input_binding_1_element_type=u8;provider_request_1_input_binding_1_shape=2x2;provider_request_1_input_binding_1_byte_length=4;provider_request_1_input_binding_1_content_hash=0xabcd;provider_request_1_input_binding_1_payload_path=none;provider_request_1_input_binding_1_producer_request_id=first;provider_request_1_input_binding_1_producer_output_buffer=output.pixels",
+        "provider_request_1_input_binding_contract={};provider_request_1_input_binding_count=2;provider_request_1_input_binding_0_name=input.pixels;provider_request_1_input_binding_0_source=artifact;provider_request_1_input_binding_0_element_type=u8;provider_request_1_input_binding_0_layout=image-2d-row-major:pixel-format=gray8;provider_request_1_input_binding_0_shape=2x2;provider_request_1_input_binding_0_row_stride_bytes=2;provider_request_1_input_binding_0_byte_length=4;provider_request_1_input_binding_0_content_hash=0x1234;provider_request_1_input_binding_0_payload_path=pixels.bin;provider_request_1_input_binding_0_producer_request_id=none;provider_request_1_input_binding_0_producer_output_buffer=none;provider_request_1_input_binding_1_name={second_name};provider_request_1_input_binding_1_source=dependency;provider_request_1_input_binding_1_element_type=u8;provider_request_1_input_binding_1_layout=image-2d-row-major:pixel-format=gray8;provider_request_1_input_binding_1_shape=2x2;provider_request_1_input_binding_1_row_stride_bytes=2;provider_request_1_input_binding_1_byte_length=4;provider_request_1_input_binding_1_content_hash=0xabcd;provider_request_1_input_binding_1_payload_path=none;provider_request_1_input_binding_1_producer_request_id=first;provider_request_1_input_binding_1_producer_output_buffer=output.pixels",
         crate::provider_input_binding::PROVIDER_INPUT_BINDING_CONTRACT
     )
 }
@@ -447,9 +488,36 @@ fn parses_named_multi_input_fan_in_bindings() {
     assert_eq!(collection.requests[1].kernel.input_buffers.len(), 2);
     assert_eq!(collection.requests[1].input_bindings.len(), 2);
     assert_eq!(
+        collection.requests[1].input_bindings[1].layout,
+        "image-2d-row-major:pixel-format=gray8"
+    );
+    assert_eq!(collection.requests[1].input_bindings[1].row_stride_bytes, 2);
+    assert_eq!(
         collection.requests[1].input_bindings[1].source,
         "dependency"
     );
+}
+
+#[test]
+fn rejects_typed_fan_in_binding_with_short_row_stride() {
+    let second = indexed_request(1, "second").replace(
+        "provider_request_1_kernel_input_buffer=input.pixels",
+        "provider_request_1_kernel_input_buffer=input.pixels;provider_request_1_kernel_input_buffers=input.pixels,input.aux",
+    );
+    let edge = dependency(1, "first").replace(
+        "consumer_input_buffer=input.pixels",
+        "consumer_input_buffer=input.aux",
+    );
+    let bindings = fan_in_bindings("input.aux").replace(
+        "provider_request_1_input_binding_1_row_stride_bytes=2",
+        "provider_request_1_input_binding_1_row_stride_bytes=1",
+    );
+    let evidence = format!(
+        "provider_request_collection_contract={PROVIDER_REQUEST_COLLECTION_CONTRACT};provider_request_count=2;{};{second};{edge};{bindings}",
+        indexed_request(0, "first"),
+    );
+
+    assert!(provider_request_collection_from_evidence(&evidence).is_none());
 }
 
 #[test]

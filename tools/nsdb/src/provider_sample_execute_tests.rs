@@ -159,7 +159,7 @@ materialization_status = "provider-sample-materialized"
         "native_output_worker_output_descriptor_roles = \"output.primary,output.audit\""
     ));
     assert!(payload
-        .contains("native_output_output_binding_contract = \"nuis-provider-output-binding-v1\""));
+        .contains("native_output_output_binding_contract = \"nuis-provider-output-binding-v2\""));
     assert!(payload.contains("native_output_output_binding_count = \"2\""));
     assert!(
         payload.contains("native_output_output_binding_roles = \"output.primary,output.audit\"")
@@ -168,7 +168,11 @@ materialization_status = "provider-sample-materialized"
         payload.contains("native_output_output_binding_buffers = \"output.primary,output.audit\"")
     );
     assert!(payload.contains("native_output_output_binding_element_types = \"u64,u64\""));
+    assert!(payload.contains(
+        "native_output_output_binding_layouts = \"tensor-contiguous,tensor-contiguous\""
+    ));
     assert!(payload.contains("native_output_output_binding_shapes = \"3,3\""));
+    assert!(payload.contains("native_output_output_binding_row_stride_bytes = \"24,24\""));
     assert!(payload.contains("native_output_output_binding_byte_lengths = \"24,24\""));
     assert!(payload.contains(
         "native_output_output_binding_comparison_ids = \"comparison.primary,comparison.audit\""

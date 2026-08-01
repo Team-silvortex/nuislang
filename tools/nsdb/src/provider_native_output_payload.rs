@@ -1,7 +1,6 @@
 use crate::provider_sample_payload::{
     fnv1a64_hex, push_toml_string, PixelMagicNativeOutputSummary,
 };
-
 pub(crate) fn push_native_output_summary(
     out: &mut String,
     summary: &PixelMagicNativeOutputSummary,
@@ -291,8 +290,16 @@ pub(crate) fn push_native_output_summary(
             summary.output_binding_element_types.as_str(),
         ),
         (
+            "output_binding_layouts",
+            summary.output_binding_layouts.as_str(),
+        ),
+        (
             "output_binding_shapes",
             summary.output_binding_shapes.as_str(),
+        ),
+        (
+            "output_binding_row_stride_bytes",
+            summary.output_binding_row_stride_bytes.as_str(),
         ),
         (
             "output_binding_byte_lengths",
@@ -373,7 +380,6 @@ pub(crate) fn push_native_output_summary(
         push_toml_string(out, &format!("native_output_{name}"), value);
     }
 }
-
 pub(crate) fn push_indexed_native_output(
     out: &mut String,
     index: usize,
@@ -675,8 +681,16 @@ pub(crate) fn push_indexed_native_output(
             summary.output_binding_element_types.as_str(),
         ),
         (
+            "output_binding_layouts",
+            summary.output_binding_layouts.as_str(),
+        ),
+        (
             "output_binding_shapes",
             summary.output_binding_shapes.as_str(),
+        ),
+        (
+            "output_binding_row_stride_bytes",
+            summary.output_binding_row_stride_bytes.as_str(),
         ),
         (
             "output_binding_byte_lengths",
@@ -757,7 +771,6 @@ pub(crate) fn push_indexed_native_output(
         push_toml_string(out, &format!("{prefix}{name}"), value);
     }
 }
-
 pub(crate) fn native_output_collection_hash(outputs: &[PixelMagicNativeOutputSummary]) -> String {
     let canonical = outputs
         .iter()

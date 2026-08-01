@@ -589,6 +589,8 @@ pub(crate) const DEV_TENSOR_RUNTIME_EXECUTION_DRIFT_CHECKS: &[DevTensorDriftChec
                 "output_binding_contract",
                 "output_binding_count",
                 "output_binding_element_types",
+                "output_binding_layouts",
+                "output_binding_row_stride_bytes",
                 "output_binding_byte_lengths",
                 "comparison_collection_contract",
                 "comparison_collection_count",

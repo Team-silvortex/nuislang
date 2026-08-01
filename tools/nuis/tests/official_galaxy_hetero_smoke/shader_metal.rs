@@ -61,6 +61,23 @@ fn shader_metal_generated_add_msl_sample_executes_provider_output() {
 }
 
 #[test]
+fn shader_metal_generated_add_pair_msl_sample_executes_provider_output() {
+    run_metal_sample_smoke(MetalSampleSmoke {
+        project_name: "shader_metal_add_pair_provider_demo",
+        assets: &[MetalGeneratedAsset {
+            asset_id: "shader.metal.add-pair-u32.msl",
+            generated_file: "nuis.shader.metal.add-pair-u32.metal",
+            operation: "add-pair-u32",
+            entry: "nuis_metal_add_pair_u32",
+        }],
+        registration_id: "official.shader.metal-add-pair-u32",
+        execution_contract: "nuis-metal-u32-canonical-provider-runner-v1",
+        expected_hash: "0xbada6f73928b9f42",
+        graph: None,
+    });
+}
+
+#[test]
 fn shader_metal_generated_sub_msl_sample_executes_provider_output() {
     run_metal_sample_smoke(MetalSampleSmoke {
         project_name: "shader_metal_sub_provider_demo",
@@ -192,6 +209,13 @@ fn run_metal_sample_smoke(sample: MetalSampleSmoke<'_>) {
     assert!(provider_samples.contains(
         "provider_code_asset_contribution_selection_set_contract=nuis-provider-code-asset-contribution-selection-set-v1"
     ));
+    if sample.registration_id == "official.shader.metal-add-pair-u32" {
+        assert!(provider_samples.contains("input_binding_contract=nuis-provider-input-binding-v2"));
+        assert!(provider_samples.contains("buffer_layout=tensor-row-major"));
+        assert!(provider_samples.contains("buffer_shape=2x2"));
+        assert!(provider_samples.contains("input_binding_1_layout=tensor-row-major"));
+        assert!(provider_samples.contains("input_binding_1_row_stride_bytes=8"));
+    }
 
     let executed = run_nsdb(&[
         "execute-provider-samples",

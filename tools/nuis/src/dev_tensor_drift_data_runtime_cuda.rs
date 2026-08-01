@@ -470,6 +470,8 @@ pub(crate) const DEV_TENSOR_RUNTIME_CUDA_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
             "provider-completion:0x",
             "glm-release:0x",
             "released-at-graph-close",
+            "output_layout",
+            "output_row_stride_bytes",
             "provider_result_projection_status",
         ],
     },

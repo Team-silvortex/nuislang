@@ -34,12 +34,7 @@ fn prepare_worker_adapter(
     request: &ProviderRequest,
     inputs: &[PreparedProviderInput],
 ) -> Result<Option<PreparedProviderExecutionAdapter>, String> {
-    if inputs.len() != 1 {
-        return Err(format!(
-            "Metal provider adapter requires one input for kernel `{}`",
-            request.kernel.id
-        ));
-    }
+    validate_metal_input_count(output_dir, request, inputs.len())?;
     let (prepared, arguments) = if is_gray8_invert(request) {
         let max_value = request
             .scalar_u8("max_value")
@@ -103,6 +98,14 @@ fn prepare_worker_adapter(
         cache_identity: prepared.cache_identity.to_owned(),
         cache_status: prepared.cache_status,
         arguments: std::iter::once(worker_descriptor_argument(&inputs[0], 0)?)
+            .chain(
+                inputs
+                    .iter()
+                    .enumerate()
+                    .skip(1)
+                    .map(|(index, input)| worker_descriptor_argument(input, index))
+                    .collect::<Result<Vec<_>, _>>()?,
+            )
             .chain(arguments)
             .collect(),
     }))
@@ -111,17 +114,12 @@ fn prepare_worker_adapter(
 fn execute(
     _input_evidence: &str,
     _provider_family: &str,
-    _output_dir: &Path,
+    output_dir: &Path,
     request: &ProviderRequest,
     inputs: &[PreparedProviderInput],
     worker_receipt: &mut ProviderWorkerDispatchReceipt,
 ) -> Result<ProviderRequestExecution, String> {
-    if inputs.len() != 1 {
-        return Err(format!(
-            "Metal provider adapter requires one input for kernel `{}`",
-            request.kernel.id
-        ));
-    }
+    validate_metal_input_count(output_dir, request, inputs.len())?;
     let execution = if is_gray8_invert(request) {
         let max_value = request
             .scalar_u8("max_value")
@@ -160,7 +158,7 @@ fn execute(
             crate::provider_runner_metal::execute_gray8_threshold(path, threshold, max_value)?
         }
     } else if is_f32_bias(request) {
-        let (code_asset_path, entry) = validated_metal_code_asset(_output_dir, request)?;
+        let (code_asset_path, entry) = validated_metal_code_asset(output_dir, request)?;
         let bias = request
             .scalar_f32("bias")
             .ok_or_else(|| "Metal provider request is missing f32 scalar `bias`".to_owned())?;
@@ -187,7 +185,7 @@ fn execute(
             )?
         }
     } else if is_f32_argmax(request) {
-        let (code_asset_path, entry) = validated_metal_code_asset(_output_dir, request)?;
+        let (code_asset_path, entry) = validated_metal_code_asset(output_dir, request)?;
         if uses_process_adapter(worker_receipt) {
             crate::provider_runner_metal::parse_metal_worker_output(
                 &worker_receipt.worker_output_payload,
@@ -209,7 +207,7 @@ fn execute(
             )?
         }
     } else if is_u32_compute(request) {
-        let (code_asset_path, entry) = validated_metal_code_asset(_output_dir, request)?;
+        let (code_asset_path, entry) = validated_metal_code_asset(output_dir, request)?;
         let runner_contract =
             crate::provider_runner_metal::u32_compute_runner_contract(&request.kernel.operation);
         if uses_process_adapter(worker_receipt) {
@@ -218,6 +216,11 @@ fn execute(
                 runner_contract,
                 worker_receipt.worker_output_result.take(),
             )?
+        } else if inputs.len() != 1 {
+            return Err(format!(
+                "Metal multi-input kernel `{}` requires the process adapter",
+                request.kernel.id
+            ));
         } else if let Some(channel) = inputs[0].direct_channel() {
             crate::provider_runner_metal::execute_u32_canonical_prepared_channel(
                 channel,
@@ -348,16 +351,148 @@ fn is_u32_copy(request: &ProviderRequest) -> bool {
 
 fn is_u32_compute(request: &ProviderRequest) -> bool {
     request.buffer.element_type == "u32"
-        && request.buffer.layout == "tensor-contiguous"
-        && matches!(
-            request.kernel.operation.as_str(),
-            "copy-u32" | "add-u32" | "sub-u32" | "mul-u32" | "xor-u32"
-        )
+        && metal_dense_u32_layout(request)
+        && request.kernel.operation.ends_with("-u32")
         && request.output_bindings.len() == 1
-        && request.output_bindings[0].element_type == "u32"
-        && request.output_bindings[0].byte_length == request.buffer.byte_length
+        && crate::provider_output_binding::output_binding_matches_buffer(
+            &request.output_bindings[0],
+            &request.buffer,
+        )
+}
+
+fn metal_dense_u32_layout(request: &ProviderRequest) -> bool {
+    match request.buffer.layout.as_str() {
+        "tensor-contiguous" => request.buffer.row_stride_bytes == request.buffer.byte_length,
+        "tensor-row-major" => {
+            let [width, height] = request.buffer.shape.as_slice() else {
+                return false;
+            };
+            width.checked_mul(std::mem::size_of::<u32>()) == Some(request.buffer.row_stride_bytes)
+                && request.buffer.row_stride_bytes.checked_mul(*height)
+                    == Some(request.buffer.byte_length)
+        }
+        _ => false,
+    }
+}
+
+fn validate_metal_input_count(
+    output_dir: &Path,
+    request: &ProviderRequest,
+    input_count: usize,
+) -> Result<(), String> {
+    if is_u32_compute(request) {
+        let (path, entry) = validated_metal_code_asset(output_dir, request)?;
+        let expected = metal_u32_input_count(&path, &entry)?;
+        if input_count != expected || request.input_bindings.len() != expected {
+            return Err(format!(
+                "Metal kernel `{}` declares {expected} input buffer(s), but the request carries {} binding(s) and {input_count} prepared input(s)",
+                request.kernel.id,
+                request.input_bindings.len()
+            ));
+        }
+        if request.input_bindings.iter().any(|binding| {
+            !crate::provider_input_binding::input_binding_matches_buffer(binding, &request.buffer)
+        }) {
+            return Err(format!(
+                "Metal kernel `{}` input layouts do not match its primary typed buffer",
+                request.kernel.id
+            ));
+        }
+        return Ok(());
+    }
+    if input_count == 1 && request.input_bindings.len() == 1 {
+        Ok(())
+    } else {
+        Err(format!(
+            "Metal provider adapter requires one input for kernel `{}`",
+            request.kernel.id
+        ))
+    }
+}
+
+fn metal_u32_input_count(path: &Path, entry: &str) -> Result<usize, String> {
+    let source = std::fs::read_to_string(path)
+        .map_err(|error| format!("failed to read verified Metal code asset: {error}"))?;
+    let marker = format!("kernel void {entry}(");
+    let signature_start = source
+        .find(&marker)
+        .ok_or_else(|| format!("Metal code asset is missing entry `{entry}`"))?;
+    let signature = source[signature_start..]
+        .split_once('{')
+        .map(|(signature, _)| signature)
+        .ok_or_else(|| format!("Metal entry `{entry}` has no function body"))?;
+    let mut inputs = Vec::new();
+    let mut outputs = Vec::new();
+    for line in signature.lines() {
+        let Some(slot) = metal_buffer_slot(line) else {
+            continue;
+        };
+        if line.contains("device const uint*") {
+            inputs.push(slot);
+        } else if line.contains("device uint*") {
+            outputs.push(slot);
+        }
+    }
+    let expected_inputs: Vec<usize> = (0..inputs.len()).collect();
+    if inputs.is_empty() || inputs != expected_inputs || outputs != [inputs.len()] {
+        return Err(format!(
+            "Metal entry `{entry}` must declare contiguous read-only u32 inputs followed by one writable u32 output"
+        ));
+    }
+    Ok(inputs.len())
+}
+
+fn metal_buffer_slot(line: &str) -> Option<usize> {
+    let start = line.find("[[buffer(")? + "[[buffer(".len();
+    let end = line[start..].find(")]]")? + start;
+    line[start..end].parse().ok()
 }
 
 fn uses_process_adapter(receipt: &ProviderWorkerDispatchReceipt) -> bool {
     receipt.execution_capsule_invocation_mode == "nuis-provider-worker-process-adapter-v5"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::metal_u32_input_count;
+    use std::{env, fs};
+
+    #[test]
+    fn metal_layout_uses_contiguous_read_inputs_followed_by_output() {
+        let path = env::temp_dir().join(format!(
+            "nuis-metal-layout-{}-{}.metal",
+            std::process::id(),
+            "pair"
+        ));
+        fs::write(
+            &path,
+            "kernel void pair(device const uint* left [[buffer(0)]],\n\
+             device const uint* right [[buffer(1)]],\n\
+             device uint* output [[buffer(2)]]) { }\n",
+        )
+        .unwrap();
+
+        assert_eq!(metal_u32_input_count(&path, "pair").unwrap(), 2);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn metal_layout_rejects_a_gap_before_output() {
+        let path = env::temp_dir().join(format!(
+            "nuis-metal-layout-{}-{}.metal",
+            std::process::id(),
+            "gap"
+        ));
+        fs::write(
+            &path,
+            "kernel void gap(device const uint* input [[buffer(0)]],\n\
+             device uint* output [[buffer(2)]]) { }\n",
+        )
+        .unwrap();
+
+        assert!(metal_u32_input_count(&path, "gap")
+            .unwrap_err()
+            .contains("contiguous read-only u32 inputs"));
+        fs::remove_file(path).unwrap();
+    }
 }
