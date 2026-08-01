@@ -109,6 +109,11 @@ stage compute(workgroup_size(1, 1, 1)) {{
     )
 }
 
+fn canonical_pair_reduced_fan_out_wgsl(entry: &str) -> String {
+    canonical_pair_fan_out_wgsl(entry)
+        .replace("xor_values: array<u32>;", "xor_values: array<u32, 2>;")
+}
+
 fn spirv_words(bytes: &[u8]) -> Vec<u32> {
     bytes
         .chunks_exact(4)
@@ -216,6 +221,42 @@ fn emits_canonical_multi_output_spirv() {
     assert!(has_instruction(&words, 198, &[3, 27, 18, 21]));
     assert!(has_instruction(&words, 62, &[23, 24]));
     assert!(has_instruction(&words, 62, &[26, 27]));
+}
+
+#[test]
+fn emits_bounds_safe_reduced_output_spirv() {
+    let entry = "nuis_vulkan_add_xor_pair_reduced_u32";
+    let lowered = lower_canonical_inline_wgsl_u32_for_profile(
+        canonical_pair_reduced_fan_out_wgsl(entry).as_bytes(),
+        entry,
+        "vulkan.discrete-or-integrated-gpu",
+    )
+    .unwrap();
+    let words = spirv_words(&lowered);
+
+    assert_eq!(words[3], 33);
+    assert!(has_instruction(&words, 20, &[32]));
+    assert!(has_instruction(&words, 43, &[3, 28, 2]));
+    assert!(has_instruction(&words, 176, &[32, 29, 16, 28]));
+    assert!(has_instruction(&words, 247, &[31, 0]));
+    assert!(has_instruction(&words, 250, &[29, 30, 31]));
+    assert!(has_instruction(&words, 248, &[30]));
+    assert!(has_instruction(&words, 65, &[12, 26, 25, 4, 16]));
+    assert!(has_instruction(&words, 62, &[26, 27]));
+    assert!(has_instruction(&words, 249, &[31]));
+    assert!(has_instruction(&words, 248, &[31]));
+}
+
+#[test]
+fn rejects_zero_output_write_extent() {
+    let source = CANONICAL_WGSL.replace("array<u32>;", "array<u32, 0>;");
+    assert!(lower_canonical_inline_wgsl_u32_for_profile(
+        source.as_bytes(),
+        "nuis_vulkan_copy_u32",
+        "vulkan.discrete-or-integrated-gpu",
+    )
+    .unwrap_err()
+    .contains("element extent must be positive"));
 }
 
 #[test]

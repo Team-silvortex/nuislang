@@ -113,7 +113,7 @@ fn evidence_matches_registration(
         .unwrap_or_else(|| registration.metadata_selector.is_none())
 }
 
-fn registrations() -> [DeviceSampleInputRegistration; 18] {
+fn registrations() -> [DeviceSampleInputRegistration; 20] {
     [
         crate::artifact_device_sample_pixelmagic::registration(),
         crate::artifact_device_sample_kernel::registration(),
@@ -129,6 +129,8 @@ fn registrations() -> [DeviceSampleInputRegistration; 18] {
         crate::artifact_device_sample_shader_vulkan::add_registration(),
         crate::artifact_device_sample_shader_vulkan::add_pair_registration(),
         crate::artifact_device_sample_shader_vulkan_fan_out::registration(),
+        crate::artifact_device_sample_shader_vulkan_fan_out::padded_registration(),
+        crate::artifact_device_sample_shader_vulkan_fan_out::reduced_registration(),
         crate::artifact_device_sample_shader_vulkan::sub_registration(),
         crate::artifact_device_sample_shader_vulkan::mul_registration(),
         crate::artifact_device_sample_shader_vulkan::xor_registration(),

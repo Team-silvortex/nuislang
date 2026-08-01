@@ -152,23 +152,24 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         .contains("weakest task card is directly actionable"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_action
-        .contains("generalize Vulkan output planning"));
+        .contains("consume the reduced output.xor"));
     let handoff_command = &summary.weakest_bootstrap_task_card_handoff_command;
     for required in [
-        "CARGO_INCREMENTAL=0 cargo check -q -p nsdb",
+        "CARGO_INCREMENTAL=0 cargo check -q -p nuisc -p nsdb",
         "cargo test -q -p nuisc shader_spirv_emitter",
+        "cargo test -q -p nuisc shader_msl_emitter",
         "cargo test -q -p nsdb provider_execution_vulkan",
         "fan_out_registration_owns_two_output_request",
-        "linux_vulkan_fan_out_shader_writes_two_provider_outputs",
+        "linux_vulkan_reduced_fan_out_shader_bounds_secondary_output",
     ] {
         assert!(handoff_command.contains(required));
     }
     assert!(summary
         .weakest_bootstrap_task_card_handoff_expected_artifact
-        .contains("one canonical Nuis Shader node"));
+        .contains("one two-node Vulkan graph"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_expected_artifact
-        .contains("padded row-major"));
+        .contains("8-byte dependency input"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.protocol,
         "nuis-dev-tensor-task-card-lineage-v1"

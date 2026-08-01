@@ -12,6 +12,13 @@ pub(crate) struct CanonicalU32Compute {
 pub(crate) struct CanonicalU32Output {
     pub(crate) binding: u32,
     pub(crate) operation: CanonicalU32Operation,
+    pub(crate) write_extent: CanonicalU32WriteExtent,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CanonicalU32WriteExtent {
+    Dispatch,
+    Elements(u32),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,6 +52,7 @@ struct StorageBinding<'a> {
     binding: u32,
     name: &'a str,
     access: StorageAccess,
+    element_extent: Option<u32>,
 }
 
 struct U32OperationPattern {
@@ -192,6 +200,9 @@ pub(crate) fn parse_canonical_inline_wgsl_u32_compute(
             Ok(CanonicalU32Output {
                 binding: output.binding,
                 operation,
+                write_extent: output
+                    .element_extent
+                    .map_or(CanonicalU32WriteExtent::Dispatch, CanonicalU32WriteExtent::Elements),
             })
         })
         .collect::<Result<Vec<_>, String>>()?;
@@ -209,12 +220,12 @@ fn storage_binding(
     binding: &crate::shader_source::InlineWgslBindingSummary,
 ) -> Result<StorageBinding<'_>, String> {
     let address_space = binding.address_space.as_deref().unwrap_or_default();
-    if !binding.ty.starts_with("array<u32") {
-        return Err(format!(
-            "canonical inline WGSL storage binding `{}` must be array<u32>",
+    let element_extent = parse_u32_array_extent(&binding.ty).map_err(|error| {
+        format!(
+            "canonical inline WGSL storage binding `{}` {error}",
             binding.name
-        ));
-    }
+        )
+    })?;
     let access = if address_space.contains("read_write") || address_space == "storage" {
         StorageAccess::Write
     } else if address_space.contains("read") {
@@ -230,7 +241,36 @@ fn storage_binding(
         binding: binding.binding,
         name: &binding.name,
         access,
+        element_extent,
     })
+}
+
+fn parse_u32_array_extent(ty: &str) -> Result<Option<u32>, String> {
+    let compact = ty
+        .chars()
+        .filter(|character| !character.is_whitespace())
+        .collect::<String>();
+    let inner = compact
+        .strip_prefix("array<")
+        .and_then(|value| value.strip_suffix('>'))
+        .ok_or_else(|| "must be array<u32> or array<u32, N>".to_owned())?;
+    let mut parts = inner.split(',');
+    if parts.next() != Some("u32") {
+        return Err("must use u32 elements".to_owned());
+    }
+    let Some(extent) = parts.next() else {
+        return Ok(None);
+    };
+    if parts.next().is_some() {
+        return Err("must declare at most one element extent".to_owned());
+    }
+    let extent = extent
+        .parse::<u32>()
+        .map_err(|_| "element extent must be a u32 literal".to_owned())?;
+    if extent == 0 {
+        return Err("element extent must be positive".to_owned());
+    }
+    Ok(Some(extent))
 }
 
 fn parse_wgsl_workgroup_size(value: Option<&str>) -> Result<[u32; 3], String> {

@@ -18,6 +18,14 @@ typedef struct {
     size_t hash_offset;
 } OutputDescriptor;
 
+typedef struct {
+    size_t logical_length;
+    size_t carrier_length;
+    size_t row_length;
+    size_t row_stride;
+    size_t row_count;
+} OutputLayout;
+
 static uint64_t fnv1a64(const unsigned char* bytes, size_t length) {
     uint64_t hash = UINT64_C(0xcbf29ce484222325);
     for (size_t index = 0; index < length; index++) {
@@ -60,6 +68,42 @@ static int parse_output_descriptors(OutputDescriptor* outputs, size_t* output_co
     if (count == 0) return 0;
     *output_count = count;
     return 1;
+}
+
+static int parse_output_layouts(
+    const char* manifest,
+    OutputLayout* outputs,
+    size_t expected_count) {
+    if (manifest == NULL || manifest[0] == '\0') return 0;
+    char* copy = strdup(manifest);
+    if (copy == NULL) return 0;
+    size_t count = 0;
+    char* state = NULL;
+    for (char* item = strtok_r(copy, ",", &state); item != NULL; item = strtok_r(NULL, ",", &state)) {
+        char tail = '\0';
+        if (count == expected_count
+            || sscanf(item, "%zu:%zu:%zu:%zu:%zu%c",
+                &outputs[count].logical_length,
+                &outputs[count].carrier_length,
+                &outputs[count].row_length,
+                &outputs[count].row_stride,
+                &outputs[count].row_count,
+                &tail) != 5
+            || outputs[count].logical_length == 0
+            || outputs[count].row_length == 0
+            || outputs[count].row_count == 0
+            || outputs[count].row_stride < outputs[count].row_length
+            || outputs[count].row_length > SIZE_MAX / outputs[count].row_count
+            || outputs[count].row_length * outputs[count].row_count != outputs[count].logical_length
+            || outputs[count].row_stride > SIZE_MAX / outputs[count].row_count
+            || outputs[count].row_stride * outputs[count].row_count != outputs[count].carrier_length) {
+            free(copy);
+            return 0;
+        }
+        count++;
+    }
+    free(copy);
+    return count == expected_count;
 }
 
 static int parse_u32(const char* text, uint32_t* value) {

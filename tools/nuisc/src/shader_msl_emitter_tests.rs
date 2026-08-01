@@ -71,6 +71,11 @@ stage compute(workgroup_size(1, 1, 1)) {{
     )
 }
 
+fn canonical_pair_reduced_fan_out_wgsl(entry: &str) -> String {
+    canonical_pair_fan_out_wgsl(entry)
+        .replace("xor_values: array<u32>;", "xor_values: array<u32, 2>;")
+}
+
 fn assert_msl_plan_proof(text: &str, profile: &str) {
     assert!(text.contains(
         "// nuis-module-lowering-plan contract=nuis-yir.shader.backend-lowering-plan.v1"
@@ -163,6 +168,22 @@ fn emits_ordered_multi_output_u32_msl() {
     assert!(text.contains("device uint* output_values_1 [[buffer(3)]]"));
     assert!(text.contains("output_values[gid] = value + rhs;"));
     assert!(text.contains("output_values_1[gid] = value ^ rhs;"));
+}
+
+#[test]
+fn emits_bounds_safe_reduced_output_u32_msl() {
+    let entry = "nuis_metal_add_xor_pair_reduced_u32";
+    let lowered = lower_canonical_inline_wgsl_u32_for_profile(
+        canonical_pair_reduced_fan_out_wgsl(entry).as_bytes(),
+        entry,
+        "metal.apple-silicon-gpu",
+    )
+    .unwrap();
+    let text = String::from_utf8(lowered).unwrap();
+
+    assert!(text.contains("output_values[gid] = value + rhs;"));
+    assert!(!text.contains("if (gid < 4u)"));
+    assert!(text.contains("if (gid < 2u) {\n        output_values_1[gid] = value ^ rhs;\n    }"));
 }
 
 #[test]

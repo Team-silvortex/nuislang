@@ -293,15 +293,18 @@ mod tests {
     #[test]
     fn vulkan_dispatch_source_keeps_dynamic_input_and_output_descriptor_abi() {
         for required in [
-            "argc != 5 && argc != 6",
-            "int input_count = argc == 6 ? 2 : 1",
+            "argc != 6 && argc != 7",
+            "int input_count = argc == 7 ? 2 : 1",
             "NUIS_VULKAN_MAX_OUTPUTS 8",
             "NUIS_PROVIDER_OUTPUT_FDS",
+            "parse_output_layouts",
             "buffer_count = (size_t)input_count + output_count",
             "VkDescriptorSetLayoutBinding bindings[2 + NUIS_VULKAN_MAX_OUTPUTS]",
             "VkBuffer buffers[2 + NUIS_VULKAN_MAX_OUTPUTS]",
             "VkDeviceMemory memories[2 + NUIS_VULKAN_MAX_OUTPUTS]",
             "output_hashes=",
+            "output_byte_lengths=",
+            "output_layouts[i].logical_length > byte_length",
             "valid_spirv_entry",
         ] {
             assert!(VULKAN_SPIRV_DISPATCH_SOURCE.contains(required));

@@ -92,6 +92,36 @@ fn linux_vulkan_fan_out_shader_writes_two_provider_outputs() {
 }
 
 #[test]
+fn linux_vulkan_padded_fan_out_shader_writes_independent_output_layouts() {
+    run_vulkan_sample_smoke(VulkanSampleSmoke {
+        project_name: "shader_vulkan_padded_fan_out_provider_demo",
+        assets: &[VulkanGeneratedAsset {
+            asset_id: "shader.vulkan.add-xor-pair-u32.spirv",
+            generated_file: "nuis.shader.vulkan.add-xor-pair-u32.spv",
+            entry: "nuis_vulkan_add_xor_pair_u32",
+        }],
+        registration_id: "official.shader.vulkan-add-xor-pair-padded-u32",
+        expected_hash: "0xbada6f73928b9f42",
+        graph: None,
+    });
+}
+
+#[test]
+fn linux_vulkan_reduced_fan_out_shader_bounds_secondary_output() {
+    run_vulkan_sample_smoke(VulkanSampleSmoke {
+        project_name: "shader_vulkan_reduced_fan_out_provider_demo",
+        assets: &[VulkanGeneratedAsset {
+            asset_id: "shader.vulkan.add-xor-pair-reduced-u32.spirv",
+            generated_file: "nuis.shader.vulkan.add-xor-pair-reduced-u32.spv",
+            entry: "nuis_vulkan_add_xor_pair_reduced_u32",
+        }],
+        registration_id: "official.shader.vulkan-add-xor-pair-reduced-u32",
+        expected_hash: "0xbada6f73928b9f42",
+        graph: None,
+    });
+}
+
+#[test]
 fn linux_vulkan_sub_shader_sample_executes_provider_output() {
     run_vulkan_sample_smoke(VulkanSampleSmoke {
         project_name: "shader_vulkan_sub_provider_demo",
@@ -215,13 +245,25 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
     ));
     if matches!(
         sample.registration_id,
-        "official.shader.vulkan-add-pair-u32" | "official.shader.vulkan-add-xor-pair-u32"
+        "official.shader.vulkan-add-pair-u32"
+            | "official.shader.vulkan-add-xor-pair-u32"
+            | "official.shader.vulkan-add-xor-pair-padded-u32"
+            | "official.shader.vulkan-add-xor-pair-reduced-u32"
     ) {
         assert!(provider_samples.contains("input_binding_contract=nuis-provider-input-binding-v2"));
         assert!(provider_samples.contains("buffer_layout=tensor-row-major"));
         assert!(provider_samples.contains("buffer_shape=2x2"));
         assert!(provider_samples.contains("input_binding_1_layout=tensor-row-major"));
         assert!(provider_samples.contains("input_binding_1_row_stride_bytes=8"));
+    }
+    if sample.registration_id == "official.shader.vulkan-add-xor-pair-padded-u32" {
+        assert!(provider_samples.contains("output_binding_1_row_stride_bytes=12"));
+        assert!(provider_samples.contains("output_binding_1_byte_length=24"));
+    }
+    if sample.registration_id == "official.shader.vulkan-add-xor-pair-reduced-u32" {
+        assert!(provider_samples.contains("output_binding_1_shape=2x1"));
+        assert!(provider_samples.contains("output_binding_1_row_stride_bytes=8"));
+        assert!(provider_samples.contains("output_binding_1_byte_length=8"));
     }
 
     let executed = run_nsdb(&[
@@ -271,7 +313,12 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
         "compiled_code_asset_selection_status = \"verified\"",
         "Vulkan compiled code asset selection",
     );
-    if sample.registration_id == "official.shader.vulkan-add-xor-pair-u32" {
+    if matches!(
+        sample.registration_id,
+        "official.shader.vulkan-add-xor-pair-u32"
+            | "official.shader.vulkan-add-xor-pair-padded-u32"
+            | "official.shader.vulkan-add-xor-pair-reduced-u32"
+    ) {
         assert_file_contains(
             &provider_output,
             "native_output_0_output_binding_count = \"2\"",
@@ -289,7 +336,14 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
         );
         assert_file_contains(
             &provider_output,
-            "native_output_0_worker_additional_output_hashes = \"0x73bb5b39fe3ab738\"",
+            &format!(
+                "native_output_0_worker_additional_output_hashes = \"{}\"",
+                match sample.registration_id {
+                    "official.shader.vulkan-add-xor-pair-padded-u32" => "0x9adad3c97291d1e8",
+                    "official.shader.vulkan-add-xor-pair-reduced-u32" => "0x279d73758e81abdd",
+                    _ => "0x73bb5b39fe3ab738",
+                }
+            ),
             "Vulkan fan-out secondary output hash",
         );
     }

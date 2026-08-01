@@ -1,0 +1,12 @@
+name = "shader_vulkan_padded_fan_out_provider_demo"
+version = "0.1.0"
+entry = "main.ns"
+packaging_mode = "nuis-self-contained-image"
+artifact_provider_metadata = [
+  "official.shader:provider-sample=vulkan-add-xor-pair-padded-u32"
+]
+modules = ["main.ns", "surface_shader.ns"]
+abi = [
+  "cpu=cpu.x86_64.sysv64",
+  "shader=shader.vulkan.spv1_6",
+]

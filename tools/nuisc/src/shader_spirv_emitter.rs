@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::shader_canonical_compute::{
     parse_canonical_inline_wgsl_u32_compute, parse_u32_operation, CanonicalU32Compute,
-    CanonicalU32Operation, CanonicalU32Output,
+    CanonicalU32Operation, CanonicalU32Output, CanonicalU32WriteExtent,
 };
 
 pub(crate) const SPIRV_COMPUTE_SOURCE_CONTRACT: &str = "nuis-spirv-compute-source-v1";
@@ -98,6 +98,7 @@ fn parse_compute_source(
         outputs: vec![CanonicalU32Output {
             binding: output_binding,
             operation,
+            write_extent: CanonicalU32WriteExtent::Dispatch,
         }],
     })
 }
@@ -255,8 +256,25 @@ fn emit_u32_module(source: &CanonicalU32Compute) -> Vec<u32> {
             element: allocate_spirv_id(&mut next_id),
             computed: spirv_u32_binary_opcode(output.operation)
                 .map(|_| allocate_spirv_id(&mut next_id)),
+            guard: None,
         })
         .collect::<Vec<_>>();
+    let mut output_ids = output_ids;
+    for (output, ids) in source.outputs.iter().zip(&mut output_ids) {
+        if let CanonicalU32WriteExtent::Elements(extent) = output.write_extent {
+            ids.guard = Some(SpirvOutputGuardIds {
+                extent,
+                extent_constant: allocate_spirv_id(&mut next_id),
+                condition: allocate_spirv_id(&mut next_id),
+                store_label: allocate_spirv_id(&mut next_id),
+                merge_label: allocate_spirv_id(&mut next_id),
+            });
+        }
+    }
+    let bool_type = output_ids
+        .iter()
+        .any(|output| output.guard.is_some())
+        .then(|| allocate_spirv_id(&mut next_id));
     let id_bound = next_id;
     let mut words = vec![SPIRV_MAGIC, SPIRV_VERSION_1_6, 0, id_bound, 0];
     instruction(&mut words, 17, &[1]);
@@ -300,7 +318,19 @@ fn emit_u32_module(source: &CanonicalU32Compute) -> Vec<u32> {
     instruction(&mut words, 19, &[VOID]);
     instruction(&mut words, 33, &[FUNCTION_TYPE, VOID]);
     instruction(&mut words, 21, &[U32_TYPE, 32, 0]);
+    if let Some(bool_type) = bool_type {
+        instruction(&mut words, 20, &[bool_type]);
+    }
     instruction(&mut words, 43, &[U32_TYPE, U32_ZERO, 0]);
+    for output in &output_ids {
+        if let Some(guard) = &output.guard {
+            instruction(
+                &mut words,
+                43,
+                &[U32_TYPE, guard.extent_constant, guard.extent],
+            );
+        }
+    }
     instruction(&mut words, 23, &[U32_VEC3, U32_TYPE, 3]);
     instruction(&mut words, 32, &[INPUT_VEC3_POINTER, 1, U32_VEC3]);
     instruction(
@@ -370,6 +400,25 @@ fn emit_u32_module(source: &CanonicalU32Compute) -> Vec<u32> {
         instruction(&mut words, 61, &[U32_TYPE, aux.value, aux.element]);
     }
     for (output, ids) in source.outputs.iter().zip(&output_ids) {
+        if let Some(guard) = &ids.guard {
+            instruction(
+                &mut words,
+                176,
+                &[
+                    bool_type.expect("bounded SPIR-V output requires bool type"),
+                    guard.condition,
+                    INDEX,
+                    guard.extent_constant,
+                ],
+            );
+            instruction(&mut words, 247, &[guard.merge_label, 0]);
+            instruction(
+                &mut words,
+                250,
+                &[guard.condition, guard.store_label, guard.merge_label],
+            );
+            instruction(&mut words, 248, &[guard.store_label]);
+        }
         instruction(
             &mut words,
             65,
@@ -390,6 +439,10 @@ fn emit_u32_module(source: &CanonicalU32Compute) -> Vec<u32> {
             }
             _ => unreachable!("SPIR-V output IDs follow the registered operation"),
         }
+        if let Some(guard) = &ids.guard {
+            instruction(&mut words, 249, &[guard.merge_label]);
+            instruction(&mut words, 248, &[guard.merge_label]);
+        }
     }
     instruction(&mut words, 253, &[]);
     instruction(&mut words, 56, &[]);
@@ -406,6 +459,15 @@ struct SpirvOutputIds {
     variable: u32,
     element: u32,
     computed: Option<u32>,
+    guard: Option<SpirvOutputGuardIds>,
+}
+
+struct SpirvOutputGuardIds {
+    extent: u32,
+    extent_constant: u32,
+    condition: u32,
+    store_label: u32,
+    merge_label: u32,
 }
 
 fn allocate_spirv_id(next: &mut u32) -> u32 {

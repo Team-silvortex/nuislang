@@ -1,5 +1,6 @@
 use crate::shader_canonical_compute::{
     parse_canonical_inline_wgsl_u32_compute, CanonicalU32Compute, CanonicalU32Operation,
+    CanonicalU32WriteExtent,
 };
 
 const MSL_TARGETS: &[&str] = &[
@@ -132,11 +133,17 @@ fn render_u32_msl(source: &CanonicalU32Compute, plan: &ModuleLoweringPlan) -> St
         .iter()
         .enumerate()
         .map(|(index, output)| {
-            format!(
-                "    {}[gid] = {};\n",
+            let store = format!(
+                "{}[gid] = {};",
                 msl_output_name(index),
                 msl_u32_expression(output.operation)
-            )
+            );
+            match output.write_extent {
+                CanonicalU32WriteExtent::Dispatch => format!("    {store}\n"),
+                CanonicalU32WriteExtent::Elements(extent) => {
+                    format!("    if (gid < {extent}u) {{\n        {store}\n    }}\n")
+                }
+            }
         })
         .collect::<String>();
     let entry = &source.entry;

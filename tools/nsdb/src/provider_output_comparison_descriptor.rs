@@ -71,7 +71,7 @@ pub(crate) fn validate_output_comparisons(
             && comparison.element_type == binding.element_type
             && comparison.shape == binding.shape
             && comparison.expected_byte_length == binding.byte_length
-            && comparison_shape_is_valid(comparison)
+            && comparison_shape_is_valid(comparison, binding)
             && !comparison.expected_path.is_empty()
             && comparison.expected_content_hash.starts_with("0x")
             && valid_tolerance(&comparison.absolute_tolerance)
@@ -86,19 +86,25 @@ pub(crate) fn validate_output_comparisons(
     })
 }
 
-fn comparison_shape_is_valid(comparison: &ProviderOutputComparisonDescriptor) -> bool {
+fn comparison_shape_is_valid(
+    comparison: &ProviderOutputComparisonDescriptor,
+    binding: &ProviderOutputBinding,
+) -> bool {
     let width = match comparison.element_type.as_str() {
         "u8" => 1usize,
         "u32" | "i32" | "f32" => 4,
         "u64" | "i64" => 8,
         _ => return false,
     };
-    comparison
+    let logical_byte_length = comparison
         .shape
         .iter()
         .try_fold(width, |bytes, dimension| bytes.checked_mul(*dimension))
-        == Some(comparison.expected_byte_length)
-        && comparison.shape.iter().all(|dimension| *dimension > 0)
+        .filter(|_| comparison.shape.iter().all(|dimension| *dimension > 0));
+    logical_byte_length.is_some_and(|logical| {
+        logical <= comparison.expected_byte_length
+            && comparison.expected_byte_length == binding.byte_length
+    })
 }
 
 fn valid_tolerance(value: &str) -> bool {

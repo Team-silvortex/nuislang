@@ -474,19 +474,28 @@ static int load_device_api(VulkanApi* vk, VkDevice device) {
 }
 
 int main(int argc, char** argv) {
-    if ((argc != 5 && argc != 6) || !valid_spirv_entry(argv[2])) return 2;
-    int input_count = argc == 6 ? 2 : 1;
+    if ((argc != 6 && argc != 7) || !valid_spirv_entry(argv[2])) return 2;
+    int input_count = argc == 7 ? 2 : 1;
     uint32_t element_count = 0;
     OutputDescriptor output_descriptors[NUIS_VULKAN_MAX_OUTPUTS] = {{0}};
+    OutputLayout output_layouts[NUIS_VULKAN_MAX_OUTPUTS] = {{0}};
     size_t output_count = 0;
     if (!parse_u32(argv[3 + input_count], &element_count)
-        || !parse_output_descriptors(output_descriptors, &output_count)) return 3;
+        || !parse_output_descriptors(output_descriptors, &output_count)
+        || !parse_output_layouts(argv[4 + input_count], output_layouts, output_count)) return 3;
     size_t byte_length = (size_t)element_count * sizeof(uint32_t);
     if (byte_length / sizeof(uint32_t) != element_count) return 4;
     for (size_t i = 0; i < output_count; i++) {
-        if (output_descriptors[i].payload_length != byte_length) return 4;
+        if (output_descriptors[i].payload_length != output_layouts[i].carrier_length
+            || output_layouts[i].logical_length == 0
+            || output_layouts[i].logical_length > byte_length) return 4;
     }
     size_t buffer_count = (size_t)input_count + output_count;
+    size_t buffer_lengths[2 + NUIS_VULKAN_MAX_OUTPUTS] = {0};
+    for (int i = 0; i < input_count; i++) buffer_lengths[i] = byte_length;
+    for (size_t i = 0; i < output_count; i++) {
+        buffer_lengths[(size_t)input_count + i] = output_layouts[i].logical_length;
+    }
     unsigned char* inputs[2] = {malloc(byte_length), input_count == 2 ? malloc(byte_length) : NULL};
     unsigned char* spirv = NULL;
     size_t spirv_length = 0;
@@ -520,7 +529,7 @@ int main(int argc, char** argv) {
     VkDeviceCreateInfo device_info = {VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO, NULL, 0, 1, &queue_info, 0, NULL, 0, NULL, NULL};
     ready = ready && vk.create_device(physical, &device_info, NULL, &device) == VK_SUCCESS && load_device_api(&vk, device);
     if (ready) vk.get_device_queue(device, queue_family, 0, &queue);
-    for (size_t i = 0; ready && i < buffer_count; i++) ready = create_host_buffer(&vk, physical, device, byte_length, &buffers[i], &memories[i]);
+    for (size_t i = 0; ready && i < buffer_count; i++) ready = create_host_buffer(&vk, physical, device, buffer_lengths[i], &buffers[i], &memories[i]);
     void* mapped = NULL;
     for (int i = 0; ready && i < input_count; i++) {
         ready = vk.map_memory(device, memories[i], 0, byte_length, 0, &mapped) == VK_SUCCESS;
@@ -546,7 +555,7 @@ int main(int argc, char** argv) {
     VkWriteDescriptorSet writes[2 + NUIS_VULKAN_MAX_OUTPUTS];
     memset(writes, 0, sizeof(writes));
     for (uint32_t i = 0; i < descriptor_count; i++) {
-        infos[i] = (VkDescriptorBufferInfo){buffers[i], 0, byte_length};
+        infos[i] = (VkDescriptorBufferInfo){buffers[i], 0, buffer_lengths[i]};
         writes[i] = (VkWriteDescriptorSet){VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, NULL, set, i, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, NULL, &infos[i], NULL};
     }
     if (ready) vk.update_descriptor_sets(device, descriptor_count, writes, 0, NULL);
@@ -578,13 +587,22 @@ int main(int argc, char** argv) {
     int persisted = ready;
     for (size_t i = 0; persisted && i < output_count; i++) {
         size_t buffer_index = (size_t)input_count + i;
-        persisted = vk.map_memory(device, memories[buffer_index], 0, byte_length, 0, &mapped) == VK_SUCCESS;
+        unsigned char* carrier = calloc(1, output_layouts[i].carrier_length);
+        persisted = carrier != NULL
+            && vk.map_memory(device, memories[buffer_index], 0, output_layouts[i].logical_length, 0, &mapped) == VK_SUCCESS;
         if (persisted) {
-            hashes[i] = fnv1a64(mapped, byte_length);
-            persisted = pwrite(output_descriptors[i].fd, mapped, byte_length, (off_t)output_descriptors[i].payload_offset) == (ssize_t)byte_length
+            for (size_t row = 0; row < output_layouts[i].row_count; row++) {
+                memcpy(
+                    carrier + row * output_layouts[i].row_stride,
+                    (const unsigned char*)mapped + row * output_layouts[i].row_length,
+                    output_layouts[i].row_length);
+            }
+            hashes[i] = fnv1a64(carrier, output_layouts[i].carrier_length);
+            persisted = pwrite(output_descriptors[i].fd, carrier, output_layouts[i].carrier_length, (off_t)output_descriptors[i].payload_offset) == (ssize_t)output_layouts[i].carrier_length
                 && pwrite(output_descriptors[i].fd, &hashes[i], sizeof(hashes[i]), (off_t)output_descriptors[i].hash_offset) == (ssize_t)sizeof(hashes[i]);
             vk.unmap_memory(device, memories[buffer_index]);
         }
+        free(carrier);
     }
     if (command_pool) vk.destroy_command_pool(device, command_pool, NULL);
     if (pipeline) vk.destroy_pipeline(device, pipeline, NULL);
@@ -617,7 +635,12 @@ int main(int argc, char** argv) {
         queue_family,
         api_version,
         output_count,
-        byte_length);
+        output_layouts[0].carrier_length);
+    printf("output_byte_lengths=");
+    for (size_t i = 0; i < output_count; i++) {
+        printf(i == 0 ? "%zu" : ",%zu", output_layouts[i].carrier_length);
+    }
+    printf("\n");
     if (output_count == 1) {
         printf("output_hash=%" PRIu64 "\n", hashes[0]);
     } else {
