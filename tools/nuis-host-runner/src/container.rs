@@ -623,7 +623,7 @@ fn container_loader_handoff_blockers(summary: &ContainerLoaderSummary) -> Vec<St
         blockers.push("container-loader:entry-kind-missing".to_owned());
     }
     match loader_entry_abi_contract {
-        Some(nuis_runtime::NUIS_LIFECYCLE_ENTRY_ABI_V1) => {}
+        Some(nuis_runtime::NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1) => {}
         Some(_) => blockers.push("container-loader:entry-abi-unsupported".to_owned()),
         None => blockers.push("container-loader:entry-abi-missing".to_owned()),
     }

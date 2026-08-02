@@ -429,20 +429,22 @@ Short reading rule:
   `nsdb-yir-hetero-runtime-trace-v1` debugger contract, and records domain
   metadata plus backend-artifact trace records so nsdb value-sample resolution
   can read runtime/device trace metadata without scraping JSON output.
-* the current self-contained smoke proves the host-runner image boundary:
-  `.nsb` readable, image hash matched, payload region mapped, and lifecycle
-  hook handoff ready. The payload scanner now sees `nsld-container-toml`, the
-  runner parses the container metadata prefix before the binary payload region,
-  and host-assisted external-import declarations no longer block the host-runner
-  handoff. They remain visible as compatibility evidence rather than being
-  treated as a pure self-contained closure.
+* the self-contained smoke now crosses the host-runner image boundary under an
+  explicit `--invoke-native-entry` gate. The runner resolves the final `.nsb`
+  from the launcher manifest, verifies the image/container/code hashes, maps the
+  entry RW-to-RX, constructs a 64-byte
+  `nuis-runtime-lifecycle-entry-context-v1`, consumes one identity-bound permit,
+  and invokes the exact Nsld-produced thunk once. Ordinary `run-artifact`
+  validation remains non-invoking.
 * `nuis-runtime` now owns `nuis-executable-memory-adapter-v1`. The first Unix
   implementation proves RW-to-RX sealing, architecture-specific instruction
-  cache synchronization, entry bounds, section hash, and a real one-shot
-  Apple AArch64 call. This does not upgrade the current smoke to payload
-  execution: its lifecycle symbol still names `compiled-artifact`, which the
-  adapter rejects because only `nuis-native-entry-code` may cross the explicit
-  unsafe `nuis-runtime-lifecycle-entry-i64-v1` boundary.
+  cache synchronization, entry bounds, section hash, and a real one-shot native
+  call through `nuis-runtime-lifecycle-entry-context-i64-v1`. The fixed-layout
+  context binds plan/execution identities plus opaque clock, GLM, scheduler, and
+  lifecycle handles. Nsld emits calling-convention-aware AArch64, x86_64 SysV,
+  and x86_64 Win64 thunks that read the context version and return nonzero when
+  it is unsupported. Only `nuis-native-entry-code` may cross this explicit
+  unsafe boundary.
 * `workflow` and LinkPlan JSON mirror that decision under
   `workflow_run_artifact_prelaunch_*`, so the main workflow surface can show the
   launch closure that `run-artifact` would prefer without forcing callers to run

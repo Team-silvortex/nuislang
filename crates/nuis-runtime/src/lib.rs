@@ -12,6 +12,7 @@ pub mod host_yir;
 pub mod lifecycle_bootstrap;
 pub mod lifecycle_execution;
 pub mod loader;
+pub mod native_entry_context;
 pub mod registry;
 pub mod session;
 
@@ -22,8 +23,8 @@ pub use executable_memory::{
     ExecutableEntryPreparation, ExecutableEntryRequest, ExecutableMemoryAdapter,
     NativeEntryInvocationPermit, NativeEntryInvocationResult, NativeHostExecutableMemoryAdapter,
     EXECUTABLE_MEMORY_ADAPTER_CONTRACT, NATIVE_ENTRY_INVOCATION_PERMIT_PROTOCOL,
-    NATIVE_ENTRY_INVOCATION_PROTOCOL, NUIS_LIFECYCLE_ENTRY_ABI_V1, NUIS_MACHINE_ARCH_AARCH64,
-    NUIS_MACHINE_ARCH_X86_64, NUIS_NATIVE_ENTRY_SECTION_KIND,
+    NATIVE_ENTRY_INVOCATION_PROTOCOL, NUIS_MACHINE_ARCH_AARCH64, NUIS_MACHINE_ARCH_X86_64,
+    NUIS_NATIVE_ENTRY_SECTION_KIND,
 };
 pub use executor::{
     ExecutionClockGate, ExecutionClockValidation, ExecutionContract, ExecutionPhaseAction,
@@ -48,6 +49,10 @@ pub use lifecycle_execution::{
     LIFECYCLE_BOOTSTRAP_EXECUTION_IDENTITY_CONTRACT, LIFECYCLE_BOOTSTRAP_EXECUTION_PROTOCOL,
 };
 pub use loader::RuntimeLoader;
+pub use native_entry_context::{
+    NativeLifecycleEntryContextV1, NATIVE_LIFECYCLE_ENTRY_CONTEXT_PROTOCOL,
+    NATIVE_LIFECYCLE_ENTRY_CONTEXT_VERSION, NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1,
+};
 pub use registry::{AdapterRegistry, DomainAdapter};
 pub use session::{
     ClockProtocolRuntimeSummary, HostConsumableDomainUnit, HostConsumableSummary, LoadedExecutable,

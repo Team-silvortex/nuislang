@@ -22,7 +22,7 @@ fn handoff_selection_is_status_aware_and_input_order_independent() {
     );
     assert_eq!(
         expected,
-        "native-binary-system/nuis-runtime/lifecycle-loader-bootstrap"
+        "native-binary-system/nuis-runtime/lifecycle-context-dispatch"
     );
     assert_eq!(selected.status, "active");
 }
@@ -138,17 +138,17 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
     assert!(summary.weakest_bootstrap_task_card_ready);
     assert_eq!(
         summary.weakest_bootstrap_task_card_coordinate,
-        "native-binary-system/nuis-runtime/lifecycle-loader-bootstrap"
+        "native-binary-system/nuis-runtime/lifecycle-context-dispatch"
     );
     assert!(summary
         .weakest_bootstrap_task_card_priority_reason
         .contains("weakest bootstrap-critical status/progress ordering"));
     assert!(summary
         .weakest_bootstrap_task_card_priority_reason
-        .contains("status `active` rank 2, progress 99/100"));
+        .contains("status `active` rank 2, progress 45/100"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_handoff_coordinate,
-        "native-binary-system/nuis-runtime/lifecycle-loader-bootstrap"
+        "native-binary-system/nuis-runtime/lifecycle-context-dispatch"
     );
     assert_eq!(summary.weakest_bootstrap_task_card_handoff_mode, "direct");
     assert!(summary
@@ -156,19 +156,19 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         .contains("weakest task card is directly actionable"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_action
-        .contains("host-runner probe flag"));
+        .contains("dispatch-table record"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_command
-        .contains("cargo test -q -p nuis-runtime lifecycle_bootstrap"));
+        .contains("cargo test -q -p nuis-runtime native_entry_context"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_command
-        .contains("cargo test -q -p nuis-runtime lifecycle_execution"));
+        .contains("cargo test -q -p nuis-host-runner native_entry"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_command
-        .contains("cargo test -q -p nuis-runtime executable_memory"));
+        .contains("cargo test -q -p nuis --test self_contained_nsb_smoke"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_expected_artifact
-        .contains("nuis-runtime-lifecycle-bootstrap-plan-v1"));
+        .contains("versioned native dispatch table"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.protocol,
         "nuis-dev-tensor-task-card-lineage-v1"
@@ -195,7 +195,7 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         summary
             .weakest_bootstrap_task_card_lineage
             .common_ancestor_path,
-        "native-binary-system/nuis-runtime/lifecycle-loader-bootstrap"
+        "native-binary-system/nuis-runtime/lifecycle-context-dispatch"
     );
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.transition_depth,
@@ -346,6 +346,7 @@ fn dev_tensor_json_exposes_coordinate_cells() {
     assert!(json.contains("weakest bootstrap-critical status/progress ordering"));
     assert!(json.contains("\"module\":\"nuis-runtime\""));
     assert!(json.contains("\"function\":\"lifecycle-loader-bootstrap\""));
+    assert!(json.contains("\"function\":\"lifecycle-context-dispatch\""));
     assert!(json.contains("nuis-runtime-lifecycle-bootstrap-plan-v1"));
     assert!(json.contains("\"module\":\"linux-cuda\""));
     assert!(json.contains("\"function\":\"cuda-provider-bringup\""));
@@ -497,7 +498,7 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("weakest_bootstrap_task_card_lineage_status: clean"));
     assert!(text.contains("weakest_bootstrap_task_card_lineage_error_count: 0"));
     assert!(text.contains(
-        "weakest_bootstrap_task_card_common_ancestor_path: native-binary-system/nuis-runtime/lifecycle-loader-bootstrap"
+        "weakest_bootstrap_task_card_common_ancestor_path: native-binary-system/nuis-runtime/lifecycle-context-dispatch"
     ));
     assert!(text.contains("weakest_bootstrap_task_card_transition_depth: 0"));
     assert!(text.contains("weakest bootstrap-critical status/progress ordering"));

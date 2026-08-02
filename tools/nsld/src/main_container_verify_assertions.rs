@@ -29,7 +29,7 @@ pub(crate) fn assert_matching_container_artifacts(
     assert!(container_source.contains("external-import:c-world-policy:wrapped"));
     assert!(container_source.contains("loader_entry_kind = \"lifecycle-bootstrap\""));
     assert!(container_source
-        .contains("loader_entry_abi_contract = \"nuis-runtime-lifecycle-entry-i64-v1\""));
+        .contains("loader_entry_abi_contract = \"nuis-runtime-lifecycle-entry-context-i64-v1\""));
     assert!(container_source.contains(&format!(
         "loader_entry_machine_arch = \"{}\"",
         preview.loader_entry_machine_arch

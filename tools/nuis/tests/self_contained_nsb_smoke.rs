@@ -75,6 +75,23 @@ fn ensure_host_runner_available() {
     assert_success(&output, "cargo build nuis-host-runner");
 }
 
+fn run_host_runner(args: &[&str]) -> std::process::Output {
+    let binary = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
+        "../../target/debug/nuis-host-runner{}",
+        std::env::consts::EXE_SUFFIX
+    ));
+    Command::new(&binary)
+        .args(args)
+        .output()
+        .unwrap_or_else(|error| {
+            panic!(
+                "failed to run host runner `{}` {:?}: {error}",
+                binary.display(),
+                args
+            )
+        })
+}
+
 fn workflow_default_output_dir(input: &Path) -> PathBuf {
     let label = input
         .file_stem()
@@ -222,6 +239,44 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
     );
 
     ensure_host_runner_available();
+
+    let launcher_manifest = output_dir.join("nuis.nsld.final-executable-launcher.toml");
+    let native_entry_probe = run_host_runner(&[
+        "--manifest",
+        &launcher_manifest.display().to_string(),
+        "--output-dir",
+        &output_dir.display().to_string(),
+        "--scheduler-entry",
+        "nuis.scheduler.loop.v1",
+        "--lifecycle-hook",
+        "on_process_start",
+        "--invoke-native-entry",
+        "--json",
+    ]);
+    assert_success(
+        &native_entry_probe,
+        "nuis-host-runner explicit native-entry probe after self-contained nsld drive",
+    );
+    let native_entry_stdout = String::from_utf8_lossy(&native_entry_probe.stdout);
+    assert!(
+        native_entry_stdout.contains("\"ready\":true")
+            && native_entry_stdout.contains("\"would_enter_lifecycle_hook\":true")
+            && native_entry_stdout.contains("\"native_entry_handoff\":{\"protocol\":\"nuis-host-native-entry-handoff-v1\",\"status\":\"invoked\",\"ready\":true")
+            && native_entry_stdout.contains("\"context_protocol\":\"nuis-runtime-lifecycle-entry-context-v1\"")
+            && native_entry_stdout.contains("\"context_status\":\"verified\"")
+            && native_entry_stdout.contains("\"context_version\":1")
+            && native_entry_stdout.contains("\"context_size_bytes\":64")
+            && native_entry_stdout.contains("\"context_identity_hash\":\"0x")
+            && native_entry_stdout.contains("\"context_clock_root_handle\":")
+            && native_entry_stdout.contains("\"context_glm_root_handle\":")
+            && native_entry_stdout.contains("\"invocation_requested\":true")
+            && native_entry_stdout.contains("\"invocation_status\":\"invoked\"")
+            && native_entry_stdout.contains("\"invoked\":true")
+            && native_entry_stdout.contains("\"invocation_return_value\":0")
+            && native_entry_stdout.contains("\"invocation_return_status\":\"verified\"")
+            && native_entry_stdout.contains("\"native-entry-invocation:invoked\""),
+        "explicit host probe should invoke the exact Nsld final-image entry once\n{native_entry_stdout}"
+    );
 
     let run_json = run_nuis(&["run-artifact", &output_dir.display().to_string(), "--json"]);
     assert_success(
@@ -534,4 +589,17 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
             && run_stdout.contains("launch_evidence_first_blocker: <none>"),
         "run-artifact text should expose the launch evidence contract\n{run_stdout}"
     );
+
+    fs::remove_dir_all(&output_dir).unwrap_or_else(|error| {
+        panic!(
+            "failed to clean smoke output `{}`: {error}",
+            output_dir.display()
+        )
+    });
+    fs::remove_dir_all(&project_dir).unwrap_or_else(|error| {
+        panic!(
+            "failed to clean smoke project `{}`: {error}",
+            project_dir.display()
+        )
+    });
 }

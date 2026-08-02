@@ -130,7 +130,7 @@ pub fn plan_lifecycle_bootstrap(facts: &LifecycleBootstrapFacts) -> LifecycleBoo
     );
     require_exact(
         facts.loader_entry_abi_contract.as_deref(),
-        crate::NUIS_LIFECYCLE_ENTRY_ABI_V1,
+        crate::NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1,
         "runtime-bootstrap:entry-abi-unsupported",
         &mut blockers,
     );
@@ -598,7 +598,7 @@ mod tests {
             scheduler_entry: "nuis.scheduler.loop.v1".to_owned(),
             process_lifecycle_hook: "on_process_start".to_owned(),
             loader_entry_kind: Some("lifecycle-bootstrap".to_owned()),
-            loader_entry_abi_contract: Some(crate::NUIS_LIFECYCLE_ENTRY_ABI_V1.to_owned()),
+            loader_entry_abi_contract: Some(crate::NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1.to_owned()),
             loader_entry_machine_arch: Some(
                 crate::native_host_machine_arch()
                     .unwrap_or(crate::NUIS_MACHINE_ARCH_AARCH64)
@@ -675,7 +675,7 @@ mod tests {
     fn ready_plan_is_deterministic_and_strictly_ordered() {
         let plan = plan_lifecycle_bootstrap(&ready_facts());
         let bind_loader_entry = format!(
-            "bind-loader-entry:main@sec0001.nuis-native-entry-code#nuis-runtime-lifecycle-entry-i64-v1@{}",
+            "bind-loader-entry:main@sec0001.nuis-native-entry-code#nuis-runtime-lifecycle-entry-context-i64-v1@{}",
             crate::native_host_machine_arch().unwrap_or(crate::NUIS_MACHINE_ARCH_AARCH64)
         );
 

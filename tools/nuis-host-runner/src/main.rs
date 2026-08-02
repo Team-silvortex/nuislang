@@ -3,6 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+mod args;
 mod container;
 mod container_backend_payload;
 mod container_bootstrap;
@@ -14,6 +15,7 @@ mod report;
 mod report_native_entry;
 mod runtime_bootstrap;
 
+use args::parse_args;
 use container::scan_container_loader;
 #[cfg(test)]
 use container::{
@@ -31,16 +33,6 @@ const HANDOFF_CONTRACT: &str = "nsld-final-output-handoff-v1";
 const IMAGE_MAGIC: &[u8; 8] = b"NUIFIMG\0";
 const IMAGE_VERSION: u32 = 1;
 const IMAGE_HEADER_SIZE: usize = 64;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct RunnerArgs {
-    manifest: PathBuf,
-    nsb: Option<PathBuf>,
-    output_dir: Option<PathBuf>,
-    scheduler_entry: Option<String>,
-    lifecycle_hook: Option<String>,
-    json: bool,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct LauncherManifest {
@@ -241,70 +233,15 @@ fn run(args: Vec<String>) -> Result<RunnerReport, String> {
         .lifecycle_hook
         .clone()
         .unwrap_or_else(|| manifest.entry_lifecycle_hook.clone());
-    Ok(validate_handoff(
+    Ok(validate_handoff_with_probe(
         &manifest_path,
         &nsb_path,
         parsed.output_dir.as_deref(),
         &scheduler_entry,
         &lifecycle_hook,
         &manifest,
+        parsed.invoke_native_entry,
     ))
-}
-
-fn parse_args(args: Vec<String>) -> Result<RunnerArgs, String> {
-    let mut manifest = None;
-    let mut nsb = None;
-    let mut output_dir = None;
-    let mut scheduler_entry = None;
-    let mut lifecycle_hook = None;
-    let mut json = false;
-    let mut iter = args.into_iter();
-    while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "--manifest" => manifest = Some(required_path_arg(&mut iter, "--manifest")?),
-            "--nsb" => nsb = Some(required_path_arg(&mut iter, "--nsb")?),
-            "--output-dir" => output_dir = Some(required_path_arg(&mut iter, "--output-dir")?),
-            "--scheduler-entry" => {
-                scheduler_entry = Some(required_string_arg(&mut iter, "--scheduler-entry")?)
-            }
-            "--lifecycle-hook" => {
-                lifecycle_hook = Some(required_string_arg(&mut iter, "--lifecycle-hook")?)
-            }
-            "--json" => json = true,
-            "--help" | "-h" => return Err(usage()),
-            other => return Err(format!("unknown argument `{other}`\n{}", usage())),
-        }
-    }
-    Ok(RunnerArgs {
-        manifest: manifest.ok_or_else(usage)?,
-        nsb,
-        output_dir,
-        scheduler_entry,
-        lifecycle_hook,
-        json,
-    })
-}
-
-fn required_path_arg(
-    iter: &mut impl Iterator<Item = String>,
-    flag: &str,
-) -> Result<PathBuf, String> {
-    iter.next()
-        .map(PathBuf::from)
-        .ok_or_else(|| format!("{flag} expects a path\n{}", usage()))
-}
-
-fn required_string_arg(
-    iter: &mut impl Iterator<Item = String>,
-    flag: &str,
-) -> Result<String, String> {
-    iter.next()
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| format!("{flag} expects a non-empty value\n{}", usage()))
-}
-
-fn usage() -> String {
-    "usage: nuis-host-runner --manifest <nuis.nsld.final-executable-launcher.toml> [--nsb <path>] [--output-dir <path>] [--scheduler-entry <id>] [--lifecycle-hook <hook>] [--json]".to_owned()
 }
 
 fn parse_launcher_manifest(source: &str) -> Result<LauncherManifest, String> {
@@ -329,6 +266,7 @@ fn parse_launcher_manifest(source: &str) -> Result<LauncherManifest, String> {
     })
 }
 
+#[cfg(test)]
 fn validate_handoff(
     manifest_path: &Path,
     nsb_path: &Path,
@@ -336,6 +274,26 @@ fn validate_handoff(
     scheduler_entry: &str,
     lifecycle_hook: &str,
     manifest: &LauncherManifest,
+) -> RunnerReport {
+    validate_handoff_with_probe(
+        manifest_path,
+        nsb_path,
+        output_dir,
+        scheduler_entry,
+        lifecycle_hook,
+        manifest,
+        false,
+    )
+}
+
+fn validate_handoff_with_probe(
+    manifest_path: &Path,
+    nsb_path: &Path,
+    output_dir: Option<&Path>,
+    scheduler_entry: &str,
+    lifecycle_hook: &str,
+    manifest: &LauncherManifest,
+    invoke_native_entry: bool,
 ) -> RunnerReport {
     let nsb_bytes = fs::read(nsb_path).ok();
     let nsb_readable = nsb_bytes.is_some();
@@ -419,7 +377,11 @@ fn validate_handoff(
     let mut runtime_bootstrap_blockers = runtime_bootstrap.plan.blockers.clone();
     runtime_bootstrap_blockers.extend(runtime_bootstrap.transfer.blockers.iter().cloned());
     blockers.extend(runtime_bootstrap_blockers.iter().cloned());
-    prepare_native_entry(&mut native_entry, &runtime_bootstrap.transfer);
+    prepare_native_entry(
+        &mut native_entry,
+        &runtime_bootstrap.transfer,
+        invoke_native_entry,
+    );
     blockers.extend(native_entry.evidence.blockers.iter().cloned());
     blockers.sort();
     blockers.dedup();
@@ -443,7 +405,10 @@ fn validate_handoff(
                 .unwrap_or("missing"),
             native_entry.evidence.protection_status
         ));
-        steps.push("native-entry-invocation:not-invoked".to_owned());
+        steps.push(format!(
+            "native-entry-invocation:{}",
+            native_entry.evidence.invocation_status
+        ));
         steps
     } else {
         Vec::new()

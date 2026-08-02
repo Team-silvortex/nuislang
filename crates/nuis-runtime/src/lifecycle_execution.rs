@@ -178,7 +178,7 @@ impl LifecycleBootstrapExecutionContext {
             self.entry_symbol, self.entry_section_id
         ));
 
-        CompiledEntryTransferResult {
+        let mut transfer = CompiledEntryTransferResult {
             protocol: COMPILED_ENTRY_TRANSFER_PROTOCOL,
             status: "transfer-ready",
             ready: true,
@@ -196,6 +196,8 @@ impl LifecycleBootstrapExecutionContext {
             entry_symbol_offset: Some(self.entry_symbol_offset),
             entry_symbol_size_bytes: Some(self.entry_symbol_size_bytes),
             entry_symbol_payload_hash: Some(self.entry_symbol_payload_hash),
+            entry_context_protocol: None,
+            entry_context_identity_hash: None,
             lifecycle_hook: Some(self.lifecycle_hook),
             scheduler_entry: Some(self.scheduler_entry),
             consumed_mapped_section_count: self.mapped_sections.len(),
@@ -203,7 +205,10 @@ impl LifecycleBootstrapExecutionContext {
             activated_service_ids,
             trace,
             blockers: Vec::new(),
-        }
+        };
+        crate::native_entry_context::bind_transfer_context(&mut transfer)
+            .expect("validated lifecycle execution forms native entry context");
+        transfer
     }
 }
 
@@ -226,6 +231,8 @@ pub struct CompiledEntryTransferResult {
     pub entry_symbol_offset: Option<usize>,
     pub entry_symbol_size_bytes: Option<usize>,
     pub entry_symbol_payload_hash: Option<String>,
+    pub entry_context_protocol: Option<String>,
+    pub entry_context_identity_hash: Option<String>,
     pub lifecycle_hook: Option<String>,
     pub scheduler_entry: Option<String>,
     pub consumed_mapped_section_count: usize,
@@ -259,6 +266,8 @@ impl CompiledEntryTransferResult {
             entry_symbol_offset: None,
             entry_symbol_size_bytes: None,
             entry_symbol_payload_hash: None,
+            entry_context_protocol: None,
+            entry_context_identity_hash: None,
             lifecycle_hook: None,
             scheduler_entry: None,
             consumed_mapped_section_count: 0,
@@ -546,7 +555,7 @@ mod tests {
             scheduler_entry: "nuis.scheduler.loop.v1".to_owned(),
             process_lifecycle_hook: "on_process_start".to_owned(),
             loader_entry_kind: Some("lifecycle-bootstrap".to_owned()),
-            loader_entry_abi_contract: Some(crate::NUIS_LIFECYCLE_ENTRY_ABI_V1.to_owned()),
+            loader_entry_abi_contract: Some(crate::NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1.to_owned()),
             loader_entry_machine_arch: Some(
                 crate::native_host_machine_arch()
                     .unwrap_or(crate::NUIS_MACHINE_ARCH_AARCH64)
@@ -675,7 +684,7 @@ mod tests {
         );
         assert_eq!(
             transfer.entry_abi_contract.as_deref(),
-            Some(crate::NUIS_LIFECYCLE_ENTRY_ABI_V1)
+            Some(crate::NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1)
         );
         assert_eq!(
             transfer.entry_machine_arch.as_deref(),
@@ -700,7 +709,8 @@ mod tests {
             ]
         );
         let request = ExecutableEntryRequest::from_transfer(&transfer, &[0; 8]).unwrap();
-        let permit = NativeEntryInvocationPermit::from_transfer(&transfer).unwrap();
+        let context = crate::NativeLifecycleEntryContextV1::from_transfer(&transfer).unwrap();
+        let permit = NativeEntryInvocationPermit::from_transfer(&transfer, &context).unwrap();
         assert_eq!(
             permit.protocol(),
             crate::NATIVE_ENTRY_INVOCATION_PERMIT_PROTOCOL
@@ -708,7 +718,7 @@ mod tests {
         let native = NativeHostExecutableMemoryAdapter.prepare(&request);
         assert!(native.ready, "{:?}", native.blockers);
         assert_eq!(native.protection_status, "sealed-read-execute");
-        assert!(native.authorize(permit).is_ok());
+        assert!(native.authorize(permit, context).is_ok());
     }
 
     #[test]

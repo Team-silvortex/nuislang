@@ -17,6 +17,7 @@ fn final_executable_writer_input_command_args_use_pe_coff_native_object_path() {
     plan.cpu_target.machine_arch = "amd64".to_owned();
     plan.cpu_target.machine_os = "windows".to_owned();
     plan.cpu_target.object_format = "pe/coff".to_owned();
+    plan.cpu_target.calling_abi = "win64".to_owned();
     fs::write(&plan.compiled_artifact.path, b"compiled-artifact").unwrap();
     fs::write(dir.join("nuis.nsld.pe-coff"), b"native-object").unwrap();
 

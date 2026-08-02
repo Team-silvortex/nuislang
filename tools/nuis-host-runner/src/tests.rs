@@ -1,12 +1,27 @@
 use super::*;
 
 const CONTAINER_CAPSULE_END_MARKER: &str = "\n# nuis-nsld-container-end-v1\n";
+#[cfg(target_arch = "aarch64")]
 const NATIVE_ENTRY_ASSET: [u8; 16] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0x00, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6,
 ];
+#[cfg(target_arch = "x86_64")]
+const NATIVE_ENTRY_ASSET: [u8; 16] = [
+    0, 0, 0, 0, 0, 0, 0, 0, 0x31, 0xc0, 0xc3, 0x90, 0x90, 0x90, 0x90, 0x90,
+];
+#[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
+const NATIVE_ENTRY_ASSET: [u8; 16] = [0; 16];
+
+#[cfg(target_arch = "aarch64")]
 const NATIVE_ENTRY_IMAGE: [u8; 16] = [
     0x48, 0, 0, 0, 0, 0, 0, 0, 0x00, 0x00, 0x80, 0xd2, 0xc0, 0x03, 0x5f, 0xd6,
 ];
+#[cfg(target_arch = "x86_64")]
+const NATIVE_ENTRY_IMAGE: [u8; 16] = [
+    0x48, 0, 0, 0, 0, 0, 0, 0, 0x31, 0xc0, 0xc3, 0x90, 0x90, 0x90, 0x90, 0x90,
+];
+#[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
+const NATIVE_ENTRY_IMAGE: [u8; 16] = [0; 16];
 
 fn base_nsb_payload() -> &'static [u8] {
     br#"schema = "nuis-nsld-container-v1"
@@ -28,7 +43,7 @@ backend_artifact_payload_table_hash = "0x7777777777777777"
 loader_readiness = "host-assisted"
 loader_blockers = []
 loader_entry_kind = "lifecycle-bootstrap"
-loader_entry_abi_contract = "nuis-runtime-lifecycle-entry-i64-v1"
+loader_entry_abi_contract = "nuis-runtime-lifecycle-entry-context-i64-v1"
 loader_entry_machine_arch = "__HOST_ARCH__"
 loader_entry_symbol = "main"
 loader_entry_section_id = "sec0000.nuis-native-entry-code"
@@ -272,7 +287,18 @@ fn validates_ready_launcher_handoff() {
         report.native_entry_handoff.protection_status,
         "sealed-read-execute"
     );
+    assert!(!report.native_entry_handoff.invocation_requested);
+    assert!(report
+        .native_entry_handoff
+        .invocation_permit_protocol
+        .is_none());
     assert_eq!(report.native_entry_handoff.invocation_status, "not-invoked");
+    assert!(!report.native_entry_handoff.invoked);
+    assert_eq!(report.native_entry_handoff.invocation_return_value, None);
+    assert_eq!(
+        report.native_entry_handoff.invocation_return_status,
+        "not-attempted"
+    );
     assert!(report.native_entry_handoff.blockers.is_empty());
     assert!(report
         .launch_steps
@@ -290,7 +316,7 @@ fn validates_ready_launcher_handoff() {
     ));
     assert!(report.launch_steps.contains(
         &format!(
-            "bind-loader-entry:main@sec0000.nuis-native-entry-code#nuis-runtime-lifecycle-entry-i64-v1@{}",
+            "bind-loader-entry:main@sec0000.nuis-native-entry-code#nuis-runtime-lifecycle-entry-context-i64-v1@{}",
             nuis_runtime::native_host_machine_arch().expect("supported host runner test arch")
         )
     ));
@@ -957,3 +983,6 @@ fn allows_host_assisted_container_loader_handoff_when_external_import_loader_blo
 
 #[path = "container_failure_tests.rs"]
 mod container_failure_tests;
+
+#[path = "native_entry_probe_tests.rs"]
+mod native_entry_probe_tests;

@@ -1,12 +1,14 @@
 use crate::{container::ContainerLoaderSummary, fnv1a64_hex};
 use nuis_runtime::{
     CompiledEntryTransferResult, ExecutableEntryRequest, ExecutableMemoryAdapter,
-    NativeHostExecutableMemoryAdapter, NUIS_NATIVE_ENTRY_SECTION_KIND,
+    NativeEntryInvocationPermit, NativeEntryInvocationResult, NativeHostExecutableMemoryAdapter,
+    NativeLifecycleEntryContextV1, NUIS_NATIVE_ENTRY_SECTION_KIND,
 };
 
 pub(super) const NATIVE_ENTRY_HANDOFF_PROTOCOL: &str = "nuis-host-native-entry-handoff-v1";
 const FINAL_IMAGE_PAYLOAD_ALIGNMENT: usize = 16;
 const RELOCATION_SLOT_BYTES: usize = 8;
+const NATIVE_ENTRY_PROBE_EXPECTED_RETURN: i64 = 0;
 const CONTAINER_CAPSULE_END_MARKER: &[u8] = b"\n# nuis-nsld-container-end-v1\n";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,7 +32,24 @@ pub(super) struct NativeEntryHandoffEvidence {
     pub(super) preparation_ready: bool,
     pub(super) mapping_size_bytes: usize,
     pub(super) protection_status: String,
-    pub(super) invocation_status: &'static str,
+    pub(super) context_protocol: Option<String>,
+    pub(super) context_status: String,
+    pub(super) context_version: Option<u32>,
+    pub(super) context_size_bytes: Option<u32>,
+    pub(super) context_identity_hash: Option<String>,
+    pub(super) context_plan_identity: Option<u64>,
+    pub(super) context_execution_identity: Option<u64>,
+    pub(super) context_clock_root_handle: Option<u64>,
+    pub(super) context_glm_root_handle: Option<u64>,
+    pub(super) context_scheduler_handle: Option<u64>,
+    pub(super) context_lifecycle_hook_handle: Option<u64>,
+    pub(super) invocation_requested: bool,
+    pub(super) invocation_permit_protocol: Option<String>,
+    pub(super) invocation_protocol: Option<String>,
+    pub(super) invocation_status: String,
+    pub(super) invoked: bool,
+    pub(super) invocation_return_value: Option<i64>,
+    pub(super) invocation_return_status: String,
     pub(super) blockers: Vec<String>,
 }
 
@@ -233,7 +252,9 @@ pub(super) fn recover_native_entry(
 pub(super) fn prepare_native_entry(
     recovered: &mut RecoveredNativeEntry,
     transfer: &CompiledEntryTransferResult,
+    invoke_native_entry: bool,
 ) {
+    recovered.evidence.invocation_requested = invoke_native_entry;
     if !recovered.evidence.ready {
         recovered.evidence.preparation_status = "not-attempted".to_owned();
         return;
@@ -261,13 +282,104 @@ pub(super) fn prepare_native_entry(
         .blockers
         .extend(preparation.blockers.iter().cloned());
     recovered.evidence.ready = recovered.evidence.blockers.is_empty() && preparation.ready;
+    if !recovered.evidence.ready {
+        recovered.evidence.status = "blocked".to_owned();
+        drop(preparation);
+        return;
+    }
+    let context = match NativeLifecycleEntryContextV1::from_transfer(transfer) {
+        Ok(context) => context,
+        Err(blocker) => {
+            recovered.evidence.blockers.push(blocker);
+            recovered.evidence.ready = false;
+            recovered.evidence.status = "blocked".to_owned();
+            recovered.evidence.context_status = "blocked".to_owned();
+            drop(preparation);
+            return;
+        }
+    };
+    record_entry_context(&mut recovered.evidence, &context);
+    if !invoke_native_entry {
+        recovered.evidence.status = "prepared".to_owned();
+        drop(preparation);
+        return;
+    }
+    let permit = match NativeEntryInvocationPermit::from_transfer(transfer, &context) {
+        Ok(permit) => permit,
+        Err(blocker) => {
+            recovered.evidence.blockers.push(blocker);
+            recovered.evidence.ready = false;
+            recovered.evidence.status = "blocked".to_owned();
+            recovered.evidence.invocation_status = "permit-blocked".to_owned();
+            recovered.evidence.invocation_return_status = "blocked".to_owned();
+            drop(preparation);
+            return;
+        }
+    };
+    recovered.evidence.invocation_permit_protocol = Some(permit.protocol().to_owned());
+    let authorized = match preparation.authorize(permit, context) {
+        Ok(authorized) => authorized,
+        Err(result) => {
+            record_invocation_result(&mut recovered.evidence, &result);
+            recovered.evidence.ready = false;
+            recovered.evidence.status = "blocked".to_owned();
+            recovered.evidence.invocation_return_status = "blocked".to_owned();
+            return;
+        }
+    };
+    // SAFETY: recovery verifies exact AOT bytes and the runtime permit binds ABI,
+    // execution identity, context, section, symbol, target architecture, and host match.
+    let result = unsafe { authorized.invoke() };
+    record_invocation_result(&mut recovered.evidence, &result);
+    if !result.invoked {
+        recovered
+            .evidence
+            .blockers
+            .push("native-entry:invocation-not-completed".to_owned());
+    } else if result.return_value != Some(NATIVE_ENTRY_PROBE_EXPECTED_RETURN) {
+        recovered.evidence.invocation_return_status = "mismatch".to_owned();
+        recovered
+            .evidence
+            .blockers
+            .push("native-entry:bootstrap-return-mismatch".to_owned());
+    } else {
+        recovered.evidence.invocation_return_status = "verified".to_owned();
+    }
+    recovered.evidence.ready = recovered.evidence.blockers.is_empty();
     recovered.evidence.status = if recovered.evidence.ready {
-        "prepared"
+        "invoked"
     } else {
         "blocked"
     }
     .to_owned();
-    drop(preparation);
+}
+
+fn record_entry_context(
+    evidence: &mut NativeEntryHandoffEvidence,
+    context: &NativeLifecycleEntryContextV1,
+) {
+    evidence.context_protocol = Some(context.protocol().to_owned());
+    evidence.context_status = "verified".to_owned();
+    evidence.context_version = Some(context.abi_version());
+    evidence.context_size_bytes = Some(context.struct_size_bytes());
+    evidence.context_identity_hash = Some(context.identity_hash());
+    evidence.context_plan_identity = Some(context.plan_identity());
+    evidence.context_execution_identity = Some(context.execution_identity());
+    evidence.context_clock_root_handle = Some(context.clock_root_handle());
+    evidence.context_glm_root_handle = Some(context.glm_root_handle());
+    evidence.context_scheduler_handle = Some(context.scheduler_handle());
+    evidence.context_lifecycle_hook_handle = Some(context.lifecycle_hook_handle());
+}
+
+fn record_invocation_result(
+    evidence: &mut NativeEntryHandoffEvidence,
+    result: &NativeEntryInvocationResult,
+) {
+    evidence.invocation_protocol = Some(result.protocol.to_owned());
+    evidence.invocation_status = result.status.to_owned();
+    evidence.invoked = result.invoked;
+    evidence.invocation_return_value = result.return_value;
+    evidence.blockers.extend(result.blockers.iter().cloned());
 }
 
 fn blocked_recovery(mut evidence: NativeEntryHandoffEvidence) -> RecoveredNativeEntry {
@@ -301,7 +413,24 @@ fn empty_evidence() -> NativeEntryHandoffEvidence {
         preparation_ready: false,
         mapping_size_bytes: 0,
         protection_status: "not-mapped".to_owned(),
-        invocation_status: "not-invoked",
+        context_protocol: None,
+        context_status: "not-verified".to_owned(),
+        context_version: None,
+        context_size_bytes: None,
+        context_identity_hash: None,
+        context_plan_identity: None,
+        context_execution_identity: None,
+        context_clock_root_handle: None,
+        context_glm_root_handle: None,
+        context_scheduler_handle: None,
+        context_lifecycle_hook_handle: None,
+        invocation_requested: false,
+        invocation_permit_protocol: None,
+        invocation_protocol: None,
+        invocation_status: "not-invoked".to_owned(),
+        invoked: false,
+        invocation_return_value: None,
+        invocation_return_status: "not-attempted".to_owned(),
         blockers: Vec::new(),
     }
 }

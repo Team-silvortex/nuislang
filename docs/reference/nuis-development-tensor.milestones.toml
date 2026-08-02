@@ -75,6 +75,7 @@ id = "beta-runtime-loader"
 required = true
 coordinates = [
   "native-binary-system/nuis-runtime/lifecycle-loader-bootstrap",
+  "native-binary-system/nuis-runtime/lifecycle-context-dispatch",
 ]
 
 [[milestones]]
