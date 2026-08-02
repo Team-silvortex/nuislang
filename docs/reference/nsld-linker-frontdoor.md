@@ -8,7 +8,7 @@ contract logic in `nuisc::linker`. It does not yet claim to be the final
 self-owned object linker. Its job is to give linker work a stable tool
 boundary before the implementation is split out further.
 
-For the current `beta-0.0.1` line, the emphasis is tensor-guided
+For the current `beta-0.1.0` line, the emphasis is tensor-guided
 executable-artifact hardening: keep the frontdoor/reporting discipline, but
 drive it toward the smallest runnable host-assisted route or explicit blocked
 executable artifact with clear run-artifact / trace readiness evidence.

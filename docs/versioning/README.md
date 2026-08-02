@@ -9,11 +9,13 @@ workflow/history checkpoints, and policy notes.
 
 If you want the current line instead of historical backfill, start with:
 
+* [nuis-beta-0.1.0-mainline-entry.md](nuis-beta-0.1.0-mainline-entry.md)
+* [nuis-beta-0.1.0-doc-sync-inventory.md](nuis-beta-0.1.0-doc-sync-inventory.md)
+
+The recorded beta predecessor and earlier alpha anchors are:
+
 * [nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md)
 * [nuis-beta-0.0.1-doc-sync-inventory.md](nuis-beta-0.0.1-doc-sync-inventory.md)
-
-The direct predecessor and earlier alpha anchors are:
-
 * [nuis-alpha-0.20-mainline-entry.md](nuis-alpha-0.20-mainline-entry.md)
 * [nuis-alpha-0.17-mainline-entry.md](nuis-alpha-0.17-mainline-entry.md)
 * [nuis-alpha-0.16-mainline-entry.md](nuis-alpha-0.16-mainline-entry.md)
@@ -30,7 +32,9 @@ The direct predecessor and earlier alpha anchors are:
 
 Use this section when the question is:
 
-* what the current `beta-0.0.1` line inherits and hardens after alpha closeout
+* what the current `beta-0.1.0` line inherits and hardens after the first beta
+  snapshot
+* what `beta-0.0.1` established at the alpha-to-beta transition
 * what `alpha-0.20.*` added by closing alpha around a beta-prep
   compiler/std/Nustar/Nsld/Nsdb/tensor foundation
 * what the predecessor `alpha-0.17.*` line added by making registered
@@ -49,10 +53,10 @@ Use this section when the question is:
 * what the predecessor `alpha-0.7.*` line established for std-backed tooling smoke
 * what the predecessor `alpha-0.6.*` line established for Nsld
 * what exists and what is still soft in the `alpha-0.4.*` hardening baseline
-* what the current mainline should optimize during `beta-0.0.1`
+* what the current mainline should optimize during `beta-0.1.0`
 * which documentation routes and wording are current after the beta entry
   refresh
-* which broad README surfaces were refreshed for beta-0.0.1
+* which broad README surfaces were refreshed for beta-0.1.0
 * what the `alpha-0.1.*` mainline established before this hardening pass
 * what should count as present-tense repo truth
 * which older files should now be treated as predecessor anchors
@@ -163,7 +167,8 @@ Read:
 
 Practical rule:
 
-* start at the `beta-0.0.1` mainline entry first
+* start at the `beta-0.1.0` mainline entry first
+* use `beta-0.0.1` for the recorded first-beta predecessor
 * use `alpha-0.20.*` for the direct alpha closeout predecessor
 * use `alpha-0.17.*` for the direct registered-worker predecessor
 * use `alpha-0.16.*` for the tensor-guided closure predecessor

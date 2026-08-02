@@ -7,10 +7,10 @@
 
 ## Current Status
 
-The repository is now on `beta-0.0.1`, the first beta foundation line. This is
-an early-beta hardening line, not an API-stability claim, but the project now
-has one connected compiler/toolchain spine instead of separate experimental
-islands.
+The repository is now on `beta-0.1.0`, the second beta minor foundation line.
+This is an early-beta hardening line, not an API-stability claim, but the
+project now has one connected compiler/toolchain spine instead of separate
+experimental islands.
 
 Current spine:
 
@@ -24,7 +24,7 @@ nuis source / nuis.toml project
   -> nsld binary-linking convergence
 ```
 
-The current `beta-0.0.1` goal is to harden the registered compiler, std,
+The current `beta-0.1.0` goal is to harden the registered compiler, std,
 Nustar, Nsld, Nsdb, heterogeneous-provider, and development-tensor surfaces as
 one repeatable foundation:
 
@@ -53,8 +53,9 @@ Start here for the current line:
 
 * [docs/current-mainline-map.md](docs/current-mainline-map.md)
 * [docs/reference/nuis-development-tensor.md](docs/reference/nuis-development-tensor.md)
+* [docs/versioning/nuis-beta-0.1.0-mainline-entry.md](docs/versioning/nuis-beta-0.1.0-mainline-entry.md)
+* [docs/versioning/nuis-beta-0.1.0-doc-sync-inventory.md](docs/versioning/nuis-beta-0.1.0-doc-sync-inventory.md)
 * [docs/versioning/nuis-beta-0.0.1-mainline-entry.md](docs/versioning/nuis-beta-0.0.1-mainline-entry.md)
-* [docs/versioning/nuis-beta-0.0.1-doc-sync-inventory.md](docs/versioning/nuis-beta-0.0.1-doc-sync-inventory.md)
 * [docs/versioning/nuis-alpha-0.20-mainline-entry.md](docs/versioning/nuis-alpha-0.20-mainline-entry.md)
 * [docs/versioning/nuis-alpha-0.17-mainline-entry.md](docs/versioning/nuis-alpha-0.17-mainline-entry.md)
 * [docs/versioning/nuis-alpha-0.16-mainline-entry.md](docs/versioning/nuis-alpha-0.16-mainline-entry.md)

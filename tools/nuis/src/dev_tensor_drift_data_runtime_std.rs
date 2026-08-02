@@ -235,7 +235,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         id: "std-readme-host-io-text-lane",
         path: "stdlib/std/README.md",
         required_patterns: &[
-            "beta-0.0.1",
+            "beta-0.1.0",
             "host I/O and text",
             "filesystem/path/location",
             "worker lease",
@@ -266,10 +266,25 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         ],
     },
     DevTensorDriftCheckSpec {
-        id: "beta-0.0.1-mainline-router",
+        id: "beta-0.1.0-mainline-entry",
+        path: "docs/versioning/nuis-beta-0.1.0-mainline-entry.md",
+        required_patterns: &[
+            "second beta minor line",
+            "official.cffi",
+            "mod cffi",
+            "registered CFFI source and ABI boundary",
+            "DPU and IPU",
+            "lifecycle-context-dispatch",
+            "development tensor",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "beta-0.1.0-mainline-router",
         path: "docs/current-mainline-map.md",
         required_patterns: &[
-            "current `beta-0.0.1` reading route",
+            "current `beta-0.1.0` reading route",
+            "nuis-beta-0.1.0-mainline-entry.md",
+            "recorded predecessor `beta-0.0.1` entry",
             "nuis-beta-0.0.1-mainline-entry.md",
             "direct predecessor `alpha-0.20.*` closeout entry",
             "predecessor `alpha-0.17.*` registered worker entry",
@@ -278,10 +293,11 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         ],
     },
     DevTensorDriftCheckSpec {
-        id: "beta-0.0.1-repository-frontdoor",
+        id: "beta-0.1.0-repository-frontdoor",
         path: "README.md",
         required_patterns: &[
-            "now on `beta-0.0.1`",
+            "now on `beta-0.1.0`",
+            "nuis-beta-0.1.0-mainline-entry.md",
             "registered Nuis worker / Nustar execution capsule",
             "verified heterogeneous output carrier",
             "registered heterogeneous provider closure",

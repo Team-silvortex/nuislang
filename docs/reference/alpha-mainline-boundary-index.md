@@ -3,9 +3,9 @@
 This file is the shortest historical index for the boundaries established
 during the alpha closeout line.
 
-For present-tense `beta-0.0.1` work, start with:
+For present-tense `beta-0.1.0` work, start with:
 
-* [../versioning/nuis-beta-0.0.1-mainline-entry.md](../../docs/versioning/nuis-beta-0.0.1-mainline-entry.md)
+* [../versioning/nuis-beta-0.1.0-mainline-entry.md](../../docs/versioning/nuis-beta-0.1.0-mainline-entry.md)
 
 For the alpha progression that led into beta, continue with:
 
@@ -179,7 +179,7 @@ Short rule:
 If you need the shortest full route, use this order:
 
 1. [docs/current-mainline-map.md](../../docs/current-mainline-map.md)
-2. [nuis-beta-0.0.1-mainline-entry.md](../../docs/versioning/nuis-beta-0.0.1-mainline-entry.md)
+2. [nuis-beta-0.1.0-mainline-entry.md](../../docs/versioning/nuis-beta-0.1.0-mainline-entry.md)
 3. [alpha-mainline-boundary-index.md](alpha-mainline-boundary-index.md)
 4. the one specific boundary doc that matches the feature you are touching
 5. the nearest positive and negative example anchors

@@ -4,7 +4,7 @@ This file records the current practical boundary for splitting capabilities out
 of the compiler core and making them explicit through `nustar`.
 
 It was written for the historical `0.20.* -> alpha-0.0.1` handoff question and
-remains a boundary reference under `beta-0.0.1`:
+remains a boundary reference under `beta-0.1.0`:
 
 `what should already belong to stable nustar capability contracts, what is still staged or hard-coded, and how should the next split pass be judged?`
 
