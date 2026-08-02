@@ -543,11 +543,12 @@ pub(crate) fn print_nsdb_replay_transcript_with_control(
             .unwrap_or("<none>")
     );
     println!(
-        "  debugger_transcript_request_selector: {} status={} ready={} request={} source_trace={} source_provider={} collection_root={}",
+        "  debugger_transcript_request_selector: {} status={} ready={} request={} frame={} source_trace={} source_provider={} collection_root={}",
         transcript.request_selection.contract,
         transcript.request_selection.status,
         transcript.request_selection.ready,
         transcript.request_selection.request_id.as_deref().unwrap_or("<none>"),
+        transcript.request_selection.request_frame_id.as_deref().unwrap_or("<none>"),
         transcript.request_selection.source_trace_id.as_deref().unwrap_or("<none>"),
         transcript.request_selection.source_provider_family.as_deref().unwrap_or("<none>"),
         transcript.request_selection.collection_root_hash.as_deref().unwrap_or("<none>"),
@@ -669,13 +670,27 @@ pub(crate) fn print_nsdb_replay_transcript_with_control(
         transcript.replayed_checkpoint_count
     );
     println!(
+        "  debugger_transcript_frame_count: {}",
+        transcript.frame_count
+    );
+    println!(
+        "  debugger_transcript_request_frame_count: {}",
+        transcript.request_frame_count
+    );
+    println!(
+        "  debugger_transcript_replayed_frame_count: {}",
+        transcript.replayed_frame_count
+    );
+    println!(
         "  debugger_transcript_first_blocker: {}",
         transcript.first_blocker.as_deref().unwrap_or("<none>")
     );
     for frame in transcript.frames {
         println!(
-            "  debugger_transcript_frame: index={} trace={} frame={} kind={} phase={} entry={} replay={} consumed={} slot={} snapshot={} value={} next={}",
+            "  debugger_transcript_frame: index={} source_checkpoint={} scope={} trace={} frame={} kind={} phase={} entry={} replay={} consumed={} slot={} snapshot={} value={} next={}",
             frame.index,
+            frame.source_checkpoint_index,
+            frame.frame_scope,
             frame.trace_id,
             frame.frame_id,
             frame.checkpoint_kind,
@@ -688,5 +703,20 @@ pub(crate) fn print_nsdb_replay_transcript_with_control(
             frame.value_content_status,
             frame.next_action
         );
+        if let Some(request) = frame.request {
+            println!(
+                "  debugger_transcript_request_frame: contract={} parent={} ordinal={} request={} provider={} dispatch={} clock={} output={} token={} selected_set={}",
+                request.contract,
+                request.parent_frame_id,
+                request.ordinal,
+                request.request_id,
+                request.provider_family,
+                request.dispatch_id,
+                request.completion_clock,
+                request.output_hash,
+                request.completion_token,
+                request.selected_set_hash,
+            );
+        }
     }
 }

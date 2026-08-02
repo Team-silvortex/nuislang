@@ -128,51 +128,31 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
     );
     assert_eq!(
         summary.weakest_bootstrap_task_card_source,
-        "weakest-global-incomplete-status-progress-path"
+        "all-cells-complete"
     );
-    assert_eq!(summary.weakest_bootstrap_task_card_status, "ready");
-    assert!(summary.weakest_bootstrap_task_card_ready);
-    assert_eq!(
-        summary.weakest_bootstrap_task_card_coordinate,
-        "heterogeneous-runtime/linux-vulkan/vulkan-provider-bringup"
-    );
+    assert_eq!(summary.weakest_bootstrap_task_card_status, "complete");
+    assert!(!summary.weakest_bootstrap_task_card_ready);
+    assert_eq!(summary.weakest_bootstrap_task_card_coordinate, "<none>");
     assert!(summary
         .weakest_bootstrap_task_card_priority_reason
-        .contains("all bootstrap-critical cells are stable at 100/100"));
-    assert!(summary
-        .weakest_bootstrap_task_card_priority_reason
-        .contains("status `usable` rank 3"));
+        .contains("all registered tensor cells are stable at 100/100"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_handoff_coordinate,
-        "heterogeneous-runtime/linux-vulkan/vulkan-provider-bringup"
+        "<none>"
     );
     assert_eq!(summary.weakest_bootstrap_task_card_handoff_mode, "direct");
     assert!(summary
         .weakest_bootstrap_task_card_handoff_reason
-        .contains("weakest task card is directly actionable"));
-    assert!(summary
-        .weakest_bootstrap_task_card_handoff_action
-        .contains("request replay frame IDs"));
-    let handoff_command = &summary.weakest_bootstrap_task_card_handoff_command;
-    for required in [
-        "CARGO_INCREMENTAL=0 cargo check -q -p nuisc -p nsdb",
-        "cargo check -q -p nuisc -p nsdb -p nsld -p nuis",
-        "cargo test -q -p nsdb provider_request_completion",
-        "cargo test -q -p nsdb replay",
-        "cargo test -q -p nsdb request_selection",
-        "cargo test -q -p nuis parses_debug_request_selector",
-        "cargo test -q -p nuis artifact_nsdb_handoff_request_completion",
-        "linux_vulkan_producer_fans_out_to_cuda_and_vulkan_consumers",
-        "cargo test -q -p nuis dev_tensor",
-    ] {
-        assert!(handoff_command.contains(required));
-    }
-    assert!(summary
-        .weakest_bootstrap_task_card_handoff_expected_artifact
-        .contains("three ordered request-level replay frames"));
-    assert!(summary
-        .weakest_bootstrap_task_card_handoff_expected_artifact
-        .contains("resume advances to the final Vulkan request"));
+        .contains("all registered tensor cells are complete"));
+    assert_eq!(summary.weakest_bootstrap_task_card_handoff_action, "<none>");
+    assert_eq!(
+        summary.weakest_bootstrap_task_card_handoff_command,
+        "<none>"
+    );
+    assert_eq!(
+        summary.weakest_bootstrap_task_card_handoff_expected_artifact,
+        "<none>"
+    );
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.protocol,
         "nuis-dev-tensor-task-card-lineage-v1"
@@ -183,14 +163,10 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         .weakest_bootstrap_task_card_lineage
         .first_error
         .is_none());
-    assert_eq!(
-        summary
-            .weakest_bootstrap_task_card_lineage
-            .task_ancestry
-            .first()
-            .map(String::as_str),
-        Some("nuislang")
-    );
+    assert!(summary
+        .weakest_bootstrap_task_card_lineage
+        .task_ancestry
+        .is_empty());
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.task_ancestry,
         summary.weakest_bootstrap_task_card_lineage.handoff_ancestry
@@ -199,7 +175,7 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         summary
             .weakest_bootstrap_task_card_lineage
             .common_ancestor_path,
-        "heterogeneous-runtime/linux-vulkan/vulkan-provider-bringup"
+        "<none>"
     );
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.transition_depth,
@@ -317,11 +293,9 @@ fn dev_tensor_json_exposes_coordinate_cells() {
     assert!(
         json.contains("\"weakest_bootstrap_task_card_protocol\":\"nuis-dev-tensor-task-card-v1\"")
     );
-    assert!(json.contains(
-        "\"weakest_bootstrap_task_card_source\":\"weakest-global-incomplete-status-progress-path\""
-    ));
-    assert!(json.contains("\"weakest_bootstrap_task_card_status\":\"ready\""));
-    assert!(json.contains("\"weakest_bootstrap_task_card_ready\":true"));
+    assert!(json.contains("\"weakest_bootstrap_task_card_source\":\"all-cells-complete\""));
+    assert!(json.contains("\"weakest_bootstrap_task_card_status\":\"complete\""));
+    assert!(json.contains("\"weakest_bootstrap_task_card_ready\":false"));
     assert!(json.contains("\"weakest_bootstrap_task_card_coordinate\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_priority_reason\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_action\""));
@@ -339,15 +313,11 @@ fn dev_tensor_json_exposes_coordinate_cells() {
     assert!(json.contains("\"weakest_bootstrap_task_card_lineage_status\":\"clean\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_lineage_error_count\":0"));
     assert!(json.contains("\"weakest_bootstrap_task_card_lineage_errors\":[]"));
-    assert!(json.contains(
-        "\"weakest_bootstrap_task_card_task_ancestry\":[\"nuislang\",\"heterogeneous-runtime\""
-    ));
-    assert!(json.contains(
-        "\"weakest_bootstrap_task_card_handoff_ancestry\":[\"nuislang\",\"heterogeneous-runtime\""
-    ));
+    assert!(json.contains("\"weakest_bootstrap_task_card_task_ancestry\":[]"));
+    assert!(json.contains("\"weakest_bootstrap_task_card_handoff_ancestry\":[]"));
     assert!(json.contains("\"weakest_bootstrap_task_card_common_ancestor_path\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_transition_depth\":"));
-    assert!(json.contains("all bootstrap-critical cells are stable at 100/100"));
+    assert!(json.contains("all registered tensor cells are stable at 100/100"));
     assert!(json.contains("\"module\":\"linux-cuda\""));
     assert!(json.contains("\"function\":\"cuda-provider-bringup\""));
     assert!(json.contains("nuis-linux-cuda-host-probe-v1"));
@@ -476,11 +446,9 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("weakest_bootstrap_validation_command:"));
     assert!(text.contains("weakest_bootstrap_expected_artifact:"));
     assert!(text.contains("weakest_bootstrap_task_card_protocol: nuis-dev-tensor-task-card-v1"));
-    assert!(text.contains(
-        "weakest_bootstrap_task_card_source: weakest-global-incomplete-status-progress-path"
-    ));
-    assert!(text.contains("weakest_bootstrap_task_card_status: ready"));
-    assert!(text.contains("weakest_bootstrap_task_card_ready: true"));
+    assert!(text.contains("weakest_bootstrap_task_card_source: all-cells-complete"));
+    assert!(text.contains("weakest_bootstrap_task_card_status: complete"));
+    assert!(text.contains("weakest_bootstrap_task_card_ready: false"));
     assert!(text.contains("weakest_bootstrap_task_card_coordinate:"));
     assert!(text.contains("weakest_bootstrap_task_card_priority_reason:"));
     assert!(text.contains("weakest_bootstrap_task_card_action:"));
@@ -497,11 +465,9 @@ fn dev_tensor_text_exposes_drift_status() {
     ));
     assert!(text.contains("weakest_bootstrap_task_card_lineage_status: clean"));
     assert!(text.contains("weakest_bootstrap_task_card_lineage_error_count: 0"));
-    assert!(text.contains(
-        "weakest_bootstrap_task_card_common_ancestor_path: heterogeneous-runtime/linux-vulkan/vulkan-provider-bringup"
-    ));
+    assert!(text.contains("weakest_bootstrap_task_card_common_ancestor_path: <none>"));
     assert!(text.contains("weakest_bootstrap_task_card_transition_depth: 0"));
-    assert!(text.contains("all bootstrap-critical cells are stable at 100/100"));
+    assert!(text.contains("all registered tensor cells are stable at 100/100"));
     assert!(text.contains(
         "cell: architecture=heterogeneous-runtime module=linux-vulkan function=vulkan-provider-bringup"
     ));

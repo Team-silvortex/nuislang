@@ -133,6 +133,7 @@ pub enum CommandKind {
         input: PathBuf,
         request_id: String,
         json: bool,
+        cursor_output: Option<PathBuf>,
     },
     DebugLineageRepair {
         input: PathBuf,
@@ -388,6 +389,7 @@ where
                 input: parsed.input,
                 request_id: parsed.request_id,
                 json: parsed.json,
+                cursor_output: parsed.cursor_output,
             })
         }
         "debug-lineage-repair" => {

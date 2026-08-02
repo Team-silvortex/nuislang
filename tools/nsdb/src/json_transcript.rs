@@ -78,6 +78,10 @@ fn nsdb_replay_transcript_json_from_transcript(
             transcript.request_selection.request_id.as_deref(),
         ),
         json_optional_string_field(
+            "debugger_transcript_request_frame_id",
+            transcript.request_selection.request_frame_id.as_deref(),
+        ),
+        json_optional_string_field(
             "debugger_transcript_request_source_trace_id",
             transcript.request_selection.source_trace_id.as_deref(),
         ),
@@ -204,6 +208,15 @@ fn nsdb_replay_transcript_json_from_transcript(
             "debugger_transcript_replayed_checkpoint_count",
             transcript.replayed_checkpoint_count,
         ),
+        json_usize_field("debugger_transcript_frame_count", transcript.frame_count),
+        json_usize_field(
+            "debugger_transcript_request_frame_count",
+            transcript.request_frame_count,
+        ),
+        json_usize_field(
+            "debugger_transcript_replayed_frame_count",
+            transcript.replayed_frame_count,
+        ),
         json_optional_string_field(
             "debugger_transcript_first_blocker",
             transcript.first_blocker.as_deref(),
@@ -222,6 +235,8 @@ fn transcript_frames_json(frames: &[NsdbReplayTranscriptFrame]) -> String {
         .map(|frame| {
             let fields = vec![
                 json_usize_field("index", frame.index),
+                json_usize_field("source_checkpoint_index", frame.source_checkpoint_index),
+                json_string_field("frame_scope", frame.frame_scope),
                 json_string_field("trace_id", &frame.trace_id),
                 json_string_field("frame_id", &frame.frame_id),
                 json_string_field("checkpoint_kind", &frame.checkpoint_kind),
@@ -236,6 +251,70 @@ fn transcript_frames_json(frames: &[NsdbReplayTranscriptFrame]) -> String {
                 json_string_field("value_content_status", &frame.value_content_status),
                 json_string_field("value_content_summary", &frame.value_content_summary),
                 json_string_field("next_action", &frame.next_action),
+                json_optional_string_field(
+                    "request_frame_contract",
+                    frame.request.as_ref().map(|request| request.contract),
+                ),
+                json_optional_string_field(
+                    "request_parent_frame_id",
+                    frame
+                        .request
+                        .as_ref()
+                        .map(|request| request.parent_frame_id.as_str()),
+                ),
+                frame.request.as_ref().map_or_else(
+                    || "\"request_ordinal\":null".to_owned(),
+                    |request| json_usize_field("request_ordinal", request.ordinal),
+                ),
+                json_optional_string_field(
+                    "request_id",
+                    frame
+                        .request
+                        .as_ref()
+                        .map(|request| request.request_id.as_str()),
+                ),
+                json_optional_string_field(
+                    "request_provider_family",
+                    frame
+                        .request
+                        .as_ref()
+                        .map(|request| request.provider_family.as_str()),
+                ),
+                json_optional_string_field(
+                    "request_dispatch_id",
+                    frame
+                        .request
+                        .as_ref()
+                        .map(|request| request.dispatch_id.as_str()),
+                ),
+                json_optional_string_field(
+                    "request_completion_clock",
+                    frame
+                        .request
+                        .as_ref()
+                        .map(|request| request.completion_clock.as_str()),
+                ),
+                json_optional_string_field(
+                    "request_output_hash",
+                    frame
+                        .request
+                        .as_ref()
+                        .map(|request| request.output_hash.as_str()),
+                ),
+                json_optional_string_field(
+                    "request_completion_token",
+                    frame
+                        .request
+                        .as_ref()
+                        .map(|request| request.completion_token.as_str()),
+                ),
+                json_optional_string_field(
+                    "request_selected_set_hash",
+                    frame
+                        .request
+                        .as_ref()
+                        .map(|request| request.selected_set_hash.as_str()),
+                ),
             ];
             format!("{{{}}}", fields.join(","))
         })

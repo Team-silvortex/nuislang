@@ -49,12 +49,18 @@ pub(crate) struct NsdbReplayTranscript {
     pub(crate) ready: bool,
     pub(crate) checkpoint_count: usize,
     pub(crate) replayed_checkpoint_count: usize,
+    pub(crate) frame_count: usize,
+    pub(crate) request_frame_count: usize,
+    pub(crate) replayed_frame_count: usize,
     pub(crate) first_blocker: Option<String>,
     pub(crate) frames: Vec<NsdbReplayTranscriptFrame>,
 }
 
+#[derive(Debug, Clone)]
 pub(crate) struct NsdbReplayTranscriptFrame {
     pub(crate) index: usize,
+    pub(crate) source_checkpoint_index: usize,
+    pub(crate) frame_scope: &'static str,
     pub(crate) trace_id: String,
     pub(crate) frame_id: String,
     pub(crate) checkpoint_kind: String,
@@ -69,6 +75,7 @@ pub(crate) struct NsdbReplayTranscriptFrame {
     pub(crate) value_content_status: String,
     pub(crate) value_content_summary: String,
     pub(crate) next_action: String,
+    pub(crate) request: Option<crate::request_replay_frames::NsdbRequestReplayFrameEvidence>,
 }
 
 pub(crate) fn build_replay_transcript(report: &NsdbInspectReport) -> NsdbReplayTranscript {
@@ -83,21 +90,31 @@ pub(crate) fn build_replay_transcript_with_control(
     let plan_ready = plan.status == "ready"
         && plan.checkpoint_count > 0
         && plan.replayable_checkpoint_count == plan.checkpoint_count;
-    let mut frames = plan
+    let checkpoint_frames = plan
         .checkpoints
         .iter()
         .map(|checkpoint| transcript_frame(checkpoint, false))
         .collect::<Vec<_>>();
+    let expansion =
+        crate::request_replay_frames::expand_request_replay_frames(report, checkpoint_frames);
+    let expansion_blocker = expansion.first_blocker;
+    let request_frame_count = expansion.request_frame_count;
+    let mut frames = expansion.frames;
+    let replay_ready = plan_ready && expansion_blocker.is_none();
     let request_selection = crate::request_replay_selector::resolve_request_replay_selection(
         report,
         control.request_id.as_deref(),
     );
     let control_result = if control.request_id.is_some() {
-        apply_request_replay_control(&mut frames, plan_ready, &request_selection)
+        crate::request_replay_frames::apply_request_replay_control(
+            &mut frames,
+            replay_ready,
+            &request_selection,
+        )
     } else {
-        apply_replay_control(&mut frames, plan_ready, control)
+        apply_replay_control(&mut frames, replay_ready, control)
     };
-    let ready = plan_ready && control_result.blocker.is_none();
+    let ready = replay_ready && control_result.blocker.is_none();
     let resume_cursor = replay_resume_cursor(&frames, &control_result);
     let dispatch_identity = &report
         .payload_execution_handoff
@@ -131,7 +148,7 @@ pub(crate) fn build_replay_transcript_with_control(
         resume_input_next_frame_id: control.resume_next_frame_id.clone(),
         selected_frame_index: control_result.selected_frame_index,
         selected_frame_id: control_result.selected_frame_id.clone(),
-        stop_reason: if plan_ready {
+        stop_reason: if replay_ready {
             control_result.stop_reason
         } else {
             "transcript-blocked"
@@ -148,35 +165,45 @@ pub(crate) fn build_replay_transcript_with_control(
             "transcript-resumed"
         } else if ready {
             "transcript-stopped"
-        } else if plan_ready {
+        } else if replay_ready {
             "transcript-control-blocked"
         } else {
             "transcript-blocked"
         },
         ready,
         checkpoint_count: plan.checkpoint_count,
-        replayed_checkpoint_count: frames.iter().filter(|frame| frame.consumed).count(),
+        replayed_checkpoint_count: frames
+            .iter()
+            .filter(|frame| frame.frame_scope == "checkpoint" && frame.consumed)
+            .count(),
+        frame_count: frames.len(),
+        request_frame_count,
+        replayed_frame_count: frames.iter().filter(|frame| frame.consumed).count(),
         first_blocker: if ready {
             None
-        } else if plan_ready {
-            control_result.blocker
-        } else {
+        } else if !plan_ready {
             plan.first_blocker
                 .or_else(|| Some("payload-execution-replay:no-checkpoints".to_owned()))
+        } else if expansion_blocker.is_some() {
+            expansion_blocker
+        } else if replay_ready {
+            control_result.blocker
+        } else {
+            Some("request-replay-frame:expansion-blocked".to_owned())
         },
         frames,
     }
 }
 
-struct ReplayControlResult {
-    mode: &'static str,
-    selector: Option<String>,
-    status: &'static str,
-    selected_frame_index: Option<usize>,
-    selected_frame_id: Option<String>,
-    stop_reason: &'static str,
-    resume_input_status: &'static str,
-    blocker: Option<String>,
+pub(crate) struct ReplayControlResult {
+    pub(crate) mode: &'static str,
+    pub(crate) selector: Option<String>,
+    pub(crate) status: &'static str,
+    pub(crate) selected_frame_index: Option<usize>,
+    pub(crate) selected_frame_id: Option<String>,
+    pub(crate) stop_reason: &'static str,
+    pub(crate) resume_input_status: &'static str,
+    pub(crate) blocker: Option<String>,
 }
 
 struct ReplayResumeCursor {
@@ -185,64 +212,6 @@ struct ReplayResumeCursor {
     after_frame_id: Option<String>,
     next_frame_index: Option<usize>,
     next_frame_id: Option<String>,
-}
-
-fn apply_request_replay_control(
-    frames: &mut [NsdbReplayTranscriptFrame],
-    plan_ready: bool,
-    selection: &crate::request_replay_selector::NsdbRequestReplaySelection,
-) -> ReplayControlResult {
-    if !plan_ready || !selection.ready {
-        return ReplayControlResult {
-            mode: "request",
-            selector: selection.request_id.clone(),
-            status: if plan_ready {
-                selection.status
-            } else {
-                "not-evaluated"
-            },
-            selected_frame_index: None,
-            selected_frame_id: None,
-            stop_reason: "request-selector-blocked",
-            resume_input_status: "not-requested",
-            blocker: selection.first_blocker.clone(),
-        };
-    }
-    let source_trace_id = selection.source_trace_id.as_deref().unwrap_or("none");
-    let matches = frames
-        .iter()
-        .enumerate()
-        .filter(|(_, frame)| frame.trace_id == source_trace_id)
-        .map(|(position, _)| position)
-        .collect::<Vec<_>>();
-    if matches.len() != 1 {
-        return ReplayControlResult {
-            mode: "request",
-            selector: selection.request_id.clone(),
-            status: "request-frame-unresolved",
-            selected_frame_index: None,
-            selected_frame_id: None,
-            stop_reason: "request-selector-blocked",
-            resume_input_status: "not-requested",
-            blocker: Some(format!(
-                "request-replay-selector:source-frame-unresolved:{source_trace_id}"
-            )),
-        };
-    }
-    let selected_position = matches[0];
-    for frame in frames.iter_mut().take(selected_position + 1) {
-        frame.consumed = true;
-    }
-    ReplayControlResult {
-        mode: "request",
-        selector: selection.request_id.clone(),
-        status: "request-selected",
-        selected_frame_index: Some(frames[selected_position].index),
-        selected_frame_id: Some(frames[selected_position].frame_id.clone()),
-        stop_reason: "request-selected",
-        resume_input_status: "not-requested",
-        blocker: None,
-    }
 }
 
 fn apply_replay_control(
@@ -511,6 +480,8 @@ fn transcript_frame(
 ) -> NsdbReplayTranscriptFrame {
     NsdbReplayTranscriptFrame {
         index: checkpoint.index,
+        source_checkpoint_index: checkpoint.index,
+        frame_scope: "checkpoint",
         trace_id: checkpoint.trace_id.clone(),
         frame_id: checkpoint.frame_id.clone(),
         checkpoint_kind: checkpoint.checkpoint_kind.clone(),
@@ -525,21 +496,21 @@ fn transcript_frame(
         value_content_status: checkpoint.value_content_status.clone(),
         value_content_summary: checkpoint.value_content_summary.clone(),
         next_action: checkpoint.next_action.clone(),
+        request: None,
     }
 }
 
 #[cfg(test)]
 mod control_tests {
-    use super::{
-        apply_replay_control, apply_request_replay_control, NsdbReplayControl,
-        NsdbReplayTranscriptFrame,
-    };
+    use super::{apply_replay_control, NsdbReplayControl, NsdbReplayTranscriptFrame};
     use crate::request_replay_selector::NsdbRequestReplaySelection;
 
     fn frames() -> Vec<NsdbReplayTranscriptFrame> {
         (0..3)
             .map(|index| NsdbReplayTranscriptFrame {
                 index,
+                source_checkpoint_index: index,
+                frame_scope: "checkpoint",
                 trace_id: format!("trace-{index}"),
                 frame_id: format!("frame-{index}"),
                 checkpoint_kind: "payload-execution-checkpoint".to_owned(),
@@ -562,6 +533,7 @@ mod control_tests {
                 value_content_status: "value-ready".to_owned(),
                 value_content_summary: index.to_string(),
                 next_action: "continue".to_owned(),
+                request: None,
             })
             .collect()
     }
@@ -595,39 +567,37 @@ mod control_tests {
     }
 
     #[test]
-    fn request_selection_consumes_through_unique_source_frame() {
+    fn request_stop_cursor_targets_exact_successor() {
         let mut frames = frames();
-        let result = apply_request_replay_control(
+        frames[1].frame_scope = "provider-request";
+        frames[2].frame_scope = "provider-request";
+        let result = crate::request_replay_frames::apply_request_replay_control(
             &mut frames,
             true,
             &NsdbRequestReplaySelection {
                 contract: "nsdb-provider-request-replay-selector-v1",
                 status: "request-resolved",
                 ready: true,
-                request_id: Some("kernel.cuda.copy".to_owned()),
+                request_id: Some("request.cuda".to_owned()),
+                request_frame_id: Some("frame-1".to_owned()),
                 source_trace_id: Some("trace-1".to_owned()),
                 source_provider_family: Some("spirv:vulkan-gpu".to_owned()),
-                collection_root_hash: Some("sha256:collection".to_owned()),
+                collection_root_hash: Some("0xcollection".to_owned()),
                 provider_family: Some("cuda:nvidia-gpu".to_owned()),
                 dispatch_id: Some("dispatch0001".to_owned()),
-                completion_clock: Some("clock0002".to_owned()),
-                output_hash: Some("sha256:output".to_owned()),
+                completion_clock: Some("clock:1".to_owned()),
+                output_hash: Some("0xoutput".to_owned()),
                 completion_token: Some("provider-completion:cuda".to_owned()),
-                selected_set_hash: Some("sha256:selected".to_owned()),
+                selected_set_hash: Some("fnv1a64:selected".to_owned()),
                 first_blocker: None,
             },
         );
+        let cursor = super::replay_resume_cursor(&frames, &result);
 
-        assert_eq!(result.mode, "request");
-        assert_eq!(result.status, "request-selected");
         assert_eq!(result.selected_frame_id.as_deref(), Some("frame-1"));
-        assert_eq!(
-            frames
-                .iter()
-                .map(|frame| frame.consumed)
-                .collect::<Vec<_>>(),
-            vec![true, true, false]
-        );
+        assert_eq!(cursor.after_frame_id.as_deref(), Some("frame-1"));
+        assert_eq!(cursor.next_frame_index, Some(2));
+        assert_eq!(cursor.next_frame_id.as_deref(), Some("frame-2"));
     }
 
     #[test]

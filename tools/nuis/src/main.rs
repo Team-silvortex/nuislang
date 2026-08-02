@@ -493,7 +493,8 @@ fn run() -> Result<(), String> {
             input,
             request_id,
             json,
-        } => debug_request_command::handle_debug_request(input, request_id, json)?,
+            cursor_output,
+        } => debug_request_command::handle_debug_request(input, request_id, json, cursor_output)?,
         cli::CommandKind::DebugLineageRepair { input, json } => {
             debug_lineage_repair_command::handle_debug_lineage_repair(input, json)?
         }
@@ -657,7 +658,7 @@ fn print_help() {
         "    nuis debug-resume [--json] [--break-at TARGET | --break-phase PHASE --break-entry SYMBOL] [--save-cursor PATH] <artifact-output-dir|nuis.build.manifest.toml>"
     );
     println!(
-        "    nuis debug-request --request-id REQUEST [--json] <artifact-output-dir|nuis.build.manifest.toml>"
+        "    nuis debug-request --request-id REQUEST [--save-cursor PATH] [--json] <artifact-output-dir|nuis.build.manifest.toml>"
     );
     println!(
         "    nuis debug-lineage-repair [--json] <artifact-output-dir|nuis.build.manifest.toml>"

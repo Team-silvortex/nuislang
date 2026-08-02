@@ -212,6 +212,8 @@ fn parses_debug_request_selector() {
             "target/demo".to_owned(),
             "--request-id".to_owned(),
             "kernel.cuda.copy".to_owned(),
+            "--save-cursor".to_owned(),
+            "target/demo/request.cursor.toml".to_owned(),
             "--json".to_owned(),
         ]
         .into_iter(),
@@ -223,6 +225,7 @@ fn parses_debug_request_selector() {
             input: PathBuf::from("target/demo"),
             request_id: "kernel.cuda.copy".to_owned(),
             json: true,
+            cursor_output: Some(PathBuf::from("target/demo/request.cursor.toml")),
         }
     );
 }

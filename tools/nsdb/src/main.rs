@@ -102,6 +102,7 @@ mod replay;
 #[cfg(test)]
 mod replay_tests;
 mod report;
+mod request_replay_frames;
 mod request_replay_selector;
 mod sidecar;
 mod transcript;

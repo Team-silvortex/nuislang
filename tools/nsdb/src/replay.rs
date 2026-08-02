@@ -616,7 +616,7 @@ fn generic_sample_resolution(event: &NsdbPayloadExecutionEvent) -> ValueSampleRe
     }
 }
 
-fn frame_id_for_event(event: &NsdbPayloadExecutionEvent) -> String {
+pub(crate) fn frame_id_for_event(event: &NsdbPayloadExecutionEvent) -> String {
     format!(
         "frame:payload:{}:{}",
         event.index,

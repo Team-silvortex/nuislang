@@ -67,20 +67,23 @@ pub(super) struct DebugRequestArgs {
     pub(super) input: PathBuf,
     pub(super) request_id: String,
     pub(super) json: bool,
+    pub(super) cursor_output: Option<PathBuf>,
 }
 
 pub(super) fn parse_debug_request_args<I>(args: &mut I) -> Result<DebugRequestArgs, String>
 where
     I: Iterator<Item = String>,
 {
-    const USAGE: &str = "usage: nuis debug-request --request-id <request-id> [--json] <artifact-output-dir|nuis.build.manifest.toml>";
+    const USAGE: &str = "usage: nuis debug-request --request-id <request-id> [--save-cursor <path>] [--json] <artifact-output-dir|nuis.build.manifest.toml>";
     let mut input = None;
     let mut request_id = None;
     let mut json = false;
+    let mut cursor_output = None;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--json" => json = true,
             "--request-id" => request_id = Some(args.next().ok_or(USAGE)?),
+            "--save-cursor" => cursor_output = Some(PathBuf::from(args.next().ok_or(USAGE)?)),
             _ if input.is_none() => input = Some(PathBuf::from(arg)),
             _ => return Err(USAGE.to_owned()),
         }
@@ -89,6 +92,7 @@ where
         input: input.ok_or(USAGE)?,
         request_id: request_id.filter(|value| !value.is_empty()).ok_or(USAGE)?,
         json,
+        cursor_output,
     })
 }
 

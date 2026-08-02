@@ -21,7 +21,7 @@ pub(crate) struct ProviderRequestCompletionReceipt {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProviderRequestCompletionEvidence {
-    present: bool,
+    pub(crate) present: bool,
     pub(crate) contract: String,
     pub(crate) status: String,
     pub(crate) count: usize,
@@ -236,7 +236,7 @@ pub(crate) fn append_hash_material(
     }
 }
 
-fn verified_shape(evidence: &ProviderRequestCompletionEvidence) -> bool {
+pub(crate) fn verified_shape(evidence: &ProviderRequestCompletionEvidence) -> bool {
     let mut request_ids = BTreeSet::new();
     evidence.contract == REQUEST_COMPLETION_COLLECTION_CONTRACT
         && evidence.count == evidence.receipts.len()

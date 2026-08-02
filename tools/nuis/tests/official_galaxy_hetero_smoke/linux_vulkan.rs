@@ -678,6 +678,8 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
         ));
 
         let request_id = "kernel.cuda.fan-out.copy-sum-u32";
+        let request_cursor = output_dir.join("nuis.nsdb.request-replay-cursor.toml");
+        let request_cursor_text = request_cursor.display().to_string();
         let request_replay = run_nsdb(&[
             "replay",
             &output_dir_text,
@@ -694,6 +696,7 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
             "\"debugger_transcript_request_id\":\"kernel.cuda.fan-out.copy-sum-u32\"",
             "\"debugger_transcript_request_provider_family\":\"cuda:nvidia-gpu\"",
             "\"debugger_transcript_request_dispatch_id\":\"dispatch0001\"",
+            "\"debugger_transcript_request_frame_count\":3",
             "\"debugger_transcript_control_mode\":\"request\"",
             "\"debugger_transcript_control_status\":\"request-selected\"",
             "\"debugger_transcript_stop_reason\":\"request-selected\"",
@@ -708,6 +711,7 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
             completion.dispatch_selected_set_hash
         )));
         for field in [
+            "debugger_transcript_request_frame_id",
             "debugger_transcript_request_completion_clock",
             "debugger_transcript_request_output_hash",
             "debugger_transcript_request_completion_token",
@@ -718,12 +722,19 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
                 "request replay should materialize `{field}`\n{request_replay_text}"
             );
         }
-
+        assert_eq!(
+            request_replay_text
+                .matches("\"frame_scope\":\"provider-request\"")
+                .count(),
+            3
+        );
         let nuis_request = run_nuis(&[
             "debug-request",
             &output_dir_text,
             "--request-id",
             request_id,
+            "--save-cursor",
+            &request_cursor_text,
             "--json",
         ]);
         assert_success(&nuis_request, "Nuis CUDA request debugger frontdoor");
@@ -737,6 +748,64 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
                 && nuis_request_text
                     .contains("\"debugger_transcript_control_status\":\"request-selected\""),
             "Nuis should preserve the typed Nsdb request selection\n{nuis_request_text}"
+        );
+        let cuda_frame =
+            json_string_values(&nuis_request_text, "debugger_transcript_request_frame_id")
+                .into_iter()
+                .next()
+                .expect("Nuis CUDA request replay frame ID");
+        let final_frame = json_string_values(
+            &nuis_request_text,
+            "debugger_transcript_resume_next_frame_id",
+        )
+        .into_iter()
+        .next()
+        .expect("Nuis final Vulkan successor frame ID");
+        assert!(cuda_frame.starts_with("frame:request:"));
+        assert!(final_frame.starts_with("frame:request:"));
+        assert_ne!(cuda_frame, final_frame);
+        assert_file_contains(
+            &request_cursor,
+            &format!("after_frame_id = \"{cuda_frame}\""),
+            "Nuis request cursor CUDA stop",
+        );
+        assert_file_contains(
+            &request_cursor,
+            &format!("next_frame_id = \"{final_frame}\""),
+            "Nuis request cursor final Vulkan successor",
+        );
+
+        let cursor_report = run_nuis(&["build-report", "--json", &output_dir_text]);
+        assert_success(&cursor_report, "Nuis selected request cursor projection");
+        let cursor_report_text = output_text(&cursor_report);
+        assert!(
+            cursor_report_text.contains(
+                "\"nsld_final_executable_output_debugger_cursor_status\":\"cursor-resume-ready\""
+            ) && cursor_report_text
+                .contains("\"closure_summary_debugger_cursor_status\":\"cursor-resume-ready\"")
+                && cursor_report_text.contains("nuis.nsdb.request-replay-cursor.toml"),
+            "Nuis build-report should follow the selected request cursor\n{cursor_report_text}"
+        );
+
+        let resumed_request = run_nuis(&[
+            "debug-resume",
+            &output_dir_text,
+            "--break-at",
+            &final_frame,
+            "--json",
+        ]);
+        assert_success(&resumed_request, "Nuis request-frame cursor resume");
+        let resumed_request_text = output_text(&resumed_request);
+        assert!(
+            resumed_request_text
+                .contains("\"debugger_transcript_resume_input_status\":\"cursor-accepted\"")
+                && resumed_request_text.contains(&format!(
+                    "\"debugger_transcript_selected_frame_id\":\"{final_frame}\""
+                ))
+                && resumed_request_text
+                    .contains("\"debugger_transcript_replayed_checkpoint_count\":0")
+                && resumed_request_text.contains("\"debugger_transcript_replayed_frame_count\":1"),
+            "Nuis should resume only the final Vulkan request frame\n{resumed_request_text}"
         );
 
         let missing = run_nsdb(&[
