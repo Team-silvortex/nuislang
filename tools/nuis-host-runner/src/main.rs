@@ -20,7 +20,7 @@ use container::{
 };
 use container_provider_dispatch::ProviderDispatchEntry;
 use report::{print_text_report, render_json_report};
-use runtime_bootstrap::runtime_bootstrap_plan;
+use runtime_bootstrap::runtime_bootstrap_handoff;
 
 const RUNNER_PROTOCOL: &str = "nuis-host-runner-v1";
 const MANIFEST_SCHEMA: &str = "nuis-host-launcher-manifest-v1";
@@ -82,6 +82,10 @@ struct RunnerReport {
     runtime_bootstrap_stage_count: usize,
     runtime_bootstrap_mapped_section_count: usize,
     runtime_bootstrap_applied_relocation_count: usize,
+    runtime_bootstrap_execution_contract: String,
+    runtime_bootstrap_execution_identity_hash: String,
+    runtime_bootstrap_execution_status: String,
+    runtime_bootstrap_activated_service_count: usize,
     runtime_bootstrap_blockers: Vec<String>,
     manifest_path: String,
     nsb_path: Option<String>,
@@ -385,14 +389,20 @@ fn validate_handoff(
             blockers.push("output-dir:empty".to_owned());
         }
     }
-    let runtime_bootstrap = runtime_bootstrap_plan(
+    let mapped_image_hash = nsb_payload_region
+        .map(fnv1a64_hex)
+        .unwrap_or_else(|| "none".to_owned());
+    let runtime_bootstrap = runtime_bootstrap_handoff(
         &container_loader,
         blockers.is_empty(),
+        &mapped_image_hash,
+        nsb_payload_region.map_or(0, <[u8]>::len),
         scheduler_entry,
         lifecycle_hook,
     );
-    let runtime_bootstrap_steps = runtime_bootstrap.rendered_stages();
-    let runtime_bootstrap_blockers = runtime_bootstrap.blockers.clone();
+    let runtime_bootstrap_steps = runtime_bootstrap.plan.rendered_stages();
+    let mut runtime_bootstrap_blockers = runtime_bootstrap.plan.blockers.clone();
+    runtime_bootstrap_blockers.extend(runtime_bootstrap.transfer.blockers.iter().cloned());
     blockers.extend(runtime_bootstrap_blockers.iter().cloned());
     let ready = blockers.is_empty();
     let launch_steps = if ready {
@@ -409,14 +419,27 @@ fn validate_handoff(
     };
     RunnerReport {
         ready,
-        would_enter_lifecycle_hook: runtime_bootstrap.ready,
-        runtime_bootstrap_contract: runtime_bootstrap.protocol.to_owned(),
-        runtime_bootstrap_identity_contract: runtime_bootstrap.identity_contract.to_owned(),
-        runtime_bootstrap_identity_hash: runtime_bootstrap.identity_hash,
-        runtime_bootstrap_status: runtime_bootstrap.status.to_owned(),
-        runtime_bootstrap_stage_count: runtime_bootstrap.stages.len(),
-        runtime_bootstrap_mapped_section_count: container_loader.container_section.entries.len(),
-        runtime_bootstrap_applied_relocation_count: container_loader.relocation.entries.len(),
+        would_enter_lifecycle_hook: runtime_bootstrap.transfer.ready,
+        runtime_bootstrap_contract: runtime_bootstrap.plan.protocol.to_owned(),
+        runtime_bootstrap_identity_contract: runtime_bootstrap.plan.identity_contract.to_owned(),
+        runtime_bootstrap_identity_hash: runtime_bootstrap.plan.identity_hash,
+        runtime_bootstrap_status: runtime_bootstrap.plan.status.to_owned(),
+        runtime_bootstrap_stage_count: runtime_bootstrap.plan.stages.len(),
+        runtime_bootstrap_mapped_section_count: runtime_bootstrap
+            .transfer
+            .consumed_mapped_section_count,
+        runtime_bootstrap_applied_relocation_count: runtime_bootstrap
+            .transfer
+            .consumed_applied_relocation_count,
+        runtime_bootstrap_execution_contract: runtime_bootstrap.execution_protocol.to_owned(),
+        runtime_bootstrap_execution_identity_hash: runtime_bootstrap
+            .transfer
+            .execution_identity_hash,
+        runtime_bootstrap_execution_status: runtime_bootstrap.transfer.status.to_owned(),
+        runtime_bootstrap_activated_service_count: runtime_bootstrap
+            .transfer
+            .activated_service_ids
+            .len(),
         runtime_bootstrap_blockers,
         manifest_path: manifest_path.display().to_string(),
         nsb_path: Some(nsb_path.display().to_string()),

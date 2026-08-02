@@ -436,6 +436,13 @@ Short reading rule:
   and host-assisted external-import declarations no longer block the host-runner
   handoff. They remain visible as compatibility evidence rather than being
   treated as a pure self-contained closure.
+* `nuis-runtime` now owns `nuis-executable-memory-adapter-v1`. The first Unix
+  implementation proves RW-to-RX sealing, architecture-specific instruction
+  cache synchronization, entry bounds, section hash, and a real one-shot
+  Apple AArch64 call. This does not upgrade the current smoke to payload
+  execution: its lifecycle symbol still names `compiled-artifact`, which the
+  adapter rejects because only `nuis-native-entry-code` may cross the explicit
+  unsafe `nuis-runtime-lifecycle-entry-i64-v1` boundary.
 * `workflow` and LinkPlan JSON mirror that decision under
   `workflow_run_artifact_prelaunch_*`, so the main workflow surface can show the
   launch closure that `run-artifact` would prefer without forcing callers to run

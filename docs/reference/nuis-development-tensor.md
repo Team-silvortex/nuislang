@@ -1523,15 +1523,30 @@ heterogeneous `glm.*` sidecar contracts. Both are immutable metadata bindings,
 and Nsdb now preserves the verified binding-table hash even when no provider
 selection is present.
 
-The coordinate is `active/75`. The new
+The coordinate is `active/90`. The
 `nuis-runtime-lifecycle-bootstrap-plan-identity-v1` deterministically covers
 entry, section and relocation tables, every normalized mapping/application,
 runtime services, lifecycle, provider dispatch, and scheduler state. Nsld
 derives it from real patch application plus byte audit, persists it in the
 container-loader handoff, and Nsdb independently validates it before replay.
-The remaining gap is no longer missing metadata: mapped-section facts still do
-not own executable-memory handles, and no runtime execution adapter activates
-the services and transfers control into compiled Nuis entry code.
+`nuis-runtime-lifecycle-bootstrap-execution-v1` now binds one owned image
+mapping plus non-cloneable section, relocation, and runtime-service
+capabilities to that exact identity. Its private context is created only when
+the resource sets and mapped ranges match, is consumed exactly once, activates
+clock/GLM services after relocation consumption, and produces a fail-closed
+`nuis-runtime-compiled-entry-transfer-v1` result. `nuis-host-runner` now gates
+lifecycle entry on that transfer result rather than plan readiness alone.
+`nuis-executable-memory-adapter-v1` adds the first native-host boundary. Its
+Unix adapter validates section identity/hash, the fixed no-arg i64 ABI, entry
+bounds, and architecture alignment, writes through RW pages only, flushes the
+instruction cache where required, then seals the mapping RX. A real Apple
+AArch64 thunk returns `42` through the one-shot invocation. The call remains an
+explicit unsafe boundary because hashes cannot prove arbitrary machine-code
+ABI behavior. Current `compiled-artifact` entry sections are rejected rather
+than executed. The remaining gap is now in Nsld and host-runner integration: a
+dedicated `nuis-native-entry-code` section must be emitted, hash-bound through
+the container/NSB byte maps, sliced from the verified image, and explicitly
+authorized for invocation.
 
 ## Linux CUDA Provider Bring-Up
 

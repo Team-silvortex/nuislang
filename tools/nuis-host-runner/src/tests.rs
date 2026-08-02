@@ -121,6 +121,15 @@ fn validates_ready_launcher_handoff() {
     assert_eq!(report.runtime_bootstrap_stage_count, 10);
     assert_eq!(report.runtime_bootstrap_mapped_section_count, 1);
     assert_eq!(report.runtime_bootstrap_applied_relocation_count, 1);
+    assert_eq!(
+        report.runtime_bootstrap_execution_contract,
+        "nuis-runtime-lifecycle-bootstrap-execution-v1"
+    );
+    assert_eq!(report.runtime_bootstrap_execution_status, "transfer-ready");
+    assert!(report
+        .runtime_bootstrap_execution_identity_hash
+        .starts_with("0x"));
+    assert_eq!(report.runtime_bootstrap_activated_service_count, 2);
     assert!(report.runtime_bootstrap_blockers.is_empty());
     assert!(report
         .launch_steps
@@ -157,6 +166,12 @@ fn validates_ready_launcher_handoff() {
     assert!(json.contains("\"runtime_bootstrap_stage_count\":10"));
     assert!(json.contains("\"runtime_bootstrap_mapped_section_count\":1"));
     assert!(json.contains("\"runtime_bootstrap_applied_relocation_count\":1"));
+    assert!(json.contains(
+        "\"runtime_bootstrap_execution_contract\":\"nuis-runtime-lifecycle-bootstrap-execution-v1\""
+    ));
+    assert!(json.contains("\"runtime_bootstrap_execution_identity_hash\":\"0x"));
+    assert!(json.contains("\"runtime_bootstrap_execution_status\":\"transfer-ready\""));
+    assert!(json.contains("\"runtime_bootstrap_activated_service_count\":2"));
     assert_eq!(
         report.container_loader_clock_root_contract.as_deref(),
         Some("nuis-clock-protocol-v1")

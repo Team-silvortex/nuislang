@@ -12,6 +12,7 @@ description = "AOT-side execution and contract scaffolding for the Nuis toolchai
 path = "src/lib.rs"
 
 [dependencies]
+libc.workspace = true
 nuis-artifact = { path = "../nuis-artifact" }
 yir-core = { path = "../yir-core" }
 yir-exec = { path = "../yir-exec" }

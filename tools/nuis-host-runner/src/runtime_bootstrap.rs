@@ -1,16 +1,26 @@
 use crate::container::ContainerLoaderSummary;
 use nuis_runtime::{
-    plan_lifecycle_bootstrap, AppliedRelocationFacts, LifecycleBootstrapFacts,
-    LifecycleBootstrapPlan, MappedSectionFacts, RuntimeServiceBindingFacts, CLOCK_ROOT_BINDING_ID,
+    plan_lifecycle_bootstrap, prepare_lifecycle_bootstrap_execution, AppliedRelocationFacts,
+    CompiledEntryTransferResult, LifecycleBootstrapFacts, LifecycleBootstrapPlan,
+    MappedSectionFacts, OwnedAppliedRelocationHandle, OwnedImageMapping, OwnedMappedSectionHandle,
+    OwnedRuntimeServiceHandle, RuntimeServiceBindingFacts, CLOCK_ROOT_BINDING_ID,
     GLM_ROOT_BINDING_ID,
 };
 
-pub(super) fn runtime_bootstrap_plan(
+pub(super) struct RuntimeBootstrapHandoff {
+    pub(super) plan: LifecycleBootstrapPlan,
+    pub(super) execution_protocol: &'static str,
+    pub(super) transfer: CompiledEntryTransferResult,
+}
+
+pub(super) fn runtime_bootstrap_handoff(
     container: &ContainerLoaderSummary,
     image_verified: bool,
+    mapped_image_hash: &str,
+    mapped_image_size_bytes: usize,
     scheduler_entry: &str,
     lifecycle_hook: &str,
-) -> LifecycleBootstrapPlan {
+) -> RuntimeBootstrapHandoff {
     let mapping_ready = image_verified && container.handoff_ready;
     let mapped_sections = container
         .container_section
@@ -40,7 +50,7 @@ pub(super) fn runtime_bootstrap_plan(
             application_status: if mapping_ready { "applied" } else { "blocked" }.to_owned(),
         })
         .collect();
-    plan_lifecycle_bootstrap(&LifecycleBootstrapFacts {
+    let facts = LifecycleBootstrapFacts {
         image_verified,
         container_handoff_ready: container.handoff_ready,
         scheduler_entry: scheduler_entry.to_owned(),
@@ -68,7 +78,37 @@ pub(super) fn runtime_bootstrap_plan(
         applied_relocations,
         runtime_service_bindings: runtime_service_binding_facts(&container.metadata_binding),
         provider_dispatch_status: container.provider_dispatch.status.clone(),
-    })
+    };
+    let plan = plan_lifecycle_bootstrap(&facts);
+    let section_handles = facts
+        .mapped_sections
+        .iter()
+        .map(|facts| OwnedMappedSectionHandle::from_facts(&plan.identity_hash, facts))
+        .collect();
+    let relocation_handles = facts
+        .applied_relocations
+        .iter()
+        .map(|facts| OwnedAppliedRelocationHandle::from_facts(&plan.identity_hash, facts))
+        .collect();
+    let service_handles = facts
+        .runtime_service_bindings
+        .iter()
+        .map(|facts| OwnedRuntimeServiceHandle::from_facts(&plan.identity_hash, facts))
+        .collect();
+    let preparation = prepare_lifecycle_bootstrap_execution(
+        &facts,
+        OwnedImageMapping::new(mapped_image_hash, mapped_image_size_bytes),
+        section_handles,
+        relocation_handles,
+        service_handles,
+    );
+    let execution_protocol = preparation.protocol;
+    let transfer = preparation.transfer();
+    RuntimeBootstrapHandoff {
+        plan,
+        execution_protocol,
+        transfer,
+    }
 }
 
 fn runtime_service_binding_facts(
