@@ -288,10 +288,10 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
         output.container_loader_entry_kind.as_deref(),
         Some("lifecycle-bootstrap")
     );
-    assert_eq!(
-        output.container_loader_entry_section_id.as_deref(),
-        Some("sec0000.compiled-artifact")
-    );
+    assert!(output
+        .container_loader_entry_section_id
+        .as_deref()
+        .is_some_and(|section| section.ends_with(".nuis-native-entry-code")));
     assert_eq!(output.container_loader_symbol_count, Some(2));
     assert_eq!(output.first_payload_execution_status, "ready");
     assert!(output.first_payload_execution_ready);
@@ -305,8 +305,8 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
         Some("lifecycle-bootstrap")
     );
     assert_eq!(
-        output.first_payload_execution_entry_section_id.as_deref(),
-        Some("sec0000.compiled-artifact")
+        output.first_payload_execution_entry_section_id,
+        output.container_loader_entry_section_id
     );
     assert_eq!(output.first_payload_execution_first_blocker, None);
     assert_eq!(
@@ -403,17 +403,14 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert!(output_json.contains("\"container_loader_handoff_first_blocker\":null"));
     assert!(output_json.contains("\"container_loader_entry_symbol\":\"main\""));
     assert!(output_json.contains("\"container_loader_entry_kind\":\"lifecycle-bootstrap\""));
-    assert!(
-        output_json.contains("\"container_loader_entry_section_id\":\"sec0000.compiled-artifact\"")
-    );
+    assert!(output_json.contains(".nuis-native-entry-code\""));
     assert!(output_json.contains("\"container_loader_symbol_count\":2"));
     assert!(output_json.contains("\"first_payload_execution_status\":\"ready\""));
     assert!(output_json.contains("\"first_payload_execution_ready\":true"));
     assert!(output_json.contains("\"first_payload_execution_target\":\"container-loader\""));
     assert!(output_json.contains("\"first_payload_execution_entry_symbol\":\"main\""));
     assert!(output_json.contains("\"first_payload_execution_entry_kind\":\"lifecycle-bootstrap\""));
-    assert!(output_json
-        .contains("\"first_payload_execution_entry_section_id\":\"sec0000.compiled-artifact\""));
+    assert!(output_json.contains("\"first_payload_execution_entry_section_id\":\"sec"));
     assert!(output_json.contains("\"first_payload_execution_first_blocker\":null"));
     assert!(output_json
         .contains("\"payload_execution_trace_protocol\":\"nsdb-yir-payload-execution-trace-v1\""));
@@ -426,7 +423,7 @@ fn self_contained_final_executable_emit_writes_nsld_owned_output() {
     assert!(output_json.contains("\"target\":\"container-loader\""));
     assert!(output_json.contains("\"entry_symbol\":\"main\""));
     assert!(output_json.contains("\"entry_kind\":\"lifecycle-bootstrap\""));
-    assert!(output_json.contains("\"entry_section_id\":\"sec0000.compiled-artifact\""));
+    assert!(output_json.contains("\"entry_section_id\":\"sec"));
     assert!(output_json.contains("\"next_action\":\"handoff-payload-trace-to-nsdb\""));
     assert!(output_json.contains("\"recommended_next_action\":\"handoff-to-container-loader\""));
     assert!(output_json.contains("\"path_present\":true"));

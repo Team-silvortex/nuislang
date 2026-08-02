@@ -9,7 +9,9 @@ mod container_bootstrap;
 mod container_metadata_binding;
 mod container_provider_dispatch;
 mod container_toml;
+mod native_entry;
 mod report;
+mod report_native_entry;
 mod runtime_bootstrap;
 
 use container::scan_container_loader;
@@ -19,6 +21,7 @@ use container::{
     CONTAINER_SCHEMA_VERSION, CONTAINER_VERSION,
 };
 use container_provider_dispatch::ProviderDispatchEntry;
+use native_entry::{prepare_native_entry, recover_native_entry, NativeEntryHandoffEvidence};
 use report::{print_text_report, render_json_report};
 use runtime_bootstrap::runtime_bootstrap_handoff;
 
@@ -87,6 +90,7 @@ struct RunnerReport {
     runtime_bootstrap_execution_status: String,
     runtime_bootstrap_activated_service_count: usize,
     runtime_bootstrap_blockers: Vec<String>,
+    native_entry_handoff: NativeEntryHandoffEvidence,
     manifest_path: String,
     nsb_path: Option<String>,
     nsb_readable: bool,
@@ -389,14 +393,25 @@ fn validate_handoff(
             blockers.push("output-dir:empty".to_owned());
         }
     }
-    let mapped_image_hash = nsb_payload_region
-        .map(fnv1a64_hex)
-        .unwrap_or_else(|| "none".to_owned());
+    let mut native_entry = recover_native_entry(nsb_payload_region, &container_loader);
+    blockers.extend(native_entry.evidence.blockers.iter().cloned());
+    let mapped_image_hash = if native_entry.mapped_payload_hash == "none" {
+        nsb_payload_region
+            .map(fnv1a64_hex)
+            .unwrap_or_else(|| "none".to_owned())
+    } else {
+        native_entry.mapped_payload_hash.clone()
+    };
+    let mapped_image_size_bytes = if native_entry.mapped_payload_size_bytes == 0 {
+        nsb_payload_region.map_or(0, <[u8]>::len)
+    } else {
+        native_entry.mapped_payload_size_bytes
+    };
     let runtime_bootstrap = runtime_bootstrap_handoff(
         &container_loader,
         blockers.is_empty(),
         &mapped_image_hash,
-        nsb_payload_region.map_or(0, <[u8]>::len),
+        mapped_image_size_bytes,
         scheduler_entry,
         lifecycle_hook,
     );
@@ -404,7 +419,13 @@ fn validate_handoff(
     let mut runtime_bootstrap_blockers = runtime_bootstrap.plan.blockers.clone();
     runtime_bootstrap_blockers.extend(runtime_bootstrap.transfer.blockers.iter().cloned());
     blockers.extend(runtime_bootstrap_blockers.iter().cloned());
+    prepare_native_entry(&mut native_entry, &runtime_bootstrap.transfer);
+    blockers.extend(native_entry.evidence.blockers.iter().cloned());
+    blockers.sort();
+    blockers.dedup();
     let ready = blockers.is_empty();
+    let would_enter_lifecycle_hook =
+        runtime_bootstrap.transfer.ready && native_entry.evidence.ready;
     let launch_steps = if ready {
         let mut steps = vec![
             "read-launcher-manifest".to_owned(),
@@ -413,13 +434,23 @@ fn validate_handoff(
             "map-payload-region".to_owned(),
         ];
         steps.extend(runtime_bootstrap_steps);
+        steps.push(format!(
+            "prepare-native-entry:{}:{}",
+            native_entry
+                .evidence
+                .section_id
+                .as_deref()
+                .unwrap_or("missing"),
+            native_entry.evidence.protection_status
+        ));
+        steps.push("native-entry-invocation:not-invoked".to_owned());
         steps
     } else {
         Vec::new()
     };
     RunnerReport {
         ready,
-        would_enter_lifecycle_hook: runtime_bootstrap.transfer.ready,
+        would_enter_lifecycle_hook,
         runtime_bootstrap_contract: runtime_bootstrap.plan.protocol.to_owned(),
         runtime_bootstrap_identity_contract: runtime_bootstrap.plan.identity_contract.to_owned(),
         runtime_bootstrap_identity_hash: runtime_bootstrap.plan.identity_hash,
@@ -441,6 +472,7 @@ fn validate_handoff(
             .activated_service_ids
             .len(),
         runtime_bootstrap_blockers,
+        native_entry_handoff: native_entry.evidence,
         manifest_path: manifest_path.display().to_string(),
         nsb_path: Some(nsb_path.display().to_string()),
         nsb_readable,

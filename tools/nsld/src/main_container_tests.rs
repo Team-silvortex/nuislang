@@ -4,6 +4,7 @@ use super::{
     nsld_container_report, nsld_emit_container_report, nsld_prepare_report,
     nsld_verify_container_plan_report, nsld_verify_container_report,
 };
+use crate::native_entry::NATIVE_ENTRY_RELOCATION_SLOT_BYTES;
 use nuisc::linker::LinkPlanHeteroNode;
 use std::{env, fs, path::Path};
 
@@ -78,7 +79,7 @@ validation_contracts = ["glm.resource-lifetime"]
 
     assert!(report.valid);
     assert!(report.issues.is_empty());
-    assert_eq!(report.actual_section_count, Some(6));
+    assert_eq!(report.actual_section_count, Some(7));
     assert_eq!(
         report.actual_container_layout_hash,
         Some(prepare.container_layout_hash)
@@ -206,9 +207,49 @@ fn emit_container_reports_metadata_table_hash() {
     let preview = nsld_container_report(Path::new("manifest.toml"), &plan);
     let preview_json = super::json::nsld_container_report_json(&preview);
     let emit_json = super::json::nsld_container_emit_report_json(&report);
+    let entry_section = preview
+        .sections
+        .iter()
+        .find(|section| section.section_kind == nuis_runtime::NUIS_NATIVE_ENTRY_SECTION_KIND)
+        .expect("container carries a dedicated Nuis entry section");
+    let entry_symbol = preview
+        .loader_symbols
+        .iter()
+        .find(|symbol| symbol.symbol_id == "sym0000.loader-entry")
+        .expect("container carries the lifecycle entry symbol");
+    let entry_relocation = preview
+        .relocations
+        .iter()
+        .find(|relocation| relocation.relocation_id == "rel0000.lifecycle-entry")
+        .expect("container carries the lifecycle entry relocation");
+    let entry_asset = fs::read(&entry_section.source_path).unwrap();
+    let expected_code_hash = super::fnv1a64_hex(&entry_asset[NATIVE_ENTRY_RELOCATION_SLOT_BYTES..]);
     fs::remove_dir_all(dir).unwrap();
 
     assert!(report.metadata_table_hash.starts_with("0x"));
+    assert_eq!(
+        preview.loader_entry_abi_contract,
+        nuis_runtime::NUIS_LIFECYCLE_ENTRY_ABI_V1
+    );
+    assert_eq!(
+        preview.loader_entry_machine_arch,
+        nuis_runtime::canonical_machine_arch(&plan.cpu_target.machine_arch)
+            .expect("test target architecture is registered")
+    );
+    assert_eq!(entry_symbol.section_id, entry_section.section_id);
+    assert_eq!(
+        entry_symbol.offset,
+        entry_section.offset + NATIVE_ENTRY_RELOCATION_SLOT_BYTES
+    );
+    assert_eq!(
+        entry_symbol.size_bytes,
+        entry_section.size_bytes - NATIVE_ENTRY_RELOCATION_SLOT_BYTES
+    );
+    assert_eq!(entry_symbol.payload_hash, expected_code_hash);
+    assert_ne!(entry_symbol.payload_hash, entry_section.payload_hash);
+    assert_eq!(entry_relocation.source_section_id, entry_section.section_id);
+    assert_eq!(entry_relocation.source_offset, entry_section.offset);
+    assert_eq!(entry_relocation.target_symbol_id, entry_symbol.symbol_id);
     assert!(container_source.contains(&format!(
         "metadata_table_hash = \"{}\"",
         report.metadata_table_hash

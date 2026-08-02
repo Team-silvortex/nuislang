@@ -18,10 +18,12 @@ pub mod session;
 pub use bridge::{BridgeExecutor, PreparedDomainExecution};
 pub use error::RuntimeError;
 pub use executable_memory::{
+    canonical_machine_arch, native_host_machine_arch, AuthorizedNativeEntry,
     ExecutableEntryPreparation, ExecutableEntryRequest, ExecutableMemoryAdapter,
-    NativeEntryInvocationResult, NativeHostExecutableMemoryAdapter,
-    EXECUTABLE_MEMORY_ADAPTER_CONTRACT, NATIVE_ENTRY_INVOCATION_PROTOCOL,
-    NUIS_LIFECYCLE_ENTRY_ABI_V1, NUIS_NATIVE_ENTRY_SECTION_KIND,
+    NativeEntryInvocationPermit, NativeEntryInvocationResult, NativeHostExecutableMemoryAdapter,
+    EXECUTABLE_MEMORY_ADAPTER_CONTRACT, NATIVE_ENTRY_INVOCATION_PERMIT_PROTOCOL,
+    NATIVE_ENTRY_INVOCATION_PROTOCOL, NUIS_LIFECYCLE_ENTRY_ABI_V1, NUIS_MACHINE_ARCH_AARCH64,
+    NUIS_MACHINE_ARCH_X86_64, NUIS_NATIVE_ENTRY_SECTION_KIND,
 };
 pub use executor::{
     ExecutionClockGate, ExecutionClockValidation, ExecutionContract, ExecutionPhaseAction,

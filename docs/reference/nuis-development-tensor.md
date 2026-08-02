@@ -1523,7 +1523,7 @@ heterogeneous `glm.*` sidecar contracts. Both are immutable metadata bindings,
 and Nsdb now preserves the verified binding-table hash even when no provider
 selection is present.
 
-The coordinate is `active/90`. The
+The coordinate is `active/99`. The
 `nuis-runtime-lifecycle-bootstrap-plan-identity-v1` deterministically covers
 entry, section and relocation tables, every normalized mapping/application,
 runtime services, lifecycle, provider dispatch, and scheduler state. Nsld
@@ -1538,15 +1538,40 @@ clock/GLM services after relocation consumption, and produces a fail-closed
 lifecycle entry on that transfer result rather than plan readiness alone.
 `nuis-executable-memory-adapter-v1` adds the first native-host boundary. Its
 Unix adapter validates section identity/hash, the fixed no-arg i64 ABI, entry
-bounds, and architecture alignment, writes through RW pages only, flushes the
-instruction cache where required, then seals the mapping RX. A real Apple
-AArch64 thunk returns `42` through the one-shot invocation. The call remains an
-explicit unsafe boundary because hashes cannot prove arbitrary machine-code
-ABI behavior. Current `compiled-artifact` entry sections are rejected rather
-than executed. The remaining gap is now in Nsld and host-runner integration: a
-dedicated `nuis-native-entry-code` section must be emitted, hash-bound through
-the container/NSB byte maps, sliced from the verified image, and explicitly
-authorized for invocation.
+bounds, canonical target architecture, host-architecture equality, and
+instruction alignment before allocating. It writes through RW pages only,
+flushes the instruction cache where required, then seals the mapping RX. A
+real host-specific thunk returns `42` through an authorized one-shot call. The
+call remains an explicit unsafe boundary because hashes and architecture
+identity cannot prove arbitrary machine-code ABI behavior.
+
+Nsld now emits a deterministic `nuis-native-entry-code` asset for AArch64 and
+x86_64. Eight reserved bytes precede the instructions as the lifecycle
+relocation slot; the loader symbol starts after that slot and hashes only the
+callable bytes. The entry is appended only to the unified container, so native
+object writers remain independent. The container persists
+`nuis-runtime-lifecycle-entry-i64-v1` plus canonical `aarch64` or `x86_64`
+machine identity. Nsld includes that identity in the container hash and
+structured verifier, while runtime plan identity, execution context, compiled
+entry transfer, and executable-memory request preserve it. Both runtime
+planning and `nuis-host-runner` reject ABI, symbol-range, symbol-hash, or
+machine-identity drift. Host-runner
+now locates the real container payload after the capsule marker and zero
+alignment padding, uses its actual hash and size as the runtime mapping
+identity, restores only the declared relocation slot before checking the
+enclosing section hash, and independently verifies the exact loader-symbol
+code slice. Those bytes reach `NativeHostExecutableMemoryAdapter::prepare`,
+become a sealed RX mapping, and are dropped without invocation. A tamper test
+changes the inner code while recomputing the outer NSB hash and proves that no
+executable mapping is prepared. Invocation authority is now type-enforced:
+`ExecutableEntryPreparation` has no direct call operation. The opaque,
+non-cloneable `nuis-native-entry-invocation-permit-v1` must be issued from the
+same ready transfer and consumed to create an `AuthorizedNativeEntry`; permit
+identity drift invokes nothing. Ordinary host-runner validation intentionally
+does not issue a permit. The remaining gap is an explicit opt-in probe that
+invokes the exact Nsld-produced entry once and records its return evidence.
+The no-arg i64 ABI remains a bootstrap ABI rather than the final
+lifecycle-context ABI.
 
 ## Linux CUDA Provider Bring-Up
 

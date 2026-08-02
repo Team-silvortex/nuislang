@@ -67,6 +67,12 @@ pub(crate) fn container_metadata_issues(
     );
     push_string_mismatch(
         &mut issues,
+        "loader_entry_machine_arch",
+        &expected_report.loader_entry_machine_arch,
+        &actual.actual_loader_entry_machine_arch,
+    );
+    push_string_mismatch(
+        &mut issues,
         "loader_entry_symbol",
         &expected_report.loader_entry_symbol,
         &actual.actual_loader_entry_symbol,

@@ -43,6 +43,10 @@ pub(crate) fn print_nsld_container_verify_report(report: &NsldContainerVerifyRep
         report.expected_loader_entry_kind
     );
     println!(
+        "  expected_loader_entry_machine_arch: {}",
+        report.expected_loader_entry_machine_arch
+    );
+    println!(
         "  expected_loader_entry_symbol: {}",
         report.expected_loader_entry_symbol
     );
@@ -245,6 +249,13 @@ pub(crate) fn print_nsld_container_verify_report(report: &NsldContainerVerifyRep
         "  actual_loader_entry_kind: {}",
         report
             .actual_loader_entry_kind
+            .as_deref()
+            .unwrap_or("missing")
+    );
+    println!(
+        "  actual_loader_entry_machine_arch: {}",
+        report
+            .actual_loader_entry_machine_arch
             .as_deref()
             .unwrap_or("missing")
     );

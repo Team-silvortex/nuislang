@@ -24,6 +24,7 @@ pub(crate) fn nsld_container_plan_report(
     let section_manifest = nsld_section_manifest_report(manifest, plan);
     let mut sections = section_manifest.sections;
     let mut blockers = section_manifest.blockers;
+    append_native_entry_section(plan, &mut sections, &mut blockers);
     append_object_output_section(plan, &mut sections, &mut blockers);
     let output_path = PathBuf::from(&plan.output_dir)
         .join("nuis.nsld.container")
@@ -52,10 +53,40 @@ pub(crate) fn nsld_container_plan_report(
     }
 }
 
+fn append_native_entry_section(
+    plan: &nuisc::linker::LinkPlan,
+    sections: &mut Vec<super::reports::NsldAssembleSectionDiagnostic>,
+    blockers: &mut Vec<String>,
+) {
+    let source_path = super::native_entry::native_entry_asset_path(plan);
+    let source_hash = fs::read(&source_path)
+        .map(|bytes| fnv1a64_hex(&bytes))
+        .unwrap_or_else(|_| "missing".to_owned());
+    if source_hash == "missing" {
+        blockers.push(format!(
+            "native-entry:{}:missing-source",
+            source_path.display()
+        ));
+    }
+    let order_index = sections.len();
+    sections.push(super::reports::NsldAssembleSectionDiagnostic {
+        order_index,
+        section_id: format!(
+            "sec{order_index:04}.{}",
+            super::native_entry::native_entry_section_kind()
+        ),
+        section_kind: super::native_entry::native_entry_section_kind().to_owned(),
+        source_path: source_path.display().to_string(),
+        source_hash,
+        required: true,
+    });
+}
+
 pub(crate) fn nsld_emit_container_plan_report(
     manifest: &Path,
     plan: &nuisc::linker::LinkPlan,
 ) -> Result<container::NsldContainerPlanEmitReport, String> {
+    super::native_entry::emit_native_entry_asset(plan)?;
     let report = nsld_container_plan_report(manifest, plan);
     let output_path = PathBuf::from(&plan.output_dir).join("nuis.nsld.container-plan.toml");
     fs::write(&output_path, container::render_container_plan_toml(&report)).map_err(|error| {
@@ -179,10 +210,15 @@ pub(crate) fn nsld_container_report(
     let container_section_table_hash =
         container::container_section_table_hash(&sections, fnv1a64_hex);
     let loader_entry_kind = "lifecycle-bootstrap".to_owned();
+    let loader_entry_abi_contract = super::native_entry::native_entry_abi_contract().to_owned();
+    let loader_entry_machine_arch =
+        super::native_entry::native_entry_machine_arch(&plan.cpu_target.machine_arch)
+            .unwrap_or("unsupported")
+            .to_owned();
     let loader_entry_symbol = plan.lifecycle.bootstrap_entry.clone();
     let loader_entry_section_id = sections
         .iter()
-        .find(|section| section.section_kind == "compiled-artifact")
+        .find(|section| section.section_kind == super::native_entry::native_entry_section_kind())
         .map(|section| section.section_id.clone())
         .unwrap_or_else(|| "missing".to_owned());
     let mut loader_symbols = container::loader_symbols(
@@ -251,6 +287,8 @@ pub(crate) fn nsld_container_report(
         &container_plan,
         &sections,
         &loader_entry_kind,
+        &loader_entry_abi_contract,
+        &loader_entry_machine_arch,
         &loader_entry_symbol,
         &loader_entry_section_id,
         &loader_symbols,
@@ -279,6 +317,8 @@ pub(crate) fn nsld_container_report(
         loader_readiness,
         loader_blockers,
         loader_entry_kind,
+        loader_entry_abi_contract,
+        loader_entry_machine_arch,
         loader_entry_symbol,
         loader_entry_section_id,
         loader_symbol_table_hash,
@@ -311,6 +351,7 @@ pub(crate) fn nsld_emit_container_report(
     manifest: &Path,
     plan: &nuisc::linker::LinkPlan,
 ) -> Result<container::NsldContainerEmitReport, String> {
+    super::native_entry::emit_native_entry_asset(plan)?;
     let report = nsld_container_report(manifest, plan);
     if !report.ready
         && report

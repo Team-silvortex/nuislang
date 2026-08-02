@@ -135,6 +135,11 @@ struct LifecycleBootstrapExecutionContext {
     runtime_services: Vec<OwnedRuntimeServiceHandle>,
     entry_symbol: String,
     entry_section_id: String,
+    entry_abi_contract: String,
+    entry_machine_arch: String,
+    entry_symbol_offset: usize,
+    entry_symbol_size_bytes: usize,
+    entry_symbol_payload_hash: String,
     lifecycle_hook: String,
     scheduler_entry: String,
 }
@@ -186,6 +191,11 @@ impl LifecycleBootstrapExecutionContext {
             entry_section_offset: Some(entry_section_offset),
             entry_section_size_bytes: Some(entry_section_size_bytes),
             entry_section_payload_hash: Some(entry_section_payload_hash),
+            entry_abi_contract: Some(self.entry_abi_contract),
+            entry_machine_arch: Some(self.entry_machine_arch),
+            entry_symbol_offset: Some(self.entry_symbol_offset),
+            entry_symbol_size_bytes: Some(self.entry_symbol_size_bytes),
+            entry_symbol_payload_hash: Some(self.entry_symbol_payload_hash),
             lifecycle_hook: Some(self.lifecycle_hook),
             scheduler_entry: Some(self.scheduler_entry),
             consumed_mapped_section_count: self.mapped_sections.len(),
@@ -211,6 +221,11 @@ pub struct CompiledEntryTransferResult {
     pub entry_section_offset: Option<usize>,
     pub entry_section_size_bytes: Option<usize>,
     pub entry_section_payload_hash: Option<String>,
+    pub entry_abi_contract: Option<String>,
+    pub entry_machine_arch: Option<String>,
+    pub entry_symbol_offset: Option<usize>,
+    pub entry_symbol_size_bytes: Option<usize>,
+    pub entry_symbol_payload_hash: Option<String>,
     pub lifecycle_hook: Option<String>,
     pub scheduler_entry: Option<String>,
     pub consumed_mapped_section_count: usize,
@@ -239,6 +254,11 @@ impl CompiledEntryTransferResult {
             entry_section_offset: None,
             entry_section_size_bytes: None,
             entry_section_payload_hash: None,
+            entry_abi_contract: None,
+            entry_machine_arch: None,
+            entry_symbol_offset: None,
+            entry_symbol_size_bytes: None,
+            entry_symbol_payload_hash: None,
             lifecycle_hook: None,
             scheduler_entry: None,
             consumed_mapped_section_count: 0,
@@ -294,6 +314,11 @@ pub fn prepare_lifecycle_bootstrap_execution(
         runtime_services: sorted_services(runtime_services),
         entry_symbol: facts.loader_entry_symbol.clone().unwrap_or_default(),
         entry_section_id: facts.loader_entry_section_id.clone().unwrap_or_default(),
+        entry_abi_contract: facts.loader_entry_abi_contract.clone().unwrap_or_default(),
+        entry_machine_arch: facts.loader_entry_machine_arch.clone().unwrap_or_default(),
+        entry_symbol_offset: facts.loader_symbol_offset.unwrap_or_default(),
+        entry_symbol_size_bytes: facts.loader_symbol_size_bytes.unwrap_or_default(),
+        entry_symbol_payload_hash: facts.loader_symbol_payload_hash.clone().unwrap_or_default(),
         lifecycle_hook: facts
             .loader_symbol_lifecycle_hook
             .clone()
@@ -509,8 +534,9 @@ fn fnv1a64_hex(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
     use crate::{
-        ExecutableEntryRequest, ExecutableMemoryAdapter, NativeHostExecutableMemoryAdapter,
-        CLOCK_ROOT_BINDING_ID, CLOCK_ROOT_CONTRACT, GLM_ROOT_BINDING_ID, GLM_ROOT_CONTRACT,
+        ExecutableEntryRequest, ExecutableMemoryAdapter, NativeEntryInvocationPermit,
+        NativeHostExecutableMemoryAdapter, CLOCK_ROOT_BINDING_ID, CLOCK_ROOT_CONTRACT,
+        GLM_ROOT_BINDING_ID, GLM_ROOT_CONTRACT,
     };
 
     fn ready_facts() -> LifecycleBootstrapFacts {
@@ -520,33 +546,53 @@ mod tests {
             scheduler_entry: "nuis.scheduler.loop.v1".to_owned(),
             process_lifecycle_hook: "on_process_start".to_owned(),
             loader_entry_kind: Some("lifecycle-bootstrap".to_owned()),
+            loader_entry_abi_contract: Some(crate::NUIS_LIFECYCLE_ENTRY_ABI_V1.to_owned()),
+            loader_entry_machine_arch: Some(
+                crate::native_host_machine_arch()
+                    .unwrap_or(crate::NUIS_MACHINE_ARCH_AARCH64)
+                    .to_owned(),
+            ),
             loader_entry_symbol: Some("main".to_owned()),
-            loader_entry_section_id: Some("sec0000.compiled-artifact".to_owned()),
+            loader_entry_section_id: Some("sec0001.nuis-native-entry-code".to_owned()),
             loader_symbol_status: "parsed".to_owned(),
             loader_symbol_kind: Some("lifecycle-bootstrap".to_owned()),
             loader_symbol_name: Some("main".to_owned()),
             loader_symbol_lifecycle_hook: Some("on_lifecycle_bootstrap".to_owned()),
-            loader_symbol_section_id: Some("sec0000.compiled-artifact".to_owned()),
+            loader_symbol_section_id: Some("sec0001.nuis-native-entry-code".to_owned()),
+            loader_symbol_offset: Some(136),
+            loader_symbol_size_bytes: Some(8),
+            loader_symbol_payload_hash: Some(fnv1a64_hex(&[0; 8])),
             relocation_targets_loader_symbol: true,
             relocation_source_matches_loader_symbol: true,
-            source_section_count: 1,
+            source_section_count: 2,
             source_section_table_hash: "0x3333333333333333".to_owned(),
-            mapped_sections: vec![MappedSectionFacts {
-                section_id: "sec0000.compiled-artifact".to_owned(),
-                section_kind: "compiled-artifact".to_owned(),
-                offset: 0,
-                size_bytes: 128,
-                payload_hash: "0x4444444444444444".to_owned(),
-                required: true,
-                mapping_status: "mapped".to_owned(),
-            }],
+            mapped_sections: vec![
+                MappedSectionFacts {
+                    section_id: "sec0000.compiled-artifact".to_owned(),
+                    section_kind: "compiled-artifact".to_owned(),
+                    offset: 0,
+                    size_bytes: 128,
+                    payload_hash: "0x4444444444444444".to_owned(),
+                    required: true,
+                    mapping_status: "mapped".to_owned(),
+                },
+                MappedSectionFacts {
+                    section_id: "sec0001.nuis-native-entry-code".to_owned(),
+                    section_kind: crate::NUIS_NATIVE_ENTRY_SECTION_KIND.to_owned(),
+                    offset: 128,
+                    size_bytes: 16,
+                    payload_hash: "0x7777777777777777".to_owned(),
+                    required: true,
+                    mapping_status: "mapped".to_owned(),
+                },
+            ],
             source_relocation_count: 1,
             source_relocation_table_hash: "0x5555555555555555".to_owned(),
             applied_relocations: vec![AppliedRelocationFacts {
                 relocation_id: "rel0000.lifecycle-entry".to_owned(),
                 relocation_kind: "lifecycle-entry-binding".to_owned(),
-                source_section_id: "sec0000.compiled-artifact".to_owned(),
-                source_offset: 0,
+                source_section_id: "sec0001.nuis-native-entry-code".to_owned(),
+                source_offset: 128,
                 target_symbol_id: "sym0000.loader-entry".to_owned(),
                 addend: 0,
                 application_status: "applied".to_owned(),
@@ -615,35 +661,54 @@ mod tests {
         let transfer = preparation.transfer();
         assert!(transfer.ready);
         assert_eq!(transfer.status, "transfer-ready");
-        assert_eq!(transfer.consumed_mapped_section_count, 1);
+        assert_eq!(transfer.consumed_mapped_section_count, 2);
         assert_eq!(transfer.consumed_applied_relocation_count, 1);
         assert_eq!(
             transfer.entry_section_kind.as_deref(),
-            Some("compiled-artifact")
+            Some(crate::NUIS_NATIVE_ENTRY_SECTION_KIND)
         );
-        assert_eq!(transfer.entry_section_offset, Some(0));
-        assert_eq!(transfer.entry_section_size_bytes, Some(128));
+        assert_eq!(transfer.entry_section_offset, Some(128));
+        assert_eq!(transfer.entry_section_size_bytes, Some(16));
         assert_eq!(
             transfer.entry_section_payload_hash.as_deref(),
-            Some("0x4444444444444444")
+            Some("0x7777777777777777")
+        );
+        assert_eq!(
+            transfer.entry_abi_contract.as_deref(),
+            Some(crate::NUIS_LIFECYCLE_ENTRY_ABI_V1)
+        );
+        assert_eq!(
+            transfer.entry_machine_arch.as_deref(),
+            crate::native_host_machine_arch()
+        );
+        assert_eq!(transfer.entry_symbol_offset, Some(136));
+        assert_eq!(transfer.entry_symbol_size_bytes, Some(8));
+        assert_eq!(
+            transfer.entry_symbol_payload_hash.as_deref(),
+            Some(fnv1a64_hex(&[0; 8]).as_str())
         );
         assert_eq!(transfer.activated_service_ids.len(), 2);
         assert_eq!(
             transfer.trace,
             vec![
                 "consume-mapped-section:sec0000.compiled-artifact",
+                "consume-mapped-section:sec0001.nuis-native-entry-code",
                 "consume-applied-relocation:rel0000.lifecycle-entry",
                 "activate-runtime-service:runtime.clock-root",
                 "activate-runtime-service:runtime.glm-root",
-                "transfer-compiled-entry:main@sec0000.compiled-artifact",
+                "transfer-compiled-entry:main@sec0001.nuis-native-entry-code",
             ]
         );
-        let request = ExecutableEntryRequest::from_transfer(&transfer, &[0; 128]).unwrap();
+        let request = ExecutableEntryRequest::from_transfer(&transfer, &[0; 8]).unwrap();
+        let permit = NativeEntryInvocationPermit::from_transfer(&transfer).unwrap();
+        assert_eq!(
+            permit.protocol(),
+            crate::NATIVE_ENTRY_INVOCATION_PERMIT_PROTOCOL
+        );
         let native = NativeHostExecutableMemoryAdapter.prepare(&request);
-        assert!(!native.ready);
-        assert!(native
-            .blockers
-            .contains(&"executable-memory:section-kind-unsupported".to_owned()));
+        assert!(native.ready, "{:?}", native.blockers);
+        assert_eq!(native.protection_status, "sealed-read-execute");
+        assert!(native.authorize(permit).is_ok());
     }
 
     #[test]

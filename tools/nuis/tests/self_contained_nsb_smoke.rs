@@ -246,7 +246,7 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
             && run_json_stdout.contains("\"host_runner_container_loader_status\":\"parsed\"")
             && run_json_stdout.contains("\"host_runner_container_loader_entry_kind\":\"lifecycle-bootstrap\"")
             && run_json_stdout.contains("\"host_runner_container_loader_entry_symbol\":\"nuis.bootstrap.lifecycle.v1\"")
-            && run_json_stdout.contains("\"host_runner_container_loader_entry_section_id\":\"sec0000.compiled-artifact\"")
+            && run_json_stdout.contains("\"host_runner_container_loader_entry_section_id\":\"sec0004.nuis-native-entry-code\"")
             && run_json_stdout.contains("\"host_runner_container_loader_handoff_ready\":true")
             && run_json_stdout.contains("\"host_runner_container_loader_handoff_status\":\"ready\"")
             && run_json_stdout.contains("\"host_runner_backend_artifact_payload_count\":0")
@@ -264,7 +264,7 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
             && run_json_stdout.contains("\"launch_evidence_first_payload_target\":\"container-loader\"")
             && run_json_stdout.contains("\"launch_evidence_first_payload_entry_symbol\":\"nuis.bootstrap.lifecycle.v1\"")
             && run_json_stdout.contains("\"launch_evidence_first_payload_entry_kind\":\"lifecycle-bootstrap\"")
-            && run_json_stdout.contains("\"launch_evidence_first_payload_entry_section_id\":\"sec0000.compiled-artifact\"")
+            && run_json_stdout.contains("\"launch_evidence_first_payload_entry_section_id\":\"sec0004.nuis-native-entry-code\"")
             && run_json_stdout.contains("\"launch_evidence_first_payload_first_blocker\":null")
             && run_json_stdout.contains("\"launch_evidence_payload_execution_trace_protocol\":\"nsdb-yir-payload-execution-trace-v1\"")
             && run_json_stdout.contains("\"launch_evidence_payload_execution_trace_available\":true")
@@ -304,7 +304,7 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
             && nsdb_handoff.contains("target = \"container-loader\"")
             && nsdb_handoff.contains("entry_symbol = \"nuis.bootstrap.lifecycle.v1\"")
             && nsdb_handoff.contains("entry_kind = \"lifecycle-bootstrap\"")
-            && nsdb_handoff.contains("entry_section_id = \"sec0000.compiled-artifact\"")
+            && nsdb_handoff.contains("entry_section_id = \"sec0004.nuis-native-entry-code\"")
             && nsdb_handoff.contains("next_action = \"handoff-payload-trace-to-nsdb\""),
         "run-artifact should persist nsdb payload execution handoff metadata\n{nsdb_handoff}"
     );
@@ -512,7 +512,7 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
                 "launch_evidence_first_payload_entry_symbol: nuis.bootstrap.lifecycle.v1"
             )
             && run_stdout.contains(
-                "launch_evidence_first_payload_entry_section_id: sec0000.compiled-artifact"
+                "launch_evidence_first_payload_entry_section_id: sec0004.nuis-native-entry-code"
             )
             && run_stdout.contains(
                 "launch_evidence_payload_execution_trace_protocol: nsdb-yir-payload-execution-trace-v1"

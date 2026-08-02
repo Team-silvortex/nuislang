@@ -208,7 +208,7 @@ fn check_reports_container_loader_readiness_without_failing_host_assisted_state(
     assert!(report.container_native_object_section_present);
     assert_eq!(
         report.container_native_object_section_id.as_deref(),
-        Some("sec0004.native-object-output")
+        Some("sec0005.native-object-output")
     );
     assert!(report.container_native_object_loader_symbol_present);
     assert_eq!(
@@ -236,7 +236,7 @@ fn check_reports_container_loader_readiness_without_failing_host_assisted_state(
     assert!(report_json
         .contains("\"container_compatibility_domain_summary\":{\"count\":1,\"table_hash\":\"0x"));
     assert!(report_json
-        .contains("\"container_native_object_section_id\":\"sec0004.native-object-output\""));
+        .contains("\"container_native_object_section_id\":\"sec0005.native-object-output\""));
     assert!(report_json
         .contains("\"container_native_object_loader_symbol_id\":\"sym0001.native-object-output\""));
     assert!(

@@ -156,6 +156,14 @@ pub(crate) fn nsld_container_report_json(report: &NsldContainerReport) -> String
         json_string_field("loader_readiness", &report.loader_readiness),
         json_string_array_field("loader_blockers", &report.loader_blockers),
         json_string_field("loader_entry_kind", &report.loader_entry_kind),
+        json_string_field(
+            "loader_entry_abi_contract",
+            &report.loader_entry_abi_contract,
+        ),
+        json_string_field(
+            "loader_entry_machine_arch",
+            &report.loader_entry_machine_arch,
+        ),
         json_string_field("loader_entry_symbol", &report.loader_entry_symbol),
         json_string_field("loader_entry_section_id", &report.loader_entry_section_id),
         json_string_field("loader_symbol_table_hash", &report.loader_symbol_table_hash),
@@ -273,6 +281,10 @@ pub(crate) fn nsld_container_verify_report_json(report: &NsldContainerVerifyRepo
         json_string_field(
             "expected_loader_entry_kind",
             &report.expected_loader_entry_kind,
+        ),
+        json_string_field(
+            "expected_loader_entry_machine_arch",
+            &report.expected_loader_entry_machine_arch,
         ),
         json_string_field(
             "expected_loader_entry_symbol",
@@ -440,6 +452,10 @@ pub(crate) fn nsld_container_verify_report_json(report: &NsldContainerVerifyRepo
         json_optional_string_field(
             "actual_loader_entry_kind",
             report.actual_loader_entry_kind.as_deref(),
+        ),
+        json_optional_string_field(
+            "actual_loader_entry_machine_arch",
+            report.actual_loader_entry_machine_arch.as_deref(),
         ),
         json_optional_string_field(
             "actual_loader_entry_symbol",

@@ -189,6 +189,7 @@ mod main_test_support;
 mod main_tests;
 #[cfg(test)]
 mod main_toml_tests;
+mod native_entry;
 mod object_byte_layout;
 mod object_elf_image;
 mod object_emit;

@@ -4,6 +4,7 @@ pub(crate) use super::container_hashes::*;
 pub(crate) use super::container_model::*;
 pub(crate) use super::container_render::{render_container_plan_toml, render_container_toml};
 
+use super::native_entry::{native_entry_code_range, NATIVE_ENTRY_RELOCATION_SLOT_BYTES};
 use super::reports::NsldAssembleSectionDiagnostic;
 
 pub(crate) fn payload_size(sections: &[NsldContainerSectionEntry]) -> usize {
@@ -224,15 +225,32 @@ pub(crate) fn loader_symbols(
         .iter()
         .find(|section| section.section_id == loader_entry_section_id)
         .map(|section| {
+            let (offset, size_bytes, payload_hash) =
+                if section.section_kind == nuis_runtime::NUIS_NATIVE_ENTRY_SECTION_KIND {
+                    fs::read(&section.source_path)
+                        .ok()
+                        .and_then(|bytes| {
+                            let range = native_entry_code_range(bytes.len())?;
+                            let code_hash = super::fnv1a64_hex(&bytes[range.clone()]);
+                            Some((section.offset + range.start, range.len(), code_hash))
+                        })
+                        .unwrap_or((section.offset, 0, "missing".to_owned()))
+                } else {
+                    (
+                        section.offset,
+                        section.size_bytes,
+                        section.payload_hash.clone(),
+                    )
+                };
             vec![NsldContainerLoaderSymbol {
                 symbol_id: "sym0000.loader-entry".to_owned(),
                 symbol_kind: loader_entry_kind.to_owned(),
                 symbol_name: loader_entry_symbol.to_owned(),
                 lifecycle_hook: "on_lifecycle_bootstrap".to_owned(),
                 section_id: section.section_id.clone(),
-                offset: section.offset,
-                size_bytes: section.size_bytes,
-                payload_hash: section.payload_hash.clone(),
+                offset,
+                size_bytes,
+                payload_hash,
             }]
         })
         .unwrap_or_default()
@@ -317,7 +335,13 @@ pub(crate) fn relocations(
             relocation_id: format!("rel{index:04}.{}", relocation_id_suffix(symbol)),
             relocation_kind: relocation_kind_for_symbol(symbol).to_owned(),
             source_section_id: symbol.section_id.clone(),
-            source_offset: symbol.offset,
+            source_offset: if symbol.symbol_id == "sym0000.loader-entry"
+                && symbol.offset >= NATIVE_ENTRY_RELOCATION_SLOT_BYTES
+            {
+                symbol.offset - NATIVE_ENTRY_RELOCATION_SLOT_BYTES
+            } else {
+                symbol.offset
+            },
             target_symbol_id: symbol.symbol_id.clone(),
             addend: 0,
         })
@@ -345,6 +369,8 @@ pub(crate) fn file_hash(
     container_plan: &NsldContainerPlanReport,
     sections: &[NsldContainerSectionEntry],
     loader_entry_kind: &str,
+    loader_entry_abi_contract: &str,
+    loader_entry_machine_arch: &str,
     loader_entry_symbol: &str,
     loader_entry_section_id: &str,
     loader_symbols: &[NsldContainerLoaderSymbol],
@@ -370,6 +396,10 @@ pub(crate) fn file_hash(
     material.push_str(loader_readiness);
     material.push('\t');
     material.push_str(loader_entry_kind);
+    material.push('\t');
+    material.push_str(loader_entry_abi_contract);
+    material.push('\t');
+    material.push_str(loader_entry_machine_arch);
     material.push('\t');
     material.push_str(loader_entry_symbol);
     material.push('\t');

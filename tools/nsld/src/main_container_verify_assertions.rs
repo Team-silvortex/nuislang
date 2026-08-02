@@ -28,15 +28,27 @@ pub(crate) fn assert_matching_container_artifacts(
     assert!(container_source.contains("external-import:clang-target:"));
     assert!(container_source.contains("external-import:c-world-policy:wrapped"));
     assert!(container_source.contains("loader_entry_kind = \"lifecycle-bootstrap\""));
+    assert!(container_source
+        .contains("loader_entry_abi_contract = \"nuis-runtime-lifecycle-entry-i64-v1\""));
+    assert!(container_source.contains(&format!(
+        "loader_entry_machine_arch = \"{}\"",
+        preview.loader_entry_machine_arch
+    )));
     assert!(container_source.contains("loader_entry_symbol = \"main\""));
-    assert!(container_source.contains("loader_entry_section_id = \"sec0000.compiled-artifact\""));
+    assert!(container_source.contains(&format!(
+        "loader_entry_section_id = \"{}\"",
+        preview.loader_entry_section_id
+    )));
     assert!(container_source.contains("loader_symbol_count = 3"));
     assert!(container_source.contains("loader_symbol_table_hash = \"0x"));
     assert!(container_source.contains("[[loader_symbol]]"));
     assert!(container_source.contains("symbol_id = \"sym0000.loader-entry\""));
     assert!(container_source.contains("symbol_name = \"main\""));
     assert!(container_source.contains("lifecycle_hook = \"on_lifecycle_bootstrap\""));
-    assert!(container_source.contains("section_id = \"sec0000.compiled-artifact\""));
+    assert!(container_source.contains(&format!(
+        "section_id = \"{}\"",
+        preview.loader_entry_section_id
+    )));
     assert!(container_source.contains("symbol_id = \"sym0001.hetero-node.shader.official.shader\""));
     assert!(container_source.contains("symbol_kind = \"hetero-node-dispatch\""));
     assert!(container_source.contains("symbol_name = \"t0001.shader\""));
@@ -50,7 +62,10 @@ pub(crate) fn assert_matching_container_artifacts(
     assert!(container_source.contains("[[relocation]]"));
     assert!(container_source.contains("relocation_id = \"rel0000.lifecycle-entry\""));
     assert!(container_source.contains("relocation_kind = \"lifecycle-entry-binding\""));
-    assert!(container_source.contains("source_section_id = \"sec0000.compiled-artifact\""));
+    assert!(container_source.contains(&format!(
+        "source_section_id = \"{}\"",
+        preview.loader_entry_section_id
+    )));
     assert!(container_source.contains("target_symbol_id = \"sym0000.loader-entry\""));
     assert!(container_source.contains("relocation_id = \"rel0001.hetero-node\""));
     assert!(container_source.contains("relocation_kind = \"hetero-node-binding\""));
@@ -85,7 +100,7 @@ pub(crate) fn assert_matching_container_artifacts(
 pub(crate) fn assert_matching_container_verify_report(report: &NsldContainerVerifyReport) {
     assert!(report.valid);
     assert!(report.issues.is_empty());
-    assert_eq!(report.actual_section_count, Some(6));
+    assert_eq!(report.actual_section_count, Some(7));
     assert_eq!(
         report.actual_container_section_table_hash.as_deref(),
         Some(report.expected_container_section_table_hash.as_str())
@@ -104,16 +119,19 @@ pub(crate) fn assert_matching_container_verify_report(report: &NsldContainerVeri
         report.actual_loader_entry_kind.as_deref(),
         Some("lifecycle-bootstrap")
     );
+    assert_eq!(
+        report.actual_loader_entry_machine_arch.as_deref(),
+        Some(report.expected_loader_entry_machine_arch.as_str())
+    );
     assert_eq!(report.expected_loader_entry_symbol, "main");
     assert_eq!(report.actual_loader_entry_symbol.as_deref(), Some("main"));
     assert_eq!(
-        report.expected_loader_entry_section_id,
-        "sec0000.compiled-artifact"
-    );
-    assert_eq!(
         report.actual_loader_entry_section_id.as_deref(),
-        Some("sec0000.compiled-artifact")
+        Some(report.expected_loader_entry_section_id.as_str())
     );
+    assert!(report
+        .expected_loader_entry_section_id
+        .ends_with(".nuis-native-entry-code"));
     assert_eq!(report.expected_external_import_count, 3);
     assert_eq!(report.actual_external_import_count, Some(3));
     assert_eq!(report.expected_loader_symbol_count, 3);
@@ -135,12 +153,12 @@ pub(crate) fn assert_matching_container_verify_report(report: &NsldContainerVeri
     assert_eq!(report.expected_loader_symbol_name, "main");
     assert_eq!(report.actual_loader_symbol_name.as_deref(), Some("main"));
     assert_eq!(
-        report.expected_loader_symbol_section_id,
-        "sec0000.compiled-artifact"
+        report.actual_loader_symbol_section_id.as_deref(),
+        Some(report.expected_loader_symbol_section_id.as_str())
     );
     assert_eq!(
-        report.actual_loader_symbol_section_id.as_deref(),
-        Some("sec0000.compiled-artifact")
+        report.expected_loader_symbol_section_id,
+        report.expected_loader_entry_section_id
     );
     assert_eq!(report.expected_relocation_count, 3);
     assert_eq!(report.actual_relocation_count, Some(3));
@@ -159,15 +177,17 @@ pub(crate) fn assert_matching_container_verify_report(report: &NsldContainerVeri
         Some("lifecycle-entry-binding")
     );
     assert_eq!(
-        report.expected_relocation_source_section_id,
-        "sec0000.compiled-artifact"
+        report.actual_relocation_source_section_id.as_deref(),
+        Some(report.expected_relocation_source_section_id.as_str())
     );
     assert_eq!(
-        report.actual_relocation_source_section_id.as_deref(),
-        Some("sec0000.compiled-artifact")
+        report.expected_relocation_source_section_id,
+        report.expected_loader_entry_section_id
     );
-    assert_eq!(report.expected_relocation_source_offset, 0);
-    assert_eq!(report.actual_relocation_source_offset, Some(0));
+    assert_eq!(
+        report.actual_relocation_source_offset,
+        Some(report.expected_relocation_source_offset)
+    );
     assert_eq!(
         report.expected_relocation_target_symbol_id,
         "sym0000.loader-entry"
@@ -356,6 +376,10 @@ fn assert_tampered_loader_symbol(tampered_report: &NsldContainerVerifyReport) {
         Some("manual-entry")
     );
     assert_eq!(
+        tampered_report.actual_loader_entry_machine_arch.as_deref(),
+        Some("manual-arch")
+    );
+    assert_eq!(
         tampered_report.actual_loader_entry_symbol.as_deref(),
         Some("alt")
     );
@@ -512,6 +536,7 @@ const EXPECTED_TAMPERED_ISSUE_PREFIXES: &[&str] = &[
     "container_section_table_hash mismatch",
     "metadata_table_hash mismatch",
     "loader_entry_kind mismatch",
+    "loader_entry_machine_arch mismatch",
     "loader_entry_symbol mismatch",
     "loader_entry_section_id mismatch",
     "loader_symbol_count mismatch",

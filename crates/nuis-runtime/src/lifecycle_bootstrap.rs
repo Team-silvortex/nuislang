@@ -46,6 +46,8 @@ pub struct LifecycleBootstrapFacts {
     pub scheduler_entry: String,
     pub process_lifecycle_hook: String,
     pub loader_entry_kind: Option<String>,
+    pub loader_entry_abi_contract: Option<String>,
+    pub loader_entry_machine_arch: Option<String>,
     pub loader_entry_symbol: Option<String>,
     pub loader_entry_section_id: Option<String>,
     pub loader_symbol_status: String,
@@ -53,6 +55,9 @@ pub struct LifecycleBootstrapFacts {
     pub loader_symbol_name: Option<String>,
     pub loader_symbol_lifecycle_hook: Option<String>,
     pub loader_symbol_section_id: Option<String>,
+    pub loader_symbol_offset: Option<usize>,
+    pub loader_symbol_size_bytes: Option<usize>,
+    pub loader_symbol_payload_hash: Option<String>,
     pub relocation_targets_loader_symbol: bool,
     pub relocation_source_matches_loader_symbol: bool,
     pub source_section_count: usize,
@@ -123,6 +128,13 @@ pub fn plan_lifecycle_bootstrap(facts: &LifecycleBootstrapFacts) -> LifecycleBoo
         "runtime-bootstrap:entry-kind-unsupported",
         &mut blockers,
     );
+    require_exact(
+        facts.loader_entry_abi_contract.as_deref(),
+        crate::NUIS_LIFECYCLE_ENTRY_ABI_V1,
+        "runtime-bootstrap:entry-abi-unsupported",
+        &mut blockers,
+    );
+    validate_machine_arch(facts.loader_entry_machine_arch.as_deref(), &mut blockers);
     require_optional_non_empty(
         facts.loader_entry_symbol.as_deref(),
         "runtime-bootstrap:entry-symbol-missing",
@@ -159,6 +171,7 @@ pub fn plan_lifecycle_bootstrap(facts: &LifecycleBootstrapFacts) -> LifecycleBoo
         "runtime-bootstrap:nuis-lifecycle-hook-missing",
         &mut blockers,
     );
+    validate_loader_symbol_range(facts, &mut blockers);
     if !facts.relocation_targets_loader_symbol {
         blockers.push("runtime-bootstrap:entry-relocation-target-mismatch".to_owned());
     }
@@ -201,6 +214,14 @@ pub fn plan_lifecycle_bootstrap(facts: &LifecycleBootstrapFacts) -> LifecycleBoo
 fn ready_stages(facts: &LifecycleBootstrapFacts) -> Vec<LifecycleBootstrapStage> {
     let entry_symbol = facts.loader_entry_symbol.as_deref().unwrap_or_default();
     let entry_section = facts.loader_entry_section_id.as_deref().unwrap_or_default();
+    let entry_abi = facts
+        .loader_entry_abi_contract
+        .as_deref()
+        .unwrap_or_default();
+    let entry_machine_arch = facts
+        .loader_entry_machine_arch
+        .as_deref()
+        .unwrap_or_default();
     let nuis_hook = facts
         .loader_symbol_lifecycle_hook
         .as_deref()
@@ -238,7 +259,7 @@ fn ready_stages(facts: &LifecycleBootstrapFacts) -> Vec<LifecycleBootstrapStage>
     }));
     specs.push((
         "bind-loader-entry",
-        format!("{entry_symbol}@{entry_section}"),
+        format!("{entry_symbol}@{entry_section}#{entry_abi}@{entry_machine_arch}"),
     ));
     let mut services = facts.runtime_service_bindings.iter().collect::<Vec<_>>();
     services.sort_by(|left, right| left.binding_id.cmp(&right.binding_id));
@@ -317,6 +338,43 @@ fn validate_mapped_sections(facts: &LifecycleBootstrapFacts, blockers: &mut Vec<
     }
 }
 
+fn validate_loader_symbol_range(facts: &LifecycleBootstrapFacts, blockers: &mut Vec<String>) {
+    let Some(entry_section_id) = facts.loader_entry_section_id.as_deref() else {
+        return;
+    };
+    let Some(section) = facts
+        .mapped_sections
+        .iter()
+        .find(|section| section.section_id == entry_section_id)
+    else {
+        return;
+    };
+    let Some(symbol_offset) = facts.loader_symbol_offset else {
+        blockers.push("runtime-bootstrap:loader-symbol-offset-missing".to_owned());
+        return;
+    };
+    let Some(symbol_size) = facts.loader_symbol_size_bytes.filter(|size| *size > 0) else {
+        blockers.push("runtime-bootstrap:loader-symbol-size-invalid".to_owned());
+        return;
+    };
+    let symbol_end = symbol_offset.checked_add(symbol_size);
+    let section_end = section.offset.checked_add(section.size_bytes);
+    if symbol_offset < section.offset
+        || symbol_end.is_none()
+        || section_end.is_none()
+        || symbol_end > section_end
+    {
+        blockers.push("runtime-bootstrap:loader-symbol-range-invalid".to_owned());
+    }
+    if facts
+        .loader_symbol_payload_hash
+        .as_deref()
+        .is_none_or(|hash| !valid_table_hash(hash))
+    {
+        blockers.push("runtime-bootstrap:loader-symbol-hash-invalid".to_owned());
+    }
+}
+
 fn validate_applied_relocations(facts: &LifecycleBootstrapFacts, blockers: &mut Vec<String>) {
     if facts.source_relocation_count == 0
         || facts.source_relocation_count != facts.applied_relocations.len()
@@ -355,13 +413,21 @@ fn validate_applied_relocations(facts: &LifecycleBootstrapFacts, blockers: &mut 
 
 fn bootstrap_plan_identity_hash(facts: &LifecycleBootstrapFacts) -> String {
     let mut material = format!(
-        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
         LIFECYCLE_BOOTSTRAP_PLAN_IDENTITY_CONTRACT,
         facts.scheduler_entry,
         facts.process_lifecycle_hook,
         facts.loader_entry_kind.as_deref().unwrap_or("none"),
+        facts.loader_entry_abi_contract.as_deref().unwrap_or("none"),
+        facts.loader_entry_machine_arch.as_deref().unwrap_or("none"),
         facts.loader_entry_symbol.as_deref().unwrap_or("none"),
         facts.loader_entry_section_id.as_deref().unwrap_or("none"),
+        facts.loader_symbol_offset.unwrap_or(usize::MAX),
+        facts.loader_symbol_size_bytes.unwrap_or(0),
+        facts
+            .loader_symbol_payload_hash
+            .as_deref()
+            .unwrap_or("none"),
         facts.source_section_table_hash,
         facts.source_relocation_table_hash
     );
@@ -484,6 +550,14 @@ fn valid_table_hash(value: &str) -> bool {
         .is_some_and(|hex| hex.len() == 16 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
 }
 
+fn validate_machine_arch(value: Option<&str>, blockers: &mut Vec<String>) {
+    match value {
+        Some(value) if crate::canonical_machine_arch(value) == Some(value) => {}
+        Some(_) => blockers.push("runtime-bootstrap:entry-machine-arch-unsupported".to_owned()),
+        None => blockers.push("runtime-bootstrap:entry-machine-arch-missing".to_owned()),
+    }
+}
+
 fn require_non_empty(value: &str, blocker: &str, blockers: &mut Vec<String>) {
     if value.is_empty() {
         blockers.push(blocker.to_owned());
@@ -524,33 +598,53 @@ mod tests {
             scheduler_entry: "nuis.scheduler.loop.v1".to_owned(),
             process_lifecycle_hook: "on_process_start".to_owned(),
             loader_entry_kind: Some("lifecycle-bootstrap".to_owned()),
+            loader_entry_abi_contract: Some(crate::NUIS_LIFECYCLE_ENTRY_ABI_V1.to_owned()),
+            loader_entry_machine_arch: Some(
+                crate::native_host_machine_arch()
+                    .unwrap_or(crate::NUIS_MACHINE_ARCH_AARCH64)
+                    .to_owned(),
+            ),
             loader_entry_symbol: Some("main".to_owned()),
-            loader_entry_section_id: Some("sec0000.compiled-artifact".to_owned()),
+            loader_entry_section_id: Some("sec0001.nuis-native-entry-code".to_owned()),
             loader_symbol_status: "parsed".to_owned(),
             loader_symbol_kind: Some("lifecycle-bootstrap".to_owned()),
             loader_symbol_name: Some("main".to_owned()),
             loader_symbol_lifecycle_hook: Some("on_lifecycle_bootstrap".to_owned()),
-            loader_symbol_section_id: Some("sec0000.compiled-artifact".to_owned()),
+            loader_symbol_section_id: Some("sec0001.nuis-native-entry-code".to_owned()),
+            loader_symbol_offset: Some(136),
+            loader_symbol_size_bytes: Some(8),
+            loader_symbol_payload_hash: Some("0x6666666666666666".to_owned()),
             relocation_targets_loader_symbol: true,
             relocation_source_matches_loader_symbol: true,
-            source_section_count: 1,
+            source_section_count: 2,
             source_section_table_hash: "0x3333333333333333".to_owned(),
-            mapped_sections: vec![MappedSectionFacts {
-                section_id: "sec0000.compiled-artifact".to_owned(),
-                section_kind: "compiled-artifact".to_owned(),
-                offset: 0,
-                size_bytes: 128,
-                payload_hash: "0x4444444444444444".to_owned(),
-                required: true,
-                mapping_status: "mapped".to_owned(),
-            }],
+            mapped_sections: vec![
+                MappedSectionFacts {
+                    section_id: "sec0000.compiled-artifact".to_owned(),
+                    section_kind: "compiled-artifact".to_owned(),
+                    offset: 0,
+                    size_bytes: 128,
+                    payload_hash: "0x4444444444444444".to_owned(),
+                    required: true,
+                    mapping_status: "mapped".to_owned(),
+                },
+                MappedSectionFacts {
+                    section_id: "sec0001.nuis-native-entry-code".to_owned(),
+                    section_kind: crate::NUIS_NATIVE_ENTRY_SECTION_KIND.to_owned(),
+                    offset: 128,
+                    size_bytes: 16,
+                    payload_hash: "0x7777777777777777".to_owned(),
+                    required: true,
+                    mapping_status: "mapped".to_owned(),
+                },
+            ],
             source_relocation_count: 1,
             source_relocation_table_hash: "0x5555555555555555".to_owned(),
             applied_relocations: vec![AppliedRelocationFacts {
                 relocation_id: "rel0000.lifecycle-entry".to_owned(),
                 relocation_kind: "lifecycle-entry-binding".to_owned(),
-                source_section_id: "sec0000.compiled-artifact".to_owned(),
-                source_offset: 0,
+                source_section_id: "sec0001.nuis-native-entry-code".to_owned(),
+                source_offset: 128,
                 target_symbol_id: "sym0000.loader-entry".to_owned(),
                 addend: 0,
                 application_status: "applied".to_owned(),
@@ -580,6 +674,10 @@ mod tests {
     #[test]
     fn ready_plan_is_deterministic_and_strictly_ordered() {
         let plan = plan_lifecycle_bootstrap(&ready_facts());
+        let bind_loader_entry = format!(
+            "bind-loader-entry:main@sec0001.nuis-native-entry-code#nuis-runtime-lifecycle-entry-i64-v1@{}",
+            crate::native_host_machine_arch().unwrap_or(crate::NUIS_MACHINE_ARCH_AARCH64)
+        );
 
         assert!(plan.ready);
         assert_eq!(plan.status, "ready");
@@ -588,16 +686,17 @@ mod tests {
             LIFECYCLE_BOOTSTRAP_PLAN_IDENTITY_CONTRACT
         );
         assert!(valid_table_hash(&plan.identity_hash));
-        assert_eq!(plan.stages.len(), 10);
+        assert_eq!(plan.stages.len(), 11);
         assert_eq!(plan.stages[0].waits_for_ordinal, None);
-        assert_eq!(plan.stages[9].waits_for_ordinal, Some(8));
+        assert_eq!(plan.stages[10].waits_for_ordinal, Some(9));
         assert_eq!(
             plan.rendered_stages(),
             vec![
                 "accept-verified-image:nuis-runtime-lifecycle-bootstrap-plan-v1",
                 "map-section:sec0000.compiled-artifact@0+128#0x4444444444444444",
-                "apply-relocation:rel0000.lifecycle-entry:lifecycle-entry-binding@sec0000.compiled-artifact+0->sym0000.loader-entry+0",
-                "bind-loader-entry:main@sec0000.compiled-artifact",
+                "map-section:sec0001.nuis-native-entry-code@128+16#0x7777777777777777",
+                "apply-relocation:rel0000.lifecycle-entry:lifecycle-entry-binding@sec0001.nuis-native-entry-code+128->sym0000.loader-entry+0",
+                bind_loader_entry.as_str(),
                 "bind-runtime-service:runtime.clock-root@nuis-clock-protocol-v1#0x1111111111111111",
                 "bind-runtime-service:runtime.glm-root@nuis-yir-glm-binding-v1#0x2222222222222222",
                 "enter-lifecycle-hook:on_process_start",

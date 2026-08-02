@@ -32,11 +32,25 @@ pub(crate) fn tampered_container_source(
             "loader_entry_kind = \"manual-entry\"",
         )
         .replace(
+            "loader_entry_abi_contract = \"nuis-runtime-lifecycle-entry-i64-v1\"",
+            "loader_entry_abi_contract = \"manual-entry-abi\"",
+        )
+        .replace(
+            &format!(
+                "loader_entry_machine_arch = \"{}\"",
+                report.expected_loader_entry_machine_arch
+            ),
+            "loader_entry_machine_arch = \"manual-arch\"",
+        )
+        .replace(
             "loader_entry_symbol = \"main\"",
             "loader_entry_symbol = \"alt\"",
         )
         .replace(
-            "loader_entry_section_id = \"sec0000.compiled-artifact\"",
+            &format!(
+                "loader_entry_section_id = \"{}\"",
+                report.expected_loader_entry_section_id
+            ),
             "loader_entry_section_id = \"sec9999.missing\"",
         )
         .replace("loader_symbol_count = 3", "loader_symbol_count = 0")
@@ -65,7 +79,10 @@ pub(crate) fn tampered_container_source(
             "symbol_name = \"t9999.shader.manual\"",
         )
         .replace(
-            "section_id = \"sec0000.compiled-artifact\"",
+            &format!(
+                "section_id = \"{}\"",
+                report.expected_loader_entry_section_id
+            ),
             "section_id = \"sec9999.missing\"",
         )
         .replace("relocation_count = 3", "relocation_count = 4")
@@ -78,10 +95,19 @@ pub(crate) fn tampered_container_source(
             "relocation_kind = \"manual-relocation\"",
         )
         .replace(
-            "source_section_id = \"sec0000.compiled-artifact\"",
+            &format!(
+                "source_section_id = \"{}\"",
+                report.expected_loader_entry_section_id
+            ),
             "source_section_id = \"sec9999.missing\"",
         )
-        .replace("source_offset = 0", "source_offset = 7")
+        .replace(
+            &format!(
+                "source_offset = {}",
+                report.expected_relocation_source_offset
+            ),
+            "source_offset = 7",
+        )
         .replace(
             "target_symbol_id = \"sym0000.loader-entry\"",
             "target_symbol_id = \"sym9999.manual\"",

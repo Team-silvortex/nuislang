@@ -78,6 +78,8 @@ pub(crate) fn nsld_final_output_bootstrap_plan(
         scheduler_entry: "nuis.scheduler.loop.v1".to_owned(),
         process_lifecycle_hook: "on_process_start".to_owned(),
         loader_entry_kind: Some(container.loader_entry_kind.clone()),
+        loader_entry_abi_contract: Some(container.loader_entry_abi_contract.clone()),
+        loader_entry_machine_arch: Some(container.loader_entry_machine_arch.clone()),
         loader_entry_symbol: Some(container.loader_entry_symbol.clone()),
         loader_entry_section_id: Some(container.loader_entry_section_id.clone()),
         loader_symbol_status: if loader_symbol.is_some() {
@@ -90,6 +92,9 @@ pub(crate) fn nsld_final_output_bootstrap_plan(
         loader_symbol_name: loader_symbol.map(|symbol| symbol.symbol_name.clone()),
         loader_symbol_lifecycle_hook: loader_symbol.map(|symbol| symbol.lifecycle_hook.clone()),
         loader_symbol_section_id: loader_symbol.map(|symbol| symbol.section_id.clone()),
+        loader_symbol_offset: loader_symbol.map(|symbol| symbol.offset),
+        loader_symbol_size_bytes: loader_symbol.map(|symbol| symbol.size_bytes),
+        loader_symbol_payload_hash: loader_symbol.map(|symbol| symbol.payload_hash.clone()),
         relocation_targets_loader_symbol: entry_relocation
             .zip(loader_symbol)
             .is_some_and(|(relocation, symbol)| relocation.target_symbol_id == symbol.symbol_id),

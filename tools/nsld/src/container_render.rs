@@ -147,6 +147,14 @@ pub(crate) fn render_container_toml(report: &NsldContainerReport) -> String {
         escape_toml_string(&report.loader_entry_kind)
     ));
     out.push_str(&format!(
+        "loader_entry_abi_contract = \"{}\"\n",
+        escape_toml_string(&report.loader_entry_abi_contract)
+    ));
+    out.push_str(&format!(
+        "loader_entry_machine_arch = \"{}\"\n",
+        escape_toml_string(&report.loader_entry_machine_arch)
+    ));
+    out.push_str(&format!(
         "loader_entry_symbol = \"{}\"\n",
         escape_toml_string(&report.loader_entry_symbol)
     ));

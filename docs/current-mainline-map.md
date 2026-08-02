@@ -155,9 +155,11 @@ Use this section as a router, not as a full inventory.
   [lifecycle_bootstrap.rs](../crates/nuis-runtime/src/lifecycle_bootstrap.rs),
   [lifecycle_execution.rs](../crates/nuis-runtime/src/lifecycle_execution.rs),
   [executable_memory.rs](../crates/nuis-runtime/src/executable_memory.rs),
+  [native_entry.rs](../tools/nsld/src/native_entry.rs),
   [container_metadata_bindings.rs](../tools/nsld/src/container_metadata_bindings.rs),
   [final_executable_bootstrap.rs](../tools/nsld/src/final_executable_bootstrap.rs),
-  [runtime_bootstrap.rs](../tools/nuis-host-runner/src/runtime_bootstrap.rs)
+  [runtime_bootstrap.rs](../tools/nuis-host-runner/src/runtime_bootstrap.rs),
+  [native_entry.rs](../tools/nuis-host-runner/src/native_entry.rs)
 * tool/reference surface:
   [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
 * std layering and tooling:

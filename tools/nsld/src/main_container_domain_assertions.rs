@@ -34,12 +34,12 @@ pub(crate) fn assert_matching_native_object_contract(report: &NsldContainerVerif
     assert!(report.expected_native_object_section_present);
     assert_eq!(
         report.expected_native_object_section_id,
-        "sec0005.native-object-output"
+        "sec0006.native-object-output"
     );
     assert!(report.actual_native_object_section_present);
     assert_eq!(
         report.actual_native_object_section_id.as_deref(),
-        Some("sec0005.native-object-output")
+        Some("sec0006.native-object-output")
     );
     assert!(report.expected_native_object_loader_symbol_present);
     assert_eq!(

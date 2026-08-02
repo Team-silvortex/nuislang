@@ -145,7 +145,7 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         .contains("weakest bootstrap-critical status/progress ordering"));
     assert!(summary
         .weakest_bootstrap_task_card_priority_reason
-        .contains("status `active` rank 2, progress 90/100"));
+        .contains("status `active` rank 2, progress 99/100"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_handoff_coordinate,
         "native-binary-system/nuis-runtime/lifecycle-loader-bootstrap"
@@ -156,7 +156,7 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         .contains("weakest task card is directly actionable"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_action
-        .contains("dedicated Nsld native lifecycle-entry section"));
+        .contains("host-runner probe flag"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_command
         .contains("cargo test -q -p nuis-runtime lifecycle_bootstrap"));

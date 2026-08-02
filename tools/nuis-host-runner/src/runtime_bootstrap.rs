@@ -56,6 +56,8 @@ pub(super) fn runtime_bootstrap_handoff(
         scheduler_entry: scheduler_entry.to_owned(),
         process_lifecycle_hook: lifecycle_hook.to_owned(),
         loader_entry_kind: container.loader_entry_kind.clone(),
+        loader_entry_abi_contract: container.loader_entry_abi_contract.clone(),
+        loader_entry_machine_arch: container.loader_entry_machine_arch.clone(),
         loader_entry_symbol: container.loader_entry_symbol.clone(),
         loader_entry_section_id: container.loader_entry_section_id.clone(),
         loader_symbol_status: container.loader_symbol.status.clone(),
@@ -63,6 +65,9 @@ pub(super) fn runtime_bootstrap_handoff(
         loader_symbol_name: container.loader_symbol.symbol_name.clone(),
         loader_symbol_lifecycle_hook: container.loader_symbol.lifecycle_hook.clone(),
         loader_symbol_section_id: container.loader_symbol.section_id.clone(),
+        loader_symbol_offset: container.loader_symbol.offset,
+        loader_symbol_size_bytes: container.loader_symbol.size_bytes,
+        loader_symbol_payload_hash: container.loader_symbol.payload_hash.clone(),
         relocation_targets_loader_symbol: container.relocation.first_targets_loader_symbol,
         relocation_source_matches_loader_symbol: container
             .relocation

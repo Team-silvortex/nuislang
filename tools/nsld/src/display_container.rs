@@ -114,6 +114,14 @@ pub(crate) fn print_nsld_container_report(report: &NsldContainerReport) {
         println!("  loader_blocker: {blocker}");
     }
     println!("  loader_entry_kind: {}", report.loader_entry_kind);
+    println!(
+        "  loader_entry_abi_contract: {}",
+        report.loader_entry_abi_contract
+    );
+    println!(
+        "  loader_entry_machine_arch: {}",
+        report.loader_entry_machine_arch
+    );
     println!("  loader_entry_symbol: {}", report.loader_entry_symbol);
     println!(
         "  loader_entry_section_id: {}",

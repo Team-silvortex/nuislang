@@ -2,19 +2,40 @@ use crate::CompiledEntryTransferResult;
 
 pub const EXECUTABLE_MEMORY_ADAPTER_CONTRACT: &str = "nuis-executable-memory-adapter-v1";
 pub const NATIVE_ENTRY_INVOCATION_PROTOCOL: &str = "nuis-native-entry-invocation-v1";
+pub const NATIVE_ENTRY_INVOCATION_PERMIT_PROTOCOL: &str = "nuis-native-entry-invocation-permit-v1";
 pub const NUIS_LIFECYCLE_ENTRY_ABI_V1: &str = "nuis-runtime-lifecycle-entry-i64-v1";
 pub const NUIS_NATIVE_ENTRY_SECTION_KIND: &str = "nuis-native-entry-code";
+pub const NUIS_MACHINE_ARCH_AARCH64: &str = "aarch64";
+pub const NUIS_MACHINE_ARCH_X86_64: &str = "x86_64";
+
+pub fn canonical_machine_arch(value: &str) -> Option<&'static str> {
+    match value {
+        "aarch64" | "arm64" => Some(NUIS_MACHINE_ARCH_AARCH64),
+        "x86_64" | "amd64" => Some(NUIS_MACHINE_ARCH_X86_64),
+        _ => None,
+    }
+}
+
+pub fn native_host_machine_arch() -> Option<&'static str> {
+    #[cfg(target_arch = "aarch64")]
+    return Some(NUIS_MACHINE_ARCH_AARCH64);
+    #[cfg(target_arch = "x86_64")]
+    return Some(NUIS_MACHINE_ARCH_X86_64);
+    #[allow(unreachable_code)]
+    None
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ExecutableEntryRequest<'a> {
     pub execution_identity_hash: &'a str,
     pub section_id: &'a str,
     pub section_kind: &'a str,
-    pub expected_section_hash: &'a str,
+    pub expected_code_hash: &'a str,
     pub entry_symbol: &'a str,
     pub entry_offset: usize,
     pub entry_size_bytes: usize,
     pub abi_contract: &'a str,
+    pub target_machine_arch: &'a str,
     pub code_bytes: &'a [u8],
 }
 
@@ -36,17 +57,24 @@ impl<'a> ExecutableEntryRequest<'a> {
                 transfer.entry_section_kind.as_deref(),
                 "entry-section-kind-missing",
             )?,
-            expected_section_hash: required_str(
-                transfer.entry_section_payload_hash.as_deref(),
-                "entry-section-hash-missing",
+            expected_code_hash: required_str(
+                transfer.entry_symbol_payload_hash.as_deref(),
+                "entry-symbol-hash-missing",
             )?,
             entry_symbol: required_str(transfer.entry_symbol.as_deref(), "entry-symbol-missing")?,
             entry_offset: 0,
             entry_size_bytes: transfer
-                .entry_section_size_bytes
+                .entry_symbol_size_bytes
                 .filter(|size| *size > 0)
-                .ok_or_else(|| "executable-memory:entry-section-size-missing".to_owned())?,
-            abi_contract: NUIS_LIFECYCLE_ENTRY_ABI_V1,
+                .ok_or_else(|| "executable-memory:entry-symbol-size-missing".to_owned())?,
+            abi_contract: required_str(
+                transfer.entry_abi_contract.as_deref(),
+                "entry-abi-missing",
+            )?,
+            target_machine_arch: required_str(
+                transfer.entry_machine_arch.as_deref(),
+                "entry-machine-arch-missing",
+            )?,
             code_bytes,
         })
     }
@@ -72,6 +100,9 @@ pub struct ExecutableEntryPreparation {
     pub execution_identity_hash: String,
     pub section_id: String,
     pub entry_symbol: String,
+    pub target_machine_arch: String,
+    pub host_machine_arch: Option<String>,
+    pub machine_arch_status: &'static str,
     pub mapping_size_bytes: usize,
     pub protection_status: &'static str,
     pub entry_bounds_status: &'static str,
@@ -90,6 +121,9 @@ impl std::fmt::Debug for ExecutableEntryPreparation {
             .field("execution_identity_hash", &self.execution_identity_hash)
             .field("section_id", &self.section_id)
             .field("entry_symbol", &self.entry_symbol)
+            .field("target_machine_arch", &self.target_machine_arch)
+            .field("host_machine_arch", &self.host_machine_arch)
+            .field("machine_arch_status", &self.machine_arch_status)
             .field("mapping_size_bytes", &self.mapping_size_bytes)
             .field("protection_status", &self.protection_status)
             .field("entry_bounds_status", &self.entry_bounds_status)
@@ -99,19 +133,35 @@ impl std::fmt::Debug for ExecutableEntryPreparation {
 }
 
 impl ExecutableEntryPreparation {
-    /// # Safety
-    /// The mapped bytes must be trusted AOT output implementing the declared entry ABI.
-    pub unsafe fn invoke(self) -> NativeEntryInvocationResult {
-        match self.entry {
-            Some(entry) => unsafe { entry.invoke() },
-            None => NativeEntryInvocationResult::blocked(
+    pub fn authorize(
+        self,
+        permit: NativeEntryInvocationPermit,
+    ) -> Result<AuthorizedNativeEntry, Box<NativeEntryInvocationResult>> {
+        let mut blockers = self.blockers.clone();
+        if !self.ready || self.entry.is_none() {
+            blockers.push("native-entry-authorization:preparation-blocked".to_owned());
+        }
+        if permit.execution_identity_hash != self.execution_identity_hash
+            || permit.section_id != self.section_id
+            || permit.entry_symbol != self.entry_symbol
+            || permit.target_machine_arch != self.target_machine_arch
+        {
+            blockers.push("native-entry-authorization:permit-identity-mismatch".to_owned());
+        }
+        blockers.sort();
+        blockers.dedup();
+        if !blockers.is_empty() {
+            return Err(Box::new(NativeEntryInvocationResult::blocked(
                 self.adapter_id,
                 self.execution_identity_hash,
                 self.section_id,
                 self.entry_symbol,
-                self.blockers,
-            ),
+                blockers,
+            )));
         }
+        Ok(AuthorizedNativeEntry {
+            entry: self.entry.expect("ready preparation owns native entry"),
+        })
     }
 
     fn blocked(
@@ -127,6 +177,9 @@ impl ExecutableEntryPreparation {
             execution_identity_hash: request.execution_identity_hash.to_owned(),
             section_id: request.section_id.to_owned(),
             entry_symbol: request.entry_symbol.to_owned(),
+            target_machine_arch: request.target_machine_arch.to_owned(),
+            host_machine_arch: native_host_machine_arch().map(str::to_owned),
+            machine_arch_status: machine_arch_status(request.target_machine_arch),
             mapping_size_bytes: 0,
             protection_status: "not-mapped",
             entry_bounds_status: "blocked",
@@ -134,6 +187,67 @@ impl ExecutableEntryPreparation {
             entry: None,
         }
     }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct NativeEntryInvocationPermit {
+    protocol: &'static str,
+    execution_identity_hash: String,
+    section_id: String,
+    entry_symbol: String,
+    target_machine_arch: String,
+}
+
+impl NativeEntryInvocationPermit {
+    pub fn from_transfer(transfer: &CompiledEntryTransferResult) -> Result<Self, String> {
+        if !transfer.ready {
+            return Err("native-entry-permit:entry-transfer-blocked".to_owned());
+        }
+        let target_machine_arch = permit_required(
+            transfer.entry_machine_arch.as_deref(),
+            "target-machine-arch-missing",
+        )?;
+        if canonical_machine_arch(target_machine_arch) != Some(target_machine_arch) {
+            return Err("native-entry-permit:target-machine-arch-unsupported".to_owned());
+        }
+        if native_host_machine_arch() != Some(target_machine_arch) {
+            return Err("native-entry-permit:host-machine-arch-mismatch".to_owned());
+        }
+        if transfer.entry_abi_contract.as_deref() != Some(NUIS_LIFECYCLE_ENTRY_ABI_V1) {
+            return Err("native-entry-permit:entry-abi-unsupported".to_owned());
+        }
+        Ok(Self {
+            protocol: NATIVE_ENTRY_INVOCATION_PERMIT_PROTOCOL,
+            execution_identity_hash: transfer.execution_identity_hash.clone(),
+            section_id: permit_required(transfer.entry_section_id.as_deref(), "section-missing")?
+                .to_owned(),
+            entry_symbol: permit_required(transfer.entry_symbol.as_deref(), "symbol-missing")?
+                .to_owned(),
+            target_machine_arch: target_machine_arch.to_owned(),
+        })
+    }
+
+    pub fn protocol(&self) -> &'static str {
+        self.protocol
+    }
+}
+
+pub struct AuthorizedNativeEntry {
+    entry: Box<dyn OneShotExecutableEntry>,
+}
+
+impl AuthorizedNativeEntry {
+    /// # Safety
+    /// The mapped bytes must be trusted AOT output implementing the declared entry ABI.
+    pub unsafe fn invoke(self) -> NativeEntryInvocationResult {
+        unsafe { self.entry.invoke() }
+    }
+}
+
+fn permit_required<'a>(value: Option<&'a str>, blocker: &str) -> Result<&'a str, String> {
+    value
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| format!("native-entry-permit:{blocker}"))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -209,9 +323,19 @@ fn validate_request(request: &ExecutableEntryRequest<'_>) -> Vec<String> {
     if request.abi_contract != NUIS_LIFECYCLE_ENTRY_ABI_V1 {
         blockers.push("executable-memory:entry-abi-unsupported".to_owned());
     }
+    match machine_arch_status(request.target_machine_arch) {
+        "verified-host-match" => {}
+        "target-unsupported" => {
+            blockers.push("executable-memory:target-machine-arch-unsupported".to_owned())
+        }
+        "host-unavailable" => {
+            blockers.push("executable-memory:host-machine-arch-unavailable".to_owned())
+        }
+        _ => blockers.push("executable-memory:host-machine-arch-mismatch".to_owned()),
+    }
     if request.code_bytes.is_empty()
-        || !valid_hash(request.expected_section_hash)
-        || fnv1a64_hex(request.code_bytes) != request.expected_section_hash
+        || !valid_hash(request.expected_code_hash)
+        || fnv1a64_hex(request.code_bytes) != request.expected_code_hash
     {
         blockers.push("executable-memory:section-bytes-unverified".to_owned());
     }
@@ -228,6 +352,20 @@ fn validate_request(request: &ExecutableEntryRequest<'_>) -> Vec<String> {
     blockers
 }
 
+fn machine_arch_status(target_machine_arch: &str) -> &'static str {
+    let Some(target) = canonical_machine_arch(target_machine_arch) else {
+        return "target-unsupported";
+    };
+    if target != target_machine_arch {
+        return "target-not-canonical";
+    }
+    match native_host_machine_arch() {
+        Some(host) if host == target => "verified-host-match",
+        Some(_) => "host-mismatch",
+        None => "host-unavailable",
+    }
+}
+
 #[cfg(all(unix, any(target_arch = "aarch64", target_arch = "x86_64")))]
 fn prepare_native_host_entry(
     adapter_id: &'static str,
@@ -242,6 +380,9 @@ fn prepare_native_host_entry(
             execution_identity_hash: request.execution_identity_hash.to_owned(),
             section_id: request.section_id.to_owned(),
             entry_symbol: request.entry_symbol.to_owned(),
+            target_machine_arch: request.target_machine_arch.to_owned(),
+            host_machine_arch: native_host_machine_arch().map(str::to_owned),
+            machine_arch_status: "verified-host-match",
             mapping_size_bytes: request.code_bytes.len(),
             protection_status: "sealed-read-execute",
             entry_bounds_status: "verified",
@@ -454,12 +595,23 @@ mod tests {
             execution_identity_hash: "0x1111111111111111",
             section_id: "sec.native-entry",
             section_kind: NUIS_NATIVE_ENTRY_SECTION_KIND,
-            expected_section_hash: expected_hash,
+            expected_code_hash: expected_hash,
             entry_symbol: "main",
             entry_offset: 0,
             entry_size_bytes: bytes.len(),
             abi_contract: NUIS_LIFECYCLE_ENTRY_ABI_V1,
+            target_machine_arch: native_host_machine_arch().expect("supported test host"),
             code_bytes: bytes,
+        }
+    }
+
+    fn permit(request: &ExecutableEntryRequest<'_>) -> NativeEntryInvocationPermit {
+        NativeEntryInvocationPermit {
+            protocol: NATIVE_ENTRY_INVOCATION_PERMIT_PROTOCOL,
+            execution_identity_hash: request.execution_identity_hash.to_owned(),
+            section_id: request.section_id.to_owned(),
+            entry_symbol: request.entry_symbol.to_owned(),
+            target_machine_arch: request.target_machine_arch.to_owned(),
         }
     }
 
@@ -475,9 +627,15 @@ mod tests {
         assert_eq!(preparation.status, "ready");
         assert_eq!(preparation.protection_status, "sealed-read-execute");
         assert_eq!(preparation.entry_bounds_status, "verified");
+        assert_eq!(preparation.machine_arch_status, "verified-host-match");
 
         // SAFETY: the architecture-specific fixture implements the declared no-arg i64 ABI.
-        let result = unsafe { preparation.invoke() };
+        let authorized = preparation.authorize(permit(&request(bytes, &expected_hash)));
+        let result = unsafe {
+            authorized
+                .expect("matching permit authorizes entry")
+                .invoke()
+        };
         assert!(result.invoked);
         assert_eq!(result.status, "invoked");
         assert_eq!(result.return_value, Some(42));
@@ -490,15 +648,18 @@ mod tests {
         };
         let expected_hash = fnv1a64_hex(bytes);
         let mut request = request(bytes, &expected_hash);
-        request.expected_section_hash = "0xaaaaaaaaaaaaaaaa";
+        request.expected_code_hash = "0xaaaaaaaaaaaaaaaa";
+        let permit = permit(&request);
         let preparation = NativeHostExecutableMemoryAdapter.prepare(&request);
         assert!(!preparation.ready);
         assert_eq!(preparation.mapping_size_bytes, 0);
         assert!(preparation
             .blockers
             .contains(&"executable-memory:section-bytes-unverified".to_owned()));
-        // SAFETY: blocked preparations never reach native code.
-        let result = unsafe { preparation.invoke() };
+        let result = preparation
+            .authorize(permit)
+            .err()
+            .expect("blocked preparation cannot be authorized");
         assert!(!result.invoked);
         assert_eq!(result.return_value, None);
     }
@@ -525,5 +686,48 @@ mod tests {
         assert!(preparation
             .blockers
             .contains(&"executable-memory:section-kind-unsupported".to_owned()));
+    }
+
+    #[test]
+    fn target_machine_arch_drift_blocks_before_mapping() {
+        let Some(bytes) = host_return_42_thunk() else {
+            return;
+        };
+        let expected_hash = fnv1a64_hex(bytes);
+        let mut request = request(bytes, &expected_hash);
+        request.target_machine_arch = match native_host_machine_arch() {
+            Some(NUIS_MACHINE_ARCH_AARCH64) => NUIS_MACHINE_ARCH_X86_64,
+            Some(NUIS_MACHINE_ARCH_X86_64) => NUIS_MACHINE_ARCH_AARCH64,
+            _ => return,
+        };
+
+        let preparation = NativeHostExecutableMemoryAdapter.prepare(&request);
+        assert!(!preparation.ready);
+        assert_eq!(preparation.mapping_size_bytes, 0);
+        assert_eq!(preparation.machine_arch_status, "host-mismatch");
+        assert!(preparation
+            .blockers
+            .contains(&"executable-memory:host-machine-arch-mismatch".to_owned()));
+    }
+
+    #[test]
+    fn mismatched_permit_cannot_authorize_prepared_entry() {
+        let Some(bytes) = host_return_42_thunk() else {
+            return;
+        };
+        let expected_hash = fnv1a64_hex(bytes);
+        let request = request(bytes, &expected_hash);
+        let preparation = NativeHostExecutableMemoryAdapter.prepare(&request);
+        let mut permit = permit(&request);
+        permit.execution_identity_hash = "0x2222222222222222".to_owned();
+
+        let result = preparation
+            .authorize(permit)
+            .err()
+            .expect("identity-drifted permit must fail");
+        assert!(!result.invoked);
+        assert!(result
+            .blockers
+            .contains(&"native-entry-authorization:permit-identity-mismatch".to_owned()));
     }
 }

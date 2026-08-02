@@ -8,6 +8,7 @@ use crate::{
     container_toml::{
         array_table_blocks, bool_value, bool_value_from_lines, first_array_table_block,
         string_array_value, string_value, string_value_from_lines, usize_value,
+        usize_value_from_lines,
     },
 };
 
@@ -27,6 +28,9 @@ pub(super) struct ContainerLoaderSymbolSummary {
     pub(super) symbol_name: Option<String>,
     pub(super) lifecycle_hook: Option<String>,
     pub(super) section_id: Option<String>,
+    pub(super) offset: Option<usize>,
+    pub(super) size_bytes: Option<usize>,
+    pub(super) payload_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -104,6 +108,8 @@ pub(super) struct ContainerLoaderSummary {
     pub(super) loader_readiness: Option<String>,
     pub(super) loader_blockers: Vec<String>,
     pub(super) loader_entry_kind: Option<String>,
+    pub(super) loader_entry_abi_contract: Option<String>,
+    pub(super) loader_entry_machine_arch: Option<String>,
     pub(super) loader_entry_symbol: Option<String>,
     pub(super) loader_entry_section_id: Option<String>,
     pub(super) loader_symbol_count: Option<usize>,
@@ -159,6 +165,8 @@ pub(super) fn scan_container_loader(
     let loader_readiness = string_value(source, "loader_readiness");
     let loader_blockers = string_array_value(source, "loader_blockers");
     let loader_entry_kind = string_value(source, "loader_entry_kind");
+    let loader_entry_abi_contract = string_value(source, "loader_entry_abi_contract");
+    let loader_entry_machine_arch = string_value(source, "loader_entry_machine_arch");
     let loader_entry_symbol = string_value(source, "loader_entry_symbol");
     let loader_entry_section_id = string_value(source, "loader_entry_section_id");
     let loader_symbol_count = usize_value(source, "loader_symbol_count");
@@ -176,33 +184,7 @@ pub(super) fn scan_container_loader(
         scan_backend_artifact_payloads(source, backend_artifact_payload_count);
     let metadata_binding = scan_metadata_bindings(source);
     let provider_dispatch = scan_provider_dispatch(source, &metadata_binding);
-    let handoff_blockers = container_loader_handoff_blockers(
-        container_schema.as_deref(),
-        container_schema_version,
-        container_kind.as_deref(),
-        container_producer.as_deref(),
-        container_ready,
-        &container_blockers,
-        container_magic.as_deref(),
-        container_version,
-        &container_section,
-        &compatibility_domain,
-        &external_import,
-        container_payload_size_bytes,
-        container_payload_hash.as_deref(),
-        loader_readiness.as_deref(),
-        &loader_blockers,
-        loader_entry_kind.as_deref(),
-        loader_entry_symbol.as_deref(),
-        loader_entry_section_id.as_deref(),
-        loader_symbol_count,
-        &loader_symbol,
-        &relocation,
-        &metadata_binding,
-        &provider_dispatch,
-    );
-    let handoff_ready = handoff_blockers.is_empty();
-    ContainerLoaderSummary {
+    let mut summary = ContainerLoaderSummary {
         status: "parsed".to_owned(),
         container_schema,
         container_schema_version,
@@ -233,15 +215,26 @@ pub(super) fn scan_container_loader(
         loader_readiness,
         loader_blockers,
         loader_entry_kind,
+        loader_entry_abi_contract,
+        loader_entry_machine_arch,
         loader_entry_symbol,
         loader_entry_section_id,
         loader_symbol_count,
         loader_symbol,
         relocation,
-        handoff_status: if handoff_ready { "ready" } else { "blocked" }.to_owned(),
-        handoff_ready,
-        handoff_blockers,
+        handoff_status: "blocked".to_owned(),
+        handoff_ready: false,
+        handoff_blockers: Vec::new(),
+    };
+    summary.handoff_blockers = container_loader_handoff_blockers(&summary);
+    summary.handoff_ready = summary.handoff_blockers.is_empty();
+    summary.handoff_status = if summary.handoff_ready {
+        "ready"
+    } else {
+        "blocked"
     }
+    .to_owned();
+    summary
 }
 
 fn container_capsule_region(region: &[u8]) -> &[u8] {
@@ -290,6 +283,8 @@ fn empty_container_loader(status: &str, handoff_blockers: Vec<String>) -> Contai
         loader_readiness: None,
         loader_blockers: Vec::new(),
         loader_entry_kind: None,
+        loader_entry_abi_contract: None,
+        loader_entry_machine_arch: None,
         loader_entry_symbol: None,
         loader_entry_section_id: None,
         loader_symbol_count: None,
@@ -310,6 +305,9 @@ impl ContainerLoaderSymbolSummary {
             symbol_name: None,
             lifecycle_hook: None,
             section_id: None,
+            offset: None,
+            size_bytes: None,
+            payload_hash: None,
         }
     }
 }
@@ -380,6 +378,9 @@ fn scan_first_loader_symbol(source: &str) -> ContainerLoaderSymbolSummary {
         symbol_name: string_value_from_lines(&block, "symbol_name"),
         lifecycle_hook: string_value_from_lines(&block, "lifecycle_hook"),
         section_id: string_value_from_lines(&block, "section_id"),
+        offset: usize_value_from_lines(&block, "offset"),
+        size_bytes: usize_value_from_lines(&block, "size_bytes"),
+        payload_hash: string_value_from_lines(&block, "payload_hash"),
     }
 }
 
@@ -486,31 +487,32 @@ fn scan_container_sections(
     }
 }
 
-fn container_loader_handoff_blockers(
-    container_schema: Option<&str>,
-    container_schema_version: Option<usize>,
-    container_kind: Option<&str>,
-    container_producer: Option<&str>,
-    container_ready: Option<bool>,
-    container_blockers: &[String],
-    container_magic: Option<&str>,
-    container_version: Option<usize>,
-    container_section: &ContainerSectionSummary,
-    compatibility_domain: &CompatibilityDomainSummary,
-    external_import: &ExternalImportSummary,
-    container_payload_size_bytes: Option<usize>,
-    container_payload_hash: Option<&str>,
-    loader_readiness: Option<&str>,
-    loader_blockers: &[String],
-    loader_entry_kind: Option<&str>,
-    loader_entry_symbol: Option<&str>,
-    loader_entry_section_id: Option<&str>,
-    loader_symbol_count: Option<usize>,
-    loader_symbol: &ContainerLoaderSymbolSummary,
-    relocation: &ContainerRelocationSummary,
-    metadata_binding: &MetadataBindingSummary,
-    provider_dispatch: &ProviderDispatchSummary,
-) -> Vec<String> {
+fn container_loader_handoff_blockers(summary: &ContainerLoaderSummary) -> Vec<String> {
+    let container_schema = summary.container_schema.as_deref();
+    let container_schema_version = summary.container_schema_version;
+    let container_kind = summary.container_kind.as_deref();
+    let container_producer = summary.container_producer.as_deref();
+    let container_ready = summary.container_ready;
+    let container_blockers = &summary.container_blockers;
+    let container_magic = summary.container_magic.as_deref();
+    let container_version = summary.container_version;
+    let container_section = &summary.container_section;
+    let compatibility_domain = &summary.compatibility_domain;
+    let external_import = &summary.external_import;
+    let container_payload_size_bytes = summary.container_payload_size_bytes;
+    let container_payload_hash = summary.container_payload_hash.as_deref();
+    let loader_readiness = summary.loader_readiness.as_deref();
+    let loader_blockers = &summary.loader_blockers;
+    let loader_entry_kind = summary.loader_entry_kind.as_deref();
+    let loader_entry_abi_contract = summary.loader_entry_abi_contract.as_deref();
+    let loader_entry_machine_arch = summary.loader_entry_machine_arch.as_deref();
+    let loader_entry_symbol = summary.loader_entry_symbol.as_deref();
+    let loader_entry_section_id = summary.loader_entry_section_id.as_deref();
+    let loader_symbol_count = summary.loader_symbol_count;
+    let loader_symbol = &summary.loader_symbol;
+    let relocation = &summary.relocation;
+    let metadata_binding = &summary.metadata_binding;
+    let provider_dispatch = &summary.provider_dispatch;
     let mut blockers = Vec::new();
     blockers.extend(metadata_binding.blockers.iter().cloned());
     blockers.extend(provider_dispatch.blockers.iter().cloned());
@@ -620,6 +622,16 @@ fn container_loader_handoff_blockers(
     if loader_entry_kind.is_none_or(str::is_empty) {
         blockers.push("container-loader:entry-kind-missing".to_owned());
     }
+    match loader_entry_abi_contract {
+        Some(nuis_runtime::NUIS_LIFECYCLE_ENTRY_ABI_V1) => {}
+        Some(_) => blockers.push("container-loader:entry-abi-unsupported".to_owned()),
+        None => blockers.push("container-loader:entry-abi-missing".to_owned()),
+    }
+    match loader_entry_machine_arch {
+        Some(value) if nuis_runtime::canonical_machine_arch(value) == Some(value) => {}
+        Some(_) => blockers.push("container-loader:entry-machine-arch-unsupported".to_owned()),
+        None => blockers.push("container-loader:entry-machine-arch-missing".to_owned()),
+    }
     if loader_entry_section_id.is_none_or(str::is_empty) {
         blockers.push("container-loader:entry-section-missing".to_owned());
     }
@@ -678,6 +690,36 @@ fn container_loader_handoff_blockers(
             {
                 blockers.push("container-loader:symbol-section-missing".to_owned());
             }
+            let symbol_range_valid = loader_symbol
+                .section_id
+                .as_deref()
+                .zip(loader_symbol.offset)
+                .zip(loader_symbol.size_bytes)
+                .and_then(|((section_id, offset), size)| {
+                    let section = container_section
+                        .entries
+                        .iter()
+                        .find(|section| section.section_id == section_id)?;
+                    Some(
+                        size > 0
+                            && offset >= section.offset
+                            && offset
+                                .checked_add(size)
+                                .zip(section.offset.checked_add(section.size_bytes))
+                                .is_some_and(|(symbol_end, section_end)| symbol_end <= section_end),
+                    )
+                })
+                .unwrap_or(false);
+            if !symbol_range_valid {
+                blockers.push("container-loader:symbol-range-invalid".to_owned());
+            }
+            if loader_symbol
+                .payload_hash
+                .as_deref()
+                .is_none_or(|hash| !valid_hash(hash))
+            {
+                blockers.push("container-loader:symbol-hash-invalid".to_owned());
+            }
         }
     }
     match relocation.declared_count {
@@ -701,4 +743,10 @@ fn container_loader_handoff_blockers(
         }
     }
     blockers
+}
+
+fn valid_hash(value: &str) -> bool {
+    value.len() == 18
+        && value.starts_with("0x")
+        && value[2..].bytes().all(|byte| byte.is_ascii_hexdigit())
 }
