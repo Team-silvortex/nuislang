@@ -56,6 +56,7 @@ mod dev_tensor_drift;
 mod dev_tensor_drift_data;
 mod dev_tensor_drift_data_core;
 mod dev_tensor_drift_data_runtime;
+mod dev_tensor_drift_data_runtime_bootstrap;
 mod dev_tensor_drift_data_runtime_cuda;
 mod dev_tensor_drift_data_runtime_dev;
 mod dev_tensor_drift_data_runtime_dev_lineage;

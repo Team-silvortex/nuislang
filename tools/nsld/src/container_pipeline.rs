@@ -215,7 +215,7 @@ pub(crate) fn nsld_container_report(
         container::backend_artifact_payload_table_hash(&backend_artifact_payloads, fnv1a64_hex);
     let provider_dispatch =
         super::container_provider_dispatch::provider_dispatch_evidence(&plan.output_dir);
-    let metadata_binding_evidence = container_metadata_binding_evidence(&plan.output_dir);
+    let metadata_binding_evidence = container_metadata_binding_evidence(plan);
     let metadata_binding_table_hash =
         container::metadata_binding_table_hash(&metadata_binding_evidence.bindings, fnv1a64_hex);
     let metadata_table_hash = container::metadata_table_hash(

@@ -58,12 +58,19 @@ pub(crate) fn independently_verify(source: &str) -> PersistedFinalImageBindingPr
         } else {
             "empty-proof-invalid"
         }
-    } else if validation_status == "verified"
-        && selected_set_contract.as_deref() == Some(SELECTED_SET_CONTRACT)
-        && selected_set_count.is_some()
-        && selected_set_hash.as_deref().is_some_and(valid_fnv1a64)
-    {
-        "verified"
+    } else if validation_status == "verified" {
+        let provider_selection_absent = selected_set_contract.is_none()
+            && selected_set_count.is_none()
+            && selected_set_hash.is_none();
+        let provider_selection_verified = selected_set_contract.as_deref()
+            == Some(SELECTED_SET_CONTRACT)
+            && selected_set_count.is_some()
+            && selected_set_hash.as_deref().is_some_and(valid_fnv1a64);
+        if provider_selection_absent || provider_selection_verified {
+            "verified"
+        } else {
+            "selected-set-proof-invalid"
+        }
     } else {
         "selected-set-proof-invalid"
     }
@@ -145,4 +152,29 @@ fn fnv1a64_hex(bytes: &[u8]) -> String {
         hash = hash.wrapping_mul(0x100000001b3);
     }
     format!("fnv1a64:{hash:016x}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn independently_verifies_runtime_only_binding_proof() {
+        let hash = canonical_hash(2, "0x1111111111111111", "verified", "none", None, "none");
+        let source = format!(
+            "final_image_binding_proof_contract = \"{PROOF_CONTRACT}\"\n\
+             final_image_metadata_binding_count = 2\n\
+             final_image_metadata_binding_table_hash = \"0x1111111111111111\"\n\
+             final_image_metadata_binding_validation_status = \"verified\"\n\
+             final_image_selected_provider_bundle_set_contract = \"\"\n\
+             final_image_selected_provider_bundle_count = 0\n\
+             final_image_selected_provider_bundle_set_hash = \"\"\n\
+             final_image_binding_proof_hash = \"{hash}\"\n"
+        );
+
+        assert_eq!(
+            independently_verify(&source).verification_status,
+            "verified"
+        );
+    }
 }

@@ -155,6 +155,9 @@ pub struct PayloadExecutionReplaySummary {
     pub provider_completion_dispatch_selected_set_hash: Option<String>,
     pub provider_completion_dispatch_identity_hash: Option<String>,
     pub provider_completions: Vec<PayloadExecutionProviderCompletion>,
+    pub runtime_bootstrap_identity_contract: Option<String>,
+    pub runtime_bootstrap_identity_status: String,
+    pub runtime_bootstrap_identity_hash: Option<String>,
     pub final_image_binding_proof_contract: Option<String>,
     pub final_image_binding_proof_status: String,
     pub final_image_binding_proof_hash: Option<String>,
@@ -188,6 +191,23 @@ pub fn payload_execution_replay_summary(
         })
         .collect::<Vec<_>>();
     let first_provider_completion = provider_completions.first();
+    let bootstrap_event = handoff
+        .events
+        .iter()
+        .find(|event| event.execution_phase == "container-loader-handoff");
+    let bootstrap_contract = bootstrap_event.map(|event| event.output_contract.as_str());
+    let bootstrap_hash = bootstrap_event.map(|event| event.output_evidence.as_str());
+    let runtime_bootstrap_identity_status = match (bootstrap_contract, bootstrap_hash) {
+        (Some(nuis_runtime_contract), Some(hash))
+            if nuis_runtime_contract == "nuis-runtime-lifecycle-bootstrap-plan-identity-v1"
+                && valid_runtime_bootstrap_hash(hash) =>
+        {
+            "verified"
+        }
+        (None, None) | (Some("" | "none"), Some("" | "none")) => "legacy-unbound",
+        _ => "invalid",
+    }
+    .to_owned();
     let provider_completion_set_hash = (handoff.provider_completion_set_hash_actual != "none")
         .then(|| handoff.provider_completion_set_hash_actual.clone());
     let first_blocker = if !handoff.available {
@@ -196,6 +216,8 @@ pub fn payload_execution_replay_summary(
         Some(format!("payload-execution-handoff:{}", handoff.status))
     } else if handoff.final_image_binding_proof.proof_status == "legacy-unbound" {
         Some("final-image-binding-proof:legacy-unbound".to_owned())
+    } else if runtime_bootstrap_identity_status == "invalid" {
+        Some("runtime-bootstrap-identity:invalid".to_owned())
     } else if handoff.hetero_execution_closure_status != "none"
         && (handoff.hetero_execution_closure_status != "closed"
             || handoff.hetero_execution_closure_ready != "true")
@@ -297,6 +319,13 @@ pub fn payload_execution_replay_summary(
             &handoff.provider_completion_dispatch_identity.identity_hash,
         ),
         provider_completions,
+        runtime_bootstrap_identity_contract: bootstrap_contract
+            .filter(|value| !value.is_empty() && *value != "none")
+            .map(str::to_owned),
+        runtime_bootstrap_identity_status,
+        runtime_bootstrap_identity_hash: bootstrap_hash
+            .filter(|value| valid_runtime_bootstrap_hash(value))
+            .map(str::to_owned),
         final_image_binding_proof_contract: (handoff.final_image_binding_proof.contract != "none")
             .then(|| handoff.final_image_binding_proof.contract.clone()),
         final_image_binding_proof_status: handoff.final_image_binding_proof.proof_status,
@@ -310,6 +339,12 @@ pub fn payload_execution_replay_summary(
 
 fn optional_identity_field(value: &str) -> Option<String> {
     (value != "none").then(|| value.to_owned())
+}
+
+fn valid_runtime_bootstrap_hash(value: &str) -> bool {
+    value
+        .strip_prefix("0x")
+        .is_some_and(|hex| hex.len() == 16 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
 }
 
 #[cfg(test)]
@@ -459,6 +494,8 @@ trace_id = "payload-trace:container-loader:main"
 status = "ready"
 execution_phase = "container-loader-handoff"
 entry_symbol = "main"
+output_contract = "nuis-runtime-lifecycle-bootstrap-plan-identity-v1"
+output_evidence = "0x1234567890abcdef"
 next_action = "handoff-payload-trace-to-nsdb"
 "#
         );
@@ -471,10 +508,32 @@ next_action = "handoff-payload-trace-to-nsdb"
             Some("nuis-final-image-binding-proof-v1")
         );
         assert_eq!(verified.final_image_binding_proof_status, "verified");
+        assert_eq!(
+            verified.runtime_bootstrap_identity_contract.as_deref(),
+            Some("nuis-runtime-lifecycle-bootstrap-plan-identity-v1")
+        );
+        assert_eq!(verified.runtime_bootstrap_identity_status, "verified");
+        assert_eq!(
+            verified.runtime_bootstrap_identity_hash.as_deref(),
+            Some("0x1234567890abcdef")
+        );
         assert!(verified
             .final_image_binding_proof_hash
             .as_deref()
             .is_some_and(|hash| hash.starts_with("fnv1a64:")));
+
+        fs::write(
+            &path,
+            source.replace("0x1234567890abcdef", "invalid-bootstrap-hash"),
+        )
+        .unwrap();
+        let invalid_bootstrap = payload_execution_replay_summary(&dir);
+        assert_eq!(invalid_bootstrap.status, "blocked");
+        assert_eq!(
+            invalid_bootstrap.first_blocker.as_deref(),
+            Some("runtime-bootstrap-identity:invalid")
+        );
+        fs::write(&path, &source).unwrap();
 
         persist_payload_execution_handoff_record(
             &dir,

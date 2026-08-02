@@ -209,6 +209,7 @@ mod tests {
             provider_dispatch_count: Some(1),
             provider_dispatch_hash: Some(table_hash.to_owned()),
             blockers: Vec::new(),
+            ..MetadataBindingSummary::not_applicable()
         }
     }
 

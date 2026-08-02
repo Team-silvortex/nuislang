@@ -86,12 +86,22 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
     assert!(handoff.contains("first_next_action = \"handoff-payload-trace-to-nsdb\""));
     assert!(handoff
         .contains("final_image_binding_proof_contract = \"nuis-final-image-binding-proof-v1\""));
-    assert!(handoff.contains("final_image_metadata_binding_count = 0"));
-    assert!(handoff.contains("final_image_metadata_binding_table_hash = \"0xcbf29ce484222325\""));
-    assert!(handoff.contains("final_image_metadata_binding_validation_status = \"not-applicable\""));
+    assert!(handoff.contains("final_image_metadata_binding_count = 2"));
+    assert!(handoff.contains(&format!(
+        "final_image_metadata_binding_table_hash = \"{}\"",
+        output
+            .container_loader_metadata_binding_table_hash
+            .as_deref()
+            .expect("runtime binding table hash")
+    )));
+    assert!(handoff.contains("final_image_metadata_binding_validation_status = \"verified\""));
     assert!(handoff.contains("final_image_binding_proof_hash = \"fnv1a64:"));
     assert!(handoff.contains("[[records]]"));
     assert!(handoff.contains("execution_phase = \"container-loader-handoff\""));
+    assert!(
+        handoff.contains("output_contract = \"nuis-runtime-lifecycle-bootstrap-plan-identity-v1\"")
+    );
+    assert!(handoff.contains("output_evidence = \"0x"));
     assert!(handoff.contains("entry_symbol = \"nuis.bootstrap.lifecycle.v1\""));
     assert!(handoff.contains("entry_kind = \"lifecycle-bootstrap\""));
     assert!(output.final_output_nsdb_handoff_persisted);
@@ -118,12 +128,30 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
     );
     assert_eq!(
         output.final_output_nsdb_final_image_binding_proof_status,
-        "verified-empty"
+        "verified"
     );
     assert!(output
         .final_output_nsdb_final_image_binding_proof_hash
         .as_deref()
         .is_some_and(|hash| hash.starts_with("fnv1a64:")));
+    assert_eq!(output.runtime_bootstrap_status, "ready");
+    assert!(output.runtime_bootstrap_identity_hash.starts_with("0x"));
+    assert_eq!(
+        output
+            .final_output_nsdb_runtime_bootstrap_identity_contract
+            .as_deref(),
+        Some("nuis-runtime-lifecycle-bootstrap-plan-identity-v1")
+    );
+    assert_eq!(
+        output.final_output_nsdb_runtime_bootstrap_identity_status,
+        "verified"
+    );
+    assert_eq!(
+        output.final_output_nsdb_runtime_bootstrap_identity_hash,
+        Some(output.runtime_bootstrap_identity_hash.clone())
+    );
+    assert!(output_json
+        .contains("\"final_output_nsdb_runtime_bootstrap_identity_status\":\"verified\""));
     assert_eq!(output.final_output_nsdb_replay_checkpoint_count, 1);
     assert_eq!(output.final_output_nsdb_replayable_checkpoint_count, 1);
     assert_eq!(merged_output.final_output_nsdb_handoff_record_count, 2);
@@ -149,7 +177,7 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
         .contains("final_image_binding_proof_contract = \"nuis-final-image-binding-proof-v1\""));
     assert_eq!(
         merged_output.final_output_nsdb_final_image_binding_proof_status,
-        "verified-empty"
+        "verified"
     );
     assert_eq!(merged_output.final_output_nsdb_provider_completion_count, 1);
     assert_eq!(
@@ -289,8 +317,9 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
     assert!(output_json.contains(
         "\"final_output_nsdb_final_image_binding_proof_contract\":\"nuis-final-image-binding-proof-v1\""
     ));
-    assert!(output_json
-        .contains("\"final_output_nsdb_final_image_binding_proof_status\":\"verified-empty\""));
+    assert!(
+        output_json.contains("\"final_output_nsdb_final_image_binding_proof_status\":\"verified\"")
+    );
     assert!(output_json.contains("\"final_output_nsdb_final_image_binding_proof_hash\":\"fnv1a64:"));
     assert!(output_json.contains(
         "\"final_output_nsdb_replay_contract\":\"nsdb-payload-execution-replay-plan-v1\""

@@ -1,4 +1,5 @@
 use super::{
+    final_executable_bootstrap::nsld_final_output_bootstrap_plan,
     final_executable_container_loader::final_executable_container_loader_evidence,
     final_executable_image::{
         parse_final_executable_image_header, FINAL_EXECUTABLE_IMAGE_HEADER_SIZE,
@@ -304,6 +305,23 @@ pub(crate) fn nsld_final_executable_output_report(
         .to_owned();
     let container_loader_evidence =
         final_executable_container_loader_evidence(output_bytes.as_deref(), host_native_output);
+    let runtime_bootstrap = nsld_final_output_bootstrap_plan(
+        manifest,
+        plan,
+        matches_verified_patched_image && output_image_header_valid,
+        container_loader_evidence.handoff_ready,
+        &image_dry_run,
+    );
+    let runtime_bootstrap_mapped_section_count = runtime_bootstrap
+        .stages
+        .iter()
+        .filter(|stage| stage.kind == "map-section")
+        .count();
+    let runtime_bootstrap_applied_relocation_count = runtime_bootstrap
+        .stages
+        .iter()
+        .filter(|stage| stage.kind == "apply-relocation")
+        .count();
     let first_payload_execution = final_executable_first_payload_execution(
         boundary_status.as_str(),
         host_native_output,
@@ -419,6 +437,14 @@ pub(crate) fn nsld_final_executable_output_report(
             .provider_dispatch_first_bundle_id,
         container_loader_provider_dispatch_first_provider_family: container_loader_evidence
             .provider_dispatch_first_provider_family,
+        runtime_bootstrap_contract: runtime_bootstrap.protocol.to_owned(),
+        runtime_bootstrap_identity_contract: runtime_bootstrap.identity_contract.to_owned(),
+        runtime_bootstrap_identity_hash: runtime_bootstrap.identity_hash,
+        runtime_bootstrap_status: runtime_bootstrap.status.to_owned(),
+        runtime_bootstrap_stage_count: runtime_bootstrap.stages.len(),
+        runtime_bootstrap_mapped_section_count,
+        runtime_bootstrap_applied_relocation_count,
+        runtime_bootstrap_blockers: runtime_bootstrap.blockers,
         first_payload_execution_status: first_payload_execution.status,
         first_payload_execution_ready: first_payload_execution.ready,
         first_payload_execution_target: first_payload_execution.target,
@@ -439,6 +465,9 @@ pub(crate) fn nsld_final_executable_output_report(
         final_output_nsdb_final_image_binding_proof_contract: None,
         final_output_nsdb_final_image_binding_proof_status: "legacy-unbound".to_owned(),
         final_output_nsdb_final_image_binding_proof_hash: None,
+        final_output_nsdb_runtime_bootstrap_identity_contract: None,
+        final_output_nsdb_runtime_bootstrap_identity_status: "legacy-unbound".to_owned(),
+        final_output_nsdb_runtime_bootstrap_identity_hash: None,
         final_output_nsdb_replay_contract: "nsdb-payload-execution-replay-plan-v1".to_owned(),
         final_output_nsdb_replay_ready: nsdb_replay_ready,
         final_output_nsdb_replay_status: nsdb_replay_status.clone(),

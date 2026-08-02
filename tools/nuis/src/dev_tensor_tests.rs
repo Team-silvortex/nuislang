@@ -20,7 +20,11 @@ fn handoff_selection_is_status_aware_and_input_order_independent() {
         ),
         expected
     );
-    assert_eq!(selected.status, "stable");
+    assert_eq!(
+        expected,
+        "native-binary-system/nuis-runtime/lifecycle-loader-bootstrap"
+    );
+    assert_eq!(selected.status, "active");
 }
 
 #[test]
@@ -128,31 +132,37 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
     );
     assert_eq!(
         summary.weakest_bootstrap_task_card_source,
-        "all-cells-complete"
+        "weakest-bootstrap-status-progress-path"
     );
-    assert_eq!(summary.weakest_bootstrap_task_card_status, "complete");
-    assert!(!summary.weakest_bootstrap_task_card_ready);
-    assert_eq!(summary.weakest_bootstrap_task_card_coordinate, "<none>");
+    assert_eq!(summary.weakest_bootstrap_task_card_status, "ready");
+    assert!(summary.weakest_bootstrap_task_card_ready);
+    assert_eq!(
+        summary.weakest_bootstrap_task_card_coordinate,
+        "native-binary-system/nuis-runtime/lifecycle-loader-bootstrap"
+    );
     assert!(summary
         .weakest_bootstrap_task_card_priority_reason
-        .contains("all registered tensor cells are stable at 100/100"));
+        .contains("weakest bootstrap-critical status/progress ordering"));
+    assert!(summary
+        .weakest_bootstrap_task_card_priority_reason
+        .contains("status `active` rank 2, progress 75/100"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_handoff_coordinate,
-        "<none>"
+        "native-binary-system/nuis-runtime/lifecycle-loader-bootstrap"
     );
     assert_eq!(summary.weakest_bootstrap_task_card_handoff_mode, "direct");
     assert!(summary
         .weakest_bootstrap_task_card_handoff_reason
-        .contains("all registered tensor cells are complete"));
-    assert_eq!(summary.weakest_bootstrap_task_card_handoff_action, "<none>");
-    assert_eq!(
-        summary.weakest_bootstrap_task_card_handoff_command,
-        "<none>"
-    );
-    assert_eq!(
-        summary.weakest_bootstrap_task_card_handoff_expected_artifact,
-        "<none>"
-    );
+        .contains("weakest task card is directly actionable"));
+    assert!(summary
+        .weakest_bootstrap_task_card_handoff_action
+        .contains("owned bootstrap execution context"));
+    assert!(summary
+        .weakest_bootstrap_task_card_handoff_command
+        .contains("cargo test -q -p nuis-runtime lifecycle_bootstrap"));
+    assert!(summary
+        .weakest_bootstrap_task_card_handoff_expected_artifact
+        .contains("nuis-runtime-lifecycle-bootstrap-plan-v1"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.protocol,
         "nuis-dev-tensor-task-card-lineage-v1"
@@ -163,10 +173,14 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         .weakest_bootstrap_task_card_lineage
         .first_error
         .is_none());
-    assert!(summary
-        .weakest_bootstrap_task_card_lineage
-        .task_ancestry
-        .is_empty());
+    assert_eq!(
+        summary
+            .weakest_bootstrap_task_card_lineage
+            .task_ancestry
+            .first()
+            .map(String::as_str),
+        Some("nuislang")
+    );
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.task_ancestry,
         summary.weakest_bootstrap_task_card_lineage.handoff_ancestry
@@ -175,13 +189,13 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         summary
             .weakest_bootstrap_task_card_lineage
             .common_ancestor_path,
-        "<none>"
+        "native-binary-system/nuis-runtime/lifecycle-loader-bootstrap"
     );
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.transition_depth,
         0
     );
-    assert_eq!(summary.bootstrap_critical_average_progress, 100);
+    assert!(summary.bootstrap_critical_average_progress < 100);
     let hierarchy = crate::dev_tensor_hierarchy::dev_tensor_hierarchy_summary();
     assert_eq!(
         hierarchy.hierarchy_protocol_version,
@@ -293,9 +307,11 @@ fn dev_tensor_json_exposes_coordinate_cells() {
     assert!(
         json.contains("\"weakest_bootstrap_task_card_protocol\":\"nuis-dev-tensor-task-card-v1\"")
     );
-    assert!(json.contains("\"weakest_bootstrap_task_card_source\":\"all-cells-complete\""));
-    assert!(json.contains("\"weakest_bootstrap_task_card_status\":\"complete\""));
-    assert!(json.contains("\"weakest_bootstrap_task_card_ready\":false"));
+    assert!(json.contains(
+        "\"weakest_bootstrap_task_card_source\":\"weakest-bootstrap-status-progress-path\""
+    ));
+    assert!(json.contains("\"weakest_bootstrap_task_card_status\":\"ready\""));
+    assert!(json.contains("\"weakest_bootstrap_task_card_ready\":true"));
     assert!(json.contains("\"weakest_bootstrap_task_card_coordinate\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_priority_reason\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_action\""));
@@ -313,11 +329,18 @@ fn dev_tensor_json_exposes_coordinate_cells() {
     assert!(json.contains("\"weakest_bootstrap_task_card_lineage_status\":\"clean\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_lineage_error_count\":0"));
     assert!(json.contains("\"weakest_bootstrap_task_card_lineage_errors\":[]"));
-    assert!(json.contains("\"weakest_bootstrap_task_card_task_ancestry\":[]"));
-    assert!(json.contains("\"weakest_bootstrap_task_card_handoff_ancestry\":[]"));
+    assert!(json.contains(
+        "\"weakest_bootstrap_task_card_task_ancestry\":[\"nuislang\",\"native-binary-system\""
+    ));
+    assert!(json.contains(
+        "\"weakest_bootstrap_task_card_handoff_ancestry\":[\"nuislang\",\"native-binary-system\""
+    ));
     assert!(json.contains("\"weakest_bootstrap_task_card_common_ancestor_path\""));
     assert!(json.contains("\"weakest_bootstrap_task_card_transition_depth\":"));
-    assert!(json.contains("all registered tensor cells are stable at 100/100"));
+    assert!(json.contains("weakest bootstrap-critical status/progress ordering"));
+    assert!(json.contains("\"module\":\"nuis-runtime\""));
+    assert!(json.contains("\"function\":\"lifecycle-loader-bootstrap\""));
+    assert!(json.contains("nuis-runtime-lifecycle-bootstrap-plan-v1"));
     assert!(json.contains("\"module\":\"linux-cuda\""));
     assert!(json.contains("\"function\":\"cuda-provider-bringup\""));
     assert!(json.contains("nuis-linux-cuda-host-probe-v1"));
@@ -446,9 +469,11 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("weakest_bootstrap_validation_command:"));
     assert!(text.contains("weakest_bootstrap_expected_artifact:"));
     assert!(text.contains("weakest_bootstrap_task_card_protocol: nuis-dev-tensor-task-card-v1"));
-    assert!(text.contains("weakest_bootstrap_task_card_source: all-cells-complete"));
-    assert!(text.contains("weakest_bootstrap_task_card_status: complete"));
-    assert!(text.contains("weakest_bootstrap_task_card_ready: false"));
+    assert!(
+        text.contains("weakest_bootstrap_task_card_source: weakest-bootstrap-status-progress-path")
+    );
+    assert!(text.contains("weakest_bootstrap_task_card_status: ready"));
+    assert!(text.contains("weakest_bootstrap_task_card_ready: true"));
     assert!(text.contains("weakest_bootstrap_task_card_coordinate:"));
     assert!(text.contains("weakest_bootstrap_task_card_priority_reason:"));
     assert!(text.contains("weakest_bootstrap_task_card_action:"));
@@ -465,9 +490,15 @@ fn dev_tensor_text_exposes_drift_status() {
     ));
     assert!(text.contains("weakest_bootstrap_task_card_lineage_status: clean"));
     assert!(text.contains("weakest_bootstrap_task_card_lineage_error_count: 0"));
-    assert!(text.contains("weakest_bootstrap_task_card_common_ancestor_path: <none>"));
+    assert!(text.contains(
+        "weakest_bootstrap_task_card_common_ancestor_path: native-binary-system/nuis-runtime/lifecycle-loader-bootstrap"
+    ));
     assert!(text.contains("weakest_bootstrap_task_card_transition_depth: 0"));
-    assert!(text.contains("all registered tensor cells are stable at 100/100"));
+    assert!(text.contains("weakest bootstrap-critical status/progress ordering"));
+    assert!(text.contains(
+        "cell: architecture=native-binary-system module=nuis-runtime function=lifecycle-loader-bootstrap"
+    ));
+    assert!(text.contains("nuis-runtime-lifecycle-bootstrap-plan-v1"));
     assert!(text.contains(
         "cell: architecture=heterogeneous-runtime module=linux-vulkan function=vulkan-provider-bringup"
     ));

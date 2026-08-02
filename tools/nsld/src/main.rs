@@ -48,6 +48,7 @@ mod display_object_image;
 mod display_prepare;
 mod display_text;
 mod drive;
+mod final_executable_bootstrap;
 mod final_executable_container_binding;
 mod final_executable_container_loader;
 mod final_executable_emit;

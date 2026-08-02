@@ -79,6 +79,18 @@ pub(crate) fn host_runner_binding_first_blocker(
     {
         return Some("container-loader-metadata-binding:table-hash-invalid".to_owned());
     }
+    let provider_selection_present = host_runner
+        .container_loader_selected_provider_bundle_set_contract
+        .is_some()
+        || host_runner
+            .container_loader_selected_provider_bundle_count
+            .is_some()
+        || host_runner
+            .container_loader_selected_provider_bundle_set_hash
+            .is_some();
+    if !provider_selection_present {
+        return None;
+    }
     if host_runner
         .container_loader_selected_provider_bundle_set_contract
         .as_deref()
@@ -100,6 +112,24 @@ pub(crate) fn host_runner_binding_first_blocker(
         return Some("selected-provider-bundle-set:hash-invalid".to_owned());
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn runtime_only_binding_table_does_not_require_provider_selection() {
+        let mut host_runner = HostRunnerJsonSurface::not_invoked("test");
+        host_runner.container_loader_metadata_binding_count = Some(2);
+        host_runner.container_loader_metadata_binding_parsed_count = Some(2);
+        host_runner.container_loader_metadata_binding_table_hash =
+            Some("0x1111111111111111".to_owned());
+        host_runner.container_loader_metadata_binding_validation_status =
+            Some("verified".to_owned());
+
+        assert_eq!(host_runner_binding_first_blocker(&host_runner), None);
+    }
 }
 
 fn valid_fnv1a64(value: &str) -> bool {

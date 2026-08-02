@@ -223,10 +223,11 @@ validation command, and expected artifact. That gives scripts and future
 self-hosted tooling one stable bundle to consume without reassembling many
 `weakest_bootstrap_*` fields by hand.
 
-The transition reason is explicit:
-`all bootstrap-critical cells are stable at 100/100`; the task card is now
-continuing product capability work rather than reopening a completed bootstrap
-boundary.
+At alpha closeout the transition reason was explicit:
+`all bootstrap-critical cells are stable at 100/100`. Beta may then register
+new foundation coordinates instead of pretending that an alpha-complete tensor
+means the runtime is finished. The current runtime-loader coordinate therefore
+reopens bootstrap selection through the normal milestone protocol.
 
 The task-card protocol is `nuis-dev-tensor-task-card-v1`. A ready task card
 means the tensor found an actionable bootstrap or global incomplete
@@ -1503,6 +1504,35 @@ self-hosting has already started or completed. Until `beta-0.10.*`, concrete
 work continues to be selected from the existing language, std, binary,
 linker, runtime, and developer-system coordinates.
 
+## Runtime Lifecycle Loader Bootstrap
+
+The first beta runtime coordinate is:
+
+`native-binary-system/nuis-runtime/lifecycle-loader-bootstrap`
+
+Its protocol is `nuis-runtime-lifecycle-bootstrap-plan-v1`. The
+platform-neutral planner consumes verified image admission, container handoff,
+loader entry identity, relocation agreement, lifecycle hooks, provider
+dispatch status, clock/GLM runtime-service bindings, complete mapped-section
+and applied-relocation sets, and scheduler identity. It emits a strictly
+ordered variable-length chain and emits no stages when any required identity drifts. `nuis-host-runner` now acts
+as an adapter into this shared runtime contract rather than owning a parallel
+post-validation launch sequence. Nsld derives `runtime.clock-root` from its
+validated clock protocol and `runtime.glm-root` from the compiled artifact plus
+heterogeneous `glm.*` sidecar contracts. Both are immutable metadata bindings,
+and Nsdb now preserves the verified binding-table hash even when no provider
+selection is present.
+
+The coordinate is `active/75`. The new
+`nuis-runtime-lifecycle-bootstrap-plan-identity-v1` deterministically covers
+entry, section and relocation tables, every normalized mapping/application,
+runtime services, lifecycle, provider dispatch, and scheduler state. Nsld
+derives it from real patch application plus byte audit, persists it in the
+container-loader handoff, and Nsdb independently validates it before replay.
+The remaining gap is no longer missing metadata: mapped-section facts still do
+not own executable-memory handles, and no runtime execution adapter activates
+the services and transfers control into compiled Nuis entry code.
+
 ## Linux CUDA Provider Bring-Up
 
 The next heterogeneous coordinate is:
@@ -1516,7 +1546,7 @@ maintenance reboot repaired the discovered driver mismatch, and the independent
 `nuis-cuda-runtime-smoke-v1` fixture now proves real allocation, transfer,
 launch, synchronization, readback, and `[11,22,33,44]` comparison.
 
-The coordinate is `active/99`. Kernel Nustar now
+The coordinate is `stable/100`. Kernel Nustar now
 registers `kernel.cuda.ptx8_0.v1`, YIR emits a CUDA backend variant, and AOT
 produces deterministic PTX 8.0 with both an internal source hash and the
 existing payload/artifact hash envelope. The exact sidecar PTX assembles and

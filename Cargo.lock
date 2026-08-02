@@ -170,6 +170,7 @@ name = "nsld"
 version = "0.1.0"
 dependencies = [
  "nsdb",
+ "nuis-runtime",
  "nuisc",
 ]
 
@@ -192,6 +193,9 @@ version = "0.1.0"
 [[package]]
 name = "nuis-host-runner"
 version = "0.1.0"
+dependencies = [
+ "nuis-runtime",
+]
 
 [[package]]
 name = "nuis-rc"

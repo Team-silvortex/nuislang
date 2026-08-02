@@ -5,10 +5,12 @@ use std::{
 
 mod container;
 mod container_backend_payload;
+mod container_bootstrap;
 mod container_metadata_binding;
 mod container_provider_dispatch;
 mod container_toml;
 mod report;
+mod runtime_bootstrap;
 
 use container::scan_container_loader;
 #[cfg(test)]
@@ -18,6 +20,7 @@ use container::{
 };
 use container_provider_dispatch::ProviderDispatchEntry;
 use report::{print_text_report, render_json_report};
+use runtime_bootstrap::runtime_bootstrap_plan;
 
 const RUNNER_PROTOCOL: &str = "nuis-host-runner-v1";
 const MANIFEST_SCHEMA: &str = "nuis-host-launcher-manifest-v1";
@@ -72,6 +75,14 @@ struct PayloadRegionScan {
 struct RunnerReport {
     ready: bool,
     would_enter_lifecycle_hook: bool,
+    runtime_bootstrap_contract: String,
+    runtime_bootstrap_identity_contract: String,
+    runtime_bootstrap_identity_hash: String,
+    runtime_bootstrap_status: String,
+    runtime_bootstrap_stage_count: usize,
+    runtime_bootstrap_mapped_section_count: usize,
+    runtime_bootstrap_applied_relocation_count: usize,
+    runtime_bootstrap_blockers: Vec<String>,
     manifest_path: String,
     nsb_path: Option<String>,
     nsb_readable: bool,
@@ -150,6 +161,14 @@ struct RunnerReport {
     container_loader_metadata_binding_parsed_count: usize,
     container_loader_metadata_binding_table_hash: Option<String>,
     container_loader_metadata_binding_validation_status: String,
+    container_loader_clock_root_contract: Option<String>,
+    container_loader_clock_root_count: Option<usize>,
+    container_loader_clock_root_hash: Option<String>,
+    container_loader_clock_root_status: Option<String>,
+    container_loader_glm_root_contract: Option<String>,
+    container_loader_glm_root_count: Option<usize>,
+    container_loader_glm_root_hash: Option<String>,
+    container_loader_glm_root_status: Option<String>,
     container_loader_selected_provider_bundle_set_contract: Option<String>,
     container_loader_selected_provider_bundle_count: Option<usize>,
     container_loader_selected_provider_bundle_set_hash: Option<String>,
@@ -366,10 +385,39 @@ fn validate_handoff(
             blockers.push("output-dir:empty".to_owned());
         }
     }
+    let runtime_bootstrap = runtime_bootstrap_plan(
+        &container_loader,
+        blockers.is_empty(),
+        scheduler_entry,
+        lifecycle_hook,
+    );
+    let runtime_bootstrap_steps = runtime_bootstrap.rendered_stages();
+    let runtime_bootstrap_blockers = runtime_bootstrap.blockers.clone();
+    blockers.extend(runtime_bootstrap_blockers.iter().cloned());
     let ready = blockers.is_empty();
+    let launch_steps = if ready {
+        let mut steps = vec![
+            "read-launcher-manifest".to_owned(),
+            "verify-nsb-header".to_owned(),
+            "verify-nsb-hash".to_owned(),
+            "map-payload-region".to_owned(),
+        ];
+        steps.extend(runtime_bootstrap_steps);
+        steps
+    } else {
+        Vec::new()
+    };
     RunnerReport {
         ready,
-        would_enter_lifecycle_hook: ready,
+        would_enter_lifecycle_hook: runtime_bootstrap.ready,
+        runtime_bootstrap_contract: runtime_bootstrap.protocol.to_owned(),
+        runtime_bootstrap_identity_contract: runtime_bootstrap.identity_contract.to_owned(),
+        runtime_bootstrap_identity_hash: runtime_bootstrap.identity_hash,
+        runtime_bootstrap_status: runtime_bootstrap.status.to_owned(),
+        runtime_bootstrap_stage_count: runtime_bootstrap.stages.len(),
+        runtime_bootstrap_mapped_section_count: container_loader.container_section.entries.len(),
+        runtime_bootstrap_applied_relocation_count: container_loader.relocation.entries.len(),
+        runtime_bootstrap_blockers,
         manifest_path: manifest_path.display().to_string(),
         nsb_path: Some(nsb_path.display().to_string()),
         nsb_readable,
@@ -468,6 +516,14 @@ fn validate_handoff(
         container_loader_metadata_binding_validation_status: container_loader
             .metadata_binding
             .validation_status,
+        container_loader_clock_root_contract: container_loader.metadata_binding.clock_root_contract,
+        container_loader_clock_root_count: container_loader.metadata_binding.clock_root_count,
+        container_loader_clock_root_hash: container_loader.metadata_binding.clock_root_hash,
+        container_loader_clock_root_status: container_loader.metadata_binding.clock_root_status,
+        container_loader_glm_root_contract: container_loader.metadata_binding.glm_root_contract,
+        container_loader_glm_root_count: container_loader.metadata_binding.glm_root_count,
+        container_loader_glm_root_hash: container_loader.metadata_binding.glm_root_hash,
+        container_loader_glm_root_status: container_loader.metadata_binding.glm_root_status,
         container_loader_selected_provider_bundle_set_contract: container_loader
             .metadata_binding
             .selected_set_contract,
@@ -499,17 +555,7 @@ fn validate_handoff(
             .map(|header| header.byte_map_hash.clone()),
         scheduler_entry: scheduler_entry.to_owned(),
         lifecycle_hook: lifecycle_hook.to_owned(),
-        launch_steps: if ready {
-            vec![
-                "read-launcher-manifest".to_owned(),
-                "verify-nsb-header".to_owned(),
-                "verify-nsb-hash".to_owned(),
-                "map-payload-region".to_owned(),
-                format!("enter-lifecycle-hook:{lifecycle_hook}"),
-            ]
-        } else {
-            Vec::new()
-        },
+        launch_steps,
         blockers,
     }
 }

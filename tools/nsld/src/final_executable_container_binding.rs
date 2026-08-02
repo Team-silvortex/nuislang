@@ -5,6 +5,10 @@ const SELECTED_SET_BINDING_ID: &str = "identity.selected-provider-bundle-set";
 const SELECTED_SET_CONTRACT: &str = "nuis-selected-provider-bundle-set-v1";
 const PROVIDER_DISPATCH_BINDING_ID: &str = "runtime.provider-dispatch-table";
 const PROVIDER_DISPATCH_CONTRACT: &str = "nuis-final-image-provider-dispatch-v1";
+const CLOCK_ROOT_BINDING_ID: &str = "runtime.clock-root";
+const CLOCK_ROOT_CONTRACT: &str = "nuis-clock-protocol-v1";
+const GLM_ROOT_BINDING_ID: &str = "runtime.glm-root";
+const GLM_ROOT_CONTRACT: &str = "nuis-yir-glm-binding-v1";
 const BINDING_TABLE_MARKER: &[u8] = b"\n[[metadata_binding]]\n";
 const NEXT_TABLE_MARKER: &[u8] = b"\n[[loader_symbol]]\n";
 
@@ -93,6 +97,18 @@ pub(crate) fn container_binding_evidence(
     {
         blockers.push("container-loader:provider-dispatch-binding-invalid".to_owned());
     }
+    validate_required_runtime_service(
+        &bindings,
+        CLOCK_ROOT_BINDING_ID,
+        CLOCK_ROOT_CONTRACT,
+        &mut blockers,
+    );
+    validate_required_runtime_service(
+        &bindings,
+        GLM_ROOT_BINDING_ID,
+        GLM_ROOT_CONTRACT,
+        &mut blockers,
+    );
     let validation_status = if blockers.is_empty() {
         if bindings.is_empty() {
             "not-applicable"
@@ -117,6 +133,31 @@ pub(crate) fn container_binding_evidence(
     }
 }
 
+fn validate_required_runtime_service(
+    bindings: &[container::NsldContainerMetadataBinding],
+    binding_id: &str,
+    contract: &str,
+    blockers: &mut Vec<String>,
+) {
+    match bindings
+        .iter()
+        .find(|binding| binding.binding_id == binding_id)
+    {
+        Some(binding)
+            if binding.contract == contract
+                && binding.value_count > 0
+                && valid_table_hash(&binding.value_hash)
+                && binding.validation_status == "verified"
+                && binding.required => {}
+        Some(_) => blockers.push(format!(
+            "container-loader:runtime-service-binding-invalid:{binding_id}"
+        )),
+        None => blockers.push(format!(
+            "container-loader:runtime-service-binding-missing:{binding_id}"
+        )),
+    }
+}
+
 fn metadata_binding_table_source(payload: &[u8], count: Option<usize>) -> Option<String> {
     if count == Some(0) {
         return Some(String::new());
@@ -132,6 +173,12 @@ fn metadata_binding_table_source(payload: &[u8], count: Option<usize>) -> Option
 fn valid_fnv1a64(value: &str) -> bool {
     value
         .strip_prefix("fnv1a64:")
+        .is_some_and(|hex| hex.len() == 16 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
+}
+
+fn valid_table_hash(value: &str) -> bool {
+    value
+        .strip_prefix("0x")
         .is_some_and(|hex| hex.len() == 16 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
 }
 

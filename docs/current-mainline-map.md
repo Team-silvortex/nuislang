@@ -125,7 +125,7 @@ Current CLI frontdoor rule:
 `nuis status/help/dev-tensor -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build -> artifact-doctor/run-artifact -> release-check`
 
 Current bootstrap pressure rule:
-`native executable back half first -> lowering coverage under real programs -> std/tooling self-use -> package/import stability -> diagnostics/debug metadata`
+`runtime lifecycle loader first -> lowering coverage under real programs -> std/tooling self-use -> package/import stability -> diagnostics/debug metadata`
 
 Current example-tree rule:
 `frontdoor first -> grouped companions next -> explicit probe routes after that`
@@ -151,6 +151,11 @@ Use this section as a router, not as a full inventory.
   [artifact_cli.rs](../tools/nuisc/tests/artifact_cli.rs)
   current host-YIR runtime probe:
   [host_yir.rs](../crates/nuis-runtime/src/host_yir.rs)
+  current lifecycle-loader bootstrap planner, plan identity, and required clock/GLM service bindings:
+  [lifecycle_bootstrap.rs](../crates/nuis-runtime/src/lifecycle_bootstrap.rs),
+  [container_metadata_bindings.rs](../tools/nsld/src/container_metadata_bindings.rs),
+  [final_executable_bootstrap.rs](../tools/nsld/src/final_executable_bootstrap.rs),
+  [runtime_bootstrap.rs](../tools/nuis-host-runner/src/runtime_bootstrap.rs)
 * tool/reference surface:
   [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
 * std layering and tooling:

@@ -724,7 +724,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &
             path: "tools/nuis/src/artifact_host_runner.rs",
             required_patterns: &["HostRunnerJsonSurface", "host_runner_invoked", "host_runner_backend_artifact_payload_count", "host_runner_backend_artifact_payload_table_hash", "host_runner_container_loader_metadata_binding_validation_status", "host_runner_container_loader_selected_provider_bundle_set_hash"],
         },
-        DevTensorDriftCheckSpec {
+    DevTensorDriftCheckSpec {
             id: "host-runner-container-loader-handoff-policy",
             path: "tools/nuis-host-runner/src/container.rs",
             required_patterns: &[

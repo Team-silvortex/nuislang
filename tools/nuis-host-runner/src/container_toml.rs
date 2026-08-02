@@ -54,6 +54,10 @@ pub(super) fn usize_value_from_lines(lines: &[&str], key: &str) -> Option<usize>
     raw_value_from_lines(lines, key)?.trim().parse().ok()
 }
 
+pub(super) fn isize_value_from_lines(lines: &[&str], key: &str) -> Option<isize> {
+    raw_value_from_lines(lines, key)?.trim().parse().ok()
+}
+
 fn raw_value<'a>(source: &'a str, key: &str) -> Option<&'a str> {
     raw_value_from_lines(&source.lines().collect::<Vec<_>>(), key)
 }

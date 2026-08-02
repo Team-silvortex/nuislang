@@ -198,6 +198,19 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         )
     );
     println!(
+        "  runtime_bootstrap: contract={} identity_contract={} identity_hash={} status={} stages={} mapped_sections={} applied_relocations={}",
+        report.runtime_bootstrap_contract,
+        report.runtime_bootstrap_identity_contract,
+        report.runtime_bootstrap_identity_hash,
+        report.runtime_bootstrap_status,
+        report.runtime_bootstrap_stage_count,
+        report.runtime_bootstrap_mapped_section_count,
+        report.runtime_bootstrap_applied_relocation_count
+    );
+    for blocker in &report.runtime_bootstrap_blockers {
+        println!("  runtime_bootstrap_blocker: {blocker}");
+    }
+    println!(
         "  first_payload_execution_status: {}",
         report.first_payload_execution_status
     );
@@ -270,6 +283,20 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         optional_string_text(
             report
                 .final_output_nsdb_final_image_binding_proof_hash
+                .as_deref()
+        )
+    );
+    println!(
+        "  final_output_nsdb_runtime_bootstrap_identity: contract={} status={} hash={}",
+        optional_string_text(
+            report
+                .final_output_nsdb_runtime_bootstrap_identity_contract
+                .as_deref()
+        ),
+        report.final_output_nsdb_runtime_bootstrap_identity_status,
+        optional_string_text(
+            report
+                .final_output_nsdb_runtime_bootstrap_identity_hash
                 .as_deref()
         )
     );

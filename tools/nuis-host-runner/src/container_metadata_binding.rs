@@ -11,6 +11,10 @@ const SELECTED_SET_BINDING_ID: &str = "identity.selected-provider-bundle-set";
 const SELECTED_SET_CONTRACT: &str = "nuis-selected-provider-bundle-set-v1";
 const PROVIDER_DISPATCH_BINDING_ID: &str = "runtime.provider-dispatch-table";
 const PROVIDER_DISPATCH_CONTRACT: &str = "nuis-final-image-provider-dispatch-v1";
+const CLOCK_ROOT_BINDING_ID: &str = "runtime.clock-root";
+const CLOCK_ROOT_CONTRACT: &str = "nuis-clock-protocol-v1";
+const GLM_ROOT_BINDING_ID: &str = "runtime.glm-root";
+const GLM_ROOT_CONTRACT: &str = "nuis-yir-glm-binding-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct MetadataBinding {
@@ -33,6 +37,16 @@ pub(super) struct MetadataBindingSummary {
     pub(super) selected_set_hash: Option<String>,
     pub(super) provider_dispatch_count: Option<usize>,
     pub(super) provider_dispatch_hash: Option<String>,
+    pub(super) clock_root_contract: Option<String>,
+    pub(super) clock_root_count: Option<usize>,
+    pub(super) clock_root_hash: Option<String>,
+    pub(super) clock_root_status: Option<String>,
+    pub(super) clock_root_required: Option<bool>,
+    pub(super) glm_root_contract: Option<String>,
+    pub(super) glm_root_count: Option<usize>,
+    pub(super) glm_root_hash: Option<String>,
+    pub(super) glm_root_status: Option<String>,
+    pub(super) glm_root_required: Option<bool>,
     pub(super) blockers: Vec<String>,
 }
 
@@ -97,6 +111,12 @@ pub(super) fn scan_metadata_bindings(source: &str) -> MetadataBindingSummary {
     let provider_dispatch = bindings
         .iter()
         .find(|binding| binding.binding_id == PROVIDER_DISPATCH_BINDING_ID);
+    let clock_root = bindings
+        .iter()
+        .find(|binding| binding.binding_id == CLOCK_ROOT_BINDING_ID);
+    let glm_root = bindings
+        .iter()
+        .find(|binding| binding.binding_id == GLM_ROOT_BINDING_ID);
     if selected.is_some_and(|binding| {
         binding.contract != SELECTED_SET_CONTRACT
             || binding.value_count == 0
@@ -115,6 +135,18 @@ pub(super) fn scan_metadata_bindings(source: &str) -> MetadataBindingSummary {
     }) {
         blockers.push("container-loader:provider-dispatch-binding-invalid".to_owned());
     }
+    validate_runtime_service_binding(
+        clock_root,
+        CLOCK_ROOT_BINDING_ID,
+        CLOCK_ROOT_CONTRACT,
+        &mut blockers,
+    );
+    validate_runtime_service_binding(
+        glm_root,
+        GLM_ROOT_BINDING_ID,
+        GLM_ROOT_CONTRACT,
+        &mut blockers,
+    );
 
     MetadataBindingSummary {
         declared_count,
@@ -135,6 +167,16 @@ pub(super) fn scan_metadata_bindings(source: &str) -> MetadataBindingSummary {
         selected_set_hash: selected.map(|binding| binding.value_hash.clone()),
         provider_dispatch_count: provider_dispatch.map(|binding| binding.value_count),
         provider_dispatch_hash: provider_dispatch.map(|binding| binding.value_hash.clone()),
+        clock_root_contract: clock_root.map(|binding| binding.contract.clone()),
+        clock_root_count: clock_root.map(|binding| binding.value_count),
+        clock_root_hash: clock_root.map(|binding| binding.value_hash.clone()),
+        clock_root_status: clock_root.map(|binding| binding.validation_status.clone()),
+        clock_root_required: clock_root.map(|binding| binding.required),
+        glm_root_contract: glm_root.map(|binding| binding.contract.clone()),
+        glm_root_count: glm_root.map(|binding| binding.value_count),
+        glm_root_hash: glm_root.map(|binding| binding.value_hash.clone()),
+        glm_root_status: glm_root.map(|binding| binding.validation_status.clone()),
+        glm_root_required: glm_root.map(|binding| binding.required),
         blockers,
     }
 }
@@ -151,8 +193,37 @@ impl MetadataBindingSummary {
             selected_set_hash: None,
             provider_dispatch_count: None,
             provider_dispatch_hash: None,
+            clock_root_contract: None,
+            clock_root_count: None,
+            clock_root_hash: None,
+            clock_root_status: None,
+            clock_root_required: None,
+            glm_root_contract: None,
+            glm_root_count: None,
+            glm_root_hash: None,
+            glm_root_status: None,
+            glm_root_required: None,
             blockers: Vec::new(),
         }
+    }
+}
+
+fn validate_runtime_service_binding(
+    binding: Option<&MetadataBinding>,
+    binding_id: &str,
+    contract: &str,
+    blockers: &mut Vec<String>,
+) {
+    if binding.is_some_and(|binding| {
+        binding.contract != contract
+            || binding.value_count == 0
+            || !valid_table_hash(&binding.value_hash)
+            || binding.validation_status != "verified"
+            || !binding.required
+    }) {
+        blockers.push(format!(
+            "container-loader:runtime-service-binding-invalid:{binding_id}"
+        ));
     }
 }
 

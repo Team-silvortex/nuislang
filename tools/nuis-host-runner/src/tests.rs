@@ -1,11 +1,46 @@
 use super::*;
 
-fn nsb_payload() -> &'static [u8] {
+fn base_nsb_payload() -> &'static [u8] {
     b"schema = \"nuis-nsld-container-v1\"\nschema_version = 1\ncontainer_kind = \"deterministic-hetero-container\"\nproducer = \"nsld\"\nproducer_phase = \"alpha-0.10.0\"\nready = true\ncontainer_magic = \"NUISNSLD\"\ncontainer_version = 1\nmetadata_table_hash = \"0x1111111111111111\"\ncontainer_section_table_hash = \"0x2222222222222222\"\ncontainer_hash = \"0xaaaaaaaaaaaaaaaa\"\nsection_count = 1\ncompatibility_domain_count = 0\nexternal_import_count = 0\nbackend_artifact_payload_count = 1\nbackend_artifact_payload_table_hash = \"0x7777777777777777\"\nloader_readiness = \"host-assisted\"\nloader_blockers = []\nloader_entry_kind = \"lifecycle-bootstrap\"\nloader_entry_symbol = \"main\"\nloader_entry_section_id = \"sec0000.compiled-artifact\"\nloader_symbol_count = 3\nloader_symbol_table_hash = \"0x3333333333333333\"\nrelocation_count = 1\nrelocation_table_hash = \"0x4444444444444444\"\ncompatibility_domain_table_hash = \"0x5555555555555555\"\nexternal_import_table_hash = \"0x6666666666666666\"\npayload_size_bytes = 128\npayload_hash = \"0xbbbbbbbbbbbbbbbb\"\npayload_path = \"nuis.nsld.container.payload\"\nblockers = []\n\n[[backend_artifact_payload]]\npayload_id = \"backend-artifact:kernel:aarch64:apple-silicon-cpu\"\ndomain_family = \"kernel\"\nbackend_family = \"aarch64\"\ntarget_device = \"apple-silicon-cpu\"\npayload_format = \"nuis-kernel-payload-v1\"\npayload_path = \"kernel.payload.bin\"\nrole_status = \"ready\"\n\n[[loader_symbol]]\nsymbol_id = \"sym0000.loader-entry\"\nsymbol_kind = \"lifecycle-bootstrap\"\nsymbol_name = \"main\"\nlifecycle_hook = \"on_lifecycle_bootstrap\"\nsection_id = \"sec0000.compiled-artifact\"\n\n[[relocation]]\nrelocation_id = \"rel0000.lifecycle-entry\"\nrelocation_kind = \"lifecycle-entry-binding\"\nsource_section_id = \"sec0000.compiled-artifact\"\nsource_offset = 0\ntarget_symbol_id = \"sym0000.loader-entry\"\naddend = 0\n\n[[section]]\norder_index = 0\nsection_id = \"sec0000.compiled-artifact\"\nsection_kind = \"compiled-artifact\"\nsource_path = \"main.nuis\"\nsource_hash = \"0xcccccccccccccccc\"\npayload_hash = \"0xdddddddddddddddd\"\nrequired = true\noffset = 0\nsize_bytes = 128\n"
 }
 
+fn nsb_payload() -> Vec<u8> {
+    let bindings = runtime_binding_toml();
+    let table_hash = runtime_binding_table_hash();
+    let source = std::str::from_utf8(base_nsb_payload()).expect("fixture is utf-8");
+    source
+        .replace(
+            "metadata_table_hash = \"0x1111111111111111\"\n",
+            &format!(
+                "metadata_table_hash = \"0x1111111111111111\"\nmetadata_binding_count = \
+                 2\nmetadata_binding_table_hash = \"{table_hash}\"\n"
+            ),
+        )
+        .replace(
+            "\n[[loader_symbol]]\n",
+            &format!("{bindings}\n[[loader_symbol]]\n"),
+        )
+        .into_bytes()
+}
+
+fn runtime_binding_toml() -> String {
+    "\n[[metadata_binding]]\nbinding_id = \"runtime.clock-root\"\ncontract = \
+     \"nuis-clock-protocol-v1\"\nvalue_count = 3\nvalue_hash = \
+     \"0x8888888888888888\"\nvalidation_status = \"verified\"\nrequired = \
+     true\n\n[[metadata_binding]]\nbinding_id = \"runtime.glm-root\"\ncontract = \
+     \"nuis-yir-glm-binding-v1\"\nvalue_count = 1\nvalue_hash = \
+     \"0x9999999999999999\"\nvalidation_status = \"verified\"\nrequired = true\n"
+        .to_owned()
+}
+
+fn runtime_binding_table_hash() -> String {
+    fnv1a64_hex(
+        b"runtime.clock-root\tnuis-clock-protocol-v1\t3\t0x8888888888888888\tverified\ttrue\nruntime.glm-root\tnuis-yir-glm-binding-v1\t1\t0x9999999999999999\tverified\ttrue\n",
+    )
+}
+
 fn nsb_bytes() -> Vec<u8> {
-    nsb_bytes_from_payload(nsb_payload())
+    nsb_bytes_from_payload(&nsb_payload())
 }
 
 fn nsb_bytes_from_payload(payload: &[u8]) -> Vec<u8> {
@@ -22,13 +57,14 @@ fn nsb_bytes_from_payload(payload: &[u8]) -> Vec<u8> {
 }
 
 fn nsb_payload_with_selected_binding(value_hash: &str, table_hash: &str) -> Vec<u8> {
-    let source = std::str::from_utf8(nsb_payload()).expect("fixture is utf-8");
+    let payload = nsb_payload();
+    let source = std::str::from_utf8(&payload).expect("fixture is utf-8");
     let source = source.replace(
-        "metadata_table_hash = \"0x1111111111111111\"\n",
         &format!(
-            "metadata_table_hash = \"0x1111111111111111\"\nmetadata_binding_count = \
-             1\nmetadata_binding_table_hash = \"{table_hash}\"\n"
+            "metadata_binding_count = 2\nmetadata_binding_table_hash = \"{}\"\n",
+            runtime_binding_table_hash()
         ),
+        &format!("metadata_binding_count = 3\nmetadata_binding_table_hash = \"{table_hash}\"\n"),
     );
     source
         .replace(
@@ -72,17 +108,72 @@ fn validates_ready_launcher_handoff() {
 
     assert!(report.ready);
     assert!(report.would_enter_lifecycle_hook);
+    assert_eq!(
+        report.runtime_bootstrap_contract,
+        "nuis-runtime-lifecycle-bootstrap-plan-v1"
+    );
+    assert_eq!(report.runtime_bootstrap_status, "ready");
+    assert_eq!(
+        report.runtime_bootstrap_identity_contract,
+        "nuis-runtime-lifecycle-bootstrap-plan-identity-v1"
+    );
+    assert!(report.runtime_bootstrap_identity_hash.starts_with("0x"));
+    assert_eq!(report.runtime_bootstrap_stage_count, 10);
+    assert_eq!(report.runtime_bootstrap_mapped_section_count, 1);
+    assert_eq!(report.runtime_bootstrap_applied_relocation_count, 1);
+    assert!(report.runtime_bootstrap_blockers.is_empty());
     assert!(report
         .launch_steps
         .contains(&"map-payload-region".to_owned()));
+    assert!(report.launch_steps.contains(
+        &"bind-runtime-service:runtime.clock-root@nuis-clock-protocol-v1#0x8888888888888888"
+            .to_owned()
+    ));
+    assert!(report
+        .launch_steps
+        .contains(&"map-section:sec0000.compiled-artifact@0+128#0xdddddddddddddddd".to_owned()));
+    assert!(report.launch_steps.contains(
+        &"apply-relocation:rel0000.lifecycle-entry:lifecycle-entry-binding@sec0000.compiled-artifact+0->sym0000.loader-entry+0".to_owned()
+    ));
+    assert!(report.launch_steps.contains(
+        &"bind-runtime-service:runtime.glm-root@nuis-yir-glm-binding-v1#0x9999999999999999"
+            .to_owned()
+    ));
     assert!(report
         .launch_steps
         .contains(&"enter-lifecycle-hook:on_process_start".to_owned()));
+    assert!(report
+        .launch_steps
+        .contains(&"enter-nuis-bootstrap:on_lifecycle_bootstrap:main".to_owned()));
+    assert!(report
+        .launch_steps
+        .contains(&"activate-scheduler:nuis.scheduler.loop.v1".to_owned()));
+    let json = report::render_json_report(&report);
+    assert!(json
+        .contains("\"runtime_bootstrap_contract\":\"nuis-runtime-lifecycle-bootstrap-plan-v1\""));
+    assert!(json.contains("\"runtime_bootstrap_status\":\"ready\""));
+    assert!(json.contains("\"runtime_bootstrap_identity_contract\":\"nuis-runtime-lifecycle-bootstrap-plan-identity-v1\""));
+    assert!(json.contains("\"runtime_bootstrap_identity_hash\":\"0x"));
+    assert!(json.contains("\"runtime_bootstrap_stage_count\":10"));
+    assert!(json.contains("\"runtime_bootstrap_mapped_section_count\":1"));
+    assert!(json.contains("\"runtime_bootstrap_applied_relocation_count\":1"));
+    assert_eq!(
+        report.container_loader_clock_root_contract.as_deref(),
+        Some("nuis-clock-protocol-v1")
+    );
+    assert_eq!(report.container_loader_clock_root_count, Some(3));
+    assert_eq!(
+        report.container_loader_glm_root_contract.as_deref(),
+        Some("nuis-yir-glm-binding-v1")
+    );
+    assert_eq!(report.container_loader_glm_root_count, Some(1));
+    assert!(json.contains("\"container_loader_clock_root_status\":\"verified\""));
+    assert!(json.contains("\"container_loader_glm_root_status\":\"verified\""));
     assert_eq!(report.nsb_payload_offset, Some(IMAGE_HEADER_SIZE));
     assert_eq!(report.nsb_payload_span, Some(nsb_payload().len()));
     assert!(report.nsb_payload_region_mapped);
     assert_eq!(report.nsb_payload_region_bytes, Some(nsb_payload().len()));
-    let expected_payload_region_hash = fnv1a64_hex(nsb_payload());
+    let expected_payload_region_hash = fnv1a64_hex(&nsb_payload());
     assert_eq!(
         report.nsb_payload_region_hash.as_deref(),
         Some(expected_payload_region_hash.as_str())
@@ -541,6 +632,14 @@ fn blocks_self_contained_container_handoff_when_required_external_import_is_decl
     );
 
     assert!(!report.ready);
+    assert_eq!(report.runtime_bootstrap_status, "blocked");
+    assert_eq!(report.runtime_bootstrap_stage_count, 0);
+    assert!(report
+        .runtime_bootstrap_blockers
+        .contains(&"runtime-bootstrap:image-unverified".to_owned()));
+    assert!(report
+        .runtime_bootstrap_blockers
+        .contains(&"runtime-bootstrap:container-handoff-blocked".to_owned()));
     assert_eq!(report.container_loader_handoff_status, "blocked");
     assert!(!report.container_loader_handoff_ready);
     assert!(report

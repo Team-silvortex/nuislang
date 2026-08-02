@@ -29,24 +29,36 @@ fn container_immutably_binds_verified_selected_provider_bundle_set() {
         .blockers
         .iter()
         .all(|blocker| !blocker.starts_with("metadata-binding:")));
-    assert_eq!(bound.metadata_bindings.len(), 2);
+    assert_eq!(bound.metadata_bindings.len(), 4);
+    assert_eq!(bound.metadata_bindings[0].binding_id, "runtime.clock-root");
     assert_eq!(
-        bound.metadata_bindings[0].binding_id,
+        bound.metadata_bindings[0].contract,
+        "nuis-clock-protocol-v1"
+    );
+    assert_eq!(bound.metadata_bindings[0].validation_status, "verified");
+    assert_eq!(bound.metadata_bindings[1].binding_id, "runtime.glm-root");
+    assert_eq!(
+        bound.metadata_bindings[1].contract,
+        "nuis-yir-glm-binding-v1"
+    );
+    assert_eq!(bound.metadata_bindings[1].validation_status, "verified");
+    assert_eq!(
+        bound.metadata_bindings[2].binding_id,
         "identity.selected-provider-bundle-set"
     );
     assert_eq!(
-        bound.metadata_bindings[0].contract,
+        bound.metadata_bindings[2].contract,
         "nuis-selected-provider-bundle-set-v1"
     );
-    assert_eq!(bound.metadata_bindings[0].value_count, 1);
-    assert_eq!(bound.metadata_bindings[0].value_hash, SELECTED_SET_HASH);
-    assert_eq!(bound.metadata_bindings[0].validation_status, "verified");
+    assert_eq!(bound.metadata_bindings[2].value_count, 1);
+    assert_eq!(bound.metadata_bindings[2].value_hash, SELECTED_SET_HASH);
+    assert_eq!(bound.metadata_bindings[2].validation_status, "verified");
     assert_eq!(
-        bound.metadata_bindings[1].binding_id,
+        bound.metadata_bindings[3].binding_id,
         "runtime.provider-dispatch-table"
     );
     assert_eq!(
-        bound.metadata_bindings[1].contract,
+        bound.metadata_bindings[3].contract,
         "nuis-final-image-provider-dispatch-v1"
     );
     assert_eq!(bound.provider_dispatch_validation_status, "verified");
@@ -57,7 +69,7 @@ fn container_immutably_binds_verified_selected_provider_bundle_set() {
     );
     assert_ne!(bound.metadata_table_hash, unbound.metadata_table_hash);
     assert_ne!(bound.container_hash, unbound.container_hash);
-    assert_eq!(emitted.metadata_binding_count, 2);
+    assert_eq!(emitted.metadata_binding_count, 4);
     assert_eq!(
         emitted.metadata_binding_table_hash,
         bound.metadata_binding_table_hash
@@ -84,7 +96,7 @@ fn container_emit_rejects_mismatched_selected_provider_bundle_set() {
     fs::remove_dir_all(&dir).unwrap();
 
     assert!(!preview.ready);
-    assert!(preview.metadata_bindings.is_empty());
+    assert_eq!(preview.metadata_bindings.len(), 2);
     assert!(preview
         .blockers
         .iter()
@@ -92,6 +104,28 @@ fn container_emit_rejects_mismatched_selected_provider_bundle_set() {
     assert!(error.contains("invalid immutable metadata binding"));
     assert!(!container_present);
     assert!(!payload_present);
+}
+
+#[test]
+fn container_emit_rejects_unverified_compiled_artifact_contract() {
+    let dir = temp_dir("unverified-artifact");
+    fs::create_dir_all(&dir).unwrap();
+    let mut plan = plan_with_artifact(&dir);
+    plan.compiled_artifact.section_table_valid = None;
+
+    let preview = nsld_container_report(Path::new("manifest.toml"), &plan);
+    let error = nsld_emit_container_report(Path::new("manifest.toml"), &plan).unwrap_err();
+    let container_present = dir.join("nuis.nsld.container").exists();
+    fs::remove_dir_all(&dir).unwrap();
+
+    assert!(!preview.ready);
+    assert_eq!(preview.metadata_bindings.len(), 2);
+    assert_eq!(preview.metadata_bindings[1].validation_status, "unverified");
+    assert!(preview.blockers.iter().any(|blocker| {
+        blocker == "metadata-binding:runtime.glm-root:artifact-contract-unverified"
+    }));
+    assert!(error.contains("invalid immutable metadata binding"));
+    assert!(!container_present);
 }
 
 #[test]
@@ -147,7 +181,7 @@ fn final_image_loader_verifies_embedded_selected_provider_bundle_binding() {
         verified.container_loader_metadata_binding_validation_status,
         "verified"
     );
-    assert_eq!(verified.container_loader_metadata_binding_count, Some(2));
+    assert_eq!(verified.container_loader_metadata_binding_count, Some(4));
     assert_eq!(
         verified
             .container_loader_selected_provider_bundle_set_contract
@@ -177,7 +211,7 @@ fn final_image_loader_verifies_embedded_selected_provider_bundle_binding() {
     );
     assert!(verified_json
         .contains("\"container_loader_metadata_binding_validation_status\":\"verified\""));
-    assert!(verified_json.contains("\"container_loader_metadata_binding_count\":2"));
+    assert!(verified_json.contains("\"container_loader_metadata_binding_count\":4"));
     assert!(verified_json.contains("\"container_loader_provider_dispatch_status\":\"verified\""));
     assert!(verified_json.contains("\"container_loader_provider_dispatch_count\":1"));
     assert!(verified_json.contains(

@@ -1,5 +1,8 @@
 use crate::{
     container_backend_payload::{scan_backend_artifact_payloads, BackendArtifactPayloadSummary},
+    container_bootstrap::{
+        relocation_records, section_records, ContainerRelocationRecord, ContainerSectionRecord,
+    },
     container_metadata_binding::{scan_metadata_bindings, MetadataBindingSummary},
     container_provider_dispatch::{scan_provider_dispatch, ProviderDispatchSummary},
     container_toml::{
@@ -34,6 +37,7 @@ pub(super) struct ContainerSectionSummary {
     pub(super) first_section_id: Option<String>,
     pub(super) first_section_kind: Option<String>,
     pub(super) entry_section_found: bool,
+    pub(super) entries: Vec<ContainerSectionRecord>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,6 +50,7 @@ pub(super) struct ContainerRelocationSummary {
     pub(super) first_target_symbol_id: Option<String>,
     pub(super) first_targets_loader_symbol: bool,
     pub(super) first_source_matches_loader_symbol: bool,
+    pub(super) entries: Vec<ContainerRelocationRecord>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -318,6 +323,7 @@ impl ContainerSectionSummary {
             first_section_id: None,
             first_section_kind: None,
             entry_section_found: false,
+            entries: Vec::new(),
         }
     }
 }
@@ -333,6 +339,7 @@ impl ContainerRelocationSummary {
             first_target_symbol_id: None,
             first_targets_loader_symbol: false,
             first_source_matches_loader_symbol: false,
+            entries: Vec::new(),
         }
     }
 }
@@ -432,28 +439,26 @@ fn scan_relocations(
     declared_count: Option<usize>,
     loader_symbol: &ContainerLoaderSymbolSummary,
 ) -> ContainerRelocationSummary {
-    let blocks = array_table_blocks(source, "relocation");
-    let first = blocks.first();
-    let first_target_symbol_id =
-        first.and_then(|block| string_value_from_lines(block, "target_symbol_id"));
-    let first_source_section_id =
-        first.and_then(|block| string_value_from_lines(block, "source_section_id"));
+    let entries = relocation_records(source);
+    let first = entries.first();
+    let first_target_symbol_id = first.map(|entry| entry.target_symbol_id.clone());
+    let first_source_section_id = first.map(|entry| entry.source_section_id.clone());
     ContainerRelocationSummary {
-        status: if blocks.is_empty() {
+        status: if entries.is_empty() {
             "missing".to_owned()
         } else {
             "parsed".to_owned()
         },
         declared_count,
-        parsed_count: blocks.len(),
-        first_relocation_kind: first
-            .and_then(|block| string_value_from_lines(block, "relocation_kind")),
+        parsed_count: entries.len(),
+        first_relocation_kind: first.map(|entry| entry.relocation_kind.clone()),
         first_targets_loader_symbol: first_target_symbol_id.as_deref()
             == loader_symbol.symbol_id.as_deref(),
         first_source_matches_loader_symbol: first_source_section_id.as_deref()
             == loader_symbol.section_id.as_deref(),
         first_source_section_id,
         first_target_symbol_id,
+        entries,
     }
 }
 
@@ -462,24 +467,22 @@ fn scan_container_sections(
     declared_count: Option<usize>,
     loader_entry_section_id: Option<&str>,
 ) -> ContainerSectionSummary {
-    let blocks = array_table_blocks(source, "section");
-    let first = blocks.first();
-    let entry_section_found = loader_entry_section_id.is_some_and(|entry| {
-        blocks
-            .iter()
-            .any(|block| string_value_from_lines(block, "section_id").as_deref() == Some(entry))
-    });
+    let entries = section_records(source);
+    let first = entries.first();
+    let entry_section_found = loader_entry_section_id
+        .is_some_and(|entry| entries.iter().any(|section| section.section_id == entry));
     ContainerSectionSummary {
-        status: if blocks.is_empty() {
+        status: if entries.is_empty() {
             "missing".to_owned()
         } else {
             "parsed".to_owned()
         },
         declared_count,
-        parsed_count: blocks.len(),
-        first_section_id: first.and_then(|block| string_value_from_lines(block, "section_id")),
-        first_section_kind: first.and_then(|block| string_value_from_lines(block, "section_kind")),
+        parsed_count: entries.len(),
+        first_section_id: first.map(|section| section.section_id.clone()),
+        first_section_kind: first.map(|section| section.section_kind.clone()),
         entry_section_found,
+        entries,
     }
 }
 

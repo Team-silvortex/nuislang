@@ -184,12 +184,18 @@ fn classify_proof(
         } else {
             "empty-proof-invalid"
         }
-    } else if validation_status == "verified"
-        && selected_set_contract == SELECTED_SET_CONTRACT
-        && selected_set_count > 0
-        && valid_fnv1a64(&selected_set_hash)
-    {
-        "verified"
+    } else if validation_status == "verified" {
+        let provider_selection_absent = selected_set_contract == "none"
+            && selected_set_count == 0
+            && selected_set_hash == "none";
+        let provider_selection_verified = selected_set_contract == SELECTED_SET_CONTRACT
+            && selected_set_count > 0
+            && valid_fnv1a64(&selected_set_hash);
+        if provider_selection_absent || provider_selection_verified {
+            "verified"
+        } else {
+            "selected-set-proof-invalid"
+        }
     } else {
         "selected-set-proof-invalid"
     }
@@ -340,5 +346,22 @@ mod tests {
             from_claim(&invalid).unwrap_err(),
             "final image binding claim invalid: binding-table-hash-invalid"
         );
+    }
+
+    #[test]
+    fn claim_builder_accepts_verified_runtime_only_binding_table() {
+        let claim = crate::model::FinalImageBindingProofClaim {
+            binding_count: 2,
+            binding_table_hash: "0x1111111111111111".to_owned(),
+            validation_status: "verified".to_owned(),
+            selected_set_contract: None,
+            selected_set_count: None,
+            selected_set_hash: None,
+        };
+
+        let proof = from_claim(&claim).expect("runtime-only binding table is authoritative");
+        assert_eq!(proof.proof_status, "verified");
+        assert_eq!(proof.selected_set_contract, "none");
+        assert_eq!(proof.selected_set_count, 0);
     }
 }

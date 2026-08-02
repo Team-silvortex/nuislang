@@ -42,6 +42,12 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
         replay_summary.final_image_binding_proof_status;
     report.final_output_nsdb_final_image_binding_proof_hash =
         replay_summary.final_image_binding_proof_hash;
+    report.final_output_nsdb_runtime_bootstrap_identity_contract =
+        replay_summary.runtime_bootstrap_identity_contract;
+    report.final_output_nsdb_runtime_bootstrap_identity_status =
+        replay_summary.runtime_bootstrap_identity_status;
+    report.final_output_nsdb_runtime_bootstrap_identity_hash =
+        replay_summary.runtime_bootstrap_identity_hash;
     report.final_output_nsdb_replay_ready = replay_summary.status == "replay-evidence-ready";
     report.final_output_nsdb_replay_status = replay_summary.status;
     report.final_output_nsdb_replay_checkpoint_count = replay_summary.checkpoint_count;
@@ -223,8 +229,8 @@ pub(crate) fn persist_final_output_nsdb_handoff(
         entry_kind: record.entry_kind.clone().unwrap_or_default(),
         entry_section_id: record.entry_section_id.clone().unwrap_or_default(),
         provider_family: String::new(),
-        output_contract: String::new(),
-        output_evidence: String::new(),
+        output_contract: report.runtime_bootstrap_identity_contract.clone(),
+        output_evidence: report.runtime_bootstrap_identity_hash.clone(),
         first_blocker: record.first_blocker.clone().unwrap_or_default(),
         next_action: record.next_action.clone(),
     };

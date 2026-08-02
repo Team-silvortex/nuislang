@@ -152,6 +152,35 @@ pub(crate) fn nsld_final_executable_output_report_json(
                 .as_deref(),
         ),
         json_string_field(
+            "runtime_bootstrap_contract",
+            &report.runtime_bootstrap_contract,
+        ),
+        json_string_field(
+            "runtime_bootstrap_identity_contract",
+            &report.runtime_bootstrap_identity_contract,
+        ),
+        json_string_field(
+            "runtime_bootstrap_identity_hash",
+            &report.runtime_bootstrap_identity_hash,
+        ),
+        json_string_field("runtime_bootstrap_status", &report.runtime_bootstrap_status),
+        json_usize_field(
+            "runtime_bootstrap_stage_count",
+            report.runtime_bootstrap_stage_count,
+        ),
+        json_usize_field(
+            "runtime_bootstrap_mapped_section_count",
+            report.runtime_bootstrap_mapped_section_count,
+        ),
+        json_usize_field(
+            "runtime_bootstrap_applied_relocation_count",
+            report.runtime_bootstrap_applied_relocation_count,
+        ),
+        json_string_array_field(
+            "runtime_bootstrap_blockers",
+            &report.runtime_bootstrap_blockers,
+        ),
+        json_string_field(
             "first_payload_execution_status",
             &report.first_payload_execution_status,
         ),
@@ -221,6 +250,22 @@ pub(crate) fn nsld_final_executable_output_report_json(
             "final_output_nsdb_final_image_binding_proof_hash",
             report
                 .final_output_nsdb_final_image_binding_proof_hash
+                .as_deref(),
+        ),
+        json_optional_string_field(
+            "final_output_nsdb_runtime_bootstrap_identity_contract",
+            report
+                .final_output_nsdb_runtime_bootstrap_identity_contract
+                .as_deref(),
+        ),
+        json_string_field(
+            "final_output_nsdb_runtime_bootstrap_identity_status",
+            &report.final_output_nsdb_runtime_bootstrap_identity_status,
+        ),
+        json_optional_string_field(
+            "final_output_nsdb_runtime_bootstrap_identity_hash",
+            report
+                .final_output_nsdb_runtime_bootstrap_identity_hash
                 .as_deref(),
         ),
         json_string_field(
