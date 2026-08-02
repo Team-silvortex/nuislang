@@ -265,7 +265,7 @@ fn writer_renderers_match_project_index_strings() {
         r#"
         use cpu Helpers;
 
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_clock_now() -> i64;
 
           fn main() -> i64 {

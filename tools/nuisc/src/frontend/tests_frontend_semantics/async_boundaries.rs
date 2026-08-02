@@ -407,7 +407,7 @@ fn rejects_async_shader_function_for_now() {
 
     assert!(error.contains("mod shader SurfaceShader"));
     assert!(error.contains("async fn profile"));
-    assert!(error.contains("only supported in `mod cpu`"));
+    assert!(error.contains("requires a host execution module"));
 }
 
 #[test]
@@ -424,7 +424,7 @@ fn rejects_async_data_function_for_now() {
     .unwrap_err();
 
     assert!(error.contains("mod data FabricPlane"));
-    assert!(error.contains("only supported in `mod cpu`"));
+    assert!(error.contains("requires a host execution module"));
 }
 
 #[test]
@@ -441,7 +441,7 @@ fn rejects_async_kernel_function_for_now() {
     .unwrap_err();
 
     assert!(error.contains("mod kernel KernelUnit"));
-    assert!(error.contains("only supported in `mod cpu`"));
+    assert!(error.contains("requires a host execution module"));
 }
 
 #[test]

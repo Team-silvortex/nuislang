@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_tty_isatty(fd: i64) -> i64;
   extern "c" fn host_tty_width(fd: i64) -> i64;
   extern "c" fn host_tty_height(fd: i64) -> i64;

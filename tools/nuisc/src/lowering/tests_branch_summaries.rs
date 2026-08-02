@@ -5,7 +5,7 @@ use crate::frontend::parse_nuis_module;
 fn lowers_branch_local_binding_into_pure_helper_param_chain() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           struct ExitSummary {
@@ -70,7 +70,7 @@ fn lowers_branch_local_binding_into_pure_helper_param_chain() {
 fn lowers_multi_step_summary_helpers_inside_branch() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           struct ExitSummary {
@@ -153,7 +153,7 @@ fn lowers_multi_step_summary_helpers_inside_branch() {
 fn lowers_shared_branch_bindings_into_multiple_pure_helpers() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           struct ExitSummary {

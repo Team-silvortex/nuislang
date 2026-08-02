@@ -4,7 +4,7 @@ use super::*;
 fn lowers_dynamic_if_binding_by_selecting_cancel_input_before_cancel() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -57,7 +57,7 @@ fn lowers_dynamic_if_binding_by_selecting_cancel_input_before_cancel() {
 fn lowers_dynamic_match_binding_by_selecting_cancel_input_before_cancel() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -116,7 +116,7 @@ fn lowers_dynamic_match_binding_by_selecting_cancel_input_before_cancel() {
 fn lowers_dynamic_if_return_by_selecting_spawn_input_before_join_result() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -168,7 +168,7 @@ fn lowers_dynamic_if_return_by_selecting_spawn_input_before_join_result() {
 fn lowers_dynamic_match_return_by_selecting_spawn_input_before_join_result() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -223,7 +223,7 @@ fn lowers_dynamic_match_return_by_selecting_spawn_input_before_join_result() {
 fn lowers_dynamic_if_return_chain_by_selecting_spawn_input_before_join_result() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -279,7 +279,7 @@ fn lowers_dynamic_if_return_chain_by_selecting_spawn_input_before_join_result() 
 fn lowers_dynamic_match_return_chain_by_selecting_spawn_input_before_join_result() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {

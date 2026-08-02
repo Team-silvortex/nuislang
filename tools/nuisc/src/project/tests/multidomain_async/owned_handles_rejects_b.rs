@@ -6,7 +6,7 @@ fn rejects_send_owned_with_listener_network_result_helper_returned_handle() {
         r#"
         use network NetworkUnit;
 
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_tcp_listener(
             local_port: i64,
             read_timeout_ms: i64,
@@ -80,7 +80,7 @@ fn rejects_send_owned_through_nested_helper_parameter_with_listener_argument() {
         r#"
         use network NetworkUnit;
 
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_tcp_listener(
             local_port: i64,
             read_timeout_ms: i64,
@@ -154,7 +154,7 @@ fn rejects_send_owned_with_listener_handle_variable() {
         r#"
         use network NetworkUnit;
 
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_tcp_listener(
             local_port: i64,
             read_timeout_ms: i64,
@@ -221,7 +221,7 @@ fn rejects_accept_owned_with_transport_handle_variable() {
         r#"
         use network NetworkUnit;
 
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_tcp_listener(
             local_port: i64,
             read_timeout_ms: i64,
@@ -285,7 +285,7 @@ fn rejects_http_status_recv_with_datagram_handle_variable() {
         r#"
         use network NetworkUnit;
 
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_udp_datagram(
             local_port: i64,
             remote_port: i64

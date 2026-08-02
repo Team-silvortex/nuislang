@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_argv_count() -> i64;
 
   fn main() -> i64 {

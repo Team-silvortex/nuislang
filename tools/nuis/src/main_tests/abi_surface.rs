@@ -165,7 +165,7 @@ fn language_test_runner_prints_clock_policy_metadata() {
     fs::write(
             &input,
             r#"
-mod cpu Main {
+mod cffi Main {
   extern "c" fn usleep(usec: i64) -> i32;
 
   test("slow_global", should_fail=true, reason="bridge policy demo", timeout_ms=25, clock_domain="global", clock_policy="bridge") async fn slow_global() -> i64 {

@@ -1,6 +1,6 @@
 use cpu StdCliContracts;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_result_is_ok(tag_handle: i64) -> i64;
   extern "c" fn host_result_value(tag_handle: i64) -> i64;
   extern "c" fn host_result_error(tag_handle: i64) -> i64;

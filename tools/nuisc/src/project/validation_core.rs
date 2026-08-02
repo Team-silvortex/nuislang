@@ -197,7 +197,8 @@ pub(super) fn validate_project_abi_requirements(
     let project_domains = collect_project_domains(manifest, modules)?;
     let mut required_domains = BTreeSet::new();
     for requirement in &manifest.abi_requirements {
-        if !project_domains.contains(&requirement.domain) {
+        let cpu_is_cffi_host_abi = requirement.domain == "cpu" && project_domains.contains("cffi");
+        if !project_domains.contains(&requirement.domain) && !cpu_is_cffi_host_abi {
             return Err(format!(
                 "project manifest ABI requirement `{}` targets domain `{}` which is not used by this project",
                 requirement.abi, requirement.domain
@@ -225,6 +226,29 @@ pub(super) fn validate_project_abi_requirements(
             ));
         }
         required_domains.insert(requirement.domain.clone());
+    }
+
+    if project_domains.contains("cffi") && !required_domains.contains("cffi") {
+        let inherited = manifest
+            .abi_requirements
+            .iter()
+            .find(|requirement| requirement.domain == "cpu")
+            .ok_or_else(|| {
+                "project manifest ABI locking for `mod cffi` requires either a `cffi` ABI or an inherited `cpu` host ABI"
+                    .to_owned()
+            })?;
+        let cffi = crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), "cffi")?;
+        if !cffi
+            .abi_profiles
+            .iter()
+            .any(|profile| profile == &inherited.abi)
+        {
+            return Err(format!(
+                "project CPU host ABI `{}` is not accepted by CFFI nustar package `{}`",
+                inherited.abi, cffi.package_id
+            ));
+        }
+        required_domains.insert("cffi".to_owned());
     }
 
     let missing_domains = project_domains

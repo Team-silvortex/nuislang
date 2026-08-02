@@ -10,6 +10,7 @@ description = "Static verifier for handwritten YIR modules."
 
 [dependencies]
 yir-core = { path = "../yir-core" }
+yir-domain-cffi = { path = "../yir-domain-cffi" }
 yir-domain-cpu = { path = "../yir-domain-cpu" }
 yir-domain-kernel = { path = "../yir-domain-kernel" }
 yir-domain-network = { path = "../yir-domain-network" }

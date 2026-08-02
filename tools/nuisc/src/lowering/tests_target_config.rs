@@ -111,7 +111,7 @@ fn rejects_unregistered_lowering_abi_target() {
 fn rejects_nurs_extern_when_lowering_target_is_plain_c_abi() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "nurs" fn host_color_bias(value: i64) -> i64;
 
           fn main() -> i64 {
@@ -143,7 +143,7 @@ fn rejects_nurs_extern_when_lowering_target_is_plain_c_abi() {
 fn allows_nurs_extern_when_lowering_target_declares_nurs_bridge() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "nurs" fn host_color_bias(value: i64) -> i64;
 
           fn main() -> i64 {

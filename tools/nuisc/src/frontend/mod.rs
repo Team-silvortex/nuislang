@@ -185,6 +185,14 @@ pub fn frontend_name() -> &'static str {
     "nuisc-parser-minimal"
 }
 
+pub(crate) fn is_host_execution_domain(domain: &str) -> bool {
+    matches!(domain, "cpu" | "cffi")
+}
+
+fn domains_share_host_execution_surface(lhs: &str, rhs: &str) -> bool {
+    lhs == rhs || (is_host_execution_domain(lhs) && is_host_execution_domain(rhs))
+}
+
 fn lower_visibility(visibility: AstVisibility) -> NirVisibility {
     match visibility {
         AstVisibility::Private => NirVisibility::Private,
@@ -250,7 +258,7 @@ pub fn lower_project_ast_to_nir(
     let local_cpu_helpers = expanded_module
         .uses
         .iter()
-        .filter(|item| item.domain == expanded_module.domain)
+        .filter(|item| domains_share_host_execution_surface(&item.domain, &expanded_module.domain))
         .filter_map(|item| {
             expanded_local_modules
                 .iter()
@@ -284,7 +292,7 @@ pub fn lower_project_ast_to_nir(
     let local_cpu_helpers = expanded_module
         .uses
         .iter()
-        .filter(|item| item.domain == expanded_module.domain)
+        .filter(|item| domains_share_host_execution_surface(&item.domain, &expanded_module.domain))
         .filter_map(|item| {
             expanded_local_modules
                 .iter()

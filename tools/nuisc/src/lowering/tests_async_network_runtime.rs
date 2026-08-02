@@ -7,7 +7,7 @@ use crate::frontend::parse_nuis_module;
 fn lowers_sync_network_host_transport_profile_bindings_without_unbound_variable_errors() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_send_probe(
             stream_window: i64,
             send_window: i64,
@@ -52,7 +52,7 @@ fn lowers_sync_network_host_transport_profile_bindings_without_unbound_variable_
 fn lowers_sync_network_result_local_binding_in_direct_return() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_send_probe(
             stream_window: i64,
             send_window: i64,
@@ -83,7 +83,7 @@ fn lowers_sync_network_result_local_binding_in_direct_return() {
 fn lowers_sync_network_result_local_bindings_inside_guard_return() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_send_probe(
             stream_window: i64,
             send_window: i64,
@@ -195,7 +195,7 @@ fn lowers_async_network_observer_step_into_async_loop_carry_chain() {
 fn lowers_async_owned_network_session_step_into_async_post_flow_break_chain() {
     let mut module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_tcp_stream(
             remote_port: i64,
             connect_timeout_ms: i64
@@ -347,7 +347,7 @@ fn lowers_async_network_poll_step_with_retry_budget_into_async_post_flow_cond_ch
 fn lowers_async_owned_network_session_step_with_retry_budget_into_async_post_flow_cond_chain() {
     let mut module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_tcp_stream(
             remote_port: i64,
             connect_timeout_ms: i64
@@ -448,7 +448,7 @@ fn lowers_async_owned_network_session_step_with_retry_budget_into_async_post_flo
 fn lowers_async_owned_network_session_step_with_timeout_budget_into_async_post_flow_cond_chain() {
     let mut module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_tcp_stream(
             remote_port: i64,
             connect_timeout_ms: i64
@@ -553,7 +553,7 @@ fn lowers_async_owned_network_session_step_with_timeout_budget_into_async_post_f
 fn lowers_async_http_client_request_session_into_async_post_flow_cond_chain() {
     let mut module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_tcp_stream(
             remote_port: i64,
             connect_timeout_ms: i64

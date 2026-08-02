@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" @host_symbol("subprocess.spawn") fn subprocess_spawn(program_handle: i64, argv_handle: i64, env_handle: i64) -> i64;
   extern "c" @host_symbol("subprocess.signal") fn subprocess_signal(process_handle: i64, signal: i64) -> i64;
   extern "c" @host_symbol("subprocess.join") fn subprocess_join(process_handle: i64) -> i64;

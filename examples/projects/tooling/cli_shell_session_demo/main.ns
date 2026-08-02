@@ -2,7 +2,7 @@ use cpu StdCliContracts;
 use cpu StdIoContracts;
 use cpu StdTextContracts;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_argv_at(index: i64) -> i64;
   extern "c" fn host_line_read(prompt_handle: i64) -> i64;
   extern "c" fn host_line_len(line_handle: i64) -> i64;

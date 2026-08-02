@@ -2,7 +2,7 @@ use cpu StdLanguageCore;
 use cpu StdLanguageOps;
 use cpu StdReportContracts;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_argv_count() -> i64;
   extern "c" fn host_argv_at(index: i64) -> i64;
   extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;

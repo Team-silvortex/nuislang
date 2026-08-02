@@ -1,4 +1,9 @@
 [[package]]
+package_id = "official.cffi"
+manifest = "cffi.toml"
+domain_family = "cffi"
+
+[[package]]
 package_id = "official.cpu"
 manifest = "cpu.toml"
 domain_family = "cpu"

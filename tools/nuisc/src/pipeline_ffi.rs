@@ -9,9 +9,10 @@ pub(super) fn validate_externs(
     if ast.externs.is_empty() && ast.extern_interfaces.is_empty() {
         return Ok(());
     }
-    if ast.domain != "cpu" {
+    if ast.domain != "cffi" {
         return Err(
-            "extern declarations are currently only supported inside `mod cpu <unit>`".to_owned(),
+            "extern declarations must be wrapped by a registered `mod cffi <unit>` boundary"
+                .to_owned(),
         );
     }
     for function in ast.externs.iter().chain(

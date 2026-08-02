@@ -1,6 +1,6 @@
 use cpu StdTextContracts;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_text_format_i64(pattern_handle: i64, value: i64) -> i64;
   extern "c" fn host_text_format_pair(pattern_handle: i64, lhs: i64, rhs: i64) -> i64;
   extern "c" fn host_text_len(text_handle: i64) -> i64;

@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_path_is_root(path_handle: i64) -> i64;
   extern "c" fn host_path_ends_with_slash(path_handle: i64) -> i64;
   extern "c" fn host_path_depth(path_handle: i64) -> i64;

@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{NirFunction, NirModule, NirStructDef, NirTypeRef};
@@ -129,9 +131,9 @@ pub(super) fn validate_test_function_signature(
     function: &NirFunction,
 ) -> Result<(), String> {
     let label = function.test_name.as_deref().unwrap_or(&function.name);
-    if module.domain != "cpu" {
+    if !is_host_execution_domain(&module.domain) {
         return Err(format!(
-            "test function `{}::{}` ({}) is only supported in `mod cpu` for now",
+            "test function `{}::{}` ({}) requires a host execution module (`mod cpu` or `mod cffi`) for now",
             module.unit, function.name, label
         ));
     }
@@ -226,9 +228,9 @@ pub(super) fn validate_benchmark_function_signature(
     function: &NirFunction,
 ) -> Result<(), String> {
     let label = function.benchmark_name.as_deref().unwrap_or(&function.name);
-    if module.domain != "cpu" {
+    if !is_host_execution_domain(&module.domain) {
         return Err(format!(
-            "benchmark function `{}::{}` ({}) is only supported in `mod cpu` for now",
+            "benchmark function `{}::{}` ({}) requires a host execution module (`mod cpu` or `mod cffi`) for now",
             module.unit, function.name, label
         ));
     }

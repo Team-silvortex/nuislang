@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use super::call_routing_slice_helpers::{
     ensure_byte_slice_input, lower_byte_slice_parts, lower_byte_split_struct,
 };
@@ -162,9 +164,9 @@ pub(super) fn lower_byte_split_builtin(
                     "bytes_split_once_byte(...) does not accept explicit generic args".to_owned(),
                 );
             }
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "bytes_split_once_byte(...) is currently only allowed inside `mod cpu <unit>`"
+                    "bytes_split_once_byte(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -205,9 +207,9 @@ pub(super) fn lower_byte_split_builtin(
                     "bytes_split_once_text(...) does not accept explicit generic args".to_owned(),
                 );
             }
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "bytes_split_once_text(...) is currently only allowed inside `mod cpu <unit>`"
+                    "bytes_split_once_text(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }

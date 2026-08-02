@@ -6,7 +6,7 @@ fn rejects_http_status_recv_through_datagram_helper_returned_handle() {
         r#"
         use network NetworkUnit;
 
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_udp_datagram(
             local_port: i64,
             remote_port: i64
@@ -75,7 +75,7 @@ fn rejects_send_owned_through_helper_parameter_with_listener_argument() {
         r#"
         use network NetworkUnit;
 
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_tcp_listener(
             local_port: i64,
             read_timeout_ms: i64,
@@ -145,7 +145,7 @@ fn rejects_send_owned_through_mutual_recursive_helper_parameter_with_listener_ar
         r#"
         use network NetworkUnit;
 
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_tcp_listener(
             local_port: i64,
             read_timeout_ms: i64,
@@ -232,7 +232,7 @@ fn rejects_send_owned_with_listener_helper_returned_handle() {
         r#"
         use network NetworkUnit;
 
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_tcp_listener(
             local_port: i64,
             read_timeout_ms: i64,

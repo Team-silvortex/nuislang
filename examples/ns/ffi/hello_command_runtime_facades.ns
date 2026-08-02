@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" @host_symbol("command.spawn") fn command_spawn(program_handle: i64, argv_handle: i64) -> i64;
   extern "c" @host_symbol("command.status") fn command_status(command_handle: i64) -> i64;
   extern "c" @host_symbol("command.wait") fn command_wait(command_handle: i64) -> i64;

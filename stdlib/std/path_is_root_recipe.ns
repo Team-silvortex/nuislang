@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_path_is_absolute(path_handle: i64) -> i64;
   extern "c" fn host_path_is_root(path_handle: i64) -> i64;
   extern "c" fn host_path_parent(path_handle: i64) -> i64;

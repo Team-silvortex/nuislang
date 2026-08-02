@@ -914,7 +914,7 @@ fn load_registered_domains_covers_all_indexed_nustar_modules() {
         .collect::<Vec<_>>();
     assert_eq!(
         domains,
-        vec!["cpu", "cpu", "data", "kernel", "network", "shader"]
+        vec!["cffi", "cpu", "cpu", "data", "kernel", "network", "shader"]
     );
     let cpu_packages = registrations
         .iter()

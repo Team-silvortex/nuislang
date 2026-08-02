@@ -1,6 +1,6 @@
 use network NetworkUnit;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_network_open_tcp_stream(
     remote_port: i64,
     connect_timeout_ms: i64

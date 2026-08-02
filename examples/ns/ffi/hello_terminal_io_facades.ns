@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_stdout_write(text_handle: i64) -> i64;
   extern "c" fn host_stderr_write(text_handle: i64) -> i64;
   extern "c" fn host_stdout_flush() -> i64;

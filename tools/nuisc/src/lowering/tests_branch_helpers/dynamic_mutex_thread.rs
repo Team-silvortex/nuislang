@@ -4,7 +4,7 @@ use super::*;
 fn lowers_dynamic_if_binding_by_selecting_mutex_input_before_lock() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           fn main() -> i64 {
@@ -47,7 +47,7 @@ fn lowers_dynamic_if_binding_by_selecting_mutex_input_before_lock() {
 fn lowers_dynamic_if_return_by_selecting_thread_input_before_join_result() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -92,7 +92,7 @@ fn lowers_dynamic_if_return_by_selecting_thread_input_before_join_result() {
 fn lowers_dynamic_if_binding_chain_by_selecting_mutex_input_before_lock() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           fn main() -> i64 {
@@ -137,7 +137,7 @@ fn lowers_dynamic_if_binding_chain_by_selecting_mutex_input_before_lock() {
 fn lowers_dynamic_if_return_chain_by_selecting_thread_input_before_join_result() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -184,7 +184,7 @@ fn lowers_dynamic_if_return_chain_by_selecting_thread_input_before_join_result()
 fn lowers_dynamic_if_long_alias_chain_by_selecting_mutex_input_before_lock() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           fn main() -> i64 {
@@ -222,7 +222,7 @@ fn lowers_dynamic_if_long_alias_chain_by_selecting_mutex_input_before_lock() {
 fn lowers_dynamic_match_binding_chain_by_selecting_mutex_input_before_lock() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           fn main() -> i64 {
@@ -268,7 +268,7 @@ fn lowers_dynamic_match_binding_chain_by_selecting_mutex_input_before_lock() {
 fn lowers_dynamic_match_return_chain_by_selecting_thread_input_before_join_result() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {

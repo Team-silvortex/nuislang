@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use nuis_semantics::model::{AstExpr, NirExpr};
 
 use crate::frontend::{i64_type, lower_expr, ref_type};
@@ -17,9 +19,9 @@ pub(super) fn lower_http_call(
     } = context;
     match callee {
         "parse_header_line" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "parse_header_line(...) is currently only allowed inside `mod cpu <unit>`"
+                    "parse_header_line(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -71,9 +73,9 @@ pub(super) fn lower_http_call(
             }))
         }
         "find_header_value" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "find_header_value(...) is currently only allowed inside `mod cpu <unit>`"
+                    "find_header_value(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -125,9 +127,9 @@ pub(super) fn lower_http_call(
             }))
         }
         "find_status_line_reason" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "find_status_line_reason(...) is currently only allowed inside `mod cpu <unit>`"
+                    "find_status_line_reason(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -170,9 +172,9 @@ pub(super) fn lower_http_call(
             }))
         }
         "parse_http_response_summary" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "parse_http_response_summary(...) is currently only allowed inside `mod cpu <unit>`"
+                    "parse_http_response_summary(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -215,9 +217,9 @@ pub(super) fn lower_http_call(
             }))
         }
         "parse_http_request_summary" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "parse_http_request_summary(...) is currently only allowed inside `mod cpu <unit>`"
+                    "parse_http_request_summary(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -260,9 +262,9 @@ pub(super) fn lower_http_call(
             }))
         }
         "parse_http_roundtrip_summary" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "parse_http_roundtrip_summary(...) is currently only allowed inside `mod cpu <unit>`"
+                    "parse_http_roundtrip_summary(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }

@@ -433,7 +433,7 @@ fn project_lowering_target_for_domain(
     else {
         return Ok(None);
     };
-    if domain != "cpu" {
+    if !crate::frontend::is_host_execution_domain(domain) {
         return Ok(None);
     }
     let target =

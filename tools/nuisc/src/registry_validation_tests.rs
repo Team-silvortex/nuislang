@@ -30,6 +30,17 @@ fn aarch64_cpu_nustar_is_independent_package_for_cpu_domain() {
 }
 
 #[test]
+fn cffi_nustar_owns_the_registered_host_boundary() {
+    let cffi = load_manifest_for_domain(Path::new("nustar-packages"), "cffi").unwrap();
+    assert_eq!(cffi.package_id, "official.cffi");
+    assert_eq!(cffi.yir_lowering_entry, "cffi.yir.lowering.v1");
+    assert_eq!(cffi.host_ffi_abis, ["nurs", "c", "libc"]);
+    assert!(cffi
+        .capability_tags
+        .contains(&"signature-whitelist".to_owned()));
+}
+
+#[test]
 fn validate_registered_domains_accepts_current_mainline_registry() {
     let issues = validate_registered_domains(Path::new("nustar-packages")).unwrap();
     assert!(issues.is_empty(), "unexpected registry issues: {issues:?}");

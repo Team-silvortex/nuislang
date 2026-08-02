@@ -1,6 +1,6 @@
 use cpu StdStyleLanguageSupport;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_argv_count() -> i64;
 
   impl Addable for i64 {

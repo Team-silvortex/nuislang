@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_i32_curve(value: i32) -> i32;
 
   fn main() -> i32 {

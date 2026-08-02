@@ -2,7 +2,7 @@ use cpu StdCliContracts;
 use cpu StdLanguageCore;
 use cpu StdLanguageOps;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_command_spawn(program_handle: i64, argv_handle: i64) -> i64;
   extern "c" fn host_command_status(command_handle: i64) -> i64;
   extern "c" fn host_command_wait(command_handle: i64) -> i64;

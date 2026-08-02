@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_subprocess_spawn(program_handle: i64, argv_handle: i64, env_handle: i64) -> i64;
   extern "c" fn host_subprocess_spawn_in(
     program_handle: i64,

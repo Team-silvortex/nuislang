@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use nuis_semantics::model::{AstExpr, NirBinaryOp, NirExpr};
 
 use crate::frontend::{i64_type, lower_expr, ref_type};
@@ -17,9 +19,10 @@ pub(super) fn lower_serialization_call(
     } = context;
     match callee {
         "text_handle" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "text_handle(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                    "text_handle(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
                 );
             }
             let [value] = args else {
@@ -41,9 +44,10 @@ pub(super) fn lower_serialization_call(
             }))
         }
         "text_len" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "text_len(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                    "text_len(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
                 );
             }
             let [value] = args else {
@@ -65,9 +69,9 @@ pub(super) fn lower_serialization_call(
             }))
         }
         "serialize_text_into" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "serialize_text_into(...) is currently only allowed inside `mod cpu <unit>`"
+                    "serialize_text_into(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -110,9 +114,9 @@ pub(super) fn lower_serialization_call(
             }))
         }
         "serialize_i64_into" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "serialize_i64_into(...) is currently only allowed inside `mod cpu <unit>`"
+                    "serialize_i64_into(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -155,9 +159,9 @@ pub(super) fn lower_serialization_call(
             }))
         }
         "serialize_bool_into" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "serialize_bool_into(...) is currently only allowed inside `mod cpu <unit>`"
+                    "serialize_bool_into(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -200,9 +204,9 @@ pub(super) fn lower_serialization_call(
             }))
         }
         "serialize_byte_into" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "serialize_byte_into(...) is currently only allowed inside `mod cpu <unit>`"
+                    "serialize_byte_into(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -245,9 +249,9 @@ pub(super) fn lower_serialization_call(
             }))
         }
         "deserialize_i64_from" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "deserialize_i64_from(...) is currently only allowed inside `mod cpu <unit>`"
+                    "deserialize_i64_from(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -290,9 +294,9 @@ pub(super) fn lower_serialization_call(
             }))
         }
         "deserialize_bool_from" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "deserialize_bool_from(...) is currently only allowed inside `mod cpu <unit>`"
+                    "deserialize_bool_from(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -340,9 +344,9 @@ pub(super) fn lower_serialization_call(
             }))
         }
         "deserialize_byte_from" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "deserialize_byte_from(...) is currently only allowed inside `mod cpu <unit>`"
+                    "deserialize_byte_from(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -376,9 +380,9 @@ pub(super) fn lower_serialization_call(
             }))
         }
         "deserialize_text_from" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "deserialize_text_from(...) is currently only allowed inside `mod cpu <unit>`"
+                    "deserialize_text_from(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }

@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_wall_time_ns() -> i64;
   extern "c" fn host_monotonic_time_ns() -> i64;
   extern "c" fn host_clock_domain_id() -> i64;

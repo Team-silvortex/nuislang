@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" @host_symbol("stdout.write") fn stdout_write(text_handle: i64) -> i64;
   extern "c" @host_symbol("stderr.write") fn stderr_write(text_handle: i64) -> i64;
   extern "c" @host_symbol("stdout.flush") fn stdout_flush() -> i64;

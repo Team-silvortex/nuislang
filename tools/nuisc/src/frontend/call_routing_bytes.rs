@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use super::call_routing_slice_helpers::{lower_byte_slice_parts, lower_host_compare_or_copy_call};
 use super::call_routing_slices::SliceCallRoutingInput;
 use super::expr_lowering::lower_expr;
@@ -27,9 +29,10 @@ pub(super) fn lower_byte_builtin(
             if !generic_args.is_empty() {
                 return Err("fillbytes(...) does not accept explicit generic args".to_owned());
             }
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "fillbytes(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                    "fillbytes(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
                 );
             }
             let (buffer, start, len) =
@@ -61,9 +64,10 @@ pub(super) fn lower_byte_builtin(
             if !generic_args.is_empty() {
                 return Err("bytes_fill(...) does not accept explicit generic args".to_owned());
             }
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "bytes_fill(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                    "bytes_fill(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
                 );
             }
             let (buffer, start, len) =
@@ -95,9 +99,10 @@ pub(super) fn lower_byte_builtin(
             if !generic_args.is_empty() {
                 return Err("copybytes(...) does not accept explicit generic args".to_owned());
             }
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "copybytes(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                    "copybytes(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
                 );
             }
             let (dst_buffer, dst_start, dst_len) =
@@ -125,9 +130,9 @@ pub(super) fn lower_byte_builtin(
             if !generic_args.is_empty() {
                 return Err("bytes_copy_from(...) does not accept explicit generic args".to_owned());
             }
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "bytes_copy_from(...) is currently only allowed inside `mod cpu <unit>`"
+                    "bytes_copy_from(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -152,9 +157,9 @@ pub(super) fn lower_byte_builtin(
             if !generic_args.is_empty() {
                 return Err("comparebytes(...) does not accept explicit generic args".to_owned());
             }
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "comparebytes(...) is currently only allowed inside `mod cpu <unit>`"
+                    "comparebytes(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -183,9 +188,9 @@ pub(super) fn lower_byte_builtin(
             if !generic_args.is_empty() {
                 return Err("bytes_compare(...) does not accept explicit generic args".to_owned());
             }
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "bytes_compare(...) is currently only allowed inside `mod cpu <unit>`"
+                    "bytes_compare(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -210,9 +215,10 @@ pub(super) fn lower_byte_builtin(
             if !generic_args.is_empty() {
                 return Err("bytes_eq(...) does not accept explicit generic args".to_owned());
             }
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "bytes_eq(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                    "bytes_eq(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
                 );
             }
             let (lhs_buffer, lhs_start, lhs_len) =
@@ -242,9 +248,9 @@ pub(super) fn lower_byte_builtin(
                     "bytes_starts_with(...) does not accept explicit generic args".to_owned(),
                 );
             }
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "bytes_starts_with(...) is currently only allowed inside `mod cpu <unit>`"
+                    "bytes_starts_with(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -281,9 +287,9 @@ pub(super) fn lower_byte_builtin(
             if !generic_args.is_empty() {
                 return Err("bytes_ends_with(...) does not accept explicit generic args".to_owned());
             }
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "bytes_ends_with(...) is currently only allowed inside `mod cpu <unit>`"
+                    "bytes_ends_with(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -329,9 +335,9 @@ pub(super) fn lower_byte_builtin(
             if !generic_args.is_empty() {
                 return Err("bytes_find_byte(...) does not accept explicit generic args".to_owned());
             }
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "bytes_find_byte(...) is currently only allowed inside `mod cpu <unit>`"
+                    "bytes_find_byte(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -364,9 +370,9 @@ pub(super) fn lower_byte_builtin(
             if !generic_args.is_empty() {
                 return Err("bytes_find_text(...) does not accept explicit generic args".to_owned());
             }
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "bytes_find_text(...) is currently only allowed inside `mod cpu <unit>`"
+                    "bytes_find_text(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -401,9 +407,9 @@ pub(super) fn lower_byte_builtin(
                     "bytes_contains_byte(...) does not accept explicit generic args".to_owned(),
                 );
             }
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "bytes_contains_byte(...) is currently only allowed inside `mod cpu <unit>`"
+                    "bytes_contains_byte(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -442,9 +448,9 @@ pub(super) fn lower_byte_builtin(
                     "bytes_contains_text(...) does not accept explicit generic args".to_owned(),
                 );
             }
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "bytes_contains_text(...) is currently only allowed inside `mod cpu <unit>`"
+                    "bytes_contains_text(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -483,9 +489,9 @@ pub(super) fn lower_byte_builtin(
                     "bytes_find_line_end(...) does not accept explicit generic args".to_owned(),
                 );
             }
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "bytes_find_line_end(...) is currently only allowed inside `mod cpu <unit>`"
+                    "bytes_find_line_end(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -507,9 +513,9 @@ pub(super) fn lower_byte_builtin(
                     "bytes_trim_line_end(...) does not accept explicit generic args".to_owned(),
                 );
             }
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "bytes_trim_line_end(...) is currently only allowed inside `mod cpu <unit>`"
+                    "bytes_trim_line_end(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }

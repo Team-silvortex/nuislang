@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use std::collections::BTreeMap;
 
 use nuis_semantics::model::{NirExternFunction, NirModule, NirStmt, NirStructDef, NirTypeRef};
@@ -41,20 +43,20 @@ pub(super) fn validate_declared_nir_types(module: &NirModule) -> Result<(), Stri
         if function.benchmark_name.is_some() {
             validate_benchmark_function_signature(module, function)?;
         }
-        if function.is_async && module.domain != "cpu" {
+        if function.is_async && !is_host_execution_domain(&module.domain) {
             return Err(format!(
-                "mod {} {} cannot declare `async fn {}` yet; async entry is currently only supported in `mod cpu` while {} logic must stay AOT/synchronous and interact through explicit profile/data contracts",
+                "mod {} {} cannot declare `async fn {}` yet; async entry requires a host execution module (`mod cpu` or `mod cffi`) while {} logic must stay AOT/synchronous and interact through explicit profile/data contracts",
                 module.domain, module.unit, function.name, module.domain
             ));
         }
         if function.is_async
-            && module.domain == "cpu"
+            && is_host_execution_domain(&module.domain)
             && function.name == "main"
             && !function.params.is_empty()
         {
             return Err(format!(
-                "async entry `mod cpu {}::main` cannot take parameters in the current scheduler; pass data through explicit data/profile contracts or call async helpers from `main` instead",
-                module.unit
+                "async entry `mod {} {}::main` cannot take parameters in the current scheduler; pass data through explicit data/profile contracts or call async helpers from `main` instead",
+                module.domain, module.unit
             ));
         }
         for param in &function.params {

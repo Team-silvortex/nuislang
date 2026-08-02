@@ -35,6 +35,7 @@ pub fn default_registry() -> ModRegistry {
     let mut registry = ModRegistry::new();
     registry.register(DataMod);
     registry.register(LegacyFabricMod);
+    registry.register(yir_domain_cffi::CffiMod);
     registry.register(yir_domain_cpu::CpuMod);
     registry.register(yir_domain_kernel::KernelMod);
     registry.register(yir_domain_kernel::LegacyNpuMod);

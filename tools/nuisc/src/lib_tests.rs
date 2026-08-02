@@ -693,7 +693,8 @@ fn benchmark_report_file_tooling_outputs_support_inspect_and_verify_json() {
     assert!(inspect_json.contains("\"link_plan\":{"));
     assert!(inspect_json.contains("\"artifact_container_version\":2"));
     assert!(inspect_json.contains("\"artifact_section_count\":6"));
-    assert!(inspect_json.contains("\"lowering_unit_count\":1"));
+    assert!(inspect_json.contains("\"lowering_unit_count\":2"));
+    assert!(inspect_json.contains("\"lowering_domain_families\":[\"cffi\",\"cpu\"]"));
     assert!(inspect_json.contains("\"final_stage_driver\":\"clang\""));
 
     let verify_manifest_json = verify_build_manifest_json(&manifest_path, &manifest_verify);
@@ -715,7 +716,7 @@ fn benchmark_report_file_tooling_outputs_support_inspect_and_verify_json() {
         .contains("\"artifact_container_kind\":\"compiled-artifact-section-table-v2\""));
     assert!(verify_artifact_json_text.contains("\"artifact_container_version\":2"));
     assert!(verify_artifact_json_text.contains("\"artifact_section_count\":6"));
-    assert!(verify_artifact_json_text.contains("\"lowering_unit_count\":1"));
+    assert!(verify_artifact_json_text.contains("\"lowering_unit_count\":2"));
     assert!(verify_artifact_json_text.contains("\"artifact_roundtrip_verified\":true"));
     assert!(verify_artifact_json_text.contains("\"lifecycle_contract_consistent\":true"));
 
@@ -732,7 +733,9 @@ fn benchmark_report_file_tooling_outputs_support_inspect_and_verify_json() {
     assert!(artifact_report.contains("\"manifest_verify_reconstructed\":false"));
     assert!(artifact_report.contains("\"execution_inspect\":{"));
     assert!(artifact_report.contains("\"kind\":\"nuis_execution_inspect\""));
-    assert!(artifact_report.contains("\"sections\":[]"));
+    assert!(artifact_report.contains("\"heterogeneous_execution_domains\":1"));
+    assert!(artifact_report.contains("\"sections\":[{"));
+    assert!(artifact_report.contains("\"domain_family\":\"cffi\""));
     assert!(artifact_report.contains("\"project_metadata\":{"));
     assert!(artifact_report.contains("\"kind\":\"nuis_project_metadata\""));
     assert!(artifact_report.contains("\"doc_index\":{"));

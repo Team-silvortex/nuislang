@@ -1,6 +1,6 @@
 use cpu StdCliContracts;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_process_id() -> i64;
   extern "c" fn host_process_status() -> i64;
   extern "c" fn host_process_exit_code(status: i64) -> i64;

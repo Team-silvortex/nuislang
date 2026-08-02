@@ -2,7 +2,7 @@ use cpu StdFsContracts;
 use cpu StdIoContracts;
 use cpu StdTextContracts;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_path_join_len(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_fs_exists(path_handle: i64) -> i64;
   extern "c" fn host_fs_size(path_handle: i64) -> i64;

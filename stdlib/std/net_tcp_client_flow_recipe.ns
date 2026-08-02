@@ -1,6 +1,6 @@
 use network NetworkUnit;
 
-mod cpu Main {
+mod cffi Main {
   type NetResult<T> = NetworkResult<T>;
 
   extern "c" fn host_argv_count() -> i64;

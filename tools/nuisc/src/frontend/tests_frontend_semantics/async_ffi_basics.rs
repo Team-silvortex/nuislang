@@ -223,7 +223,7 @@ fn rejects_async_function_result_family_return_boundary() {
 fn accepts_host_buffer_handle_to_extern_i64_host_handle_bridge() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_stdin_read(buffer_handle: i64, len: i64) -> i64;
 
           fn main() -> i64 {
@@ -242,7 +242,7 @@ fn accepts_host_buffer_handle_to_extern_i64_host_handle_bridge() {
 fn rejects_ref_node_to_extern_i64_host_handle_slot() {
     let error = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_stdin_read(buffer_handle: i64, len: i64) -> i64;
 
           fn main() -> i64 {
@@ -262,7 +262,7 @@ fn rejects_ref_node_to_extern_i64_host_handle_slot() {
 fn accepts_ref_buffer_parameter_to_extern_host_handle_bridge() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_stdin_read(buffer: ref Buffer, len: i64) -> i64;
 
           fn main() -> i64 {

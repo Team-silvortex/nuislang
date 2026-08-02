@@ -500,7 +500,7 @@ fn rejects_unknown_std_host_symbol_annotation() {
 fn rejects_non_c_extern_host_symbol_bridge() {
     let error = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "nurs" @host_symbol("network.open_tcp") fn open_tcp(local_port: i64, remote_port: i64) -> i64;
         }
         "#,

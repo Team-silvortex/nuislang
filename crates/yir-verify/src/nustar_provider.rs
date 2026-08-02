@@ -10,6 +10,10 @@ pub struct StaticNustarSemanticProvider {
 
 const STATIC_NUSTAR_SEMANTIC_PROVIDERS: &[StaticNustarSemanticProvider] = &[
     StaticNustarSemanticProvider {
+        lowering_entry: "cffi.yir.lowering.v1",
+        register_mods: register_cffi,
+    },
+    StaticNustarSemanticProvider {
         lowering_entry: "cpu.yir.lowering.v1",
         register_mods: register_cpu,
     },
@@ -34,6 +38,10 @@ const STATIC_NUSTAR_SEMANTIC_PROVIDERS: &[StaticNustarSemanticProvider] = &[
         register_mods: register_shader,
     },
 ];
+
+fn register_cffi(registry: &mut ModRegistry) {
+    registry.register(yir_domain_cffi::CffiMod);
+}
 
 pub fn static_nustar_semantic_providers() -> &'static [StaticNustarSemanticProvider] {
     STATIC_NUSTAR_SEMANTIC_PROVIDERS
@@ -84,6 +92,17 @@ mod tests {
         ));
         assert!(registry.lookup("cpu").is_some());
         assert!(registry.lookup("shader").is_none());
+    }
+
+    #[test]
+    fn cffi_provider_is_independent_from_cpu_semantics() {
+        let mut registry = ModRegistry::new();
+        assert!(register_static_nustar_semantics(
+            "cffi.yir.lowering.v1",
+            &mut registry
+        ));
+        assert!(registry.lookup("cffi").is_some());
+        assert!(registry.lookup("cpu").is_none());
     }
 
     #[test]

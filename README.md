@@ -81,7 +81,8 @@ Implemented or actively usable surfaces:
 * `nuisc` compiler core with parser/frontend, NIR/YIR generation, verifier
   checks, LLVM lowering, AOT artifact emission, and project metadata.
 * `nustar` registration for the main domain set: `cpu`, `data`, `shader`,
-  `kernel`, `network`, plus CFFI/host-compatibility boundaries.
+  `kernel`, `network`, and the first-class `official.cffi`
+  host-compatibility boundary.
 * `YIR` as the central semantic execution boundary, with result-family,
   artifact, clock, ABI, and domain validation surfaces.
 * `nsld` as the linker frontdoor over the current linker core, with object,
@@ -241,7 +242,8 @@ Current core domain set:
 * `shader`: shader artifact and graphics/image-processing pressure surface
 * `kernel`: compute-kernel and future ML/NPU pressure surface
 * `network`: profile/session/flow and host-backed networking contracts
-* `cffi`: compatibility boundary for libc/C ABI/classic host object support
+* `cffi`: registered compatibility boundary for libc/C ABI/classic host object
+  support; Nuis source declarations are owned by `mod cffi`, not `mod cpu`
 
 Important references:
 

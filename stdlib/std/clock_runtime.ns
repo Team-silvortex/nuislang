@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_clock_domain_id() -> i64;
   extern "c" fn host_clock_epoch_ns() -> i64;
   extern "c" fn host_clock_scale_ppm() -> i64;

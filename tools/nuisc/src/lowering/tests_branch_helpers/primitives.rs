@@ -113,7 +113,7 @@ fn lowers_thread_and_mutex_primitives_into_cpu_nodes() {
 fn lowers_pure_branch_local_binding_into_guard_print_return() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           fn main() -> i64 {
@@ -144,7 +144,7 @@ fn lowers_pure_branch_local_binding_into_guard_print_return() {
 fn lowers_pure_helper_call_binding_into_guard_print_return() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           fn usage_exit_code() -> i64 {
@@ -178,7 +178,7 @@ fn lowers_pure_helper_call_binding_into_guard_print_return() {
 fn lowers_pure_text_helper_call_binding_into_guard_print_return() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           fn usage_message() -> String {
@@ -215,7 +215,7 @@ fn lowers_pure_text_helper_call_binding_into_guard_print_return() {
 fn lowers_pure_struct_helper_call_binding_into_branch_print_return() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           struct ExitSummary {

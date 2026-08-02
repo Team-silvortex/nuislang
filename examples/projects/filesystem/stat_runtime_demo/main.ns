@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_stat_mtime_ns(path_handle: i64) -> i64;
   extern "c" fn host_stat_ctime_ns(path_handle: i64) -> i64;
   extern "c" fn host_stat_mode(path_handle: i64) -> i64;

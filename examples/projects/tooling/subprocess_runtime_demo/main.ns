@@ -1,6 +1,6 @@
 use cpu StdCliContracts;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_subprocess_spawn(program_handle: i64, argv_handle: i64, env_handle: i64) -> i64;
   extern "c" fn host_subprocess_signal(process_handle: i64, signal: i64) -> i64;
   extern "c" fn host_subprocess_join(process_handle: i64) -> i64;

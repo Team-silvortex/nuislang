@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use nuis_semantics::model::{AstExpr, NirBinaryOp, NirExpr};
 
 use crate::frontend::{i64_type, lower_expr, ref_type};
@@ -17,9 +19,9 @@ pub(super) fn lower_text_call(
     } = context;
     match callee {
         "deserialize_text_equals" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "deserialize_text_equals(...) is currently only allowed inside `mod cpu <unit>`"
+                    "deserialize_text_equals(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -76,9 +78,9 @@ pub(super) fn lower_text_call(
             }))
         }
         "deserialize_text_starts_with" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "deserialize_text_starts_with(...) is currently only allowed inside `mod cpu <unit>`"
+                    "deserialize_text_starts_with(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -135,9 +137,9 @@ pub(super) fn lower_text_call(
             }))
         }
         "deserialize_text_contains" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "deserialize_text_contains(...) is currently only allowed inside `mod cpu <unit>`"
+                    "deserialize_text_contains(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -194,9 +196,9 @@ pub(super) fn lower_text_call(
             }))
         }
         "deserialize_text_ends_with" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "deserialize_text_ends_with(...) is currently only allowed inside `mod cpu <unit>`"
+                    "deserialize_text_ends_with(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }

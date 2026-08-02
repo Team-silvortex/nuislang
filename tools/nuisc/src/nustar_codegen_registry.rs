@@ -95,7 +95,7 @@ mod tests {
         let manifests =
             crate::registry::load_all_manifests(Path::new(NUSTAR_REGISTRY_ROOT)).unwrap();
         let registries = assemble_codegen_registries(&manifests).unwrap();
-        for module in ["cpu", "data", "kernel", "network", "shader"] {
+        for module in ["cffi", "cpu", "data", "kernel", "network", "shader"] {
             assert!(
                 registries.yir.lookup(module).is_some(),
                 "missing semantic registration for {module}"

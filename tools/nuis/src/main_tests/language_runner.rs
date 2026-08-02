@@ -257,7 +257,7 @@ fn language_benchmark_runner_times_out_end_to_end() {
     fs::write(
         &input,
         r#"
-mod cpu Main {
+mod cffi Main {
   extern "c" fn usleep(usec: i64) -> i32;
 
   benchmark("slow_async", measure_iters=1, timeout_ms=25) async fn slow_async() -> i64 {
@@ -420,7 +420,7 @@ fn language_test_runner_times_out_end_to_end() {
     fs::write(
         &input,
         r#"
-mod cpu Main {
+mod cffi Main {
   extern "c" fn usleep(usec: i64) -> i32;
 
   test("slow_async", timeout_ms=25) async fn slow_async() -> i64 {

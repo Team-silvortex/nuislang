@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use nuis_semantics::model::{AstExpr, NirExpr, NirResultFamily, NirResultStage};
 
 use super::super::{
@@ -87,9 +89,9 @@ pub(super) fn lower_shader_profile_builtin_call(
             let [unit, base, delta] = args else {
                 return Err("shader_profile_color_seed(...) expects 3 args".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "shader_profile_color_seed(...) is currently only allowed inside `mod cpu <unit>`"
+                    "shader_profile_color_seed(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -124,9 +126,9 @@ pub(super) fn lower_shader_profile_builtin_call(
             let [unit, delta, scale, base] = args else {
                 return Err("shader_profile_speed_seed(...) expects 4 args".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "shader_profile_speed_seed(...) is currently only allowed inside `mod cpu <unit>`"
+                    "shader_profile_speed_seed(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -170,9 +172,9 @@ pub(super) fn lower_shader_profile_builtin_call(
             let [unit, base, delta] = args else {
                 return Err("shader_profile_radius_seed(...) expects 3 args".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "shader_profile_radius_seed(...) is currently only allowed inside `mod cpu <unit>`"
+                    "shader_profile_radius_seed(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -204,14 +206,14 @@ pub(super) fn lower_shader_profile_builtin_call(
             }
         }
         "shader_profile_packet" | "shader_profile_panel_packet" | "nova_panel_packet" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
                     if callee == "shader_profile_panel_packet" {
-                        "shader_profile_panel_packet(...) is currently only allowed inside `mod cpu <unit>`"
+                        "shader_profile_panel_packet(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                     } else if callee == "nova_panel_packet" {
-                        "nova_panel_packet(...) is currently only allowed inside `mod cpu <unit>`"
+                        "nova_panel_packet(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                     } else {
-                        "shader_profile_packet(...) is currently only allowed inside `mod cpu <unit>`"
+                        "shader_profile_packet(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                     }
                     .to_owned(),
                 );

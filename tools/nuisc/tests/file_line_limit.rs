@@ -110,7 +110,12 @@ fn visit_files(root: &Path, dir: &Path, files: &mut Vec<PathBuf>) {
         let entry = entry.unwrap_or_else(|err| panic!("failed to read directory entry: {err}"));
         let path = entry.path();
         let rel = path.strip_prefix(root).unwrap_or(&path);
-        if rel.starts_with(".git") || rel.starts_with("target") {
+        if rel.starts_with(".git")
+            || rel.starts_with("target")
+            || rel
+                .components()
+                .any(|component| component.as_os_str() == ".nuis")
+        {
             continue;
         }
         if path.is_dir() {

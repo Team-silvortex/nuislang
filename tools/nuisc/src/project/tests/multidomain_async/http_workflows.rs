@@ -6,7 +6,7 @@ fn validates_http_status_recv_with_stream_handle_variable() {
         r#"
         use network NetworkUnit;
 
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_tcp_stream(
             remote_port: i64,
             connect_timeout_ms: i64
@@ -68,7 +68,7 @@ fn validates_http_status_recv_through_stream_helper_workflow() {
         r#"
         use network NetworkUnit;
 
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_tcp_stream(
             remote_port: i64,
             connect_timeout_ms: i64
@@ -180,7 +180,7 @@ fn validates_service_lane_helper_workflow() {
         r#"
         use network NetworkUnit;
 
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_tcp_listener(
             local_port: i64,
             read_timeout_ms: i64,
@@ -309,7 +309,7 @@ fn validates_httpish_header_session_helper_workflow() {
         r#"
         use network NetworkUnit;
 
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_tcp_stream(
             remote_port: i64,
             connect_timeout_ms: i64

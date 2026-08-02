@@ -84,7 +84,7 @@ fn lowers_match_expression_with_shared_borrow_lifecycle_and_shared_suffix() {
 fn lowers_nested_pure_helper_call_chain_into_branch_print_return() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           struct ExitSummary {
@@ -151,7 +151,7 @@ fn lowers_nested_pure_helper_call_chain_into_branch_print_return() {
 fn lowers_nested_pure_helper_param_passthrough_into_branch_print_return() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           struct ExitSummary {

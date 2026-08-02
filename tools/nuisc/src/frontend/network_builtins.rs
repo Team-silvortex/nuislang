@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use std::collections::BTreeMap;
 
 use nuis_semantics::model::{
@@ -38,9 +40,9 @@ pub(super) fn lower_network_builtin_call(
             let [unit] = args else {
                 return Err("network_profile_bind_core(...) expects 1 arg".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "network_profile_bind_core(...) is currently only allowed inside `mod cpu <unit>`"
+                    "network_profile_bind_core(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -55,9 +57,9 @@ pub(super) fn lower_network_builtin_call(
             let [unit] = args else {
                 return Err("network_profile_endpoint_kind(...) expects 1 arg".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "network_profile_endpoint_kind(...) is currently only allowed inside `mod cpu <unit>`"
+                    "network_profile_endpoint_kind(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -73,9 +75,9 @@ pub(super) fn lower_network_builtin_call(
             let [unit] = args else {
                 return Err("network_profile_transport_family(...) expects 1 arg".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "network_profile_transport_family(...) is currently only allowed inside `mod cpu <unit>`"
+                    "network_profile_transport_family(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -91,9 +93,9 @@ pub(super) fn lower_network_builtin_call(
             let [unit] = args else {
                 return Err("network_profile_local_port(...) expects 1 arg".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "network_profile_local_port(...) is currently only allowed inside `mod cpu <unit>`"
+                    "network_profile_local_port(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -108,9 +110,9 @@ pub(super) fn lower_network_builtin_call(
             let [unit] = args else {
                 return Err("network_profile_remote_port(...) expects 1 arg".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "network_profile_remote_port(...) is currently only allowed inside `mod cpu <unit>`"
+                    "network_profile_remote_port(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -126,9 +128,9 @@ pub(super) fn lower_network_builtin_call(
             let [unit] = args else {
                 return Err("network_profile_connect_timeout(...) expects 1 arg".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "network_profile_connect_timeout(...) is currently only allowed inside `mod cpu <unit>`"
+                    "network_profile_connect_timeout(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -144,9 +146,9 @@ pub(super) fn lower_network_builtin_call(
             let [unit] = args else {
                 return Err("network_profile_read_timeout(...) expects 1 arg".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "network_profile_read_timeout(...) is currently only allowed inside `mod cpu <unit>`"
+                    "network_profile_read_timeout(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -162,9 +164,9 @@ pub(super) fn lower_network_builtin_call(
             let [unit] = args else {
                 return Err("network_profile_write_timeout(...) expects 1 arg".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "network_profile_write_timeout(...) is currently only allowed inside `mod cpu <unit>`"
+                    "network_profile_write_timeout(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -180,9 +182,9 @@ pub(super) fn lower_network_builtin_call(
             let [unit] = args else {
                 return Err("network_profile_timeout_budget(...) expects 1 arg".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "network_profile_timeout_budget(...) is currently only allowed inside `mod cpu <unit>`"
+                    "network_profile_timeout_budget(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -198,9 +200,9 @@ pub(super) fn lower_network_builtin_call(
             let [unit] = args else {
                 return Err("network_profile_retry_budget(...) expects 1 arg".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "network_profile_retry_budget(...) is currently only allowed inside `mod cpu <unit>`"
+                    "network_profile_retry_budget(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -216,9 +218,9 @@ pub(super) fn lower_network_builtin_call(
             let [unit] = args else {
                 return Err("network_profile_stream_window(...) expects 1 arg".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "network_profile_stream_window(...) is currently only allowed inside `mod cpu <unit>`"
+                    "network_profile_stream_window(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -234,9 +236,9 @@ pub(super) fn lower_network_builtin_call(
             let [unit] = args else {
                 return Err("network_profile_recv_window(...) expects 1 arg".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "network_profile_recv_window(...) is currently only allowed inside `mod cpu <unit>`"
+                    "network_profile_recv_window(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -252,9 +254,9 @@ pub(super) fn lower_network_builtin_call(
             let [unit] = args else {
                 return Err("network_profile_send_window(...) expects 1 arg".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "network_profile_send_window(...) is currently only allowed inside `mod cpu <unit>`"
+                    "network_profile_send_window(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -270,9 +272,9 @@ pub(super) fn lower_network_builtin_call(
             let [unit] = args else {
                 return Err("network_profile_protocol_kind(...) expects 1 arg".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "network_profile_protocol_kind(...) is currently only allowed inside `mod cpu <unit>`"
+                    "network_profile_protocol_kind(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -288,9 +290,9 @@ pub(super) fn lower_network_builtin_call(
             let [unit] = args else {
                 return Err("network_profile_protocol_version(...) expects 1 arg".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "network_profile_protocol_version(...) is currently only allowed inside `mod cpu <unit>`"
+                    "network_profile_protocol_version(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -306,9 +308,9 @@ pub(super) fn lower_network_builtin_call(
             let [unit] = args else {
                 return Err("network_profile_protocol_header_bytes(...) expects 1 arg".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "network_profile_protocol_header_bytes(...) is currently only allowed inside `mod cpu <unit>`"
+                    "network_profile_protocol_header_bytes(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }

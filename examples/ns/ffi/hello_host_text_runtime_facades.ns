@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" @host_symbol("text.len") fn text_len(text_handle: i64) -> i64;
   extern "c" @host_symbol("text.concat") fn text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" @host_symbol("text.concat_len") fn text_concat_len(lhs_handle: i64, rhs_handle: i64) -> i64;

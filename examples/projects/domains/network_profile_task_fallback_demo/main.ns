@@ -1,7 +1,7 @@
 use cpu NetworkTaskAsyncShapes;
 use network NetworkUnit;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_argv_count() -> i64;
 
   struct NetworkProfileSummary {

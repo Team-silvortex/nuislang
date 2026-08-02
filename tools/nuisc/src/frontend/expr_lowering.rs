@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::binary_lowering::{lower_binary_expr_with_async, BinaryLoweringInput};
@@ -252,9 +254,9 @@ fn lower_expr_with_context(input: ExprLoweringInput<'_>) -> Result<NirExpr, Stri
             )
         }
         AstExpr::Instantiate { domain, unit } => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(format!(
-                    "instantiate {} {} is only allowed inside `mod cpu <unit>` in the current frontend",
+                    "instantiate {} {} requires a host execution module (`mod cpu` or `mod cffi`) in the current frontend",
                     domain, unit
                 ));
             }

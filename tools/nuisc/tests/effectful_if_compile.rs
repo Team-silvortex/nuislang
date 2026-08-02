@@ -2,7 +2,7 @@
 fn lowers_nested_effectful_if_call_inside_selected_return_branch() {
     let artifacts = nuisc::pipeline::compile_source(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" @host_symbol("provider_worker.reply")
           fn host_provider_worker_reply(status: i64) -> i64;
 

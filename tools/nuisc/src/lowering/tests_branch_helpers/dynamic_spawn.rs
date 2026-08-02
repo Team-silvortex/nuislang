@@ -4,7 +4,7 @@ use super::*;
 fn lowers_dynamic_if_binding_by_selecting_spawn_args_before_spawn_task() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -51,7 +51,7 @@ fn lowers_dynamic_if_binding_by_selecting_spawn_args_before_spawn_task() {
 fn lowers_dynamic_match_binding_by_selecting_spawn_args_before_spawn_task() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -103,7 +103,7 @@ fn lowers_dynamic_match_binding_by_selecting_spawn_args_before_spawn_task() {
 fn lowers_dynamic_if_binding_chain_by_selecting_spawn_args_before_spawn_task() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -154,7 +154,7 @@ fn lowers_dynamic_if_binding_chain_by_selecting_spawn_args_before_spawn_task() {
 fn lowers_dynamic_match_binding_chain_by_selecting_spawn_args_before_spawn_task() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {

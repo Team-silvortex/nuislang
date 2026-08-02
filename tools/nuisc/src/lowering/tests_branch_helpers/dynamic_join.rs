@@ -4,7 +4,7 @@ use super::*;
 fn lowers_dynamic_if_return_by_selecting_spawn_input_before_join() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -56,7 +56,7 @@ fn lowers_dynamic_if_return_by_selecting_spawn_input_before_join() {
 fn lowers_dynamic_match_return_by_selecting_spawn_input_before_join() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -111,7 +111,7 @@ fn lowers_dynamic_match_return_by_selecting_spawn_input_before_join() {
 fn lowers_dynamic_if_return_by_selecting_thread_spawn_input_before_thread_join_result() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -169,7 +169,7 @@ fn lowers_dynamic_if_return_by_selecting_thread_spawn_input_before_thread_join_r
 fn lowers_dynamic_if_return_chain_by_selecting_thread_spawn_input_before_thread_join_result() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -231,7 +231,7 @@ fn lowers_dynamic_if_return_chain_by_selecting_thread_spawn_input_before_thread_
 fn lowers_dynamic_if_return_by_selecting_thread_spawn_input_before_thread_join() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -283,7 +283,7 @@ fn lowers_dynamic_if_return_by_selecting_thread_spawn_input_before_thread_join()
 fn lowers_dynamic_match_return_by_selecting_thread_spawn_input_before_thread_join_result() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -344,7 +344,7 @@ fn lowers_dynamic_match_return_by_selecting_thread_spawn_input_before_thread_joi
 fn lowers_dynamic_match_return_chain_by_selecting_thread_spawn_input_before_thread_join_result() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {

@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_speed_curve(value: i64) -> i64;
 
   fn main() {

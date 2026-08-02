@@ -1,6 +1,6 @@
 use cpu StdCliContracts;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_diag_label(message_handle: i64) -> i64;
   extern "c" fn host_diag_span(start: i64, end: i64) -> i64;
   extern "c" fn host_diag_emit(label_handle: i64, span_handle: i64, severity: i64) -> i64;

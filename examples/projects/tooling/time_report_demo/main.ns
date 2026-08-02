@@ -2,7 +2,7 @@ use cpu StdIoContracts;
 use cpu StdTextContracts;
 use cpu StdTimeContracts;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_wall_time_ns() -> i64;
   extern "c" fn host_monotonic_time_ns() -> i64;
   extern "c" fn host_sleep_ns(duration_ns: i64) -> i64;

@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_home_dir_handle() -> i64;
   extern "c" fn host_home_dir_len() -> i64;
   extern "c" fn host_config_dir_handle() -> i64;

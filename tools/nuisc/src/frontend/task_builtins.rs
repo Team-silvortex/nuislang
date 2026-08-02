@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use std::collections::BTreeMap;
 
 use nuis_semantics::model::{AstExpr, NirExpr, NirResultFamily, NirStructDef, NirTypeRef};
@@ -49,9 +51,10 @@ pub(super) fn lower_task_builtin_call(
     }
     let expr = match callee {
         "spawn" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "spawn(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                    "spawn(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
                 );
             }
             let [call] = args else {
@@ -107,9 +110,9 @@ pub(super) fn lower_task_builtin_call(
             }
         }
         "thread_spawn" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "thread_spawn(...) is currently only allowed inside `mod cpu <unit>`"
+                    "thread_spawn(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -167,9 +170,10 @@ pub(super) fn lower_task_builtin_call(
             }
         }
         "join" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "join(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                    "join(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
                 );
             }
             let [task] = args else {
@@ -180,9 +184,10 @@ pub(super) fn lower_task_builtin_call(
             NirExpr::CpuJoin(Box::new(lowered))
         }
         "cancel" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "cancel(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                    "cancel(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
                 );
             }
             let [task] = args else {
@@ -193,9 +198,10 @@ pub(super) fn lower_task_builtin_call(
             NirExpr::CpuCancel(Box::new(lowered))
         }
         "join_result" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "join_result(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                    "join_result(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
                 );
             }
             let [task] = args else {
@@ -206,9 +212,10 @@ pub(super) fn lower_task_builtin_call(
             NirExpr::CpuJoinResult(Box::new(lowered))
         }
         "thread_join" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "thread_join(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                    "thread_join(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
                 );
             }
             let [thread] = args else {
@@ -219,9 +226,9 @@ pub(super) fn lower_task_builtin_call(
             NirExpr::CpuThreadJoin(Box::new(lowered))
         }
         "thread_join_result" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "thread_join_result(...) is currently only allowed inside `mod cpu <unit>`"
+                    "thread_join_result(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -239,9 +246,10 @@ pub(super) fn lower_task_builtin_call(
             NirExpr::CpuThreadJoinResult(Box::new(lowered))
         }
         "mutex_new" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "mutex_new(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                    "mutex_new(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
                 );
             }
             let [value] = args else {
@@ -263,9 +271,10 @@ pub(super) fn lower_task_builtin_call(
             NirExpr::CpuMutexNew(Box::new(lowered))
         }
         "mutex_lock" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "mutex_lock(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                    "mutex_lock(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
                 );
             }
             let [mutex] = args else {
@@ -276,9 +285,9 @@ pub(super) fn lower_task_builtin_call(
             NirExpr::CpuMutexLock(Box::new(lowered))
         }
         "mutex_unlock" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "mutex_unlock(...) is currently only allowed inside `mod cpu <unit>`"
+                    "mutex_unlock(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -290,9 +299,10 @@ pub(super) fn lower_task_builtin_call(
             NirExpr::CpuMutexUnlock(Box::new(lowered))
         }
         "mutex_value" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "mutex_value(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                    "mutex_value(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
                 );
             }
             let [guard] = args else {
@@ -363,9 +373,10 @@ pub(super) fn lower_task_builtin_call(
             build: |expr| NirExpr::CpuTaskValue(Box::new(expr)),
         })?,
         "timeout" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "timeout(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                    "timeout(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
                 );
             }
             let [task, limit] = args else {
@@ -388,9 +399,10 @@ pub(super) fn lower_task_builtin_call(
             }
         }
         "ready_after" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "ready_after(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                    "ready_after(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
                 );
             }
             let [task, delay] = args else {

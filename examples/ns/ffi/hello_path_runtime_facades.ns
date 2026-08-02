@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" @host_symbol("path.join_len") fn path_join_len(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" @host_symbol("path.is_absolute") fn path_is_absolute(path_handle: i64) -> i64;
   extern "c" @host_symbol("path.basename") fn path_basename(path_handle: i64) -> i64;

@@ -138,7 +138,7 @@ fn lowers_try_result_variant_payload_guard_return_survivor() {
 fn lowers_dynamic_try_result_continuation_as_result_level_select() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           enum Error {

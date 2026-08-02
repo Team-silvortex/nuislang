@@ -1,6 +1,6 @@
 use network NetworkUnit;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_argv_count() -> i64;
   extern "c" fn host_network_close(handle: i64) -> i64;
   extern "c" fn host_network_send_probe(

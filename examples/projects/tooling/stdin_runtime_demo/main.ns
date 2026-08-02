@@ -1,6 +1,6 @@
 use cpu StdIoContracts;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_stdin_read(buffer_handle: i64, len: i64) -> i64;
 
   struct StdinProjectSummary {

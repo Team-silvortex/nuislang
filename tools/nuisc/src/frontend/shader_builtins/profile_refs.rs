@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use nuis_semantics::model::{AstExpr, NirExpr};
 
 pub(super) fn lower_shader_profile_unit_ref(
@@ -63,9 +65,9 @@ fn profile_unit_arg(
     let [unit] = args else {
         return Err(format!("{callee}(...) expects 1 arg"));
     };
-    if current_domain != "cpu" {
+    if !is_host_execution_domain(current_domain) {
         return Err(format!(
-            "{callee}(...) is currently only allowed inside `mod cpu <unit>`"
+            "{callee}(...) requires a host execution module (`mod cpu` or `mod cffi`)"
         ));
     }
     let AstExpr::Text(unit) = unit else {

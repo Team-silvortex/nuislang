@@ -262,7 +262,7 @@ fn rejects_test_function_outside_cpu_domain() {
     )
     .unwrap_err();
 
-    assert!(error.contains("only supported in `mod cpu`"));
+    assert!(error.contains("requires a host execution module"));
 }
 
 #[test]

@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use std::collections::BTreeSet;
 
 use nuis_semantics::model::{
@@ -193,7 +195,7 @@ pub(crate) fn validate_export_annotations(module: &AstModule) -> Result<(), Stri
         let Some(export_name) = export_name else {
             continue;
         };
-        if module.domain != "cpu" {
+        if !is_host_execution_domain(&module.domain) {
             return Err(format!(
                 "function `{}::{}` can only use `@export(name = \"...\")` inside `mod cpu` in the current MVP",
                 module.unit, function.name
@@ -337,7 +339,7 @@ pub(crate) fn validate_host_symbol_bridge_annotations(module: &AstModule) -> Res
                 function.name, logical_symbol
             ));
         }
-        if module.domain != "cpu" {
+        if !is_host_execution_domain(&module.domain) {
             return Err(format!(
                 "function `{}::{}` can only use `@host_symbol(\"{}\")` inside `mod cpu` in the current MVP; prefer `extern \"c\" @host_symbol(...) fn ...;` for the stable host-boundary form",
                 module.unit, function.name, logical_symbol
@@ -415,7 +417,7 @@ fn validate_extern_host_symbol(
             function.name, logical_symbol
         ));
     }
-    if module.domain != "cpu" {
+    if !is_host_execution_domain(&module.domain) {
         return Err(format!(
             "extern function `{}::{}` can only use `@host_symbol(\"{}\")` inside `mod cpu` in the current MVP",
             module.unit, function.name, logical_symbol

@@ -4,7 +4,7 @@ use super::*;
 fn lowers_dynamic_if_timeout_task_binding_into_shared_result_observer_suffix() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -73,7 +73,7 @@ fn lowers_dynamic_if_timeout_task_binding_into_shared_result_observer_suffix() {
 fn lowers_dynamic_match_timeout_task_binding_into_shared_result_observer_suffix() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -147,7 +147,7 @@ fn lowers_dynamic_match_timeout_task_binding_into_shared_result_observer_suffix(
 fn lowers_dynamic_if_timeout_task_binding_into_shared_result_observer_and_pure_suffix() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -224,7 +224,7 @@ fn lowers_dynamic_if_timeout_task_binding_into_shared_result_observer_and_pure_s
 fn lowers_dynamic_match_timeout_task_binding_into_shared_result_observer_and_pure_suffix() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -307,7 +307,7 @@ fn lowers_dynamic_match_timeout_task_binding_into_shared_result_observer_and_pur
 fn lowers_dynamic_if_return_by_selecting_timeout_spawn_input_before_join_result() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -359,7 +359,7 @@ fn lowers_dynamic_if_return_by_selecting_timeout_spawn_input_before_join_result(
 fn lowers_dynamic_match_return_by_selecting_timeout_spawn_input_before_join_result() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -414,7 +414,7 @@ fn lowers_dynamic_match_return_by_selecting_timeout_spawn_input_before_join_resu
 fn lowers_dynamic_if_return_chain_by_selecting_timeout_spawn_input_before_join_result() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -470,7 +470,7 @@ fn lowers_dynamic_if_return_chain_by_selecting_timeout_spawn_input_before_join_r
 fn lowers_dynamic_match_return_chain_by_selecting_timeout_spawn_input_before_join_result() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {

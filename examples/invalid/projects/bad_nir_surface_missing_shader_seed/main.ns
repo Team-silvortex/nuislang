@@ -8,7 +8,7 @@ extern "nurs" interface HostRenderCurves {
   fn mix_tick(base: i64, tick: i64) -> i64;
 }
 
-mod cpu Main {
+mod cffi Main {
   struct RenderControls {
     color: i64,
     speed: i64,

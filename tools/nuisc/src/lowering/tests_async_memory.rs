@@ -419,7 +419,7 @@ fn lowers_bytes_and_subbytes_backed_buffer_access_sequence() {
 fn sequences_network_session_packet_staging_memory_lifecycle() {
     let mut module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_tcp_stream(
             remote_port: i64,
             connect_timeout_ms: i64

@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" @host_symbol("provider_worker.open")
   fn host_provider_worker_open(provider_key: i64, capability_hash: i64) -> i64;
   extern "c" @host_symbol("provider_worker.receive")

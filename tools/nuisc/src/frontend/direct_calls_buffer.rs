@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use nuis_semantics::model::{AstExpr, NirExpr};
 
 use crate::frontend::{i64_type, lower_expr, named_type, ref_type};
@@ -17,9 +19,9 @@ pub(super) fn lower_buffer_call(
     } = context;
     match callee {
         "bytes_len" | "drop_bytes" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(format!(
-                    "{callee}(...) is currently only allowed inside `mod cpu <unit>`"
+                    "{callee}(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                 ));
             }
             let [bytes] = args else {
@@ -40,9 +42,10 @@ pub(super) fn lower_buffer_call(
             }))
         }
         "copy_bytes" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "copy_bytes(...) is currently only allowed inside `mod cpu <unit>`".to_owned(),
+                    "copy_bytes(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
                 );
             }
             let [buffer] = args else {
@@ -59,9 +62,9 @@ pub(super) fn lower_buffer_call(
             Ok(Some(NirExpr::CopyBufferOwned(Box::new(lowered))))
         }
         "buffer_find_byte" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "buffer_find_byte(...) is currently only allowed inside `mod cpu <unit>`"
+                    "buffer_find_byte(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -113,9 +116,9 @@ pub(super) fn lower_buffer_call(
             }))
         }
         "buffer_find_text" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "buffer_find_text(...) is currently only allowed inside `mod cpu <unit>`"
+                    "buffer_find_text(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -167,9 +170,9 @@ pub(super) fn lower_buffer_call(
             }))
         }
         "buffer_find_line_end" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "buffer_find_line_end(...) is currently only allowed inside `mod cpu <unit>`"
+                    "buffer_find_line_end(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -212,9 +215,9 @@ pub(super) fn lower_buffer_call(
             }))
         }
         "buffer_trim_line_end" => {
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "buffer_trim_line_end(...) is currently only allowed inside `mod cpu <unit>`"
+                    "buffer_trim_line_end(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }

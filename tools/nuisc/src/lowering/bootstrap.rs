@@ -36,10 +36,32 @@ pub(super) fn dispatch_nustar_lowering(
 }
 
 fn bootstrap_lowering_provider(entry: &str) -> Option<&'static dyn BootstrapLoweringProvider> {
+    static CFFI_PROVIDER: CffiBootstrapLoweringProvider = CffiBootstrapLoweringProvider;
     static CPU_PROVIDER: CpuBootstrapLoweringProvider = CpuBootstrapLoweringProvider;
-    [(&CPU_PROVIDER as &dyn BootstrapLoweringProvider)]
-        .into_iter()
-        .find(|provider| provider.lowering_entry() == entry)
+    [
+        (&CFFI_PROVIDER as &dyn BootstrapLoweringProvider),
+        (&CPU_PROVIDER as &dyn BootstrapLoweringProvider),
+    ]
+    .into_iter()
+    .find(|provider| provider.lowering_entry() == entry)
+}
+
+struct CffiBootstrapLoweringProvider;
+
+impl BootstrapLoweringProvider for CffiBootstrapLoweringProvider {
+    fn lowering_entry(&self) -> &'static str {
+        "cffi.yir.lowering.v1"
+    }
+
+    fn lower(
+        &self,
+        module: &NirModule,
+        target_config: Option<&LoweringTargetConfig>,
+    ) -> Result<YirModule, String> {
+        // The CFFI package owns the source boundary while CPU remains the
+        // registered host object-code provider during the bootstrap phase.
+        lower_nir_to_yir_builtin_cpu_with_target(module, target_config)
+    }
 }
 
 struct CpuBootstrapLoweringProvider;
@@ -76,9 +98,9 @@ pub(super) fn lower_nir_to_yir_builtin_cpu_with_registry(
     target_config: Option<&LoweringTargetConfig>,
     branch_action_registry: &ModRegistry,
 ) -> Result<YirModule, String> {
-    if module.domain != "cpu" {
+    if !crate::frontend::is_host_execution_domain(&module.domain) {
         return Err(format!(
-            "minimal nuisc lowering currently only supports `mod cpu`, found `{}`",
+            "minimal nuisc host lowering supports `mod cpu` and `mod cffi`, found `{}`",
             module.domain
         ));
     }
@@ -293,7 +315,7 @@ fn validate_lowering_target(
         return Ok(());
     };
     crate::registry::validate_manifest_abi(manifest, &target_config.abi)?;
-    if module.domain == "cpu" {
+    if crate::frontend::is_host_execution_domain(&module.domain) {
         let registered = crate::registry::registered_abi_target(manifest, &target_config.abi)?;
         if registered.machine_arch != target_config.machine_arch
             || registered.machine_os != target_config.machine_os

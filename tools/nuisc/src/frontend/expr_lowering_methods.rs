@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use std::collections::BTreeMap;
 
 use nuis_semantics::model::AstTypeRef;
@@ -96,9 +98,9 @@ pub(super) fn lower_method_call_with_async(
                 })?;
             }
             if signature.is_extern {
-                if current_domain != "cpu" {
+                if !is_host_execution_domain(current_domain) {
                     return Err(format!(
-                                "extern method `{signature_key}` is currently only allowed inside `mod cpu <unit>`"
+                                "extern method `{signature_key}` requires a host execution module (`mod cpu` or `mod cffi`)"
                             ));
                 }
                 let lowered_args = lowered_args

@@ -6,7 +6,7 @@ pub(in crate::project::rendering) fn selected_lowering_target_for_domain(
     registered_lowering_targets: &[String],
 ) -> Result<Option<String>, String> {
     match domain {
-        "cpu" => {
+        "cpu" | "cffi" => {
             crate::aot::resolve_cpu_build_target_from_abi(Path::new("nustar-packages"), abi)?;
             Ok(Some("llvm".to_owned()))
         }

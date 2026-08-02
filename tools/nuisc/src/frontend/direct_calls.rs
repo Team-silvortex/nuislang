@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use std::collections::BTreeMap;
 
 use nuis_semantics::model::{AstExpr, NirExpr, NirStructDef, NirTypeRef};
@@ -218,9 +220,9 @@ fn lower_named_call(input: NamedCallLoweringInput<'_>) -> Result<Option<NirExpr>
         }
     }
     if signature.is_extern {
-        if current_domain != "cpu" {
+        if !is_host_execution_domain(current_domain) {
             return Err(format!(
-                "extern call `{callee}` is currently only allowed inside `mod cpu <unit>`"
+                "extern call `{callee}` requires a host execution module (`mod cpu` or `mod cffi`)"
             ));
         }
         let lowered_args = lowered_args

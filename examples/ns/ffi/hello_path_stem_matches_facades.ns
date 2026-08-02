@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_path_stem(path_handle: i64) -> i64;
   extern "c" fn host_path_extension(path_handle: i64) -> i64;
   extern "c" fn host_path_stem_matches(path_handle: i64, name_handle: i64) -> i64;

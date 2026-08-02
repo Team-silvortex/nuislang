@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use nuis_semantics::model::{
     AstAttribute, AstAttributeArg, AstAttributeValue, AstExpr, AstFunction, AstModule, AstStmt,
 };
@@ -10,7 +12,7 @@ struct RewriteStats {
 
 pub(super) fn rewrite_text_handle_helpers(module: &AstModule) -> AstModule {
     let mut rewritten = module.clone();
-    if rewritten.domain != "cpu" {
+    if !is_host_execution_domain(&rewritten.domain) {
         return rewritten;
     }
     rewritten.functions = rewritten

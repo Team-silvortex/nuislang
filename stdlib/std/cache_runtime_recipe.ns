@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_cache_open(name_handle: i64) -> i64;
   extern "c" fn host_cache_lookup(cache_handle: i64, key_handle: i64) -> i64;
   extern "c" fn host_cache_store(cache_handle: i64, key_handle: i64, value_handle: i64) -> i64;

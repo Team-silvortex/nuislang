@@ -1,7 +1,7 @@
 use cpu StdPkgCore;
 use cpu StdPkgOps;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_argv_count() -> i64;
 
   async fn work(seed: i64) -> i64 {

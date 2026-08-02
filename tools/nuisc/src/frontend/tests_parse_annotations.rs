@@ -677,7 +677,7 @@ fn lowers_struct_and_field_annotations_into_nir() {
 fn parses_extern_host_symbol_bridge_into_ast() {
     let ast = parse_nuis_ast(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" @host_symbol("network.open_tcp") fn open_tcp(local_port: i64, remote_port: i64) -> i64;
         }
         "#,
@@ -700,7 +700,7 @@ fn parses_pub_extern_items_into_ast() {
         pub extern "c" interface Clock {
           fn now() -> i64;
         }
-        mod cpu Main {
+        mod cffi Main {
           fn main() -> i64 {
             return 0;
           }
@@ -723,7 +723,7 @@ fn parses_pub_extern_items_into_ast() {
 fn lowers_extern_host_symbol_bridge_into_nir_signature() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" @host_symbol("network.open_tcp") fn open_tcp(local_port: i64, remote_port: i64) -> i64;
 
           fn main() -> i64 {
@@ -760,7 +760,7 @@ fn lowers_extern_host_symbol_bridge_into_nir_signature() {
 fn lowers_non_network_extern_host_symbol_bridges_into_nir_signatures() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" @host_symbol("file.open") fn open_file(path_handle: i64, flags: i64) -> i64;
           extern "c" @host_symbol("path.join_len") fn join_len(lhs_handle: i64, rhs_handle: i64) -> i64;
 
@@ -800,7 +800,7 @@ fn lowers_non_network_extern_host_symbol_bridges_into_nir_signatures() {
 fn lowers_output_host_symbol_extern_bridge_into_nir_signature() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" @host_symbol("stdout.write") fn stdout_write(text_handle: i64) -> i64;
 
           fn main() -> i64 {
@@ -938,7 +938,7 @@ fn rejects_ref_parameter_in_extern_function_signature() {
     let error = parse_nuis_module(
         r#"
         extern "c" fn host_take_ptr(head: ref Node) -> i64;
-        mod cpu Main {
+        mod cffi Main {
           fn main() -> i64 {
             return 0;
           }
@@ -958,7 +958,7 @@ fn rejects_ref_return_in_extern_interface_signature() {
         extern "c" interface Nodes {
           fn head() -> ref Node;
         }
-        mod cpu Main {
+        mod cffi Main {
           fn main() -> i64 {
             return 0;
           }
@@ -976,7 +976,7 @@ fn accepts_ref_buffer_parameter_in_extern_function_signature() {
     let module = parse_nuis_module(
         r#"
         extern "c" fn host_take_buffer(buffer: ref Buffer, len: i64) -> i64;
-        mod cpu Main {
+        mod cffi Main {
           fn main() -> i64 {
             let backing: ref Buffer = alloc_buffer(8, 0);
             return host_take_buffer(backing, 8);
@@ -1024,7 +1024,7 @@ fn accepts_ref_buffer_parameter_in_extern_function_signature() {
 fn helper_pub_externs_can_cross_module_but_private_ones_cannot() {
     let main_ast = parse_nuis_ast(
         r#"
-        use cpu Helper;
+        use cffi Helper;
         mod cpu Main {
           fn main() -> i64 {
             return host_clock() + hidden_clock();
@@ -1037,7 +1037,7 @@ fn helper_pub_externs_can_cross_module_but_private_ones_cannot() {
         r#"
         pub extern "c" fn host_clock() -> i64;
         extern "c" fn hidden_clock() -> i64;
-        mod cpu Helper {
+        mod cffi Helper {
           fn main() -> i64 {
             return 0;
           }

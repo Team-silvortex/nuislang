@@ -274,7 +274,7 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
 "#
         .trim_start(),
         r#"
-            mod cpu Main {
+            mod cffi Main {
               extern "c" fn host_file_open(path_handle: i64, flags: i64) -> i64;
               extern "c" fn host_file_read(file_handle: i64, buffer_handle: i64, len: i64) -> i64;
               extern "c" fn host_file_write(file_handle: i64, text_handle: i64) -> i64;
@@ -520,7 +520,7 @@ modules = ["main.ns"]
 "#
         .trim_start(),
         r#"
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_monotonic_time_ns() -> i64;
   extern "c" fn host_sleep_ns(duration_ns: i64) -> i64;
 

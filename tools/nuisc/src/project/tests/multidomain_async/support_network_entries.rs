@@ -26,7 +26,7 @@ pub(super) fn network_host_transport_entry() -> &'static str {
     r#"
     use network NetworkUnit;
 
-    mod cpu Main {
+    mod cffi Main {
       extern "c" fn host_network_send_probe(
         stream_window: i64,
         send_window: i64,
@@ -74,7 +74,7 @@ pub(super) fn network_host_transport_missing_routing_entry() -> &'static str {
     r#"
     use network NetworkUnit;
 
-    mod cpu Main {
+    mod cffi Main {
       extern "c" fn host_network_send_probe(
         stream_window: i64,
         send_window: i64,
@@ -103,7 +103,7 @@ pub(super) fn network_owned_udp_open_entry() -> &'static str {
     r#"
     use network NetworkUnit;
 
-    mod cpu Main {
+    mod cffi Main {
       extern "c" fn host_network_open_udp_datagram(
         local_port: i64,
         remote_port: i64
@@ -144,7 +144,7 @@ pub(super) fn network_owned_udp_open_missing_routing_entry() -> &'static str {
     r#"
     use network NetworkUnit;
 
-    mod cpu Main {
+    mod cffi Main {
       extern "c" fn host_network_open_udp_datagram(
         local_port: i64,
         remote_port: i64
@@ -171,7 +171,7 @@ pub(super) fn network_accept_owned_without_listener_source_entry() -> &'static s
     r#"
     use network NetworkUnit;
 
-    mod cpu Main {
+    mod cffi Main {
       extern "c" fn host_network_accept_owned(
         listener_handle: i64,
         read_timeout_ms: i64,
@@ -203,7 +203,7 @@ pub(super) fn network_close_owned_without_owned_handle_source_entry() -> &'stati
     r#"
     use network NetworkUnit;
 
-    mod cpu Main {
+    mod cffi Main {
       extern "c" fn host_network_close_owned(handle: i64) -> i64;
 
       fn main() -> i64 {
@@ -227,7 +227,7 @@ pub(super) fn network_close_owned_after_shadowing_handle_entry() -> &'static str
     r#"
     use network NetworkUnit;
 
-    mod cpu Main {
+    mod cffi Main {
       extern "c" fn host_network_open_tcp_stream(
         remote_port: i64,
         connect_timeout_ms: i64
@@ -257,7 +257,7 @@ pub(super) fn network_close_owned_after_while_shadowing_handle_entry() -> &'stat
     r#"
     use network NetworkUnit;
 
-    mod cpu Main {
+    mod cffi Main {
       extern "c" fn host_network_open_tcp_stream(
         remote_port: i64,
         connect_timeout_ms: i64
@@ -290,7 +290,7 @@ pub(super) fn network_close_owned_through_helper_parameter_entry() -> &'static s
     r#"
     use network NetworkUnit;
 
-    mod cpu Main {
+    mod cffi Main {
       extern "c" fn host_network_open_tcp_stream(
         remote_port: i64,
         connect_timeout_ms: i64
@@ -323,7 +323,7 @@ pub(super) fn network_close_owned_through_spawned_helper_parameter_entry() -> &'
     r#"
     use network NetworkUnit;
 
-    mod cpu Main {
+    mod cffi Main {
       extern "c" fn host_network_open_tcp_stream(
         remote_port: i64,
         connect_timeout_ms: i64
@@ -361,7 +361,7 @@ pub(super) fn network_close_owned_through_helper_returned_handle_entry() -> &'st
     r#"
     use network NetworkUnit;
 
-    mod cpu Main {
+    mod cffi Main {
       extern "c" fn host_network_open_tcp_stream(
         remote_port: i64,
         connect_timeout_ms: i64
@@ -394,7 +394,7 @@ pub(super) fn network_close_owned_through_nested_helper_returned_handle_entry() 
     r#"
     use network NetworkUnit;
 
-    mod cpu Main {
+    mod cffi Main {
       extern "c" fn host_network_open_tcp_stream(
         remote_port: i64,
         connect_timeout_ms: i64
@@ -432,7 +432,7 @@ pub(super) fn network_close_owned_through_network_result_helper_returned_handle_
     r#"
     use network NetworkUnit;
 
-    mod cpu Main {
+    mod cffi Main {
       extern "c" fn host_network_open_tcp_stream(
         remote_port: i64,
         connect_timeout_ms: i64
@@ -469,7 +469,7 @@ pub(super) fn network_close_owned_through_recursive_helper_returned_handle_entry
     r#"
     use network NetworkUnit;
 
-    mod cpu Main {
+    mod cffi Main {
       extern "c" fn host_network_open_tcp_stream(
         remote_port: i64,
         connect_timeout_ms: i64
@@ -506,7 +506,7 @@ pub(super) fn network_close_owned_through_timed_and_cancelled_spawned_helper_par
     r#"
     use network NetworkUnit;
 
-    mod cpu Main {
+    mod cffi Main {
       extern "c" fn host_network_open_tcp_stream(
         remote_port: i64,
         connect_timeout_ms: i64
@@ -544,7 +544,7 @@ pub(super) fn network_close_owned_through_datagram_helper_returned_handle_entry(
     r#"
     use network NetworkUnit;
 
-    mod cpu Main {
+    mod cffi Main {
       extern "c" fn host_network_open_udp_datagram(
         local_port: i64,
         remote_port: i64

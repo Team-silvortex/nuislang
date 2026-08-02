@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use nuis_semantics::model::{AstExpr, NirExpr, NirResultFamily, NirResultStage};
 
 use super::super::{
@@ -24,9 +26,9 @@ pub(super) fn lower_kernel_profile_builtin_call(
             let [unit] = args else {
                 return Err("kernel_profile_bind_core(...) expects 1 arg".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "kernel_profile_bind_core(...) is currently only allowed inside `mod cpu <unit>`"
+                    "kernel_profile_bind_core(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -41,9 +43,9 @@ pub(super) fn lower_kernel_profile_builtin_call(
             let [unit] = args else {
                 return Err("kernel_profile_queue_depth(...) expects 1 arg".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "kernel_profile_queue_depth(...) is currently only allowed inside `mod cpu <unit>`"
+                    "kernel_profile_queue_depth(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -58,9 +60,9 @@ pub(super) fn lower_kernel_profile_builtin_call(
             let [unit] = args else {
                 return Err("kernel_profile_batch_lanes(...) expects 1 arg".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "kernel_profile_batch_lanes(...) is currently only allowed inside `mod cpu <unit>`"
+                    "kernel_profile_batch_lanes(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }

@@ -164,6 +164,7 @@ fn json_escape(value: &str) -> String {
 pub fn resolve_project_abi(project: &LoadedProject) -> Result<ProjectAbiResolution, String> {
     if !project.manifest.abi_requirements.is_empty() {
         let mut requirements = project.manifest.abi_requirements.clone();
+        inherit_cffi_host_abi(project, &mut requirements)?;
         requirements.sort_by(|lhs, rhs| lhs.domain.cmp(&rhs.domain));
         return Ok(ProjectAbiResolution {
             requirements,
@@ -186,6 +187,31 @@ pub fn resolve_project_abi(project: &LoadedProject) -> Result<ProjectAbiResoluti
     })
 }
 
+fn inherit_cffi_host_abi(
+    project: &LoadedProject,
+    requirements: &mut Vec<ProjectAbiRequirement>,
+) -> Result<(), String> {
+    let domains = collect_project_domains(&project.manifest, &project.modules)?;
+    if !domains.contains("cffi") || requirements.iter().any(|item| item.domain == "cffi") {
+        return Ok(());
+    }
+    let abi = requirements
+        .iter()
+        .find(|item| item.domain == "cpu")
+        .map(|item| item.abi.clone())
+        .or_else(|| {
+            crate::registry::load_manifest_for_domain(Path::new("nustar-packages"), "cffi")
+                .ok()
+                .and_then(|manifest| recommend_abi_profile_for_host(&manifest))
+        })
+        .ok_or_else(|| "cffi domain has no registered host ABI profile".to_owned())?;
+    requirements.push(ProjectAbiRequirement {
+        domain: "cffi".to_owned(),
+        abi,
+    });
+    Ok(())
+}
+
 pub fn validate_project_abi_selections(
     project: &LoadedProject,
     resolution: &ProjectAbiResolution,
@@ -197,7 +223,12 @@ pub fn validate_project_abi_selections(
         .map(|item| {
             let mut issues = Vec::new();
             let mut abi_registered = false;
-            if resolution.explicit && !project_domains.contains(&item.domain) {
+            let cpu_is_cffi_host_abi =
+                item.domain == "cpu" && project_domains.contains("cffi");
+            if resolution.explicit
+                && !project_domains.contains(&item.domain)
+                && !cpu_is_cffi_host_abi
+            {
                 issues.push(ProjectAbiIssue {
                     kind: ProjectAbiIssueKind::UnusedExplicitDomainAbi,
                     message: format!(

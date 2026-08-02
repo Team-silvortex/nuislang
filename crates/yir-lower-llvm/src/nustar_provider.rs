@@ -10,6 +10,10 @@ pub struct StaticNustarLlvmEmitterProvider {
 
 const STATIC_NUSTAR_LLVM_EMITTER_PROVIDERS: &[StaticNustarLlvmEmitterProvider] = &[
     StaticNustarLlvmEmitterProvider {
+        lowering_entry: "cffi.yir.lowering.v1",
+        register_branch_effect_emitters: register_cpu_branch_effect_llvm_emitters,
+    },
+    StaticNustarLlvmEmitterProvider {
         lowering_entry: "cpu.yir.lowering.v1",
         register_branch_effect_emitters: register_cpu_branch_effect_llvm_emitters,
     },
@@ -43,7 +47,11 @@ mod tests {
 
     #[test]
     fn cpu_provider_aliases_install_the_same_emitters() {
-        for entry in ["cpu.yir.lowering.v1", "cpu.aarch64.yir.lowering.v1"] {
+        for entry in [
+            "cffi.yir.lowering.v1",
+            "cpu.yir.lowering.v1",
+            "cpu.aarch64.yir.lowering.v1",
+        ] {
             let mut registry = BranchEffectLlvmEmitterRegistry::new();
             assert!(register_static_nustar_branch_effect_emitters(
                 entry,

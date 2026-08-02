@@ -4,7 +4,7 @@ use super::*;
 fn lowers_dynamic_if_task_result_binding_into_shared_observer_suffix() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -75,7 +75,7 @@ fn lowers_dynamic_if_task_result_binding_into_shared_observer_suffix() {
 fn lowers_dynamic_match_task_result_binding_into_shared_observer_suffix() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -151,7 +151,7 @@ fn lowers_dynamic_match_task_result_binding_into_shared_observer_suffix() {
 fn lowers_dynamic_if_task_result_binding_into_shared_observer_and_pure_suffix() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -221,7 +221,7 @@ fn lowers_dynamic_if_task_result_binding_into_shared_observer_and_pure_suffix() 
 fn lowers_dynamic_match_task_result_binding_into_shared_observer_and_pure_suffix() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -296,7 +296,7 @@ fn lowers_dynamic_match_task_result_binding_into_shared_observer_and_pure_suffix
 fn lowers_dynamic_if_task_result_binding_into_two_stage_shared_pure_suffix() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {
@@ -361,7 +361,7 @@ fn lowers_dynamic_if_task_result_binding_into_two_stage_shared_pure_suffix() {
 fn lowers_dynamic_match_task_result_binding_into_two_stage_shared_pure_suffix() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
 
           async fn ping(seed: i64) -> i64 {

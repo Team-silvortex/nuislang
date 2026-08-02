@@ -131,13 +131,33 @@ Short rule:
 
 ## Current Beta Reading
 
-This contract is not a claim that the repository already has a finished
-self-owned linker, complete CFFI Nustar, or native Nuis OS loader.
+The repository now has a registered `official.cffi` Nustar and a strict source
+boundary. Checked-in Nuis declarations using `extern` live under `mod cffi`;
+placing an extern declaration in `mod cpu` is rejected rather than treated as a
+legacy escape hatch. The CFFI manifest owns the accepted ABI profiles,
+host-symbol surfaces, exact signatures, and signature hashes.
 
-It is a design constraint for current work:
+```nuis
+mod cffi Main {
+  extern "c" fn host_stdout_write(text_handle: i64) -> i64;
+
+  fn main() -> i64 {
+    return host_stdout_write(71);
+  }
+}
+```
+
+This is still a bootstrap bridge, not a claim that the repository has a
+finished self-owned linker or native Nuis OS loader. `cffi.yir.lowering.v1`
+currently delegates host object-code production to the registered CPU/LLVM
+provider. A CFFI project therefore reports both `official.cffi` and
+`official.cpu`: CFFI owns source admission and ABI policy, while CPU owns the
+current host machine-code realization.
+
+Current constraints remain:
 
 * standard-library host facades should stay narrow and explicit
-* CFFI signatures should move toward whitelist registration
+* CFFI signatures must remain exact-whitelist and hash registered
 * Nsld native-object lanes should carry lifecycle metadata
 * YIR and GLM should remain the semantic review layer
 * host-native formats should remain useful wrappers, not the internal truth

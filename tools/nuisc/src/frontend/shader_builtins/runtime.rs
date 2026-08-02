@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use std::collections::BTreeMap;
 
 use nuis_semantics::model::{AstExpr, NirExpr, NirTypeRef};
@@ -450,9 +452,9 @@ pub(super) fn lower_shader_runtime_builtin_call(
             let [unit, pass, packet] = args else {
                 return Err("shader_profile_draw_instanced(...) expects 3 args".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "shader_profile_draw_instanced(...) is currently only allowed inside `mod cpu <unit>`"
+                    "shader_profile_draw_instanced(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }
@@ -489,9 +491,9 @@ pub(super) fn lower_shader_runtime_builtin_call(
             let [unit, packet] = args else {
                 return Err("shader_profile_render(...) expects 2 args".to_owned());
             };
-            if current_domain != "cpu" {
+            if !is_host_execution_domain(current_domain) {
                 return Err(
-                    "shader_profile_render(...) is currently only allowed inside `mod cpu <unit>`"
+                    "shader_profile_render(...) requires a host execution module (`mod cpu` or `mod cffi`)"
                         .to_owned(),
                 );
             }

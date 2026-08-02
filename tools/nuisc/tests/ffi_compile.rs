@@ -130,11 +130,11 @@ fn source_extern_is_registered(
 }
 
 #[test]
-fn source_host_ffi_facades_are_exactly_registered_by_cpu_nustar() {
+fn source_host_ffi_facades_are_wrapped_and_registered_by_cffi_nustar() {
     let workspace = Path::new("../..");
     let manifest =
-        nuisc::registry::load_manifest(&workspace.join("nustar-packages"), "official.cpu")
-            .expect("official cpu manifest should load");
+        nuisc::registry::load_manifest(&workspace.join("nustar-packages"), "official.cffi")
+            .expect("official cffi manifest should load");
     let view = HostFfiRegistryView::from_manifest(&manifest);
 
     let mut declarations = collect_source_extern_signatures(&workspace.join("stdlib"));
@@ -145,6 +145,14 @@ fn source_host_ffi_facades_are_exactly_registered_by_cpu_nustar() {
     let mut unique = BTreeSet::new();
     let mut missing = BTreeMap::new();
     for declaration in declarations {
+        let source = fs::read_to_string(&declaration.path).unwrap_or_else(|error| {
+            panic!("should read `{}`: {error}", declaration.path.display())
+        });
+        assert!(
+            source.contains("mod cffi "),
+            "source C FFI declaration must be wrapped by mod cffi: {}",
+            declaration.path.display()
+        );
         if !unique.insert((
             declaration.abi.clone(),
             declaration.symbol.clone(),
@@ -170,7 +178,7 @@ fn source_host_ffi_facades_are_exactly_registered_by_cpu_nustar() {
 
     assert!(
         missing.is_empty(),
-        "source C FFI declarations must be exact-registered by official.cpu; missing: {missing:#?}"
+        "source C FFI declarations must be exact-registered by official.cffi; missing: {missing:#?}"
     );
 }
 
@@ -207,6 +215,43 @@ fn lowers_i32_ffi_frontdoor_source_to_i32_extern_call() {
         .llvm_ir
         .contains("declare i32 @host_i32_curve(i32)"));
     assert!(artifacts.llvm_ir.contains("call i32 @host_i32_curve(i32"));
+    assert!(artifacts
+        .loaded_nustar
+        .contains(&"official.cffi".to_owned()));
+    assert!(artifacts.loaded_nustar.contains(&"official.cpu".to_owned()));
+}
+
+#[test]
+fn rejects_extern_declarations_outside_cffi_module() {
+    let path = std::env::temp_dir().join(format!(
+        "nuis_cpu_ffi_boundary_{}_{}.ns",
+        std::process::id(),
+        "host_i32_curve"
+    ));
+    fs::write(
+        &path,
+        r#"
+        mod cpu Main {
+          extern "c" fn host_speed_curve(value: i64) -> i64;
+
+          fn main() -> i64 {
+            return host_speed_curve(7);
+          }
+        }
+        "#,
+    )
+    .expect("should write temporary CPU FFI source");
+
+    let error = nuisc::pipeline::compile_source_path(&path)
+        .err()
+        .expect("extern declarations in mod cpu must be rejected");
+    let _ = fs::remove_file(&path);
+
+    assert!(
+        error.contains("extern declarations must be wrapped"),
+        "unexpected error: {error}"
+    );
+    assert!(error.contains("mod cffi"), "unexpected error: {error}");
 }
 
 #[test]
@@ -219,7 +264,7 @@ fn rejects_c_ffi_signatures_outside_nustar_allowlist() {
     fs::write(
         &path,
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_f64_curve(value: f64) -> f64;
 
           fn main() -> f64 {
@@ -249,7 +294,7 @@ fn rejects_registered_c_ffi_symbol_with_wrong_signature() {
     fs::write(
         &path,
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_i32_curve(value: f64) -> f64;
 
           fn main() -> f64 {
@@ -279,7 +324,7 @@ fn rejects_registered_host_runtime_symbol_with_wide_family_signature() {
     fs::write(
         &path,
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count(seed: i64) -> i64;
 
           fn main() -> i64 {
@@ -309,7 +354,7 @@ fn rejects_registered_network_probe_symbol_with_wide_family_signature() {
     fs::write(
         &path,
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_connect_probe(port: i64) -> i64;
 
           fn main() -> i64 {
@@ -339,7 +384,7 @@ fn rejects_registered_stdout_facade_symbol_with_wide_family_signature() {
     fs::write(
         &path,
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_stdout_write(lhs: i64, rhs: i64) -> i64;
 
           fn main() -> i64 {
@@ -369,7 +414,7 @@ fn rejects_registered_libc_symbol_with_wide_family_signature() {
     fs::write(
         &path,
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "libc" fn usleep(usec: i64) -> i32;
 
           fn main() -> i32 {
@@ -399,7 +444,7 @@ fn rejects_unregistered_libc_symbol_even_with_known_text_signature() {
     fs::write(
         &path,
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "libc" fn strlen_like(message: String) -> i64;
 
           fn main() -> i64 {
@@ -429,7 +474,7 @@ fn accepts_hash_registered_c_ffi_symbol_signature() {
     fs::write(
         &path,
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_hashed_curve(value: i64) -> i64;
 
           fn main() -> i64 {
@@ -455,7 +500,7 @@ fn rejects_hash_registered_c_ffi_symbol_with_wrong_signature() {
     fs::write(
         &path,
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_hashed_curve(value: f64) -> f64;
 
           fn main() -> f64 {

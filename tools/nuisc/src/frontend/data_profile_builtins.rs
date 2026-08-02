@@ -1,3 +1,5 @@
+use crate::frontend::is_host_execution_domain;
+
 use std::collections::BTreeMap;
 
 use nuis_semantics::model::{AstExpr, NirExpr, NirStructDef, NirTypeRef};
@@ -165,9 +167,9 @@ fn require_cpu_unit_text(
     current_domain: &str,
     unit: &AstExpr,
 ) -> Result<String, String> {
-    if current_domain != "cpu" {
+    if !is_host_execution_domain(current_domain) {
         return Err(format!(
-            "{context} is currently only allowed inside `mod cpu <unit>`"
+            "{context} requires a host execution module (`mod cpu` or `mod cffi`)"
         ));
     }
     let AstExpr::Text(unit) = unit else {

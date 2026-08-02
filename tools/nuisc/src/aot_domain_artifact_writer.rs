@@ -437,7 +437,7 @@ mod tests {
         let table =
             fs::read_to_string(output_dir.join("nuis.domain.code-asset-contributions.toml"))
                 .unwrap();
-        assert!(table.contains("contribution_count = 7"));
+        assert!(table.contains("contribution_count = 9"));
         assert!(table.contains("owner_package_id = \"official.shader\""));
         assert!(table.contains("asset_id = \"shader.vulkan.copy-u32.spirv\""));
         assert!(table.contains("asset_id = \"shader.vulkan.add-u32.spirv\""));
@@ -687,7 +687,7 @@ kernel.target_config target kernel0 x86_64 cuda 1 ptx\n";
             fs::read_to_string(output_dir.join("nuis.domain.code-asset-contributions.toml"))
                 .unwrap();
         assert!(table.contains("protocol = \"nuis-domain-code-asset-contribution-table-v1\""));
-        assert!(table.contains("contribution_count = 3"));
+        assert!(table.contains("contribution_count = 4"));
         assert!(table.contains("owner_package_id = \"official.kernel\""));
         assert!(table.contains("owner_package_id = \"official.shader\""));
         assert!(table.contains("path = \"nuis.domain.kernel.cuda.ptx\""));

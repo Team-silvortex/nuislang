@@ -5,6 +5,7 @@ members = [
     "crates/nuis-semantics",
     "crates/strategy-ai",
     "crates/yir-core",
+    "crates/yir-domain-cffi",
     "crates/yir-domain-cpu",
     "crates/yir-domain-kernel",
     "crates/yir-domain-network",

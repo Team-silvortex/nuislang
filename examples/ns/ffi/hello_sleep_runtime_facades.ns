@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_sleep_ns(duration_ns: i64) -> i64;
 
   struct SleepFacadeSummary {

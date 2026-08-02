@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" @host_symbol("process.id") fn process_id() -> i64;
   extern "c" @host_symbol("process.status") fn process_status() -> i64;
   extern "c" @host_symbol("process.exit_code") fn process_exit_code(status: i64) -> i64;

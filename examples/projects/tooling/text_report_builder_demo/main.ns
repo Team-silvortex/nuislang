@@ -1,6 +1,6 @@
 use cpu StdTextContracts;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_text_concat(lhs_handle: i64, rhs_handle: i64) -> i64;
   extern "c" fn host_text_len(text_handle: i64) -> i64;
   extern "c" fn host_text_line_count(text_handle: i64) -> i64;

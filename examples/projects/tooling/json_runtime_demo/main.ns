@@ -1,6 +1,6 @@
 use cpu StdTextContracts;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_json_pair_len(key_handle: i64, value_handle: i64) -> i64;
   extern "c" fn host_json_array_len(item_count: i64) -> i64;
   extern "c" fn host_json_object_len(field_count: i64) -> i64;

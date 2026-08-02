@@ -1,4 +1,4 @@
-mod cpu Main {
+mod cffi Main {
   extern "c" @host_symbol("argv.count") fn argv_count() -> i64;
   extern "c" @host_symbol("argv.at") fn argv_at(index: i64) -> i64;
   extern "c" @host_symbol("file.open") fn file_open(path_handle: i64, flags: i64) -> i64;

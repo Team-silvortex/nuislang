@@ -5,7 +5,7 @@ use crate::frontend::parse_nuis_module;
 fn lowers_let_bound_host_call_chain_into_guard_host_call_return() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
           extern "c" fn host_stdout_write(text_handle: i64) -> i64;
           extern "c" fn host_stdout_flush() -> i64;
@@ -43,7 +43,7 @@ fn lowers_let_bound_host_call_chain_into_guard_host_call_return() {
 fn lowers_host_call_chain_write_flush_exit_code_as_computed_guard_return() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
           extern "c" fn host_stdout_write(text_handle: i64) -> i64;
           extern "c" fn host_stdout_flush() -> i64;
@@ -88,7 +88,7 @@ fn lowers_host_call_chain_write_flush_exit_code_as_computed_guard_return() {
 fn lowers_diag_host_call_chain_into_guard_host_call_return() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
           extern "c" fn host_diag_label(message_handle: i64) -> i64;
           extern "c" fn host_diag_span(start: i64, end: i64) -> i64;
@@ -133,7 +133,7 @@ fn lowers_diag_host_call_chain_into_guard_host_call_return() {
 fn lowers_two_way_host_call_branches_into_branch_host_call_return() {
     let module = parse_nuis_module(
         r#"
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_argv_count() -> i64;
           extern "c" fn host_stdout_write(text_handle: i64) -> i64;
           extern "c" fn host_stdout_flush() -> i64;

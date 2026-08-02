@@ -6,7 +6,7 @@ fn validates_async_loop_owned_network_session_step_workflow() {
         r#"
         use network NetworkUnit;
 
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_tcp_stream(
             remote_port: i64,
             connect_timeout_ms: i64
@@ -83,7 +83,7 @@ fn compiles_async_loop_owned_network_http_session_project() {
         r#"
         use network NetworkUnit;
 
-        mod cpu Main {
+        mod cffi Main {
           extern "c" fn host_network_open_tcp_stream(
             remote_port: i64,
             connect_timeout_ms: i64

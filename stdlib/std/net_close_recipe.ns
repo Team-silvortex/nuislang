@@ -1,6 +1,6 @@
 use network NetworkUnit;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_network_close(handle: i64) -> i64;
 
   struct NetCloseSummary {

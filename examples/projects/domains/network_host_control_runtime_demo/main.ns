@@ -1,6 +1,6 @@
 use network NetworkUnit;
 
-mod cpu Main {
+mod cffi Main {
   extern "c" fn host_network_connect_probe(
     local_port: i64,
     remote_port: i64,
