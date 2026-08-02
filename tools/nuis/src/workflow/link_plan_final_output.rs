@@ -121,6 +121,12 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         next_command: nsdb_replay.next_command.as_deref(),
         first_blocker: nsdb_replay.first_blocker.as_deref(),
     });
+    let provider_request_completion_capability =
+        super::link_plan_provider_request_completion::validated_provider_request_completion_capability(
+            &nsdb_replay.contract,
+            &nsdb_replay.status,
+            &nsdb_replay.provider_completions,
+        );
     let object_evidence = nsld_final_executable_output_object_evidence(plan);
     let object_package_summary = object_package_summary(&replay_vocabulary);
     let debugger_transcript = debugger_transcript_summary(&replay_vocabulary);
@@ -263,6 +269,7 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         debugger_cursor_lineage_provider_dispatch_identity_hash: debugger_cursor_lineage
             .provider_dispatch_identity_hash,
         provider_dispatch_identity_capability,
+        provider_request_completion_capability,
         debugger_cursor_lineage_first_blocker: debugger_cursor_lineage
             .first_blocker
             .map(str::to_owned),
@@ -423,15 +430,7 @@ fn nsld_final_executable_output_nsdb_replay(
         provider_completions: handoff
             .provider_completions()
             .iter()
-            .map(|completion| {
-                super::link_plan_final_output_summary::ProviderCompletionBoundarySummary {
-                    trace_id: completion.trace_id.clone(),
-                    provider_family: completion.provider_family.clone(),
-                    output_contract: completion.output_contract.clone(),
-                    output_evidence: completion.output_evidence.clone(),
-                    record_hash: completion.record_hash.clone(),
-                }
-            })
+            .map(super::link_plan_provider_completion_projection::boundary_completion)
             .collect(),
         command,
         next_action,

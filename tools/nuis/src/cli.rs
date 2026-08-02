@@ -7,9 +7,9 @@ use galaxy::parse_galaxy_args;
 pub use galaxy::GalaxyCommand;
 use support::{
     parse_bench_args, parse_build_args, parse_cache_status_args, parse_clean_cache_args,
-    parse_debug_resume_args, parse_optional_json_input, parse_prune_cache_args,
-    parse_release_check_args, parse_required_json_input, parse_required_json_input_output,
-    parse_test_args,
+    parse_debug_request_args, parse_debug_resume_args, parse_optional_json_input,
+    parse_prune_cache_args, parse_release_check_args, parse_required_json_input,
+    parse_required_json_input_output, parse_test_args,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -128,6 +128,11 @@ pub enum CommandKind {
         breakpoint_phase: Option<String>,
         breakpoint_entry: Option<String>,
         cursor_output: Option<PathBuf>,
+    },
+    DebugRequest {
+        input: PathBuf,
+        request_id: String,
+        json: bool,
     },
     DebugLineageRepair {
         input: PathBuf,
@@ -377,6 +382,14 @@ where
                 cursor_output: parsed.cursor_output,
             })
         }
+        "debug-request" => {
+            let parsed = parse_debug_request_args(&mut args)?;
+            Ok(CommandKind::DebugRequest {
+                input: parsed.input,
+                request_id: parsed.request_id,
+                json: parsed.json,
+            })
+        }
         "debug-lineage-repair" => {
             let (input, json) = parse_required_json_input(
                 &mut args,
@@ -441,7 +454,7 @@ where
         }),
         "galaxy" => parse_galaxy_args(args),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `debug-lineage-repair`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `debug-request`, `debug-lineage-repair`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
         )),
     }
 }

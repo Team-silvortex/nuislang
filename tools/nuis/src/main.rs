@@ -48,6 +48,7 @@ mod closure_summary_lineage_repair_json;
 mod closure_summary_provider_bundle;
 mod closure_summary_provider_completion;
 mod debug_lineage_repair_command;
+mod debug_request_command;
 mod debug_resume_command;
 mod dev_tensor;
 mod dev_tensor_data;
@@ -488,6 +489,11 @@ fn run() -> Result<(), String> {
             breakpoint_entry,
             cursor_output,
         )?,
+        cli::CommandKind::DebugRequest {
+            input,
+            request_id,
+            json,
+        } => debug_request_command::handle_debug_request(input, request_id, json)?,
         cli::CommandKind::DebugLineageRepair { input, json } => {
             debug_lineage_repair_command::handle_debug_lineage_repair(input, json)?
         }
@@ -649,6 +655,9 @@ fn print_help() {
     );
     println!(
         "    nuis debug-resume [--json] [--break-at TARGET | --break-phase PHASE --break-entry SYMBOL] [--save-cursor PATH] <artifact-output-dir|nuis.build.manifest.toml>"
+    );
+    println!(
+        "    nuis debug-request --request-id REQUEST [--json] <artifact-output-dir|nuis.build.manifest.toml>"
     );
     println!(
         "    nuis debug-lineage-repair [--json] <artifact-output-dir|nuis.build.manifest.toml>"

@@ -128,6 +128,11 @@ pub(super) fn assemble_provider_complete_final_image(
             && completion.request_completion_count == completion.completion_evidence_count
             && completion.request_completion_root_hash.starts_with("0x")
     }));
+    let request_completion_count = replay
+        .provider_completions
+        .iter()
+        .map(|completion| completion.request_completion_count)
+        .sum::<usize>();
     for completion in &replay.provider_completions {
         assert_provider_output_evidence_hash(output_dir, &completion.output_evidence);
     }
@@ -144,7 +149,15 @@ pub(super) fn assemble_provider_complete_final_image(
             && final_output_stdout.contains("\"completion_tokens\":\"provider-completion:0x")
             && final_output_stdout
                 .contains("\"glm_release_contract\":\"nuis-provider-glm-release-evidence-v1\"")
-            && final_output_stdout.contains("\"glm_release_tokens\":\"glm-release:0x"),
+            && final_output_stdout.contains("\"glm_release_tokens\":\"glm-release:0x")
+            && final_output_stdout.contains(
+                "\"request_completion_contract\":\"nuis-provider-request-completion-receipt-collection-v1\""
+            )
+            && final_output_stdout.contains("\"request_completions\":[{")
+            && final_output_stdout.contains(&format!(
+                "\"selected_set_hash\":\"{}\"",
+                executed.final_image_dispatch_selected_set_hash
+            )),
         "Nsld final output omitted verified provider completion evidence\n{final_output_stdout}"
     );
 
@@ -184,6 +197,21 @@ pub(super) fn assemble_provider_complete_final_image(
             && frontdoor_stdout.contains(
                 "\"nsld_final_executable_output_provider_dispatch_identity_projection_source\":\"final_output_provider_completion_dispatch_identity_hash\""
             )
+            && frontdoor_stdout.contains(
+                "\"nsld_final_executable_output_object_package_provider_request_completion_status\":\"verified\""
+            )
+            && frontdoor_stdout.contains(&format!(
+                "\"nsld_final_executable_output_object_package_provider_request_completion_receipt_count\":{request_completion_count}"
+            ))
+            && frontdoor_stdout.contains(
+                "\"nsld_final_executable_output_debugger_api_provider_request_completion_status\":\"verified\""
+            )
+            && frontdoor_stdout.contains(&format!(
+                "\"nsld_final_executable_output_debugger_api_provider_request_completion_receipt_count\":{request_completion_count}"
+            ))
+            && frontdoor_stdout.contains(
+                "\"nsld_final_executable_output_debugger_api_provider_request_completion_collections\":[{"
+            )
             && frontdoor_stdout.contains(&format!(
                 "\"nsld_final_executable_output_object_package_selected_provider_bundle_count\":{provider_dispatch_count}"
             ))
@@ -200,6 +228,15 @@ pub(super) fn assemble_provider_complete_final_image(
             )
             && frontdoor_stdout.contains(
                 "\"closure_summary_provider_dispatch_identity_projection_source\":\"final_output_provider_completion_dispatch_identity_hash\""
+            )
+            && frontdoor_stdout.contains(
+                "\"closure_summary_object_package_provider_request_completion_status\":\"verified\""
+            )
+            && frontdoor_stdout.contains(&format!(
+                "\"closure_summary_object_package_provider_request_completion_receipt_count\":{request_completion_count}"
+            ))
+            && frontdoor_stdout.contains(
+                "\"closure_summary_debugger_api_provider_request_completion_collections\":[{"
             ),
         "Nuis frontdoor omitted sealed final-image package/debugger replay projection\n{frontdoor_stdout}"
     );

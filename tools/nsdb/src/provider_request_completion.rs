@@ -3,7 +3,8 @@ use std::collections::BTreeSet;
 
 pub(crate) const REQUEST_COMPLETION_COLLECTION_CONTRACT: &str =
     "nuis-provider-request-completion-receipt-collection-v1";
-const REQUEST_COMPLETION_RECEIPT_CONTRACT: &str = "nuis-provider-request-completion-receipt-v1";
+pub(crate) const REQUEST_COMPLETION_RECEIPT_CONTRACT: &str =
+    "nuis-provider-request-completion-receipt-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProviderRequestCompletionReceipt {

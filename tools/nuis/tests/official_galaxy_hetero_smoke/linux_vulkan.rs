@@ -666,7 +666,98 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
                 "request_completion_{index}_selected_set_hash = \"{}\"",
                 completion.dispatch_selected_set_hash
             )));
+            assert!(frontdoor.contains(&format!("\"request_id\":\"{request_id}\"")));
+            assert!(frontdoor.contains(&format!("\"provider_family\":\"{family}\"")));
+            assert!(frontdoor.contains(&format!("\"dispatch_id\":\"{dispatch_id}\"")));
         }
+        assert!(frontdoor.contains(
+            "\"nsld_final_executable_output_object_package_provider_request_completion_receipt_count\":3"
+        ));
+        assert!(frontdoor.contains(
+            "\"closure_summary_debugger_api_provider_request_completion_receipt_count\":3"
+        ));
+
+        let request_id = "kernel.cuda.fan-out.copy-sum-u32";
+        let request_replay = run_nsdb(&[
+            "replay",
+            &output_dir_text,
+            "--request-id",
+            request_id,
+            "--json",
+        ]);
+        assert_success(&request_replay, "Nsdb CUDA request-addressable replay");
+        let request_replay_text = output_text(&request_replay);
+        for expected in [
+            "\"debugger_transcript_request_selector_contract\":\"nsdb-provider-request-replay-selector-v1\"",
+            "\"debugger_transcript_request_selector_status\":\"request-resolved\"",
+            "\"debugger_transcript_request_selector_ready\":true",
+            "\"debugger_transcript_request_id\":\"kernel.cuda.fan-out.copy-sum-u32\"",
+            "\"debugger_transcript_request_provider_family\":\"cuda:nvidia-gpu\"",
+            "\"debugger_transcript_request_dispatch_id\":\"dispatch0001\"",
+            "\"debugger_transcript_control_mode\":\"request\"",
+            "\"debugger_transcript_control_status\":\"request-selected\"",
+            "\"debugger_transcript_stop_reason\":\"request-selected\"",
+        ] {
+            assert!(
+                request_replay_text.contains(expected),
+                "request replay should contain `{expected}`\n{request_replay_text}"
+            );
+        }
+        assert!(request_replay_text.contains(&format!(
+            "\"debugger_transcript_request_selected_set_hash\":\"{}\"",
+            completion.dispatch_selected_set_hash
+        )));
+        for field in [
+            "debugger_transcript_request_completion_clock",
+            "debugger_transcript_request_output_hash",
+            "debugger_transcript_request_completion_token",
+            "debugger_transcript_selected_frame_id",
+        ] {
+            assert!(
+                request_replay_text.contains(&format!("\"{field}\":\"")),
+                "request replay should materialize `{field}`\n{request_replay_text}"
+            );
+        }
+
+        let nuis_request = run_nuis(&[
+            "debug-request",
+            &output_dir_text,
+            "--request-id",
+            request_id,
+            "--json",
+        ]);
+        assert_success(&nuis_request, "Nuis CUDA request debugger frontdoor");
+        let nuis_request_text = output_text(&nuis_request);
+        assert!(
+            nuis_request_text
+                .contains("\"debugger_transcript_request_selector_status\":\"request-resolved\"")
+                && nuis_request_text.contains(
+                    "\"debugger_transcript_request_provider_family\":\"cuda:nvidia-gpu\""
+                )
+                && nuis_request_text
+                    .contains("\"debugger_transcript_control_status\":\"request-selected\""),
+            "Nuis should preserve the typed Nsdb request selection\n{nuis_request_text}"
+        );
+
+        let missing = run_nsdb(&[
+            "replay",
+            &output_dir_text,
+            "--request-id",
+            "missing.request",
+            "--json",
+        ]);
+        assert_success(&missing, "Nsdb unknown request fail-closed replay");
+        let missing_text = output_text(&missing);
+        assert!(
+            missing_text
+                .contains("\"debugger_transcript_request_selector_status\":\"request-not-found\"")
+                && missing_text.contains("\"debugger_transcript_request_selector_ready\":false")
+                && missing_text
+                    .contains("\"debugger_transcript_control_status\":\"request-not-found\"")
+                && missing_text
+                    .contains("request-replay-selector:request-not-found:missing.request"),
+            "unknown requests must not fall back to whole-transcript replay\n{missing_text}"
+        );
     }
     assert!(
         frontdoor.contains("\"nsld_final_executable_output_nsdb_first_provider_family\":\"spirv:vulkan-gpu\"")

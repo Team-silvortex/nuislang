@@ -72,6 +72,20 @@ impl Default for CompiledCodeAssetSelectionEvidence {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(dead_code)]
+pub struct PayloadExecutionProviderRequestCompletion {
+    pub contract: String,
+    pub status: String,
+    pub request_id: String,
+    pub provider_family: String,
+    pub dispatch_id: String,
+    pub completion_clock: String,
+    pub output_hash: String,
+    pub completion_token: String,
+    pub selected_set_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)]
 pub struct PayloadExecutionProviderCompletion {
     pub trace_id: String,
     pub provider_family: String,
@@ -98,6 +112,7 @@ pub struct PayloadExecutionProviderCompletion {
     pub request_completion_status: String,
     pub request_completion_count: usize,
     pub request_completion_root_hash: String,
+    pub request_completions: Vec<PayloadExecutionProviderRequestCompletion>,
     pub dispatch_authority_contract: String,
     pub dispatch_authority_status: String,
     pub dispatch_table_hash: String,

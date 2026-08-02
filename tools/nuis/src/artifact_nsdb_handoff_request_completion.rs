@@ -5,7 +5,25 @@ const RECEIPT_CONTRACT: &str = "nuis-provider-request-completion-receipt-v1";
 
 #[derive(Clone)]
 pub(crate) struct PersistedRequestCompletionAudit {
+    pub(crate) contract: String,
+    pub(crate) status: String,
+    pub(crate) count: usize,
+    pub(crate) root_hash: String,
+    pub(crate) receipts: Vec<PersistedRequestCompletionReceipt>,
     pub(crate) validation_status: String,
+}
+
+#[derive(Clone)]
+pub(crate) struct PersistedRequestCompletionReceipt {
+    pub(crate) contract: String,
+    pub(crate) status: String,
+    pub(crate) request_id: String,
+    pub(crate) provider_family: String,
+    pub(crate) dispatch_id: String,
+    pub(crate) completion_clock: String,
+    pub(crate) output_hash: String,
+    pub(crate) completion_token: String,
+    pub(crate) selected_set_hash: String,
 }
 
 pub(crate) fn parse_and_append(
@@ -13,7 +31,14 @@ pub(crate) fn parse_and_append(
     record: &str,
 ) -> PersistedRequestCompletionAudit {
     if optional_field(record, "request_completion_contract").is_none() {
-        return audit("legacy-unavailable");
+        return audit(
+            "none",
+            "not-applicable",
+            0,
+            "none",
+            Vec::new(),
+            "legacy-unavailable",
+        );
     }
     let contract = field(record, "request_completion_contract");
     let status = field(record, "request_completion_status");
@@ -39,26 +64,24 @@ pub(crate) fn parse_and_append(
     } else {
         "mismatch"
     };
-    audit(validation_status)
+    audit(
+        &contract,
+        &status,
+        count,
+        &root_hash,
+        receipts,
+        validation_status,
+    )
 }
 
-#[derive(Clone)]
-struct Receipt {
-    contract: String,
-    status: String,
-    request_id: String,
-    provider_family: String,
-    dispatch_id: String,
-    completion_clock: String,
-    output_hash: String,
-    completion_token: String,
-    selected_set_hash: String,
-}
-
-fn parse_receipt_and_append(material: &mut String, record: &str, index: usize) -> Receipt {
+fn parse_receipt_and_append(
+    material: &mut String,
+    record: &str,
+    index: usize,
+) -> PersistedRequestCompletionReceipt {
     let prefix = format!("request_completion_{index}_");
     let value = |suffix| field(record, &format!("{prefix}{suffix}"));
-    let receipt = Receipt {
+    let receipt = PersistedRequestCompletionReceipt {
         contract: value("contract"),
         status: value("status"),
         request_id: value("request_id"),
@@ -84,7 +107,7 @@ fn parse_receipt_and_append(material: &mut String, record: &str, index: usize) -
     receipt
 }
 
-fn receipts_verified(receipts: &[Receipt]) -> bool {
+fn receipts_verified(receipts: &[PersistedRequestCompletionReceipt]) -> bool {
     let mut request_ids = BTreeSet::new();
     receipts.iter().all(|receipt| {
         receipt.contract == RECEIPT_CONTRACT
@@ -103,7 +126,7 @@ fn receipts_verified(receipts: &[Receipt]) -> bool {
     })
 }
 
-fn receipt_root_hash(receipts: &[Receipt]) -> String {
+fn receipt_root_hash(receipts: &[PersistedRequestCompletionReceipt]) -> String {
     let mut material = format!("{COLLECTION_CONTRACT}\n");
     for (index, receipt) in receipts.iter().enumerate() {
         material.push_str(&format!(
@@ -120,8 +143,20 @@ fn receipt_root_hash(receipts: &[Receipt]) -> String {
     fnv1a64_hex(material.as_bytes())
 }
 
-fn audit(validation_status: &str) -> PersistedRequestCompletionAudit {
+fn audit(
+    contract: &str,
+    status: &str,
+    count: usize,
+    root_hash: &str,
+    receipts: Vec<PersistedRequestCompletionReceipt>,
+    validation_status: &str,
+) -> PersistedRequestCompletionAudit {
     PersistedRequestCompletionAudit {
+        contract: contract.to_owned(),
+        status: status.to_owned(),
+        count,
+        root_hash: root_hash.to_owned(),
+        receipts,
         validation_status: validation_status.to_owned(),
     }
 }
@@ -171,7 +206,7 @@ mod tests {
 
     #[test]
     fn verifies_receipt_root_and_rejects_tampering() {
-        let receipt = Receipt {
+        let receipt = PersistedRequestCompletionReceipt {
             contract: RECEIPT_CONTRACT.to_owned(),
             status: "verified".to_owned(),
             request_id: "request.cuda".to_owned(),

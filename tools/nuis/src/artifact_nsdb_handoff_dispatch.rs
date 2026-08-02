@@ -1,4 +1,5 @@
 use crate::artifact_nsdb_handoff_integrity::record_hash;
+use crate::artifact_nsdb_handoff_request_completion::PersistedRequestCompletionAudit;
 use std::collections::BTreeSet;
 
 const AUTHORITY_CONTRACT: &str = "nuis-provider-completion-dispatch-authority-v1";
@@ -23,7 +24,7 @@ pub(crate) struct PersistedProviderCompletion {
     pub(crate) dispatch_runner_contract: String,
     pub(crate) dispatch_runner_adapter_contract: String,
     pub(crate) dispatch_runner_adapter_id: String,
-    pub(crate) request_completion_validation_status: String,
+    pub(crate) request_completion: PersistedRequestCompletionAudit,
     pub(crate) record_hash: String,
 }
 
@@ -69,7 +70,7 @@ pub(crate) fn dispatch_identity(
     }
     if completions.iter().any(|completion| {
         matches!(
-            completion.request_completion_validation_status.as_str(),
+            completion.request_completion.validation_status.as_str(),
             "mismatch" | "pre-seal-acquisition"
         ) || completion.dispatch_authority_contract != AUTHORITY_CONTRACT
             || completion.dispatch_authority_contract != first.dispatch_authority_contract
@@ -170,7 +171,7 @@ fn parse_completion(record: &str, digest_contract: &str) -> PersistedProviderCom
         dispatch_runner_contract,
         dispatch_runner_adapter_contract,
         dispatch_runner_adapter_id,
-        request_completion_validation_status: request_completion.validation_status,
+        request_completion,
         record_hash: record_hash(digest_contract, material.as_bytes())
             .unwrap_or_else(|| "none".to_owned()),
     }

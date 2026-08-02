@@ -1,6 +1,9 @@
 use super::{
     final_executable_output::{owned_package_summary_next_action, owned_package_summary_status},
-    reports::{NsldFinalExecutableOutputReport, NsldProviderCompletionSummary},
+    reports::{
+        NsldFinalExecutableOutputReport, NsldProviderCompletionSummary,
+        NsldProviderRequestCompletionSummary,
+    },
 };
 use std::path::Path;
 
@@ -100,6 +103,25 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
             code_asset_identity_set_count: completion.code_asset_identity_set_count,
             code_asset_identity_set_root_hash: completion.code_asset_identity_set_root_hash,
             compiled_code_asset_selection: completion.compiled_code_asset_selection,
+            request_completion_contract: completion.request_completion_contract,
+            request_completion_status: completion.request_completion_status,
+            request_completion_count: completion.request_completion_count,
+            request_completion_root_hash: completion.request_completion_root_hash,
+            request_completions: completion
+                .request_completions
+                .into_iter()
+                .map(|request| NsldProviderRequestCompletionSummary {
+                    contract: request.contract,
+                    status: request.status,
+                    request_id: request.request_id,
+                    provider_family: request.provider_family,
+                    dispatch_id: request.dispatch_id,
+                    completion_clock: request.completion_clock,
+                    output_hash: request.output_hash,
+                    completion_token: request.completion_token,
+                    selected_set_hash: request.selected_set_hash,
+                })
+                .collect(),
             record_hash: completion.record_hash,
         })
         .collect();

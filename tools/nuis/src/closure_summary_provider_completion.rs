@@ -23,6 +23,9 @@ pub(crate) struct ProviderCompletionRecordClosureMirror {
     pub(crate) provider_family: String,
     pub(crate) output_contract: String,
     pub(crate) output_evidence: String,
+    pub(crate) dispatch_selected_set_hash: String,
+    pub(crate) request_completion:
+        crate::workflow::ProviderRequestCompletionCollectionBoundarySummary,
     pub(crate) record_hash: String,
 }
 
@@ -69,6 +72,8 @@ impl ProviderCompletionClosureMirror {
                     provider_family: completion.provider_family.clone(),
                     output_contract: completion.output_contract.clone(),
                     output_evidence: completion.output_evidence.clone(),
+                    dispatch_selected_set_hash: completion.dispatch_selected_set_hash.clone(),
+                    request_completion: completion.request_completion.clone(),
                     record_hash: completion.record_hash.clone(),
                 })
                 .collect(),
@@ -86,11 +91,21 @@ pub(crate) fn provider_completion_json_fields(
                 .iter()
                 .map(|record| {
                     format!(
-                        "{{{},{},{},{},{}}}",
+                        "{{{},{},{},{},{},{},{}}}",
                         crate::json_field("trace_id", &record.trace_id),
                         crate::json_field("provider_family", &record.provider_family),
                         crate::json_field("output_contract", &record.output_contract),
                         crate::json_field("output_evidence", &record.output_evidence),
+                        crate::json_field(
+                            "dispatch_selected_set_hash",
+                            &record.dispatch_selected_set_hash,
+                        ),
+                        format!(
+                            "\"request_completion\":{}",
+                            crate::workflow::request_completion_collection_json(
+                                &record.request_completion,
+                            )
+                        ),
                         crate::json_field("record_hash", &record.record_hash),
                     )
                 })

@@ -119,6 +119,42 @@ pub(crate) fn provider_completion_records_json(report: &NsldFinalExecutableOutpu
                         .collect::<Vec<_>>()
                         .join(",")
                 ),
+                json_string_field(
+                    "request_completion_contract",
+                    &completion.request_completion_contract,
+                ),
+                json_string_field(
+                    "request_completion_status",
+                    &completion.request_completion_status,
+                ),
+                json_usize_field(
+                    "request_completion_count",
+                    completion.request_completion_count,
+                ),
+                json_string_field(
+                    "request_completion_root_hash",
+                    &completion.request_completion_root_hash,
+                ),
+                format!(
+                    "\"request_completions\":[{}]",
+                    completion
+                        .request_completions
+                        .iter()
+                        .map(|request| format!(
+                            "{{{},{},{},{},{},{},{},{},{}}}",
+                            json_string_field("contract", &request.contract),
+                            json_string_field("status", &request.status),
+                            json_string_field("request_id", &request.request_id),
+                            json_string_field("provider_family", &request.provider_family),
+                            json_string_field("dispatch_id", &request.dispatch_id),
+                            json_string_field("completion_clock", &request.completion_clock),
+                            json_string_field("output_hash", &request.output_hash),
+                            json_string_field("completion_token", &request.completion_token),
+                            json_string_field("selected_set_hash", &request.selected_set_hash),
+                        ))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                ),
                 json_string_field("record_hash", &completion.record_hash),
             ];
             format!("{{{}}}", fields.join(","))

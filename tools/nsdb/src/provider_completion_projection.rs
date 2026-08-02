@@ -1,4 +1,7 @@
-use crate::model::{NsdbPayloadExecutionEvent, PayloadExecutionProviderCompletion};
+use crate::model::{
+    NsdbPayloadExecutionEvent, PayloadExecutionProviderCompletion,
+    PayloadExecutionProviderRequestCompletion,
+};
 
 pub(crate) fn public_completion(
     event: &NsdbPayloadExecutionEvent,
@@ -33,6 +36,21 @@ pub(crate) fn public_completion(
         request_completion_status: requests.status.clone(),
         request_completion_count: requests.count,
         request_completion_root_hash: requests.root_hash.clone(),
+        request_completions: requests
+            .receipts
+            .iter()
+            .map(|receipt| PayloadExecutionProviderRequestCompletion {
+                contract: receipt.contract.clone(),
+                status: receipt.status.clone(),
+                request_id: receipt.request_id.clone(),
+                provider_family: receipt.provider_family.clone(),
+                dispatch_id: receipt.dispatch_id.clone(),
+                completion_clock: receipt.completion_clock.clone(),
+                output_hash: receipt.output_hash.clone(),
+                completion_token: receipt.completion_token.clone(),
+                selected_set_hash: receipt.selected_set_hash.clone(),
+            })
+            .collect(),
         dispatch_authority_contract: dispatch.contract.clone(),
         dispatch_authority_status: dispatch.status.clone(),
         dispatch_table_hash: dispatch.table_hash.clone(),

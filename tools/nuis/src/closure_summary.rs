@@ -29,6 +29,8 @@ pub(crate) struct FrontdoorClosureSummary {
         Option<crate::closure_summary_provider_bundle::ProviderBundleClosureMirror>,
     pub(crate) provider_dispatch_identity:
         Option<crate::closure_summary_dispatch_identity::ProviderDispatchIdentityClosureMirror>,
+    pub(crate) provider_request_completion:
+        Option<crate::workflow::ValidatedProviderRequestCompletionCapability>,
 }
 
 #[derive(Clone)]
@@ -173,6 +175,7 @@ impl FrontdoorClosureSummary {
             provider_completion: None,
             provider_bundle: None,
             provider_dispatch_identity: None,
+            provider_request_completion: None,
         }
     }
 
@@ -210,6 +213,7 @@ impl FrontdoorClosureSummary {
             provider_completion: None,
             provider_bundle: None,
             provider_dispatch_identity: None,
+            provider_request_completion: None,
         }
     }
 
@@ -278,6 +282,9 @@ impl FrontdoorClosureSummary {
                 provider_dispatch_identity: Some(
                     crate::closure_summary_dispatch_identity::ProviderDispatchIdentityClosureMirror::from_final_output(final_output),
                 ),
+                provider_request_completion: Some(
+                    final_output.provider_request_completion_capability.clone(),
+                ),
             };
         }
         if final_output.ready && !final_output.nsdb_replay_ready {
@@ -344,6 +351,9 @@ impl FrontdoorClosureSummary {
                 provider_dispatch_identity: Some(
                     crate::closure_summary_dispatch_identity::ProviderDispatchIdentityClosureMirror::from_final_output(final_output),
                 ),
+                provider_request_completion: Some(
+                    final_output.provider_request_completion_capability.clone(),
+                ),
             };
         }
         Self::from_nsld_next_action(source, action, command, reason)
@@ -389,6 +399,8 @@ impl FrontdoorClosureSummary {
         self.provider_dispatch_identity = Some(
             crate::closure_summary_dispatch_identity::ProviderDispatchIdentityClosureMirror::from_final_output(final_output),
         );
+        self.provider_request_completion =
+            Some(final_output.provider_request_completion_capability.clone());
         self
     }
 
@@ -442,6 +454,7 @@ impl FrontdoorClosureSummary {
             provider_completion: self.provider_completion,
             provider_bundle: self.provider_bundle,
             provider_dispatch_identity: self.provider_dispatch_identity,
+            provider_request_completion: self.provider_request_completion,
         }
     }
 
@@ -608,6 +621,16 @@ impl FrontdoorClosureSummary {
         fields.extend(
             crate::closure_summary_dispatch_identity::ProviderDispatchIdentityClosureMirror::json_fields(
                 self.provider_dispatch_identity.as_ref(),
+            ),
+        );
+        fields.extend(
+            crate::workflow::provider_request_completion_capability_json_fields(
+                self.provider_request_completion.as_ref(),
+                &[
+                    "closure_summary_object_package",
+                    "closure_summary_debugger_api",
+                ],
+                "closure_summary_provider_request_completion_projection_source",
             ),
         );
         fields.extend(

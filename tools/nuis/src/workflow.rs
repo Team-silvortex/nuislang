@@ -15,8 +15,11 @@ mod link_plan_final_output_replay_vocabulary_json;
 mod link_plan_final_output_summary;
 mod link_plan_json;
 mod link_plan_json_nsld_output;
+mod link_plan_provider_completion_projection;
 mod link_plan_provider_dispatch_identity;
 mod link_plan_provider_dispatch_identity_json;
+mod link_plan_provider_request_completion;
+mod link_plan_provider_request_completion_json;
 mod link_plan_tail;
 mod object_identity;
 mod render;
@@ -72,9 +75,16 @@ pub(crate) use link_plan_final_output_replay_vocabulary::FinalOutputReplayVocabu
 pub(crate) use link_plan_final_output_summary::NsldFinalExecutableOutputBoundarySummary;
 #[cfg(test)]
 pub(crate) use link_plan_final_output_summary::ProviderCompletionBoundarySummary;
+#[cfg(test)]
+pub(crate) use link_plan_final_output_summary::ProviderRequestCompletionBoundarySummary;
+pub(crate) use link_plan_final_output_summary::ProviderRequestCompletionCollectionBoundarySummary;
 pub(crate) use link_plan_json::append_workflow_link_plan_json_fields;
 #[cfg(test)]
 pub(crate) use link_plan_provider_dispatch_identity::ValidatedProviderDispatchIdentityCapability;
+pub(crate) use link_plan_provider_request_completion::ValidatedProviderRequestCompletionCapability;
+pub(crate) use link_plan_provider_request_completion_json::{
+    provider_request_completion_capability_json_fields, request_completion_collection_json,
+};
 pub(crate) use link_plan_tail::{
     nsld_final_executable_tail_summary, NsldFinalExecutableTailSummary,
 };

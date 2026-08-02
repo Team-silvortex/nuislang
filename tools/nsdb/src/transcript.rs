@@ -5,6 +5,7 @@ use crate::{
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct NsdbReplayControl {
+    pub(crate) request_id: Option<String>,
     pub(crate) frame_selector: Option<String>,
     pub(crate) breakpoint_selector: Option<String>,
     pub(crate) breakpoint_phase: Option<String>,
@@ -23,6 +24,7 @@ pub(crate) struct NsdbReplayTranscript {
     pub(crate) provider_dispatch_table_hash: String,
     pub(crate) provider_dispatch_selected_set_hash: String,
     pub(crate) provider_dispatch_identity_hash: Option<String>,
+    pub(crate) request_selection: crate::request_replay_selector::NsdbRequestReplaySelection,
     pub(crate) control_protocol: &'static str,
     pub(crate) control_mode: &'static str,
     pub(crate) control_selector: Option<String>,
@@ -86,7 +88,15 @@ pub(crate) fn build_replay_transcript_with_control(
         .iter()
         .map(|checkpoint| transcript_frame(checkpoint, false))
         .collect::<Vec<_>>();
-    let control_result = apply_replay_control(&mut frames, plan_ready, control);
+    let request_selection = crate::request_replay_selector::resolve_request_replay_selection(
+        report,
+        control.request_id.as_deref(),
+    );
+    let control_result = if control.request_id.is_some() {
+        apply_request_replay_control(&mut frames, plan_ready, &request_selection)
+    } else {
+        apply_replay_control(&mut frames, plan_ready, control)
+    };
     let ready = plan_ready && control_result.blocker.is_none();
     let resume_cursor = replay_resume_cursor(&frames, &control_result);
     let dispatch_identity = &report
@@ -107,6 +117,7 @@ pub(crate) fn build_replay_transcript_with_control(
         provider_dispatch_selected_set_hash: dispatch_identity.selected_set_hash.clone(),
         provider_dispatch_identity_hash: (dispatch_identity.identity_hash != "none")
             .then(|| dispatch_identity.identity_hash.clone()),
+        request_selection,
         control_protocol: "nsdb-yir-replay-control-v1",
         control_mode: control_result.mode,
         control_selector: control_result.selector,
@@ -174,6 +185,64 @@ struct ReplayResumeCursor {
     after_frame_id: Option<String>,
     next_frame_index: Option<usize>,
     next_frame_id: Option<String>,
+}
+
+fn apply_request_replay_control(
+    frames: &mut [NsdbReplayTranscriptFrame],
+    plan_ready: bool,
+    selection: &crate::request_replay_selector::NsdbRequestReplaySelection,
+) -> ReplayControlResult {
+    if !plan_ready || !selection.ready {
+        return ReplayControlResult {
+            mode: "request",
+            selector: selection.request_id.clone(),
+            status: if plan_ready {
+                selection.status
+            } else {
+                "not-evaluated"
+            },
+            selected_frame_index: None,
+            selected_frame_id: None,
+            stop_reason: "request-selector-blocked",
+            resume_input_status: "not-requested",
+            blocker: selection.first_blocker.clone(),
+        };
+    }
+    let source_trace_id = selection.source_trace_id.as_deref().unwrap_or("none");
+    let matches = frames
+        .iter()
+        .enumerate()
+        .filter(|(_, frame)| frame.trace_id == source_trace_id)
+        .map(|(position, _)| position)
+        .collect::<Vec<_>>();
+    if matches.len() != 1 {
+        return ReplayControlResult {
+            mode: "request",
+            selector: selection.request_id.clone(),
+            status: "request-frame-unresolved",
+            selected_frame_index: None,
+            selected_frame_id: None,
+            stop_reason: "request-selector-blocked",
+            resume_input_status: "not-requested",
+            blocker: Some(format!(
+                "request-replay-selector:source-frame-unresolved:{source_trace_id}"
+            )),
+        };
+    }
+    let selected_position = matches[0];
+    for frame in frames.iter_mut().take(selected_position + 1) {
+        frame.consumed = true;
+    }
+    ReplayControlResult {
+        mode: "request",
+        selector: selection.request_id.clone(),
+        status: "request-selected",
+        selected_frame_index: Some(frames[selected_position].index),
+        selected_frame_id: Some(frames[selected_position].frame_id.clone()),
+        stop_reason: "request-selected",
+        resume_input_status: "not-requested",
+        blocker: None,
+    }
 }
 
 fn apply_replay_control(
@@ -461,7 +530,11 @@ fn transcript_frame(
 
 #[cfg(test)]
 mod control_tests {
-    use super::{apply_replay_control, NsdbReplayControl, NsdbReplayTranscriptFrame};
+    use super::{
+        apply_replay_control, apply_request_replay_control, NsdbReplayControl,
+        NsdbReplayTranscriptFrame,
+    };
+    use crate::request_replay_selector::NsdbRequestReplaySelection;
 
     fn frames() -> Vec<NsdbReplayTranscriptFrame> {
         (0..3)
@@ -500,6 +573,7 @@ mod control_tests {
             &mut frames,
             true,
             &NsdbReplayControl {
+                request_id: None,
                 frame_selector: Some("frame-1".to_owned()),
                 breakpoint_selector: None,
                 breakpoint_phase: None,
@@ -521,12 +595,49 @@ mod control_tests {
     }
 
     #[test]
+    fn request_selection_consumes_through_unique_source_frame() {
+        let mut frames = frames();
+        let result = apply_request_replay_control(
+            &mut frames,
+            true,
+            &NsdbRequestReplaySelection {
+                contract: "nsdb-provider-request-replay-selector-v1",
+                status: "request-resolved",
+                ready: true,
+                request_id: Some("kernel.cuda.copy".to_owned()),
+                source_trace_id: Some("trace-1".to_owned()),
+                source_provider_family: Some("spirv:vulkan-gpu".to_owned()),
+                collection_root_hash: Some("sha256:collection".to_owned()),
+                provider_family: Some("cuda:nvidia-gpu".to_owned()),
+                dispatch_id: Some("dispatch0001".to_owned()),
+                completion_clock: Some("clock0002".to_owned()),
+                output_hash: Some("sha256:output".to_owned()),
+                completion_token: Some("provider-completion:cuda".to_owned()),
+                selected_set_hash: Some("sha256:selected".to_owned()),
+                first_blocker: None,
+            },
+        );
+
+        assert_eq!(result.mode, "request");
+        assert_eq!(result.status, "request-selected");
+        assert_eq!(result.selected_frame_id.as_deref(), Some("frame-1"));
+        assert_eq!(
+            frames
+                .iter()
+                .map(|frame| frame.consumed)
+                .collect::<Vec<_>>(),
+            vec![true, true, false]
+        );
+    }
+
+    #[test]
     fn breakpoint_consumes_through_selected_index() {
         let mut frames = frames();
         let result = apply_replay_control(
             &mut frames,
             true,
             &NsdbReplayControl {
+                request_id: None,
                 frame_selector: None,
                 breakpoint_selector: Some("1".to_owned()),
                 breakpoint_phase: None,
@@ -554,6 +665,7 @@ mod control_tests {
             &mut frames,
             true,
             &NsdbReplayControl {
+                request_id: None,
                 frame_selector: Some("missing".to_owned()),
                 breakpoint_selector: None,
                 breakpoint_phase: None,
@@ -578,6 +690,7 @@ mod control_tests {
             &mut frames,
             true,
             &NsdbReplayControl {
+                request_id: None,
                 frame_selector: None,
                 breakpoint_selector: None,
                 breakpoint_phase: Some("device-dispatch".to_owned()),
@@ -611,6 +724,7 @@ mod control_tests {
             &mut frames,
             true,
             &NsdbReplayControl {
+                request_id: None,
                 frame_selector: None,
                 breakpoint_selector: None,
                 breakpoint_phase: None,
@@ -639,6 +753,7 @@ mod control_tests {
             &mut frames,
             true,
             &NsdbReplayControl {
+                request_id: None,
                 frame_selector: None,
                 breakpoint_selector: None,
                 breakpoint_phase: None,

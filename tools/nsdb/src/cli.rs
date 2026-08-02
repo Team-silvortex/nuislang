@@ -132,7 +132,7 @@ pub(crate) fn resolve_manifest_input(input: &Path) -> Result<PathBuf, String> {
 }
 
 fn usage() -> &'static str {
-    "usage:\n  nsdb status\n  nsdb inspect <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb events <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb replay-plan <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb replay <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>] [--frame <index|frame-id> | --break-at <index|frame-id> | [--break-phase <phase>] [--break-entry <symbol>]] [--resume-after <frame-id> --resume-next <frame-id> | --resume-cursor <path>] [--save-cursor <path>]\n  nsdb cursor-lineage-repair <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsdb materialize-provider-samples <artifact-output-dir> [--provider-family <family>] [--json]\n  nsdb execute-provider-samples <artifact-output-dir> [--provider-family <family>] [--json]"
+    "usage:\n  nsdb status\n  nsdb inspect <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb events <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb replay-plan <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>]\n  nsdb replay <nuis.build.manifest.toml|artifact-output-dir> [--json] [--event-status <status>] [--event-phase <phase>] [--trace-id <trace-id>] [--request-id <request-id> | --frame <index|frame-id> | --break-at <index|frame-id> | [--break-phase <phase>] [--break-entry <symbol>]] [--resume-after <frame-id> --resume-next <frame-id> | --resume-cursor <path>] [--save-cursor <path>]\n  nsdb cursor-lineage-repair <nuis.build.manifest.toml|artifact-output-dir> [--json]\n  nsdb materialize-provider-samples <artifact-output-dir> [--provider-family <family>] [--json]\n  nsdb execute-provider-samples <artifact-output-dir> [--provider-family <family>] [--json]"
 }
 
 fn parse_required_input_json<I>(args: &mut I) -> Result<(PathBuf, bool), String>
@@ -179,6 +179,9 @@ where
             "--event-status" => event_filter.status = Some(required_value(args, "--event-status")?),
             "--event-phase" => event_filter.phase = Some(required_value(args, "--event-phase")?),
             "--trace-id" => event_filter.trace_id = Some(required_value(args, "--trace-id")?),
+            "--request-id" => {
+                replay_control.request_id = Some(required_value(args, "--request-id")?)
+            }
             "--frame" => replay_control.frame_selector = Some(required_value(args, "--frame")?),
             "--break-at" => {
                 replay_control.breakpoint_selector = Some(required_value(args, "--break-at")?)
@@ -207,6 +210,20 @@ where
     }
     let has_predicate =
         replay_control.breakpoint_phase.is_some() || replay_control.breakpoint_entry.is_some();
+    let has_resume = replay_control.resume_after_frame_id.is_some()
+        || replay_control.resume_next_frame_id.is_some()
+        || cursor_input.is_some();
+    if replay_control.request_id.is_some()
+        && (replay_control.frame_selector.is_some()
+            || replay_control.breakpoint_selector.is_some()
+            || has_predicate
+            || has_resume)
+    {
+        return Err(
+            "--request-id is mutually exclusive with frame, breakpoint, and resume controls"
+                .to_owned(),
+        );
+    }
     if replay_control.frame_selector.is_some()
         && (replay_control.breakpoint_selector.is_some() || has_predicate)
     {
@@ -458,6 +475,48 @@ mod tests {
     }
 
     #[test]
+    fn parses_request_replay_selector_and_rejects_competing_controls() {
+        let command = parse_args(
+            vec![
+                "replay".to_owned(),
+                "out".to_owned(),
+                "--request-id".to_owned(),
+                "kernel.cuda.copy".to_owned(),
+                "--json".to_owned(),
+            ]
+            .into_iter(),
+        );
+        assert_eq!(
+            command,
+            Ok(Command::Replay {
+                input: PathBuf::from("out"),
+                json: true,
+                event_filter: NsdbPayloadExecutionEventFilter::default(),
+                replay_control: NsdbReplayControl {
+                    request_id: Some("kernel.cuda.copy".to_owned()),
+                    ..NsdbReplayControl::default()
+                },
+                cursor_input: None,
+                cursor_output: None,
+            })
+        );
+
+        let error = parse_args(
+            vec![
+                "replay".to_owned(),
+                "out".to_owned(),
+                "--request-id".to_owned(),
+                "kernel.cuda.copy".to_owned(),
+                "--break-at".to_owned(),
+                "frame-1".to_owned(),
+            ]
+            .into_iter(),
+        )
+        .unwrap_err();
+        assert!(error.contains("mutually exclusive"));
+    }
+
+    #[test]
     fn parses_replay_frame_and_breakpoint_controls() {
         let frame = parse_args(
             vec![
@@ -475,6 +534,7 @@ mod tests {
                 json: false,
                 event_filter: NsdbPayloadExecutionEventFilter::default(),
                 replay_control: NsdbReplayControl {
+                    request_id: None,
                     frame_selector: Some("3".to_owned()),
                     breakpoint_selector: None,
                     breakpoint_phase: None,
@@ -522,6 +582,7 @@ mod tests {
                 json: false,
                 event_filter: NsdbPayloadExecutionEventFilter::default(),
                 replay_control: NsdbReplayControl {
+                    request_id: None,
                     frame_selector: None,
                     breakpoint_selector: None,
                     breakpoint_phase: Some("device-dispatch".to_owned()),
@@ -557,6 +618,7 @@ mod tests {
                 json: false,
                 event_filter: NsdbPayloadExecutionEventFilter::default(),
                 replay_control: NsdbReplayControl {
+                    request_id: None,
                     frame_selector: None,
                     breakpoint_selector: None,
                     breakpoint_phase: None,

@@ -717,6 +717,10 @@ pub(super) fn nsld_final_output_json_fields(
                     .map(|summary| &summary.provider_dispatch_identity_capability),
             ),
     );
+    fields.extend(
+        super::link_plan_provider_request_completion_json::
+            final_output_provider_request_completion_json_fields(nsld_final_output),
+    );
     fields
 }
 

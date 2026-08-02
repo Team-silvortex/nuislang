@@ -1,6 +1,33 @@
 use crate::artifact_nsdb_replay_cursor_lineage::DebuggerCursorLineageRepairAction;
 use crate::workflow::link_plan_final_output_replay_vocabulary::FinalOutputReplayVocabulary;
 use crate::workflow::link_plan_provider_dispatch_identity::ValidatedProviderDispatchIdentityCapability;
+use crate::workflow::link_plan_provider_request_completion::ValidatedProviderRequestCompletionCapability;
+
+#[derive(Clone)]
+pub(crate) struct ProviderRequestCompletionBoundarySummary {
+    pub(crate) contract: String,
+    pub(crate) status: String,
+    pub(crate) request_id: String,
+    pub(crate) provider_family: String,
+    pub(crate) dispatch_id: String,
+    pub(crate) completion_clock: String,
+    pub(crate) output_hash: String,
+    pub(crate) completion_token: String,
+    pub(crate) selected_set_hash: String,
+}
+
+#[derive(Clone)]
+pub(crate) struct ProviderRequestCompletionCollectionBoundarySummary {
+    pub(crate) source_trace_id: String,
+    pub(crate) source_provider_family: String,
+    pub(crate) dispatch_selected_set_hash: String,
+    pub(crate) contract: String,
+    pub(crate) status: String,
+    pub(crate) count: usize,
+    pub(crate) root_hash: String,
+    pub(crate) validation_status: String,
+    pub(crate) receipts: Vec<ProviderRequestCompletionBoundarySummary>,
+}
 
 #[derive(Clone)]
 pub(crate) struct ProviderCompletionBoundarySummary {
@@ -8,6 +35,8 @@ pub(crate) struct ProviderCompletionBoundarySummary {
     pub(crate) provider_family: String,
     pub(crate) output_contract: String,
     pub(crate) output_evidence: String,
+    pub(crate) dispatch_selected_set_hash: String,
+    pub(crate) request_completion: ProviderRequestCompletionCollectionBoundarySummary,
     pub(crate) record_hash: String,
 }
 
@@ -104,6 +133,7 @@ pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) debugger_cursor_lineage_latest_hash: Option<String>,
     pub(crate) debugger_cursor_lineage_provider_dispatch_identity_hash: Option<String>,
     pub(crate) provider_dispatch_identity_capability: ValidatedProviderDispatchIdentityCapability,
+    pub(crate) provider_request_completion_capability: ValidatedProviderRequestCompletionCapability,
     pub(crate) debugger_cursor_lineage_first_blocker: Option<String>,
     pub(crate) debugger_cursor_lineage_next_action: Option<String>,
     pub(crate) debugger_cursor_lineage_next_command: Option<String>,

@@ -152,12 +152,15 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         .contains("weakest task card is directly actionable"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_action
-        .contains("provider-neutral typed request-completion projection"));
+        .contains("request replay frame IDs"));
     let handoff_command = &summary.weakest_bootstrap_task_card_handoff_command;
     for required in [
         "CARGO_INCREMENTAL=0 cargo check -q -p nuisc -p nsdb",
         "cargo check -q -p nuisc -p nsdb -p nsld -p nuis",
         "cargo test -q -p nsdb provider_request_completion",
+        "cargo test -q -p nsdb replay",
+        "cargo test -q -p nsdb request_selection",
+        "cargo test -q -p nuis parses_debug_request_selector",
         "cargo test -q -p nuis artifact_nsdb_handoff_request_completion",
         "linux_vulkan_producer_fans_out_to_cuda_and_vulkan_consumers",
         "cargo test -q -p nuis dev_tensor",
@@ -166,10 +169,10 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
     }
     assert!(summary
         .weakest_bootstrap_task_card_handoff_expected_artifact
-        .contains("three typed request-completion receipts"));
+        .contains("three ordered request-level replay frames"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_expected_artifact
-        .contains("shared selected-set root"));
+        .contains("resume advances to the final Vulkan request"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.protocol,
         "nuis-dev-tensor-task-card-lineage-v1"

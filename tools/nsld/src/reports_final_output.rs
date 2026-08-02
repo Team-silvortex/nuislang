@@ -1,4 +1,17 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldProviderRequestCompletionSummary {
+    pub(crate) contract: String,
+    pub(crate) status: String,
+    pub(crate) request_id: String,
+    pub(crate) provider_family: String,
+    pub(crate) dispatch_id: String,
+    pub(crate) completion_clock: String,
+    pub(crate) output_hash: String,
+    pub(crate) completion_token: String,
+    pub(crate) selected_set_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldProviderCompletionSummary {
     pub(crate) trace_id: String,
     pub(crate) provider_family: String,
@@ -21,6 +34,11 @@ pub(crate) struct NsldProviderCompletionSummary {
     pub(crate) code_asset_identity_set_count: usize,
     pub(crate) code_asset_identity_set_root_hash: String,
     pub(crate) compiled_code_asset_selection: nsdb::CompiledCodeAssetSelectionEvidence,
+    pub(crate) request_completion_contract: String,
+    pub(crate) request_completion_status: String,
+    pub(crate) request_completion_count: usize,
+    pub(crate) request_completion_root_hash: String,
+    pub(crate) request_completions: Vec<NsldProviderRequestCompletionSummary>,
     pub(crate) record_hash: String,
 }
 

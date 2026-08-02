@@ -205,6 +205,29 @@ fn parses_debug_resume_json_with_manifest_input() {
 }
 
 #[test]
+fn parses_debug_request_selector() {
+    let command = parse_args(
+        [
+            "debug-request".to_owned(),
+            "target/demo".to_owned(),
+            "--request-id".to_owned(),
+            "kernel.cuda.copy".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .expect("debug-request parses");
+    assert_eq!(
+        command,
+        CommandKind::DebugRequest {
+            input: PathBuf::from("target/demo"),
+            request_id: "kernel.cuda.copy".to_owned(),
+            json: true,
+        }
+    );
+}
+
+#[test]
 fn parses_debug_lineage_repair_json_with_manifest_input() {
     let command = parse_args(
         [

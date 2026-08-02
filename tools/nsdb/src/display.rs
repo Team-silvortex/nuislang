@@ -542,6 +542,26 @@ pub(crate) fn print_nsdb_replay_transcript_with_control(
             .as_deref()
             .unwrap_or("<none>")
     );
+    println!(
+        "  debugger_transcript_request_selector: {} status={} ready={} request={} source_trace={} source_provider={} collection_root={}",
+        transcript.request_selection.contract,
+        transcript.request_selection.status,
+        transcript.request_selection.ready,
+        transcript.request_selection.request_id.as_deref().unwrap_or("<none>"),
+        transcript.request_selection.source_trace_id.as_deref().unwrap_or("<none>"),
+        transcript.request_selection.source_provider_family.as_deref().unwrap_or("<none>"),
+        transcript.request_selection.collection_root_hash.as_deref().unwrap_or("<none>"),
+    );
+    println!(
+        "  debugger_transcript_request_evidence: provider={} dispatch={} clock={} output={} token={} selected_set={} blocker={}",
+        transcript.request_selection.provider_family.as_deref().unwrap_or("<none>"),
+        transcript.request_selection.dispatch_id.as_deref().unwrap_or("<none>"),
+        transcript.request_selection.completion_clock.as_deref().unwrap_or("<none>"),
+        transcript.request_selection.output_hash.as_deref().unwrap_or("<none>"),
+        transcript.request_selection.completion_token.as_deref().unwrap_or("<none>"),
+        transcript.request_selection.selected_set_hash.as_deref().unwrap_or("<none>"),
+        transcript.request_selection.first_blocker.as_deref().unwrap_or("<none>"),
+    );
     println!("  debugger_transcript_status: {}", transcript.status);
     println!("  debugger_transcript_ready: {}", transcript.ready);
     println!(

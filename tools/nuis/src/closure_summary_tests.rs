@@ -56,12 +56,27 @@ fn final_output_closure_becomes_ready_when_replay_evidence_is_ready() {
         "fnv1a64:0126ed9d38f1895f".to_owned();
     final_output.device_provider_sample_selected_provider_bundle_set_validation_status =
         "verified".to_owned();
+    let selected_set_hash = "fnv1a64:0126ed9d38f1895f";
+    let shader_completion = request_completion(
+        "shader-request-0000",
+        "metal:apple-silicon-gpu",
+        "dispatch-0000",
+        selected_set_hash,
+    );
+    let kernel_completion = request_completion(
+        "kernel-request-0001",
+        "coreml:apple-ane",
+        "dispatch-0001",
+        selected_set_hash,
+    );
     final_output.nsdb_provider_completions = vec![
         crate::workflow::ProviderCompletionBoundarySummary {
             trace_id: "hetero-trace:shader:metal:apple-silicon-gpu".to_owned(),
             provider_family: "metal:apple-silicon-gpu".to_owned(),
             output_contract: "nuis-provider-output-payload-handoff-v1".to_owned(),
             output_evidence: "provider-output.toml:hash=0x1234".to_owned(),
+            dispatch_selected_set_hash: selected_set_hash.to_owned(),
+            request_completion: shader_completion.clone(),
             record_hash: "0xrecord1234".to_owned(),
         },
         crate::workflow::ProviderCompletionBoundarySummary {
@@ -69,9 +84,24 @@ fn final_output_closure_becomes_ready_when_replay_evidence_is_ready() {
             provider_family: "coreml:apple-ane".to_owned(),
             output_contract: "nuis-provider-output-payload-handoff-v1".to_owned(),
             output_evidence: "coreml-output.toml:hash=0x5678".to_owned(),
+            dispatch_selected_set_hash: selected_set_hash.to_owned(),
+            request_completion: kernel_completion.clone(),
             record_hash: "0xrecord5678".to_owned(),
         },
     ];
+    final_output.provider_request_completion_capability =
+        crate::workflow::ValidatedProviderRequestCompletionCapability {
+            contract: "nuis-validated-provider-request-completion-capability-v1",
+            source_contract: "nsdb-payload-execution-replay-plan-v1".to_owned(),
+            source_status: "replay-evidence-ready".to_owned(),
+            projection_source: "final_output_provider_request_completion_collections",
+            ready: true,
+            status: "verified",
+            collection_count: 2,
+            receipt_count: 2,
+            collections: vec![shader_completion, kernel_completion],
+            first_blocker: None,
+        };
 
     let summary = FrontdoorClosureSummary::from_nsld_final_output_closure(
         "workflow-link-plan",
@@ -218,9 +248,21 @@ fn final_output_closure_becomes_ready_when_replay_evidence_is_ready() {
         &"\"closure_summary_provider_completion_set_hash_validation_status\":\"verified\""
             .to_owned()
     ));
-    assert!(fields
-        .iter()
-        .any(|field| field.starts_with("\"closure_summary_provider_completions\":[{")));
+    assert!(fields.iter().any(|field| field
+        .starts_with("\"closure_summary_provider_completions\":[{")
+        && field.contains("\"request_id\":\"shader-request-0000\"")));
+    assert!(fields.contains(
+        &"\"closure_summary_object_package_provider_request_completion_receipt_count\":2"
+            .to_owned()
+    ));
+    assert!(fields.contains(
+        &"\"closure_summary_debugger_api_provider_request_completion_receipt_count\":2".to_owned()
+    ));
+    assert!(fields.iter().any(|field| {
+        field.starts_with(
+            "\"closure_summary_debugger_api_provider_request_completion_collections\":[{",
+        ) && field.contains("\"dispatch_id\":\"dispatch-0001\"")
+    }));
     assert!(fields.contains(
         &"\"closure_summary_object_package_provider_bundle_manifest_hash\":\"fnv1a64:08a971e5a543be2e\""
             .to_owned()
@@ -339,6 +381,35 @@ fn drive_safe_next_wraps_mutating_blocked_closure() {
         .primary_blocker
         .as_deref()
         .is_some_and(|blocker| blocker.contains("nsld-drive-safe-next-v1 gate required")));
+}
+
+fn request_completion(
+    request_id: &str,
+    provider_family: &str,
+    dispatch_id: &str,
+    selected_set_hash: &str,
+) -> crate::workflow::ProviderRequestCompletionCollectionBoundarySummary {
+    crate::workflow::ProviderRequestCompletionCollectionBoundarySummary {
+        source_trace_id: format!("trace:{request_id}"),
+        source_provider_family: provider_family.to_owned(),
+        dispatch_selected_set_hash: selected_set_hash.to_owned(),
+        contract: "nuis-provider-request-completion-receipt-collection-v1".to_owned(),
+        status: "verified".to_owned(),
+        count: 1,
+        root_hash: format!("fnv1a64:{request_id}"),
+        validation_status: "verified".to_owned(),
+        receipts: vec![crate::workflow::ProviderRequestCompletionBoundarySummary {
+            contract: "nuis-provider-request-completion-receipt-v1".to_owned(),
+            status: "verified".to_owned(),
+            request_id: request_id.to_owned(),
+            provider_family: provider_family.to_owned(),
+            dispatch_id: dispatch_id.to_owned(),
+            completion_clock: "1:0".to_owned(),
+            output_hash: format!("fnv1a64:{dispatch_id}"),
+            completion_token: format!("completion:{request_id}"),
+            selected_set_hash: selected_set_hash.to_owned(),
+        }],
+    }
 }
 
 fn final_output_summary(
@@ -539,6 +610,24 @@ fn final_output_summary(
                 first_blocker: Some(
                     "validated-provider-dispatch-identity-source-unavailable".to_owned(),
                 ),
+            },
+        provider_request_completion_capability:
+            crate::workflow::ValidatedProviderRequestCompletionCapability {
+                contract: "nuis-validated-provider-request-completion-capability-v1",
+                source_contract: "nsdb-payload-execution-replay-plan-v1".to_owned(),
+                source_status: if nsdb_replay_ready {
+                    "replay-evidence-ready"
+                } else {
+                    "blocked"
+                }
+                .to_owned(),
+                projection_source: "final_output_provider_request_completion_collections",
+                ready: true,
+                status: "verified-empty",
+                collection_count: 0,
+                receipt_count: 0,
+                collections: Vec::new(),
+                first_blocker: None,
             },
         debugger_cursor_lineage_first_blocker: None,
         debugger_cursor_lineage_next_action: None,

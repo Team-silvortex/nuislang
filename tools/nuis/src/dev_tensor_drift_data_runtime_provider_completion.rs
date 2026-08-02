@@ -57,6 +57,40 @@ pub(crate) const DEV_TENSOR_RUNTIME_PROVIDER_COMPLETION_DRIFT_CHECKS: &[DevTenso
             ],
         },
         DevTensorDriftCheckSpec {
+            id: "nsdb-provider-request-replay-selector",
+            path: "tools/nsdb/src/request_replay_selector.rs",
+            required_patterns: &[
+                "nsdb-provider-request-replay-selector-v1",
+                "resolve_request_replay_selection",
+                "request-ambiguous",
+                "dispatch-authority-unverified",
+                "completion_clock",
+                "completion_token",
+            ],
+        },
+        DevTensorDriftCheckSpec {
+            id: "nsdb-provider-request-replay-json",
+            path: "tools/nsdb/src/json_transcript.rs",
+            required_patterns: &[
+                "debugger_transcript_request_selector_status",
+                "debugger_transcript_request_provider_family",
+                "debugger_transcript_request_dispatch_id",
+                "debugger_transcript_request_completion_clock",
+                "debugger_transcript_request_output_hash",
+                "debugger_transcript_request_completion_token",
+            ],
+        },
+        DevTensorDriftCheckSpec {
+            id: "nuis-debug-request-frontdoor",
+            path: "tools/nuis/src/debug_request_command.rs",
+            required_patterns: &[
+                "handle_debug_request",
+                "resolve_artifact_output_input",
+                "resolve_nsdb_program",
+                "--request-id",
+            ],
+        },
+        DevTensorDriftCheckSpec {
             id: "provider-request-completion-real-mixed-smoke",
             path: "tools/nuis/tests/official_galaxy_hetero_smoke/linux_vulkan.rs",
             required_patterns: &[
@@ -65,6 +99,54 @@ pub(crate) const DEV_TENSOR_RUNTIME_PROVIDER_COMPLETION_DRIFT_CHECKS: &[DevTenso
                 "request_completion_{index}_provider_family",
                 "request_completion_{index}_dispatch_id",
                 "request_completion_{index}_selected_set_hash",
+                "nsld_final_executable_output_object_package_provider_request_completion_receipt_count",
+                "closure_summary_debugger_api_provider_request_completion_receipt_count",
+                "nsdb-provider-request-replay-selector-v1",
+                "debugger_transcript_request_selector_status",
+                "debugger_transcript_request_provider_family",
+                "debugger_transcript_control_status",
+                "request-replay-selector:request-not-found:missing.request",
+            ],
+        },
+        DevTensorDriftCheckSpec {
+            id: "nsld-provider-request-completion-final-output",
+            path: "tools/nsld/src/json_final_output_provider_completion.rs",
+            required_patterns: &[
+                "request_completion_contract",
+                "request_completion_root_hash",
+                "request_completions",
+                "selected_set_hash",
+            ],
+        },
+        DevTensorDriftCheckSpec {
+            id: "nuis-validated-provider-request-completion-capability",
+            path: "tools/nuis/src/workflow/link_plan_provider_request_completion.rs",
+            required_patterns: &[
+                "nuis-validated-provider-request-completion-capability-v1",
+                "selected-set-mismatch",
+                "dispatch_selected_set_hash",
+                "verified-empty",
+            ],
+        },
+        DevTensorDriftCheckSpec {
+            id: "nuis-provider-request-completion-frontdoor-projection",
+            path: "tools/nuis/src/workflow/link_plan_provider_request_completion_json.rs",
+            required_patterns: &[
+                "provider_request_completion_receipt_count",
+                "provider_request_completion_collections",
+                "request_completion_collection_json",
+                "source_trace_id",
+                "dispatch_selected_set_hash",
+                "completion_token",
+            ],
+        },
+        DevTensorDriftCheckSpec {
+            id: "nuis-provider-request-completion-closure-projection",
+            path: "tools/nuis/src/closure_summary_provider_completion.rs",
+            required_patterns: &[
+                "dispatch_selected_set_hash",
+                "request_completion",
+                "request_completion_collection_json",
             ],
         },
     ];
