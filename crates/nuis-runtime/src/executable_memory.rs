@@ -1,5 +1,6 @@
 use crate::{
-    CompiledEntryTransferResult, NativeLifecycleEntryContextV1, NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1,
+    CompiledEntryTransferResult, NativeLifecycleEntryContextV1, NativeRuntimeDispatchTableV1,
+    NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1,
 };
 
 pub const EXECUTABLE_MEMORY_ADAPTER_CONTRACT: &str = "nuis-executable-memory-adapter-v1";
@@ -153,6 +154,12 @@ impl ExecutableEntryPreparation {
         if permit.context_identity_hash != context.identity_hash() {
             blockers.push("native-entry-authorization:context-identity-mismatch".to_owned());
         }
+        let dispatch_table = NativeRuntimeDispatchTableV1::from_context(&context);
+        if permit.dispatch_table_identity != dispatch_table.identity()
+            || permit.dispatch_capability_mask != dispatch_table.capability_mask()
+        {
+            blockers.push("native-entry-authorization:dispatch-identity-mismatch".to_owned());
+        }
         blockers.sort();
         blockers.dedup();
         if !blockers.is_empty() {
@@ -203,6 +210,8 @@ pub struct NativeEntryInvocationPermit {
     entry_symbol: String,
     target_machine_arch: String,
     context_identity_hash: String,
+    dispatch_table_identity: u64,
+    dispatch_capability_mask: u64,
 }
 
 impl NativeEntryInvocationPermit {
@@ -230,6 +239,7 @@ impl NativeEntryInvocationPermit {
         if expected_context != *context {
             return Err("native-entry-permit:context-identity-mismatch".to_owned());
         }
+        let dispatch_table = NativeRuntimeDispatchTableV1::from_context(context);
         Ok(Self {
             protocol: NATIVE_ENTRY_INVOCATION_PERMIT_PROTOCOL,
             execution_identity_hash: transfer.execution_identity_hash.clone(),
@@ -239,6 +249,8 @@ impl NativeEntryInvocationPermit {
                 .to_owned(),
             target_machine_arch: target_machine_arch.to_owned(),
             context_identity_hash: context.identity_hash(),
+            dispatch_table_identity: dispatch_table.identity(),
+            dispatch_capability_mask: dispatch_table.capability_mask(),
         })
     }
 
@@ -248,6 +260,14 @@ impl NativeEntryInvocationPermit {
 
     pub fn context_identity_hash(&self) -> &str {
         &self.context_identity_hash
+    }
+
+    pub fn dispatch_table_identity(&self) -> u64 {
+        self.dispatch_table_identity
+    }
+
+    pub fn dispatch_capability_mask(&self) -> u64 {
+        self.dispatch_capability_mask
     }
 }
 
@@ -643,6 +663,8 @@ mod tests {
             entry_symbol: request.entry_symbol.to_owned(),
             target_machine_arch: request.target_machine_arch.to_owned(),
             context_identity_hash: context.identity_hash(),
+            dispatch_table_identity: context.dispatch_table_identity(),
+            dispatch_capability_mask: context.dispatch_capability_mask(),
         }
     }
 
@@ -755,6 +777,7 @@ mod tests {
         let context = NativeLifecycleEntryContextV1::test_fixture();
         let mut permit = permit(&request, &context);
         permit.execution_identity_hash = "0x2222222222222222".to_owned();
+        permit.dispatch_table_identity ^= 1;
 
         let result = preparation
             .authorize(permit, context)
@@ -764,5 +787,8 @@ mod tests {
         assert!(result
             .blockers
             .contains(&"native-entry-authorization:permit-identity-mismatch".to_owned()));
+        assert!(result
+            .blockers
+            .contains(&"native-entry-authorization:dispatch-identity-mismatch".to_owned()));
     }
 }

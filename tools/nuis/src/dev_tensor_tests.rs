@@ -145,7 +145,7 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         .contains("weakest bootstrap-critical status/progress ordering"));
     assert!(summary
         .weakest_bootstrap_task_card_priority_reason
-        .contains("status `active` rank 2, progress 45/100"));
+        .contains("status `active` rank 2, progress 60/100"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_handoff_coordinate,
         "native-binary-system/nuis-runtime/lifecycle-context-dispatch"
@@ -156,10 +156,10 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         .contains("weakest task card is directly actionable"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_action
-        .contains("dispatch-table record"));
+        .contains("runtime-dispatch import contract"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_command
-        .contains("cargo test -q -p nuis-runtime native_entry_context"));
+        .contains("cargo test -q -p nuis-runtime native_service_dispatch"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_command
         .contains("cargo test -q -p nuis-host-runner native_entry"));
@@ -168,7 +168,7 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         .contains("cargo test -q -p nuis --test self_contained_nsb_smoke"));
     assert!(summary
         .weakest_bootstrap_task_card_handoff_expected_artifact
-        .contains("versioned native dispatch table"));
+        .contains("provider-neutral runtime dispatch dependency"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.protocol,
         "nuis-dev-tensor-task-card-lineage-v1"

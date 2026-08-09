@@ -76,6 +76,10 @@ impl NativeLifecycleEntryContextV1 {
     }
 
     pub fn identity_hash(&self) -> String {
+        format!("0x{:016x}", self.identity_value())
+    }
+
+    pub fn identity_value(&self) -> u64 {
         let mut bytes = Vec::with_capacity(self.struct_size_bytes as usize);
         bytes.extend_from_slice(&self.magic);
         bytes.extend_from_slice(&self.abi_version.to_le_bytes());
@@ -86,7 +90,27 @@ impl NativeLifecycleEntryContextV1 {
         bytes.extend_from_slice(&self.glm_root_handle.to_le_bytes());
         bytes.extend_from_slice(&self.scheduler_handle.to_le_bytes());
         bytes.extend_from_slice(&self.lifecycle_hook_handle.to_le_bytes());
-        fnv1a64_hex(&bytes)
+        fnv1a64(&bytes)
+    }
+
+    pub fn dispatch_table_identity(&self) -> u64 {
+        crate::NativeRuntimeDispatchTableV1::from_context(self).identity()
+    }
+
+    pub fn dispatch_capability_mask(&self) -> u64 {
+        crate::NativeRuntimeDispatchTableV1::from_context(self).capability_mask()
+    }
+
+    pub(crate) fn is_well_formed(&self) -> bool {
+        self.magic == NATIVE_LIFECYCLE_ENTRY_CONTEXT_MAGIC
+            && self.abi_version == NATIVE_LIFECYCLE_ENTRY_CONTEXT_VERSION
+            && self.struct_size_bytes == std::mem::size_of::<Self>() as u32
+            && self.plan_identity != 0
+            && self.execution_identity != 0
+            && self.clock_root_handle != 0
+            && self.glm_root_handle != 0
+            && self.scheduler_handle != 0
+            && self.lifecycle_hook_handle != 0
     }
 
     pub(crate) fn derive_from_transfer(
@@ -178,10 +202,6 @@ fn bound_handle(execution_identity: &str, kind: &str, value: &str) -> u64 {
         format!("{NATIVE_LIFECYCLE_ENTRY_CONTEXT_PROTOCOL}\t{execution_identity}\t{kind}\t{value}")
             .as_bytes(),
     )
-}
-
-fn fnv1a64_hex(bytes: &[u8]) -> String {
-    format!("0x{:016x}", fnv1a64(bytes))
 }
 
 fn fnv1a64(bytes: &[u8]) -> u64 {
