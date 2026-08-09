@@ -37,7 +37,9 @@ pub(super) fn expr_contains_conditional_effect_primitive(expr: &NirExpr) -> bool
             inner.as_ref(),
             NirExpr::Call { .. } | NirExpr::MethodCall { .. }
         ),
-        NirExpr::CpuExternCall { .. } | NirExpr::CpuExternCallI32 { .. } => true,
+        NirExpr::CpuExternCall { .. }
+        | NirExpr::CpuExternCallI32 { .. }
+        | NirExpr::CpuExternCallOwnedBuffer { .. } => true,
         _ if is_branch_local_runtime_consumer(expr) => true,
         _ if is_branch_local_runtime_observer(expr) => false,
         NirExpr::Borrow(inner)

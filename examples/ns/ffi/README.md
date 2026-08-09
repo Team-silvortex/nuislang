@@ -22,7 +22,7 @@ Current role rule:
 
 * this subtree is a narrow source-side facade mirror layer
 * it should not compete with project-form tooling/filesystem/task onboarding
-* during `alpha-0.4.*`, the goal is to keep one short host bridge ladder, one
+* during early beta, the goal is to keep one short host bridge ladder, one
   short task/runtime ladder, and one short path/runtime ladder obvious while
   project-form examples carry the broader workflow story
 * when a facade belongs to the std-owned host surface, prefer
@@ -44,6 +44,7 @@ Host bridge ladder:
 * [libc_write_demo.ns](libc_write_demo.ns)
 * [libc_close_demo.ns](libc_close_demo.ns)
 * [libc_read_buffer_demo.ns](libc_read_buffer_demo.ns)
+* [owned_return_buffer_demo.ns](owned_return_buffer_demo.ns)
 
 Runnable libc smoke:
 
@@ -66,6 +67,9 @@ cargo run -p nuis -- run-artifact "$TMPDIR/nuis_libc_close_demo"
 cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
   examples/ns/ffi/libc_read_buffer_demo.ns "$TMPDIR/nuis_libc_read_buffer_demo"
 cargo run -p nuis -- run-artifact "$TMPDIR/nuis_libc_read_buffer_demo"
+cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
+  examples/ns/ffi/owned_return_buffer_demo.ns "$TMPDIR/nuis_owned_return_buffer_demo"
+cargo run -p nuis -- run-artifact "$TMPDIR/nuis_owned_return_buffer_demo"
 ```
 
 Task/runtime ladder:

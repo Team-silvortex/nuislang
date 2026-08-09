@@ -11,6 +11,8 @@ pub(crate) const NUSTAR_REGISTRY_ROOT: &str = "nustar-packages";
 
 #[path = "pipeline_ffi.rs"]
 mod pipeline_ffi;
+#[path = "pipeline_ffi_owned_buffer.rs"]
+mod pipeline_ffi_owned_buffer;
 #[path = "pipeline_report.rs"]
 mod pipeline_report;
 #[path = "pipeline_units.rs"]
@@ -448,6 +450,7 @@ fn lower_prepared_pipeline(
         &prepared.lowering_manifest,
         lowering_target.as_ref(),
     )?;
+    pipeline_ffi_owned_buffer::validate_owned_return_buffer_yir(&yir)?;
     let loaded_nustar =
         collect_loaded_nustar(&prepared.nir, &yir, &prepared.lowering_manifest.package_id)?;
     let llvm_ir =

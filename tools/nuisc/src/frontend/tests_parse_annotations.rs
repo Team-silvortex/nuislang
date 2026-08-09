@@ -948,7 +948,7 @@ fn rejects_ref_parameter_in_extern_function_signature() {
     .unwrap_err();
 
     assert!(error.contains("extern function `host_take_ptr` parameter `head`"));
-    assert!(error.contains("only non-optional `ref Buffer` parameters are currently stabilized"));
+    assert!(error.contains("hash-bound owned `ref Buffer` return candidates"));
 }
 
 #[test]
@@ -968,7 +968,7 @@ fn rejects_ref_return_in_extern_interface_signature() {
     .unwrap_err();
 
     assert!(error.contains("extern method `Nodes.head` return type"));
-    assert!(error.contains("pointer returns remain unsupported"));
+    assert!(error.contains("hash-bound owned `ref Buffer` return candidates"));
 }
 
 #[test]

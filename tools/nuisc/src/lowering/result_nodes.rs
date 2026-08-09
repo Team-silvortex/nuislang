@@ -23,15 +23,29 @@ pub(super) fn lower_cpu_unary_value_effect(
     prefix: &str,
     instruction: &str,
 ) -> Result<String, String> {
+    lower_cpu_unary_value_effect_with_metadata(state, bindings, input, prefix, instruction, &[])
+}
+
+pub(super) fn lower_cpu_unary_value_effect_with_metadata(
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+    input: &NirExpr,
+    prefix: &str,
+    instruction: &str,
+    metadata: &[&str],
+) -> Result<String, String> {
     let input_name = lower_expr(input, state, bindings)?;
     let name = next_name(state, prefix);
+    let mut args = Vec::with_capacity(1 + metadata.len());
+    args.push(input_name.clone());
+    args.extend(metadata.iter().map(|value| (*value).to_owned()));
     state.yir.nodes.push(Node {
         name: name.clone(),
         resource: "cpu0".to_owned(),
         op: Operation {
             module: "cpu".to_owned(),
             instruction: instruction.to_owned(),
-            args: vec![input_name.clone()],
+            args,
         },
     });
     push_dep_edges(state, &input_name, &name);

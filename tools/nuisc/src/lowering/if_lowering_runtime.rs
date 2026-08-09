@@ -77,13 +77,21 @@ fn lower_selected_cpu_unary_runtime_effect(
         lower_select(condition_name, lhs_name, rhs_name, state)?
     };
     let name = next_name(state, lhs_op.prefix());
+    let mut args = vec![selected_input.clone()];
+    if lhs_op.is_mutex() {
+        args.extend(
+            yir_core::CPU_MUTEX_RUNTIME_METADATA
+                .iter()
+                .map(|value| (*value).to_owned()),
+        );
+    }
     state.yir.nodes.push(Node {
         name: name.clone(),
         resource: "cpu0".to_owned(),
         op: Operation {
             module: "cpu".to_owned(),
             instruction: lhs_op.instruction().to_owned(),
-            args: vec![selected_input.clone()],
+            args,
         },
     });
     push_dep_edges(state, &selected_input, &name);

@@ -439,6 +439,8 @@ mod shader_sidecar;
 mod shim_file_io;
 #[path = "aot_tests/shim_lifecycle.rs"]
 mod shim_lifecycle;
+#[path = "aot_tests/shim_mutex.rs"]
+mod shim_mutex;
 #[path = "aot_tests/shim_process.rs"]
 mod shim_process;
 #[path = "aot_tests/shim_runtime_hooks.rs"]

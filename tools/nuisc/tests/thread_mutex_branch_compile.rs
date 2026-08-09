@@ -14,6 +14,24 @@ fn cpu_op_count(artifacts: &nuisc::pipeline::PipelineArtifacts, instruction: &st
         .count()
 }
 
+fn assert_scheduler_mutex_metadata(artifacts: &nuisc::pipeline::PipelineArtifacts) {
+    let mutex_nodes = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction.starts_with("mutex_"))
+        .collect::<Vec<_>>();
+    assert!(!mutex_nodes.is_empty(), "expected mutex YIR nodes");
+    for node in mutex_nodes {
+        assert_eq!(
+            &node.op.args[1..],
+            yir_core::CPU_MUTEX_RUNTIME_METADATA,
+            "mutex contract metadata drifted for {}",
+            node.name
+        );
+    }
+}
+
 #[test]
 fn lowers_branch_local_mutex_lock_through_one_selected_runtime_prefix() {
     let artifacts =
@@ -23,6 +41,7 @@ fn lowers_branch_local_mutex_lock_through_one_selected_runtime_prefix() {
     assert_eq!(cpu_op_count(&artifacts, "mutex_value"), 1);
     assert_eq!(cpu_op_count(&artifacts, "add"), 2);
     assert!(cpu_op_count(&artifacts, "select") >= 2);
+    assert_scheduler_mutex_metadata(&artifacts);
 }
 
 #[test]

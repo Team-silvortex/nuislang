@@ -169,10 +169,6 @@ fn validate_extern_memory_capabilities(
                 function.name, function.abi
             ));
         }
-        return Err(format!(
-            "extern `{}` ABI `{}` symbol `{symbol}` has a verified owned return-buffer capability, but source pointer-return lowering remains closed until its GLM transfer path is implemented",
-            function.name, function.abi
-        ));
     }
     Ok(())
 }
@@ -341,7 +337,7 @@ mod tests {
     }
 
     #[test]
-    fn keeps_owned_return_buffer_lowering_closed_after_contract_validation() {
+    fn accepts_owned_return_buffer_after_contract_validation() {
         let ast = crate::frontend::parse_nuis_ast(
             r#"
             mod cffi Main {
@@ -369,11 +365,7 @@ mod tests {
             .render(),
         );
 
-        let error = validate_externs(&ast, &manifest)
-            .expect_err("owned pointer return must remain closed before GLM lowering exists");
-
-        assert!(error.contains("verified owned return-buffer capability"));
-        assert!(error.contains("source pointer-return lowering remains closed"));
-        assert!(error.contains("GLM transfer path"));
+        validate_externs(&ast, &manifest)
+            .expect("an exact owned return capability should open frontend validation");
     }
 }

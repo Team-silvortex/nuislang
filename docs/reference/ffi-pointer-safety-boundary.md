@@ -33,6 +33,8 @@ Stable source-facing FFI should be read as:
   lift/lookup helpers
 * the narrow `ref Buffer` host bridge used for buffer-backed read/write
   surfaces
+* one exact-whitelisted owned `ref Buffer` return whose runtime-header length
+  and registered destructor enter the normal GLM ownership pipeline
 
 Host FFI is also registered through `nustar`.
 
@@ -112,11 +114,20 @@ Those are real source/compiler paths, not placeholder registrations. A
 non-reference `String` extern parameter without the matching capability is
 rejected before lowering.
 
-Owned return-buffer registration is protocol-valid and regression-tested, but
-source pointer-return execution is still closed. The compiler rejects it after
-contract validation until the returned allocation can enter YIR/GLM with its
-length and exact-once destructor transfer. This distinction prevents a valid
-manifest from being mistaken for a completed ownership implementation.
+Owned return-buffer execution is now open for one deliberately narrow linear
+path. `host_owned_buffer_make(i64) -> ref Buffer` is admitted only through its
+exact manifest capability. Lowering emits a dedicated Res-producing operation
+with `nuis-ffi-owned-buffer-v1` metadata, recomputes the producer, capability,
+and destructor hashes, recovers length from the registered runtime header, and
+carries the exact destructor beside the LLVM pointer. A post-lowering graph
+gate allows only direct buffer access followed by one same-function
+`free(...)`; branch, loop, return, async, and secondary-extern escapes fail
+closed. Native smoke proves payload access and exact registered destruction.
+
+This is not generalized pointer-return support. It is one owned `ref Buffer`
+contract with a fixed length policy and linear lifetime, so a valid manifest
+still cannot authorize arbitrary `ref T`, raw `ptr<T>`, retained borrows, or
+task-carried host memory.
 
 In `nustar` manifest strings, multi-argument `ffi_symbol:` signatures can use
 the same comma-separated form as source-facing signatures, for example
@@ -189,13 +200,15 @@ The narrow buffer bridge means:
 * this is not a promise that arbitrary `ref T` is a stable host ABI value
 * borrowed and owned pointer authority still belongs to the internal memory
   model and verifier
+* an exact `owned_return_buffer` capability may return `ref Buffer`, but only
+  through runtime-header length recovery and one registered destructor
 
 Not currently source-stable:
 
 * `ptr<T>` / raw pointer types
 * pointer arithmetic
 * arbitrary `ref T` host ABI parameters
-* host ABI pointer returns
+* unregistered or generalized host ABI pointer returns
 * generalized external authority contracts for raw host memory
 
 ## Current AOT / LLVM Contract
@@ -210,6 +223,11 @@ Current dynamic extern parameter inference is conservative:
   `move_ptr`, `load_next`, and `null` can pass a `ptr`
 * `extern_call_i32` / `const_i32` / `call_i32` producers can pass `i32`
 * everything else defaults to `i64`
+
+The owned return lane is stricter than that inference. Its dedicated YIR op
+calls the registered producer as `ptr`, traps on null or negative header
+length, records `ptr+len+destructor`, and lowers `cpu.free` to that exact
+destructor rather than libc `free`.
 
 This is an AOT bridge implementation detail, not a source-language raw pointer
 feature.
@@ -226,6 +244,8 @@ Current regression anchors:
 * [tests.rs](../../crates/yir-lower-llvm/src/tests.rs)
 * [ffi_compile.rs](../../tools/nuisc/tests/ffi_compile.rs)
 * [registry_host_ffi_tests.rs](../../tools/nuisc/src/registry_host_ffi_tests.rs)
+* [pipeline_ffi_owned_buffer.rs](../../tools/nuisc/src/pipeline_ffi_owned_buffer.rs)
+* [ffi_smoke.rs](../../tools/nuis/tests/ffi_smoke.rs)
 * [lib_tests_execution.rs](../../tools/nuisc/src/lib_tests_execution.rs)
 
 ## Current String Boundary

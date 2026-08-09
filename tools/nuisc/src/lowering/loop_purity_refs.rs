@@ -69,7 +69,8 @@ pub(in crate::lowering) fn expr_references_names(expr: &NirExpr, names: &BTreeSe
         | NirExpr::CpuSpawn { args, .. }
         | NirExpr::CpuThreadSpawn { args, .. }
         | NirExpr::CpuExternCall { args, .. }
-        | NirExpr::CpuExternCallI32 { args, .. } => {
+        | NirExpr::CpuExternCallI32 { args, .. }
+        | NirExpr::CpuExternCallOwnedBuffer { args, .. } => {
             args.iter().any(|arg| expr_references_names(arg, names))
         }
         NirExpr::MethodCall { receiver, args, .. } => {

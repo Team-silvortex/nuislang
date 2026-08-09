@@ -23,6 +23,48 @@ fn glm_profile_uses_semantic_op_classification() {
 }
 
 #[test]
+fn glm_profiles_owned_ffi_buffer_as_resource_with_only_real_inputs() {
+    let signature = "ref_Buffer(i64)";
+    let signature_hash =
+        crate::ffi::ffi_symbol_signature_hash("c", "host_owned_buffer_make", signature);
+    let destructor_hash =
+        crate::ffi::ffi_symbol_signature_hash("c", "host_owned_buffer_destroy", "i64(ref_Buffer)");
+    let descriptor =
+        crate::ffi::owned_buffer_return_descriptor("host_owned_buffer_destroy", &destructor_hash);
+    let capability_hash = crate::ffi::ffi_memory_capability_hash(
+        "c",
+        "host_owned_buffer_make",
+        &signature_hash,
+        &descriptor,
+    );
+    let op = Operation::parse(
+        "cpu.extern_call_owned_buffer",
+        vec![
+            crate::ffi::OWNED_BUFFER_RETURN_PROTOCOL.to_owned(),
+            "c".to_owned(),
+            "host_owned_buffer_make".to_owned(),
+            signature.to_owned(),
+            signature_hash,
+            capability_hash,
+            crate::ffi::OWNED_BUFFER_RETURN_LENGTH_POLICY.to_owned(),
+            "host_owned_buffer_destroy".to_owned(),
+            destructor_hash,
+            "seed".to_owned(),
+        ],
+    )
+    .unwrap();
+    let profile = crate::glm_profile_for_operation(&op);
+
+    assert_eq!(op.semantic_op(), SemanticOp::CpuExternCallOwnedBuffer);
+    assert_eq!(op.cpu_llvm_lowering_class(), CpuLlvmLoweringClass::Runtime);
+    assert_eq!(profile.result_class, GlmValueClass::Res);
+    assert_eq!(profile.accesses.len(), 1);
+    assert_eq!(profile.accesses[0].input, "seed");
+    assert_eq!(profile.accesses[0].class, GlmValueClass::Val);
+    assert_eq!(profile.accesses[0].mode, GlmUseMode::Read);
+}
+
+#[test]
 fn glm_profiles_owned_bytes_select_as_conditional_ownership_transfer() {
     let op = Operation::parse(
         "cpu.select_owned_bytes",

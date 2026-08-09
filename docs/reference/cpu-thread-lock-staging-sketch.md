@@ -21,7 +21,7 @@ Today the repository already has:
 Today the repository also explicitly does **not** yet have:
 
 * a mature parallel executor
-* shared-memory synchronization primitives
+* source-level shared mutex authorization across workers
 * a final concurrent memory visibility contract
 * a stable thread runtime
 
@@ -90,6 +90,25 @@ Likely long-term meaning:
 Short rule:
 
 `locks should enter the language as explicit coordination resources, not as accidental value wrappers`
+
+### Current scheduler-runtime foothold
+
+The first narrow runtime slice now exists for `Mutex<i64>`:
+
+* LLVM lowers `mutex_new/lock/value/unlock` to scheduler ABI calls
+* opaque handles and generation-bound guard tokens prevent stale identity reuse
+* cooperative worker IDs make ownership evidence observable
+* acquire/release fences and monotonically increasing release epochs make the
+  current visibility promise explicit
+* YIR carries the shared `scheduler-handle-v1`,
+  `acquire-release-epoch-v1`, `linear-guard-v1`, and
+  `i64-native-staged-fallback` contract metadata
+
+This is intentionally a runtime foothold, not the final source model. Current
+Nuis `Mutex<T>` remains linear: lock consumes the mutex, unlock consumes the
+guard, and neither family may be copied across an async boundary. A future
+shared form therefore needs an explicit GLM permit/lease authority rather than
+raw handle duplication.
 
 ## Staging Rule
 
@@ -191,7 +210,9 @@ If this line becomes active implementation work, the safest order is:
 3. define `NIR`/`YIR` semantic roles for thread spawn/join and lock
    acquire/release
 4. define `GLM` classification for thread handles and lock/guard objects
-5. only then begin claiming stronger parallel/runtime semantics
+5. define an explicit shared permit/lease authority without weakening the
+   current linear mutex family
+6. only then begin claiming stronger parallel/runtime semantics
 
 ## What Not To Do First
 

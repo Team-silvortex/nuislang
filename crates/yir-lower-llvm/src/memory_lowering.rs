@@ -338,6 +338,15 @@ pub(crate) fn lower_cpu_memory_node(
             *last_cpu_value = Some(reg);
         }
         "free" => {
+            if let Some(LlvmValueRef::OwnedExternalBuffer {
+                ptr, destructor, ..
+            }) = registers.get(&node.op.args[0])
+            {
+                let status = fresh_reg(next_reg);
+                body.push(format!("  {status} = call i64 @{destructor}(ptr {ptr})"));
+                registers.insert(node.name.clone(), LlvmValueRef::Void);
+                return Ok(true);
+            }
             let Some(ptr) = get_ptr(registers, &node.op.args[0]) else {
                 body.push(format!(
                         "  ; deferred lowering for cpu.free `{}` because its input is outside the current CPU LLVM slice",

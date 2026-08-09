@@ -432,9 +432,19 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 ));
                 return true;
             };
+            let runtime_handle = if let LlvmValueRef::I64(value) = &value_ref {
+                let handle = fresh_reg(&mut state.next_reg);
+                state.body.push(format!(
+                    "  {handle} = call i64 @nuis_scheduler_mutex_new_i64_v1(i64 {value})"
+                ));
+                Some(handle)
+            } else {
+                None
+            };
             state.registers.insert(
                 node.name.clone(),
                 LlvmValueRef::Mutex(MutexLlvmValueRef {
+                    runtime_handle,
                     value: Box::new(value_ref),
                 }),
             );
@@ -449,9 +459,19 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 ));
                 return true;
             };
+            let runtime_guard = mutex.runtime_handle.as_ref().map(|handle| {
+                let guard = fresh_reg(&mut state.next_reg);
+                state.body.push(format!(
+                    "  {guard} = call i64 @nuis_scheduler_mutex_lock_i64_v1(i64 {handle})"
+                ));
+                guard
+            });
             state.registers.insert(
                 node.name.clone(),
-                LlvmValueRef::MutexGuard(MutexGuardLlvmValueRef { value: mutex.value }),
+                LlvmValueRef::MutexGuard(MutexGuardLlvmValueRef {
+                    runtime_guard,
+                    value: mutex.value,
+                }),
             );
             propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
             true
@@ -464,9 +484,19 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 ));
                 return true;
             };
+            let runtime_handle = guard.runtime_guard.as_ref().map(|runtime_guard| {
+                let handle = fresh_reg(&mut state.next_reg);
+                state.body.push(format!(
+                    "  {handle} = call i64 @nuis_scheduler_mutex_unlock_i64_v1(i64 {runtime_guard})"
+                ));
+                handle
+            });
             state.registers.insert(
                 node.name.clone(),
-                LlvmValueRef::Mutex(MutexLlvmValueRef { value: guard.value }),
+                LlvmValueRef::Mutex(MutexLlvmValueRef {
+                    runtime_handle,
+                    value: guard.value,
+                }),
             );
             propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
             true
@@ -479,7 +509,15 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 ));
                 return true;
             };
-            let value_ref = (*guard.value).clone();
+            let value_ref = if let Some(runtime_guard) = &guard.runtime_guard {
+                let value = fresh_reg(&mut state.next_reg);
+                state.body.push(format!(
+                    "  {value} = call i64 @nuis_scheduler_mutex_value_i64_v1(i64 {runtime_guard})"
+                ));
+                LlvmValueRef::I64(value)
+            } else {
+                (*guard.value).clone()
+            };
             state.registers.insert(node.name.clone(), value_ref.clone());
             if let Some(as_i64) = coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg) {
                 state.last_cpu_value = Some(as_i64);

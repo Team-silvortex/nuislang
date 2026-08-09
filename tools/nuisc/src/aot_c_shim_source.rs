@@ -16,6 +16,7 @@ use crate::aot_c_shim_network_owned_runtime::append_c_shim_network_owned_runtime
 use crate::aot_c_shim_network_probe_runtime::append_c_shim_network_probe_runtime;
 use crate::aot_c_shim_network_runtime::append_c_shim_network_runtime;
 use crate::aot_c_shim_owned_blob_runtime::append_c_shim_owned_blob_runtime;
+use crate::aot_c_shim_owned_buffer_runtime::append_c_shim_owned_buffer_runtime;
 use crate::aot_c_shim_path_runtime::append_c_shim_path_runtime;
 use crate::aot_c_shim_process_runtime::append_c_shim_process_runtime;
 use crate::aot_c_shim_provider_worker_runtime::append_c_shim_provider_worker_runtime;
@@ -47,6 +48,7 @@ pub(crate) fn render_c_shim_source(ast: &AstModule) -> String {
     );
     append_c_shim_lifecycle_runtime(&mut out);
     append_c_shim_text_runtime(&mut out);
+    append_c_shim_owned_buffer_runtime(&mut out);
     append_c_shim_owned_blob_runtime(&mut out);
     append_c_shim_serialization_runtime(&mut out);
     append_c_shim_header_runtime(&mut out);

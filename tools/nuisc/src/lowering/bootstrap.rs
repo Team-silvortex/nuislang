@@ -9,6 +9,7 @@ pub(super) trait BootstrapLoweringProvider {
     fn lower(
         &self,
         module: &NirModule,
+        manifest: &NustarPackageManifest,
         target_config: Option<&LoweringTargetConfig>,
     ) -> Result<YirModule, String>;
 }
@@ -32,7 +33,7 @@ pub(super) fn dispatch_nustar_lowering(
             )
         })?;
     validate_lowering_target(module, nustar_manifest, target_config)?;
-    provider.lower(module, target_config)
+    provider.lower(module, nustar_manifest, target_config)
 }
 
 fn bootstrap_lowering_provider(entry: &str) -> Option<&'static dyn BootstrapLoweringProvider> {
@@ -56,11 +57,12 @@ impl BootstrapLoweringProvider for CffiBootstrapLoweringProvider {
     fn lower(
         &self,
         module: &NirModule,
+        manifest: &NustarPackageManifest,
         target_config: Option<&LoweringTargetConfig>,
     ) -> Result<YirModule, String> {
         // The CFFI package owns the source boundary while CPU remains the
         // registered host object-code provider during the bootstrap phase.
-        lower_nir_to_yir_builtin_cpu_with_target(module, target_config)
+        lower_nir_to_yir_builtin_cpu_with_manifest(module, manifest, target_config)
     }
 }
 
@@ -74,9 +76,10 @@ impl BootstrapLoweringProvider for CpuBootstrapLoweringProvider {
     fn lower(
         &self,
         module: &NirModule,
+        manifest: &NustarPackageManifest,
         target_config: Option<&LoweringTargetConfig>,
     ) -> Result<YirModule, String> {
-        lower_nir_to_yir_builtin_cpu_with_target(module, target_config)
+        lower_nir_to_yir_builtin_cpu_with_manifest(module, manifest, target_config)
     }
 }
 
@@ -85,18 +88,54 @@ pub(super) fn lower_nir_to_yir_builtin_cpu(module: &NirModule) -> Result<YirModu
     lower_nir_to_yir_builtin_cpu_with_target(module, None)
 }
 
+#[cfg(test)]
 pub(super) fn lower_nir_to_yir_builtin_cpu_with_target(
     module: &NirModule,
     target_config: Option<&LoweringTargetConfig>,
 ) -> Result<YirModule, String> {
     let branch_action_registry = yir_verify::default_registry();
-    lower_nir_to_yir_builtin_cpu_with_registry(module, target_config, &branch_action_registry)
+    lower_nir_to_yir_builtin_cpu_with_registries(
+        module,
+        target_config,
+        &branch_action_registry,
+        None,
+    )
 }
 
+fn lower_nir_to_yir_builtin_cpu_with_manifest(
+    module: &NirModule,
+    manifest: &NustarPackageManifest,
+    target_config: Option<&LoweringTargetConfig>,
+) -> Result<YirModule, String> {
+    let branch_action_registry = yir_verify::default_registry();
+    let host_ffi_registry = HostFfiRegistryView::try_from_manifest(manifest)?;
+    lower_nir_to_yir_builtin_cpu_with_registries(
+        module,
+        target_config,
+        &branch_action_registry,
+        Some(host_ffi_registry),
+    )
+}
+
+#[cfg(test)]
 pub(super) fn lower_nir_to_yir_builtin_cpu_with_registry(
     module: &NirModule,
     target_config: Option<&LoweringTargetConfig>,
     branch_action_registry: &ModRegistry,
+) -> Result<YirModule, String> {
+    lower_nir_to_yir_builtin_cpu_with_registries(
+        module,
+        target_config,
+        branch_action_registry,
+        None,
+    )
+}
+
+fn lower_nir_to_yir_builtin_cpu_with_registries(
+    module: &NirModule,
+    target_config: Option<&LoweringTargetConfig>,
+    branch_action_registry: &ModRegistry,
+    host_ffi_registry: Option<HostFfiRegistryView>,
 ) -> Result<YirModule, String> {
     if !crate::frontend::is_host_execution_domain(&module.domain) {
         return Err(format!(
@@ -181,6 +220,7 @@ pub(super) fn lower_nir_to_yir_builtin_cpu_with_registry(
         call_stack: Vec::new(),
         last_effect_anchor: None,
         target_config: target_config.cloned(),
+        host_ffi_registry,
     };
 
     materialize_cpu_target_config_node(&mut state);

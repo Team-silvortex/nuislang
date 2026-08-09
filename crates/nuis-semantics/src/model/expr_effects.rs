@@ -189,6 +189,7 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::DataProfileSendDownlink { .. }
         | NirExpr::CpuExternCall { .. }
         | NirExpr::CpuExternCallI32 { .. }
+        | NirExpr::CpuExternCallOwnedBuffer { .. }
         | NirExpr::Free(_) => NirExprEffectClass::Stateful,
     }
 }

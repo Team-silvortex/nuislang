@@ -233,16 +233,21 @@ historical closures.
 
 The `beta-0.1` calibration baseline is:
 
-* `standard-library/std/concurrency-task-thread-lock`: `active/76`, required;
-  this is now the current weakest task after the CFFI capability tranche;
-  recursive selected-prefix lowering and the native cancel/unlock project now
-  close both dynamic branches; scheduler-backed mutex contention and visibility
-  remain open
+* `standard-library/std/concurrency-task-thread-lock`: `active/80`, required
+  and now the current weakest task;
+  recursive selected-prefix lowering and the native cancel/unlock project close
+  both dynamic branches; `Mutex<i64>` now has opaque scheduler handles,
+  generation-bound guards, worker ownership, acquire/release epochs, strict YIR
+  metadata, deterministic contention, replay rejection, and native LLVM ABI
+  evidence; source-level shared-worker authority and non-`i64` payloads remain
+  open
 * `host-compatibility/cffi/registered-pointer-string-object-boundary`:
-  `active/77`, required; five real borrowed
-  UTF-8 calls now carry exact signature plus memory-capability hashes through
-  compile, project metadata, and Nsld validation, while owned return-buffer
-  descriptors remain fail-closed until their GLM transfer lowering exists
+  `active/83`, required; five real borrowed UTF-8 calls and one owned
+  `ref Buffer` return carry exact signature plus memory-capability hashes
+  through compile, project metadata, and Nsld validation; the owned path now
+  has self-verifying YIR metadata, runtime-header length recovery, exact
+  destructor dispatch, branch/async escape rejection, and native execution,
+  while raw pointers and generalized ownership transfer remain closed
 * `package-system/galaxy/source-import-and-lock-resolution`: `usable/78`,
   required; local/transitive imports work, while a hash-bound lock closure does
   not yet exist

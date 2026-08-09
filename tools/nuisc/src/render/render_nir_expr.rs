@@ -368,6 +368,26 @@ pub(super) fn render_nir_expr(value: &NirExpr) -> String {
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
+        NirExpr::CpuExternCallOwnedBuffer {
+            abi,
+            interface,
+            callee,
+            signature,
+            args,
+        } => format!(
+            "extern_owned_buffer \"{}\" {}{} signature=\"{}\"({})",
+            abi,
+            interface
+                .as_ref()
+                .map(|name| format!("{name}::"))
+                .unwrap_or_default(),
+            callee,
+            escape_debug(signature),
+            args.iter()
+                .map(render_nir_expr)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
         NirExpr::LoadValue(value) => format!("load_value({})", render_nir_expr(value)),
         NirExpr::LoadNext(value) => format!("load_next({})", render_nir_expr(value)),
         NirExpr::BufferLen(value) => format!("buffer_len({})", render_nir_expr(value)),

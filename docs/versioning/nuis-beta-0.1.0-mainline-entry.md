@@ -146,6 +146,39 @@ With CFFI at `active/77`, deterministic tensor ordering returns the next task
 card to the lower `active/76` concurrency coordinate instead of pinning work to
 one subsystem by hand.
 
+The first scheduler-mutex runtime tranche then advances concurrency to
+`active/80`. `Mutex<i64>` now lowers through opaque monotonic scheduler handles
+and generation-bound one-shot guard tokens. Cooperative worker IDs, acquire and
+release fences, monotonically increasing release epochs, held-lock contention,
+reacquisition, replay/forgery rejection, and lifecycle cleanup are covered by a
+compiled runtime harness. Generated mutex YIR carries one shared ordered
+contract for scheduler identity, visibility, linear guard authority, and the
+`i64`-native typed-fallback policy; the CPU domain rejects drift, LLVM emits the
+runtime ABI, and the existing Nuis branch demo still executes both native paths
+with exits `81` and `89`.
+
+This does not open raw shared handles: Nuis source retains consume-on-lock and
+consume-on-unlock GLM authority, non-`i64` payloads remain staged, and no
+OS-thread-parallel mutex claim is made. With concurrency above CFFI, the normal
+bootstrap selector returns the current task card to
+`host-compatibility/cffi/registered-pointer-string-object-boundary` at
+`active/77`.
+
+The first executable owned-return tranche then advances CFFI to `active/83`.
+One exact-whitelisted `host_owned_buffer_make(i64) -> ref Buffer` now lowers
+through a dedicated Res-producing NIR/YIR operation. Its
+`nuis-ffi-owned-buffer-v1` metadata independently revalidates producer,
+capability, and destructor hashes; LLVM recovers the runtime-header length,
+traps on invalid pointer/length state, and retains the exact registered
+destructor until `cpu.free`. The YIR gate requires one same-function free and
+rejects branch, loop, return, async, and secondary-extern escape while the
+owner is live. A native CLI smoke reads the payload and releases it successfully.
+
+Raw pointers, arbitrary `ref T`, retained borrows, and branch/task-carried host
+owners remain closed. With CFFI now above concurrency on the same `active`
+status rank, deterministic tensor ordering hands the next task back to
+`standard-library/std/concurrency-task-thread-lock` at `active/80`.
+
 ## Honesty Boundary
 
 `beta-0.1.0` should not claim:

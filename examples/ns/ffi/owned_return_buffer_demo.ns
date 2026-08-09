@@ -1,0 +1,11 @@
+mod cffi Main {
+  extern "c" fn host_owned_buffer_make(seed: i64) -> ref Buffer;
+
+  fn main() -> i64 {
+    let buffer: ref Buffer = host_owned_buffer_make(7);
+    let len: i64 = buffer_len(buffer);
+    let tail: i64 = load_at(buffer, 3);
+    free(buffer);
+    return len + tail - 14;
+  }
+}

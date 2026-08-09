@@ -192,6 +192,62 @@ fn accepts_registered_libc_demo_signatures() {
     compiled_source("../../examples/ns/ffi/libc_write_demo.ns");
     compiled_source("../../examples/ns/ffi/libc_close_demo.ns");
     compiled_source("../../examples/ns/ffi/libc_read_buffer_demo.ns");
+    compiled_source("../../examples/ns/ffi/owned_return_buffer_demo.ns");
+}
+
+#[test]
+fn lowers_registered_owned_buffer_return_with_exact_destructor() {
+    let artifacts = nuisc::pipeline::compile_source_path(Path::new(
+        "../../examples/ns/ffi/owned_return_buffer_demo.ns",
+    ))
+    .unwrap_or_else(|error| panic!("owned return buffer source should compile: {error}"));
+
+    let owned_call = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| node.op.instruction == "extern_call_owned_buffer")
+        .expect("owned return call should have a dedicated YIR node");
+    let contract = yir_core::ffi::parse_owned_buffer_return_contract(&owned_call.op.args)
+        .expect("owned return YIR metadata should revalidate");
+    assert_eq!(contract.symbol, "host_owned_buffer_make");
+    assert_eq!(contract.destructor_symbol, "host_owned_buffer_destroy");
+    assert!(artifacts
+        .llvm_ir
+        .contains("declare ptr @host_owned_buffer_make(i64)"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("declare i64 @host_owned_buffer_destroy(ptr)"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call ptr @host_owned_buffer_make(i64"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("getelementptr inbounds i64, ptr"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("call i64 @host_owned_buffer_destroy(ptr"));
+}
+
+#[test]
+fn rejects_owned_buffer_return_without_linear_destructor_transfer() {
+    let ast = nuisc::frontend::parse_nuis_ast(
+        r#"
+        mod cffi Main {
+          extern "c" fn host_owned_buffer_make(seed: i64) -> ref Buffer;
+          fn main() -> i64 {
+            let buffer: ref Buffer = host_owned_buffer_make(3);
+            return buffer_len(buffer);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let error = match nuisc::pipeline::compile_ast(ast) {
+        Ok(_) => panic!("owned return without free must remain closed"),
+        Err(error) => error,
+    };
+    assert!(error.contains("exactly one direct free"), "{error}");
 }
 
 #[test]

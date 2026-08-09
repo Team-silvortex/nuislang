@@ -174,6 +174,23 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
             }],
             effect: GlmEffect::LifetimeEnd,
         },
+        SemanticOp::CpuExternCallOwnedBuffer => {
+            let inputs = crate::ffi::parse_owned_buffer_return_contract(&op.args)
+                .map(|contract| contract.inputs)
+                .unwrap_or(&[]);
+            GlmNodeProfile {
+                result_class: GlmValueClass::Res,
+                accesses: inputs
+                    .iter()
+                    .map(|input| GlmAccess {
+                        input: input.clone(),
+                        class: GlmValueClass::Val,
+                        mode: GlmUseMode::Read,
+                    })
+                    .collect(),
+                effect: GlmEffect::None,
+            }
+        }
         SemanticOp::DataMove => GlmNodeProfile {
             result_class: GlmValueClass::Res,
             accesses: vec![GlmAccess {

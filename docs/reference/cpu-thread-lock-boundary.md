@@ -22,8 +22,10 @@ Read the current line this way:
 * `Thread<T>` / `Mutex<T>` / `MutexGuard<T>` are real staged frontend,
   lowering, and verifier-visible families
 * they already have compile-closure anchors and `GLM` ownership rules
-* they still do **not** imply a finalized concurrent runtime or visibility
-  contract
+* `Mutex<i64>` now reaches a cooperative scheduler handle/guard runtime with
+  explicit acquire/release epoch evidence
+* that foothold still does **not** imply source-level shared-lock authority, a
+  parallel executor, or a finalized cross-thread visibility contract
 
 ## What Is Real Today
 
@@ -110,6 +112,53 @@ Important checked-in examples in that file:
 * post-unlock guard reuse is rejected
 * branch-local guard reads may remain legal when no consuming step happened
 
+### 5. The first scheduler mutex runtime is real
+
+The current native `Mutex<i64>` lane now lowers through opaque runtime
+identities rather than LLVM-only value wrappers:
+
+* `mutex_new` allocates a monotonic scheduler handle
+* `mutex_lock` consumes that handle and yields a one-shot guard token
+* each guard records the cooperative scheduler worker identity and the release
+  epoch observed by acquisition
+* `mutex_value` requires a live, generation-matching locked guard
+* `mutex_unlock` performs a release fence, advances the visibility epoch,
+  invalidates the guard, and returns the original handle
+* contention, repeated unlock, forged tokens, stale generations, and exhausted
+  tables fail closed
+* lifecycle shutdown invalidates all live mutex and guard slots
+
+Generated YIR records this boundary on every mutex node:
+
+```text
+mutex_contract=scheduler-handle-v1
+visibility=acquire-release-epoch-v1
+authority=linear-guard-v1
+payload_policy=i64-native-staged-fallback
+```
+
+The CPU domain accepts the full ordered contract, rejects metadata drift, and
+keeps only the first argument as the data dependency. Legacy single-input YIR
+remains readable during this transition.
+
+Current proof surfaces:
+
+* [shim_mutex.rs](../../tools/nuisc/src/aot_tests/shim_mutex.rs) runs two
+  cooperative workers through deterministic contention, release publication,
+  reacquisition, token replay rejection, and lifecycle cleanup
+* [concurrency_branch_native_smoke.rs](../../tools/nuis/tests/concurrency_branch_native_smoke.rs)
+  proves generated Nuis YIR carries the metadata and native LLVM calls the
+  scheduler mutex ABI while both dynamic source branches still execute
+
+Honesty boundary:
+
+* only the current `i64` payload lane is runtime-backed
+* other typed mutex payloads retain the staged typed wrapper fallback
+* the contention harness exercises scheduler workers at the runtime boundary;
+  Nuis source still cannot duplicate or send one mutex authority into multiple
+  workers
+* this runtime is cooperative and does not yet claim OS-thread parallel safety
+
 ## What Is Still Intentionally Blocked
 
 ### Arbitrary branch-local runtime mini-programs
@@ -136,7 +185,10 @@ Short rule:
 Still not promised today:
 
 * a mature worker runtime
-* a final memory visibility model
+* source-level shared mutex authorization across task/thread boundaries
+* an OS-thread-parallel mutex implementation
+* a final memory visibility model beyond the current acquire/release epoch
+  protocol
 * a finished synchronization contract
 * a claim that thread/lock families are already semantically complete
 
@@ -167,10 +219,13 @@ For the current beta foundation line, this lane is now strong enough to say:
 * compile-closure anchors exist
 * structured branch-local consuming prefixes have exactly-once YIR regressions
 * `GLM` ownership truth exists
+* `Mutex<i64>` reaches a scheduler-backed native runtime with auditable
+  visibility metadata
 
 But it is **not** yet strong enough to say:
 
 * the concurrent runtime model is final
+* a mutex may already be shared across Nuis workers
 * the visibility/synchronization story is complete
 
 That is the right beta-hardening posture:

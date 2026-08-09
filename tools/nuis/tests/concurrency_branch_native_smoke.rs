@@ -49,6 +49,18 @@ fn branch_selected_cancel_and_unlock_reach_native_binary_once_per_chain() {
     assert_eq!(yir.matches("cpu.spawn_task").count(), 1);
     assert_eq!(yir.matches("cpu.cancel").count(), 1);
     assert_eq!(yir.matches("cpu.join_result").count(), 1);
+    for metadata in [
+        "mutex_contract=scheduler-handle-v1",
+        "visibility=acquire-release-epoch-v1",
+        "authority=linear-guard-v1",
+        "payload_policy=i64-native-staged-fallback",
+    ] {
+        assert_eq!(
+            yir.matches(metadata).count(),
+            6,
+            "every mutex YIR node must carry `{metadata}`"
+        );
+    }
 
     let llvm = read(&output_dir.join("task_branch_cancel_unlock_demo.ll"));
     assert_eq!(
@@ -63,6 +75,26 @@ fn branch_selected_cancel_and_unlock_reach_native_binary_once_per_chain() {
     );
     assert_eq!(
         llvm.matches("call i64 @nuis_scheduler_task_join_state_v1")
+            .count(),
+        1
+    );
+    assert_eq!(
+        llvm.matches("call i64 @nuis_scheduler_mutex_new_i64_v1")
+            .count(),
+        1
+    );
+    assert_eq!(
+        llvm.matches("call i64 @nuis_scheduler_mutex_lock_i64_v1")
+            .count(),
+        2
+    );
+    assert_eq!(
+        llvm.matches("call i64 @nuis_scheduler_mutex_unlock_i64_v1")
+            .count(),
+        2
+    );
+    assert_eq!(
+        llvm.matches("call i64 @nuis_scheduler_mutex_value_i64_v1")
             .count(),
         1
     );

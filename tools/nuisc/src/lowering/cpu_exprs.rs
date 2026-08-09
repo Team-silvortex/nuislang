@@ -94,6 +94,15 @@ pub(super) fn lower_cpu_expr(
         } => Some(lower_cpu_extern_call_i32(
             abi, callee, args, state, bindings,
         )),
+        NirExpr::CpuExternCallOwnedBuffer {
+            abi,
+            interface: _,
+            callee,
+            signature,
+            args,
+        } => Some(lower_cpu_extern_call_owned_buffer(
+            abi, callee, signature, args, state, bindings,
+        )),
         NirExpr::HostBufferHandle(value) => Some(lower_expr(value, state, bindings)),
         _ => None,
     }
@@ -321,12 +330,13 @@ fn lower_cpu_mutex_new(
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
 ) -> Result<String, String> {
-    super::result_nodes::lower_cpu_unary_value_effect(
+    super::result_nodes::lower_cpu_unary_value_effect_with_metadata(
         state,
         bindings,
         value,
         "cpu_mutex_new",
         "mutex_new",
+        &yir_core::CPU_MUTEX_RUNTIME_METADATA,
     )
 }
 
@@ -335,12 +345,13 @@ fn lower_cpu_mutex_lock(
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
 ) -> Result<String, String> {
-    super::result_nodes::lower_cpu_unary_value_effect(
+    super::result_nodes::lower_cpu_unary_value_effect_with_metadata(
         state,
         bindings,
         mutex,
         "cpu_mutex_lock",
         "mutex_lock",
+        &yir_core::CPU_MUTEX_RUNTIME_METADATA,
     )
 }
 
@@ -349,12 +360,13 @@ fn lower_cpu_mutex_unlock(
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
 ) -> Result<String, String> {
-    super::result_nodes::lower_cpu_unary_value_effect(
+    super::result_nodes::lower_cpu_unary_value_effect_with_metadata(
         state,
         bindings,
         guard,
         "cpu_mutex_unlock",
         "mutex_unlock",
+        &yir_core::CPU_MUTEX_RUNTIME_METADATA,
     )
 }
 
@@ -363,12 +375,13 @@ fn lower_cpu_mutex_value(
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
 ) -> Result<String, String> {
-    super::result_nodes::lower_cpu_unary_value_effect(
+    super::result_nodes::lower_cpu_unary_value_effect_with_metadata(
         state,
         bindings,
         guard,
         "cpu_mutex_value",
         "mutex_value",
+        &yir_core::CPU_MUTEX_RUNTIME_METADATA,
     )
 }
 
@@ -528,6 +541,82 @@ fn lower_cpu_extern_call_i32(
         op: Operation {
             module: "cpu".to_owned(),
             instruction: "extern_call_i32".to_owned(),
+            args: op_args,
+        },
+    });
+    for arg in lowered_args {
+        push_dep_edges(state, &arg, &name);
+    }
+    Ok(name)
+}
+
+fn lower_cpu_extern_call_owned_buffer(
+    abi: &str,
+    callee: &str,
+    signature: &str,
+    args: &[NirExpr],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    if let Some(target_config) = &state.target_config {
+        if !target_config.supports_host_ffi_abi(abi) {
+            return Err(format!(
+                "extern ABI `{abi}` is not supported by lowering target `{}`",
+                target_config.abi
+            ));
+        }
+    }
+    let signature_hash = yir_core::ffi::ffi_symbol_signature_hash(abi, callee, signature);
+    let registry = state.host_ffi_registry.as_ref().ok_or_else(|| {
+        format!("owned extern buffer `{callee}` requires a loaded hash-bound host FFI registry")
+    })?;
+    let capability = registry
+        .memory_capabilities(abi, callee, &signature_hash)
+        .iter()
+        .find(|capability| {
+            capability.kind == HostFfiMemoryKind::OwnedReturnBuffer
+                && capability.slot == HostFfiMemorySlot::Return
+        })
+        .ok_or_else(|| {
+            format!(
+                "owned extern buffer `{callee}` ABI `{abi}` signature `{signature}` hash `{signature_hash}` has no exact registered return capability"
+            )
+        })?;
+    let HostFfiMemoryDestructor::Registered {
+        symbol: destructor_symbol,
+        signature_hash: destructor_signature_hash,
+    } = &capability.destructor
+    else {
+        return Err(format!(
+            "owned extern buffer `{callee}` capability does not name a registered destructor"
+        ));
+    };
+    let capability_hash = capability.capability_hash.clone();
+    let destructor_symbol = destructor_symbol.clone();
+    let destructor_signature_hash = destructor_signature_hash.clone();
+    let lowered_args = args
+        .iter()
+        .map(|arg| lower_expr(arg, state, bindings))
+        .collect::<Result<Vec<_>, _>>()?;
+    let name = next_name(state, "cpu_extern_owned_buffer");
+    let mut op_args = vec![
+        yir_core::ffi::OWNED_BUFFER_RETURN_PROTOCOL.to_owned(),
+        abi.to_owned(),
+        callee.to_owned(),
+        signature.to_owned(),
+        signature_hash,
+        capability_hash,
+        yir_core::ffi::OWNED_BUFFER_RETURN_LENGTH_POLICY.to_owned(),
+        destructor_symbol,
+        destructor_signature_hash,
+    ];
+    op_args.extend(lowered_args.clone());
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "extern_call_owned_buffer".to_owned(),
             args: op_args,
         },
     });

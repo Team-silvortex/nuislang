@@ -413,6 +413,26 @@ fn dev_tensor_drift_checks_are_currently_clean() {
         .checks
         .iter()
         .any(|check| check.id == "cffi-memory-capability-project-nsld-roundtrip"));
+    assert!(drift
+        .checks
+        .iter()
+        .any(|check| check.id == "cffi-owned-buffer-yir-escape-gate"));
+    assert!(drift
+        .checks
+        .iter()
+        .any(|check| check.id == "cffi-owned-buffer-llvm-native-lowering"));
+    assert!(drift
+        .checks
+        .iter()
+        .any(|check| check.id == "scheduler-mutex-yir-contract"));
+    assert!(drift
+        .checks
+        .iter()
+        .any(|check| check.id == "scheduler-mutex-runtime-visibility"));
+    assert!(drift
+        .checks
+        .iter()
+        .any(|check| check.id == "scheduler-mutex-llvm-native-lowering"));
 }
 
 #[test]
@@ -517,6 +537,11 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("drift_check: id=std-filesystem-light-smoke"));
     assert!(text.contains("drift_check: id=cffi-memory-capability-canonical-hash"));
     assert!(text.contains("drift_check: id=cffi-memory-capability-project-nsld-roundtrip"));
+    assert!(text.contains("drift_check: id=cffi-owned-buffer-yir-escape-gate"));
+    assert!(text.contains("drift_check: id=cffi-owned-buffer-llvm-native-lowering"));
+    assert!(text.contains("drift_check: id=scheduler-mutex-yir-contract"));
+    assert!(text.contains("drift_check: id=scheduler-mutex-runtime-visibility"));
+    assert!(text.contains("drift_check: id=scheduler-mutex-llvm-native-lowering"));
     assert!(text.contains("drift_first_failed_check: <none>"));
 }
 

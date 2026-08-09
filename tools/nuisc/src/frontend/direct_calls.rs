@@ -5,7 +5,8 @@ use std::collections::BTreeMap;
 use nuis_semantics::model::{AstExpr, NirExpr, NirStructDef, NirTypeRef};
 
 use super::call_helpers::{
-    ensure_call_arg_matches_param, lower_extern_call_arg_for_param, CallArgParamCheck,
+    ensure_call_arg_matches_param, extern_signature_pattern, is_owned_extern_buffer_return,
+    lower_extern_call_arg_for_param, CallArgParamCheck,
 };
 use super::{
     ensure_ref_like, i32_type, infer_nir_expr_type, lower_expr, lower_nested_expr_with_async,
@@ -235,6 +236,15 @@ fn lower_named_call(input: NamedCallLoweringInput<'_>) -> Result<Option<NirExpr>
                 abi: signature.abi.clone(),
                 interface: None,
                 callee: signature.symbol_name.clone(),
+                args: lowered_args,
+            }));
+        }
+        if is_owned_extern_buffer_return(signature) {
+            return Ok(Some(NirExpr::CpuExternCallOwnedBuffer {
+                abi: signature.abi.clone(),
+                interface: None,
+                callee: signature.symbol_name.clone(),
+                signature: extern_signature_pattern(signature),
                 args: lowered_args,
             }));
         }

@@ -21,7 +21,7 @@ fn rehash(capability: &mut HostFfiMemoryCapability) {
 }
 
 #[test]
-fn official_cffi_registry_exposes_hash_bound_borrowed_utf8_contracts() {
+fn official_cffi_registry_exposes_hash_bound_memory_contracts() {
     let manifest = cffi_manifest();
     let view = HostFfiRegistryView::try_from_manifest(&manifest)
         .expect("official CFFI memory capabilities should validate");
@@ -29,7 +29,7 @@ fn official_cffi_registry_exposes_hash_bound_borrowed_utf8_contracts() {
 
     let capabilities = view.memory_capabilities("libc", "puts", &signature_hash);
 
-    assert_eq!(manifest.host_ffi_memory_capabilities.len(), 5);
+    assert_eq!(manifest.host_ffi_memory_capabilities.len(), 6);
     assert_eq!(capabilities.len(), 1);
     assert_eq!(capabilities[0].kind, HostFfiMemoryKind::BorrowedUtf8);
     assert_eq!(capabilities[0].slot, HostFfiMemorySlot::Arg(0));
@@ -37,6 +37,19 @@ fn official_cffi_registry_exposes_hash_bound_borrowed_utf8_contracts() {
     assert_eq!(capabilities[0].mutability, "read_only");
     assert_eq!(capabilities[0].lifetime, "call");
     assert_eq!(capabilities[0].destructor, HostFfiMemoryDestructor::None);
+
+    let owned_signature_hash =
+        ffi_symbol_signature_hash("c", "host_owned_buffer_make", "ref_Buffer(i64)");
+    let owned = view.memory_capabilities("c", "host_owned_buffer_make", &owned_signature_hash);
+    assert_eq!(owned.len(), 1);
+    assert_eq!(owned[0].kind, HostFfiMemoryKind::OwnedReturnBuffer);
+    assert_eq!(owned[0].slot, HostFfiMemorySlot::Return);
+    assert_eq!(owned[0].length, "runtime_header");
+    assert!(matches!(
+        owned[0].destructor,
+        HostFfiMemoryDestructor::Registered { ref symbol, .. }
+            if symbol == "host_owned_buffer_destroy"
+    ));
 }
 
 #[test]

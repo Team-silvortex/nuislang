@@ -503,6 +503,13 @@ pub enum NirExpr {
         callee: String,
         args: Vec<NirExpr>,
     },
+    CpuExternCallOwnedBuffer {
+        abi: String,
+        interface: Option<String>,
+        callee: String,
+        signature: String,
+        args: Vec<NirExpr>,
+    },
     HostBufferHandle(Box<NirExpr>),
     CastI64ToI32(Box<NirExpr>),
     CastI32ToI64(Box<NirExpr>),

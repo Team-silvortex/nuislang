@@ -5,7 +5,8 @@ use std::collections::BTreeMap;
 use nuis_semantics::model::AstTypeRef;
 
 use crate::frontend::call_helpers::{
-    ensure_call_arg_matches_param, lower_extern_call_arg_for_param, CallArgParamCheck,
+    ensure_call_arg_matches_param, extern_signature_pattern, is_owned_extern_buffer_return,
+    lower_extern_call_arg_for_param, CallArgParamCheck,
 };
 use crate::frontend::metadata::ModuleConstValue;
 use crate::frontend::{
@@ -115,6 +116,15 @@ pub(super) fn lower_method_call_with_async(
                         abi: signature.abi.clone(),
                         interface: signature.interface.clone(),
                         callee: signature.symbol_name.clone(),
+                        args: lowered_args,
+                    });
+                }
+                if is_owned_extern_buffer_return(signature) {
+                    return Ok(NirExpr::CpuExternCallOwnedBuffer {
+                        abi: signature.abi.clone(),
+                        interface: signature.interface.clone(),
+                        callee: signature.symbol_name.clone(),
+                        signature: extern_signature_pattern(signature),
                         args: lowered_args,
                     });
                 }

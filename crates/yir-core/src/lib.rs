@@ -6,6 +6,7 @@ mod data_mod_describe;
 pub mod ffi;
 mod glm;
 mod module_graph;
+mod mutex_contract;
 mod operation_results;
 mod operation_semantics;
 mod owned_select_tree;
@@ -18,6 +19,7 @@ pub use branch_effect::*;
 pub use data_mod::{DataMod, LegacyFabricMod};
 pub use glm::*;
 pub use module_graph::*;
+pub use mutex_contract::*;
 pub use owned_select_tree::*;
 pub use registry::*;
 pub use value_types::*;
@@ -57,6 +59,7 @@ pub enum SemanticOp {
     CpuStoreNext,
     CpuStoreAt,
     CpuFree,
+    CpuExternCallOwnedBuffer,
     CpuJoin,
     CpuCancel,
     CpuTimeout,

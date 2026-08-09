@@ -53,6 +53,7 @@ pub(super) struct LoweringState<'a> {
     pub(super) call_stack: Vec<String>,
     pub(super) last_effect_anchor: Option<String>,
     pub(super) target_config: Option<LoweringTargetConfig>,
+    pub(super) host_ffi_registry: Option<HostFfiRegistryView>,
 }
 
 pub(super) fn next_name(state: &mut LoweringState<'_>, prefix: &str) -> String {

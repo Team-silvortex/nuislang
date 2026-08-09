@@ -381,6 +381,9 @@ fn folds_known_mutex_value_for_lazy_const_select() {
     );
 
     let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(llvm_ir.contains("call i64 @nuis_scheduler_mutex_new_i64_v1"));
+    assert!(llvm_ir.contains("call i64 @nuis_scheduler_mutex_lock_i64_v1"));
+    assert!(llvm_ir.contains("call i64 @nuis_scheduler_mutex_value_i64_v1"));
     assert!(llvm_ir.contains("icmp eq i64"));
     assert!(!llvm_ir.contains("select i1"));
     assert!(!llvm_ir.contains("deferred lowering for cpu.select `selected`"));

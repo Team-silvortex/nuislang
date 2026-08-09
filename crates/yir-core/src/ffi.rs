@@ -1,6 +1,97 @@
 pub const FFI_SYMBOL_HASH_PREFIX: &str = "fnv1a64:";
 pub const FFI_SYMBOL_HASH_CANONICAL_VERSION: &str = "nuis-ffi-symbol-v1";
 pub const FFI_MEMORY_CAPABILITY_HASH_CANONICAL_VERSION: &str = "nuis-ffi-memory-v1";
+pub const OWNED_BUFFER_RETURN_PROTOCOL: &str = "nuis-ffi-owned-buffer-v1";
+pub const OWNED_BUFFER_RETURN_LENGTH_POLICY: &str = "runtime_header";
+pub const OWNED_BUFFER_RETURN_METADATA_LEN: usize = 9;
+pub const OWNED_BUFFER_DESTRUCTOR_SIGNATURE: &str = "i64(ref_Buffer)";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OwnedBufferReturnContract<'a> {
+    pub abi: &'a str,
+    pub symbol: &'a str,
+    pub signature: &'a str,
+    pub signature_hash: &'a str,
+    pub capability_hash: &'a str,
+    pub destructor_symbol: &'a str,
+    pub destructor_signature_hash: &'a str,
+    pub inputs: &'a [String],
+}
+
+pub fn owned_buffer_return_descriptor(
+    destructor_symbol: &str,
+    destructor_signature_hash: &str,
+) -> String {
+    format!(
+        "kind=owned_return_buffer,slot=return,length={OWNED_BUFFER_RETURN_LENGTH_POLICY},mutability=unique,lifetime=owned,destructor={destructor_symbol}@{destructor_signature_hash}"
+    )
+}
+
+pub fn parse_owned_buffer_return_contract(
+    args: &[String],
+) -> Result<OwnedBufferReturnContract<'_>, String> {
+    if args.len() < OWNED_BUFFER_RETURN_METADATA_LEN {
+        return Err(format!(
+            "owned FFI buffer call expects at least {OWNED_BUFFER_RETURN_METADATA_LEN} contract arguments, found {}",
+            args.len()
+        ));
+    }
+    if args[0] != OWNED_BUFFER_RETURN_PROTOCOL {
+        return Err(format!(
+            "owned FFI buffer call protocol must be `{OWNED_BUFFER_RETURN_PROTOCOL}`, found `{}`",
+            args[0]
+        ));
+    }
+    if args[1].is_empty() || args[2].is_empty() || args[3].is_empty() || args[7].is_empty() {
+        return Err("owned FFI buffer call contract contains an empty ABI, symbol, signature, or destructor symbol".to_owned());
+    }
+    if args[6] != OWNED_BUFFER_RETURN_LENGTH_POLICY {
+        return Err(format!(
+            "owned FFI buffer call length policy must be `{OWNED_BUFFER_RETURN_LENGTH_POLICY}`, found `{}`",
+            args[6]
+        ));
+    }
+    let expected_signature_hash = ffi_symbol_signature_hash(&args[1], &args[2], &args[3]);
+    if args[4] != expected_signature_hash {
+        return Err(format!(
+            "owned FFI buffer call signature hash mismatch: expected `{expected_signature_hash}`, found `{}`",
+            args[4]
+        ));
+    }
+    if !is_ffi_symbol_hash_token(&args[8]) {
+        return Err(format!(
+            "owned FFI buffer call destructor signature hash `{}` is malformed",
+            args[8]
+        ));
+    }
+    let expected_destructor_hash =
+        ffi_symbol_signature_hash(&args[1], &args[7], OWNED_BUFFER_DESTRUCTOR_SIGNATURE);
+    if args[8] != expected_destructor_hash {
+        return Err(format!(
+            "owned FFI buffer call destructor signature hash mismatch: expected `{expected_destructor_hash}`, found `{}`",
+            args[8]
+        ));
+    }
+    let descriptor = owned_buffer_return_descriptor(&args[7], &args[8]);
+    let expected_capability_hash =
+        ffi_memory_capability_hash(&args[1], &args[2], &args[4], &descriptor);
+    if args[5] != expected_capability_hash {
+        return Err(format!(
+            "owned FFI buffer call capability hash mismatch: expected `{expected_capability_hash}`, found `{}`",
+            args[5]
+        ));
+    }
+    Ok(OwnedBufferReturnContract {
+        abi: &args[1],
+        symbol: &args[2],
+        signature: &args[3],
+        signature_hash: &args[4],
+        capability_hash: &args[5],
+        destructor_symbol: &args[7],
+        destructor_signature_hash: &args[8],
+        inputs: &args[OWNED_BUFFER_RETURN_METADATA_LEN..],
+    })
+}
 
 pub fn ffi_symbol_signature_hash(abi: &str, symbol: &str, signature: &str) -> String {
     fnv1a64_token(&ffi_symbol_signature_canonical_input(
@@ -61,6 +152,9 @@ mod tests {
     use super::{
         ffi_memory_capability_canonical_input, ffi_memory_capability_hash,
         ffi_symbol_signature_canonical_input, ffi_symbol_signature_hash, is_ffi_symbol_hash_token,
+        owned_buffer_return_descriptor, parse_owned_buffer_return_contract,
+        OWNED_BUFFER_DESTRUCTOR_SIGNATURE, OWNED_BUFFER_RETURN_LENGTH_POLICY,
+        OWNED_BUFFER_RETURN_PROTOCOL,
     };
 
     #[test]
@@ -95,5 +189,52 @@ mod tests {
             ffi_memory_capability_hash("libc", "puts", &signature_hash, descriptor),
             "fnv1a64:588094eacdd1e033"
         );
+    }
+
+    #[test]
+    fn owned_buffer_return_contract_revalidates_embedded_hashes() {
+        let signature = "ref_Buffer(i64)";
+        let signature_hash = ffi_symbol_signature_hash("c", "host_owned_buffer_make", signature);
+        let destructor_hash = ffi_symbol_signature_hash(
+            "c",
+            "host_owned_buffer_destroy",
+            OWNED_BUFFER_DESTRUCTOR_SIGNATURE,
+        );
+        let descriptor =
+            owned_buffer_return_descriptor("host_owned_buffer_destroy", &destructor_hash);
+        let capability_hash =
+            ffi_memory_capability_hash("c", "host_owned_buffer_make", &signature_hash, &descriptor);
+        let args = vec![
+            OWNED_BUFFER_RETURN_PROTOCOL.to_owned(),
+            "c".to_owned(),
+            "host_owned_buffer_make".to_owned(),
+            signature.to_owned(),
+            signature_hash,
+            capability_hash,
+            OWNED_BUFFER_RETURN_LENGTH_POLICY.to_owned(),
+            "host_owned_buffer_destroy".to_owned(),
+            destructor_hash,
+            "seed".to_owned(),
+        ];
+        let contract = parse_owned_buffer_return_contract(&args).unwrap();
+        assert_eq!(contract.inputs, ["seed"]);
+
+        let mut tampered = args;
+        tampered[7] = "other_destroy".to_owned();
+        assert!(parse_owned_buffer_return_contract(&tampered)
+            .unwrap_err()
+            .contains("destructor signature hash mismatch"));
+
+        tampered[8] = "fnv1a64:0000000000000000".to_owned();
+        let forged_descriptor = owned_buffer_return_descriptor("other_destroy", &tampered[8]);
+        tampered[5] = ffi_memory_capability_hash(
+            "c",
+            "host_owned_buffer_make",
+            &tampered[4],
+            &forged_descriptor,
+        );
+        assert!(parse_owned_buffer_return_contract(&tampered)
+            .unwrap_err()
+            .contains("destructor signature hash mismatch"));
     }
 }

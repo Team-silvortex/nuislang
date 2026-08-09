@@ -175,6 +175,37 @@ pub(super) fn lower_extern_call_arg_for_param(
     arg
 }
 
+pub(super) fn is_owned_extern_buffer_return(signature: &FunctionSignature) -> bool {
+    signature.return_type.as_ref() == Some(&buffer_ref_type())
+}
+
+pub(super) fn extern_signature_pattern(signature: &FunctionSignature) -> String {
+    let return_type = signature
+        .return_type
+        .as_ref()
+        .map(ffi_type_token)
+        .unwrap_or_else(|| "Unit".to_owned());
+    let params = signature
+        .params
+        .iter()
+        .map(ffi_type_token)
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("{return_type}({params})")
+}
+
+fn ffi_type_token(ty: &NirTypeRef) -> String {
+    render_type_name(ty)
+        .chars()
+        .map(|ch| match ch {
+            ' ' | '<' | '>' | ',' => '_',
+            _ => ch,
+        })
+        .collect::<String>()
+        .trim_matches('_')
+        .to_owned()
+}
+
 pub(super) fn ensure_spawn_input_safe(
     name: &str,
     expr: &NirExpr,

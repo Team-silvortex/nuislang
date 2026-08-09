@@ -77,6 +77,16 @@ pub(super) fn describe_cpu_host_node(node: &Node) -> Result<Option<InstructionSe
             }
             Ok(InstructionSemantics::effect(node.op.args[2..].to_vec()))
         }
+        "extern_call_owned_buffer" => {
+            let contract = yir_core::ffi::parse_owned_buffer_return_contract(&node.op.args)
+                .map_err(|error| {
+                    format!(
+                        "node `{}` has invalid owned FFI buffer contract: {error}",
+                        node.name
+                    )
+                })?;
+            Ok(InstructionSemantics::effect(contract.inputs.to_vec()))
+        }
         "input_i64" => {
             if node.op.args.len() != 2 && node.op.args.len() != 5 {
                 return Err(format!(

@@ -120,7 +120,7 @@ fn validate_extern_abi_surface(
     reject_extern_ref_abi_type(
         &function.return_type,
         &format!("{callee_label} return type"),
-        false,
+        true,
     )?;
     Ok(())
 }
@@ -140,7 +140,7 @@ fn reject_extern_ref_abi_type(
     }
     if ty.is_ref {
         return Err(format!(
-            "{context} cannot use `{}` in the current extern ABI; only non-optional `ref Buffer` parameters are currently stabilized as the narrow host buffer-handle bridge, while other host-boundary pointer parameters and all pointer returns remain unsupported",
+            "{context} cannot use `{}` in the current extern ABI; only non-optional `ref Buffer` parameters and hash-bound owned `ref Buffer` return candidates are open, while other host-boundary pointer types remain unsupported",
             ty.render(),
         ));
     }

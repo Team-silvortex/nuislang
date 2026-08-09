@@ -28,6 +28,17 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::VariantFieldAccess { .. }
         | NirExpr::Binary { .. }
         | NirExpr::IsNull(_) => None,
+        NirExpr::CpuExternCallOwnedBuffer { args, .. } => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Res,
+            accesses: args
+                .iter()
+                .map(|_| NirGlmAccess {
+                    class: NirGlmValueClass::Val,
+                    mode: NirGlmUseMode::Read,
+                })
+                .collect(),
+            effect: NirGlmEffect::None,
+        }),
         NirExpr::CpuJoin(_) | NirExpr::CpuJoinResult(_) | NirExpr::CpuThreadJoin(_) => {
             Some(NirGlmProfile {
                 result_class: NirGlmValueClass::Val,

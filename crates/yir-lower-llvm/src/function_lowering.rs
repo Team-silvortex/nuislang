@@ -189,7 +189,15 @@ pub(super) fn emit_cpu_function(
             continue;
         }
 
-        if lower_cpu_extern_call_node(node, body, registers, &mut next_reg, last_cpu_value)? {
+        if lower_cpu_extern_call_node(
+            node,
+            body,
+            registers,
+            buffer_lengths,
+            &mut next_reg,
+            &mut next_block,
+            last_cpu_value,
+        )? {
             continue;
         }
 

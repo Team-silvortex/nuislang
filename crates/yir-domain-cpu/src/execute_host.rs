@@ -149,6 +149,10 @@ pub(crate) fn execute_cpu_host_node(
             );
             Ok(Value::I32(value))
         }
+        "extern_call_owned_buffer" => Err(format!(
+            "node `{}` owned FFI buffer call requires native LLVM execution; the deterministic YIR interpreter does not expose host pointers",
+            node.name
+        )),
         "input_i64" => {
             let channel = &node.op.args[0];
             let default_value = node.op.args[1].parse::<i64>().map_err(|_| {

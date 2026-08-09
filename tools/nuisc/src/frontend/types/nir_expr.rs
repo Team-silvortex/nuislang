@@ -296,6 +296,7 @@ pub(crate) fn infer_nir_expr_type(
             }
         }
         NirExpr::CpuExternCallI32 { .. } => Some(i32_type()),
+        NirExpr::CpuExternCallOwnedBuffer { .. } => Some(ref_type("Buffer")),
         NirExpr::CpuExternCall { callee, .. }
             if callee == "host_text_handle"
                 || callee == "host_text_len"

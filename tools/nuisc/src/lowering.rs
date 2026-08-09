@@ -13,7 +13,10 @@ use yir_core::{
     YirModule, YirResultRole, YirResultState, YirValueOwnership,
 };
 
-use crate::registry::NustarPackageManifest;
+use crate::registry::{
+    HostFfiMemoryDestructor, HostFfiMemoryKind, HostFfiMemorySlot, HostFfiRegistryView,
+    NustarPackageManifest,
+};
 
 #[path = "lowering/body_lowering.rs"]
 mod body_lowering;
@@ -289,7 +292,8 @@ fn lower_expr(
         | NirExpr::CpuReadyAfter { .. }
         | NirExpr::CpuPresentFrame(_)
         | NirExpr::CpuExternCall { .. }
-        | NirExpr::CpuExternCallI32 { .. } => lower_cpu_expr(expr, state, bindings)
+        | NirExpr::CpuExternCallI32 { .. }
+        | NirExpr::CpuExternCallOwnedBuffer { .. } => lower_cpu_expr(expr, state, bindings)
             .expect("cpu expr family must be handled by lower_cpu_expr"),
         NirExpr::NetworkProfileBindCoreRef { .. }
         | NirExpr::NetworkProfileEndpointKindRef { .. }

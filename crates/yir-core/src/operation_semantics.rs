@@ -56,6 +56,9 @@ impl Operation {
             (OperationDomainFamily::Cpu, "store_next") => SemanticOp::CpuStoreNext,
             (OperationDomainFamily::Cpu, "store_at") => SemanticOp::CpuStoreAt,
             (OperationDomainFamily::Cpu, "free") => SemanticOp::CpuFree,
+            (OperationDomainFamily::Cpu, "extern_call_owned_buffer") => {
+                SemanticOp::CpuExternCallOwnedBuffer
+            }
             (OperationDomainFamily::Cpu, "join") | (OperationDomainFamily::Cpu, "thread_join") => {
                 SemanticOp::CpuJoin
             }
@@ -300,6 +303,7 @@ impl Operation {
             "input_i64"
             | "extern_call_i64"
             | "extern_call_i32"
+            | "extern_call_owned_buffer"
             | "param_bool"
             | "param_i32"
             | "param_i64"

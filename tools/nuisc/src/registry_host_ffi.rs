@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::registry::NustarPackageManifest;
 use yir_core::ffi::{
     ffi_memory_capability_hash, ffi_symbol_signature_hash, is_ffi_symbol_hash_token,
+    OWNED_BUFFER_DESTRUCTOR_SIGNATURE,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -574,9 +575,9 @@ fn validate_memory_capability_shape(
                         capability.abi
                     )
                 })?;
-            if destructor_signature != "i64(ref_Buffer)" {
+            if destructor_signature != OWNED_BUFFER_DESTRUCTOR_SIGNATURE {
                 return Err(format!(
-                    "nustar package `{package_id}` owned return-buffer destructor `{symbol}` must use `i64(ref_Buffer)`, found `{destructor_signature}`"
+                    "nustar package `{package_id}` owned return-buffer destructor `{symbol}` must use `{OWNED_BUFFER_DESTRUCTOR_SIGNATURE}`, found `{destructor_signature}`"
                 ));
             }
         }

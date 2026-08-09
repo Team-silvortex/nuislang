@@ -1,3 +1,5 @@
+use crate::aot_c_shim_mutex_runtime::append_c_shim_mutex_runtime;
+
 pub(crate) fn append_c_shim_prelude(
     out: &mut String,
     network_lifecycle_enabled: &str,
@@ -6,6 +8,7 @@ pub(crate) fn append_c_shim_prelude(
 ) {
     out.push_str(
         r#"#include <stdint.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,6 +29,7 @@ pub(crate) fn append_c_shim_prelude(
 
 extern int64_t nuis_yir_entry(void);
 static void nuis_host_text_release_all_v1(void);
+static void nuis_scheduler_mutex_reset_v1(void);
 
 static int nuis_argc = 0;
 static char** nuis_argv = NULL;
@@ -77,6 +81,7 @@ static NuisSchedulerTaskThunkPacket nuis_scheduler_task_thunk_packets[256];
 static NuisSchedulerOwnedPayloadV1 nuis_scheduler_task_owned_payloads[256];
 static int64_t nuis_scheduler_task_payload_kinds[256];
 static int64_t nuis_scheduler_task_len = 0;
+static int64_t nuis_scheduler_current_worker_id_v1 = 1;
 "#,
     );
     out.push_str(&format!(
@@ -169,6 +174,8 @@ static void nuis_lifecycle_state_reset(void) {
     nuis_lifecycle_state.last_status = 0;
     nuis_lifecycle_state.yalivia_rpc_enabled = 1;
     nuis_scheduler_task_len = 0;
+    nuis_scheduler_current_worker_id_v1 = 1;
+    nuis_scheduler_mutex_reset_v1();
 }
 
 static int64_t nuis_lifecycle_on_bridge_bind_v1(void) {
@@ -192,7 +199,10 @@ static int64_t nuis_scheduler_task_execute_thunk_v1(int64_t index) {
     packet->invoker = NULL;
     packet->context = NULL;
     packet->owned_template = nuis_scheduler_empty_owned_payload_v1();
+    int64_t previous_worker = nuis_scheduler_current_worker_id_v1;
+    nuis_scheduler_current_worker_id_v1 = index + 2;
     int64_t result = invoker(context);
+    nuis_scheduler_current_worker_id_v1 = previous_worker;
     free(context);
     if (kind == 2 && result != 0) {
         owned_template.data = (void*)(uintptr_t)result;
@@ -491,6 +501,7 @@ static int64_t nuis_lifecycle_shutdown_v1(int64_t status) {
         nuis_scheduler_task_release_owned_payload_v1(index);
     }
     nuis_host_text_release_all_v1();
+    nuis_scheduler_mutex_reset_v1();
     nuis_lifecycle_state.phase = 3;
     nuis_lifecycle_state.last_status = status;
     return status;
@@ -501,6 +512,7 @@ static int64_t nuis_lifecycle_yalivia_rpc_hook_v1(void) {
 }
 "#,
     );
+    append_c_shim_mutex_runtime(out);
 }
 
 pub(crate) fn append_c_shim_main(out: &mut String) {

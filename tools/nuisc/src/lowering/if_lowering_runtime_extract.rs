@@ -13,6 +13,10 @@ pub(super) enum SelectableCpuUnaryRuntimeOp {
 }
 
 impl SelectableCpuUnaryRuntimeOp {
+    pub(super) fn is_mutex(self) -> bool {
+        matches!(self, Self::MutexNew | Self::MutexLock | Self::MutexUnlock)
+    }
+
     pub(super) fn prefix(self) -> &'static str {
         match self {
             Self::Join => "cpu_join",

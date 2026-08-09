@@ -1,6 +1,75 @@
 use super::support::*;
 
 #[test]
+fn lowers_owned_ffi_buffer_header_and_registered_destructor() {
+    let mut module = module_with_cpu0();
+    push_cpu_const_i64(&mut module, "seed", "7");
+    let signature = "ref_Buffer(i64)";
+    let signature_hash =
+        yir_core::ffi::ffi_symbol_signature_hash("c", "host_owned_buffer_make", signature);
+    let destructor_hash = yir_core::ffi::ffi_symbol_signature_hash(
+        "c",
+        "host_owned_buffer_destroy",
+        "i64(ref_Buffer)",
+    );
+    let descriptor = yir_core::ffi::owned_buffer_return_descriptor(
+        "host_owned_buffer_destroy",
+        &destructor_hash,
+    );
+    let capability_hash = yir_core::ffi::ffi_memory_capability_hash(
+        "c",
+        "host_owned_buffer_make",
+        &signature_hash,
+        &descriptor,
+    );
+    module.nodes.push(Node {
+        name: "owned".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.extern_call_owned_buffer",
+            vec![
+                yir_core::ffi::OWNED_BUFFER_RETURN_PROTOCOL.to_owned(),
+                "c".to_owned(),
+                "host_owned_buffer_make".to_owned(),
+                signature.to_owned(),
+                signature_hash,
+                capability_hash,
+                yir_core::ffi::OWNED_BUFFER_RETURN_LENGTH_POLICY.to_owned(),
+                "host_owned_buffer_destroy".to_owned(),
+                destructor_hash,
+                "seed".to_owned(),
+            ],
+        )
+        .unwrap(),
+    });
+    push_cpu_node(&mut module, "len", "cpu.buffer_len", vec!["owned"]);
+    push_cpu_node(&mut module, "release", "cpu.free", vec!["owned"]);
+    push_deps(
+        &mut module,
+        &[("seed", "owned"), ("owned", "len"), ("owned", "release")],
+    );
+    module.edges.push(Edge {
+        kind: EdgeKind::Lifetime,
+        from: "owned".to_owned(),
+        to: "release".to_owned(),
+    });
+    module.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: "len".to_owned(),
+        to: "release".to_owned(),
+    });
+
+    let llvm = emit_module(&module).unwrap();
+    assert!(llvm.contains("declare ptr @host_owned_buffer_make(i64)"));
+    assert!(llvm.contains("declare i64 @host_owned_buffer_destroy(ptr)"));
+    assert!(llvm.contains("call ptr @host_owned_buffer_make(i64"));
+    assert!(llvm.contains("getelementptr inbounds i64, ptr"));
+    assert!(llvm.contains("load i64, ptr"));
+    assert!(llvm.contains("call void @llvm.trap()"));
+    assert!(llvm.contains("call i64 @host_owned_buffer_destroy(ptr"));
+}
+
+#[test]
 fn emits_dynamic_declare_for_cpu_extern_calls() {
     let mut module = YirModule::new("0.1");
     module.resources.push(Resource {

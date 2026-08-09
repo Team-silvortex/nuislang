@@ -1,4 +1,30 @@
 use super::*;
+use yir_core::CPU_MUTEX_RUNTIME_METADATA;
+
+fn describe_mutex_effect(node: &Node, value_role: &str) -> Result<InstructionSemantics, String> {
+    if node.op.args.len() == 1 {
+        return Ok(InstructionSemantics::effect(vec![node.op.args[0].clone()]));
+    }
+    let expected_len = 1 + CPU_MUTEX_RUNTIME_METADATA.len();
+    if node.op.args.len() != expected_len {
+        return Err(format!(
+            "node `{}` expects `cpu.{} <name> <resource> <{}> [{}]`",
+            node.name,
+            node.op.instruction,
+            value_role,
+            CPU_MUTEX_RUNTIME_METADATA.join(" ")
+        ));
+    }
+    for (actual, expected) in node.op.args[1..].iter().zip(CPU_MUTEX_RUNTIME_METADATA) {
+        if actual != expected {
+            return Err(format!(
+                "node `{}` has unsupported cpu.{} mutex metadata `{actual}`; expected `{expected}`",
+                node.name, node.op.instruction
+            ));
+        }
+    }
+    Ok(InstructionSemantics::effect(vec![node.op.args[0].clone()]))
+}
 
 pub(super) fn describe_cpu_async_node(node: &Node) -> Result<Option<InstructionSemantics>, String> {
     let semantics = match node.op.instruction.as_str() {
@@ -23,8 +49,7 @@ pub(super) fn describe_cpu_async_node(node: &Node) -> Result<Option<InstructionS
             Ok(InstructionSemantics::effect(vec![node.op.args[1].clone()]))
         }
         "join" | "cancel" | "join_result" | "thread_join" | "thread_join_result"
-        | "task_completed" | "task_timed_out" | "task_cancelled" | "task_failed" | "task_value"
-        | "mutex_lock" | "mutex_unlock" | "mutex_value" => {
+        | "task_completed" | "task_timed_out" | "task_cancelled" | "task_failed" | "task_value" => {
             if node.op.args.len() != 1 {
                 return Err(format!(
                     "node `{}` expects `cpu.{} <name> <resource> <input>`",
@@ -33,15 +58,8 @@ pub(super) fn describe_cpu_async_node(node: &Node) -> Result<Option<InstructionS
             }
             Ok(InstructionSemantics::effect(node.op.args.clone()))
         }
-        "mutex_new" => {
-            if node.op.args.len() != 1 {
-                return Err(format!(
-                    "node `{}` expects `cpu.mutex_new <name> <resource> <value>`",
-                    node.name
-                ));
-            }
-            Ok(InstructionSemantics::effect(node.op.args.clone()))
-        }
+        "mutex_new" => describe_mutex_effect(node, "value"),
+        "mutex_lock" | "mutex_unlock" | "mutex_value" => describe_mutex_effect(node, "input"),
         "timeout" | "ready_after" => {
             if node.op.args.len() != 2 {
                 return Err(format!(
@@ -54,4 +72,50 @@ pub(super) fn describe_cpu_async_node(node: &Node) -> Result<Option<InstructionS
         _ => return Ok(None),
     };
     semantics.map(Some)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use yir_core::Operation;
+
+    fn mutex_node(metadata: &[&str]) -> Node {
+        let mut args = vec!["input".to_owned()];
+        args.extend(metadata.iter().map(|value| (*value).to_owned()));
+        Node {
+            name: "lock".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation {
+                module: "cpu".to_owned(),
+                instruction: "mutex_lock".to_owned(),
+                args,
+            },
+        }
+    }
+
+    #[test]
+    fn accepts_scheduler_mutex_metadata_without_treating_it_as_dependencies() {
+        let semantics = describe_cpu_async_node(&mutex_node(&CPU_MUTEX_RUNTIME_METADATA))
+            .expect("scheduler mutex metadata")
+            .expect("mutex semantics");
+        assert_eq!(semantics.dependencies, vec!["input".to_owned()]);
+    }
+
+    #[test]
+    fn preserves_legacy_single_input_mutex_nodes() {
+        let semantics = describe_cpu_async_node(&mutex_node(&[]))
+            .expect("legacy mutex node")
+            .expect("mutex semantics");
+        assert_eq!(semantics.dependencies, vec!["input".to_owned()]);
+    }
+
+    #[test]
+    fn rejects_scheduler_mutex_metadata_drift() {
+        let mut metadata = CPU_MUTEX_RUNTIME_METADATA;
+        metadata[1] = "visibility=unbounded";
+        let error = describe_cpu_async_node(&mutex_node(&metadata))
+            .expect_err("visibility drift must fail closed");
+        assert!(error.contains("unsupported cpu.mutex_lock mutex metadata"));
+        assert!(error.contains("visibility=acquire-release-epoch-v1"));
+    }
 }

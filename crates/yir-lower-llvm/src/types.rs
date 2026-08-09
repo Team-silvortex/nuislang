@@ -35,6 +35,11 @@ pub(crate) enum LlvmValueRef {
         ptr: String,
         len: String,
     },
+    OwnedExternalBuffer {
+        ptr: String,
+        len: String,
+        destructor: String,
+    },
     TextHandle {
         ptr: String,
         handle: String,
@@ -78,10 +83,12 @@ pub(crate) struct TaskResultLlvmValueRef {
 }
 #[derive(Clone)]
 pub(crate) struct MutexLlvmValueRef {
+    pub(crate) runtime_handle: Option<String>,
     pub(crate) value: Box<LlvmValueRef>,
 }
 #[derive(Clone)]
 pub(crate) struct MutexGuardLlvmValueRef {
+    pub(crate) runtime_guard: Option<String>,
     pub(crate) value: Box<LlvmValueRef>,
 }
 pub(crate) struct LlvmLoweringState {
