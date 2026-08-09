@@ -50,6 +50,20 @@ pub(super) fn print_native_entry_evidence(evidence: &NativeEntryHandoffEvidence)
         optional_u64_hex(evidence.context_lifecycle_hook_handle)
     );
     println!(
+        "  native_entry_dispatch: protocol={} status={} declared={} table={} capabilities={} slot={} code={} acknowledged={}",
+        evidence
+            .dispatch_resolution_protocol
+            .as_deref()
+            .unwrap_or("<none>"),
+        evidence.dispatch_resolution_status,
+        evidence.dispatch_import_declared,
+        optional_u64_hex(evidence.dispatch_table_identity),
+        optional_u64_hex(evidence.dispatch_capability_mask),
+        optional_u32(evidence.dispatch_slot),
+        optional_i32(evidence.dispatch_status_code),
+        evidence.dispatch_acknowledged
+    );
+    println!(
         "  native_entry_invocation: requested={} permit_protocol={} protocol={} status={} invoked={} return={} return_status={}",
         evidence.invocation_requested,
         evidence
@@ -74,7 +88,7 @@ pub(super) fn print_native_entry_evidence(evidence: &NativeEntryHandoffEvidence)
 
 pub(super) fn native_entry_evidence_json(evidence: &NativeEntryHandoffEvidence) -> String {
     format!(
-        "{{\"protocol\":\"{}\",\"status\":\"{}\",\"ready\":{},\"container_payload_offset\":{},\"container_payload_size_bytes\":{},\"container_payload_hash\":{},\"section_id\":{},\"section_hash_status\":\"{}\",\"code_offset\":{},\"code_size_bytes\":{},\"code_hash_status\":\"{}\",\"target_machine_arch\":{},\"host_machine_arch\":{},\"machine_arch_status\":\"{}\",\"preparation_protocol\":{},\"preparation_status\":\"{}\",\"preparation_ready\":{},\"mapping_size_bytes\":{},\"protection_status\":\"{}\",\"context_protocol\":{},\"context_status\":\"{}\",\"context_version\":{},\"context_size_bytes\":{},\"context_identity_hash\":{},\"context_plan_identity\":{},\"context_execution_identity\":{},\"context_clock_root_handle\":{},\"context_glm_root_handle\":{},\"context_scheduler_handle\":{},\"context_lifecycle_hook_handle\":{},\"invocation_requested\":{},\"invocation_permit_protocol\":{},\"invocation_protocol\":{},\"invocation_status\":\"{}\",\"invoked\":{},\"invocation_return_value\":{},\"invocation_return_status\":\"{}\",\"blockers\":[{}]}}",
+        "{{\"protocol\":\"{}\",\"status\":\"{}\",\"ready\":{},\"container_payload_offset\":{},\"container_payload_size_bytes\":{},\"container_payload_hash\":{},\"section_id\":{},\"section_hash_status\":\"{}\",\"code_offset\":{},\"code_size_bytes\":{},\"code_hash_status\":\"{}\",\"target_machine_arch\":{},\"host_machine_arch\":{},\"machine_arch_status\":\"{}\",\"preparation_protocol\":{},\"preparation_status\":\"{}\",\"preparation_ready\":{},\"mapping_size_bytes\":{},\"protection_status\":\"{}\",\"context_protocol\":{},\"context_status\":\"{}\",\"context_version\":{},\"context_size_bytes\":{},\"context_identity_hash\":{},\"context_plan_identity\":{},\"context_execution_identity\":{},\"context_clock_root_handle\":{},\"context_glm_root_handle\":{},\"context_scheduler_handle\":{},\"context_lifecycle_hook_handle\":{},\"dispatch_resolution_protocol\":{},\"dispatch_resolution_status\":\"{}\",\"dispatch_import_declared\":{},\"dispatch_table_identity\":{},\"dispatch_capability_mask\":{},\"dispatch_slot\":{},\"dispatch_status_code\":{},\"dispatch_acknowledged\":{},\"invocation_requested\":{},\"invocation_permit_protocol\":{},\"invocation_protocol\":{},\"invocation_status\":\"{}\",\"invoked\":{},\"invocation_return_value\":{},\"invocation_return_status\":\"{}\",\"blockers\":[{}]}}",
         json_escape(evidence.protocol),
         json_escape(&evidence.status),
         evidence.ready,
@@ -105,6 +119,14 @@ pub(super) fn native_entry_evidence_json(evidence: &NativeEntryHandoffEvidence) 
         json_optional_u64(evidence.context_glm_root_handle),
         json_optional_u64(evidence.context_scheduler_handle),
         json_optional_u64(evidence.context_lifecycle_hook_handle),
+        json_optional_string(evidence.dispatch_resolution_protocol.as_deref()),
+        json_escape(&evidence.dispatch_resolution_status),
+        evidence.dispatch_import_declared,
+        json_optional_u64(evidence.dispatch_table_identity),
+        json_optional_u64(evidence.dispatch_capability_mask),
+        json_optional_u32(evidence.dispatch_slot),
+        json_optional_i32(evidence.dispatch_status_code),
+        evidence.dispatch_acknowledged,
         evidence.invocation_requested,
         json_optional_string(evidence.invocation_permit_protocol.as_deref()),
         json_optional_string(evidence.invocation_protocol.as_deref()),
@@ -133,6 +155,12 @@ fn optional_i64(value: Option<i64>) -> String {
         .unwrap_or_else(|| "<none>".to_owned())
 }
 
+fn optional_i32(value: Option<i32>) -> String {
+    value
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "<none>".to_owned())
+}
+
 fn optional_u32(value: Option<u32>) -> String {
     value
         .map(|value| value.to_string())
@@ -152,6 +180,12 @@ fn json_optional_usize(value: Option<usize>) -> String {
 }
 
 fn json_optional_i64(value: Option<i64>) -> String {
+    value
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "null".to_owned())
+}
+
+fn json_optional_i32(value: Option<i32>) -> String {
     value
         .map(|value| value.to_string())
         .unwrap_or_else(|| "null".to_owned())

@@ -9,6 +9,29 @@ use nuisc::linker::LinkPlanHeteroNode;
 use std::{env, fs, path::Path};
 
 #[test]
+fn runtime_dispatch_capability_becomes_registered_static_import() {
+    let mut plan = empty_link_plan();
+    plan.lifecycle
+        .runtime_capability_flags
+        .push(nuis_runtime::NATIVE_RUNTIME_DISPATCH_CAPABILITY_FLAG.to_owned());
+
+    let imports = crate::container::external_imports(&plan);
+    let dispatch = imports
+        .iter()
+        .find(|entry| entry.import_kind == nuis_runtime::NATIVE_RUNTIME_DISPATCH_IMPORT_KIND)
+        .expect("runtime dispatch capability emits an import");
+    assert_eq!(
+        dispatch.import_name,
+        nuis_runtime::NATIVE_RUNTIME_DISPATCH_IMPORT_NAME
+    );
+    assert_eq!(
+        dispatch.provider,
+        nuis_runtime::NATIVE_RUNTIME_DISPATCH_IMPORT_PROVIDER
+    );
+    assert!(dispatch.required);
+}
+
+#[test]
 fn verify_container_plan_accepts_matching_emitted_plan() {
     let dir = env::temp_dir().join(format!("nsld-container-plan-verify-{}", std::process::id()));
     fs::create_dir_all(&dir).unwrap();

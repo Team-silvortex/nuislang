@@ -1,4 +1,8 @@
 use crate::{container::ContainerLoaderSummary, fnv1a64_hex};
+use crate::{
+    container::ExternalImportSummary,
+    runtime_dispatch::{resolve_runtime_dispatch, RUNTIME_DISPATCH_RESOLUTION_PROTOCOL},
+};
 use nuis_runtime::{
     CompiledEntryTransferResult, ExecutableEntryRequest, ExecutableMemoryAdapter,
     NativeEntryInvocationPermit, NativeEntryInvocationResult, NativeHostExecutableMemoryAdapter,
@@ -43,6 +47,14 @@ pub(super) struct NativeEntryHandoffEvidence {
     pub(super) context_glm_root_handle: Option<u64>,
     pub(super) context_scheduler_handle: Option<u64>,
     pub(super) context_lifecycle_hook_handle: Option<u64>,
+    pub(super) dispatch_resolution_protocol: Option<String>,
+    pub(super) dispatch_resolution_status: String,
+    pub(super) dispatch_import_declared: bool,
+    pub(super) dispatch_table_identity: Option<u64>,
+    pub(super) dispatch_capability_mask: Option<u64>,
+    pub(super) dispatch_slot: Option<u32>,
+    pub(super) dispatch_status_code: Option<i32>,
+    pub(super) dispatch_acknowledged: bool,
     pub(super) invocation_requested: bool,
     pub(super) invocation_permit_protocol: Option<String>,
     pub(super) invocation_protocol: Option<String>,
@@ -252,6 +264,7 @@ pub(super) fn recover_native_entry(
 pub(super) fn prepare_native_entry(
     recovered: &mut RecoveredNativeEntry,
     transfer: &CompiledEntryTransferResult,
+    imports: &ExternalImportSummary,
     invoke_native_entry: bool,
 ) {
     recovered.evidence.invocation_requested = invoke_native_entry;
@@ -299,6 +312,24 @@ pub(super) fn prepare_native_entry(
         }
     };
     record_entry_context(&mut recovered.evidence, &context);
+    let dispatch_resolution = resolve_runtime_dispatch(imports, &context);
+    recovered.evidence.dispatch_resolution_protocol =
+        Some(RUNTIME_DISPATCH_RESOLUTION_PROTOCOL.to_owned());
+    recovered.evidence.dispatch_resolution_status = dispatch_resolution.status.to_owned();
+    recovered.evidence.dispatch_import_declared = dispatch_resolution.declared;
+    recovered.evidence.dispatch_table_identity = dispatch_resolution.table_identity;
+    recovered.evidence.dispatch_capability_mask = dispatch_resolution.capability_mask;
+    if !dispatch_resolution.ready {
+        recovered
+            .evidence
+            .blockers
+            .extend(dispatch_resolution.blockers);
+        recovered.evidence.ready = false;
+        recovered.evidence.status = "blocked".to_owned();
+        recovered.evidence.invocation_status = "dispatch-import-blocked".to_owned();
+        drop(preparation);
+        return;
+    }
     if !invoke_native_entry {
         recovered.evidence.status = "prepared".to_owned();
         drop(preparation);
@@ -336,6 +367,12 @@ pub(super) fn prepare_native_entry(
             .evidence
             .blockers
             .push("native-entry:invocation-not-completed".to_owned());
+    } else if recovered.evidence.dispatch_import_declared && !result.dispatch_acknowledged {
+        recovered.evidence.invocation_return_status = "dispatch-missing".to_owned();
+        recovered
+            .evidence
+            .blockers
+            .push("native-entry:runtime-dispatch-not-acknowledged".to_owned());
     } else if result.return_value != Some(NATIVE_ENTRY_PROBE_EXPECTED_RETURN) {
         recovered.evidence.invocation_return_status = "mismatch".to_owned();
         recovered
@@ -379,6 +416,11 @@ fn record_invocation_result(
     evidence.invocation_status = result.status.to_owned();
     evidence.invoked = result.invoked;
     evidence.invocation_return_value = result.return_value;
+    evidence.dispatch_table_identity = result.dispatch_table_identity;
+    evidence.dispatch_capability_mask = result.dispatch_capability_mask;
+    evidence.dispatch_slot = result.dispatch_slot;
+    evidence.dispatch_status_code = result.dispatch_status_code;
+    evidence.dispatch_acknowledged = result.dispatch_acknowledged;
     evidence.blockers.extend(result.blockers.iter().cloned());
 }
 
@@ -424,6 +466,14 @@ fn empty_evidence() -> NativeEntryHandoffEvidence {
         context_glm_root_handle: None,
         context_scheduler_handle: None,
         context_lifecycle_hook_handle: None,
+        dispatch_resolution_protocol: None,
+        dispatch_resolution_status: "not-attempted".to_owned(),
+        dispatch_import_declared: false,
+        dispatch_table_identity: None,
+        dispatch_capability_mask: None,
+        dispatch_slot: None,
+        dispatch_status_code: None,
+        dispatch_acknowledged: false,
         invocation_requested: false,
         invocation_permit_protocol: None,
         invocation_protocol: None,

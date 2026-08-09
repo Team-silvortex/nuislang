@@ -89,6 +89,7 @@ pub(crate) fn build_nuis_lifecycle_contract(
         "runtime.tick".to_owned(),
         "runtime.shutdown".to_owned(),
         "runtime.rpc.yalivia".to_owned(),
+        nuis_runtime::NATIVE_RUNTIME_DISPATCH_CAPABILITY_FLAG.to_owned(),
     ];
     if envelope
         .contract_families

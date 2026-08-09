@@ -9,6 +9,10 @@ pub const NATIVE_RUNTIME_DISPATCH_KNOWN_CAPABILITIES: u64 =
         | NATIVE_RUNTIME_DISPATCH_CAP_SCHEDULER_ACKNOWLEDGE;
 pub const NATIVE_RUNTIME_DISPATCH_SLOT_CLOCK_ACKNOWLEDGE: u32 = 1;
 pub const NATIVE_RUNTIME_DISPATCH_SLOT_SCHEDULER_ACKNOWLEDGE: u32 = 2;
+pub const NATIVE_RUNTIME_DISPATCH_CAPABILITY_FLAG: &str = "runtime.service-dispatch.v1";
+pub const NATIVE_RUNTIME_DISPATCH_IMPORT_KIND: &str = "runtime-service-dispatch";
+pub const NATIVE_RUNTIME_DISPATCH_IMPORT_NAME: &str = "nuis.runtime.service.dispatch.v1";
+pub const NATIVE_RUNTIME_DISPATCH_IMPORT_PROVIDER: &str = "registered-runtime";
 
 pub const NATIVE_RUNTIME_DISPATCH_STATUS_ACKNOWLEDGED: i32 = 0;
 pub const NATIVE_RUNTIME_DISPATCH_STATUS_INVALID_RECORD: i32 = 1;
@@ -186,6 +190,14 @@ impl NativeRuntimeDispatchResponseV1 {
         self.acknowledged_capability
     }
 
+    pub fn table_identity(&self) -> u64 {
+        self.table_identity
+    }
+
+    pub fn context_identity(&self) -> u64 {
+        self.context_identity
+    }
+
     fn blocked(table_identity: u64, context_identity: u64, slot: u32, status_code: i32) -> Self {
         Self {
             abi_version: NATIVE_RUNTIME_DISPATCH_TABLE_VERSION,
@@ -198,6 +210,61 @@ impl NativeRuntimeDispatchResponseV1 {
             status_code,
             reserved: 0,
         }
+    }
+}
+
+/// Launch-time materialization appended to the stable context prefix. Only the
+/// context is passed as the native entry argument; dispatch-aware code reaches
+/// the remaining records through their locked offsets.
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct NativeRuntimeDispatchFrameV1 {
+    context: NativeLifecycleEntryContextV1,
+    table: NativeRuntimeDispatchTableV1,
+    request: NativeRuntimeDispatchRequestV1,
+    response: NativeRuntimeDispatchResponseV1,
+}
+
+impl NativeRuntimeDispatchFrameV1 {
+    pub fn scheduler_acknowledgment(context: NativeLifecycleEntryContextV1) -> Self {
+        let table = NativeRuntimeDispatchTableV1::from_context(&context);
+        let request = NativeRuntimeDispatchRequestV1::acknowledge(
+            &context,
+            &table,
+            NATIVE_RUNTIME_DISPATCH_SLOT_SCHEDULER_ACKNOWLEDGE,
+        );
+        let response = NativeRuntimeDispatchResponseV1::blocked(
+            table.identity(),
+            context.identity_value(),
+            request.slot(),
+            NATIVE_RUNTIME_DISPATCH_STATUS_INVALID_RECORD,
+        );
+        Self {
+            context,
+            table,
+            request,
+            response,
+        }
+    }
+
+    pub fn context(&self) -> &NativeLifecycleEntryContextV1 {
+        &self.context
+    }
+
+    pub fn table(&self) -> &NativeRuntimeDispatchTableV1 {
+        &self.table
+    }
+
+    pub fn request(&self) -> &NativeRuntimeDispatchRequestV1 {
+        &self.request
+    }
+
+    pub fn response(&self) -> &NativeRuntimeDispatchResponseV1 {
+        &self.response
+    }
+
+    pub(crate) fn context_pointer(&self) -> *const NativeLifecycleEntryContextV1 {
+        &self.context
     }
 }
 
@@ -337,6 +404,23 @@ mod tests {
         assert_eq!(std::mem::size_of::<NativeRuntimeDispatchTableV1>(), 48);
         assert_eq!(std::mem::size_of::<NativeRuntimeDispatchRequestV1>(), 40);
         assert_eq!(std::mem::size_of::<NativeRuntimeDispatchResponseV1>(), 48);
+        assert_eq!(std::mem::size_of::<NativeRuntimeDispatchFrameV1>(), 200);
+        assert_eq!(
+            std::mem::offset_of!(NativeRuntimeDispatchFrameV1, context),
+            0
+        );
+        assert_eq!(
+            std::mem::offset_of!(NativeRuntimeDispatchFrameV1, table),
+            64
+        );
+        assert_eq!(
+            std::mem::offset_of!(NativeRuntimeDispatchFrameV1, request),
+            112
+        );
+        assert_eq!(
+            std::mem::offset_of!(NativeRuntimeDispatchFrameV1, response),
+            152
+        );
         assert_eq!(table.abi_version(), 1);
         assert_eq!(table.context_identity(), context.identity_value());
         assert_eq!(table.identity(), context.dispatch_table_identity());

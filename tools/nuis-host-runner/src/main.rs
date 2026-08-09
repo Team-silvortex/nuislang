@@ -14,6 +14,7 @@ mod native_entry;
 mod report;
 mod report_native_entry;
 mod runtime_bootstrap;
+mod runtime_dispatch;
 
 use args::parse_args;
 use container::scan_container_loader;
@@ -380,6 +381,7 @@ fn validate_handoff_with_probe(
     prepare_native_entry(
         &mut native_entry,
         &runtime_bootstrap.transfer,
+        &container_loader.external_import,
         invoke_native_entry,
     );
     blockers.extend(native_entry.evidence.blockers.iter().cloned());

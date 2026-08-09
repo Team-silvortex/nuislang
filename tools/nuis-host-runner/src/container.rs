@@ -67,6 +67,14 @@ pub(super) struct CompatibilityDomainSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct ExternalImportEntry {
+    pub(super) import_kind: String,
+    pub(super) import_name: String,
+    pub(super) provider: String,
+    pub(super) required: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct ExternalImportSummary {
     pub(super) status: String,
     pub(super) declared_count: Option<usize>,
@@ -74,6 +82,7 @@ pub(super) struct ExternalImportSummary {
     pub(super) first_import_kind: Option<String>,
     pub(super) first_import_name: Option<String>,
     pub(super) required_imports: Vec<String>,
+    pub(super) entries: Vec<ExternalImportEntry>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -363,6 +372,7 @@ impl ExternalImportSummary {
             first_import_kind: None,
             first_import_name: None,
             required_imports: Vec::new(),
+            entries: Vec::new(),
         }
     }
 }
@@ -421,6 +431,17 @@ fn scan_external_imports(source: &str, declared_count: Option<usize>) -> Externa
             format!("{kind}:{name}")
         })
         .collect();
+    let entries = blocks
+        .iter()
+        .filter_map(|block| {
+            Some(ExternalImportEntry {
+                import_kind: string_value_from_lines(block, "import_kind")?,
+                import_name: string_value_from_lines(block, "import_name")?,
+                provider: string_value_from_lines(block, "provider")?,
+                required: bool_value_from_lines(block, "required")?,
+            })
+        })
+        .collect();
     ExternalImportSummary {
         status: if blocks.is_empty() {
             "missing".to_owned()
@@ -432,6 +453,7 @@ fn scan_external_imports(source: &str, declared_count: Option<usize>) -> Externa
         first_import_kind: first.and_then(|block| string_value_from_lines(block, "import_kind")),
         first_import_name: first.and_then(|block| string_value_from_lines(block, "import_name")),
         required_imports,
+        entries,
     }
 }
 

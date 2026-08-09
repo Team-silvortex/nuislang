@@ -136,7 +136,7 @@ fn build_manifest_round_trips_cpu_target_metadata() {
     assert_eq!(compiled_artifact.lifecycle.export_surface.len(), 4);
     assert_eq!(
         compiled_artifact.lifecycle.runtime_capability_flags.len(),
-        4
+        5
     );
     assert!(compiled_artifact
         .lifecycle
@@ -146,6 +146,10 @@ fn build_manifest_round_trips_cpu_target_metadata() {
         .lifecycle
         .runtime_capability_flags
         .contains(&"runtime.tick".to_owned()));
+    assert!(compiled_artifact
+        .lifecycle
+        .runtime_capability_flags
+        .contains(&nuis_runtime::NATIVE_RUNTIME_DISPATCH_CAPABILITY_FLAG.to_owned()));
     assert!(manifest_text.contains("[nuis_lifecycle]"));
     assert!(manifest_text.contains("lifecycle_schema = \"nuis-lifecycle-contract-v1\""));
     assert!(manifest_text.contains("lifecycle_export_surface = ["));

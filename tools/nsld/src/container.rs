@@ -122,6 +122,18 @@ pub(crate) fn external_imports(plan: &nuisc::linker::LinkPlan) -> Vec<NsldContai
             "c-world-wrapper",
         );
     }
+    if plan
+        .lifecycle
+        .runtime_capability_flags
+        .iter()
+        .any(|flag| flag == nuis_runtime::NATIVE_RUNTIME_DISPATCH_CAPABILITY_FLAG)
+    {
+        push_import(
+            nuis_runtime::NATIVE_RUNTIME_DISPATCH_IMPORT_KIND,
+            nuis_runtime::NATIVE_RUNTIME_DISPATCH_IMPORT_NAME.to_owned(),
+            nuis_runtime::NATIVE_RUNTIME_DISPATCH_IMPORT_PROVIDER,
+        );
+    }
 
     imports
 }
