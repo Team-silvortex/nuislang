@@ -1,12 +1,8 @@
 use crate::{container::ContainerLoaderSummary, fnv1a64_hex};
-use crate::{
-    container::ExternalImportSummary,
-    runtime_dispatch::{resolve_runtime_dispatch, RUNTIME_DISPATCH_RESOLUTION_PROTOCOL},
-};
 use nuis_runtime::{
     CompiledEntryTransferResult, ExecutableEntryRequest, ExecutableMemoryAdapter,
     NativeEntryInvocationPermit, NativeEntryInvocationResult, NativeHostExecutableMemoryAdapter,
-    NativeLifecycleEntryContextV1, NUIS_NATIVE_ENTRY_SECTION_KIND,
+    NativeLifecycleEntryContextV1, RuntimeDispatchImportResolution, NUIS_NATIVE_ENTRY_SECTION_KIND,
 };
 
 pub(super) const NATIVE_ENTRY_HANDOFF_PROTOCOL: &str = "nuis-host-native-entry-handoff-v1";
@@ -50,6 +46,7 @@ pub(super) struct NativeEntryHandoffEvidence {
     pub(super) dispatch_resolution_protocol: Option<String>,
     pub(super) dispatch_resolution_status: String,
     pub(super) dispatch_import_declared: bool,
+    pub(super) dispatch_import_identity_hash: Option<String>,
     pub(super) dispatch_table_identity: Option<u64>,
     pub(super) dispatch_capability_mask: Option<u64>,
     pub(super) dispatch_slot: Option<u32>,
@@ -264,12 +261,24 @@ pub(super) fn recover_native_entry(
 pub(super) fn prepare_native_entry(
     recovered: &mut RecoveredNativeEntry,
     transfer: &CompiledEntryTransferResult,
-    imports: &ExternalImportSummary,
+    dispatch_resolution: &RuntimeDispatchImportResolution,
     invoke_native_entry: bool,
 ) {
     recovered.evidence.invocation_requested = invoke_native_entry;
     if !recovered.evidence.ready {
         recovered.evidence.preparation_status = "not-attempted".to_owned();
+        return;
+    }
+    record_dispatch_resolution(&mut recovered.evidence, transfer, dispatch_resolution);
+    if !dispatch_resolution.ready {
+        recovered
+            .evidence
+            .blockers
+            .extend(dispatch_resolution.blockers.iter().cloned());
+        recovered.evidence.ready = false;
+        recovered.evidence.status = "blocked".to_owned();
+        recovered.evidence.preparation_status = "dispatch-import-blocked".to_owned();
+        recovered.evidence.invocation_status = "dispatch-import-blocked".to_owned();
         return;
     }
     let request = match ExecutableEntryRequest::from_transfer(transfer, &recovered.code_bytes) {
@@ -312,24 +321,6 @@ pub(super) fn prepare_native_entry(
         }
     };
     record_entry_context(&mut recovered.evidence, &context);
-    let dispatch_resolution = resolve_runtime_dispatch(imports, &context);
-    recovered.evidence.dispatch_resolution_protocol =
-        Some(RUNTIME_DISPATCH_RESOLUTION_PROTOCOL.to_owned());
-    recovered.evidence.dispatch_resolution_status = dispatch_resolution.status.to_owned();
-    recovered.evidence.dispatch_import_declared = dispatch_resolution.declared;
-    recovered.evidence.dispatch_table_identity = dispatch_resolution.table_identity;
-    recovered.evidence.dispatch_capability_mask = dispatch_resolution.capability_mask;
-    if !dispatch_resolution.ready {
-        recovered
-            .evidence
-            .blockers
-            .extend(dispatch_resolution.blockers);
-        recovered.evidence.ready = false;
-        recovered.evidence.status = "blocked".to_owned();
-        recovered.evidence.invocation_status = "dispatch-import-blocked".to_owned();
-        drop(preparation);
-        return;
-    }
     if !invoke_native_entry {
         recovered.evidence.status = "prepared".to_owned();
         drop(preparation);
@@ -367,7 +358,12 @@ pub(super) fn prepare_native_entry(
             .evidence
             .blockers
             .push("native-entry:invocation-not-completed".to_owned());
-    } else if recovered.evidence.dispatch_import_declared && !result.dispatch_acknowledged {
+    } else if transfer
+        .entry_abi_contract
+        .as_deref()
+        .is_some_and(nuis_runtime::is_dispatch_aware_lifecycle_entry_abi)
+        && !result.dispatch_acknowledged
+    {
         recovered.evidence.invocation_return_status = "dispatch-missing".to_owned();
         recovered
             .evidence
@@ -389,6 +385,32 @@ pub(super) fn prepare_native_entry(
         "blocked"
     }
     .to_owned();
+}
+
+fn record_dispatch_resolution(
+    evidence: &mut NativeEntryHandoffEvidence,
+    transfer: &CompiledEntryTransferResult,
+    resolution: &RuntimeDispatchImportResolution,
+) {
+    evidence.dispatch_resolution_protocol = Some(resolution.protocol.to_owned());
+    evidence.dispatch_import_declared = resolution.declared;
+    let materialized = transfer.runtime_dispatch_import.as_ref();
+    evidence.dispatch_import_identity_hash = materialized
+        .map(|binding| binding.import_identity_hash.clone())
+        .or_else(|| {
+            resolution
+                .binding
+                .as_ref()
+                .map(|binding| binding.import_identity_hash.clone())
+        });
+    evidence.dispatch_resolution_status = if resolution.ready && materialized.is_some() {
+        "resolved"
+    } else {
+        resolution.status
+    }
+    .to_owned();
+    evidence.dispatch_table_identity = materialized.and_then(|binding| binding.table_identity);
+    evidence.dispatch_capability_mask = materialized.map(|binding| binding.capability_mask);
 }
 
 fn record_entry_context(
@@ -469,6 +491,7 @@ fn empty_evidence() -> NativeEntryHandoffEvidence {
         dispatch_resolution_protocol: None,
         dispatch_resolution_status: "not-attempted".to_owned(),
         dispatch_import_declared: false,
+        dispatch_import_identity_hash: None,
         dispatch_table_identity: None,
         dispatch_capability_mask: None,
         dispatch_slot: None,

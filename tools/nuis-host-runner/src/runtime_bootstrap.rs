@@ -1,16 +1,19 @@
 use crate::container::ContainerLoaderSummary;
+use crate::runtime_dispatch::runtime_dispatch_import_facts;
 use nuis_runtime::{
-    plan_lifecycle_bootstrap, prepare_lifecycle_bootstrap_execution, AppliedRelocationFacts,
-    CompiledEntryTransferResult, LifecycleBootstrapFacts, LifecycleBootstrapPlan,
-    MappedSectionFacts, OwnedAppliedRelocationHandle, OwnedImageMapping, OwnedMappedSectionHandle,
-    OwnedRuntimeServiceHandle, RuntimeServiceBindingFacts, CLOCK_ROOT_BINDING_ID,
-    GLM_ROOT_BINDING_ID,
+    plan_lifecycle_bootstrap, prepare_lifecycle_bootstrap_execution_with_dispatch,
+    resolve_runtime_dispatch_import, AppliedRelocationFacts, CompiledEntryTransferResult,
+    LifecycleBootstrapFacts, LifecycleBootstrapPlan, MappedSectionFacts,
+    OwnedAppliedRelocationHandle, OwnedImageMapping, OwnedMappedSectionHandle,
+    OwnedRuntimeServiceHandle, RuntimeDispatchImportResolution, RuntimeServiceBindingFacts,
+    CLOCK_ROOT_BINDING_ID, GLM_ROOT_BINDING_ID,
 };
 
 pub(super) struct RuntimeBootstrapHandoff {
     pub(super) plan: LifecycleBootstrapPlan,
     pub(super) execution_protocol: &'static str,
     pub(super) transfer: CompiledEntryTransferResult,
+    pub(super) dispatch_resolution: RuntimeDispatchImportResolution,
 }
 
 pub(super) fn runtime_bootstrap_handoff(
@@ -100,12 +103,17 @@ pub(super) fn runtime_bootstrap_handoff(
         .iter()
         .map(|facts| OwnedRuntimeServiceHandle::from_facts(&plan.identity_hash, facts))
         .collect();
-    let preparation = prepare_lifecycle_bootstrap_execution(
+    let dispatch_resolution = resolve_runtime_dispatch_import(
+        facts.loader_entry_abi_contract.as_deref().unwrap_or(""),
+        &runtime_dispatch_import_facts(&container.external_import),
+    );
+    let preparation = prepare_lifecycle_bootstrap_execution_with_dispatch(
         &facts,
         OwnedImageMapping::new(mapped_image_hash, mapped_image_size_bytes),
         section_handles,
         relocation_handles,
         service_handles,
+        &dispatch_resolution,
     );
     let execution_protocol = preparation.protocol;
     let transfer = preparation.transfer();
@@ -113,6 +121,7 @@ pub(super) fn runtime_bootstrap_handoff(
         plan,
         execution_protocol,
         transfer,
+        dispatch_resolution,
     }
 }
 

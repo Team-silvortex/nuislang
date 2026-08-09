@@ -20,6 +20,7 @@ fn request<'a>(bytes: &'a [u8], expected_hash: &'a str) -> ExecutableEntryReques
         entry_size_bytes: bytes.len(),
         abi_contract: NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1,
         target_machine_arch: native_host_machine_arch().expect("supported test host"),
+        runtime_dispatch_import_identity_hash: None,
         code_bytes: bytes,
     }
 }
@@ -34,6 +35,9 @@ fn permit(
         section_id: request.section_id.to_owned(),
         entry_symbol: request.entry_symbol.to_owned(),
         target_machine_arch: request.target_machine_arch.to_owned(),
+        runtime_dispatch_import_identity_hash: request
+            .runtime_dispatch_import_identity_hash
+            .map(str::to_owned),
         context_identity_hash: context.identity_hash(),
         dispatch_table_identity: context.dispatch_table_identity(),
         dispatch_capability_mask: context.dispatch_capability_mask(),

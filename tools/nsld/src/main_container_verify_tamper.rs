@@ -32,7 +32,7 @@ pub(crate) fn tampered_container_source(
             "loader_entry_kind = \"manual-entry\"",
         )
         .replace(
-            "loader_entry_abi_contract = \"nuis-runtime-lifecycle-entry-context-i64-v1\"",
+            "loader_entry_abi_contract = \"nuis-runtime-lifecycle-entry-dispatch-i64-v2\"",
             "loader_entry_abi_contract = \"manual-entry-abi\"",
         )
         .replace(

@@ -1,6 +1,7 @@
 use crate::{
     CompiledEntryTransferResult, NativeLifecycleEntryContextV1, NativeRuntimeDispatchFrameV1,
     NativeRuntimeDispatchTableV1, NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1,
+    NUIS_LIFECYCLE_ENTRY_DISPATCH_ABI_V2,
 };
 
 pub const EXECUTABLE_MEMORY_ADAPTER_CONTRACT: &str = "nuis-executable-memory-adapter-v1";
@@ -38,6 +39,7 @@ pub struct ExecutableEntryRequest<'a> {
     pub entry_size_bytes: usize,
     pub abi_contract: &'a str,
     pub target_machine_arch: &'a str,
+    pub runtime_dispatch_import_identity_hash: Option<&'a str>,
     pub code_bytes: &'a [u8],
 }
 
@@ -49,6 +51,7 @@ impl<'a> ExecutableEntryRequest<'a> {
         if !transfer.ready {
             return Err("executable-memory:entry-transfer-blocked".to_owned());
         }
+        crate::lifecycle_execution::validate_transfer_execution_identity(transfer)?;
         Ok(Self {
             execution_identity_hash: &transfer.execution_identity_hash,
             section_id: required_str(
@@ -77,6 +80,10 @@ impl<'a> ExecutableEntryRequest<'a> {
                 transfer.entry_machine_arch.as_deref(),
                 "entry-machine-arch-missing",
             )?,
+            runtime_dispatch_import_identity_hash: transfer
+                .runtime_dispatch_import
+                .as_ref()
+                .map(|binding| binding.import_identity_hash.as_str()),
             code_bytes,
         })
     }
@@ -103,6 +110,7 @@ pub struct ExecutableEntryPreparation {
     pub section_id: String,
     pub entry_symbol: String,
     pub target_machine_arch: String,
+    pub runtime_dispatch_import_identity_hash: Option<String>,
     pub host_machine_arch: Option<String>,
     pub machine_arch_status: &'static str,
     pub mapping_size_bytes: usize,
@@ -124,6 +132,10 @@ impl std::fmt::Debug for ExecutableEntryPreparation {
             .field("section_id", &self.section_id)
             .field("entry_symbol", &self.entry_symbol)
             .field("target_machine_arch", &self.target_machine_arch)
+            .field(
+                "runtime_dispatch_import_identity_hash",
+                &self.runtime_dispatch_import_identity_hash,
+            )
             .field("host_machine_arch", &self.host_machine_arch)
             .field("machine_arch_status", &self.machine_arch_status)
             .field("mapping_size_bytes", &self.mapping_size_bytes)
@@ -148,6 +160,8 @@ impl ExecutableEntryPreparation {
             || permit.section_id != self.section_id
             || permit.entry_symbol != self.entry_symbol
             || permit.target_machine_arch != self.target_machine_arch
+            || permit.runtime_dispatch_import_identity_hash
+                != self.runtime_dispatch_import_identity_hash
         {
             blockers.push("native-entry-authorization:permit-identity-mismatch".to_owned());
         }
@@ -191,6 +205,9 @@ impl ExecutableEntryPreparation {
             section_id: request.section_id.to_owned(),
             entry_symbol: request.entry_symbol.to_owned(),
             target_machine_arch: request.target_machine_arch.to_owned(),
+            runtime_dispatch_import_identity_hash: request
+                .runtime_dispatch_import_identity_hash
+                .map(str::to_owned),
             host_machine_arch: native_host_machine_arch().map(str::to_owned),
             machine_arch_status: machine_arch_status(request.target_machine_arch),
             mapping_size_bytes: 0,
@@ -209,6 +226,7 @@ pub struct NativeEntryInvocationPermit {
     section_id: String,
     entry_symbol: String,
     target_machine_arch: String,
+    runtime_dispatch_import_identity_hash: Option<String>,
     context_identity_hash: String,
     dispatch_table_identity: u64,
     dispatch_capability_mask: u64,
@@ -232,7 +250,11 @@ impl NativeEntryInvocationPermit {
         if native_host_machine_arch() != Some(target_machine_arch) {
             return Err("native-entry-permit:host-machine-arch-mismatch".to_owned());
         }
-        if transfer.entry_abi_contract.as_deref() != Some(NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1) {
+        if !transfer
+            .entry_abi_contract
+            .as_deref()
+            .is_some_and(crate::is_supported_lifecycle_entry_abi)
+        {
             return Err("native-entry-permit:entry-abi-unsupported".to_owned());
         }
         let expected_context = NativeLifecycleEntryContextV1::from_transfer(transfer)?;
@@ -248,6 +270,10 @@ impl NativeEntryInvocationPermit {
             entry_symbol: permit_required(transfer.entry_symbol.as_deref(), "symbol-missing")?
                 .to_owned(),
             target_machine_arch: target_machine_arch.to_owned(),
+            runtime_dispatch_import_identity_hash: transfer
+                .runtime_dispatch_import
+                .as_ref()
+                .map(|binding| binding.import_identity_hash.clone()),
             context_identity_hash: context.identity_hash(),
             dispatch_table_identity: dispatch_table.identity(),
             dispatch_capability_mask: dispatch_table.capability_mask(),
@@ -260,6 +286,10 @@ impl NativeEntryInvocationPermit {
 
     pub fn context_identity_hash(&self) -> &str {
         &self.context_identity_hash
+    }
+
+    pub fn runtime_dispatch_import_identity_hash(&self) -> Option<&str> {
+        self.runtime_dispatch_import_identity_hash.as_deref()
     }
 
     pub fn dispatch_table_identity(&self) -> u64 {
@@ -373,8 +403,21 @@ fn validate_request(request: &ExecutableEntryRequest<'_>) -> Vec<String> {
     if request.entry_symbol.is_empty() {
         blockers.push("executable-memory:entry-symbol-missing".to_owned());
     }
-    if request.abi_contract != NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1 {
+    if !crate::is_supported_lifecycle_entry_abi(request.abi_contract) {
         blockers.push("executable-memory:entry-abi-unsupported".to_owned());
+    }
+    match request.abi_contract {
+        NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1
+            if request.runtime_dispatch_import_identity_hash.is_some() =>
+        {
+            blockers.push("executable-memory:legacy-dispatch-binding-forbidden".to_owned())
+        }
+        NUIS_LIFECYCLE_ENTRY_DISPATCH_ABI_V2
+            if request.runtime_dispatch_import_identity_hash.is_none() =>
+        {
+            blockers.push("executable-memory:dispatch-binding-missing".to_owned())
+        }
+        _ => {}
     }
     match machine_arch_status(request.target_machine_arch) {
         "verified-host-match" => {}
@@ -434,6 +477,9 @@ fn prepare_native_host_entry(
             section_id: request.section_id.to_owned(),
             entry_symbol: request.entry_symbol.to_owned(),
             target_machine_arch: request.target_machine_arch.to_owned(),
+            runtime_dispatch_import_identity_hash: request
+                .runtime_dispatch_import_identity_hash
+                .map(str::to_owned),
             host_machine_arch: native_host_machine_arch().map(str::to_owned),
             machine_arch_status: "verified-host-match",
             mapping_size_bytes: request.code_bytes.len(),

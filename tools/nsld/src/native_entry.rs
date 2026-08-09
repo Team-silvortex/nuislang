@@ -1,4 +1,4 @@
-use nuis_runtime::{NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1, NUIS_NATIVE_ENTRY_SECTION_KIND};
+use nuis_runtime::{NUIS_LIFECYCLE_ENTRY_DISPATCH_ABI_V2, NUIS_NATIVE_ENTRY_SECTION_KIND};
 use std::{fs, ops::Range, path::PathBuf};
 
 pub(crate) const NATIVE_ENTRY_ASSET_FILE: &str = "nuis.nsld.native-entry.bin";
@@ -28,7 +28,7 @@ pub(crate) fn native_entry_code_range(section_size_bytes: usize) -> Option<Range
 }
 
 pub(crate) fn native_entry_abi_contract() -> &'static str {
-    NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1
+    NUIS_LIFECYCLE_ENTRY_DISPATCH_ABI_V2
 }
 
 pub(crate) fn native_entry_section_kind() -> &'static str {
@@ -39,7 +39,7 @@ pub(crate) fn native_entry_machine_arch(machine_arch: &str) -> Result<&'static s
     nuis_runtime::canonical_machine_arch(machine_arch).ok_or_else(|| {
         format!(
             "unsupported Nsld native lifecycle-entry architecture `{machine_arch}` for {} / {}",
-            NUIS_NATIVE_ENTRY_SECTION_KIND, NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1
+            NUIS_NATIVE_ENTRY_SECTION_KIND, NUIS_LIFECYCLE_ENTRY_DISPATCH_ABI_V2
         )
     })
 }

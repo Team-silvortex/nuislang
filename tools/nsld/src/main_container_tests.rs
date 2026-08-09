@@ -252,7 +252,7 @@ fn emit_container_reports_metadata_table_hash() {
     assert!(report.metadata_table_hash.starts_with("0x"));
     assert_eq!(
         preview.loader_entry_abi_contract,
-        nuis_runtime::NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1
+        nuis_runtime::NUIS_LIFECYCLE_ENTRY_DISPATCH_ABI_V2
     );
     assert_eq!(
         preview.loader_entry_machine_arch,

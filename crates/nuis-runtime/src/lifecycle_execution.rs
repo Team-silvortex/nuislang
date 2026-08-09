@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     plan_lifecycle_bootstrap, AppliedRelocationFacts, LifecycleBootstrapFacts, MappedSectionFacts,
+    ResolvedRuntimeDispatchImport, RuntimeDispatchImportFacts, RuntimeDispatchImportResolution,
     RuntimeServiceBindingFacts,
 };
 
@@ -9,6 +10,8 @@ pub const LIFECYCLE_BOOTSTRAP_EXECUTION_PROTOCOL: &str =
     "nuis-runtime-lifecycle-bootstrap-execution-v1";
 pub const LIFECYCLE_BOOTSTRAP_EXECUTION_IDENTITY_CONTRACT: &str =
     "nuis-runtime-lifecycle-bootstrap-execution-identity-v1";
+pub const LIFECYCLE_BOOTSTRAP_DISPATCH_EXECUTION_IDENTITY_CONTRACT: &str =
+    "nuis-runtime-lifecycle-bootstrap-dispatch-execution-identity-v2";
 pub const COMPILED_ENTRY_TRANSFER_PROTOCOL: &str = "nuis-runtime-compiled-entry-transfer-v1";
 
 #[derive(Debug, PartialEq, Eq)]
@@ -142,6 +145,7 @@ struct LifecycleBootstrapExecutionContext {
     entry_symbol_payload_hash: String,
     lifecycle_hook: String,
     scheduler_entry: String,
+    runtime_dispatch_import: Option<ResolvedRuntimeDispatchImport>,
 }
 
 impl LifecycleBootstrapExecutionContext {
@@ -177,6 +181,12 @@ impl LifecycleBootstrapExecutionContext {
             "transfer-compiled-entry:{}@{}",
             self.entry_symbol, self.entry_section_id
         ));
+        if let Some(binding) = &self.runtime_dispatch_import {
+            trace.push(format!(
+                "bind-runtime-dispatch-import:{}",
+                binding.import_identity_hash
+            ));
+        }
 
         let mut transfer = CompiledEntryTransferResult {
             protocol: COMPILED_ENTRY_TRANSFER_PROTOCOL,
@@ -184,7 +194,11 @@ impl LifecycleBootstrapExecutionContext {
             ready: true,
             plan_identity_hash: self.plan_identity_hash,
             execution_identity_hash: self.execution_identity_hash,
+            execution_identity_contract: execution_identity_contract(
+                self.runtime_dispatch_import.as_ref(),
+            ),
             image_hash: Some(self.image_mapping.image_hash),
+            image_size_bytes: Some(self.image_mapping.size_bytes),
             entry_symbol: Some(self.entry_symbol),
             entry_section_id: Some(self.entry_section_id),
             entry_section_kind: Some(entry_section_kind),
@@ -200,6 +214,7 @@ impl LifecycleBootstrapExecutionContext {
             entry_context_identity_hash: None,
             lifecycle_hook: Some(self.lifecycle_hook),
             scheduler_entry: Some(self.scheduler_entry),
+            runtime_dispatch_import: self.runtime_dispatch_import,
             consumed_mapped_section_count: self.mapped_sections.len(),
             consumed_applied_relocation_count: self.applied_relocations.len(),
             activated_service_ids,
@@ -219,7 +234,9 @@ pub struct CompiledEntryTransferResult {
     pub ready: bool,
     pub plan_identity_hash: String,
     pub execution_identity_hash: String,
+    pub execution_identity_contract: &'static str,
     pub image_hash: Option<String>,
+    pub image_size_bytes: Option<usize>,
     pub entry_symbol: Option<String>,
     pub entry_section_id: Option<String>,
     pub entry_section_kind: Option<String>,
@@ -235,6 +252,7 @@ pub struct CompiledEntryTransferResult {
     pub entry_context_identity_hash: Option<String>,
     pub lifecycle_hook: Option<String>,
     pub scheduler_entry: Option<String>,
+    pub runtime_dispatch_import: Option<ResolvedRuntimeDispatchImport>,
     pub consumed_mapped_section_count: usize,
     pub consumed_applied_relocation_count: usize,
     pub activated_service_ids: Vec<String>,
@@ -254,7 +272,9 @@ impl CompiledEntryTransferResult {
             ready: false,
             plan_identity_hash,
             execution_identity_hash,
+            execution_identity_contract: LIFECYCLE_BOOTSTRAP_EXECUTION_IDENTITY_CONTRACT,
             image_hash: None,
+            image_size_bytes: None,
             entry_symbol: None,
             entry_section_id: None,
             entry_section_kind: None,
@@ -270,6 +290,7 @@ impl CompiledEntryTransferResult {
             entry_context_identity_hash: None,
             lifecycle_hook: None,
             scheduler_entry: None,
+            runtime_dispatch_import: None,
             consumed_mapped_section_count: 0,
             consumed_applied_relocation_count: 0,
             activated_service_ids: Vec::new(),
@@ -285,6 +306,28 @@ pub fn prepare_lifecycle_bootstrap_execution(
     mapped_sections: Vec<OwnedMappedSectionHandle>,
     applied_relocations: Vec<OwnedAppliedRelocationHandle>,
     runtime_services: Vec<OwnedRuntimeServiceHandle>,
+) -> LifecycleBootstrapExecutionPreparation {
+    let dispatch_resolution = crate::resolve_runtime_dispatch_import(
+        facts.loader_entry_abi_contract.as_deref().unwrap_or(""),
+        &RuntimeDispatchImportFacts::default(),
+    );
+    prepare_lifecycle_bootstrap_execution_with_dispatch(
+        facts,
+        image_mapping,
+        mapped_sections,
+        applied_relocations,
+        runtime_services,
+        &dispatch_resolution,
+    )
+}
+
+pub fn prepare_lifecycle_bootstrap_execution_with_dispatch(
+    facts: &LifecycleBootstrapFacts,
+    image_mapping: OwnedImageMapping,
+    mapped_sections: Vec<OwnedMappedSectionHandle>,
+    applied_relocations: Vec<OwnedAppliedRelocationHandle>,
+    runtime_services: Vec<OwnedRuntimeServiceHandle>,
+    dispatch_resolution: &RuntimeDispatchImportResolution,
 ) -> LifecycleBootstrapExecutionPreparation {
     let plan = plan_lifecycle_bootstrap(facts);
     if !plan.ready {
@@ -307,13 +350,21 @@ pub fn prepare_lifecycle_bootstrap_execution(
         &mut blockers,
     );
     validate_services(&plan.identity_hash, facts, &runtime_services, &mut blockers);
+    if !dispatch_resolution.ready {
+        blockers.extend(dispatch_resolution.blockers.iter().cloned());
+    }
     blockers.sort();
     blockers.dedup();
     if !blockers.is_empty() {
         return blocked_preparation(plan.identity_hash, blockers);
     }
 
-    let execution_identity_hash = execution_identity_hash(&plan.identity_hash, &image_mapping);
+    let runtime_dispatch_import = dispatch_resolution.binding.clone();
+    let execution_identity_hash = execution_identity_hash(
+        &plan.identity_hash,
+        &image_mapping,
+        runtime_dispatch_import.as_ref(),
+    );
     let context = LifecycleBootstrapExecutionContext {
         plan_identity_hash: plan.identity_hash.clone(),
         execution_identity_hash: execution_identity_hash.clone(),
@@ -333,6 +384,7 @@ pub fn prepare_lifecycle_bootstrap_execution(
             .clone()
             .unwrap_or_default(),
         scheduler_entry: facts.scheduler_entry.clone(),
+        runtime_dispatch_import,
     };
     LifecycleBootstrapExecutionPreparation {
         protocol: LIFECYCLE_BOOTSTRAP_EXECUTION_PROTOCOL,
@@ -511,17 +563,86 @@ fn sorted_services(mut handles: Vec<OwnedRuntimeServiceHandle>) -> Vec<OwnedRunt
     handles
 }
 
-fn execution_identity_hash(plan_hash: &str, mapping: &OwnedImageMapping) -> String {
-    fnv1a64_hex(
-        format!(
-            "{}\t{}\t{}\t{}",
-            LIFECYCLE_BOOTSTRAP_EXECUTION_IDENTITY_CONTRACT,
-            plan_hash,
-            mapping.image_hash,
-            mapping.size_bytes
-        )
-        .as_bytes(),
-    )
+fn execution_identity_contract(binding: Option<&ResolvedRuntimeDispatchImport>) -> &'static str {
+    if binding.is_some() {
+        LIFECYCLE_BOOTSTRAP_DISPATCH_EXECUTION_IDENTITY_CONTRACT
+    } else {
+        LIFECYCLE_BOOTSTRAP_EXECUTION_IDENTITY_CONTRACT
+    }
+}
+
+fn execution_identity_hash(
+    plan_hash: &str,
+    mapping: &OwnedImageMapping,
+    binding: Option<&ResolvedRuntimeDispatchImport>,
+) -> String {
+    match binding {
+        Some(binding) => fnv1a64_hex(
+            format!(
+                "{}\t{}\t{}\t{}\t{}",
+                LIFECYCLE_BOOTSTRAP_DISPATCH_EXECUTION_IDENTITY_CONTRACT,
+                plan_hash,
+                mapping.image_hash,
+                mapping.size_bytes,
+                binding.import_identity_hash
+            )
+            .as_bytes(),
+        ),
+        None => fnv1a64_hex(
+            format!(
+                "{}\t{}\t{}\t{}",
+                LIFECYCLE_BOOTSTRAP_EXECUTION_IDENTITY_CONTRACT,
+                plan_hash,
+                mapping.image_hash,
+                mapping.size_bytes
+            )
+            .as_bytes(),
+        ),
+    }
+}
+
+pub(crate) fn validate_transfer_execution_identity(
+    transfer: &CompiledEntryTransferResult,
+) -> Result<(), String> {
+    match transfer.entry_abi_contract.as_deref() {
+        Some(crate::NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1)
+            if transfer.runtime_dispatch_import.is_none() => {}
+        Some(crate::NUIS_LIFECYCLE_ENTRY_DISPATCH_ABI_V2)
+            if transfer.runtime_dispatch_import.is_some() => {}
+        Some(crate::NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1) => {
+            return Err("runtime-bootstrap-execution:legacy-dispatch-binding-forbidden".to_owned());
+        }
+        Some(crate::NUIS_LIFECYCLE_ENTRY_DISPATCH_ABI_V2) => {
+            return Err("runtime-bootstrap-execution:dispatch-binding-missing".to_owned());
+        }
+        _ => return Err("runtime-bootstrap-execution:entry-abi-unsupported".to_owned()),
+    }
+    let image_hash = transfer
+        .image_hash
+        .as_deref()
+        .filter(|value| valid_hash(value))
+        .ok_or_else(|| "runtime-bootstrap-execution:transfer-image-hash-invalid".to_owned())?;
+    let image_size_bytes = transfer
+        .image_size_bytes
+        .filter(|size| *size > 0)
+        .ok_or_else(|| "runtime-bootstrap-execution:transfer-image-size-invalid".to_owned())?;
+    if let Some(binding) = &transfer.runtime_dispatch_import {
+        binding.validate_static()?;
+    }
+    let mapping = OwnedImageMapping::new(image_hash, image_size_bytes);
+    let expected_contract = execution_identity_contract(transfer.runtime_dispatch_import.as_ref());
+    if transfer.execution_identity_contract != expected_contract {
+        return Err("runtime-bootstrap-execution:identity-contract-mismatch".to_owned());
+    }
+    let expected_hash = execution_identity_hash(
+        &transfer.plan_identity_hash,
+        &mapping,
+        transfer.runtime_dispatch_import.as_ref(),
+    );
+    if transfer.execution_identity_hash != expected_hash {
+        return Err("runtime-bootstrap-execution:identity-mismatch".to_owned());
+    }
+    Ok(())
 }
 
 fn valid_hash(value: &str) -> bool {
@@ -540,258 +661,5 @@ fn fnv1a64_hex(bytes: &[u8]) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{
-        ExecutableEntryRequest, ExecutableMemoryAdapter, NativeEntryInvocationPermit,
-        NativeHostExecutableMemoryAdapter, CLOCK_ROOT_BINDING_ID, CLOCK_ROOT_CONTRACT,
-        GLM_ROOT_BINDING_ID, GLM_ROOT_CONTRACT,
-    };
-
-    fn ready_facts() -> LifecycleBootstrapFacts {
-        LifecycleBootstrapFacts {
-            image_verified: true,
-            container_handoff_ready: true,
-            scheduler_entry: "nuis.scheduler.loop.v1".to_owned(),
-            process_lifecycle_hook: "on_process_start".to_owned(),
-            loader_entry_kind: Some("lifecycle-bootstrap".to_owned()),
-            loader_entry_abi_contract: Some(crate::NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1.to_owned()),
-            loader_entry_machine_arch: Some(
-                crate::native_host_machine_arch()
-                    .unwrap_or(crate::NUIS_MACHINE_ARCH_AARCH64)
-                    .to_owned(),
-            ),
-            loader_entry_symbol: Some("main".to_owned()),
-            loader_entry_section_id: Some("sec0001.nuis-native-entry-code".to_owned()),
-            loader_symbol_status: "parsed".to_owned(),
-            loader_symbol_kind: Some("lifecycle-bootstrap".to_owned()),
-            loader_symbol_name: Some("main".to_owned()),
-            loader_symbol_lifecycle_hook: Some("on_lifecycle_bootstrap".to_owned()),
-            loader_symbol_section_id: Some("sec0001.nuis-native-entry-code".to_owned()),
-            loader_symbol_offset: Some(136),
-            loader_symbol_size_bytes: Some(8),
-            loader_symbol_payload_hash: Some(fnv1a64_hex(&[0; 8])),
-            relocation_targets_loader_symbol: true,
-            relocation_source_matches_loader_symbol: true,
-            source_section_count: 2,
-            source_section_table_hash: "0x3333333333333333".to_owned(),
-            mapped_sections: vec![
-                MappedSectionFacts {
-                    section_id: "sec0000.compiled-artifact".to_owned(),
-                    section_kind: "compiled-artifact".to_owned(),
-                    offset: 0,
-                    size_bytes: 128,
-                    payload_hash: "0x4444444444444444".to_owned(),
-                    required: true,
-                    mapping_status: "mapped".to_owned(),
-                },
-                MappedSectionFacts {
-                    section_id: "sec0001.nuis-native-entry-code".to_owned(),
-                    section_kind: crate::NUIS_NATIVE_ENTRY_SECTION_KIND.to_owned(),
-                    offset: 128,
-                    size_bytes: 16,
-                    payload_hash: "0x7777777777777777".to_owned(),
-                    required: true,
-                    mapping_status: "mapped".to_owned(),
-                },
-            ],
-            source_relocation_count: 1,
-            source_relocation_table_hash: "0x5555555555555555".to_owned(),
-            applied_relocations: vec![AppliedRelocationFacts {
-                relocation_id: "rel0000.lifecycle-entry".to_owned(),
-                relocation_kind: "lifecycle-entry-binding".to_owned(),
-                source_section_id: "sec0001.nuis-native-entry-code".to_owned(),
-                source_offset: 128,
-                target_symbol_id: "sym0000.loader-entry".to_owned(),
-                addend: 0,
-                application_status: "applied".to_owned(),
-            }],
-            runtime_service_bindings: vec![
-                RuntimeServiceBindingFacts {
-                    binding_id: CLOCK_ROOT_BINDING_ID.to_owned(),
-                    contract: CLOCK_ROOT_CONTRACT.to_owned(),
-                    value_count: 3,
-                    value_hash: "0x1111111111111111".to_owned(),
-                    validation_status: "verified".to_owned(),
-                    required: true,
-                },
-                RuntimeServiceBindingFacts {
-                    binding_id: GLM_ROOT_BINDING_ID.to_owned(),
-                    contract: GLM_ROOT_CONTRACT.to_owned(),
-                    value_count: 2,
-                    value_hash: "0x2222222222222222".to_owned(),
-                    validation_status: "verified".to_owned(),
-                    required: true,
-                },
-            ],
-            provider_dispatch_status: "verified-empty".to_owned(),
-        }
-    }
-
-    fn owned_inputs(
-        facts: &LifecycleBootstrapFacts,
-    ) -> (
-        OwnedImageMapping,
-        Vec<OwnedMappedSectionHandle>,
-        Vec<OwnedAppliedRelocationHandle>,
-        Vec<OwnedRuntimeServiceHandle>,
-    ) {
-        let plan_hash = plan_lifecycle_bootstrap(facts).identity_hash;
-        (
-            OwnedImageMapping::new("0x9999999999999999", 256),
-            facts
-                .mapped_sections
-                .iter()
-                .map(|facts| OwnedMappedSectionHandle::from_facts(&plan_hash, facts))
-                .collect(),
-            facts
-                .applied_relocations
-                .iter()
-                .map(|facts| OwnedAppliedRelocationHandle::from_facts(&plan_hash, facts))
-                .collect(),
-            facts
-                .runtime_service_bindings
-                .iter()
-                .map(|facts| OwnedRuntimeServiceHandle::from_facts(&plan_hash, facts))
-                .collect(),
-        )
-    }
-
-    #[test]
-    fn ready_context_consumes_every_capability_before_entry_transfer() {
-        let facts = ready_facts();
-        let (image, sections, relocations, services) = owned_inputs(&facts);
-        let preparation =
-            prepare_lifecycle_bootstrap_execution(&facts, image, sections, relocations, services);
-        assert!(preparation.ready);
-        assert_eq!(preparation.status, "ready");
-        assert!(valid_hash(&preparation.execution_identity_hash));
-
-        let transfer = preparation.transfer();
-        assert!(transfer.ready);
-        assert_eq!(transfer.status, "transfer-ready");
-        assert_eq!(transfer.consumed_mapped_section_count, 2);
-        assert_eq!(transfer.consumed_applied_relocation_count, 1);
-        assert_eq!(
-            transfer.entry_section_kind.as_deref(),
-            Some(crate::NUIS_NATIVE_ENTRY_SECTION_KIND)
-        );
-        assert_eq!(transfer.entry_section_offset, Some(128));
-        assert_eq!(transfer.entry_section_size_bytes, Some(16));
-        assert_eq!(
-            transfer.entry_section_payload_hash.as_deref(),
-            Some("0x7777777777777777")
-        );
-        assert_eq!(
-            transfer.entry_abi_contract.as_deref(),
-            Some(crate::NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1)
-        );
-        assert_eq!(
-            transfer.entry_machine_arch.as_deref(),
-            crate::native_host_machine_arch()
-        );
-        assert_eq!(transfer.entry_symbol_offset, Some(136));
-        assert_eq!(transfer.entry_symbol_size_bytes, Some(8));
-        assert_eq!(
-            transfer.entry_symbol_payload_hash.as_deref(),
-            Some(fnv1a64_hex(&[0; 8]).as_str())
-        );
-        assert_eq!(transfer.activated_service_ids.len(), 2);
-        assert_eq!(
-            transfer.trace,
-            vec![
-                "consume-mapped-section:sec0000.compiled-artifact",
-                "consume-mapped-section:sec0001.nuis-native-entry-code",
-                "consume-applied-relocation:rel0000.lifecycle-entry",
-                "activate-runtime-service:runtime.clock-root",
-                "activate-runtime-service:runtime.glm-root",
-                "transfer-compiled-entry:main@sec0001.nuis-native-entry-code",
-            ]
-        );
-        let request = ExecutableEntryRequest::from_transfer(&transfer, &[0; 8]).unwrap();
-        let context = crate::NativeLifecycleEntryContextV1::from_transfer(&transfer).unwrap();
-        let permit = NativeEntryInvocationPermit::from_transfer(&transfer, &context).unwrap();
-        assert_eq!(
-            permit.protocol(),
-            crate::NATIVE_ENTRY_INVOCATION_PERMIT_PROTOCOL
-        );
-        let native = NativeHostExecutableMemoryAdapter.prepare(&request);
-        assert!(native.ready, "{:?}", native.blockers);
-        assert_eq!(native.protection_status, "sealed-read-execute");
-        assert!(native.authorize(permit, context).is_ok());
-    }
-
-    #[test]
-    fn section_capability_drift_fails_closed_without_consuming_anything() {
-        let facts = ready_facts();
-        let (image, mut sections, relocations, services) = owned_inputs(&facts);
-        sections[0].payload_hash = "0xaaaaaaaaaaaaaaaa".to_owned();
-
-        let transfer =
-            prepare_lifecycle_bootstrap_execution(&facts, image, sections, relocations, services)
-                .transfer();
-        assert!(!transfer.ready);
-        assert_eq!(transfer.status, "blocked");
-        assert_eq!(transfer.consumed_mapped_section_count, 0);
-        assert_eq!(transfer.consumed_applied_relocation_count, 0);
-        assert!(transfer.activated_service_ids.is_empty());
-        assert!(transfer.trace.is_empty());
-        assert!(transfer.blockers.iter().any(|blocker| {
-            blocker
-                == "runtime-bootstrap-execution:section-handle-invalid:sec0000.compiled-artifact"
-        }));
-    }
-
-    #[test]
-    fn capabilities_cannot_cross_plan_identity_boundaries() {
-        let facts = ready_facts();
-        let (image, sections, mut relocations, services) = owned_inputs(&facts);
-        relocations[0].plan_identity_hash = "0xaaaaaaaaaaaaaaaa".to_owned();
-
-        let transfer =
-            prepare_lifecycle_bootstrap_execution(&facts, image, sections, relocations, services)
-                .transfer();
-        assert!(!transfer.ready);
-        assert!(transfer.blockers.iter().any(|blocker| {
-            blocker
-                == "runtime-bootstrap-execution:relocation-handle-invalid:rel0000.lifecycle-entry"
-        }));
-    }
-
-    #[test]
-    fn undersized_mapping_fails_closed_before_section_consumption() {
-        let facts = ready_facts();
-        let (_, sections, relocations, services) = owned_inputs(&facts);
-        let transfer = prepare_lifecycle_bootstrap_execution(
-            &facts,
-            OwnedImageMapping::new("0x9999999999999999", 64),
-            sections,
-            relocations,
-            services,
-        )
-        .transfer();
-
-        assert!(!transfer.ready);
-        assert_eq!(transfer.image_hash, None);
-        assert!(transfer.blockers.iter().any(|blocker| {
-            blocker
-                == "runtime-bootstrap-execution:section-handle-invalid:sec0000.compiled-artifact"
-        }));
-    }
-
-    #[test]
-    fn blocked_plan_never_materializes_an_execution_context() {
-        let mut facts = ready_facts();
-        facts.image_verified = false;
-        let (image, sections, relocations, services) = owned_inputs(&facts);
-        let transfer =
-            prepare_lifecycle_bootstrap_execution(&facts, image, sections, relocations, services)
-                .transfer();
-
-        assert!(!transfer.ready);
-        assert_eq!(transfer.plan_identity_hash, "none");
-        assert!(transfer
-            .blockers
-            .contains(&"runtime-bootstrap:image-unverified".to_owned()));
-    }
-}
+#[path = "lifecycle_execution_tests.rs"]
+mod tests;

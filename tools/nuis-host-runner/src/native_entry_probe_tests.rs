@@ -8,6 +8,10 @@ const NONZERO_NATIVE_ENTRY_CODE: [u8; 8] = [0xb8, 42, 0, 0, 0, 0xc3, 0x90, 0x90]
 fn nsb_with_runtime_dispatch_import(provider: &str) -> Vec<u8> {
     let capsule = String::from_utf8(container_capsule())
         .expect("container capsule is utf-8")
+        .replace(
+            nuis_runtime::NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1,
+            nuis_runtime::NUIS_LIFECYCLE_ENTRY_DISPATCH_ABI_V2,
+        )
         .replace("external_import_count = 0", "external_import_count = 1")
         .replace(
             CONTAINER_CAPSULE_END_MARKER,
@@ -16,6 +20,16 @@ fn nsb_with_runtime_dispatch_import(provider: &str) -> Vec<u8> {
                 nuis_runtime::NATIVE_RUNTIME_DISPATCH_IMPORT_KIND,
                 nuis_runtime::NATIVE_RUNTIME_DISPATCH_IMPORT_NAME,
             ),
+        );
+    nsb_bytes_from_payload(&image_payload_from_capsule(capsule.as_bytes()))
+}
+
+fn nsb_with_dispatch_abi_without_import() -> Vec<u8> {
+    let capsule = String::from_utf8(container_capsule())
+        .expect("container capsule is utf-8")
+        .replace(
+            nuis_runtime::NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1,
+            nuis_runtime::NUIS_LIFECYCLE_ENTRY_DISPATCH_ABI_V2,
         );
     nsb_bytes_from_payload(&image_payload_from_capsule(capsule.as_bytes()))
 }
@@ -180,6 +194,43 @@ fn explicit_probe_rejects_unregistered_runtime_dispatch_provider() {
     assert!(report
         .blockers
         .contains(&"runtime-dispatch-import:provider-unsupported".to_owned()));
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn dispatch_aware_probe_rejects_missing_import_without_legacy_fallback() {
+    let bytes = nsb_with_dispatch_abi_without_import();
+    let manifest = parse_launcher_manifest(&manifest_source(&fnv1a64_hex(&bytes), bytes.len()))
+        .expect("manifest parses");
+    let dir = env::temp_dir().join(format!(
+        "nuis-host-runner-dispatch-missing-test-{}",
+        std::process::id()
+    ));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let nsb_path = dir.join("nuis-app.nsb");
+    fs::write(&nsb_path, bytes).expect("write nsb");
+
+    let report = validate_handoff_with_probe(
+        &dir.join("nuis.nsld.final-executable-launcher.toml"),
+        &nsb_path,
+        Some(&dir),
+        "nuis.scheduler.loop.v1",
+        "on_process_start",
+        &manifest,
+        true,
+    );
+
+    assert!(!report.ready);
+    assert_eq!(
+        report.native_entry_handoff.dispatch_resolution_status,
+        "blocked"
+    );
+    assert!(!report.native_entry_handoff.dispatch_import_declared);
+    assert!(!report.native_entry_handoff.invoked);
+    assert!(report
+        .blockers
+        .contains(&"runtime-dispatch-import:declaration-count-invalid".to_owned()));
     let _ = fs::remove_dir_all(&dir);
 }
 

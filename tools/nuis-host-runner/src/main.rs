@@ -381,7 +381,7 @@ fn validate_handoff_with_probe(
     prepare_native_entry(
         &mut native_entry,
         &runtime_bootstrap.transfer,
-        &container_loader.external_import,
+        &runtime_bootstrap.dispatch_resolution,
         invoke_native_entry,
     );
     blockers.extend(native_entry.evidence.blockers.iter().cloned());

@@ -1,6 +1,8 @@
 use crate::lifecycle_execution::CompiledEntryTransferResult;
 
 pub const NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1: &str = "nuis-runtime-lifecycle-entry-context-i64-v1";
+pub const NUIS_LIFECYCLE_ENTRY_DISPATCH_ABI_V2: &str =
+    "nuis-runtime-lifecycle-entry-dispatch-i64-v2";
 pub const NATIVE_LIFECYCLE_ENTRY_CONTEXT_PROTOCOL: &str = "nuis-runtime-lifecycle-entry-context-v1";
 pub const NATIVE_LIFECYCLE_ENTRY_CONTEXT_VERSION: u32 = 1;
 const NATIVE_LIFECYCLE_ENTRY_CONTEXT_MAGIC: [u8; 8] = *b"NUISCTX1";
@@ -36,6 +38,7 @@ impl NativeLifecycleEntryContextV1 {
         if context.identity_hash() != expected_identity {
             return Err("native-entry-context:identity-mismatch".to_owned());
         }
+        crate::runtime_dispatch_binding::validate_transfer_runtime_dispatch(transfer, &context)?;
         Ok(context)
     }
 
@@ -119,9 +122,14 @@ impl NativeLifecycleEntryContextV1 {
         if !transfer.ready {
             return Err("native-entry-context:entry-transfer-blocked".to_owned());
         }
-        if transfer.entry_abi_contract.as_deref() != Some(NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1) {
+        if !transfer
+            .entry_abi_contract
+            .as_deref()
+            .is_some_and(is_supported_lifecycle_entry_abi)
+        {
             return Err("native-entry-context:entry-abi-unsupported".to_owned());
         }
+        crate::lifecycle_execution::validate_transfer_execution_identity(transfer)?;
         let plan_identity = parse_hash(&transfer.plan_identity_hash, "plan-identity")?;
         let execution_identity =
             parse_hash(&transfer.execution_identity_hash, "execution-identity")?;
@@ -165,7 +173,19 @@ pub(crate) fn bind_transfer_context(
     let context = NativeLifecycleEntryContextV1::derive_from_transfer(transfer)?;
     transfer.entry_context_protocol = Some(NATIVE_LIFECYCLE_ENTRY_CONTEXT_PROTOCOL.to_owned());
     transfer.entry_context_identity_hash = Some(context.identity_hash());
+    crate::runtime_dispatch_binding::materialize_transfer_runtime_dispatch(transfer, &context)?;
     Ok(())
+}
+
+pub fn is_supported_lifecycle_entry_abi(value: &str) -> bool {
+    matches!(
+        value,
+        NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1 | NUIS_LIFECYCLE_ENTRY_DISPATCH_ABI_V2
+    )
+}
+
+pub fn is_dispatch_aware_lifecycle_entry_abi(value: &str) -> bool {
+    value == NUIS_LIFECYCLE_ENTRY_DISPATCH_ABI_V2
 }
 
 fn required_text<'a>(value: Option<&'a str>, field: &str) -> Result<&'a str, String> {
@@ -219,13 +239,30 @@ mod tests {
     use crate::{COMPILED_ENTRY_TRANSFER_PROTOCOL, NUIS_NATIVE_ENTRY_SECTION_KIND};
 
     fn ready_transfer() -> CompiledEntryTransferResult {
+        let plan_identity_hash = "0x0101010101010101";
+        let image_hash = "0x2222222222222222";
+        let execution_identity_hash = format!(
+            "0x{:016x}",
+            fnv1a64(
+                format!(
+                    "{}\t{}\t{}\t{}",
+                    crate::LIFECYCLE_BOOTSTRAP_EXECUTION_IDENTITY_CONTRACT,
+                    plan_identity_hash,
+                    image_hash,
+                    256
+                )
+                .as_bytes()
+            )
+        );
         let mut transfer = CompiledEntryTransferResult {
             protocol: COMPILED_ENTRY_TRANSFER_PROTOCOL,
             status: "transfer-ready",
             ready: true,
-            plan_identity_hash: "0x0101010101010101".to_owned(),
-            execution_identity_hash: "0x1111111111111111".to_owned(),
-            image_hash: Some("0x2222222222222222".to_owned()),
+            plan_identity_hash: plan_identity_hash.to_owned(),
+            execution_identity_hash,
+            execution_identity_contract: crate::LIFECYCLE_BOOTSTRAP_EXECUTION_IDENTITY_CONTRACT,
+            image_hash: Some(image_hash.to_owned()),
+            image_size_bytes: Some(256),
             entry_symbol: Some("main".to_owned()),
             entry_section_id: Some("sec.native-entry".to_owned()),
             entry_section_kind: Some(NUIS_NATIVE_ENTRY_SECTION_KIND.to_owned()),
@@ -241,6 +278,7 @@ mod tests {
             entry_context_identity_hash: None,
             lifecycle_hook: Some("on_process_start".to_owned()),
             scheduler_entry: Some("nuis.scheduler.loop.v1".to_owned()),
+            runtime_dispatch_import: None,
             consumed_mapped_section_count: 1,
             consumed_applied_relocation_count: 1,
             activated_service_ids: vec![

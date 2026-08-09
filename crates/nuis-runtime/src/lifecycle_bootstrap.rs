@@ -128,12 +128,13 @@ pub fn plan_lifecycle_bootstrap(facts: &LifecycleBootstrapFacts) -> LifecycleBoo
         "runtime-bootstrap:entry-kind-unsupported",
         &mut blockers,
     );
-    require_exact(
-        facts.loader_entry_abi_contract.as_deref(),
-        crate::NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1,
-        "runtime-bootstrap:entry-abi-unsupported",
-        &mut blockers,
-    );
+    if !facts
+        .loader_entry_abi_contract
+        .as_deref()
+        .is_some_and(crate::is_supported_lifecycle_entry_abi)
+    {
+        blockers.push("runtime-bootstrap:entry-abi-unsupported".to_owned());
+    }
     validate_machine_arch(facts.loader_entry_machine_arch.as_deref(), &mut blockers);
     require_optional_non_empty(
         facts.loader_entry_symbol.as_deref(),

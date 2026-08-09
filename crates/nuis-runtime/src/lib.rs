@@ -15,6 +15,7 @@ pub mod loader;
 pub mod native_entry_context;
 pub mod native_service_dispatch;
 pub mod registry;
+pub mod runtime_dispatch_binding;
 pub mod session;
 
 pub use bridge::{BridgeExecutor, PreparedDomainExecution};
@@ -44,15 +45,19 @@ pub use lifecycle_bootstrap::{
     LIFECYCLE_BOOTSTRAP_PLAN_PROTOCOL,
 };
 pub use lifecycle_execution::{
-    prepare_lifecycle_bootstrap_execution, CompiledEntryTransferResult,
-    LifecycleBootstrapExecutionPreparation, OwnedAppliedRelocationHandle, OwnedImageMapping,
-    OwnedMappedSectionHandle, OwnedRuntimeServiceHandle, COMPILED_ENTRY_TRANSFER_PROTOCOL,
+    prepare_lifecycle_bootstrap_execution, prepare_lifecycle_bootstrap_execution_with_dispatch,
+    CompiledEntryTransferResult, LifecycleBootstrapExecutionPreparation,
+    OwnedAppliedRelocationHandle, OwnedImageMapping, OwnedMappedSectionHandle,
+    OwnedRuntimeServiceHandle, COMPILED_ENTRY_TRANSFER_PROTOCOL,
+    LIFECYCLE_BOOTSTRAP_DISPATCH_EXECUTION_IDENTITY_CONTRACT,
     LIFECYCLE_BOOTSTRAP_EXECUTION_IDENTITY_CONTRACT, LIFECYCLE_BOOTSTRAP_EXECUTION_PROTOCOL,
 };
 pub use loader::RuntimeLoader;
 pub use native_entry_context::{
+    is_dispatch_aware_lifecycle_entry_abi, is_supported_lifecycle_entry_abi,
     NativeLifecycleEntryContextV1, NATIVE_LIFECYCLE_ENTRY_CONTEXT_PROTOCOL,
     NATIVE_LIFECYCLE_ENTRY_CONTEXT_VERSION, NUIS_LIFECYCLE_ENTRY_CONTEXT_ABI_V1,
+    NUIS_LIFECYCLE_ENTRY_DISPATCH_ABI_V2,
 };
 pub use native_service_dispatch::{
     NativeRuntimeDispatchFrameV1, NativeRuntimeDispatchHandlerV1, NativeRuntimeDispatchRequestV1,
@@ -71,6 +76,12 @@ pub use native_service_dispatch::{
     NATIVE_RUNTIME_DISPATCH_TABLE_VERSION,
 };
 pub use registry::{AdapterRegistry, DomainAdapter};
+pub use runtime_dispatch_binding::{
+    resolve_runtime_dispatch_import, ResolvedRuntimeDispatchImport,
+    RuntimeDispatchImportDeclaration, RuntimeDispatchImportFacts, RuntimeDispatchImportResolution,
+    RUNTIME_DISPATCH_IMPORT_BINDING_PROTOCOL, RUNTIME_DISPATCH_IMPORT_IDENTITY_CONTRACT,
+    RUNTIME_DISPATCH_IMPORT_RESOLUTION_PROTOCOL,
+};
 pub use session::{
     ClockProtocolRuntimeSummary, HostConsumableDomainUnit, HostConsumableSummary, LoadedExecutable,
 };
