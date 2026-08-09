@@ -369,7 +369,26 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
             && nsdb_handoff.contains("entry_symbol = \"nuis.bootstrap.lifecycle.v1\"")
             && nsdb_handoff.contains("entry_kind = \"lifecycle-bootstrap\"")
             && nsdb_handoff.contains("entry_section_id = \"sec0004.nuis-native-entry-code\"")
-            && nsdb_handoff.contains("next_action = \"handoff-payload-trace-to-nsdb\""),
+            && nsdb_handoff.contains("next_action = \"handoff-payload-trace-to-nsdb\"")
+            && nsdb_handoff.contains(
+                "runtime_dispatch_receipt_contract = \"nuis-runtime-dispatch-receipt-v1\""
+            )
+            && nsdb_handoff.contains(
+                "runtime_dispatch_receipt_resolution_protocol = \"nuis-runtime-dispatch-import-resolution-v1\""
+            )
+            && nsdb_handoff.contains(
+                "runtime_dispatch_receipt_resolution_status = \"resolved\""
+            )
+            && nsdb_handoff.contains("runtime_dispatch_receipt_execution_identity_hash = \"0x")
+            && nsdb_handoff.contains("runtime_dispatch_receipt_import_identity_hash = \"0x")
+            && nsdb_handoff.contains("runtime_dispatch_receipt_table_identity = \"0x")
+            && nsdb_handoff.contains(
+                "runtime_dispatch_receipt_capability_mask = \"0x0000000000000003\""
+            )
+            && nsdb_handoff.contains("runtime_dispatch_receipt_slot = 2")
+            && nsdb_handoff.contains("runtime_dispatch_receipt_status_code = 0")
+            && nsdb_handoff.contains("runtime_dispatch_receipt_acknowledged = true")
+            && nsdb_handoff.contains("runtime_dispatch_receipt_hash = \"fnv1a64:"),
         "run-artifact should persist nsdb payload execution handoff metadata\n{nsdb_handoff}"
     );
 
@@ -390,6 +409,15 @@ fn self_contained_nsb_route_moves_from_nsld_drive_to_run_artifact_handoff() {
                 .contains("\"nsld_final_executable_output_nsdb_replay_ready\":true")
             && workflow_stdout.contains(
                 "\"nsld_final_executable_output_nsdb_replay_status\":\"replay-evidence-ready\""
+            )
+            && workflow_stdout.contains(
+                "\"nsld_final_executable_output_nsdb_runtime_dispatch_receipt_status\":\"verified\""
+            )
+            && workflow_stdout.contains(
+                "\"nsld_final_executable_output_nsdb_runtime_dispatch_slot\":2"
+            )
+            && workflow_stdout.contains(
+                "\"nsld_final_executable_output_nsdb_runtime_dispatch_acknowledged\":true"
             )
             && workflow_stdout.contains(
                 "\"nsld_final_executable_output_nsdb_replay_contract\":\"nsdb-payload-execution-replay-plan-v1\""

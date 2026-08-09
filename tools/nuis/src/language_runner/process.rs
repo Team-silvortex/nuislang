@@ -308,7 +308,7 @@ fn compile_benchmark_harness_binary(
     label: &str,
 ) -> Result<nuisc::aot::CompileArtifacts, String> {
     let harness_ast = harness::build_benchmark_harness_module(ast, benchmark_function, iterations)?;
-    let artifacts = nuisc::pipeline::compile_ast(harness_ast)?;
+    let artifacts = nuisc::pipeline::compile_benchmark_harness_ast(harness_ast)?;
     let output_dir = harness::temp_test_output_dir(label);
     let cpu_target =
         nuisc::aot::resolve_cpu_build_target(Path::new("nustar-packages"), None, None, None)?;

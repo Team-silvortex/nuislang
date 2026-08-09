@@ -48,6 +48,19 @@ pub(crate) fn attach_final_output_nsdb_handoff_summary(
         replay_summary.runtime_bootstrap_identity_status;
     report.final_output_nsdb_runtime_bootstrap_identity_hash =
         replay_summary.runtime_bootstrap_identity_hash;
+    let dispatch_receipt = replay_summary.runtime_dispatch_receipt;
+    report.final_output_nsdb_runtime_dispatch_receipt_contract = dispatch_receipt.contract;
+    report.final_output_nsdb_runtime_dispatch_receipt_status = dispatch_receipt.status;
+    report.final_output_nsdb_runtime_dispatch_receipt_hash = dispatch_receipt.receipt_hash;
+    report.final_output_nsdb_runtime_dispatch_execution_identity_hash =
+        dispatch_receipt.execution_identity_hash;
+    report.final_output_nsdb_runtime_dispatch_import_identity_hash =
+        dispatch_receipt.import_identity_hash;
+    report.final_output_nsdb_runtime_dispatch_table_identity = dispatch_receipt.table_identity;
+    report.final_output_nsdb_runtime_dispatch_capability_mask = dispatch_receipt.capability_mask;
+    report.final_output_nsdb_runtime_dispatch_slot = dispatch_receipt.slot;
+    report.final_output_nsdb_runtime_dispatch_status_code = dispatch_receipt.status_code;
+    report.final_output_nsdb_runtime_dispatch_acknowledged = dispatch_receipt.acknowledged;
     report.final_output_nsdb_replay_ready = replay_summary.status == "replay-evidence-ready";
     report.final_output_nsdb_replay_status = replay_summary.status;
     report.final_output_nsdb_replay_checkpoint_count = replay_summary.checkpoint_count;

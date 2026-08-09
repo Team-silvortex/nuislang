@@ -1,9 +1,13 @@
-use super::{json_fields::*, reports::NsldFinalExecutableOutputReport};
+use super::{
+    json_fields::*,
+    json_final_output_runtime_dispatch_receipt::runtime_dispatch_receipt_json_fields,
+    reports::NsldFinalExecutableOutputReport,
+};
 
 pub(crate) fn nsld_final_executable_output_report_json(
     report: &NsldFinalExecutableOutputReport,
 ) -> String {
-    let fields = [
+    let mut fields = vec![
         json_string_field("tool", "nsld"),
         json_string_field("kind", "nsld_final_executable_output"),
         json_string_field("manifest", &report.manifest),
@@ -708,6 +712,7 @@ pub(crate) fn nsld_final_executable_output_report_json(
         json_string_array_field("blockers", &report.blockers),
         json_string_array_field("issues", &report.issues),
     ];
+    fields.extend(runtime_dispatch_receipt_json_fields(report));
     format!("{{{}}}", fields.join(","))
 }
 

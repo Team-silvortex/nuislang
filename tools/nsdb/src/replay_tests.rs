@@ -395,6 +395,7 @@ next_action = "execute-provider-sample"
                 },
             )
             .unwrap(),
+            runtime_dispatch_receipt: crate::runtime_dispatch_receipt::parse_and_verify(""),
             provider_completion_claim_authority_contract: "none".to_owned(),
             provider_completion_claim_authority: "none".to_owned(),
             provider_completion_claim_authority_status: "not-applicable".to_owned(),

@@ -426,6 +426,7 @@ fn try_run_nsld_host_runner(
     let output = Command::new(&program)
         .arg("--manifest")
         .arg(&manifest)
+        .arg("--invoke-native-entry")
         .arg("--json")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

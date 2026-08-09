@@ -40,6 +40,39 @@ pub(crate) struct ProviderCompletionBoundarySummary {
     pub(crate) record_hash: String,
 }
 
+#[derive(Default)]
+pub(crate) struct RuntimeDispatchReceiptBoundarySummary {
+    pub(crate) contract: Option<String>,
+    pub(crate) status: String,
+    pub(crate) receipt_hash: Option<String>,
+    pub(crate) execution_identity_hash: Option<String>,
+    pub(crate) import_identity_hash: Option<String>,
+    pub(crate) table_identity: Option<String>,
+    pub(crate) capability_mask: Option<String>,
+    pub(crate) slot: Option<u32>,
+    pub(crate) status_code: Option<i32>,
+    pub(crate) acknowledged: Option<bool>,
+}
+
+impl RuntimeDispatchReceiptBoundarySummary {
+    pub(super) fn from_persisted(
+        receipt: &crate::artifact_runtime_dispatch_receipt::PersistedRuntimeDispatchReceipt,
+    ) -> Self {
+        Self {
+            contract: receipt.contract.clone(),
+            status: receipt.verification_status.clone(),
+            receipt_hash: receipt.receipt_hash.clone(),
+            execution_identity_hash: receipt.execution_identity_hash.clone(),
+            import_identity_hash: receipt.import_identity_hash.clone(),
+            table_identity: receipt.table_identity.clone(),
+            capability_mask: receipt.capability_mask.clone(),
+            slot: receipt.slot,
+            status_code: receipt.status_code,
+            acknowledged: receipt.acknowledged,
+        }
+    }
+}
+
 pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) artifact_chain_safe_next_contract: String,
     pub(crate) artifact_chain_safe_next_probe_command: String,
@@ -88,6 +121,7 @@ pub(crate) struct NsldFinalExecutableOutputBoundarySummary {
     pub(crate) nsdb_replay_status: String,
     pub(crate) nsdb_replay_checkpoint_count: usize,
     pub(crate) nsdb_replayable_checkpoint_count: usize,
+    pub(crate) runtime_dispatch_receipt: RuntimeDispatchReceiptBoundarySummary,
     pub(crate) nsdb_provider_completion_count: usize,
     pub(crate) nsdb_first_provider_family: Option<String>,
     pub(crate) nsdb_first_provider_output_contract: Option<String>,

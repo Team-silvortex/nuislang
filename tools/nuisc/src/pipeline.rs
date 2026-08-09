@@ -19,7 +19,7 @@ mod pipeline_units;
 #[path = "pipeline_tests.rs"]
 mod tests;
 
-use pipeline_ffi::validate_externs;
+use pipeline_ffi::{validate_benchmark_harness_externs, validate_externs};
 pub use pipeline_report::compile_pipeline_report;
 use pipeline_units::{
     collect_loaded_nustar, validate_instantiated_units, validate_used_units_with_local_units,
@@ -105,6 +105,12 @@ struct PreparedPipeline {
     ast: AstModule,
     nir: NirModule,
     lowering_manifest: crate::registry::NustarPackageManifest,
+}
+
+#[derive(Clone, Copy)]
+enum ExternValidationMode {
+    Source,
+    BenchmarkHarness,
 }
 
 impl ResolvedCompileInput {
@@ -197,9 +203,13 @@ pub fn compile_project_plan_with_options(
             .ok()
             .and_then(|target| target)
     });
-    let prepared = prepare_pipeline(ast, nir, &local_units, |_, nir, _| {
-        crate::project::validate_project_links_against_nir(project, nir)
-    })?;
+    let prepared = prepare_pipeline(
+        ast,
+        nir,
+        &local_units,
+        ExternValidationMode::Source,
+        |_, nir, _| crate::project::validate_project_links_against_nir(project, nir),
+    )?;
     let mut artifacts = lower_prepared_pipeline(prepared, lowering_target)?;
     crate::project::apply_project_support_modules_to_yir(project, &mut artifacts.yir)?;
     crate::project::apply_project_links_to_yir(project, &mut artifacts.yir)?;
@@ -235,8 +245,26 @@ pub fn compile_ast_with_options(
     options: &PipelineCompileOptions,
 ) -> Result<PipelineArtifacts, String> {
     let nir = crate::frontend::lower_ast_to_nir(&ast)?;
-    let prepared = prepare_pipeline(ast, nir, &BTreeSet::new(), |_, _, _| Ok(()))?;
+    let prepared = prepare_pipeline(
+        ast,
+        nir,
+        &BTreeSet::new(),
+        ExternValidationMode::Source,
+        |_, _, _| Ok(()),
+    )?;
     lower_prepared_pipeline(prepared, options.lowering_target.clone())
+}
+
+pub fn compile_benchmark_harness_ast(ast: AstModule) -> Result<PipelineArtifacts, String> {
+    let nir = crate::frontend::lower_ast_to_nir(&ast)?;
+    let prepared = prepare_pipeline(
+        ast,
+        nir,
+        &BTreeSet::new(),
+        ExternValidationMode::BenchmarkHarness,
+        |_, _, _| Ok(()),
+    )?;
+    lower_prepared_pipeline(prepared, None)
 }
 
 fn compile_ast_with_helper_modules(
@@ -249,7 +277,13 @@ fn compile_ast_with_helper_modules(
         .map(|module| (module.domain.clone(), module.unit.clone()))
         .collect::<BTreeSet<_>>();
     let nir = crate::frontend::lower_project_ast_to_nir(&ast, helper_modules)?;
-    let prepared = prepare_pipeline(ast, nir, &local_units, |_, _, _| Ok(()))?;
+    let prepared = prepare_pipeline(
+        ast,
+        nir,
+        &local_units,
+        ExternValidationMode::Source,
+        |_, _, _| Ok(()),
+    )?;
     lower_prepared_pipeline(prepared, options.lowering_target.clone())
 }
 
@@ -369,6 +403,7 @@ fn prepare_pipeline<F>(
     ast: AstModule,
     mut nir: NirModule,
     local_units: &BTreeSet<(String, String)>,
+    extern_validation_mode: ExternValidationMode,
     validate_nir_hook: F,
 ) -> Result<PreparedPipeline, String>
 where
@@ -383,7 +418,12 @@ where
     crate::nir_verify::verify_nir_module(&nir)?;
     let lowering_manifest =
         crate::registry::load_manifest_for_domain(Path::new(NUSTAR_REGISTRY_ROOT), &nir.domain)?;
-    validate_externs(&ast, &lowering_manifest)?;
+    match extern_validation_mode {
+        ExternValidationMode::Source => validate_externs(&ast, &lowering_manifest)?,
+        ExternValidationMode::BenchmarkHarness => {
+            validate_benchmark_harness_externs(&ast, &lowering_manifest)?
+        }
+    }
     crate::registry::validate_unit_binding(
         std::slice::from_ref(&lowering_manifest),
         &ast.domain,

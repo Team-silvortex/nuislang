@@ -1,4 +1,5 @@
 use super::{
+    display_final_output_runtime_dispatch_receipt::display_runtime_dispatch_receipt,
     display_final_output_trace::*, display_text::*, reports::NsldFinalExecutableOutputReport,
 };
 
@@ -286,20 +287,7 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
                 .as_deref()
         )
     );
-    println!(
-        "  final_output_nsdb_runtime_bootstrap_identity: contract={} status={} hash={}",
-        optional_string_text(
-            report
-                .final_output_nsdb_runtime_bootstrap_identity_contract
-                .as_deref()
-        ),
-        report.final_output_nsdb_runtime_bootstrap_identity_status,
-        optional_string_text(
-            report
-                .final_output_nsdb_runtime_bootstrap_identity_hash
-                .as_deref()
-        )
-    );
+    display_runtime_dispatch_receipt(report);
     println!(
         "  final_output_nsdb_replay_contract: {}",
         report.final_output_nsdb_replay_contract

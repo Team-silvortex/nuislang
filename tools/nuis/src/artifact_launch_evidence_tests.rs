@@ -49,6 +49,7 @@ fn ready_host_runner() -> HostRunnerJsonSurface {
         backend_artifact_payload_first_kind: None,
         backend_artifact_payload_first_role_status: None,
         backend_artifact_payload_table_hash: None,
+        runtime_dispatch_receipt: None,
     }
 }
 

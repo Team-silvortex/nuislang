@@ -35,6 +35,7 @@ mod artifact_nsdb_replay_cursor_lineage;
 mod artifact_nsdb_replay_cursor_lineage_repair;
 mod artifact_provider_metadata;
 mod artifact_runtime_command;
+mod artifact_runtime_dispatch_receipt;
 mod artifact_runtime_persistence;
 mod artifact_runtime_trace;
 mod build_report_command;

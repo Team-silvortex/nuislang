@@ -21,6 +21,10 @@ use crate::{
         parse_and_verify as parse_and_verify_provider_completion_signature,
         validation_error as provider_completion_signature_error,
     },
+    artifact_runtime_dispatch_receipt::{
+        independently_verify as verify_runtime_dispatch_receipt, upsert_claim,
+        PersistedRuntimeDispatchReceipt,
+    },
     json_bool_field, json_field, json_optional_string_field, json_usize_field,
 };
 use std::{
@@ -58,6 +62,7 @@ pub(crate) struct PersistedNsdbHandoffSummary {
     first_status: Option<String>,
     first_next_action: Option<String>,
     final_image_binding_proof: PersistedFinalImageBindingProof,
+    runtime_dispatch_receipt: PersistedRuntimeDispatchReceipt,
     provider_completion_count: usize,
     first_provider_family: Option<String>,
     first_provider_output_contract: Option<String>,
@@ -103,6 +108,10 @@ impl PersistedNsdbHandoffSummary {
 
     pub(crate) fn final_image_binding_proof_hash(&self) -> Option<&str> {
         self.final_image_binding_proof.proof_hash.as_deref()
+    }
+
+    pub(crate) fn runtime_dispatch_receipt(&self) -> &PersistedRuntimeDispatchReceipt {
+        &self.runtime_dispatch_receipt
     }
 
     pub(crate) fn provider_completion_count(&self) -> usize {
@@ -192,149 +201,12 @@ impl PersistedNsdbHandoffSummary {
     }
 
     pub(crate) fn json_fields_with_prefix(&self, prefix: &str) -> Vec<String> {
-        vec![
-            json_bool_field(&format!("{prefix}_available"), self.available),
-            json_optional_string_field(&format!("{prefix}_protocol"), self.protocol.as_deref()),
-            json_optional_string_field(
-                &format!("{prefix}_debugger_contract"),
-                self.debugger_contract.as_deref(),
-            ),
-            json_field(&format!("{prefix}_path"), &self.path.display().to_string()),
-            json_usize_field(&format!("{prefix}_record_count"), self.record_count),
-            json_usize_field(
-                &format!("{prefix}_ready_record_count"),
-                self.ready_record_count,
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_first_trace_id"),
-                self.first_trace_id.as_deref(),
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_first_status"),
-                self.first_status.as_deref(),
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_first_next_action"),
-                self.first_next_action.as_deref(),
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_final_image_binding_proof_contract"),
-                self.final_image_binding_proof.contract.as_deref(),
-            ),
-            json_usize_field(
-                &format!("{prefix}_final_image_metadata_binding_count"),
-                self.final_image_binding_proof.binding_count,
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_final_image_metadata_binding_table_hash"),
-                self.final_image_binding_proof.binding_table_hash.as_deref(),
-            ),
-            json_field(
-                &format!("{prefix}_final_image_metadata_binding_validation_status"),
-                &self.final_image_binding_proof.validation_status,
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_final_image_selected_provider_bundle_set_contract"),
-                self.final_image_binding_proof
-                    .selected_set_contract
-                    .as_deref(),
-            ),
-            json_usize_field(
-                &format!("{prefix}_final_image_selected_provider_bundle_count"),
-                self.final_image_binding_proof
-                    .selected_set_count
-                    .unwrap_or(0),
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_final_image_selected_provider_bundle_set_hash"),
-                self.final_image_binding_proof.selected_set_hash.as_deref(),
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_final_image_binding_proof_hash"),
-                self.final_image_binding_proof.proof_hash.as_deref(),
-            ),
-            json_field(
-                &format!("{prefix}_final_image_binding_proof_verification_status"),
-                &self.final_image_binding_proof.verification_status,
-            ),
-            json_field(
-                &format!("{prefix}_final_image_binding_proof_next_action"),
-                crate::artifact_nsdb_handoff_binding::next_action(
-                    &self.final_image_binding_proof.verification_status,
-                ),
-            ),
-            json_usize_field(
-                &format!("{prefix}_provider_completion_count"),
-                self.provider_completion_count,
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_first_provider_family"),
-                self.first_provider_family.as_deref(),
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_first_provider_output_contract"),
-                self.first_provider_output_contract.as_deref(),
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_first_provider_output_evidence"),
-                self.first_provider_output_evidence.as_deref(),
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_provider_completion_claim_authority_contract"),
-                self.provider_completion_claim_authority_contract.as_deref(),
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_provider_completion_claim_authority"),
-                self.provider_completion_claim_authority.as_deref(),
-            ),
-            json_field(
-                &format!("{prefix}_provider_completion_claim_authority_status"),
-                &self.provider_completion_claim_authority_status,
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_provider_completion_signature_contract"),
-                self.provider_completion_signature_contract.as_deref(),
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_provider_completion_signature_public_key_id"),
-                self.provider_completion_signature_public_key_id.as_deref(),
-            ),
-            json_field(
-                &format!("{prefix}_provider_completion_signature_status"),
-                &self.provider_completion_signature_status,
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_provider_completion_digest_contract"),
-                self.provider_completion_digest_contract.as_deref(),
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_provider_completion_set_hash_claim"),
-                self.provider_completion_set_hash_claim.as_deref(),
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_provider_completion_set_hash"),
-                self.provider_completion_set_hash.as_deref(),
-            ),
-            json_field(
-                &format!("{prefix}_provider_completion_set_hash_validation_status"),
-                &self.provider_completion_set_hash_validation_status,
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_hetero_execution_closure_status"),
-                self.hetero_execution_closure_status.as_deref(),
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_hetero_execution_closure_ready"),
-                self.hetero_execution_closure_ready.as_deref(),
-            ),
-            json_optional_string_field(
-                &format!("{prefix}_hetero_execution_closure_next_action"),
-                self.hetero_execution_closure_next_action.as_deref(),
-            ),
-            json_optional_string_field(&format!("{prefix}_error"), self.error.as_deref()),
-        ]
+        json::fields(self, prefix)
     }
 }
+
+#[path = "artifact_nsdb_handoff_json.rs"]
+mod json;
 
 pub(crate) fn read_persisted_nsdb_handoff(
     output_dir: Option<&Path>,
@@ -351,6 +223,7 @@ pub(crate) fn read_persisted_nsdb_handoff(
             first_status: None,
             first_next_action: None,
             final_image_binding_proof: verify_final_image_binding_proof(""),
+            runtime_dispatch_receipt: verify_runtime_dispatch_receipt(""),
             provider_completion_count: 0,
             first_provider_family: None,
             first_provider_output_contract: None,
@@ -386,6 +259,7 @@ pub(crate) fn read_persisted_nsdb_handoff(
             first_status: None,
             first_next_action: None,
             final_image_binding_proof: verify_final_image_binding_proof(""),
+            runtime_dispatch_receipt: verify_runtime_dispatch_receipt(""),
             provider_completion_count: 0,
             first_provider_family: None,
             first_provider_output_contract: None,
@@ -410,6 +284,7 @@ pub(crate) fn read_persisted_nsdb_handoff(
     };
     let protocol = parse_string_toml_field(&source, "protocol");
     let final_image_binding_proof = verify_final_image_binding_proof(&source);
+    let runtime_dispatch_receipt = verify_runtime_dispatch_receipt(&source);
     let record_count = parse_usize_toml_field(&source, "record_count").unwrap_or(0);
     let provider_completion_claim_authority_contract =
         parse_string_toml_field(&source, "provider_completion_claim_authority_contract")
@@ -523,35 +398,45 @@ pub(crate) fn read_persisted_nsdb_handoff(
         &provider_completions,
         &final_image_binding_proof.verification_status,
     );
-    let error = match (
-        final_image_binding_proof.verification_status.as_str(),
-        provider_completion_set_hash_validation_status.as_str(),
-        provider_completion_claim_authority_status.as_str(),
-        provider_completion_signature_status.as_str(),
-        provider_dispatch_identity.status.as_str(),
+    let error = if !matches!(
+        runtime_dispatch_receipt.verification_status.as_str(),
+        "verified" | "legacy-absent"
     ) {
-        (status, _, _, _, _)
-            if !matches!(status, "verified" | "verified-empty" | "legacy-unbound") =>
-        {
-            Some(format!("final-image-binding-proof-{status}"))
+        Some(format!(
+            "runtime-dispatch-receipt-{}",
+            runtime_dispatch_receipt.verification_status
+        ))
+    } else {
+        match (
+            final_image_binding_proof.verification_status.as_str(),
+            provider_completion_set_hash_validation_status.as_str(),
+            provider_completion_claim_authority_status.as_str(),
+            provider_completion_signature_status.as_str(),
+            provider_dispatch_identity.status.as_str(),
+        ) {
+            (status, _, _, _, _)
+                if !matches!(status, "verified" | "verified-empty" | "legacy-unbound") =>
+            {
+                Some(format!("final-image-binding-proof-{status}"))
+            }
+            (_, "mismatch", _, _, _) => Some("provider-completion-set-hash-mismatch".to_owned()),
+            (_, "unsupported-digest-contract", _, _, _) => {
+                Some("provider-completion-digest-contract-unsupported".to_owned())
+            }
+            (_, _, "authority-missing", _, _) => {
+                Some("provider-completion-claim-authority-missing".to_owned())
+            }
+            (_, _, "unsupported-authority-contract", _, _) => {
+                Some("provider-completion-claim-authority-contract-unsupported".to_owned())
+            }
+            (_, _, "authority-untrusted", _, _) => {
+                Some("provider-completion-claim-authority-untrusted".to_owned())
+            }
+            (_, _, _, _, status @ ("mismatch" | "final-image-authority-missing")) => {
+                Some(format!("provider-completion-dispatch-{status}"))
+            }
+            _ => provider_completion_signature_error(&provider_completion_signature_status),
         }
-        (_, "mismatch", _, _, _) => Some("provider-completion-set-hash-mismatch".to_owned()),
-        (_, "unsupported-digest-contract", _, _, _) => {
-            Some("provider-completion-digest-contract-unsupported".to_owned())
-        }
-        (_, _, "authority-missing", _, _) => {
-            Some("provider-completion-claim-authority-missing".to_owned())
-        }
-        (_, _, "unsupported-authority-contract", _, _) => {
-            Some("provider-completion-claim-authority-contract-unsupported".to_owned())
-        }
-        (_, _, "authority-untrusted", _, _) => {
-            Some("provider-completion-claim-authority-untrusted".to_owned())
-        }
-        (_, _, _, _, status @ ("mismatch" | "final-image-authority-missing")) => {
-            Some(format!("provider-completion-dispatch-{status}"))
-        }
-        _ => provider_completion_signature_error(&provider_completion_signature_status),
     };
     PersistedNsdbHandoffSummary {
         available: true,
@@ -564,6 +449,7 @@ pub(crate) fn read_persisted_nsdb_handoff(
         first_status: parse_string_toml_field(&source, "first_status"),
         first_next_action: parse_string_toml_field(&source, "first_next_action"),
         final_image_binding_proof,
+        runtime_dispatch_receipt,
         provider_completion_count: provider_completions.len(),
         first_provider_family: first_provider_completion
             .map(|completion| completion.provider_family.clone())
@@ -708,6 +594,22 @@ pub(crate) fn persist_launch_evidence_nsdb_handoff(
     let path = output_dir.join(NSDB_HANDOFF_FILE_NAME);
     let existing_handoff = read_persisted_nsdb_handoff(Some(output_dir));
     if existing_handoff.provider_completion_count > 0 && existing_handoff.error.is_none() {
+        if let (Some(receipt), Ok(existing)) = (
+            evidence.runtime_dispatch_receipt(),
+            fs::read_to_string(&path),
+        ) {
+            let content = upsert_claim(&existing, receipt);
+            if let Err(error) = fs::write(&path, content) {
+                return LaunchEvidenceNsdbHandoffPersistence {
+                    persisted: false,
+                    path: Some(path),
+                    record_count: existing_handoff.record_count,
+                    ready_record_count: existing_handoff.ready_record_count,
+                    first_trace_id: existing_handoff.first_trace_id,
+                    error: Some(error.to_string()),
+                };
+            }
+        }
         return LaunchEvidenceNsdbHandoffPersistence {
             persisted: true,
             path: Some(path),

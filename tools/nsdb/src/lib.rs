@@ -94,6 +94,7 @@ mod provider_worker_summary;
 mod provider_worker_transport;
 #[cfg(unix)]
 mod provider_worker_transport_unix;
+mod runtime_dispatch_receipt;
 
 pub use model::{
     CompiledCodeAssetSelectionEvidence, CompiledCodeAssetSelectionItem,
@@ -104,6 +105,7 @@ pub use provider_sample_execute::{execute_provider_samples, ProviderSampleExecut
 pub use provider_sample_materialize::{
     materialize_provider_samples, ProviderSampleMaterializeReport,
 };
+pub use runtime_dispatch_receipt::RuntimeDispatchReceiptSummary;
 
 pub fn validate_provider_request_evidence(input_evidence: &str) -> bool {
     provider_request::provider_request_collection_from_evidence(input_evidence).is_some()
@@ -158,6 +160,7 @@ pub struct PayloadExecutionReplaySummary {
     pub runtime_bootstrap_identity_contract: Option<String>,
     pub runtime_bootstrap_identity_status: String,
     pub runtime_bootstrap_identity_hash: Option<String>,
+    pub runtime_dispatch_receipt: RuntimeDispatchReceiptSummary,
     pub final_image_binding_proof_contract: Option<String>,
     pub final_image_binding_proof_status: String,
     pub final_image_binding_proof_hash: Option<String>,
@@ -326,6 +329,9 @@ pub fn payload_execution_replay_summary(
         runtime_bootstrap_identity_hash: bootstrap_hash
             .filter(|value| valid_runtime_bootstrap_hash(value))
             .map(str::to_owned),
+        runtime_dispatch_receipt: runtime_dispatch_receipt::public_summary(
+            &handoff.runtime_dispatch_receipt,
+        ),
         final_image_binding_proof_contract: (handoff.final_image_binding_proof.contract != "none")
             .then(|| handoff.final_image_binding_proof.contract.clone()),
         final_image_binding_proof_status: handoff.final_image_binding_proof.proof_status,

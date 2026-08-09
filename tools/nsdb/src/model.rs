@@ -322,6 +322,8 @@ pub(crate) struct NsdbPayloadExecutionHandoffInfo {
     pub(crate) first_entry_symbol: String,
     pub(crate) first_execution_phase: String,
     pub(crate) final_image_binding_proof: crate::handoff_binding::FinalImageBindingProofInfo,
+    pub(crate) runtime_dispatch_receipt:
+        crate::runtime_dispatch_receipt::RuntimeDispatchReceiptInfo,
     pub(crate) provider_completion_claim_authority_contract: String,
     pub(crate) provider_completion_claim_authority: String,
     pub(crate) provider_completion_claim_authority_status: String,

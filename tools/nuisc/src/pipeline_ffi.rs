@@ -35,6 +35,51 @@ pub(super) fn validate_externs(
     Ok(())
 }
 
+pub(super) fn validate_benchmark_harness_externs(
+    ast: &AstModule,
+    lowering_manifest: &crate::registry::NustarPackageManifest,
+) -> Result<(), String> {
+    const GENERATED_SYMBOLS: [&str; 5] = [
+        "host_monotonic_time_ns",
+        "host_serialize_i64_into",
+        "host_deserialize_text_from",
+        "host_text_len",
+        "host_stdout_write",
+    ];
+    if ast.domain == "cffi" {
+        return validate_externs(ast, lowering_manifest);
+    }
+    if ast.domain != "cpu" || !ast.extern_interfaces.is_empty() {
+        return Err(
+            "benchmark harness host services require a generated `mod cpu` boundary".to_owned(),
+        );
+    }
+    if ast.externs.len() != GENERATED_SYMBOLS.len()
+        || GENERATED_SYMBOLS.iter().any(|name| {
+            ast.externs
+                .iter()
+                .filter(|function| function.name == *name)
+                .count()
+                != 1
+        })
+    {
+        return Err(
+            "benchmark harness host service set does not match the compiler-owned contract"
+                .to_owned(),
+        );
+    }
+    for function in &ast.externs {
+        if function.abi != "c" || function.interface.is_some() || function.host_symbol.is_some() {
+            return Err(format!(
+                "benchmark harness host service `{}` has an invalid generated ABI surface",
+                function.name
+            ));
+        }
+        validate_extern_signature_allowlist(function, lowering_manifest)?;
+    }
+    Ok(())
+}
+
 fn validate_extern_signature_allowlist(
     function: &AstExternFunction,
     lowering_manifest: &crate::registry::NustarPackageManifest,

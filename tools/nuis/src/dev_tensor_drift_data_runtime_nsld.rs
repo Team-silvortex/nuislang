@@ -286,16 +286,16 @@ pub(crate) const DEV_TENSOR_RUNTIME_NSLD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
     },
     DevTensorDriftCheckSpec {
         id: "link-plan-json-final-output-replay-surface",
-        path: "tools/nuis/src/surface_render/link_plan_nsld_tail.rs",
+        path: "tools/nuis/src/workflow/link_plan_json_runtime_dispatch.rs",
         required_patterns: &[
             "nsld_final_executable_output_nsdb_replay_contract",
             "nsld_final_executable_output_nsdb_replay_ready",
             "nsld_final_executable_output_nsdb_replay_status",
             "nsld_final_executable_output_nsdb_replay_first_blocker",
-            "nsld_final_executable_output_object_package_contract",
-            "nsld_final_executable_output_object_package_ready",
-            "nsld_final_executable_output_debugger_transcript_contract",
-            "nsld_final_executable_output_debugger_transcript_ready",
+            "nsld_final_executable_output_nsdb_runtime_dispatch_receipt_contract",
+            "nsld_final_executable_output_nsdb_runtime_dispatch_receipt_status",
+            "nsld_final_executable_output_nsdb_runtime_dispatch_execution_identity_hash",
+            "nsld_final_executable_output_nsdb_runtime_dispatch_acknowledged",
         ],
     },
     DevTensorDriftCheckSpec {

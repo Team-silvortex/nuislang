@@ -104,6 +104,7 @@ mod replay_tests;
 mod report;
 mod request_replay_frames;
 mod request_replay_selector;
+mod runtime_dispatch_receipt;
 mod sidecar;
 mod transcript;
 use crate::{

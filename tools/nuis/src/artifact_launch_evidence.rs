@@ -25,6 +25,8 @@ pub(crate) struct RunArtifactLaunchEvidence {
     payload_execution_trace_available: bool,
     payload_execution_trace_records: Vec<PayloadExecutionTraceRecord>,
     final_image_binding_proof: Option<crate::artifact_launch_binding::FinalImageBindingProof>,
+    runtime_dispatch_receipt:
+        Option<crate::artifact_runtime_dispatch_receipt::RuntimeDispatchReceipt>,
     backend_artifact_payload_evidence_available: bool,
     backend_artifact_payload_count: usize,
     backend_artifact_payload_present_count: usize,
@@ -129,6 +131,7 @@ impl RunArtifactLaunchEvidence {
             payload_execution_trace_available: !payload_execution_trace_records.is_empty(),
             payload_execution_trace_records,
             final_image_binding_proof,
+            runtime_dispatch_receipt: host_runner.runtime_dispatch_receipt.clone(),
             backend_artifact_payload_evidence_available: backend_evidence.available,
             backend_artifact_payload_count: backend_evidence.count,
             backend_artifact_payload_present_count: backend_evidence.present_count,
@@ -162,6 +165,12 @@ impl RunArtifactLaunchEvidence {
         &self,
     ) -> Option<&crate::artifact_launch_binding::FinalImageBindingProof> {
         self.final_image_binding_proof.as_ref()
+    }
+
+    pub(crate) fn runtime_dispatch_receipt(
+        &self,
+    ) -> Option<&crate::artifact_runtime_dispatch_receipt::RuntimeDispatchReceipt> {
+        self.runtime_dispatch_receipt.as_ref()
     }
 
     pub(crate) fn hetero_execution_closure_protocol(&self) -> &'static str {

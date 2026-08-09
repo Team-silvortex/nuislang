@@ -26,6 +26,10 @@ use crate::provider_completion_signature::{
     signing_key_configured, verify_from_environment,
     SIGNATURE_CONTRACT as PROVIDER_COMPLETION_SIGNATURE_CONTRACT,
 };
+use crate::runtime_dispatch_receipt::{
+    parse_and_verify as verify_runtime_dispatch_receipt,
+    render_fields as render_runtime_dispatch_receipt,
+};
 use std::{fs, path::Path};
 
 const HANDOFF_FILE_NAME: &str = "nuis.nsdb.payload-execution-handoff.toml";
@@ -117,6 +121,17 @@ fn persist_payload_execution_handoff_event_inner(
         return Err(format!(
             "final image binding proof validation failed in existing handoff: {}",
             existing.final_image_binding_proof.proof_status
+        ));
+    }
+    if existing.available
+        && !matches!(
+            existing.runtime_dispatch_receipt.status.as_str(),
+            "verified" | "legacy-absent"
+        )
+    {
+        return Err(format!(
+            "runtime dispatch receipt validation failed in existing handoff: {}",
+            existing.runtime_dispatch_receipt.status
         ));
     }
     let final_image_binding_proof = match requested_binding {
@@ -247,6 +262,9 @@ fn render_payload_execution_handoff(
     out.push_str(&format!("record_count = {}\n", events.len()));
     out.push_str(&format!("ready_record_count = {ready_count}\n"));
     out.push_str(&render_fields(final_image_binding_proof));
+    out.push_str(&render_runtime_dispatch_receipt(
+        &existing.runtime_dispatch_receipt,
+    ));
     push_toml_string(
         &mut out,
         "first_trace_id",
@@ -399,6 +417,7 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
             first_entry_symbol: "none".to_owned(),
             first_execution_phase: "none".to_owned(),
             final_image_binding_proof: verify_binding_proof(""),
+            runtime_dispatch_receipt: verify_runtime_dispatch_receipt(""),
             provider_completion_claim_authority_contract: "none".to_owned(),
             provider_completion_claim_authority: "none".to_owned(),
             provider_completion_claim_authority_status: "not-applicable".to_owned(),
@@ -427,6 +446,7 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
     let ready_record_count = parse_usize_toml_field(&source, "ready_record_count").unwrap_or(0);
     let events = parse_payload_execution_events(&source);
     let final_image_binding_proof = verify_binding_proof(&source);
+    let runtime_dispatch_receipt = verify_runtime_dispatch_receipt(&source);
     let provider_completion_dispatch_identity =
         completion_identity(&events, &final_image_binding_proof.proof_status);
     let provider_completion_claim_authority_contract =
@@ -551,6 +571,7 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
         &provider_completion_signature_status,
         &final_image_binding_proof.proof_status,
         &provider_completion_dispatch_identity.status,
+        &runtime_dispatch_receipt.status,
     );
     NsdbPayloadExecutionHandoffInfo {
         available: true,
@@ -574,6 +595,7 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
             .map(|event| event.execution_phase.clone())
             .unwrap_or_else(|| "none".to_owned()),
         final_image_binding_proof,
+        runtime_dispatch_receipt,
         provider_completion_claim_authority_contract,
         provider_completion_claim_authority,
         provider_completion_claim_authority_status,
@@ -626,6 +648,7 @@ fn payload_handoff_status(
     provider_completion_signature_status: &str,
     final_image_binding_proof_status: &str,
     provider_completion_dispatch_status: &str,
+    runtime_dispatch_receipt_status: &str,
 ) -> String {
     if protocol != "nuis-nsdb-payload-execution-handoff-v1" {
         return "unsupported-protocol".to_owned();
@@ -641,6 +664,12 @@ fn payload_handoff_status(
         "verified" | "verified-empty" | "legacy-unbound"
     ) {
         return format!("final-image-binding-proof-{final_image_binding_proof_status}");
+    }
+    if !matches!(
+        runtime_dispatch_receipt_status,
+        "verified" | "legacy-absent"
+    ) {
+        return format!("runtime-dispatch-receipt-{runtime_dispatch_receipt_status}");
     }
     if matches!(
         provider_completion_dispatch_status,

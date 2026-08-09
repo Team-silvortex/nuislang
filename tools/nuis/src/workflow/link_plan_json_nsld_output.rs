@@ -240,66 +240,6 @@ pub(super) fn nsld_final_output_json_fields(
             }),
         ),
         json_optional_string_field(
-            "nsld_final_executable_output_nsdb_replay_contract",
-            nsld_final_output.map(|summary| summary.nsdb_replay_contract.as_str()),
-        ),
-        json_bool_field(
-            "nsld_final_executable_output_nsdb_replay_ready",
-            nsld_final_output.is_some_and(|summary| summary.nsdb_replay_ready),
-        ),
-        json_optional_string_field(
-            "nsld_final_executable_output_nsdb_replay_status",
-            nsld_final_output.map(|summary| summary.nsdb_replay_status.as_str()),
-        ),
-        json_usize_field(
-            "nsld_final_executable_output_nsdb_replay_checkpoint_count",
-            nsld_final_output
-                .map(|summary| summary.nsdb_replay_checkpoint_count)
-                .unwrap_or(0),
-        ),
-        json_usize_field(
-            "nsld_final_executable_output_nsdb_replayable_checkpoint_count",
-            nsld_final_output
-                .map(|summary| summary.nsdb_replayable_checkpoint_count)
-                .unwrap_or(0),
-        ),
-        json_usize_field(
-            "nsld_final_executable_output_nsdb_provider_completion_count",
-            nsld_final_output
-                .map(|summary| summary.nsdb_provider_completion_count)
-                .unwrap_or(0),
-        ),
-        json_optional_string_field(
-            "nsld_final_executable_output_nsdb_first_provider_family",
-            nsld_final_output.and_then(|summary| summary.nsdb_first_provider_family.as_deref()),
-        ),
-        json_optional_string_field(
-            "nsld_final_executable_output_nsdb_first_provider_output_contract",
-            nsld_final_output
-                .and_then(|summary| summary.nsdb_first_provider_output_contract.as_deref()),
-        ),
-        json_optional_string_field(
-            "nsld_final_executable_output_nsdb_first_provider_output_evidence",
-            nsld_final_output
-                .and_then(|summary| summary.nsdb_first_provider_output_evidence.as_deref()),
-        ),
-        json_optional_string_field(
-            "nsld_final_executable_output_nsdb_replay_command",
-            nsld_final_output.and_then(|summary| summary.nsdb_replay_command.as_deref()),
-        ),
-        json_optional_string_field(
-            "nsld_final_executable_output_nsdb_replay_next_action",
-            nsld_final_output.map(|summary| summary.nsdb_replay_next_action.as_str()),
-        ),
-        json_optional_string_field(
-            "nsld_final_executable_output_nsdb_replay_next_command",
-            nsld_final_output.and_then(|summary| summary.nsdb_replay_next_command.as_deref()),
-        ),
-        json_optional_string_field(
-            "nsld_final_executable_output_nsdb_replay_first_blocker",
-            nsld_final_output.and_then(|summary| summary.nsdb_replay_first_blocker.as_deref()),
-        ),
-        json_optional_string_field(
             "nsld_final_executable_output_object_package_contract",
             nsld_final_output.map(|summary| summary.object_package_summary_contract.as_str()),
         ),
@@ -716,6 +656,9 @@ pub(super) fn nsld_final_output_json_fields(
                 nsld_final_output
                     .map(|summary| &summary.provider_dispatch_identity_capability),
             ),
+    );
+    fields.extend(
+        super::link_plan_json_runtime_dispatch::runtime_dispatch_json_fields(nsld_final_output),
     );
     fields.extend(
         super::link_plan_provider_request_completion_json::

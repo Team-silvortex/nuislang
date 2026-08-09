@@ -28,6 +28,9 @@ pub(crate) fn render_launch_evidence_nsdb_handoff(
     out.push_str(&format!("record_count = {}\n", records.len()));
     out.push_str(&format!("ready_record_count = {ready_record_count}\n"));
     render_final_image_binding_proof(&mut out, evidence, fallback_proof);
+    if let Some(receipt) = evidence.runtime_dispatch_receipt() {
+        out.push_str(&crate::artifact_runtime_dispatch_receipt::render_claim_fields(receipt));
+    }
     push_string(
         &mut out,
         "hetero_execution_closure_protocol",

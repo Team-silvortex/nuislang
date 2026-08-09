@@ -328,87 +328,6 @@ pub(super) fn nsld_tail_json_fields(
                 .map(|summary| summary.recommended_next_action.as_str()),
         ),
         crate::json_optional_string_field(
-            "nsld_final_executable_output_nsdb_replay_contract",
-            final_output_summary
-                .as_ref()
-                .map(|summary| summary.nsdb_replay_contract.as_str()),
-        ),
-        crate::json_bool_field(
-            "nsld_final_executable_output_nsdb_replay_ready",
-            final_output_summary
-                .as_ref()
-                .is_some_and(|summary| summary.nsdb_replay_ready),
-        ),
-        crate::json_optional_string_field(
-            "nsld_final_executable_output_nsdb_replay_status",
-            final_output_summary
-                .as_ref()
-                .map(|summary| summary.nsdb_replay_status.as_str()),
-        ),
-        crate::json_usize_field(
-            "nsld_final_executable_output_nsdb_replay_checkpoint_count",
-            final_output_summary
-                .as_ref()
-                .map(|summary| summary.nsdb_replay_checkpoint_count)
-                .unwrap_or(0),
-        ),
-        crate::json_usize_field(
-            "nsld_final_executable_output_nsdb_replayable_checkpoint_count",
-            final_output_summary
-                .as_ref()
-                .map(|summary| summary.nsdb_replayable_checkpoint_count)
-                .unwrap_or(0),
-        ),
-        crate::json_usize_field(
-            "nsld_final_executable_output_nsdb_provider_completion_count",
-            final_output_summary
-                .as_ref()
-                .map(|summary| summary.nsdb_provider_completion_count)
-                .unwrap_or(0),
-        ),
-        crate::json_optional_string_field(
-            "nsld_final_executable_output_nsdb_first_provider_family",
-            final_output_summary
-                .as_ref()
-                .and_then(|summary| summary.nsdb_first_provider_family.as_deref()),
-        ),
-        crate::json_optional_string_field(
-            "nsld_final_executable_output_nsdb_first_provider_output_contract",
-            final_output_summary.as_ref().and_then(|summary| {
-                summary.nsdb_first_provider_output_contract.as_deref()
-            }),
-        ),
-        crate::json_optional_string_field(
-            "nsld_final_executable_output_nsdb_first_provider_output_evidence",
-            final_output_summary.as_ref().and_then(|summary| {
-                summary.nsdb_first_provider_output_evidence.as_deref()
-            }),
-        ),
-        crate::json_optional_string_field(
-            "nsld_final_executable_output_nsdb_replay_command",
-            final_output_summary
-                .as_ref()
-                .and_then(|summary| summary.nsdb_replay_command.as_deref()),
-        ),
-        crate::json_optional_string_field(
-            "nsld_final_executable_output_nsdb_replay_next_action",
-            final_output_summary
-                .as_ref()
-                .map(|summary| summary.nsdb_replay_next_action.as_str()),
-        ),
-        crate::json_optional_string_field(
-            "nsld_final_executable_output_nsdb_replay_next_command",
-            final_output_summary
-                .as_ref()
-                .and_then(|summary| summary.nsdb_replay_next_command.as_deref()),
-        ),
-        crate::json_optional_string_field(
-            "nsld_final_executable_output_nsdb_replay_first_blocker",
-            final_output_summary
-                .as_ref()
-                .and_then(|summary| summary.nsdb_replay_first_blocker.as_deref()),
-        ),
-        crate::json_optional_string_field(
             "nsld_final_executable_output_object_package_contract",
             final_output_summary
                 .as_ref()
@@ -792,6 +711,9 @@ pub(super) fn nsld_tail_json_fields(
                 .and_then(|summary| summary.first_blocker.as_deref()),
         ),
     ];
+    fields.extend(crate::workflow::runtime_dispatch_json_fields(
+        final_output_summary,
+    ));
     fields
         .extend(super::link_plan_nsld_lineage::dispatch_identity_json_fields(final_output_summary));
     fields

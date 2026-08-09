@@ -4,7 +4,9 @@ use super::{
     link_plan_final_output_replay_vocabulary::{
         final_output_replay_vocabulary, FinalOutputReplayVocabularySource,
     },
-    link_plan_final_output_summary::NsldFinalExecutableOutputBoundarySummary,
+    link_plan_final_output_summary::{
+        NsldFinalExecutableOutputBoundarySummary, RuntimeDispatchReceiptBoundarySummary,
+    },
     link_plan_provider_dispatch_identity::validated_provider_dispatch_identity_capability,
     nsld_drive_command_set_for_output_dir,
     object_identity::workflow_object_identity,
@@ -109,7 +111,8 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
     );
     let provider_sample_manifest =
         collect_device_provider_sample_manifest_mirror(Some(Path::new(&plan.output_dir)));
-    let nsdb_replay = nsld_final_executable_output_nsdb_replay(plan);
+    let persisted_handoff = read_persisted_nsdb_handoff(Some(Path::new(&plan.output_dir)));
+    let nsdb_replay = nsld_final_executable_output_nsdb_replay(plan, &persisted_handoff);
     let replay_vocabulary = final_output_replay_vocabulary(FinalOutputReplayVocabularySource {
         contract: &nsdb_replay.contract,
         ready: nsdb_replay.ready,
@@ -135,8 +138,10 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         &Path::new(&plan.output_dir).join("nuis.build.manifest.toml"),
     );
     let debugger_cursor_lineage = read_debugger_cursor_lineage(Path::new(&plan.output_dir));
-    let provider_dispatch_identity =
-        read_persisted_nsdb_handoff(Some(Path::new(&plan.output_dir))).provider_dispatch_identity();
+    let provider_dispatch_identity = persisted_handoff.provider_dispatch_identity();
+    let runtime_dispatch_receipt = RuntimeDispatchReceiptBoundarySummary::from_persisted(
+        persisted_handoff.runtime_dispatch_receipt(),
+    );
     let provider_dispatch_identity_capability = validated_provider_dispatch_identity_capability(
         &debugger_cursor_lineage,
         &provider_dispatch_identity,
@@ -218,6 +223,7 @@ pub(crate) fn nsld_final_executable_output_boundary_summary(
         nsdb_replay_status: nsdb_replay.status,
         nsdb_replay_checkpoint_count: nsdb_replay.checkpoint_count,
         nsdb_replayable_checkpoint_count: nsdb_replay.replayable_checkpoint_count,
+        runtime_dispatch_receipt,
         nsdb_provider_completion_count: nsdb_replay.provider_completion_count,
         nsdb_first_provider_family: nsdb_replay.first_provider_family,
         nsdb_first_provider_output_contract: nsdb_replay.first_provider_output_contract,
@@ -351,8 +357,8 @@ struct NsldFinalExecutableOutputNsdbReplay {
 
 fn nsld_final_executable_output_nsdb_replay(
     plan: &nuisc::linker::LinkPlan,
+    handoff: &crate::artifact_nsdb_handoff::PersistedNsdbHandoffSummary,
 ) -> NsldFinalExecutableOutputNsdbReplay {
-    let handoff = read_persisted_nsdb_handoff(Some(Path::new(&plan.output_dir)));
     let checkpoint_count = handoff.record_count();
     let replayable_checkpoint_count = handoff.ready_record_count();
     let first_blocker = if !handoff.available() {

@@ -53,6 +53,8 @@ pub(crate) struct HostRunnerJsonSurface {
     pub(crate) backend_artifact_payload_first_kind: Option<String>,
     pub(crate) backend_artifact_payload_first_role_status: Option<String>,
     pub(crate) backend_artifact_payload_table_hash: Option<String>,
+    pub(crate) runtime_dispatch_receipt:
+        Option<crate::artifact_runtime_dispatch_receipt::RuntimeDispatchReceipt>,
 }
 
 impl HostRunnerJsonSurface {
@@ -90,6 +92,7 @@ impl HostRunnerJsonSurface {
             backend_artifact_payload_first_kind: None,
             backend_artifact_payload_first_role_status: None,
             backend_artifact_payload_table_hash: None,
+            runtime_dispatch_receipt: None,
         }
     }
 
@@ -127,6 +130,7 @@ impl HostRunnerJsonSurface {
             backend_artifact_payload_first_kind: None,
             backend_artifact_payload_first_role_status: None,
             backend_artifact_payload_table_hash: None,
+            runtime_dispatch_receipt: None,
         }
     }
 
@@ -238,6 +242,8 @@ impl HostRunnerJsonSurface {
                 &output.stdout,
                 "backend_artifact_payload_table_hash",
             ),
+            runtime_dispatch_receipt:
+                crate::artifact_runtime_dispatch_receipt::from_host_runner_json(&output.stdout),
         }
     }
 

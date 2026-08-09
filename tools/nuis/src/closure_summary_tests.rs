@@ -472,6 +472,7 @@ fn final_output_summary(
         .to_owned(),
         nsdb_replay_checkpoint_count: usize::from(nsdb_replay_ready),
         nsdb_replayable_checkpoint_count: usize::from(nsdb_replay_ready),
+        runtime_dispatch_receipt: Default::default(),
         nsdb_provider_completion_count: 0,
         nsdb_first_provider_family: None,
         nsdb_first_provider_output_contract: None,
