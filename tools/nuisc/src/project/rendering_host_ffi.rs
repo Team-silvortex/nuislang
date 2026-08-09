@@ -1,5 +1,6 @@
 use super::*;
 use crate::aot_ffi_bridge::SIGNATURE_WHITELIST_POLICY;
+use crate::registry::HostFfiMemoryCapability;
 use yir_core::ffi::ffi_symbol_signature_hash;
 
 #[cfg(test)]
@@ -27,6 +28,8 @@ pub(in crate::project) fn write_project_host_ffi_index<W: fmt::Write>(
             let signature_pattern = host_ffi_signature_pattern(function);
             let signature_hash =
                 ffi_symbol_signature_hash(&function.abi, &symbol, &signature_pattern);
+            let memory_capabilities =
+                host_ffi_memory_capabilities(function, &symbol, &signature_hash);
             write!(
                 out,
                 "{}\tmod {} {}\tabi={}\tinterface={}\tsymbol={}\tsignature=",
@@ -40,7 +43,9 @@ pub(in crate::project) fn write_project_host_ffi_index<W: fmt::Write>(
             write_host_ffi_signature(out, function)?;
             writeln!(
                 out,
-                "\tsignature_pattern={signature_pattern}\tsignature_hash={signature_hash}\tpolicy={SIGNATURE_WHITELIST_POLICY}"
+                "\tsignature_pattern={signature_pattern}\tsignature_hash={signature_hash}\tpolicy={SIGNATURE_WHITELIST_POLICY}\tmemory_capability_count={}\tmemory_capabilities={}",
+                memory_capabilities.len(),
+                render_memory_capabilities(&memory_capabilities)
             )?;
         }
 
@@ -50,6 +55,8 @@ pub(in crate::project) fn write_project_host_ffi_index<W: fmt::Write>(
                 let signature_pattern = host_ffi_signature_pattern(method);
                 let signature_hash =
                     ffi_symbol_signature_hash(&method.abi, &symbol, &signature_pattern);
+                let memory_capabilities =
+                    host_ffi_memory_capabilities(method, &symbol, &signature_hash);
                 write!(
                     out,
                     "{}\tmod {} {}\tabi={}\tinterface={}\tsymbol={}\tsignature=",
@@ -63,12 +70,42 @@ pub(in crate::project) fn write_project_host_ffi_index<W: fmt::Write>(
                 write_host_ffi_signature(out, method)?;
                 writeln!(
                     out,
-                    "\tsignature_pattern={signature_pattern}\tsignature_hash={signature_hash}\tpolicy={SIGNATURE_WHITELIST_POLICY}"
+                    "\tsignature_pattern={signature_pattern}\tsignature_hash={signature_hash}\tpolicy={SIGNATURE_WHITELIST_POLICY}\tmemory_capability_count={}\tmemory_capabilities={}",
+                    memory_capabilities.len(),
+                    render_memory_capabilities(&memory_capabilities)
                 )?;
             }
         }
     }
     Ok(())
+}
+
+fn host_ffi_memory_capabilities(
+    function: &AstExternFunction,
+    symbol: &str,
+    signature_hash: &str,
+) -> Vec<HostFfiMemoryCapability> {
+    function
+        .params
+        .iter()
+        .enumerate()
+        .filter(|(_, param)| param.ty.name == "String" && !param.ty.is_ref && !param.ty.is_optional)
+        .map(|(index, _)| {
+            HostFfiMemoryCapability::borrowed_utf8(&function.abi, symbol, signature_hash, index)
+        })
+        .collect()
+}
+
+fn render_memory_capabilities(capabilities: &[HostFfiMemoryCapability]) -> String {
+    if capabilities.is_empty() {
+        "-".to_owned()
+    } else {
+        capabilities
+            .iter()
+            .map(HostFfiMemoryCapability::render)
+            .collect::<Vec<_>>()
+            .join(";")
+    }
 }
 
 fn host_ffi_symbol_name(function: &AstExternFunction) -> String {

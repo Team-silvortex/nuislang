@@ -28,6 +28,7 @@ pub struct LinkPlanHostFfiFootprint {
     pub index_path: Option<String>,
     pub symbol_count: usize,
     pub policy_count: usize,
+    pub memory_capability_count: usize,
     pub policy: String,
     pub abi_groups: Vec<LinkPlanHostFfiAbiGroup>,
     pub entries: Vec<LinkPlanHostFfiEntry>,
@@ -39,6 +40,7 @@ pub struct LinkPlanHostFfiAbiGroup {
     pub abi: String,
     pub symbol_count: usize,
     pub policy_count: usize,
+    pub memory_capability_count: usize,
     pub symbols: Vec<String>,
     pub entries: Vec<LinkPlanHostFfiAbiEntry>,
     pub validation: LinkPlanHostFfiValidationSummary,
@@ -50,6 +52,7 @@ pub struct LinkPlanHostFfiAbiEntry {
     pub signature_pattern: String,
     pub signature_hash: String,
     pub policy: String,
+    pub memory_capabilities: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,6 +62,7 @@ pub struct LinkPlanHostFfiEntry {
     pub signature_pattern: String,
     pub signature_hash: String,
     pub policy: String,
+    pub memory_capabilities: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

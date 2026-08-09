@@ -161,6 +161,7 @@ fn cpu_manifest_with_host_target() -> NustarPackageManifest {
         machine_abi_policy: "exact-match".to_owned(),
         abi_profiles: vec!["cpu.host.v1".to_owned()],
         abi_capabilities: vec!["cpu.host.v1:op:cpu.*".to_owned()],
+        host_ffi_memory_capabilities: Vec::new(),
         abi_targets: vec![
             "cpu.host.v1:arch=host|os=host|object=host|calling=host|clang=host".to_owned(),
         ],
@@ -233,7 +234,7 @@ fn host_ffi_registry_view_collects_signature_and_hash_registrations() {
             "c:ffi:i64(*)|ffi:i32(*)|ffi_symbol:host_i32_curve=i32(i32)|ffi_symbol_hash:host_hashed_curve=fnv1a64:38ca92f356fcb551".to_owned(),
         ];
 
-    let view = HostFfiRegistryView::from_manifest(&manifest);
+    let view = HostFfiRegistryView::try_from_manifest(&manifest).unwrap();
 
     assert!(view.has_abi("c"));
     assert_eq!(
@@ -307,6 +308,7 @@ fn render_manifest_text(manifest: &NustarPackageManifest) -> String {
             "machine_abi_policy = \"{}\"\n",
             "abi_profiles = {}\n",
             "abi_capabilities = {}\n",
+            "host_ffi_memory_capabilities = {}\n",
             "abi_targets = {}\n",
             "implementation_kinds = {}\n",
             "loader_entry = \"{}\"\n",
@@ -386,6 +388,7 @@ fn render_manifest_text(manifest: &NustarPackageManifest) -> String {
         manifest.machine_abi_policy,
         render_array(&manifest.abi_profiles),
         render_array(&manifest.abi_capabilities),
+        render_array(&manifest.host_ffi_memory_capabilities),
         render_array(&manifest.abi_targets),
         render_array(&manifest.implementation_kinds),
         manifest.loader_entry,

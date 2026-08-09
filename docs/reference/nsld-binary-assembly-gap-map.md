@@ -122,13 +122,11 @@ than relying only on the broader final-image binding proof.
 
 It does not yet own:
 
-* ELF or PE compatibility object emission
-* native relocation application
-* final executable entrypoint generation
-* host-shell executable materialization
-* OS-native executable entrypoint materialization
-* Nuis lifecycle runtime bootstrapping
-* heterogeneous dispatch at runtime
+* complete Mach-O, ELF, and PE/COFF compatibility object parity
+* general native relocation application across those target formats
+* an OS-native executable shell finalized without a registered external host
+  finalizer
+* a durable embedded Nsdb/YIR debug metadata section
 
 ## Gap 1: Compatibility Object Writer
 
@@ -165,39 +163,21 @@ The next relocation layer needs:
 This should stay below the YIR contract and above the final platform object
 format.
 
-## Gap 3: Loader Bootstrap
+## Closed Foundation: Loader Bootstrap
 
-The container records a lifecycle bootstrap symbol, but there is no finished
-Nuis loader runtime yet.
+The final NSB now carries architecture-specific native entry thunks, a
+hash-bound lifecycle context, one-shot invocation authorization, deterministic
+hook order, and independently verified host-runner/Nsdb evidence. Linux and
+Windows execution remain cross-host validation lanes, but loader bootstrap is
+no longer an unimplemented architectural gap.
 
-The loader needs:
+## Closed Foundation: Heterogeneous Dispatch Bridge
 
-* one native entrypoint shim
-* bootstrap of the Nuis lifecycle loop
-* deterministic hook execution order
-* access to container metadata and payload sections
-* bridge points for clock protocol and GLM checks
-* failure reporting that can be consumed by Nsdb later
-
-This is where the container stops being just inspectable and starts becoming
-runnable.
-
-## Gap 4: Heterogeneous Dispatch Bridge
-
-Shader, kernel, network, and future Nustar domains already contribute lowering
-sidecars and link units. They still need a runtime dispatch bridge.
-
-The bridge needs:
-
-* per-domain dispatch table materialization
-* backend target selection without hardcoding finite combinations
-* capability-driven sidecar loading
-* deterministic clock-edge handoff
-* GLM/resource validation at the boundary
-* fallback or host-proxy mode when real hardware backend is unavailable
-
-The bridge should consume Nustar registrations, not compiler hardcoded domain
-logic.
+Registered provider bundles now materialize an open final-image dispatch table,
+bind provider selection into the NSB identity, execute through capability-owned
+worker adapters, and preserve clock, GLM, completion, and replay evidence.
+Backend breadth remains ongoing work, but the provider-neutral bridge itself is
+an established runtime slice rather than a missing foundation.
 
 ## Gap 5: Debug Metadata Section
 

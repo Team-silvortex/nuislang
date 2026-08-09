@@ -154,6 +154,21 @@ provider. A CFFI project therefore reports both `official.cffi` and
 `official.cpu`: CFFI owns source admission and ABI policy, while CPU owns the
 current host machine-code realization.
 
+The first concrete memory-authority protocol is also active. Borrowed UTF-8
+arguments are bound to their exact ABI, symbol, signature hash, argument slot,
+NUL-terminated length policy, read-only mutability, call lifetime, and absent
+destructor by a second `nuis-ffi-memory-v1` hash. Five official libc/text
+entries exercise this route through compilation, project metadata, and Nsld
+link-plan validation. Drift in signature, capability hash, slot, length,
+mutability, lifetime, count, or destructor fails before lowering or linking.
+
+An owned return-buffer descriptor can already prove a `ref_Buffer` return and
+an exact registered `i64(ref_Buffer)` destructor. It does not yet grant source
+execution authority: lowering remains closed until YIR and GLM can own the
+returned length-bearing allocation and prove exact-once transfer and cleanup.
+This is the intended domain rule in practice: registration may describe the
+next safe capability without silently opening a host pointer escape.
+
 Current constraints remain:
 
 * standard-library host facades should stay narrow and explicit

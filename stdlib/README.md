@@ -3,8 +3,9 @@
 This directory is the repository's standard-library layout and source-asset
 staging area.
 
-It is not yet a crate-like automatically imported library tree, but it is no
-longer just empty scaffolding either.
+It is not yet a versioned, lockfile-backed remote package tree, but it is no
+longer just empty scaffolding either. Workspace Galaxies already support
+policy-controlled automatic and explicit source-module imports.
 
 The current top-level modules are:
 
@@ -42,8 +43,8 @@ Read that as:
 
 At the current repo stage:
 
-* the repository still does not have a crate-like automatic source import flow
-  for stdlib modules yet
+* project-auto library modules are injected from resolved workspace Galaxies;
+  manual-only modules remain explicit
 * project manifests can now declare local stdlib galaxy dependencies such as
   `galaxy = ["pixelmagic=workspace"]`; the compiler resolves them through
   [index.toml](index.toml) and emits
@@ -68,9 +69,9 @@ At the current repo stage:
   `galaxy_imports = ["ns-nova:lib/nova_contracts.ns"]` are now validated as a
   unique set, so duplicate entries fail manifest loading instead of being
   silently collapsed during path resolution
-* those resolved galaxy dependencies are not auto-injected into the source
-  module set yet, because many current stdlib recipe assets still collide on
-  repeated bindings such as `mod cpu Main`
+* only declared `library_modules` participate in project injection; arbitrary
+  recipe assets are not injected, which avoids repeated entry bindings such as
+  `mod cpu Main`
 * the live implementation focus is still on `nuis / nuisc / YIR / nustar`
 * but `stdlib` is no longer empty scaffolding; all five layers now carry real
   checked-in `.ns` assets

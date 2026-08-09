@@ -742,39 +742,6 @@ fn lowers_hello_thread_mutex_branch_suffix_memory_source_with_shared_pure_suffix
 }
 
 #[test]
-fn rejects_hello_thread_mutex_if_lock_branch_invalid_memory_source_with_precise_branch_boundary_diagnostic(
-) {
-    let source =
-        Path::new("../../examples/invalid/ns/memory/hello_thread_mutex_if_lock_branch_invalid.ns");
-    let error = nuisc::pipeline::compile_source_path(source).err().expect(
-        "if-branch mutex lock invalid source should fail until branch-local lock lowering exists",
-    );
-    assert!(error.contains(
-        "conditional `if`/lowered-`match` lowering does not yet support branch-local consuming task/thread/mutex runtime primitives"
-    ));
-    assert!(error.contains(
-        "hoist those effects before the branch or reduce each branch to pure/select-compatible values"
-    ));
-}
-
-#[test]
-fn rejects_hello_thread_mutex_match_join_result_branch_invalid_memory_source_with_precise_branch_boundary_diagnostic(
-) {
-    let source = Path::new(
-        "../../examples/invalid/ns/memory/hello_thread_mutex_match_join_result_branch_invalid.ns",
-    );
-    let error = nuisc::pipeline::compile_source_path(source)
-        .err()
-        .expect("match-branch thread join_result invalid source should fail until branch-local thread result lowering exists");
-    assert!(error.contains(
-        "conditional `if`/lowered-`match` lowering does not yet support branch-local consuming task/thread/mutex runtime primitives"
-    ));
-    assert!(error.contains(
-        "hoist those effects before the branch or reduce each branch to pure/select-compatible values"
-    ));
-}
-
-#[test]
 fn lowers_hello_byte_buffer_memory_source_with_byte_intrinsic_shape() {
     let artifacts = compiled_source("../../examples/ns/memory/hello_byte_buffer.ns");
 

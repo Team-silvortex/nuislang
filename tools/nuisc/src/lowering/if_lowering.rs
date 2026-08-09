@@ -17,6 +17,7 @@ use if_lowering_runtime::{
     lower_direct_selectable_binary_runtime_binding, lower_direct_selectable_binary_runtime_return,
     lower_direct_selectable_call_runtime_binding, lower_direct_selectable_call_runtime_return,
     lower_direct_selectable_runtime_binding, lower_direct_selectable_runtime_return,
+    lower_selectable_runtime_prefix,
 };
 
 fn unsupported_if_shape_message(then_body: &[NirStmt], else_body: &[NirStmt]) -> String {
@@ -36,7 +37,7 @@ fn unsupported_if_shape_message(then_body: &[NirStmt], else_body: &[NirStmt]) ->
     if stmts_contain_conditional_effect_primitive(then_body)
         || stmts_contain_conditional_effect_primitive(else_body)
     {
-        format!("conditional `if`/lowered-`match` lowering does not yet support branch-local consuming task/thread/mutex runtime primitives such as join-result, lock, unlock, spawn, join, or timeout; hoist those effects before the branch or reduce each branch to pure/select-compatible values ({shape})")
+        format!("conditional `if`/lowered-`match` lowering does not yet support this branch-local consuming task/thread/mutex runtime shape; use matching operation forms with a shared or select-compatible suffix, or hoist the effects before the branch ({shape})")
     } else {
         format!("minimal nuisc lowering currently only supports `if` as matching `print`, matching `let/const`, `return <expr>`, or small terminal branches like `print(...); return ...` ({shape})")
     }
@@ -301,6 +302,18 @@ pub(super) fn lower_if_pair(
         if let Some(returned) = lower_guard_return_chain(then_body, state, bindings)? {
             lower_guard_return(condition_name.clone(), returned, state);
             return Ok(LoweredIfOutcome::Continued);
+        }
+    }
+
+    if then_body.len() > 1 && else_body.len() > 1 {
+        if let Some(lowered) = lower_selectable_runtime_prefix(
+            condition_name.clone(),
+            then_body,
+            else_body,
+            state,
+            bindings,
+        )? {
+            return Ok(lowered);
         }
     }
 

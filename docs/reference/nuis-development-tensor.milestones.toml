@@ -91,3 +91,20 @@ required = true
 coordinates = [
   "developer-system/dev-tensor/self-hosting-phase-roadmap",
 ]
+
+[[milestones]]
+id = "beta-0.1-foundation-hardening"
+required = true
+coordinates = [
+  "linker-toolchain/nsld/os-native-executable-finalization",
+  "standard-library/std/concurrency-task-thread-lock",
+  "host-compatibility/cffi/registered-pointer-string-object-boundary",
+  "package-system/galaxy/source-import-and-lock-resolution",
+]
+
+[[milestones]]
+id = "beta-0.1-data-provider-direction"
+required = false
+coordinates = [
+  "heterogeneous-runtime/data/provider-neutral-data-fabric",
+]

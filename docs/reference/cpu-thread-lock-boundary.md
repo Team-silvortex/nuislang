@@ -37,6 +37,10 @@ Current source anchors:
   branch-selected guard/thread plus shared observer suffix
 * [hello_thread_mutex_branch_suffix.ns](../../examples/ns/memory/hello_thread_mutex_branch_suffix.ns)
   branch-selected guard/thread plus shared observer and shared pure suffix
+* [hello_thread_mutex_if_lock_branch.ns](../../examples/ns/memory/hello_thread_mutex_if_lock_branch.ns)
+  branch-local mutex-lock syntax converged into one selected lock operation
+* [hello_thread_mutex_match_join_result_branch.ns](../../examples/ns/memory/hello_thread_mutex_match_join_result_branch.ns)
+  branch-local thread spawn/join-result syntax converged into one selected chain
 
 Current source compile regression surface:
 
@@ -52,10 +56,13 @@ Short rule:
 Current project anchor:
 
 * [task_thread_mutex_demo](../../examples/projects/task/task_thread_mutex_demo)
+* [task_branch_cancel_unlock_demo](../../examples/projects/task/task_branch_cancel_unlock_demo)
 
 Short rule:
 
 * use the project demo when you want generic helper/facade shape
+* use the branch demo when you want native dynamic cancel/unlock closure with
+  both source branches executed
 * use the single-file `.ns` anchors when you want the shortest boundary
 
 ### 3. Shared observer control-flow paths are real
@@ -105,30 +112,24 @@ Important checked-in examples in that file:
 
 ## What Is Still Intentionally Blocked
 
-### Branch-local consuming thread/lock runtime work inside `if` / lowered `match`
+### Arbitrary branch-local runtime mini-programs
 
-Current rejection rule:
+Current boundary:
 
-* the branch itself still may not hide deeper consuming task/thread/mutex work
-  as an arbitrary branch-local mini-program
-* current invalid anchors intentionally place the consuming step and its
-  observer chain inside each branch
-
-Current invalid anchors:
-
-* [hello_thread_mutex_if_lock_branch_invalid.ns](../../examples/invalid/ns/memory/hello_thread_mutex_if_lock_branch_invalid.ns)
-* [hello_thread_mutex_match_join_result_branch_invalid.ns](../../examples/invalid/ns/memory/hello_thread_mutex_match_join_result_branch_invalid.ns)
-
-Current diagnostic contract:
-
-* `conditional if/lowered-match lowering does not yet support branch-local consuming task/thread/mutex runtime primitives`
-* `hoist those effects before the branch or reduce each branch to pure/select-compatible values`
+* matching branch-local lock or spawn/join-result prefixes are now supported
+* lowering selects the resource or call arguments first, emits the common
+  consuming operation once, and then lowers one shared or selectable suffix
+* differently shaped operations, unrelated callees, or non-collapsible effect
+  suffixes remain outside this route
 
 Short rule:
 
-* selecting a handle/guard before a shared observer suffix is supported
-* burying the consuming runtime effect chain separately inside each branch is
-  still intentionally rejected
+* source syntax may place the matching operation inside each branch
+* YIR still receives one post-selection consuming operation rather than eager
+  execution of both source branches
+* matching consuming prefixes may form a multi-stage chain; the native branch
+  demo proves one `mutex_new -> lock -> unlock` chain and one
+  `spawn -> cancel -> join_result` chain
 
 ### Final concurrent visibility claims
 
@@ -143,29 +144,28 @@ For that broader positioning, read:
 
 * [cpu-thread-lock-staging-sketch.md](cpu-thread-lock-staging-sketch.md)
 
-## Practical Reading Rule Before `alpha-0.0.1`
+## Practical Reading Rule
 
-Before `alpha`, read the thread/lock line in this order:
+Read the thread/lock line in this order:
 
 1. source anchors in [examples/ns/memory/README.md](../../examples/ns/memory/README.md)
-2. invalid anchors in [examples/invalid/ns/memory/README.md](../../examples/invalid/ns/memory/README.md)
+2. lowering regressions in [thread_mutex_branch_compile.rs](../../tools/nuisc/tests/thread_mutex_branch_compile.rs)
 3. ownership/lifecycle truth in [glm_verify.rs](../../tools/nuisc/tests/glm_verify.rs)
 4. larger staging intent in [cpu-thread-lock-staging-sketch.md](cpu-thread-lock-staging-sketch.md)
 
 That keeps the line honest:
 
 * positive examples show what compiles
-* negative examples show what is still blocked
+* lowering regressions prove exactly-once selected-prefix behavior
 * verifier tests show what the ownership story actually means
 
-## Why This Matters For `alpha`
+## Why This Matters For Beta Hardening
 
-For the `0.20.* -> alpha-0.0.1` handoff, this lane is now strong enough to
-say:
+For the current beta foundation line, this lane is now strong enough to say:
 
 * thread/lock syntax is not just aspirational
 * compile-closure anchors exist
-* invalid boundary anchors exist
+* structured branch-local consuming prefixes have exactly-once YIR regressions
 * `GLM` ownership truth exists
 
 But it is **not** yet strong enough to say:
@@ -173,7 +173,7 @@ But it is **not** yet strong enough to say:
 * the concurrent runtime model is final
 * the visibility/synchronization story is complete
 
-That is the right pre-`alpha` posture:
+That is the right beta-hardening posture:
 
 * explicit enough to build on
 * still honest about what remains staged

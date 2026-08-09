@@ -1,0 +1,42 @@
+mod cffi Main {
+  extern "c" fn host_argv_count() -> i64;
+
+  async fn ping(seed: i64) -> i64 {
+    return seed + 5;
+  }
+
+  fn main() -> i64 {
+    let argc: i64 = host_argv_count();
+    let reopened: Mutex<i64> = if argc < 2 {
+      let guard: MutexGuard<i64> = mutex_lock(mutex_new(11));
+      let lock: Mutex<i64> = mutex_unlock(guard);
+      lock
+    } else {
+      let guard: MutexGuard<i64> = mutex_lock(mutex_new(19));
+      let lock: Mutex<i64> = mutex_unlock(guard);
+      lock
+    };
+
+    let observed_guard: MutexGuard<i64> = mutex_lock(reopened);
+    let observed: i64 = mutex_value(observed_guard);
+    let released: Mutex<i64> = mutex_unlock(observed_guard);
+
+    let cancelled_result: TaskResult<i64> = match argc {
+      1 => {
+        let task: Task<i64> = cancel(spawn(ping(7)));
+        let joined: TaskResult<i64> = join_result(task);
+        joined
+      }
+      _ => {
+        let task: Task<i64> = cancel(spawn(ping(9)));
+        let joined: TaskResult<i64> = join_result(task);
+        joined
+      }
+    };
+
+    if task_cancelled(cancelled_result) {
+      return observed + 70;
+    }
+    return 1;
+  }
+}

@@ -55,9 +55,10 @@ pub fn render_link_plan_summary(plan: &LinkPlan) -> Vec<String> {
         plan.lowering_plan_index_source
     ));
     lines.push(format!(
-        "host_ffi: symbols={} policies={} policy={} validation={} index={}",
+        "host_ffi: symbols={} policies={} memory_capabilities={} policy={} validation={} index={}",
         plan.host_ffi.symbol_count,
         plan.host_ffi.policy_count,
+        plan.host_ffi.memory_capability_count,
         plan.host_ffi.policy,
         if plan.host_ffi.validation.valid {
             "valid"
@@ -68,10 +69,11 @@ pub fn render_link_plan_summary(plan: &LinkPlan) -> Vec<String> {
     ));
     for group in &plan.host_ffi.abi_groups {
         lines.push(format!(
-            "host_ffi_abi: abi={} symbols={} policies={} valid={} entries={}",
+            "host_ffi_abi: abi={} symbols={} policies={} memory_capabilities={} valid={} entries={}",
             group.abi,
             group.symbol_count,
             group.policy_count,
+            group.memory_capability_count,
             group.validation.valid,
             group.symbols.join(",")
         ));
@@ -231,6 +233,10 @@ pub fn render_link_plan_json(plan: &LinkPlan) -> String {
         ),
         json_usize_field("host_ffi_symbol_count", plan.host_ffi.symbol_count),
         json_usize_field("host_ffi_policy_count", plan.host_ffi.policy_count),
+        json_usize_field(
+            "host_ffi_memory_capability_count",
+            plan.host_ffi.memory_capability_count,
+        ),
         json_string_field("host_ffi_policy", &plan.host_ffi.policy),
         json_usize_field(
             "host_ffi_validation_checked",
@@ -317,6 +323,7 @@ fn render_host_ffi_abi_group_json(group: &LinkPlanHostFfiAbiGroup) -> String {
         json_string_field("abi", &group.abi),
         json_usize_field("symbol_count", group.symbol_count),
         json_usize_field("policy_count", group.policy_count),
+        json_usize_field("memory_capability_count", group.memory_capability_count),
         json_string_array_field("symbols", &group.symbols),
         format!(
             "\"validation\":{}",
@@ -344,6 +351,7 @@ fn render_host_ffi_abi_entry_json(entry: &LinkPlanHostFfiAbiEntry) -> String {
         json_string_field("signature_pattern", &entry.signature_pattern),
         json_string_field("signature_hash", &entry.signature_hash),
         json_string_field("policy", &entry.policy),
+        json_string_array_field("memory_capabilities", &entry.memory_capabilities),
     ];
     format!("{{{}}}", fields.join(","))
 }
@@ -355,6 +363,7 @@ fn render_host_ffi_entry_json(entry: &LinkPlanHostFfiEntry) -> String {
         json_string_field("signature_pattern", &entry.signature_pattern),
         json_string_field("signature_hash", &entry.signature_hash),
         json_string_field("policy", &entry.policy),
+        json_string_array_field("memory_capabilities", &entry.memory_capabilities),
     ];
     format!("{{{}}}", fields.join(","))
 }

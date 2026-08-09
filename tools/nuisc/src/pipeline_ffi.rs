@@ -1,4 +1,4 @@
-use crate::registry::HostFfiRegistryView;
+use crate::registry::{HostFfiMemoryKind, HostFfiMemorySlot, HostFfiRegistryView};
 use nuis_semantics::model::{AstExternFunction, AstModule, AstTypeRef};
 use yir_core::ffi::ffi_symbol_signature_hash;
 
@@ -84,18 +84,19 @@ fn validate_extern_signature_allowlist(
     function: &AstExternFunction,
     lowering_manifest: &crate::registry::NustarPackageManifest,
 ) -> Result<(), String> {
-    let ffi_registry = HostFfiRegistryView::from_manifest(lowering_manifest);
+    let ffi_registry = HostFfiRegistryView::try_from_manifest(lowering_manifest)?;
     let signature = extern_signature_pattern(function);
     let symbol = extern_ffi_symbol_name(function);
+    let actual_hash = ffi_symbol_signature_hash(&function.abi, &symbol, &signature);
     let symbol_allowlist = ffi_registry.symbol_registrations(&function.abi, &symbol);
     if !symbol_allowlist.is_empty() {
-        let actual_hash = ffi_symbol_signature_hash(&function.abi, &symbol, &signature);
         if symbol_allowlist.iter().any(|entry| {
             entry.matches(
                 |pattern| ffi_signature_pattern_matches(pattern, &signature),
                 &actual_hash,
             )
         }) {
+            validate_extern_memory_capabilities(function, &ffi_registry, &symbol, &actual_hash)?;
             return Ok(());
         }
         return Err(format!(
@@ -119,6 +120,7 @@ fn validate_extern_signature_allowlist(
         .iter()
         .any(|pattern| ffi_signature_pattern_matches(pattern, &signature))
     {
+        validate_extern_memory_capabilities(function, &ffi_registry, &symbol, &actual_hash)?;
         return Ok(());
     }
     Err(format!(
@@ -129,6 +131,50 @@ fn validate_extern_signature_allowlist(
         lowering_manifest.package_id,
         allowed.join(", ")
     ))
+}
+
+fn validate_extern_memory_capabilities(
+    function: &AstExternFunction,
+    registry: &HostFfiRegistryView,
+    symbol: &str,
+    signature_hash: &str,
+) -> Result<(), String> {
+    let capabilities = registry.memory_capabilities(&function.abi, symbol, signature_hash);
+    for (index, param) in function.params.iter().enumerate() {
+        if param.ty.name != "String" || param.ty.is_ref || param.ty.is_optional {
+            continue;
+        }
+        if !capabilities.iter().any(|capability| {
+            capability.kind == HostFfiMemoryKind::BorrowedUtf8
+                && capability.slot == HostFfiMemorySlot::Arg(index)
+        }) {
+            return Err(format!(
+                "extern `{}` ABI `{}` symbol `{symbol}` String parameter `{}` at arg:{index} requires a hash-bound `borrowed_utf8` host FFI memory capability before lowering",
+                function.name, function.abi, param.name
+            ));
+        }
+    }
+
+    if function.return_type.name == "Buffer"
+        && function.return_type.is_ref
+        && !function.return_type.is_optional
+    {
+        let registered = capabilities.iter().any(|capability| {
+            capability.kind == HostFfiMemoryKind::OwnedReturnBuffer
+                && capability.slot == HostFfiMemorySlot::Return
+        });
+        if !registered {
+            return Err(format!(
+                "extern `{}` ABI `{}` symbol `{symbol}` ref Buffer return requires a hash-bound `owned_return_buffer` host FFI memory capability before lowering",
+                function.name, function.abi
+            ));
+        }
+        return Err(format!(
+            "extern `{}` ABI `{}` symbol `{symbol}` has a verified owned return-buffer capability, but source pointer-return lowering remains closed until its GLM transfer path is implemented",
+            function.name, function.abi
+        ));
+    }
+    Ok(())
 }
 
 fn extern_ffi_symbol_name(function: &AstExternFunction) -> String {
@@ -257,5 +303,77 @@ fn split_ffi_params(params: &str) -> Vec<&str> {
         Vec::new()
     } else {
         params.split([',', '+']).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::registry::HostFfiMemoryCapability;
+
+    fn cffi_manifest() -> crate::registry::NustarPackageManifest {
+        crate::registry::load_manifest_for_domain(std::path::Path::new("nustar-packages"), "cffi")
+            .unwrap()
+    }
+
+    #[test]
+    fn rejects_string_extern_without_hash_bound_memory_capability() {
+        let ast = crate::frontend::parse_nuis_ast(
+            r#"
+            mod cffi Main {
+              extern "libc" fn puts(message: String) -> i32;
+              fn main() -> i64 { return 0; }
+            }
+            "#,
+        )
+        .unwrap();
+        let mut manifest = cffi_manifest();
+        manifest
+            .host_ffi_memory_capabilities
+            .retain(|entry| !entry.starts_with("libc:puts@"));
+
+        let error = validate_externs(&ast, &manifest)
+            .expect_err("String extern without memory authority must be rejected");
+
+        assert!(error.contains("String parameter `message` at arg:0"));
+        assert!(error.contains("requires a hash-bound `borrowed_utf8`"));
+        assert!(error.contains("before lowering"));
+    }
+
+    #[test]
+    fn keeps_owned_return_buffer_lowering_closed_after_contract_validation() {
+        let ast = crate::frontend::parse_nuis_ast(
+            r#"
+            mod cffi Main {
+              extern "c" fn test_buffer_acquire(seed: i64) -> ref Buffer;
+              fn main() -> i64 { return 0; }
+            }
+            "#,
+        )
+        .unwrap();
+        let mut manifest = cffi_manifest();
+        let acquire_hash = ffi_symbol_signature_hash("c", "test_buffer_acquire", "ref_Buffer(i64)");
+        let release_hash = ffi_symbol_signature_hash("c", "test_buffer_release", "i64(ref_Buffer)");
+        manifest.abi_capabilities.push(
+            "c:ffi_symbol:test_buffer_acquire=ref_Buffer(i64)|ffi_symbol:test_buffer_release=i64(ref_Buffer)"
+                .to_owned(),
+        );
+        manifest.host_ffi_memory_capabilities.push(
+            HostFfiMemoryCapability::owned_return_buffer(
+                "c",
+                "test_buffer_acquire",
+                &acquire_hash,
+                "test_buffer_release",
+                &release_hash,
+            )
+            .render(),
+        );
+
+        let error = validate_externs(&ast, &manifest)
+            .expect_err("owned pointer return must remain closed before GLM lowering exists");
+
+        assert!(error.contains("verified owned return-buffer capability"));
+        assert!(error.contains("source pointer-return lowering remains closed"));
+        assert!(error.contains("GLM transfer path"));
     }
 }

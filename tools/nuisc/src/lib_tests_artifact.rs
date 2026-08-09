@@ -435,6 +435,7 @@ fn artifact_report_summary_lines_expose_compact_overview() {
             index_path: None,
             symbol_count: 0,
             policy_count: 0,
+            memory_capability_count: 0,
             policy: "signature-whitelist-required".to_owned(),
             abi_groups: Vec::new(),
             entries: Vec::new(),

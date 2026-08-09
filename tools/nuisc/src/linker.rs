@@ -86,6 +86,7 @@ mod tests {
             signature_pattern: signature_pattern.to_owned(),
             signature_hash: "fnv1a64:test".to_owned(),
             policy: crate::aot_ffi_bridge::SIGNATURE_WHITELIST_POLICY.to_owned(),
+            memory_capabilities: Vec::new(),
         }
     }
 
@@ -99,6 +100,7 @@ mod tests {
         let validation = validate_host_ffi_footprint(
             2,
             2,
+            0,
             crate::aot_ffi_bridge::SIGNATURE_WHITELIST_POLICY,
             &entries,
         );
@@ -122,6 +124,7 @@ mod tests {
         let validation = validate_host_ffi_footprint(
             2,
             2,
+            0,
             crate::aot_ffi_bridge::SIGNATURE_WHITELIST_POLICY,
             &entries,
         );

@@ -76,6 +76,8 @@ pub(crate) fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageM
     let abi_profiles = parse_optional_string_array(source, "abi_profiles").unwrap_or_default();
     let abi_capabilities =
         parse_optional_string_array(source, "abi_capabilities").unwrap_or_default();
+    let host_ffi_memory_capabilities =
+        parse_optional_string_array(source, "host_ffi_memory_capabilities").unwrap_or_default();
     let abi_targets = parse_optional_string_array(source, "abi_targets").unwrap_or_default();
     let implementation_kinds = parse_optional_string_array(source, "implementation_kinds")
         .unwrap_or_else(|| vec!["native-stub".to_owned()]);
@@ -182,6 +184,7 @@ pub(crate) fn parse_manifest(source: &str, path: &Path) -> Result<NustarPackageM
         machine_abi_policy,
         abi_profiles,
         abi_capabilities,
+        host_ffi_memory_capabilities,
         abi_targets,
         implementation_kinds,
         loader_entry,

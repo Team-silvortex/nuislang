@@ -154,7 +154,7 @@ fn validate_surface_pattern_for_domain(
 }
 pub(super) fn render_manifest(manifest: &NustarPackageManifest) -> String {
     format!(
-        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nabi_profiles = {}\nabi_capabilities = {}\nabi_targets = {}\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nhost_ffi_surface = {}\nhost_ffi_abis = {}\nhost_ffi_bridge = \"{}\"\nsupport_surface = {}\nsupport_profile_slots = {}\ncapability_tags = {}\ndefault_lanes = {}\nprovider_bundles = {}\ncode_assets = {}\nclock_domain_id = \"{}\"\nclock_kind = \"{}\"\nclock_epoch_kind = \"{}\"\nclock_resolution = \"{}\"\nclock_bridge_default = \"{}\"\nprofiles = {}\nresource_families = {}\nunit_types = {}\nlowering_targets = {}\nops = {}\n",
+        "manifest_schema = \"{}\"\npackage_id = \"{}\"\ndomain_family = \"{}\"\nfrontend = \"{}\"\nentry_crate = \"{}\"\nast_entry = \"{}\"\nnir_entry = \"{}\"\nyir_lowering_entry = \"{}\"\npart_verify_entry = \"{}\"\nast_surface = {}\nnir_surface = {}\nyir_lowering = {}\npart_verify = {}\nbinary_extension = \"{}\"\npackage_layout = \"{}\"\nmachine_abi_policy = \"{}\"\nabi_profiles = {}\nabi_capabilities = {}\nhost_ffi_memory_capabilities = {}\nabi_targets = {}\nimplementation_kinds = {}\nloader_entry = \"{}\"\nloader_abi = \"{}\"\nhost_ffi_surface = {}\nhost_ffi_abis = {}\nhost_ffi_bridge = \"{}\"\nsupport_surface = {}\nsupport_profile_slots = {}\ncapability_tags = {}\ndefault_lanes = {}\nprovider_bundles = {}\ncode_assets = {}\nclock_domain_id = \"{}\"\nclock_kind = \"{}\"\nclock_epoch_kind = \"{}\"\nclock_resolution = \"{}\"\nclock_bridge_default = \"{}\"\nprofiles = {}\nresource_families = {}\nunit_types = {}\nlowering_targets = {}\nops = {}\n",
         manifest.manifest_schema,
         manifest.package_id,
         manifest.domain_family,
@@ -173,6 +173,7 @@ pub(super) fn render_manifest(manifest: &NustarPackageManifest) -> String {
         manifest.machine_abi_policy,
         render_array(&manifest.abi_profiles),
         render_array(&manifest.abi_capabilities),
+        render_array(&manifest.host_ffi_memory_capabilities),
         render_array(&manifest.abi_targets),
         render_array(&manifest.implementation_kinds),
         manifest.loader_entry,
@@ -245,6 +246,11 @@ pub(super) fn parse_manifest_text(
         abi_profiles: parse_optional_string_array(source, "abi_profiles").unwrap_or_default(),
         abi_capabilities: parse_optional_string_array(source, "abi_capabilities")
             .unwrap_or_default(),
+        host_ffi_memory_capabilities: parse_optional_string_array(
+            source,
+            "host_ffi_memory_capabilities",
+        )
+        .unwrap_or_default(),
         abi_targets: parse_optional_string_array(source, "abi_targets").unwrap_or_default(),
         implementation_kinds: parse_string_array(source, "implementation_kinds", path)?,
         loader_entry: parse_required_string(source, "loader_entry", path)?,

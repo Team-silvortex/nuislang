@@ -42,6 +42,7 @@ fn make_manifest(domain: &str) -> NustarPackageManifest {
         machine_abi_policy: "exact-match".to_owned(),
         abi_profiles,
         abi_capabilities: Vec::new(),
+        host_ffi_memory_capabilities: Vec::new(),
         abi_targets,
         implementation_kinds: vec!["native-stub".to_owned()],
         loader_entry: "nustar.bootstrap.v1".to_owned(),
@@ -149,6 +150,28 @@ fn binary_manifest_round_trip_preserves_code_asset_registrations() {
     let decoded = decode(&encode(&binary), Path::new("code-asset-round-trip.nustar"))
         .expect("code asset binary");
     assert_eq!(decoded.manifest.code_assets, manifest.code_assets);
+}
+
+#[test]
+fn binary_manifest_round_trip_preserves_host_ffi_memory_capabilities() {
+    let mut manifest = make_manifest("cffi");
+    manifest.abi_capabilities = vec![
+        "cffi.abi.v1:op:cffi.*".to_owned(),
+        "libc:ffi_symbol:puts=i32(String)".to_owned(),
+    ];
+    manifest.host_ffi_abis = vec!["libc".to_owned()];
+    manifest.host_ffi_memory_capabilities = vec![
+        "libc:puts@fnv1a64:8ab85ff9f4111c91@fnv1a64:588094eacdd1e033=kind=borrowed_utf8,slot=arg:0,length=nul_terminated,mutability=read_only,lifetime=call,destructor=none"
+            .to_owned(),
+    ];
+    let binary = default_binary(manifest.clone(), vec![1, 2, 3]);
+    let decoded = decode(&encode(&binary), Path::new("ffi-memory-round-trip.nustar"))
+        .expect("host FFI memory binary");
+
+    assert_eq!(
+        decoded.manifest.host_ffi_memory_capabilities,
+        manifest.host_ffi_memory_capabilities
+    );
 }
 
 #[test]

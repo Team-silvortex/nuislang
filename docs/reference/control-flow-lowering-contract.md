@@ -78,8 +78,12 @@ Current truth:
 
 * branch-local runtime observation is now a supported sub-family of value
   selection
-* this support is intentionally narrow and currently means observer-shaped task
-  or mutex reads that still collapse into branch-local values
+* this support includes observer-shaped task or mutex reads that collapse into
+  branch-local values
+* matching branch-local consuming prefixes can now converge by selecting their
+  inputs first and emitting the common runtime operation exactly once
+* matching multi-stage prefixes recurse through the same rule, so a chain does
+  not need to expose eager intermediate branch effects
 * today the stable checked-in observer family is:
   * `task_completed(...)`
   * `task_timed_out(...)`
@@ -90,14 +94,18 @@ Current truth:
 Regression anchor:
 
 * [tests_branch_helpers.rs](../../tools/nuisc/src/lowering/tests_branch_helpers.rs)
-* [hello_thread_mutex_if_lock_branch_invalid.ns](../../examples/invalid/ns/memory/hello_thread_mutex_if_lock_branch_invalid.ns)
-* [hello_thread_mutex_match_join_result_branch_invalid.ns](../../examples/invalid/ns/memory/hello_thread_mutex_match_join_result_branch_invalid.ns)
+* [thread_mutex_branch_compile.rs](../../tools/nuisc/tests/thread_mutex_branch_compile.rs)
+* [hello_thread_mutex_if_lock_branch.ns](../../examples/ns/memory/hello_thread_mutex_if_lock_branch.ns)
+* [hello_thread_mutex_match_join_result_branch.ns](../../examples/ns/memory/hello_thread_mutex_match_join_result_branch.ns)
 
 Working rule:
 
 * observer-shaped branch-local reads are allowed when each branch still reduces
   to a select-compatible value path
-* this is not a general promise for arbitrary branch-local runtime work
+* lock and thread-join-result prefixes are allowed when both branches expose the
+  same operation shape and a shared or select-compatible suffix
+* this is not a promise for arbitrary or differently shaped branch-local
+  runtime mini-programs
 
 ### 4. Structured async `while` with branch-local carry updates
 
@@ -175,42 +183,34 @@ recognize and lower predictably.
 
 ## Not Yet Supported
 
-### Branch-local consuming task/thread/mutex runtime primitives
+### Non-collapsible branch-local task/thread/mutex runtime programs
 
 Current rejection:
 
-* branch-local consuming runtime primitives are still intentionally rejected in
-  `if` / lowered `match`
-* the current disallowed family includes shapes such as:
-  * `join_result(...)`
-  * `thread_join_result(...)`
-  * `spawn(...)`
-  * `thread_spawn(...)`
-  * `join(...)`
-  * `thread_join(...)`
-  * `cancel(...)`
-  * `timeout(...)`
-  * `mutex_new(...)`
-  * `mutex_lock(...)`
-  * `mutex_unlock(...)`
+* matching runtime prefixes are supported when lowering can select inputs or
+  arguments first and emit one common operation
+* branches remain rejected when they use different runtime operations, unrelated
+  callees, or effect suffixes that cannot collapse into one shared or
+  select-compatible value path
 
 Regression anchor:
 
 * [tests_branch_helpers.rs](../../tools/nuisc/src/lowering/tests_branch_helpers.rs)
+* [thread_mutex_branch_compile.rs](../../tools/nuisc/tests/thread_mutex_branch_compile.rs)
 
 Current diagnostic contract:
 
-* `conditional if/lowered-match lowering does not yet support branch-local consuming task/thread/mutex runtime primitives`
-* `hoist those effects before the branch or reduce each branch to pure/select-compatible values`
+* `conditional if/lowered-match lowering does not yet support this branch-local consuming task/thread/mutex runtime shape`
+* `use matching operation forms with a shared or select-compatible suffix, or hoist the effects before the branch`
 
 What this means:
 
-* branch-local runtime observation and branch-local runtime consumption are not
-  the same support boundary
-* observer-safe task/mutex reads are now part of the current control-flow
-  mainline
-* consuming task/thread/mutex operations still need to be hoisted or reduced to
-  pre-branch values before lowering
+* branch-local runtime observation and structured branch-local consumption are
+  both part of the current control-flow mainline
+* source branches may each spell `mutex_lock(...)` or a matching
+  `thread_join_result(thread_spawn(...))` chain without eagerly executing both
+* arbitrary effectful branch mini-programs still require a more general branch
+  execution contract
 
 ### Mixed factor expressions after additive shared-suffix re-mix inside structured async `while`
 

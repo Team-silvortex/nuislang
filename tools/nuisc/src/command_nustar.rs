@@ -64,6 +64,12 @@ pub(crate) fn run_bindings(input: PathBuf) -> Result<(), String> {
                 binding.abi_capabilities.join(", ")
             );
         }
+        if !binding.host_ffi_memory_capabilities.is_empty() {
+            println!(
+                "  host_ffi_memory_capabilities: {}",
+                binding.host_ffi_memory_capabilities.join(", ")
+            );
+        }
         println!("  ast_surface: {}", binding.ast_surface.join(", "));
         println!("  nir_surface: {}", binding.nir_surface.join(", "));
         println!("  yir_lowering: {}", binding.yir_lowering.join(", "));
@@ -215,6 +221,12 @@ pub(crate) fn run_pack_nustar(package_id: String, output: PathBuf) -> Result<(),
         "  abi_capabilities: {}",
         binary.manifest.abi_capabilities.join(", ")
     );
+    if !binary.manifest.host_ffi_memory_capabilities.is_empty() {
+        println!(
+            "  host_ffi_memory_capabilities: {}",
+            binary.manifest.host_ffi_memory_capabilities.join(", ")
+        );
+    }
     if !binary.manifest.abi_targets.is_empty() {
         println!("  abi_targets: {}", binary.manifest.abi_targets.join(", "));
     }
@@ -384,6 +396,12 @@ fn print_manifest_surface(manifest: &registry::NustarPackageManifest) {
         println!(
             "  abi_capabilities: {}",
             manifest.abi_capabilities.join(", ")
+        );
+    }
+    if !manifest.host_ffi_memory_capabilities.is_empty() {
+        println!(
+            "  host_ffi_memory_capabilities: {}",
+            manifest.host_ffi_memory_capabilities.join(", ")
         );
     }
     if !manifest.abi_targets.is_empty() {

@@ -100,8 +100,9 @@ share the same provider-neutral contract.
 
 1. keep the CFFI source and whitelist boundary strict while widening pointer,
    string, and object support only through registered contracts
-2. advance the weakest runtime coordinate,
-   `native-binary-system/nuis-runtime/lifecycle-context-dispatch`
+2. preserve the closed lifecycle-dispatch slices, then advance the
+   tensor-selected foundation coordinate, currently
+   `standard-library/std/concurrency-task-thread-lock`
 3. preserve GLM, clock, dependency, replay, and final-image evidence across
    heterogeneous provider graphs
 4. keep Nsld and Nsdb provider-neutral while real backends mature
@@ -110,6 +111,40 @@ share the same provider-neutral contract.
 6. harden package/import and std behavior under larger CLI and heterogeneous
    programs
 7. update the development tensor after each implementation tranche
+
+The `beta-0.1-foundation-hardening` recalibration keeps alpha and runtime-loader
+`stable/100` cells as historical milestone slices. It adds required
+fine-grained coordinates for concurrency, CFFI memory authority, Galaxy lock
+resolution, and OS-native Nsld finalization, plus an optional early Data/DPU
+direction coordinate. A terminal `all-cells-complete` card must not return
+until those newly registered slices also close.
+
+The first concurrency hardening tranche closes matching branch-local mutex-lock
+and thread-spawn/join-result prefixes through select-before-consume lowering.
+This advances `standard-library/std/concurrency-task-thread-lock` to
+`active/76`: recursive selected-prefix lowering now emits one mutex
+new/lock/unlock chain and one spawn/cancel/join-result chain, while the native
+project executes both dynamic branches. The tensor consequently hands current
+work to the lower `active/72` registered CFFI memory boundary.
+
+The first CFFI memory-authority tranche then advances that boundary to
+`active/77`. `official.cffi` now registers five real borrowed UTF-8 parameters
+with two independently reviewable hashes: the exact ABI symbol-signature hash
+and a `nuis-ffi-memory-v1` capability hash over kind, slot, length policy,
+mutability, lifetime, and destructor authority. Compilation rejects a `String`
+extern before lowering unless that exact borrowed capability exists; project
+host-FFI metadata preserves it, and Nsld includes it in per-ABI and aggregate
+link-plan validation.
+
+The same protocol can validate an owned `ref Buffer` return only when it names
+an exact registered `i64(ref_Buffer)` destructor and uses runtime-header length,
+unique mutability, and owned lifetime. This is intentionally not execution
+support yet: source pointer-return lowering still fails closed until the host
+allocation can enter YIR/GLM as a length-bearing owner and reach exact-once
+native destruction. Raw pointers and retained host borrows remain unopened.
+With CFFI at `active/77`, deterministic tensor ordering returns the next task
+card to the lower `active/76` concurrency coordinate instead of pinning work to
+one subsystem by hand.
 
 ## Honesty Boundary
 

@@ -226,8 +226,36 @@ self-hosted tooling one stable bundle to consume without reassembling many
 At alpha closeout the transition reason was explicit:
 `all bootstrap-critical cells are stable at 100/100`. Beta may then register
 new foundation coordinates instead of pretending that an alpha-complete tensor
-means the runtime is finished. The current runtime-loader coordinate therefore
-reopens bootstrap selection through the normal milestone protocol.
+means the runtime is finished. The runtime loader and lifecycle dispatch slices
+have now closed, so the `beta-0.1-foundation-hardening` milestone reopens
+bootstrap selection with finer coordinates rather than downgrading those
+historical closures.
+
+The `beta-0.1` calibration baseline is:
+
+* `standard-library/std/concurrency-task-thread-lock`: `active/76`, required;
+  this is now the current weakest task after the CFFI capability tranche;
+  recursive selected-prefix lowering and the native cancel/unlock project now
+  close both dynamic branches; scheduler-backed mutex contention and visibility
+  remain open
+* `host-compatibility/cffi/registered-pointer-string-object-boundary`:
+  `active/77`, required; five real borrowed
+  UTF-8 calls now carry exact signature plus memory-capability hashes through
+  compile, project metadata, and Nsld validation, while owned return-buffer
+  descriptors remain fail-closed until their GLM transfer lowering exists
+* `package-system/galaxy/source-import-and-lock-resolution`: `usable/78`,
+  required; local/transitive imports work, while a hash-bound lock closure does
+  not yet exist
+* `linker-toolchain/nsld/os-native-executable-finalization`: `usable/82`,
+  required; NSB execution closes, while host-native shell finalization still
+  crosses a registered external finalizer
+* `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
+  optional; provider-neutral movement exists, but no physical DPU/IPU backend is
+  claimed
+
+These scores describe the new beta slices only. Existing `stable/100` cells
+remain evidence that their narrower protocol milestone closed; they are not a
+claim that the containing architecture is finished forever.
 
 The task-card protocol is `nuis-dev-tensor-task-card-v1`. A ready task card
 means the tensor found an actionable bootstrap or global incomplete
@@ -1716,6 +1744,8 @@ The first useful jobs are:
   a human to reread the whole roadmap
 * preserve alpha milestone provenance while early-beta foundation and later
   self-hosting pressure grow
+* recalibrate completed broad slices into narrower beta coordinates instead of
+  erasing historical closure evidence or reporting a false project-wide 100%
 * preserve the foundation-through-`beta-0.9.*`, migration-from-`beta-0.10.*`,
   and completion-at-`gamma-0.5.*` self-hosting route without confusing roadmap
   agreement with implementation completion

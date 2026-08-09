@@ -1,6 +1,10 @@
 use std::fs;
 
 use crate::aot_ffi_bridge::SIGNATURE_WHITELIST_POLICY;
+use crate::registry::{
+    HostFfiMemoryCapability, HostFfiMemoryDestructor, HostFfiMemoryKind, HostFfiMemorySlot,
+};
+use crate::registry_host_ffi::parse_memory_capability;
 use yir_core::ffi::ffi_symbol_signature_hash;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -8,6 +12,7 @@ pub(crate) struct HostFfiIndexFootprint {
     pub(crate) index_path: Option<String>,
     pub(crate) symbol_count: usize,
     pub(crate) policy_count: usize,
+    pub(crate) memory_capability_count: usize,
     pub(crate) policy: String,
     pub(crate) entries: Vec<HostFfiIndexEntry>,
 }
@@ -19,6 +24,7 @@ pub(crate) struct HostFfiIndexEntry {
     pub(crate) signature_pattern: String,
     pub(crate) signature_hash: String,
     pub(crate) policy: String,
+    pub(crate) memory_capabilities: Vec<HostFfiMemoryCapability>,
 }
 
 pub(crate) fn host_ffi_index_footprint(index_path: Option<&str>) -> HostFfiIndexFootprint {
@@ -30,6 +36,10 @@ pub(crate) fn host_ffi_index_footprint(index_path: Option<&str>) -> HostFfiIndex
             .iter()
             .filter(|entry| !entry.policy.is_empty())
             .count(),
+        memory_capability_count: entries
+            .iter()
+            .map(|entry| entry.memory_capabilities.len())
+            .sum(),
         policy: SIGNATURE_WHITELIST_POLICY.to_owned(),
         entries,
     }
@@ -63,6 +73,7 @@ pub(crate) fn parse_host_ffi_index_source(
         }
         entries.push(parse_host_ffi_index_line(index_path, line_index + 1, line)?);
     }
+    validate_host_ffi_memory_links(index_path, &entries)?;
     Ok(entries)
 }
 
@@ -76,6 +87,20 @@ fn parse_host_ffi_index_line(
     let signature_pattern = required_tab_field(index_path, line_number, line, "signature_pattern")?;
     let signature_hash = required_tab_field(index_path, line_number, line, "signature_hash")?;
     let policy = required_tab_field(index_path, line_number, line, "policy")?;
+    let memory_capability_count = required_tab_field(
+        index_path,
+        line_number,
+        line,
+        "memory_capability_count",
+    )?
+    .parse::<usize>()
+    .map_err(|_| {
+        format!(
+            "project host_ffi index `{index_path}` line {line_number} has invalid `memory_capability_count`"
+        )
+    })?;
+    let memory_capabilities_raw =
+        required_tab_field(index_path, line_number, line, "memory_capabilities")?;
     if policy != SIGNATURE_WHITELIST_POLICY {
         return Err(format!(
             "project host_ffi index `{index_path}` line {line_number} has unsupported policy `{policy}`; expected `{SIGNATURE_WHITELIST_POLICY}`"
@@ -87,13 +112,141 @@ fn parse_host_ffi_index_line(
             "project host_ffi index `{index_path}` line {line_number} signature hash mismatch for `{symbol}` ABI `{abi}` signature `{signature_pattern}`: expected `{expected_hash}`, found `{signature_hash}`"
         ));
     }
+    let memory_capabilities = parse_index_memory_capabilities(
+        index_path,
+        line_number,
+        abi,
+        symbol,
+        signature_pattern,
+        signature_hash,
+        memory_capability_count,
+        memory_capabilities_raw,
+    )?;
     Ok(HostFfiIndexEntry {
         abi: abi.to_owned(),
         symbol: symbol.to_owned(),
         signature_pattern: signature_pattern.to_owned(),
         signature_hash: signature_hash.to_owned(),
         policy: policy.to_owned(),
+        memory_capabilities,
     })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn parse_index_memory_capabilities(
+    index_path: &str,
+    line_number: usize,
+    abi: &str,
+    symbol: &str,
+    signature_pattern: &str,
+    signature_hash: &str,
+    expected_count: usize,
+    raw: &str,
+) -> Result<Vec<HostFfiMemoryCapability>, String> {
+    let capabilities = if raw == "-" {
+        Vec::new()
+    } else {
+        raw.split(';')
+            .map(|entry| parse_memory_capability(entry, index_path))
+            .collect::<Result<Vec<_>, _>>()?
+    };
+    if capabilities.len() != expected_count {
+        return Err(format!(
+            "project host_ffi index `{index_path}` line {line_number} memory capability count mismatch: expected {expected_count}, found {}",
+            capabilities.len()
+        ));
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    for capability in &capabilities {
+        if capability.abi != abi
+            || capability.symbol != symbol
+            || capability.signature_hash != signature_hash
+        {
+            return Err(format!(
+                "project host_ffi index `{index_path}` line {line_number} memory capability identity does not match ABI `{abi}` symbol `{symbol}` signature hash `{signature_hash}`"
+            ));
+        }
+        if !seen.insert((capability.kind, capability.slot.clone())) {
+            return Err(format!(
+                "project host_ffi index `{index_path}` line {line_number} repeats memory capability `{}` slot `{}`",
+                capability.kind.as_str(),
+                capability.slot.render()
+            ));
+        }
+        validate_index_memory_shape(index_path, line_number, capability, signature_pattern)?;
+    }
+    Ok(capabilities)
+}
+
+fn validate_index_memory_shape(
+    index_path: &str,
+    line_number: usize,
+    capability: &HostFfiMemoryCapability,
+    signature: &str,
+) -> Result<(), String> {
+    match (&capability.kind, &capability.slot) {
+        (HostFfiMemoryKind::BorrowedUtf8, HostFfiMemorySlot::Arg(index)) => {
+            let args = signature
+                .split_once('(')
+                .and_then(|(_, args)| args.strip_suffix(')'))
+                .map(|args| {
+                    if args.is_empty() {
+                        Vec::new()
+                    } else {
+                        args.split(',').collect::<Vec<_>>()
+                    }
+                })
+                .unwrap_or_default();
+            if args.get(*index).copied() != Some("String") {
+                return Err(format!(
+                    "project host_ffi index `{index_path}` line {line_number} borrowed UTF-8 slot `arg:{index}` does not reference `String` in `{signature}`"
+                ));
+            }
+        }
+        (HostFfiMemoryKind::OwnedReturnBuffer, HostFfiMemorySlot::Return) => {
+            if signature.split_once('(').map(|(ret, _)| ret) != Some("ref_Buffer") {
+                return Err(format!(
+                    "project host_ffi index `{index_path}` line {line_number} owned return-buffer capability requires `ref_Buffer` return signature"
+                ));
+            }
+        }
+        _ => {
+            return Err(format!(
+                "project host_ffi index `{index_path}` line {line_number} memory capability kind/slot mismatch"
+            ))
+        }
+    }
+    Ok(())
+}
+
+fn validate_host_ffi_memory_links(
+    index_path: &str,
+    entries: &[HostFfiIndexEntry],
+) -> Result<(), String> {
+    for entry in entries {
+        for capability in &entry.memory_capabilities {
+            let HostFfiMemoryDestructor::Registered {
+                symbol,
+                signature_hash,
+            } = &capability.destructor
+            else {
+                continue;
+            };
+            let valid = entries.iter().any(|candidate| {
+                candidate.abi == capability.abi
+                    && candidate.symbol == *symbol
+                    && candidate.signature_hash == *signature_hash
+                    && candidate.signature_pattern == "i64(ref_Buffer)"
+            });
+            if !valid {
+                return Err(format!(
+                    "project host_ffi index `{index_path}` owned return-buffer capability for `{}` references missing or drifted destructor `{symbol}` hash `{signature_hash}`",
+                    capability.symbol
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn required_tab_field<'a>(
@@ -129,7 +282,7 @@ mod tests {
     fn valid_line() -> String {
         let hash = ffi_symbol_signature_hash("c", "host_sleep_ns", "i64(i64)");
         format!(
-            "abi=c\tsymbol=host_sleep_ns\tsignature_pattern=i64(i64)\tsignature_hash={hash}\tpolicy={SIGNATURE_WHITELIST_POLICY}"
+            "abi=c\tsymbol=host_sleep_ns\tsignature_pattern=i64(i64)\tsignature_hash={hash}\tpolicy={SIGNATURE_WHITELIST_POLICY}\tmemory_capability_count=0\tmemory_capabilities=-"
         )
     }
 
@@ -144,6 +297,7 @@ mod tests {
         assert_eq!(entries[0].symbol, "host_sleep_ns");
         assert_eq!(entries[0].signature_pattern, "i64(i64)");
         assert_eq!(entries[0].policy, SIGNATURE_WHITELIST_POLICY);
+        assert!(entries[0].memory_capabilities.is_empty());
     }
 
     #[test]

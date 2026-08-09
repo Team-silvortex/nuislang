@@ -18,11 +18,17 @@ pub(super) fn build_host_ffi_footprint(index_path: Option<&str>) -> LinkPlanHost
             signature_pattern: entry.signature_pattern,
             signature_hash: entry.signature_hash,
             policy: entry.policy,
+            memory_capabilities: entry
+                .memory_capabilities
+                .iter()
+                .map(crate::registry::HostFfiMemoryCapability::render)
+                .collect(),
         })
         .collect::<Vec<_>>();
     let validation = validate_host_ffi_footprint(
         footprint.symbol_count,
         footprint.policy_count,
+        footprint.memory_capability_count,
         &footprint.policy,
         &entries,
     );
@@ -31,6 +37,7 @@ pub(super) fn build_host_ffi_footprint(index_path: Option<&str>) -> LinkPlanHost
         index_path: footprint.index_path,
         symbol_count: footprint.symbol_count,
         policy_count: footprint.policy_count,
+        memory_capability_count: footprint.memory_capability_count,
         policy: footprint.policy,
         abi_groups,
         validation,
@@ -41,6 +48,7 @@ pub(super) fn build_host_ffi_footprint(index_path: Option<&str>) -> LinkPlanHost
 pub(super) fn validate_host_ffi_footprint(
     symbol_count: usize,
     policy_count: usize,
+    memory_capability_count: usize,
     policy: &str,
     entries: &[LinkPlanHostFfiEntry],
 ) -> LinkPlanHostFfiValidationSummary {
@@ -56,6 +64,15 @@ pub(super) fn validate_host_ffi_footprint(
         issues.push(format!(
             "host_ffi policy_count {policy_count} does not match parsed entries {}",
             entries.len()
+        ));
+    }
+    let parsed_memory_capability_count = entries
+        .iter()
+        .map(|entry| entry.memory_capabilities.len())
+        .sum::<usize>();
+    if memory_capability_count != parsed_memory_capability_count {
+        issues.push(format!(
+            "host_ffi memory_capability_count {memory_capability_count} does not match parsed capabilities {parsed_memory_capability_count}"
         ));
     }
     let mut seen_signatures = BTreeSet::new();
@@ -113,22 +130,26 @@ pub(super) fn derive_host_ffi_abi_groups(
         let mut abi_entries = Vec::with_capacity(entries.len());
         let mut symbols = Vec::with_capacity(entries.len());
         let mut policy_count = 0usize;
+        let mut memory_capability_count = 0usize;
         for entry in &entries {
             if !entry.policy.is_empty() {
                 policy_count += 1;
             }
+            memory_capability_count += entry.memory_capabilities.len();
             symbols.push(format!("{}:{}", entry.symbol, entry.signature_pattern));
             abi_entries.push(LinkPlanHostFfiAbiEntry {
                 symbol: entry.symbol.clone(),
                 signature_pattern: entry.signature_pattern.clone(),
                 signature_hash: entry.signature_hash.clone(),
                 policy: entry.policy.clone(),
+                memory_capabilities: entry.memory_capabilities.clone(),
             });
         }
         abi_groups.push(LinkPlanHostFfiAbiGroup {
             abi: abi.to_owned(),
             symbol_count: entries.len(),
             policy_count,
+            memory_capability_count,
             symbols,
             validation: validate_host_ffi_abi_group(abi, &abi_entries),
             entries: abi_entries,

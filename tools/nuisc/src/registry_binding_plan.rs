@@ -147,6 +147,7 @@ pub fn plan_bindings(
             machine_abi_policy: manifest.machine_abi_policy,
             abi_profiles: manifest.abi_profiles,
             abi_capabilities: manifest.abi_capabilities,
+            host_ffi_memory_capabilities: manifest.host_ffi_memory_capabilities,
             ast_surface: manifest.ast_surface,
             nir_surface: manifest.nir_surface,
             yir_lowering: manifest.yir_lowering,

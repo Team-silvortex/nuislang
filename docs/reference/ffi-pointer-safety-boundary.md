@@ -76,6 +76,48 @@ The hash form uses the canonical input:
 For example, `c|host_hashed_curve|i64(i64)` is registered as
 `ffi_symbol_hash:host_hashed_curve=fnv1a64:38ca92f356fcb551`.
 
+## Hash-Bound Memory Authority
+
+An exact symbol signature can now carry a second, independent memory-authority
+hash. Its canonical input is:
+
+`nuis-ffi-memory-v1|<abi>|<symbol>|<signature_hash>|<descriptor>`
+
+The manifest registration is:
+
+`<abi>:<symbol>@<signature_hash>@<capability_hash>=<descriptor>`
+
+The descriptor has one canonical field order:
+
+`kind=<kind>,slot=<slot>,length=<policy>,mutability=<policy>,lifetime=<policy>,destructor=<authority>`
+
+The first two admitted capability shapes are deliberately closed sets:
+
+* `borrowed_utf8` must target a real `String` argument, use
+  `length=nul_terminated`, `mutability=read_only`, `lifetime=call`, and
+  `destructor=none`
+* `owned_return_buffer` must target a `ref_Buffer` return, use
+  `length=runtime_header`, `mutability=unique`, `lifetime=owned`, and name an
+  exact registered destructor with signature `i64(ref_Buffer)`
+
+Validation requires the ABI to be declared, the symbol to have an exact
+`ffi_symbol:` signature, both hashes to match, every kind/slot pair to be
+unique, and any destructor registration to match exactly. A coarse `ffi:*`
+family or a hash-only symbol entry cannot grant memory authority.
+
+`official.cffi` currently uses the borrowed form for `libc.puts` argument 0,
+`libc.strlen` argument 0, `libc.write` argument 1,
+`c.host_text_line_count` argument 0, and `c.host_text_word_count` argument 0.
+Those are real source/compiler paths, not placeholder registrations. A
+non-reference `String` extern parameter without the matching capability is
+rejected before lowering.
+
+Owned return-buffer registration is protocol-valid and regression-tested, but
+source pointer-return execution is still closed. The compiler rejects it after
+contract validation until the returned allocation can enter YIR/GLM with its
+length and exact-once destructor transfer. This distinction prevents a valid
+manifest from being mistaken for a completed ownership implementation.
+
 In `nustar` manifest strings, multi-argument `ffi_symbol:` signatures can use
 the same comma-separated form as source-facing signatures, for example
 `i64(i64,i64)`. Older `+`-separated manifest signatures such as
@@ -90,10 +132,12 @@ Project metadata mirrors the same policy earlier in
 `nuis.project.host_ffi.txt`. Each extern row keeps the source-facing
 `signature=fn <name>(...) -> <type>` for humans, and also records
 `signature_pattern=<ret>(<args>)`, `signature_hash=fnv1a64:<hex>`, and
-`policy=signature-whitelist-required` for tools. This is the project-level
-audit trail used by heterogeneous proxy tests before the final AOT bundle is
-packed. `nuisc verify-build-manifest` checks these project-level rows and
-rejects signature hash drift before reporting the build manifest as verified.
+`policy=signature-whitelist-required` for tools. It additionally records
+`memory_capability_count` and the canonical `memory_capabilities` list for each
+row. This is the project-level audit trail used by heterogeneous proxy tests
+before the final AOT bundle is packed. `nuisc verify-build-manifest` checks the
+signature hash, capability count, identity, hash, shape, and destructor linkage
+before reporting the build manifest as verified.
 
 The linker-facing plan consumes the same project host FFI index as structured
 data. Its `host_ffi` footprint contains the original index path, symbol and
@@ -103,8 +147,8 @@ top-level validation exposes `valid`, `link_allowed`, `issues`, and `notes`.
 `abi+symbol+signature` whitelist entries, policy drift, or count drift block
 linking; notes such as multiple whitelisted signatures for the same
 `abi+symbol` stay visible without blocking. ABI groups repeat this validation
-locally so `nsld` can reason about each host ABI lane without reparsing the
-text index.
+locally and expose memory-capability counts and canonical descriptors, so
+`nsld` can reason about each host ABI lane without reparsing the text index.
 
 This is still not a dynamic C escape hatch. The linker consumes a static,
 manifest-verified whitelist footprint. It does not invent new C ABI authority,
@@ -181,6 +225,8 @@ Current regression anchors:
 
 * [tests.rs](../../crates/yir-lower-llvm/src/tests.rs)
 * [ffi_compile.rs](../../tools/nuisc/tests/ffi_compile.rs)
+* [registry_host_ffi_tests.rs](../../tools/nuisc/src/registry_host_ffi_tests.rs)
+* [lib_tests_execution.rs](../../tools/nuisc/src/lib_tests_execution.rs)
 
 ## Current String Boundary
 

@@ -566,6 +566,73 @@ mod cffi Main {
 }
 
 #[test]
+fn compile_command_carries_borrowed_utf8_capability_into_nsld_plan() {
+    let project_root = write_temp_project_fixture(
+        "borrowed_utf8_host_ffi_capability",
+        r#"
+name = "borrowed_utf8_host_ffi_capability"
+entry = "main.ns"
+modules = ["main.ns"]
+"#
+        .trim_start(),
+        r#"
+mod cffi Main {
+  extern "c" fn host_text_line_count(text: String) -> i64;
+
+  fn main() -> i64 {
+    let lines: i64 = host_text_line_count("alpha\nbeta\n");
+    if lines == 2 {
+      return 0;
+    }
+    return 1;
+  }
+}
+"#,
+    );
+    let output_dir = temp_dir("borrowed_utf8_host_ffi_capability_outputs");
+
+    run(CommandKind::Compile {
+        input: project_root,
+        output_dir: output_dir.clone(),
+        verbose_cache: false,
+        cpu_abi: None,
+        target: None,
+        packaging_mode: None,
+    })
+    .unwrap();
+
+    let host_ffi_path = output_dir.join("nuis.project.host_ffi.txt");
+    let host_ffi_text = fs::read_to_string(&host_ffi_path).unwrap();
+    assert!(host_ffi_text.contains("memory_capability_count=1"));
+    assert!(host_ffi_text.contains("kind=borrowed_utf8"));
+    assert!(host_ffi_text.contains("slot=arg:0"));
+    assert!(host_ffi_text.contains("length=nul_terminated"));
+    assert!(host_ffi_text.contains("mutability=read_only"));
+    assert!(host_ffi_text.contains("lifetime=call"));
+    assert!(host_ffi_text.contains("destructor=none"));
+
+    let manifest_path = output_dir.join("nuis.build.manifest.toml");
+    let manifest_report = aot::verify_build_manifest(&manifest_path).unwrap();
+    let artifact = load_nuis_compiled_artifact(&manifest_path).unwrap();
+    let link_plan = linker::build_link_plan(&manifest_report, &artifact);
+    let link_plan_json = linker::render_link_plan_json(&link_plan);
+    assert_eq!(link_plan.host_ffi.memory_capability_count, 1);
+    assert!(link_plan.host_ffi.validation.link_allowed);
+    assert!(link_plan_json.contains("\"host_ffi_memory_capability_count\":1"));
+    assert!(link_plan_json.contains("\"memory_capability_count\":1"));
+    assert!(link_plan_json.contains("kind=borrowed_utf8"));
+
+    let damaged = host_ffi_text.replace("lifetime=call", "lifetime=retained");
+    fs::write(&host_ffi_path, damaged).unwrap();
+    let error = match aot::verify_build_manifest(&manifest_path) {
+        Ok(_) => panic!("expected borrowed UTF-8 lifetime drift to be rejected"),
+        Err(error) => error,
+    };
+    assert!(error.contains("lifetime, length, mutability"));
+    assert!(error.contains("policy drift"));
+}
+
+#[test]
 fn benchmark_inventory_collects_declared_benchmarks() {
     let artifacts = pipeline::compile_source(
             r#"

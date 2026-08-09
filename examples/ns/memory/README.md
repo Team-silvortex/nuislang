@@ -69,12 +69,16 @@ Thread/lock staged ladder:
 * [hello_thread_mutex_observe.ns](hello_thread_mutex_observe.ns)
 * [hello_thread_mutex_branch_observe.ns](hello_thread_mutex_branch_observe.ns)
 * [hello_thread_mutex_branch_suffix.ns](hello_thread_mutex_branch_suffix.ns)
+* [hello_thread_mutex_if_lock_branch.ns](hello_thread_mutex_if_lock_branch.ns)
+* [hello_thread_mutex_match_join_result_branch.ns](hello_thread_mutex_match_join_result_branch.ns)
 
 This is the shortest staged thread/lock route for:
 
 * basic `Thread<T>` / `Mutex<T>` observation
 * branch-selected observer shaping
 * branch-selected observer shaping with shared pure suffix
+* branch-local lock and join-result syntax converged into one selected runtime
+  prefix
 
 ## Companion Detail Map
 
@@ -102,6 +106,8 @@ This is the shortest staged thread/lock route for:
   - [hello_thread_mutex_observe.ns](hello_thread_mutex_observe.ns)
   - [hello_thread_mutex_branch_observe.ns](hello_thread_mutex_branch_observe.ns)
   - [hello_thread_mutex_branch_suffix.ns](hello_thread_mutex_branch_suffix.ns)
+  - [hello_thread_mutex_if_lock_branch.ns](hello_thread_mutex_if_lock_branch.ns)
+  - [hello_thread_mutex_match_join_result_branch.ns](hello_thread_mutex_match_join_result_branch.ns)
 
 ## Current Compile-Closure Set
 
@@ -118,6 +124,8 @@ These examples now survive real source compile coverage under
 * [hello_thread_mutex_observe.ns](hello_thread_mutex_observe.ns)
 * [hello_thread_mutex_branch_observe.ns](hello_thread_mutex_branch_observe.ns)
 * [hello_thread_mutex_branch_suffix.ns](hello_thread_mutex_branch_suffix.ns)
+* [hello_thread_mutex_if_lock_branch.ns](hello_thread_mutex_if_lock_branch.ns)
+* [hello_thread_mutex_match_join_result_branch.ns](hello_thread_mutex_match_join_result_branch.ns)
 
 Read this set as:
 

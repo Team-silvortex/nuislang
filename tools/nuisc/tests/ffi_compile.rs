@@ -135,7 +135,8 @@ fn source_host_ffi_facades_are_wrapped_and_registered_by_cffi_nustar() {
     let manifest =
         nuisc::registry::load_manifest(&workspace.join("nustar-packages"), "official.cffi")
             .expect("official cffi manifest should load");
-    let view = HostFfiRegistryView::from_manifest(&manifest);
+    let view = HostFfiRegistryView::try_from_manifest(&manifest)
+        .expect("official cffi host FFI registry should validate");
 
     let mut declarations = collect_source_extern_signatures(&workspace.join("stdlib"));
     declarations.extend(collect_source_extern_signatures(

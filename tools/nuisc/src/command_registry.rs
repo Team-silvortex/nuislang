@@ -103,6 +103,12 @@ pub(crate) fn run_registry(json: bool) -> Result<(), String> {
                 manifest.abi_capabilities.join(", ")
             );
         }
+        if !manifest.host_ffi_memory_capabilities.is_empty() {
+            println!(
+                "  host_ffi_memory_capabilities: {}",
+                manifest.host_ffi_memory_capabilities.join(", ")
+            );
+        }
         println!(
             "  implementation_kinds: {}",
             manifest.implementation_kinds.join(", ")
