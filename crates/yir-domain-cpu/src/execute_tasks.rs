@@ -278,6 +278,75 @@ pub(crate) fn execute_cpu_task_node(
             );
             Ok(value)
         }
+        "mutex_share" => {
+            let mutex = state.expect_mutex(&node.op.args[0])?;
+            let label = mutex.label.clone();
+            let value = mutex.value.clone();
+            state.push_resource_event(
+                resource,
+                format!(
+                    "effect cpu.mutex_share @{} [{}]: {}",
+                    node.resource, resource.kind.raw, label
+                ),
+            );
+            Ok(Value::Mutex(yir_core::MutexHandle { label, value }))
+        }
+        "mutex_permit" => {
+            let mutex = state.expect_mutex(&node.op.args[0])?;
+            let label = mutex.label.clone();
+            let value = mutex.value.clone();
+            let lane = state.expect_int(&node.op.args[1])?;
+            if !(0..=1).contains(&lane) {
+                return Err(format!(
+                    "mutex permit lane `{lane}` is outside fixed range 0..=1"
+                ));
+            }
+            state.push_resource_event(
+                resource,
+                format!(
+                    "effect cpu.mutex_permit @{} [{}]: {} lane={}",
+                    node.resource, resource.kind.raw, label, lane
+                ),
+            );
+            Ok(Value::MutexPermit(yir_core::MutexPermitHandle {
+                label,
+                lane,
+                value,
+            }))
+        }
+        "mutex_permit_lock" => {
+            let permit = state.expect_mutex_permit(&node.op.args[0])?;
+            let label = permit.label.clone();
+            let lane = permit.lane;
+            let value = permit.value.clone();
+            state.push_resource_event(
+                resource,
+                format!(
+                    "effect cpu.mutex_permit_lock @{} [{}]: {} lane={}",
+                    node.resource, resource.kind.raw, label, lane
+                ),
+            );
+            Ok(Value::MutexGuard(yir_core::MutexGuardHandle {
+                label,
+                value,
+            }))
+        }
+        "mutex_lease_value" => {
+            let lease = state.expect_mutex_guard(&node.op.args[0])?;
+            Ok((*lease.value).clone())
+        }
+        "mutex_lease_unlock" => {
+            let lease = state.expect_mutex_guard(&node.op.args[0])?;
+            let label = lease.label.clone();
+            state.push_resource_event(
+                resource,
+                format!(
+                    "effect cpu.mutex_lease_unlock @{} [{}]: {}",
+                    node.resource, resource.kind.raw, label
+                ),
+            );
+            Ok(Value::Int(1))
+        }
         "await" => {
             let value = state.expect_value(&node.op.args[0])?.clone();
             state.push_resource_event(

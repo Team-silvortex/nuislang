@@ -144,8 +144,25 @@ impl NirTypeRef {
         self.name == "MutexGuard" && !self.is_ref
     }
 
+    pub fn is_shared_mutex_family(&self) -> bool {
+        self.name == "SharedMutex" && !self.is_ref
+    }
+
+    pub fn is_mutex_permit_family(&self) -> bool {
+        self.name == "MutexPermit" && !self.is_ref
+    }
+
+    pub fn is_mutex_lease_family(&self) -> bool {
+        self.name == "MutexLease" && !self.is_ref
+    }
+
     pub fn is_concurrency_bridge_family(&self) -> bool {
-        self.is_thread_family() || self.is_mutex_family() || self.is_mutex_guard_family()
+        self.is_thread_family()
+            || self.is_mutex_family()
+            || self.is_mutex_guard_family()
+            || self.is_shared_mutex_family()
+            || self.is_mutex_permit_family()
+            || self.is_mutex_lease_family()
     }
 
     pub fn thread_payload(&self) -> Option<&NirTypeRef> {
@@ -172,6 +189,30 @@ impl NirTypeRef {
         }
     }
 
+    pub fn shared_mutex_payload(&self) -> Option<&NirTypeRef> {
+        if self.is_shared_mutex_family() {
+            self.generic_args.first()
+        } else {
+            None
+        }
+    }
+
+    pub fn mutex_permit_payload(&self) -> Option<&NirTypeRef> {
+        if self.is_mutex_permit_family() {
+            self.generic_args.first()
+        } else {
+            None
+        }
+    }
+
+    pub fn mutex_lease_payload(&self) -> Option<&NirTypeRef> {
+        if self.is_mutex_lease_family() {
+            self.generic_args.first()
+        } else {
+            None
+        }
+    }
+
     pub fn marker_tag(&self) -> Option<&NirTypeRef> {
         if self.is_marker_family() {
             self.generic_args.first()
@@ -191,6 +232,12 @@ impl NirTypeRef {
     pub fn is_async_boundary_safe(&self) -> bool {
         if self.is_ref || self.is_optional {
             return false;
+        }
+        if self.is_mutex_permit_family() {
+            return self.generic_args.len() == 1
+                && self
+                    .mutex_permit_payload()
+                    .is_some_and(NirTypeRef::is_async_boundary_safe);
         }
         if matches!(
             self.container_kind(),
@@ -398,6 +445,29 @@ impl NirTypeRef {
                     {
                         return Err(format!(
                             "`MutexGuard<...>` expects a staged value payload, found `{}`",
+                            payload.render()
+                        ));
+                    }
+                }
+                if self.is_shared_mutex_family()
+                    || self.is_mutex_permit_family()
+                    || self.is_mutex_lease_family()
+                {
+                    if self.generic_args.len() != 1 {
+                        return Err(format!(
+                            "`{}<...>` must carry exactly one payload type argument",
+                            self.name
+                        ));
+                    }
+                    let payload = self.generic_args.first().expect("mutex capability payload");
+                    if payload.is_ref
+                        || payload.is_optional
+                        || payload.is_result_family()
+                        || payload.is_concurrency_bridge_family()
+                    {
+                        return Err(format!(
+                            "`{}<...>` expects a staged value payload, found `{}`",
+                            self.name,
                             payload.render()
                         ));
                     }

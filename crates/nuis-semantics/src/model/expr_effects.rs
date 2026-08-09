@@ -162,6 +162,7 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::CpuMutexLock(_)
         | NirExpr::CpuMutexUnlock(_)
         | NirExpr::CpuMutexValue(_)
+        | NirExpr::CpuMutexCapability { .. }
         | NirExpr::CpuTimeout { .. }
         | NirExpr::CpuReadyAfter { .. }
         | NirExpr::CpuPresentFrame(_)

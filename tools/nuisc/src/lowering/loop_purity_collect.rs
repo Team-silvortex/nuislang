@@ -331,6 +331,13 @@ fn is_pure_helper_expr(
         | NirExpr::CpuTaskFailed(inner)
         | NirExpr::CpuTaskValue(inner)
         | NirExpr::CpuMutexValue(inner) => is_pure_helper_expr(inner, function_map, memo, visiting),
+        NirExpr::CpuMutexCapability {
+            op: NirMutexCapabilityOp::LeaseValue,
+            args,
+        } => args
+            .iter()
+            .all(|arg| is_pure_helper_expr(arg, function_map, memo, visiting)),
+        NirExpr::CpuMutexCapability { .. } => false,
         NirExpr::StructLiteral { fields, .. } => fields
             .iter()
             .all(|(_, value)| is_pure_helper_expr(value, function_map, memo, visiting)),

@@ -422,6 +422,7 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         }
         NirExpr::CpuSpawn { args, .. }
         | NirExpr::CpuThreadSpawn { args, .. }
+        | NirExpr::CpuMutexCapability { args, .. }
         | NirExpr::CpuExternCall { args, .. }
         | NirExpr::CpuExternCallI32 { args, .. }
         | NirExpr::CpuExternCallOwnedBuffer { args, .. }

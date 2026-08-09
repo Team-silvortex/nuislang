@@ -120,6 +120,7 @@ pub(in crate::project) fn expr_walk_any(
         } => predicate(color) || predicate(speed) || predicate(radius),
         NirExpr::CpuSpawn { args, .. }
         | NirExpr::CpuThreadSpawn { args, .. }
+        | NirExpr::CpuMutexCapability { args, .. }
         | NirExpr::CpuExternCall { args, .. }
         | NirExpr::Call { args, .. } => args.iter().any(predicate),
         NirExpr::CpuTimeout { task, limit } => predicate(task) || predicate(limit),

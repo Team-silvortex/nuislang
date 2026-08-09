@@ -87,19 +87,31 @@ fn recognizes_staged_thread_and_mutex_families() {
     let thread = generic("Thread", named("i64"));
     let mutex = generic("Mutex", named("i64"));
     let guard = generic("MutexGuard", named("i64"));
+    let shared = generic("SharedMutex", named("i64"));
+    let permit = generic("MutexPermit", named("i64"));
+    let lease = generic("MutexLease", named("i64"));
 
     assert!(thread.is_thread_family());
     assert!(mutex.is_mutex_family());
     assert!(guard.is_mutex_guard_family());
+    assert!(shared.is_shared_mutex_family());
+    assert!(permit.is_mutex_permit_family());
+    assert!(lease.is_mutex_lease_family());
     assert!(thread.is_concurrency_bridge_family());
     assert!(mutex.is_concurrency_bridge_family());
     assert!(guard.is_concurrency_bridge_family());
     assert!(!thread.is_async_boundary_safe());
     assert!(!mutex.is_async_boundary_safe());
     assert!(!guard.is_async_boundary_safe());
+    assert!(!shared.is_async_boundary_safe());
+    assert!(permit.is_async_boundary_safe());
+    assert!(!lease.is_async_boundary_safe());
     thread.validate_container_contract().unwrap();
     mutex.validate_container_contract().unwrap();
     guard.validate_container_contract().unwrap();
+    shared.validate_container_contract().unwrap();
+    permit.validate_container_contract().unwrap();
+    lease.validate_container_contract().unwrap();
 }
 
 #[test]

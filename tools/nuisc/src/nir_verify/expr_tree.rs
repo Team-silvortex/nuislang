@@ -273,6 +273,7 @@ pub(super) fn verify_expr_tree(
         )?,
         NirExpr::CpuSpawn { args, .. }
         | NirExpr::CpuThreadSpawn { args, .. }
+        | NirExpr::CpuMutexCapability { args, .. }
         | NirExpr::CpuExternCall { args, .. }
         | NirExpr::CpuExternCallI32 { args, .. }
         | NirExpr::CpuExternCallOwnedBuffer { args, .. } => verify_expr_sequence(

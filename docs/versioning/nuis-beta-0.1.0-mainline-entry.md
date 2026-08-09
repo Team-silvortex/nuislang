@@ -101,7 +101,8 @@ share the same provider-neutral contract.
 1. keep the CFFI source and whitelist boundary strict while widening pointer,
    string, and object support only through registered contracts
 2. preserve the closed lifecycle-dispatch slices, then advance the
-   tensor-selected foundation coordinate, currently
+   tensor-selected foundation coordinate rather than hard-coding one subsystem;
+   the current concurrency tranche is tracked at
    `standard-library/std/concurrency-task-thread-lock`
 3. preserve GLM, clock, dependency, replay, and final-image evidence across
    heterogeneous provider graphs
@@ -178,6 +179,25 @@ Raw pointers, arbitrary `ref T`, retained borrows, and branch/task-carried host
 owners remain closed. With CFFI now above concurrency on the same `active`
 status rank, deterministic tensor ordering hands the next task back to
 `standard-library/std/concurrency-task-thread-lock` at `active/80`.
+
+The first shared-mutex authority tranche then advances concurrency to
+`active/85`. `mutex_share` consumes one ordinary `Mutex<i64>` into
+`SharedMutex<i64>`; lane `0` and lane `1` may each issue one non-cloneable,
+generation-bound `MutexPermit<i64>`. A freshly issued permit may cross one task
+boundary as an opaque scalar, but the worker can only consume it into a linear
+`MutexLease<i64>` and cannot observe the scheduler handle. Shared capability
+YIR carries strict scheduler, visibility, permit/lease, fixed-lane, one-shot,
+and payload-policy metadata through CPU validation and dedicated LLVM lowering.
+
+The checked-in native project emits one share, two permit issues, and two task
+invocations; both workers observe `17`, unlock exactly once, and the process
+exits `34`. GLM rejects permit replay and post-unlock lease reads, while the C
+runtime harness rejects duplicate lanes, out-of-range lanes, stale permits, and
+replay. This remains a cooperative `i64` lane with fixed cardinality: mutable
+lease updates, explicit close/revocation, generalized payloads, and OS-thread
+parallel safety are still open. The tensor now hands the next foundation task
+to `host-compatibility/cffi/registered-pointer-string-object-boundary` at
+`active/83`.
 
 ## Honesty Boundary
 

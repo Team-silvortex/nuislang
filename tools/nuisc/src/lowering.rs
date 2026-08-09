@@ -5,7 +5,7 @@ use std::{
 
 use nuis_semantics::model::{
     nir_expr_effect_class, NirBinaryOp, NirExpr, NirExprEffectClass, NirFunction, NirKernelMapOp,
-    NirModule, NirStmt, NirStructDef, NirTypeRef,
+    NirModule, NirMutexCapabilityOp, NirStmt, NirStructDef, NirTypeRef,
 };
 use yir_core::{
     Edge, EdgeKind, ModRegistry, Node, Operation, Resource, ResourceKind, SemanticOp,
@@ -288,6 +288,7 @@ fn lower_expr(
         | NirExpr::CpuMutexLock(_)
         | NirExpr::CpuMutexUnlock(_)
         | NirExpr::CpuMutexValue(_)
+        | NirExpr::CpuMutexCapability { .. }
         | NirExpr::CpuTimeout { .. }
         | NirExpr::CpuReadyAfter { .. }
         | NirExpr::CpuPresentFrame(_)

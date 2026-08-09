@@ -149,6 +149,7 @@ pub(crate) fn walk_child_exprs(expr: &NirExpr, f: &mut dyn FnMut(&NirExpr)) {
         | NirExpr::FieldAccess { base: input, .. } => f(input),
         NirExpr::CpuSpawn { args, .. }
         | NirExpr::CpuThreadSpawn { args, .. }
+        | NirExpr::CpuMutexCapability { args, .. }
         | NirExpr::CpuExternCall { args, .. }
         | NirExpr::Call { args, .. } => {
             for arg in args {

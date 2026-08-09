@@ -3,6 +3,7 @@ use yir_core::Node;
 use super::{
     facts::propagate_known_facts,
     fresh_reg,
+    mutex_capability_lowering::lower_cpu_mutex_capability_node,
     task_owned_payload::{
         emit_owned_struct_invoker_spawn, emit_owned_struct_spawn, emit_owned_struct_take,
     },
@@ -13,6 +14,9 @@ use super::{
 };
 
 pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
+    if lower_cpu_mutex_capability_node(node, state) {
+        return true;
+    }
     match node.op.instruction.as_str() {
         "async_call" => {
             if node.op.args[1..]

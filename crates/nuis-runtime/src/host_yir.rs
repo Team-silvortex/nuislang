@@ -133,6 +133,7 @@ fn value_kind(value: &Value) -> &'static str {
         Value::Thread(_) => "thread",
         Value::TaskResult(_) => "task-result",
         Value::Mutex(_) => "mutex",
+        Value::MutexPermit(_) => "mutex-permit",
         Value::MutexGuard(_) => "mutex-guard",
         Value::Unit => "unit",
     }

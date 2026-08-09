@@ -1,5 +1,14 @@
 use super::*;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NirMutexCapabilityOp {
+    Share,
+    Permit,
+    PermitLock,
+    LeaseValue,
+    LeaseUnlock,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NirExpr {
     Bool(bool),
@@ -137,6 +146,10 @@ pub enum NirExpr {
     CpuMutexLock(Box<NirExpr>),
     CpuMutexUnlock(Box<NirExpr>),
     CpuMutexValue(Box<NirExpr>),
+    CpuMutexCapability {
+        op: NirMutexCapabilityOp,
+        args: Vec<NirExpr>,
+    },
     CpuTimeout {
         task: Box<NirExpr>,
         limit: Box<NirExpr>,

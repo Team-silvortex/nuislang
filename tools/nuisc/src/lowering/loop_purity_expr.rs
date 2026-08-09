@@ -46,6 +46,13 @@ pub(in crate::lowering) fn is_terminal_branch_pure_expr(
         | NirExpr::CastF32ToI64(inner)
         | NirExpr::CastI64ToF64(inner)
         | NirExpr::CastF64ToI64(inner) => is_terminal_branch_pure_expr(inner, pure_helpers),
+        NirExpr::CpuMutexCapability {
+            op: NirMutexCapabilityOp::LeaseValue,
+            args,
+        } => args
+            .iter()
+            .all(|arg| is_terminal_branch_pure_expr(arg, pure_helpers)),
+        NirExpr::CpuMutexCapability { .. } => false,
         NirExpr::MethodCall { .. } => false,
         NirExpr::Await(_) | NirExpr::Instantiate { .. } => false,
         NirExpr::StructLiteral { fields, .. } => fields

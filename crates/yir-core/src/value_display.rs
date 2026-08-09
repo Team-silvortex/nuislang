@@ -70,6 +70,9 @@ impl fmt::Display for Value {
             Self::Thread(thread) => write!(f, "thread<{}:{}>", thread.label, thread.state),
             Self::TaskResult(result) => write!(f, "task_result<{}:{}>", result.label, result.state),
             Self::Mutex(mutex) => write!(f, "mutex<{}>", mutex.label),
+            Self::MutexPermit(permit) => {
+                write!(f, "mutex_permit<{}:{}>", permit.label, permit.lane)
+            }
             Self::MutexGuard(guard) => write!(f, "mutex_guard<{}>", guard.label),
             Self::Unit => write!(f, "()"),
         }

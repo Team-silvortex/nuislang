@@ -1,5 +1,5 @@
 use super::*;
-use yir_core::CPU_MUTEX_RUNTIME_METADATA;
+use yir_core::{CPU_MUTEX_RUNTIME_METADATA, CPU_SHARED_MUTEX_RUNTIME_METADATA};
 
 fn describe_mutex_effect(node: &Node, value_role: &str) -> Result<InstructionSemantics, String> {
     if node.op.args.len() == 1 {
@@ -24,6 +24,35 @@ fn describe_mutex_effect(node: &Node, value_role: &str) -> Result<InstructionSem
         }
     }
     Ok(InstructionSemantics::effect(vec![node.op.args[0].clone()]))
+}
+
+fn describe_shared_mutex_effect(
+    node: &Node,
+    dependency_count: usize,
+) -> Result<InstructionSemantics, String> {
+    let expected_len = dependency_count + CPU_SHARED_MUTEX_RUNTIME_METADATA.len();
+    if node.op.args.len() != expected_len {
+        return Err(format!(
+            "node `{}` expects {} dependency argument(s) followed by shared-mutex metadata [{}]",
+            node.name,
+            dependency_count,
+            CPU_SHARED_MUTEX_RUNTIME_METADATA.join(" ")
+        ));
+    }
+    for (actual, expected) in node.op.args[dependency_count..]
+        .iter()
+        .zip(CPU_SHARED_MUTEX_RUNTIME_METADATA)
+    {
+        if actual != expected {
+            return Err(format!(
+                "node `{}` has unsupported cpu.{} shared-mutex metadata `{actual}`; expected `{expected}`",
+                node.name, node.op.instruction
+            ));
+        }
+    }
+    Ok(InstructionSemantics::effect(
+        node.op.args[..dependency_count].to_vec(),
+    ))
 }
 
 pub(super) fn describe_cpu_async_node(node: &Node) -> Result<Option<InstructionSemantics>, String> {
@@ -60,6 +89,10 @@ pub(super) fn describe_cpu_async_node(node: &Node) -> Result<Option<InstructionS
         }
         "mutex_new" => describe_mutex_effect(node, "value"),
         "mutex_lock" | "mutex_unlock" | "mutex_value" => describe_mutex_effect(node, "input"),
+        "mutex_permit" => describe_shared_mutex_effect(node, 2),
+        "mutex_share" | "mutex_permit_lock" | "mutex_lease_value" | "mutex_lease_unlock" => {
+            describe_shared_mutex_effect(node, 1)
+        }
         "timeout" | "ready_after" => {
             if node.op.args.len() != 2 {
                 return Err(format!(
@@ -117,5 +150,49 @@ mod tests {
             .expect_err("visibility drift must fail closed");
         assert!(error.contains("unsupported cpu.mutex_lock mutex metadata"));
         assert!(error.contains("visibility=acquire-release-epoch-v1"));
+    }
+
+    #[test]
+    fn shared_mutex_permit_metadata_keeps_both_dependencies() {
+        let mut args = vec!["shared".to_owned(), "lane".to_owned()];
+        args.extend(
+            CPU_SHARED_MUTEX_RUNTIME_METADATA
+                .iter()
+                .map(|value| (*value).to_owned()),
+        );
+        let node = Node {
+            name: "permit".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation {
+                module: "cpu".to_owned(),
+                instruction: "mutex_permit".to_owned(),
+                args,
+            },
+        };
+        let semantics = describe_cpu_async_node(&node)
+            .expect("shared mutex metadata")
+            .expect("shared mutex semantics");
+        assert_eq!(semantics.dependencies, vec!["shared", "lane"]);
+    }
+
+    #[test]
+    fn rejects_shared_mutex_metadata_drift() {
+        let mut metadata = CPU_SHARED_MUTEX_RUNTIME_METADATA;
+        metadata[3] = "permit_scope=unbounded";
+        let mut args = vec!["shared".to_owned(), "lane".to_owned()];
+        args.extend(metadata.iter().map(|value| (*value).to_owned()));
+        let node = Node {
+            name: "permit".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation {
+                module: "cpu".to_owned(),
+                instruction: "mutex_permit".to_owned(),
+                args,
+            },
+        };
+        let error = describe_cpu_async_node(&node)
+            .expect_err("shared permit metadata drift must fail closed");
+        assert!(error.contains("unsupported cpu.mutex_permit shared-mutex metadata"));
+        assert!(error.contains("permit_scope=fixed-two-lane-v1"));
     }
 }

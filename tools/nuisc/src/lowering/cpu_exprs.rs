@@ -38,6 +38,9 @@ pub(super) fn lower_cpu_expr(
         NirExpr::CpuMutexLock(mutex) => Some(lower_cpu_mutex_lock(mutex, state, bindings)),
         NirExpr::CpuMutexUnlock(guard) => Some(lower_cpu_mutex_unlock(guard, state, bindings)),
         NirExpr::CpuMutexValue(guard) => Some(lower_cpu_mutex_value(guard, state, bindings)),
+        NirExpr::CpuMutexCapability { op, args } => {
+            Some(lower_cpu_mutex_capability(*op, args, state, bindings))
+        }
         NirExpr::CpuTaskCompleted(result) => Some(lower_task_result_observer_node(
             state,
             bindings,
@@ -383,6 +386,56 @@ fn lower_cpu_mutex_value(
         "mutex_value",
         &yir_core::CPU_MUTEX_RUNTIME_METADATA,
     )
+}
+
+fn lower_cpu_mutex_capability(
+    op: NirMutexCapabilityOp,
+    args: &[NirExpr],
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    let (prefix, instruction, arity) = match op {
+        NirMutexCapabilityOp::Share => ("cpu_mutex_share", "mutex_share", 1),
+        NirMutexCapabilityOp::Permit => ("cpu_mutex_permit", "mutex_permit", 2),
+        NirMutexCapabilityOp::PermitLock => ("cpu_mutex_permit_lock", "mutex_permit_lock", 1),
+        NirMutexCapabilityOp::LeaseValue => ("cpu_mutex_lease_value", "mutex_lease_value", 1),
+        NirMutexCapabilityOp::LeaseUnlock => ("cpu_mutex_lease_unlock", "mutex_lease_unlock", 1),
+    };
+    if args.len() != arity {
+        return Err(format!(
+            "{instruction}(...) lowering expects {arity} argument(s), found {}",
+            args.len()
+        ));
+    }
+    let lowered = args
+        .iter()
+        .map(|arg| lower_expr(arg, state, bindings))
+        .collect::<Result<Vec<_>, _>>()?;
+    let name = next_name(state, prefix);
+    let mut op_args = lowered.clone();
+    op_args.extend(
+        yir_core::CPU_SHARED_MUTEX_RUNTIME_METADATA
+            .iter()
+            .map(|value| (*value).to_owned()),
+    );
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: instruction.to_owned(),
+            args: op_args,
+        },
+    });
+    for input in lowered {
+        push_dep_edges(state, &input, &name);
+        state.yir.edges.push(Edge {
+            kind: EdgeKind::Effect,
+            from: input,
+            to: name.clone(),
+        });
+    }
+    Ok(name)
 }
 
 fn lower_cpu_timeout(

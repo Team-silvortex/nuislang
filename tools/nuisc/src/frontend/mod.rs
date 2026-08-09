@@ -132,8 +132,9 @@ use self::annotations::{
     validate_host_symbol_bridge_annotations, validate_struct_annotations,
 };
 use self::call_helpers::{
-    ensure_mutex_guard_like, ensure_mutex_like, ensure_ref_like, ensure_spawn_input_safe,
-    ensure_task_like, ensure_thread_like, lower_result_observer_call_with_consts,
+    ensure_mutex_guard_like, ensure_mutex_lease_like, ensure_mutex_like, ensure_mutex_permit_like,
+    ensure_ref_like, ensure_shared_mutex_like, ensure_spawn_input_safe, ensure_task_like,
+    ensure_thread_like, lower_result_observer_call_with_consts,
     lower_result_wrapper_call_with_consts, ResultObserverCallInput, ResultWrapperCallInput,
 };
 use self::call_lowering::{lower_call_expr_with_async, CallLoweringInput};

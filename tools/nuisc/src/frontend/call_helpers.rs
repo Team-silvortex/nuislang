@@ -122,6 +122,63 @@ pub(super) fn ensure_mutex_guard_like(
     }
 }
 
+pub(super) fn ensure_shared_mutex_like(
+    name: &str,
+    expr: &NirExpr,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<(), String> {
+    match infer_nir_expr_type(expr, bindings, signatures, struct_table) {
+        Some(ty) if ty.is_shared_mutex_family() => Ok(()),
+        Some(ty) => Err(format!(
+            "{name}(...) expects `SharedMutex<...>`, found `{}`",
+            render_type_name(&ty)
+        )),
+        None => Err(format!(
+            "{name}(...) requires a typed shared mutex in the current frontend"
+        )),
+    }
+}
+
+pub(super) fn ensure_mutex_permit_like(
+    name: &str,
+    expr: &NirExpr,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<(), String> {
+    match infer_nir_expr_type(expr, bindings, signatures, struct_table) {
+        Some(ty) if ty.is_mutex_permit_family() => Ok(()),
+        Some(ty) => Err(format!(
+            "{name}(...) expects `MutexPermit<...>`, found `{}`",
+            render_type_name(&ty)
+        )),
+        None => Err(format!(
+            "{name}(...) requires a typed mutex permit in the current frontend"
+        )),
+    }
+}
+
+pub(super) fn ensure_mutex_lease_like(
+    name: &str,
+    expr: &NirExpr,
+    bindings: &BTreeMap<String, NirTypeRef>,
+    signatures: &BTreeMap<String, FunctionSignature>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<(), String> {
+    match infer_nir_expr_type(expr, bindings, signatures, struct_table) {
+        Some(ty) if ty.is_mutex_lease_family() => Ok(()),
+        Some(ty) => Err(format!(
+            "{name}(...) expects `MutexLease<...>`, found `{}`",
+            render_type_name(&ty)
+        )),
+        None => Err(format!(
+            "{name}(...) requires a typed mutex lease in the current frontend"
+        )),
+    }
+}
+
 pub(super) struct CallArgParamCheck<'a> {
     pub(super) callee: &'a str,
     pub(super) arg_index: usize,

@@ -68,6 +68,7 @@ pub(in crate::lowering) fn expr_references_names(expr: &NirExpr, names: &BTreeSe
         NirExpr::Call { args, .. }
         | NirExpr::CpuSpawn { args, .. }
         | NirExpr::CpuThreadSpawn { args, .. }
+        | NirExpr::CpuMutexCapability { args, .. }
         | NirExpr::CpuExternCall { args, .. }
         | NirExpr::CpuExternCallI32 { args, .. }
         | NirExpr::CpuExternCallOwnedBuffer { args, .. } => {

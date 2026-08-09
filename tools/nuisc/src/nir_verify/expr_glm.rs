@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use nuis_semantics::model::{nir_glm_profile, NirExpr, NirGlmUseMode};
+use nuis_semantics::model::{nir_glm_profile, NirExpr, NirGlmUseMode, NirMutexCapabilityOp};
 
 use super::super::owned_address_error;
 use super::super::task_result_facts::{expr_is_borrowed_pointer, BorrowBindings};
@@ -48,6 +48,23 @@ pub(super) fn verify_glm_expr_access(
                 }
                 NirExpr::CpuTimeout { task, .. } | NirExpr::CpuReadyAfter { task, .. } => {
                     if let Some(source) = expr_resource_key(task) {
+                        if borrows.get(&source).copied().unwrap_or(0) > 0 {
+                            return Err(format!(
+                                "nir verify: cannot consume `{}` while borrow(s) are active",
+                                source
+                            ));
+                        }
+                    }
+                }
+                NirExpr::CpuMutexCapability { op, args }
+                    if matches!(
+                        op,
+                        NirMutexCapabilityOp::Share
+                            | NirMutexCapabilityOp::PermitLock
+                            | NirMutexCapabilityOp::LeaseUnlock
+                    ) =>
+                {
+                    if let Some(source) = args.first().and_then(expr_resource_key) {
                         if borrows.get(&source).copied().unwrap_or(0) > 0 {
                             return Err(format!(
                                 "nir verify: cannot consume `{}` while borrow(s) are active",

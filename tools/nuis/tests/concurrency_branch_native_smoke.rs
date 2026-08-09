@@ -111,3 +111,69 @@ fn branch_selected_cancel_and_unlock_reach_native_binary_once_per_chain() {
         .expect("run right native branch");
     assert_eq!(right.status.code(), Some(89));
 }
+
+#[test]
+fn shared_mutex_permits_cross_two_native_task_boundaries_without_handle_copies() {
+    let output_dir = temp_dir("shared_mutex_permits");
+    let build = Command::new(env!("CARGO_BIN_EXE_nuis"))
+        .args([
+            "build",
+            "../../examples/projects/task/task_shared_mutex_permit_demo",
+            output_dir.to_str().expect("UTF-8 output path"),
+        ])
+        .output()
+        .expect("run nuis build for shared mutex permit demo");
+    assert_success(&build, "nuis build shared mutex permit demo");
+
+    let yir = read(&output_dir.join("task_shared_mutex_permit_demo.yir"));
+    assert_eq!(yir.matches("cpu.mutex_share").count(), 1);
+    assert_eq!(yir.matches("cpu.mutex_permit ").count(), 2);
+    assert_eq!(yir.matches("cpu.mutex_permit_lock").count(), 1);
+    assert_eq!(yir.matches("cpu.mutex_lease_value").count(), 1);
+    assert_eq!(yir.matches("cpu.mutex_lease_unlock").count(), 1);
+    assert_eq!(yir.matches("cpu.spawn_task").count(), 2);
+    for metadata in [
+        "authority=linear-permit-lease-v1",
+        "permit_scope=fixed-two-lane-v1",
+        "permit_policy=one-shot-generation-bound-v1",
+    ] {
+        assert_eq!(
+            yir.matches(metadata).count(),
+            6,
+            "every shared mutex YIR node must carry `{metadata}`"
+        );
+    }
+
+    let llvm = read(&output_dir.join("task_shared_mutex_permit_demo.ll"));
+    assert_eq!(
+        llvm.matches("call i64 @nuis_scheduler_mutex_share_i64_v1")
+            .count(),
+        1
+    );
+    assert_eq!(
+        llvm.matches("call i64 @nuis_scheduler_mutex_permit_i64_v1")
+            .count(),
+        2
+    );
+    assert_eq!(
+        llvm.matches("call i64 @nuis_scheduler_mutex_permit_lock_i64_v1")
+            .count(),
+        1
+    );
+    assert_eq!(
+        llvm.matches("call i64 @nuis_scheduler_mutex_lease_unlock_i64_v1")
+            .count(),
+        1
+    );
+    assert_eq!(
+        llvm.matches("call i64 @nuis_scheduler_task_spawn_invoker_i64_v1")
+            .count(),
+        2
+    );
+    assert!(!llvm.contains("deferred lowering for cpu.mutex"));
+
+    let run = Command::new(output_dir.join("task_shared_mutex_permit_demo"))
+        .output()
+        .expect("run shared mutex permit native binary");
+    assert_eq!(run.status.code(), Some(34));
+}

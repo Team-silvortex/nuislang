@@ -1,7 +1,7 @@
 # CPU Thread/Lock Boundary
 
 This file records the practical boundary for staged `Thread<T>`, `Mutex<T>`,
-and `MutexGuard<T>` work that entered the mainline before `alpha-0.0.1`.
+`MutexGuard<T>`, `SharedMutex<T>`, `MutexPermit<T>`, and `MutexLease<T>` work.
 
 For hardening-baseline routing from the `alpha-0.4.*` line, read this as a
 still-relevant contract note under the current system inventory, not as the
@@ -24,8 +24,11 @@ Read the current line this way:
 * they already have compile-closure anchors and `GLM` ownership rules
 * `Mutex<i64>` now reaches a cooperative scheduler handle/guard runtime with
   explicit acquire/release epoch evidence
-* that foothold still does **not** imply source-level shared-lock authority, a
-  parallel executor, or a finalized cross-thread visibility contract
+* `SharedMutex<i64>` can authorize exactly two task lanes through distinct,
+  non-cloneable `MutexPermit<i64>` values; each worker consumes its permit into
+  one `MutexLease<i64>` without receiving the raw scheduler handle
+* this foothold still does **not** imply a parallel executor, mutable lease
+  payloads, dynamic permit cardinality, or a finalized visibility contract
 
 ## What Is Real Today
 
@@ -58,11 +61,14 @@ Short rule:
 Current project anchor:
 
 * [task_thread_mutex_demo](../../examples/projects/task/task_thread_mutex_demo)
+* [task_shared_mutex_permit_demo](../../examples/projects/task/task_shared_mutex_permit_demo)
 * [task_branch_cancel_unlock_demo](../../examples/projects/task/task_branch_cancel_unlock_demo)
 
 Short rule:
 
 * use the project demo when you want generic helper/facade shape
+* use the shared permit demo when you want the shortest native two-task
+  authorization path without copied mutex handles
 * use the branch demo when you want native dynamic cancel/unlock closure with
   both source branches executed
 * use the single-file `.ns` anchors when you want the shortest boundary
@@ -98,6 +104,11 @@ Current `GLM`/verifier truth already includes:
 * `mutex_lock(...)` consumes the mutex handle and produces guard authority
 * `mutex_unlock(...)` consumes the guard
 * `mutex_value(...)` is a read, not a consume
+* `mutex_share(...)` consumes the original mutex and produces shared authority
+* `mutex_permit(...)` reads shared authority and issues one lane-bound permit
+* `mutex_permit_lock(...)` consumes a permit and produces lease authority
+* `mutex_lease_value(...)` reads a live lease
+* `mutex_lease_unlock(...)` consumes the lease without returning a raw handle
 * `task_value(...)` on thread-produced `TaskResult<T>` still requires a
   completed path, just like ordinary task results
 
@@ -159,6 +170,48 @@ Honesty boundary:
   workers
 * this runtime is cooperative and does not yet claim OS-thread parallel safety
 
+### 6. Shared permit/lease authority reaches native tasks
+
+The first source-level shared-mutex path is now closed for two statically
+authorized task lanes:
+
+```text
+Mutex<i64>
+  -> SharedMutex<i64>
+  -> MutexPermit<i64> for lane 0 or lane 1
+  -> task boundary as an opaque scheduler scalar
+  -> MutexLease<i64>
+  -> value read
+  -> lease unlock
+```
+
+The runtime keeps the mutex handle inside its permit table. A permit carries
+only an unforgeable token, is bound to the mutex generation and one fixed lane,
+and is consumed before locking. Duplicate lanes, lanes outside `0..2`, stale
+generations, and token replay fail closed. Nuis only accepts a freshly issued
+inline permit at `spawn`/`thread_spawn`; a stored permit variable cannot escape
+across that boundary.
+
+Every shared capability YIR node carries:
+
+```text
+mutex_contract=scheduler-handle-v1
+visibility=acquire-release-epoch-v1
+authority=linear-permit-lease-v1
+permit_scope=fixed-two-lane-v1
+permit_policy=one-shot-generation-bound-v1
+payload_policy=i64-native-staged-fallback
+```
+
+The native project smoke emits one share, two permit issues, two scheduler task
+invocations, and one reusable worker body. Both workers observe `17`, release
+their leases, and the final binary exits `34`. The runtime harness separately
+proves duplicate-lane rejection, one-shot consumption, two release epochs, and
+lifecycle cleanup.
+
+This is shared authorization, not copied ownership: ordinary `Mutex<T>` and
+`MutexGuard<T>` retain their existing linear behavior.
+
 ## What Is Still Intentionally Blocked
 
 ### Arbitrary branch-local runtime mini-programs
@@ -185,8 +238,9 @@ Short rule:
 Still not promised today:
 
 * a mature worker runtime
-* source-level shared mutex authorization across task/thread boundaries
 * an OS-thread-parallel mutex implementation
+* more than two statically authorized permit lanes
+* mutable lease payload replacement or explicit shared-mutex close/revocation
 * a final memory visibility model beyond the current acquire/release epoch
   protocol
 * a finished synchronization contract
@@ -202,8 +256,9 @@ Read the thread/lock line in this order:
 
 1. source anchors in [examples/ns/memory/README.md](../../examples/ns/memory/README.md)
 2. lowering regressions in [thread_mutex_branch_compile.rs](../../tools/nuisc/tests/thread_mutex_branch_compile.rs)
-3. ownership/lifecycle truth in [glm_verify.rs](../../tools/nuisc/tests/glm_verify.rs)
-4. larger staging intent in [cpu-thread-lock-staging-sketch.md](cpu-thread-lock-staging-sketch.md)
+3. shared authority closure in [concurrency_branch_native_smoke.rs](../../tools/nuis/tests/concurrency_branch_native_smoke.rs)
+4. ownership/lifecycle truth in [glm_verify.rs](../../tools/nuisc/tests/glm_verify.rs)
+5. larger staging intent in [cpu-thread-lock-staging-sketch.md](cpu-thread-lock-staging-sketch.md)
 
 That keeps the line honest:
 
@@ -221,11 +276,13 @@ For the current beta foundation line, this lane is now strong enough to say:
 * `GLM` ownership truth exists
 * `Mutex<i64>` reaches a scheduler-backed native runtime with auditable
   visibility metadata
+* fixed two-lane shared permits cross native Nuis task boundaries without raw
+  handle copies
 
 But it is **not** yet strong enough to say:
 
 * the concurrent runtime model is final
-* a mutex may already be shared across Nuis workers
+* shared mutex authority is dynamically sized or OS-thread parallel
 * the visibility/synchronization story is complete
 
 That is the right beta-hardening posture:

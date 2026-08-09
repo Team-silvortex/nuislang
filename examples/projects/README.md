@@ -122,6 +122,7 @@ reading an entire subtree.
   Start with:
   [task_runtime_demo](task/task_runtime_demo),
   [task_thread_mutex_demo](task/task_thread_mutex_demo),
+  [task_shared_mutex_permit_demo](task/task_shared_mutex_permit_demo),
   [task_branch_cancel_unlock_demo](task/task_branch_cancel_unlock_demo),
   [task_recursive_async_demo](task/task_recursive_async_demo),
   [task_result_policy_branch_demo](task/task_result_policy_branch_demo),

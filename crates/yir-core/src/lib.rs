@@ -261,6 +261,7 @@ impl ExecutionState {
             Some(Value::Thread(_)) => Err(format!("`{name}` is thread, expected int")),
             Some(Value::TaskResult(_)) => Err(format!("`{name}` is task-result, expected int")),
             Some(Value::Mutex(_)) => Err(format!("`{name}` is mutex, expected int")),
+            Some(Value::MutexPermit(_)) => Err(format!("`{name}` is mutex-permit, expected int")),
             Some(Value::MutexGuard(_)) => Err(format!("`{name}` is mutex-guard, expected int")),
             Some(Value::Unit) => Err(format!("`{name}` is unit, expected int")),
             None => Err(format!("missing value for `{name}`")),
@@ -361,6 +362,14 @@ impl ExecutionState {
         match self.values.get(name) {
             Some(Value::Mutex(mutex)) => Ok(mutex),
             Some(other) => Err(format!("`{name}` is {other}, expected mutex")),
+            None => Err(format!("missing value for `{name}`")),
+        }
+    }
+
+    pub fn expect_mutex_permit(&self, name: &str) -> Result<&MutexPermitHandle, String> {
+        match self.values.get(name) {
+            Some(Value::MutexPermit(permit)) => Ok(permit),
+            Some(other) => Err(format!("`{name}` is {other}, expected mutex-permit")),
             None => Err(format!("missing value for `{name}`")),
         }
     }

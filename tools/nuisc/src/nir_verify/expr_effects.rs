@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use nuis_semantics::model::NirExpr;
+use nuis_semantics::model::{NirExpr, NirMutexCapabilityOp};
 
 use super::super::effects::note_binding_effects;
 use super::super::task_result_facts::BorrowBindings;
@@ -213,6 +213,17 @@ pub(in crate::nir_verify) fn apply_guaranteed_expr_effects(
                 );
             }
         }
+        NirExpr::CpuMutexCapability { args, .. } => {
+            for arg in args {
+                apply_guaranteed_expr_effects(
+                    arg,
+                    moved,
+                    borrows,
+                    borrow_bindings,
+                    include_temporary_borrows,
+                );
+            }
+        }
         NirExpr::StructLiteral { fields, .. } => {
             for (_, value) in fields {
                 apply_guaranteed_expr_effects(
@@ -251,6 +262,16 @@ pub(in crate::nir_verify) fn apply_guaranteed_expr_effects(
         | NirExpr::CpuMutexLock(_)
         | NirExpr::CpuMutexUnlock(_)
         | NirExpr::BorrowEnd(_) => note_binding_effects(expr, "_", moved, borrows, borrow_bindings),
+        NirExpr::CpuMutexCapability { op, .. }
+            if matches!(
+                op,
+                NirMutexCapabilityOp::Share
+                    | NirMutexCapabilityOp::PermitLock
+                    | NirMutexCapabilityOp::LeaseUnlock
+            ) =>
+        {
+            note_binding_effects(expr, "_", moved, borrows, borrow_bindings)
+        }
         NirExpr::Borrow(_) | NirExpr::LoadNext(_) if include_temporary_borrows => {
             note_binding_effects(expr, "_", moved, borrows, borrow_bindings)
         }

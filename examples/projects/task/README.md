@@ -22,6 +22,8 @@ If you only want the current task mainline, start with:
   smallest task/runtime anchor
 * [task_thread_mutex_demo](task_thread_mutex_demo)
   current staged `Thread<T>` / `Mutex<T>` helper/facade project anchor
+* [task_shared_mutex_permit_demo](task_shared_mutex_permit_demo)
+  native two-task shared-mutex permit/lease authority anchor
 * [task_branch_cancel_unlock_demo](task_branch_cancel_unlock_demo)
   dynamic native cancel/unlock selected-prefix closure anchor
 * [task_recursive_async_demo](task_recursive_async_demo)
@@ -96,12 +98,15 @@ If you only want the current task mainline, start with:
   `StdLanguageOps.build_report` into `StdTaskContracts` and a real stdout path
 * staged thread/lock route:
   [task_thread_mutex_demo](task_thread_mutex_demo),
+  [task_shared_mutex_permit_demo](task_shared_mutex_permit_demo),
   [task_branch_cancel_unlock_demo](task_branch_cancel_unlock_demo)
   current note:
   explicit project smoke test is checked in and now runs through the staged
   AOT thread/lock lowering path, including generic helper-style
-  `mutex_snapshot<T>` / `join_thread_*<T>` wrappers; the branch companion adds
-  dynamic select-before-consume cancellation and unlock execution
+  `mutex_snapshot<T>` / `join_thread_*<T>` wrappers; the shared companion
+  issues two non-cloneable lane permits without exposing the scheduler mutex
+  handle, and the branch companion adds dynamic select-before-consume
+  cancellation and unlock execution
 * probe-only route:
   [task_join_nonconsuming_probe_demo](task_join_nonconsuming_probe_demo)
 

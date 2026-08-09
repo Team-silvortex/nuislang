@@ -233,16 +233,17 @@ historical closures.
 
 The `beta-0.1` calibration baseline is:
 
-* `standard-library/std/concurrency-task-thread-lock`: `active/80`, required
-  and now the current weakest task;
+* `standard-library/std/concurrency-task-thread-lock`: `active/85`, required;
   recursive selected-prefix lowering and the native cancel/unlock project close
   both dynamic branches; `Mutex<i64>` now has opaque scheduler handles,
   generation-bound guards, worker ownership, acquire/release epochs, strict YIR
   metadata, deterministic contention, replay rejection, and native LLVM ABI
-  evidence; source-level shared-worker authority and non-`i64` payloads remain
-  open
+  evidence; fixed two-lane `SharedMutex<i64>` permits now cross two native task
+  invocations as one-shot generation-bound tokens and become linear leases
+  without exposing the handle; mutable lease updates, explicit close/revocation,
+  dynamic permit counts, non-`i64` payloads, and OS-thread parallelism remain open
 * `host-compatibility/cffi/registered-pointer-string-object-boundary`:
-  `active/83`, required; five real borrowed UTF-8 calls and one owned
+  `active/83`, required and now the current weakest task; five real borrowed UTF-8 calls and one owned
   `ref Buffer` return carry exact signature plus memory-capability hashes
   through compile, project metadata, and Nsld validation; the owned path now
   has self-verifying YIR metadata, runtime-header length recovery, exact

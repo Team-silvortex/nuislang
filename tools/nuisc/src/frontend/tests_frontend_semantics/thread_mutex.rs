@@ -1,4 +1,5 @@
 use super::*;
+use nuis_semantics::model::NirMutexCapabilityOp;
 
 #[test]
 fn lowers_explicit_timeout_on_task_handle() {
@@ -170,6 +171,128 @@ fn lowers_thread_and_mutex_builtins_with_expected_surface_types() {
             ..
         }) if ty.render() == "i64"
     ));
+}
+
+#[test]
+fn lowers_shared_mutex_permits_into_two_async_workers() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn observe(permit: MutexPermit<i64>) -> i64 {
+            let lease: MutexLease<i64> = mutex_permit_lock(permit);
+            let value: i64 = mutex_lease_value(lease);
+            let released: i64 = mutex_lease_unlock(lease);
+            return value + released - 1;
+          }
+
+          fn main() -> i64 {
+            let lock: Mutex<i64> = mutex_new(17);
+            let shared: SharedMutex<i64> = mutex_share(lock);
+            let left: Task<i64> = spawn(observe(mutex_permit(shared, 0)));
+            let right: Task<i64> = spawn(observe(mutex_permit(shared, 1)));
+            return join(left) + join(right);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let observe = module
+        .functions
+        .iter()
+        .find(|function| function.name == "observe")
+        .unwrap();
+    assert_eq!(observe.params[0].ty.render(), "MutexPermit<i64>");
+    assert!(matches!(
+        observe.body.first(),
+        Some(NirStmt::Let {
+            ty: Some(ty),
+            value: NirExpr::CpuMutexCapability {
+                op: NirMutexCapabilityOp::PermitLock,
+                ..
+            },
+            ..
+        }) if ty.render() == "MutexLease<i64>"
+    ));
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            ty: Some(ty),
+            value: NirExpr::CpuMutexCapability {
+                op: NirMutexCapabilityOp::Share,
+                ..
+            },
+            ..
+        }) if ty.render() == "SharedMutex<i64>"
+    ));
+    assert!(matches!(
+        main.body.get(2),
+        Some(NirStmt::Let {
+            value: NirExpr::CpuSpawn { args, .. },
+            ..
+        }) if matches!(
+            args.as_slice(),
+            [NirExpr::CpuMutexCapability {
+                op: NirMutexCapabilityOp::Permit,
+                ..
+            }]
+        )
+    ));
+}
+
+#[test]
+fn rejects_dynamic_or_out_of_range_mutex_permit_lanes() {
+    for lane in ["lane", "2"] {
+        let source = format!(
+            r#"
+            mod cpu Main {{
+              fn main() -> i64 {{
+                let lane: i64 = 0;
+                let lock: Mutex<i64> = mutex_new(17);
+                let shared: SharedMutex<i64> = mutex_share(lock);
+                let permit: MutexPermit<i64> = mutex_permit(shared, {lane});
+                return 0;
+              }}
+            }}
+            "#
+        );
+        let error = parse_nuis_module(&source).unwrap_err();
+        assert!(error.contains("requires a unique literal lane `0` or `1`"));
+    }
+}
+
+#[test]
+fn rejects_copying_a_stored_mutex_permit_into_spawn() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn observe(permit: MutexPermit<i64>) -> i64 {
+            let lease: MutexLease<i64> = mutex_permit_lock(permit);
+            let value: i64 = mutex_lease_value(lease);
+            mutex_lease_unlock(lease);
+            return value;
+          }
+
+          fn main() -> i64 {
+            let lock: Mutex<i64> = mutex_new(17);
+            let shared: SharedMutex<i64> = mutex_share(lock);
+            let permit: MutexPermit<i64> = mutex_permit(shared, 0);
+            let task: Task<i64> = spawn(observe(permit));
+            return join(task);
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("requires a freshly issued inline MutexPermit"));
+    assert!(error.contains("cannot be copied across task boundaries"));
 }
 
 #[test]

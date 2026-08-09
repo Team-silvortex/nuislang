@@ -447,6 +447,16 @@ fn infer_network_param_requirements_in_expr(
                 )?;
             }
         }
+        NirExpr::CpuMutexCapability { args, .. } => {
+            for arg in args {
+                infer_network_param_requirements_in_expr(
+                    arg,
+                    requirements,
+                    function_requirements,
+                    bindings,
+                )?;
+            }
+        }
         NirExpr::StructLiteral { fields, .. } => {
             for (_, value) in fields {
                 infer_network_param_requirements_in_expr(

@@ -378,7 +378,9 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
             collect_instantiated_units_expr(input, units);
             collect_instantiated_units_expr(bias, units);
         }
-        NirExpr::CpuSpawn { args, .. } | NirExpr::CpuThreadSpawn { args, .. } => {
+        NirExpr::CpuSpawn { args, .. }
+        | NirExpr::CpuThreadSpawn { args, .. }
+        | NirExpr::CpuMutexCapability { args, .. } => {
             for arg in args {
                 collect_instantiated_units_expr(arg, units);
             }

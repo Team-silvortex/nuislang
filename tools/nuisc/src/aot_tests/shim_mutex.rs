@@ -100,3 +100,74 @@ int64_t nuis_yir_entry(void) {
         String::from_utf8_lossy(&run.stderr)
     );
 }
+
+#[test]
+fn scheduler_shared_mutex_permits_are_lane_bound_and_one_shot() {
+    let dir = temp_dir("scheduler_shared_mutex_permit");
+    let source_path = dir.join("scheduler_shared_mutex_permit.c");
+    let binary_path = dir.join("scheduler_shared_mutex_permit");
+    let mut source = String::new();
+    crate::aot_c_shim_runtime::append_c_shim_prelude(&mut source, "0", "0", 0);
+    crate::aot_c_shim_runtime::append_c_shim_lifecycle_runtime(&mut source);
+    crate::aot_c_shim_text_runtime::append_c_shim_text_runtime(&mut source);
+    source.push_str(
+        r#"
+int64_t nuis_yir_entry(void) {
+    int64_t shared = nuis_scheduler_mutex_share_i64_v1(
+        nuis_scheduler_mutex_new_i64_v1(23)
+    );
+    int64_t left = nuis_scheduler_mutex_permit_i64_v1(shared, 0);
+    int64_t right = nuis_scheduler_mutex_permit_i64_v1(shared, 1);
+    if (left == 0 || right == 0) return 10;
+    if (left == right) return 11;
+    if (nuis_scheduler_mutex_active_permit_count_get_v1(shared) != 2) return 12;
+
+    if (nuis_scheduler_mutex_try_permit_i64_v1(shared, 0) != 0) return 13;
+    if (nuis_scheduler_mutex_try_permit_i64_v1(shared, 2) != 0) return 14;
+    if (nuis_scheduler_mutex_rejected_permit_count_get_v1() != 2) return 15;
+
+    int64_t left_lease = nuis_scheduler_mutex_permit_lock_i64_v1(left);
+    if (nuis_scheduler_mutex_value_i64_v1(left_lease) != 23) return 16;
+    if (nuis_scheduler_mutex_active_permit_count_get_v1(shared) != 1) return 17;
+    if (nuis_scheduler_mutex_lease_unlock_i64_v1(left_lease) != 1) return 18;
+    if (nuis_scheduler_mutex_release_epoch_v1(shared) != 1) return 19;
+    if (nuis_scheduler_mutex_try_permit_lock_i64_v1(left) != 0) return 20;
+    if (nuis_scheduler_mutex_rejected_permit_count_get_v1() != 3) return 21;
+
+    int64_t right_lease = nuis_scheduler_mutex_permit_lock_i64_v1(right);
+    if (nuis_scheduler_mutex_value_i64_v1(right_lease) != 23) return 22;
+    if (nuis_scheduler_mutex_active_permit_count_get_v1(shared) != 0) return 23;
+    if (nuis_scheduler_mutex_lease_unlock_i64_v1(right_lease) != 1) return 24;
+    if (nuis_scheduler_mutex_release_epoch_v1(shared) != 2) return 25;
+    if (nuis_scheduler_mutex_successful_unlock_count_get_v1() != 2) return 26;
+    if (nuis_lifecycle_shutdown_v1(0) != 0) return 27;
+    return nuis_scheduler_mutex_live_count_get_v1() == 0 ? 0 : 28;
+}
+"#,
+    );
+    crate::aot_c_shim_runtime::append_c_shim_main(&mut source);
+    fs::write(&source_path, source).expect("write shared mutex permit harness");
+
+    let compile = Command::new("clang")
+        .arg("-std=c11")
+        .arg(&source_path)
+        .arg("-o")
+        .arg(&binary_path)
+        .output()
+        .expect("compile shared mutex permit harness");
+    assert!(
+        compile.status.success(),
+        "clang failed: {}",
+        String::from_utf8_lossy(&compile.stderr)
+    );
+    let run = Command::new(&binary_path)
+        .output()
+        .expect("run shared mutex permit harness");
+    assert_eq!(
+        run.status.code(),
+        Some(0),
+        "shared mutex permit harness failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&run.stdout),
+        String::from_utf8_lossy(&run.stderr)
+    );
+}

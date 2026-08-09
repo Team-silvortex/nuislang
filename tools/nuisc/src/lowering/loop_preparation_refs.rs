@@ -92,7 +92,8 @@ fn expr_references_any_name(expr: &NirExpr, names: &BTreeSet<String>) -> bool {
         NirExpr::Call { args, .. }
         | NirExpr::CpuExternCall { args, .. }
         | NirExpr::CpuSpawn { args, .. }
-        | NirExpr::CpuThreadSpawn { args, .. } => {
+        | NirExpr::CpuThreadSpawn { args, .. }
+        | NirExpr::CpuMutexCapability { args, .. } => {
             args.iter().any(|arg| expr_references_any_name(arg, names))
         }
         NirExpr::MethodCall { receiver, args, .. } => {

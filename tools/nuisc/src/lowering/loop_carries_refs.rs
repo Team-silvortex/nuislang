@@ -276,7 +276,8 @@ pub(in crate::lowering) fn expr_contains_loop_variant_name(
         NirExpr::Call { args, .. }
         | NirExpr::CpuExternCall { args, .. }
         | NirExpr::CpuSpawn { args, .. }
-        | NirExpr::CpuThreadSpawn { args, .. } => args
+        | NirExpr::CpuThreadSpawn { args, .. }
+        | NirExpr::CpuMutexCapability { args, .. } => args
             .iter()
             .any(|arg| expr_contains_loop_variant_name(arg, binding_name, carries)),
         NirExpr::MethodCall { receiver, args, .. } => {

@@ -28,8 +28,8 @@ use nuis_semantics::model::{
     AstFunction, AstGenericParam, AstImplDef, AstImplMethod, AstMatchPattern, AstModule, AstStmt,
     AstTraitDef, AstTraitMethodSig, AstTypeRef, AstUnaryOp, AstVisibility, AstWherePredicate,
     NirAnnotation, NirAttributeArg, NirAttributeValue, NirBinaryOp, NirExpr, NirExternInterface,
-    NirFunction, NirGenericParam, NirImplDef, NirImplMethod, NirModule, NirStmt, NirTraitDef,
-    NirTraitMethodSig, NirVisibility, NirWherePredicate,
+    NirFunction, NirGenericParam, NirImplDef, NirImplMethod, NirModule, NirMutexCapabilityOp,
+    NirStmt, NirTraitDef, NirTraitMethodSig, NirVisibility, NirWherePredicate,
 };
 use yir_core::YirModule;
 

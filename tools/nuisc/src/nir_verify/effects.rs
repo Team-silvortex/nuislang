@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use nuis_semantics::model::NirExpr;
+use nuis_semantics::model::{NirExpr, NirMutexCapabilityOp};
 
 use super::expr_resource_key;
 use super::task_result_facts::{borrowed_address_binding, BorrowBindings, BorrowedAddressBinding};
@@ -117,6 +117,19 @@ pub(super) fn note_binding_effects(
         | NirExpr::CpuMutexLock(inner)
         | NirExpr::CpuMutexUnlock(inner) => {
             if let Some(source) = expr_resource_key(inner) {
+                moved.insert(source.clone());
+                borrows.remove(&source);
+            }
+        }
+        NirExpr::CpuMutexCapability { op, args }
+            if matches!(
+                op,
+                NirMutexCapabilityOp::Share
+                    | NirMutexCapabilityOp::PermitLock
+                    | NirMutexCapabilityOp::LeaseUnlock
+            ) =>
+        {
+            if let Some(source) = args.first().and_then(expr_resource_key) {
                 moved.insert(source.clone());
                 borrows.remove(&source);
             }
@@ -261,6 +274,11 @@ fn note_nested_expr_effects(
         | NirExpr::VariantIs { base, .. }
         | NirExpr::VariantFieldAccess { base, .. } => {
             note_binding_effects(base, "_", moved, borrows, borrow_bindings);
+        }
+        NirExpr::CpuMutexCapability { args, .. } => {
+            for arg in args {
+                note_binding_effects(arg, "_", moved, borrows, borrow_bindings);
+            }
         }
         _ => {}
     }

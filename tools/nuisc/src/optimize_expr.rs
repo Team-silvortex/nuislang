@@ -195,6 +195,10 @@ pub(super) fn simplify_expr(
             let (inner, changed) = simplify_expr(*inner, env, inline_templates, active_inline);
             (NirExpr::CpuMutexValue(Box::new(inner)), changed)
         }
+        NirExpr::CpuMutexCapability { op, args } => {
+            let (args, changed) = simplify_expr_vec(args, env, inline_templates, active_inline);
+            (NirExpr::CpuMutexCapability { op, args }, changed)
+        }
         NirExpr::CpuTimeout { task, limit } => {
             let (task, left) = simplify_expr(*task, env, inline_templates, active_inline);
             let (limit, right) = simplify_expr(*limit, env, inline_templates, active_inline);

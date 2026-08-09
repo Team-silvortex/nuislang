@@ -2,11 +2,14 @@ use crate::frontend::is_host_execution_domain;
 
 use std::collections::BTreeMap;
 
-use nuis_semantics::model::{AstExpr, NirExpr, NirResultFamily, NirStructDef, NirTypeRef};
+use nuis_semantics::model::{
+    AstExpr, NirExpr, NirMutexCapabilityOp, NirResultFamily, NirStructDef, NirTypeRef,
+};
 
 use super::{
-    ensure_mutex_guard_like, ensure_mutex_like, ensure_spawn_input_safe, ensure_task_like,
-    ensure_thread_like, i64_type, infer_nir_expr_type, lower_nested_expr_with_async_and_consts,
+    ensure_mutex_guard_like, ensure_mutex_lease_like, ensure_mutex_like, ensure_mutex_permit_like,
+    ensure_shared_mutex_like, ensure_spawn_input_safe, ensure_task_like, ensure_thread_like,
+    i64_type, infer_nir_expr_type, lower_nested_expr_with_async_and_consts,
     lower_result_observer_call_with_consts, FunctionSignature, ModuleConstValue,
     NestedExprWithConstsInput, ResultObserverCallInput,
 };
@@ -104,6 +107,21 @@ pub(super) fn lower_task_builtin_call(
                             signatures,
                             struct_table,
                         )?;
+                        if infer_nir_expr_type(&lowered, bindings, signatures, struct_table)
+                            .is_some_and(|ty| ty.is_mutex_permit_family())
+                            && !matches!(
+                                &lowered,
+                                NirExpr::CpuMutexCapability {
+                                    op: NirMutexCapabilityOp::Permit,
+                                    ..
+                                }
+                            )
+                        {
+                            return Err(
+                                "spawn(...) requires a freshly issued inline MutexPermit; stored permits cannot be copied across task boundaries"
+                                    .to_owned(),
+                            );
+                        }
                         Ok::<NirExpr, String>(lowered)
                     })
                     .collect::<Result<Vec<_>, _>>()?,
@@ -164,6 +182,21 @@ pub(super) fn lower_task_builtin_call(
                             signatures,
                             struct_table,
                         )?;
+                        if infer_nir_expr_type(&lowered, bindings, signatures, struct_table)
+                            .is_some_and(|ty| ty.is_mutex_permit_family())
+                            && !matches!(
+                                &lowered,
+                                NirExpr::CpuMutexCapability {
+                                    op: NirMutexCapabilityOp::Permit,
+                                    ..
+                                }
+                            )
+                        {
+                            return Err(
+                                "thread_spawn(...) requires a freshly issued inline MutexPermit; stored permits cannot be copied across worker boundaries"
+                                    .to_owned(),
+                            );
+                        }
                         Ok::<NirExpr, String>(lowered)
                     })
                     .collect::<Result<Vec<_>, _>>()?,
@@ -311,6 +344,98 @@ pub(super) fn lower_task_builtin_call(
             let lowered = lower_task_expr!(guard, None)?;
             ensure_mutex_guard_like("mutex_value", &lowered, bindings, signatures, struct_table)?;
             NirExpr::CpuMutexValue(Box::new(lowered))
+        }
+        "mutex_share" => {
+            if !is_host_execution_domain(current_domain) {
+                return Err(
+                    "mutex_share(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
+                );
+            }
+            let [mutex] = args else {
+                return Err("mutex_share(...) expects exactly one mutex handle".to_owned());
+            };
+            let lowered = lower_task_expr!(mutex, None)?;
+            ensure_mutex_like("mutex_share", &lowered, bindings, signatures, struct_table)?;
+            NirExpr::CpuMutexCapability {
+                op: NirMutexCapabilityOp::Share,
+                args: vec![lowered],
+            }
+        }
+        "mutex_permit" => {
+            if !is_host_execution_domain(current_domain) {
+                return Err(
+                    "mutex_permit(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
+                );
+            }
+            let [shared, lane] = args else {
+                return Err(
+                    "mutex_permit(...) expects one shared mutex and one lane literal".to_owned(),
+                );
+            };
+            if !matches!(lane, AstExpr::Int(0 | 1)) {
+                return Err(
+                    "mutex_permit(...) currently requires a unique literal lane `0` or `1`"
+                        .to_owned(),
+                );
+            }
+            let lowered_shared = lower_task_expr!(shared, None)?;
+            ensure_shared_mutex_like(
+                "mutex_permit",
+                &lowered_shared,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let lowered_lane = lower_task_expr!(lane, Some(&i64_type()))?;
+            NirExpr::CpuMutexCapability {
+                op: NirMutexCapabilityOp::Permit,
+                args: vec![lowered_shared, lowered_lane],
+            }
+        }
+        "mutex_permit_lock" => {
+            if !is_host_execution_domain(current_domain) {
+                return Err(
+                    "mutex_permit_lock(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
+                );
+            }
+            let [permit] = args else {
+                return Err("mutex_permit_lock(...) expects exactly one permit".to_owned());
+            };
+            let lowered = lower_task_expr!(permit, None)?;
+            ensure_mutex_permit_like(
+                "mutex_permit_lock",
+                &lowered,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            NirExpr::CpuMutexCapability {
+                op: NirMutexCapabilityOp::PermitLock,
+                args: vec![lowered],
+            }
+        }
+        "mutex_lease_value" | "mutex_lease_unlock" => {
+            if !is_host_execution_domain(current_domain) {
+                return Err(format!(
+                    "{callee}(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                ));
+            }
+            let [lease] = args else {
+                return Err(format!("{callee}(...) expects exactly one mutex lease"));
+            };
+            let lowered = lower_task_expr!(lease, None)?;
+            ensure_mutex_lease_like(callee, &lowered, bindings, signatures, struct_table)?;
+            NirExpr::CpuMutexCapability {
+                op: if callee == "mutex_lease_value" {
+                    NirMutexCapabilityOp::LeaseValue
+                } else {
+                    NirMutexCapabilityOp::LeaseUnlock
+                },
+                args: vec![lowered],
+            }
         }
         "task_completed" => lower_result_observer_call_with_consts(ResultObserverCallInput {
             name: "task_completed",

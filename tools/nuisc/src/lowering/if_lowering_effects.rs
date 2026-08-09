@@ -9,6 +9,10 @@ fn is_branch_local_runtime_observer(expr: &NirExpr) -> bool {
             | NirExpr::CpuTaskFailed(_)
             | NirExpr::CpuTaskValue(_)
             | NirExpr::CpuMutexValue(_)
+            | NirExpr::CpuMutexCapability {
+                op: NirMutexCapabilityOp::LeaseValue,
+                ..
+            }
     )
 }
 
@@ -28,6 +32,10 @@ fn is_branch_local_runtime_consumer(expr: &NirExpr) -> bool {
             | NirExpr::CpuMutexUnlock(_)
             | NirExpr::CpuTimeout { .. }
             | NirExpr::CpuReadyAfter { .. }
+    ) || matches!(
+        expr,
+        NirExpr::CpuMutexCapability { op, .. }
+            if *op != NirMutexCapabilityOp::LeaseValue
     )
 }
 

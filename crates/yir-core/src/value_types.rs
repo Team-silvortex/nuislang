@@ -43,6 +43,7 @@ pub enum Value {
     Thread(ThreadHandle),
     TaskResult(TaskResultHandle),
     Mutex(MutexHandle),
+    MutexPermit(MutexPermitHandle),
     MutexGuard(MutexGuardHandle),
     Unit,
 }
@@ -301,6 +302,13 @@ pub struct TaskResultHandle {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MutexHandle {
     pub label: String,
+    pub value: Box<Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MutexPermitHandle {
+    pub label: String,
+    pub lane: i64,
     pub value: Box<Value>,
 }
 

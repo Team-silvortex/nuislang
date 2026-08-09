@@ -211,6 +211,23 @@ pub(super) fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::CpuMutexLock(mutex) => format!("mutex_lock({})", render_nir_expr(mutex)),
         NirExpr::CpuMutexUnlock(guard) => format!("mutex_unlock({})", render_nir_expr(guard)),
         NirExpr::CpuMutexValue(guard) => format!("mutex_value({})", render_nir_expr(guard)),
+        NirExpr::CpuMutexCapability { op, args } => {
+            let name = match op {
+                NirMutexCapabilityOp::Share => "mutex_share",
+                NirMutexCapabilityOp::Permit => "mutex_permit",
+                NirMutexCapabilityOp::PermitLock => "mutex_permit_lock",
+                NirMutexCapabilityOp::LeaseValue => "mutex_lease_value",
+                NirMutexCapabilityOp::LeaseUnlock => "mutex_lease_unlock",
+            };
+            format!(
+                "{}({})",
+                name,
+                args.iter()
+                    .map(render_nir_expr)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        }
         NirExpr::CpuTimeout { task, limit } => format!(
             "timeout({}, {})",
             render_nir_expr(task),

@@ -121,6 +121,11 @@ fn collect_scheduler_spawned_functions_in_expr(
                 collect_scheduler_spawned_functions_in_expr(arg, eligible, spawned);
             }
         }
+        NirExpr::CpuMutexCapability { args, .. } => {
+            for arg in args {
+                collect_scheduler_spawned_functions_in_expr(arg, eligible, spawned);
+            }
+        }
         NirExpr::MethodCall { receiver, args, .. } => {
             collect_scheduler_spawned_functions_in_expr(receiver, eligible, spawned);
             for arg in args {
@@ -248,6 +253,9 @@ fn collect_async_loop_step_function_in_while(
 }
 
 fn direct_call_scalar_kind(ty: &nuis_semantics::model::NirTypeRef) -> Option<DirectCallScalarKind> {
+    if ty.is_mutex_permit_family() && ty.generic_args.len() == 1 && !ty.is_optional {
+        return Some(DirectCallScalarKind::I64);
+    }
     if ty.is_optional || !ty.generic_args.is_empty() {
         return None;
     }
@@ -292,6 +300,13 @@ pub(super) fn supports_direct_call_signature(function: &NirFunction) -> bool {
 }
 
 fn direct_call_signature_kind(function: &NirFunction) -> Option<DirectCallScalarKind> {
+    if function
+        .return_type
+        .as_ref()
+        .is_some_and(nuis_semantics::model::NirTypeRef::is_mutex_permit_family)
+    {
+        return None;
+    }
     let return_kind = direct_call_scalar_kind(function.return_type.as_ref()?)?;
     if matches!(
         return_kind,
@@ -513,7 +528,9 @@ fn expr_collect_called_functions(
         | NirExpr::DataProfileSendDownlink { input, .. } => {
             expr_collect_called_functions(input, eligible_names, called);
         }
-        NirExpr::CpuSpawn { args, .. } | NirExpr::CpuThreadSpawn { args, .. } => {
+        NirExpr::CpuSpawn { args, .. }
+        | NirExpr::CpuThreadSpawn { args, .. }
+        | NirExpr::CpuMutexCapability { args, .. } => {
             for arg in args {
                 expr_collect_called_functions(arg, eligible_names, called);
             }

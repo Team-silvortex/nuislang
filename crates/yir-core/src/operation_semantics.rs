@@ -315,7 +315,12 @@ impl Operation {
             | "call_i64"
             | "call_owned_bytes"
             | "branch_call_owned_bytes"
-            | "call_owned_struct" => CpuLlvmLoweringClass::Runtime,
+            | "call_owned_struct"
+            | "mutex_share"
+            | "mutex_permit"
+            | "mutex_permit_lock"
+            | "mutex_lease_value"
+            | "mutex_lease_unlock" => CpuLlvmLoweringClass::Runtime,
             "print"
             | "return_bool"
             | "return_i32"

@@ -276,6 +276,88 @@ pub(super) fn infer_ast_call_type(input: AstCallInferenceInput<'_>) -> Option<As
                 None
             }
         }
+        "mutex_share" => {
+            let [mutex] = args else {
+                return None;
+            };
+            let mutex_ty = infer_ast_expr_type_inner(
+                mutex,
+                env,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                active_exprs,
+            )?;
+            if mutex_ty.name == "Mutex" && mutex_ty.generic_args.len() == 1 {
+                Some(ast_generic_named_type(
+                    "SharedMutex",
+                    vec![mutex_ty.generic_args[0].clone()],
+                ))
+            } else {
+                None
+            }
+        }
+        "mutex_permit" => {
+            let [shared, _] = args else {
+                return None;
+            };
+            let shared_ty = infer_ast_expr_type_inner(
+                shared,
+                env,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                active_exprs,
+            )?;
+            if shared_ty.name == "SharedMutex" && shared_ty.generic_args.len() == 1 {
+                Some(ast_generic_named_type(
+                    "MutexPermit",
+                    vec![shared_ty.generic_args[0].clone()],
+                ))
+            } else {
+                None
+            }
+        }
+        "mutex_permit_lock" => {
+            let [permit] = args else {
+                return None;
+            };
+            let permit_ty = infer_ast_expr_type_inner(
+                permit,
+                env,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                active_exprs,
+            )?;
+            if permit_ty.name == "MutexPermit" && permit_ty.generic_args.len() == 1 {
+                Some(ast_generic_named_type(
+                    "MutexLease",
+                    vec![permit_ty.generic_args[0].clone()],
+                ))
+            } else {
+                None
+            }
+        }
+        "mutex_lease_value" => {
+            let [lease] = args else {
+                return None;
+            };
+            let lease_ty = infer_ast_expr_type_inner(
+                lease,
+                env,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                active_exprs,
+            )?;
+            if lease_ty.name == "MutexLease" && lease_ty.generic_args.len() == 1 {
+                Some(lease_ty.generic_args[0].clone())
+            } else {
+                None
+            }
+        }
+        "mutex_lease_unlock" => Some(ast_named_type("i64")),
         "task_completed" | "task_timed_out" | "task_cancelled" | "task_failed" | "data_ready"
         | "data_moved" | "data_windowed" => Some(ast_named_type("bool")),
         "task_value" => {

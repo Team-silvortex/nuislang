@@ -1,4 +1,5 @@
 use super::*;
+use nuis_semantics::model::NirMutexCapabilityOp;
 
 pub(crate) fn infer_nir_expr_type(
     expr: &NirExpr,
@@ -95,6 +96,28 @@ pub(crate) fn infer_nir_expr_type(
             infer_nir_expr_type(guard, bindings, signatures, struct_table)
                 .and_then(|ty| ty.mutex_guard_payload().cloned())
         }
+        NirExpr::CpuMutexCapability { op, args } => match op {
+            NirMutexCapabilityOp::Share => {
+                infer_nir_expr_type(args.first()?, bindings, signatures, struct_table)
+                    .and_then(|ty| ty.mutex_payload().cloned())
+                    .map(|ty| generic_named_type("SharedMutex", vec![ty]))
+            }
+            NirMutexCapabilityOp::Permit => {
+                infer_nir_expr_type(args.first()?, bindings, signatures, struct_table)
+                    .and_then(|ty| ty.shared_mutex_payload().cloned())
+                    .map(|ty| generic_named_type("MutexPermit", vec![ty]))
+            }
+            NirMutexCapabilityOp::PermitLock => {
+                infer_nir_expr_type(args.first()?, bindings, signatures, struct_table)
+                    .and_then(|ty| ty.mutex_permit_payload().cloned())
+                    .map(|ty| generic_named_type("MutexLease", vec![ty]))
+            }
+            NirMutexCapabilityOp::LeaseValue => {
+                infer_nir_expr_type(args.first()?, bindings, signatures, struct_table)
+                    .and_then(|ty| ty.mutex_lease_payload().cloned())
+            }
+            NirMutexCapabilityOp::LeaseUnlock => Some(i64_type()),
+        },
         NirExpr::CpuTaskCompleted(_)
         | NirExpr::CpuTaskTimedOut(_)
         | NirExpr::CpuTaskCancelled(_)
