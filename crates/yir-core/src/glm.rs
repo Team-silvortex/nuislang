@@ -191,6 +191,33 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
                 effect: GlmEffect::None,
             }
         }
+        _ if op.module == "cpu" && op.instruction == "call_owned_external_buffer" => {
+            let inputs = crate::ffi::parse_owned_buffer_function_transfer_contract(&op.args[1..])
+                .map(|contract| contract.inputs)
+                .unwrap_or(&[]);
+            GlmNodeProfile {
+                result_class: GlmValueClass::Res,
+                accesses: inputs.iter().map(value_read).collect(),
+                effect: GlmEffect::None,
+            }
+        }
+        _ if op.module == "cpu" && op.instruction == "return_owned_external_buffer" => {
+            GlmNodeProfile {
+                result_class: GlmValueClass::Val,
+                accesses: op
+                    .args
+                    .first()
+                    .map(|input| {
+                        vec![GlmAccess {
+                            input: input.clone(),
+                            class: GlmValueClass::Res,
+                            mode: GlmUseMode::Own,
+                        }]
+                    })
+                    .unwrap_or_default(),
+                effect: GlmEffect::DomainMove,
+            }
+        }
         SemanticOp::DataMove => GlmNodeProfile {
             result_class: GlmValueClass::Res,
             accesses: vec![GlmAccess {

@@ -242,7 +242,7 @@ pub(super) fn emit_cpu_function(
             body,
             registers,
             helper_signatures,
-            &state.buffer_lengths,
+            buffer_lengths,
             &mut next_reg,
             &mut next_block,
         )? {
@@ -254,7 +254,7 @@ pub(super) fn emit_cpu_function(
             body,
             registers,
             helper_signatures,
-            &state.buffer_lengths,
+            buffer_lengths,
             &deferred_task_calls,
             &mut next_reg,
             last_cpu_value,

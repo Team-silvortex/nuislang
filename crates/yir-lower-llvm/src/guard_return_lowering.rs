@@ -263,6 +263,9 @@ pub(crate) fn lower_cpu_guard_return_node(
                 CpuCallScalarKind::OwnedBytes => {
                     unreachable!("owned Bytes cannot be guard return values")
                 }
+                CpuCallScalarKind::OwnedExternalBuffer => {
+                    unreachable!("owned external buffers cannot be guard return values")
+                }
             }
             body.push(format!("{cont_label}:"));
         }

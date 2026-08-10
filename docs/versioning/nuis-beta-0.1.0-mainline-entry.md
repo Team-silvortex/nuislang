@@ -230,6 +230,24 @@ OS-thread safety remain open. The tensor therefore hands the next task back to
 `host-compatibility/cffi/registered-pointer-string-object-boundary` at
 `active/88`.
 
+The first registered-owner function-return tranche advances CFFI to
+`usable/93`. A synchronous helper may now return one direct registered
+`ref Buffer` producer through `nuis-ffi-owned-buffer-function-transfer-v1`.
+The YIR function result is explicitly owned and retains the ABI, destructor,
+and destructor-signature hash as static identity; LLVM carries only the
+runtime `{ ptr, i64 }` payload. CPU heap verification consumes the producer,
+reconstructs one caller-owned result, and requires one direct caller release.
+Compiler regressions reject identity drift and missing cleanup, while the CLI
+smoke builds, links, and runs two helper transfers with exit `0`.
+
+This remains a narrow synchronous path. Source helper chains may normalize to
+the one admitted boundary, but runtime helper-to-helper or recursive transfer,
+tasks, async work, loops, retained borrows, raw pointers, and arbitrary `ref T`
+remain closed. With CFFI promoted to usable, deterministic status-first tensor
+selection returns to `standard-library/std/concurrency-task-thread-lock` at
+`active/90`; the lower-progress Galaxy lock cell remains behind it because
+`active` work ranks ahead of `usable` work.
+
 ## Honesty Boundary
 
 `beta-0.1.0` should not claim:

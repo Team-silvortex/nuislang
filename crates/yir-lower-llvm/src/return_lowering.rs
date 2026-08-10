@@ -108,6 +108,49 @@ pub(crate) fn lower_cpu_return_node(
             };
             body.push(format!("  ret ptr {blob}"));
         }
+        "return_owned_external_buffer" => {
+            let contract =
+                yir_core::ffi::parse_owned_buffer_function_transfer_contract(&node.op.args[1..])
+                    .map_err(|error| {
+                        format!(
+                    "cpu.return_owned_external_buffer `{}` has invalid transfer metadata: {error}",
+                    node.name
+                )
+                    })?;
+            let Some(LlvmValueRef::OwnedExternalBuffer {
+                ptr,
+                len,
+                abi,
+                destructor,
+                destructor_signature_hash,
+            }) = registers.get(&node.op.args[0])
+            else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.return_owned_external_buffer `{}` because its input is not a registered owner",
+                    node.name
+                ));
+                return Ok(ReturnLoweringOutcome::Deferred);
+            };
+            if !contract.inputs.is_empty()
+                || contract.abi != abi
+                || contract.destructor_symbol != destructor
+                || contract.destructor_signature_hash != destructor_signature_hash
+            {
+                return Err(format!(
+                    "cpu.return_owned_external_buffer `{}` does not match its producer ABI/destructor/hash identity",
+                    node.name
+                ));
+            }
+            let with_ptr = fresh_reg(next_reg);
+            let aggregate = fresh_reg(next_reg);
+            body.push(format!(
+                "  {with_ptr} = insertvalue {{ ptr, i64 }} undef, ptr {ptr}, 0"
+            ));
+            body.push(format!(
+                "  {aggregate} = insertvalue {{ ptr, i64 }} {with_ptr}, i64 {len}, 1"
+            ));
+            body.push(format!("  ret {{ ptr, i64 }} {aggregate}"));
+        }
         "return_owned_struct" => {
             let Some(LlvmValueRef::Struct(value)) = registers.get(&node.op.args[0]) else {
                 body.push(format!(

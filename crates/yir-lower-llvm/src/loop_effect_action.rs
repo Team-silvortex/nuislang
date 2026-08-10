@@ -222,6 +222,7 @@ fn lower_scoped_operand(
             CpuCallScalarKind::BorrowedBuffer => get_ptr(registers, operand),
             CpuCallScalarKind::TraversalPointer => get_ptr(registers, operand),
             CpuCallScalarKind::OwnedBytes => None,
+            CpuCallScalarKind::OwnedExternalBuffer => None,
         }
     }
     .ok_or_else(|| format!("cannot lower scoped call operand `{operand}`"))?;

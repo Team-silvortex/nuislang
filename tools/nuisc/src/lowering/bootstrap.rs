@@ -1,5 +1,6 @@
 use super::*;
 use crate::lowering::direct_calls::collect_async_loop_step_functions;
+use crate::lowering::direct_calls::collect_owned_external_buffer_return_helpers;
 use crate::lowering::direct_calls::collect_recursive_async_helper_functions;
 use crate::lowering::direct_calls::collect_recursive_direct_call_functions;
 use crate::lowering::direct_calls::collect_scheduler_async_thunk_functions;
@@ -164,6 +165,9 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
         .cloned()
         .collect::<BTreeSet<_>>()
         .union(&collect_conditional_owned_return_helpers(module))
+        .cloned()
+        .collect::<BTreeSet<_>>()
+        .union(&collect_owned_external_buffer_return_helpers(module))
         .cloned()
         .collect::<BTreeSet<_>>()
         .union(&exported_functions)

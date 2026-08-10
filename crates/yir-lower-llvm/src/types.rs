@@ -120,6 +120,14 @@ pub(crate) enum CpuCallScalarKind {
     BorrowedBuffer,
     TraversalPointer,
     OwnedBytes,
+    OwnedExternalBuffer,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub(crate) struct CpuOwnedExternalBufferAbi {
+    pub(crate) abi: String,
+    pub(crate) destructor: String,
+    pub(crate) destructor_signature_hash: String,
 }
 #[derive(Clone)]
 pub(crate) struct TaskThunkArgument {
@@ -135,4 +143,5 @@ pub(crate) enum CpuLoopScalarKind {
 pub(crate) struct CpuHelperSignature {
     pub(crate) params: Vec<CpuCallScalarKind>,
     pub(crate) ret: CpuCallScalarKind,
+    pub(crate) owned_external_buffer_return: Option<CpuOwnedExternalBufferAbi>,
 }

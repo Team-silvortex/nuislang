@@ -132,6 +132,24 @@ const FFI_SMOKE_CASES: &[FfiSmokeCase] = &[
         stdout_contains: &["exit_status: 0"],
         expect_manifest: false,
     },
+    FfiSmokeCase {
+        name: "owned_return_buffer_helper_demo",
+        source: "../../examples/ns/ffi/owned_return_buffer_helper_demo.ns",
+        artifact: "owned_return_buffer_helper_demo",
+        yir_contains: &[
+            "return_owned_external_buffer",
+            "call_owned_external_buffer",
+            "nuis-ffi-owned-buffer-function-transfer-v1",
+        ],
+        llvm_contains: &[
+            "define { ptr, i64 } @nuis_fn_make_registered_buffer(i64",
+            "insertvalue { ptr, i64 }",
+            "extractvalue { ptr, i64 }",
+            "call i64 @host_owned_buffer_destroy(ptr",
+        ],
+        stdout_contains: &["exit_status: 0"],
+        expect_manifest: false,
+    },
 ];
 
 #[test]

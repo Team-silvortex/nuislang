@@ -48,6 +48,9 @@ Host bridge ladder:
 * [owned_return_buffer_select_demo.ns](owned_return_buffer_select_demo.ns)
   transfers two exact-registered owners through both conditional directions
   while retaining length and destructor authority
+* [owned_return_buffer_helper_demo.ns](owned_return_buffer_helper_demo.ns)
+  moves an exact-registered owner through one synchronous helper return and
+  leaves the caller responsible for one final release
 
 Runnable libc smoke:
 
@@ -77,6 +80,10 @@ cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
   examples/ns/ffi/owned_return_buffer_select_demo.ns \
   "$TMPDIR/nuis_owned_return_buffer_select_demo"
 cargo run -p nuis -- run-artifact "$TMPDIR/nuis_owned_return_buffer_select_demo"
+cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
+  examples/ns/ffi/owned_return_buffer_helper_demo.ns \
+  "$TMPDIR/nuis_owned_return_buffer_helper_demo"
+cargo run -p nuis -- run-artifact "$TMPDIR/nuis_owned_return_buffer_helper_demo"
 ```
 
 Task/runtime ladder:

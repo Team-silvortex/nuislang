@@ -154,9 +154,20 @@ pub(crate) fn execute_cpu_value_node(
         "param_buffer_ref" | "param_node_ref" => Ok(Value::Pointer(None)),
         "param_owned_bytes" => Ok(Value::OwnedBytes(Vec::new())),
         "loop_owned_result" => Ok(Value::OwnedBytes(Vec::new())),
-        "call_bool" | "call_i32" | "call_i64" | "call_f32" | "call_f64" | "call_owned_bytes" => {
+        "call_bool"
+        | "call_i32"
+        | "call_i64"
+        | "call_f32"
+        | "call_f64"
+        | "call_owned_bytes"
+        | "call_owned_external_buffer" => {
             let callee = &node.op.args[0];
-            let args = node.op.args[1..]
+            let argument_offset = if node.op.instruction == "call_owned_external_buffer" {
+                5
+            } else {
+                1
+            };
+            let args = node.op.args[argument_offset..]
                 .iter()
                 .map(|arg| state.expect_value(arg).map(|value| value.to_string()))
                 .collect::<Result<Vec<_>, _>>()?;
@@ -176,6 +187,7 @@ pub(crate) fn execute_cpu_value_node(
                 "call_f32" => Ok(Value::F32(0.0)),
                 "call_f64" => Ok(Value::F64(0.0)),
                 "call_owned_bytes" => Ok(Value::OwnedBytes(Vec::new())),
+                "call_owned_external_buffer" => Ok(Value::Pointer(None)),
                 _ => Ok(Value::Int(0)),
             }
         }
@@ -282,6 +294,9 @@ pub(crate) fn execute_cpu_value_node(
                 return Err(format!("node `{}` expects owned bytes", node.name));
             };
             Ok(Value::OwnedBytes(bytes.clone()))
+        }
+        "return_owned_external_buffer" => {
+            Ok(Value::Pointer(state.expect_pointer(&node.op.args[0])?))
         }
         "return_i64" => {
             let value = state.expect_int(&node.op.args[0])?;

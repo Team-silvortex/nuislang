@@ -285,13 +285,13 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         required_patterns: &[
             "FFI_MEMORY_CAPABILITY_HASH_CANONICAL_VERSION",
             "nuis-ffi-memory-v1",
-            "ffi_memory_capability_canonical_input",
             "ffi_memory_capability_hash",
-            "ffi_memory_capability_hash_is_stable",
             "OWNED_BUFFER_RETURN_PROTOCOL",
-            "OWNED_BUFFER_DESTRUCTOR_SIGNATURE",
             "nuis-ffi-owned-buffer-v1",
             "parse_owned_buffer_return_contract",
+            "OWNED_BUFFER_FUNCTION_TRANSFER_PROTOCOL",
+            "nuis-ffi-owned-buffer-function-transfer-v1",
+            "parse_owned_buffer_function_transfer_contract",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -340,11 +340,11 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         id: "cffi-owned-buffer-yir-escape-gate",
         path: "tools/nuisc/src/pipeline_ffi_owned_buffer.rs",
         required_patterns: &[
-            "parse_owned_buffer_return_contract",
+            "validate_owned_buffer_function_transfers",
             "OWNED_BUFFER_BRANCH_TRANSFER_ACTION",
-            "one exact ABI/destructor/hash identity",
-            "async escape remains closed",
-            "one registered owner transfer",
+            "return_owned_external_buffer",
+            "call_owned_external_buffer",
+            "direct caller free",
         ],
     },
     DevTensorDriftCheckSpec {

@@ -233,7 +233,8 @@ historical closures.
 
 The `beta-0.1` calibration baseline is:
 
-* `standard-library/std/concurrency-task-thread-lock`: `active/90`, required;
+* `standard-library/std/concurrency-task-thread-lock`: `active/90`, required
+  and now the current weakest task;
   recursive selected-prefix lowering and the native cancel/unlock project close
   both dynamic branches; `Mutex<i64>` now has opaque scheduler handles,
   generation-bound guards, worker ownership, acquire/release epochs, strict YIR
@@ -246,14 +247,18 @@ The `beta-0.1` calibration baseline is:
   count through interpreted and native paths; mutable lease updates, dynamic
   permit counts, non-`i64` payloads, and OS-thread parallelism remain open
 * `host-compatibility/cffi/registered-pointer-string-object-boundary`:
-  `active/88`, required and now the current weakest task; five real borrowed UTF-8 calls and one owned
+  `usable/93`, required; five real borrowed UTF-8 calls and one owned
   `ref Buffer` return carry exact signature plus memory-capability hashes
   through compile, project metadata, and Nsld validation; the owned path now
   has self-verifying YIR metadata, runtime-header length recovery, exact
   destructor dispatch, and native execution; one GLM-typed conditional transfer
   accepts only direct owners with identical ABI/destructor/hash identity, drops
-  the unselected owner, and merges pointer plus runtime length; returned,
-  nested, task/async-carried, raw-pointer, and generalized ownership remain closed
+  the unselected owner, and merges pointer plus runtime length; one synchronous
+  helper may now return that owner to its entry caller through a `{ptr,i64}`
+  runtime ABI while YIR retains static ABI/destructor/hash identity and enforces
+  one caller release; source helper chains may normalize to that single
+  boundary, while runtime nested/recursive, task/async/loop-carried,
+  raw-pointer, and generalized ownership remain closed
 * `package-system/galaxy/source-import-and-lock-resolution`: `usable/78`,
   required; local/transitive imports work, while a hash-bound lock closure does
   not yet exist

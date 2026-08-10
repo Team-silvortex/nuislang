@@ -194,6 +194,7 @@ fn accepts_registered_libc_demo_signatures() {
     compiled_source("../../examples/ns/ffi/libc_read_buffer_demo.ns");
     compiled_source("../../examples/ns/ffi/owned_return_buffer_demo.ns");
     compiled_source("../../examples/ns/ffi/owned_return_buffer_select_demo.ns");
+    compiled_source("../../examples/ns/ffi/owned_return_buffer_helper_demo.ns");
 }
 
 #[test]
@@ -228,6 +229,183 @@ fn lowers_registered_owned_buffer_return_with_exact_destructor() {
     assert!(artifacts
         .llvm_ir
         .contains("call i64 @host_owned_buffer_destroy(ptr"));
+}
+
+#[test]
+fn lowers_registered_owned_buffer_function_transfer_with_exact_identity() {
+    let artifacts = nuisc::pipeline::compile_source_path(Path::new(
+        "../../examples/ns/ffi/owned_return_buffer_helper_demo.ns",
+    ))
+    .unwrap_or_else(|error| panic!("owned buffer helper transfer should compile: {error}"));
+
+    let returned = artifacts
+        .yir
+        .nodes
+        .iter()
+        .find(|node| node.op.instruction == "return_owned_external_buffer")
+        .expect("helper should move its registered owner into the result");
+    let return_contract =
+        yir_core::ffi::parse_owned_buffer_function_transfer_contract(&returned.op.args[1..])
+            .expect("helper return transfer metadata should revalidate");
+    assert_eq!(return_contract.abi, "c");
+    assert_eq!(
+        return_contract.destructor_symbol,
+        "host_owned_buffer_destroy"
+    );
+    assert!(return_contract.inputs.is_empty());
+
+    let helper = artifacts
+        .yir
+        .functions
+        .iter()
+        .find(|function| function.name == "make_registered_buffer")
+        .expect("helper function should be explicit in YIR");
+    let result = helper
+        .result
+        .as_ref()
+        .expect("helper should return an owner");
+    assert_eq!(result.node, returned.name);
+    assert_eq!(result.ownership, yir_core::YirValueOwnership::Owned);
+
+    let calls = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.instruction == "call_owned_external_buffer")
+        .collect::<Vec<_>>();
+    assert_eq!(calls.len(), 2);
+    for call in calls {
+        let contract =
+            yir_core::ffi::parse_owned_buffer_function_transfer_contract(&call.op.args[1..])
+                .expect("call transfer metadata should revalidate");
+        assert_eq!(contract.inputs.len(), 1);
+        assert_eq!(
+            yir_core::glm_profile_for_operation(&call.op).result_class,
+            yir_core::GlmValueClass::Res
+        );
+    }
+
+    assert!(artifacts
+        .llvm_ir
+        .contains("define { ptr, i64 } @nuis_fn_make_registered_buffer(i64"));
+    assert!(artifacts.llvm_ir.contains("insertvalue { ptr, i64 }"));
+    assert!(artifacts.llvm_ir.contains("extractvalue { ptr, i64 }"));
+    assert_eq!(
+        artifacts
+            .llvm_ir
+            .matches("call i64 @host_owned_buffer_destroy(ptr")
+            .count(),
+        2
+    );
+    assert!(!artifacts.llvm_ir.contains("deferred lowering"));
+}
+
+#[test]
+fn llvm_rejects_owned_buffer_function_transfer_identity_drift() {
+    let mut yir = nuisc::pipeline::compile_source_path(Path::new(
+        "../../examples/ns/ffi/owned_return_buffer_helper_demo.ns",
+    ))
+    .expect("owned buffer helper transfer should compile")
+    .yir;
+    let call = yir
+        .nodes
+        .iter_mut()
+        .find(|node| node.op.instruction == "call_owned_external_buffer")
+        .expect("registered owner helper call");
+    call.op.args[2] = "nurs".to_owned();
+    call.op.args[4] = yir_core::ffi::ffi_symbol_signature_hash(
+        &call.op.args[2],
+        &call.op.args[3],
+        yir_core::ffi::OWNED_BUFFER_DESTRUCTOR_SIGNATURE,
+    );
+
+    let error = yir_lower_llvm::emit_module(&yir).unwrap_err();
+    assert!(
+        error.contains(
+            "does not match helper `make_registered_buffer` ABI/destructor/hash identity"
+        ),
+        "{error}"
+    );
+}
+
+#[test]
+fn rejects_owned_buffer_function_result_without_caller_free() {
+    let ast = nuisc::frontend::parse_nuis_ast(
+        r#"
+        mod cffi Main {
+          extern "c" fn host_owned_buffer_make(seed: i64) -> ref Buffer;
+          fn make_registered_buffer(seed: i64) -> ref Buffer {
+            return host_owned_buffer_make(seed);
+          }
+          fn main() -> i64 {
+            let buffer: ref Buffer = make_registered_buffer(3);
+            return buffer_len(buffer);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let error = match nuisc::pipeline::compile_ast(ast) {
+        Ok(_) => panic!("returned owner without caller free must remain closed"),
+        Err(error) => error,
+    };
+    assert!(
+        error.contains("must be consumed by exactly one direct caller free"),
+        "{error}"
+    );
+}
+
+#[test]
+fn flattens_nested_owned_buffer_source_helper_to_one_runtime_transfer() {
+    let ast = nuisc::frontend::parse_nuis_ast(
+        r#"
+        mod cffi Main {
+          extern "c" fn host_owned_buffer_make(seed: i64) -> ref Buffer;
+          fn make_registered_buffer(seed: i64) -> ref Buffer {
+            return host_owned_buffer_make(seed);
+          }
+          fn forward_registered_buffer(seed: i64) -> ref Buffer {
+            return make_registered_buffer(seed);
+          }
+          fn main() -> i64 {
+            let buffer: ref Buffer = forward_registered_buffer(3);
+            free(buffer);
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let artifacts = nuisc::pipeline::compile_ast(ast)
+        .expect("source helper chain should normalize before owner transfer lowering");
+    assert_eq!(
+        artifacts
+            .yir
+            .nodes
+            .iter()
+            .filter(|node| node.op.instruction == "return_owned_external_buffer")
+            .count(),
+        1
+    );
+    assert_eq!(
+        artifacts
+            .yir
+            .nodes
+            .iter()
+            .filter(|node| node.op.instruction == "call_owned_external_buffer")
+            .count(),
+        1
+    );
+    assert!(artifacts
+        .yir
+        .functions
+        .iter()
+        .any(|function| function.name == "forward_registered_buffer"));
+    assert!(!artifacts
+        .yir
+        .functions
+        .iter()
+        .any(|function| function.name == "make_registered_buffer"));
 }
 
 #[test]

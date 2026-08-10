@@ -114,8 +114,8 @@ use simple_loop_lowering::lower_cpu_simple_loop_node;
 use static_lowering::lower_cpu_static_node;
 use topology::topological_order;
 pub(crate) use types::{
-    CpuCallScalarKind, CpuHelperSignature, CpuLoopScalarKind, EmittedCpuFunction,
-    LlvmLoweringState, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef,
+    CpuCallScalarKind, CpuHelperSignature, CpuLoopScalarKind, CpuOwnedExternalBufferAbi,
+    EmittedCpuFunction, LlvmLoweringState, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef,
     NetworkResultLlvmValueRef, StructLlvmValueRef, TaskLlvmValueRef, TaskResultLlvmValueRef,
     TaskThunkArgument, ThreadLlvmValueRef, VariantUnionLlvmValueRef,
 };
@@ -175,25 +175,50 @@ pub fn emit_module_with_registries(
             })
             .collect::<Result<Vec<_>, String>>()?;
         params.sort_by_key(|(index, _, _)| *index);
-        let ret = module
+        let return_node = module
             .nodes
             .iter()
             .filter(|node| module.node_lanes.get(&node.name) == Some(lane))
-            .find_map(|node| {
-                if node.op.instruction == "return_owned_struct" {
-                    return Some(CpuCallScalarKind::I64);
-                }
-                let kind = cpu_call_scalar_kind_for_instruction(&node.op.instruction)?;
-                node.op.instruction.starts_with("return_").then_some(kind)
-            })
+            .find(|node| node.op.instruction.starts_with("return_"))
             .ok_or_else(|| {
                 format!("helper lane `{function_name}` does not contain a typed cpu.return_*")
             })?;
+        let ret = if return_node.op.instruction == "return_owned_struct" {
+            CpuCallScalarKind::I64
+        } else {
+            cpu_call_scalar_kind_for_instruction(&return_node.op.instruction).ok_or_else(|| {
+                format!(
+                    "helper lane `{function_name}` has unsupported return operation `{}`",
+                    return_node.op.full_name()
+                )
+            })?
+        };
+        let owned_external_buffer_return = if ret == CpuCallScalarKind::OwnedExternalBuffer {
+            let contract = yir_core::ffi::parse_owned_buffer_function_transfer_contract(
+                &return_node.op.args[1..],
+            )
+            .map_err(|error| {
+                format!("helper lane `{function_name}` has invalid owned return ABI: {error}")
+            })?;
+            if !contract.inputs.is_empty() {
+                return Err(format!(
+                    "helper lane `{function_name}` owned return ABI has trailing inputs"
+                ));
+            }
+            Some(CpuOwnedExternalBufferAbi {
+                abi: contract.abi.to_owned(),
+                destructor: contract.destructor_symbol.to_owned(),
+                destructor_signature_hash: contract.destructor_signature_hash.to_owned(),
+            })
+        } else {
+            None
+        };
         helper_signatures.insert(
             function_name,
             CpuHelperSignature {
                 params: params.iter().map(|(_, _, kind)| *kind).collect(),
                 ret,
+                owned_external_buffer_return,
             },
         );
     }
@@ -403,6 +428,9 @@ fn render_scalar_task_invoker(
             CpuCallScalarKind::OwnedBytes => {
                 unreachable!("direct owned Bytes params do not have scalar task invokers")
             }
+            CpuCallScalarKind::OwnedExternalBuffer => {
+                unreachable!("owned external buffers do not have task invokers")
+            }
         };
         call_args.push(format!("{} {argument}", cpu_scalar_kind_llvm_type(kind)));
     }
@@ -438,6 +466,9 @@ fn render_scalar_task_invoker(
         }
         CpuCallScalarKind::OwnedBytes => {
             unreachable!("owned Bytes cannot return from scalar task invokers")
+        }
+        CpuCallScalarKind::OwnedExternalBuffer => {
+            unreachable!("owned external buffers cannot return from scalar task invokers")
         }
     }
     Some(format!(

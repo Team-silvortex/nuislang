@@ -110,6 +110,60 @@ pub(crate) fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String>
                 );
                 values.insert(node.name.clone(), PointerState::Owned(id));
             }
+            "call_owned_external_buffer" => {
+                yir_core::ffi::parse_owned_buffer_function_transfer_contract(&node.op.args[1..])
+                    .map_err(|error| {
+                        format!(
+                            "node `{}` cannot establish returned owned-buffer authority: {error}",
+                            node.name
+                        )
+                    })?;
+                let id = next_id;
+                next_id += 1;
+                heap.insert(
+                    id,
+                    HeapBinding {
+                        live: true,
+                        kind: HeapObjectKind::Buffer { len: None },
+                    },
+                );
+                values.insert(node.name.clone(), PointerState::Owned(id));
+            }
+            "return_owned_external_buffer" => {
+                yir_core::ffi::parse_owned_buffer_function_transfer_contract(&node.op.args[1..])
+                    .map_err(|error| {
+                        format!(
+                            "node `{}` cannot transfer returned owned-buffer authority: {error}",
+                            node.name
+                        )
+                    })?;
+                let source_name = &node.op.args[0];
+                match pointer_arg(&values, source_name) {
+                    PointerState::Owned(id) => {
+                        ensure_live_heap(&heap, id, node)?;
+                        ensure_no_active_borrows(&borrow_counts, id, node, "function return")?;
+                        moved_names.insert(source_name.clone());
+                    }
+                    PointerState::Borrowed(_) => {
+                        return Err(format!(
+                            "node `{}` cannot return borrowed buffer `{source_name}` as registered ownership",
+                            node.name
+                        ));
+                    }
+                    PointerState::Null => {
+                        return Err(format!(
+                            "node `{}` cannot return null as registered buffer ownership",
+                            node.name
+                        ));
+                    }
+                    PointerState::Unknown => {
+                        return Err(format!(
+                            "node `{}` cannot prove returned buffer ownership for `{source_name}`",
+                            node.name
+                        ));
+                    }
+                }
+            }
             "borrow" => {
                 let source = pointer_arg(&values, &node.op.args[0]);
                 match source {

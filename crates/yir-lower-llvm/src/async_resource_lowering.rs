@@ -601,6 +601,9 @@ fn emit_scalar_task_context(
             CpuCallScalarKind::OwnedBytes => {
                 unreachable!("direct owned Bytes params cannot enter scalar task payloads")
             }
+            CpuCallScalarKind::OwnedExternalBuffer => {
+                unreachable!("owned external buffers cannot enter scalar task payloads")
+            }
         };
         state
             .body
@@ -656,6 +659,9 @@ fn unpack_task_payload(
         }
         CpuCallScalarKind::OwnedBytes => {
             unreachable!("direct owned Bytes params cannot return from scalar tasks")
+        }
+        CpuCallScalarKind::OwnedExternalBuffer => {
+            unreachable!("owned external buffers cannot return from scalar tasks")
         }
     }
 }

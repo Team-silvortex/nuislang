@@ -6,6 +6,9 @@ pub const OWNED_BUFFER_RETURN_LENGTH_POLICY: &str = "runtime_header";
 pub const OWNED_BUFFER_RETURN_METADATA_LEN: usize = 9;
 pub const OWNED_BUFFER_DESTRUCTOR_SIGNATURE: &str = "i64(ref_Buffer)";
 pub const OWNED_BUFFER_BRANCH_TRANSFER_ACTION: &str = "take_owned_buffer_drop_other_v1";
+pub const OWNED_BUFFER_FUNCTION_TRANSFER_PROTOCOL: &str =
+    "nuis-ffi-owned-buffer-function-transfer-v1";
+pub const OWNED_BUFFER_FUNCTION_TRANSFER_METADATA_LEN: usize = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OwnedBufferReturnContract<'a> {
@@ -17,6 +20,70 @@ pub struct OwnedBufferReturnContract<'a> {
     pub destructor_symbol: &'a str,
     pub destructor_signature_hash: &'a str,
     pub inputs: &'a [String],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OwnedBufferFunctionTransferContract<'a> {
+    pub abi: &'a str,
+    pub destructor_symbol: &'a str,
+    pub destructor_signature_hash: &'a str,
+    pub inputs: &'a [String],
+}
+
+pub fn owned_buffer_function_transfer_metadata(
+    abi: &str,
+    destructor_symbol: &str,
+    destructor_signature_hash: &str,
+) -> [String; OWNED_BUFFER_FUNCTION_TRANSFER_METADATA_LEN] {
+    [
+        OWNED_BUFFER_FUNCTION_TRANSFER_PROTOCOL.to_owned(),
+        abi.to_owned(),
+        destructor_symbol.to_owned(),
+        destructor_signature_hash.to_owned(),
+    ]
+}
+
+pub fn parse_owned_buffer_function_transfer_contract(
+    args: &[String],
+) -> Result<OwnedBufferFunctionTransferContract<'_>, String> {
+    if args.len() < OWNED_BUFFER_FUNCTION_TRANSFER_METADATA_LEN {
+        return Err(format!(
+            "owned FFI buffer function transfer expects at least {OWNED_BUFFER_FUNCTION_TRANSFER_METADATA_LEN} metadata arguments, found {}",
+            args.len()
+        ));
+    }
+    if args[0] != OWNED_BUFFER_FUNCTION_TRANSFER_PROTOCOL {
+        return Err(format!(
+            "owned FFI buffer function transfer protocol must be `{OWNED_BUFFER_FUNCTION_TRANSFER_PROTOCOL}`, found `{}`",
+            args[0]
+        ));
+    }
+    if args[1].is_empty() || args[2].is_empty() {
+        return Err(
+            "owned FFI buffer function transfer contains an empty ABI or destructor symbol"
+                .to_owned(),
+        );
+    }
+    if !is_ffi_symbol_hash_token(&args[3]) {
+        return Err(format!(
+            "owned FFI buffer function transfer destructor signature hash `{}` is malformed",
+            args[3]
+        ));
+    }
+    let expected_hash =
+        ffi_symbol_signature_hash(&args[1], &args[2], OWNED_BUFFER_DESTRUCTOR_SIGNATURE);
+    if args[3] != expected_hash {
+        return Err(format!(
+            "owned FFI buffer function transfer destructor signature hash mismatch: expected `{expected_hash}`, found `{}`",
+            args[3]
+        ));
+    }
+    Ok(OwnedBufferFunctionTransferContract {
+        abi: &args[1],
+        destructor_symbol: &args[2],
+        destructor_signature_hash: &args[3],
+        inputs: &args[OWNED_BUFFER_FUNCTION_TRANSFER_METADATA_LEN..],
+    })
 }
 
 pub fn owned_buffer_return_descriptor(
@@ -153,8 +220,9 @@ mod tests {
     use super::{
         ffi_memory_capability_canonical_input, ffi_memory_capability_hash,
         ffi_symbol_signature_canonical_input, ffi_symbol_signature_hash, is_ffi_symbol_hash_token,
-        owned_buffer_return_descriptor, parse_owned_buffer_return_contract,
-        OWNED_BUFFER_DESTRUCTOR_SIGNATURE, OWNED_BUFFER_RETURN_LENGTH_POLICY,
+        owned_buffer_return_descriptor, parse_owned_buffer_function_transfer_contract,
+        parse_owned_buffer_return_contract, OWNED_BUFFER_DESTRUCTOR_SIGNATURE,
+        OWNED_BUFFER_FUNCTION_TRANSFER_PROTOCOL, OWNED_BUFFER_RETURN_LENGTH_POLICY,
         OWNED_BUFFER_RETURN_PROTOCOL,
     };
 
@@ -235,6 +303,30 @@ mod tests {
             &forged_descriptor,
         );
         assert!(parse_owned_buffer_return_contract(&tampered)
+            .unwrap_err()
+            .contains("destructor signature hash mismatch"));
+    }
+
+    #[test]
+    fn owned_buffer_function_transfer_revalidates_destructor_identity() {
+        let hash = ffi_symbol_signature_hash(
+            "c",
+            "host_owned_buffer_destroy",
+            OWNED_BUFFER_DESTRUCTOR_SIGNATURE,
+        );
+        let args = vec![
+            OWNED_BUFFER_FUNCTION_TRANSFER_PROTOCOL.to_owned(),
+            "c".to_owned(),
+            "host_owned_buffer_destroy".to_owned(),
+            hash,
+            "seed".to_owned(),
+        ];
+        let contract = parse_owned_buffer_function_transfer_contract(&args).unwrap();
+        assert_eq!(contract.inputs, ["seed"]);
+
+        let mut tampered = args;
+        tampered[2] = "other_destroy".to_owned();
+        assert!(parse_owned_buffer_function_transfer_contract(&tampered)
             .unwrap_err()
             .contains("destructor signature hash mismatch"));
     }

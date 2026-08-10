@@ -229,6 +229,23 @@ pub(super) fn describe_cpu_basic_node(node: &Node) -> Result<Option<InstructionS
                 node.op.args.iter().skip(argument_offset).cloned().collect(),
             ))
         }
+        "call_owned_external_buffer" => {
+            if node.op.args.len() < 5 {
+                return Err(format!(
+                    "node `{}` expects a callee plus registered owned-buffer transfer metadata",
+                    node.name
+                ));
+            }
+            let contract =
+                yir_core::ffi::parse_owned_buffer_function_transfer_contract(&node.op.args[1..])
+                    .map_err(|error| {
+                        format!(
+                            "node `{}` has invalid owned-buffer call transfer: {error}",
+                            node.name
+                        )
+                    })?;
+            Ok(InstructionSemantics::effect(contract.inputs.to_vec()))
+        }
         "branch_call_owned_bytes" => {
             let Some(args) = parse_branch_owned_call_args(&node.op.args) else {
                 return Err(format!(
@@ -255,6 +272,29 @@ pub(super) fn describe_cpu_basic_node(node: &Node) -> Result<Option<InstructionS
                 ));
             }
             Ok(InstructionSemantics::effect(node.op.args.clone()))
+        }
+        "return_owned_external_buffer" => {
+            if node.op.args.len() != 5 {
+                return Err(format!(
+                    "node `{}` expects one owner plus registered owned-buffer transfer metadata",
+                    node.name
+                ));
+            }
+            let contract =
+                yir_core::ffi::parse_owned_buffer_function_transfer_contract(&node.op.args[1..])
+                    .map_err(|error| {
+                        format!(
+                            "node `{}` has invalid owned-buffer return transfer: {error}",
+                            node.name
+                        )
+                    })?;
+            if !contract.inputs.is_empty() {
+                return Err(format!(
+                    "node `{}` owned-buffer return transfer has trailing inputs",
+                    node.name
+                ));
+            }
+            Ok(InstructionSemantics::effect(vec![node.op.args[0].clone()]))
         }
         _ => return Ok(None),
     };

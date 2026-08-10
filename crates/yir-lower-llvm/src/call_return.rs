@@ -12,6 +12,9 @@ pub(crate) fn cpu_call_scalar_kind_for_instruction(instruction: &str) -> Option<
         "param_owned_bytes" | "call_owned_bytes" | "return_owned_bytes" => {
             Some(CpuCallScalarKind::OwnedBytes)
         }
+        "call_owned_external_buffer" | "return_owned_external_buffer" => {
+            Some(CpuCallScalarKind::OwnedExternalBuffer)
+        }
         _ => None,
     }
 }
@@ -26,6 +29,7 @@ pub(crate) fn cpu_scalar_kind_llvm_type(kind: CpuCallScalarKind) -> &'static str
         CpuCallScalarKind::BorrowedBuffer => "ptr",
         CpuCallScalarKind::TraversalPointer => "ptr",
         CpuCallScalarKind::OwnedBytes => "ptr",
+        CpuCallScalarKind::OwnedExternalBuffer => "{ ptr, i64 }",
     }
 }
 
@@ -49,6 +53,9 @@ pub(crate) fn cpu_param_binding(kind: CpuCallScalarKind, index: usize) -> LlvmVa
         },
         CpuCallScalarKind::TraversalPointer => LlvmValueRef::Ptr(arg),
         CpuCallScalarKind::OwnedBytes => LlvmValueRef::OwnedBytes { blob: arg },
+        CpuCallScalarKind::OwnedExternalBuffer => {
+            unreachable!("owned external buffers cannot be helper parameters")
+        }
     }
 }
 
@@ -167,6 +174,7 @@ pub(crate) fn emit_typed_return_from_value(
             }
             _ => false,
         },
+        CpuCallScalarKind::OwnedExternalBuffer => false,
     }
 }
 
@@ -211,6 +219,7 @@ pub(crate) fn can_emit_typed_return_from_value(
         ),
         CpuCallScalarKind::BorrowedBuffer | CpuCallScalarKind::TraversalPointer => false,
         CpuCallScalarKind::OwnedBytes => matches!(return_value, LlvmValueRef::OwnedBytes { .. }),
+        CpuCallScalarKind::OwnedExternalBuffer => false,
     }
 }
 
@@ -251,5 +260,8 @@ pub(crate) fn emit_typed_return_from_last_value(
             unreachable!("traversal pointers cannot be function return values")
         }
         CpuCallScalarKind::OwnedBytes => unreachable!("owned Bytes returns require a blob value"),
+        CpuCallScalarKind::OwnedExternalBuffer => {
+            unreachable!("owned external buffer returns require explicit transfer metadata")
+        }
     }
 }

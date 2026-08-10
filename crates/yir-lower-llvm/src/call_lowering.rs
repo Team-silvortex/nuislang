@@ -193,7 +193,7 @@ pub(crate) fn lower_cpu_call_node(
     body: &mut Vec<String>,
     registers: &mut BTreeMap<String, LlvmValueRef>,
     helper_signatures: &BTreeMap<String, CpuHelperSignature>,
-    buffer_lengths: &BTreeMap<String, String>,
+    buffer_lengths: &mut BTreeMap<String, String>,
     deferred_task_calls: &BTreeSet<String>,
     next_reg: &mut usize,
     last_cpu_value: &mut Option<String>,
@@ -209,6 +209,7 @@ pub(crate) fn lower_cpu_call_node(
             | "call_f32"
             | "call_f64"
             | "call_owned_bytes"
+            | "call_owned_external_buffer"
             | "call_owned_struct"
     ) {
         return Ok(false);
@@ -223,8 +224,43 @@ pub(crate) fn lower_cpu_call_node(
         return Ok(true);
     };
 
-    let argument_offset = usize::from(node.op.instruction == "call_owned_struct") + 1;
-    let lowered_args = node.op.args[argument_offset..]
+    let call_inputs = if node.op.instruction == "call_owned_external_buffer" {
+        let contract =
+            yir_core::ffi::parse_owned_buffer_function_transfer_contract(&node.op.args[1..])
+                .map_err(|error| {
+                    format!(
+                "cpu.call_owned_external_buffer `{}` has invalid transfer metadata: {error}",
+                node.name
+            )
+                })?;
+        let expected = signature
+            .owned_external_buffer_return
+            .as_ref()
+            .ok_or_else(|| format!("helper `{callee}` lacks registered owned-buffer return ABI"))?;
+        if contract.abi != expected.abi
+            || contract.destructor_symbol != expected.destructor
+            || contract.destructor_signature_hash != expected.destructor_signature_hash
+        {
+            return Err(format!(
+                "cpu.call_owned_external_buffer `{}` does not match helper `{callee}` ABI/destructor/hash identity",
+                node.name
+            ));
+        }
+        contract.inputs
+    } else {
+        let argument_offset = usize::from(node.op.instruction == "call_owned_struct") + 1;
+        &node.op.args[argument_offset..]
+    };
+    if call_inputs.len() != signature.params.len() {
+        return Err(format!(
+            "cpu.{} `{}` expects {} helper input(s), found {}",
+            node.op.instruction,
+            node.name,
+            signature.params.len(),
+            call_inputs.len()
+        ));
+    }
+    let lowered_args = call_inputs
         .iter()
         .zip(signature.params.iter())
         .map(|(arg, kind)| match kind {
@@ -254,6 +290,7 @@ pub(crate) fn lower_cpu_call_node(
                 Some(LlvmValueRef::OwnedBytes { blob }) => Some(vec![format!("ptr {blob}")]),
                 _ => None,
             },
+            CpuCallScalarKind::OwnedExternalBuffer => None,
         })
         .collect::<Option<Vec<_>>>()
         .map(|args| args.into_iter().flatten().collect::<Vec<_>>());
@@ -390,6 +427,28 @@ pub(crate) fn lower_cpu_call_node(
         CpuCallScalarKind::TraversalPointer => unreachable!("traversal refs cannot return"),
         CpuCallScalarKind::OwnedBytes => {
             registers.insert(node.name.clone(), LlvmValueRef::OwnedBytes { blob: reg });
+        }
+        CpuCallScalarKind::OwnedExternalBuffer => {
+            let contract = signature
+                .owned_external_buffer_return
+                .as_ref()
+                .expect("owned external buffer helper ABI should be validated");
+            let ptr = fresh_reg(next_reg);
+            let len = fresh_reg(next_reg);
+            body.push(format!("  {ptr} = extractvalue {{ ptr, i64 }} {reg}, 0"));
+            body.push(format!("  {len} = extractvalue {{ ptr, i64 }} {reg}, 1"));
+            registers.insert(
+                node.name.clone(),
+                LlvmValueRef::OwnedExternalBuffer {
+                    ptr: ptr.clone(),
+                    len: len.clone(),
+                    abi: contract.abi.clone(),
+                    destructor: contract.destructor.clone(),
+                    destructor_signature_hash: contract.destructor_signature_hash.clone(),
+                },
+            );
+            buffer_lengths.insert(node.name.clone(), len);
+            *last_cpu_value = Some(ptr);
         }
     }
 

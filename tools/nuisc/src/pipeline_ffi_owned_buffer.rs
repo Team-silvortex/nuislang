@@ -5,7 +5,11 @@ use yir_core::{
     YirModule,
 };
 
+#[path = "pipeline_ffi_owned_buffer_return.rs"]
+mod function_return;
+
 pub(super) fn validate_owned_return_buffer_yir(module: &YirModule) -> Result<(), String> {
+    function_return::validate_owned_buffer_function_transfers(module)?;
     let nodes = module
         .nodes
         .iter()
@@ -65,8 +69,17 @@ pub(super) fn validate_owned_return_buffer_yir(module: &YirModule) -> Result<(),
                     .is_some_and(|inputs| inputs.contains(&producer.name.as_str()))
             })
             .collect::<Vec<_>>();
-        match (free_nodes.as_slice(), transfer_nodes.as_slice()) {
-            ([free], []) => validate_owner_tail(
+        let return_nodes = consumers
+            .iter()
+            .copied()
+            .filter(|node| is_exact_function_return(node, &producer.name))
+            .collect::<Vec<_>>();
+        match (
+            free_nodes.as_slice(),
+            transfer_nodes.as_slice(),
+            return_nodes.as_slice(),
+        ) {
+            ([free], [], []) => validate_owner_tail(
                 contract.symbol,
                 &producer.name,
                 producer_index,
@@ -76,7 +89,7 @@ pub(super) fn validate_owned_return_buffer_yir(module: &YirModule) -> Result<(),
                 &positions,
                 &nodes,
             )?,
-            ([], [transfer]) => {
+            ([], [transfer], []) => {
                 let Some(&transfer_index) = positions.get(transfer.name.as_str()) else {
                     return Err(format!(
                         "owned extern buffer `{}` transfer escapes YIR function `{}`",
@@ -116,15 +129,86 @@ pub(super) fn validate_owned_return_buffer_yir(module: &YirModule) -> Result<(),
                     &nodes,
                 )?;
             }
+            ([], [], [returned]) => validate_owner_tail(
+                contract.symbol,
+                &producer.name,
+                producer_index,
+                returned,
+                &consumers,
+                function,
+                &positions,
+                &nodes,
+            )?,
             _ => {
                 return Err(format!(
-                    "owned extern buffer `{}` must be consumed by exactly one direct free(...) or one registered owned-buffer branch transfer in the same linear block; found {} free(s) and {} transfer(s)",
+                    "owned extern buffer `{}` must be consumed by exactly one direct free(...), registered branch transfer, or registered helper return; found {} free(s), {} branch transfer(s), and {} return transfer(s)",
                     contract.symbol,
                     free_nodes.len(),
-                    transfer_nodes.len()
+                    transfer_nodes.len(),
+                    return_nodes.len()
                 ));
             }
         }
+    }
+    validate_returned_call_owners(module, &nodes)?;
+    Ok(())
+}
+
+fn validate_returned_call_owners(
+    module: &YirModule,
+    nodes: &BTreeMap<&str, &Node>,
+) -> Result<(), String> {
+    for owner in module.nodes.iter().filter(|node| {
+        node.op.module == "cpu" && node.op.instruction == "call_owned_external_buffer"
+    }) {
+        let contract =
+            yir_core::ffi::parse_owned_buffer_function_transfer_contract(&owner.op.args[1..])
+                .map_err(|error| format!("returned owned buffer `{}`: {error}", owner.name))?;
+        let function = module
+            .functions
+            .iter()
+            .find(|function| function.body_nodes.contains(&owner.name))
+            .ok_or_else(|| {
+                format!(
+                    "returned owned buffer `{}` must belong to one caller function",
+                    owner.name
+                )
+            })?;
+        let positions = function
+            .body_nodes
+            .iter()
+            .enumerate()
+            .map(|(index, name)| (name.as_str(), index))
+            .collect::<BTreeMap<_, _>>();
+        let owner_index = positions[owner.name.as_str()];
+        let consumers = module
+            .edges
+            .iter()
+            .filter(|edge| edge.kind == EdgeKind::Dep && edge.from == owner.name)
+            .filter_map(|edge| nodes.get(edge.to.as_str()).copied())
+            .collect::<Vec<_>>();
+        let free_nodes = consumers
+            .iter()
+            .copied()
+            .filter(|node| is_exact_free(node, &owner.name))
+            .collect::<Vec<_>>();
+        let [free] = free_nodes.as_slice() else {
+            return Err(format!(
+                "returned owned buffer from `{}` must be consumed by exactly one direct caller free(...); found {}",
+                owner.op.args[0],
+                free_nodes.len()
+            ));
+        };
+        validate_owner_tail(
+            &format!("{} via {}", owner.op.args[0], contract.destructor_symbol),
+            &owner.name,
+            owner_index,
+            free,
+            &consumers,
+            function,
+            &positions,
+            nodes,
+        )?;
     }
     Ok(())
 }
@@ -360,6 +444,12 @@ fn is_exact_free(node: &Node, producer: &str) -> bool {
     node.op.module == "cpu"
         && node.op.instruction == "free"
         && node.op.args.as_slice() == [producer]
+}
+
+fn is_exact_function_return(node: &Node, producer: &str) -> bool {
+    node.op.module == "cpu"
+        && node.op.instruction == "return_owned_external_buffer"
+        && node.op.args.first().map(String::as_str) == Some(producer)
 }
 
 fn is_direct_buffer_access(node: &Node, producer: &str) -> bool {

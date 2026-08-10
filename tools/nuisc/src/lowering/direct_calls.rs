@@ -10,7 +10,18 @@ enum DirectCallScalarKind {
     BorrowedBuffer,
     TraversalPointer,
     OwnedBytes,
+    OwnedExternalBuffer,
 }
+
+#[path = "direct_calls/kinds.rs"]
+mod kinds;
+pub(super) use kinds::{
+    collect_owned_external_buffer_return_helpers, supports_direct_call_signature,
+};
+use kinds::{
+    direct_call_scalar_kind, direct_call_signature_kind, is_scheduler_scalar_kind,
+    owned_external_buffer_metadata_for_helper, owned_external_buffer_metadata_for_node,
+};
 
 pub(super) fn collect_recursive_direct_call_functions(module: &NirModule) -> BTreeSet<String> {
     collect_recursive_helper_functions(module, false)
@@ -153,7 +164,7 @@ pub(super) fn collect_async_loop_step_functions(module: &NirModule) -> BTreeSet<
         .functions
         .iter()
         .filter(|function| function.is_async)
-        .filter(|function| direct_call_signature_kind(function).is_some())
+        .filter(|function| supports_direct_call_signature(function))
         .map(|function| function.name.as_str())
         .collect::<BTreeSet<_>>();
     let mut collected = BTreeSet::new();
@@ -168,7 +179,7 @@ fn collect_recursive_helper_functions(module: &NirModule, is_async: bool) -> BTr
         .functions
         .iter()
         .filter(|function| function.is_async == is_async)
-        .filter(|function| direct_call_signature_kind(function).is_some())
+        .filter(|function| supports_direct_call_signature(function))
         .collect::<Vec<_>>();
     let eligible_names = eligible
         .iter()
@@ -250,74 +261,6 @@ fn collect_async_loop_step_function_in_while(
     if eligible_names.contains(callee.as_str()) && matches!(args.as_slice(), [NirExpr::Var(_)]) {
         collected.insert(callee.clone());
     }
-}
-
-fn direct_call_scalar_kind(ty: &nuis_semantics::model::NirTypeRef) -> Option<DirectCallScalarKind> {
-    if ty.is_mutex_permit_family() && ty.generic_args.len() == 1 && !ty.is_optional {
-        return Some(DirectCallScalarKind::I64);
-    }
-    if ty.is_optional || !ty.generic_args.is_empty() {
-        return None;
-    }
-    if ty.is_ref {
-        return match ty.name.as_str() {
-            "Buffer" => Some(DirectCallScalarKind::BorrowedBuffer),
-            "Node" => Some(DirectCallScalarKind::TraversalPointer),
-            _ => None,
-        };
-    }
-    if ty.name == "Bytes" {
-        return Some(DirectCallScalarKind::OwnedBytes);
-    }
-    if ty.is_bool_scalar() {
-        Some(DirectCallScalarKind::Bool)
-    } else if ty.name == "i32" {
-        Some(DirectCallScalarKind::I32)
-    } else if ty.name == "i64" {
-        Some(DirectCallScalarKind::I64)
-    } else if ty.name == "f32" {
-        Some(DirectCallScalarKind::F32)
-    } else if ty.name == "f64" {
-        Some(DirectCallScalarKind::F64)
-    } else {
-        None
-    }
-}
-
-fn is_scheduler_scalar_kind(kind: DirectCallScalarKind) -> bool {
-    matches!(
-        kind,
-        DirectCallScalarKind::Bool
-            | DirectCallScalarKind::I32
-            | DirectCallScalarKind::I64
-            | DirectCallScalarKind::F32
-            | DirectCallScalarKind::F64
-    )
-}
-
-pub(super) fn supports_direct_call_signature(function: &NirFunction) -> bool {
-    direct_call_signature_kind(function).is_some()
-}
-
-fn direct_call_signature_kind(function: &NirFunction) -> Option<DirectCallScalarKind> {
-    if function
-        .return_type
-        .as_ref()
-        .is_some_and(nuis_semantics::model::NirTypeRef::is_mutex_permit_family)
-    {
-        return None;
-    }
-    let return_kind = direct_call_scalar_kind(function.return_type.as_ref()?)?;
-    if matches!(
-        return_kind,
-        DirectCallScalarKind::BorrowedBuffer | DirectCallScalarKind::TraversalPointer
-    ) {
-        return None;
-    }
-    for param in &function.params {
-        direct_call_scalar_kind(&param.ty)?;
-    }
-    Some(return_kind)
 }
 
 fn function_called_functions(
@@ -665,6 +608,9 @@ pub(super) fn lower_direct_call_helper_function(
             DirectCallScalarKind::BorrowedBuffer => "param_buffer_ref",
             DirectCallScalarKind::TraversalPointer => "param_node_ref",
             DirectCallScalarKind::OwnedBytes => "param_owned_bytes",
+            DirectCallScalarKind::OwnedExternalBuffer => {
+                unreachable!("owned external buffers cannot be helper parameters")
+            }
         };
         state.yir.nodes.push(Node {
             name: node_name.clone(),
@@ -688,15 +634,21 @@ pub(super) fn lower_direct_call_helper_function(
         .ok_or_else(|| format!("function `{}` did not return a value", function.name))?;
     state.last_effect_anchor = saved_effect_anchor;
     let return_name = format!("__fn_{}_return", function.name);
-    let return_instruction = if function_owned_struct_layout(function, state).is_some() {
-        "return_owned_struct"
+    let struct_return = function_owned_struct_layout(function, state).is_some();
+    let return_kind = if struct_return {
+        None
     } else {
-        match direct_call_signature_kind(function).ok_or_else(|| {
+        Some(direct_call_signature_kind(function).ok_or_else(|| {
             format!(
-                "ordinary direct-call lowering only supports scalar or scheduler-owned recursive scalar struct return type in `{}`",
+                "ordinary direct-call lowering does not support the return type in `{}`",
                 function.name
             )
-        })? {
+        })?)
+    };
+    let (return_instruction, mut return_args) = if struct_return {
+        ("return_owned_struct", vec![returned.clone()])
+    } else {
+        let instruction = match return_kind.expect("non-struct return kind") {
             DirectCallScalarKind::Bool => "return_bool",
             DirectCallScalarKind::I32 => "return_i32",
             DirectCallScalarKind::I64 => "return_i64",
@@ -707,18 +659,28 @@ pub(super) fn lower_direct_call_helper_function(
                 unreachable!("traversal refs cannot return")
             }
             DirectCallScalarKind::OwnedBytes => "return_owned_bytes",
-        }
+            DirectCallScalarKind::OwnedExternalBuffer => "return_owned_external_buffer",
+        };
+        (instruction, vec![returned.clone()])
     };
+    if return_kind == Some(DirectCallScalarKind::OwnedExternalBuffer) {
+        return_args.extend(owned_external_buffer_metadata_for_node(
+            state.yir, &returned,
+        )?);
+    }
     state.yir.nodes.push(Node {
         name: return_name.clone(),
         resource: "cpu0".to_owned(),
         op: Operation {
             module: "cpu".to_owned(),
             instruction: return_instruction.to_owned(),
-            args: vec![returned.clone()],
+            args: return_args,
         },
     });
     push_dep_edges(state, &returned, &return_name);
+    if return_kind == Some(DirectCallScalarKind::OwnedExternalBuffer) {
+        push_lifetime_edge(state, &returned, &return_name);
+    }
     state.yir.edges.push(Edge {
         kind: EdgeKind::Effect,
         from: returned,
@@ -742,7 +704,11 @@ pub(super) fn lower_direct_call_helper_function(
         parameters: function_parameters,
         result: Some(YirFunctionResult {
             ty: return_type.render(),
-            ownership: yir_value_ownership(return_type),
+            ownership: if return_kind == Some(DirectCallScalarKind::OwnedExternalBuffer) {
+                YirValueOwnership::Owned
+            } else {
+                yir_value_ownership(return_type)
+            },
             node: return_name,
         }),
         body_nodes,
@@ -757,15 +723,20 @@ pub(super) fn push_direct_call_node(
 ) -> Result<String, String> {
     let name = next_name(state, "cpu_call");
     let struct_layout = function_owned_struct_layout(function, state);
+    let return_kind = if struct_layout.is_some() {
+        None
+    } else {
+        Some(direct_call_signature_kind(function).ok_or_else(|| {
+            format!(
+                "ordinary direct-call lowering does not support the return type in `{}`",
+                function.name
+            )
+        })?)
+    };
     let instruction = if struct_layout.is_some() {
         "call_owned_struct"
     } else {
-        match direct_call_signature_kind(function).ok_or_else(|| {
-            format!(
-                "ordinary direct-call lowering only supports scalar or scheduler-owned recursive scalar struct return type in `{}`",
-                function.name
-            )
-        })? {
+        match return_kind.expect("non-struct return kind") {
             DirectCallScalarKind::Bool => "call_bool",
             DirectCallScalarKind::I32 => "call_i32",
             DirectCallScalarKind::I64 => "call_i64",
@@ -776,11 +747,18 @@ pub(super) fn push_direct_call_node(
                 unreachable!("traversal refs cannot return")
             }
             DirectCallScalarKind::OwnedBytes => "call_owned_bytes",
+            DirectCallScalarKind::OwnedExternalBuffer => "call_owned_external_buffer",
         }
     };
     let mut op_args = vec![function.name.clone()];
     if let Some(layout) = struct_layout {
         op_args.push(layout);
+    }
+    if return_kind == Some(DirectCallScalarKind::OwnedExternalBuffer) {
+        op_args.extend(owned_external_buffer_metadata_for_helper(
+            state.yir,
+            &function.name,
+        )?);
     }
     op_args.extend(args.iter().cloned());
     state.yir.nodes.push(Node {

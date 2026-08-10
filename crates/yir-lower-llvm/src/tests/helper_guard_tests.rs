@@ -272,6 +272,7 @@ fn renders_bit_preserving_f32_and_f64_task_invokers() {
         &CpuHelperSignature {
             params: vec![CpuCallScalarKind::F32],
             ret: CpuCallScalarKind::F32,
+            owned_external_buffer_return: None,
         },
     )
     .expect("f32 task invoker");
@@ -285,6 +286,7 @@ fn renders_bit_preserving_f32_and_f64_task_invokers() {
         &CpuHelperSignature {
             params: vec![CpuCallScalarKind::Bool, CpuCallScalarKind::F64],
             ret: CpuCallScalarKind::F64,
+            owned_external_buffer_return: None,
         },
     )
     .expect("f64 task invoker");
