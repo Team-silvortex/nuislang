@@ -6,9 +6,10 @@ use super::{
     call_return::cpu_scalar_kind_llvm_type,
     fresh_block, fresh_reg,
     value_ref::{
-        borrowed_buffer_parts, coerce_to_i64, get_bool, get_f32, get_f64, get_i32, get_i64, get_ptr,
+        borrowed_buffer_parts, coerce_to_i64, get_bool, get_f32, get_f64, get_i32, get_i64,
+        get_mutex_permit, get_ptr,
     },
-    CpuCallScalarKind, CpuHelperSignature, LlvmValueRef, TaskThunkArgument,
+    CpuCallScalarKind, CpuHelperSignature, LlvmValueRef, MutexScalarKind, TaskThunkArgument,
 };
 
 pub(crate) fn lower_cpu_branch_owned_call_node(
@@ -70,6 +71,7 @@ pub(crate) fn lower_cpu_branch_owned_call_node(
         buffer_lengths,
         args.then_scalar_args,
         &then_signature.params[1..],
+        &then_signature.mutex_permit_params[1..],
     ) else {
         body.push(format!(
             "  ; deferred lowering for cpu.branch_call_owned_bytes `{}` because one or more then scalar inputs are outside the current CPU LLVM slice",
@@ -82,6 +84,7 @@ pub(crate) fn lower_cpu_branch_owned_call_node(
         buffer_lengths,
         args.else_scalar_args,
         &else_signature.params[1..],
+        &else_signature.mutex_permit_params[1..],
     ) else {
         body.push(format!(
             "  ; deferred lowering for cpu.branch_call_owned_bytes `{}` because one or more else scalar inputs are outside the current CPU LLVM slice",
@@ -157,18 +160,26 @@ pub(crate) fn lower_branch_scalar_args(
     buffer_lengths: &BTreeMap<String, String>,
     args: &[String],
     kinds: &[CpuCallScalarKind],
+    mutex_permit_kinds: &[Option<MutexScalarKind>],
 ) -> Option<Vec<String>> {
     args.iter()
-        .zip(kinds)
-        .map(|(arg, kind)| match kind {
-            CpuCallScalarKind::BorrowedBuffer => {
-                let (pointer, len) = borrowed_buffer_parts(registers, buffer_lengths, arg)?;
-                Some(vec![format!("ptr {pointer}"), format!("i64 {len}")])
+        .zip(kinds.iter().zip(mutex_permit_kinds))
+        .map(|(arg, (kind, mutex_permit_kind))| match mutex_permit_kind {
+            Some(expected_kind) => {
+                let permit = get_mutex_permit(registers, arg)?;
+                (permit.scalar_kind == *expected_kind)
+                    .then(|| vec![format!("i64 {}", permit.runtime_token)])
             }
-            CpuCallScalarKind::TraversalPointer => {
-                get_ptr(registers, arg).map(|ptr| vec![format!("ptr {ptr}")])
-            }
-            _ => Some(vec![lower_scalar_value_arg(registers.get(arg)?, kind)?]),
+            None => match kind {
+                CpuCallScalarKind::BorrowedBuffer => {
+                    let (pointer, len) = borrowed_buffer_parts(registers, buffer_lengths, arg)?;
+                    Some(vec![format!("ptr {pointer}"), format!("i64 {len}")])
+                }
+                CpuCallScalarKind::TraversalPointer => {
+                    get_ptr(registers, arg).map(|ptr| vec![format!("ptr {ptr}")])
+                }
+                _ => Some(vec![lower_scalar_value_arg(registers.get(arg)?, kind)?]),
+            },
         })
         .collect::<Option<Vec<_>>>()
         .map(|args| args.into_iter().flatten().collect())
@@ -262,35 +273,47 @@ pub(crate) fn lower_cpu_call_node(
     }
     let lowered_args = call_inputs
         .iter()
-        .zip(signature.params.iter())
-        .map(|(arg, kind)| match kind {
-            CpuCallScalarKind::Bool => {
-                get_bool(registers, arg).map(|value| vec![format!("i1 {value}")])
+        .zip(
+            signature
+                .params
+                .iter()
+                .zip(signature.mutex_permit_params.iter()),
+        )
+        .map(|(arg, (kind, mutex_permit_kind))| match mutex_permit_kind {
+            Some(expected_kind) => {
+                let permit = get_mutex_permit(registers, arg)?;
+                (permit.scalar_kind == *expected_kind)
+                    .then(|| vec![format!("i64 {}", permit.runtime_token)])
             }
-            CpuCallScalarKind::I32 => {
-                get_i32(registers, arg).map(|value| vec![format!("i32 {value}")])
-            }
-            CpuCallScalarKind::I64 => {
-                get_i64(registers, arg).map(|value| vec![format!("i64 {value}")])
-            }
-            CpuCallScalarKind::F32 => {
-                get_f32(registers, arg).map(|value| vec![format!("float {value}")])
-            }
-            CpuCallScalarKind::F64 => {
-                get_f64(registers, arg).map(|value| vec![format!("double {value}")])
-            }
-            CpuCallScalarKind::BorrowedBuffer => {
-                borrowed_buffer_parts(registers, buffer_lengths, arg)
-                    .map(|(ptr, len)| vec![format!("ptr {ptr}"), format!("i64 {len}")])
-            }
-            CpuCallScalarKind::TraversalPointer => {
-                get_ptr(registers, arg).map(|ptr| vec![format!("ptr {ptr}")])
-            }
-            CpuCallScalarKind::OwnedBytes => match registers.get(arg) {
-                Some(LlvmValueRef::OwnedBytes { blob }) => Some(vec![format!("ptr {blob}")]),
-                _ => None,
+            None => match kind {
+                CpuCallScalarKind::Bool => {
+                    get_bool(registers, arg).map(|value| vec![format!("i1 {value}")])
+                }
+                CpuCallScalarKind::I32 => {
+                    get_i32(registers, arg).map(|value| vec![format!("i32 {value}")])
+                }
+                CpuCallScalarKind::I64 => {
+                    get_i64(registers, arg).map(|value| vec![format!("i64 {value}")])
+                }
+                CpuCallScalarKind::F32 => {
+                    get_f32(registers, arg).map(|value| vec![format!("float {value}")])
+                }
+                CpuCallScalarKind::F64 => {
+                    get_f64(registers, arg).map(|value| vec![format!("double {value}")])
+                }
+                CpuCallScalarKind::BorrowedBuffer => {
+                    borrowed_buffer_parts(registers, buffer_lengths, arg)
+                        .map(|(ptr, len)| vec![format!("ptr {ptr}"), format!("i64 {len}")])
+                }
+                CpuCallScalarKind::TraversalPointer => {
+                    get_ptr(registers, arg).map(|ptr| vec![format!("ptr {ptr}")])
+                }
+                CpuCallScalarKind::OwnedBytes => match registers.get(arg) {
+                    Some(LlvmValueRef::OwnedBytes { blob }) => Some(vec![format!("ptr {blob}")]),
+                    _ => None,
+                },
+                CpuCallScalarKind::OwnedExternalBuffer => None,
             },
-            CpuCallScalarKind::OwnedExternalBuffer => None,
         })
         .collect::<Option<Vec<_>>>()
         .map(|args| args.into_iter().flatten().collect::<Vec<_>>());

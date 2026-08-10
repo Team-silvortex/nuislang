@@ -323,3 +323,78 @@ fn lease_replace_publishes_value_across_preissued_permits() {
         Some(&3)
     );
 }
+
+#[test]
+fn lease_replace_preserves_i32_payload_kind() {
+    let cpu = CpuMod;
+    let mut state = ExecutionState::default();
+    state.bind_value("value", Value::I32(-17));
+    state.bind_value("replacement", Value::I32(23));
+    state.bind_value("wrong_kind", Value::Int(23));
+    state.bind_value("cardinality", Value::Int(1));
+    state.bind_value("lane", Value::Int(0));
+
+    let mutex =
+        execute(&cpu, &mut state, "i32_mutex", "mutex_new", &["value"]).expect("create i32 mutex");
+    state.bind_value("i32_mutex", mutex);
+    let shared = execute(
+        &cpu,
+        &mut state,
+        "i32_shared",
+        "mutex_share",
+        &["i32_mutex", "cardinality"],
+    )
+    .expect("share i32 mutex");
+    state.bind_value("i32_shared", shared);
+    let permit = execute(
+        &cpu,
+        &mut state,
+        "i32_permit",
+        "mutex_permit",
+        &["i32_shared", "lane"],
+    )
+    .expect("issue i32 permit");
+    state.bind_value("i32_permit", permit);
+    let lease = execute(
+        &cpu,
+        &mut state,
+        "i32_lease",
+        "mutex_permit_lock",
+        &["i32_permit"],
+    )
+    .expect("lock i32 permit");
+    state.bind_value("i32_lease", lease);
+
+    let mismatch = execute(
+        &cpu,
+        &mut state,
+        "i32_mismatch",
+        "mutex_lease_replace",
+        &["i32_lease", "wrong_kind"],
+    )
+    .unwrap_err();
+    assert!(mismatch.contains("must preserve the native i32/i64 scalar payload kind"));
+
+    assert_eq!(
+        execute(
+            &cpu,
+            &mut state,
+            "i32_old",
+            "mutex_lease_replace",
+            &["i32_lease", "replacement"],
+        )
+        .expect("replace i32 payload"),
+        Value::I32(-17)
+    );
+    assert_eq!(
+        execute(
+            &cpu,
+            &mut state,
+            "i32_current",
+            "mutex_lease_value",
+            &["i32_lease"],
+        )
+        .expect("read i32 payload"),
+        Value::I32(23)
+    );
+}

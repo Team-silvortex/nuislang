@@ -138,6 +138,15 @@ pub(super) fn extract_selectable_cpu_binary_runtime_expr(
     }
 }
 
+pub(super) fn extract_selectable_cpu_mutex_capability_expr(
+    expr: &NirExpr,
+) -> Option<(NirMutexCapabilityOp, &[NirExpr])> {
+    let NirExpr::CpuMutexCapability { op, args } = expr else {
+        return None;
+    };
+    Some((*op, args.as_slice()))
+}
+
 fn extract_binding_name_and_value(stmt: &NirStmt) -> Option<(&String, &NirExpr)> {
     match stmt {
         NirStmt::Let { name, value, .. } | NirStmt::Const { name, value, .. } => {

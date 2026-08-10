@@ -3,10 +3,13 @@ pub(crate) fn append_c_shim_mutex_runtime(out: &mut String) {
         r#"
 
 #define NUIS_SCHEDULER_MUTEX_CAPACITY_V1 256
+#define NUIS_SCHEDULER_MUTEX_SCALAR_I32_V1 1
+#define NUIS_SCHEDULER_MUTEX_SCALAR_I64_V1 2
 
 typedef struct {
     int64_t handle;
     int64_t value;
+    int64_t scalar_kind;
     uint64_t generation;
     uint64_t release_epoch;
     int64_t active;
@@ -51,6 +54,11 @@ static int64_t nuis_scheduler_mutex_rejected_unlock_count_v1 = 0;
 static int64_t nuis_scheduler_mutex_successful_unlock_count_v1 = 0;
 static int64_t nuis_scheduler_mutex_rejected_permit_count_v1 = 0;
 static int64_t nuis_scheduler_mutex_rejected_close_count_v1 = 0;
+
+static int64_t nuis_scheduler_mutex_scalar_kind_valid_v1(int64_t scalar_kind) {
+    return scalar_kind == NUIS_SCHEDULER_MUTEX_SCALAR_I32_V1
+        || scalar_kind == NUIS_SCHEDULER_MUTEX_SCALAR_I64_V1;
+}
 
 static NuisSchedulerMutexSlotV1* nuis_scheduler_mutex_slot_v1(int64_t handle) {
     if (handle <= 0) return NULL;
@@ -106,6 +114,7 @@ static NuisSchedulerMutexPermitSlotV1* nuis_scheduler_mutex_free_permit_slot_v1(
 static void nuis_scheduler_mutex_reset_v1(void) {
     for (int64_t index = 0; index < NUIS_SCHEDULER_MUTEX_CAPACITY_V1; index += 1) {
         nuis_scheduler_mutex_slots_v1[index].active = 0;
+        nuis_scheduler_mutex_slots_v1[index].scalar_kind = 0;
         nuis_scheduler_mutex_slots_v1[index].locked = 0;
         nuis_scheduler_mutex_slots_v1[index].shared = 0;
         nuis_scheduler_mutex_slots_v1[index].permit_cardinality = 0;
@@ -123,13 +132,15 @@ static void nuis_scheduler_mutex_reset_v1(void) {
     nuis_scheduler_mutex_rejected_close_count_v1 = 0;
 }
 
-int64_t nuis_scheduler_mutex_new_i64_v1(int64_t value) {
+int64_t nuis_scheduler_mutex_new_scalar_v1(int64_t value, int64_t scalar_kind) {
+    if (!nuis_scheduler_mutex_scalar_kind_valid_v1(scalar_kind)) return 0;
     for (int64_t index = 0; index < NUIS_SCHEDULER_MUTEX_CAPACITY_V1; index += 1) {
         NuisSchedulerMutexSlotV1* slot = &nuis_scheduler_mutex_slots_v1[index];
         if (slot->active) continue;
         if (nuis_scheduler_mutex_next_handle_v1 == INT64_MAX) return 0;
         slot->handle = nuis_scheduler_mutex_next_handle_v1++;
         slot->value = value;
+        slot->scalar_kind = scalar_kind;
         slot->generation = nuis_scheduler_mutex_next_generation_v1++;
         slot->release_epoch = nuis_scheduler_mutex_visibility_epoch_v1;
         slot->active = 1;
@@ -141,6 +152,13 @@ int64_t nuis_scheduler_mutex_new_i64_v1(int64_t value) {
         return slot->handle;
     }
     return 0;
+}
+
+int64_t nuis_scheduler_mutex_new_i64_v1(int64_t value) {
+    return nuis_scheduler_mutex_new_scalar_v1(
+        value,
+        NUIS_SCHEDULER_MUTEX_SCALAR_I64_V1
+    );
 }
 
 int64_t nuis_scheduler_mutex_try_lock_i64_v1(int64_t handle) {
@@ -171,19 +189,32 @@ int64_t nuis_scheduler_mutex_lock_i64_v1(int64_t handle) {
     exit(72);
 }
 
-int64_t nuis_scheduler_mutex_value_i64_v1(int64_t guard_token) {
+int64_t nuis_scheduler_mutex_value_scalar_v1(
+    int64_t guard_token,
+    int64_t scalar_kind
+) {
     NuisSchedulerMutexGuardSlotV1* guard =
         nuis_scheduler_mutex_guard_slot_v1(guard_token);
     NuisSchedulerMutexSlotV1* mutex = guard == NULL
         ? NULL
         : nuis_scheduler_mutex_slot_v1(guard->mutex_handle);
     if (guard == NULL || mutex == NULL || !mutex->locked
-        || mutex->generation != guard->mutex_generation) {
-        fprintf(stderr, "nuis: scheduler mutex value rejected for guard %lld\n",
-            (long long)guard_token);
+        || mutex->generation != guard->mutex_generation
+        || !nuis_scheduler_mutex_scalar_kind_valid_v1(scalar_kind)
+        || mutex->scalar_kind != scalar_kind) {
+        fprintf(stderr,
+            "nuis: scheduler mutex scalar value rejected for guard %lld kind %lld\n",
+            (long long)guard_token, (long long)scalar_kind);
         exit(73);
     }
     return mutex->value;
+}
+
+int64_t nuis_scheduler_mutex_value_i64_v1(int64_t guard_token) {
+    return nuis_scheduler_mutex_value_scalar_v1(
+        guard_token,
+        NUIS_SCHEDULER_MUTEX_SCALAR_I64_V1
+    );
 }
 
 int64_t nuis_scheduler_mutex_try_unlock_i64_v1(int64_t guard_token) {
@@ -349,9 +380,10 @@ int64_t nuis_scheduler_mutex_lease_unlock_i64_v1(int64_t guard_token) {
     exit(78);
 }
 
-int64_t nuis_scheduler_mutex_lease_replace_i64_v1(
+int64_t nuis_scheduler_mutex_lease_replace_scalar_v1(
     int64_t guard_token,
-    int64_t replacement
+    int64_t replacement,
+    int64_t scalar_kind
 ) {
     NuisSchedulerMutexGuardSlotV1* guard =
         nuis_scheduler_mutex_guard_slot_v1(guard_token);
@@ -359,9 +391,12 @@ int64_t nuis_scheduler_mutex_lease_replace_i64_v1(
         ? NULL
         : nuis_scheduler_mutex_slot_v1(guard->mutex_handle);
     if (guard == NULL || mutex == NULL || !guard->shared_lease || !mutex->locked
-        || mutex->generation != guard->mutex_generation) {
-        fprintf(stderr, "nuis: scheduler mutex lease replace rejected for guard %lld\n",
-            (long long)guard_token);
+        || mutex->generation != guard->mutex_generation
+        || !nuis_scheduler_mutex_scalar_kind_valid_v1(scalar_kind)
+        || mutex->scalar_kind != scalar_kind) {
+        fprintf(stderr,
+            "nuis: scheduler mutex scalar lease replace rejected for guard %lld kind %lld\n",
+            (long long)guard_token, (long long)scalar_kind);
         exit(80);
     }
     int64_t old = mutex->value;
@@ -370,6 +405,17 @@ int64_t nuis_scheduler_mutex_lease_replace_i64_v1(
     nuis_scheduler_mutex_visibility_epoch_v1 += 1;
     mutex->release_epoch = nuis_scheduler_mutex_visibility_epoch_v1;
     return old;
+}
+
+int64_t nuis_scheduler_mutex_lease_replace_i64_v1(
+    int64_t guard_token,
+    int64_t replacement
+) {
+    return nuis_scheduler_mutex_lease_replace_scalar_v1(
+        guard_token,
+        replacement,
+        NUIS_SCHEDULER_MUTEX_SCALAR_I64_V1
+    );
 }
 
 int64_t nuis_scheduler_mutex_guard_owner_v1(int64_t guard_token) {

@@ -493,9 +493,9 @@ pub(super) fn lower_task_builtin_call(
                     .ok_or_else(|| {
                         "mutex_lease_replace(...) cannot resolve the lease payload type".to_owned()
                     })?;
-            if payload_ty.render() != "i64" {
+            if !matches!(payload_ty.render().as_str(), "i32" | "i64") {
                 return Err(format!(
-                    "mutex_lease_replace(...) currently supports only `MutexLease<i64>`, found `MutexLease<{}>`",
+                    "mutex_lease_replace(...) currently supports native scalar `MutexLease<i32>` or `MutexLease<i64>`, found `MutexLease<{}>`",
                     payload_ty.render()
                 ));
             }

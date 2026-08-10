@@ -26,8 +26,12 @@ If you only want the current task mainline, start with:
   native two-task shared-mutex permit/lease authority anchor
 * [task_shared_mutex_cardinality_demo](task_shared_mutex_cardinality_demo)
   native three-task static permit-cardinality anchor
+* [task_shared_mutex_branch_demo](task_shared_mutex_branch_demo)
+  native branch-selected shared capability exactly-once anchor
 * [task_shared_mutex_replace_demo](task_shared_mutex_replace_demo)
   native lease mutation and cross-permit publication anchor
+* [task_shared_mutex_i32_demo](task_shared_mutex_i32_demo)
+  native non-i64 scalar permit, mutation, and publication anchor
 * [task_branch_cancel_unlock_demo](task_branch_cancel_unlock_demo)
   dynamic native cancel/unlock selected-prefix closure anchor
 * [task_recursive_async_demo](task_recursive_async_demo)
@@ -104,7 +108,9 @@ If you only want the current task mainline, start with:
   [task_thread_mutex_demo](task_thread_mutex_demo),
   [task_shared_mutex_permit_demo](task_shared_mutex_permit_demo),
   [task_shared_mutex_cardinality_demo](task_shared_mutex_cardinality_demo),
+  [task_shared_mutex_branch_demo](task_shared_mutex_branch_demo),
   [task_shared_mutex_replace_demo](task_shared_mutex_replace_demo),
+  [task_shared_mutex_i32_demo](task_shared_mutex_i32_demo),
   [task_branch_cancel_unlock_demo](task_branch_cancel_unlock_demo)
   current note:
   explicit project smoke test is checked in and now runs through the staged
@@ -112,9 +118,11 @@ If you only want the current task mainline, start with:
   `mutex_snapshot<T>` / `join_thread_*<T>` wrappers; the shared companion
   issues two non-cloneable lane permits without exposing the scheduler mutex
   handle; the cardinality companion declares three static lanes at share time;
-  the branch companion adds dynamic select-before-consume cancellation and
-  unlock execution; the replace companion proves that a lease mutation is
-  release-published to a permit issued before the mutation
+  the shared branch companion selects capability inputs before emitting one
+  share/permit/lease chain; the task branch companion adds dynamic
+  select-before-consume cancellation and unlock execution; the replace
+  companion proves that a lease mutation is release-published to a permit
+  issued before the mutation
 * probe-only route:
   [task_join_nonconsuming_probe_demo](task_join_nonconsuming_probe_demo)
 

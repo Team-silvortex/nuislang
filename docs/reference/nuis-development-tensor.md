@@ -233,7 +233,7 @@ historical closures.
 
 The `beta-0.1` calibration baseline is:
 
-* `standard-library/std/concurrency-task-thread-lock`: `active/97`, required
+* `standard-library/std/concurrency-task-thread-lock`: `active/99`, required
   and now the current weakest task;
   recursive selected-prefix lowering and the native cancel/unlock project close
   both dynamic branches; `Mutex<i64>` now has opaque scheduler handles,
@@ -247,11 +247,17 @@ The `beta-0.1` calibration baseline is:
   authority, rejects active leases, release-publishes closure, revokes pending
   same-generation permits, invalidates the runtime slot, and returns the revoked
   count through interpreted and native paths; `mutex_lease_replace` now keeps
-  linear lease authority while returning the old `i64`, publishes a release
+  linear lease authority while returning the old scalar, publishes a release
   epoch, and makes the replacement visible to a permit issued before mutation
-  in interpreter, C-runtime, LLVM, and native task-project evidence; non-`i64`
-  payloads, branch-local shared capabilities, runtime-dynamic cardinality, and
-  OS-thread parallelism remain open
+  in interpreter, C-runtime, LLVM, and native task-project evidence; matching
+  branch-local share/permit/lease prefixes now select inputs before emitting one
+  capability chain, reject cardinality/lane drift, and execute both native paths
+  with exits `25` and `43`; the scalar-v1 follow-up now preserves
+  `MutexPermit<i32>` across task packing/helper reconstruction, carries signed
+  i32 bits through kind-checked native slots, replaces `17` with `23`, observes
+  the replacement, and exits `63` without deferred mutex lowering;
+  runtime-dynamic cardinality, bool/float native payloads, and OS-thread
+  parallelism remain open
 * `host-compatibility/cffi/registered-pointer-string-object-boundary`:
   `usable/93`, required; five real borrowed UTF-8 calls and one owned
   `ref Buffer` return carry exact signature plus memory-capability hashes

@@ -22,16 +22,16 @@ Read the current line this way:
 * `Thread<T>` / `Mutex<T>` / `MutexGuard<T>` are real staged frontend,
   lowering, and verifier-visible families
 * they already have compile-closure anchors and `GLM` ownership rules
-* `Mutex<i64>` now reaches a cooperative scheduler handle/guard runtime with
-  explicit acquire/release epoch evidence
-* `SharedMutex<i64>` can authorize a statically declared `1..=64` task lanes
-  through distinct, non-cloneable `MutexPermit<i64>` values; the one-argument
+* `Mutex<i32>` and `Mutex<i64>` now reach a cooperative scheduler handle/guard
+  runtime with explicit acquire/release epoch evidence
+* `SharedMutex<i32|i64>` can authorize a statically declared `1..=64` task
+  lanes through distinct, non-cloneable typed permits; the one-argument
   `mutex_share(lock)` form remains a two-lane shorthand
-* each worker consumes its permit into one `MutexLease<i64>` without receiving
-  the raw scheduler handle, and a live lease can replace the central `i64`
-  payload while retaining authority
+* each worker consumes its permit into one typed `MutexLease<T>` without
+  receiving the raw scheduler handle, and a live lease can replace the central
+  scalar payload while retaining authority
 * this foothold still does **not** imply a parallel executor, runtime-dynamic
-  permit cardinality, generalized payloads, or a finalized visibility contract
+  permit cardinality, bool/float native payloads, or finalized visibility
 
 ## What Is Real Today
 
@@ -66,7 +66,9 @@ Current project anchor:
 * [task_thread_mutex_demo](../../examples/projects/task/task_thread_mutex_demo)
 * [task_shared_mutex_permit_demo](../../examples/projects/task/task_shared_mutex_permit_demo)
 * [task_shared_mutex_cardinality_demo](../../examples/projects/task/task_shared_mutex_cardinality_demo)
+* [task_shared_mutex_branch_demo](../../examples/projects/task/task_shared_mutex_branch_demo)
 * [task_shared_mutex_replace_demo](../../examples/projects/task/task_shared_mutex_replace_demo)
+* [task_shared_mutex_i32_demo](../../examples/projects/task/task_shared_mutex_i32_demo)
 * [task_branch_cancel_unlock_demo](../../examples/projects/task/task_branch_cancel_unlock_demo)
 
 Short rule:
@@ -75,8 +77,12 @@ Short rule:
 * use the shared permit demo when you want the shortest native default-two-lane
   authorization path without copied mutex handles
 * use the cardinality demo when you want three statically declared task lanes
+* use the shared branch demo when you want share/permit/lease operations
+  selected before one exactly-once capability chain is emitted
 * use the replace demo when you want release-published lease mutation observed
   by a permit issued before that mutation
+* use the i32 demo when you want the typed permit to cross two task boundaries
+  without becoming an ordinary i64 value
 * use the branch demo when you want native dynamic cancel/unlock closure with
   both source branches executed
 * use the single-file `.ns` anchors when you want the shortest boundary
@@ -157,7 +163,7 @@ Generated YIR records this boundary on every mutex node:
 mutex_contract=scheduler-handle-v1
 visibility=acquire-release-epoch-v1
 authority=linear-guard-v1
-payload_policy=i64-native-staged-fallback
+payload_policy=scalar-i32-i64-native-staged-fallback-v1
 ```
 
 The CPU domain accepts the full ordered contract, rejects metadata drift, and
@@ -175,8 +181,8 @@ Current proof surfaces:
 
 Honesty boundary:
 
-* only the current `i64` payload lane is runtime-backed
-* other typed mutex payloads retain the staged typed wrapper fallback
+* `i32` and `i64` payload lanes are runtime-backed by explicit scalar kind tags
+* bool, float, and aggregate mutex payloads retain staged typed wrappers
 * the contention harness exercises scheduler workers at the runtime boundary;
   Nuis source still cannot duplicate or send one mutex authority into multiple
   workers
@@ -188,12 +194,12 @@ The source-level shared-mutex path now closes over a statically declared permit
 cardinality:
 
 ```text
-Mutex<i64>
+Mutex<i32|i64>
   -> mutex_share(lock, N), where N is a literal in 1..=64
-  -> SharedMutex<i64>
-  -> MutexPermit<i64> for one lane in 0..N
+  -> SharedMutex<i32|i64>
+  -> MutexPermit<i32|i64> for one lane in 0..N
   -> task boundary as an opaque scheduler scalar
-  -> MutexLease<i64>
+  -> MutexLease<i32|i64>
   -> value read or release-published replacement
   -> lease unlock
   -> shared close
@@ -220,19 +226,24 @@ visibility=acquire-release-epoch-v1
 authority=linear-permit-lease-v1
 permit_cardinality=share-literal-1-to-64-v1
 permit_policy=one-shot-generation-bound-v1
-payload_policy=i64-native-staged-fallback
+payload_policy=scalar-i32-i64-native-staged-fallback-v1
 lifecycle=explicit-close-revoke-v1
 mutation=lease-replace-release-epoch-v1
 ```
 
-Three native project smokes pin the current boundary:
+Five native project smokes pin the current boundary:
 
 * `task_shared_mutex_permit_demo` uses the default cardinality, sends two
   permits through two scheduler task invocations, and exits `34`
 * `task_shared_mutex_cardinality_demo` declares cardinality `3`, admits lanes
   `0`, `1`, and `2`, sends all three permits through tasks, and exits `33`
+* `task_shared_mutex_branch_demo` selects initial payload and replacement values
+  before emitting one share/permit/lease chain, then executes both native
+  branches with exits `25` and `43`
 * `task_shared_mutex_replace_demo` replaces `17` with `23` through one lease,
   exposes the replacement to a pre-issued second permit, and exits `65`
+* `task_shared_mutex_i32_demo` carries two typed i32 permits through native
+  tasks, replaces `17` with `23`, observes the replacement, and exits `63`
 
 Close performs a release fence, rejects an active lease, revokes every pending
 same-generation permit, invalidates the mutex slot, and returns the revocation
@@ -254,6 +265,8 @@ This is shared authorization, not copied ownership: ordinary `Mutex<T>` and
 Current boundary:
 
 * matching branch-local lock or spawn/join-result prefixes are now supported
+* matching shared-mutex share/permit/lease prefixes are supported when both
+  branches retain the same static cardinality and lane literals
 * lowering selects the resource or call arguments first, emits the common
   consuming operation once, and then lowers one shared or selectable suffix
 * differently shaped operations, unrelated callees, or non-collapsible effect
@@ -267,6 +280,9 @@ Short rule:
 * matching consuming prefixes may form a multi-stage chain; the native branch
   demo proves one `mutex_new -> lock -> unlock` chain and one
   `spawn -> cancel -> join_result` chain
+* the shared branch demo proves one
+  `mutex_new -> share -> permit -> lease -> replace/read/unlock -> close` chain
+  across both dynamic paths
 
 ### Final concurrent visibility claims
 
@@ -276,7 +292,6 @@ Still not promised today:
 * an OS-thread-parallel mutex implementation
 * runtime-dynamic permit cardinality
 * generalized non-`i64` shared payloads and replacement
-* branch-local shared-capability selected-prefix lowering
 * a final memory visibility model beyond the current acquire/release epoch
   protocol
 * a finished synchronization contract
@@ -316,6 +331,8 @@ For the current beta foundation line, this lane is now strong enough to say:
   handle copies, including a three-lane native proof
 * lease replacement and explicit close/revocation share one interpreter/native
   contract
+* branch-local shared capabilities select inputs before one YIR/LLVM operation,
+  with differing static cardinality or lane contracts rejected
 
 But it is **not** yet strong enough to say:
 

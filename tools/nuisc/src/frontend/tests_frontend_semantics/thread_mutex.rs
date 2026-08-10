@@ -316,7 +316,42 @@ fn lowers_lease_replace_without_consuming_the_lease() {
 }
 
 #[test]
-fn rejects_lease_replace_for_non_i64_payloads() {
+fn lowers_i32_lease_replace_without_erasing_its_payload_type() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let initial: i32 = i32_from_i64(17);
+            let lock: Mutex<i32> = mutex_new(initial);
+            let shared: SharedMutex<i32> = mutex_share(lock);
+            let permit: MutexPermit<i32> = mutex_permit(shared, 0);
+            let lease: MutexLease<i32> = mutex_permit_lock(permit);
+            let old: i32 = mutex_lease_replace(lease, i32_from_i64(23));
+            mutex_lease_unlock(lease);
+            mutex_shared_close(shared);
+            if old == initial { return 0; }
+            return 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert!(matches!(
+        module.functions[0].body.get(5),
+        Some(NirStmt::Let {
+            ty: Some(ty),
+            value: NirExpr::CpuMutexCapability {
+                op: NirMutexCapabilityOp::LeaseReplace,
+                ..
+            },
+            ..
+        }) if ty.render() == "i32"
+    ));
+}
+
+#[test]
+fn rejects_lease_replace_for_payloads_outside_the_native_scalar_protocol() {
     let error = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -333,7 +368,7 @@ fn rejects_lease_replace_for_non_i64_payloads() {
     )
     .unwrap_err();
 
-    assert!(error.contains("currently supports only `MutexLease<i64>`"));
+    assert!(error.contains("native scalar `MutexLease<i32>` or `MutexLease<i64>`"));
     assert!(error.contains("found `MutexLease<bool>`"));
 }
 

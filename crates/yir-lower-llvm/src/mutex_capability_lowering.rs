@@ -2,8 +2,10 @@ use yir_core::Node;
 
 use super::{
     fresh_reg,
-    value_ref::{get_i64, get_mutex, get_mutex_guard},
+    mutex_scalar::{emit_mutex_replace, emit_mutex_value, mutex_scalar_kind},
+    value_ref::{coerce_to_i64, get_i64, get_mutex, get_mutex_guard, get_mutex_permit},
     LlvmLoweringState, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef,
+    MutexPermitLlvmValueRef,
 };
 
 pub(crate) fn lower_cpu_mutex_capability_node(node: &Node, state: &mut LlvmLoweringState) -> bool {
@@ -86,6 +88,7 @@ fn lower_share(node: &Node, state: &mut LlvmLoweringState) -> bool {
         LlvmValueRef::Mutex(MutexLlvmValueRef {
             runtime_handle,
             value: mutex.value,
+            scalar_kind: mutex.scalar_kind,
         }),
     );
     true
@@ -113,19 +116,29 @@ fn lower_permit(node: &Node, state: &mut LlvmLoweringState) -> bool {
         ));
         return true;
     };
+    let Some(scalar_kind) = shared.scalar_kind else {
+        state.body.push(format!(
+            "  ; deferred lowering for cpu.mutex_permit `{}` because its payload is outside the native scalar mutex protocol",
+            node.name
+        ));
+        return true;
+    };
     let permit = fresh_reg(&mut state.next_reg);
     state.body.push(format!(
         "  {permit} = call i64 @nuis_scheduler_mutex_permit_i64_v1(i64 {handle}, i64 {lane})"
     ));
-    state
-        .registers
-        .insert(node.name.clone(), LlvmValueRef::I64(permit.clone()));
-    state.last_cpu_value = Some(permit);
+    state.registers.insert(
+        node.name.clone(),
+        LlvmValueRef::MutexPermit(MutexPermitLlvmValueRef {
+            runtime_token: permit,
+            scalar_kind,
+        }),
+    );
     true
 }
 
 fn lower_permit_lock(node: &Node, state: &mut LlvmLoweringState) -> bool {
-    let Some(permit) = get_i64(&state.registers, &node.op.args[0]) else {
+    let Some(permit) = get_mutex_permit(&state.registers, &node.op.args[0]).cloned() else {
         state.body.push(format!(
             "  ; deferred lowering for cpu.mutex_permit_lock `{}` because its permit is outside the current CPU LLVM slice",
             node.name
@@ -134,13 +147,15 @@ fn lower_permit_lock(node: &Node, state: &mut LlvmLoweringState) -> bool {
     };
     let guard = fresh_reg(&mut state.next_reg);
     state.body.push(format!(
-        "  {guard} = call i64 @nuis_scheduler_mutex_permit_lock_i64_v1(i64 {permit})"
+        "  {guard} = call i64 @nuis_scheduler_mutex_permit_lock_i64_v1(i64 {})",
+        permit.runtime_token
     ));
     state.registers.insert(
         node.name.clone(),
         LlvmValueRef::MutexGuard(MutexGuardLlvmValueRef {
             runtime_guard: Some(guard),
-            value: Box::new(LlvmValueRef::I64("0".to_owned())),
+            value: Box::new(permit.scalar_kind.staged_zero()),
+            scalar_kind: Some(permit.scalar_kind),
         }),
     );
     true
@@ -154,18 +169,12 @@ fn lower_lease_value(node: &Node, state: &mut LlvmLoweringState) -> bool {
         ));
         return true;
     };
-    let value = lease.runtime_guard.as_ref().map_or_else(
-        || (*lease.value).clone(),
-        |guard| {
-            let value = fresh_reg(&mut state.next_reg);
-            state.body.push(format!(
-                "  {value} = call i64 @nuis_scheduler_mutex_value_i64_v1(i64 {guard})"
-            ));
-            LlvmValueRef::I64(value)
-        },
-    );
+    let value = match (&lease.runtime_guard, lease.scalar_kind) {
+        (Some(guard), Some(kind)) => emit_mutex_value(guard, kind, state),
+        _ => (*lease.value).clone(),
+    };
     state.registers.insert(node.name.clone(), value.clone());
-    if let LlvmValueRef::I64(value) = value {
+    if let Some(value) = coerce_to_i64(&value, &mut state.body, &mut state.next_reg) {
         state.last_cpu_value = Some(value);
     }
     true
@@ -179,43 +188,58 @@ fn lower_lease_replace(node: &Node, state: &mut LlvmLoweringState) -> bool {
         ));
         return true;
     };
-    let Some(replacement) = get_i64(&state.registers, &node.op.args[1]).map(str::to_owned) else {
+    let Some(replacement) = state.registers.get(&node.op.args[1]).cloned() else {
         state.body.push(format!(
             "  ; deferred lowering for cpu.mutex_lease_replace `{}` because its replacement is outside the current CPU LLVM slice",
             node.name
         ));
         return true;
     };
+    let Some(scalar_kind) = lease
+        .scalar_kind
+        .or_else(|| mutex_scalar_kind(&replacement))
+    else {
+        state.body.push(format!(
+            "  ; deferred lowering for cpu.mutex_lease_replace `{}` because its payload is outside the native scalar mutex protocol",
+            node.name
+        ));
+        return true;
+    };
+    if mutex_scalar_kind(&replacement) != Some(scalar_kind) {
+        state.body.push(format!(
+            "  ; deferred lowering for cpu.mutex_lease_replace `{}` because its replacement scalar kind does not match the lease",
+            node.name
+        ));
+        return true;
+    }
     let old = match lease.runtime_guard.as_ref() {
-        Some(guard) => {
-            let old = fresh_reg(&mut state.next_reg);
-            state.body.push(format!(
-                "  {old} = call i64 @nuis_scheduler_mutex_lease_replace_i64_v1(i64 {guard}, i64 {replacement})"
-            ));
-            old
-        }
-        None => match lease.value.as_ref() {
-            LlvmValueRef::I64(old) => old.clone(),
-            _ => {
-                state.body.push(format!(
-                    "  ; deferred lowering for cpu.mutex_lease_replace `{}` because its staged lease payload is not i64",
-                    node.name
-                ));
-                return true;
-            }
+        Some(guard) => match emit_mutex_replace(guard, &replacement, scalar_kind, state) {
+            Some(old) => old,
+            None => return true,
         },
+        None if mutex_scalar_kind(lease.value.as_ref()) == Some(scalar_kind) => {
+            (*lease.value).clone()
+        }
+        None => {
+            state.body.push(format!(
+                "  ; deferred lowering for cpu.mutex_lease_replace `{}` because its staged lease scalar kind does not match the replacement",
+                node.name
+            ));
+            return true;
+        }
     };
     state.registers.insert(
         node.op.args[0].clone(),
         LlvmValueRef::MutexGuard(MutexGuardLlvmValueRef {
             runtime_guard: lease.runtime_guard,
-            value: Box::new(LlvmValueRef::I64(replacement)),
+            value: Box::new(replacement),
+            scalar_kind: Some(scalar_kind),
         }),
     );
-    state
-        .registers
-        .insert(node.name.clone(), LlvmValueRef::I64(old.clone()));
-    state.last_cpu_value = Some(old);
+    state.registers.insert(node.name.clone(), old.clone());
+    if let Some(old) = coerce_to_i64(&old, &mut state.body, &mut state.next_reg) {
+        state.last_cpu_value = Some(old);
+    }
     true
 }
 

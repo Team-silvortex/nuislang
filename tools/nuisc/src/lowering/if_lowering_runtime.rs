@@ -2,16 +2,19 @@ use super::*;
 
 #[path = "if_lowering_runtime_extract.rs"]
 mod if_lowering_runtime_extract;
+#[path = "if_lowering_runtime_mutex.rs"]
+mod if_lowering_runtime_mutex;
 
 use if_lowering_runtime_extract::{
     extract_selectable_cpu_binary_runtime_binding_chain,
     extract_selectable_cpu_binary_runtime_expr, extract_selectable_cpu_binary_runtime_return_chain,
     extract_selectable_cpu_call_runtime_binding_chain, extract_selectable_cpu_call_runtime_expr,
-    extract_selectable_cpu_call_runtime_return_chain,
+    extract_selectable_cpu_call_runtime_return_chain, extract_selectable_cpu_mutex_capability_expr,
     extract_selectable_cpu_unary_runtime_binding_chain, extract_selectable_cpu_unary_runtime_expr,
     extract_selectable_cpu_unary_runtime_return_chain, SelectableCpuBinaryRuntimeOp,
     SelectableCpuCallRuntimeOp, SelectableCpuUnaryRuntimeOp,
 };
+use if_lowering_runtime_mutex::lower_selected_cpu_mutex_capability_effect;
 
 fn build_selectable_cpu_unary_runtime_expr(
     op: SelectableCpuUnaryRuntimeOp,
@@ -37,6 +40,7 @@ fn is_selectable_cpu_runtime_expr(expr: &NirExpr) -> bool {
     extract_selectable_cpu_unary_runtime_expr(expr).is_some()
         || extract_selectable_cpu_call_runtime_expr(expr).is_some()
         || extract_selectable_cpu_binary_runtime_expr(expr).is_some()
+        || extract_selectable_cpu_mutex_capability_expr(expr).is_some()
 }
 
 fn lower_selected_cpu_unary_runtime_effect(
@@ -293,6 +297,25 @@ fn lower_selected_cpu_runtime_effect(
                 condition_name,
                 lhs,
                 rhs,
+                state,
+                bindings,
+            )
+        }
+        (Some(_), None) | (None, Some(_)) => return Ok(None),
+        (None, None) => {}
+    }
+
+    match (
+        extract_selectable_cpu_mutex_capability_expr(lhs),
+        extract_selectable_cpu_mutex_capability_expr(rhs),
+    ) {
+        (Some((lhs_op, lhs_args)), Some((rhs_op, rhs_args))) => {
+            return lower_selected_cpu_mutex_capability_effect(
+                condition_name,
+                lhs_op,
+                lhs_args,
+                rhs_op,
+                rhs_args,
                 state,
                 bindings,
             )

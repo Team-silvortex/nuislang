@@ -460,11 +460,24 @@ pub(crate) fn execute_cpu_task_node(
                     "mutex lease `{label}` is stale or already released"
                 ));
             }
-            let replacement = Value::Int(state.expect_int(&node.op.args[1])?);
             let old = state
                 .shared_mutex_values
-                .insert(label.clone(), replacement.clone())
+                .get(&label)
+                .cloned()
                 .ok_or_else(|| format!("shared mutex `{label}` has no published value"))?;
+            let replacement = state
+                .values
+                .get(&node.op.args[1])
+                .cloned()
+                .ok_or_else(|| format!("missing value for `{}`", node.op.args[1]))?;
+            if !matches!(
+                (&old, &replacement),
+                (Value::I32(_), Value::I32(_)) | (Value::Int(_), Value::Int(_))
+            ) {
+                return Err(format!(
+                    "mutex lease `{label}` replacement must preserve the native i32/i64 scalar payload kind"
+                ));
+            }
             let release_epoch = state
                 .shared_mutex_release_epochs
                 .get(&label)
@@ -472,6 +485,9 @@ pub(crate) fn execute_cpu_task_node(
                 .unwrap_or(0)
                 .checked_add(1)
                 .ok_or_else(|| format!("shared mutex `{label}` release epoch overflow"))?;
+            state
+                .shared_mutex_values
+                .insert(label.clone(), replacement.clone());
             state
                 .shared_mutex_release_epochs
                 .insert(label.clone(), release_epoch);

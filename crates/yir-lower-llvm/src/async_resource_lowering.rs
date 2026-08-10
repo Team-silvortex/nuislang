@@ -4,6 +4,7 @@ use super::{
     facts::propagate_known_facts,
     fresh_reg,
     mutex_capability_lowering::lower_cpu_mutex_capability_node,
+    mutex_scalar::{emit_mutex_new, emit_mutex_value, mutex_scalar_kind},
     task_owned_payload::{
         emit_owned_struct_invoker_spawn, emit_owned_struct_spawn, emit_owned_struct_take,
     },
@@ -436,20 +437,14 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 ));
                 return true;
             };
-            let runtime_handle = if let LlvmValueRef::I64(value) = &value_ref {
-                let handle = fresh_reg(&mut state.next_reg);
-                state.body.push(format!(
-                    "  {handle} = call i64 @nuis_scheduler_mutex_new_i64_v1(i64 {value})"
-                ));
-                Some(handle)
-            } else {
-                None
-            };
+            let scalar_kind = mutex_scalar_kind(&value_ref);
+            let runtime_handle = scalar_kind.map(|kind| emit_mutex_new(&value_ref, kind, state));
             state.registers.insert(
                 node.name.clone(),
                 LlvmValueRef::Mutex(MutexLlvmValueRef {
                     runtime_handle,
                     value: Box::new(value_ref),
+                    scalar_kind,
                 }),
             );
             propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
@@ -475,6 +470,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 LlvmValueRef::MutexGuard(MutexGuardLlvmValueRef {
                     runtime_guard,
                     value: mutex.value,
+                    scalar_kind: mutex.scalar_kind,
                 }),
             );
             propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
@@ -500,6 +496,7 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 LlvmValueRef::Mutex(MutexLlvmValueRef {
                     runtime_handle,
                     value: guard.value,
+                    scalar_kind: guard.scalar_kind,
                 }),
             );
             propagate_known_facts(&node.op.args[0], &node.name, &mut state.facts);
@@ -513,14 +510,9 @@ pub(crate) fn lower_cpu_async_resource_node(node: &Node, state: &mut LlvmLowerin
                 ));
                 return true;
             };
-            let value_ref = if let Some(runtime_guard) = &guard.runtime_guard {
-                let value = fresh_reg(&mut state.next_reg);
-                state.body.push(format!(
-                    "  {value} = call i64 @nuis_scheduler_mutex_value_i64_v1(i64 {runtime_guard})"
-                ));
-                LlvmValueRef::I64(value)
-            } else {
-                (*guard.value).clone()
+            let value_ref = match (&guard.runtime_guard, guard.scalar_kind) {
+                (Some(runtime_guard), Some(kind)) => emit_mutex_value(runtime_guard, kind, state),
+                _ => (*guard.value).clone(),
             };
             state.registers.insert(node.name.clone(), value_ref.clone());
             if let Some(as_i64) = coerce_to_i64(&value_ref, &mut state.body, &mut state.next_reg) {

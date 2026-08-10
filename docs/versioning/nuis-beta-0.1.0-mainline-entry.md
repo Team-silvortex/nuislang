@@ -283,6 +283,36 @@ one-shot tokens, lease replacement visibility, and explicit close/revocation.
 Generalized payloads, branch-local shared-capability lowering, runtime-dynamic
 cardinality, and OS-thread parallel safety remain open.
 
+The branch-selected shared-capability tranche advances concurrency to
+`active/99`. Matching `mutex_share`, `mutex_permit`, `mutex_permit_lock`,
+`mutex_lease_replace`, `mutex_lease_value`, and `mutex_lease_unlock` prefixes
+now select their inputs before emitting one shared-capability YIR node. Share
+branches must retain one identical static cardinality literal, and permit
+branches must retain one identical static lane literal; drift fails before YIR
+instead of turning those contracts into runtime-dynamic values. Every emitted
+node reuses the canonical shared-mutex metadata array.
+
+`task_shared_mutex_branch_demo` selects initial values `11`/`19` and replacement
+values `13`/`23`, while YIR and LLVM each contain exactly one operation for the
+entire share/permit/lease chain. Its two native paths exit `25` and `43` with no
+deferred mutex lowering. Shared payloads remain `i64`, and runtime-dynamic
+cardinality plus OS-thread parallel safety remain open.
+
+The first non-i64 shared-mutex tranche keeps concurrency at `active/99` while
+closing the requested scalar protocol slice. Canonical mutex metadata now says
+`payload_policy=scalar-i32-i64-native-staged-fallback-v1`. YIR function
+parameters retain `MutexPermit<T>` identity, LLVM carries an opaque permit token
+plus its scalar kind, task contexts transport only token bits, and helper entry
+reconstructs the typed permit before lock acquisition.
+
+The scheduler slot records and validates an explicit scalar kind. Signed i32
+payloads are sign-extended into the native slot and truncated back to i32 on
+read or replacement; existing i64 entry points remain compatibility wrappers.
+`task_shared_mutex_i32_demo` sends two `MutexPermit<i32>` values through native
+tasks, replaces `17` with `23`, observes `23`, emits no deferred mutex lowering,
+and exits `63`. OS-thread parallel slot safety, runtime-dynamic cardinality, and
+bool/float native payloads remain open.
+
 ## Honesty Boundary
 
 `beta-0.1.0` should not claim:

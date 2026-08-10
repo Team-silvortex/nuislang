@@ -1,8 +1,9 @@
 use std::collections::BTreeMap;
 
 use super::{
-    fresh_reg, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef, NetworkResultLlvmValueRef,
-    StructLlvmValueRef, TaskLlvmValueRef, TaskResultLlvmValueRef, ThreadLlvmValueRef,
+    fresh_reg, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef, MutexPermitLlvmValueRef,
+    NetworkResultLlvmValueRef, StructLlvmValueRef, TaskLlvmValueRef, TaskResultLlvmValueRef,
+    ThreadLlvmValueRef,
 };
 
 pub(crate) fn get_i64<'a>(
@@ -123,6 +124,16 @@ pub(crate) fn get_mutex_guard<'a>(
 ) -> Option<&'a MutexGuardLlvmValueRef> {
     match registers.get(name) {
         Some(LlvmValueRef::MutexGuard(guard)) => Some(guard),
+        _ => None,
+    }
+}
+
+pub(crate) fn get_mutex_permit<'a>(
+    registers: &'a BTreeMap<String, LlvmValueRef>,
+    name: &str,
+) -> Option<&'a MutexPermitLlvmValueRef> {
+    match registers.get(name) {
+        Some(LlvmValueRef::MutexPermit(permit)) => Some(permit),
         _ => None,
     }
 }

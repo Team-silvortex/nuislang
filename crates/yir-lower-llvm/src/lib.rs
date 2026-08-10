@@ -38,6 +38,7 @@ mod loop_flow_control_lowering;
 mod loop_scalar;
 mod memory_lowering;
 mod mutex_capability_lowering;
+mod mutex_scalar;
 mod nustar_provider;
 mod owned_tree_call_args;
 mod param_lowering;
@@ -95,6 +96,7 @@ use loop_scalar::{
     loop_scalar_llvm_type, loop_scalar_value_ref,
 };
 use memory_lowering::lower_cpu_memory_node;
+use mutex_scalar::mutex_permit_scalar_kind;
 pub use nustar_provider::{
     register_static_nustar_branch_effect_emitters, static_nustar_llvm_emitter_providers,
     StaticNustarLlvmEmitterProvider,
@@ -116,8 +118,9 @@ use topology::topological_order;
 pub(crate) use types::{
     CpuCallScalarKind, CpuHelperSignature, CpuLoopScalarKind, CpuOwnedExternalBufferAbi,
     EmittedCpuFunction, LlvmLoweringState, LlvmValueRef, MutexGuardLlvmValueRef, MutexLlvmValueRef,
-    NetworkResultLlvmValueRef, StructLlvmValueRef, TaskLlvmValueRef, TaskResultLlvmValueRef,
-    TaskThunkArgument, ThreadLlvmValueRef, VariantUnionLlvmValueRef,
+    MutexPermitLlvmValueRef, MutexScalarKind, NetworkResultLlvmValueRef, StructLlvmValueRef,
+    TaskLlvmValueRef, TaskResultLlvmValueRef, TaskThunkArgument, ThreadLlvmValueRef,
+    VariantUnionLlvmValueRef,
 };
 use value_ref::coerce_to_i64;
 pub fn emit_module(module: &YirModule) -> Result<String, String> {
@@ -217,6 +220,17 @@ pub fn emit_module_with_registries(
             function_name,
             CpuHelperSignature {
                 params: params.iter().map(|(_, _, kind)| *kind).collect(),
+                mutex_permit_params: params
+                    .iter()
+                    .map(|(index, _, _)| {
+                        module
+                            .functions
+                            .iter()
+                            .find(|function| function.name == lane.trim_start_matches("fn:"))
+                            .and_then(|function| function.parameters.get(*index))
+                            .and_then(|parameter| mutex_permit_scalar_kind(&parameter.ty))
+                    })
+                    .collect(),
                 ret,
                 owned_external_buffer_return,
             },
@@ -252,16 +266,34 @@ pub fn emit_module_with_registries(
             })
             .collect::<Result<Vec<_>, String>>()?;
         params.sort_by_key(|(index, _, _)| *index);
+        let function_name = lane.trim_start_matches("fn:");
+        let helper_signature = helper_signatures
+            .get(function_name)
+            .expect("helper signature should exist");
         let param_bindings = params
             .iter()
-            .map(|(index, name, kind)| (name.clone(), cpu_param_binding(*kind, *index)))
+            .enumerate()
+            .map(|(position, (index, name, kind))| {
+                let value = match helper_signature
+                    .mutex_permit_params
+                    .get(position)
+                    .copied()
+                    .flatten()
+                {
+                    Some(scalar_kind) => LlvmValueRef::MutexPermit(MutexPermitLlvmValueRef {
+                        runtime_token: format!("%arg{index}"),
+                        scalar_kind,
+                    }),
+                    None => cpu_param_binding(*kind, *index),
+                };
+                (name.clone(), value)
+            })
             .collect::<BTreeMap<_, _>>();
         let param_buffer_lengths = params
             .iter()
             .filter(|(_, _, kind)| *kind == CpuCallScalarKind::BorrowedBuffer)
             .map(|(index, name, _)| (name.clone(), format!("%arg{index}_len")))
             .collect::<BTreeMap<_, _>>();
-        let function_name = lane.trim_start_matches("fn:");
         let emitted = emit_cpu_function(
             module,
             &resources,
@@ -347,8 +379,8 @@ declare ptr @nuis_scheduler_owned_aggregate_alloc_v1(i64)\ndeclare i64 @nuis_sch
 declare ptr @nuis_scheduler_owned_aggregate_finish_v1(ptr)\ndeclare void @nuis_scheduler_owned_aggregate_require_v1(ptr)\n\
 declare i64 @nuis_scheduler_owned_aggregate_get_v1(ptr, i64)\ndeclare ptr @nuis_scheduler_owned_aggregate_take_blob_v1(ptr, i64)\ndeclare void @nuis_scheduler_owned_aggregate_drop_v1(ptr)\n\
 declare i64 @nuis_scheduler_task_spawn_owned_invoker_v1(ptr, ptr, i64, i64, i64, ptr)\n\
-declare i64 @nuis_scheduler_mutex_new_i64_v1(i64)\ndeclare i64 @nuis_scheduler_mutex_lock_i64_v1(i64)\ndeclare i64 @nuis_scheduler_mutex_value_i64_v1(i64)\ndeclare i64 @nuis_scheduler_mutex_unlock_i64_v1(i64)\n\
-declare i64 @nuis_scheduler_mutex_share_i64_v1(i64, i64)\ndeclare i64 @nuis_scheduler_mutex_shared_close_i64_v1(i64)\ndeclare i64 @nuis_scheduler_mutex_permit_i64_v1(i64, i64)\ndeclare i64 @nuis_scheduler_mutex_permit_lock_i64_v1(i64)\ndeclare i64 @nuis_scheduler_mutex_lease_unlock_i64_v1(i64)\ndeclare i64 @nuis_scheduler_mutex_lease_replace_i64_v1(i64, i64)\n\
+declare i64 @nuis_scheduler_mutex_new_scalar_v1(i64, i64)\ndeclare i64 @nuis_scheduler_mutex_new_i64_v1(i64)\ndeclare i64 @nuis_scheduler_mutex_lock_i64_v1(i64)\ndeclare i64 @nuis_scheduler_mutex_value_scalar_v1(i64, i64)\ndeclare i64 @nuis_scheduler_mutex_value_i64_v1(i64)\ndeclare i64 @nuis_scheduler_mutex_unlock_i64_v1(i64)\n\
+declare i64 @nuis_scheduler_mutex_share_i64_v1(i64, i64)\ndeclare i64 @nuis_scheduler_mutex_shared_close_i64_v1(i64)\ndeclare i64 @nuis_scheduler_mutex_permit_i64_v1(i64, i64)\ndeclare i64 @nuis_scheduler_mutex_permit_lock_i64_v1(i64)\ndeclare i64 @nuis_scheduler_mutex_lease_unlock_i64_v1(i64)\ndeclare i64 @nuis_scheduler_mutex_lease_replace_scalar_v1(i64, i64, i64)\ndeclare i64 @nuis_scheduler_mutex_lease_replace_i64_v1(i64, i64)\n\
 declare i64 @host_color_bias(i64)\ndeclare i64 @host_speed_curve(i64)\ndeclare i64 @host_radius_curve(i64)\ndeclare i64 @host_mix_tick(i64, i64)\ndeclare i64 @host_text_handle(i64)\ndeclare i64 @host_text_len(i64)\ndeclare i64 @host_text_line_count(i64)\ndeclare i64 @host_text_word_count(i64)\ndeclare i64 @host_text_concat(i64, i64)\n\
 declare i64 @host_argv_count()\ndeclare i64 @host_argv_at(i64)\ndeclare i64 @host_env_has(i64)\ndeclare i64 @host_env_get(i64)\ndeclare i64 @host_file_open(i64, i64)\ndeclare i64 @host_file_read(i64, i64, i64)\ndeclare i64 @host_file_write(i64, i64)\ndeclare i64 @host_file_close(i64)\n\
 declare i64 @host_stdout_write(i64)\ndeclare i64 @host_stdout_flush()\ndeclare i64 @host_stderr_write(i64)\ndeclare i64 @host_stderr_flush()\ndeclare i64 @host_serialize_i64_into(i64, i64, i64)\ndeclare i64 @host_serialize_text_into(i64, i64, i64)\ndeclare i64 @host_deserialize_text_from(i64, i64, i64)\ndeclare i64 @host_monotonic_time_ns()\n\

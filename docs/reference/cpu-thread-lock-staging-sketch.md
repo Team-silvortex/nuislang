@@ -93,7 +93,7 @@ Short rule:
 
 ### Current scheduler-runtime foothold
 
-The first narrow runtime slice now exists for `Mutex<i64>`:
+The narrow runtime slice now exists for `Mutex<i32>` and `Mutex<i64>`:
 
 * LLVM lowers `mutex_new/lock/value/unlock` to scheduler ABI calls
 * opaque handles and generation-bound guard tokens prevent stale identity reuse
@@ -102,13 +102,13 @@ The first narrow runtime slice now exists for `Mutex<i64>`:
   current visibility promise explicit
 * YIR carries the shared `scheduler-handle-v1`,
   `acquire-release-epoch-v1`, `linear-guard-v1`, and
-  `i64-native-staged-fallback` contract metadata
+  `scalar-i32-i64-native-staged-fallback-v1` contract metadata
 
 This is intentionally a runtime foothold, not the final source model. Current
 Nuis `Mutex<T>` remains linear: lock consumes the mutex, unlock consumes the
-guard, and neither family may be copied across an async boundary. A future
-shared form therefore needs an explicit GLM permit/lease authority rather than
-raw handle duplication.
+guard, and neither family may be copied across an async boundary. The shared
+form therefore uses explicit GLM permit/lease authority rather than raw handle
+duplication.
 
 ## Staging Rule
 

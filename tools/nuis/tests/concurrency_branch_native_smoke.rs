@@ -53,7 +53,7 @@ fn branch_selected_cancel_and_unlock_reach_native_binary_once_per_chain() {
         "mutex_contract=scheduler-handle-v1",
         "visibility=acquire-release-epoch-v1",
         "authority=linear-guard-v1",
-        "payload_policy=i64-native-staged-fallback",
+        "payload_policy=scalar-i32-i64-native-staged-fallback-v1",
     ] {
         assert_eq!(
             yir.matches(metadata).count(),
@@ -248,6 +248,53 @@ fn lease_replace_is_visible_across_native_task_permits() {
 }
 
 #[test]
+fn i32_shared_mutex_payload_crosses_native_task_boundaries_without_type_erasure() {
+    let output_dir = temp_dir("shared_mutex_i32");
+    let build = Command::new(env!("CARGO_BIN_EXE_nuis"))
+        .args([
+            "build",
+            "../../examples/projects/task/task_shared_mutex_i32_demo",
+            output_dir.to_str().expect("UTF-8 output path"),
+        ])
+        .output()
+        .expect("run nuis build for i32 shared mutex demo");
+    assert_success(&build, "nuis build i32 shared mutex demo");
+
+    let yir = read(&output_dir.join("task_shared_mutex_i32_demo.yir"));
+    assert!(yir.contains("MutexPermit<i32>"), "{yir}");
+    for (instruction, expected) in [
+        ("cpu.mutex_share ", 1),
+        ("cpu.mutex_permit ", 2),
+        ("cpu.mutex_permit_lock", 2),
+        ("cpu.mutex_lease_replace", 1),
+        ("cpu.mutex_lease_value", 2),
+        ("cpu.mutex_lease_unlock", 2),
+        ("cpu.mutex_shared_close", 1),
+        ("cpu.spawn_task", 2),
+    ] {
+        assert_eq!(yir.matches(instruction).count(), expected, "{instruction}");
+    }
+
+    let llvm = read(&output_dir.join("task_shared_mutex_i32_demo.ll"));
+    for (call, expected) in [
+        ("call i64 @nuis_scheduler_mutex_new_scalar_v1", 1),
+        ("call i64 @nuis_scheduler_mutex_value_scalar_v1", 2),
+        ("call i64 @nuis_scheduler_mutex_lease_replace_scalar_v1", 1),
+        ("call i64 @nuis_scheduler_task_spawn_invoker_i64_v1", 2),
+    ] {
+        assert_eq!(llvm.matches(call).count(), expected, "{call}");
+    }
+    assert!(llvm.contains("define i32 @nuis_fn_replace(i64 %arg0, i32 %arg1)"));
+    assert!(llvm.contains("define i32 @nuis_fn_observe(i64 %arg0)"));
+    assert!(!llvm.contains("deferred lowering for cpu.mutex"));
+
+    let run = Command::new(output_dir.join("task_shared_mutex_i32_demo"))
+        .output()
+        .expect("run i32 shared mutex native binary");
+    assert_eq!(run.status.code(), Some(63));
+}
+
+#[test]
 fn static_three_lane_cardinality_reaches_native_runtime() {
     let output_dir = temp_dir("shared_mutex_cardinality");
     let build = Command::new(env!("CARGO_BIN_EXE_nuis"))
@@ -309,4 +356,77 @@ fn static_three_lane_cardinality_reaches_native_runtime() {
         .output()
         .expect("run shared mutex cardinality native binary");
     assert_eq!(run.status.code(), Some(33));
+}
+
+#[test]
+fn branch_selected_shared_mutex_capabilities_reach_native_binary_once() {
+    let output_dir = temp_dir("shared_mutex_branch");
+    let build = Command::new(env!("CARGO_BIN_EXE_nuis"))
+        .args([
+            "build",
+            "../../examples/projects/task/task_shared_mutex_branch_demo",
+            output_dir.to_str().expect("UTF-8 output path"),
+        ])
+        .output()
+        .expect("run nuis build for shared mutex branch demo");
+    assert_success(&build, "nuis build shared mutex branch demo");
+
+    let yir = read(&output_dir.join("task_shared_mutex_branch_demo.yir"));
+    for instruction in [
+        "cpu.mutex_new",
+        "cpu.mutex_share ",
+        "cpu.mutex_permit ",
+        "cpu.mutex_permit_lock",
+        "cpu.mutex_lease_replace",
+        "cpu.mutex_lease_value",
+        "cpu.mutex_lease_unlock",
+        "cpu.mutex_shared_close",
+    ] {
+        assert_eq!(
+            yir.matches(instruction).count(),
+            1,
+            "branch-selected `{instruction}` must reach YIR once"
+        );
+    }
+    assert_eq!(yir.matches("cpu.select").count(), 2);
+    assert_eq!(
+        yir.matches("permit_cardinality=share-literal-1-to-64-v1")
+            .count(),
+        7
+    );
+
+    let llvm = read(&output_dir.join("task_shared_mutex_branch_demo.ll"));
+    for call in [
+        "call i64 @nuis_scheduler_mutex_new_i64_v1",
+        "call i64 @nuis_scheduler_mutex_share_i64_v1",
+        "call i64 @nuis_scheduler_mutex_permit_i64_v1",
+        "call i64 @nuis_scheduler_mutex_permit_lock_i64_v1",
+        "call i64 @nuis_scheduler_mutex_lease_replace_i64_v1",
+        "call i64 @nuis_scheduler_mutex_value_i64_v1",
+        "call i64 @nuis_scheduler_mutex_lease_unlock_i64_v1",
+        "call i64 @nuis_scheduler_mutex_shared_close_i64_v1",
+    ] {
+        assert_eq!(
+            llvm.matches(call).count(),
+            1,
+            "branch-selected `{call}` must reach LLVM once"
+        );
+    }
+    let share_call = llvm
+        .lines()
+        .find(|line| line.contains("call i64 @nuis_scheduler_mutex_share_i64_v1"))
+        .expect("branch-selected share call");
+    assert!(share_call.contains(", i64 3)"));
+    assert!(!llvm.contains("deferred lowering for cpu.mutex"));
+
+    let binary = output_dir.join("task_shared_mutex_branch_demo");
+    let left = Command::new(&binary)
+        .output()
+        .expect("run left shared mutex branch");
+    assert_eq!(left.status.code(), Some(25));
+    let right = Command::new(&binary)
+        .arg("right")
+        .output()
+        .expect("run right shared mutex branch");
+    assert_eq!(right.status.code(), Some(43));
 }

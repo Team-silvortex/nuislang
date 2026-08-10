@@ -1,0 +1,59 @@
+mod cffi Main {
+  extern "c" fn host_argv_count() -> i64;
+
+  fn main() -> i64 {
+    let argc: i64 = host_argv_count();
+    let shared: SharedMutex<i64> = if argc < 2 {
+      let selected: SharedMutex<i64> = mutex_share(mutex_new(11), 3);
+      selected
+    } else {
+      let selected: SharedMutex<i64> = mutex_share(mutex_new(19), 3);
+      selected
+    };
+
+    let permit: MutexPermit<i64> = match argc {
+      1 => {
+        let selected: MutexPermit<i64> = mutex_permit(shared, 0);
+        selected
+      }
+      _ => {
+        let selected: MutexPermit<i64> = mutex_permit(shared, 0);
+        selected
+      }
+    };
+    let lease: MutexLease<i64> = if argc < 2 {
+      let selected: MutexLease<i64> = mutex_permit_lock(permit);
+      selected
+    } else {
+      let selected: MutexLease<i64> = mutex_permit_lock(permit);
+      selected
+    };
+
+    let old: i64 = match argc {
+      1 => {
+        let selected: i64 = mutex_lease_replace(lease, 13);
+        selected
+      }
+      _ => {
+        let selected: i64 = mutex_lease_replace(lease, 23);
+        selected
+      }
+    };
+    let observed: i64 = if argc < 2 {
+      let selected: i64 = mutex_lease_value(lease);
+      selected
+    } else {
+      let selected: i64 = mutex_lease_value(lease);
+      selected
+    };
+    let released: i64 = if argc < 2 {
+      let selected: i64 = mutex_lease_unlock(lease);
+      selected
+    } else {
+      let selected: i64 = mutex_lease_unlock(lease);
+      selected
+    };
+    let revoked: i64 = mutex_shared_close(shared);
+    return old + observed + released + revoked;
+  }
+}

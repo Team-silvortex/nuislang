@@ -102,6 +102,62 @@ int64_t nuis_yir_entry(void) {
 }
 
 #[test]
+fn scheduler_mutex_scalar_protocol_preserves_signed_i32_bits() {
+    let dir = temp_dir("scheduler_mutex_scalar_i32");
+    let source_path = dir.join("scheduler_mutex_scalar_i32.c");
+    let binary_path = dir.join("scheduler_mutex_scalar_i32");
+    let mut source = String::new();
+    crate::aot_c_shim_runtime::append_c_shim_prelude(&mut source, "0", "0", 0);
+    crate::aot_c_shim_runtime::append_c_shim_lifecycle_runtime(&mut source);
+    crate::aot_c_shim_text_runtime::append_c_shim_text_runtime(&mut source);
+    source.push_str(
+        r#"
+int64_t nuis_yir_entry(void) {
+    if (nuis_scheduler_mutex_new_scalar_v1(1, 99) != 0) return 10;
+    int64_t shared = nuis_scheduler_mutex_share_i64_v1(
+        nuis_scheduler_mutex_new_scalar_v1(-17, NUIS_SCHEDULER_MUTEX_SCALAR_I32_V1),
+        1
+    );
+    int64_t permit = nuis_scheduler_mutex_permit_i64_v1(shared, 0);
+    int64_t lease = nuis_scheduler_mutex_permit_lock_i64_v1(permit);
+    if (nuis_scheduler_mutex_value_scalar_v1(
+        lease, NUIS_SCHEDULER_MUTEX_SCALAR_I32_V1
+    ) != -17) return 11;
+    if (nuis_scheduler_mutex_lease_replace_scalar_v1(
+        lease, 23, NUIS_SCHEDULER_MUTEX_SCALAR_I32_V1
+    ) != -17) return 12;
+    if (nuis_scheduler_mutex_value_scalar_v1(
+        lease, NUIS_SCHEDULER_MUTEX_SCALAR_I32_V1
+    ) != 23) return 13;
+    if (nuis_scheduler_mutex_lease_unlock_i64_v1(lease) != 1) return 14;
+    if (nuis_scheduler_mutex_shared_close_i64_v1(shared) != 0) return 15;
+    if (nuis_lifecycle_shutdown_v1(0) != 0) return 16;
+    return nuis_scheduler_mutex_live_count_get_v1() == 0 ? 0 : 17;
+}
+"#,
+    );
+    crate::aot_c_shim_runtime::append_c_shim_main(&mut source);
+    fs::write(&source_path, source).expect("write scalar mutex harness");
+
+    let compile = Command::new("clang")
+        .arg("-std=c11")
+        .arg(&source_path)
+        .arg("-o")
+        .arg(&binary_path)
+        .output()
+        .expect("compile scalar mutex harness");
+    assert!(
+        compile.status.success(),
+        "clang failed: {}",
+        String::from_utf8_lossy(&compile.stderr)
+    );
+    let run = Command::new(&binary_path)
+        .output()
+        .expect("run scalar mutex harness");
+    assert_eq!(run.status.code(), Some(0), "{:?}", run);
+}
+
+#[test]
 fn scheduler_shared_mutex_permits_are_lane_bound_and_one_shot() {
     let dir = temp_dir("scheduler_shared_mutex_permit");
     let source_path = dir.join("scheduler_shared_mutex_permit.c");

@@ -26,6 +26,7 @@ pub(crate) enum LlvmValueRef {
     Thread(ThreadLlvmValueRef),
     TaskResult(TaskResultLlvmValueRef),
     Mutex(MutexLlvmValueRef),
+    MutexPermit(MutexPermitLlvmValueRef),
     MutexGuard(MutexGuardLlvmValueRef),
     NetworkResult(NetworkResultLlvmValueRef),
     Struct(StructLlvmValueRef),
@@ -87,11 +88,18 @@ pub(crate) struct TaskResultLlvmValueRef {
 pub(crate) struct MutexLlvmValueRef {
     pub(crate) runtime_handle: Option<String>,
     pub(crate) value: Box<LlvmValueRef>,
+    pub(crate) scalar_kind: Option<MutexScalarKind>,
+}
+#[derive(Clone)]
+pub(crate) struct MutexPermitLlvmValueRef {
+    pub(crate) runtime_token: String,
+    pub(crate) scalar_kind: MutexScalarKind,
 }
 #[derive(Clone)]
 pub(crate) struct MutexGuardLlvmValueRef {
     pub(crate) runtime_guard: Option<String>,
     pub(crate) value: Box<LlvmValueRef>,
+    pub(crate) scalar_kind: Option<MutexScalarKind>,
 }
 pub(crate) struct LlvmLoweringState {
     pub(crate) body: Vec<String>,
@@ -123,6 +131,12 @@ pub(crate) enum CpuCallScalarKind {
     OwnedExternalBuffer,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum MutexScalarKind {
+    I32,
+    I64,
+}
+
 #[derive(Clone, PartialEq, Eq)]
 pub(crate) struct CpuOwnedExternalBufferAbi {
     pub(crate) abi: String,
@@ -142,6 +156,7 @@ pub(crate) enum CpuLoopScalarKind {
 }
 pub(crate) struct CpuHelperSignature {
     pub(crate) params: Vec<CpuCallScalarKind>,
+    pub(crate) mutex_permit_params: Vec<Option<MutexScalarKind>>,
     pub(crate) ret: CpuCallScalarKind,
     pub(crate) owned_external_buffer_return: Option<CpuOwnedExternalBufferAbi>,
 }
