@@ -322,6 +322,7 @@ impl Operation {
             | "mutex_permit"
             | "mutex_permit_lock"
             | "mutex_lease_value"
+            | "mutex_lease_replace"
             | "mutex_lease_unlock" => CpuLlvmLoweringClass::Runtime,
             "print"
             | "return_bool"

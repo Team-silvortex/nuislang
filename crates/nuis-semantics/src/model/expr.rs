@@ -7,6 +7,7 @@ pub enum NirMutexCapabilityOp {
     Permit,
     PermitLock,
     LeaseValue,
+    LeaseReplace,
     LeaseUnlock,
 }
 

@@ -248,6 +248,41 @@ selection returns to `standard-library/std/concurrency-task-thread-lock` at
 `active/90`; the lower-progress Galaxy lock cell remains behind it because
 `active` work ranks ahead of `usable` work.
 
+The first shared-mutex mutation tranche advances concurrency to `active/95`.
+`mutex_lease_replace(lease, replacement) -> i64` performs one GLM `Write`
+through the live `MutexLease<i64>` without consuming or widening that
+authority, returns the previous value, and publishes a release epoch before a
+subsequent unlock publishes again. Every shared capability YIR node now carries
+`mutation=lease-replace-release-epoch-v1`; CPU validation, interpreter state,
+LLVM lowering, and the scheduler runtime consume the same contract.
+
+The interpreter now keeps one central shared value rather than copying the
+payload into each permit. The C runtime independently marks shared leases so a
+normal mutex guard cannot enter lease mutation. The checked-in
+`task_shared_mutex_replace_demo` issues both permits before mutation, replaces
+`17` with `23` in the first worker, observes `23` in the second worker, contains
+no deferred mutex lowering, and exits `65` as a native binary. Configurable
+static permit cardinality, generalized payloads, branch-local shared-capability
+lowering, and OS-thread parallel safety remain open.
+
+The static shared-mutex cardinality tranche then advances concurrency to
+`active/97`. `mutex_share(lock)` remains source-compatible and normalizes to
+cardinality `2`; `mutex_share(lock, N)` accepts a literal `N` in `1..=64`.
+`mutex_permit(shared, lane)` accepts a literal lane in `0..=63`, while the CPU
+interpreter and native scheduler enforce the exact relation `lane < N` from the
+cardinality carried by the share node's second YIR dependency. Every shared
+capability node now identifies that protocol with
+`permit_cardinality=share-literal-1-to-64-v1`, replacing the fixed-pair marker
+without exposing the scheduler handle.
+
+The checked-in `task_shared_mutex_cardinality_demo` declares three permits,
+sends lanes `0`, `1`, and `2` through three native task invocations, emits no
+deferred mutex lowering, and exits `33`. Interpreter and C-runtime regressions
+also reject lane `3` for that shared mutex, while preserving generation-bound
+one-shot tokens, lease replacement visibility, and explicit close/revocation.
+Generalized payloads, branch-local shared-capability lowering, runtime-dynamic
+cardinality, and OS-thread parallel safety remain open.
+
 ## Honesty Boundary
 
 `beta-0.1.0` should not claim:

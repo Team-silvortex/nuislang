@@ -352,14 +352,35 @@ pub(super) fn lower_task_builtin_call(
                         .to_owned(),
                 );
             }
-            let [mutex] = args else {
-                return Err("mutex_share(...) expects exactly one mutex handle".to_owned());
+            let (mutex, permit_cardinality) = match args {
+                [mutex] => (mutex, 2),
+                [mutex, AstExpr::Int(permit_cardinality)]
+                    if (1..=64).contains(permit_cardinality) =>
+                {
+                    (mutex, *permit_cardinality)
+                }
+                [_, AstExpr::Int(permit_cardinality)] => {
+                    return Err(format!(
+                        "mutex_share(...) permit cardinality must be in `1..=64`, found `{permit_cardinality}`"
+                    ));
+                }
+                [_, _] => {
+                    return Err(
+                        "mutex_share(...) requires a static permit cardinality literal".to_owned(),
+                    );
+                }
+                _ => {
+                    return Err(
+                        "mutex_share(...) expects one mutex and an optional permit cardinality literal"
+                            .to_owned(),
+                    );
+                }
             };
             let lowered = lower_task_expr!(mutex, None)?;
             ensure_mutex_like("mutex_share", &lowered, bindings, signatures, struct_table)?;
             NirExpr::CpuMutexCapability {
                 op: NirMutexCapabilityOp::Share,
-                args: vec![lowered],
+                args: vec![lowered, NirExpr::Int(permit_cardinality)],
             }
         }
         "mutex_shared_close" => {
@@ -397,11 +418,16 @@ pub(super) fn lower_task_builtin_call(
                     "mutex_permit(...) expects one shared mutex and one lane literal".to_owned(),
                 );
             };
-            if !matches!(lane, AstExpr::Int(0 | 1)) {
+            let AstExpr::Int(lane) = lane else {
                 return Err(
-                    "mutex_permit(...) currently requires a unique literal lane `0` or `1`"
+                    "mutex_permit(...) requires a unique static lane literal in `0..=63`"
                         .to_owned(),
                 );
+            };
+            if !(0..=63).contains(lane) {
+                return Err(format!(
+                    "mutex_permit(...) lane literal must be in `0..=63`, found `{lane}`"
+                ));
             }
             let lowered_shared = lower_task_expr!(shared, None)?;
             ensure_shared_mutex_like(
@@ -411,7 +437,7 @@ pub(super) fn lower_task_builtin_call(
                 signatures,
                 struct_table,
             )?;
-            let lowered_lane = lower_task_expr!(lane, Some(&i64_type()))?;
+            let lowered_lane = NirExpr::Int(*lane);
             NirExpr::CpuMutexCapability {
                 op: NirMutexCapabilityOp::Permit,
                 args: vec![lowered_shared, lowered_lane],
@@ -438,6 +464,45 @@ pub(super) fn lower_task_builtin_call(
             NirExpr::CpuMutexCapability {
                 op: NirMutexCapabilityOp::PermitLock,
                 args: vec![lowered],
+            }
+        }
+        "mutex_lease_replace" => {
+            if !is_host_execution_domain(current_domain) {
+                return Err(
+                    "mutex_lease_replace(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
+                );
+            }
+            let [lease, replacement] = args else {
+                return Err(
+                    "mutex_lease_replace(...) expects one mutex lease and one replacement value"
+                        .to_owned(),
+                );
+            };
+            let lowered_lease = lower_task_expr!(lease, None)?;
+            ensure_mutex_lease_like(
+                "mutex_lease_replace",
+                &lowered_lease,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            let payload_ty =
+                infer_nir_expr_type(&lowered_lease, bindings, signatures, struct_table)
+                    .and_then(|ty| ty.mutex_lease_payload().cloned())
+                    .ok_or_else(|| {
+                        "mutex_lease_replace(...) cannot resolve the lease payload type".to_owned()
+                    })?;
+            if payload_ty.render() != "i64" {
+                return Err(format!(
+                    "mutex_lease_replace(...) currently supports only `MutexLease<i64>`, found `MutexLease<{}>`",
+                    payload_ty.render()
+                ));
+            }
+            let lowered_replacement = lower_task_expr!(replacement, Some(&payload_ty))?;
+            NirExpr::CpuMutexCapability {
+                op: NirMutexCapabilityOp::LeaseReplace,
+                args: vec![lowered_lease, lowered_replacement],
             }
         }
         "mutex_lease_value" | "mutex_lease_unlock" => {

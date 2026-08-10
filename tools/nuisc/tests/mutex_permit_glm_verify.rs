@@ -64,8 +64,29 @@ fn shared_mutex_glm_distinguishes_read_permit_from_owned_lease_transitions() {
     assert_eq!(permit_profile.accesses[0].mode, NirGlmUseMode::Read);
     assert_eq!(permit_profile.effect, NirGlmEffect::None);
 
+    let share = NirExpr::CpuMutexCapability {
+        op: NirMutexCapabilityOp::Share,
+        args: vec![NirExpr::Var("lock".to_owned()), NirExpr::Int(3)],
+    };
+    let share_profile = nir_glm_profile(&share).expect("share GLM profile");
+    assert_eq!(share_profile.result_class, NirGlmValueClass::Res);
+    assert_eq!(share_profile.accesses.len(), 2);
+    assert_eq!(share_profile.accesses[0].mode, NirGlmUseMode::Own);
+    assert_eq!(share_profile.accesses[1].mode, NirGlmUseMode::Read);
+    assert_eq!(share_profile.effect, NirGlmEffect::DomainMove);
+
+    let replace = NirExpr::CpuMutexCapability {
+        op: NirMutexCapabilityOp::LeaseReplace,
+        args: vec![NirExpr::Var("lease".to_owned()), NirExpr::Int(29)],
+    };
+    let replace_profile = nir_glm_profile(&replace).expect("lease replace GLM profile");
+    assert_eq!(replace_profile.result_class, NirGlmValueClass::Val);
+    assert_eq!(replace_profile.accesses.len(), 2);
+    assert_eq!(replace_profile.accesses[0].mode, NirGlmUseMode::Write);
+    assert_eq!(replace_profile.accesses[1].mode, NirGlmUseMode::Read);
+    assert_eq!(replace_profile.effect, NirGlmEffect::None);
+
     for op in [
-        NirMutexCapabilityOp::Share,
         NirMutexCapabilityOp::SharedClose,
         NirMutexCapabilityOp::PermitLock,
         NirMutexCapabilityOp::LeaseUnlock,
@@ -124,6 +145,14 @@ fn glm_verifier_allows_lease_read_then_rejects_read_after_unlock() {
             name: "lease".to_owned(),
             ty: None,
             value: NirExpr::Int(1),
+        },
+        NirStmt::Let {
+            name: "old".to_owned(),
+            ty: None,
+            value: NirExpr::CpuMutexCapability {
+                op: NirMutexCapabilityOp::LeaseReplace,
+                args: vec![NirExpr::Var("lease".to_owned()), NirExpr::Int(29)],
+            },
         },
         NirStmt::Let {
             name: "value".to_owned(),

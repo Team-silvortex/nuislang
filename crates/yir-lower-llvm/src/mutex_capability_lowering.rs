@@ -16,6 +16,7 @@ pub(crate) fn lower_cpu_mutex_capability_node(node: &Node, state: &mut LlvmLower
         "mutex_permit" => lower_permit(node, state),
         "mutex_permit_lock" => lower_permit_lock(node, state),
         "mutex_lease_value" => lower_lease_value(node, state),
+        "mutex_lease_replace" => lower_lease_replace(node, state),
         "mutex_lease_unlock" => lower_lease_unlock(node, state),
         _ => false,
     }
@@ -55,10 +56,28 @@ fn lower_share(node: &Node, state: &mut LlvmLoweringState) -> bool {
         ));
         return true;
     };
+    let static_cardinality = state.facts.get_i64(&node.op.args[1]).or_else(|| {
+        get_i64(&state.registers, &node.op.args[1]).and_then(|value| value.parse().ok())
+    });
+    let Some(static_cardinality) = static_cardinality else {
+        state.body.push(format!(
+            "  ; deferred lowering for cpu.mutex_share `{}` because its permit cardinality is not static",
+            node.name
+        ));
+        return true;
+    };
+    if !(1..=64).contains(&static_cardinality) {
+        state.body.push(format!(
+            "  ; deferred lowering for cpu.mutex_share `{}` because permit cardinality {static_cardinality} is outside 1..=64",
+            node.name
+        ));
+        return true;
+    }
+    let permit_cardinality = static_cardinality.to_string();
     let runtime_handle = mutex.runtime_handle.as_ref().map(|handle| {
         let shared = fresh_reg(&mut state.next_reg);
         state.body.push(format!(
-            "  {shared} = call i64 @nuis_scheduler_mutex_share_i64_v1(i64 {handle})"
+            "  {shared} = call i64 @nuis_scheduler_mutex_share_i64_v1(i64 {handle}, i64 {permit_cardinality})"
         ));
         shared
     });
@@ -149,6 +168,54 @@ fn lower_lease_value(node: &Node, state: &mut LlvmLoweringState) -> bool {
     if let LlvmValueRef::I64(value) = value {
         state.last_cpu_value = Some(value);
     }
+    true
+}
+
+fn lower_lease_replace(node: &Node, state: &mut LlvmLoweringState) -> bool {
+    let Some(lease) = get_mutex_guard(&state.registers, &node.op.args[0]).cloned() else {
+        state.body.push(format!(
+            "  ; deferred lowering for cpu.mutex_lease_replace `{}` because its lease is outside the current CPU LLVM slice",
+            node.name
+        ));
+        return true;
+    };
+    let Some(replacement) = get_i64(&state.registers, &node.op.args[1]).map(str::to_owned) else {
+        state.body.push(format!(
+            "  ; deferred lowering for cpu.mutex_lease_replace `{}` because its replacement is outside the current CPU LLVM slice",
+            node.name
+        ));
+        return true;
+    };
+    let old = match lease.runtime_guard.as_ref() {
+        Some(guard) => {
+            let old = fresh_reg(&mut state.next_reg);
+            state.body.push(format!(
+                "  {old} = call i64 @nuis_scheduler_mutex_lease_replace_i64_v1(i64 {guard}, i64 {replacement})"
+            ));
+            old
+        }
+        None => match lease.value.as_ref() {
+            LlvmValueRef::I64(old) => old.clone(),
+            _ => {
+                state.body.push(format!(
+                    "  ; deferred lowering for cpu.mutex_lease_replace `{}` because its staged lease payload is not i64",
+                    node.name
+                ));
+                return true;
+            }
+        },
+    };
+    state.registers.insert(
+        node.op.args[0].clone(),
+        LlvmValueRef::MutexGuard(MutexGuardLlvmValueRef {
+            runtime_guard: lease.runtime_guard,
+            value: Box::new(LlvmValueRef::I64(replacement)),
+        }),
+    );
+    state
+        .registers
+        .insert(node.name.clone(), LlvmValueRef::I64(old.clone()));
+    state.last_cpu_value = Some(old);
     true
 }
 

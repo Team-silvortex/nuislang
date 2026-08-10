@@ -277,8 +277,9 @@ pub(super) fn infer_ast_call_type(input: AstCallInferenceInput<'_>) -> Option<As
             }
         }
         "mutex_share" => {
-            let [mutex] = args else {
-                return None;
+            let mutex = match args {
+                [mutex] | [mutex, _] => mutex,
+                _ => return None,
             };
             let mutex_ty = infer_ast_expr_type_inner(
                 mutex,
@@ -342,6 +343,24 @@ pub(super) fn infer_ast_call_type(input: AstCallInferenceInput<'_>) -> Option<As
         }
         "mutex_lease_value" => {
             let [lease] = args else {
+                return None;
+            };
+            let lease_ty = infer_ast_expr_type_inner(
+                lease,
+                env,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                active_exprs,
+            )?;
+            if lease_ty.name == "MutexLease" && lease_ty.generic_args.len() == 1 {
+                Some(lease_ty.generic_args[0].clone())
+            } else {
+                None
+            }
+        }
+        "mutex_lease_replace" => {
+            let [lease, _] = args else {
                 return None;
             };
             let lease_ty = infer_ast_expr_type_inner(

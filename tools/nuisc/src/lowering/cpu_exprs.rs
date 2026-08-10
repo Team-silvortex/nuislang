@@ -395,11 +395,12 @@ fn lower_cpu_mutex_capability(
     bindings: &BTreeMap<String, String>,
 ) -> Result<String, String> {
     let (prefix, instruction, arity) = match op {
-        NirMutexCapabilityOp::Share => ("cpu_mutex_share", "mutex_share", 1),
+        NirMutexCapabilityOp::Share => ("cpu_mutex_share", "mutex_share", 2),
         NirMutexCapabilityOp::SharedClose => ("cpu_mutex_shared_close", "mutex_shared_close", 1),
         NirMutexCapabilityOp::Permit => ("cpu_mutex_permit", "mutex_permit", 2),
         NirMutexCapabilityOp::PermitLock => ("cpu_mutex_permit_lock", "mutex_permit_lock", 1),
         NirMutexCapabilityOp::LeaseValue => ("cpu_mutex_lease_value", "mutex_lease_value", 1),
+        NirMutexCapabilityOp::LeaseReplace => ("cpu_mutex_lease_replace", "mutex_lease_replace", 2),
         NirMutexCapabilityOp::LeaseUnlock => ("cpu_mutex_lease_unlock", "mutex_lease_unlock", 1),
     };
     if args.len() != arity {

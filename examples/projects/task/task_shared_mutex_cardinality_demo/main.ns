@@ -1,0 +1,21 @@
+mod cpu Main {
+  async fn observe(permit: MutexPermit<i64>) -> i64 {
+    let lease: MutexLease<i64> = mutex_permit_lock(permit);
+    let value: i64 = mutex_lease_value(lease);
+    let released: i64 = mutex_lease_unlock(lease);
+    return value + released;
+  }
+
+  fn main() -> i64 {
+    let lock: Mutex<i64> = mutex_new(10);
+    let shared: SharedMutex<i64> = mutex_share(lock, 3);
+    let first: Task<i64> = spawn(observe(mutex_permit(shared, 0)));
+    let second: Task<i64> = spawn(observe(mutex_permit(shared, 1)));
+    let third: Task<i64> = spawn(observe(mutex_permit(shared, 2)));
+    let first_value: i64 = join(first);
+    let second_value: i64 = join(second);
+    let third_value: i64 = join(third);
+    let revoked: i64 = mutex_shared_close(shared);
+    return first_value + second_value + third_value + revoked;
+  }
+}

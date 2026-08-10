@@ -282,16 +282,32 @@ pub(crate) fn execute_cpu_task_node(
             let mutex = state.expect_mutex(&node.op.args[0])?;
             let label = mutex.label.clone();
             let value = mutex.value.clone();
+            let permit_cardinality = state.expect_int(&node.op.args[1])?;
+            if !(1..=64).contains(&permit_cardinality) {
+                return Err(format!(
+                    "shared mutex `{label}` permit cardinality `{permit_cardinality}` is outside `1..=64`"
+                ));
+            }
             if state.closed_shared_mutexes.contains(&label) {
                 return Err(format!(
                     "shared mutex `{label}` cannot be reopened after close"
                 ));
             }
+            state
+                .shared_mutex_values
+                .insert(label.clone(), (*value).clone());
+            state
+                .shared_mutex_release_epochs
+                .entry(label.clone())
+                .or_insert(0);
+            state
+                .shared_mutex_permit_cardinalities
+                .insert(label.clone(), permit_cardinality);
             state.push_resource_event(
                 resource,
                 format!(
-                    "effect cpu.mutex_share @{} [{}]: {}",
-                    node.resource, resource.kind.raw, label
+                    "effect cpu.mutex_share @{} [{}]: {} permit_cardinality={permit_cardinality}",
+                    node.resource, resource.kind.raw, label,
                 ),
             );
             Ok(Value::Mutex(yir_core::MutexHandle { label, value }))
@@ -316,28 +332,53 @@ pub(crate) fn execute_cpu_task_node(
                 .live_mutex_permits
                 .retain(|(permit_label, _)| permit_label != &label);
             state.closed_shared_mutexes.insert(label.clone());
+            let release_epoch = state
+                .shared_mutex_release_epochs
+                .get(&label)
+                .copied()
+                .unwrap_or(0)
+                .checked_add(1)
+                .ok_or_else(|| format!("shared mutex `{label}` release epoch overflow"))?;
+            state
+                .shared_mutex_release_epochs
+                .insert(label.clone(), release_epoch);
             state.push_resource_event(
                 resource,
                 format!(
-                    "effect cpu.mutex_shared_close @{} [{}]: {} revoked={revoked}",
-                    node.resource, resource.kind.raw, label
+                    "effect cpu.mutex_shared_close @{} [{}]: {} revoked={revoked} release_epoch={release_epoch}",
+                    node.resource, resource.kind.raw, label,
                 ),
             );
+            state.shared_mutex_values.remove(&label);
+            state.shared_mutex_release_epochs.remove(&label);
+            state.shared_mutex_permit_cardinalities.remove(&label);
             Ok(Value::Int(revoked as i64))
         }
         "mutex_permit" => {
             let mutex = state.expect_mutex(&node.op.args[0])?;
             let label = mutex.label.clone();
-            let value = mutex.value.clone();
-            let lane = state.expect_int(&node.op.args[1])?;
-            if !(0..=1).contains(&lane) {
-                return Err(format!(
-                    "mutex permit lane `{lane}` is outside fixed range 0..=1"
-                ));
-            }
             if state.closed_shared_mutexes.contains(&label) {
                 return Err(format!(
-                    "shared mutex `{label}` cannot issue permit lane `{lane}` after close"
+                    "shared mutex `{label}` cannot issue permit after close"
+                ));
+            }
+            let permit_cardinality = state
+                .shared_mutex_permit_cardinalities
+                .get(&label)
+                .copied()
+                .ok_or_else(|| {
+                    format!("shared mutex `{label}` has no static permit cardinality")
+                })?;
+            let value = state
+                .shared_mutex_values
+                .get(&label)
+                .cloned()
+                .map(Box::new)
+                .unwrap_or_else(|| mutex.value.clone());
+            let lane = state.expect_int(&node.op.args[1])?;
+            if lane < 0 || lane >= permit_cardinality {
+                return Err(format!(
+                    "mutex permit lane `{lane}` is outside configured range `0..{permit_cardinality}`"
                 ));
             }
             if !state.live_mutex_permits.insert((label.clone(), lane)) {
@@ -348,8 +389,8 @@ pub(crate) fn execute_cpu_task_node(
             state.push_resource_event(
                 resource,
                 format!(
-                    "effect cpu.mutex_permit @{} [{}]: {} lane={}",
-                    node.resource, resource.kind.raw, label, lane
+                    "effect cpu.mutex_permit @{} [{}]: {} lane={} permit_cardinality={permit_cardinality}",
+                    node.resource, resource.kind.raw, label, lane,
                 ),
             );
             Ok(Value::MutexPermit(yir_core::MutexPermitHandle {
@@ -362,7 +403,7 @@ pub(crate) fn execute_cpu_task_node(
             let permit = state.expect_mutex_permit(&node.op.args[0])?;
             let label = permit.label.clone();
             let lane = permit.lane;
-            let value = permit.value.clone();
+            let fallback_value = permit.value.clone();
             if state.closed_shared_mutexes.contains(&label) {
                 return Err(format!(
                     "mutex permit `{label}:{lane}` was revoked by shared close"
@@ -378,6 +419,12 @@ pub(crate) fn execute_cpu_task_node(
                     "mutex permit `{label}:{lane}` is stale or consumed"
                 ));
             }
+            let value = state
+                .shared_mutex_values
+                .get(&label)
+                .cloned()
+                .map(Box::new)
+                .unwrap_or(fallback_value);
             state.active_mutex_leases.insert(label.clone());
             state.push_resource_event(
                 resource,
@@ -393,7 +440,49 @@ pub(crate) fn execute_cpu_task_node(
         }
         "mutex_lease_value" => {
             let lease = state.expect_mutex_guard(&node.op.args[0])?;
-            Ok((*lease.value).clone())
+            let label = lease.label.clone();
+            if !state.active_mutex_leases.contains(&label) {
+                return Err(format!(
+                    "mutex lease `{label}` is stale or already released"
+                ));
+            }
+            state
+                .shared_mutex_values
+                .get(&label)
+                .cloned()
+                .ok_or_else(|| format!("shared mutex `{label}` has no published value"))
+        }
+        "mutex_lease_replace" => {
+            let lease = state.expect_mutex_guard(&node.op.args[0])?;
+            let label = lease.label.clone();
+            if !state.active_mutex_leases.contains(&label) {
+                return Err(format!(
+                    "mutex lease `{label}` is stale or already released"
+                ));
+            }
+            let replacement = Value::Int(state.expect_int(&node.op.args[1])?);
+            let old = state
+                .shared_mutex_values
+                .insert(label.clone(), replacement.clone())
+                .ok_or_else(|| format!("shared mutex `{label}` has no published value"))?;
+            let release_epoch = state
+                .shared_mutex_release_epochs
+                .get(&label)
+                .copied()
+                .unwrap_or(0)
+                .checked_add(1)
+                .ok_or_else(|| format!("shared mutex `{label}` release epoch overflow"))?;
+            state
+                .shared_mutex_release_epochs
+                .insert(label.clone(), release_epoch);
+            state.push_resource_event(
+                resource,
+                format!(
+                    "effect cpu.mutex_lease_replace @{} [{}]: {} old={} new={} release_epoch={release_epoch}",
+                    node.resource, resource.kind.raw, label, old, replacement,
+                ),
+            );
+            Ok(old)
         }
         "mutex_lease_unlock" => {
             let lease = state.expect_mutex_guard(&node.op.args[0])?;
@@ -403,11 +492,21 @@ pub(crate) fn execute_cpu_task_node(
                     "mutex lease `{label}` is stale or already released"
                 ));
             }
+            let release_epoch = state
+                .shared_mutex_release_epochs
+                .get(&label)
+                .copied()
+                .unwrap_or(0)
+                .checked_add(1)
+                .ok_or_else(|| format!("shared mutex `{label}` release epoch overflow"))?;
+            state
+                .shared_mutex_release_epochs
+                .insert(label.clone(), release_epoch);
             state.push_resource_event(
                 resource,
                 format!(
-                    "effect cpu.mutex_lease_unlock @{} [{}]: {}",
-                    node.resource, resource.kind.raw, label
+                    "effect cpu.mutex_lease_unlock @{} [{}]: {} release_epoch={release_epoch}",
+                    node.resource, resource.kind.raw, label,
                 ),
             );
             Ok(Value::Int(1))

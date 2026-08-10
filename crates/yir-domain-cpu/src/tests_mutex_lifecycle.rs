@@ -31,15 +31,32 @@ fn execute(
 }
 
 fn shared_mutex(cpu: &CpuMod, state: &mut ExecutionState, prefix: &str) {
+    shared_mutex_with_cardinality(cpu, state, prefix, 2);
+}
+
+fn shared_mutex_with_cardinality(
+    cpu: &CpuMod,
+    state: &mut ExecutionState,
+    prefix: &str,
+    permit_cardinality: i64,
+) {
     let value_name = format!("{prefix}_value");
     let mutex_name = format!("{prefix}_mutex");
     let shared_name = format!("{prefix}_shared");
+    let cardinality_name = format!("{prefix}_cardinality");
     state.bind_value(&value_name, Value::Int(23));
+    state.bind_value(&cardinality_name, Value::Int(permit_cardinality));
     let mutex =
         execute(cpu, state, &mutex_name, "mutex_new", &[&value_name]).expect("create mutex");
     state.bind_value(&mutex_name, mutex);
-    let shared =
-        execute(cpu, state, &shared_name, "mutex_share", &[&mutex_name]).expect("share mutex");
+    let shared = execute(
+        cpu,
+        state,
+        &shared_name,
+        "mutex_share",
+        &[&mutex_name, &cardinality_name],
+    )
+    .expect("share mutex");
     state.bind_value(&shared_name, shared);
 }
 
@@ -153,5 +170,156 @@ fn shared_close_revokes_permits_and_rejects_active_leases() {
         )
         .expect("close released mutex"),
         Value::Int(0)
+    );
+}
+
+#[test]
+fn static_cardinality_admits_three_lanes_and_rejects_the_fourth() {
+    let cpu = CpuMod;
+    let mut state = ExecutionState::default();
+    for lane in 0..=3 {
+        state.bind_value(&format!("lane{lane}"), Value::Int(lane));
+    }
+    shared_mutex_with_cardinality(&cpu, &mut state, "wide", 3);
+
+    for lane in 0..=2 {
+        let name = format!("permit{lane}");
+        let lane_name = format!("lane{lane}");
+        let permit = execute(
+            &cpu,
+            &mut state,
+            &name,
+            "mutex_permit",
+            &["wide_shared", &lane_name],
+        )
+        .expect("issue configured permit lane");
+        state.bind_value(&name, permit);
+    }
+    let error = execute(
+        &cpu,
+        &mut state,
+        "permit3",
+        "mutex_permit",
+        &["wide_shared", "lane3"],
+    )
+    .unwrap_err();
+    assert!(error.contains("outside configured range `0..3`"));
+    assert_eq!(
+        state.shared_mutex_permit_cardinalities.get("wide_mutex"),
+        Some(&3)
+    );
+    assert_eq!(
+        execute(
+            &cpu,
+            &mut state,
+            "wide_close",
+            "mutex_shared_close",
+            &["wide_shared"],
+        )
+        .expect("close three-lane mutex"),
+        Value::Int(3)
+    );
+    assert!(!state
+        .shared_mutex_permit_cardinalities
+        .contains_key("wide_mutex"));
+}
+
+#[test]
+fn lease_replace_publishes_value_across_preissued_permits() {
+    let cpu = CpuMod;
+    let mut state = ExecutionState::default();
+    state.bind_value("lane0", Value::Int(0));
+    state.bind_value("lane1", Value::Int(1));
+    state.bind_value("replacement", Value::Int(31));
+    shared_mutex(&cpu, &mut state, "replace");
+
+    for (name, lane) in [("left_permit", "lane0"), ("right_permit", "lane1")] {
+        let permit = execute(
+            &cpu,
+            &mut state,
+            name,
+            "mutex_permit",
+            &["replace_shared", lane],
+        )
+        .expect("issue permit before mutation");
+        state.bind_value(name, permit);
+    }
+
+    let left_lease = execute(
+        &cpu,
+        &mut state,
+        "left_lease",
+        "mutex_permit_lock",
+        &["left_permit"],
+    )
+    .expect("lock first permit");
+    state.bind_value("left_lease", left_lease);
+    assert_eq!(
+        execute(
+            &cpu,
+            &mut state,
+            "old",
+            "mutex_lease_replace",
+            &["left_lease", "replacement"],
+        )
+        .expect("replace leased value"),
+        Value::Int(23)
+    );
+    assert_eq!(
+        execute(
+            &cpu,
+            &mut state,
+            "left_value",
+            "mutex_lease_value",
+            &["left_lease"],
+        )
+        .expect("read replacement through first lease"),
+        Value::Int(31)
+    );
+    execute(
+        &cpu,
+        &mut state,
+        "left_release",
+        "mutex_lease_unlock",
+        &["left_lease"],
+    )
+    .expect("release first lease");
+
+    let right_lease = execute(
+        &cpu,
+        &mut state,
+        "right_lease",
+        "mutex_permit_lock",
+        &["right_permit"],
+    )
+    .expect("lock preissued second permit");
+    state.bind_value("right_lease", right_lease);
+    assert_eq!(
+        execute(
+            &cpu,
+            &mut state,
+            "right_value",
+            "mutex_lease_value",
+            &["right_lease"],
+        )
+        .expect("observe published replacement"),
+        Value::Int(31)
+    );
+    execute(
+        &cpu,
+        &mut state,
+        "right_release",
+        "mutex_lease_unlock",
+        &["right_lease"],
+    )
+    .expect("release second lease");
+
+    assert_eq!(
+        state.shared_mutex_values.get("replace_mutex"),
+        Some(&Value::Int(31))
+    );
+    assert_eq!(
+        state.shared_mutex_release_epochs.get("replace_mutex"),
+        Some(&3)
     );
 }

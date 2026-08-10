@@ -24,11 +24,14 @@ Read the current line this way:
 * they already have compile-closure anchors and `GLM` ownership rules
 * `Mutex<i64>` now reaches a cooperative scheduler handle/guard runtime with
   explicit acquire/release epoch evidence
-* `SharedMutex<i64>` can authorize exactly two task lanes through distinct,
-  non-cloneable `MutexPermit<i64>` values; each worker consumes its permit into
-  one `MutexLease<i64>` without receiving the raw scheduler handle
-* this foothold still does **not** imply a parallel executor, mutable lease
-  payloads, dynamic permit cardinality, or a finalized visibility contract
+* `SharedMutex<i64>` can authorize a statically declared `1..=64` task lanes
+  through distinct, non-cloneable `MutexPermit<i64>` values; the one-argument
+  `mutex_share(lock)` form remains a two-lane shorthand
+* each worker consumes its permit into one `MutexLease<i64>` without receiving
+  the raw scheduler handle, and a live lease can replace the central `i64`
+  payload while retaining authority
+* this foothold still does **not** imply a parallel executor, runtime-dynamic
+  permit cardinality, generalized payloads, or a finalized visibility contract
 
 ## What Is Real Today
 
@@ -62,13 +65,18 @@ Current project anchor:
 
 * [task_thread_mutex_demo](../../examples/projects/task/task_thread_mutex_demo)
 * [task_shared_mutex_permit_demo](../../examples/projects/task/task_shared_mutex_permit_demo)
+* [task_shared_mutex_cardinality_demo](../../examples/projects/task/task_shared_mutex_cardinality_demo)
+* [task_shared_mutex_replace_demo](../../examples/projects/task/task_shared_mutex_replace_demo)
 * [task_branch_cancel_unlock_demo](../../examples/projects/task/task_branch_cancel_unlock_demo)
 
 Short rule:
 
 * use the project demo when you want generic helper/facade shape
-* use the shared permit demo when you want the shortest native two-task
+* use the shared permit demo when you want the shortest native default-two-lane
   authorization path without copied mutex handles
+* use the cardinality demo when you want three statically declared task lanes
+* use the replace demo when you want release-published lease mutation observed
+  by a permit issued before that mutation
 * use the branch demo when you want native dynamic cancel/unlock closure with
   both source branches executed
 * use the single-file `.ns` anchors when you want the shortest boundary
@@ -104,12 +112,14 @@ Current `GLM`/verifier truth already includes:
 * `mutex_lock(...)` consumes the mutex handle and produces guard authority
 * `mutex_unlock(...)` consumes the guard
 * `mutex_value(...)` is a read, not a consume
-* `mutex_share(...)` consumes the original mutex and produces shared authority
+* `mutex_share(...)` consumes the original mutex, reads its static cardinality,
+  and produces shared authority
 * `mutex_shared_close(...)` consumes shared authority, revokes pending permits,
   and returns the revoked permit count
 * `mutex_permit(...)` reads shared authority and issues one lane-bound permit
 * `mutex_permit_lock(...)` consumes a permit and produces lease authority
 * `mutex_lease_value(...)` reads a live lease
+* `mutex_lease_replace(...)` writes through a live lease without consuming it
 * `mutex_lease_unlock(...)` consumes the lease without returning a raw handle
 * `task_value(...)` on thread-produced `TaskResult<T>` still requires a
   completed path, just like ordinary task results
@@ -174,26 +184,33 @@ Honesty boundary:
 
 ### 6. Shared permit/lease authority reaches native tasks
 
-The first source-level shared-mutex path is now closed for two statically
-authorized task lanes:
+The source-level shared-mutex path now closes over a statically declared permit
+cardinality:
 
 ```text
 Mutex<i64>
+  -> mutex_share(lock, N), where N is a literal in 1..=64
   -> SharedMutex<i64>
-  -> MutexPermit<i64> for lane 0 or lane 1
+  -> MutexPermit<i64> for one lane in 0..N
   -> task boundary as an opaque scheduler scalar
   -> MutexLease<i64>
-  -> value read
+  -> value read or release-published replacement
   -> lease unlock
   -> shared close
 ```
 
+`mutex_share(lock)` is normalized by the compiler to
+`mutex_share(lock, 2)`. The two-argument form accepts only a literal cardinality
+in `1..=64`. `mutex_permit(shared, lane)` likewise requires a literal lane in
+`0..=63`; the interpreter and native runtime then enforce the exact relation
+`lane < N` from the cardinality stored at share time.
+
 The runtime keeps the mutex handle inside its permit table. A permit carries
 only an unforgeable token, is bound to the mutex generation and one fixed lane,
-and is consumed before locking. Duplicate lanes, lanes outside `0..2`, stale
-generations, and token replay fail closed. Nuis only accepts a freshly issued
-inline permit at `spawn`/`thread_spawn`; a stored permit variable cannot escape
-across that boundary.
+and is consumed before locking. Duplicate lanes, lanes outside the declared
+cardinality, stale generations, and token replay fail closed. Nuis only accepts
+a freshly issued inline permit at `spawn`/`thread_spawn`; a stored permit
+variable cannot escape across that boundary.
 
 Every shared capability YIR node carries:
 
@@ -201,22 +218,31 @@ Every shared capability YIR node carries:
 mutex_contract=scheduler-handle-v1
 visibility=acquire-release-epoch-v1
 authority=linear-permit-lease-v1
-permit_scope=fixed-two-lane-v1
+permit_cardinality=share-literal-1-to-64-v1
 permit_policy=one-shot-generation-bound-v1
 payload_policy=i64-native-staged-fallback
 lifecycle=explicit-close-revoke-v1
+mutation=lease-replace-release-epoch-v1
 ```
 
-The native project smoke emits one share, two permit issues, two scheduler task
-invocations, and one reusable worker body. Both workers observe `17`, release
-their leases, explicitly close shared authority, and the final binary exits
-`34`. Close performs a release fence, rejects an active lease, revokes every
-pending same-generation permit, invalidates the mutex slot, and returns the
-revocation count. The runtime harness separately proves duplicate-lane
-rejection, one-shot consumption, two release epochs, active-lease close
-rejection, post-close token failure, and lifecycle cleanup. The CPU interpreter
-tracks the same close, permit, and lease state rather than treating close as a
-native-only effect.
+Three native project smokes pin the current boundary:
+
+* `task_shared_mutex_permit_demo` uses the default cardinality, sends two
+  permits through two scheduler task invocations, and exits `34`
+* `task_shared_mutex_cardinality_demo` declares cardinality `3`, admits lanes
+  `0`, `1`, and `2`, sends all three permits through tasks, and exits `33`
+* `task_shared_mutex_replace_demo` replaces `17` with `23` through one lease,
+  exposes the replacement to a pre-issued second permit, and exits `65`
+
+Close performs a release fence, rejects an active lease, revokes every pending
+same-generation permit, invalidates the mutex slot, and returns the revocation
+count. Lease replacement updates one central shared value and publishes a
+release epoch without consuming the lease. The runtime harness separately
+proves duplicate/out-of-range lane rejection, one-shot consumption, epoch
+progression, active-lease close rejection, post-close token failure, and
+lifecycle cleanup. The CPU interpreter tracks the same cardinality, close,
+permit, lease, and mutation state rather than treating them as native-only
+effects.
 
 This is shared authorization, not copied ownership: ordinary `Mutex<T>` and
 `MutexGuard<T>` retain their existing linear behavior.
@@ -248,8 +274,9 @@ Still not promised today:
 
 * a mature worker runtime
 * an OS-thread-parallel mutex implementation
-* more than two statically authorized permit lanes
-* mutable lease payload replacement or explicit shared-mutex close/revocation
+* runtime-dynamic permit cardinality
+* generalized non-`i64` shared payloads and replacement
+* branch-local shared-capability selected-prefix lowering
 * a final memory visibility model beyond the current acquire/release epoch
   protocol
 * a finished synchronization contract
@@ -285,13 +312,15 @@ For the current beta foundation line, this lane is now strong enough to say:
 * `GLM` ownership truth exists
 * `Mutex<i64>` reaches a scheduler-backed native runtime with auditable
   visibility metadata
-* fixed two-lane shared permits cross native Nuis task boundaries without raw
-  handle copies
+* statically sized shared permits cross native Nuis task boundaries without raw
+  handle copies, including a three-lane native proof
+* lease replacement and explicit close/revocation share one interpreter/native
+  contract
 
 But it is **not** yet strong enough to say:
 
 * the concurrent runtime model is final
-* shared mutex authority is dynamically sized or OS-thread parallel
+* shared mutex authority is runtime-dynamic or OS-thread parallel
 * the visibility/synchronization story is complete
 
 That is the right beta-hardening posture:

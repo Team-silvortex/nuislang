@@ -114,7 +114,7 @@ fn scheduler_shared_mutex_permits_are_lane_bound_and_one_shot() {
         r#"
 int64_t nuis_yir_entry(void) {
     int64_t shared = nuis_scheduler_mutex_share_i64_v1(
-        nuis_scheduler_mutex_new_i64_v1(23)
+        nuis_scheduler_mutex_new_i64_v1(23), 2
     );
     int64_t left = nuis_scheduler_mutex_permit_i64_v1(shared, 0);
     int64_t right = nuis_scheduler_mutex_permit_i64_v1(shared, 1);
@@ -127,40 +127,68 @@ int64_t nuis_yir_entry(void) {
     if (nuis_scheduler_mutex_rejected_permit_count_get_v1() != 2) return 15;
 
     int64_t left_lease = nuis_scheduler_mutex_permit_lock_i64_v1(left);
-    if (nuis_scheduler_mutex_value_i64_v1(left_lease) != 23) return 16;
-    if (nuis_scheduler_mutex_active_permit_count_get_v1(shared) != 1) return 17;
-    if (nuis_scheduler_mutex_lease_unlock_i64_v1(left_lease) != 1) return 18;
-    if (nuis_scheduler_mutex_release_epoch_v1(shared) != 1) return 19;
-    if (nuis_scheduler_mutex_try_permit_lock_i64_v1(left) != 0) return 20;
-    if (nuis_scheduler_mutex_rejected_permit_count_get_v1() != 3) return 21;
+    if (nuis_scheduler_mutex_lease_replace_i64_v1(left_lease, 29) != 23) return 16;
+    if (nuis_scheduler_mutex_release_epoch_v1(shared) != 1) return 17;
+    if (nuis_scheduler_mutex_value_i64_v1(left_lease) != 29) return 18;
+    if (nuis_scheduler_mutex_active_permit_count_get_v1(shared) != 1) return 19;
+    if (nuis_scheduler_mutex_lease_unlock_i64_v1(left_lease) != 1) return 20;
+    if (nuis_scheduler_mutex_release_epoch_v1(shared) != 2) return 21;
+    if (nuis_scheduler_mutex_try_permit_lock_i64_v1(left) != 0) return 22;
+    if (nuis_scheduler_mutex_rejected_permit_count_get_v1() != 3) return 23;
 
     int64_t right_lease = nuis_scheduler_mutex_permit_lock_i64_v1(right);
-    if (nuis_scheduler_mutex_value_i64_v1(right_lease) != 23) return 22;
-    if (nuis_scheduler_mutex_active_permit_count_get_v1(shared) != 0) return 23;
-    if (nuis_scheduler_mutex_lease_unlock_i64_v1(right_lease) != 1) return 24;
-    if (nuis_scheduler_mutex_release_epoch_v1(shared) != 2) return 25;
-    if (nuis_scheduler_mutex_successful_unlock_count_get_v1() != 2) return 26;
-    if (nuis_scheduler_mutex_shared_close_i64_v1(shared) != 0) return 27;
-    if (nuis_scheduler_mutex_live_count_get_v1() != 0) return 28;
+    if (nuis_scheduler_mutex_value_i64_v1(right_lease) != 29) return 24;
+    if (nuis_scheduler_mutex_active_permit_count_get_v1(shared) != 0) return 25;
+    if (nuis_scheduler_mutex_lease_unlock_i64_v1(right_lease) != 1) return 26;
+    if (nuis_scheduler_mutex_release_epoch_v1(shared) != 3) return 27;
+    if (nuis_scheduler_mutex_successful_unlock_count_get_v1() != 2) return 28;
+    if (nuis_scheduler_mutex_shared_close_i64_v1(shared) != 0) return 29;
+    if (nuis_scheduler_mutex_live_count_get_v1() != 0) return 30;
 
     int64_t closing = nuis_scheduler_mutex_share_i64_v1(
-        nuis_scheduler_mutex_new_i64_v1(31)
+        nuis_scheduler_mutex_new_i64_v1(31), 2
     );
     int64_t pending = nuis_scheduler_mutex_permit_i64_v1(closing, 0);
     int64_t active = nuis_scheduler_mutex_permit_i64_v1(closing, 1);
     int64_t active_lease = nuis_scheduler_mutex_permit_lock_i64_v1(active);
-    if (nuis_scheduler_mutex_try_shared_close_i64_v1(closing) != -1) return 29;
-    if (nuis_scheduler_mutex_rejected_close_count_get_v1() != 1) return 30;
-    if (nuis_scheduler_mutex_lease_unlock_i64_v1(active_lease) != 1) return 31;
-    if (nuis_scheduler_mutex_shared_close_i64_v1(closing) != 1) return 32;
-    if (nuis_scheduler_mutex_try_permit_lock_i64_v1(pending) != 0) return 33;
-    if (nuis_scheduler_mutex_try_permit_i64_v1(closing, 1) != 0) return 34;
-    if (nuis_scheduler_mutex_rejected_permit_count_get_v1() != 5) return 35;
-    if (nuis_scheduler_mutex_try_shared_close_i64_v1(closing) != -1) return 36;
-    if (nuis_scheduler_mutex_rejected_close_count_get_v1() != 2) return 37;
-    if (nuis_scheduler_mutex_live_count_get_v1() != 0) return 38;
-    if (nuis_lifecycle_shutdown_v1(0) != 0) return 39;
-    return nuis_scheduler_mutex_live_count_get_v1() == 0 ? 0 : 40;
+    if (nuis_scheduler_mutex_try_shared_close_i64_v1(closing) != -1) return 31;
+    if (nuis_scheduler_mutex_rejected_close_count_get_v1() != 1) return 32;
+    if (nuis_scheduler_mutex_lease_unlock_i64_v1(active_lease) != 1) return 33;
+    if (nuis_scheduler_mutex_shared_close_i64_v1(closing) != 1) return 34;
+    if (nuis_scheduler_mutex_try_permit_lock_i64_v1(pending) != 0) return 35;
+    if (nuis_scheduler_mutex_try_permit_i64_v1(closing, 1) != 0) return 36;
+    if (nuis_scheduler_mutex_rejected_permit_count_get_v1() != 5) return 37;
+    if (nuis_scheduler_mutex_try_shared_close_i64_v1(closing) != -1) return 38;
+    if (nuis_scheduler_mutex_rejected_close_count_get_v1() != 2) return 39;
+    if (nuis_scheduler_mutex_live_count_get_v1() != 0) return 40;
+
+    int64_t wide = nuis_scheduler_mutex_share_i64_v1(
+        nuis_scheduler_mutex_new_i64_v1(41), 3
+    );
+    if (nuis_scheduler_mutex_permit_cardinality_get_v1(wide) != 3) return 41;
+    int64_t third = nuis_scheduler_mutex_permit_i64_v1(wide, 2);
+    if (third == 0) return 42;
+    if (nuis_scheduler_mutex_try_permit_i64_v1(wide, 3) != 0) return 43;
+    if (nuis_scheduler_mutex_rejected_permit_count_get_v1() != 6) return 44;
+    int64_t third_lease = nuis_scheduler_mutex_permit_lock_i64_v1(third);
+    if (nuis_scheduler_mutex_value_i64_v1(third_lease) != 41) return 45;
+    if (nuis_scheduler_mutex_lease_unlock_i64_v1(third_lease) != 1) return 46;
+    if (nuis_scheduler_mutex_shared_close_i64_v1(wide) != 0) return 47;
+
+    int64_t maximum = nuis_scheduler_mutex_share_i64_v1(
+        nuis_scheduler_mutex_new_i64_v1(43), 64
+    );
+    if (nuis_scheduler_mutex_permit_cardinality_get_v1(maximum) != 64) return 48;
+    int64_t last = nuis_scheduler_mutex_permit_i64_v1(maximum, 63);
+    if (last == 0) return 49;
+    if (nuis_scheduler_mutex_try_permit_i64_v1(maximum, 64) != 0) return 50;
+    if (nuis_scheduler_mutex_rejected_permit_count_get_v1() != 7) return 51;
+    int64_t last_lease = nuis_scheduler_mutex_permit_lock_i64_v1(last);
+    if (nuis_scheduler_mutex_value_i64_v1(last_lease) != 43) return 52;
+    if (nuis_scheduler_mutex_lease_unlock_i64_v1(last_lease) != 1) return 53;
+    if (nuis_scheduler_mutex_shared_close_i64_v1(maximum) != 0) return 54;
+    if (nuis_lifecycle_shutdown_v1(0) != 0) return 55;
+    return nuis_scheduler_mutex_live_count_get_v1() == 0 ? 0 : 56;
 }
 "#,
     );

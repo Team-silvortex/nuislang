@@ -123,6 +123,8 @@ reading an entire subtree.
   [task_runtime_demo](task/task_runtime_demo),
   [task_thread_mutex_demo](task/task_thread_mutex_demo),
   [task_shared_mutex_permit_demo](task/task_shared_mutex_permit_demo),
+  [task_shared_mutex_cardinality_demo](task/task_shared_mutex_cardinality_demo),
+  [task_shared_mutex_replace_demo](task/task_shared_mutex_replace_demo),
   [task_branch_cancel_unlock_demo](task/task_branch_cancel_unlock_demo),
   [task_recursive_async_demo](task/task_recursive_async_demo),
   [task_result_policy_branch_demo](task/task_result_policy_branch_demo),

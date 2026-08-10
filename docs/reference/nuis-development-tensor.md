@@ -233,19 +233,25 @@ historical closures.
 
 The `beta-0.1` calibration baseline is:
 
-* `standard-library/std/concurrency-task-thread-lock`: `active/90`, required
+* `standard-library/std/concurrency-task-thread-lock`: `active/97`, required
   and now the current weakest task;
   recursive selected-prefix lowering and the native cancel/unlock project close
   both dynamic branches; `Mutex<i64>` now has opaque scheduler handles,
   generation-bound guards, worker ownership, acquire/release epochs, strict YIR
   metadata, deterministic contention, replay rejection, and native LLVM ABI
-  evidence; fixed two-lane `SharedMutex<i64>` permits now cross two native task
-  invocations as one-shot generation-bound tokens and become linear leases
+  evidence; `SharedMutex<i64>` now declares a literal permit cardinality in
+  `1..=64` at share time, with the one-argument form defaulting to `2`; lane
+  admission derives from that single YIR fact across the interpreter and native
+  runtime, and a three-permit project closes as a native binary with exit `33`
   without exposing the handle; `mutex_shared_close` now consumes shared
   authority, rejects active leases, release-publishes closure, revokes pending
   same-generation permits, invalidates the runtime slot, and returns the revoked
-  count through interpreted and native paths; mutable lease updates, dynamic
-  permit counts, non-`i64` payloads, and OS-thread parallelism remain open
+  count through interpreted and native paths; `mutex_lease_replace` now keeps
+  linear lease authority while returning the old `i64`, publishes a release
+  epoch, and makes the replacement visible to a permit issued before mutation
+  in interpreter, C-runtime, LLVM, and native task-project evidence; non-`i64`
+  payloads, branch-local shared capabilities, runtime-dynamic cardinality, and
+  OS-thread parallelism remain open
 * `host-compatibility/cffi/registered-pointer-string-object-boundary`:
   `usable/93`, required; five real borrowed UTF-8 calls and one owned
   `ref Buffer` return carry exact signature plus memory-capability hashes

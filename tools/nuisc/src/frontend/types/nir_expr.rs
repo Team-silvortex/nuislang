@@ -117,6 +117,10 @@ pub(crate) fn infer_nir_expr_type(
                 infer_nir_expr_type(args.first()?, bindings, signatures, struct_table)
                     .and_then(|ty| ty.mutex_lease_payload().cloned())
             }
+            NirMutexCapabilityOp::LeaseReplace => {
+                infer_nir_expr_type(args.first()?, bindings, signatures, struct_table)
+                    .and_then(|ty| ty.mutex_lease_payload().cloned())
+            }
             NirMutexCapabilityOp::LeaseUnlock => Some(i64_type()),
         },
         NirExpr::CpuTaskCompleted(_)

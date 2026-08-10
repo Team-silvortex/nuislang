@@ -218,6 +218,7 @@ pub(super) fn render_nir_expr(value: &NirExpr) -> String {
                 NirMutexCapabilityOp::Permit => "mutex_permit",
                 NirMutexCapabilityOp::PermitLock => "mutex_permit_lock",
                 NirMutexCapabilityOp::LeaseValue => "mutex_lease_value",
+                NirMutexCapabilityOp::LeaseReplace => "mutex_lease_replace",
                 NirMutexCapabilityOp::LeaseUnlock => "mutex_lease_unlock",
             };
             format!(

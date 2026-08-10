@@ -101,7 +101,21 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
             effect: NirGlmEffect::DomainMove,
         }),
         NirExpr::CpuMutexCapability { op, .. } => match op {
-            NirMutexCapabilityOp::Share | NirMutexCapabilityOp::PermitLock => Some(NirGlmProfile {
+            NirMutexCapabilityOp::Share => Some(NirGlmProfile {
+                result_class: NirGlmValueClass::Res,
+                accesses: vec![
+                    NirGlmAccess {
+                        class: NirGlmValueClass::Res,
+                        mode: NirGlmUseMode::Own,
+                    },
+                    NirGlmAccess {
+                        class: NirGlmValueClass::Val,
+                        mode: NirGlmUseMode::Read,
+                    },
+                ],
+                effect: NirGlmEffect::DomainMove,
+            }),
+            NirMutexCapabilityOp::PermitLock => Some(NirGlmProfile {
                 result_class: NirGlmValueClass::Res,
                 accesses: vec![NirGlmAccess {
                     class: NirGlmValueClass::Res,
@@ -129,6 +143,20 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
                     class: NirGlmValueClass::Res,
                     mode: NirGlmUseMode::Read,
                 }],
+                effect: NirGlmEffect::None,
+            }),
+            NirMutexCapabilityOp::LeaseReplace => Some(NirGlmProfile {
+                result_class: NirGlmValueClass::Val,
+                accesses: vec![
+                    NirGlmAccess {
+                        class: NirGlmValueClass::Res,
+                        mode: NirGlmUseMode::Write,
+                    },
+                    NirGlmAccess {
+                        class: NirGlmValueClass::Val,
+                        mode: NirGlmUseMode::Read,
+                    },
+                ],
                 effect: NirGlmEffect::None,
             }),
             NirMutexCapabilityOp::SharedClose | NirMutexCapabilityOp::LeaseUnlock => {

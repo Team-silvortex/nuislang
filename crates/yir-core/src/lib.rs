@@ -212,6 +212,9 @@ pub struct ExecutionState {
     pub closed_shared_mutexes: BTreeSet<String>,
     pub live_mutex_permits: BTreeSet<(String, i64)>,
     pub active_mutex_leases: BTreeSet<String>,
+    pub shared_mutex_values: BTreeMap<String, Value>,
+    pub shared_mutex_release_epochs: BTreeMap<String, u64>,
+    pub shared_mutex_permit_cardinalities: BTreeMap<String, i64>,
 }
 
 impl ExecutionState {

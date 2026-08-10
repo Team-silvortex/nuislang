@@ -229,10 +229,11 @@ fn lowers_shared_mutex_permits_into_two_async_workers() {
             ty: Some(ty),
             value: NirExpr::CpuMutexCapability {
                 op: NirMutexCapabilityOp::Share,
-                ..
+                args,
             },
             ..
         }) if ty.render() == "SharedMutex<i64>"
+            && matches!(args.as_slice(), [_, NirExpr::Int(2)])
     ));
     assert!(matches!(
         main.body.get(2),
@@ -261,8 +262,87 @@ fn lowers_shared_mutex_permits_into_two_async_workers() {
 }
 
 #[test]
+fn lowers_lease_replace_without_consuming_the_lease() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          async fn replace(permit: MutexPermit<i64>, replacement: i64) -> i64 {
+            let lease: MutexLease<i64> = mutex_permit_lock(permit);
+            let old: i64 = mutex_lease_replace(lease, replacement);
+            let current: i64 = mutex_lease_value(lease);
+            let released: i64 = mutex_lease_unlock(lease);
+            return old + current + released;
+          }
+
+          fn main() -> i64 {
+            let lock: Mutex<i64> = mutex_new(17);
+            let shared: SharedMutex<i64> = mutex_share(lock);
+            let task: Task<i64> = spawn(replace(mutex_permit(shared, 0), 23));
+            let result: i64 = join(task);
+            mutex_shared_close(shared);
+            return result;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let replace = module
+        .functions
+        .iter()
+        .find(|function| function.name == "replace")
+        .unwrap();
+    assert!(matches!(
+        replace.body.get(1),
+        Some(NirStmt::Let {
+            ty: Some(ty),
+            value: NirExpr::CpuMutexCapability {
+                op: NirMutexCapabilityOp::LeaseReplace,
+                args,
+            },
+            ..
+        }) if ty.render() == "i64" && args.len() == 2
+    ));
+    assert!(matches!(
+        replace.body.get(2),
+        Some(NirStmt::Let {
+            value: NirExpr::CpuMutexCapability {
+                op: NirMutexCapabilityOp::LeaseValue,
+                ..
+            },
+            ..
+        })
+    ));
+}
+
+#[test]
+fn rejects_lease_replace_for_non_i64_payloads() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let lock: Mutex<bool> = mutex_new(true);
+            let shared: SharedMutex<bool> = mutex_share(lock);
+            let permit: MutexPermit<bool> = mutex_permit(shared, 0);
+            let lease: MutexLease<bool> = mutex_permit_lock(permit);
+            mutex_lease_replace(lease, false);
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("currently supports only `MutexLease<i64>`"));
+    assert!(error.contains("found `MutexLease<bool>`"));
+}
+
+#[test]
 fn rejects_dynamic_or_out_of_range_mutex_permit_lanes() {
-    for lane in ["lane", "2"] {
+    for (lane, expected) in [
+        ("lane", "requires a unique static lane literal"),
+        ("64", "lane literal must be in `0..=63`"),
+    ] {
         let source = format!(
             r#"
             mod cpu Main {{
@@ -277,7 +357,79 @@ fn rejects_dynamic_or_out_of_range_mutex_permit_lanes() {
             "#
         );
         let error = parse_nuis_module(&source).unwrap_err();
-        assert!(error.contains("requires a unique literal lane `0` or `1`"));
+        assert!(error.contains(expected));
+    }
+}
+
+#[test]
+fn lowers_static_three_lane_shared_mutex_cardinality() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            let lock: Mutex<i64> = mutex_new(17);
+            let shared: SharedMutex<i64> = mutex_share(lock, 3);
+            let third: MutexPermit<i64> = mutex_permit(shared, 2);
+            let lease: MutexLease<i64> = mutex_permit_lock(third);
+            let value: i64 = mutex_lease_value(lease);
+            mutex_lease_unlock(lease);
+            mutex_shared_close(shared);
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let main = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert!(matches!(
+        main.body.get(1),
+        Some(NirStmt::Let {
+            value: NirExpr::CpuMutexCapability {
+                op: NirMutexCapabilityOp::Share,
+                args,
+            },
+            ..
+        }) if matches!(args.as_slice(), [_, NirExpr::Int(3)])
+    ));
+    assert!(matches!(
+        main.body.get(2),
+        Some(NirStmt::Let {
+            value: NirExpr::CpuMutexCapability {
+                op: NirMutexCapabilityOp::Permit,
+                args,
+            },
+            ..
+        }) if matches!(args.as_slice(), [_, NirExpr::Int(2)])
+    ));
+}
+
+#[test]
+fn rejects_dynamic_or_out_of_range_shared_mutex_cardinality() {
+    for (cardinality, expected) in [
+        ("count", "requires a static permit cardinality literal"),
+        ("0", "permit cardinality must be in `1..=64`"),
+        ("65", "permit cardinality must be in `1..=64`"),
+    ] {
+        let source = format!(
+            r#"
+            mod cpu Main {{
+              fn main() -> i64 {{
+                let count: i64 = 3;
+                let lock: Mutex<i64> = mutex_new(17);
+                let shared: SharedMutex<i64> = mutex_share(lock, {cardinality});
+                mutex_shared_close(shared);
+                return 0;
+              }}
+            }}
+            "#
+        );
+        let error = parse_nuis_module(&source).unwrap_err();
+        assert!(error.contains(expected));
     }
 }
 
