@@ -102,6 +102,7 @@ pub(crate) fn infer_nir_expr_type(
                     .and_then(|ty| ty.mutex_payload().cloned())
                     .map(|ty| generic_named_type("SharedMutex", vec![ty]))
             }
+            NirMutexCapabilityOp::SharedClose => Some(i64_type()),
             NirMutexCapabilityOp::Permit => {
                 infer_nir_expr_type(args.first()?, bindings, signatures, struct_table)
                     .and_then(|ty| ty.shared_mutex_payload().cloned())

@@ -5,6 +5,7 @@ pub const OWNED_BUFFER_RETURN_PROTOCOL: &str = "nuis-ffi-owned-buffer-v1";
 pub const OWNED_BUFFER_RETURN_LENGTH_POLICY: &str = "runtime_header";
 pub const OWNED_BUFFER_RETURN_METADATA_LEN: usize = 9;
 pub const OWNED_BUFFER_DESTRUCTOR_SIGNATURE: &str = "i64(ref_Buffer)";
+pub const OWNED_BUFFER_BRANCH_TRANSFER_ACTION: &str = "take_owned_buffer_drop_other_v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OwnedBufferReturnContract<'a> {

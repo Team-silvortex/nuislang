@@ -48,6 +48,7 @@ static int64_t nuis_scheduler_mutex_rejected_lock_count_v1 = 0;
 static int64_t nuis_scheduler_mutex_rejected_unlock_count_v1 = 0;
 static int64_t nuis_scheduler_mutex_successful_unlock_count_v1 = 0;
 static int64_t nuis_scheduler_mutex_rejected_permit_count_v1 = 0;
+static int64_t nuis_scheduler_mutex_rejected_close_count_v1 = 0;
 
 static NuisSchedulerMutexSlotV1* nuis_scheduler_mutex_slot_v1(int64_t handle) {
     if (handle <= 0) return NULL;
@@ -115,6 +116,7 @@ static void nuis_scheduler_mutex_reset_v1(void) {
     nuis_scheduler_mutex_rejected_unlock_count_v1 = 0;
     nuis_scheduler_mutex_successful_unlock_count_v1 = 0;
     nuis_scheduler_mutex_rejected_permit_count_v1 = 0;
+    nuis_scheduler_mutex_rejected_close_count_v1 = 0;
 }
 
 int64_t nuis_scheduler_mutex_new_i64_v1(int64_t value) {
@@ -219,6 +221,41 @@ int64_t nuis_scheduler_mutex_share_i64_v1(int64_t handle) {
     return mutex->handle;
 }
 
+int64_t nuis_scheduler_mutex_try_shared_close_i64_v1(int64_t handle) {
+    NuisSchedulerMutexSlotV1* mutex = nuis_scheduler_mutex_slot_v1(handle);
+    if (mutex == NULL || !mutex->shared || mutex->locked) {
+        nuis_scheduler_mutex_rejected_close_count_v1 += 1;
+        return -1;
+    }
+    int64_t revoked = 0;
+    for (int64_t index = 0; index < NUIS_SCHEDULER_MUTEX_CAPACITY_V1; index += 1) {
+        NuisSchedulerMutexPermitSlotV1* permit =
+            &nuis_scheduler_mutex_permit_slots_v1[index];
+        if (!permit->active || permit->mutex_handle != mutex->handle
+            || permit->mutex_generation != mutex->generation) {
+            continue;
+        }
+        permit->active = 0;
+        revoked += 1;
+    }
+    atomic_thread_fence(memory_order_release);
+    nuis_scheduler_mutex_visibility_epoch_v1 += 1;
+    mutex->release_epoch = nuis_scheduler_mutex_visibility_epoch_v1;
+    mutex->issued_permit_lanes = 0;
+    mutex->active_permits = 0;
+    mutex->shared = 0;
+    mutex->active = 0;
+    return revoked;
+}
+
+int64_t nuis_scheduler_mutex_shared_close_i64_v1(int64_t handle) {
+    int64_t revoked = nuis_scheduler_mutex_try_shared_close_i64_v1(handle);
+    if (revoked >= 0) return revoked;
+    fprintf(stderr, "nuis: scheduler shared mutex close rejected for handle %lld\n",
+        (long long)handle);
+    exit(79);
+}
+
 int64_t nuis_scheduler_mutex_try_permit_i64_v1(int64_t handle, int64_t lane) {
     NuisSchedulerMutexSlotV1* mutex = nuis_scheduler_mutex_slot_v1(handle);
     NuisSchedulerMutexPermitSlotV1* permit =
@@ -313,6 +350,10 @@ int64_t nuis_scheduler_mutex_successful_unlock_count_get_v1(void) {
 
 int64_t nuis_scheduler_mutex_rejected_permit_count_get_v1(void) {
     return nuis_scheduler_mutex_rejected_permit_count_v1;
+}
+
+int64_t nuis_scheduler_mutex_rejected_close_count_get_v1(void) {
+    return nuis_scheduler_mutex_rejected_close_count_v1;
 }
 
 int64_t nuis_scheduler_mutex_active_permit_count_get_v1(int64_t handle) {

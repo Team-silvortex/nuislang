@@ -195,7 +195,9 @@ fn lower_owned_buffer_call(
         LlvmValueRef::OwnedExternalBuffer {
             ptr: ptr.clone(),
             len: len.clone(),
+            abi: contract.abi.to_owned(),
             destructor: contract.destructor_symbol.to_owned(),
+            destructor_signature_hash: contract.destructor_signature_hash.to_owned(),
         },
     );
     buffer_lengths.insert(node.name.clone(), len);

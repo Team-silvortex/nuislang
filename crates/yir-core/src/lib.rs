@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 mod branch_call_args;
 mod branch_effect;
 mod data_mod;
@@ -209,6 +209,9 @@ pub struct ExecutionState {
     pub buffers: BTreeMap<usize, HeapBuffer>,
     pub next_heap_address: usize,
     pub current_lane: Option<String>,
+    pub closed_shared_mutexes: BTreeSet<String>,
+    pub live_mutex_permits: BTreeSet<(String, i64)>,
+    pub active_mutex_leases: BTreeSet<String>,
 }
 
 impl ExecutionState {

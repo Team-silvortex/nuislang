@@ -90,6 +90,26 @@ pub(crate) fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String>
                 );
                 values.insert(node.name.clone(), PointerState::Owned(id));
             }
+            "extern_call_owned_buffer" => {
+                yir_core::ffi::parse_owned_buffer_return_contract(&node.op.args).map_err(
+                    |error| {
+                        format!(
+                            "node `{}` cannot establish registered owned-buffer authority: {error}",
+                            node.name
+                        )
+                    },
+                )?;
+                let id = next_id;
+                next_id += 1;
+                heap.insert(
+                    id,
+                    HeapBinding {
+                        live: true,
+                        kind: HeapObjectKind::Buffer { len: None },
+                    },
+                );
+                values.insert(node.name.clone(), PointerState::Owned(id));
+            }
             "borrow" => {
                 let source = pointer_arg(&values, &node.op.args[0]);
                 match source {

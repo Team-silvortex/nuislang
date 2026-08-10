@@ -12,12 +12,39 @@ pub(crate) fn lower_cpu_mutex_capability_node(node: &Node, state: &mut LlvmLower
     }
     match node.op.instruction.as_str() {
         "mutex_share" => lower_share(node, state),
+        "mutex_shared_close" => lower_shared_close(node, state),
         "mutex_permit" => lower_permit(node, state),
         "mutex_permit_lock" => lower_permit_lock(node, state),
         "mutex_lease_value" => lower_lease_value(node, state),
         "mutex_lease_unlock" => lower_lease_unlock(node, state),
         _ => false,
     }
+}
+
+fn lower_shared_close(node: &Node, state: &mut LlvmLoweringState) -> bool {
+    let Some(shared) = get_mutex(&state.registers, &node.op.args[0]).cloned() else {
+        state.body.push(format!(
+            "  ; deferred lowering for cpu.mutex_shared_close `{}` because its shared mutex is outside the current CPU LLVM slice",
+            node.name
+        ));
+        return true;
+    };
+    let Some(handle) = shared.runtime_handle else {
+        state.body.push(format!(
+            "  ; deferred lowering for cpu.mutex_shared_close `{}` because its shared mutex has no scheduler handle",
+            node.name
+        ));
+        return true;
+    };
+    let revoked = fresh_reg(&mut state.next_reg);
+    state.body.push(format!(
+        "  {revoked} = call i64 @nuis_scheduler_mutex_shared_close_i64_v1(i64 {handle})"
+    ));
+    state
+        .registers
+        .insert(node.name.clone(), LlvmValueRef::I64(revoked.clone()));
+    state.last_cpu_value = Some(revoked);
+    true
 }
 
 fn lower_share(node: &Node, state: &mut LlvmLoweringState) -> bool {

@@ -297,6 +297,7 @@ pub(super) fn infer_ast_call_type(input: AstCallInferenceInput<'_>) -> Option<As
                 None
             }
         }
+        "mutex_shared_close" => Some(ast_named_type("i64")),
         "mutex_permit" => {
             let [shared, _] = args else {
                 return None;

@@ -29,6 +29,12 @@ pub(super) const CPU_BRANCH_EFFECT_ACTIONS: &[BranchEffectActionCapability] = &[
         result: BranchEffectResult::OwnedPointer,
         operand_accesses: POINTER_SELECT_OWN,
     },
+    BranchEffectActionCapability {
+        module: "cpu",
+        instruction: yir_core::ffi::OWNED_BUFFER_BRANCH_TRANSFER_ACTION,
+        result: BranchEffectResult::OwnedPointer,
+        operand_accesses: POINTER_SELECT_OWN,
+    },
 ];
 
 pub(super) fn execute_cpu_branch_effect_action(
@@ -69,6 +75,25 @@ pub(super) fn execute_cpu_branch_effect_action(
                 format!(
                     "effect {} take_ptr_drop_other selected={pointer:?} discarded={discarded:?}",
                     parent.op.full_name()
+                ),
+            );
+            Ok(Value::Pointer(pointer))
+        }
+        instruction if instruction == yir_core::ffi::OWNED_BUFFER_BRANCH_TRANSFER_ACTION => {
+            let discarded = state.expect_pointer(action.operands[1].value)?;
+            if pointer == discarded {
+                return Err(format!(
+                    "{} cannot transfer and discard the same owned buffer",
+                    parent.op.full_name()
+                ));
+            }
+            state.free_heap_node(discarded)?;
+            state.push_resource_event(
+                resource,
+                format!(
+                    "effect {} {} selected={pointer:?} discarded={discarded:?}",
+                    parent.op.full_name(),
+                    yir_core::ffi::OWNED_BUFFER_BRANCH_TRANSFER_ACTION
                 ),
             );
             Ok(Value::Pointer(pointer))

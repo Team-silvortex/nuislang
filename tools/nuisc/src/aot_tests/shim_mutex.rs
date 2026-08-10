@@ -140,8 +140,27 @@ int64_t nuis_yir_entry(void) {
     if (nuis_scheduler_mutex_lease_unlock_i64_v1(right_lease) != 1) return 24;
     if (nuis_scheduler_mutex_release_epoch_v1(shared) != 2) return 25;
     if (nuis_scheduler_mutex_successful_unlock_count_get_v1() != 2) return 26;
-    if (nuis_lifecycle_shutdown_v1(0) != 0) return 27;
-    return nuis_scheduler_mutex_live_count_get_v1() == 0 ? 0 : 28;
+    if (nuis_scheduler_mutex_shared_close_i64_v1(shared) != 0) return 27;
+    if (nuis_scheduler_mutex_live_count_get_v1() != 0) return 28;
+
+    int64_t closing = nuis_scheduler_mutex_share_i64_v1(
+        nuis_scheduler_mutex_new_i64_v1(31)
+    );
+    int64_t pending = nuis_scheduler_mutex_permit_i64_v1(closing, 0);
+    int64_t active = nuis_scheduler_mutex_permit_i64_v1(closing, 1);
+    int64_t active_lease = nuis_scheduler_mutex_permit_lock_i64_v1(active);
+    if (nuis_scheduler_mutex_try_shared_close_i64_v1(closing) != -1) return 29;
+    if (nuis_scheduler_mutex_rejected_close_count_get_v1() != 1) return 30;
+    if (nuis_scheduler_mutex_lease_unlock_i64_v1(active_lease) != 1) return 31;
+    if (nuis_scheduler_mutex_shared_close_i64_v1(closing) != 1) return 32;
+    if (nuis_scheduler_mutex_try_permit_lock_i64_v1(pending) != 0) return 33;
+    if (nuis_scheduler_mutex_try_permit_i64_v1(closing, 1) != 0) return 34;
+    if (nuis_scheduler_mutex_rejected_permit_count_get_v1() != 5) return 35;
+    if (nuis_scheduler_mutex_try_shared_close_i64_v1(closing) != -1) return 36;
+    if (nuis_scheduler_mutex_rejected_close_count_get_v1() != 2) return 37;
+    if (nuis_scheduler_mutex_live_count_get_v1() != 0) return 38;
+    if (nuis_lifecycle_shutdown_v1(0) != 0) return 39;
+    return nuis_scheduler_mutex_live_count_get_v1() == 0 ? 0 : 40;
 }
 "#,
     );

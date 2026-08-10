@@ -131,14 +131,16 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
                 }],
                 effect: NirGlmEffect::None,
             }),
-            NirMutexCapabilityOp::LeaseUnlock => Some(NirGlmProfile {
-                result_class: NirGlmValueClass::Val,
-                accesses: vec![NirGlmAccess {
-                    class: NirGlmValueClass::Res,
-                    mode: NirGlmUseMode::Own,
-                }],
-                effect: NirGlmEffect::DomainMove,
-            }),
+            NirMutexCapabilityOp::SharedClose | NirMutexCapabilityOp::LeaseUnlock => {
+                Some(NirGlmProfile {
+                    result_class: NirGlmValueClass::Val,
+                    accesses: vec![NirGlmAccess {
+                        class: NirGlmValueClass::Res,
+                        mode: NirGlmUseMode::Own,
+                    }],
+                    effect: NirGlmEffect::DomainMove,
+                })
+            }
         },
         NirExpr::Borrow(_) => Some(NirGlmProfile {
             result_class: NirGlmValueClass::Res,

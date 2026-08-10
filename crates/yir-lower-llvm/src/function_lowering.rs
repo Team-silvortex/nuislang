@@ -182,6 +182,7 @@ pub(super) fn emit_cpu_function(
             node,
             body,
             registers,
+            buffer_lengths,
             &mut next_reg,
             &mut next_block,
             branch_effect_emitters,

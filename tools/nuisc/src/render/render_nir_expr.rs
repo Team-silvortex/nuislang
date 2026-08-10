@@ -214,6 +214,7 @@ pub(super) fn render_nir_expr(value: &NirExpr) -> String {
         NirExpr::CpuMutexCapability { op, args } => {
             let name = match op {
                 NirMutexCapabilityOp::Share => "mutex_share",
+                NirMutexCapabilityOp::SharedClose => "mutex_shared_close",
                 NirMutexCapabilityOp::Permit => "mutex_permit",
                 NirMutexCapabilityOp::PermitLock => "mutex_permit_lock",
                 NirMutexCapabilityOp::LeaseValue => "mutex_lease_value",

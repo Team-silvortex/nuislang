@@ -60,6 +60,7 @@ pub(super) fn verify_glm_expr_access(
                     if matches!(
                         op,
                         NirMutexCapabilityOp::Share
+                            | NirMutexCapabilityOp::SharedClose
                             | NirMutexCapabilityOp::PermitLock
                             | NirMutexCapabilityOp::LeaseUnlock
                     ) =>

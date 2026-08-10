@@ -66,6 +66,7 @@ fn shared_mutex_glm_distinguishes_read_permit_from_owned_lease_transitions() {
 
     for op in [
         NirMutexCapabilityOp::Share,
+        NirMutexCapabilityOp::SharedClose,
         NirMutexCapabilityOp::PermitLock,
         NirMutexCapabilityOp::LeaseUnlock,
     ] {
@@ -73,6 +74,28 @@ fn shared_mutex_glm_distinguishes_read_permit_from_owned_lease_transitions() {
         assert_eq!(profile.accesses[0].mode, NirGlmUseMode::Own);
         assert_eq!(profile.effect, NirGlmEffect::DomainMove);
     }
+}
+
+#[test]
+fn glm_verifier_rejects_permit_issue_after_shared_close() {
+    let module = module_with_body(vec![
+        NirStmt::Let {
+            name: "shared".to_owned(),
+            ty: None,
+            value: NirExpr::Int(1),
+        },
+        NirStmt::Let {
+            name: "revoked".to_owned(),
+            ty: None,
+            value: capability(NirMutexCapabilityOp::SharedClose, "shared"),
+        },
+        NirStmt::Expr(NirExpr::CpuMutexCapability {
+            op: NirMutexCapabilityOp::Permit,
+            args: vec![NirExpr::Var("shared".to_owned()), NirExpr::Int(0)],
+        }),
+    ]);
+    let error = verify_nir_module(&module).unwrap_err();
+    assert!(error.contains("use of moved value `shared`"));
 }
 
 #[test]

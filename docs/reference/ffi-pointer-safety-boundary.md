@@ -114,20 +114,26 @@ Those are real source/compiler paths, not placeholder registrations. A
 non-reference `String` extern parameter without the matching capability is
 rejected before lowering.
 
-Owned return-buffer execution is now open for one deliberately narrow linear
-path. `host_owned_buffer_make(i64) -> ref Buffer` is admitted only through its
+Owned return-buffer execution is now open for two deliberately narrow linear
+paths. `host_owned_buffer_make(i64) -> ref Buffer` is admitted only through its
 exact manifest capability. Lowering emits a dedicated Res-producing operation
 with `nuis-ffi-owned-buffer-v1` metadata, recomputes the producer, capability,
 and destructor hashes, recovers length from the registered runtime header, and
 carries the exact destructor beside the LLVM pointer. A post-lowering graph
-gate allows only direct buffer access followed by one same-function
-`free(...)`; branch, loop, return, async, and secondary-extern escapes fail
-closed. Native smoke proves payload access and exact registered destruction.
+gate allows direct buffer access followed by either one same-function
+`free(...)` or one registered conditional owner transfer. The transfer accepts
+two direct external producers only when ABI, destructor symbol, and destructor
+signature hash are identical. LLVM destroys the unselected owner in its branch,
+merges pointer and runtime length together, and retains the registered destructor
+until the selected owner is freed exactly once. Native smoke executes both
+selection directions. Loop, return, async, secondary-extern, nested-transfer,
+and mixed heap/external-owner escapes remain closed.
 
 This is not generalized pointer-return support. It is one owned `ref Buffer`
-contract with a fixed length policy and linear lifetime, so a valid manifest
-still cannot authorize arbitrary `ref T`, raw `ptr<T>`, retained borrows, or
-task-carried host memory.
+contract with a fixed length policy, linear lifetime, and one non-recursive
+conditional transfer, so a valid manifest still cannot authorize arbitrary
+`ref T`, raw `ptr<T>`, retained borrows, returned owners, or task-carried host
+memory.
 
 In `nustar` manifest strings, multi-argument `ffi_symbol:` signatures can use
 the same comma-separated form as source-facing signatures, for example
@@ -247,6 +253,7 @@ Current regression anchors:
 * [pipeline_ffi_owned_buffer.rs](../../tools/nuisc/src/pipeline_ffi_owned_buffer.rs)
 * [ffi_smoke.rs](../../tools/nuis/tests/ffi_smoke.rs)
 * [lib_tests_execution.rs](../../tools/nuisc/src/lib_tests_execution.rs)
+* [owned_return_buffer_select_demo.ns](../../examples/ns/ffi/owned_return_buffer_select_demo.ns)
 
 ## Current String Boundary
 

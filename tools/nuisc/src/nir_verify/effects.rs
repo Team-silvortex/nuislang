@@ -125,6 +125,7 @@ pub(super) fn note_binding_effects(
             if matches!(
                 op,
                 NirMutexCapabilityOp::Share
+                    | NirMutexCapabilityOp::SharedClose
                     | NirMutexCapabilityOp::PermitLock
                     | NirMutexCapabilityOp::LeaseUnlock
             ) =>

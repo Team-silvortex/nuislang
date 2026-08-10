@@ -190,7 +190,10 @@ fn lowers_shared_mutex_permits_into_two_async_workers() {
             let shared: SharedMutex<i64> = mutex_share(lock);
             let left: Task<i64> = spawn(observe(mutex_permit(shared, 0)));
             let right: Task<i64> = spawn(observe(mutex_permit(shared, 1)));
-            return join(left) + join(right);
+            let left_value: i64 = join(left);
+            let right_value: i64 = join(right);
+            let revoked: i64 = mutex_shared_close(shared);
+            return left_value + right_value + revoked;
           }
         }
         "#,
@@ -243,6 +246,17 @@ fn lowers_shared_mutex_permits_into_two_async_workers() {
                 ..
             }]
         )
+    ));
+    assert!(matches!(
+        main.body.get(6),
+        Some(NirStmt::Let {
+            ty: Some(ty),
+            value: NirExpr::CpuMutexCapability {
+                op: NirMutexCapabilityOp::SharedClose,
+                ..
+            },
+            ..
+        }) if ty.render() == "i64"
     ));
 }
 

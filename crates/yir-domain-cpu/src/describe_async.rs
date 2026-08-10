@@ -90,9 +90,8 @@ pub(super) fn describe_cpu_async_node(node: &Node) -> Result<Option<InstructionS
         "mutex_new" => describe_mutex_effect(node, "value"),
         "mutex_lock" | "mutex_unlock" | "mutex_value" => describe_mutex_effect(node, "input"),
         "mutex_permit" => describe_shared_mutex_effect(node, 2),
-        "mutex_share" | "mutex_permit_lock" | "mutex_lease_value" | "mutex_lease_unlock" => {
-            describe_shared_mutex_effect(node, 1)
-        }
+        "mutex_share" | "mutex_shared_close" | "mutex_permit_lock" | "mutex_lease_value"
+        | "mutex_lease_unlock" => describe_shared_mutex_effect(node, 1),
         "timeout" | "ready_after" => {
             if node.op.args.len() != 2 {
                 return Err(format!(
@@ -194,5 +193,26 @@ mod tests {
             .expect_err("shared permit metadata drift must fail closed");
         assert!(error.contains("unsupported cpu.mutex_permit shared-mutex metadata"));
         assert!(error.contains("permit_scope=fixed-two-lane-v1"));
+    }
+
+    #[test]
+    fn rejects_shared_mutex_close_lifecycle_drift() {
+        let mut metadata = CPU_SHARED_MUTEX_RUNTIME_METADATA;
+        metadata[6] = "lifecycle=implicit-drop";
+        let mut args = vec!["shared".to_owned()];
+        args.extend(metadata.iter().map(|value| (*value).to_owned()));
+        let node = Node {
+            name: "close".to_owned(),
+            resource: "cpu0".to_owned(),
+            op: Operation {
+                module: "cpu".to_owned(),
+                instruction: "mutex_shared_close".to_owned(),
+                args,
+            },
+        };
+        let error = describe_cpu_async_node(&node)
+            .expect_err("shared close lifecycle drift must fail closed");
+        assert!(error.contains("unsupported cpu.mutex_shared_close shared-mutex metadata"));
+        assert!(error.contains("lifecycle=explicit-close-revoke-v1"));
     }
 }

@@ -126,20 +126,22 @@ fn shared_mutex_permits_cross_two_native_task_boundaries_without_handle_copies()
     assert_success(&build, "nuis build shared mutex permit demo");
 
     let yir = read(&output_dir.join("task_shared_mutex_permit_demo.yir"));
-    assert_eq!(yir.matches("cpu.mutex_share").count(), 1);
+    assert_eq!(yir.matches("cpu.mutex_share ").count(), 1);
     assert_eq!(yir.matches("cpu.mutex_permit ").count(), 2);
     assert_eq!(yir.matches("cpu.mutex_permit_lock").count(), 1);
     assert_eq!(yir.matches("cpu.mutex_lease_value").count(), 1);
     assert_eq!(yir.matches("cpu.mutex_lease_unlock").count(), 1);
+    assert_eq!(yir.matches("cpu.mutex_shared_close").count(), 1);
     assert_eq!(yir.matches("cpu.spawn_task").count(), 2);
     for metadata in [
         "authority=linear-permit-lease-v1",
         "permit_scope=fixed-two-lane-v1",
         "permit_policy=one-shot-generation-bound-v1",
+        "lifecycle=explicit-close-revoke-v1",
     ] {
         assert_eq!(
             yir.matches(metadata).count(),
-            6,
+            7,
             "every shared mutex YIR node must carry `{metadata}`"
         );
     }
@@ -162,6 +164,11 @@ fn shared_mutex_permits_cross_two_native_task_boundaries_without_handle_copies()
     );
     assert_eq!(
         llvm.matches("call i64 @nuis_scheduler_mutex_lease_unlock_i64_v1")
+            .count(),
+        1
+    );
+    assert_eq!(
+        llvm.matches("call i64 @nuis_scheduler_mutex_shared_close_i64_v1")
             .count(),
         1
     );

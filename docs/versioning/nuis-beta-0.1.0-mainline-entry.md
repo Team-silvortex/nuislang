@@ -199,6 +199,37 @@ parallel safety are still open. The tensor now hands the next foundation task
 to `host-compatibility/cffi/registered-pointer-string-object-boundary` at
 `active/83`.
 
+The first conditional registered-owner tranche then advances CFFI to
+`active/88`. Two direct `extern_call_owned_buffer` values may enter one
+GLM-typed `take_owned_buffer_drop_other_v1` branch effect only when their ABI,
+destructor symbol, and destructor signature hash are identical. CPU heap
+verification treats both as owned buffers; LLVM releases the unselected owner
+inside the chosen branch, merges pointer and runtime length together, and
+retains the exact destructor for one final release. The checked-in example
+executes both selection directions as native binaries.
+
+This does not open a generic pointer escape: mixed heap/external values,
+destructor drift, nested transfer, loops, function return, tasks, async work,
+and secondary extern calls still fail closed. With CFFI now above concurrency,
+the deterministic tensor selector returns the task card to
+`standard-library/std/concurrency-task-thread-lock` at `active/85`.
+
+The first explicit shared-mutex close tranche then advances concurrency to
+`active/90`. `mutex_shared_close(shared) -> i64` consumes the shared authority
+under GLM, carries `lifecycle=explicit-close-revoke-v1` through every shared
+YIR node, and returns the number of pending permits revoked. The interpreter
+and native scheduler both reject close while a lease is active, invalidate
+same-generation permits, reject post-close use, and prevent reopening. Native
+close performs a release fence before invalidating the mutex slot.
+
+The checked-in task project now joins both permit workers, explicitly closes
+the shared mutex, and still exits `34`; the runtime harness additionally proves
+pending-permit revocation and repeated-close rejection. Mutable lease updates,
+static cardinality beyond the current fixed pair, generalized payloads, and
+OS-thread safety remain open. The tensor therefore hands the next task back to
+`host-compatibility/cffi/registered-pointer-string-object-boundary` at
+`active/88`.
+
 ## Honesty Boundary
 
 `beta-0.1.0` should not claim:

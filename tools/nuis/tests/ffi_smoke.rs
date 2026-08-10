@@ -114,6 +114,24 @@ const FFI_SMOKE_CASES: &[FfiSmokeCase] = &[
         stdout_contains: &["exit_status: 0"],
         expect_manifest: false,
     },
+    FfiSmokeCase {
+        name: "owned_return_buffer_select_demo",
+        source: "../../examples/ns/ffi/owned_return_buffer_select_demo.ns",
+        artifact: "owned_return_buffer_select_demo",
+        yir_contains: &[
+            "extern_call_owned_buffer",
+            "take_owned_buffer_drop_other_v1",
+            "host_owned_buffer_destroy",
+        ],
+        llvm_contains: &[
+            "call ptr @host_owned_buffer_make(i64",
+            "phi ptr",
+            "phi i64",
+            "call i64 @host_owned_buffer_destroy(ptr",
+        ],
+        stdout_contains: &["exit_status: 0"],
+        expect_manifest: false,
+    },
 ];
 
 #[test]

@@ -266,6 +266,7 @@ pub(in crate::nir_verify) fn apply_guaranteed_expr_effects(
             if matches!(
                 op,
                 NirMutexCapabilityOp::Share
+                    | NirMutexCapabilityOp::SharedClose
                     | NirMutexCapabilityOp::PermitLock
                     | NirMutexCapabilityOp::LeaseUnlock
             ) =>

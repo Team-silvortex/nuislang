@@ -362,6 +362,29 @@ pub(super) fn lower_task_builtin_call(
                 args: vec![lowered],
             }
         }
+        "mutex_shared_close" => {
+            if !is_host_execution_domain(current_domain) {
+                return Err(
+                    "mutex_shared_close(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
+                );
+            }
+            let [shared] = args else {
+                return Err("mutex_shared_close(...) expects exactly one shared mutex".to_owned());
+            };
+            let lowered = lower_task_expr!(shared, None)?;
+            ensure_shared_mutex_like(
+                "mutex_shared_close",
+                &lowered,
+                bindings,
+                signatures,
+                struct_table,
+            )?;
+            NirExpr::CpuMutexCapability {
+                op: NirMutexCapabilityOp::SharedClose,
+                args: vec![lowered],
+            }
+        }
         "mutex_permit" => {
             if !is_host_execution_domain(current_domain) {
                 return Err(

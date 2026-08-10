@@ -282,6 +282,11 @@ pub(crate) fn execute_cpu_task_node(
             let mutex = state.expect_mutex(&node.op.args[0])?;
             let label = mutex.label.clone();
             let value = mutex.value.clone();
+            if state.closed_shared_mutexes.contains(&label) {
+                return Err(format!(
+                    "shared mutex `{label}` cannot be reopened after close"
+                ));
+            }
             state.push_resource_event(
                 resource,
                 format!(
@@ -291,6 +296,35 @@ pub(crate) fn execute_cpu_task_node(
             );
             Ok(Value::Mutex(yir_core::MutexHandle { label, value }))
         }
+        "mutex_shared_close" => {
+            let mutex = state.expect_mutex(&node.op.args[0])?;
+            let label = mutex.label.clone();
+            if state.closed_shared_mutexes.contains(&label) {
+                return Err(format!("shared mutex `{label}` is already closed"));
+            }
+            if state.active_mutex_leases.contains(&label) {
+                return Err(format!(
+                    "shared mutex `{label}` cannot close while a lease is active"
+                ));
+            }
+            let revoked = state
+                .live_mutex_permits
+                .iter()
+                .filter(|(permit_label, _)| permit_label == &label)
+                .count();
+            state
+                .live_mutex_permits
+                .retain(|(permit_label, _)| permit_label != &label);
+            state.closed_shared_mutexes.insert(label.clone());
+            state.push_resource_event(
+                resource,
+                format!(
+                    "effect cpu.mutex_shared_close @{} [{}]: {} revoked={revoked}",
+                    node.resource, resource.kind.raw, label
+                ),
+            );
+            Ok(Value::Int(revoked as i64))
+        }
         "mutex_permit" => {
             let mutex = state.expect_mutex(&node.op.args[0])?;
             let label = mutex.label.clone();
@@ -299,6 +333,16 @@ pub(crate) fn execute_cpu_task_node(
             if !(0..=1).contains(&lane) {
                 return Err(format!(
                     "mutex permit lane `{lane}` is outside fixed range 0..=1"
+                ));
+            }
+            if state.closed_shared_mutexes.contains(&label) {
+                return Err(format!(
+                    "shared mutex `{label}` cannot issue permit lane `{lane}` after close"
+                ));
+            }
+            if !state.live_mutex_permits.insert((label.clone(), lane)) {
+                return Err(format!(
+                    "shared mutex `{label}` already issued live permit lane `{lane}`"
                 ));
             }
             state.push_resource_event(
@@ -319,6 +363,22 @@ pub(crate) fn execute_cpu_task_node(
             let label = permit.label.clone();
             let lane = permit.lane;
             let value = permit.value.clone();
+            if state.closed_shared_mutexes.contains(&label) {
+                return Err(format!(
+                    "mutex permit `{label}:{lane}` was revoked by shared close"
+                ));
+            }
+            if state.active_mutex_leases.contains(&label) {
+                return Err(format!(
+                    "shared mutex `{label}` already has an active lease"
+                ));
+            }
+            if !state.live_mutex_permits.remove(&(label.clone(), lane)) {
+                return Err(format!(
+                    "mutex permit `{label}:{lane}` is stale or consumed"
+                ));
+            }
+            state.active_mutex_leases.insert(label.clone());
             state.push_resource_event(
                 resource,
                 format!(
@@ -338,6 +398,11 @@ pub(crate) fn execute_cpu_task_node(
         "mutex_lease_unlock" => {
             let lease = state.expect_mutex_guard(&node.op.args[0])?;
             let label = lease.label.clone();
+            if !state.active_mutex_leases.remove(&label) {
+                return Err(format!(
+                    "mutex lease `{label}` is stale or already released"
+                ));
+            }
             state.push_resource_event(
                 resource,
                 format!(

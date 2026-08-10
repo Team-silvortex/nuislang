@@ -193,6 +193,7 @@ fn accepts_registered_libc_demo_signatures() {
     compiled_source("../../examples/ns/ffi/libc_close_demo.ns");
     compiled_source("../../examples/ns/ffi/libc_read_buffer_demo.ns");
     compiled_source("../../examples/ns/ffi/owned_return_buffer_demo.ns");
+    compiled_source("../../examples/ns/ffi/owned_return_buffer_select_demo.ns");
 }
 
 #[test]
@@ -248,6 +249,110 @@ fn rejects_owned_buffer_return_without_linear_destructor_transfer() {
         Err(error) => error,
     };
     assert!(error.contains("exactly one direct free"), "{error}");
+}
+
+#[test]
+fn lowers_registered_owned_buffer_branch_transfer_with_exact_destructor() {
+    let artifacts = nuisc::pipeline::compile_source_path(Path::new(
+        "../../examples/ns/ffi/owned_return_buffer_select_demo.ns",
+    ))
+    .unwrap_or_else(|error| panic!("owned buffer branch transfer should compile: {error}"));
+
+    let transfers = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| {
+            node.op.module == "cpu"
+                && node.op.instruction == "branch_effect"
+                && node
+                    .op
+                    .args
+                    .iter()
+                    .any(|arg| arg == yir_core::ffi::OWNED_BUFFER_BRANCH_TRANSFER_ACTION)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(transfers.len(), 2);
+    for transfer in transfers {
+        let profile = yir_core::glm_profile_for_operation(&transfer.op);
+        assert_eq!(profile.result_class, yir_core::GlmValueClass::Res);
+        assert_eq!(
+            profile
+                .accesses
+                .iter()
+                .filter(|access| access.mode == yir_core::GlmUseMode::Own)
+                .count(),
+            2
+        );
+    }
+    assert_eq!(artifacts.llvm_ir.matches("phi ptr").count(), 2);
+    assert_eq!(artifacts.llvm_ir.matches("phi i64").count(), 2);
+    assert_eq!(
+        artifacts
+            .llvm_ir
+            .matches("call i64 @host_owned_buffer_destroy(ptr")
+            .count(),
+        6
+    );
+    assert!(!artifacts.llvm_ir.contains("deferred lowering"));
+}
+
+#[test]
+fn llvm_rejects_registered_owned_buffer_branch_abi_identity_drift() {
+    let mut yir = nuisc::pipeline::compile_source_path(Path::new(
+        "../../examples/ns/ffi/owned_return_buffer_select_demo.ns",
+    ))
+    .expect("owned buffer branch transfer should compile")
+    .yir;
+    let producer = yir
+        .nodes
+        .iter_mut()
+        .filter(|node| node.op.module == "cpu" && node.op.instruction == "extern_call_owned_buffer")
+        .nth(1)
+        .expect("second registered owner producer");
+    let args = &mut producer.op.args;
+    args[1] = "nurs".to_owned();
+    args[4] = yir_core::ffi::ffi_symbol_signature_hash(&args[1], &args[2], &args[3]);
+    args[8] = yir_core::ffi::ffi_symbol_signature_hash(
+        &args[1],
+        &args[7],
+        yir_core::ffi::OWNED_BUFFER_DESTRUCTOR_SIGNATURE,
+    );
+    let descriptor = yir_core::ffi::owned_buffer_return_descriptor(&args[7], &args[8]);
+    args[5] = yir_core::ffi::ffi_memory_capability_hash(&args[1], &args[2], &args[4], &descriptor);
+
+    let error = yir_lower_llvm::emit_module(&yir).unwrap_err();
+    assert!(
+        error.contains("requires one exact ABI/destructor/hash identity"),
+        "{error}"
+    );
+}
+
+#[test]
+fn rejects_mixed_heap_and_registered_buffer_branch_transfer() {
+    let ast = nuisc::frontend::parse_nuis_ast(
+        r#"
+        mod cffi Main {
+          extern "c" fn host_owned_buffer_make(seed: i64) -> ref Buffer;
+          fn main() -> i64 {
+            let external: ref Buffer = host_owned_buffer_make(3);
+            let heap: ref Buffer = alloc_buffer(4, 9);
+            let selected: ref Buffer = select_owned_ptr(true, move(external), move(heap));
+            free(selected);
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let error = match nuisc::pipeline::compile_ast(ast) {
+        Ok(_) => panic!("mixed registered and heap owners must remain closed"),
+        Err(error) => error,
+    };
+    assert!(
+        error.contains("cannot mix a registered external Buffer owner with a heap Buffer owner"),
+        "{error}"
+    );
 }
 
 #[test]

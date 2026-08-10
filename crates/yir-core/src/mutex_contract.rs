@@ -5,11 +5,12 @@ pub const CPU_MUTEX_RUNTIME_METADATA: [&str; 4] = [
     "payload_policy=i64-native-staged-fallback",
 ];
 
-pub const CPU_SHARED_MUTEX_RUNTIME_METADATA: [&str; 6] = [
+pub const CPU_SHARED_MUTEX_RUNTIME_METADATA: [&str; 7] = [
     "mutex_contract=scheduler-handle-v1",
     "visibility=acquire-release-epoch-v1",
     "authority=linear-permit-lease-v1",
     "permit_scope=fixed-two-lane-v1",
     "permit_policy=one-shot-generation-bound-v1",
     "payload_policy=i64-native-staged-fallback",
+    "lifecycle=explicit-close-revoke-v1",
 ];

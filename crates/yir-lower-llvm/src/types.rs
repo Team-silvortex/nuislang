@@ -38,7 +38,9 @@ pub(crate) enum LlvmValueRef {
     OwnedExternalBuffer {
         ptr: String,
         len: String,
+        abi: String,
         destructor: String,
+        destructor_signature_hash: String,
     },
     TextHandle {
         ptr: String,

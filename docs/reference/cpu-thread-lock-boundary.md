@@ -105,6 +105,8 @@ Current `GLM`/verifier truth already includes:
 * `mutex_unlock(...)` consumes the guard
 * `mutex_value(...)` is a read, not a consume
 * `mutex_share(...)` consumes the original mutex and produces shared authority
+* `mutex_shared_close(...)` consumes shared authority, revokes pending permits,
+  and returns the revoked permit count
 * `mutex_permit(...)` reads shared authority and issues one lane-bound permit
 * `mutex_permit_lock(...)` consumes a permit and produces lease authority
 * `mutex_lease_value(...)` reads a live lease
@@ -183,6 +185,7 @@ Mutex<i64>
   -> MutexLease<i64>
   -> value read
   -> lease unlock
+  -> shared close
 ```
 
 The runtime keeps the mutex handle inside its permit table. A permit carries
@@ -201,13 +204,19 @@ authority=linear-permit-lease-v1
 permit_scope=fixed-two-lane-v1
 permit_policy=one-shot-generation-bound-v1
 payload_policy=i64-native-staged-fallback
+lifecycle=explicit-close-revoke-v1
 ```
 
 The native project smoke emits one share, two permit issues, two scheduler task
 invocations, and one reusable worker body. Both workers observe `17`, release
-their leases, and the final binary exits `34`. The runtime harness separately
-proves duplicate-lane rejection, one-shot consumption, two release epochs, and
-lifecycle cleanup.
+their leases, explicitly close shared authority, and the final binary exits
+`34`. Close performs a release fence, rejects an active lease, revokes every
+pending same-generation permit, invalidates the mutex slot, and returns the
+revocation count. The runtime harness separately proves duplicate-lane
+rejection, one-shot consumption, two release epochs, active-lease close
+rejection, post-close token failure, and lifecycle cleanup. The CPU interpreter
+tracks the same close, permit, and lease state rather than treating close as a
+native-only effect.
 
 This is shared authorization, not copied ownership: ordinary `Mutex<T>` and
 `MutexGuard<T>` retain their existing linear behavior.

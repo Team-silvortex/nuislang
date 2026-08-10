@@ -317,6 +317,7 @@ impl Operation {
             | "branch_call_owned_bytes"
             | "call_owned_struct"
             | "mutex_share"
+            | "mutex_shared_close"
             | "mutex_permit"
             | "mutex_permit_lock"
             | "mutex_lease_value"

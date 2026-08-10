@@ -3,6 +3,7 @@ use super::*;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NirMutexCapabilityOp {
     Share,
+    SharedClose,
     Permit,
     PermitLock,
     LeaseValue,

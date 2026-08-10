@@ -20,14 +20,40 @@ pub(super) fn lower_owned_pointer_select(
     if then_owner == else_owner {
         return Err("select_owned_ptr(...) candidates must be distinct owners".to_owned());
     }
+    let then_external = owned_buffer_destructor_identity(state, &then_owner)?;
+    let else_external = owned_buffer_destructor_identity(state, &else_owner)?;
+    let action = match (then_external, else_external) {
+        (Some(then_identity), Some(else_identity)) => {
+            if address_kind != nuis_semantics::model::NirOwnedPointerAddressKind::Buffer {
+                return Err(
+                    "registered owned-buffer transfer requires `address_kind=buffer`".to_owned(),
+                );
+            }
+            if then_identity != else_identity {
+                return Err(format!(
+                    "select_owned_ptr(...) registered buffers require one exact destructor identity; found `{}` versus `{}`",
+                    then_identity.render(),
+                    else_identity.render()
+                ));
+            }
+            yir_core::ffi::OWNED_BUFFER_BRANCH_TRANSFER_ACTION
+        }
+        (None, None) => "take_ptr_drop_other",
+        _ => {
+            return Err(
+                "select_owned_ptr(...) cannot mix a registered external Buffer owner with a heap Buffer owner"
+                    .to_owned(),
+            )
+        }
+    };
     let then_action = state.branch_action_registry.plan_branch_effect_action(
         "cpu",
-        "take_ptr_drop_other",
+        action,
         vec![then_owner.clone(), else_owner.clone()],
     )?;
     let else_action = state.branch_action_registry.plan_branch_effect_action(
         "cpu",
-        "take_ptr_drop_other",
+        action,
         vec![else_owner.clone(), then_owner.clone()],
     )?;
     let name = next_name(state, "select_owned_ptr");
@@ -57,6 +83,40 @@ pub(super) fn lower_owned_pointer_select(
     }
     chain_statement_effect(state, &name);
     Ok(name)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct OwnedBufferDestructorIdentity {
+    abi: String,
+    symbol: String,
+    signature_hash: String,
+}
+
+impl OwnedBufferDestructorIdentity {
+    fn render(&self) -> String {
+        format!("{}:{}@{}", self.abi, self.symbol, self.signature_hash)
+    }
+}
+
+fn owned_buffer_destructor_identity(
+    state: &LoweringState<'_>,
+    owner: &str,
+) -> Result<Option<OwnedBufferDestructorIdentity>, String> {
+    let Some(node) = state.yir.nodes.iter().find(|node| node.name == owner) else {
+        return Ok(None);
+    };
+    if node.op.module != "cpu" || node.op.instruction != "extern_call_owned_buffer" {
+        return Ok(None);
+    }
+    let contract =
+        yir_core::ffi::parse_owned_buffer_return_contract(&node.op.args).map_err(|error| {
+            format!("select_owned_ptr(...) found invalid registered owner `{owner}`: {error}")
+        })?;
+    Ok(Some(OwnedBufferDestructorIdentity {
+        abi: contract.abi.to_owned(),
+        symbol: contract.destructor_symbol.to_owned(),
+        signature_hash: contract.destructor_signature_hash.to_owned(),
+    }))
 }
 
 fn moved_binding(expr: &NirExpr, bindings: &BTreeMap<String, String>) -> Result<String, String> {
