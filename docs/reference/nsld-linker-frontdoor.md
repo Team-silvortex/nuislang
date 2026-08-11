@@ -1026,6 +1026,22 @@ hash, final-stage plan hash, writer identity, writer status, and planned command
 argument count and values, plus the `writer_blockers` array. The current host-assisted command input records the
 selected driver, target triple, native object, and output path, but still does
 not invoke the host linker.
+
+`nuis-nsld-executable-finalizer-registry-v1` now owns the boundary after that
+format-independent writer input. It canonicalizes architecture, OS, and object
+format, rejects absent or ambiguous providers, and hashes the static provider
+set. Mach-O arm64 selects
+`nsld.finalizer.mach-o.arm64.host-command-shell-v1`; Mach-O fallback, ELF, and
+PE/COFF remain explicit `registered-not-implemented` targets. The selected
+contract, registry hash, target key, provider id/status, and execution kind are
+projected through host dry-run JSON and persisted in the verified invoke-plan
+artifact. Actual process spawning lives in the selected provider callback, not
+the generic final executable emit path. Host-command execution uses the exact
+driver path resolved by the verified dry-run boundary instead of performing a
+second `PATH` lookup. The ready Mach-O provider still uses a registered host
+command, so this closes registration decoupling rather than claiming a pure
+Nsld platform linker.
+
 `nsld final-executable-host-dry-run` consumes the verified writer input,
 resolves the selected host driver through an explicit path or `PATH`, and
 reports `environment_ready`, `driver_available`, `driver_resolved_path`, and

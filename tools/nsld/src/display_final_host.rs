@@ -127,6 +127,28 @@ pub(crate) fn print_nsld_final_executable_host_dry_run_report(
         "  writer_input_hash: {}",
         optional_string_text(report.writer_input_hash.as_deref())
     );
+    println!("  finalizer_contract: {}", report.finalizer_contract);
+    println!(
+        "  finalizer_registry_hash: {}",
+        report.finalizer_registry_hash
+    );
+    println!(
+        "  finalizer_registry_valid: {}",
+        report.finalizer_registry_valid
+    );
+    println!("  finalizer_target_key: {}", report.finalizer_target_key);
+    println!(
+        "  finalizer_provider_id: {}",
+        optional_string_text(report.finalizer_provider_id.as_deref())
+    );
+    println!(
+        "  finalizer_provider_status: {}",
+        optional_string_text(report.finalizer_provider_status.as_deref())
+    );
+    println!(
+        "  finalizer_execution_kind: {}",
+        optional_string_text(report.finalizer_execution_kind.as_deref())
+    );
     println!("  driver: {}", report.driver);
     println!("  driver_available: {}", report.driver_available);
     println!(
@@ -162,6 +184,28 @@ pub(crate) fn print_nsld_final_executable_host_invoke_plan_report(
     println!("  manifest: {}", report.manifest);
     println!("  output_path: {}", report.output_path);
     println!("  writer_input_path: {}", report.writer_input_path);
+    println!("  finalizer_contract: {}", report.finalizer_contract);
+    println!(
+        "  finalizer_registry_hash: {}",
+        report.finalizer_registry_hash
+    );
+    println!(
+        "  finalizer_registry_valid: {}",
+        report.finalizer_registry_valid
+    );
+    println!("  finalizer_target_key: {}", report.finalizer_target_key);
+    println!(
+        "  finalizer_provider_id: {}",
+        optional_string_text(report.finalizer_provider_id.as_deref())
+    );
+    println!(
+        "  finalizer_provider_status: {}",
+        optional_string_text(report.finalizer_provider_status.as_deref())
+    );
+    println!(
+        "  finalizer_execution_kind: {}",
+        optional_string_text(report.finalizer_execution_kind.as_deref())
+    );
     println!("  invocation_kind: {}", report.invocation_kind);
     println!("  invocation_policy: {}", report.invocation_policy);
     println!(

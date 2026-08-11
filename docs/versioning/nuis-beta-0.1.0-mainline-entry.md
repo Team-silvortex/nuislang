@@ -348,7 +348,25 @@ the generated-build evidence slice, not the package-manager admission slice:
 the root `nuis.galaxy.lock` still uses the older direct-bundle format and must
 be migrated before `lock-deps`, `sync-deps`, build admission, and
 `project-status` share one fail-closed resolution authority. Tensor selection
-therefore moves to the lower `usable/82` Nsld OS-native finalization cell.
+therefore moved to the lower `usable/82` Nsld OS-native finalization cell.
+
+The first OS-native finalizer registration tranche advances
+`linker-toolchain/nsld/os-native-executable-finalization` to `usable/85`.
+`nuis-nsld-executable-finalizer-registry-v1` now canonicalizes target identity,
+hashes the static provider set, rejects missing or ambiguous selection, and
+persists provider identity through dry-run JSON and the verified invoke plan.
+The Mach-O arm64 host-command shell writer owns command planning and actual
+process invocation behind its provider callback; the generic emit path no
+longer spawns a platform tool directly, and host execution is pinned to the
+driver path verified at dry-run instead of repeating `PATH` lookup. ELF and
+PE/COFF are explicit `registered-not-implemented` providers rather than hidden
+fallbacks.
+
+This does not claim a pure Nsld Mach-O writer: native relocation application
+and executable-shell byte emission still depend on future work, and the ready
+Mach-O provider still uses a registered host tool. With Nsld at `usable/85`,
+the weakest bootstrap coordinate returns to the Galaxy lock/admission slice at
+`usable/84`.
 
 ## Honesty Boundary
 

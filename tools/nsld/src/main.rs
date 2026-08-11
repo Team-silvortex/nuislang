@@ -56,6 +56,7 @@ mod final_executable_emit;
 mod final_executable_emit_actual;
 mod final_executable_emit_output_verify;
 mod final_executable_emit_shape;
+mod final_executable_finalizer_registry;
 mod final_executable_host;
 mod final_executable_image;
 mod final_executable_image_actual;

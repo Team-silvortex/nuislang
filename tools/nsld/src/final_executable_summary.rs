@@ -22,7 +22,7 @@ pub(crate) fn nsld_final_executable_readiness_report(
         "self-contained-final-executable"
     }
     .to_owned();
-    let writer_blockers = final_executable_writer_blockers(&final_stage);
+    let writer_blockers = final_executable_writer_blockers(&final_stage, plan);
     let writer_status = if final_stage.ready && writer_blockers.is_empty() {
         "ready"
     } else {
@@ -124,7 +124,7 @@ pub(crate) fn nsld_final_executable_writer_plan_report(
         "self-contained-final-executable"
     }
     .to_owned();
-    let writer_blockers = final_executable_writer_blockers(&final_stage);
+    let writer_blockers = final_executable_writer_blockers(&final_stage, plan);
     let writer_status = if final_stage.ready && writer_blockers.is_empty() {
         "ready"
     } else {

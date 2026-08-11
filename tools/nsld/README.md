@@ -72,6 +72,9 @@ by terminal command formatting:
 * `final_stage.rs` owns only the final-stage plan report, emitter, and verifier.
 * `final_executable_summary.rs` owns readiness and writer-plan summaries.
 * `final_executable_writer_input.rs` owns writer input emission and verification.
+* `final_executable_finalizer_registry.rs` owns canonical target selection,
+  static finalizer registration, registry hashing, command planning, and the
+  provider execution callback.
 * `final_executable_host.rs` owns host finalizer dry-run and invoke-plan gates.
 * `final_executable_layout_stage.rs` owns the Nsld final executable layout plan.
 * `final_executable_image_stage.rs` owns the `NUIFIMG` dry-run image checkpoint.
@@ -84,6 +87,12 @@ by terminal command formatting:
 Keep future linker execution work behind the same stage boundaries so Mach-O,
 ELF, PE/COFF, and future Nuis-native writers can evolve without coupling the
 front-door plan to one backend.
+
+The current `nuis-nsld-executable-finalizer-registry-v1` route selects a ready
+Mach-O arm64 host-command shell provider. ELF and PE/COFF are explicit
+`registered-not-implemented` providers. This proves the registration boundary
+and keeps actual process invocation out of the generic emit path; it does not
+yet claim pure Nsld Mach-O relocation or executable-shell byte emission.
 
 ## Current Early-Beta Rule
 

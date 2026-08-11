@@ -116,6 +116,30 @@ pub(crate) const DEV_TENSOR_CORE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "nsld-executable-finalizer-registry-contract",
+        path: "tools/nsld/src/final_executable_finalizer_registry.rs",
+        required_patterns: &[
+            "nuis-nsld-executable-finalizer-registry-v1",
+            "nsld.finalizer.mach-o.arm64.host-command-shell-v1",
+            "nsld.finalizer.elf.registered-v1",
+            "nsld.finalizer.pe-coff.registered-v1",
+            "registered-not-implemented",
+            "invoke_registered_finalizer",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-executable-finalizer-invoke-plan-projection",
+        path: "tools/nsld/src/final_executable_writer.rs",
+        required_patterns: &[
+            "finalizer_contract",
+            "finalizer_registry_hash",
+            "finalizer_target_key",
+            "finalizer_provider_id",
+            "finalizer_provider_status",
+            "finalizer_execution_kind",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nsld-nsb-relocation-application-layout",
         path: "tools/nsld/src/final_executable_layout_stage.rs",
         required_patterns: &[

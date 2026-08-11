@@ -1,4 +1,8 @@
 use super::{
+    final_executable_finalizer_registry::{
+        executable_finalizer_registry_validation, executable_finalizer_target_key,
+        select_executable_finalizer, EXECUTABLE_FINALIZER_CONTRACT,
+    },
     final_executable_paths::nsld_final_executable_host_invoke_plan_path,
     final_executable_summary::nsld_final_executable_writer_plan_report,
     final_executable_writer::{render_final_executable_host_invoke_plan, resolve_host_driver_path},
@@ -34,8 +38,32 @@ pub(crate) fn nsld_final_executable_host_dry_run_report(
         .first()
         .cloned()
         .unwrap_or_else(|| writer_plan.final_stage_driver.clone());
-    let driver_resolved_path = resolve_host_driver_path(&driver);
-    let driver_available = driver_resolved_path.is_some();
+    let registry = executable_finalizer_registry_validation();
+    let finalizer = select_executable_finalizer(plan);
+    let finalizer_target_key = finalizer
+        .as_ref()
+        .map(|selection| selection.target_key.clone())
+        .unwrap_or_else(|_| executable_finalizer_target_key(plan));
+    let finalizer_provider_id = finalizer
+        .as_ref()
+        .ok()
+        .map(|selection| selection.provider_id().to_owned());
+    let finalizer_provider_status = finalizer
+        .as_ref()
+        .ok()
+        .map(|selection| selection.provider_status().to_owned());
+    let finalizer_execution_kind = finalizer
+        .as_ref()
+        .ok()
+        .map(|selection| selection.execution_kind().to_owned());
+    let finalizer_ready = finalizer.as_ref().is_ok_and(|selection| selection.ready());
+    let requires_host_driver = finalizer
+        .as_ref()
+        .is_ok_and(|selection| selection.requires_host_driver());
+    let driver_resolved_path = requires_host_driver
+        .then(|| resolve_host_driver_path(&driver))
+        .flatten();
+    let driver_available = !requires_host_driver || driver_resolved_path.is_some();
     let mut blockers = Vec::new();
     if !writer_input.valid {
         blockers.push("final-executable-writer-input:invalid".to_owned());
@@ -46,7 +74,25 @@ pub(crate) fn nsld_final_executable_host_dry_run_report(
                 .map(|issue| format!("final-executable-writer-input:{issue}")),
         );
     }
-    if !driver_available {
+    if !registry.valid {
+        blockers.push("executable-finalizer-registry:invalid".to_owned());
+        blockers.extend(
+            registry
+                .issues
+                .iter()
+                .map(|issue| format!("executable-finalizer-registry:{issue}")),
+        );
+    }
+    match finalizer.as_ref() {
+        Ok(selection) if !selection.ready() => blockers.push(format!(
+            "executable-finalizer-provider:{}:{}",
+            selection.provider_id(),
+            selection.provider_status()
+        )),
+        Err(error) => blockers.push(format!("executable-finalizer-provider:{error}")),
+        _ => {}
+    }
+    if requires_host_driver && !driver_available {
         blockers.push(format!("host-finalizer-driver-unavailable:{driver}"));
     }
     blockers.extend(writer_plan.writer_blockers.iter().cloned());
@@ -55,7 +101,8 @@ pub(crate) fn nsld_final_executable_host_dry_run_report(
     if let Some(blocker) = policy_blocker {
         blockers.push(blocker);
     }
-    let environment_ready = writer_input.valid && driver_available;
+    let environment_ready =
+        writer_input.valid && registry.valid && finalizer_ready && driver_available;
     let can_invoke_host_finalizer = environment_ready
         && writer_plan.writer_blockers.is_empty()
         && invocation_policy == "allow-host-invoke";
@@ -66,12 +113,32 @@ pub(crate) fn nsld_final_executable_host_dry_run_report(
         "host-finalizer-policy-env:{HOST_FINALIZER_POLICY_ENV}={}",
         invocation_policy
     ));
+    notes.push(format!(
+        "executable-finalizer-contract:{}",
+        EXECUTABLE_FINALIZER_CONTRACT
+    ));
+    notes.push(format!(
+        "executable-finalizer-target:{finalizer_target_key}"
+    ));
+    if let Ok(selection) = finalizer.as_ref() {
+        notes.push(format!(
+            "executable-finalizer-provider:{}",
+            selection.provider_id()
+        ));
+    }
 
     NsldFinalExecutableHostDryRunReport {
         manifest: manifest.display().to_string(),
         writer_input_path: writer_input.input_path,
         writer_input_valid: writer_input.valid,
         writer_input_hash: writer_input.actual_writer_input_hash,
+        finalizer_contract: registry.contract.to_owned(),
+        finalizer_registry_hash: registry.registry_hash,
+        finalizer_registry_valid: registry.valid,
+        finalizer_target_key,
+        finalizer_provider_id,
+        finalizer_provider_status,
+        finalizer_execution_kind,
         driver,
         driver_available,
         driver_resolved_path,
@@ -115,6 +182,13 @@ pub(crate) fn nsld_final_executable_host_invoke_plan_report(
         manifest: manifest.display().to_string(),
         output_path: plan.final_stage.output_path.clone(),
         writer_input_path: dry_run.writer_input_path,
+        finalizer_contract: dry_run.finalizer_contract,
+        finalizer_registry_hash: dry_run.finalizer_registry_hash,
+        finalizer_registry_valid: dry_run.finalizer_registry_valid,
+        finalizer_target_key: dry_run.finalizer_target_key,
+        finalizer_provider_id: dry_run.finalizer_provider_id,
+        finalizer_provider_status: dry_run.finalizer_provider_status,
+        finalizer_execution_kind: dry_run.finalizer_execution_kind,
         invocation_kind,
         invocation_policy: dry_run.invocation_policy,
         invocation_policy_reason: dry_run.invocation_policy_reason,

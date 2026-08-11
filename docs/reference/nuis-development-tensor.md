@@ -275,13 +275,16 @@ The `beta-0.1` calibration baseline is:
   boundary, while runtime nested/recursive, task/async/loop-carried,
   raw-pointer, and generalized ownership remain closed
 * `package-system/galaxy/source-import-and-lock-resolution`: `usable/84`,
-  required; each build now emits a portable SHA-256-bound compiler resolution
+  required and now the current weakest bootstrap task; each build emits a
+  portable SHA-256-bound compiler resolution
   snapshot covering direct/transitive edges, package identity, manifest/source/
   library content, import policy, and actual module selection, and the build
   manifest verifier rejects drift; root package-manager lock migration remains
-* `linker-toolchain/nsld/os-native-executable-finalization`: `usable/82`,
-  required and now the current weakest task; NSB execution closes, while
-  host-native shell finalization still crosses a registered external finalizer
+* `linker-toolchain/nsld/os-native-executable-finalization`: `usable/85`,
+  required; a provider-neutral, hash-bound static registry now selects and
+  invokes the Mach-O arm64 host-command shell provider while ELF and PE/COFF
+  remain explicit blocked registrations; native relocation and pure platform
+  shell emission are still incomplete
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

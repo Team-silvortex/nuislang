@@ -62,6 +62,7 @@ pub(crate) fn empty_link_plan() -> LinkPlan {
             index_path: None,
             symbol_count: 0,
             policy_count: 0,
+            memory_capability_count: 0,
             policy: "signature-whitelist-required".to_owned(),
             abi_groups: Vec::new(),
             entries: Vec::new(),

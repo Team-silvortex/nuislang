@@ -33,6 +33,8 @@ fn cli_emit_final_executable_invokes_allowed_host_finalizer_without_env_pollutio
     );
 
     let output = run_nsld_with_host_finalizer_env("final-executable-output", &manifest, &fake_bin);
+    let host_invoke_plan =
+        run_nsld_with_host_finalizer_env("final-executable-host-invoke-plan", &manifest, &fake_bin);
     let check = run_nsld_with_host_finalizer_env("check", &manifest, &fake_bin);
     let next_action = run_nsld_with_host_finalizer_env("check-next-action", &manifest, &fake_bin);
     let artifact_chain = run_nsld_with_host_finalizer_env("artifact-chain", &manifest, &fake_bin);
@@ -51,6 +53,21 @@ fn cli_emit_final_executable_invokes_allowed_host_finalizer_without_env_pollutio
 
     assert_eq!(final_binary_bytes, b"host-native-executable\n");
     assert!(invoked);
+    assert!(
+        host_invoke_plan
+            .contains("\"finalizer_contract\":\"nuis-nsld-executable-finalizer-registry-v1\""),
+        "{host_invoke_plan}"
+    );
+    assert!(
+        host_invoke_plan.contains(
+            "\"finalizer_provider_id\":\"nsld.finalizer.mach-o.arm64.host-command-shell-v1\""
+        ),
+        "{host_invoke_plan}"
+    );
+    assert!(
+        host_invoke_plan.contains("\"finalizer_provider_status\":\"ready\""),
+        "{host_invoke_plan}"
+    );
     assert!(
         drive.contains("\"kind\":\"nsld_drive_until_clean\""),
         "{drive}"

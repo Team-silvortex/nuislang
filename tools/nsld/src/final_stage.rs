@@ -134,7 +134,7 @@ pub(crate) fn nsld_final_stage_plan_report(
     if closure.container_loader_readiness == "blocked" {
         blockers.push("container-loader-blocked".to_owned());
     }
-    if host_wrapper_required && !host_assisted_writer_execution_enabled() {
+    if host_wrapper_required && !host_assisted_writer_execution_enabled(plan) {
         blockers.push("self-owned-final-native-linker".to_owned());
     }
 

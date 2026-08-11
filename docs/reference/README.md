@@ -43,6 +43,7 @@ Start in this order:
   - [nustar-multi-backend-artifact-contract.md](nustar-multi-backend-artifact-contract.md)
   - [nsld-linker-frontdoor.md](nsld-linker-frontdoor.md)
   - [nsld-binary-assembly-gap-map.md](nsld-binary-assembly-gap-map.md)
+  - [nsld-executable-finalizer-registry.md](nsld-executable-finalizer-registry.md)
   - [nuis-packaging-lifecycle-responsibility-map.md](nuis-packaging-lifecycle-responsibility-map.md)
   - [cffi-von-neumann-domain-contract.md](cffi-von-neumann-domain-contract.md)
   - [nsdb-yir-debugger-frontdoor.md](nsdb-yir-debugger-frontdoor.md)

@@ -4,6 +4,7 @@ use super::{
     },
     final_executable_emit_output_verify::push_final_output_emit_verify_mismatches,
     final_executable_emit_shape::nsld_final_executable_emit_report_shape,
+    final_executable_finalizer_registry::invoke_registered_finalizer,
     final_executable_output_summary::populate_final_output_emit_summary,
     final_executable_paths::nsld_final_executable_blocked_path,
     final_executable_render::{
@@ -11,7 +12,7 @@ use super::{
     },
     reports::{NsldFinalExecutableEmitReport, NsldFinalExecutableEmitVerifyReport},
 };
-use std::{fs, path::Path, process::Command};
+use std::{fs, path::Path};
 
 pub(crate) fn nsld_emit_final_executable_report(
     manifest: &Path,
@@ -28,7 +29,7 @@ pub(crate) fn nsld_emit_final_executable_report(
             })?;
         }
         if report.host_wrapper_required {
-            emit_host_assisted_final_executable(&report)?;
+            emit_host_assisted_final_executable(plan, &report)?;
         } else {
             fs::copy(&report.image_dry_run_bytes_path, &report.output_path).map_err(|error| {
                 format!(
@@ -55,28 +56,15 @@ pub(crate) fn nsld_emit_final_executable_report(
 }
 
 fn emit_host_assisted_final_executable(
+    plan: &nuisc::linker::LinkPlan,
     report: &NsldFinalExecutableEmitReport,
 ) -> Result<(), String> {
-    let (program, args) = report
-        .host_dry_run_command_args
-        .split_first()
-        .ok_or_else(|| "host finalizer command args are empty".to_owned())?;
-    let status = Command::new(program)
-        .args(args)
-        .status()
-        .map_err(|error| format!("failed to invoke host finalizer driver `{program}`: {error}"))?;
-    if !status.success() {
-        return Err(format!(
-            "host finalizer driver `{program}` exited with status {status}"
-        ));
-    }
-    if !Path::new(&report.output_path).is_file() {
-        return Err(format!(
-            "host finalizer driver `{program}` completed but did not create `{}`",
-            report.output_path
-        ));
-    }
-    Ok(())
+    invoke_registered_finalizer(
+        plan,
+        &report.host_dry_run_command_args,
+        report.host_dry_run_driver_resolved_path.as_deref(),
+        Path::new(&report.output_path),
+    )
 }
 
 pub(crate) fn nsld_verify_final_executable_emit_report(

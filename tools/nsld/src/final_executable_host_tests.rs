@@ -49,6 +49,19 @@ fn host_finalizer_reports_keep_pe_coff_native_object_command_arg() {
         .command_args
         .iter()
         .all(|arg| !arg.ends_with("nuis.nsld.mach-o")));
+    assert_eq!(
+        dry_run.finalizer_provider_id.as_deref(),
+        Some("nsld.finalizer.pe-coff.registered-v1")
+    );
+    assert_eq!(
+        dry_run.finalizer_provider_status.as_deref(),
+        Some("registered-not-implemented")
+    );
+    assert!(!dry_run.environment_ready);
+    assert!(dry_run.blockers.iter().any(|blocker| {
+        blocker
+            == "executable-finalizer-provider:nsld.finalizer.pe-coff.registered-v1:registered-not-implemented"
+    }));
 }
 
 #[test]
@@ -73,4 +86,7 @@ fn host_invoke_plan_records_alpha_0_10_producer_phase() {
     fs::remove_dir_all(dir).unwrap();
 
     assert!(source.contains("producer_phase = \"alpha-0.10.0\""));
+    assert!(source.contains("finalizer_contract = \"nuis-nsld-executable-finalizer-registry-v1\""));
+    assert!(source
+        .contains("finalizer_provider_id = \"nsld.finalizer.mach-o.arm64.host-command-shell-v1\""));
 }

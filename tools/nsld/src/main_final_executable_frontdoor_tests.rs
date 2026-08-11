@@ -202,6 +202,22 @@ fn final_executable_host_dry_run_reports_missing_driver_without_invoking() {
 
     assert!(report.writer_input_valid);
     assert_eq!(
+        report.finalizer_contract,
+        "nuis-nsld-executable-finalizer-registry-v1"
+    );
+    assert!(report.finalizer_registry_hash.starts_with("0x"));
+    assert!(report.finalizer_registry_valid);
+    assert_eq!(report.finalizer_target_key, "aarch64-macos-mach-o");
+    assert_eq!(
+        report.finalizer_provider_id.as_deref(),
+        Some("nsld.finalizer.mach-o.arm64.host-command-shell-v1")
+    );
+    assert_eq!(report.finalizer_provider_status.as_deref(), Some("ready"));
+    assert_eq!(
+        report.finalizer_execution_kind.as_deref(),
+        Some("registered-host-command-shell-writer")
+    );
+    assert_eq!(
         report.driver,
         "definitely-missing-nsld-host-driver-for-test"
     );
@@ -233,6 +249,11 @@ fn final_executable_host_dry_run_reports_missing_driver_without_invoking() {
         .iter()
         .any(|note| note == "host-finalizer-is-not-invoked"));
     assert!(report_json.contains("\"kind\":\"nsld_final_executable_host_dry_run\""));
+    assert!(report_json
+        .contains("\"finalizer_contract\":\"nuis-nsld-executable-finalizer-registry-v1\""));
+    assert!(report_json.contains(
+        "\"finalizer_provider_id\":\"nsld.finalizer.mach-o.arm64.host-command-shell-v1\""
+    ));
     assert!(report_json.contains("\"driver_available\":false"));
     assert!(report_json.contains("\"invocation_policy\":\"dry-run-only\""));
     assert!(report_json.contains("\"can_invoke_host_finalizer\":false"));
@@ -259,6 +280,15 @@ fn final_executable_host_invoke_plan_requires_explicit_allow() {
     fs::remove_dir_all(dir).unwrap();
 
     assert_eq!(report.invocation_kind, "host-finalizer-command");
+    assert_eq!(
+        report.finalizer_contract,
+        "nuis-nsld-executable-finalizer-registry-v1"
+    );
+    assert!(report.finalizer_registry_valid);
+    assert_eq!(
+        report.finalizer_provider_id.as_deref(),
+        Some("nsld.finalizer.mach-o.arm64.host-command-shell-v1")
+    );
     assert_eq!(report.invocation_policy, "dry-run-only");
     assert!(report.requires_explicit_allow);
     assert!(!report.explicit_allow_present);
@@ -279,6 +309,7 @@ fn final_executable_host_invoke_plan_requires_explicit_allow() {
         .iter()
         .any(|note| note == "host-finalizer-process-is-not-spawned"));
     assert!(report_json.contains("\"kind\":\"nsld_final_executable_host_invoke_plan\""));
+    assert!(report_json.contains("\"finalizer_target_key\":\"aarch64-macos-mach-o\""));
     assert!(report_json.contains("\"requires_explicit_allow\":true"));
     assert!(report_json.contains("\"would_invoke\":false"));
 }
@@ -323,6 +354,11 @@ fn final_executable_host_invoke_plan_emit_and_verify_round_trip() {
         Some(emit.invoke_plan_hash.as_str())
     );
     assert!(report_source.contains("schema = \"nuis-nsld-final-executable-host-invoke-plan-v1\""));
+    assert!(report_source
+        .contains("finalizer_contract = \"nuis-nsld-executable-finalizer-registry-v1\""));
+    assert!(report_source
+        .contains("finalizer_provider_id = \"nsld.finalizer.mach-o.arm64.host-command-shell-v1\""));
+    assert!(report_source.contains("finalizer_provider_status = \"ready\""));
     assert!(report_source.contains("would_invoke = false"));
     assert!(emit_json.contains("\"kind\":\"nsld_final_executable_host_invoke_plan_emit\""));
     assert!(verify_json.contains("\"kind\":\"nsld_final_executable_host_invoke_plan_verify\""));

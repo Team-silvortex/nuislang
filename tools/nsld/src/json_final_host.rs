@@ -100,6 +100,22 @@ pub(crate) fn nsld_final_executable_host_dry_run_report_json(
         json_string_field("writer_input_path", &report.writer_input_path),
         json_bool_field("writer_input_valid", report.writer_input_valid),
         json_optional_string_field("writer_input_hash", report.writer_input_hash.as_deref()),
+        json_string_field("finalizer_contract", &report.finalizer_contract),
+        json_string_field("finalizer_registry_hash", &report.finalizer_registry_hash),
+        json_bool_field("finalizer_registry_valid", report.finalizer_registry_valid),
+        json_string_field("finalizer_target_key", &report.finalizer_target_key),
+        json_optional_string_field(
+            "finalizer_provider_id",
+            report.finalizer_provider_id.as_deref(),
+        ),
+        json_optional_string_field(
+            "finalizer_provider_status",
+            report.finalizer_provider_status.as_deref(),
+        ),
+        json_optional_string_field(
+            "finalizer_execution_kind",
+            report.finalizer_execution_kind.as_deref(),
+        ),
         json_string_field("driver", &report.driver),
         json_bool_field("driver_available", report.driver_available),
         json_optional_string_field(
@@ -130,6 +146,22 @@ pub(crate) fn nsld_final_executable_host_invoke_plan_report_json(
         json_string_field("manifest", &report.manifest),
         json_string_field("output_path", &report.output_path),
         json_string_field("writer_input_path", &report.writer_input_path),
+        json_string_field("finalizer_contract", &report.finalizer_contract),
+        json_string_field("finalizer_registry_hash", &report.finalizer_registry_hash),
+        json_bool_field("finalizer_registry_valid", report.finalizer_registry_valid),
+        json_string_field("finalizer_target_key", &report.finalizer_target_key),
+        json_optional_string_field(
+            "finalizer_provider_id",
+            report.finalizer_provider_id.as_deref(),
+        ),
+        json_optional_string_field(
+            "finalizer_provider_status",
+            report.finalizer_provider_status.as_deref(),
+        ),
+        json_optional_string_field(
+            "finalizer_execution_kind",
+            report.finalizer_execution_kind.as_deref(),
+        ),
         json_string_field("invocation_kind", &report.invocation_kind),
         json_string_field("invocation_policy", &report.invocation_policy),
         json_string_field("invocation_policy_reason", &report.invocation_policy_reason),

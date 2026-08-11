@@ -1,4 +1,8 @@
 use super::{
+    final_executable_finalizer_registry::{
+        executable_finalizer_registry_validation, registered_finalizer_command_args,
+        select_executable_finalizer,
+    },
     reports::{
         NsldFinalExecutableHostInvokePlanReport, NsldFinalExecutableWriterPlanReport,
         NsldFinalStagePlanReport,
@@ -12,12 +16,31 @@ const HOST_FINALIZER_POLICY_ENV: &str = "NUIS_NSLD_HOST_FINALIZER_POLICY";
 
 pub(crate) fn final_executable_writer_blockers(
     final_stage: &NsldFinalStagePlanReport,
+    plan: &nuisc::linker::LinkPlan,
 ) -> Vec<String> {
     if !final_stage.host_wrapper_required {
         return Vec::new();
     }
 
-    if host_assisted_writer_execution_enabled() {
+    let registry = executable_finalizer_registry_validation();
+    if !registry.valid {
+        return vec!["final-executable-finalizer-registry:invalid".to_owned()];
+    }
+    let selection = match select_executable_finalizer(plan) {
+        Ok(selection) => selection,
+        Err(_) => {
+            return vec!["final-executable-finalizer-provider:not-registered".to_owned()];
+        }
+    };
+    if !selection.ready() {
+        return vec![format!(
+            "final-executable-finalizer-provider:{}:{}",
+            selection.provider_id(),
+            selection.provider_status()
+        )];
+    }
+
+    if host_assisted_writer_execution_enabled(plan) {
         return Vec::new();
     }
     if host_finalizer_policy_allows_invoke() {
@@ -51,26 +74,7 @@ pub(crate) fn final_executable_writer_command_args(
     report: &NsldFinalExecutableWriterPlanReport,
     plan: &nuisc::linker::LinkPlan,
 ) -> Vec<String> {
-    let mut args = Vec::with_capacity(if plan.cpu_target.clang_target.is_empty() {
-        4
-    } else {
-        6
-    });
-    args.push(report.final_stage_driver.clone());
-    if !plan.cpu_target.clang_target.is_empty() {
-        args.push("-target".to_owned());
-        args.push(plan.cpu_target.clang_target.clone());
-    }
-    if let Some(native_object) = report
-        .inputs
-        .iter()
-        .find(|input| input.input_id == "fsi0003.native-object")
-    {
-        args.push(native_object.path.clone());
-    }
-    args.push("-o".to_owned());
-    args.push(report.output_path.clone());
-    args
+    registered_finalizer_command_args(report, plan)
 }
 
 pub(crate) fn resolve_host_driver_path(driver: &str) -> Option<String> {
@@ -90,8 +94,10 @@ pub(crate) fn resolve_host_driver_path(driver: &str) -> Option<String> {
     })
 }
 
-pub(crate) fn host_assisted_writer_execution_enabled() -> bool {
-    host_finalizer_policy_allows_invoke() && host_finalizer_explicit_allow_present()
+pub(crate) fn host_assisted_writer_execution_enabled(plan: &nuisc::linker::LinkPlan) -> bool {
+    select_executable_finalizer(plan).is_ok_and(|selection| selection.ready())
+        && host_finalizer_policy_allows_invoke()
+        && host_finalizer_explicit_allow_present()
 }
 
 fn host_finalizer_policy_allows_invoke() -> bool {
@@ -250,6 +256,48 @@ pub(crate) fn render_final_executable_host_invoke_plan(
         out,
         "writer_input_path = \"{}\"",
         toml::escape_toml_string(&report.writer_input_path)
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_contract = \"{}\"",
+        toml::escape_toml_string(&report.finalizer_contract)
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_registry_hash = \"{}\"",
+        toml::escape_toml_string(&report.finalizer_registry_hash)
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_registry_valid = {}",
+        report.finalizer_registry_valid
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_target_key = \"{}\"",
+        toml::escape_toml_string(&report.finalizer_target_key)
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_provider_id = \"{}\"",
+        toml::escape_toml_string(report.finalizer_provider_id.as_deref().unwrap_or(""))
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_provider_status = \"{}\"",
+        toml::escape_toml_string(report.finalizer_provider_status.as_deref().unwrap_or(""))
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_execution_kind = \"{}\"",
+        toml::escape_toml_string(report.finalizer_execution_kind.as_deref().unwrap_or(""))
     )
     .unwrap();
     writeln!(
