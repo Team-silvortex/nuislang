@@ -84,6 +84,7 @@ mod command_nustar;
 mod command_project_metadata;
 mod command_registry;
 pub mod data_markers;
+mod digest_sha256;
 mod domain_build_report;
 pub mod engine;
 pub mod errors;

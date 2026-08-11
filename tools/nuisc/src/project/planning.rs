@@ -113,16 +113,16 @@ pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
         if !dependency.auto_injectable {
             continue;
         }
-        for (library_module, path) in dependency
+        for ((library_module, path), identity) in dependency
             .library_modules
             .iter()
             .zip(dependency.resolved_library_paths.iter())
+            .zip(dependency.library_content_identities.iter())
         {
             if !seen_paths.insert(path.clone()) {
                 continue;
             }
-            let source = fs::read_to_string(path)
-                .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+            let source = crate::stdlib_registry::read_verified_galaxy_text(path, identity)?;
             let ast = crate::frontend::parse_nuis_ast(&source)?;
             modules.push(ProjectModule {
                 path: path.clone(),
@@ -146,11 +146,12 @@ pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
                     import.galaxy, import.library_module, import.galaxy
                 )
             })?;
-        let Some((_, path)) = dependency
+        let Some(((_, path), identity)) = dependency
             .library_modules
             .iter()
             .zip(dependency.resolved_library_paths.iter())
-            .find(|(library_module, _)| *library_module == &import.library_module)
+            .zip(dependency.library_content_identities.iter())
+            .find(|((library_module, _), _)| *library_module == &import.library_module)
         else {
             return Err(format!(
                 "project galaxy import `{}:{}` is not declared by galaxy `{}`; declared library_modules=[{}]",
@@ -167,8 +168,7 @@ pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
         if !seen_paths.insert(path.clone()) {
             continue;
         }
-        let source = fs::read_to_string(path)
-            .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+        let source = crate::stdlib_registry::read_verified_galaxy_text(path, identity)?;
         let ast = crate::frontend::parse_nuis_ast(&source)?;
         modules.push(ProjectModule {
             path: path.clone(),

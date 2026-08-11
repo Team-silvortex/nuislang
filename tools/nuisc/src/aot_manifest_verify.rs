@@ -93,6 +93,8 @@ pub fn verify_build_manifest(path: &Path) -> Result<BuildManifestVerifyReport, S
             project_imports_documented_visible_item_count: fields
                 .project_imports_documented_visible_item_count,
             project_galaxy_index: fields.project_galaxy_index.as_deref(),
+            project_galaxy_resolution_lock: fields.project_galaxy_resolution_lock.as_deref(),
+            project_galaxy_resolution_sha256: fields.project_galaxy_resolution_sha256.as_deref(),
             project_galaxy_count: fields.project_galaxy_count,
             project_documented_galaxy_count: fields.project_documented_galaxy_count,
             project_documented_galaxy_library_module_count: fields

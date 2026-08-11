@@ -36,6 +36,8 @@ pub struct BuildManifestProjectInfo {
     pub imports_documented_visible_module_count: usize,
     pub imports_documented_visible_item_count: usize,
     pub galaxy_index_path: Option<String>,
+    pub galaxy_resolution_lock_path: Option<String>,
+    pub galaxy_resolution_sha256: Option<String>,
     pub galaxy_count: usize,
     pub galaxy_documented_count: usize,
     pub galaxy_documented_library_module_count: usize,

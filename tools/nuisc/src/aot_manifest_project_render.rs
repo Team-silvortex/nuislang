@@ -127,6 +127,18 @@ pub(crate) fn append_project_manifest_section(
             escape_toml_string(value)
         ));
     }
+    if let Some(value) = &project.galaxy_resolution_lock_path {
+        out.push_str(&format!(
+            "galaxy_resolution_lock = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
+    if let Some(value) = &project.galaxy_resolution_sha256 {
+        out.push_str(&format!(
+            "galaxy_resolution_sha256 = \"{}\"\n",
+            escape_toml_string(value)
+        ));
+    }
     out.push_str(&format!("galaxy_count = {}\n", project.galaxy_count));
     out.push_str(&format!(
         "documented_galaxy_count = {}\n",

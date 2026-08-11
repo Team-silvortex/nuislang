@@ -47,6 +47,13 @@ pub struct StdlibModuleManifest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedGalaxyContentIdentity {
+    pub logical_path: String,
+    pub bytes: usize,
+    pub sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedGalaxyDependency {
     pub name: String,
     pub version: String,
@@ -55,13 +62,16 @@ pub struct ResolvedGalaxyDependency {
     pub requested_by: Vec<String>,
     pub module_dir: PathBuf,
     pub manifest_path: PathBuf,
+    pub manifest_content_identity: ResolvedGalaxyContentIdentity,
     pub depends_on: Vec<String>,
     pub surfaces: Vec<String>,
     pub code_assets: Vec<String>,
     pub source_modules: Vec<String>,
     pub resolved_source_paths: Vec<PathBuf>,
+    pub source_content_identities: Vec<ResolvedGalaxyContentIdentity>,
     pub library_modules: Vec<String>,
     pub resolved_library_paths: Vec<PathBuf>,
+    pub library_content_identities: Vec<ResolvedGalaxyContentIdentity>,
     pub library_import_policy: StdlibLibraryImportPolicy,
     pub auto_injectable: bool,
     pub auto_inject_blockers: Vec<String>,

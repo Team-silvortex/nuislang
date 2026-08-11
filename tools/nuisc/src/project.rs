@@ -13,6 +13,7 @@ mod bridge_contracts;
 mod data_bridge_directions;
 mod data_contract_types;
 mod data_validation;
+mod galaxy_lock;
 mod kernel_validation;
 mod manifest;
 mod network_validation;
@@ -53,6 +54,11 @@ use data_contract_types::{
 };
 #[cfg(test)]
 use data_validation::validate_data_profile_token_types;
+pub use galaxy_lock::{
+    render_project_galaxy_resolution_lock, verify_project_galaxy_resolution_lock,
+    verify_project_galaxy_resolution_lock_source, write_project_galaxy_resolution_lock,
+    PROJECT_GALAXY_RESOLUTION_LOCK_DIGEST, PROJECT_GALAXY_RESOLUTION_LOCK_SCHEMA,
+};
 #[cfg(test)]
 use kernel_validation::{
     validate_kernel_profile_slot_contract, validate_kernel_target_config_contract,
@@ -143,6 +149,10 @@ mod tests {
     mod abi_recommendation_shader;
     #[path = "galaxy_resolution.rs"]
     mod galaxy_resolution;
+    #[path = "galaxy_resolution_imports.rs"]
+    mod galaxy_resolution_imports;
+    #[path = "galaxy_resolution_lock.rs"]
+    mod galaxy_resolution_lock;
     #[path = "multidomain_async.rs"]
     mod multidomain_async;
     #[path = "packet_data_contracts.rs"]

@@ -751,3 +751,5 @@ fn benchmark_report_file_tooling_outputs_support_inspect_and_verify_json() {
 mod artifact_tests;
 #[path = "lib_tests_execution.rs"]
 mod execution_tests;
+#[path = "lib_tests_galaxy_lock.rs"]
+mod galaxy_lock_tests;

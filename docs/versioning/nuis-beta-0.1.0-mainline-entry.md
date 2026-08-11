@@ -313,6 +313,43 @@ tasks, replaces `17` with `23`, observes `23`, emits no deferred mutex lowering,
 and exits `63`. OS-thread parallel slot safety, runtime-dynamic cardinality, and
 bool/float native payloads remain open.
 
+The scheduler slot-admission tranche closes concurrency at `stable/100` for
+the current beta foundation scope. A scheduler-private C11 atomic gate now
+serializes every mutex, guard, and permit lookup, allocation, mutation,
+observer, and reset operation. Nested permit-lock and lease-unlock routes call
+already-admitted internal operations, so this protection does not introduce a
+recursive gate deadlock or expose a host lock through source, YIR, or LLVM ABI.
+
+A dedicated harness starts 32 real pthread workers at one barrier. Every worker
+allocates a unique mutex, shares one permit, consumes it into a simultaneously
+live lease, verifies its payload, and then crosses a second barrier before all
+workers unlock and close concurrently. The harness observes 32 live handles,
+32 unique identities, exact successful-unlock counts, and zero live residue.
+This proves scheduler-table host-thread admission safety, not a mature parallel
+Nuis executor, per-mutex parking/fairness, runtime-dynamic cardinality, or the
+final memory-visibility model.
+
+The first Galaxy reproducibility tranche advances
+`package-system/galaxy/source-import-and-lock-resolution` to `usable/84`.
+`nuisc` now owns `nuis-galaxy-resolution-lock-v1`; every project build emits a
+portable `nuis.project.galaxy.lock` whose canonical payload binds direct and
+transitive dependency edges, package identity, import policy, actual library
+selection, and SHA-256 records for each Galaxy manifest, source module, and
+library module. No physical workspace path enters the snapshot.
+
+Manifest content identity is captured from the same resolver read, and each
+library source must still match its resolved byte count and SHA-256 before AST
+parsing. Lock emission uses that frozen identity rather than rereading mutable
+workspace files after compilation.
+
+The build manifest independently records the resolution digest, and its normal
+verifier rejects payload mutation or lock/manifest digest drift. This closes
+the generated-build evidence slice, not the package-manager admission slice:
+the root `nuis.galaxy.lock` still uses the older direct-bundle format and must
+be migrated before `lock-deps`, `sync-deps`, build admission, and
+`project-status` share one fail-closed resolution authority. Tensor selection
+therefore moves to the lower `usable/82` Nsld OS-native finalization cell.
+
 ## Honesty Boundary
 
 `beta-0.1.0` should not claim:

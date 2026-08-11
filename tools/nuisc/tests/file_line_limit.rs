@@ -78,7 +78,6 @@ fn exception_budgets() -> BTreeMap<&'static str, usize> {
         ("tools/nuisc/src/lowering/tests_loops_basic.rs", 626),
         ("tools/nuisc/src/lowering/tests_recursion.rs", 850),
         ("tools/nuisc/src/nir_verify/tests.rs", 1789),
-        ("tools/nuisc/src/project/tests/galaxy_resolution.rs", 1139),
         (
             "tools/nuisc/src/project/tests/packet_data_contracts.rs",
             699,

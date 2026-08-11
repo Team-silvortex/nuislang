@@ -79,6 +79,8 @@ fn verify_compiled_artifact_preserves_heterogeneous_domain_unit_paths() {
                 imports_documented_visible_module_count: 0,
                 imports_documented_visible_item_count: 0,
                 galaxy_index_path: None,
+                galaxy_resolution_lock_path: None,
+                galaxy_resolution_sha256: None,
                 galaxy_count: 0,
                 galaxy_documented_count: 0,
                 galaxy_documented_library_module_count: 0,

@@ -274,3 +274,155 @@ int64_t nuis_yir_entry(void) {
         String::from_utf8_lossy(&run.stderr)
     );
 }
+
+#[test]
+fn scheduler_mutex_slots_admit_simultaneous_host_threads_without_aliasing() {
+    let dir = temp_dir("scheduler_mutex_host_threads");
+    let source_path = dir.join("scheduler_mutex_host_threads.c");
+    let binary_path = dir.join("scheduler_mutex_host_threads");
+    let mut source = String::from("#include <pthread.h>\n");
+    crate::aot_c_shim_runtime::append_c_shim_prelude(&mut source, "0", "0", 0);
+    crate::aot_c_shim_runtime::append_c_shim_lifecycle_runtime(&mut source);
+    crate::aot_c_shim_text_runtime::append_c_shim_text_runtime(&mut source);
+    source.push_str(
+        r#"
+#define NUIS_HOST_MUTEX_WORKERS_V1 32
+
+typedef struct {
+    int64_t index;
+    int64_t handle;
+    int64_t lease;
+    int64_t result;
+} NuisHostMutexWorkerV1;
+
+static atomic_int nuis_host_mutex_ready_v1 = 0;
+static atomic_int nuis_host_mutex_leases_ready_v1 = 0;
+static atomic_int nuis_host_mutex_start_v1 = 0;
+static atomic_int nuis_host_mutex_release_v1 = 0;
+
+static void* nuis_host_mutex_worker_v1(void* opaque) {
+    NuisHostMutexWorkerV1* worker = (NuisHostMutexWorkerV1*)opaque;
+    atomic_fetch_add_explicit(&nuis_host_mutex_ready_v1, 1, memory_order_release);
+    while (atomic_load_explicit(&nuis_host_mutex_start_v1, memory_order_acquire) == 0) {
+    }
+
+    int64_t expected = 1000 + worker->index;
+    int64_t handle = nuis_scheduler_mutex_new_i64_v1(expected);
+    worker->handle = handle;
+    if (handle == 0) {
+        worker->result = 10;
+    } else {
+        int64_t shared = nuis_scheduler_mutex_share_i64_v1(handle, 1);
+        int64_t permit = nuis_scheduler_mutex_try_permit_i64_v1(shared, 0);
+        int64_t lease = permit == 0
+            ? 0
+            : nuis_scheduler_mutex_try_permit_lock_i64_v1(permit);
+        if (shared != handle || permit == 0 || lease == 0) {
+            worker->result = 11;
+        } else if (nuis_scheduler_mutex_value_i64_v1(lease) != expected) {
+            worker->result = 12;
+        } else {
+            worker->lease = lease;
+        }
+    }
+
+    atomic_fetch_add_explicit(
+        &nuis_host_mutex_leases_ready_v1,
+        1,
+        memory_order_release
+    );
+    while (atomic_load_explicit(&nuis_host_mutex_release_v1, memory_order_acquire) == 0) {
+    }
+
+    if (worker->result != 0) return NULL;
+    if (nuis_scheduler_mutex_lease_unlock_i64_v1(worker->lease) != 1) {
+        worker->result = 13;
+    } else if (nuis_scheduler_mutex_try_shared_close_i64_v1(handle) != 0) {
+        worker->result = 14;
+    } else {
+        worker->result = 0;
+    }
+    return NULL;
+}
+
+int64_t nuis_yir_entry(void) {
+    alarm(10);
+    pthread_t threads[NUIS_HOST_MUTEX_WORKERS_V1];
+    NuisHostMutexWorkerV1 workers[NUIS_HOST_MUTEX_WORKERS_V1] = {0};
+    int64_t created = 0;
+    for (int64_t index = 0; index < NUIS_HOST_MUTEX_WORKERS_V1; index += 1) {
+        workers[index].index = index;
+        if (pthread_create(
+            &threads[index],
+            NULL,
+            nuis_host_mutex_worker_v1,
+            &workers[index]
+        ) != 0) {
+            atomic_store_explicit(&nuis_host_mutex_start_v1, 1, memory_order_release);
+            atomic_store_explicit(&nuis_host_mutex_release_v1, 1, memory_order_release);
+            for (int64_t joined = 0; joined < created; joined += 1) {
+                pthread_join(threads[joined], NULL);
+            }
+            return 20;
+        }
+        created += 1;
+    }
+
+    while (atomic_load_explicit(&nuis_host_mutex_ready_v1, memory_order_acquire)
+        != NUIS_HOST_MUTEX_WORKERS_V1) {
+    }
+    atomic_store_explicit(&nuis_host_mutex_start_v1, 1, memory_order_release);
+    while (atomic_load_explicit(
+        &nuis_host_mutex_leases_ready_v1,
+        memory_order_acquire
+    ) != NUIS_HOST_MUTEX_WORKERS_V1) {
+    }
+
+    int64_t live_while_held = nuis_scheduler_mutex_live_count_get_v1();
+    atomic_store_explicit(&nuis_host_mutex_release_v1, 1, memory_order_release);
+    for (int64_t index = 0; index < NUIS_HOST_MUTEX_WORKERS_V1; index += 1) {
+        if (pthread_join(threads[index], NULL) != 0) return 21;
+    }
+    if (live_while_held != NUIS_HOST_MUTEX_WORKERS_V1) return 22;
+
+    for (int64_t index = 0; index < NUIS_HOST_MUTEX_WORKERS_V1; index += 1) {
+        if (workers[index].result != 0 || workers[index].handle <= 0) return 23;
+        for (int64_t other = index + 1; other < NUIS_HOST_MUTEX_WORKERS_V1; other += 1) {
+            if (workers[index].handle == workers[other].handle) return 24;
+        }
+    }
+    if (nuis_scheduler_mutex_successful_unlock_count_get_v1()
+        != NUIS_HOST_MUTEX_WORKERS_V1) return 25;
+    if (nuis_scheduler_mutex_live_count_get_v1() != 0) return 26;
+    if (nuis_lifecycle_shutdown_v1(0) != 0) return 27;
+    return nuis_scheduler_mutex_live_count_get_v1() == 0 ? 0 : 28;
+}
+"#,
+    );
+    crate::aot_c_shim_runtime::append_c_shim_main(&mut source);
+    fs::write(&source_path, source).expect("write host-thread mutex harness");
+
+    let compile = Command::new("clang")
+        .arg("-std=c11")
+        .arg("-pthread")
+        .arg(&source_path)
+        .arg("-o")
+        .arg(&binary_path)
+        .output()
+        .expect("compile host-thread mutex harness");
+    assert!(
+        compile.status.success(),
+        "clang failed: {}",
+        String::from_utf8_lossy(&compile.stderr)
+    );
+    let run = Command::new(&binary_path)
+        .output()
+        .expect("run host-thread mutex harness");
+    assert_eq!(
+        run.status.code(),
+        Some(0),
+        "host-thread mutex harness failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&run.stdout),
+        String::from_utf8_lossy(&run.stderr)
+    );
+}

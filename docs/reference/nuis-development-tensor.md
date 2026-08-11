@@ -233,8 +233,7 @@ historical closures.
 
 The `beta-0.1` calibration baseline is:
 
-* `standard-library/std/concurrency-task-thread-lock`: `active/99`, required
-  and now the current weakest task;
+* `standard-library/std/concurrency-task-thread-lock`: `stable/100`, required;
   recursive selected-prefix lowering and the native cancel/unlock project close
   both dynamic branches; `Mutex<i64>` now has opaque scheduler handles,
   generation-bound guards, worker ownership, acquire/release epochs, strict YIR
@@ -255,9 +254,13 @@ The `beta-0.1` calibration baseline is:
   with exits `25` and `43`; the scalar-v1 follow-up now preserves
   `MutexPermit<i32>` across task packing/helper reconstruction, carries signed
   i32 bits through kind-checked native slots, replaces `17` with `23`, observes
-  the replacement, and exits `63` without deferred mutex lowering;
-  runtime-dynamic cardinality, bool/float native payloads, and OS-thread
-  parallelism remain open
+  the replacement, and exits `63` without deferred mutex lowering; a
+  scheduler-private C11 atomic admission gate now protects all mutex, guard,
+  and permit table operations, while a 32-pthread harness proves simultaneous
+  unique slot allocation, 32 live leases, concurrent release/close, exact
+  counters, and zero residue; runtime-dynamic cardinality, bool/float native
+  payloads, per-mutex parking/fairness, and a mature parallel Nuis executor
+  remain open
 * `host-compatibility/cffi/registered-pointer-string-object-boundary`:
   `usable/93`, required; five real borrowed UTF-8 calls and one owned
   `ref Buffer` return carry exact signature plus memory-capability hashes
@@ -271,12 +274,14 @@ The `beta-0.1` calibration baseline is:
   one caller release; source helper chains may normalize to that single
   boundary, while runtime nested/recursive, task/async/loop-carried,
   raw-pointer, and generalized ownership remain closed
-* `package-system/galaxy/source-import-and-lock-resolution`: `usable/78`,
-  required; local/transitive imports work, while a hash-bound lock closure does
-  not yet exist
+* `package-system/galaxy/source-import-and-lock-resolution`: `usable/84`,
+  required; each build now emits a portable SHA-256-bound compiler resolution
+  snapshot covering direct/transitive edges, package identity, manifest/source/
+  library content, import policy, and actual module selection, and the build
+  manifest verifier rejects drift; root package-manager lock migration remains
 * `linker-toolchain/nsld/os-native-executable-finalization`: `usable/82`,
-  required; NSB execution closes, while host-native shell finalization still
-  crosses a registered external finalizer
+  required and now the current weakest task; NSB execution closes, while
+  host-native shell finalization still crosses a registered external finalizer
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

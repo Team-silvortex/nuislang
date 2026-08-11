@@ -39,6 +39,7 @@ Start in this order:
   - [nuis-binary-format-protocol.md](nuis-binary-format-protocol.md)
   - [nuis-native-artifact-workflow.md](nuis-native-artifact-workflow.md)
   - [toolchain-galaxy-core-boundary.md](toolchain-galaxy-core-boundary.md)
+  - [galaxy-resolution-lock-contract.md](galaxy-resolution-lock-contract.md)
   - [nustar-multi-backend-artifact-contract.md](nustar-multi-backend-artifact-contract.md)
   - [nsld-linker-frontdoor.md](nsld-linker-frontdoor.md)
   - [nsld-binary-assembly-gap-map.md](nsld-binary-assembly-gap-map.md)

@@ -100,6 +100,8 @@ The narrow runtime slice now exists for `Mutex<i32>` and `Mutex<i64>`:
 * cooperative worker IDs make ownership evidence observable
 * acquire/release fences and monotonically increasing release epochs make the
   current visibility promise explicit
+* a scheduler-private C11 atomic admission gate protects mutex, guard, and
+  permit slot lookup/allocation/mutation from simultaneous host-thread access
 * YIR carries the shared `scheduler-handle-v1`,
   `acquire-release-epoch-v1`, `linear-guard-v1`, and
   `scalar-i32-i64-native-staged-fallback-v1` contract metadata
@@ -108,7 +110,8 @@ This is intentionally a runtime foothold, not the final source model. Current
 Nuis `Mutex<T>` remains linear: lock consumes the mutex, unlock consumes the
 guard, and neither family may be copied across an async boundary. The shared
 form therefore uses explicit GLM permit/lease authority rather than raw handle
-duplication.
+duplication. The admission gate closes table-level data races; it is not the
+future executor, a per-mutex parking primitive, or the final visibility model.
 
 ## Staging Rule
 

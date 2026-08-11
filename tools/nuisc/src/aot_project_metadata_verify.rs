@@ -27,6 +27,8 @@ pub(crate) struct ProjectMetadataArtifactsVerifyInput<'a> {
     pub project_imports_documented_visible_module_count: usize,
     pub project_imports_documented_visible_item_count: usize,
     pub project_galaxy_index: Option<&'a str>,
+    pub project_galaxy_resolution_lock: Option<&'a str>,
+    pub project_galaxy_resolution_sha256: Option<&'a str>,
     pub project_galaxy_count: usize,
     pub project_documented_galaxy_count: usize,
     pub project_documented_galaxy_library_module_count: usize,
@@ -58,6 +60,8 @@ pub(crate) fn verify_project_metadata_artifacts(
         project_imports_documented_visible_module_count,
         project_imports_documented_visible_item_count,
         project_galaxy_index,
+        project_galaxy_resolution_lock,
+        project_galaxy_resolution_sha256,
         project_galaxy_count,
         project_documented_galaxy_count,
         project_documented_galaxy_library_module_count,
@@ -148,6 +152,33 @@ pub(crate) fn verify_project_metadata_artifacts(
             ));
         }
         project_metadata_checked += 1;
+    }
+    if let Some(galaxy_lock) = project_galaxy_resolution_lock {
+        let galaxy_lock_source =
+            read_project_index("Galaxy resolution lock", galaxy_lock, manifest_path)?;
+        let summary = crate::project::verify_project_galaxy_resolution_lock_source(
+            &galaxy_lock_source,
+            Path::new(galaxy_lock),
+        )?;
+        let expected_hash = project_galaxy_resolution_sha256.ok_or_else(|| {
+            format!(
+                "`{}` declares galaxy_resolution_lock but is missing galaxy_resolution_sha256",
+                manifest_path.display()
+            )
+        })?;
+        if summary.resolution_sha256 != expected_hash {
+            return Err(format!(
+                "Galaxy resolution lock `{galaxy_lock}` digest does not match `{}`: manifest=`{expected_hash}`, lock=`{}`",
+                manifest_path.display(),
+                summary.resolution_sha256
+            ));
+        }
+        project_metadata_checked += 1;
+    } else if project_galaxy_resolution_sha256.is_some() {
+        return Err(format!(
+            "`{}` declares galaxy_resolution_sha256 without galaxy_resolution_lock",
+            manifest_path.display()
+        ));
     }
     if let Some(packet_index) = project_packet_index {
         read_project_index("packet", packet_index, manifest_path)?;

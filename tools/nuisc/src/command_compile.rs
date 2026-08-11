@@ -286,6 +286,12 @@ pub(crate) fn run_compile(
                     galaxy_index_path: project_metadata
                         .as_ref()
                         .map(|item| item.galaxy_index_path.clone()),
+                    galaxy_resolution_lock_path: project_metadata
+                        .as_ref()
+                        .map(|item| item.galaxy_lock_path.clone()),
+                    galaxy_resolution_sha256: project_metadata
+                        .as_ref()
+                        .map(|item| item.galaxy_lock_summary.resolution_sha256.clone()),
                     galaxy_count: project_metadata
                         .as_ref()
                         .map(|item| item.galaxy_summary.galaxies)
@@ -431,6 +437,11 @@ pub(crate) fn run_compile(
             println!("project_docs: {}", metadata.docs_index_path);
             println!("project_imports: {}", metadata.imports_index_path);
             println!("project_galaxy: {}", metadata.galaxy_index_path);
+            println!("project_galaxy_lock: {}", metadata.galaxy_lock_path);
+            println!(
+                "project_galaxy_lock_sha256: {}",
+                metadata.galaxy_lock_summary.resolution_sha256
+            );
             println!("project_links: {}", metadata.links_index_path);
             println!("project_packet: {}", metadata.packet_index_path);
             println!("project_host_ffi: {}", metadata.host_ffi_index_path);

@@ -37,6 +37,8 @@ pub(crate) struct ManifestFieldVerification {
     pub project_imports_documented_visible_module_count: usize,
     pub project_imports_documented_visible_item_count: usize,
     pub project_galaxy_index: Option<String>,
+    pub project_galaxy_resolution_lock: Option<String>,
+    pub project_galaxy_resolution_sha256: Option<String>,
     pub project_galaxy_count: usize,
     pub project_documented_galaxy_count: usize,
     pub project_documented_galaxy_library_module_count: usize,
@@ -163,6 +165,14 @@ pub(crate) fn verify_manifest_fields(
         )
         .unwrap_or(0),
         project_galaxy_index: parse_optional_toml_string(source, "galaxy_index"),
+        project_galaxy_resolution_lock: parse_optional_toml_string(
+            source,
+            "galaxy_resolution_lock",
+        ),
+        project_galaxy_resolution_sha256: parse_optional_toml_string(
+            source,
+            "galaxy_resolution_sha256",
+        ),
         project_galaxy_count: parse_optional_toml_usize(source, "galaxy_count").unwrap_or(0),
         project_documented_galaxy_count: parse_optional_toml_usize(
             source,

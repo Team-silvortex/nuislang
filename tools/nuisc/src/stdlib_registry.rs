@@ -17,8 +17,8 @@ pub(crate) use stdlib_registry_render::summarize_resolved_galaxy_docs;
 pub use stdlib_registry_render::{render_resolved_galaxy_index, write_resolved_galaxy_index};
 pub(crate) use stdlib_registry_types::ResolvedGalaxyDocSummary;
 pub use stdlib_registry_types::{
-    ResolvedGalaxyDependency, StdlibIndexModule, StdlibLayout, StdlibLibraryImportPolicy,
-    StdlibModuleManifest,
+    ResolvedGalaxyContentIdentity, ResolvedGalaxyDependency, StdlibIndexModule, StdlibLayout,
+    StdlibLibraryImportPolicy, StdlibModuleManifest,
 };
 pub fn load_stdlib_layout(stdlib_root: &Path) -> Result<StdlibLayout, String> {
     let path = stdlib_root.join("index.toml");
@@ -63,6 +63,14 @@ pub fn load_stdlib_module_manifest(
     stdlib_root: &Path,
     module_path: &str,
 ) -> Result<StdlibModuleManifest, String> {
+    load_stdlib_module_manifest_with_identity(stdlib_root, module_path)
+        .map(|(manifest, _)| manifest)
+}
+
+fn load_stdlib_module_manifest_with_identity(
+    stdlib_root: &Path,
+    module_path: &str,
+) -> Result<(StdlibModuleManifest, ResolvedGalaxyContentIdentity), String> {
     let path = stdlib_root.join(module_path).join("module.toml");
     let source = fs::read_to_string(&path).map_err(|error| {
         format!(
@@ -70,7 +78,7 @@ pub fn load_stdlib_module_manifest(
             path.display()
         )
     })?;
-    Ok(StdlibModuleManifest {
+    let manifest = StdlibModuleManifest {
         name: parse_required_string(&source, "name", &path)?,
         package_id: parse_required_string(&source, "package_id", &path)?,
         tier: parse_required_string(&source, "tier", &path)?,
@@ -82,7 +90,8 @@ pub fn load_stdlib_module_manifest(
         library_modules: parse_optional_string_array(&source, "library_modules")
             .unwrap_or_default(),
         library_import_policy: parse_library_import_policy(&source, &path)?,
-    })
+    };
+    Ok((manifest, content_identity("module.toml", source.as_bytes())))
 }
 
 pub fn resolve_galaxy_dependencies(
@@ -119,7 +128,8 @@ pub fn resolve_galaxy_dependencies(
                 stdlib_root.join("index.toml").display()
             )
         })?;
-        let manifest = load_stdlib_module_manifest(stdlib_root, &entry.path)?;
+        let (manifest, manifest_content_identity) =
+            load_stdlib_module_manifest_with_identity(stdlib_root, &entry.path)?;
         let module_dir = stdlib_root.join(&entry.path);
         let resolved_source_paths = manifest
             .source_modules
@@ -131,8 +141,15 @@ pub fn resolve_galaxy_dependencies(
             .iter()
             .map(|item| module_dir.join(item))
             .collect::<Vec<_>>();
-        let (auto_injectable, auto_inject_blockers) =
-            detect_auto_injectability(&resolved_library_paths, &manifest.library_import_policy)?;
+        let source_content_identities =
+            read_content_identities(&manifest.source_modules, &resolved_source_paths)?;
+        let library_content_identities =
+            read_content_identities(&manifest.library_modules, &resolved_library_paths)?;
+        let (auto_injectable, auto_inject_blockers) = detect_auto_injectability(
+            &resolved_library_paths,
+            &library_content_identities,
+            &manifest.library_import_policy,
+        )?;
 
         let item = resolved
             .entry(name.clone())
@@ -144,13 +161,16 @@ pub fn resolve_galaxy_dependencies(
                 requested_by: vec![],
                 module_dir: module_dir.clone(),
                 manifest_path: module_dir.join("module.toml"),
+                manifest_content_identity: manifest_content_identity.clone(),
                 depends_on: manifest.depends_on.clone(),
                 surfaces: manifest.surfaces.clone(),
                 code_assets: manifest.code_assets.clone(),
                 source_modules: manifest.source_modules.clone(),
                 resolved_source_paths,
+                source_content_identities,
                 library_modules: manifest.library_modules.clone(),
                 resolved_library_paths,
+                library_content_identities,
                 library_import_policy: manifest.library_import_policy.clone(),
                 auto_injectable,
                 auto_inject_blockers,
@@ -179,6 +199,7 @@ pub fn resolve_galaxy_dependencies(
 
 fn detect_auto_injectability(
     source_paths: &[PathBuf],
+    content_identities: &[ResolvedGalaxyContentIdentity],
     import_policy: &StdlibLibraryImportPolicy,
 ) -> Result<(bool, Vec<String>), String> {
     if source_paths.is_empty() {
@@ -200,13 +221,11 @@ fn detect_auto_injectability(
 
     let mut seen = BTreeMap::<(String, String), usize>::new();
     let mut blockers = Vec::new();
-    for path in source_paths {
-        let source = fs::read_to_string(path).map_err(|error| {
-            format!(
-                "failed to read stdlib source module `{}`: {error}",
-                path.display()
-            )
-        })?;
+    if source_paths.len() != content_identities.len() {
+        return Err("Galaxy resolution produced mismatched library content identities".to_owned());
+    }
+    for (path, identity) in source_paths.iter().zip(content_identities) {
+        let source = read_verified_galaxy_text(path, identity)?;
         let ast = crate::frontend::parse_nuis_ast(&source).map_err(|error| {
             format!(
                 "failed to parse stdlib source module `{}` for galaxy resolution: {error}",
@@ -224,6 +243,63 @@ fn detect_auto_injectability(
         }
     }
     Ok((blockers.is_empty(), blockers))
+}
+
+pub(crate) fn read_verified_galaxy_text(
+    path: &Path,
+    identity: &ResolvedGalaxyContentIdentity,
+) -> Result<String, String> {
+    let source = fs::read_to_string(path).map_err(|error| {
+        format!(
+            "failed to read Galaxy source `{}` for `{}`: {error}",
+            path.display(),
+            identity.logical_path
+        )
+    })?;
+    let actual = content_identity(&identity.logical_path, source.as_bytes());
+    if actual != *identity {
+        return Err(format!(
+            "Galaxy source `{}` drifted after resolution: expected bytes={} sha256={}, actual bytes={} sha256={}",
+            identity.logical_path,
+            identity.bytes,
+            identity.sha256,
+            actual.bytes,
+            actual.sha256
+        ));
+    }
+    Ok(source)
+}
+
+fn read_content_identities(
+    logical_paths: &[String],
+    physical_paths: &[PathBuf],
+) -> Result<Vec<ResolvedGalaxyContentIdentity>, String> {
+    if logical_paths.len() != physical_paths.len() {
+        return Err(
+            "Galaxy resolution produced mismatched logical and physical source tables".to_owned(),
+        );
+    }
+    logical_paths
+        .iter()
+        .zip(physical_paths)
+        .map(|(logical_path, physical_path)| {
+            let source = fs::read_to_string(physical_path).map_err(|error| {
+                format!(
+                    "failed to read Galaxy source `{}`: {error}",
+                    physical_path.display()
+                )
+            })?;
+            Ok(content_identity(logical_path, source.as_bytes()))
+        })
+        .collect()
+}
+
+fn content_identity(logical_path: &str, bytes: &[u8]) -> ResolvedGalaxyContentIdentity {
+    ResolvedGalaxyContentIdentity {
+        logical_path: logical_path.to_owned(),
+        bytes: bytes.len(),
+        sha256: format!("sha256:{}", crate::digest_sha256::sha256_hex(bytes)),
+    }
 }
 
 #[cfg(test)]

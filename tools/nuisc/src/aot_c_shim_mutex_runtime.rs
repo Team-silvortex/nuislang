@@ -54,6 +54,22 @@ static int64_t nuis_scheduler_mutex_rejected_unlock_count_v1 = 0;
 static int64_t nuis_scheduler_mutex_successful_unlock_count_v1 = 0;
 static int64_t nuis_scheduler_mutex_rejected_permit_count_v1 = 0;
 static int64_t nuis_scheduler_mutex_rejected_close_count_v1 = 0;
+static atomic_flag nuis_scheduler_mutex_admission_gate_v1 = ATOMIC_FLAG_INIT;
+
+static void nuis_scheduler_mutex_admission_enter_v1(void) {
+    while (atomic_flag_test_and_set_explicit(
+        &nuis_scheduler_mutex_admission_gate_v1,
+        memory_order_acquire
+    )) {
+    }
+}
+
+static void nuis_scheduler_mutex_admission_leave_v1(void) {
+    atomic_flag_clear_explicit(
+        &nuis_scheduler_mutex_admission_gate_v1,
+        memory_order_release
+    );
+}
 
 static int64_t nuis_scheduler_mutex_scalar_kind_valid_v1(int64_t scalar_kind) {
     return scalar_kind == NUIS_SCHEDULER_MUTEX_SCALAR_I32_V1
@@ -112,6 +128,7 @@ static NuisSchedulerMutexPermitSlotV1* nuis_scheduler_mutex_free_permit_slot_v1(
 }
 
 static void nuis_scheduler_mutex_reset_v1(void) {
+    nuis_scheduler_mutex_admission_enter_v1();
     for (int64_t index = 0; index < NUIS_SCHEDULER_MUTEX_CAPACITY_V1; index += 1) {
         nuis_scheduler_mutex_slots_v1[index].active = 0;
         nuis_scheduler_mutex_slots_v1[index].scalar_kind = 0;
@@ -130,14 +147,17 @@ static void nuis_scheduler_mutex_reset_v1(void) {
     nuis_scheduler_mutex_successful_unlock_count_v1 = 0;
     nuis_scheduler_mutex_rejected_permit_count_v1 = 0;
     nuis_scheduler_mutex_rejected_close_count_v1 = 0;
+    nuis_scheduler_mutex_admission_leave_v1();
 }
 
 int64_t nuis_scheduler_mutex_new_scalar_v1(int64_t value, int64_t scalar_kind) {
     if (!nuis_scheduler_mutex_scalar_kind_valid_v1(scalar_kind)) return 0;
+    int64_t handle = 0;
+    nuis_scheduler_mutex_admission_enter_v1();
     for (int64_t index = 0; index < NUIS_SCHEDULER_MUTEX_CAPACITY_V1; index += 1) {
         NuisSchedulerMutexSlotV1* slot = &nuis_scheduler_mutex_slots_v1[index];
         if (slot->active) continue;
-        if (nuis_scheduler_mutex_next_handle_v1 == INT64_MAX) return 0;
+        if (nuis_scheduler_mutex_next_handle_v1 == INT64_MAX) break;
         slot->handle = nuis_scheduler_mutex_next_handle_v1++;
         slot->value = value;
         slot->scalar_kind = scalar_kind;
@@ -149,9 +169,11 @@ int64_t nuis_scheduler_mutex_new_scalar_v1(int64_t value, int64_t scalar_kind) {
         slot->permit_cardinality = 0;
         slot->issued_permit_lanes = 0;
         slot->active_permits = 0;
-        return slot->handle;
+        handle = slot->handle;
+        break;
     }
-    return 0;
+    nuis_scheduler_mutex_admission_leave_v1();
+    return handle;
 }
 
 int64_t nuis_scheduler_mutex_new_i64_v1(int64_t value) {
@@ -161,7 +183,7 @@ int64_t nuis_scheduler_mutex_new_i64_v1(int64_t value) {
     );
 }
 
-int64_t nuis_scheduler_mutex_try_lock_i64_v1(int64_t handle) {
+static int64_t nuis_scheduler_mutex_try_lock_locked_i64_v1(int64_t handle) {
     NuisSchedulerMutexSlotV1* mutex = nuis_scheduler_mutex_slot_v1(handle);
     NuisSchedulerMutexGuardSlotV1* guard = nuis_scheduler_mutex_free_guard_slot_v1();
     if (mutex == NULL || mutex->locked || guard == NULL
@@ -181,6 +203,13 @@ int64_t nuis_scheduler_mutex_try_lock_i64_v1(int64_t handle) {
     return guard->token;
 }
 
+int64_t nuis_scheduler_mutex_try_lock_i64_v1(int64_t handle) {
+    nuis_scheduler_mutex_admission_enter_v1();
+    int64_t guard = nuis_scheduler_mutex_try_lock_locked_i64_v1(handle);
+    nuis_scheduler_mutex_admission_leave_v1();
+    return guard;
+}
+
 int64_t nuis_scheduler_mutex_lock_i64_v1(int64_t handle) {
     int64_t guard = nuis_scheduler_mutex_try_lock_i64_v1(handle);
     if (guard != 0) return guard;
@@ -193,21 +222,25 @@ int64_t nuis_scheduler_mutex_value_scalar_v1(
     int64_t guard_token,
     int64_t scalar_kind
 ) {
+    nuis_scheduler_mutex_admission_enter_v1();
     NuisSchedulerMutexGuardSlotV1* guard =
         nuis_scheduler_mutex_guard_slot_v1(guard_token);
     NuisSchedulerMutexSlotV1* mutex = guard == NULL
         ? NULL
         : nuis_scheduler_mutex_slot_v1(guard->mutex_handle);
-    if (guard == NULL || mutex == NULL || !mutex->locked
+    int64_t rejected = guard == NULL || mutex == NULL || !mutex->locked
         || mutex->generation != guard->mutex_generation
         || !nuis_scheduler_mutex_scalar_kind_valid_v1(scalar_kind)
-        || mutex->scalar_kind != scalar_kind) {
+        || mutex->scalar_kind != scalar_kind;
+    int64_t value = rejected ? 0 : mutex->value;
+    nuis_scheduler_mutex_admission_leave_v1();
+    if (rejected) {
         fprintf(stderr,
             "nuis: scheduler mutex scalar value rejected for guard %lld kind %lld\n",
             (long long)guard_token, (long long)scalar_kind);
         exit(73);
     }
-    return mutex->value;
+    return value;
 }
 
 int64_t nuis_scheduler_mutex_value_i64_v1(int64_t guard_token) {
@@ -217,7 +250,9 @@ int64_t nuis_scheduler_mutex_value_i64_v1(int64_t guard_token) {
     );
 }
 
-int64_t nuis_scheduler_mutex_try_unlock_i64_v1(int64_t guard_token) {
+static int64_t nuis_scheduler_mutex_try_unlock_locked_i64_v1(
+    int64_t guard_token
+) {
     NuisSchedulerMutexGuardSlotV1* guard =
         nuis_scheduler_mutex_guard_slot_v1(guard_token);
     NuisSchedulerMutexSlotV1* mutex = guard == NULL
@@ -237,6 +272,13 @@ int64_t nuis_scheduler_mutex_try_unlock_i64_v1(int64_t guard_token) {
     return mutex->handle;
 }
 
+int64_t nuis_scheduler_mutex_try_unlock_i64_v1(int64_t guard_token) {
+    nuis_scheduler_mutex_admission_enter_v1();
+    int64_t handle = nuis_scheduler_mutex_try_unlock_locked_i64_v1(guard_token);
+    nuis_scheduler_mutex_admission_leave_v1();
+    return handle;
+}
+
 int64_t nuis_scheduler_mutex_unlock_i64_v1(int64_t guard_token) {
     int64_t handle = nuis_scheduler_mutex_try_unlock_i64_v1(guard_token);
     if (handle != 0) return handle;
@@ -249,9 +291,11 @@ int64_t nuis_scheduler_mutex_share_i64_v1(
     int64_t handle,
     int64_t permit_cardinality
 ) {
+    nuis_scheduler_mutex_admission_enter_v1();
     NuisSchedulerMutexSlotV1* mutex = nuis_scheduler_mutex_slot_v1(handle);
     if (mutex == NULL || mutex->locked || mutex->shared
         || permit_cardinality < 1 || permit_cardinality > 64) {
+        nuis_scheduler_mutex_admission_leave_v1();
         fprintf(stderr,
             "nuis: scheduler mutex share rejected for handle %lld cardinality %lld\n",
             (long long)handle, (long long)permit_cardinality);
@@ -261,13 +305,17 @@ int64_t nuis_scheduler_mutex_share_i64_v1(
     mutex->permit_cardinality = permit_cardinality;
     mutex->issued_permit_lanes = 0;
     mutex->active_permits = 0;
-    return mutex->handle;
+    int64_t shared_handle = mutex->handle;
+    nuis_scheduler_mutex_admission_leave_v1();
+    return shared_handle;
 }
 
 int64_t nuis_scheduler_mutex_try_shared_close_i64_v1(int64_t handle) {
+    nuis_scheduler_mutex_admission_enter_v1();
     NuisSchedulerMutexSlotV1* mutex = nuis_scheduler_mutex_slot_v1(handle);
     if (mutex == NULL || !mutex->shared || mutex->locked) {
         nuis_scheduler_mutex_rejected_close_count_v1 += 1;
+        nuis_scheduler_mutex_admission_leave_v1();
         return -1;
     }
     int64_t revoked = 0;
@@ -289,6 +337,7 @@ int64_t nuis_scheduler_mutex_try_shared_close_i64_v1(int64_t handle) {
     mutex->permit_cardinality = 0;
     mutex->shared = 0;
     mutex->active = 0;
+    nuis_scheduler_mutex_admission_leave_v1();
     return revoked;
 }
 
@@ -301,6 +350,7 @@ int64_t nuis_scheduler_mutex_shared_close_i64_v1(int64_t handle) {
 }
 
 int64_t nuis_scheduler_mutex_try_permit_i64_v1(int64_t handle, int64_t lane) {
+    nuis_scheduler_mutex_admission_enter_v1();
     NuisSchedulerMutexSlotV1* mutex = nuis_scheduler_mutex_slot_v1(handle);
     NuisSchedulerMutexPermitSlotV1* permit =
         nuis_scheduler_mutex_free_permit_slot_v1();
@@ -312,6 +362,7 @@ int64_t nuis_scheduler_mutex_try_permit_i64_v1(int64_t handle, int64_t lane) {
         || (mutex->issued_permit_lanes & lane_bit) != 0 || permit == NULL
         || nuis_scheduler_mutex_next_permit_v1 == INT64_MAX) {
         nuis_scheduler_mutex_rejected_permit_count_v1 += 1;
+        nuis_scheduler_mutex_admission_leave_v1();
         return 0;
     }
     permit->token = nuis_scheduler_mutex_next_permit_v1++;
@@ -321,7 +372,9 @@ int64_t nuis_scheduler_mutex_try_permit_i64_v1(int64_t handle, int64_t lane) {
     permit->active = 1;
     mutex->issued_permit_lanes |= lane_bit;
     mutex->active_permits += 1;
-    return permit->token;
+    int64_t token = permit->token;
+    nuis_scheduler_mutex_admission_leave_v1();
+    return token;
 }
 
 int64_t nuis_scheduler_mutex_permit_i64_v1(int64_t handle, int64_t lane) {
@@ -332,7 +385,9 @@ int64_t nuis_scheduler_mutex_permit_i64_v1(int64_t handle, int64_t lane) {
     exit(76);
 }
 
-int64_t nuis_scheduler_mutex_try_permit_lock_i64_v1(int64_t permit_token) {
+static int64_t nuis_scheduler_mutex_try_permit_lock_locked_i64_v1(
+    int64_t permit_token
+) {
     NuisSchedulerMutexPermitSlotV1* permit =
         nuis_scheduler_mutex_permit_slot_v1(permit_token);
     NuisSchedulerMutexSlotV1* mutex = permit == NULL
@@ -343,7 +398,7 @@ int64_t nuis_scheduler_mutex_try_permit_lock_i64_v1(int64_t permit_token) {
         nuis_scheduler_mutex_rejected_permit_count_v1 += 1;
         return 0;
     }
-    int64_t guard = nuis_scheduler_mutex_try_lock_i64_v1(mutex->handle);
+    int64_t guard = nuis_scheduler_mutex_try_lock_locked_i64_v1(mutex->handle);
     if (guard == 0) return 0;
     NuisSchedulerMutexGuardSlotV1* guard_slot =
         nuis_scheduler_mutex_guard_slot_v1(guard);
@@ -357,6 +412,14 @@ int64_t nuis_scheduler_mutex_try_permit_lock_i64_v1(int64_t permit_token) {
     return guard;
 }
 
+int64_t nuis_scheduler_mutex_try_permit_lock_i64_v1(int64_t permit_token) {
+    nuis_scheduler_mutex_admission_enter_v1();
+    int64_t guard =
+        nuis_scheduler_mutex_try_permit_lock_locked_i64_v1(permit_token);
+    nuis_scheduler_mutex_admission_leave_v1();
+    return guard;
+}
+
 int64_t nuis_scheduler_mutex_permit_lock_i64_v1(int64_t permit_token) {
     int64_t guard = nuis_scheduler_mutex_try_permit_lock_i64_v1(permit_token);
     if (guard != 0) return guard;
@@ -366,14 +429,17 @@ int64_t nuis_scheduler_mutex_permit_lock_i64_v1(int64_t permit_token) {
 }
 
 int64_t nuis_scheduler_mutex_lease_unlock_i64_v1(int64_t guard_token) {
+    nuis_scheduler_mutex_admission_enter_v1();
     NuisSchedulerMutexGuardSlotV1* guard =
         nuis_scheduler_mutex_guard_slot_v1(guard_token);
     if (guard == NULL || !guard->shared_lease) {
+        nuis_scheduler_mutex_admission_leave_v1();
         fprintf(stderr, "nuis: scheduler mutex lease unlock rejected for guard %lld\n",
             (long long)guard_token);
         exit(78);
     }
-    int64_t handle = nuis_scheduler_mutex_try_unlock_i64_v1(guard_token);
+    int64_t handle = nuis_scheduler_mutex_try_unlock_locked_i64_v1(guard_token);
+    nuis_scheduler_mutex_admission_leave_v1();
     if (handle != 0) return 1;
     fprintf(stderr, "nuis: scheduler mutex lease unlock rejected for guard %lld\n",
         (long long)guard_token);
@@ -385,15 +451,19 @@ int64_t nuis_scheduler_mutex_lease_replace_scalar_v1(
     int64_t replacement,
     int64_t scalar_kind
 ) {
+    nuis_scheduler_mutex_admission_enter_v1();
     NuisSchedulerMutexGuardSlotV1* guard =
         nuis_scheduler_mutex_guard_slot_v1(guard_token);
     NuisSchedulerMutexSlotV1* mutex = guard == NULL
         ? NULL
         : nuis_scheduler_mutex_slot_v1(guard->mutex_handle);
-    if (guard == NULL || mutex == NULL || !guard->shared_lease || !mutex->locked
+    int64_t rejected =
+        guard == NULL || mutex == NULL || !guard->shared_lease || !mutex->locked
         || mutex->generation != guard->mutex_generation
         || !nuis_scheduler_mutex_scalar_kind_valid_v1(scalar_kind)
-        || mutex->scalar_kind != scalar_kind) {
+        || mutex->scalar_kind != scalar_kind;
+    if (rejected) {
+        nuis_scheduler_mutex_admission_leave_v1();
         fprintf(stderr,
             "nuis: scheduler mutex scalar lease replace rejected for guard %lld kind %lld\n",
             (long long)guard_token, (long long)scalar_kind);
@@ -404,6 +474,7 @@ int64_t nuis_scheduler_mutex_lease_replace_scalar_v1(
     atomic_thread_fence(memory_order_release);
     nuis_scheduler_mutex_visibility_epoch_v1 += 1;
     mutex->release_epoch = nuis_scheduler_mutex_visibility_epoch_v1;
+    nuis_scheduler_mutex_admission_leave_v1();
     return old;
 }
 
@@ -419,57 +490,89 @@ int64_t nuis_scheduler_mutex_lease_replace_i64_v1(
 }
 
 int64_t nuis_scheduler_mutex_guard_owner_v1(int64_t guard_token) {
+    nuis_scheduler_mutex_admission_enter_v1();
     NuisSchedulerMutexGuardSlotV1* guard =
         nuis_scheduler_mutex_guard_slot_v1(guard_token);
-    return guard == NULL ? 0 : guard->owner_worker;
+    int64_t owner = guard == NULL ? 0 : guard->owner_worker;
+    nuis_scheduler_mutex_admission_leave_v1();
+    return owner;
 }
 
 int64_t nuis_scheduler_mutex_guard_acquire_epoch_v1(int64_t guard_token) {
+    nuis_scheduler_mutex_admission_enter_v1();
     NuisSchedulerMutexGuardSlotV1* guard =
         nuis_scheduler_mutex_guard_slot_v1(guard_token);
-    return guard == NULL ? -1 : (int64_t)guard->acquire_epoch;
+    int64_t epoch = guard == NULL ? -1 : (int64_t)guard->acquire_epoch;
+    nuis_scheduler_mutex_admission_leave_v1();
+    return epoch;
 }
 
 int64_t nuis_scheduler_mutex_release_epoch_v1(int64_t handle) {
+    nuis_scheduler_mutex_admission_enter_v1();
     NuisSchedulerMutexSlotV1* mutex = nuis_scheduler_mutex_slot_v1(handle);
-    return mutex == NULL ? -1 : (int64_t)mutex->release_epoch;
+    int64_t epoch = mutex == NULL ? -1 : (int64_t)mutex->release_epoch;
+    nuis_scheduler_mutex_admission_leave_v1();
+    return epoch;
 }
 
 int64_t nuis_scheduler_mutex_rejected_lock_count_get_v1(void) {
-    return nuis_scheduler_mutex_rejected_lock_count_v1;
+    nuis_scheduler_mutex_admission_enter_v1();
+    int64_t count = nuis_scheduler_mutex_rejected_lock_count_v1;
+    nuis_scheduler_mutex_admission_leave_v1();
+    return count;
 }
 
 int64_t nuis_scheduler_mutex_rejected_unlock_count_get_v1(void) {
-    return nuis_scheduler_mutex_rejected_unlock_count_v1;
+    nuis_scheduler_mutex_admission_enter_v1();
+    int64_t count = nuis_scheduler_mutex_rejected_unlock_count_v1;
+    nuis_scheduler_mutex_admission_leave_v1();
+    return count;
 }
 
 int64_t nuis_scheduler_mutex_successful_unlock_count_get_v1(void) {
-    return nuis_scheduler_mutex_successful_unlock_count_v1;
+    nuis_scheduler_mutex_admission_enter_v1();
+    int64_t count = nuis_scheduler_mutex_successful_unlock_count_v1;
+    nuis_scheduler_mutex_admission_leave_v1();
+    return count;
 }
 
 int64_t nuis_scheduler_mutex_rejected_permit_count_get_v1(void) {
-    return nuis_scheduler_mutex_rejected_permit_count_v1;
+    nuis_scheduler_mutex_admission_enter_v1();
+    int64_t count = nuis_scheduler_mutex_rejected_permit_count_v1;
+    nuis_scheduler_mutex_admission_leave_v1();
+    return count;
 }
 
 int64_t nuis_scheduler_mutex_rejected_close_count_get_v1(void) {
-    return nuis_scheduler_mutex_rejected_close_count_v1;
+    nuis_scheduler_mutex_admission_enter_v1();
+    int64_t count = nuis_scheduler_mutex_rejected_close_count_v1;
+    nuis_scheduler_mutex_admission_leave_v1();
+    return count;
 }
 
 int64_t nuis_scheduler_mutex_active_permit_count_get_v1(int64_t handle) {
+    nuis_scheduler_mutex_admission_enter_v1();
     NuisSchedulerMutexSlotV1* mutex = nuis_scheduler_mutex_slot_v1(handle);
-    return mutex == NULL ? -1 : mutex->active_permits;
+    int64_t count = mutex == NULL ? -1 : mutex->active_permits;
+    nuis_scheduler_mutex_admission_leave_v1();
+    return count;
 }
 
 int64_t nuis_scheduler_mutex_permit_cardinality_get_v1(int64_t handle) {
+    nuis_scheduler_mutex_admission_enter_v1();
     NuisSchedulerMutexSlotV1* mutex = nuis_scheduler_mutex_slot_v1(handle);
-    return mutex == NULL ? -1 : mutex->permit_cardinality;
+    int64_t cardinality = mutex == NULL ? -1 : mutex->permit_cardinality;
+    nuis_scheduler_mutex_admission_leave_v1();
+    return cardinality;
 }
 
 int64_t nuis_scheduler_mutex_live_count_get_v1(void) {
     int64_t count = 0;
+    nuis_scheduler_mutex_admission_enter_v1();
     for (int64_t index = 0; index < NUIS_SCHEDULER_MUTEX_CAPACITY_V1; index += 1) {
         if (nuis_scheduler_mutex_slots_v1[index].active) count += 1;
     }
+    nuis_scheduler_mutex_admission_leave_v1();
     return count;
 }
 "#,

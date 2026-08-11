@@ -189,6 +189,23 @@ pub struct ProjectGalaxySummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectGalaxyResolutionLockSummary {
+    pub schema: String,
+    pub digest_contract: String,
+    pub resolution_sha256: String,
+    pub dependencies: usize,
+    pub source_modules: usize,
+    pub library_modules: usize,
+    pub selected_library_modules: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderedProjectGalaxyResolutionLock {
+    pub source: String,
+    pub summary: ProjectGalaxyResolutionLockSummary,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectBuildMetadata {
     pub manifest_copy_path: String,
     pub plan_index_path: String,
@@ -201,6 +218,8 @@ pub struct ProjectBuildMetadata {
     pub imports_summary: ProjectImportsSummary,
     pub galaxy_index_path: String,
     pub galaxy_summary: ProjectGalaxySummary,
+    pub galaxy_lock_path: String,
+    pub galaxy_lock_summary: ProjectGalaxyResolutionLockSummary,
     pub links_index_path: String,
     pub packet_index_path: String,
     pub host_ffi_index_path: String,

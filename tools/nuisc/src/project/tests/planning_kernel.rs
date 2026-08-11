@@ -387,25 +387,14 @@ fn categorizes_project_compilation_dependencies() {
         }
         "#,
     )]);
-    project.resolved_galaxies = vec![crate::stdlib_registry::ResolvedGalaxyDependency {
-        name: "demo.dep".to_owned(),
-        version: "1.2.3".to_owned(),
-        package_id: "nuis.demo.dep".to_owned(),
-        direct: true,
-        requested_by: vec!["demo.dep".to_owned()],
-        module_dir: PathBuf::from("stdlib/demo.dep"),
-        manifest_path: PathBuf::from("stdlib/demo.dep/module.toml"),
-        depends_on: vec![],
-        surfaces: vec!["surface.demo.dep.contracts.v1".to_owned()],
-        code_assets: vec![],
-        source_modules: vec![],
-        resolved_source_paths: vec![],
-        library_modules: vec!["lib/demo_dep.ns".to_owned()],
-        resolved_library_paths: vec![PathBuf::from("stdlib/demo.dep/lib/demo_dep.ns")],
-        library_import_policy: crate::stdlib_registry::StdlibLibraryImportPolicy::ProjectAuto,
-        auto_injectable: true,
-        auto_inject_blockers: vec![],
-    }];
+    project.resolved_galaxies = vec![super::test_support::resolved_galaxy_dependency_fixture(
+        "demo.dep",
+        "1.2.3",
+        "nuis.demo.dep",
+        "surface.demo.dep.contracts.v1",
+        "lib/demo_dep.ns",
+        crate::stdlib_registry::StdlibLibraryImportPolicy::ProjectAuto,
+    )];
     let plan = build_project_compilation_plan(&project).unwrap();
     assert_eq!(plan.dependencies.len(), 1);
     assert_eq!(plan.dependencies[0].category, "stdlib-galaxy-direct");

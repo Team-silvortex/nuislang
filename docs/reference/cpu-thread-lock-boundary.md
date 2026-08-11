@@ -30,8 +30,11 @@ Read the current line this way:
 * each worker consumes its permit into one typed `MutexLease<T>` without
   receiving the raw scheduler handle, and a live lease can replace the central
   scalar payload while retaining authority
-* this foothold still does **not** imply a parallel executor, runtime-dynamic
-  permit cardinality, bool/float native payloads, or finalized visibility
+* a scheduler-private atomic admission gate now makes mutex, guard, and permit
+  table access safe when called simultaneously by host threads
+* this foothold still does **not** imply a parallel Nuis executor,
+  runtime-dynamic permit cardinality, bool/float native payloads, per-mutex
+  parking/fairness, or finalized visibility
 
 ## What Is Real Today
 
@@ -143,7 +146,7 @@ Important checked-in examples in that file:
 
 ### 5. The first scheduler mutex runtime is real
 
-The current native `Mutex<i64>` lane now lowers through opaque runtime
+The current native `Mutex<i32>` / `Mutex<i64>` lane now lowers through opaque runtime
 identities rather than LLVM-only value wrappers:
 
 * `mutex_new` allocates a monotonic scheduler handle
@@ -155,6 +158,10 @@ identities rather than LLVM-only value wrappers:
   invalidates the guard, and returns the original handle
 * contention, repeated unlock, forged tokens, stale generations, and exhausted
   tables fail closed
+* one scheduler-private C11 atomic gate protects all mutex, guard, and permit
+  table lookup, admission, mutation, observation, and reset operations
+* nested permit-lock and lease-unlock paths use already-admitted internal
+  operations, so the implementation does not recursively acquire that gate
 * lifecycle shutdown invalidates all live mutex and guard slots
 
 Generated YIR records this boundary on every mutex node:
@@ -173,8 +180,9 @@ remains readable during this transition.
 Current proof surfaces:
 
 * [shim_mutex.rs](../../tools/nuisc/src/aot_tests/shim_mutex.rs) runs two
-  cooperative workers through deterministic contention, release publication,
-  reacquisition, token replay rejection, and lifecycle cleanup
+  cooperative workers through deterministic contention and also runs 32 real
+  pthread workers through simultaneous mutex/permit/guard slot admission,
+  unique-handle checks, concurrent release, and lifecycle cleanup
 * [concurrency_branch_native_smoke.rs](../../tools/nuis/tests/concurrency_branch_native_smoke.rs)
   proves generated Nuis YIR carries the metadata and native LLVM calls the
   scheduler mutex ABI while both dynamic source branches still execute
@@ -183,10 +191,11 @@ Honesty boundary:
 
 * `i32` and `i64` payload lanes are runtime-backed by explicit scalar kind tags
 * bool, float, and aggregate mutex payloads retain staged typed wrappers
-* the contention harness exercises scheduler workers at the runtime boundary;
-  Nuis source still cannot duplicate or send one mutex authority into multiple
-  workers
-* this runtime is cooperative and does not yet claim OS-thread parallel safety
+* the admission harness proves the process-local scheduler tables are free from
+  host-thread slot races; Nuis source still cannot duplicate or send one mutex
+  authority into multiple workers
+* the Nuis executor remains cooperative; the global admission gate is not a
+  claim of mature OS-thread scheduling, per-mutex fairness, or final visibility
 
 ### 6. Shared permit/lease authority reaches native tasks
 
@@ -289,7 +298,7 @@ Short rule:
 Still not promised today:
 
 * a mature worker runtime
-* an OS-thread-parallel mutex implementation
+* a mature OS-thread-parallel executor and per-mutex parking/fairness strategy
 * runtime-dynamic permit cardinality
 * generalized non-`i64` shared payloads and replacement
 * a final memory visibility model beyond the current acquire/release epoch
@@ -337,7 +346,8 @@ For the current beta foundation line, this lane is now strong enough to say:
 But it is **not** yet strong enough to say:
 
 * the concurrent runtime model is final
-* shared mutex authority is runtime-dynamic or OS-thread parallel
+* shared mutex authority is runtime-dynamic or integrated into a mature
+  OS-thread-parallel executor
 * the visibility/synchronization story is complete
 
 That is the right beta-hardening posture:

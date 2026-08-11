@@ -15,6 +15,7 @@ pub fn write_project_metadata(
     let docs_index_path = output_dir.join("nuis.project.docs.txt");
     let imports_index_path = output_dir.join("nuis.project.imports.txt");
     let galaxy_index_path = output_dir.join("nuis.project.galaxy.txt");
+    let galaxy_lock_path = output_dir.join("nuis.project.galaxy.lock");
     let links_index_path = output_dir.join("nuis.project.links.txt");
     let packet_index_path = output_dir.join("nuis.project.packet.txt");
     let host_ffi_index_path = output_dir.join("nuis.project.host_ffi.txt");
@@ -103,6 +104,8 @@ pub fn write_project_metadata(
             galaxy_index_path.display()
         )
     })?;
+    let galaxy_lock_summary =
+        super::super::write_project_galaxy_resolution_lock(&galaxy_lock_path, project)?;
     let mut links_index = String::new();
     write_project_links_index(&mut links_index, &organization)
         .expect("writing project links index to String should not fail");
@@ -150,6 +153,8 @@ pub fn write_project_metadata(
         imports_summary,
         galaxy_index_path: galaxy_index_path.display().to_string(),
         galaxy_summary,
+        galaxy_lock_path: galaxy_lock_path.display().to_string(),
+        galaxy_lock_summary,
         links_index_path: links_index_path.display().to_string(),
         packet_index_path: packet_index_path.display().to_string(),
         host_ffi_index_path: host_ffi_index_path.display().to_string(),

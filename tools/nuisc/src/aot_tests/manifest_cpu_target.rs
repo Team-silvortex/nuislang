@@ -75,6 +75,8 @@ fn build_manifest_round_trips_cpu_target_metadata() {
                     imports_documented_visible_module_count: 0,
                     imports_documented_visible_item_count: 0,
                     galaxy_index_path: None,
+                    galaxy_resolution_lock_path: None,
+                    galaxy_resolution_sha256: None,
                     galaxy_count: 0,
                     galaxy_documented_count: 0,
                     galaxy_documented_library_module_count: 0,
