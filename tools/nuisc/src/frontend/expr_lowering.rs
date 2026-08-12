@@ -9,8 +9,9 @@ use super::unary_lowering::{lower_unary_expr_with_async, UnaryLoweringInput};
 use super::validation_helpers::render_type_name;
 use super::{
     infer_nir_expr_type, instantiate_struct_field_type, lower_call_expr_with_async, named_type,
-    resolve_declared_or_inferred, struct_field_type, AstExpr, CallLoweringInput, FunctionSignature,
-    NirExpr, NirStructDef, NirTypeRef,
+    resolve_ast_type_ref_aliases, resolve_declared_or_inferred, struct_field_type, AstExpr,
+    AstTypeAlias, AstTypeRef, CallLoweringInput, FunctionSignature, NirExpr, NirStructDef,
+    NirTypeRef,
 };
 
 #[path = "expr_lowering_methods.rs"]
@@ -25,6 +26,8 @@ use expr_lowering_structs::{
 
 thread_local! {
     static CURRENT_MODULE_STRUCTS: RefCell<BTreeSet<String>> = RefCell::new(BTreeSet::new());
+    static CURRENT_TYPE_ALIASES: RefCell<BTreeMap<String, AstTypeAlias>> =
+        RefCell::new(BTreeMap::new());
 }
 
 pub(super) fn with_current_module_structs<T>(
@@ -40,6 +43,26 @@ pub(super) fn with_current_module_structs<T>(
         let result = f();
 
         CURRENT_MODULE_STRUCTS.with(|current| {
+            *current.borrow_mut() = previous;
+        });
+
+        result
+    })
+}
+
+pub(super) fn with_current_type_aliases<T>(
+    current_type_aliases: &BTreeMap<String, AstTypeAlias>,
+    f: impl FnOnce() -> T,
+) -> T {
+    CURRENT_TYPE_ALIASES.with(|current| {
+        let mut current = current.borrow_mut();
+        let previous = std::mem::take(&mut *current);
+        *current = current_type_aliases.clone();
+        drop(current);
+
+        let result = f();
+
+        CURRENT_TYPE_ALIASES.with(|current| {
             *current.borrow_mut() = previous;
         });
 
@@ -428,8 +451,19 @@ fn lower_expr_with_context(input: ExprLoweringInput<'_>) -> Result<NirExpr, Stri
             type_args,
             fields,
         } => {
+            let resolved_struct_type = CURRENT_TYPE_ALIASES.with(|aliases| {
+                resolve_ast_type_ref_aliases(
+                    &AstTypeRef {
+                        name: type_name.clone(),
+                        generic_args: type_args.to_vec(),
+                        is_optional: false,
+                        is_ref: false,
+                    },
+                    &aliases.borrow(),
+                )
+            })?;
             let definition = struct_table
-                .get(type_name)
+                .get(&resolved_struct_type.name)
                 .ok_or_else(|| format!("unknown struct type `{}`", type_name))?;
             let generic_name_set = definition
                 .generic_params
@@ -437,50 +471,58 @@ fn lower_expr_with_context(input: ExprLoweringInput<'_>) -> Result<NirExpr, Stri
                 .map(|param| param.name.clone())
                 .collect::<BTreeSet<_>>();
             let has_placeholder_type_args =
-                ast_type_args_are_placeholder_generics(type_args, &generic_name_set);
+                ast_type_args_are_placeholder_generics(&resolved_struct_type.generic_args, &generic_name_set);
             let literal_ty = if definition.generic_params.is_empty() {
-                if !type_args.is_empty() {
+                if !resolved_struct_type.generic_args.is_empty() {
                     return Err(format!(
                         "struct literal `{}` does not accept explicit generic arguments because struct `{}` is not generic",
-                        type_name, type_name
+                        resolved_struct_type.name, resolved_struct_type.name
                     ));
                 }
-                named_type(type_name)
-            } else if !type_args.is_empty() && !has_placeholder_type_args {
-                if type_args.len() != definition.generic_params.len() {
+                named_type(&resolved_struct_type.name)
+            } else if !resolved_struct_type.generic_args.is_empty() && !has_placeholder_type_args {
+                if resolved_struct_type.generic_args.len() != definition.generic_params.len() {
                     return Err(format!(
                         "struct literal `{}<...>` expects {} generic argument(s), found {}",
-                        type_name,
+                        resolved_struct_type.name,
                         definition.generic_params.len(),
-                        type_args.len()
+                        resolved_struct_type.generic_args.len()
                     ));
                 }
                 NirTypeRef {
-                    name: type_name.clone(),
-                    generic_args: type_args.iter().map(super::lower_type_ref).collect(),
+                    name: resolved_struct_type.name.clone(),
+                    generic_args: resolved_struct_type
+                        .generic_args
+                        .iter()
+                        .map(super::lower_type_ref)
+                        .collect(),
                     is_optional: false,
                     is_ref: false,
                 }
             } else if let Some(expected) = expected {
                 let expected_matches_parent = expected
                     .name
-                    .eq(type_name.rsplit_once('.').map(|(parent, _)| parent).unwrap_or_default());
-                if expected.name != *type_name && !expected_matches_parent {
+                    .eq(resolved_struct_type
+                        .name
+                        .rsplit_once('.')
+                        .map(|(parent, _)| parent)
+                        .unwrap_or_default());
+                if expected.name != resolved_struct_type.name && !expected_matches_parent {
                     return Err(format!(
                         "cannot infer generic arguments for struct literal `{}` from expected type `{}`",
-                        type_name,
+                        resolved_struct_type.name,
                         expected.render()
                     ));
                 }
                 NirTypeRef {
-                    name: type_name.clone(),
+                    name: resolved_struct_type.name.clone(),
                     generic_args: expected.generic_args.clone(),
                     is_optional: false,
                     is_ref: false,
                 }
             } else {
                 infer_generic_struct_literal_type_from_fields(GenericStructLiteralInferenceInput {
-                    type_name,
+                    type_name: &resolved_struct_type.name,
                     definition,
                     fields,
                     context: StructLiteralInferenceContext {
@@ -494,10 +536,10 @@ fn lower_expr_with_context(input: ExprLoweringInput<'_>) -> Result<NirExpr, Stri
                 })?
             };
             let hidden_private_fields = hidden_private_field_count(definition);
-            if hidden_private_fields > 0 && !current_module_structs_contains(type_name) {
+            if hidden_private_fields > 0 && !current_module_structs_contains(&resolved_struct_type.name) {
                 return Err(format!(
                     "struct literal `{}` cannot be constructed outside its defining module because it hides {} private field(s); either mark fields `pub` in the defining module or provide a public constructor function",
-                    type_name, hidden_private_fields
+                    resolved_struct_type.name, hidden_private_fields
                 ));
             }
             let mut seen = BTreeSet::new();
@@ -507,11 +549,16 @@ fn lower_expr_with_context(input: ExprLoweringInput<'_>) -> Result<NirExpr, Stri
                     .fields
                     .iter()
                     .find(|field| field.name == *name)
-                    .ok_or_else(|| format!("struct `{}` has no field `{}`", type_name, name))?;
+                    .ok_or_else(|| {
+                        format!(
+                            "struct `{}` has no field `{}`",
+                            resolved_struct_type.name, name
+                        )
+                    })?;
                 if !seen.insert(name.clone()) {
                     return Err(format!(
                         "struct literal `{}` duplicates field `{}`",
-                        type_name, name
+                        resolved_struct_type.name, name
                     ));
                 }
                 let expected_field_ty =
@@ -531,12 +578,12 @@ fn lower_expr_with_context(input: ExprLoweringInput<'_>) -> Result<NirExpr, Stri
             if definition.fields.len() != lowered_fields.len() {
                 return Err(format!(
                     "struct literal `{}` must initialize all {} field(s)",
-                    type_name,
+                    resolved_struct_type.name,
                     definition.fields.len()
                 ));
             }
             NirExpr::StructLiteral {
-                type_name: type_name.clone(),
+                type_name: resolved_struct_type.name,
                 type_args: literal_ty.generic_args,
                 fields: lowered_fields,
             }

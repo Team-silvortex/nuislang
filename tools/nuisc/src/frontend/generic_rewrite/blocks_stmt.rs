@@ -116,7 +116,7 @@ pub(super) fn rewrite_generic_calls_in_stmt(
             AstStmt::Let {
                 mutable: *mutable,
                 name: name.clone(),
-                ty: inferred.or_else(|| ty.clone()),
+                ty: ty.clone(),
                 value: rewritten_value,
             }
         }
@@ -214,7 +214,7 @@ pub(super) fn rewrite_generic_calls_in_stmt(
             }
             AstStmt::Const {
                 name: name.clone(),
-                ty: inferred.or_else(|| ty.clone()),
+                ty: ty.clone(),
                 value: rewritten_value,
             }
         }

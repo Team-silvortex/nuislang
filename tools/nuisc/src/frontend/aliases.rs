@@ -7,9 +7,9 @@ use nuis_semantics::model::{
 
 use super::types::ast_type_from_nir;
 use super::{
-    infer_nir_expr_type, is_public_visibility, lower_expr_with_async, lower_visibility,
-    resolve_declared_or_inferred, validate_type_ref, ExprWithAsyncInput, FunctionSignature,
-    ModuleConstValue,
+    infer_nir_expr_type, is_public_visibility, lower_expr_with_async,
+    with_current_type_aliases, lower_visibility, resolve_declared_or_inferred, validate_type_ref,
+    ExprWithAsyncInput, FunctionSignature, ModuleConstValue,
 };
 
 pub(crate) fn lower_param_with_aliases(
@@ -203,16 +203,18 @@ pub(crate) fn lower_module_const_items(
             validate_type_ref(expected)?;
         }
         let type_bindings = const_type_bindings(&available_consts);
-        let lowered_value = lower_expr_with_async(ExprWithAsyncInput {
-            expr: &constant.value,
-            current_domain: &module.domain,
-            current_function_is_async: false,
-            bindings: &type_bindings,
-            module_consts: &available_consts,
-            signatures,
-            struct_table,
-            expected: expected.as_ref(),
-            allow_async_calls: false,
+        let lowered_value = with_current_type_aliases(type_aliases, || {
+            lower_expr_with_async(ExprWithAsyncInput {
+                expr: &constant.value,
+                current_domain: &module.domain,
+                current_function_is_async: false,
+                bindings: &type_bindings,
+                module_consts: &available_consts,
+                signatures,
+                struct_table,
+                expected: expected.as_ref(),
+                allow_async_calls: false,
+            })
         })?;
         let inferred =
             infer_nir_expr_type(&lowered_value, &type_bindings, signatures, struct_table);
@@ -240,7 +242,7 @@ pub(crate) fn build_function_return_type_table(
     generic_templates: &BTreeMap<String, AstFunction>,
     local_cpu_helpers: &[&AstModule],
     aliases: &BTreeMap<String, AstTypeAlias>,
-) -> BTreeMap<String, Option<AstTypeRef>> {
+) -> Result<BTreeMap<String, Option<AstTypeRef>>, String> {
     let mut table = BTreeMap::new();
     for function in &module.externs {
         table.insert(
@@ -270,6 +272,7 @@ pub(crate) fn build_function_return_type_table(
         );
     }
     for helper in local_cpu_helpers {
+        let helper_type_aliases = build_visible_type_alias_map(helper, local_cpu_helpers)?;
         for function in helper
             .functions
             .iter()
@@ -278,16 +281,18 @@ pub(crate) fn build_function_return_type_table(
             table.insert(
                 function.name.clone(),
                 function.return_type.as_ref().map(|ty| {
-                    resolve_ast_type_ref_aliases(ty, aliases).unwrap_or_else(|_| ty.clone())
+                    resolve_ast_type_ref_aliases(ty, &helper_type_aliases)
+                        .unwrap_or_else(|_| ty.clone())
                 }),
             );
             table.insert(
                 format!("{}.{}", helper.unit, function.name),
                 function.return_type.as_ref().map(|ty| {
-                    resolve_ast_type_ref_aliases(ty, aliases).unwrap_or_else(|_| ty.clone())
+                    resolve_ast_type_ref_aliases(ty, &helper_type_aliases)
+                        .unwrap_or_else(|_| ty.clone())
                 }),
             );
         }
     }
-    table
+    Ok(table)
 }

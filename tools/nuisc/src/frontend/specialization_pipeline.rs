@@ -13,7 +13,8 @@ use super::stmt_lowering::{lower_stmt_sequence_with_async, StmtSequenceLoweringI
 use super::{
     build_default_impl_method, build_default_impl_method_function,
     build_function_return_type_table, build_impl_method_function, impl_method_lookup_key,
-    impl_method_symbol_name, infer_missing_function_return_type, is_public_visibility,
+    build_visible_type_alias_map, impl_method_symbol_name, infer_missing_function_return_type,
+    is_public_visibility,
     build_module_struct_table, build_visible_struct_defs,
     lower_function, lower_param_with_aliases, lower_type_ref_with_aliases, lower_visibility,
     rewrite_generic_calls_in_function, FunctionSignature, GenericFunctionRewriteInput,
@@ -143,7 +144,7 @@ pub(super) fn build_lowered_functions_and_impls(
         generic_templates,
         local_cpu_helpers,
         visible_type_aliases,
-    );
+    )?;
     let mut inferred_function_return_types = function_return_types.clone();
     let mut specialized_functions = Vec::new();
     let mut specialized_signatures = Vec::new();
@@ -382,6 +383,7 @@ pub(super) fn build_lowered_functions_and_impls(
     );
 
     for helper in local_cpu_helpers {
+        let helper_type_aliases = build_visible_type_alias_map(helper, local_cpu_helpers)?;
         let helper_public_functions = helper
             .functions
             .iter()
@@ -394,7 +396,8 @@ pub(super) fn build_lowered_functions_and_impls(
             .iter()
             .filter(|function| {
                 function.params.iter().any(|param| {
-                    is_callable_type_with_aliases(&param.ty, visible_type_aliases).unwrap_or(false)
+                    is_callable_type_with_aliases(&param.ty, &helper_type_aliases)
+                        .unwrap_or(false)
                 })
             })
             .flat_map(|function| {
@@ -442,7 +445,7 @@ pub(super) fn build_lowered_functions_and_impls(
                 continue;
             };
             let lowered_for_type =
-                lower_type_ref_with_aliases(&definition.for_type, visible_type_aliases)?;
+                lower_type_ref_with_aliases(&definition.for_type, &helper_type_aliases)?;
             let mut impl_methods = definition.methods.to_vec();
             for trait_method in &trait_def.methods {
                 if trait_method.default_body.is_none()
@@ -456,7 +459,8 @@ pub(super) fn build_lowered_functions_and_impls(
             }
             for method in &impl_methods {
                 if method.params.iter().any(|param| {
-                    is_callable_type_with_aliases(&param.ty, visible_type_aliases).unwrap_or(false)
+                    is_callable_type_with_aliases(&param.ty, &helper_type_aliases)
+                        .unwrap_or(false)
                 }) {
                     continue;
                 }
@@ -472,12 +476,14 @@ pub(super) fn build_lowered_functions_and_impls(
                     params: method
                         .params
                         .iter()
-                        .map(|param| lower_type_ref_with_aliases(&param.ty, visible_type_aliases))
+                        .map(|param| {
+                            lower_type_ref_with_aliases(&param.ty, &helper_type_aliases)
+                        })
                         .collect::<Result<Vec<_>, _>>()?,
                     return_type: method
                         .return_type
                         .as_ref()
-                        .map(|ty| lower_type_ref_with_aliases(ty, visible_type_aliases))
+                        .map(|ty| lower_type_ref_with_aliases(ty, &helper_type_aliases))
                         .transpose()?,
                     is_extern: false,
                     is_async: false,
@@ -521,7 +527,7 @@ pub(super) fn build_lowered_functions_and_impls(
             let rewritten = rewrite_generic_calls_in_function(GenericFunctionRewriteInput {
                 function,
                 module_const_env: &BTreeMap::new(),
-                visible_type_aliases,
+                visible_type_aliases: &helper_type_aliases,
                 generic_templates: &helper_generic_templates,
                 generic_impl_method_templates: &generic_impl_method_templates,
                 higher_order_templates: &helper_higher_order_templates,
@@ -542,7 +548,8 @@ pub(super) fn build_lowered_functions_and_impls(
             signatures.insert(name, signature);
         }
 
-        let mut helper_struct_table = build_visible_struct_defs(helper, &[], visible_type_aliases)?
+        let mut helper_struct_table =
+            build_visible_struct_defs(helper, &[], &helper_type_aliases)?
             .into_iter()
             .map(|definition| (definition.name.clone(), definition))
             .collect::<BTreeMap<_, _>>();
@@ -564,7 +571,7 @@ pub(super) fn build_lowered_functions_and_impls(
                         &helper.unit,
                         &helper_struct_set,
                         helper_const_maps.get(&helper.unit).unwrap(),
-                        visible_type_aliases,
+                        &helper_type_aliases,
                         signatures,
                         &helper_struct_table,
                     )
@@ -585,13 +592,13 @@ pub(super) fn build_lowered_functions_and_impls(
                         .insert(function.name.clone(), Some(inferred_return_type));
                 }
             }
-                    lowered_functions.push(lower_function(
+            lowered_functions.push(lower_function(
                 &function,
                 &module.domain,
                 &helper.unit,
                 &helper_struct_set,
                 helper_const_maps.get(&helper.unit).unwrap(),
-                visible_type_aliases,
+                &helper_type_aliases,
                 signatures,
                 &helper_struct_table,
             )?);

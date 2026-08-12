@@ -4,7 +4,7 @@ use nuis_semantics::model::{AstFunction, AstModule, AstTypeAlias, NirTypeRef};
 
 use super::{
     extern_function_symbol_name, function_host_symbol_name, is_public_visibility,
-    lower_type_ref_with_aliases,
+    build_visible_type_alias_map, lower_type_ref_with_aliases,
 };
 
 fn is_helper_internal_synthetic(function: &AstFunction) -> bool {
@@ -84,6 +84,7 @@ pub(super) fn build_initial_function_signatures(
     }
 
     for helper in local_cpu_helpers {
+        let helper_type_aliases = build_visible_type_alias_map(helper, local_cpu_helpers)?;
         for function in helper
             .externs
             .iter()
@@ -97,11 +98,13 @@ pub(super) fn build_initial_function_signatures(
                 params: function
                     .params
                     .iter()
-                    .map(|param| lower_type_ref_with_aliases(&param.ty, visible_type_aliases))
+                    .map(|param| {
+                        lower_type_ref_with_aliases(&param.ty, &helper_type_aliases)
+                    })
                     .collect::<Result<Vec<_>, _>>()?,
                 return_type: Some(lower_type_ref_with_aliases(
                     &function.return_type,
-                    visible_type_aliases,
+                    &helper_type_aliases,
                 )?),
                 is_extern: true,
                 is_async: false,
@@ -131,11 +134,13 @@ pub(super) fn build_initial_function_signatures(
                     params: function
                         .params
                         .iter()
-                        .map(|param| lower_type_ref_with_aliases(&param.ty, visible_type_aliases))
+                        .map(|param| {
+                            lower_type_ref_with_aliases(&param.ty, &helper_type_aliases)
+                        })
                         .collect::<Result<Vec<_>, _>>()?,
                     return_type: Some(lower_type_ref_with_aliases(
                         &function.return_type,
-                        visible_type_aliases,
+                        &helper_type_aliases,
                     )?),
                     is_extern: true,
                     is_async: false,
@@ -189,6 +194,7 @@ pub(super) fn build_initial_function_signatures(
     }
 
     for helper in local_cpu_helpers {
+        let helper_type_aliases = build_visible_type_alias_map(helper, local_cpu_helpers)?;
         for function in helper.functions.iter().filter(|function| {
             is_public_visibility(function.visibility) || is_helper_internal_synthetic(function)
         }) {
@@ -199,12 +205,14 @@ pub(super) fn build_initial_function_signatures(
                 params: function
                     .params
                     .iter()
-                    .map(|param| lower_type_ref_with_aliases(&param.ty, visible_type_aliases))
+                    .map(|param| {
+                        lower_type_ref_with_aliases(&param.ty, &helper_type_aliases)
+                    })
                     .collect::<Result<Vec<_>, _>>()?,
                 return_type: function
                     .return_type
                     .as_ref()
-                    .map(|ty| lower_type_ref_with_aliases(ty, visible_type_aliases))
+                    .map(|ty| lower_type_ref_with_aliases(ty, &helper_type_aliases))
                     .transpose()?,
                 is_extern: false,
                 is_async: function.is_async,

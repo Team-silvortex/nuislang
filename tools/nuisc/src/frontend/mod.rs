@@ -144,7 +144,7 @@ use self::direct_calls::{lower_direct_call_builtin_or_named_call, DirectCallBuil
 use self::expr_lowering::{
     lower_expr, lower_expr_with_async, lower_nested_expr_with_async,
     lower_nested_expr_with_async_and_consts, ExprWithAsyncInput, NestedExprWithConstsInput,
-    current_module_structs_contains, with_current_module_structs,
+    current_module_structs_contains, with_current_module_structs, with_current_type_aliases,
 };
 use self::function_lowering::find_impl_method_signature;
 use self::function_lowering::{

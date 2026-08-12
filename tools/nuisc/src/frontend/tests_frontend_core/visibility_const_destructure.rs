@@ -63,6 +63,43 @@ fn rejects_struct_literals_for_imported_structs_with_hidden_private_fields() {
 }
 
 #[test]
+fn resolves_struct_aliases_before_private_field_visibility_checks() {
+    let entry = parse_nuis_ast(
+        r#"
+        use cpu Shapes;
+
+        mod cpu Main {
+          fn main() -> i64 {
+            let cfg: ConfigAlias = ConfigAlias {
+              visible: 1
+            };
+            return cfg.visible;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let helper = parse_nuis_ast(
+        r#"
+        mod cpu Shapes {
+          pub struct Config {
+            pub visible: i64,
+            secret: i64
+          }
+          pub type ConfigAlias = Config;
+        }
+        "#,
+    )
+    .unwrap();
+
+    let error = super::lower_project_ast_to_nir(&entry, &[helper]).unwrap_err();
+    assert!(
+        error.contains("struct literal `Config` cannot be constructed outside its defining module because it hides 1 private field(s); either mark fields `pub` in the defining module or provide a public constructor function"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
 fn parses_pub_const_items_into_ast() {
     let ast = parse_nuis_ast(
         r#"

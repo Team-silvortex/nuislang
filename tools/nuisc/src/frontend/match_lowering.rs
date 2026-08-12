@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
     nir_expr_effect_class, AstMatchArm, AstMatchPattern, AstTypeAlias, NirBinaryOp, NirExpr,
-    NirExprEffectClass, NirStmt, NirStructDef, NirTypeRef,
+    NirExprEffectClass, NirScalarKind, NirStmt, NirStructDef, NirTypeRef,
 };
 
 use super::stmt_lowering::{lower_stmt_block_with_async, StmtBlockLoweringInput};
@@ -212,6 +212,9 @@ fn is_exhaustive_enum_match(
     type_aliases: &BTreeMap<String, AstTypeAlias>,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<bool, String> {
+    if value_ty.scalar_kind() == Some(NirScalarKind::Bool) {
+        return Ok(match_bool_pattern_coverage(arms, /*require_exhaustive=*/true)?);
+    }
     if arms.is_empty() || arms.iter().any(|arm| arm.guard.is_some()) {
         return Ok(false);
     }
@@ -248,6 +251,9 @@ fn is_non_exhaustive_enum_match(
     type_aliases: &BTreeMap<String, AstTypeAlias>,
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<bool, String> {
+    if value_ty.scalar_kind() == Some(NirScalarKind::Bool) {
+        return Ok(match_bool_pattern_coverage(arms, /*require_exhaustive=*/false)?);
+    }
     if arms.is_empty() || arms.iter().any(|arm| arm.guard.is_some()) {
         return Ok(false);
     }
@@ -314,6 +320,29 @@ fn exhaustive_enum_variants(
             (enum_name == parent).then(|| variant_name.to_owned())
         })
         .collect()
+}
+
+fn match_bool_pattern_coverage(
+    arms: &[AstMatchArm],
+    require_exhaustive: bool,
+) -> Result<bool, String> {
+    let mut has_true = false;
+    let mut has_false = false;
+    for arm in arms {
+        if arm.guard.is_some() {
+            return Ok(false);
+        }
+        match arm.pattern {
+            AstMatchPattern::Bool(true) => has_true = true,
+            AstMatchPattern::Bool(false) => has_false = true,
+            _ => return Ok(false),
+        }
+    }
+
+    if has_true && has_false {
+        return Ok(true);
+    }
+    Ok(!require_exhaustive && (has_true || has_false))
 }
 
 fn substitute_pattern_binding_vars(

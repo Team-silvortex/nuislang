@@ -107,7 +107,7 @@ pub(super) fn validate_ast_generic_constraints(
         &generic_templates,
         local_cpu_helpers,
         visible_type_aliases,
-    );
+    )?;
 
     for alias in &module.type_aliases {
         let generic_bounds = build_generic_bound_env(
