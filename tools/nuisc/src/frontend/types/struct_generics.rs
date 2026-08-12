@@ -7,7 +7,11 @@ pub(crate) fn instantiate_struct_field_type(
     definition: &NirStructDef,
     field_ty: &NirTypeRef,
 ) -> NirTypeRef {
-    if definition.generic_params.len() != base_ty.generic_args.len() {
+    let substitution_count = definition
+        .generic_params
+        .len()
+        .min(base_ty.generic_args.len());
+    if substitution_count == 0 {
         return field_ty.clone();
     }
     substitute_struct_generic_type(
@@ -15,6 +19,7 @@ pub(crate) fn instantiate_struct_field_type(
         &definition
             .generic_params
             .iter()
+            .take(substitution_count)
             .map(|param| param.name.clone())
             .zip(base_ty.generic_args.iter().cloned())
             .collect::<BTreeMap<_, _>>(),

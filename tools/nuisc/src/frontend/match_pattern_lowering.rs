@@ -60,6 +60,56 @@ pub(super) fn lower_match_pattern_condition_and_bindings(
             },
             Vec::new(),
         )),
+        (AstMatchPattern::Tuple(patterns), _) => {
+            if value_ty.name != "Tuple" {
+                return Err(format!(
+                    "tuple match pattern requires scrutinee of type `Tuple`, found `{}`",
+                    value_ty.render()
+                ));
+            }
+            if patterns.len() != value_ty.generic_args.len() {
+                return Err(format!(
+                    "tuple match pattern expects {} element(s), found tuple type `{}`",
+                    patterns.len(),
+                    value_ty.render()
+                ));
+            }
+            let mut conditions = Vec::new();
+            let mut bindings = Vec::new();
+            for (index, pattern) in patterns.iter().enumerate() {
+                let field_ty = value_ty
+                    .generic_args
+                    .get(index)
+                    .ok_or_else(|| "tuple match pattern arity exceeds scrutinee arity".to_owned())?;
+                let field_expr = NirExpr::FieldAccess {
+                    base: Box::new(lowered_value.clone()),
+                    field: index.to_string(),
+                };
+                let (field_condition, field_bindings) = lower_match_pattern_condition_and_bindings(
+                    pattern,
+                    &field_expr,
+                    field_ty,
+                    type_aliases,
+                    struct_table,
+                )?;
+                conditions.push(field_condition);
+                bindings.extend(field_bindings);
+            }
+            let first = conditions
+                .drain(..1)
+                .next()
+                .ok_or_else(|| "tuple match pattern cannot be empty".to_owned())?;
+            Ok((
+                conditions
+                    .into_iter()
+                    .fold(first, |lhs, rhs| NirExpr::Binary {
+                        op: NirBinaryOp::And,
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                    }),
+                bindings,
+            ))
+        }
         (AstMatchPattern::Or(patterns), _) => {
             let mut conditions = patterns
                 .iter()
@@ -236,7 +286,10 @@ pub(super) fn lower_match_pattern_condition_and_bindings(
             ))
         }
         (AstMatchPattern::Bool(_), _) => {
-            Err("`match` arm pattern `true`/`false` requires a `bool` scrutinee".to_owned())
+            Err(format!(
+                "`match` arm pattern `true`/`false` requires a `bool` scrutinee, found `{}`",
+                value_ty.render()
+            ))
         }
         (AstMatchPattern::Int(_) | AstMatchPattern::IntRangeInclusive(_, _), _) => {
             Err("minimal `match` integer patterns require an `i64` scrutinee".to_owned())

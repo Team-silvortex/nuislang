@@ -179,5 +179,6 @@ pub(super) fn lower_match_expr_stmt_with_context(
         type_aliases,
         signatures,
         struct_table,
+        allow_non_exhaustive_enum_fallthrough: false,
     })
 }

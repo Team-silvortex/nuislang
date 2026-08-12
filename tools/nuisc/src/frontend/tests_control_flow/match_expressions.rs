@@ -278,6 +278,65 @@ fn rejects_match_without_final_wildcard_arm() {
 }
 
 #[test]
+fn allows_non_exhaustive_enum_match_in_statement_context() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Duo {
+            A,
+            B,
+          }
+
+          fn main() {
+            let choice: Duo = Duo.A;
+            match choice {
+              Duo.A => {
+                print(10);
+              }
+            }
+            print(20);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = module
+        .functions
+        .iter()
+        .find(|function| function.name == "main")
+        .unwrap();
+    assert_eq!(function.body.len(), 3);
+    assert!(matches!(&function.body[0], NirStmt::Let { .. }));
+    assert!(matches!(&function.body[1], NirStmt::If { .. }));
+    assert!(matches!(&function.body[2], NirStmt::Expr(_)));
+}
+
+#[test]
+fn rejects_non_exhaustive_enum_match_in_expression_context() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Duo {
+            A,
+            B,
+          }
+
+          fn main() -> i64 {
+            let value: i64 = match Duo.A {
+              Duo.A => { 7 }
+            };
+            return value;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("requires a final unguarded `_` arm"));
+}
+
+#[test]
 fn rejects_match_on_non_scalar_scrutinee() {
     let error = parse_nuis_module(
         r#"

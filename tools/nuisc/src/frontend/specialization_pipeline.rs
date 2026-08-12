@@ -14,6 +14,7 @@ use super::{
     build_default_impl_method, build_default_impl_method_function,
     build_function_return_type_table, build_impl_method_function, impl_method_lookup_key,
     impl_method_symbol_name, infer_missing_function_return_type, is_public_visibility,
+    build_module_struct_table, build_visible_struct_defs,
     lower_function, lower_param_with_aliases, lower_type_ref_with_aliases, lower_visibility,
     rewrite_generic_calls_in_function, FunctionSignature, GenericFunctionRewriteInput,
     GenericImplMethodTemplate, ModuleConstValue,
@@ -329,6 +330,7 @@ pub(super) fn build_lowered_functions_and_impls(
                 function,
                 &module.domain,
                 &module.unit,
+                &module_struct_table.keys().cloned().collect(),
                 module_const_values,
                 visible_type_aliases,
                 signatures,
@@ -369,6 +371,7 @@ pub(super) fn build_lowered_functions_and_impls(
                     function,
                     &module.domain,
                     &module.unit,
+                    &module_struct_table.keys().cloned().collect(),
                     module_const_values,
                     visible_type_aliases,
                     signatures,
@@ -538,6 +541,19 @@ pub(super) fn build_lowered_functions_and_impls(
         for (name, signature) in helper_specialized_signatures {
             signatures.insert(name, signature);
         }
+
+        let mut helper_struct_table = build_visible_struct_defs(helper, &[], visible_type_aliases)?
+            .into_iter()
+            .map(|definition| (definition.name.clone(), definition))
+            .collect::<BTreeMap<_, _>>();
+        for (name, definition) in struct_table {
+            helper_struct_table.entry(name.clone()).or_insert_with(|| definition.clone());
+        }
+
+        let helper_struct_set = build_module_struct_table(helper)
+            .keys()
+            .cloned()
+            .collect();
         lowered_functions.extend(
             helper_rewritten_functions
                 .iter()
@@ -546,10 +562,11 @@ pub(super) fn build_lowered_functions_and_impls(
                         function,
                         &module.domain,
                         &helper.unit,
+                        &helper_struct_set,
                         helper_const_maps.get(&helper.unit).unwrap(),
                         visible_type_aliases,
                         signatures,
-                        struct_table,
+                        &helper_struct_table,
                     )
                 })
                 .collect::<Result<Vec<_>, _>>()?,
@@ -568,14 +585,15 @@ pub(super) fn build_lowered_functions_and_impls(
                         .insert(function.name.clone(), Some(inferred_return_type));
                 }
             }
-            lowered_functions.push(lower_function(
+                    lowered_functions.push(lower_function(
                 &function,
                 &module.domain,
                 &helper.unit,
+                &helper_struct_set,
                 helper_const_maps.get(&helper.unit).unwrap(),
                 visible_type_aliases,
                 signatures,
-                struct_table,
+                &helper_struct_table,
             )?);
         }
     }

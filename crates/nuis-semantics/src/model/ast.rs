@@ -286,6 +286,7 @@ pub enum AstMatchPattern {
     Int(i64),
     IntRangeInclusive(i64, i64),
     Or(Vec<AstMatchPattern>),
+    Tuple(Vec<AstMatchPattern>),
     PayloadStruct {
         type_ref: AstTypeRef,
         payload: Box<AstMatchPattern>,

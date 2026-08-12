@@ -39,7 +39,9 @@ impl Parser {
             return self.parse_await_stmt();
         }
         if self.peek_word("mod") {
-            return Err("nested mod definitions are not allowed".to_owned());
+            return Err(
+                "nested mod definitions are not allowed in function bodies; put this `mod` at top-level".to_owned(),
+            );
         }
 
         if let Some(stmt) = self.try_parse_assignment_stmt()? {

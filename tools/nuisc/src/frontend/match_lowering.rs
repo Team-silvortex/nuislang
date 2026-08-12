@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
     nir_expr_effect_class, AstMatchArm, AstMatchPattern, AstTypeAlias, NirBinaryOp, NirExpr,
-    NirExprEffectClass, NirStmt, NirTypeRef,
+    NirExprEffectClass, NirStmt, NirStructDef, NirTypeRef,
 };
 
 use super::stmt_lowering::{lower_stmt_block_with_async, StmtBlockLoweringInput};
@@ -34,6 +34,7 @@ pub(super) fn lower_match_stmt_with_async(
         type_aliases,
         signatures,
         struct_table,
+        allow_non_exhaustive_enum_fallthrough,
     } = input;
     if arms.is_empty() {
         return Err("`match` requires at least one arm".to_owned());
@@ -98,7 +99,7 @@ pub(super) fn lower_match_stmt_with_async(
         let mut wildcard_bindings = bindings.clone();
         let else_body = lower_block!(&arms[wildcard_index].body, &mut wildcard_bindings)?;
         (&arms[..wildcard_index], else_body)
-    } else if is_exhaustive_option_or_result_match(arms, &value_ty, type_aliases)? {
+    } else if is_exhaustive_enum_match(arms, &value_ty, type_aliases, struct_table)? {
         let (last_arm, arms_to_lower) = arms
             .split_last()
             .ok_or_else(|| "internal error: exhaustive match has no arms".to_owned())?;
@@ -121,9 +122,13 @@ pub(super) fn lower_match_stmt_with_async(
         }
         else_body.extend(lower_block!(&last_arm.body, &mut last_bindings)?);
         (arms_to_lower, else_body)
+    } else if allow_non_exhaustive_enum_fallthrough
+        && is_non_exhaustive_enum_match(arms, &value_ty, type_aliases, struct_table)?
+    {
+        (arms, Vec::new())
     } else {
         return Err(
-            "minimal `match` currently requires a final unguarded `_` arm unless an `Option` or `Result` match is explicitly exhaustive"
+            "minimal `match` currently requires a final unguarded `_` arm unless the match is explicitly exhaustive over all variants"
                 .to_owned(),
         );
     };
@@ -201,10 +206,11 @@ pub(super) fn lower_match_stmt_with_async(
     }
 }
 
-fn is_exhaustive_option_or_result_match(
+fn is_exhaustive_enum_match(
     arms: &[AstMatchArm],
     value_ty: &NirTypeRef,
     type_aliases: &BTreeMap<String, AstTypeAlias>,
+    struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<bool, String> {
     if arms.is_empty() || arms.iter().any(|arm| arm.guard.is_some()) {
         return Ok(false);
@@ -214,13 +220,10 @@ fn is_exhaustive_option_or_result_match(
     let mut variants = BTreeSet::new();
     for arm in arms {
         let Some((parent, variant)) =
-            exhaustive_option_or_result_variant_name(&arm.pattern, value_ty, type_aliases)?
+            exhaustive_enum_variant_name(&arm.pattern, value_ty, type_aliases)?
         else {
             return Ok(false);
         };
-        if !matches!(parent.as_str(), "Option" | "Result") {
-            return Ok(false);
-        }
         if let Some(existing) = parent_name.as_ref() {
             if existing != &parent {
                 return Ok(false);
@@ -231,14 +234,54 @@ fn is_exhaustive_option_or_result_match(
         variants.insert(variant);
     }
 
-    match parent_name.as_deref() {
-        Some("Option") => Ok(variants.contains("Some") && variants.contains("None")),
-        Some("Result") => Ok(variants.contains("Ok") && variants.contains("Err")),
-        _ => Ok(false),
-    }
+    let Some(parent_name) = parent_name else {
+        return Ok(false);
+    };
+
+    let all_variants = exhaustive_enum_variants(&parent_name, struct_table);
+    Ok(variants == all_variants)
 }
 
-fn exhaustive_option_or_result_variant_name(
+fn is_non_exhaustive_enum_match(
+    arms: &[AstMatchArm],
+    value_ty: &NirTypeRef,
+    type_aliases: &BTreeMap<String, AstTypeAlias>,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> Result<bool, String> {
+    if arms.is_empty() || arms.iter().any(|arm| arm.guard.is_some()) {
+        return Ok(false);
+    }
+
+    let mut parent_name: Option<String> = None;
+    let mut variants = BTreeSet::new();
+    for arm in arms {
+        let Some((parent, variant)) =
+            exhaustive_enum_variant_name(&arm.pattern, value_ty, type_aliases)?
+        else {
+            return Ok(false);
+        };
+        if let Some(existing) = parent_name.as_ref() {
+            if existing != &parent {
+                return Ok(false);
+            }
+        } else {
+            parent_name = Some(parent);
+        }
+        variants.insert(variant);
+    }
+
+    let Some(parent_name) = parent_name else {
+        return Ok(false);
+    };
+    let all_variants = exhaustive_enum_variants(&parent_name, struct_table);
+    if all_variants.is_empty() {
+        return Ok(false);
+    }
+
+    Ok(variants.len() < all_variants.len())
+}
+
+fn exhaustive_enum_variant_name(
     pattern: &AstMatchPattern,
     value_ty: &NirTypeRef,
     type_aliases: &BTreeMap<String, AstTypeAlias>,
@@ -258,6 +301,19 @@ fn exhaustive_option_or_result_variant_name(
         return Ok(None);
     };
     Ok(Some((parent.to_owned(), variant.to_owned())))
+}
+
+fn exhaustive_enum_variants(
+    parent: &str,
+    struct_table: &BTreeMap<String, NirStructDef>,
+) -> BTreeSet<String> {
+    struct_table
+        .keys()
+        .filter_map(|name| {
+            let (enum_name, variant_name) = name.split_once('.')?;
+            (enum_name == parent).then(|| variant_name.to_owned())
+        })
+        .collect()
 }
 
 fn substitute_pattern_binding_vars(

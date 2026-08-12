@@ -1,5 +1,6 @@
 use crate::frontend::is_host_execution_domain;
 
+use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::binary_lowering::{lower_binary_expr_with_async, BinaryLoweringInput};
@@ -21,6 +22,34 @@ use expr_lowering_structs::{
     ast_type_args_are_placeholder_generics, infer_generic_struct_literal_type_from_fields,
     suggest_struct_field_name, GenericStructLiteralInferenceInput, StructLiteralInferenceContext,
 };
+
+thread_local! {
+    static CURRENT_MODULE_STRUCTS: RefCell<BTreeSet<String>> = RefCell::new(BTreeSet::new());
+}
+
+pub(super) fn with_current_module_structs<T>(
+    current_module_structs: &BTreeSet<String>,
+    f: impl FnOnce() -> T,
+) -> T {
+    CURRENT_MODULE_STRUCTS.with(|current| {
+        let mut current = current.borrow_mut();
+        let previous = std::mem::take(&mut *current);
+        *current = current_module_structs.clone();
+        drop(current);
+
+        let result = f();
+
+        CURRENT_MODULE_STRUCTS.with(|current| {
+            *current.borrow_mut() = previous;
+        });
+
+        result
+    })
+}
+
+pub(super) fn current_module_structs_contains(type_name: &str) -> bool {
+    CURRENT_MODULE_STRUCTS.with(|current| current.borrow().contains(type_name))
+}
 
 #[derive(Clone, Copy)]
 struct ExprLoweringContext<'a> {
@@ -307,6 +336,97 @@ fn lower_expr_with_context(input: ExprLoweringInput<'_>) -> Result<NirExpr, Stri
             type_name,
             type_args,
             fields,
+        } if type_name == "Tuple" => {
+            let typed_field_types = if !type_args.is_empty() {
+                if type_args.len() != fields.len() {
+                    return Err(format!(
+                        "tuple literal `{}` expects {} generic argument(s), found {}",
+                        type_name,
+                        fields.len(),
+                        type_args.len()
+                    ));
+                }
+                Some(type_args.iter().map(super::lower_type_ref).collect())
+            } else if let Some(expected) = expected {
+                if expected.name != "Tuple" {
+                    return Err(format!(
+                        "cannot infer generic arguments for tuple literal `{}` from expected type `{}`",
+                        type_name,
+                        expected.render()
+                    ));
+                }
+                if expected.generic_args.len() != fields.len() {
+                    return Err(format!(
+                        "tuple literal `{}` expects {} element(s), found expected type `{}`",
+                        type_name,
+                        fields.len(),
+                        expected.render()
+                    ));
+                }
+                Some(expected.generic_args.clone())
+            } else {
+                None
+            };
+            let mut seen = BTreeSet::new();
+            let mut lowered_fields = Vec::new();
+            let mut inferred_field_types = Vec::new();
+            for (index, (name, value)) in fields.iter().enumerate() {
+                let expected_name = index.to_string();
+                if *name != expected_name {
+                    return Err(format!(
+                        "tuple literal `{}` requires field `{}` for position {index}, found `{}`",
+                        type_name, expected_name, name
+                    ));
+                }
+                if !seen.insert(name.clone()) {
+                    return Err(format!(
+                        "tuple literal `{}` duplicates field `{}`",
+                        type_name, name
+                    ));
+                }
+                let expected_type = typed_field_types.as_ref().and_then(|types| types.get(index));
+                let lowered = lower_expr_with_context(ExprLoweringInput {
+                    expr: value,
+                    context: ExprLoweringContext {
+                        expected: expected_type,
+                        allow_async_calls: false,
+                        ..context
+                    },
+                })?;
+                let inferred = infer_nir_expr_type(&lowered, bindings, signatures, struct_table)
+                    .ok_or_else(|| {
+                        format!("cannot infer tuple element `{}` type in tuple literal", expected_name)
+                    })?;
+                let resolved_type = if let Some(expected_type) = expected_type {
+                    let _ = resolve_declared_or_inferred(
+                        name,
+                        Some(expected_type.clone()),
+                        Some(inferred.clone()),
+                    )?;
+                    expected_type.clone()
+                } else {
+                    inferred
+                };
+                lowered_fields.push((name.clone(), lowered));
+                inferred_field_types.push(resolved_type);
+            }
+            if fields.len() != lowered_fields.len() {
+                return Err(format!(
+                    "tuple literal `{}` must initialize all {} element(s)",
+                    type_name,
+                    fields.len()
+                ));
+            }
+            NirExpr::StructLiteral {
+                type_name: type_name.clone(),
+                type_args: inferred_field_types,
+                fields: lowered_fields,
+            }
+        }
+        AstExpr::StructLiteral {
+            type_name,
+            type_args,
+            fields,
         } => {
             let definition = struct_table
                 .get(type_name)
@@ -374,9 +494,9 @@ fn lower_expr_with_context(input: ExprLoweringInput<'_>) -> Result<NirExpr, Stri
                 })?
             };
             let hidden_private_fields = hidden_private_field_count(definition);
-            if hidden_private_fields > 0 {
+            if hidden_private_fields > 0 && !current_module_structs_contains(type_name) {
                 return Err(format!(
-                    "struct literal `{}` cannot be constructed outside its defining module because it hides {} private field(s)",
+                    "struct literal `{}` cannot be constructed outside its defining module because it hides {} private field(s); either mark fields `pub` in the defining module or provide a public constructor function",
                     type_name, hidden_private_fields
                 ));
             }

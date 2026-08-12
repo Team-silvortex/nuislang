@@ -74,6 +74,15 @@ impl Parser {
 
     fn parse_single_match_pattern(&mut self) -> Result<AstMatchPattern, String> {
         match self.next() {
+            Some(Token::Symbol('(')) => {
+                let first = self.parse_single_match_pattern()?;
+                if self.peek_symbol(',') {
+                    self.parse_tuple_match_pattern_from_first(first)
+                } else {
+                    self.expect_symbol(')')?;
+                    Ok(first)
+                }
+            }
             Some(Token::Symbol('{')) => {
                 self.cursor = self.cursor.saturating_sub(1);
                 self.parse_struct_match_pattern_with_fields(None)
@@ -145,6 +154,15 @@ impl Parser {
 
     fn parse_single_struct_field_match_pattern(&mut self) -> Result<AstMatchPattern, String> {
         match self.next() {
+            Some(Token::Symbol('(')) => {
+                let first = self.parse_single_struct_field_match_pattern()?;
+                if self.peek_symbol(',') {
+                    self.parse_tuple_match_pattern_from_first(first)
+                } else {
+                    self.expect_symbol(')')?;
+                    Ok(first)
+                }
+            }
             Some(Token::Word(word)) if word == "_" => Ok(AstMatchPattern::Wildcard),
             Some(Token::Word(word)) if word == "true" => Ok(AstMatchPattern::Bool(true)),
             Some(Token::Word(word)) if word == "false" => Ok(AstMatchPattern::Bool(false)),
@@ -223,5 +241,22 @@ impl Parser {
         }
         self.expect_symbol('}')?;
         Ok(AstMatchPattern::StructFields { type_ref, fields })
+    }
+
+    fn parse_tuple_match_pattern_from_first(
+        &mut self,
+        first: AstMatchPattern,
+    ) -> Result<AstMatchPattern, String> {
+        let mut patterns = vec![first];
+        while self.peek_symbol(',') {
+            self.expect_symbol(',')?;
+            if self.peek_symbol(')') {
+                self.expect_symbol(')')?;
+                return Ok(AstMatchPattern::Tuple(patterns));
+            }
+            patterns.push(self.parse_single_match_pattern()?);
+        }
+        self.expect_symbol(')')?;
+        Ok(AstMatchPattern::Tuple(patterns))
     }
 }

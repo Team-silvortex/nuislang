@@ -26,9 +26,15 @@ pub fn validate_unit_binding(
         return Ok(());
     }
 
+    let available_units = if manifest.unit_types.is_empty() {
+        "<none>".to_owned()
+    } else {
+        manifest.unit_types.join(", ")
+    };
+
     Err(format!(
-        "unit `{unit}` is not registered by nustar package `{}` for mod domain `{domain}`",
-        manifest.package_id
+        "unit `{unit}` is not registered by nustar package `{}` for mod domain `{domain}`, available units: {}",
+        manifest.package_id, available_units
     ))
 }
 

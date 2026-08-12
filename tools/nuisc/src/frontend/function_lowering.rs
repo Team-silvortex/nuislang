@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use nuis_semantics::model::{
     AstFunction, AstImplDef, AstImplMethod, AstTraitMethodSig, AstTypeAlias, AstTypeRef,
@@ -8,7 +8,7 @@ use nuis_semantics::model::{
 use super::stmt_lowering::{lower_stmt_block_with_async, StmtBlockLoweringInput};
 use super::{
     lower_ast_attributes, lower_param_with_aliases, lower_type_ref_with_aliases, lower_visibility,
-    FunctionSignature, ModuleConstValue,
+    with_current_module_structs, FunctionSignature, ModuleConstValue,
 };
 
 pub(super) fn impl_method_lookup_key(for_type: &NirTypeRef, method: &str) -> String {
@@ -212,6 +212,7 @@ pub(super) fn lower_function(
     function: &AstFunction,
     current_domain: &str,
     _current_unit: &str,
+    current_module_structs: &BTreeSet<String>,
     module_consts: &BTreeMap<String, ModuleConstValue>,
     type_aliases: &BTreeMap<String, AstTypeAlias>,
     signatures: &BTreeMap<String, FunctionSignature>,
@@ -281,16 +282,18 @@ pub(super) fn lower_function(
             .as_ref()
             .map(|ty| lower_type_ref_with_aliases(ty, type_aliases))
             .transpose()?,
-        body: lower_stmt_block_with_async(StmtBlockLoweringInput {
-            stmts: &function.body,
-            current_domain,
-            current_function_is_async: function.is_async,
-            bindings: &mut bindings,
-            module_consts,
-            return_type: function.return_type.as_ref(),
-            type_aliases,
-            signatures,
-            struct_table,
+        body: with_current_module_structs(current_module_structs, || {
+            lower_stmt_block_with_async(StmtBlockLoweringInput {
+                stmts: &function.body,
+                current_domain,
+                current_function_is_async: function.is_async,
+                bindings: &mut bindings,
+                module_consts,
+                return_type: function.return_type.as_ref(),
+                type_aliases,
+                signatures,
+                struct_table,
+            })
         })?,
     })
 }

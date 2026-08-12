@@ -203,6 +203,30 @@ pub(crate) fn infer_ast_expr_type_inner(
             type_args,
             fields,
         } => {
+            if type_name == "Tuple" {
+                if !type_args.is_empty() {
+                    if type_args.len() != fields.len() {
+                        return None;
+                    }
+                    return Some(ast_generic_named_type(type_name, type_args.clone()));
+                }
+                let mut tuple_args = Vec::new();
+                for (index, (name, value)) in fields.iter().enumerate() {
+                    if *name != index.to_string() {
+                        return None;
+                    }
+                    let value_ty = infer_ast_expr_type_inner(
+                        value,
+                        env,
+                        impl_lookup,
+                        struct_table,
+                        function_return_types,
+                        active_exprs,
+                    )?;
+                    tuple_args.push(value_ty);
+                }
+                return Some(ast_generic_named_type(type_name, tuple_args));
+            }
             let definition = struct_table.get(type_name)?;
             let placeholder_names = definition
                 .generic_params

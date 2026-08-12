@@ -380,8 +380,12 @@ impl Parser {
             }
             Some(Token::Symbol('(')) => {
                 let expr = self.parse_expr()?;
-                self.expect_symbol(')')?;
-                Ok(expr)
+                if self.peek_symbol(',') {
+                    self.parse_tuple_expr_from_first(expr)
+                } else {
+                    self.expect_symbol(')')?;
+                    Ok(expr)
+                }
             }
             Some(other) => Err(format!(
                 "minimal nuisc frontend expected instantiate, string, integer, identifier, or grouped expression, found {}",
@@ -468,5 +472,30 @@ impl Parser {
             }
         }
         Ok(params)
+    }
+
+    fn parse_tuple_expr_from_first(&mut self, first: AstExpr) -> Result<AstExpr, String> {
+        let mut fields = vec![("0".to_owned(), first)];
+        let mut field_index = 1usize;
+        while self.peek_symbol(',') {
+            self.expect_symbol(',')?;
+            if self.peek_symbol(')') {
+                self.expect_symbol(')')?;
+                return Ok(AstExpr::StructLiteral {
+                    type_name: "Tuple".to_owned(),
+                    type_args: Vec::new(),
+                    fields,
+                });
+            }
+            let value = self.parse_expr()?;
+            fields.push((field_index.to_string(), value));
+            field_index += 1;
+        }
+        self.expect_symbol(')')?;
+        Ok(AstExpr::StructLiteral {
+            type_name: "Tuple".to_owned(),
+            type_args: Vec::new(),
+            fields,
+        })
     }
 }

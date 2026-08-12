@@ -95,7 +95,9 @@ impl Parser {
         let mut functions = Vec::new();
         while !self.peek_symbol('}') {
             if self.peek_word("mod") {
-                return Err("nested mod definitions are not allowed".to_owned());
+                return Err(
+                    "nested mod definitions are not allowed in module bodies; define nested modules at top-level for now".to_owned(),
+                );
             }
             if self.peek_item_keyword_after_attributes("extern") {
                 let (visibility, attributes) = self.parse_visibility_and_attribute_list()?;

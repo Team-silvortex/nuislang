@@ -45,6 +45,29 @@ pub(super) fn lower_return_if_chain(
             };
             Ok(Some(lower_select(condition_name, lhs, rhs, state)?))
         }
+        [NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        }, tail @ ..] => {
+            let condition_name = lower_expr(condition, state, bindings)?;
+            let then_value = lower_return_if_chain(then_body, state, bindings)?;
+            let else_value = lower_return_if_chain(else_body, state, bindings)?;
+            let tail_value = lower_return_if_chain(tail, state, bindings)?;
+
+            match (then_value, else_value, tail_value) {
+                (Some(lhs), Some(rhs), Some(_)) => {
+                    Ok(Some(lower_select(condition_name, lhs, rhs, state)?))
+                }
+                (Some(lhs), None, Some(rhs)) => {
+                    Ok(Some(lower_select(condition_name, lhs, rhs, state)?))
+                }
+                (None, Some(rhs), Some(lhs)) => {
+                    Ok(Some(lower_select(condition_name, lhs, rhs, state)?))
+                }
+                _ => Ok(None),
+            }
+        }
         _ => Ok(None),
     }
 }

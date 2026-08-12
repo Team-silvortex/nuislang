@@ -277,6 +277,14 @@ pub(super) fn render_ast_match_pattern(pattern: &AstMatchPattern) -> String {
             .map(render_ast_match_pattern)
             .collect::<Vec<_>>()
             .join(" | "),
+        AstMatchPattern::Tuple(patterns) => format!(
+            "({})",
+            patterns
+                .iter()
+                .map(render_ast_match_pattern)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
         AstMatchPattern::PayloadStruct { type_ref, payload } => format!(
             "{}({})",
             render_ast_type(type_ref),

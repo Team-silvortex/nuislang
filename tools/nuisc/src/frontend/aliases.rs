@@ -84,6 +84,26 @@ pub(crate) fn resolve_ast_type_ref_aliases_inner(
         is_optional: ty.is_optional,
         is_ref: ty.is_ref,
     };
+
+    if let Some((alias_name, variant_name)) = raw.name.split_once('.') {
+        if aliases.contains_key(alias_name) {
+            let alias_base = AstTypeRef {
+                name: alias_name.to_owned(),
+                generic_args: raw.generic_args.clone(),
+                is_optional: raw.is_optional,
+                is_ref: raw.is_ref,
+            };
+            let resolved_base =
+                resolve_ast_type_ref_aliases_inner(&alias_base, aliases, visiting)?;
+            return Ok(AstTypeRef {
+                name: format!("{}.{}", resolved_base.name, variant_name),
+                generic_args: resolved_base.generic_args,
+                is_optional: raw.is_optional,
+                is_ref: raw.is_ref,
+            });
+        }
+    }
+
     let Some(alias_definition) = aliases.get(&raw.name) else {
         return Ok(raw);
     };

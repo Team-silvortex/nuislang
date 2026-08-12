@@ -7,7 +7,8 @@ use super::name_suggestions::suggest_similar_name;
 use super::{
     impl_method_symbol_names, infer_nir_expr_type, lower_direct_call_builtin_or_named_call,
     lower_expr_with_async, lower_routed_call_or_core_builtin, resolve_declared_or_inferred,
-    DirectCallBuiltinInput, ExprWithAsyncInput, FunctionSignature, ModuleConstValue,
+    current_module_structs_contains, DirectCallBuiltinInput, ExprWithAsyncInput, FunctionSignature,
+    ModuleConstValue,
     RoutedCallLoweringInput,
 };
 
@@ -269,9 +270,9 @@ fn lower_payload_struct_constructor_sugar(
         ));
     }
     let hidden_private_fields = hidden_private_field_count(definition);
-    if hidden_private_fields > 0 {
+    if hidden_private_fields > 0 && !current_module_structs_contains(callee) {
         return Err(format!(
-            "struct literal `{}` cannot be constructed outside its defining module because it hides {} private field(s)",
+            "struct literal `{}` cannot be constructed outside its defining module because it hides {} private field(s); either mark fields `pub` in the defining module or provide a public constructor function",
             callee, hidden_private_fields
         ));
     }

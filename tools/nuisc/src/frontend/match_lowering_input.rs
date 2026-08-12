@@ -17,4 +17,5 @@ pub(in crate::frontend) struct MatchStmtLoweringInput<'a> {
     pub(in crate::frontend) type_aliases: &'a BTreeMap<String, AstTypeAlias>,
     pub(in crate::frontend) signatures: &'a BTreeMap<String, FunctionSignature>,
     pub(in crate::frontend) struct_table: &'a BTreeMap<String, NirStructDef>,
+    pub(in crate::frontend) allow_non_exhaustive_enum_fallthrough: bool,
 }

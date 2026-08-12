@@ -1,5 +1,5 @@
-use super::parse_nuis_module;
-use nuis_semantics::model::{NirBinaryOp, NirExpr, NirStmt};
+use super::{parse_nuis_ast, parse_nuis_module};
+use nuis_semantics::model::{AstExpr, AstMatchPattern, AstStmt, NirBinaryOp, NirExpr, NirStmt};
 
 #[test]
 fn lowers_multi_pattern_match_arms_inside_while() {
@@ -456,5 +456,437 @@ fn lowers_range_guard_match_arms_inside_while() {
             other => panic!("expected lowered guarded match if in while body, found {other:?}"),
         },
         other => panic!("expected while statement after let binding, found {other:?}"),
+    }
+}
+
+#[test]
+fn parses_single_element_tuple_type_and_expr_syntax() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          fn main() -> (i64,) {
+            let value: (i64,) = (42,);
+            return 1;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = &ast.functions[0];
+    let return_type = function.return_type.as_ref().expect("expected explicit return type");
+    assert_eq!(return_type.name, "Tuple");
+    assert_eq!(return_type.generic_args.len(), 1);
+    assert_eq!(return_type.generic_args[0].name, "i64");
+
+    match &function.body[0] {
+        AstStmt::Let { ty, value, .. } => {
+            let let_ty = ty.as_ref().expect("expected explicit tuple type annotation");
+            assert_eq!(let_ty.name, "Tuple");
+            assert_eq!(let_ty.generic_args.len(), 1);
+            assert_eq!(let_ty.generic_args[0].name, "i64");
+            assert!(matches!(
+                value,
+                AstExpr::StructLiteral {
+                    type_name,
+                    fields,
+                    ..
+                } if type_name == "Tuple" && fields.len() == 1 && fields[0].0 == "0"
+            ));
+        }
+        other => panic!("expected let statement, found {other:?}"),
+    }
+}
+
+#[test]
+fn parses_single_element_tuple_pattern_in_match() {
+    let ast = parse_nuis_ast(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            return match (42,) {
+              (value,) => { value }
+              _ => { 0 }
+            };
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    let function = &ast.functions[0];
+    match &function.body[0] {
+        AstStmt::Return(Some(AstExpr::Match { arms, .. })) => match &arms[0].pattern {
+            AstMatchPattern::Tuple(patterns) => {
+                assert_eq!(patterns.len(), 1);
+                assert!(matches!(&patterns[0], AstMatchPattern::Bind(name) if name == "value"));
+            }
+            other => panic!(
+                "expected tuple pattern for first arm, found {other:?}"
+            ),
+        },
+        other => panic!("expected return(match...) statement, found {other:?}"),
+    }
+}
+
+#[test]
+fn lowers_nested_single_element_tuple_pattern_in_match_expression() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            return match ((42,),) {
+              ((value,),) => { value }
+              _ => { 0 }
+            };
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &module.functions[0].body[0] {
+        NirStmt::If {
+            then_body,
+            else_body,
+            ..
+        } => {
+            assert!(matches!(
+                then_body.as_slice(),
+                [NirStmt::Let {
+                    name,
+                    value,
+                    ..
+                }, NirStmt::Return(Some(NirExpr::Var(result)))] if name == "value"
+                    && result == "value"
+                    && matches!(
+                        value,
+                        NirExpr::FieldAccess {
+                            field,
+                            base
+                        } if field == "0"
+                            && matches!(&**base,
+                                NirExpr::FieldAccess {
+                                    field,
+                                    ..
+                                } if field == "0")
+                    )
+            ));
+            assert!(matches!(
+                else_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Int(0)))]
+            ));
+        }
+        other => panic!("expected lowered match-expression if, found {other:?}"),
+    }
+}
+
+#[test]
+fn lowers_triple_nested_single_element_tuple_pattern_in_match_expression() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            return match (((42,),),) {
+              (((value,),),) => { value }
+              _ => { 0 }
+            };
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &module.functions[0].body[0] {
+        NirStmt::If {
+            then_body,
+            else_body,
+            ..
+        } => {
+            assert!(matches!(
+                then_body.as_slice(),
+                [NirStmt::Let {
+                    name,
+                    value,
+                    ..
+                }, NirStmt::Return(Some(NirExpr::Var(result)))] if name == "value"
+                    && result == "value"
+                    && matches!(
+                        value,
+                        NirExpr::FieldAccess {
+                            field,
+                            base
+                        } if field == "0"
+                            && matches!(
+                                &**base,
+                                NirExpr::FieldAccess {
+                                    field,
+                                    base
+                                } if field == "0"
+                                    && matches!(
+                                        &**base,
+                                        NirExpr::FieldAccess { field, .. } if field == "0"
+                                    )
+                            )
+                    )
+            ));
+            assert!(matches!(
+                else_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Int(0)))]
+            ));
+        }
+        other => panic!("expected lowered match-expression if, found {other:?}"),
+    }
+}
+
+#[test]
+fn lowers_quad_nested_single_element_tuple_pattern_in_match_expression_with_guard() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            return match ((((42,),),),) {
+              ((((value,),),),) if value == 42 => { value }
+              _ => { 0 }
+            };
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &module.functions[0].body[0] {
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+            ..
+        } => {
+                match condition {
+                    NirExpr::Binary {
+                        op,
+                    lhs,
+                    rhs,
+                } => {
+                    assert_eq!(*op, NirBinaryOp::And);
+                    assert!(matches!(lhs.as_ref(), NirExpr::Bool(true)));
+                    match rhs.as_ref() {
+                        NirExpr::Binary {
+                            op,
+                            lhs,
+                            rhs,
+                        } => {
+                            assert_eq!(*op, NirBinaryOp::Eq);
+                            assert!(matches!(rhs.as_ref(), NirExpr::Int(42)));
+                            assert!(matches!(
+                                lhs.as_ref(),
+                                NirExpr::FieldAccess {
+                                    field,
+                                    base
+                                } if field == "0"
+                                    && matches!(&**base,
+                                        NirExpr::FieldAccess {
+                                            field,
+                                            base
+                                        } if field == "0"
+                                            && matches!(
+                                                &**base,
+                                                NirExpr::FieldAccess {
+                                                    field,
+                                                    base
+                                                } if field == "0"
+                                                    && matches!(
+                                                        &**base,
+                                                        NirExpr::FieldAccess {
+                                                            field,
+                                                            ..
+                                                        } if field == "0"
+                                                    )
+                                            )
+                                    )
+                            ));
+                        }
+                        other => panic!("expected guard equality condition, found {other:?}"),
+                    }
+                }
+                other => panic!("expected guarded match condition (and bool + eq), found {other:?}"),
+            }
+            assert!(matches!(
+                then_body.as_slice(),
+                [NirStmt::Let {
+                    name,
+                    value,
+                    ..
+                }, NirStmt::Return(Some(NirExpr::Var(result)))] if name == "value"
+                    && result == "value"
+                    && matches!(
+                        value,
+                        NirExpr::FieldAccess {
+                            field,
+                            base
+                        } if field == "0"
+                            && matches!(
+                                &**base,
+                                NirExpr::FieldAccess {
+                                    field,
+                                    base
+                                } if field == "0"
+                                    && matches!(
+                                        &**base,
+                                        NirExpr::FieldAccess {
+                                            field,
+                                            base
+                                        } if field == "0"
+                                            && matches!(
+                                                &**base,
+                                                NirExpr::FieldAccess {
+                                                    field,
+                                                    ..
+                                                } if field == "0"
+                                            )
+                                    )
+                            )
+                    )
+            ));
+            assert!(matches!(
+                else_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Int(0)))]
+            ));
+        }
+        other => panic!("expected lowered match-expression if, found {other:?}"),
+    }
+}
+
+#[test]
+fn lowers_quintuple_nested_single_element_tuple_pattern_in_match_expression_with_guard() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          fn main() -> i64 {
+            return match (((((42,),),),),) {
+              (((((value,),),),),) if value == 42 => { value }
+              _ => { 0 }
+            };
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    match &module.functions[0].body[0] {
+        NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+            ..
+        } => {
+            match condition {
+                NirExpr::Binary {
+                    op,
+                    lhs,
+                    rhs,
+                } => {
+                    assert_eq!(*op, NirBinaryOp::And);
+                    assert!(matches!(lhs.as_ref(), NirExpr::Bool(true)));
+                    match rhs.as_ref() {
+                        NirExpr::Binary {
+                            op,
+                            lhs,
+                            rhs,
+                        } => {
+                            assert_eq!(*op, NirBinaryOp::Eq);
+                            assert!(matches!(rhs.as_ref(), NirExpr::Int(42)));
+                            assert!(matches!(
+                                lhs.as_ref(),
+                                NirExpr::FieldAccess {
+                                    field,
+                                    base
+                                } if field == "0"
+                                    && matches!(
+                                        &**base,
+                                        NirExpr::FieldAccess {
+                                            field,
+                                            base
+                                        } if field == "0"
+                                            && matches!(
+                                                &**base,
+                                                NirExpr::FieldAccess {
+                                                    field,
+                                                    base
+                                                } if field == "0"
+                                                    && matches!(
+                                                        &**base,
+                                                        NirExpr::FieldAccess {
+                                                            field,
+                                                            base
+                                                        } if field == "0"
+                                                            && matches!(
+                                                                &**base,
+                                                                NirExpr::FieldAccess {
+                                                                    field,
+                                                                    ..
+                                                                } if field == "0"
+                                                            )
+                                                    )
+                                            )
+                                    )
+                            ));
+                        }
+                        other => panic!("expected guard equality condition, found {other:?}"),
+                    }
+                }
+                other => panic!("expected guarded match condition (and bool + eq), found {other:?}"),
+            }
+
+            assert!(matches!(
+                then_body.as_slice(),
+                [NirStmt::Let {
+                    name,
+                    value,
+                    ..
+                }, NirStmt::Return(Some(NirExpr::Var(result)))] if name == "value"
+                    && result == "value"
+                    && matches!(
+                        value,
+                        NirExpr::FieldAccess {
+                            field,
+                            base
+                        } if field == "0"
+                            && matches!(
+                                &**base,
+                                NirExpr::FieldAccess {
+                                    field,
+                                    base
+                                } if field == "0"
+                                    && matches!(
+                                        &**base,
+                                        NirExpr::FieldAccess {
+                                            field,
+                                            base
+                                        } if field == "0"
+                                            && matches!(
+                                                &**base,
+                                                NirExpr::FieldAccess {
+                                                    field,
+                                                    base
+                                                } if field == "0"
+                                                    && matches!(
+                                                        &**base,
+                                                        NirExpr::FieldAccess {
+                                                            field,
+                                                            ..
+                                                        } if field == "0"
+                                                    )
+                                            )
+                                    )
+                            )
+                    )
+            ));
+            assert!(matches!(
+                else_body.as_slice(),
+                [NirStmt::Return(Some(NirExpr::Int(0)))]
+            ));
+        }
+        other => panic!("expected lowered match-expression if, found {other:?}"),
     }
 }

@@ -309,6 +309,12 @@ fn specialize_match_pattern(
             type_ref: specialize_ast_type_ref(type_ref, substitutions)?,
             payload: Box::new(specialize_match_pattern(payload, substitutions)?),
         },
+        AstMatchPattern::Tuple(patterns) => AstMatchPattern::Tuple(
+            patterns
+                .iter()
+                .map(|pattern| specialize_match_pattern(pattern, substitutions))
+                .collect::<Result<Vec<_>, _>>()?,
+        ),
         AstMatchPattern::StructFields { type_ref, fields } => AstMatchPattern::StructFields {
             type_ref: type_ref
                 .as_ref()

@@ -188,7 +188,9 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
         .functions
         .iter()
         .find(|function| function.name == "main")
-        .ok_or_else(|| "minimal nuisc lowering expects `fn main()`".to_owned())?;
+        .ok_or_else(|| {
+            "minimal nuisc lowering expects `fn main()`; add `fn main() -> ...` in module `Main`".to_owned()
+        })?;
 
     let function_map = module
         .functions

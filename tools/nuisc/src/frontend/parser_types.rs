@@ -75,11 +75,16 @@ impl Parser {
         } else {
             false
         };
-        let name = self.parse_qualified_ident()?;
-        let generic_args = if self.peek_symbol('<') {
-            self.parse_type_arg_list()?
+        let (name, generic_args) = if self.peek_symbol('(') {
+            ("Tuple".to_owned(), self.parse_tuple_type_list()?)
         } else {
-            Vec::new()
+            let name = self.parse_qualified_ident()?;
+            let generic_args = if self.peek_symbol('<') {
+                self.parse_type_arg_list()?
+            } else {
+                Vec::new()
+            };
+            (name, generic_args)
         };
         let is_optional = if self.peek_symbol('?') {
             self.expect_symbol('?')?;
@@ -93,6 +98,29 @@ impl Parser {
             is_optional,
             is_ref,
         })
+    }
+
+    fn parse_tuple_type_list(&mut self) -> Result<Vec<AstTypeRef>, String> {
+        self.expect_symbol('(')?;
+        let mut args = Vec::new();
+        if self.peek_symbol(')') {
+            self.expect_symbol(')')?;
+            return Ok(args);
+        }
+        loop {
+            args.push(self.parse_type_ref()?);
+            if self.peek_symbol(',') {
+                self.expect_symbol(',')?;
+                if self.peek_symbol(')') {
+                    self.expect_symbol(')')?;
+                    return Ok(args);
+                }
+            } else {
+                break;
+            }
+        }
+        self.expect_symbol(')')?;
+        Ok(args)
     }
 
     pub(super) fn parse_qualified_ident(&mut self) -> Result<String, String> {

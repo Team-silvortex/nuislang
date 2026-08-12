@@ -57,6 +57,12 @@ pub(crate) fn struct_field_type(
     if let Some(builtin) = builtin_struct_field_type(&base_ty.name, field) {
         return Some(builtin);
     }
+    if base_ty.name == "Tuple" {
+        return field
+            .parse::<usize>()
+            .ok()
+            .and_then(|index| base_ty.generic_args.get(index).cloned());
+    }
     let definition = struct_table.get(&base_ty.name)?;
     Some(instantiate_struct_field_type(
         base_ty,

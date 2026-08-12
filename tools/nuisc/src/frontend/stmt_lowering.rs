@@ -351,6 +351,7 @@ pub(super) fn lower_stmt_with_async(input: StmtLoweringInput<'_>) -> Result<NirS
             type_aliases,
             signatures,
             struct_table,
+            allow_non_exhaustive_enum_fallthrough: true,
         })?,
         AstStmt::While { condition, body } => {
             let mut loop_bindings = bindings.clone();

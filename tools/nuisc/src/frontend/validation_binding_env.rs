@@ -130,6 +130,23 @@ pub(super) fn bind_match_pattern_for_type(
                 env,
             )?;
         }
+        AstMatchPattern::Tuple(patterns) => {
+            if type_ref.name != "Tuple" {
+                return Ok(());
+            }
+            for (index, field_pattern) in patterns.iter().enumerate() {
+                let Some(field_ty) = type_ref.generic_args.get(index) else {
+                    return Ok(());
+                };
+                bind_match_pattern_for_type(
+                    field_ty,
+                    field_pattern,
+                    visible_type_aliases,
+                    visible_structs,
+                    env,
+                )?;
+            }
+        }
         AstMatchPattern::StructFields {
             type_ref: explicit_type,
             fields,
@@ -200,12 +217,17 @@ pub(super) fn instantiate_ast_struct_field_type(
     definition: &AstStructDef,
     field_ty: &AstTypeRef,
 ) -> AstTypeRef {
-    if definition.generic_params.len() != base_ty.generic_args.len() {
+    let substitution_count = definition
+        .generic_params
+        .len()
+        .min(base_ty.generic_args.len());
+    if substitution_count == 0 {
         return field_ty.clone();
     }
     let substitutions = definition
         .generic_params
         .iter()
+        .take(substitution_count)
         .map(|param| param.name.clone())
         .zip(base_ty.generic_args.iter().cloned())
         .collect::<BTreeMap<_, _>>();
