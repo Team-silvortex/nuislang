@@ -343,12 +343,13 @@ parsing. Lock emission uses that frozen identity rather than rereading mutable
 workspace files after compilation.
 
 The build manifest independently records the resolution digest, and its normal
-verifier rejects payload mutation or lock/manifest digest drift. This closes
-the generated-build evidence slice, not the package-manager admission slice:
-the root `nuis.galaxy.lock` still uses the older direct-bundle format and must
-be migrated before `lock-deps`, `sync-deps`, build admission, and
-`project-status` share one fail-closed resolution authority. Tensor selection
-therefore moved to the lower `usable/82` Nsld OS-native finalization cell.
+verifier rejects payload mutation or lock/manifest digest drift. That first
+tranche closed the generated-build evidence slice, not the package-manager
+admission slice: at that point the root `nuis.galaxy.lock` still used the older
+direct-bundle format and needed migration before `lock-deps`, `sync-deps`,
+build admission, and `project-status` could share one fail-closed resolution
+authority. Tensor selection therefore moved to the lower `usable/82` Nsld
+OS-native finalization cell.
 
 The first OS-native finalizer registration tranche advances
 `linker-toolchain/nsld/os-native-executable-finalization` to `usable/85`.
@@ -365,8 +366,41 @@ fallbacks.
 This does not claim a pure Nsld Mach-O writer: native relocation application
 and executable-shell byte emission still depend on future work, and the ready
 Mach-O provider still uses a registered host tool. With Nsld at `usable/85`,
-the weakest bootstrap coordinate returns to the Galaxy lock/admission slice at
-`usable/84`.
+the weakest bootstrap coordinate returned to the Galaxy lock/admission slice
+at `usable/84`.
+
+The follow-up root-lock tranche advances that Galaxy coordinate to
+`usable/93`. `lock-deps`, `verify-lock`, `sync-deps`, project-status, and build
+admission now consume the compiler-owned resolution protocol. Root locks no
+longer contain absolute bundle paths; direct and transitive package identity,
+edges, selection, and content SHA-256 records form the authority. Sync
+re-verifies every frozen file into a staged tree and transactionally replaces
+the old materialization, while an existing mismatched lock rejects build
+before cache restore or output creation. The build-side snapshot is
+byte-identical to the committed lock.
+
+This is not yet the final package resolver. A missing root lock remains legal
+for early-beta development examples, and compilation still reads the workspace
+closure before comparing it with the lock rather than resolving directly from
+a content-addressed synchronized cache. Required-lock release admission and
+cache-owned resolution are the next bootstrap package milestones. The weakest
+bootstrap coordinate therefore returns to Nsld OS-native finalization at
+`usable/85`.
+
+The OS-native materialization follow-up advances that coordinate to
+`usable/90`. For `native-cpu-llvm` on Mach-O arm64, the registry now selects
+`nsld.finalizer.mach-o.arm64.artifact-image-v1`. This internal provider parses
+the compiled artifact, verifies its target and ABI identity, validates a thin
+or universal arm64 `MH_EXECUTE` image, and atomically installs executable bytes
+without host policy variables or a second clang invocation. The registered
+host-command provider remains an explicitly gated compatibility fallback, and
+ELF plus PE/COFF remain visible `registered-not-implemented` routes.
+
+This is a real runnable executable materialization boundary, not yet pure Nsld
+linking. Nuisc still asks the host toolchain for the prelinked image embedded in
+the compiled artifact. The next tranche must hand relocatable host/runtime
+objects to Nsld and move Mach-O load-command, symbol, and relocation ownership
+behind the same provider boundary.
 
 ## Honesty Boundary
 

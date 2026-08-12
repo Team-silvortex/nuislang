@@ -717,7 +717,7 @@ fn std_style_language_import_project_crosses_module_boundary() {
     );
     assert_file_contains(
         &output_dir.join("nuis.project.imports.txt"),
-        "use\tcpu.Main\tcpu.StdStyleLanguageSupport\tresolution=local-visible",
+        "use\tcffi.Main\tcpu.StdStyleLanguageSupport\tresolution=local-visible",
         "std-style language import project imports",
     );
     assert_file_contains(

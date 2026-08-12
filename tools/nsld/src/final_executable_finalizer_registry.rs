@@ -1,10 +1,17 @@
-use super::{fnv1a64_hex, reports::NsldFinalExecutableWriterPlanReport};
+use super::{
+    final_executable_macho_artifact::{
+        macho_artifact_image_validation_issues, materialize_macho_artifact_image,
+    },
+    fnv1a64_hex,
+    reports::NsldFinalExecutableWriterPlanReport,
+};
 use std::{collections::BTreeSet, path::Path, process::Command};
 
 pub(crate) const EXECUTABLE_FINALIZER_CONTRACT: &str = "nuis-nsld-executable-finalizer-registry-v1";
 
 type CommandPlanner = for<'a> fn(&ExecutableFinalizerCommandContext<'a>) -> Vec<String>;
-type FinalizerExecutor = fn(&[String], &Path) -> Result<(), String>;
+type InputValidator = fn(&nuisc::linker::LinkPlan) -> Vec<String>;
+type FinalizerExecutor = for<'a> fn(&ExecutableFinalizerExecutionContext<'a>) -> Result<(), String>;
 
 #[derive(Clone, Copy)]
 struct ExecutableFinalizerRegistration {
@@ -12,10 +19,13 @@ struct ExecutableFinalizerRegistration {
     machine_arch: &'static str,
     machine_os: &'static str,
     object_format: &'static str,
+    packaging_mode: &'static str,
     provider_status: &'static str,
     execution_kind: &'static str,
+    input_kind: &'static str,
     requires_host_driver: bool,
     command_planner: CommandPlanner,
+    input_validator: InputValidator,
     executor: Option<FinalizerExecutor>,
 }
 
@@ -25,21 +35,41 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         machine_arch: "*",
         machine_os: "linux",
         object_format: "elf",
+        packaging_mode: "*",
         provider_status: "registered-not-implemented",
         execution_kind: "registered-platform-writer",
+        input_kind: "native-object-output",
         requires_host_driver: false,
         command_planner: plan_host_command,
+        input_validator: validate_no_additional_inputs,
         executor: None,
+    },
+    ExecutableFinalizerRegistration {
+        provider_id: "nsld.finalizer.mach-o.arm64.artifact-image-v1",
+        machine_arch: "aarch64",
+        machine_os: "macos",
+        object_format: "mach-o",
+        packaging_mode: "native-cpu-llvm",
+        provider_status: "ready",
+        execution_kind: "registered-nsld-artifact-image-writer",
+        input_kind: "compiled-artifact-host-image",
+        requires_host_driver: false,
+        command_planner: plan_internal_artifact_image,
+        input_validator: macho_artifact_image_validation_issues,
+        executor: Some(execute_internal_artifact_image),
     },
     ExecutableFinalizerRegistration {
         provider_id: "nsld.finalizer.mach-o.arm64.host-command-shell-v1",
         machine_arch: "aarch64",
         machine_os: "macos",
         object_format: "mach-o",
+        packaging_mode: "*",
         provider_status: "ready",
         execution_kind: "registered-host-command-shell-writer",
+        input_kind: "native-object-output",
         requires_host_driver: true,
         command_planner: plan_host_command,
+        input_validator: validate_no_additional_inputs,
         executor: Some(execute_host_command),
     },
     ExecutableFinalizerRegistration {
@@ -47,10 +77,13 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         machine_arch: "*",
         machine_os: "macos",
         object_format: "mach-o",
+        packaging_mode: "*",
         provider_status: "registered-not-implemented",
         execution_kind: "registered-platform-writer",
+        input_kind: "native-object-output",
         requires_host_driver: false,
         command_planner: plan_host_command,
+        input_validator: validate_no_additional_inputs,
         executor: None,
     },
     ExecutableFinalizerRegistration {
@@ -58,10 +91,13 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         machine_arch: "*",
         machine_os: "windows",
         object_format: "pe-coff",
+        packaging_mode: "*",
         provider_status: "registered-not-implemented",
         execution_kind: "registered-platform-writer",
+        input_kind: "native-object-output",
         requires_host_driver: false,
         command_planner: plan_host_command,
+        input_validator: validate_no_additional_inputs,
         executor: None,
     },
 ];
@@ -70,7 +106,15 @@ pub(crate) struct ExecutableFinalizerCommandContext<'a> {
     pub(crate) driver: &'a str,
     pub(crate) target_triple: &'a str,
     pub(crate) native_object_path: &'a str,
+    pub(crate) compiled_artifact_path: &'a str,
     pub(crate) output_path: &'a str,
+}
+
+pub(crate) struct ExecutableFinalizerExecutionContext<'a> {
+    pub(crate) plan: &'a nuisc::linker::LinkPlan,
+    pub(crate) command_args: &'a [String],
+    pub(crate) resolved_driver_path: Option<&'a str>,
+    pub(crate) output_path: &'a Path,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -101,12 +145,20 @@ impl ExecutableFinalizerSelection {
         self.registration.execution_kind
     }
 
+    pub(crate) fn input_kind(&self) -> &'static str {
+        self.registration.input_kind
+    }
+
     pub(crate) fn requires_host_driver(&self) -> bool {
         self.registration.requires_host_driver
     }
 
     pub(crate) fn ready(&self) -> bool {
         self.registration.provider_status == "ready" && self.registration.executor.is_some()
+    }
+
+    pub(crate) fn input_validation_issues(&self, plan: &nuisc::linker::LinkPlan) -> Vec<String> {
+        (self.registration.input_validator)(plan)
     }
 
     pub(crate) fn command_args(
@@ -118,8 +170,7 @@ impl ExecutableFinalizerSelection {
 
     pub(crate) fn execute(
         &self,
-        command_args: &[String],
-        output_path: &Path,
+        context: &ExecutableFinalizerExecutionContext<'_>,
     ) -> Result<(), String> {
         if !self.ready() {
             return Err(format!(
@@ -128,7 +179,15 @@ impl ExecutableFinalizerSelection {
                 self.provider_status()
             ));
         }
-        self.registration.executor.expect("ready provider executor")(command_args, output_path)
+        let input_issues = self.input_validation_issues(context.plan);
+        if !input_issues.is_empty() {
+            return Err(format!(
+                "executable finalizer provider `{}` rejected its inputs: {}",
+                self.provider_id(),
+                input_issues.join("; ")
+            ));
+        }
+        self.registration.executor.expect("ready provider executor")(context)
     }
 }
 
@@ -144,10 +203,10 @@ pub(crate) fn executable_finalizer_registry_validation() -> ExecutableFinalizerR
                 registration.provider_id
             ));
         }
-        let target_key = registration_target_key(registration);
-        if !target_keys.insert(target_key.clone()) {
+        let route_key = registration_route_key(registration);
+        if !target_keys.insert(route_key.clone()) {
             issues.push(format!(
-                "duplicate executable finalizer target `{target_key}`"
+                "duplicate executable finalizer route `{route_key}`"
             ));
         }
         if registration.provider_status == "ready" && registration.executor.is_none() {
@@ -195,13 +254,19 @@ pub(crate) fn select_executable_finalizer(
             target_component_matches(registration.machine_arch, &machine_arch)
                 && target_component_matches(registration.machine_os, &machine_os)
                 && target_component_matches(registration.object_format, &object_format)
+                && target_component_matches(registration.packaging_mode, &plan.packaging_mode)
         })
         .collect::<Vec<_>>();
     let max_specificity = candidates
         .iter()
         .map(|registration| registration_specificity(registration))
         .max()
-        .ok_or_else(|| format!("no executable finalizer provider registered for `{target_key}`"))?;
+        .ok_or_else(|| {
+            format!(
+                "no executable finalizer provider registered for `{target_key}` with packaging mode `{}`",
+                plan.packaging_mode
+            )
+        })?;
     let most_specific = candidates
         .into_iter()
         .filter(|registration| registration_specificity(registration) == max_specificity)
@@ -237,14 +302,12 @@ pub(crate) fn registered_finalizer_command_args(
     writer_plan: &NsldFinalExecutableWriterPlanReport,
     plan: &nuisc::linker::LinkPlan,
 ) -> Vec<String> {
-    let Some(native_object_path) = writer_plan
+    let native_object_path = writer_plan
         .inputs
         .iter()
         .find(|input| input.input_id == "fsi0003.native-object")
         .map(|input| input.path.as_str())
-    else {
-        return Vec::new();
-    };
+        .unwrap_or("");
     let Ok(selection) = select_executable_finalizer(plan) else {
         return Vec::new();
     };
@@ -252,6 +315,7 @@ pub(crate) fn registered_finalizer_command_args(
         driver: &writer_plan.final_stage_driver,
         target_triple: &plan.cpu_target.clang_target,
         native_object_path,
+        compiled_artifact_path: &plan.compiled_artifact.path,
         output_path: &writer_plan.output_path,
     })
 }
@@ -263,9 +327,8 @@ pub(crate) fn invoke_registered_finalizer(
     output_path: &Path,
 ) -> Result<(), String> {
     let selection = select_executable_finalizer(plan)?;
-    let mut execution_args = command_args.to_vec();
     if selection.requires_host_driver() {
-        let resolved_driver_path = resolved_driver_path
+        resolved_driver_path
             .filter(|path| !path.is_empty() && Path::new(path).is_file())
             .ok_or_else(|| {
                 format!(
@@ -273,12 +336,23 @@ pub(crate) fn invoke_registered_finalizer(
                     selection.provider_id()
                 )
             })?;
-        let program = execution_args
-            .first_mut()
-            .ok_or_else(|| "registered executable finalizer command args are empty".to_owned())?;
-        *program = resolved_driver_path.to_owned();
     }
-    selection.execute(&execution_args, output_path)
+    selection.execute(&ExecutableFinalizerExecutionContext {
+        plan,
+        command_args,
+        resolved_driver_path,
+        output_path,
+    })
+}
+
+fn plan_internal_artifact_image(context: &ExecutableFinalizerCommandContext<'_>) -> Vec<String> {
+    vec![
+        "nsld-internal-artifact-image-writer".to_owned(),
+        "--compiled-artifact".to_owned(),
+        context.compiled_artifact_path.to_owned(),
+        "--output".to_owned(),
+        context.output_path.to_owned(),
+    ]
 }
 
 fn plan_host_command(context: &ExecutableFinalizerCommandContext<'_>) -> Vec<String> {
@@ -298,8 +372,39 @@ fn plan_host_command(context: &ExecutableFinalizerCommandContext<'_>) -> Vec<Str
     args
 }
 
-fn execute_host_command(command_args: &[String], output_path: &Path) -> Result<(), String> {
-    let (program, args) = command_args
+fn execute_internal_artifact_image(
+    context: &ExecutableFinalizerExecutionContext<'_>,
+) -> Result<(), String> {
+    let expected = plan_internal_artifact_image(&ExecutableFinalizerCommandContext {
+        driver: &context.plan.final_stage.driver,
+        target_triple: &context.plan.cpu_target.clang_target,
+        native_object_path: "",
+        compiled_artifact_path: &context.plan.compiled_artifact.path,
+        output_path: context
+            .output_path
+            .to_str()
+            .ok_or_else(|| "final output path is not valid UTF-8".to_owned())?,
+    });
+    if context.command_args != expected {
+        return Err(format!(
+            "registered internal finalizer request drift: expected [{}], found [{}]",
+            expected.join(", "),
+            context.command_args.join(", ")
+        ));
+    }
+    materialize_macho_artifact_image(context.plan, context.output_path)
+}
+
+fn execute_host_command(context: &ExecutableFinalizerExecutionContext<'_>) -> Result<(), String> {
+    let mut execution_args = context.command_args.to_vec();
+    let resolved_driver_path = context.resolved_driver_path.ok_or_else(|| {
+        "registered host finalizer is missing its resolved driver path".to_owned()
+    })?;
+    let program = execution_args
+        .first_mut()
+        .ok_or_else(|| "registered executable finalizer command args are empty".to_owned())?;
+    *program = resolved_driver_path.to_owned();
+    let (program, args) = execution_args
         .split_first()
         .ok_or_else(|| "registered executable finalizer command args are empty".to_owned())?;
     let status = Command::new(program).args(args).status().map_err(|error| {
@@ -310,13 +415,17 @@ fn execute_host_command(command_args: &[String], output_path: &Path) -> Result<(
             "registered executable finalizer `{program}` exited with status {status}"
         ));
     }
-    if !output_path.is_file() {
+    if !context.output_path.is_file() {
         return Err(format!(
             "registered executable finalizer `{program}` completed but did not create `{}`",
-            output_path.display()
+            context.output_path.display()
         ));
     }
     Ok(())
+}
+
+fn validate_no_additional_inputs(_plan: &nuisc::linker::LinkPlan) -> Vec<String> {
+    Vec::new()
 }
 
 fn executable_finalizer_registry_hash() -> String {
@@ -325,11 +434,12 @@ fn executable_finalizer_registry_hash() -> String {
     let mut material = format!("contract={EXECUTABLE_FINALIZER_CONTRACT}\n");
     for registration in registrations {
         material.push_str(&format!(
-            "provider={}\ntarget={}\nstatus={}\nexecution={}\nhost_driver={}\n",
+            "provider={}\nroute={}\nstatus={}\nexecution={}\ninput={}\nhost_driver={}\n",
             registration.provider_id,
-            registration_target_key(registration),
+            registration_route_key(registration),
             registration.provider_status,
             registration.execution_kind,
+            registration.input_kind,
             registration.requires_host_driver
         ));
     }
@@ -344,6 +454,14 @@ fn registration_target_key(registration: &ExecutableFinalizerRegistration) -> St
     )
 }
 
+fn registration_route_key(registration: &ExecutableFinalizerRegistration) -> String {
+    format!(
+        "{}@{}",
+        registration_target_key(registration),
+        registration.packaging_mode
+    )
+}
+
 fn canonical_target_key(machine_arch: &str, machine_os: &str, object_format: &str) -> String {
     format!("{machine_arch}-{machine_os}-{object_format}")
 }
@@ -353,6 +471,7 @@ fn registration_specificity(registration: &ExecutableFinalizerRegistration) -> u
         registration.machine_arch,
         registration.machine_os,
         registration.object_format,
+        registration.packaging_mode,
     ]
     .into_iter()
     .filter(|component| *component != "*")
@@ -399,7 +518,7 @@ mod tests {
 
         assert!(validation.valid, "{:?}", validation.issues);
         assert_eq!(validation.contract, EXECUTABLE_FINALIZER_CONTRACT);
-        assert_eq!(validation.registration_count, 4);
+        assert_eq!(validation.registration_count, 5);
         assert!(validation.registry_hash.starts_with("0x"));
     }
 
@@ -419,6 +538,23 @@ mod tests {
         );
         assert!(selection.ready());
         assert!(selection.requires_host_driver());
+    }
+
+    #[test]
+    fn registry_prefers_internal_artifact_image_for_native_cpu_llvm() {
+        let mut plan = empty_link_plan();
+        plan.packaging_mode = "native-cpu-llvm".to_owned();
+
+        let selection = select_executable_finalizer(&plan).unwrap();
+
+        assert_eq!(selection.target_key, "aarch64-macos-mach-o");
+        assert_eq!(
+            selection.provider_id(),
+            "nsld.finalizer.mach-o.arm64.artifact-image-v1"
+        );
+        assert_eq!(selection.input_kind(), "compiled-artifact-host-image");
+        assert!(selection.ready());
+        assert!(!selection.requires_host_driver());
     }
 
     #[test]
@@ -462,6 +598,7 @@ mod tests {
                 driver: "registered-driver",
                 target_triple: "registered-target",
                 native_object_path: "input.native-object",
+                compiled_artifact_path: "input.compiled-artifact",
                 output_path: "output.executable",
             });
 

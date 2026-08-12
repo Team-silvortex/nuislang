@@ -274,17 +274,20 @@ The `beta-0.1` calibration baseline is:
   one caller release; source helper chains may normalize to that single
   boundary, while runtime nested/recursive, task/async/loop-carried,
   raw-pointer, and generalized ownership remain closed
-* `package-system/galaxy/source-import-and-lock-resolution`: `usable/84`,
-  required and now the current weakest bootstrap task; each build emits a
-  portable SHA-256-bound compiler resolution
-  snapshot covering direct/transitive edges, package identity, manifest/source/
-  library content, import policy, and actual module selection, and the build
-  manifest verifier rejects drift; root package-manager lock migration remains
-* `linker-toolchain/nsld/os-native-executable-finalization`: `usable/85`,
-  required; a provider-neutral, hash-bound static registry now selects and
-  invokes the Mach-O arm64 host-command shell provider while ELF and PE/COFF
-  remain explicit blocked registrations; native relocation and pure platform
-  shell emission are still incomplete
+* `package-system/galaxy/source-import-and-lock-resolution`: `usable/93`,
+  required; root and generated build locks now share one portable SHA-256-bound
+  compiler resolution protocol covering direct/transitive edges, package
+  identity, manifest/source/library content, import policy, and actual module
+  selection; existing root-lock drift rejects verify, sync, status, and build,
+  while sync transactionally materializes the verified closure without bundle
+  paths; required-lock release mode and cache-owned resolution remain open
+* `linker-toolchain/nsld/os-native-executable-finalization`: `usable/90`,
+  required and now the current weakest bootstrap task; a provider-neutral,
+  hash-bound static registry selects an internal Mach-O arm64 artifact-image
+  provider for `native-cpu-llvm`, validates thin/universal images, and
+  atomically installs a runnable executable without a second clang invocation;
+  the compiler still supplies a prelinked host image, while relocatable-object
+  handoff, Nsld-owned Mach-O shell relocation, ELF, and PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

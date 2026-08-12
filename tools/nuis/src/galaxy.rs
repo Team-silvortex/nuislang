@@ -9,6 +9,9 @@ const GALAXY_BUNDLE_VERSION: u16 = 1;
 
 mod bundle;
 mod deps;
+#[cfg(test)]
+#[path = "galaxy/deps_tests.rs"]
+mod deps_tests;
 mod local;
 mod manifest;
 mod package;
@@ -27,9 +30,8 @@ pub use local::{
     remove_local, verify_local,
 };
 use manifest::{
-    compare_version, escape, fnv1a64_hex, parse_local_index_entry, parse_manifest,
-    parse_ns_nova_manifest, parse_optional_string, parse_optional_string_array, parse_optional_u64,
-    parse_required_string, render_manifest, render_ns_nova_manifest, render_string_array,
+    compare_version, fnv1a64_hex, parse_local_index_entry, parse_manifest, parse_ns_nova_manifest,
+    parse_optional_string_array, render_manifest, render_ns_nova_manifest, render_string_array,
     select_local_entry,
 };
 pub use package::{inspect_bundle, pack, publish_local};
@@ -138,20 +140,22 @@ pub struct RemovedLocalGalaxy {
 pub struct InstalledGalaxyDependency {
     pub name: String,
     pub version: String,
+    pub package_id: String,
+    pub direct: bool,
     pub output: PathBuf,
     pub project: PathBuf,
-    pub bundle: PathBuf,
-    pub bundle_bytes: u64,
-    pub bundle_fnv1a64: String,
+    pub manifest_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GalaxyLockEntry {
     pub name: String,
     pub version: String,
-    pub bundle: PathBuf,
-    pub bundle_bytes: u64,
-    pub bundle_fnv1a64: String,
+    pub package_id: String,
+    pub direct: bool,
+    pub manifest_sha256: String,
+    pub source_modules: usize,
+    pub library_modules: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -160,6 +164,7 @@ pub struct WroteGalaxyLock {
     pub project_plan_summary: String,
     pub path: PathBuf,
     pub entries: Vec<GalaxyLockEntry>,
+    pub summary: nuisc::project::ProjectGalaxyResolutionLockSummary,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -176,6 +181,7 @@ pub struct VerifiedGalaxyLock {
     pub project_plan_summary: String,
     pub path: PathBuf,
     pub entries: Vec<GalaxyLockEntry>,
+    pub summary: nuisc::project::ProjectGalaxyResolutionLockSummary,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -184,13 +190,14 @@ pub struct SyncedProjectDeps {
     pub project_plan_summary: String,
     pub root: PathBuf,
     pub entries: Vec<GalaxyLockEntry>,
+    pub summary: nuisc::project::ProjectGalaxyResolutionLockSummary,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GalaxyDoctorDependency {
     pub name: String,
     pub version: String,
-    pub local_available: bool,
+    pub source_available: bool,
     pub locked: bool,
     pub installed: bool,
 }

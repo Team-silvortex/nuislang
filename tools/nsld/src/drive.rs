@@ -1,6 +1,6 @@
-use crate::commands::{
-    nsld_check_next_action, nsld_check_next_action_dry_run, NsldCheckNextAction,
-};
+use crate::commands::{nsld_check_next_action, NsldCheckNextAction};
+use crate::drive_boundary::final_output_boundary_stop_reason;
+use crate::drive_fast_path::nsld_drive_fast_next_action;
 use crate::json_fields::{
     json_bool_field, json_optional_string_field, json_string_array_field, json_string_field,
     json_usize_field,
@@ -89,8 +89,10 @@ pub(crate) fn run_drive_command(
         }
         return Ok(());
     }
-    let report = nsld_check_report(&ctx.manifest, &ctx.plan);
-    let next_action = nsld_check_next_action(&report);
+    let next_action = match nsld_drive_fast_next_action(&ctx.manifest, &ctx.plan) {
+        Some(next_action) => next_action,
+        None => nsld_check_next_action(&nsld_check_report(&ctx.manifest, &ctx.plan)),
+    };
     if apply {
         let apply_report = nsld_drive_apply_next_action(&ctx.manifest, &ctx.plan, &next_action)?;
         if json_output {
@@ -102,7 +104,11 @@ pub(crate) fn run_drive_command(
     }
     if json_output {
         println!("{}", nsld_drive_dry_run_json(&next_action));
-    } else if let Some(command) = nsld_check_next_action_dry_run(&report) {
+    } else if let Some(command) = next_action
+        .crossing_command_resolved
+        .as_deref()
+        .or(next_action.command_resolved.as_deref())
+    {
         println!("drive dry-run: {command}");
     } else {
         println!("drive dry-run: no-next-action");
@@ -577,8 +583,23 @@ pub(crate) fn nsld_drive_apply_until_clean(
     let mut applied_command_ids = Vec::new();
     let mut applied_steps = 0;
     for _ in 0..MAX_STEPS {
-        let report = nsld_check_report(manifest, plan);
-        let next_action = nsld_check_next_action(&report);
+        let mut full_report = None;
+        let fast_next_action = nsld_drive_fast_next_action(manifest, plan).filter(|action| {
+            action.command_id.as_ref().is_none_or(|command_id| {
+                !applied_command_ids
+                    .iter()
+                    .any(|applied| applied == command_id)
+            })
+        });
+        let next_action = match fast_next_action {
+            Some(next_action) => next_action,
+            None => {
+                let report = nsld_check_report(manifest, plan);
+                let next_action = nsld_check_next_action(&report);
+                full_report = Some(report);
+                next_action
+            }
+        };
         let command_id = next_action.command_id.clone();
         if let Some(command_id) = command_id.as_deref() {
             if applied_command_ids
@@ -615,12 +636,17 @@ pub(crate) fn nsld_drive_apply_until_clean(
             } else {
                 "clean"
             };
-            let stop_action_reason =
-                drive_stop_action_reason(&report, stop_reason, next_action.reason.as_deref());
-            let stop_gate_action = next_action
-                .gate_action
-                .clone()
-                .or_else(|| drive_stop_gate_action(&report, stop_reason));
+            let stop_action_reason = full_report
+                .as_ref()
+                .and_then(|report| {
+                    drive_stop_action_reason(report, stop_reason, next_action.reason.as_deref())
+                })
+                .or_else(|| next_action.reason.clone());
+            let stop_gate_action = next_action.gate_action.clone().or_else(|| {
+                full_report
+                    .as_ref()
+                    .and_then(|report| drive_stop_gate_action(report, stop_reason))
+            });
             let stop_gate_env_assignments = if next_action.gate_env_assignments.is_empty() {
                 stop_gate_action_env_assignments(stop_gate_action.as_deref())
             } else {
@@ -699,36 +725,6 @@ fn drive_stop_action_reason(
         return Some(reason.to_owned());
     };
     Some(format!("{reason}; next_gate_action:{action}"))
-}
-
-fn final_output_boundary_stop_reason(reason: Option<&str>) -> &'static str {
-    match reason {
-        Some(reason)
-            if reason.contains("repair provider output payload diagnostics")
-                || reason.contains("provider-sample-blocked") =>
-        {
-            "provider-output-payload-repair-required"
-        }
-        Some(reason) if reason.contains("device-provider-sample:") => {
-            "provider-sample-materialization-required"
-        }
-        Some(reason) if reason.contains("final-executable-output:not-nsld-owned") => {
-            "host-finalizer-policy-required"
-        }
-        Some(reason) if reason.contains("final-executable-output:missing") => {
-            "final-output-missing"
-        }
-        Some(reason) if reason.contains("final-executable-output:image-header-invalid") => {
-            "final-output-invalid"
-        }
-        Some(reason) if reason.contains("final-executable-output:hash-mismatch") => {
-            "final-output-invalid"
-        }
-        Some(reason) if reason.contains("final-executable-output:size-mismatch") => {
-            "final-output-invalid"
-        }
-        _ => "blocked-boundary",
-    }
 }
 
 fn final_output_boundary_crossing_enabled() -> bool {

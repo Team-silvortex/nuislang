@@ -1,165 +1,111 @@
-use super::bundle::{decode_bundle, extract_bundle};
-use super::local::ensure_local_layout;
+use std::path::Component;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use super::*;
 
+struct VerifiedProjectLockContext {
+    project: nuisc::project::LoadedProject,
+    project_plan_summary: String,
+    path: PathBuf,
+    source: String,
+    entries: Vec<GalaxyLockEntry>,
+    summary: nuisc::project::ProjectGalaxyResolutionLockSummary,
+}
+
 pub fn install_project_deps(input: &Path) -> Result<InstalledProjectDeps, String> {
-    ensure_local_layout()?;
-    let project = nuisc::project::load_project(input)?;
-    let plan = nuisc::project::build_project_compilation_plan(&project)?;
-    let project_plan_summary = nuisc::project::describe_project_compilation_plan(&plan);
-    let deps_root = project.root.join(".nuis").join("deps").join("galaxy");
-    fs::create_dir_all(&deps_root)
-        .map_err(|error| format!("failed to create `{}`: {error}", deps_root.display()))?;
-    let mut installed = Vec::new();
-    for dependency in &project.manifest.galaxy_dependencies {
-        let resolved = select_local_entry(&dependency.name, Some(&dependency.version))?;
-        let output = deps_root.join(&dependency.name).join(&dependency.version);
-        fs::create_dir_all(&output)
-            .map_err(|error| format!("failed to create `{}`: {error}", output.display()))?;
-        let project_path = install_local(&dependency.name, Some(&dependency.version), &output)?;
-        installed.push(InstalledGalaxyDependency {
-            name: dependency.name.clone(),
-            version: dependency.version.clone(),
-            output,
-            project: project_path,
-            bundle: PathBuf::from(&resolved.package),
-            bundle_bytes: resolved.bundle_bytes.unwrap_or(0),
-            bundle_fnv1a64: resolved.bundle_fnv1a64.unwrap_or_default(),
-        });
-    }
-    let lock = write_project_lock_from_installed(&project.root, &project_plan_summary, &installed)?;
+    let lock = lock_project_deps(input)?;
+    let synced = sync_project_deps(input)?;
+    let installed = synced
+        .entries
+        .iter()
+        .map(|entry| {
+            let output = synced.root.join(&entry.name).join(&entry.version);
+            InstalledGalaxyDependency {
+                name: entry.name.clone(),
+                version: entry.version.clone(),
+                package_id: entry.package_id.clone(),
+                direct: entry.direct,
+                project: output.join("module.toml"),
+                output,
+                manifest_sha256: entry.manifest_sha256.clone(),
+            }
+        })
+        .collect();
     Ok(InstalledProjectDeps {
-        project_root: project.root,
-        project_plan_summary,
+        project_root: synced.project_root,
+        project_plan_summary: synced.project_plan_summary,
         installed,
         lock,
     })
 }
 
 pub fn lock_project_deps(input: &Path) -> Result<WroteGalaxyLock, String> {
-    ensure_local_layout()?;
     let project = nuisc::project::load_project(input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
-    let mut entries = Vec::new();
-    for dependency in &project.manifest.galaxy_dependencies {
-        let resolved = select_local_entry(&dependency.name, Some(&dependency.version))?;
-        let verified = verify_local(&dependency.name, Some(&dependency.version))?;
-        entries.push(GalaxyLockEntry {
-            name: resolved.name,
-            version: resolved.version,
-            bundle: verified.package,
-            bundle_bytes: verified.bundle_bytes,
-            bundle_fnv1a64: verified.bundle_fnv1a64,
-        });
-    }
-    write_project_lock(
-        &project.root,
-        &nuisc::project::describe_project_compilation_plan(&plan),
-        &entries,
-    )
+    let path = nuisc::project::committed_project_galaxy_resolution_lock_path(&project);
+    let summary = nuisc::project::write_project_galaxy_resolution_lock(&path, &project)?;
+    Ok(WroteGalaxyLock {
+        project_root: project.root.clone(),
+        project_plan_summary: nuisc::project::describe_project_compilation_plan(&plan),
+        path,
+        entries: resolution_entries(&project),
+        summary,
+    })
 }
 
 pub fn verify_project_lock(input: &Path) -> Result<VerifiedGalaxyLock, String> {
-    ensure_local_layout()?;
-    let project = nuisc::project::load_project(input)?;
-    let plan = nuisc::project::build_project_compilation_plan(&project)?;
-    let path = project.root.join("nuis.galaxy.lock");
-    let source = fs::read_to_string(&path)
-        .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
-    let entries = parse_lock_entries(&source, &path)?;
-    for entry in &entries {
-        let bytes = fs::read(&entry.bundle).map_err(|error| {
-            format!(
-                "failed to read locked galaxy bundle `{}`: {error}",
-                entry.bundle.display()
-            )
-        })?;
-        let actual_bytes = bytes.len() as u64;
-        if actual_bytes != entry.bundle_bytes {
-            return Err(format!(
-                "locked galaxy dependency `{}` version `{}` byte size mismatch: lock={}, actual={}",
-                entry.name, entry.version, entry.bundle_bytes, actual_bytes
-            ));
-        }
-        let actual_hash = fnv1a64_hex(&bytes);
-        if actual_hash != entry.bundle_fnv1a64 {
-            return Err(format!(
-                "locked galaxy dependency `{}` version `{}` hash mismatch: lock={}, actual={}",
-                entry.name, entry.version, entry.bundle_fnv1a64, actual_hash
-            ));
-        }
-        let inspected = decode_bundle(&bytes, &entry.bundle)?;
-        if inspected.manifest.name != entry.name {
-            return Err(format!(
-                "locked galaxy dependency bundle `{}` resolved to package `{}`, expected `{}`",
-                entry.bundle.display(),
-                inspected.manifest.name,
-                entry.name
-            ));
-        }
-        if inspected.manifest.version != entry.version {
-            return Err(format!(
-                "locked galaxy dependency bundle `{}` resolved to version `{}`, expected `{}`",
-                entry.bundle.display(),
-                inspected.manifest.version,
-                entry.version
-            ));
-        }
-    }
+    let context = load_verified_project_lock(input)?;
     Ok(VerifiedGalaxyLock {
-        project_root: project.root,
-        project_plan_summary: nuisc::project::describe_project_compilation_plan(&plan),
-        path,
-        entries,
+        project_root: context.project.root,
+        project_plan_summary: context.project_plan_summary,
+        path: context.path,
+        entries: context.entries,
+        summary: context.summary,
     })
 }
 
 pub fn sync_project_deps(input: &Path) -> Result<SyncedProjectDeps, String> {
-    ensure_local_layout()?;
-    let verified = verify_project_lock(input)?;
-    let deps_root = verified
-        .project_root
-        .join(".nuis")
-        .join("deps")
-        .join("galaxy");
+    let context = load_verified_project_lock(input)?;
+    let deps_parent = context.project.root.join(".nuis").join("deps");
+    fs::create_dir_all(&deps_parent)
+        .map_err(|error| format!("failed to create `{}`: {error}", deps_parent.display()))?;
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("system clock is before Unix epoch: {error}"))?
+        .as_nanos();
+    let suffix = format!("{}-{nonce}", std::process::id());
+    let stage = deps_parent.join(format!(".galaxy.syncing-{suffix}"));
+    let backup = deps_parent.join(format!(".galaxy.previous-{suffix}"));
+    let deps_root = deps_parent.join("galaxy");
+    fs::create_dir(&stage)
+        .map_err(|error| format!("failed to create sync stage `{}`: {error}", stage.display()))?;
 
-    if deps_root.exists() {
-        fs::remove_dir_all(&deps_root)
-            .map_err(|error| format!("failed to reset `{}`: {error}", deps_root.display()))?;
+    if let Err(error) = materialize_resolution(&context, &stage) {
+        let _ = fs::remove_dir_all(&stage);
+        return Err(error);
     }
-    fs::create_dir_all(&deps_root)
-        .map_err(|error| format!("failed to create `{}`: {error}", deps_root.display()))?;
-
-    for entry in &verified.entries {
-        let output = deps_root.join(&entry.name).join(&entry.version);
-        fs::create_dir_all(&output)
-            .map_err(|error| format!("failed to create `{}`: {error}", output.display()))?;
-        let bytes = fs::read(&entry.bundle).map_err(|error| {
-            format!(
-                "failed to read locked galaxy bundle `{}`: {error}",
-                entry.bundle.display()
-            )
-        })?;
-        extract_bundle(&bytes, &entry.bundle, &output)?;
-    }
+    replace_materialized_tree(&stage, &deps_root, &backup)?;
 
     Ok(SyncedProjectDeps {
-        project_root: verified.project_root,
-        project_plan_summary: verified.project_plan_summary,
+        project_root: context.project.root,
+        project_plan_summary: context.project_plan_summary,
         root: deps_root,
-        entries: verified.entries,
+        entries: context.entries,
+        summary: context.summary,
     })
 }
 
 pub fn doctor_project(input: &Path) -> Result<GalaxyDoctorReport, String> {
-    ensure_local_layout()?;
     let project = nuisc::project::load_project(input)?;
     let plan = nuisc::project::build_project_compilation_plan(&project)?;
     let deps_root = project.root.join(".nuis").join("deps").join("galaxy");
-    let lock_path = project.root.join("nuis.galaxy.lock");
-    let local_entries = list_local()?;
-    let available = local_entries
-        .into_iter()
+    let lock_path = project
+        .root
+        .join(nuisc::project::PROJECT_GALAXY_RESOLUTION_LOCK_FILE);
+    let available = project
+        .resolved_galaxies
+        .iter()
+        .filter(|entry| entry.direct)
         .map(|entry| format!("{}={}", entry.name, entry.version))
         .collect::<BTreeSet<_>>();
     let installed = collect_installed_project_deps(&deps_root)?;
@@ -170,6 +116,7 @@ pub fn doctor_project(input: &Path) -> Result<GalaxyDoctorReport, String> {
             None,
             lock.entries
                 .into_iter()
+                .filter(|entry| entry.direct)
                 .map(|entry| format!("{}={}", entry.name, entry.version))
                 .collect::<BTreeSet<_>>(),
         ),
@@ -186,7 +133,7 @@ pub fn doctor_project(input: &Path) -> Result<GalaxyDoctorReport, String> {
             GalaxyDoctorDependency {
                 name: item.name.clone(),
                 version: item.version.clone(),
-                local_available: available.contains(&key),
+                source_available: available.contains(&key),
                 locked: locked.contains(&key),
                 installed: installed.contains(&key),
             }
@@ -205,128 +152,154 @@ pub fn doctor_project(input: &Path) -> Result<GalaxyDoctorReport, String> {
     })
 }
 
-pub(super) fn write_project_lock_from_installed(
-    project_root: &Path,
-    project_plan_summary: &str,
-    installed: &[InstalledGalaxyDependency],
-) -> Result<WroteGalaxyLock, String> {
-    let entries = installed
-        .iter()
-        .map(|item| GalaxyLockEntry {
-            name: item.name.clone(),
-            version: item.version.clone(),
-            bundle: item.bundle.clone(),
-            bundle_bytes: item.bundle_bytes,
-            bundle_fnv1a64: item.bundle_fnv1a64.clone(),
-        })
-        .collect::<Vec<_>>();
-    write_project_lock(project_root, project_plan_summary, &entries)
-}
-
-pub(super) fn write_project_lock(
-    project_root: &Path,
-    project_plan_summary: &str,
-    entries: &[GalaxyLockEntry],
-) -> Result<WroteGalaxyLock, String> {
-    let path = project_root.join("nuis.galaxy.lock");
-    let mut sorted = entries.to_vec();
-    sorted.sort_by(|lhs, rhs| {
-        lhs.name
-            .cmp(&rhs.name)
-            .then(compare_version(&lhs.version, &rhs.version))
-    });
-    let mut source = String::new();
-    source.push_str("lock_schema = \"nuis-galaxy-lock-v1\"\n");
-    for entry in &sorted {
-        source.push_str("\n[[dependency]]\n");
-        source.push_str(&format!("name = \"{}\"\n", escape(&entry.name)));
-        source.push_str(&format!("version = \"{}\"\n", escape(&entry.version)));
-        source.push_str(&format!(
-            "bundle = \"{}\"\n",
-            escape(&entry.bundle.display().to_string())
-        ));
-        source.push_str(&format!("bundle_bytes = {}\n", entry.bundle_bytes));
-        source.push_str(&format!(
-            "bundle_fnv1a64 = \"{}\"\n",
-            escape(&entry.bundle_fnv1a64)
-        ));
-    }
-    fs::write(&path, source)
-        .map_err(|error| format!("failed to write `{}`: {error}", path.display()))?;
-    Ok(WroteGalaxyLock {
-        project_root: project_root.to_path_buf(),
-        project_plan_summary: project_plan_summary.to_owned(),
+fn load_verified_project_lock(input: &Path) -> Result<VerifiedProjectLockContext, String> {
+    let project = nuisc::project::load_project(input)?;
+    let plan = nuisc::project::build_project_compilation_plan(&project)?;
+    let path = nuisc::project::committed_project_galaxy_resolution_lock_path(&project);
+    let source = fs::read_to_string(&path)
+        .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+    let summary = nuisc::project::verify_project_galaxy_resolution_lock(&project, &source, &path)?;
+    Ok(VerifiedProjectLockContext {
+        entries: resolution_entries(&project),
+        project,
+        project_plan_summary: nuisc::project::describe_project_compilation_plan(&plan),
         path,
-        entries: sorted,
+        source,
+        summary,
     })
 }
 
-pub(super) fn parse_lock_entries(
-    source: &str,
-    path: &Path,
-) -> Result<Vec<GalaxyLockEntry>, String> {
-    let schema = parse_optional_string(source, "lock_schema").ok_or_else(|| {
-        format!(
-            "galaxy lock `{}` is missing required key `lock_schema`",
-            path.display()
-        )
-    })?;
-    if schema != "nuis-galaxy-lock-v1" {
+fn resolution_entries(project: &nuisc::project::LoadedProject) -> Vec<GalaxyLockEntry> {
+    let mut entries = project
+        .resolved_galaxies
+        .iter()
+        .map(|dependency| GalaxyLockEntry {
+            name: dependency.name.clone(),
+            version: dependency.version.clone(),
+            package_id: dependency.package_id.clone(),
+            direct: dependency.direct,
+            manifest_sha256: dependency.manifest_content_identity.sha256.clone(),
+            source_modules: dependency.source_modules.len(),
+            library_modules: dependency.library_modules.len(),
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by(|lhs, rhs| {
+        lhs.name
+            .cmp(&rhs.name)
+            .then(lhs.version.cmp(&rhs.version))
+            .then(lhs.package_id.cmp(&rhs.package_id))
+    });
+    entries
+}
+
+fn materialize_resolution(
+    context: &VerifiedProjectLockContext,
+    stage: &Path,
+) -> Result<(), String> {
+    for dependency in &context.project.resolved_galaxies {
+        validate_galaxy_token("dependency name", &dependency.name, &context.path)?;
+        validate_galaxy_token("dependency version", &dependency.version, &context.path)?;
+        let output = stage.join(&dependency.name).join(&dependency.version);
+        fs::create_dir_all(&output)
+            .map_err(|error| format!("failed to create `{}`: {error}", output.display()))?;
+        write_verified_content(
+            &dependency.manifest_path,
+            &dependency.manifest_content_identity,
+            &output,
+        )?;
+        for (source, identity) in dependency
+            .resolved_source_paths
+            .iter()
+            .zip(&dependency.source_content_identities)
+            .chain(
+                dependency
+                    .resolved_library_paths
+                    .iter()
+                    .zip(&dependency.library_content_identities),
+            )
+        {
+            write_verified_content(source, identity, &output)?;
+        }
+    }
+    fs::write(
+        stage.join(nuisc::project::PROJECT_GALAXY_RESOLUTION_LOCK_FILE),
+        &context.source,
+    )
+    .map_err(|error| format!("failed to materialize canonical Galaxy lock: {error}"))?;
+    Ok(())
+}
+
+fn write_verified_content(
+    source_path: &Path,
+    identity: &nuisc::stdlib_registry::ResolvedGalaxyContentIdentity,
+    output: &Path,
+) -> Result<(), String> {
+    validate_materialized_relative_path(&identity.logical_path)?;
+    let source = nuisc::stdlib_registry::read_verified_galaxy_text(source_path, identity)?;
+    let destination = output.join(&identity.logical_path);
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("failed to create `{}`: {error}", parent.display()))?;
+    }
+    fs::write(&destination, source.as_bytes())
+        .map_err(|error| format!("failed to write `{}`: {error}", destination.display()))
+}
+
+fn validate_materialized_relative_path(path: &str) -> Result<(), String> {
+    let candidate = Path::new(path);
+    if path.is_empty()
+        || path.contains('\\')
+        || candidate.is_absolute()
+        || candidate
+            .components()
+            .any(|component| !matches!(component, Component::Normal(_)))
+    {
         return Err(format!(
-            "galaxy lock `{}` has unsupported schema `{}`",
-            path.display(),
-            schema
+            "Galaxy materialization path `{path}` is not a canonical portable relative path"
         ));
     }
+    Ok(())
+}
 
-    let mut rows = Vec::<Vec<String>>::new();
-    let mut current = Vec::<String>::new();
-    for raw_line in source.lines() {
-        let line = raw_line.trim();
-        if line == "[[dependency]]" {
-            if !current.is_empty() {
-                rows.push(current);
-                current = Vec::new();
-            }
-            continue;
-        }
-        if line.is_empty() {
-            continue;
-        }
-        current.push(line.to_owned());
-    }
-    if !current.is_empty() {
-        rows.push(current);
-    }
-
-    let mut entries = Vec::new();
-    for row in rows {
-        if row.iter().any(|line| line.starts_with("lock_schema = ")) {
-            continue;
-        }
-        let block = row.join("\n");
-        let name = parse_required_string(&block, "name", path)?;
-        let version = parse_required_string(&block, "version", path)?;
-        let bundle = PathBuf::from(parse_required_string(&block, "bundle", path)?);
-        validate_galaxy_token("dependency name", &name, path)?;
-        validate_galaxy_token("dependency version", &version, path)?;
-        let bundle_bytes = parse_optional_u64(&block, "bundle_bytes").ok_or_else(|| {
+fn replace_materialized_tree(
+    stage: &Path,
+    destination: &Path,
+    backup: &Path,
+) -> Result<(), String> {
+    if !destination.exists() {
+        return fs::rename(stage, destination).map_err(|error| {
             format!(
-                "galaxy lock `{}` dependency `{}` is missing required key `bundle_bytes`",
-                path.display(),
-                name
+                "failed to activate Galaxy dependency tree `{}`: {error}",
+                destination.display()
             )
-        })?;
-        let bundle_fnv1a64 = parse_required_string(&block, "bundle_fnv1a64", path)?;
-        entries.push(GalaxyLockEntry {
-            name,
-            version,
-            bundle,
-            bundle_bytes,
-            bundle_fnv1a64,
         });
     }
-    Ok(entries)
+    fs::rename(destination, backup).map_err(|error| {
+        format!(
+            "failed to preserve previous Galaxy dependency tree `{}`: {error}",
+            destination.display()
+        )
+    })?;
+    if let Err(error) = fs::rename(stage, destination) {
+        let restore = fs::rename(backup, destination);
+        return Err(match restore {
+            Ok(()) => format!(
+                "failed to activate Galaxy dependency tree `{}`; previous tree restored: {error}",
+                destination.display()
+            ),
+            Err(restore_error) => format!(
+                "failed to activate Galaxy dependency tree `{}` ({error}) and failed to restore `{}` ({restore_error})",
+                destination.display(),
+                backup.display()
+            ),
+        });
+    }
+    fs::remove_dir_all(backup).map_err(|error| {
+        format!(
+            "activated Galaxy dependency tree but failed to remove previous tree `{}`: {error}",
+            backup.display()
+        )
+    })
 }
 
 pub(super) fn collect_installed_project_deps(root: &Path) -> Result<BTreeSet<String>, String> {
@@ -359,7 +332,7 @@ pub(super) fn collect_installed_project_deps(root: &Path) -> Result<BTreeSet<Str
             let Some(version) = version_path.file_name().and_then(|item| item.to_str()) else {
                 continue;
             };
-            if version_path.join("nuis.toml").exists() {
+            if version_path.join("module.toml").exists() {
                 installed.insert(format!("{name}={version}"));
             }
         }

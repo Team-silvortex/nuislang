@@ -60,6 +60,10 @@ pub(crate) fn nsld_final_executable_host_dry_run_report(
     let requires_host_driver = finalizer
         .as_ref()
         .is_ok_and(|selection| selection.requires_host_driver());
+    let finalizer_input_issues = finalizer
+        .as_ref()
+        .map(|selection| selection.input_validation_issues(plan))
+        .unwrap_or_default();
     let driver_resolved_path = requires_host_driver
         .then(|| resolve_host_driver_path(&driver))
         .flatten();
@@ -92,20 +96,35 @@ pub(crate) fn nsld_final_executable_host_dry_run_report(
         Err(error) => blockers.push(format!("executable-finalizer-provider:{error}")),
         _ => {}
     }
+    blockers.extend(
+        finalizer_input_issues
+            .iter()
+            .map(|issue| format!("executable-finalizer-input:{issue}")),
+    );
     if requires_host_driver && !driver_available {
         blockers.push(format!("host-finalizer-driver-unavailable:{driver}"));
     }
     blockers.extend(writer_plan.writer_blockers.iter().cloned());
-    let (invocation_policy, invocation_policy_reason, policy_blocker) =
-        host_finalizer_invocation_policy();
+    let (invocation_policy, invocation_policy_reason, policy_blocker) = if requires_host_driver {
+        host_finalizer_invocation_policy()
+    } else {
+        (
+            "registered-internal".to_owned(),
+            "registered-finalizer-requires-no-host-process".to_owned(),
+            None,
+        )
+    };
     if let Some(blocker) = policy_blocker {
         blockers.push(blocker);
     }
-    let environment_ready =
-        writer_input.valid && registry.valid && finalizer_ready && driver_available;
+    let environment_ready = writer_input.valid
+        && registry.valid
+        && finalizer_ready
+        && finalizer_input_issues.is_empty()
+        && driver_available;
     let can_invoke_host_finalizer = environment_ready
         && writer_plan.writer_blockers.is_empty()
-        && invocation_policy == "allow-host-invoke";
+        && (invocation_policy == "allow-host-invoke" || invocation_policy == "registered-internal");
     let mut notes = writer_plan.notes.clone();
     notes.push("host-finalizer-dry-run-is-non-mutating".to_owned());
     notes.push("host-finalizer-is-not-invoked".to_owned());
@@ -124,6 +143,10 @@ pub(crate) fn nsld_final_executable_host_dry_run_report(
         notes.push(format!(
             "executable-finalizer-provider:{}",
             selection.provider_id()
+        ));
+        notes.push(format!(
+            "executable-finalizer-input:{}",
+            selection.input_kind()
         ));
     }
 
@@ -158,25 +181,36 @@ pub(crate) fn nsld_final_executable_host_invoke_plan_report(
     plan: &nuisc::linker::LinkPlan,
 ) -> NsldFinalExecutableHostInvokePlanReport {
     let dry_run = nsld_final_executable_host_dry_run_report(manifest, plan);
-    let requires_explicit_allow = true;
-    let explicit_allow_present = host_finalizer_explicit_allow_present();
+    let requires_explicit_allow =
+        select_executable_finalizer(plan).is_ok_and(|selection| selection.requires_host_driver());
+    let explicit_allow_present = requires_explicit_allow && host_finalizer_explicit_allow_present();
     let mut blockers = dry_run.blockers.clone();
     if requires_explicit_allow && !explicit_allow_present {
         blockers.push("host-finalizer-explicit-allow:missing".to_owned());
     }
-    let would_invoke = dry_run.can_invoke_host_finalizer && explicit_allow_present;
-    let invocation_kind = "host-finalizer-command".to_owned();
+    let would_invoke =
+        dry_run.can_invoke_host_finalizer && (!requires_explicit_allow || explicit_allow_present);
+    let invocation_kind = if requires_explicit_allow {
+        "host-finalizer-command"
+    } else {
+        "registered-internal-finalizer"
+    }
+    .to_owned();
     let mut notes = dry_run.notes.clone();
     notes.push("host-invoke-plan-is-non-mutating".to_owned());
     notes.push("host-finalizer-process-is-not-spawned".to_owned());
-    notes.push(format!(
-        "host-finalizer-explicit-allow-env:{HOST_FINALIZER_ALLOW_ENV}={}",
-        if explicit_allow_present {
-            "present"
-        } else {
-            "missing"
-        }
-    ));
+    notes.push(if requires_explicit_allow {
+        format!(
+            "host-finalizer-explicit-allow-env:{HOST_FINALIZER_ALLOW_ENV}={}",
+            if explicit_allow_present {
+                "present"
+            } else {
+                "missing"
+            }
+        )
+    } else {
+        "host-finalizer-explicit-allow:not-required-for-internal-provider".to_owned()
+    });
 
     NsldFinalExecutableHostInvokePlanReport {
         manifest: manifest.display().to_string(),

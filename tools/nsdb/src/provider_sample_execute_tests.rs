@@ -12,6 +12,49 @@ use std::{
 static TEST_NONCE: AtomicU64 = AtomicU64::new(0);
 
 #[test]
+fn rejects_declared_provider_request_that_fails_validation() {
+    let nonce = TEST_NONCE.fetch_add(1, Ordering::Relaxed);
+    let output_dir = env::temp_dir().join(format!(
+        "nsdb-provider-invalid-request-{}-{nonce}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&output_dir).unwrap();
+    let evidence = "provider_buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;provider_buffer_id=input.bytes;provider_buffer_element_type=u8;provider_buffer_layout=tensor-contiguous;provider_buffer_shape=4;provider_buffer_row_stride_bytes=1;provider_buffer_byte_length=4;provider_buffer_payload_path=input.bin;provider_buffer_content_hash=0x1234;provider_kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;provider_kernel_id=invalid.copy;provider_kernel_operation=copy;provider_kernel_input_buffer=input.bytes;provider_kernel_output_buffer=output.bytes;provider_kernel_dispatch=4x1x1";
+    let manifest = format!(
+        r#"protocol = "nuis-device-provider-samples-v1"
+schema = "nsdb-yir-device-provider-sample-v1"
+source = "provider-invalid-request-test"
+status = "ready"
+record_count = 1
+ready_record_count = 1
+pending_record_count = 0
+
+[[device_provider_samples]]
+trace_id = "hetero-trace:data:host"
+provider = "native-worker-test"
+provider_family = "data:host"
+input_evidence = "{evidence}"
+materialization_status = "provider-sample-materialized"
+"#
+    );
+    fs::write(
+        output_dir.join("nuis.nsdb.device-provider-samples.toml"),
+        manifest,
+    )
+    .unwrap();
+
+    let error = match execute_provider_samples(&output_dir, Some("data:host")) {
+        Ok(_) => panic!("invalid declared request must fail closed"),
+        Err(error) => error,
+    };
+    assert!(error.contains("declares a request contract but failed validation"));
+    assert!(!output_dir
+        .join("nuis.nsdb.provider-output.data-host.toml")
+        .exists());
+    fs::remove_dir_all(output_dir).unwrap();
+}
+
+#[test]
 fn executes_registered_native_worker_with_two_graph_outputs() {
     let nonce = TEST_NONCE.fetch_add(1, Ordering::Relaxed);
     let output_dir = env::temp_dir().join(format!(

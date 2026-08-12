@@ -15,7 +15,7 @@ pub(super) fn finalize_official_hetero(
         provider_record_count,
         provider_record_count,
     );
-    super::replay::assert_multi_checkpoint_replay_resume(output_dir);
+    super::replay::assert_multi_frame_replay_resume(output_dir);
 }
 
 pub(super) fn assemble_provider_complete_final_image(
@@ -88,6 +88,12 @@ pub(super) fn assemble_provider_complete_final_image(
         executed.final_image_dispatch_selected_set_hash,
         executed.selected_provider_bundle_set_hash
     );
+    let refreshed = nsdb::materialize_provider_samples(output_dir, None)
+        .expect("sealed provider completions refresh the replay handoff");
+    assert_eq!(refreshed.status, "ready");
+    assert_eq!(refreshed.matched_record_count, provider_record_count);
+    assert_eq!(refreshed.materialized_record_count, provider_record_count);
+    assert_eq!(refreshed.skipped_record_count, 0);
     let replay = nsdb::payload_execution_replay_summary(output_dir);
     assert_eq!(
         replay.provider_completion_dispatch_authority_status,

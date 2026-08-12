@@ -713,8 +713,8 @@ fn print_help() {
     println!("    nuis galaxy check [project-dir|galaxy.toml]");
     println!("    nuis galaxy doctor [project-dir|nuis.toml]");
     println!("    nuis galaxy lock-deps [project-dir|nuis.toml]");
-    println!("    nuis galaxy sync-deps [project-dir|nuis.toml]");
     println!("    nuis galaxy verify-lock [project-dir|nuis.toml]");
+    println!("    nuis galaxy sync-deps [project-dir|nuis.toml]");
     println!("    nuis galaxy install-deps [project-dir|nuis.toml]");
     println!("    nuis galaxy pack [project-dir|galaxy.toml] [output.galaxy]");
     println!("    nuis galaxy inspect <input.galaxy>");

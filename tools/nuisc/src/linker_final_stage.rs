@@ -17,7 +17,7 @@ pub(super) fn derive_final_stage(
         inputs.push(path.clone());
     }
     let (kind, driver, link_mode, mut notes) = match report.packaging_mode.as_str() {
-        "native-cpu-llvm" => (
+        "native-cpu-llvm" | "executable" => (
             "host-native-link".to_owned(),
             "clang".to_owned(),
             "host-toolchain-finalize".to_owned(),

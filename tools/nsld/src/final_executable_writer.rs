@@ -40,6 +40,18 @@ pub(crate) fn final_executable_writer_blockers(
         )];
     }
 
+    let input_issues = selection.input_validation_issues(plan);
+    if !input_issues.is_empty() {
+        return input_issues
+            .into_iter()
+            .map(|issue| format!("final-executable-finalizer-input:{issue}"))
+            .collect();
+    }
+
+    if !selection.requires_host_driver() {
+        return Vec::new();
+    }
+
     if host_assisted_writer_execution_enabled(plan) {
         return Vec::new();
     }
@@ -50,8 +62,21 @@ pub(crate) fn final_executable_writer_blockers(
     vec!["final-executable-writer:host-assisted:not-implemented".to_owned()]
 }
 
-pub(crate) fn final_executable_writer_steps(final_stage: &NsldFinalStagePlanReport) -> Vec<String> {
+pub(crate) fn final_executable_writer_steps(
+    final_stage: &NsldFinalStagePlanReport,
+    plan: &nuisc::linker::LinkPlan,
+) -> Vec<String> {
     if final_stage.host_wrapper_required {
+        if select_executable_finalizer(plan)
+            .is_ok_and(|selection| !selection.requires_host_driver())
+        {
+            return vec![
+                "consume-compiled-artifact-host-image".to_owned(),
+                "validate-registered-os-native-image".to_owned(),
+                "atomically-materialize-os-native-executable".to_owned(),
+                "verify-final-executable-boundary".to_owned(),
+            ];
+        }
         vec![
             "consume-native-object-output".to_owned(),
             "consume-nsld-container-and-payload".to_owned(),
@@ -95,9 +120,13 @@ pub(crate) fn resolve_host_driver_path(driver: &str) -> Option<String> {
 }
 
 pub(crate) fn host_assisted_writer_execution_enabled(plan: &nuisc::linker::LinkPlan) -> bool {
-    select_executable_finalizer(plan).is_ok_and(|selection| selection.ready())
-        && host_finalizer_policy_allows_invoke()
-        && host_finalizer_explicit_allow_present()
+    select_executable_finalizer(plan).is_ok_and(|selection| {
+        selection.ready()
+            && selection.input_validation_issues(plan).is_empty()
+            && (!selection.requires_host_driver()
+                || (host_finalizer_policy_allows_invoke()
+                    && host_finalizer_explicit_allow_present()))
+    })
 }
 
 fn host_finalizer_policy_allows_invoke() -> bool {

@@ -114,12 +114,20 @@ pub(crate) fn handle_galaxy(command: cli::GalaxyCommand) -> Result<(), String> {
                 println!("  project_plan: {}", installed.project_plan_summary);
                 for item in installed.installed {
                     println!("  dep: {}={}", item.name, item.version);
+                    println!("  package_id: {}", item.package_id);
+                    println!(
+                        "  scope: {}",
+                        if item.direct { "direct" } else { "transitive" }
+                    );
                     println!("  output: {}", item.output.display());
                     println!("  project: {}", item.project.display());
-                    println!("  bundle: {}", item.bundle.display());
-                    println!("  bundle_fnv1a64: {}", item.bundle_fnv1a64);
+                    println!("  manifest_sha256: {}", item.manifest_sha256);
                 }
                 println!("  lock: {}", installed.lock.path.display());
+                println!(
+                    "  resolution_sha256: {}",
+                    installed.lock.summary.resolution_sha256
+                );
             }
         }
         cli::GalaxyCommand::Doctor { input } => {
@@ -140,10 +148,10 @@ pub(crate) fn handle_galaxy(command: cli::GalaxyCommand) -> Result<(), String> {
             println!("  dependencies: {}", report.dependencies.len());
             for item in report.dependencies {
                 println!(
-                    "  dep: {}={} local={} lock={} installed={}",
+                    "  dep: {}={} source={} lock={} installed={}",
                     item.name,
                     item.version,
-                    yes_no(item.local_available),
+                    yes_no(item.source_available),
                     yes_no(item.locked),
                     yes_no(item.installed)
                 );
@@ -161,11 +169,16 @@ pub(crate) fn handle_galaxy(command: cli::GalaxyCommand) -> Result<(), String> {
                 println!("  project_root: {}", synced.project_root.display());
                 println!("  project_plan: {}", synced.project_plan_summary);
                 println!("  root: {}", synced.root.display());
+                println!("  resolution_sha256: {}", synced.summary.resolution_sha256);
                 println!("  dependencies: {}", synced.entries.len());
                 for entry in synced.entries {
                     println!("  dep: {}={}", entry.name, entry.version);
-                    println!("  bundle: {}", entry.bundle.display());
-                    println!("  bundle_fnv1a64: {}", entry.bundle_fnv1a64);
+                    println!("  package_id: {}", entry.package_id);
+                    println!(
+                        "  scope: {}",
+                        if entry.direct { "direct" } else { "transitive" }
+                    );
+                    println!("  manifest_sha256: {}", entry.manifest_sha256);
                 }
             }
         }
@@ -175,11 +188,16 @@ pub(crate) fn handle_galaxy(command: cli::GalaxyCommand) -> Result<(), String> {
             println!("  project_root: {}", lock.project_root.display());
             println!("  project_plan: {}", lock.project_plan_summary);
             println!("  lock: {}", lock.path.display());
+            println!("  resolution_sha256: {}", lock.summary.resolution_sha256);
             println!("  dependencies: {}", lock.entries.len());
             for entry in lock.entries {
                 println!("  dep: {}={}", entry.name, entry.version);
-                println!("  bundle: {}", entry.bundle.display());
-                println!("  bundle_fnv1a64: {}", entry.bundle_fnv1a64);
+                println!("  package_id: {}", entry.package_id);
+                println!(
+                    "  scope: {}",
+                    if entry.direct { "direct" } else { "transitive" }
+                );
+                println!("  manifest_sha256: {}", entry.manifest_sha256);
             }
         }
         cli::GalaxyCommand::VerifyLock { input } => {
@@ -188,11 +206,16 @@ pub(crate) fn handle_galaxy(command: cli::GalaxyCommand) -> Result<(), String> {
             println!("  project_root: {}", lock.project_root.display());
             println!("  project_plan: {}", lock.project_plan_summary);
             println!("  lock: {}", lock.path.display());
+            println!("  resolution_sha256: {}", lock.summary.resolution_sha256);
             println!("  dependencies: {}", lock.entries.len());
             for entry in lock.entries {
                 println!("  dep: {}={}", entry.name, entry.version);
-                println!("  bundle: {}", entry.bundle.display());
-                println!("  bundle_fnv1a64: {}", entry.bundle_fnv1a64);
+                println!("  package_id: {}", entry.package_id);
+                println!(
+                    "  scope: {}",
+                    if entry.direct { "direct" } else { "transitive" }
+                );
+                println!("  manifest_sha256: {}", entry.manifest_sha256);
             }
         }
         cli::GalaxyCommand::InspectLocal { name, version } => {

@@ -32,10 +32,10 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
     let deps_len = galaxy_doctor.dependencies.len();
     let include_galaxy_flow =
         galaxy_manifest_exists || !project.manifest.galaxy_dependencies.is_empty();
-    let any_local_missing = galaxy_doctor
+    let any_source_missing = galaxy_doctor
         .dependencies
         .iter()
-        .any(|dependency| !dependency.local_available);
+        .any(|dependency| !dependency.source_available);
     let any_lock_missing = galaxy_doctor
         .dependencies
         .iter()
@@ -163,9 +163,9 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
             "run `nuis galaxy sync-deps <project-dir>` to materialize locked galaxy dependencies under `.nuis/deps/galaxy`".to_owned(),
         );
     }
-    if any_local_missing && deps_len > 0 {
+    if any_source_missing && deps_len > 0 {
         next_steps.push(
-            "some galaxy deps are not available locally; use `nuis galaxy list` to inspect the local registry or publish/install the missing packages first".to_owned(),
+            "some galaxy dependency sources are unavailable; restore the configured workspace, cache, or registry provider before locking".to_owned(),
         );
     }
     if !hidden_manual_only_library_modules.is_empty() {
@@ -234,7 +234,7 @@ pub(crate) fn render_project_doctor_json(input: &Path) -> Result<String, String>
                 "{{{},{},{},{},{}}}",
                 crate::json_field("name", &dependency.name),
                 crate::json_field("version", &dependency.version),
-                crate::json_bool_field("local_available", dependency.local_available),
+                crate::json_bool_field("source_available", dependency.source_available),
                 crate::json_bool_field("locked", dependency.locked),
                 crate::json_bool_field("installed", dependency.installed),
             )

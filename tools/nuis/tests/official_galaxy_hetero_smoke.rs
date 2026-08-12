@@ -5,14 +5,36 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-fn temp_dir(label: &str) -> PathBuf {
+struct TestOutputDir(PathBuf);
+
+impl std::ops::Deref for TestOutputDir {
+    type Target = Path;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl AsRef<Path> for TestOutputDir {
+    fn as_ref(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for TestOutputDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+fn temp_dir(label: &str) -> TestOutputDir {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
     let dir = std::env::temp_dir().join(format!("nuis_official_hetero_{label}_{nonce}"));
     fs::create_dir_all(&dir).unwrap();
-    dir
+    TestOutputDir(dir)
 }
 
 fn run_nuis(args: &[&str]) -> std::process::Output {

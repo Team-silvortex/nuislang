@@ -3,11 +3,12 @@ use super::{
     container_provider_dispatch::{
         provider_dispatch_evidence, PROVIDER_DISPATCH_BINDING_ID, PROVIDER_DISPATCH_CONTRACT,
     },
+    content_hash_cache::cached_file_content_hash,
     final_executable_provider_sample::nsld_device_provider_sample_evidence,
     fnv1a64_hex,
     link_units::nsld_sidecar_capability_diagnostics,
 };
-use std::{collections::BTreeSet, fs};
+use std::{collections::BTreeSet, path::Path};
 
 pub(crate) const SELECTED_PROVIDER_BUNDLE_BINDING_ID: &str =
     "identity.selected-provider-bundle-set";
@@ -177,8 +178,8 @@ fn clock_protocol_hash(clock: &nuisc::linker::LinkPlanClockProtocol) -> String {
 
 fn glm_binding_material(plan: &nuisc::linker::LinkPlan) -> (usize, String, bool, Vec<String>) {
     let mut blockers = Vec::new();
-    let artifact_hash = match fs::read(&plan.compiled_artifact.path) {
-        Ok(bytes) => fnv1a64_hex(&bytes),
+    let artifact_hash = match cached_file_content_hash(Path::new(&plan.compiled_artifact.path)) {
+        Ok(hash) => hash,
         Err(_) => {
             blockers.push(format!(
                 "metadata-binding:{GLM_ROOT_BINDING_ID}:compiled-artifact-unreadable"

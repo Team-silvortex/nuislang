@@ -1,6 +1,7 @@
 use super::bundle::decode_bundle;
+use super::manifest::escape;
 use super::{
-    escape, parse_manifest, parse_ns_nova_manifest, render_manifest, render_ns_nova_manifest,
+    parse_manifest, parse_ns_nova_manifest, render_manifest, render_ns_nova_manifest,
     GalaxyManifest, NsNovaManifest, GALAXY_BUNDLE_VERSION, GALAXY_MAGIC,
 };
 use std::path::Path;

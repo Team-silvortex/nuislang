@@ -386,6 +386,4 @@ fn run_metal_sample_smoke(sample: MetalSampleSmoke<'_>) {
             ),
         "generated Metal sealed final image should project through provider-neutral frontdoors\n{frontdoor}"
     );
-
-    fs::remove_dir_all(output_dir).unwrap();
 }

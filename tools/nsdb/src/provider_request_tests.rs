@@ -113,6 +113,16 @@ fn parses_registered_buffer_and_kernel_descriptors() {
 }
 
 #[test]
+fn parses_rank_three_contiguous_tensor_with_flat_span_stride() {
+    let evidence = "provider_buffer_descriptor_contract=nuis-provider-buffer-descriptor-v1;provider_buffer_id=input.features;provider_buffer_element_type=f32;provider_buffer_layout=tensor-contiguous;provider_buffer_shape=16x64x64;provider_buffer_row_stride_bytes=262144;provider_buffer_byte_length=262144;provider_buffer_payload_path=features.bin;provider_buffer_content_hash=0x1234;provider_kernel_descriptor_contract=nuis-provider-kernel-descriptor-v1;provider_kernel_id=tensor.rank3.copy;provider_kernel_operation=copy;provider_kernel_input_buffer=input.features;provider_kernel_output_buffer=output.features;provider_kernel_dispatch=16x64x64";
+    let request = provider_request_from_evidence(evidence).expect("rank-three tensor request");
+    assert_eq!(request.buffer.shape, [16, 64, 64]);
+    assert_eq!(request.buffer.row_stride_bytes, 262_144);
+    assert_eq!(request.input_bindings[0].row_stride_bytes, 262_144);
+    assert_eq!(request.output_bindings[0].row_stride_bytes, 262_144);
+}
+
+#[test]
 fn parses_ordered_multi_output_bindings_with_compatibility_primary() {
     let evidence = format!(
         "{REGISTERED};provider_output_binding_contract={LEGACY_PROVIDER_OUTPUT_BINDING_CONTRACT};provider_output_binding_count=2;provider_output_binding_0_role=output.primary;provider_output_binding_0_buffer=output.pixels;provider_output_binding_0_element_type=u8;provider_output_binding_0_shape=2x2;provider_output_binding_0_byte_length=4;provider_output_binding_0_comparison_id=none;provider_output_binding_1_role=output.audit;provider_output_binding_1_buffer=output.audit;provider_output_binding_1_element_type=u64;provider_output_binding_1_shape=3;provider_output_binding_1_byte_length=24;provider_output_binding_1_comparison_id=none"

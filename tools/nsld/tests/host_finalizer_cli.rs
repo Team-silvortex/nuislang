@@ -1,7 +1,8 @@
-#![cfg(unix)]
+#![cfg(all(target_os = "macos", target_arch = "aarch64"))]
 
 use std::{
     env, fs,
+    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
@@ -10,170 +11,80 @@ use std::{
 use nuisc::aot::{
     host_cpu_build_target, write_build_manifest, BuildManifestContext, CompileArtifacts,
 };
-use std::os::unix::fs::PermissionsExt;
 
 #[test]
-fn cli_emit_final_executable_invokes_allowed_host_finalizer_without_env_pollution() {
-    let dir = unique_temp_dir("nsld-cli-host-finalizer");
+fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
+    let dir = unique_temp_dir("nsld-cli-internal-macho-finalizer");
     fs::create_dir_all(&dir).unwrap();
-    let manifest = write_native_cpu_fixture(&dir);
-    let fake_bin = dir.join("fake-bin");
-    fs::create_dir_all(&fake_bin).unwrap();
-    write_fake_clang(&fake_bin.join("clang"));
-
-    let drive = run_nsld_args_with_host_finalizer_env(
-        &[
-            "drive",
-            manifest.to_str().unwrap(),
-            "--apply",
-            "--until-clean",
-            "--json",
-        ],
-        &fake_bin,
-    );
-
-    let output = run_nsld_with_host_finalizer_env("final-executable-output", &manifest, &fake_bin);
-    let host_invoke_plan =
-        run_nsld_with_host_finalizer_env("final-executable-host-invoke-plan", &manifest, &fake_bin);
-    let check = run_nsld_with_host_finalizer_env("check", &manifest, &fake_bin);
-    let next_action = run_nsld_with_host_finalizer_env("check-next-action", &manifest, &fake_bin);
-    let artifact_chain = run_nsld_with_host_finalizer_env("artifact-chain", &manifest, &fake_bin);
-    let launcher_manifest = run_nsld_with_host_finalizer_env(
-        "final-executable-launcher-manifest",
-        &manifest,
-        &fake_bin,
-    );
-    let launcher_dry_run =
-        run_nsld_with_host_finalizer_env("final-executable-launcher-dry-run", &manifest, &fake_bin);
+    let source_executable = find_path_executable("true");
+    let expected_binary = fs::read(&source_executable).unwrap();
+    let manifest = write_native_cpu_fixture(&dir, &source_executable);
     let final_binary = dir.join("demo.bin");
-    let invoked_marker = dir.join("demo.bin.invoked");
-    let final_binary_bytes = fs::read(&final_binary).unwrap();
-    let invoked = invoked_marker.exists();
+
+    let mut non_executable = fs::metadata(&final_binary).unwrap().permissions();
+    non_executable.set_mode(0o644);
+    fs::set_permissions(&final_binary, non_executable).unwrap();
+
+    let drive = run_nsld_args(&[
+        "drive",
+        manifest.to_str().unwrap(),
+        "--apply",
+        "--until-clean",
+        "--json",
+    ]);
+    let output = run_nsld("final-executable-output", &manifest);
+    let invoke_plan = run_nsld("final-executable-host-invoke-plan", &manifest);
+    let check = run_nsld("check", &manifest);
+    let artifact_chain = run_nsld("artifact-chain", &manifest);
+    let launcher = run_nsld("final-executable-launcher-manifest", &manifest);
+    let launcher_dry_run = run_nsld("final-executable-launcher-dry-run", &manifest);
+
+    let actual_binary = fs::read(&final_binary).unwrap();
+    let executable_mode = fs::metadata(&final_binary).unwrap().permissions().mode();
+    let launched = Command::new(&final_binary).output().unwrap();
     fs::remove_dir_all(dir).unwrap();
 
-    assert_eq!(final_binary_bytes, b"host-native-executable\n");
-    assert!(invoked);
-    assert!(
-        host_invoke_plan
-            .contains("\"finalizer_contract\":\"nuis-nsld-executable-finalizer-registry-v1\""),
-        "{host_invoke_plan}"
-    );
-    assert!(
-        host_invoke_plan.contains(
-            "\"finalizer_provider_id\":\"nsld.finalizer.mach-o.arm64.host-command-shell-v1\""
-        ),
-        "{host_invoke_plan}"
-    );
-    assert!(
-        host_invoke_plan.contains("\"finalizer_provider_status\":\"ready\""),
-        "{host_invoke_plan}"
-    );
-    assert!(
-        drive.contains("\"kind\":\"nsld_drive_until_clean\""),
-        "{drive}"
-    );
+    assert_eq!(actual_binary, expected_binary);
+    assert_ne!(executable_mode & 0o111, 0);
+    assert!(launched.status.success());
+    assert!(invoke_plan
+        .contains("\"finalizer_contract\":\"nuis-nsld-executable-finalizer-registry-v1\""));
+    assert!(invoke_plan
+        .contains("\"finalizer_provider_id\":\"nsld.finalizer.mach-o.arm64.artifact-image-v1\""));
+    assert!(invoke_plan
+        .contains("\"finalizer_execution_kind\":\"registered-nsld-artifact-image-writer\""));
+    assert!(invoke_plan.contains("\"invocation_kind\":\"registered-internal-finalizer\""));
+    assert!(invoke_plan.contains("\"invocation_policy\":\"registered-internal\""));
+    assert!(invoke_plan.contains("\"requires_explicit_allow\":false"));
+    assert!(invoke_plan.contains("\"explicit_allow_present\":false"));
+    assert!(invoke_plan.contains("\"would_invoke\":true"));
+    assert!(drive.contains("\"kind\":\"nsld_drive_until_clean\""));
     assert!(drive.contains("\"completed\":true"), "{drive}");
     assert!(drive.contains("\"stop_reason\":\"clean\""), "{drive}");
-    assert!(
-        output.contains("\"output_kind\":\"host-native-executable\""),
-        "{output}"
-    );
-    assert!(
-        output.contains("\"output_validation_mode\":\"host-native-presence-and-invoke-plan\""),
-        "{output}"
-    );
+    assert!(output.contains("\"output_kind\":\"host-native-executable\""));
     assert!(output.contains("\"present\":true"), "{output}");
+    assert!(output.contains("\"nsld_owned_output\":true"), "{output}");
     assert!(output.contains("\"runnable_candidate\":true"), "{output}");
-    assert!(
-        output.contains("\"output_image_header_required\":false"),
-        "{output}"
-    );
-    assert!(!output.contains("final-executable-output:image-header-invalid"));
-    assert!(
-        check.contains("\"final_executable_output_kind\":\"host-native-executable\""),
-        "{check}"
-    );
-    assert!(
-        check.contains(
-            "\"final_executable_output_validation_mode\":\"host-native-presence-and-invoke-plan\""
-        ),
-        "{check}"
-    );
-    assert!(
-        check.contains("\"final_executable_output_runnable_candidate\":true"),
-        "{check}"
-    );
-    assert!(
-        check.contains("\"final_executable_output_image_header_required\":false"),
-        "{check}"
-    );
-    assert!(next_action.contains("\"available\":false"), "{next_action}");
-    assert!(next_action.contains("\"command_id\":null"), "{next_action}");
-    assert!(
-        artifact_chain.contains("\"next_action_available\":false"),
-        "{artifact_chain}"
-    );
-    assert!(
-        artifact_chain.contains("\"stage_id\":\"final-executable-output\"")
-            && artifact_chain.contains("\"present\":true"),
-        "{artifact_chain}"
-    );
-    assert!(
-        launcher_manifest.contains("\"output_kind\":\"host-native-executable\""),
-        "{launcher_manifest}"
-    );
-    assert!(
-        launcher_manifest
-            .contains("\"output_validation_mode\":\"host-native-presence-and-invoke-plan\""),
-        "{launcher_manifest}"
-    );
-    assert!(
-        launcher_manifest.contains("\"final_output_present\":true"),
-        "{launcher_manifest}"
-    );
-    assert!(
-        launcher_manifest.contains("\"image_header_required\":false"),
-        "{launcher_manifest}"
-    );
-    assert!(
-        launcher_manifest.contains("\"ready\":true"),
-        "{launcher_manifest}"
-    );
-    assert!(
-        launcher_dry_run.contains("\"final_output_readable\":true"),
-        "{launcher_dry_run}"
-    );
-    assert!(
-        launcher_dry_run.contains("\"final_output_hash_matches\":true"),
-        "{launcher_dry_run}"
-    );
-    assert!(
-        launcher_dry_run.contains("\"dry_run_ready\":true"),
-        "{launcher_dry_run}"
-    );
-    assert!(
-        launcher_dry_run.contains("\"verify-host-native-output-presence\""),
-        "{launcher_dry_run}"
-    );
+    assert!(check.contains("\"final_executable_output_present\":true"));
+    assert!(check.contains("\"final_executable_output_runnable_candidate\":true"));
+    assert!(artifact_chain.contains("\"stage_id\":\"final-executable-output\""));
+    assert!(artifact_chain.contains("\"present\":true"));
+    assert!(launcher.contains("\"final_output_present\":true"));
+    assert!(launcher.contains("\"ready\":true"));
+    assert!(launcher_dry_run.contains("\"final_output_readable\":true"));
+    assert!(launcher_dry_run.contains("\"dry_run_ready\":true"));
 }
 
-fn run_nsld_with_host_finalizer_env(command: &str, manifest: &Path, fake_bin: &Path) -> String {
-    run_nsld_args_with_host_finalizer_env(
-        &[command, manifest.to_str().unwrap(), "--json"],
-        fake_bin,
-    )
+fn run_nsld(command: &str, manifest: &Path) -> String {
+    run_nsld_args(&[command, manifest.to_str().unwrap(), "--json"])
 }
 
-fn run_nsld_args_with_host_finalizer_env(args: &[&str], fake_bin: &Path) -> String {
-    let mut path = env::split_paths(&env::var_os("PATH").unwrap_or_default()).collect::<Vec<_>>();
-    path.insert(0, fake_bin.to_path_buf());
-    let path = env::join_paths(path).unwrap();
+fn run_nsld_args(args: &[&str]) -> String {
     let command_label = args.join(" ");
     let output = Command::new(env!("CARGO_BIN_EXE_nsld"))
         .args(args)
-        .env("PATH", path)
-        .env("NUIS_NSLD_HOST_FINALIZER_POLICY", "allow-host-invoke")
-        .env("NUIS_NSLD_ALLOW_HOST_FINALIZER", "1")
+        .env_remove("NUIS_NSLD_HOST_FINALIZER_POLICY")
+        .env_remove("NUIS_NSLD_ALLOW_HOST_FINALIZER")
         .output()
         .unwrap_or_else(|error| panic!("failed to run nsld {command_label}: {error}"));
     if !output.status.success() {
@@ -187,7 +98,7 @@ fn run_nsld_args_with_host_finalizer_env(args: &[&str], fake_bin: &Path) -> Stri
     String::from_utf8(output.stdout).unwrap()
 }
 
-fn write_native_cpu_fixture(dir: &Path) -> PathBuf {
+fn write_native_cpu_fixture(dir: &Path, source_executable: &Path) -> PathBuf {
     let ast = dir.join("demo.ast.txt");
     let nir = dir.join("demo.nir.txt");
     let yir = dir.join("demo.yir");
@@ -199,7 +110,7 @@ fn write_native_cpu_fixture(dir: &Path) -> PathBuf {
     fs::write(&nir, "nir").unwrap();
     fs::write(&yir, "yir").unwrap();
     fs::write(&ll, "llvm").unwrap();
-    fs::write(&bin, "host-native-executable\n").unwrap();
+    fs::copy(source_executable, &bin).unwrap();
 
     let manifest = write_build_manifest(
         dir,
@@ -225,21 +136,19 @@ fn write_native_cpu_fixture(dir: &Path) -> PathBuf {
     PathBuf::from(manifest)
 }
 
-fn write_fake_clang(path: &Path) {
-    fs::write(
-        path,
-        "#!/usr/bin/env sh\nout=\"\"\nwhile [ \"$#\" -gt 0 ]; do\n  if [ \"$1\" = \"-o\" ]; then\n    shift\n    out=\"$1\"\n  fi\n  shift\ndone\nif [ -z \"$out\" ]; then\n  exit 64\nfi\nprintf 'host-native-executable\\n' > \"$out\"\nprintf 'invoked\\n' > \"$out.invoked\"\n",
-    )
-    .unwrap();
-    let mut permissions = fs::metadata(path).unwrap().permissions();
-    permissions.set_mode(0o755);
-    fs::set_permissions(path, permissions).unwrap();
-}
-
 fn unique_temp_dir(label: &str) -> PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
     env::temp_dir().join(format!("{label}-{}-{nanos}", std::process::id()))
+}
+
+fn find_path_executable(name: &str) -> PathBuf {
+    env::var_os("PATH")
+        .into_iter()
+        .flat_map(|paths| env::split_paths(&paths).collect::<Vec<_>>())
+        .map(|directory| directory.join(name))
+        .find(|candidate| candidate.is_file())
+        .unwrap_or_else(|| panic!("required test executable `{name}` was not found on PATH"))
 }

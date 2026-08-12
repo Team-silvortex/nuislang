@@ -848,6 +848,4 @@ fn run_vulkan_sample_smoke(sample: VulkanSampleSmoke<'_>) {
             ),
         "Vulkan sealed final image should project through Nuis object-package/debugger frontdoors without a cursor lineage prerequisite\n{frontdoor}"
     );
-
-    fs::remove_dir_all(output_dir).unwrap();
 }

@@ -1028,51 +1028,56 @@ selected driver, target triple, native object, and output path, but still does
 not invoke the host linker.
 
 `nuis-nsld-executable-finalizer-registry-v1` now owns the boundary after that
-format-independent writer input. It canonicalizes architecture, OS, and object
-format, rejects absent or ambiguous providers, and hashes the static provider
-set. Mach-O arm64 selects
-`nsld.finalizer.mach-o.arm64.host-command-shell-v1`; Mach-O fallback, ELF, and
-PE/COFF remain explicit `registered-not-implemented` targets. The selected
-contract, registry hash, target key, provider id/status, and execution kind are
-projected through host dry-run JSON and persisted in the verified invoke-plan
-artifact. Actual process spawning lives in the selected provider callback, not
-the generic final executable emit path. Host-command execution uses the exact
-driver path resolved by the verified dry-run boundary instead of performing a
-second `PATH` lookup. The ready Mach-O provider still uses a registered host
-command, so this closes registration decoupling rather than claiming a pure
-Nsld platform linker.
+format-independent writer input. It canonicalizes architecture, OS, object
+format, and packaging route, rejects absent or ambiguous providers, and hashes
+the static provider set. `native-cpu-llvm` on Mach-O arm64 selects
+`nsld.finalizer.mach-o.arm64.artifact-image-v1`; a host-command provider remains
+the compatibility fallback, while Mach-O wildcard, ELF, and PE/COFF writers
+remain explicit `registered-not-implemented` targets. The selected contract,
+registry hash, target key, provider id/status, and execution kind are projected
+through dry-run JSON and persisted in the verified invoke-plan artifact.
+
+The internal provider parses the compiled artifact, validates target/ABI and a
+thin or universal arm64 `MH_EXECUTE` image, then installs it atomically with
+executable permissions. It requires neither host policy variables nor a child
+process, removing the former second clang invocation from the Nsld path.
+Host-command execution remains provider-owned and uses the exact driver path
+resolved by the verified dry-run boundary instead of performing a second
+`PATH` lookup.
+
+This still does not claim a pure Nsld platform linker: Nuisc currently embeds a
+host-toolchain-linked image rather than handing Nsld relocatable LLVM objects.
+Mach-O shell construction and final native relocation ownership remain the
+next boundary.
 
 `nsld final-executable-host-dry-run` consumes the verified writer input,
-resolves the selected host driver through an explicit path or `PATH`, and
-reports `environment_ready`, `driver_available`, `driver_resolved_path`, and
-the exact command arguments. It is non-mutating and never invokes the host
-driver; alpha-0.8.x reports `invocation_policy = "dry-run-only"` with
-`alpha-host-finalizer-execution-disabled` by default so Nsld cannot
-accidentally execute a host linker before the execution policy is deliberately
-changed. `NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke` (or `allow`) lets
-the report recognize the next policy state as `allow-host-invoke`; an empty,
-missing, or `dry-run-only` value stays blocked, and any other value is reported
-as `host-finalizer-policy-env:invalid:NUIS_NSLD_HOST_FINALIZER_POLICY`. This
-policy switch only changes the audited plan state: the dry-run command remains
-non-mutating and still never spawns the host driver. The command exists to make
-the final host-assisted call boundary auditable before Nsld is allowed to
-execute it.
-`nsld final-executable-host-invoke-plan` sits one step after dry-run and before
-any future mutating host finalizer invocation. It reuses the dry-run command
-shape, reports `invocation_kind = "host-finalizer-command"`, requires an
-explicit allow gate, and reports whether `NUIS_NSLD_ALLOW_HOST_FINALIZER` is
-present with an allow-like value (`1`, `true`, `yes`, or `allow`). By default
-`explicit_allow_present = false` and `would_invoke = false`. Even when the
-explicit allow marker and `NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke`
-are both present, the invoke-plan reports `would_invoke = true`; the standalone
-plan command itself remains non-mutating and leaves actual execution to the
-explicit final executable emit boundary. The command records
+reports `environment_ready`, provider identity, and exact command arguments.
+For a host-command provider it resolves the selected driver through an
+explicit path or `PATH` and records `driver_available` plus
+`driver_resolved_path`. The internal artifact-image provider instead reports
+`invocation_policy = "registered-internal"`, requires no driver lookup or
+environment gate, and still keeps the dry-run non-mutating.
+
+For the compatibility host provider,
+`NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke` (or `allow`) selects the
+audited allow state; an empty, missing, or `dry-run-only` value stays blocked,
+and any other value is reported as
+`host-finalizer-policy-env:invalid:NUIS_NSLD_HOST_FINALIZER_POLICY`. This switch
+does not mutate artifacts or spawn the host driver.
+
+`nsld final-executable-host-invoke-plan` sits between dry-run and the mutating
+provider callback. A host-command provider reports
+`invocation_kind = "host-finalizer-command"` and also requires an allow-like
+`NUIS_NSLD_ALLOW_HOST_FINALIZER` value (`1`, `true`, `yes`, or `allow`). The
+internal provider reports `invocation_kind = "registered-internal-finalizer"`,
+`requires_explicit_allow = false`, and may report `would_invoke = true` once
+its verified inputs are ready. The standalone plan command remains
+non-mutating in both cases and leaves execution to the explicit final
+executable emit boundary. It records
 `host-invoke-plan-is-non-mutating` and
-`host-finalizer-process-is-not-spawned`, adds
+`host-finalizer-process-is-not-spawned`; for host providers it adds
 `host-finalizer-explicit-allow:missing` to blockers when that marker is absent,
-and never spawns the host driver. This gives alpha-0.8.x a stable audit surface
-for the future transition from “known finalizer command” to “deliberately
-invoked finalizer command” without weakening the current execution gate.
+and never spawns the host driver.
 `nsld emit-final-executable-host-invoke-plan` writes the same gate as
 `nuis.nsld.final-executable-host-invoke-plan.toml`, and
 `nsld verify-final-executable-host-invoke-plan` re-renders it to catch content

@@ -16,11 +16,15 @@ galaxy = ["std=workspace"]
         .trim_start(),
         &source,
     );
+    let project = crate::project::load_project(&project_root).unwrap();
+    let committed_lock_path = project_root.join("nuis.galaxy.lock");
+    crate::project::write_project_galaxy_resolution_lock(&committed_lock_path, &project).unwrap();
+    let committed_lock_source = fs::read_to_string(&committed_lock_path).unwrap();
     let output_dir = temp_dir("compile_command_galaxy_resolution_lock_outputs");
     let output_stem = "hetero_proxy_benchmark_demo".to_owned();
 
     run(CommandKind::Compile {
-        input: project_root,
+        input: project_root.clone(),
         output_dir: output_dir.clone(),
         verbose_cache: false,
         cpu_abi: None,
@@ -50,6 +54,7 @@ galaxy = ["std=workspace"]
 
     let galaxy_lock_path = output_dir.join("nuis.project.galaxy.lock");
     let galaxy_lock_source = fs::read_to_string(&galaxy_lock_path).unwrap();
+    assert_eq!(galaxy_lock_source, committed_lock_source);
     let galaxy_lock_summary = crate::project::verify_project_galaxy_resolution_lock_source(
         &galaxy_lock_source,
         &galaxy_lock_path,
@@ -112,4 +117,24 @@ galaxy = ["std=workspace"]
         Err(error) => error,
     };
     assert!(error.contains("payload hash mismatch"));
+
+    let drifted_root_lock = committed_lock_source.replacen(
+        "package_id = \"nuis.core\"",
+        "package_id = \"nuis.core.drifted\"",
+        1,
+    );
+    fs::write(&committed_lock_path, drifted_root_lock).unwrap();
+    let rejected_output = temp_dir("compile_command_rejected_root_lock_outputs");
+    fs::remove_dir_all(&rejected_output).unwrap();
+    let error = run(CommandKind::Compile {
+        input: project_root,
+        output_dir: rejected_output.clone(),
+        verbose_cache: false,
+        cpu_abi: None,
+        target: None,
+        packaging_mode: None,
+    })
+    .unwrap_err();
+    assert!(error.contains("payload hash mismatch"));
+    assert!(!rejected_output.exists());
 }

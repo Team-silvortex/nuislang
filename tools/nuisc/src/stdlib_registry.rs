@@ -245,7 +245,7 @@ fn detect_auto_injectability(
     Ok((blockers.is_empty(), blockers))
 }
 
-pub(crate) fn read_verified_galaxy_text(
+pub fn read_verified_galaxy_text(
     path: &Path,
     identity: &ResolvedGalaxyContentIdentity,
 ) -> Result<String, String> {

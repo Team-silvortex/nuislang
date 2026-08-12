@@ -412,6 +412,12 @@ pub(crate) fn write_project_status_text_summary<W: fmt::Write>(
                 .map_err(|e| e.to_string())?;
             writeln!(out, "  galaxy_lock_dependencies: {}", lock.entries.len())
                 .map_err(|e| e.to_string())?;
+            writeln!(
+                out,
+                "  galaxy_lock_resolution_sha256: {}",
+                lock.summary.resolution_sha256
+            )
+            .map_err(|e| e.to_string())?;
             let declared = project
                 .manifest
                 .galaxy_dependencies
@@ -421,6 +427,7 @@ pub(crate) fn write_project_status_text_summary<W: fmt::Write>(
             let locked = lock
                 .entries
                 .iter()
+                .filter(|item| item.direct)
                 .map(|item| format!("{}={}", item.name, item.version))
                 .collect::<std::collections::BTreeSet<_>>();
             writeln!(
@@ -432,8 +439,12 @@ pub(crate) fn write_project_status_text_summary<W: fmt::Write>(
             for item in lock.entries {
                 writeln!(
                     out,
-                    "  galaxy_lock_entry: {}={} {}",
-                    item.name, item.version, item.bundle_fnv1a64
+                    "  galaxy_lock_entry: {}={} package={} scope={} manifest={}",
+                    item.name,
+                    item.version,
+                    item.package_id,
+                    if item.direct { "direct" } else { "transitive" },
+                    item.manifest_sha256
                 )
                 .map_err(|e| e.to_string())?;
             }

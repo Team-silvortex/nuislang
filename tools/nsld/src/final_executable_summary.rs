@@ -131,7 +131,7 @@ pub(crate) fn nsld_final_executable_writer_plan_report(
         "blocked"
     }
     .to_owned();
-    let writer_steps = final_executable_writer_steps(&final_stage);
+    let writer_steps = final_executable_writer_steps(&final_stage, plan);
     let mut notes = final_stage.notes.clone();
     notes.push("final-executable-writer-plan-is-non-mutating".to_owned());
 

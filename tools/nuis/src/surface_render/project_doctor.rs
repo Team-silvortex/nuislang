@@ -42,10 +42,10 @@ pub(crate) fn write_project_doctor_text_summary<W: fmt::Write>(
     let deps_len = galaxy_doctor.dependencies.len();
     let include_galaxy_flow =
         galaxy_manifest_exists || !project.manifest.galaxy_dependencies.is_empty();
-    let any_local_missing = galaxy_doctor
+    let any_source_missing = galaxy_doctor
         .dependencies
         .iter()
-        .any(|dependency| !dependency.local_available);
+        .any(|dependency| !dependency.source_available);
     let any_lock_missing = galaxy_doctor
         .dependencies
         .iter()
@@ -414,10 +414,10 @@ pub(crate) fn write_project_doctor_text_summary<W: fmt::Write>(
     for dependency in &galaxy_doctor.dependencies {
         writeln!(
             out,
-            "  dep: {}={} local={} lock={} installed={}",
+            "  dep: {}={} source={} lock={} installed={}",
             dependency.name,
             dependency.version,
-            crate::yes_no(dependency.local_available),
+            crate::yes_no(dependency.source_available),
             crate::yes_no(dependency.locked),
             crate::yes_no(dependency.installed)
         )
@@ -541,9 +541,9 @@ pub(crate) fn write_project_doctor_text_summary<W: fmt::Write>(
             "run `nuis galaxy sync-deps <project-dir>` to materialize locked galaxy dependencies under `.nuis/deps/galaxy`".to_owned(),
         );
     }
-    if any_local_missing && deps_len > 0 {
+    if any_source_missing && deps_len > 0 {
         next_steps.push(
-            "some galaxy deps are not available locally; use `nuis galaxy list` to inspect the local registry or publish/install the missing packages first".to_owned(),
+            "some galaxy dependency sources are unavailable; restore the configured workspace, cache, or registry provider before locking".to_owned(),
         );
     }
     if !hidden_manual_only_library_modules.is_empty() {

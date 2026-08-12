@@ -55,9 +55,11 @@ use data_contract_types::{
 #[cfg(test)]
 use data_validation::validate_data_profile_token_types;
 pub use galaxy_lock::{
-    render_project_galaxy_resolution_lock, verify_project_galaxy_resolution_lock,
+    committed_project_galaxy_resolution_lock_path, render_project_galaxy_resolution_lock,
+    verify_committed_project_galaxy_resolution_lock, verify_project_galaxy_resolution_lock,
     verify_project_galaxy_resolution_lock_source, write_project_galaxy_resolution_lock,
-    PROJECT_GALAXY_RESOLUTION_LOCK_DIGEST, PROJECT_GALAXY_RESOLUTION_LOCK_SCHEMA,
+    PROJECT_GALAXY_RESOLUTION_LOCK_DIGEST, PROJECT_GALAXY_RESOLUTION_LOCK_FILE,
+    PROJECT_GALAXY_RESOLUTION_LOCK_SCHEMA,
 };
 #[cfg(test)]
 use kernel_validation::{

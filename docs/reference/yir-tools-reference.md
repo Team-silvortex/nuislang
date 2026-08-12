@@ -367,6 +367,9 @@ The front-door workflow is now project-aware:
 
 * `check`, `test`, `build`, `dump-ast`, `dump-nir`, `dump-yir`, `bindings`, and cache commands all accept single-file `.ns`, project directories, or direct `nuis.toml` inputs where applicable
 * `project-status` prints the resolved project graph, declared `tests = [...]`, effective ABI mode, and per-domain ABI target details
+  * when `nuis.galaxy.lock` exists, the compiler-owned resolution verifier
+    reports its SHA-256 digest, direct/transitive package identities, and any
+    closure drift
 * `project-doctor` prints a higher-level health summary covering project ABI state, declared/missing test inputs, `galaxy.toml`, `nuis.galaxy.lock`, dependency materialization state, `ns-nova.toml`, and current `stdlib/ns-nova` source-asset visibility
 * `project-lock-abi` materializes the currently recommended host-matching ABI set into the project manifest
 * `test` runs `check` first, collects language-level `test fn` declarations, can list them with `--list`, can restrict execution to a substring filter on the test function name or declared label, supports `--exact`, supports `--ignored` / `--include-ignored`, and currently understands the MVP metadata `ignored`, `should_fail`, `reason`, `timeout_ms`, and `clock_domain`
@@ -419,6 +422,9 @@ Read that as:
   for the current clock/bridge contract
 * `build`
   artifact generation
+  verifies an existing canonical `nuis.galaxy.lock` before cache restore,
+  lowering, linking, or output creation; the emitted
+  `nuis.project.galaxy.lock` is the same canonical resolution snapshot
   emits the concrete output directory plus project-side indexes such as
   `nuis.project.plan.txt`, `nuis.project.organization.txt`,
   `nuis.project.exchange.txt`, `nuis.project.packet.txt`,
@@ -439,9 +445,17 @@ For framework/package-aware projects, the current companion `galaxy` flow is:
 galaxy init
   -> galaxy check
   -> galaxy lock-deps
+  -> galaxy verify-lock
   -> galaxy sync-deps
   -> project-doctor
 ```
+
+`lock-deps`, `verify-lock`, and `sync-deps` share
+`nuis-galaxy-resolution-lock-v1`. Sync transactionally materializes only
+SHA-256-verified manifest/source/library files under `.nuis/deps/galaxy` and
+does not use machine-specific bundle paths. `install-deps` is the combined
+`lock-deps + sync-deps` convenience operation; local bundle publication stays
+independent from compiler resolution.
 
 `nuis project-status` and `nuis project-doctor` now also print this same route
 as lightweight front-door hints, using the clearer
@@ -455,7 +469,7 @@ as lightweight front-door hints, using the clearer
   * `list=nuis test --list <project-dir>; exact=nuis test --exact <project-dir> <test-name>; ignored=nuis test --ignored <project-dir>; include_ignored=nuis test --include-ignored <project-dir>`
 * `project_galaxy_workflow`
   * printed when the project already has `galaxy.toml` or declared galaxy deps:
-    `nuis galaxy init <project-dir> -> nuis galaxy check <project-dir> -> nuis galaxy lock-deps <project-dir> -> nuis galaxy sync-deps <project-dir> -> nuis project-doctor <project-dir>`
+    `nuis galaxy init <project-dir> -> nuis galaxy check <project-dir> -> nuis galaxy lock-deps <project-dir> -> nuis galaxy verify-lock <project-dir> -> nuis galaxy sync-deps <project-dir> -> nuis project-doctor <project-dir>`
 
 Current project-aware front doors now also share a normalized compiler-side
 plan summary:

@@ -26,7 +26,7 @@ pub fn project_test_workflow_brief() -> &'static str {
 }
 
 pub fn project_galaxy_workflow_brief() -> &'static str {
-    "galaxy=nuis galaxy init <project-dir> -> nuis galaxy check <project-dir> -> nuis galaxy lock-deps <project-dir> -> nuis galaxy sync-deps <project-dir> -> nuis project-doctor <project-dir> -> nuisc inspect-project-metadata --summary <project-dir>"
+    "galaxy=nuis galaxy init <project-dir> -> nuis galaxy check <project-dir> -> nuis galaxy lock-deps <project-dir> -> nuis galaxy verify-lock <project-dir> -> nuis galaxy sync-deps <project-dir> -> nuis project-doctor <project-dir> -> nuisc inspect-project-metadata --summary <project-dir>"
 }
 
 pub(crate) fn resolve_compile_input(

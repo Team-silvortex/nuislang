@@ -90,6 +90,9 @@ pub(crate) fn run_compile(
     packaging_mode: Option<String>,
 ) -> Result<(), String> {
     let resolved = resolve_compile_input(&input)?;
+    if let Some(project) = &resolved.project {
+        project::verify_committed_project_galaxy_resolution_lock(project)?;
+    }
     let requested_packaging_mode = packaging_mode
         .as_deref()
         .or_else(|| {

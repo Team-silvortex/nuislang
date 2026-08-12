@@ -324,6 +324,4 @@ fn sealed_linux_cuda_image_executes_and_replays_completion() {
     )));
     assert!(final_output_text.contains("\"completion_tokens\":\"provider-completion:0x"));
     assert!(final_output_text.contains("\"glm_release_tokens\":\"glm-release:0x"));
-
-    fs::remove_dir_all(output_dir).unwrap();
 }

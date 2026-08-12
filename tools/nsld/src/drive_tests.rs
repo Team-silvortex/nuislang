@@ -454,7 +454,7 @@ fn drive_until_clean_command_reaches_host_assisted_pipeline_block() {
         std::process::id()
     ));
     fs::create_dir_all(&dir).unwrap();
-    let manifest = write_test_build_manifest(&dir);
+    let manifest = write_test_build_manifest_with_packaging_mode(&dir, "executable");
 
     run_drive_command(&dir, true, true, true).unwrap();
     let plan = nuisc::linker::build_link_plan_from_manifest(Path::new(&manifest)).unwrap();

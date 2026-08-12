@@ -21,7 +21,7 @@ pub(super) fn assert_provider_bundle_audit_evidence(source: &str, label: &str) {
     let (count, hash) = match label {
         "pixelmagic_pipeline_demo" => (2, "fnv1a64:0126ed9d38f1895f"),
         "pixelmagic_threshold_provider_demo" => (1, "fnv1a64:5c7ac5158d84aa8b"),
-        "witsage_kernel_demo" => (1, "fnv1a64:e9a82b052c861b93"),
+        "witsage_kernel_demo" => (2, "fnv1a64:0126ed9d38f1895f"),
         other => panic!("missing selected provider bundle expectation for `{other}`"),
     };
     for evidence in [

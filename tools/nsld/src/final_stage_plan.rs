@@ -1,4 +1,7 @@
-use super::{fnv1a64_hex, reports::NsldFinalStageInputDiagnostic};
+use super::{
+    content_hash_cache::cached_file_content_hash, fnv1a64_hex,
+    reports::NsldFinalStageInputDiagnostic,
+};
 use std::path::PathBuf;
 
 pub(crate) fn final_stage_input(
@@ -10,9 +13,7 @@ pub(crate) fn final_stage_input(
 ) -> NsldFinalStageInputDiagnostic {
     let present = path.exists();
     let content_hash = if present {
-        std::fs::read(&path)
-            .map(|bytes| fnv1a64_hex(&bytes))
-            .unwrap_or_else(|_| "missing".to_owned())
+        cached_file_content_hash(&path).unwrap_or_else(|_| "missing".to_owned())
     } else {
         "missing".to_owned()
     };

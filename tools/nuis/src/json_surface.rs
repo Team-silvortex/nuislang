@@ -370,6 +370,7 @@ pub(crate) fn galaxy_lock_json_fields(
             let locked = lock
                 .entries
                 .iter()
+                .filter(|item| item.direct)
                 .map(|item| format!("{}={}", item.name, item.version))
                 .collect::<BTreeSet<_>>();
             let declared = declared_dependencies
@@ -379,6 +380,10 @@ pub(crate) fn galaxy_lock_json_fields(
             vec![
                 crate::json_field("galaxy_lock_status", "ok"),
                 crate::json_field("galaxy_lock_path", &lock.path.display().to_string()),
+                crate::json_field(
+                    "galaxy_lock_resolution_sha256",
+                    &lock.summary.resolution_sha256,
+                ),
                 crate::json_usize_field("galaxy_lock_dependencies", lock.entries.len()),
                 crate::json_bool_field("galaxy_lock_matches_manifest", declared == locked),
                 crate::json_string_array_field(
@@ -387,7 +392,14 @@ pub(crate) fn galaxy_lock_json_fields(
                         .entries
                         .iter()
                         .map(|item| {
-                            format!("{}={} {}", item.name, item.version, item.bundle_fnv1a64)
+                            format!(
+                                "{}={} package={} scope={} manifest={}",
+                                item.name,
+                                item.version,
+                                item.package_id,
+                                if item.direct { "direct" } else { "transitive" },
+                                item.manifest_sha256
+                            )
                         })
                         .collect::<Vec<_>>(),
                 ),
@@ -416,6 +428,7 @@ pub(crate) fn append_galaxy_lock_json_fields(
             let locked = lock
                 .entries
                 .iter()
+                .filter(|item| item.direct)
                 .map(|item| format!("{}={}", item.name, item.version))
                 .collect::<BTreeSet<_>>();
             let declared = declared_dependencies
@@ -427,6 +440,10 @@ pub(crate) fn append_galaxy_lock_json_fields(
                 vec![
                     crate::json_field("galaxy_lock_status", "ok"),
                     crate::json_field("galaxy_lock_path", &lock.path.display().to_string()),
+                    crate::json_field(
+                        "galaxy_lock_resolution_sha256",
+                        &lock.summary.resolution_sha256,
+                    ),
                     crate::json_usize_field("galaxy_lock_dependencies", lock.entries.len()),
                     crate::json_bool_field("galaxy_lock_matches_manifest", declared == locked),
                     crate::json_string_array_field(
@@ -435,7 +452,14 @@ pub(crate) fn append_galaxy_lock_json_fields(
                             .entries
                             .iter()
                             .map(|item| {
-                                format!("{}={} {}", item.name, item.version, item.bundle_fnv1a64)
+                                format!(
+                                    "{}={} package={} scope={} manifest={}",
+                                    item.name,
+                                    item.version,
+                                    item.package_id,
+                                    if item.direct { "direct" } else { "transitive" },
+                                    item.manifest_sha256
+                                )
                             })
                             .collect::<Vec<_>>(),
                     ),

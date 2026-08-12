@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::{
     LoadedProject, ProjectGalaxyResolutionLockSummary, ProjectModuleOrigin,
@@ -10,6 +10,7 @@ use super::{
 
 pub const PROJECT_GALAXY_RESOLUTION_LOCK_SCHEMA: &str = "nuis-galaxy-resolution-lock-v1";
 pub const PROJECT_GALAXY_RESOLUTION_LOCK_DIGEST: &str = "sha256";
+pub const PROJECT_GALAXY_RESOLUTION_LOCK_FILE: &str = "nuis.galaxy.lock";
 
 pub fn render_project_galaxy_resolution_lock(
     project: &LoadedProject,
@@ -296,6 +297,26 @@ pub fn write_project_galaxy_resolution_lock(
         )
     })?;
     Ok(rendered.summary)
+}
+
+pub fn committed_project_galaxy_resolution_lock_path(project: &LoadedProject) -> PathBuf {
+    project.root.join(PROJECT_GALAXY_RESOLUTION_LOCK_FILE)
+}
+
+pub fn verify_committed_project_galaxy_resolution_lock(
+    project: &LoadedProject,
+) -> Result<Option<ProjectGalaxyResolutionLockSummary>, String> {
+    let path = committed_project_galaxy_resolution_lock_path(project);
+    if !path.exists() {
+        return Ok(None);
+    }
+    let source = fs::read_to_string(&path).map_err(|error| {
+        format!(
+            "failed to read committed Galaxy resolution lock `{}`: {error}",
+            path.display()
+        )
+    })?;
+    verify_project_galaxy_resolution_lock(project, &source, &path).map(Some)
 }
 
 fn selected_library_modules(project: &LoadedProject) -> BTreeMap<(String, String), &'static str> {

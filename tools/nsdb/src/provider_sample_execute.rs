@@ -438,6 +438,12 @@ fn execute_native_provider_outputs(
     });
     let Some(mut collection) = provider_request_collection_from_evidence(&record.input_evidence)
     else {
+        if declares_provider_request_contract(&record.input_evidence) {
+            return Err(format!(
+                "provider request evidence for trace `{}` declares a request contract but failed validation",
+                record.trace_id
+            ));
+        }
         return Ok(NativeProviderOutputs {
             native_outputs: Vec::new(),
             transport_receipts: Vec::new(),
@@ -569,6 +575,19 @@ fn execute_native_provider_outputs(
         transport_receipts,
         code_asset_identity,
         compiled_code_asset_selection,
+    })
+}
+
+fn declares_provider_request_contract(input_evidence: &str) -> bool {
+    input_evidence.split(';').any(|field| {
+        field.trim().split_once('=').is_some_and(|(name, _)| {
+            matches!(
+                name,
+                "provider_request_collection_contract"
+                    | "provider_buffer_descriptor_contract"
+                    | "provider_kernel_descriptor_contract"
+            )
+        })
     })
 }
 

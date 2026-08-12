@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
+pub(super) fn assert_multi_frame_replay_resume(output_dir: &Path) {
     let output_dir_text = output_dir.display().to_string();
     let unavailable = run_nuis(&["debug-resume", "--json", &output_dir_text]);
     assert!(
@@ -35,6 +35,9 @@ pub(super) fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
     let first = &frame_ids[0];
     let second = &frame_ids[1];
     let third = &frame_ids[2];
+    assert!(first.starts_with("frame:payload:"));
+    assert!(second.starts_with("frame:request:"));
+    assert!(third.starts_with("frame:request:"));
     let cursor_path = output_dir.join("nuis.nsdb.replay-cursor.toml");
     let cursor_path_text = cursor_path.display().to_string();
 
@@ -123,7 +126,8 @@ pub(super) fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
             && resumed_stdout.contains(&format!(
                 "\"debugger_transcript_selected_frame_id\":\"{second}\""
             ))
-            && resumed_stdout.contains("\"debugger_transcript_replayed_checkpoint_count\":1"),
+            && resumed_stdout.contains("\"debugger_transcript_replayed_checkpoint_count\":0")
+            && resumed_stdout.contains("\"debugger_transcript_replayed_frame_count\":1"),
         "Nuis debug-resume should validate, resume, and stop at the selected heterogeneous frame\n{resumed_stdout}"
     );
     assert_file_contains(
@@ -456,7 +460,8 @@ pub(super) fn assert_multi_checkpoint_replay_resume(output_dir: &Path) {
                 "\"debugger_transcript_selected_frame_id\":\"{third}\""
             ))
             && resumed_again_stdout
-                .contains("\"debugger_transcript_replayed_checkpoint_count\":1"),
+                .contains("\"debugger_transcript_replayed_checkpoint_count\":0")
+            && resumed_again_stdout.contains("\"debugger_transcript_replayed_frame_count\":1"),
         "Nuis debug-resume should consume the replaced cursor and stop at the third heterogeneous frame\n{resumed_again_stdout}"
     );
 }

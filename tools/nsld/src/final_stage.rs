@@ -43,6 +43,7 @@ use super::{
         NsldArtifactStageKind,
     },
     closure::{nsld_closure_report, nsld_verify_closure_report},
+    final_executable_finalizer_registry::select_executable_finalizer,
     final_executable_paths::nsld_final_stage_plan_path,
     final_executable_render::render_final_stage_plan,
     final_executable_writer::host_assisted_writer_execution_enabled,
@@ -74,11 +75,16 @@ pub(crate) fn nsld_final_stage_plan_report(
         plan.final_stage.link_mode.as_str(),
         "host-toolchain-finalize" | "bundle-packaging"
     );
-    let native_object_required = matches!(
-        plan.final_stage.link_mode.as_str(),
-        "host-toolchain-finalize" | "bundle-packaging"
-    );
-    let inputs = vec![
+    let selected_finalizer = select_executable_finalizer(plan).ok();
+    let native_object_required = host_wrapper_required
+        && selected_finalizer
+            .as_ref()
+            .is_none_or(|selection| selection.input_kind() == "native-object-output");
+    let compiled_artifact_host_image_required = host_wrapper_required
+        && selected_finalizer
+            .as_ref()
+            .is_some_and(|selection| selection.input_kind() == "compiled-artifact-host-image");
+    let mut inputs = vec![
         final_stage_input(
             0,
             "fsi0000.container",
@@ -115,6 +121,15 @@ pub(crate) fn nsld_final_stage_plan_report(
             true,
         ),
     ];
+    if compiled_artifact_host_image_required {
+        inputs.push(final_stage_input(
+            5,
+            "fsi0005.compiled-artifact-host-image",
+            "compiled-artifact-host-image",
+            PathBuf::from(&plan.compiled_artifact.path),
+            true,
+        ));
+    }
     let mut blockers = Vec::with_capacity(6);
     for input in &inputs {
         if input.required && !input.present {
@@ -137,8 +152,21 @@ pub(crate) fn nsld_final_stage_plan_report(
     if host_wrapper_required && !host_assisted_writer_execution_enabled(plan) {
         blockers.push("self-owned-final-native-linker".to_owned());
     }
+    if plan.final_stage.link_mode == "custom" {
+        blockers.push("unsupported-custom-final-stage".to_owned());
+    }
 
-    let notes = final_stage_notes(plan, host_wrapper_required);
+    let mut notes = final_stage_notes(plan, host_wrapper_required);
+    if let Some(selection) = selected_finalizer {
+        notes.push(format!(
+            "executable-finalizer-provider:{}",
+            selection.provider_id()
+        ));
+        notes.push(format!(
+            "executable-finalizer-input:{}",
+            selection.input_kind()
+        ));
+    }
     let ready = blockers.is_empty();
     let plan_hash = nsld_final_stage_plan_hash(
         plan,

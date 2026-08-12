@@ -692,7 +692,7 @@ pub(super) fn assert_official_galaxy_hetero_build(
         );
         assert_file_contains(
             &provider_output_payload_path,
-            "provider_input_binding_contract = \"nuis-provider-input-binding-v1\"",
+            "provider_input_binding_contract = \"nuis-provider-input-binding-v2\"",
             "official galaxy CoreML input binding contract",
         );
         assert_file_contains(
