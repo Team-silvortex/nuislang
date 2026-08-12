@@ -77,6 +77,9 @@ by terminal command formatting:
   provider execution callback.
 * `final_executable_macho_artifact.rs` validates and atomically materializes
   thin or universal arm64 Mach-O images embedded in compiled artifacts.
+* `final_executable_macho_object.rs` validates the relocatable program/runtime
+  object handoff, including roles, LinkPlan hashes, `MH_OBJECT`, and load
+  command structure.
 * `final_executable_host.rs` owns host finalizer dry-run and invoke-plan gates.
 * `final_executable_layout_stage.rs` owns the Nsld final executable layout plan.
 * `final_executable_image_stage.rs` owns the `NUIFIMG` dry-run image checkpoint.
@@ -93,13 +96,15 @@ ELF, PE/COFF, and future Nuis-native writers can evolve without coupling the
 front-door plan to one backend.
 
 The current `nuis-nsld-executable-finalizer-registry-v1` route selects an
-internal Mach-O arm64 artifact-image provider for `native-cpu-llvm`. It
-validates and atomically materializes the embedded executable without a second
-clang invocation. A gated host-command provider remains as a compatibility
+internal Mach-O arm64 artifact-image provider for `native-cpu-llvm`. Nuisc
+hands it separate LLVM program and runtime shim objects through the compiled
+artifact; Nsld verifies their roles, hashes, and Mach-O object structure before
+atomically materializing the embedded compatibility executable without a
+second Nsld-side clang invocation. A gated host-command provider remains as a
 fallback; ELF and PE/COFF are explicit `registered-not-implemented` providers.
-This proves the registration and materialization boundary, but it does not yet
-claim that Nsld consumes relocatable LLVM objects or emits a complete Mach-O
-shell independently of the compiler's current host-toolchain step.
+This proves the relocatable-input registration and materialization boundary,
+but it does not yet claim that Nsld resolves those object symbols/relocations
+or emits a complete Mach-O shell independently of Nuisc's compatibility link.
 
 ## Current Early-Beta Rule
 

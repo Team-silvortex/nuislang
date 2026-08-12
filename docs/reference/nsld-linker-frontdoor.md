@@ -32,12 +32,14 @@ For the automation frontdoor, see [nsld-driver-frontdoor.md](nsld-driver-frontdo
 * object-plan target identity metadata for optional Mach-O/ELF/COFF-family
   compatibility writers
 * final-stage reporting
+* verified relocatable host object handoff identity and Mach-O object parsing
+* registered Mach-O arm64 compatibility-image materialization
 * the first independent CLI boundary for future linker work
 
 `Nsld` does not yet own:
 
-* final host-native executable wrapping for Mach-O, ELF, or PE
-* replacement of the host toolchain wrapper
+* Mach-O symbol resolution, relocation application, and shell synthesis
+* final host-native executable wrapping for ELF or PE/COFF
 * binary section assembly independent from `nuisc`
 * stable linker script or relocation formats
 * finished `nsld-core` galaxy-style API for direct compiler/runtime consumers
@@ -1037,18 +1039,21 @@ remain explicit `registered-not-implemented` targets. The selected contract,
 registry hash, target key, provider id/status, and execution kind are projected
 through dry-run JSON and persisted in the verified invoke-plan artifact.
 
-The internal provider parses the compiled artifact, validates target/ABI and a
-thin or universal arm64 `MH_EXECUTE` image, then installs it atomically with
-executable permissions. It requires neither host policy variables nor a child
-process, removing the former second clang invocation from the Nsld path.
+The internal provider parses the compiled artifact and its `NHOB` object
+bundle. It requires one LLVM program object and one runtime shim object,
+validates their LinkPlan identity, content hashes, arm64 `MH_OBJECT` headers,
+and load-command spans, then validates a thin or universal arm64 `MH_EXECUTE`
+compatibility image and installs it atomically with executable permissions. It
+requires neither host policy variables nor a child process, removing the
+former second clang invocation from the Nsld path.
 Host-command execution remains provider-owned and uses the exact driver path
 resolved by the verified dry-run boundary instead of performing a second
 `PATH` lookup.
 
-This still does not claim a pure Nsld platform linker: Nuisc currently embeds a
-host-toolchain-linked image rather than handing Nsld relocatable LLVM objects.
-Mach-O shell construction and final native relocation ownership remain the
-next boundary.
+This still does not claim a pure Nsld platform linker: Nuisc now hands Nsld
+real relocatable objects, but it also embeds a host-toolchain-linked
+compatibility image. Mach-O symbol resolution, relocation application, shell
+construction, and final native layout ownership remain the next boundary.
 
 `nsld final-executable-host-dry-run` consumes the verified writer input,
 reports `environment_ready`, provider identity, and exact command arguments.

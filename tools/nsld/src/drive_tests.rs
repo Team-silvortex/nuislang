@@ -653,6 +653,7 @@ fn write_test_build_manifest_with_packaging_mode(dir: &Path, packaging_mode: &st
         llvm_ir_path: ll.display().to_string(),
         binary_path: bin.display().to_string(),
         packaging_mode: packaging_mode.to_owned(),
+        host_objects: Vec::new(),
     };
     nuisc::aot::write_build_manifest(
         dir,

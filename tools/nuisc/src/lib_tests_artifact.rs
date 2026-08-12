@@ -347,6 +347,12 @@ fn artifact_report_summary_lines_expose_compact_overview() {
         packaging_mode: "native-cpu-llvm".to_owned(),
         binary_name: "demo".to_owned(),
         binary_bytes: 1,
+        host_object_count: 0,
+        host_object_ids: Vec::new(),
+        host_object_roles: Vec::new(),
+        host_object_formats: Vec::new(),
+        host_object_bytes: Vec::new(),
+        host_object_hashes: Vec::new(),
         build_manifest_bytes: 1,
         envelope_schema: "nuis-executable-envelope-v1".to_owned(),
         envelope_package_count: 1,
@@ -425,6 +431,7 @@ fn artifact_report_summary_lines_expose_compact_overview() {
             lowering_domain_families: Vec::new(),
             lowering_targets: Vec::new(),
             lowering_units: Vec::new(),
+            host_objects: Vec::new(),
         },
         bridge_registry_path: None,
         host_bridge_plan_index_path: None,
@@ -578,7 +585,7 @@ fn artifact_report_summary_lines_expose_compact_overview() {
         None,
     );
 
-    assert_eq!(lines.len(), 7);
+    assert_eq!(lines.len(), 8);
     assert!(lines[0].contains("artifact_roundtrip=ok"));
     assert!(lines[0].contains("lifecycle=ok"));
     assert!(lines[0].contains("runtime_flags=ok"));
@@ -589,13 +596,14 @@ fn artifact_report_summary_lines_expose_compact_overview() {
     assert!(lines[1].contains("drift=0"));
     assert!(lines[1].contains("failing=<none>"));
     assert_eq!(lines[2], "summary_manifest: reconstructed=false");
-    assert!(lines[3].contains("final_stage=host-native-link"));
-    assert!(lines[3].contains("driver=clang"));
-    assert!(lines[4].contains("summary_execution: hetero_domains=1"));
-    assert!(lines[4].contains("network(target=urlsession.socket-io phases=4 events=4)"));
-    assert_eq!(lines[5], "summary_execution_issues: <none>");
+    assert_eq!(lines[3], "summary_host_objects: count=0 roles=<none>");
+    assert!(lines[4].contains("final_stage=host-native-link"));
+    assert!(lines[4].contains("driver=clang"));
+    assert!(lines[5].contains("summary_execution: hetero_domains=1"));
+    assert!(lines[5].contains("network(target=urlsession.socket-io phases=4 events=4)"));
+    assert_eq!(lines[6], "summary_execution_issues: <none>");
     assert_eq!(
-        lines[6],
+        lines[7],
         "summary_docs: modules=1 documented_items=1 documented_modules=cpu.Main"
     );
 

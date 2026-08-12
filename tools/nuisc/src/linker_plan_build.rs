@@ -1,12 +1,13 @@
 use std::path::Path;
 
 use crate::aot;
+use crate::aot_encoding::fnv1a64_hex;
 use nuis_artifact::protocol::COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML;
 
 use super::{
     build_artifact_lowering_alignment_summary, linker_clock_protocol, linker_final_stage,
     linker_hetero_calculate, linker_host_ffi, LinkPlan, LinkPlanArtifact, LinkPlanCpuTarget,
-    LinkPlanDomainUnit, LinkPlanEnvelope, LinkPlanLifecycle, LINK_PLAN_SCHEMA,
+    LinkPlanDomainUnit, LinkPlanEnvelope, LinkPlanHostObject, LinkPlanLifecycle, LINK_PLAN_SCHEMA,
 };
 
 pub fn build_link_plan(
@@ -91,6 +92,17 @@ pub fn build_link_plan(
             .as_ref()
             .map(|container| container.lowering_units.clone())
             .unwrap_or_default(),
+        host_objects: artifact
+            .host_objects
+            .iter()
+            .map(|object| LinkPlanHostObject {
+                object_id: object.object_id.clone(),
+                role: object.role.clone(),
+                object_format: object.object_format.clone(),
+                bytes: object.bytes.len(),
+                content_hash: fnv1a64_hex(&object.bytes),
+            })
+            .collect(),
     };
     let artifact_lowering_alignment =
         build_artifact_lowering_alignment_summary(&compiled_artifact, &domain_units);

@@ -281,13 +281,14 @@ The `beta-0.1` calibration baseline is:
   selection; existing root-lock drift rejects verify, sync, status, and build,
   while sync transactionally materializes the verified closure without bundle
   paths; required-lock release mode and cache-owned resolution remain open
-* `linker-toolchain/nsld/os-native-executable-finalization`: `usable/90`,
+* `linker-toolchain/nsld/os-native-executable-finalization`: `usable/92`,
   required and now the current weakest bootstrap task; a provider-neutral,
-  hash-bound static registry selects an internal Mach-O arm64 artifact-image
-  provider for `native-cpu-llvm`, validates thin/universal images, and
-  atomically installs a runnable executable without a second clang invocation;
-  the compiler still supplies a prelinked host image, while relocatable-object
-  handoff, Nsld-owned Mach-O shell relocation, ELF, and PE/COFF remain open
+  hash-bound static registry now consumes an `NHOB`-bound pair of actual
+  `program-llvm` and `runtime-shim` Mach-O objects, validates their LinkPlan
+  identity, hashes, roles, and `MH_OBJECT` structure, then atomically installs
+  the current compatibility executable without a second Nsld-side clang
+  invocation; Nsld-owned symbol resolution, Mach-O shell relocation, ELF, and
+  PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

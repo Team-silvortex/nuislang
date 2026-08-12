@@ -10,6 +10,7 @@ use std::{
 
 use nuisc::aot::{
     host_cpu_build_target, write_build_manifest, BuildManifestContext, CompileArtifacts,
+    CompileHostObject,
 };
 
 #[test]
@@ -105,11 +106,15 @@ fn write_native_cpu_fixture(dir: &Path, source_executable: &Path) -> PathBuf {
     let ll = dir.join("demo.ll");
     let bin = dir.join("demo.bin");
     let source = dir.join("demo.ns");
+    let program_object = dir.join("demo.host-program.o");
+    let runtime_object = dir.join("demo.host-runtime.o");
     fs::write(&source, "fn main() -> i64 { 0 }\n").unwrap();
     fs::write(&ast, "ast").unwrap();
     fs::write(&nir, "nir").unwrap();
     fs::write(&yir, "yir").unwrap();
     fs::write(&ll, "llvm").unwrap();
+    fs::write(&program_object, minimal_arm64_object()).unwrap();
+    fs::write(&runtime_object, minimal_arm64_object()).unwrap();
     fs::copy(source_executable, &bin).unwrap();
 
     let manifest = write_build_manifest(
@@ -121,6 +126,18 @@ fn write_native_cpu_fixture(dir: &Path, source_executable: &Path) -> PathBuf {
             llvm_ir_path: ll.display().to_string(),
             binary_path: bin.display().to_string(),
             packaging_mode: "native-cpu-llvm".to_owned(),
+            host_objects: vec![
+                CompileHostObject {
+                    object_id: "host.program-llvm".to_owned(),
+                    role: "program-llvm".to_owned(),
+                    path: program_object.display().to_string(),
+                },
+                CompileHostObject {
+                    object_id: "host.runtime-shim".to_owned(),
+                    role: "runtime-shim".to_owned(),
+                    path: runtime_object.display().to_string(),
+                },
+            ],
         },
         &BuildManifestContext {
             input_path: source.display().to_string(),
@@ -134,6 +151,18 @@ fn write_native_cpu_fixture(dir: &Path, source_executable: &Path) -> PathBuf {
     )
     .unwrap();
     PathBuf::from(manifest)
+}
+
+fn minimal_arm64_object() -> Vec<u8> {
+    let mut bytes = vec![0u8; 104];
+    bytes[..4].copy_from_slice(&[0xcf, 0xfa, 0xed, 0xfe]);
+    bytes[4..8].copy_from_slice(&0x0100_000cu32.to_le_bytes());
+    bytes[12..16].copy_from_slice(&1u32.to_le_bytes());
+    bytes[16..20].copy_from_slice(&1u32.to_le_bytes());
+    bytes[20..24].copy_from_slice(&72u32.to_le_bytes());
+    bytes[32..36].copy_from_slice(&0x19u32.to_le_bytes());
+    bytes[36..40].copy_from_slice(&72u32.to_le_bytes());
+    bytes
 }
 
 fn unique_temp_dir(label: &str) -> PathBuf {

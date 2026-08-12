@@ -16,6 +16,11 @@ use super::{
 pub fn encode_nuis_compiled_artifact_binary(
     artifact: &NuisCompiledArtifact,
 ) -> Result<Vec<u8>, ArtifactError> {
+    if !artifact.host_objects.is_empty() {
+        return Err(ArtifactError::new(
+            "legacy compiled artifact binary v1 cannot encode host objects; use the section-table encoder",
+        ));
+    }
     let envelope = encode_nuis_executable_envelope_binary(&artifact.envelope)?;
     let packaging_mode = artifact.packaging_mode.as_bytes();
     let cpu_target_abi = artifact.cpu_target_abi.as_bytes();
@@ -398,5 +403,6 @@ pub fn decode_nuis_compiled_artifact_binary(
         },
         build_manifest_source,
         binary_blob,
+        host_objects: Vec::new(),
     })
 }

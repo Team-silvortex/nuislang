@@ -221,6 +221,7 @@ mod tests {
                 },
                 build_manifest_source: String::new(),
                 binary_blob: vec![],
+                host_objects: Vec::new(),
             },
             envelope: NuisExecutableEnvelope {
                 schema: "nuis-executable-envelope-v1".to_owned(),

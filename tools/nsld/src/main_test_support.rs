@@ -52,6 +52,7 @@ pub(crate) fn empty_link_plan() -> LinkPlan {
             lowering_domain_families: Vec::new(),
             lowering_targets: Vec::new(),
             lowering_units: Vec::new(),
+            host_objects: Vec::new(),
         },
         bridge_registry_path: None,
         host_bridge_plan_index_path: None,

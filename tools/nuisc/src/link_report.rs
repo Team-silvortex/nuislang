@@ -78,6 +78,17 @@ pub(crate) fn link_plan_domain_unit_json(unit: &linker::LinkPlanDomainUnit) -> S
     format!("{{{}}}", fields.join(","))
 }
 
+pub(crate) fn link_plan_host_object_json(object: &linker::LinkPlanHostObject) -> String {
+    let fields = [
+        json_string_field("object_id", &object.object_id),
+        json_string_field("role", &object.role),
+        json_string_field("object_format", &object.object_format),
+        json_usize_field("bytes", object.bytes),
+        json_string_field("content_hash", &object.content_hash),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
 pub(crate) fn link_plan_hetero_node_json(node: &linker::LinkPlanHeteroNode) -> String {
     let fields = [
         json_usize_field("index", node.index),
@@ -279,6 +290,19 @@ pub(crate) fn link_plan_json(plan: &linker::LinkPlan) -> String {
         ),
         json_string_array_field("lowering_targets", &plan.compiled_artifact.lowering_targets),
         artifact_lowering_units_json(&plan.compiled_artifact.lowering_units),
+        json_usize_field(
+            "artifact_host_object_count",
+            plan.compiled_artifact.host_objects.len(),
+        ),
+        format!(
+            "\"artifact_host_objects\":[{}]",
+            plan.compiled_artifact
+                .host_objects
+                .iter()
+                .map(link_plan_host_object_json)
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
         format!(
             "\"artifact_lowering_alignment\":{}",
             artifact_lowering_alignment_summary_json(&plan.artifact_lowering_alignment)

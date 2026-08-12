@@ -16,8 +16,8 @@ pub use artifact::{
     encode_nuis_compiled_artifact_section_table_binary, materialize_embedded_artifact_support,
     parse_nuis_compiled_artifact, parse_nuis_lowering_index_from_source,
     validate_compiled_artifact_section_table, write_nuis_compiled_artifact, NuisCompiledArtifact,
-    NuisCompiledArtifactSection, NuisCompiledArtifactSectionTable, NuisLifecycleContract,
-    NuisLoweringIndex, NuisLoweringIndexUnit,
+    NuisCompiledArtifactHostObject, NuisCompiledArtifactSection, NuisCompiledArtifactSectionTable,
+    NuisLifecycleContract, NuisLoweringIndex, NuisLoweringIndexUnit,
 };
 pub use bridge_registry::{
     parse_bridge_registry, parse_bridge_registry_from_source, BridgeRegistry, BridgeRegistryEntry,

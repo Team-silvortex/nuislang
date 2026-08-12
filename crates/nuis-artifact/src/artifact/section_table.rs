@@ -5,9 +5,9 @@ use crate::{
     protocol::{
         supported_compiled_artifact_sections, COMPILED_ARTIFACT_MAGIC,
         COMPILED_ARTIFACT_SECTION_BUILD_MANIFEST_TOML, COMPILED_ARTIFACT_SECTION_ENVELOPE_BINARY,
-        COMPILED_ARTIFACT_SECTION_HOST_BINARY, COMPILED_ARTIFACT_SECTION_LIFECYCLE_TOML,
-        COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML, COMPILED_ARTIFACT_SECTION_METADATA_TOML,
-        COMPILED_ARTIFACT_SECTION_TABLE_BINARY_VERSION,
+        COMPILED_ARTIFACT_SECTION_HOST_BINARY, COMPILED_ARTIFACT_SECTION_HOST_OBJECTS_BINARY,
+        COMPILED_ARTIFACT_SECTION_LIFECYCLE_TOML, COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML,
+        COMPILED_ARTIFACT_SECTION_METADATA_TOML, COMPILED_ARTIFACT_SECTION_TABLE_BINARY_VERSION,
     },
     toml::parse_required_toml_string,
     ArtifactError,
@@ -15,6 +15,7 @@ use crate::{
 
 use super::{
     encode_u32_len,
+    host_objects::{decode_host_object_bundle, encode_host_object_bundle},
     metadata::{
         parse_lifecycle_contract, render_compiled_artifact_metadata, render_lifecycle_contract,
         render_lowering_index,
@@ -206,34 +207,39 @@ pub(super) fn compiled_artifact_to_section_table(
     let lifecycle = render_lifecycle_contract(&artifact.lifecycle);
     let lowering_index = render_lowering_index(artifact)?;
     let envelope = encode_nuis_executable_envelope_binary(&artifact.envelope)?;
-    Ok(NuisCompiledArtifactSectionTable {
-        sections: vec![
-            NuisCompiledArtifactSection {
-                name: COMPILED_ARTIFACT_SECTION_METADATA_TOML.to_owned(),
-                bytes: metadata.into_bytes(),
-            },
-            NuisCompiledArtifactSection {
-                name: COMPILED_ARTIFACT_SECTION_ENVELOPE_BINARY.to_owned(),
-                bytes: envelope,
-            },
-            NuisCompiledArtifactSection {
-                name: COMPILED_ARTIFACT_SECTION_LIFECYCLE_TOML.to_owned(),
-                bytes: lifecycle.into_bytes(),
-            },
-            NuisCompiledArtifactSection {
-                name: COMPILED_ARTIFACT_SECTION_BUILD_MANIFEST_TOML.to_owned(),
-                bytes: artifact.build_manifest_source.as_bytes().to_vec(),
-            },
-            NuisCompiledArtifactSection {
-                name: COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML.to_owned(),
-                bytes: lowering_index.into_bytes(),
-            },
-            NuisCompiledArtifactSection {
-                name: COMPILED_ARTIFACT_SECTION_HOST_BINARY.to_owned(),
-                bytes: artifact.binary_blob.clone(),
-            },
-        ],
-    })
+    let mut sections = vec![
+        NuisCompiledArtifactSection {
+            name: COMPILED_ARTIFACT_SECTION_METADATA_TOML.to_owned(),
+            bytes: metadata.into_bytes(),
+        },
+        NuisCompiledArtifactSection {
+            name: COMPILED_ARTIFACT_SECTION_ENVELOPE_BINARY.to_owned(),
+            bytes: envelope,
+        },
+        NuisCompiledArtifactSection {
+            name: COMPILED_ARTIFACT_SECTION_LIFECYCLE_TOML.to_owned(),
+            bytes: lifecycle.into_bytes(),
+        },
+        NuisCompiledArtifactSection {
+            name: COMPILED_ARTIFACT_SECTION_BUILD_MANIFEST_TOML.to_owned(),
+            bytes: artifact.build_manifest_source.as_bytes().to_vec(),
+        },
+        NuisCompiledArtifactSection {
+            name: COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML.to_owned(),
+            bytes: lowering_index.into_bytes(),
+        },
+        NuisCompiledArtifactSection {
+            name: COMPILED_ARTIFACT_SECTION_HOST_BINARY.to_owned(),
+            bytes: artifact.binary_blob.clone(),
+        },
+    ];
+    if !artifact.host_objects.is_empty() {
+        sections.push(NuisCompiledArtifactSection {
+            name: COMPILED_ARTIFACT_SECTION_HOST_OBJECTS_BINARY.to_owned(),
+            bytes: encode_host_object_bundle(&artifact.host_objects)?,
+        });
+    }
+    Ok(NuisCompiledArtifactSectionTable { sections })
 }
 
 pub(super) fn section_table_to_compiled_artifact(
@@ -248,6 +254,13 @@ pub(super) fn section_table_to_compiled_artifact(
         COMPILED_ARTIFACT_SECTION_ENVELOPE_BINARY,
     )?)?;
     let binary_blob = section_bytes(table, COMPILED_ARTIFACT_SECTION_HOST_BINARY)?.to_vec();
+    let host_objects = table
+        .sections
+        .iter()
+        .find(|section| section.name == COMPILED_ARTIFACT_SECTION_HOST_OBJECTS_BINARY)
+        .map(|section| decode_host_object_bundle(&section.bytes))
+        .transpose()?
+        .unwrap_or_default();
     let lifecycle = parse_lifecycle_contract(lifecycle_source)?;
     validate_lowering_index_against_build_manifest(
         section_utf8(table, COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML)?,
@@ -300,6 +313,7 @@ pub(super) fn section_table_to_compiled_artifact(
         lifecycle,
         build_manifest_source,
         binary_blob,
+        host_objects,
     })
 }
 

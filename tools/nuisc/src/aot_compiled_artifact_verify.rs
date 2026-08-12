@@ -12,6 +12,7 @@ use crate::aot_artifact::{
     inspect_nuis_compiled_artifact_container, parse_nuis_compiled_artifact,
     validate_nuis_compiled_artifact_layout,
 };
+use crate::aot_encoding::fnv1a64_hex;
 use crate::aot_lifecycle::build_nuis_lifecycle_contract;
 use crate::aot_manifest_verify::verify_build_manifest;
 use crate::aot_verify_report::NuisCompiledArtifactVerifyReport;
@@ -88,6 +89,32 @@ pub(crate) fn verify_nuis_compiled_artifact_impl(
     let manifest_report = verify_build_manifest(&manifest_path)?;
     let _ = fs::remove_dir_all(&temp_root);
 
+    let host_object_ids = artifact
+        .host_objects
+        .iter()
+        .map(|object| object.object_id.clone())
+        .collect::<Vec<_>>();
+    let host_object_roles = artifact
+        .host_objects
+        .iter()
+        .map(|object| object.role.clone())
+        .collect::<Vec<_>>();
+    let host_object_formats = artifact
+        .host_objects
+        .iter()
+        .map(|object| object.object_format.clone())
+        .collect::<Vec<_>>();
+    let host_object_bytes = artifact
+        .host_objects
+        .iter()
+        .map(|object| object.bytes.len())
+        .collect::<Vec<_>>();
+    let host_object_hashes = artifact
+        .host_objects
+        .iter()
+        .map(|object| fnv1a64_hex(&object.bytes))
+        .collect::<Vec<_>>();
+
     Ok(NuisCompiledArtifactVerifyReport {
         schema: artifact.schema,
         artifact_container_kind: container.container_kind,
@@ -102,6 +129,12 @@ pub(crate) fn verify_nuis_compiled_artifact_impl(
         packaging_mode: artifact.packaging_mode,
         binary_name: artifact.binary_name,
         binary_bytes: artifact.binary_bytes,
+        host_object_count: artifact.host_objects.len(),
+        host_object_ids,
+        host_object_roles,
+        host_object_formats,
+        host_object_bytes,
+        host_object_hashes,
         build_manifest_bytes: artifact.build_manifest_bytes,
         envelope_schema: artifact.envelope.schema,
         envelope_package_count: artifact.envelope.package_count,

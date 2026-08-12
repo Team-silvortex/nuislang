@@ -74,6 +74,7 @@ fn write_minimal_cpu_artifact(label: &str) -> (PathBuf, PathBuf) {
         llvm_ir_path: ll.display().to_string(),
         binary_path: bin.display().to_string(),
         packaging_mode: "native-cpu-llvm".to_owned(),
+        host_objects: Vec::new(),
     };
     let cpu_target = CpuBuildTarget {
         abi: "cpu.x86_64.sysv64".to_owned(),
@@ -433,6 +434,8 @@ mod domain_profiles;
 mod manifest_cpu_target;
 #[path = "aot_tests/manifest_domain_units.rs"]
 mod manifest_domain_units;
+#[path = "aot_tests/native_host_object_handoff.rs"]
+mod native_host_object_handoff;
 #[path = "aot_tests/shader_sidecar.rs"]
 mod shader_sidecar;
 #[path = "aot_tests/shim_file_io.rs"]

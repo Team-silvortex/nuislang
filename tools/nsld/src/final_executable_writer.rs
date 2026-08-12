@@ -71,8 +71,9 @@ pub(crate) fn final_executable_writer_steps(
             .is_ok_and(|selection| !selection.requires_host_driver())
         {
             return vec![
-                "consume-compiled-artifact-host-image".to_owned(),
-                "validate-registered-os-native-image".to_owned(),
+                "consume-compiled-artifact-native-handoff".to_owned(),
+                "validate-relocatable-host-objects".to_owned(),
+                "validate-os-native-compatibility-image".to_owned(),
                 "atomically-materialize-os-native-executable".to_owned(),
                 "verify-final-executable-boundary".to_owned(),
             ];

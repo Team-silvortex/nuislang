@@ -80,10 +80,10 @@ pub(crate) fn nsld_final_stage_plan_report(
         && selected_finalizer
             .as_ref()
             .is_none_or(|selection| selection.input_kind() == "native-object-output");
-    let compiled_artifact_host_image_required = host_wrapper_required
+    let compiled_artifact_native_handoff_required = host_wrapper_required
         && selected_finalizer
             .as_ref()
-            .is_some_and(|selection| selection.input_kind() == "compiled-artifact-host-image");
+            .is_some_and(|selection| selection.input_kind() == "compiled-artifact-native-handoff");
     let mut inputs = vec![
         final_stage_input(
             0,
@@ -121,11 +121,11 @@ pub(crate) fn nsld_final_stage_plan_report(
             true,
         ),
     ];
-    if compiled_artifact_host_image_required {
+    if compiled_artifact_native_handoff_required {
         inputs.push(final_stage_input(
             5,
-            "fsi0005.compiled-artifact-host-image",
-            "compiled-artifact-host-image",
+            "fsi0005.compiled-artifact-native-handoff",
+            "compiled-artifact-native-handoff",
             PathBuf::from(&plan.compiled_artifact.path),
             true,
         ));

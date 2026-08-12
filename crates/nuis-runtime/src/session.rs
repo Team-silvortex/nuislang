@@ -253,6 +253,7 @@ mod tests {
                 lifecycle: lifecycle.clone(),
                 build_manifest_source: String::new(),
                 binary_blob: Vec::new(),
+                host_objects: Vec::new(),
             },
             envelope,
             manifest: BuildManifest {

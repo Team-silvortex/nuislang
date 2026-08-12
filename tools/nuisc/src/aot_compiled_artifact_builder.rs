@@ -1,6 +1,9 @@
 use std::{fs, path::Path};
 
-use nuis_artifact::{NuisCompiledArtifact, NuisExecutableEnvelope, NuisLifecycleContract};
+use nuis_artifact::{
+    NuisCompiledArtifact, NuisCompiledArtifactHostObject, NuisExecutableEnvelope,
+    NuisLifecycleContract,
+};
 
 use crate::aot_manifest_types::{BuildManifestContext, CompileArtifacts};
 
@@ -22,6 +25,24 @@ pub(crate) fn build_nuis_compiled_artifact(
         .and_then(|name| name.to_str())
         .unwrap_or("nuis-binary")
         .to_owned();
+    let host_objects = written
+        .host_objects
+        .iter()
+        .map(|object| {
+            let bytes = fs::read(&object.path).map_err(|error| {
+                format!(
+                    "failed to read host object `{}` from `{}`: {error}",
+                    object.object_id, object.path
+                )
+            })?;
+            Ok(NuisCompiledArtifactHostObject {
+                object_id: object.object_id.clone(),
+                role: object.role.clone(),
+                object_format: context.cpu_target.object_format.clone(),
+                bytes,
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
     Ok(NuisCompiledArtifact {
         schema: "nuis-compiled-artifact-v1".to_owned(),
         packaging_mode: written.packaging_mode.clone(),
@@ -37,5 +58,6 @@ pub(crate) fn build_nuis_compiled_artifact(
         lifecycle: lifecycle.clone(),
         build_manifest_source: build_manifest_source.to_owned(),
         binary_blob,
+        host_objects,
     })
 }

@@ -50,25 +50,56 @@ pub(crate) fn build_window_bundle(
 pub(crate) fn compile_native_binary(
     ll_path: &Path,
     shim_path: &Path,
+    llvm_object_path: &Path,
+    runtime_object_path: &Path,
     exe_path: &Path,
     cpu_target: &CpuBuildTarget,
 ) -> Result<(), String> {
-    let output = Command::new("clang")
-        .arg("-target")
-        .arg(&cpu_target.clang_target)
-        .arg(ll_path)
-        .arg(shim_path)
-        .arg("-O2")
-        .arg("-o")
-        .arg(exe_path)
+    run_clang(
+        Command::new("clang")
+            .arg("-target")
+            .arg(&cpu_target.clang_target)
+            .arg("-c")
+            .arg(ll_path)
+            .arg("-O2")
+            .arg("-o")
+            .arg(llvm_object_path),
+        "LLVM program object",
+    )?;
+    run_clang(
+        Command::new("clang")
+            .arg("-target")
+            .arg(&cpu_target.clang_target)
+            .arg("-c")
+            .arg(shim_path)
+            .arg("-O2")
+            .arg("-o")
+            .arg(runtime_object_path),
+        "runtime shim object",
+    )?;
+    run_clang(
+        Command::new("clang")
+            .arg("-target")
+            .arg(&cpu_target.clang_target)
+            .arg(llvm_object_path)
+            .arg(runtime_object_path)
+            .arg("-O2")
+            .arg("-o")
+            .arg(exe_path),
+        "compatibility executable",
+    )
+}
+
+fn run_clang(command: &mut Command, artifact_kind: &str) -> Result<(), String> {
+    let output = command
         .output()
-        .map_err(|error| format!("failed to invoke clang: {error}"))?;
+        .map_err(|error| format!("failed to invoke clang for {artifact_kind}: {error}"))?;
 
     if output.status.success() {
         Ok(())
     } else {
         Err(format!(
-            "clang failed:\nstdout:\n{}\nstderr:\n{}",
+            "clang failed while producing {artifact_kind}:\nstdout:\n{}\nstderr:\n{}",
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         ))

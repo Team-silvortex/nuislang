@@ -28,6 +28,15 @@ pub(crate) fn json_usize_field(name: &str, value: usize) -> String {
     format!("\"{}\":{}", name, value)
 }
 
+pub(crate) fn json_usize_array_field(name: &str, values: &[usize]) -> String {
+    let entries = values
+        .iter()
+        .map(|value| value.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("\"{}\":[{}]", name, entries)
+}
+
 pub(crate) fn json_i64_field(name: &str, value: i64) -> String {
     format!("\"{}\":{}", name, value)
 }

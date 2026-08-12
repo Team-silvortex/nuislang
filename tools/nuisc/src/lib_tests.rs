@@ -501,7 +501,10 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
     assert!(json.contains("\"lowering_targets\":[\"llvm\"]"));
     assert!(json.contains("\"lowering_units\":[{"));
     assert!(json.contains("\"link_plan\":{\"schema\":\"nuis-link-plan-v1\""));
-    assert!(json.contains("\"artifact_section_count\":6"));
+    assert!(json.contains("\"artifact_section_count\":7"));
+    assert!(json.contains("\"artifact_host_object_count\":2"));
+    assert!(json.contains("\"role\":\"program-llvm\""));
+    assert!(json.contains("\"role\":\"runtime-shim\""));
 }
 
 #[test]
@@ -553,13 +556,16 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
     assert_eq!(decoded.binary_name, artifact.binary_name);
     assert!(json.contains("\"artifact_container_kind\":\"compiled-artifact-section-table-v2\""));
     assert!(json.contains("\"artifact_container_version\":2"));
-    assert!(json.contains("\"artifact_section_count\":6"));
+    assert!(json.contains("\"artifact_section_count\":7"));
     assert!(json.contains("\"metadata_toml\""));
     assert!(json.contains("\"envelope_binary\""));
     assert!(json.contains("\"lifecycle_toml\""));
     assert!(json.contains("\"build_manifest_toml\""));
     assert!(json.contains("\"lowering_index_toml\""));
     assert!(json.contains("\"host_binary\""));
+    assert!(json.contains("\"host_objects_binary\""));
+    assert!(json.contains("\"host_object_count\":2"));
+    assert!(json.contains("\"host_object_roles\":[\"program-llvm\",\"runtime-shim\"]"));
     assert!(json.contains("\"artifact_section_table_valid\":true"));
     assert!(json.contains("\"lowering_unit_count\":1"));
     assert!(json.contains("\"lowering_domain_families\":[\"cpu\"]"));
@@ -572,7 +578,9 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         verify_json.contains("\"artifact_container_kind\":\"compiled-artifact-section-table-v2\"")
     );
     assert!(verify_json.contains("\"artifact_container_version\":2"));
-    assert!(verify_json.contains("\"artifact_section_count\":6"));
+    assert!(verify_json.contains("\"artifact_section_count\":7"));
+    assert!(verify_json.contains("\"host_object_count\":2"));
+    assert!(verify_json.contains("\"host_object_hashes\":["));
     assert!(verify_json.contains("\"lowering_unit_count\":1"));
     assert!(verify_json.contains("\"lowering_targets\":[\"llvm\"]"));
     assert!(verify_json.contains("\"lowering_units\":[{"));
@@ -692,7 +700,9 @@ fn benchmark_report_file_tooling_outputs_support_inspect_and_verify_json() {
     assert!(inspect_json.contains("\"domain_build_contracts\":["));
     assert!(inspect_json.contains("\"link_plan\":{"));
     assert!(inspect_json.contains("\"artifact_container_version\":2"));
-    assert!(inspect_json.contains("\"artifact_section_count\":6"));
+    assert!(inspect_json.contains("\"artifact_section_count\":7"));
+    assert!(inspect_json.contains("\"host_object_count\":2"));
+    assert!(inspect_json.contains("\"artifact_host_object_count\":2"));
     assert!(inspect_json.contains("\"lowering_unit_count\":2"));
     assert!(inspect_json.contains("\"lowering_domain_families\":[\"cffi\",\"cpu\"]"));
     assert!(inspect_json.contains("\"final_stage_driver\":\"clang\""));
@@ -715,7 +725,8 @@ fn benchmark_report_file_tooling_outputs_support_inspect_and_verify_json() {
     assert!(verify_artifact_json_text
         .contains("\"artifact_container_kind\":\"compiled-artifact-section-table-v2\""));
     assert!(verify_artifact_json_text.contains("\"artifact_container_version\":2"));
-    assert!(verify_artifact_json_text.contains("\"artifact_section_count\":6"));
+    assert!(verify_artifact_json_text.contains("\"artifact_section_count\":7"));
+    assert!(verify_artifact_json_text.contains("\"host_object_count\":2"));
     assert!(verify_artifact_json_text.contains("\"lowering_unit_count\":2"));
     assert!(verify_artifact_json_text.contains("\"artifact_roundtrip_verified\":true"));
     assert!(verify_artifact_json_text.contains("\"lifecycle_contract_consistent\":true"));

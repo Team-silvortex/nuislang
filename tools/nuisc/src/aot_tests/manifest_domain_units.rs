@@ -21,6 +21,7 @@ fn build_manifest_tracks_heterogeneous_domain_build_units() {
         llvm_ir_path: ll.display().to_string(),
         binary_path: bin.display().to_string(),
         packaging_mode: "native-cpu-llvm".to_owned(),
+        host_objects: Vec::new(),
     };
     let cpu_target = CpuBuildTarget {
         abi: "cpu.arm64.apple_aapcs64".to_owned(),

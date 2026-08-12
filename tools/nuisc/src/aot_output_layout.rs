@@ -6,6 +6,8 @@ pub(crate) struct OutputLayout {
     pub(crate) yir_path: PathBuf,
     pub(crate) llvm_ir_path: PathBuf,
     pub(crate) shim_path: PathBuf,
+    pub(crate) llvm_object_path: PathBuf,
+    pub(crate) runtime_object_path: PathBuf,
     pub(crate) binary_stub_path: PathBuf,
 }
 
@@ -20,6 +22,8 @@ pub(crate) fn output_layout(input: &Path, output_dir: &Path) -> OutputLayout {
         yir_path: output_dir.join(format!("{stem}.yir")),
         llvm_ir_path: output_dir.join(format!("{stem}.ll")),
         shim_path: output_dir.join(format!("{stem}_shim.c")),
+        llvm_object_path: output_dir.join(format!("{stem}.host-program.o")),
+        runtime_object_path: output_dir.join(format!("{stem}.host-runtime.o")),
         binary_stub_path: output_dir.join(stem),
     }
 }

@@ -6,6 +6,31 @@ pub(crate) fn inspect_artifact_json(
     container: Option<&aot::NuisCompiledArtifactContainerInspect>,
     manifest_verify: Option<&aot::BuildManifestVerifyReport>,
 ) -> String {
+    let host_object_ids = artifact
+        .host_objects
+        .iter()
+        .map(|object| object.object_id.clone())
+        .collect::<Vec<_>>();
+    let host_object_roles = artifact
+        .host_objects
+        .iter()
+        .map(|object| object.role.clone())
+        .collect::<Vec<_>>();
+    let host_object_formats = artifact
+        .host_objects
+        .iter()
+        .map(|object| object.object_format.clone())
+        .collect::<Vec<_>>();
+    let host_object_bytes = artifact
+        .host_objects
+        .iter()
+        .map(|object| object.bytes.len())
+        .collect::<Vec<_>>();
+    let host_object_hashes = artifact
+        .host_objects
+        .iter()
+        .map(|object| crate::aot_encoding::fnv1a64_hex(&object.bytes))
+        .collect::<Vec<_>>();
     let mut fields = vec![
         json_string_field("kind", "nuis_artifact_inspect"),
         json_string_field("input", &input.display().to_string()),
@@ -21,6 +46,12 @@ pub(crate) fn inspect_artifact_json(
         json_string_field("cpu_target_calling_abi", &artifact.cpu_target_calling_abi),
         json_string_field("binary_name", &artifact.binary_name),
         json_usize_field("binary_bytes", artifact.binary_bytes),
+        json_usize_field("host_object_count", artifact.host_objects.len()),
+        json_string_array_field("host_object_ids", &host_object_ids),
+        json_string_array_field("host_object_roles", &host_object_roles),
+        json_string_array_field("host_object_formats", &host_object_formats),
+        json_usize_array_field("host_object_bytes", &host_object_bytes),
+        json_string_array_field("host_object_hashes", &host_object_hashes),
         json_usize_field("build_manifest_bytes", artifact.build_manifest_bytes),
         json_string_field("envelope_schema", &artifact.envelope.schema),
         json_string_array_field(

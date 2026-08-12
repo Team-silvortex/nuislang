@@ -2,7 +2,8 @@
 
 The repository now follows a simple file-size rule:
 
-* default maximum: `600` lines per code/config text file
+* default maximum: `800` lines per Rust/Nuis source or config text file
+* test-source maximum: `1000` lines
 * Markdown maximum: `2000` lines per `.md` reference/history document
 * checked categories:
   * `.rs`
@@ -29,7 +30,7 @@ The goal is:
 
 ## Historical Exceptions
 
-There are still legacy code/config/source files above the `600` line default.
+There are still legacy code/config/source files above the `800` line default.
 Markdown files are allowed to be longer because reference material often needs a
 larger narrative envelope, but they should still stay below `2000` lines.
 

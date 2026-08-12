@@ -34,7 +34,7 @@ use crate::aot_lifecycle::build_nuis_lifecycle_contract;
 pub use crate::aot_manifest_relocate::render_relocated_unpacked_build_manifest;
 pub use crate::aot_manifest_types::{
     BuildManifestCacheInfo, BuildManifestContext, BuildManifestDocIndexInfo,
-    BuildManifestProjectInfo, CompileArtifacts,
+    BuildManifestProjectInfo, CompileArtifacts, CompileHostObject,
 };
 pub use crate::aot_manifest_verify::verify_build_manifest;
 pub use crate::aot_manifest_writer::write_build_manifest;
@@ -48,7 +48,7 @@ pub use crate::aot_verify_report::{BuildManifestVerifyReport, NuisCompiledArtifa
 
 pub use nuis_artifact::{
     BuildManifestDomainBuildUnit, DomainBuildUnitPayloadBlob, NuisCompiledArtifact,
-    NuisExecutableEnvelope, NuisLifecycleContract,
+    NuisCompiledArtifactHostObject, NuisExecutableEnvelope, NuisLifecycleContract,
 };
 
 #[cfg(test)]

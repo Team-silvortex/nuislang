@@ -123,6 +123,7 @@ packaging_role = "host-binary"
         },
         build_manifest_source: manifest.to_owned(),
         binary_blob: b"bin".to_vec(),
+        host_objects: Vec::new(),
     };
 
     let loaded = RuntimeLoader
@@ -386,6 +387,7 @@ packaging_role = "hetero-contract"
         },
         build_manifest_source: manifest,
         binary_blob: b"bin".to_vec(),
+        host_objects: Vec::new(),
     };
 
     let loaded = RuntimeLoader
@@ -533,6 +535,7 @@ fn minimal_artifact_with_manifest(manifest: &str) -> NuisCompiledArtifact {
         },
         build_manifest_source: manifest.to_owned(),
         binary_blob: b"bin".to_vec(),
+        host_objects: Vec::new(),
     }
 }
 

@@ -8,7 +8,7 @@ use std::{
 
 use crate::project::{LoadedProject, ProjectCompilationPlan};
 
-const COMPILE_CACHE_EPOCH: &str = "2026-06-22-aot-streaming-cache-fingerprint-v1";
+const COMPILE_CACHE_EPOCH: &str = "2026-08-12-host-object-handoff-v2";
 
 #[path = "cache_entry.rs"]
 mod cache_entry;

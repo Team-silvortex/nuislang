@@ -5,7 +5,7 @@ use yir_core::YirModule;
 
 use crate::aot::CpuBuildTarget;
 use crate::aot_c_shim_source::render_c_shim_source;
-use crate::aot_manifest_types::CompileArtifacts;
+use crate::aot_manifest_types::{CompileArtifacts, CompileHostObject};
 use crate::aot_native_runner::{
     build_window_bundle, compile_native_binary, requires_window_bundle,
 };
@@ -30,6 +30,8 @@ pub fn write_and_link(
     let yir_path = layout.yir_path;
     let ll_path = layout.llvm_ir_path;
     let shim_path = layout.shim_path;
+    let llvm_object_path = layout.llvm_object_path;
+    let runtime_object_path = layout.runtime_object_path;
     let exe_path = layout.binary_stub_path;
 
     fs::write(&ast_path, render::render_ast(ast))
@@ -43,11 +45,24 @@ pub fn write_and_link(
     fs::write(&shim_path, render_c_shim_source(ast))
         .map_err(|error| format!("failed to write `{}`: {error}", shim_path.display()))?;
 
-    let (binary_path, packaging_mode) = if requires_window_bundle(yir) {
-        build_window_bundle(&yir_path, output_dir, &exe_path, cpu_target)?
+    let (binary_path, packaging_mode, host_objects) = if requires_window_bundle(yir) {
+        let (binary_path, packaging_mode) =
+            build_window_bundle(&yir_path, output_dir, &exe_path, cpu_target)?;
+        (binary_path, packaging_mode, Vec::new())
     } else {
-        compile_native_binary(&ll_path, &shim_path, &exe_path, cpu_target)?;
-        (exe_path.display().to_string(), "native-cpu-llvm".to_owned())
+        compile_native_binary(
+            &ll_path,
+            &shim_path,
+            &llvm_object_path,
+            &runtime_object_path,
+            &exe_path,
+            cpu_target,
+        )?;
+        (
+            exe_path.display().to_string(),
+            "native-cpu-llvm".to_owned(),
+            native_host_objects(&llvm_object_path, &runtime_object_path),
+        )
     };
 
     Ok(CompileArtifacts {
@@ -57,6 +72,7 @@ pub fn write_and_link(
         llvm_ir_path: ll_path.display().to_string(),
         binary_path,
         packaging_mode,
+        host_objects,
     })
 }
 
@@ -85,6 +101,17 @@ pub fn compile_artifacts_for_output_dir_with_packaging_mode(
             output_dir.display()
         ));
     }
+    let host_objects = (packaging_mode == "native-cpu-llvm")
+        .then(|| native_host_objects(&layout.llvm_object_path, &layout.runtime_object_path))
+        .unwrap_or_default();
+    for object in &host_objects {
+        if !Path::new(&object.path).is_file() {
+            return Err(format!(
+                "cached native host object `{}` is missing at `{}`",
+                object.object_id, object.path
+            ));
+        }
+    }
     Ok(CompileArtifacts {
         ast_path: layout.ast_path.display().to_string(),
         nir_path: layout.nir_path.display().to_string(),
@@ -92,7 +119,26 @@ pub fn compile_artifacts_for_output_dir_with_packaging_mode(
         llvm_ir_path: layout.llvm_ir_path.display().to_string(),
         binary_path: layout.binary_stub_path.display().to_string(),
         packaging_mode: packaging_mode.to_owned(),
+        host_objects,
     })
+}
+
+fn native_host_objects(
+    llvm_object_path: &Path,
+    runtime_object_path: &Path,
+) -> Vec<CompileHostObject> {
+    vec![
+        CompileHostObject {
+            object_id: "host.program-llvm".to_owned(),
+            role: "program-llvm".to_owned(),
+            path: llvm_object_path.display().to_string(),
+        },
+        CompileHostObject {
+            object_id: "host.runtime-shim".to_owned(),
+            role: "runtime-shim".to_owned(),
+            path: runtime_object_path.display().to_string(),
+        },
+    ]
 }
 
 fn is_supported_packaging_mode(packaging_mode: &str) -> bool {

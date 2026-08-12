@@ -52,7 +52,7 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         packaging_mode: "native-cpu-llvm",
         provider_status: "ready",
         execution_kind: "registered-nsld-artifact-image-writer",
-        input_kind: "compiled-artifact-host-image",
+        input_kind: "compiled-artifact-native-handoff",
         requires_host_driver: false,
         command_planner: plan_internal_artifact_image,
         input_validator: macho_artifact_image_validation_issues,
@@ -552,7 +552,7 @@ mod tests {
             selection.provider_id(),
             "nsld.finalizer.mach-o.arm64.artifact-image-v1"
         );
-        assert_eq!(selection.input_kind(), "compiled-artifact-host-image");
+        assert_eq!(selection.input_kind(), "compiled-artifact-native-handoff");
         assert!(selection.ready());
         assert!(!selection.requires_host_driver());
     }

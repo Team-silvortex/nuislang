@@ -31,7 +31,7 @@ pub use linker_types::{
     LinkPlanFinalStage, LinkPlanHeteroCalculate, LinkPlanHeteroNode,
     LinkPlanHeteroValidationSummary, LinkPlanHostFfiAbiEntry, LinkPlanHostFfiAbiGroup,
     LinkPlanHostFfiEntry, LinkPlanHostFfiFootprint, LinkPlanHostFfiValidationSummary,
-    LinkPlanLifecycle, LINK_PLAN_SCHEMA,
+    LinkPlanHostObject, LinkPlanLifecycle, LINK_PLAN_SCHEMA,
 };
 
 pub fn build_clock_protocol(
@@ -295,6 +295,7 @@ mod tests {
             },
             build_manifest_source: String::new(),
             binary_blob: vec![1, 2, 3],
+            host_objects: Vec::new(),
         }
     }
 

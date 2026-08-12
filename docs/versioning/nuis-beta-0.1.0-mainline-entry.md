@@ -402,6 +402,20 @@ the compiled artifact. The next tranche must hand relocatable host/runtime
 objects to Nsld and move Mach-O load-command, symbol, and relocation ownership
 behind the same provider boundary.
 
+The relocatable-input follow-up advances the coordinate to `usable/92`.
+`native-cpu-llvm` now compiles the LLVM program and runtime shim into separate
+objects, embeds them in the versioned `NHOB` artifact section, and projects
+their stable ids, roles, formats, sizes, and hashes through artifact and
+LinkPlan reports. Nsld requires both roles, checks LinkPlan identity and hashes,
+and parses each payload as an arm64 `MH_OBJECT` before accepting the current
+compatibility executable. The compile cache now snapshots only after the
+manifest and compiled artifact are complete, so both objects survive a real
+miss-to-hit restore regression.
+
+This still stops before pure Nsld linking: Nuisc retains the temporary
+compatibility link, while Nsld has not yet resolved the handed-off symbols,
+applied relocations, or emitted the final Mach-O shell itself.
+
 ## Honesty Boundary
 
 `beta-0.1.0` should not claim:

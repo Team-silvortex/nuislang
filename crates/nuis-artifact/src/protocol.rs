@@ -29,6 +29,7 @@ pub const COMPILED_ARTIFACT_SECTION_LIFECYCLE_TOML: &str = "lifecycle_toml";
 pub const COMPILED_ARTIFACT_SECTION_BUILD_MANIFEST_TOML: &str = "build_manifest_toml";
 pub const COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML: &str = "lowering_index_toml";
 pub const COMPILED_ARTIFACT_SECTION_HOST_BINARY: &str = "host_binary";
+pub const COMPILED_ARTIFACT_SECTION_HOST_OBJECTS_BINARY: &str = "host_objects_binary";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NuisBinaryContainerProtocol {

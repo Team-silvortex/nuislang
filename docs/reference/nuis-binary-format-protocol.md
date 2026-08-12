@@ -230,6 +230,15 @@ are:
 * `build_manifest_toml`
 * `lowering_index_toml`
 * `host_binary`
+* optional `host_objects_binary`
+
+`host_objects_binary` uses the `NHOB` version `1` bundle. Every entry carries
+a stable object id, role, object format, and opaque relocatable bytes. The
+current `native-cpu-llvm` route emits `host.program-llvm` / `program-llvm` and
+`host.runtime-shim` / `runtime-shim`. Empty payloads, duplicate ids, malformed
+tokens, truncation, and trailing bytes fail closed. Object interpretation
+belongs to the selected Nsld platform provider rather than the generic
+artifact decoder.
 
 `lowering_index_toml` is generated from the embedded build manifest's
 `[[domain_build_unit]]` records. It snapshots the package id, domain family,
@@ -240,7 +249,7 @@ shader/kernel/network internals into the generic artifact reader.
 
 Current write rule:
 
-`the default writer still emits NART v1; NART v2 exists as a linker-facing draft route that the generic decoder can already read`
+`nuisc emits NART v2; the generic decoder still reads legacy NART v1, while v1 encoding rejects host objects rather than dropping them`
 
 Current section-table validation:
 

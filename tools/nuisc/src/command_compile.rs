@@ -136,23 +136,23 @@ pub(crate) fn run_compile(
         if let Some(packaging_mode) = requested_packaging_mode {
             written.packaging_mode = packaging_mode.to_owned();
         }
-        let _ = cache::store_compile_cache(&cache_key, &output_dir)?;
         Ok((written, artifacts.loaded_nustar))
     };
     let (written, loaded_nustar, used_cache_restore) = if let Some(entry) = &cache_hit {
-        match cache::restore_compile_cache(entry, &output_dir)
+        let restored = cache::restore_compile_cache(entry, &output_dir)
             .and_then(|_| aot::verify_build_manifest(&output_dir.join("nuis.build.manifest.toml")))
-        {
-            Ok(restored_manifest) => {
+            .and_then(|manifest| {
                 let packaging_mode =
-                    requested_packaging_mode.unwrap_or(restored_manifest.packaging_mode.as_str());
-                let written = aot::compile_artifacts_for_output_dir_with_packaging_mode(
+                    requested_packaging_mode.unwrap_or(manifest.packaging_mode.as_str());
+                aot::compile_artifacts_for_output_dir_with_packaging_mode(
                     &resolved.effective_input_path,
                     &output_dir,
                     packaging_mode,
-                )?;
-                (written, restored_manifest.loaded_nustar, true)
-            }
+                )
+                .map(|written| (written, manifest.loaded_nustar))
+            });
+        match restored {
+            Ok((written, loaded_nustar)) => (written, loaded_nustar, true),
             Err(_) => {
                 let (written, loaded_nustar) = compile_fresh()?;
                 (written, loaded_nustar, false)
@@ -328,6 +328,9 @@ pub(crate) fn run_compile(
             cpu_target: cpu_target.clone(),
         },
     )?;
+    if !used_cache_restore {
+        cache::store_compile_cache(&cache_key, &output_dir)?;
+    }
     if success_logs_enabled() {
         println!("compiled nuis source: {}", input.display());
         println!(

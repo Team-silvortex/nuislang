@@ -53,6 +53,15 @@ pub(crate) fn artifact_report_summary_lines(
                 "false"
             }
         ),
+        format!(
+            "summary_host_objects: count={} roles={}",
+            artifact_verify.host_object_count,
+            if artifact_verify.host_object_roles.is_empty() {
+                "<none>".to_owned()
+            } else {
+                artifact_verify.host_object_roles.join(", ")
+            }
+        ),
     ];
     if let Some(plan) = link_plan {
         lines.push(format!(

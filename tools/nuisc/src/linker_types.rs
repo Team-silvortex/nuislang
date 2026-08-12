@@ -123,6 +123,16 @@ pub struct LinkPlanArtifact {
     pub lowering_domain_families: Vec<String>,
     pub lowering_targets: Vec<String>,
     pub lowering_units: Vec<crate::aot::NuisCompiledArtifactLoweringUnitInspect>,
+    pub host_objects: Vec<LinkPlanHostObject>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkPlanHostObject {
+    pub object_id: String,
+    pub role: String,
+    pub object_format: String,
+    pub bytes: usize,
+    pub content_hash: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

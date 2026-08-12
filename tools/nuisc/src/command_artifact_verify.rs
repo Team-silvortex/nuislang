@@ -62,6 +62,31 @@ pub(crate) fn run_verify_artifact(input: PathBuf, json: bool) -> Result<(), Stri
     println!("  packaging_mode: {}", report.packaging_mode);
     println!("  binary_name: {}", report.binary_name);
     println!("  binary_bytes: {}", report.binary_bytes);
+    println!("  host_object_count: {}", report.host_object_count);
+    if !report.host_object_ids.is_empty() {
+        println!("  host_object_ids: {}", report.host_object_ids.join(", "));
+        println!(
+            "  host_object_roles: {}",
+            report.host_object_roles.join(", ")
+        );
+        println!(
+            "  host_object_formats: {}",
+            report.host_object_formats.join(", ")
+        );
+        println!(
+            "  host_object_bytes: {}",
+            report
+                .host_object_bytes
+                .iter()
+                .map(|bytes| bytes.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        println!(
+            "  host_object_hashes: {}",
+            report.host_object_hashes.join(", ")
+        );
+    }
     println!("  build_manifest_bytes: {}", report.build_manifest_bytes);
     println!("  envelope_schema: {}", report.envelope_schema);
     println!(

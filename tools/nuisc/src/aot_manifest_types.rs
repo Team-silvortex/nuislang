@@ -7,6 +7,14 @@ pub struct CompileArtifacts {
     pub llvm_ir_path: String,
     pub binary_path: String,
     pub packaging_mode: String,
+    pub host_objects: Vec<CompileHostObject>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompileHostObject {
+    pub object_id: String,
+    pub role: String,
+    pub path: String,
 }
 
 pub struct BuildManifestProjectInfo {

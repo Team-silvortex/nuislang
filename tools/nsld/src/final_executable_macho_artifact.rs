@@ -1,4 +1,5 @@
 use crate::content_hash_cache::{file_fingerprint, FileFingerprint};
+use crate::final_executable_macho_object::validate_macho_host_object_handoff;
 use std::{
     fs::{self, OpenOptions},
     io::Write,
@@ -46,7 +47,7 @@ pub(crate) fn macho_artifact_image_validation_issues(
     validated_macho_artifact_image(plan)
         .err()
         .into_iter()
-        .map(|error| format!("compiled-artifact-host-image:{error}"))
+        .map(|error| format!("compiled-artifact-native-handoff:{error}"))
         .collect()
 }
 
@@ -171,6 +172,7 @@ fn load_and_validate_macho_artifact_image(
             plan.cpu_target.calling_abi, artifact.cpu_target_calling_abi
         ));
     }
+    validate_macho_host_object_handoff(&artifact, plan)?;
     if artifact.binary_name != plan.compiled_artifact.binary_name {
         return Err(format!(
             "binary name mismatch: plan={}, artifact={}",

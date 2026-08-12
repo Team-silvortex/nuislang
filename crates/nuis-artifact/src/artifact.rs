@@ -3,6 +3,7 @@ use std::{fs, path::Path};
 use crate::{ArtifactError, NuisExecutableEnvelope};
 
 mod binary;
+mod host_objects;
 mod lowering_index;
 mod metadata;
 mod section_table;
@@ -46,6 +47,15 @@ pub struct NuisCompiledArtifact {
     pub lifecycle: NuisLifecycleContract,
     pub build_manifest_source: String,
     pub binary_blob: Vec<u8>,
+    pub host_objects: Vec<NuisCompiledArtifactHostObject>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NuisCompiledArtifactHostObject {
+    pub object_id: String,
+    pub role: String,
+    pub object_format: String,
+    pub bytes: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -116,17 +126,19 @@ mod tests {
 
     use crate::{
         decode_nuis_compiled_artifact_binary, decode_nuis_compiled_artifact_section_table_binary,
-        encode_domain_payload_blob, encode_nuis_compiled_artifact_section_table,
+        encode_domain_payload_blob, encode_nuis_compiled_artifact_binary,
+        encode_nuis_compiled_artifact_section_table,
         encode_nuis_compiled_artifact_section_table_binary, materialize_embedded_artifact_support,
         parse_nuis_lowering_index_from_source,
         protocol::{
             COMPILED_ARTIFACT_SECTION_BUILD_MANIFEST_TOML,
             COMPILED_ARTIFACT_SECTION_ENVELOPE_BINARY, COMPILED_ARTIFACT_SECTION_HOST_BINARY,
+            COMPILED_ARTIFACT_SECTION_HOST_OBJECTS_BINARY,
             COMPILED_ARTIFACT_SECTION_LIFECYCLE_TOML,
             COMPILED_ARTIFACT_SECTION_LOWERING_INDEX_TOML, COMPILED_ARTIFACT_SECTION_METADATA_TOML,
         },
         DomainBuildUnitPayloadBlob, DomainBuildUnitPayloadBlobSection, NuisCompiledArtifact,
-        NuisExecutableEnvelope, NuisLifecycleContract,
+        NuisCompiledArtifactHostObject, NuisExecutableEnvelope, NuisLifecycleContract,
     };
 
     fn temp_dir(label: &str) -> PathBuf {
@@ -235,6 +247,7 @@ packaging_role = "host-binary"
             },
             build_manifest_source,
             binary_blob: b"bin".to_vec(),
+            host_objects: Vec::new(),
         }
     }
 
@@ -270,6 +283,36 @@ packaging_role = "host-binary"
         assert!(lowering_index.contains("backend_family = \"llvm\""));
         assert!(lowering_index.contains("selected_lowering_target = \"llvm\""));
         assert_eq!(decoded, artifact);
+    }
+
+    #[test]
+    fn section_table_roundtrips_relocatable_host_object_bundle() {
+        let mut artifact = sample_compiled_artifact();
+        artifact.host_objects = vec![
+            NuisCompiledArtifactHostObject {
+                object_id: "host.program-llvm".to_owned(),
+                role: "program-llvm".to_owned(),
+                object_format: "mach-o".to_owned(),
+                bytes: vec![1, 2, 3],
+            },
+            NuisCompiledArtifactHostObject {
+                object_id: "host.runtime-shim".to_owned(),
+                role: "runtime-shim".to_owned(),
+                object_format: "mach-o".to_owned(),
+                bytes: vec![4, 5],
+            },
+        ];
+
+        let encoded = encode_nuis_compiled_artifact_section_table_binary(&artifact).unwrap();
+        let table = decode_nuis_compiled_artifact_section_table_binary(&encoded).unwrap();
+        let decoded = decode_nuis_compiled_artifact_binary(&encoded).unwrap();
+
+        assert!(table.contains_section(COMPILED_ARTIFACT_SECTION_HOST_OBJECTS_BINARY));
+        assert_eq!(decoded, artifact);
+        assert!(encode_nuis_compiled_artifact_binary(&artifact)
+            .unwrap_err()
+            .to_string()
+            .contains("cannot encode host objects"));
     }
 
     #[test]
@@ -558,6 +601,7 @@ packaging_role = "hetero-contract"
             },
             build_manifest_source: manifest,
             binary_blob: b"bin".to_vec(),
+            host_objects: Vec::new(),
         };
 
         let out = temp_dir("materialize_support");

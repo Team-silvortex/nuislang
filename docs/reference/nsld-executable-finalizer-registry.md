@@ -56,18 +56,26 @@ The current static set is deliberately asymmetric:
 
 | Provider | Target | Packaging | Input | Status |
 | --- | --- | --- | --- | --- |
-| `nsld.finalizer.mach-o.arm64.artifact-image-v1` | `aarch64-macos-mach-o` | `native-cpu-llvm` | compiled-artifact host image | `ready` |
+| `nsld.finalizer.mach-o.arm64.artifact-image-v1` | `aarch64-macos-mach-o` | `native-cpu-llvm` | compiled-artifact native handoff | `ready` |
 | `nsld.finalizer.mach-o.arm64.host-command-shell-v1` | `aarch64-macos-mach-o` | any | native object | `ready` |
 | `nsld.finalizer.mach-o.registered-v1` | `*-macos-mach-o` | any | native object | `registered-not-implemented` |
 | `nsld.finalizer.elf.registered-v1` | `*-linux-elf` | any | native object | `registered-not-implemented` |
 | `nsld.finalizer.pe-coff.registered-v1` | `*-windows-pe-coff` | any | native object | `registered-not-implemented` |
 
-For `native-cpu-llvm`, the internal Mach-O provider parses the compiled
-artifact, checks target and ABI identity, validates either a thin arm64
-`MH_EXECUTE` image or the arm64 slice of a universal Mach-O, and atomically
-materializes it with executable permissions. This path requires no host
-process or environment gate, so Nsld no longer invokes clang a second time
-after Nuisc has already produced the embedded host image.
+For `native-cpu-llvm`, Nuisc compiles the LLVM program and runtime shim into
+separate relocatable objects. The compiled artifact carries them in the
+versioned `NHOB` bundle under `host_objects_binary`, with stable object id,
+role, object format, and bytes. Artifact reports and LinkPlan additionally
+project byte counts and content hashes.
+
+The internal Mach-O provider parses that compiled-artifact native handoff,
+checks target and ABI identity, requires exactly one `program-llvm` and one
+`runtime-shim` role, and checks every object against its LinkPlan identity and
+hash. Each payload must be an arm64 `MH_OBJECT` with a structurally valid load
+command span and `LC_SEGMENT_64`. It then validates either a thin arm64
+`MH_EXECUTE` compatibility image or the arm64 slice of a universal Mach-O and
+atomically materializes it with executable permissions. This path requires no
+host process or environment gate, so Nsld does not invoke clang a second time.
 
 The host-command provider remains a compatibility fallback. It owns both
 command planning and actual process invocation, while
@@ -76,12 +84,13 @@ gates still apply before that provider may run. It must execute the exact
 driver path resolved during the verified dry-run boundary and may not repeat a
 `PATH` lookup after admission.
 
-This is not yet a pure Nsld linker claim. Nuisc currently asks the host
-toolchain to produce the executable embedded in the compiled artifact; Nsld
-validates and materializes that image but does not yet consume an LLVM
-relocatable object and synthesize Mach-O load commands, symbols, and final
-relocations itself. ELF and PE/COFF remain visible, selectable, and honestly
-blocked rather than silently falling through a generic linker.
+This is not yet a pure Nsld linker claim. Nsld now consumes and validates real
+relocatable inputs, but Nuisc still asks the host toolchain to prelink the
+compatibility executable embedded in the same artifact. Nsld does not yet
+resolve object symbols, apply their relocations, or synthesize the final
+Mach-O load commands and executable shell itself. ELF and PE/COFF remain
+visible, selectable, and honestly blocked rather than silently falling through
+a generic linker.
 
 ## Extension Rule
 
@@ -94,9 +103,8 @@ A future provider must:
    is unsupported;
 5. pass the registry conformance and finalizer CLI regressions.
 
-The next native milestone is to change the compiler handoff from a prelinked
-host image to relocatable host/runtime objects, then add Nsld-owned Mach-O
-relocation and executable-shell emission behind the same registry boundary.
+The next native milestone is Nsld-owned Mach-O symbol resolution, relocation
+application, and executable-shell emission from the verified object handoff.
 That work must not add Mach-O branches to Nuisc, final-stage planning, or the
 generic emit frontdoor.
 

@@ -34,6 +34,20 @@ pub fn render_link_plan_summary(plan: &LinkPlan) -> Vec<String> {
             plan.compiled_artifact.binary_bytes
         ),
         format!(
+            "artifact_host_objects: count={} roles={}",
+            plan.compiled_artifact.host_objects.len(),
+            if plan.compiled_artifact.host_objects.is_empty() {
+                "none".to_owned()
+            } else {
+                plan.compiled_artifact
+                    .host_objects
+                    .iter()
+                    .map(|object| object.role.as_str())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            }
+        ),
+        format!(
             "final_stage: kind={} driver={} link_mode={} output={}",
             plan.final_stage.kind,
             plan.final_stage.driver,
@@ -275,6 +289,19 @@ pub fn render_link_plan_json(plan: &LinkPlan) -> String {
             plan.compiled_artifact.container_kind.as_deref(),
         ),
         json_usize_field(
+            "artifact_host_object_count",
+            plan.compiled_artifact.host_objects.len(),
+        ),
+        format!(
+            "\"artifact_host_objects\":[{}]",
+            plan.compiled_artifact
+                .host_objects
+                .iter()
+                .map(render_host_object_json)
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
+        json_usize_field(
             "artifact_lowering_alignment_checked",
             plan.artifact_lowering_alignment.checked,
         ),
@@ -308,6 +335,17 @@ pub fn render_link_plan_json(plan: &LinkPlan) -> String {
             "hetero_calculate_valid",
             plan.hetero_calculate.validation.valid,
         ),
+    ];
+    format!("{{{}}}", fields.join(","))
+}
+
+fn render_host_object_json(object: &LinkPlanHostObject) -> String {
+    let fields = [
+        json_string_field("object_id", &object.object_id),
+        json_string_field("role", &object.role),
+        json_string_field("object_format", &object.object_format),
+        json_usize_field("bytes", object.bytes),
+        json_string_field("content_hash", &object.content_hash),
     ];
     format!("{{{}}}", fields.join(","))
 }
