@@ -99,12 +99,16 @@ The current `nuis-nsld-executable-finalizer-registry-v1` route selects an
 internal Mach-O arm64 artifact-image provider for `native-cpu-llvm`. Nuisc
 hands it separate LLVM program and runtime shim objects through the compiled
 artifact; Nsld verifies their roles, hashes, and Mach-O object structure before
-atomically materializing the embedded compatibility executable without a
-second Nsld-side clang invocation. A gated host-command provider remains as a
-fallback; ELF and PE/COFF are explicit `registered-not-implemented` providers.
-This proves the relocatable-input registration and materialization boundary,
-but it does not yet claim that Nsld resolves those object symbols/relocations
-or emits a complete Mach-O shell independently of Nuisc's compatibility link.
+parsing their sections, symbol/string tables, and ARM64 relocation records.
+The provider projects `nuis-nsld-macho-host-object-linkage-v1`, including
+internal cross-object resolutions and explicit unresolved C/system symbols,
+before atomically materializing the embedded compatibility executable without
+a second Nsld-side clang invocation. A gated host-command provider remains as
+a fallback; ELF and PE/COFF are explicit `registered-not-implemented`
+providers. This proves the relocatable-input registration, table parsing, and
+materialization boundary, but it does not yet claim final address assignment,
+relocation writes, or complete Mach-O shell emission independently of Nuisc's
+compatibility link.
 
 ## Current Early-Beta Rule
 

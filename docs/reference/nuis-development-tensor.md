@@ -262,7 +262,8 @@ The `beta-0.1` calibration baseline is:
   payloads, per-mutex parking/fairness, and a mature parallel Nuis executor
   remain open
 * `host-compatibility/cffi/registered-pointer-string-object-boundary`:
-  `usable/93`, required; five real borrowed UTF-8 calls and one owned
+  `usable/93`, required and now the current weakest bootstrap task; five real
+  borrowed UTF-8 calls and one owned
   `ref Buffer` return carry exact signature plus memory-capability hashes
   through compile, project metadata, and Nsld validation; the owned path now
   has self-verifying YIR metadata, runtime-header length recovery, exact
@@ -281,14 +282,15 @@ The `beta-0.1` calibration baseline is:
   selection; existing root-lock drift rejects verify, sync, status, and build,
   while sync transactionally materializes the verified closure without bundle
   paths; required-lock release mode and cache-owned resolution remain open
-* `linker-toolchain/nsld/os-native-executable-finalization`: `usable/92`,
-  required and now the current weakest bootstrap task; a provider-neutral,
-  hash-bound static registry now consumes an `NHOB`-bound pair of actual
+* `linker-toolchain/nsld/os-native-executable-finalization`: `usable/94`,
+  required; a provider-neutral, hash-bound static registry now consumes an
+  `NHOB`-bound pair of actual
   `program-llvm` and `runtime-shim` Mach-O objects, validates their LinkPlan
-  identity, hashes, roles, and `MH_OBJECT` structure, then atomically installs
-  the current compatibility executable without a second Nsld-side clang
-  invocation; Nsld-owned symbol resolution, Mach-O shell relocation, ELF, and
-  PE/COFF remain open
+  identity, hashes, roles, sections, symbol/string tables, and ARM64 relocation
+  references, then projects a structured internal-resolution/external-boundary
+  summary and atomically installs the current compatibility executable without
+  a second Nsld-side clang invocation; final section placement, symbol binding,
+  relocation writes, Mach-O shell synthesis, ELF, and PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

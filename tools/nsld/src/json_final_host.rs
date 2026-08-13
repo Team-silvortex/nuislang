@@ -116,6 +116,7 @@ pub(crate) fn nsld_final_executable_host_dry_run_report_json(
             "finalizer_execution_kind",
             report.finalizer_execution_kind.as_deref(),
         ),
+        finalizer_input_summary_json(report.finalizer_input_summary.as_ref()),
         json_string_field("driver", &report.driver),
         json_bool_field("driver_available", report.driver_available),
         json_optional_string_field(
@@ -162,6 +163,7 @@ pub(crate) fn nsld_final_executable_host_invoke_plan_report_json(
             "finalizer_execution_kind",
             report.finalizer_execution_kind.as_deref(),
         ),
+        finalizer_input_summary_json(report.finalizer_input_summary.as_ref()),
         json_string_field("invocation_kind", &report.invocation_kind),
         json_string_field("invocation_policy", &report.invocation_policy),
         json_string_field("invocation_policy_reason", &report.invocation_policy_reason),
@@ -184,6 +186,35 @@ pub(crate) fn nsld_final_executable_host_invoke_plan_report_json(
         json_string_array_field("notes", &report.notes),
     ];
     format!("{{{}}}", fields.join(","))
+}
+
+fn finalizer_input_summary_json(summary: Option<&NsldExecutableFinalizerInputSummary>) -> String {
+    let Some(summary) = summary else {
+        return "\"finalizer_input_summary\":null".to_owned();
+    };
+    let fields = [
+        json_string_field("contract", &summary.contract),
+        json_string_field("status", &summary.status),
+        json_usize_field("object_count", summary.object_count),
+        json_usize_field("section_count", summary.section_count),
+        json_usize_field("symbol_count", summary.symbol_count),
+        json_usize_field("relocation_count", summary.relocation_count),
+        json_usize_field("defined_symbol_count", summary.defined_symbol_count),
+        json_usize_field("undefined_symbol_count", summary.undefined_symbol_count),
+        json_usize_field(
+            "internally_resolved_symbol_count",
+            summary.internally_resolved_symbol_count,
+        ),
+        json_usize_field(
+            "unresolved_external_symbol_count",
+            summary.unresolved_external_symbol_count,
+        ),
+        json_string_array_field(
+            "unresolved_external_symbols",
+            &summary.unresolved_external_symbols,
+        ),
+    ];
+    format!("\"finalizer_input_summary\":{{{}}}", fields.join(","))
 }
 
 pub(crate) fn nsld_final_executable_host_invoke_plan_emit_report_json(

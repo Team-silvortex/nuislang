@@ -149,6 +149,7 @@ pub(crate) fn print_nsld_final_executable_host_dry_run_report(
         "  finalizer_execution_kind: {}",
         optional_string_text(report.finalizer_execution_kind.as_deref())
     );
+    print_finalizer_input_summary(report.finalizer_input_summary.as_ref());
     println!("  driver: {}", report.driver);
     println!("  driver_available: {}", report.driver_available);
     println!(
@@ -206,6 +207,7 @@ pub(crate) fn print_nsld_final_executable_host_invoke_plan_report(
         "  finalizer_execution_kind: {}",
         optional_string_text(report.finalizer_execution_kind.as_deref())
     );
+    print_finalizer_input_summary(report.finalizer_input_summary.as_ref());
     println!("  invocation_kind: {}", report.invocation_kind);
     println!("  invocation_policy: {}", report.invocation_policy);
     println!(
@@ -240,6 +242,41 @@ pub(crate) fn print_nsld_final_executable_host_invoke_plan_report(
     }
     for note in &report.notes {
         println!("  note: {note}");
+    }
+}
+
+fn print_finalizer_input_summary(summary: Option<&NsldExecutableFinalizerInputSummary>) {
+    let Some(summary) = summary else {
+        println!("  finalizer_input_summary: none");
+        return;
+    };
+    println!("  finalizer_input_contract: {}", summary.contract);
+    println!("  finalizer_input_status: {}", summary.status);
+    println!("  finalizer_input_object_count: {}", summary.object_count);
+    println!("  finalizer_input_section_count: {}", summary.section_count);
+    println!("  finalizer_input_symbol_count: {}", summary.symbol_count);
+    println!(
+        "  finalizer_input_relocation_count: {}",
+        summary.relocation_count
+    );
+    println!(
+        "  finalizer_input_defined_symbol_count: {}",
+        summary.defined_symbol_count
+    );
+    println!(
+        "  finalizer_input_undefined_symbol_count: {}",
+        summary.undefined_symbol_count
+    );
+    println!(
+        "  finalizer_input_internally_resolved_symbol_count: {}",
+        summary.internally_resolved_symbol_count
+    );
+    println!(
+        "  finalizer_input_unresolved_external_symbol_count: {}",
+        summary.unresolved_external_symbol_count
+    );
+    for symbol in &summary.unresolved_external_symbols {
+        println!("  finalizer_input_unresolved_external_symbol: {symbol}");
     }
 }
 

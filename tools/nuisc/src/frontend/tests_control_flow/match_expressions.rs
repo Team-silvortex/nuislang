@@ -337,6 +337,33 @@ fn rejects_non_exhaustive_enum_match_in_expression_context() {
 }
 
 #[test]
+fn rejects_non_exhaustive_enum_match_in_non_unit_statement_context() {
+    let error = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Duo {
+            A,
+            B,
+          }
+
+          fn main() -> i64 {
+            let value: Duo = Duo.A;
+            match value {
+              Duo.A => {
+                return 1;
+              }
+            }
+            return 2;
+          }
+        }
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("requires a final unguarded `_` arm"));
+}
+
+#[test]
 fn allows_non_exhaustive_bool_match_in_statement_context() {
     let module = parse_nuis_module(
         r#"

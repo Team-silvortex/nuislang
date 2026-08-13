@@ -1,16 +1,24 @@
+use crate::{
+    final_executable_macho_input::parse_macho_arm64_object_linkage,
+    reports::NsldExecutableFinalizerInputSummary,
+};
 use std::collections::BTreeSet;
 
-const MACH_O_64_HEADER_SIZE: usize = 32;
-const MACH_O_64_LE_MAGIC: [u8; 4] = [0xcf, 0xfa, 0xed, 0xfe];
-const MACH_O_CPU_TYPE_ARM64: u32 = 0x0100_000c;
-const MACH_O_FILE_TYPE_OBJECT: u32 = 1;
-const MACH_O_LOAD_COMMAND_SEGMENT_64: u32 = 0x19;
+pub(crate) const MACHO_HOST_OBJECT_LINKAGE_CONTRACT: &str =
+    "nuis-nsld-macho-host-object-linkage-v1";
 const REQUIRED_HOST_OBJECT_ROLES: [&str; 2] = ["program-llvm", "runtime-shim"];
 
 pub(crate) fn validate_macho_host_object_handoff(
     artifact: &nuisc::aot::NuisCompiledArtifact,
     plan: &nuisc::linker::LinkPlan,
 ) -> Result<(), String> {
+    summarize_macho_host_object_handoff(artifact, plan).map(|_| ())
+}
+
+pub(crate) fn summarize_macho_host_object_handoff(
+    artifact: &nuisc::aot::NuisCompiledArtifact,
+    plan: &nuisc::linker::LinkPlan,
+) -> Result<NsldExecutableFinalizerInputSummary, String> {
     if artifact.host_objects.is_empty() {
         return Err("compiled artifact has no relocatable host objects".to_owned());
     }
@@ -23,6 +31,13 @@ pub(crate) fn validate_macho_host_object_handoff(
     }
 
     let mut object_ids = BTreeSet::new();
+    let mut section_count = 0usize;
+    let mut symbol_count = 0usize;
+    let mut relocation_count = 0usize;
+    let mut defined_symbol_count = 0usize;
+    let mut undefined_symbol_count = 0usize;
+    let mut external_definitions = BTreeSet::new();
+    let mut external_undefined = BTreeSet::new();
     for object in &artifact.host_objects {
         if !object_ids.insert(object.object_id.as_str()) {
             return Err(format!("duplicate host object id `{}`", object.object_id));
@@ -36,8 +51,15 @@ pub(crate) fn validate_macho_host_object_handoff(
             ));
         }
         validate_plan_identity(object, plan)?;
-        validate_thin_macho_arm64_object(&object.bytes)
+        let parsed = parse_macho_arm64_object_linkage(&object.bytes)
             .map_err(|error| format!("host object `{}`: {error}", object.object_id))?;
+        section_count += parsed.section_count;
+        symbol_count += parsed.symbol_count;
+        relocation_count += parsed.relocation_count;
+        defined_symbol_count += parsed.defined_symbol_count;
+        undefined_symbol_count += parsed.undefined_symbol_count;
+        external_definitions.extend(parsed.external_definitions);
+        external_undefined.extend(parsed.external_undefined);
     }
 
     for required_role in REQUIRED_HOST_OBJECT_ROLES {
@@ -52,7 +74,32 @@ pub(crate) fn validate_macho_host_object_handoff(
             ));
         }
     }
-    Ok(())
+    let internally_resolved = external_undefined
+        .intersection(&external_definitions)
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let unresolved_external_symbols = external_undefined
+        .difference(&external_definitions)
+        .cloned()
+        .collect::<Vec<_>>();
+    let status = if unresolved_external_symbols.is_empty() {
+        "verified-internal-closure"
+    } else {
+        "verified-with-external-compatibility-boundary"
+    };
+    Ok(NsldExecutableFinalizerInputSummary {
+        contract: MACHO_HOST_OBJECT_LINKAGE_CONTRACT.to_owned(),
+        status: status.to_owned(),
+        object_count: artifact.host_objects.len(),
+        section_count,
+        symbol_count,
+        relocation_count,
+        defined_symbol_count,
+        undefined_symbol_count,
+        internally_resolved_symbol_count: internally_resolved.len(),
+        unresolved_external_symbol_count: unresolved_external_symbols.len(),
+        unresolved_external_symbols,
+    })
 }
 
 fn validate_plan_identity(
@@ -93,133 +140,11 @@ fn validate_plan_identity(
     Ok(())
 }
 
-fn validate_thin_macho_arm64_object(bytes: &[u8]) -> Result<(), String> {
-    if bytes.len() < MACH_O_64_HEADER_SIZE {
-        return Err(format!(
-            "Mach-O object is truncated: expected at least {MACH_O_64_HEADER_SIZE} bytes, found {}",
-            bytes.len()
-        ));
-    }
-    if bytes[..4] != MACH_O_64_LE_MAGIC {
-        return Err("Mach-O object magic is not little-endian MH_MAGIC_64".to_owned());
-    }
-    let cpu_type = read_u32_le(bytes, 4)?;
-    if cpu_type != MACH_O_CPU_TYPE_ARM64 {
-        return Err(format!(
-            "Mach-O object CPU type is 0x{cpu_type:08x}; expected ARM64"
-        ));
-    }
-    let file_type = read_u32_le(bytes, 12)?;
-    if file_type != MACH_O_FILE_TYPE_OBJECT {
-        return Err(format!(
-            "Mach-O file type is {file_type}; expected MH_OBJECT"
-        ));
-    }
-    validate_load_commands(bytes)
-}
-
-fn validate_load_commands(bytes: &[u8]) -> Result<(), String> {
-    let command_count = read_u32_le(bytes, 16)? as usize;
-    let command_span = read_u32_le(bytes, 20)? as usize;
-    let command_end = MACH_O_64_HEADER_SIZE
-        .checked_add(command_span)
-        .ok_or_else(|| "Mach-O object load-command span overflows address space".to_owned())?;
-    if command_end > bytes.len() {
-        return Err(format!(
-            "Mach-O object load-command span ends at {command_end}, beyond object size {}",
-            bytes.len()
-        ));
-    }
-
-    let mut cursor = MACH_O_64_HEADER_SIZE;
-    let mut segment_present = false;
-    for index in 0..command_count {
-        if cursor.checked_add(8).is_none_or(|end| end > command_end) {
-            return Err(format!(
-                "Mach-O object load command {index} header is truncated"
-            ));
-        }
-        let command = read_u32_le(bytes, cursor)?;
-        let command_size = read_u32_le(bytes, cursor + 4)? as usize;
-        if command_size < 8 || command_size % 4 != 0 {
-            return Err(format!(
-                "Mach-O object load command {index} has invalid size {command_size}"
-            ));
-        }
-        if command == MACH_O_LOAD_COMMAND_SEGMENT_64 {
-            if command_size < 72 {
-                return Err(format!(
-                    "Mach-O object LC_SEGMENT_64 command {index} is shorter than 72 bytes"
-                ));
-            }
-            segment_present = true;
-        }
-        cursor = cursor
-            .checked_add(command_size)
-            .filter(|end| *end <= command_end)
-            .ok_or_else(|| format!("Mach-O object load command {index} exceeds declared span"))?;
-    }
-    if cursor != command_end {
-        return Err(format!(
-            "Mach-O object load-command count consumes {} bytes, declared span is {command_span}",
-            cursor.saturating_sub(MACH_O_64_HEADER_SIZE)
-        ));
-    }
-    if !segment_present {
-        return Err("Mach-O object has no LC_SEGMENT_64 command".to_owned());
-    }
-    Ok(())
-}
-
 fn canonical_object_format(object_format: &str) -> &str {
     match object_format.trim().to_ascii_lowercase().as_str() {
         "mach-o" | "macho" => "mach-o",
         "elf" => "elf",
         "coff" | "pe" | "pe-coff" | "pe/coff" => "pe-coff",
         _ => "unknown",
-    }
-}
-
-fn read_u32_le(bytes: &[u8], offset: usize) -> Result<u32, String> {
-    let raw: [u8; 4] = bytes
-        .get(offset..offset.saturating_add(4))
-        .ok_or_else(|| format!("Mach-O object u32 at offset {offset} is truncated"))?
-        .try_into()
-        .map_err(|_| format!("Mach-O object u32 at offset {offset} is malformed"))?;
-    Ok(u32::from_le_bytes(raw))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn accepts_minimal_arm64_relocatable_object() {
-        assert_eq!(
-            validate_thin_macho_arm64_object(&minimal_arm64_object()),
-            Ok(())
-        );
-    }
-
-    #[test]
-    fn rejects_executable_file_type_at_object_boundary() {
-        let mut bytes = minimal_arm64_object();
-        bytes[12..16].copy_from_slice(&2u32.to_le_bytes());
-
-        assert!(validate_thin_macho_arm64_object(&bytes)
-            .unwrap_err()
-            .contains("expected MH_OBJECT"));
-    }
-
-    fn minimal_arm64_object() -> Vec<u8> {
-        let mut bytes = vec![0u8; 104];
-        bytes[..4].copy_from_slice(&MACH_O_64_LE_MAGIC);
-        bytes[4..8].copy_from_slice(&MACH_O_CPU_TYPE_ARM64.to_le_bytes());
-        bytes[12..16].copy_from_slice(&MACH_O_FILE_TYPE_OBJECT.to_le_bytes());
-        bytes[16..20].copy_from_slice(&1u32.to_le_bytes());
-        bytes[20..24].copy_from_slice(&72u32.to_le_bytes());
-        bytes[32..36].copy_from_slice(&MACH_O_LOAD_COMMAND_SEGMENT_64.to_le_bytes());
-        bytes[36..40].copy_from_slice(&72u32.to_le_bytes());
-        bytes
     }
 }

@@ -416,6 +416,21 @@ This still stops before pure Nsld linking: Nuisc retains the temporary
 compatibility link, while Nsld has not yet resolved the handed-off symbols,
 applied relocations, or emitted the final Mach-O shell itself.
 
+The object-table inspection follow-up advances the coordinate to `usable/94`.
+The Mach-O provider now parses checked section records, `LC_SYMTAB`,
+`nlist_64`, UTF-8 string-table names, and ARM64 relocation records from the
+actual program/runtime objects. It handles ARM64 `ADDEND` payload fields,
+rejects invalid spans and references, and emits
+`nuis-nsld-macho-host-object-linkage-v1` with internal-resolution counts and
+the explicit unresolved C/system boundary through JSON, text, and persisted
+invoke plans. A real `nuisc` compile regression and the runnable finalizer CLI
+regression cover this path.
+
+The next tranche is deliberately narrower than "finish the linker": produce a
+deterministic merged-section placement and symbol binding map, reject ambiguous
+definitions, then use that model for relocation writes and final Mach-O shell
+emission.
+
 ## Honesty Boundary
 
 `beta-0.1.0` should not claim:

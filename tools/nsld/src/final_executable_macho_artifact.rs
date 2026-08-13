@@ -1,5 +1,10 @@
 use crate::content_hash_cache::{file_fingerprint, FileFingerprint};
-use crate::final_executable_macho_object::validate_macho_host_object_handoff;
+use crate::{
+    final_executable_macho_object::{
+        summarize_macho_host_object_handoff, validate_macho_host_object_handoff,
+    },
+    reports::NsldExecutableFinalizerInputSummary,
+};
 use std::{
     fs::{self, OpenOptions},
     io::Write,
@@ -49,6 +54,19 @@ pub(crate) fn macho_artifact_image_validation_issues(
         .into_iter()
         .map(|error| format!("compiled-artifact-native-handoff:{error}"))
         .collect()
+}
+
+pub(crate) fn macho_artifact_input_summary(
+    plan: &nuisc::linker::LinkPlan,
+) -> Result<Option<NsldExecutableFinalizerInputSummary>, String> {
+    let artifact_path = Path::new(&plan.compiled_artifact.path);
+    let artifact = nuisc::aot::parse_nuis_compiled_artifact(artifact_path).map_err(|error| {
+        format!(
+            "failed to parse compiled artifact `{}`: {error}",
+            artifact_path.display()
+        )
+    })?;
+    summarize_macho_host_object_handoff(&artifact, plan).map(Some)
 }
 
 pub(crate) fn materialize_macho_artifact_image(

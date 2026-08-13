@@ -54,6 +54,10 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
         .contains("\"finalizer_provider_id\":\"nsld.finalizer.mach-o.arm64.artifact-image-v1\""));
     assert!(invoke_plan
         .contains("\"finalizer_execution_kind\":\"registered-nsld-artifact-image-writer\""));
+    assert!(invoke_plan.contains("\"contract\":\"nuis-nsld-macho-host-object-linkage-v1\""));
+    assert!(invoke_plan.contains("\"relocation_count\":2"));
+    assert!(invoke_plan.contains("\"internally_resolved_symbol_count\":1"));
+    assert!(invoke_plan.contains("\"unresolved_external_symbols\":[\"_puts\"]"));
     assert!(invoke_plan.contains("\"invocation_kind\":\"registered-internal-finalizer\""));
     assert!(invoke_plan.contains("\"invocation_policy\":\"registered-internal\""));
     assert!(invoke_plan.contains("\"requires_explicit_allow\":false"));
@@ -113,8 +117,12 @@ fn write_native_cpu_fixture(dir: &Path, source_executable: &Path) -> PathBuf {
     fs::write(&nir, "nir").unwrap();
     fs::write(&yir, "yir").unwrap();
     fs::write(&ll, "llvm").unwrap();
-    fs::write(&program_object, minimal_arm64_object()).unwrap();
-    fs::write(&runtime_object, minimal_arm64_object()).unwrap();
+    fs::write(
+        &program_object,
+        arm64_object("_nuis_entry", "_nuis_runtime"),
+    )
+    .unwrap();
+    fs::write(&runtime_object, arm64_object("_nuis_runtime", "_puts")).unwrap();
     fs::copy(source_executable, &bin).unwrap();
 
     let manifest = write_build_manifest(
@@ -153,16 +161,63 @@ fn write_native_cpu_fixture(dir: &Path, source_executable: &Path) -> PathBuf {
     PathBuf::from(manifest)
 }
 
-fn minimal_arm64_object() -> Vec<u8> {
-    let mut bytes = vec![0u8; 104];
+fn arm64_object(defined: &str, undefined: &str) -> Vec<u8> {
+    const SEGMENT_OFFSET: usize = 32;
+    const SECTION_OFFSET: usize = 104;
+    const SYMTAB_OFFSET: usize = 184;
+    const PAYLOAD_OFFSET: usize = 208;
+    const RELOCATION_OFFSET: usize = 216;
+    const SYMBOL_OFFSET: usize = 224;
+    const STRING_OFFSET: usize = 256;
+    let mut strings = vec![0];
+    let defined_index = strings.len() as u32;
+    strings.extend_from_slice(defined.as_bytes());
+    strings.push(0);
+    let undefined_index = strings.len() as u32;
+    strings.extend_from_slice(undefined.as_bytes());
+    strings.push(0);
+    let mut bytes = vec![0u8; STRING_OFFSET + strings.len()];
     bytes[..4].copy_from_slice(&[0xcf, 0xfa, 0xed, 0xfe]);
     bytes[4..8].copy_from_slice(&0x0100_000cu32.to_le_bytes());
     bytes[12..16].copy_from_slice(&1u32.to_le_bytes());
-    bytes[16..20].copy_from_slice(&1u32.to_le_bytes());
-    bytes[20..24].copy_from_slice(&72u32.to_le_bytes());
-    bytes[32..36].copy_from_slice(&0x19u32.to_le_bytes());
-    bytes[36..40].copy_from_slice(&72u32.to_le_bytes());
+    write_u32(&mut bytes, 16, 2);
+    write_u32(&mut bytes, 20, 176);
+    write_u32(&mut bytes, SEGMENT_OFFSET, 0x19);
+    write_u32(&mut bytes, SEGMENT_OFFSET + 4, 152);
+    write_u32(&mut bytes, SEGMENT_OFFSET + 64, 1);
+    bytes[SECTION_OFFSET..SECTION_OFFSET + 6].copy_from_slice(b"__text");
+    bytes[SECTION_OFFSET + 16..SECTION_OFFSET + 22].copy_from_slice(b"__TEXT");
+    write_u64(&mut bytes, SECTION_OFFSET + 40, 8);
+    write_u32(&mut bytes, SECTION_OFFSET + 48, PAYLOAD_OFFSET as u32);
+    write_u32(&mut bytes, SECTION_OFFSET + 56, RELOCATION_OFFSET as u32);
+    write_u32(&mut bytes, SECTION_OFFSET + 60, 1);
+    write_u32(&mut bytes, SYMTAB_OFFSET, 0x2);
+    write_u32(&mut bytes, SYMTAB_OFFSET + 4, 24);
+    write_u32(&mut bytes, SYMTAB_OFFSET + 8, SYMBOL_OFFSET as u32);
+    write_u32(&mut bytes, SYMTAB_OFFSET + 12, 2);
+    write_u32(&mut bytes, SYMTAB_OFFSET + 16, STRING_OFFSET as u32);
+    write_u32(&mut bytes, SYMTAB_OFFSET + 20, strings.len() as u32);
+    write_u32(&mut bytes, RELOCATION_OFFSET, 0);
+    write_u32(
+        &mut bytes,
+        RELOCATION_OFFSET + 4,
+        1 | (1 << 24) | (2 << 25) | (1 << 27) | (2 << 28),
+    );
+    write_u32(&mut bytes, SYMBOL_OFFSET, defined_index);
+    bytes[SYMBOL_OFFSET + 4] = 0x0f;
+    bytes[SYMBOL_OFFSET + 5] = 1;
+    write_u32(&mut bytes, SYMBOL_OFFSET + 16, undefined_index);
+    bytes[SYMBOL_OFFSET + 20] = 0x01;
+    bytes[STRING_OFFSET..].copy_from_slice(&strings);
     bytes
+}
+
+fn write_u32(bytes: &mut [u8], offset: usize, value: u32) {
+    bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+}
+
+fn write_u64(bytes: &mut [u8], offset: usize, value: u64) {
+    bytes[offset..offset + 8].copy_from_slice(&value.to_le_bytes());
 }
 
 fn unique_temp_dir(label: &str) -> PathBuf {

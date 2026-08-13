@@ -89,6 +89,14 @@ pub(super) fn lower_match_stmt_with_async(
         .iter()
         .position(|arm| matches!(arm.pattern, AstMatchPattern::Wildcard) && arm.guard.is_none());
 
+    let allow_non_exhaustive_in_unit_context = allow_non_exhaustive_enum_fallthrough
+        && return_type.is_none_or(|return_type| {
+            return_type.name == "Unit"
+                && return_type.generic_args.is_empty()
+                && !return_type.is_optional
+                && !return_type.is_ref
+        });
+
     let (arms_to_lower, mut else_body) = if let Some(wildcard_index) = wildcard_index {
         if wildcard_index != arms.len() - 1 {
             return Err(
@@ -122,7 +130,7 @@ pub(super) fn lower_match_stmt_with_async(
         }
         else_body.extend(lower_block!(&last_arm.body, &mut last_bindings)?);
         (arms_to_lower, else_body)
-    } else if allow_non_exhaustive_enum_fallthrough
+    } else if allow_non_exhaustive_in_unit_context
         && is_non_exhaustive_enum_match(arms, &value_ty, type_aliases, struct_table)?
     {
         (arms, Vec::new())
@@ -213,7 +221,9 @@ fn is_exhaustive_enum_match(
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<bool, String> {
     if value_ty.scalar_kind() == Some(NirScalarKind::Bool) {
-        return Ok(match_bool_pattern_coverage(arms, /*require_exhaustive=*/true)?);
+        return Ok(match_bool_pattern_coverage(
+            arms, /*require_exhaustive=*/ true,
+        )?);
     }
     if arms.is_empty() || arms.iter().any(|arm| arm.guard.is_some()) {
         return Ok(false);
@@ -252,7 +262,9 @@ fn is_non_exhaustive_enum_match(
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<bool, String> {
     if value_ty.scalar_kind() == Some(NirScalarKind::Bool) {
-        return Ok(match_bool_pattern_coverage(arms, /*require_exhaustive=*/false)?);
+        return Ok(match_bool_pattern_coverage(
+            arms, /*require_exhaustive=*/ false,
+        )?);
     }
     if arms.is_empty() || arms.iter().any(|arm| arm.guard.is_some()) {
         return Ok(false);

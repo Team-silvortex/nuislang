@@ -179,6 +179,21 @@ pub(crate) struct NsldFinalExecutableWriterInputVerifyReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldExecutableFinalizerInputSummary {
+    pub(crate) contract: String,
+    pub(crate) status: String,
+    pub(crate) object_count: usize,
+    pub(crate) section_count: usize,
+    pub(crate) symbol_count: usize,
+    pub(crate) relocation_count: usize,
+    pub(crate) defined_symbol_count: usize,
+    pub(crate) undefined_symbol_count: usize,
+    pub(crate) internally_resolved_symbol_count: usize,
+    pub(crate) unresolved_external_symbol_count: usize,
+    pub(crate) unresolved_external_symbols: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldFinalExecutableHostDryRunReport {
     pub(crate) manifest: String,
     pub(crate) writer_input_path: String,
@@ -191,6 +206,7 @@ pub(crate) struct NsldFinalExecutableHostDryRunReport {
     pub(crate) finalizer_provider_id: Option<String>,
     pub(crate) finalizer_provider_status: Option<String>,
     pub(crate) finalizer_execution_kind: Option<String>,
+    pub(crate) finalizer_input_summary: Option<NsldExecutableFinalizerInputSummary>,
     pub(crate) driver: String,
     pub(crate) driver_available: bool,
     pub(crate) driver_resolved_path: Option<String>,
@@ -216,6 +232,7 @@ pub(crate) struct NsldFinalExecutableHostInvokePlanReport {
     pub(crate) finalizer_provider_id: Option<String>,
     pub(crate) finalizer_provider_status: Option<String>,
     pub(crate) finalizer_execution_kind: Option<String>,
+    pub(crate) finalizer_input_summary: Option<NsldExecutableFinalizerInputSummary>,
     pub(crate) invocation_kind: String,
     pub(crate) invocation_policy: String,
     pub(crate) invocation_policy_reason: String,

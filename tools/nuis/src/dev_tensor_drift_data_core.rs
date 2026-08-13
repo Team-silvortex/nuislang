@@ -145,9 +145,20 @@ pub(crate) const DEV_TENSOR_CORE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
         required_patterns: &[
             "program-llvm",
             "runtime-shim",
+            "nuis-nsld-macho-host-object-linkage-v1",
+            "parse_macho_arm64_object_linkage",
+            "identity drift",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-macho-object-table-parser",
+        path: "tools/nsld/src/final_executable_macho_input.rs",
+        required_patterns: &[
             "MH_OBJECT",
             "LC_SEGMENT_64",
-            "identity drift",
+            "LC_SYMTAB",
+            "NLIST_64_SIZE",
+            "ARM64_RELOCATION_ADDEND",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -169,6 +180,7 @@ pub(crate) const DEV_TENSOR_CORE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
             "finalizer_provider_id",
             "finalizer_provider_status",
             "finalizer_execution_kind",
+            "finalizer_input_summary",
         ],
     },
     DevTensorDriftCheckSpec {

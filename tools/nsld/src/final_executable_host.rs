@@ -64,6 +64,13 @@ pub(crate) fn nsld_final_executable_host_dry_run_report(
         .as_ref()
         .map(|selection| selection.input_validation_issues(plan))
         .unwrap_or_default();
+    let (finalizer_input_summary, finalizer_input_summary_issue) = match finalizer.as_ref() {
+        Ok(selection) => match selection.input_summary(plan) {
+            Ok(summary) => (summary, None),
+            Err(error) => (None, Some(error)),
+        },
+        Err(_) => (None, None),
+    };
     let driver_resolved_path = requires_host_driver
         .then(|| resolve_host_driver_path(&driver))
         .flatten();
@@ -101,6 +108,9 @@ pub(crate) fn nsld_final_executable_host_dry_run_report(
             .iter()
             .map(|issue| format!("executable-finalizer-input:{issue}")),
     );
+    if let Some(issue) = finalizer_input_summary_issue.as_ref() {
+        blockers.push(format!("executable-finalizer-input-summary:{issue}"));
+    }
     if requires_host_driver && !driver_available {
         blockers.push(format!("host-finalizer-driver-unavailable:{driver}"));
     }
@@ -121,6 +131,7 @@ pub(crate) fn nsld_final_executable_host_dry_run_report(
         && registry.valid
         && finalizer_ready
         && finalizer_input_issues.is_empty()
+        && finalizer_input_summary_issue.is_none()
         && driver_available;
     let can_invoke_host_finalizer = environment_ready
         && writer_plan.writer_blockers.is_empty()
@@ -162,6 +173,7 @@ pub(crate) fn nsld_final_executable_host_dry_run_report(
         finalizer_provider_id,
         finalizer_provider_status,
         finalizer_execution_kind,
+        finalizer_input_summary,
         driver,
         driver_available,
         driver_resolved_path,
@@ -223,6 +235,7 @@ pub(crate) fn nsld_final_executable_host_invoke_plan_report(
         finalizer_provider_id: dry_run.finalizer_provider_id,
         finalizer_provider_status: dry_run.finalizer_provider_status,
         finalizer_execution_kind: dry_run.finalizer_execution_kind,
+        finalizer_input_summary: dry_run.finalizer_input_summary,
         invocation_kind,
         invocation_policy: dry_run.invocation_policy,
         invocation_policy_reason: dry_run.invocation_policy_reason,

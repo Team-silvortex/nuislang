@@ -1,9 +1,11 @@
 use super::{
     final_executable_macho_artifact::{
-        macho_artifact_image_validation_issues, materialize_macho_artifact_image,
+        macho_artifact_image_validation_issues, macho_artifact_input_summary,
+        materialize_macho_artifact_image,
     },
+    final_executable_macho_object::MACHO_HOST_OBJECT_LINKAGE_CONTRACT,
     fnv1a64_hex,
-    reports::NsldFinalExecutableWriterPlanReport,
+    reports::{NsldExecutableFinalizerInputSummary, NsldFinalExecutableWriterPlanReport},
 };
 use std::{collections::BTreeSet, path::Path, process::Command};
 
@@ -11,6 +13,8 @@ pub(crate) const EXECUTABLE_FINALIZER_CONTRACT: &str = "nuis-nsld-executable-fin
 
 type CommandPlanner = for<'a> fn(&ExecutableFinalizerCommandContext<'a>) -> Vec<String>;
 type InputValidator = fn(&nuisc::linker::LinkPlan) -> Vec<String>;
+type InputSummarizer =
+    fn(&nuisc::linker::LinkPlan) -> Result<Option<NsldExecutableFinalizerInputSummary>, String>;
 type FinalizerExecutor = for<'a> fn(&ExecutableFinalizerExecutionContext<'a>) -> Result<(), String>;
 
 #[derive(Clone, Copy)]
@@ -23,9 +27,11 @@ struct ExecutableFinalizerRegistration {
     provider_status: &'static str,
     execution_kind: &'static str,
     input_kind: &'static str,
+    input_summary_contract: Option<&'static str>,
     requires_host_driver: bool,
     command_planner: CommandPlanner,
     input_validator: InputValidator,
+    input_summarizer: InputSummarizer,
     executor: Option<FinalizerExecutor>,
 }
 
@@ -39,9 +45,11 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         provider_status: "registered-not-implemented",
         execution_kind: "registered-platform-writer",
         input_kind: "native-object-output",
+        input_summary_contract: None,
         requires_host_driver: false,
         command_planner: plan_host_command,
         input_validator: validate_no_additional_inputs,
+        input_summarizer: summarize_no_additional_inputs,
         executor: None,
     },
     ExecutableFinalizerRegistration {
@@ -53,9 +61,11 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         provider_status: "ready",
         execution_kind: "registered-nsld-artifact-image-writer",
         input_kind: "compiled-artifact-native-handoff",
+        input_summary_contract: Some(MACHO_HOST_OBJECT_LINKAGE_CONTRACT),
         requires_host_driver: false,
         command_planner: plan_internal_artifact_image,
         input_validator: macho_artifact_image_validation_issues,
+        input_summarizer: macho_artifact_input_summary,
         executor: Some(execute_internal_artifact_image),
     },
     ExecutableFinalizerRegistration {
@@ -67,9 +77,11 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         provider_status: "ready",
         execution_kind: "registered-host-command-shell-writer",
         input_kind: "native-object-output",
+        input_summary_contract: None,
         requires_host_driver: true,
         command_planner: plan_host_command,
         input_validator: validate_no_additional_inputs,
+        input_summarizer: summarize_no_additional_inputs,
         executor: Some(execute_host_command),
     },
     ExecutableFinalizerRegistration {
@@ -81,9 +93,11 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         provider_status: "registered-not-implemented",
         execution_kind: "registered-platform-writer",
         input_kind: "native-object-output",
+        input_summary_contract: None,
         requires_host_driver: false,
         command_planner: plan_host_command,
         input_validator: validate_no_additional_inputs,
+        input_summarizer: summarize_no_additional_inputs,
         executor: None,
     },
     ExecutableFinalizerRegistration {
@@ -95,9 +109,11 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         provider_status: "registered-not-implemented",
         execution_kind: "registered-platform-writer",
         input_kind: "native-object-output",
+        input_summary_contract: None,
         requires_host_driver: false,
         command_planner: plan_host_command,
         input_validator: validate_no_additional_inputs,
+        input_summarizer: summarize_no_additional_inputs,
         executor: None,
     },
 ];
@@ -161,6 +177,28 @@ impl ExecutableFinalizerSelection {
         (self.registration.input_validator)(plan)
     }
 
+    pub(crate) fn input_summary(
+        &self,
+        plan: &nuisc::linker::LinkPlan,
+    ) -> Result<Option<NsldExecutableFinalizerInputSummary>, String> {
+        let summary = (self.registration.input_summarizer)(plan)?;
+        match (self.registration.input_summary_contract, summary.as_ref()) {
+            (Some(expected), Some(actual)) if actual.contract != expected => Err(format!(
+                "executable finalizer provider `{}` input summary contract drift: expected `{expected}`, found `{}`",
+                self.provider_id(), actual.contract
+            )),
+            (Some(expected), None) => Err(format!(
+                "executable finalizer provider `{}` did not produce required input summary `{expected}`",
+                self.provider_id()
+            )),
+            (None, Some(actual)) => Err(format!(
+                "executable finalizer provider `{}` produced undeclared input summary `{}`",
+                self.provider_id(), actual.contract
+            )),
+            _ => Ok(summary),
+        }
+    }
+
     pub(crate) fn command_args(
         &self,
         context: &ExecutableFinalizerCommandContext<'_>,
@@ -212,6 +250,12 @@ pub(crate) fn executable_finalizer_registry_validation() -> ExecutableFinalizerR
         if registration.provider_status == "ready" && registration.executor.is_none() {
             issues.push(format!(
                 "ready executable finalizer provider `{}` has no executor",
+                registration.provider_id
+            ));
+        }
+        if registration.input_summary_contract == Some("") {
+            issues.push(format!(
+                "executable finalizer provider `{}` declares an empty input summary contract",
                 registration.provider_id
             ));
         }
@@ -428,18 +472,25 @@ fn validate_no_additional_inputs(_plan: &nuisc::linker::LinkPlan) -> Vec<String>
     Vec::new()
 }
 
+fn summarize_no_additional_inputs(
+    _plan: &nuisc::linker::LinkPlan,
+) -> Result<Option<NsldExecutableFinalizerInputSummary>, String> {
+    Ok(None)
+}
+
 fn executable_finalizer_registry_hash() -> String {
     let mut registrations = REGISTERED_FINALIZERS.iter().collect::<Vec<_>>();
     registrations.sort_by_key(|registration| registration.provider_id);
     let mut material = format!("contract={EXECUTABLE_FINALIZER_CONTRACT}\n");
     for registration in registrations {
         material.push_str(&format!(
-            "provider={}\nroute={}\nstatus={}\nexecution={}\ninput={}\nhost_driver={}\n",
+            "provider={}\nroute={}\nstatus={}\nexecution={}\ninput={}\ninput_summary={}\nhost_driver={}\n",
             registration.provider_id,
             registration_route_key(registration),
             registration.provider_status,
             registration.execution_kind,
             registration.input_kind,
+            registration.input_summary_contract.unwrap_or("none"),
             registration.requires_host_driver
         ));
     }

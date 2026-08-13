@@ -72,7 +72,18 @@ The internal Mach-O provider parses that compiled-artifact native handoff,
 checks target and ABI identity, requires exactly one `program-llvm` and one
 `runtime-shim` role, and checks every object against its LinkPlan identity and
 hash. Each payload must be an arm64 `MH_OBJECT` with a structurally valid load
-command span and `LC_SEGMENT_64`. It then validates either a thin arm64
+command span. The provider now parses every `LC_SEGMENT_64` section record,
+the single `LC_SYMTAB` plus its `nlist_64` and string tables, and every ARM64
+relocation table. All spans, section ordinals, symbol indexes, relocation
+widths, and `ADDEND` payload semantics are checked before admission.
+
+The provider returns `nuis-nsld-macho-host-object-linkage-v1` through the
+generic finalizer summary callback. That report counts objects, sections,
+symbols, and relocations; identifies cross-object references resolved inside
+the program/runtime pair; and lists the remaining C/system compatibility
+symbols without treating them as internally resolved. JSON, CLI text, and the
+persisted invoke plan consume the same typed summary. The provider then
+validates either a thin arm64
 `MH_EXECUTE` compatibility image or the arm64 slice of a universal Mach-O and
 atomically materializes it with executable permissions. This path requires no
 host process or environment gate, so Nsld does not invoke clang a second time.
@@ -84,13 +95,14 @@ gates still apply before that provider may run. It must execute the exact
 driver path resolved during the verified dry-run boundary and may not repeat a
 `PATH` lookup after admission.
 
-This is not yet a pure Nsld linker claim. Nsld now consumes and validates real
-relocatable inputs, but Nuisc still asks the host toolchain to prelink the
-compatibility executable embedded in the same artifact. Nsld does not yet
-resolve object symbols, apply their relocations, or synthesize the final
-Mach-O load commands and executable shell itself. ELF and PE/COFF remain
-visible, selectable, and honestly blocked rather than silently falling through
-a generic linker.
+This is not yet a pure Nsld linker claim. Nsld now understands the real input
+tables and can distinguish internal from external symbol references, but Nuisc
+still asks the host toolchain to prelink the compatibility executable embedded
+in the same artifact. Nsld does not yet assign final section addresses, create
+the binding map used for relocation writes, apply those writes, or synthesize
+the final Mach-O load commands and executable shell itself. ELF and PE/COFF
+remain visible, selectable, and honestly blocked rather than silently falling
+through a generic linker.
 
 ## Extension Rule
 
@@ -103,15 +115,17 @@ A future provider must:
    is unsupported;
 5. pass the registry conformance and finalizer CLI regressions.
 
-The next native milestone is Nsld-owned Mach-O symbol resolution, relocation
-application, and executable-shell emission from the verified object handoff.
-That work must not add Mach-O branches to Nuisc, final-stage planning, or the
-generic emit frontdoor.
+The next native milestone is a deterministic merged-section layout and
+cross-object symbol binding map, including duplicate-definition rejection and
+an explicit unresolved system-symbol boundary. Relocation application and
+executable-shell emission follow that report. This work must not add Mach-O
+branches to Nuisc, final-stage planning, or the generic emit frontdoor.
 
 ## Validation
 
 ```sh
 CARGO_INCREMENTAL=0 cargo test -q -j 1 -p nsld executable_finalizer
+CARGO_INCREMENTAL=0 cargo test -q -j 1 -p nsld final_executable_macho_input
 CARGO_INCREMENTAL=0 cargo test -q -j 1 -p nsld final_executable_host
 CARGO_INCREMENTAL=0 cargo test -q -j 1 -p nsld --test host_finalizer_cli
 ```

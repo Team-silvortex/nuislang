@@ -330,6 +330,7 @@ pub(crate) fn render_final_executable_host_invoke_plan(
         toml::escape_toml_string(report.finalizer_execution_kind.as_deref().unwrap_or(""))
     )
     .unwrap();
+    render_finalizer_input_summary(&mut out, report.finalizer_input_summary.as_ref());
     writeln!(
         out,
         "invocation_kind = \"{}\"",
@@ -396,4 +397,81 @@ pub(crate) fn render_final_executable_host_invoke_plan(
     )
     .unwrap();
     out
+}
+
+fn render_finalizer_input_summary(
+    out: &mut String,
+    summary: Option<&crate::reports::NsldExecutableFinalizerInputSummary>,
+) {
+    let Some(summary) = summary else {
+        out.push_str("finalizer_input_summary_present = false\n");
+        return;
+    };
+    out.push_str("finalizer_input_summary_present = true\n");
+    writeln!(
+        out,
+        "finalizer_input_contract = \"{}\"",
+        toml::escape_toml_string(&summary.contract)
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_status = \"{}\"",
+        toml::escape_toml_string(&summary.status)
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_object_count = {}",
+        summary.object_count
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_section_count = {}",
+        summary.section_count
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_symbol_count = {}",
+        summary.symbol_count
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_relocation_count = {}",
+        summary.relocation_count
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_defined_symbol_count = {}",
+        summary.defined_symbol_count
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_undefined_symbol_count = {}",
+        summary.undefined_symbol_count
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_internally_resolved_symbol_count = {}",
+        summary.internally_resolved_symbol_count
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_unresolved_external_symbol_count = {}",
+        summary.unresolved_external_symbol_count
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_unresolved_external_symbols = [{}]",
+        toml::toml_string_array_literal(&summary.unresolved_external_symbols)
+    )
+    .unwrap();
 }
