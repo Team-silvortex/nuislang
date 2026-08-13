@@ -16,6 +16,20 @@ fn temp_dir(label: &str) -> PathBuf {
     dir
 }
 
+fn copy_dir_recursive(source: &Path, destination: &Path) {
+    fs::create_dir_all(destination).unwrap();
+    for entry in fs::read_dir(source).unwrap() {
+        let entry = entry.unwrap();
+        let source_path = entry.path();
+        let destination_path = destination.join(entry.file_name());
+        if source_path.is_dir() {
+            copy_dir_recursive(&source_path, &destination_path);
+        } else {
+            fs::copy(source_path, destination_path).unwrap();
+        }
+    }
+}
+
 fn run_nuis(args: &[&str]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_nuis"))
         .args(args)
@@ -648,13 +662,20 @@ fn std_tooling_observable_cli_smoke_checks_reports_and_stdin() {
 
 #[test]
 fn std_path_safety_release_check_reports_nsld_drive_command_set() {
+    let project_root = temp_dir("path_safety_release_project").join("path_safety_demo");
+    copy_dir_recursive(
+        Path::new("../../examples/projects/tooling/path_safety_demo"),
+        &project_root,
+    );
+    let project_root_text = project_root.display().to_string();
+    let galaxy_lock = run_nuis(&["galaxy", "lock-deps", &project_root_text]);
+    assert_success(&galaxy_lock, "nuis galaxy lock-deps std path safety smoke");
+    let galaxy_sync = run_nuis(&["galaxy", "sync-deps", &project_root_text]);
+    assert_success(&galaxy_sync, "nuis galaxy sync-deps std path safety smoke");
+
     let output_dir = temp_dir("path_safety_release_check");
     let output_dir_text = output_dir.display().to_string();
-    let release_check = run_nuis(&[
-        "release-check",
-        "../../examples/projects/tooling/path_safety_demo",
-        &output_dir_text,
-    ]);
+    let release_check = run_nuis(&["release-check", &project_root_text, &output_dir_text]);
     assert_success(&release_check, "nuis release-check std path safety smoke");
     let stdout = String::from_utf8_lossy(&release_check.stdout);
     assert!(
@@ -714,7 +735,7 @@ fn std_path_safety_release_check_reports_nsld_drive_command_set() {
     let release_check_json = run_nuis(&[
         "release-check",
         "--json",
-        "../../examples/projects/tooling/path_safety_demo",
+        &project_root_text,
         &json_output_dir_text,
     ]);
     assert_success(
@@ -811,24 +832,23 @@ fn std_path_safety_release_check_reports_nsld_drive_command_set() {
         "nsld drive until-clean did not apply the expected remaining stage count\n{nsld_until_clean_stdout}"
     );
     assert!(
-        nsld_until_clean_stdout.contains("\"stop_reason\":\"host-finalizer-policy-required\""),
-        "nsld drive until-clean should stop at the explicit host finalizer policy boundary\n{nsld_until_clean_stdout}"
+        nsld_until_clean_stdout.contains("\"stop_reason\":\"clean\""),
+        "nsld drive until-clean should close the owned finalizer chain\n{nsld_until_clean_stdout}"
     );
     assert!(
-        nsld_until_clean_stdout.contains("\"stop_command_id\":\"final-executable-output\""),
-        "nsld drive until-clean should report the final executable output boundary command\n{nsld_until_clean_stdout}"
+        nsld_until_clean_stdout.contains("\"stop_command_id\":null"),
+        "nsld drive until-clean should not retain a stale host boundary command\n{nsld_until_clean_stdout}"
     );
     assert!(
-        nsld_until_clean_stdout.contains(
-            "\"stop_source\":\"final-output-boundary\""
-        ),
-        "nsld drive until-clean should classify the stop as the final output boundary\n{nsld_until_clean_stdout}"
+        nsld_until_clean_stdout.contains("\"safe_next_action\":\"clean\"")
+            && nsld_until_clean_stdout.contains("\"safe_next_gate_required\":false"),
+        "nsld drive until-clean should expose a clean, ungated next state\n{nsld_until_clean_stdout}"
     );
     assert!(
         nsld_until_clean_stdout
             .contains("\"messages\":[\"applied emit-units\"")
-            && nsld_until_clean_stdout.contains("\"read-only-boundary:final-executable-output\""),
-        "nsld drive until-clean should materialize the chain before the read-only host boundary\n{nsld_until_clean_stdout}"
+            && nsld_until_clean_stdout.contains("\"no-next-action\""),
+        "nsld drive until-clean should materialize and close the artifact chain\n{nsld_until_clean_stdout}"
     );
     assert!(
         nsld_until_clean_stdout.contains("\"last_command_id\":\"emit-final-executable-pipeline\""),
@@ -868,21 +888,20 @@ fn std_path_safety_release_check_reports_nsld_drive_command_set() {
     );
     let run_artifact_stdout = String::from_utf8_lossy(&run_artifact_json.stdout);
     assert!(
-        run_artifact_stdout.contains("\"nsld_final_executable_output_ready\":false"),
-        "run-artifact json should distinguish host runnable output from Nsld-owned final output readiness\n{run_artifact_stdout}"
+        run_artifact_stdout.contains("\"nsld_final_executable_output_ready\":true"),
+        "run-artifact json should report the completed Nsld-owned final output\n{run_artifact_stdout}"
     );
     assert!(
         run_artifact_stdout.contains("\"nsld_final_executable_output_path_present\":true"),
         "run-artifact json did not report the host final output path after nsld drive\n{run_artifact_stdout}"
     );
     assert!(
-        run_artifact_stdout.contains("\"nsld_final_executable_output_nsld_owned\":false"),
-        "run-artifact json did not resolve final output ownership after nsld drive\n{run_artifact_stdout}"
+        run_artifact_stdout.contains("\"nsld_final_executable_output_nsld_owned\":true"),
+        "run-artifact json did not preserve Nsld final output ownership after drive\n{run_artifact_stdout}"
     );
     assert!(
-        run_artifact_stdout
-            .contains("\"nsld_final_executable_output_blockers\":[\"final-executable-output:not-nsld-owned\"]"),
-        "run-artifact json did not report the not-nsld-owned final output blocker after nsld drive\n{run_artifact_stdout}"
+        run_artifact_stdout.contains("\"nsld_final_executable_output_blockers\":[]"),
+        "run-artifact json retained a blocker after the owned finalizer closed\n{run_artifact_stdout}"
     );
 }
 

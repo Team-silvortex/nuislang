@@ -16,7 +16,8 @@ enum DirectCallScalarKind {
 #[path = "direct_calls/kinds.rs"]
 mod kinds;
 pub(super) use kinds::{
-    collect_owned_external_buffer_return_helpers, supports_direct_call_signature,
+    collect_owned_external_buffer_return_helpers, owned_external_buffer_helper_lowering_order,
+    supports_direct_call_signature,
 };
 use kinds::{
     direct_call_scalar_kind, direct_call_signature_kind, is_scheduler_scalar_kind,

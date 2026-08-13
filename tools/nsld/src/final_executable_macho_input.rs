@@ -34,14 +34,23 @@ pub(crate) struct ParsedMachOObjectLinkage {
     pub(crate) undefined_symbol_count: usize,
     pub(crate) external_definitions: BTreeSet<String>,
     pub(crate) external_undefined: BTreeSet<String>,
+    pub(crate) sections: Vec<ParsedMachOSection>,
+    pub(crate) symbols: Vec<ParsedMachOSymbol>,
+    pub(crate) relocations: Vec<ParsedMachORelocation>,
 }
 
-#[derive(Debug)]
-struct SectionRecord {
-    name: String,
-    size: u64,
-    relocation_offset: usize,
-    relocation_count: usize,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ParsedMachOSection {
+    pub(crate) ordinal: usize,
+    pub(crate) segment_name: String,
+    pub(crate) name: String,
+    pub(crate) address: u64,
+    pub(crate) size: u64,
+    pub(crate) alignment: u64,
+    pub(crate) flags: u32,
+    pub(crate) zero_fill: bool,
+    pub(crate) relocation_offset: usize,
+    pub(crate) relocation_count: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -52,9 +61,28 @@ struct SymbolTableCommand {
     string_size: usize,
 }
 
-#[derive(Debug)]
-struct SymbolRecord {
-    name: String,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ParsedMachOSymbol {
+    pub(crate) index: usize,
+    pub(crate) name: String,
+    pub(crate) kind: String,
+    pub(crate) external: bool,
+    pub(crate) defined: bool,
+    pub(crate) section_ordinal: Option<usize>,
+    pub(crate) value: u64,
+    pub(crate) common_alignment: Option<u64>,
+    pub(crate) indirect_target: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ParsedMachORelocation {
+    pub(crate) section_ordinal: usize,
+    pub(crate) offset: u32,
+    pub(crate) symbol_number: usize,
+    pub(crate) width_bytes: u64,
+    pub(crate) pc_relative: bool,
+    pub(crate) external: bool,
+    pub(crate) relocation_type: u32,
 }
 
 pub(crate) fn parse_macho_arm64_object_linkage(
@@ -79,16 +107,19 @@ pub(crate) fn parse_macho_arm64_object_linkage(
         external_definitions,
         external_undefined,
     ) = parse_symbols(bytes, symbol_table, sections.len())?;
-    let relocation_count = parse_relocations(bytes, &sections, &symbols)?;
+    let relocations = parse_relocations(bytes, &sections, &symbols)?;
 
     Ok(ParsedMachOObjectLinkage {
         section_count: sections.len(),
         symbol_count: symbols.len(),
-        relocation_count,
+        relocation_count: relocations.len(),
         defined_symbol_count,
         undefined_symbol_count,
         external_definitions,
         external_undefined,
+        sections,
+        symbols,
+        relocations,
     })
 }
 
@@ -121,7 +152,7 @@ fn parse_load_commands(
     bytes: &[u8],
     command_count: usize,
     command_end: usize,
-) -> Result<(Vec<SectionRecord>, Option<SymbolTableCommand>), String> {
+) -> Result<(Vec<ParsedMachOSection>, Option<SymbolTableCommand>), String> {
     let mut cursor = MACH_O_64_HEADER_SIZE;
     let mut sections = Vec::new();
     let mut symbol_table = None;
@@ -179,7 +210,7 @@ fn parse_segment_command(
     bytes: &[u8],
     command_offset: usize,
     command_size: usize,
-    sections: &mut Vec<SectionRecord>,
+    sections: &mut Vec<ParsedMachOSection>,
 ) -> Result<(), String> {
     if command_size < SEGMENT_COMMAND_64_SIZE {
         return Err("Mach-O object LC_SEGMENT_64 is shorter than 72 bytes".to_owned());
@@ -200,12 +231,21 @@ fn parse_segment_command(
     for local_index in 0..section_count {
         let offset = command_offset + SEGMENT_COMMAND_64_SIZE + local_index * SECTION_64_SIZE;
         let name = fixed_name(bytes, offset, 16)?;
+        let segment_name = fixed_name(bytes, offset + 16, 16)?;
+        let address = read_u64_le(bytes, offset + 32)?;
         let size = read_u64_le(bytes, offset + 40)?;
         let payload_offset = read_u32_le(bytes, offset + 48)? as usize;
+        let alignment_exponent = read_u32_le(bytes, offset + 52)?;
+        let alignment = 1u64.checked_shl(alignment_exponent).ok_or_else(|| {
+            format!(
+                "Mach-O section `{name}` alignment exponent {alignment_exponent} is unsupported"
+            )
+        })?;
         let relocation_offset = read_u32_le(bytes, offset + 56)? as usize;
         let relocation_count = read_u32_le(bytes, offset + 60)? as usize;
         let flags = read_u32_le(bytes, offset + 64)?;
-        if !is_zero_fill(flags) {
+        let zero_fill = is_zero_fill(flags);
+        if !zero_fill {
             let payload_size = usize::try_from(size).map_err(|_| {
                 format!("Mach-O section `{name}` size does not fit host address space")
             })?;
@@ -216,9 +256,15 @@ fn parse_segment_command(
                 &format!("section `{name}` payload"),
             )?;
         }
-        sections.push(SectionRecord {
+        sections.push(ParsedMachOSection {
+            ordinal: sections.len() + 1,
+            segment_name,
             name,
+            address,
             size,
+            alignment,
+            flags,
+            zero_fill,
             relocation_offset,
             relocation_count,
         });
@@ -243,7 +289,7 @@ fn parse_symbol_table_command(
 }
 
 type ParsedSymbols = (
-    Vec<SymbolRecord>,
+    Vec<ParsedMachOSymbol>,
     usize,
     usize,
     BTreeSet<String>,
@@ -288,11 +334,17 @@ fn parse_symbols(
             .get(offset + 5)
             .ok_or_else(|| format!("Mach-O symbol {index} section ordinal is truncated"))?
             as usize;
+        let description = read_u16_le(bytes, offset + 6)?;
         let value = read_u64_le(bytes, offset + 8)?;
         let name = string_name(strings, string_index, index)?;
+        let mut kind_name = "debug";
+        let mut defined = false;
+        let mut resolved_section_ordinal = None;
+        let mut common_alignment = None;
+        let mut indirect_target = None;
+        let external = symbol_type & N_EXT != 0;
         if symbol_type & N_STAB == 0 {
             let kind = symbol_type & N_TYPE;
-            let external = symbol_type & N_EXT != 0;
             match kind {
                 N_SECT => {
                     if section_ordinal == 0 || section_ordinal > section_count {
@@ -300,30 +352,48 @@ fn parse_symbols(
                             "Mach-O symbol {index} `{name}` references invalid section ordinal {section_ordinal}"
                         ));
                     }
+                    kind_name = "section";
+                    defined = true;
+                    resolved_section_ordinal = Some(section_ordinal);
                     defined_count += 1;
                     if external && !name.is_empty() {
                         external_definitions.insert(name.clone());
                     }
                 }
                 N_ABS | N_INDR => {
+                    kind_name = if kind == N_ABS {
+                        "absolute"
+                    } else {
+                        "indirect"
+                    };
+                    defined = true;
                     defined_count += 1;
                     if kind == N_INDR {
                         let target_index = usize::try_from(value).map_err(|_| {
                             format!("Mach-O indirect symbol {index} target index overflows")
                         })?;
-                        string_name(strings, target_index, index)?;
+                        indirect_target = Some(string_name(strings, target_index, index)?);
                     }
                     if external && !name.is_empty() {
                         external_definitions.insert(name.clone());
                     }
                 }
                 N_UNDF if value != 0 => {
+                    kind_name = "common";
+                    defined = true;
+                    let exponent = u32::from((description >> 8) & 0x0f);
+                    common_alignment = Some(1u64 << exponent);
                     defined_count += 1;
                     if external && !name.is_empty() {
                         external_definitions.insert(name.clone());
                     }
                 }
                 N_UNDF | N_PBUD => {
+                    kind_name = if kind == N_UNDF {
+                        "undefined"
+                    } else {
+                        "prebound-undefined"
+                    };
                     undefined_count += 1;
                     if external {
                         if name.is_empty() {
@@ -341,7 +411,17 @@ fn parse_symbols(
                 }
             }
         }
-        symbols.push(SymbolRecord { name });
+        symbols.push(ParsedMachOSymbol {
+            index,
+            name,
+            kind: kind_name.to_owned(),
+            external,
+            defined,
+            section_ordinal: resolved_section_ordinal,
+            value,
+            common_alignment,
+            indirect_target,
+        });
     }
     Ok((
         symbols,
@@ -354,10 +434,10 @@ fn parse_symbols(
 
 fn parse_relocations(
     bytes: &[u8],
-    sections: &[SectionRecord],
-    symbols: &[SymbolRecord],
-) -> Result<usize, String> {
-    let mut total = 0usize;
+    sections: &[ParsedMachOSection],
+    symbols: &[ParsedMachOSymbol],
+) -> Result<Vec<ParsedMachORelocation>, String> {
+    let mut relocations = Vec::new();
     for section in sections {
         let table_size = section
             .relocation_count
@@ -385,6 +465,7 @@ fn parse_relocations(
             }
             let word = read_u32_le(bytes, offset + 4)?;
             let symbol_number = (word & 0x00ff_ffff) as usize;
+            let pc_relative = (word >> 24) & 0x1 != 0;
             let length = (word >> 25) & 0x3;
             let external = (word >> 27) & 0x1 != 0;
             let relocation_type = word >> 28;
@@ -428,12 +509,18 @@ fn parse_relocations(
                     section.name
                 ));
             }
+            relocations.push(ParsedMachORelocation {
+                section_ordinal: section.ordinal,
+                offset: address,
+                symbol_number,
+                width_bytes: width,
+                pc_relative,
+                external,
+                relocation_type,
+            });
         }
-        total = total
-            .checked_add(section.relocation_count)
-            .ok_or_else(|| "Mach-O relocation count overflows address space".to_owned())?;
     }
-    Ok(total)
+    Ok(relocations)
 }
 
 fn string_name(strings: &[u8], index: usize, symbol_index: usize) -> Result<String, String> {
@@ -489,6 +576,14 @@ fn read_u32_le(bytes: &[u8], offset: usize) -> Result<u32, String> {
         .try_into()
         .map_err(|_| format!("Mach-O object u32 at offset {offset} is malformed"))?;
     Ok(u32::from_le_bytes(raw))
+}
+
+fn read_u16_le(bytes: &[u8], offset: usize) -> Result<u16, String> {
+    let range = checked_range(offset, 2, bytes.len(), "u16")?;
+    let raw: [u8; 2] = bytes[range]
+        .try_into()
+        .map_err(|_| format!("Mach-O object u16 at offset {offset} is malformed"))?;
+    Ok(u16::from_le_bytes(raw))
 }
 
 fn read_u64_le(bytes: &[u8], offset: usize) -> Result<u64, String> {

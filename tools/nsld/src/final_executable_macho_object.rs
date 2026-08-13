@@ -1,5 +1,6 @@
 use crate::{
     final_executable_macho_input::parse_macho_arm64_object_linkage,
+    final_executable_macho_layout::{build_macho_placement_binding_report, MachOLayoutObject},
     reports::NsldExecutableFinalizerInputSummary,
 };
 use std::collections::BTreeSet;
@@ -38,6 +39,7 @@ pub(crate) fn summarize_macho_host_object_handoff(
     let mut undefined_symbol_count = 0usize;
     let mut external_definitions = BTreeSet::new();
     let mut external_undefined = BTreeSet::new();
+    let mut parsed_objects = Vec::with_capacity(artifact.host_objects.len());
     for object in &artifact.host_objects {
         if !object_ids.insert(object.object_id.as_str()) {
             return Err(format!("duplicate host object id `{}`", object.object_id));
@@ -58,8 +60,9 @@ pub(crate) fn summarize_macho_host_object_handoff(
         relocation_count += parsed.relocation_count;
         defined_symbol_count += parsed.defined_symbol_count;
         undefined_symbol_count += parsed.undefined_symbol_count;
-        external_definitions.extend(parsed.external_definitions);
-        external_undefined.extend(parsed.external_undefined);
+        external_definitions.extend(parsed.external_definitions.iter().cloned());
+        external_undefined.extend(parsed.external_undefined.iter().cloned());
+        parsed_objects.push((object, parsed));
     }
 
     for required_role in REQUIRED_HOST_OBJECT_ROLES {
@@ -87,6 +90,15 @@ pub(crate) fn summarize_macho_host_object_handoff(
     } else {
         "verified-with-external-compatibility-boundary"
     };
+    let placement_inputs = parsed_objects
+        .iter()
+        .map(|(object, linkage)| MachOLayoutObject {
+            object_id: &object.object_id,
+            role: &object.role,
+            linkage,
+        })
+        .collect::<Vec<_>>();
+    let placement_binding = build_macho_placement_binding_report(&placement_inputs)?;
     Ok(NsldExecutableFinalizerInputSummary {
         contract: MACHO_HOST_OBJECT_LINKAGE_CONTRACT.to_owned(),
         status: status.to_owned(),
@@ -99,6 +111,7 @@ pub(crate) fn summarize_macho_host_object_handoff(
         internally_resolved_symbol_count: internally_resolved.len(),
         unresolved_external_symbol_count: unresolved_external_symbols.len(),
         unresolved_external_symbols,
+        placement_binding,
     })
 }
 

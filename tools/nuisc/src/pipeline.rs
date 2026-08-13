@@ -138,7 +138,7 @@ impl ResolvedCompileInput {
 
 pub fn resolve_compile_input(path: &Path) -> Result<ResolvedCompileInput, String> {
     if crate::project::is_project_input(path) {
-        let project = crate::project::load_project(path)?;
+        let project = crate::project::load_project_for_compile(path)?;
         let plan = crate::project::build_project_compilation_plan(&project)?;
         return Ok(ResolvedCompileInput {
             input_path: path.to_path_buf(),
@@ -179,7 +179,7 @@ pub fn compile_source_path_with_options(
 }
 
 pub fn compile_project(path: &Path) -> Result<PipelineArtifacts, String> {
-    let project = crate::project::load_project(path)?;
+    let project = crate::project::load_project_for_compile(path)?;
     let plan = crate::project::build_project_compilation_plan(&project)?;
     compile_project_plan(&project, &plan)
 }

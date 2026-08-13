@@ -13,6 +13,7 @@ mod bridge_contracts;
 mod data_bridge_directions;
 mod data_contract_types;
 mod data_validation;
+mod galaxy_cache;
 mod galaxy_lock;
 mod kernel_validation;
 mod manifest;
@@ -54,6 +55,12 @@ use data_contract_types::{
 };
 #[cfg(test)]
 use data_validation::validate_data_profile_token_types;
+pub use galaxy_cache::{
+    materialize_project_galaxy_cache, project_galaxy_cache_base, project_galaxy_cache_root,
+    project_galaxy_cache_root_under, verify_required_project_galaxy_resolution_cache,
+    PROJECT_GALAXY_CACHE_DIGEST_DIR, PROJECT_GALAXY_CACHE_MANIFEST_FILE,
+    PROJECT_GALAXY_CACHE_SCHEMA,
+};
 pub use galaxy_lock::{
     committed_project_galaxy_resolution_lock_path, render_project_galaxy_resolution_lock,
     verify_committed_project_galaxy_resolution_lock, verify_project_galaxy_resolution_lock,
@@ -72,8 +79,8 @@ pub use packet::render_project_packet_index;
 pub use planning::{
     build_project_compilation_plan, describe_project, describe_project_compilation_plan,
     describe_project_dependency_categories, describe_project_exchange_route_classes,
-    describe_project_output_intent_categories, load_project, project_docs_summary,
-    project_galaxy_summary, render_project_compilation_plan_index,
+    describe_project_output_intent_categories, load_project, load_project_for_compile,
+    project_docs_summary, project_galaxy_summary, render_project_compilation_plan_index,
     write_project_compilation_plan_index, write_project_metadata,
 };
 use profile_apply::{

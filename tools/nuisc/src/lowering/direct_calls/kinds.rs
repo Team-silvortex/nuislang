@@ -93,7 +93,62 @@ pub(in crate::lowering) fn collect_owned_external_buffer_return_helpers(
     else {
         return BTreeSet::new();
     };
-    super::function_called_functions(main, &main.body, &eligible)
+    let roots = super::function_called_functions(main, &main.body, &eligible);
+    let mut selected = roots.clone();
+    for root in roots {
+        let Some(function) = module
+            .functions
+            .iter()
+            .find(|function| function.name == root)
+        else {
+            continue;
+        };
+        selected.extend(super::function_called_functions(
+            function,
+            &function.body,
+            &eligible,
+        ));
+    }
+    selected
+}
+
+pub(in crate::lowering) fn owned_external_buffer_helper_lowering_order(
+    module: &NirModule,
+    selected: &BTreeSet<String>,
+) -> Result<Vec<String>, String> {
+    let eligible = selected.iter().map(String::as_str).collect::<BTreeSet<_>>();
+    let dependencies = module
+        .functions
+        .iter()
+        .filter(|function| selected.contains(&function.name))
+        .map(|function| {
+            (
+                function.name.clone(),
+                super::function_called_functions(function, &function.body, &eligible),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let mut pending = selected.clone();
+    let mut order = Vec::with_capacity(selected.len());
+    while !pending.is_empty() {
+        let Some(next) = pending
+            .iter()
+            .find(|name| {
+                dependencies
+                    .get(name.as_str())
+                    .is_none_or(|called| called.iter().all(|callee| !pending.contains(callee)))
+            })
+            .cloned()
+        else {
+            return Err(
+                "recursive owned-buffer helper transfers remain closed during bootstrap lowering"
+                    .to_owned(),
+            );
+        };
+        pending.remove(&next);
+        order.push(next);
+    }
+    Ok(order)
 }
 
 pub(super) fn owned_external_buffer_metadata_for_node(
@@ -105,21 +160,46 @@ pub(super) fn owned_external_buffer_metadata_for_node(
         .iter()
         .find(|node| node.name == node_name)
         .ok_or_else(|| format!("owned external buffer return references missing `{node_name}`"))?;
-    if node.op.module != "cpu" || node.op.instruction != "extern_call_owned_buffer" {
-        return Err(format!(
-            "owned external buffer helper must return one direct registered producer, found `{}.{}`",
-            node.op.module, node.op.instruction
-        ));
-    }
-    let contract = yir_core::ffi::parse_owned_buffer_return_contract(&node.op.args)
-        .map_err(|error| format!("owned external buffer helper has invalid authority: {error}"))?;
-    Ok(yir_core::ffi::owned_buffer_function_transfer_metadata(
-        contract.abi,
-        contract.destructor_symbol,
-        contract.destructor_signature_hash,
+    let (abi, destructor, destructor_hash) = match (
+        node.op.module.as_str(),
+        node.op.instruction.as_str(),
+    ) {
+        ("cpu", "extern_call_owned_buffer") => {
+            let contract = yir_core::ffi::parse_owned_buffer_return_contract(&node.op.args)
+                .map_err(|error| {
+                    format!("owned external buffer helper has invalid authority: {error}")
+                })?;
+            (
+                contract.abi,
+                contract.destructor_symbol,
+                contract.destructor_signature_hash,
+            )
+        }
+        ("cpu", "call_owned_external_buffer") => {
+            let contract = yir_core::ffi::parse_owned_buffer_function_transfer_contract(
+                node.op.args.get(1..).unwrap_or_default(),
+            )
+            .map_err(|error| {
+                format!("owned external buffer helper call has invalid authority: {error}")
+            })?;
+            (
+                contract.abi,
+                contract.destructor_symbol,
+                contract.destructor_signature_hash,
+            )
+        }
+        _ => {
+            return Err(format!(
+                "owned external buffer helper must return one registered producer or helper transfer, found `{}.{}`",
+                node.op.module, node.op.instruction
+            ));
+        }
+    };
+    Ok(
+        yir_core::ffi::owned_buffer_function_transfer_metadata(abi, destructor, destructor_hash)
+            .into_iter()
+            .collect(),
     )
-    .into_iter()
-    .collect())
 }
 
 pub(super) fn owned_external_buffer_metadata_for_helper(

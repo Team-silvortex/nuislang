@@ -18,8 +18,19 @@ galaxy = ["std=workspace"]
     );
     let project = crate::project::load_project(&project_root).unwrap();
     let committed_lock_path = project_root.join("nuis.galaxy.lock");
-    crate::project::write_project_galaxy_resolution_lock(&committed_lock_path, &project).unwrap();
+    let committed_lock_summary =
+        crate::project::write_project_galaxy_resolution_lock(&committed_lock_path, &project)
+            .unwrap();
     let committed_lock_source = fs::read_to_string(&committed_lock_path).unwrap();
+    let cache_root =
+        crate::project::project_galaxy_cache_root(&project_root, &committed_lock_summary).unwrap();
+    crate::project::materialize_project_galaxy_cache(
+        &project,
+        &committed_lock_source,
+        &committed_lock_path,
+        &cache_root,
+    )
+    .unwrap();
     let output_dir = temp_dir("compile_command_galaxy_resolution_lock_outputs");
     let output_stem = "hetero_proxy_benchmark_demo".to_owned();
 

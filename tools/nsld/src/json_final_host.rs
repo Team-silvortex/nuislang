@@ -213,8 +213,95 @@ fn finalizer_input_summary_json(summary: Option<&NsldExecutableFinalizerInputSum
             "unresolved_external_symbols",
             &summary.unresolved_external_symbols,
         ),
+        macho_placement_binding_json(&summary.placement_binding),
     ];
     format!("\"finalizer_input_summary\":{{{}}}", fields.join(","))
+}
+
+fn macho_placement_binding_json(report: &NsldMachOPlacementBindingReport) -> String {
+    let merged_sections = report
+        .merged_sections
+        .iter()
+        .map(|section| {
+            let fields = [
+                json_string_field("section_id", &section.section_id),
+                json_string_field("segment_name", &section.segment_name),
+                json_string_field("section_name", &section.section_name),
+                json_string_field("flags", &format!("0x{:08x}", section.flags)),
+                json_usize_field("alignment", section.alignment),
+                json_usize_field("output_offset", section.output_offset),
+                json_usize_field("size_bytes", section.size_bytes),
+                json_usize_field("contribution_count", section.contribution_count),
+                json_bool_field("zero_fill", section.zero_fill),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    let placements = report
+        .section_placements
+        .iter()
+        .map(|placement| {
+            let fields = [
+                json_string_field("object_id", &placement.object_id),
+                json_string_field("object_role", &placement.object_role),
+                json_usize_field("input_section_ordinal", placement.input_section_ordinal),
+                json_string_field("input_segment_name", &placement.input_segment_name),
+                json_string_field("input_section_name", &placement.input_section_name),
+                json_string_field("output_section_id", &placement.output_section_id),
+                json_usize_field("output_offset", placement.output_offset),
+                json_usize_field("output_section_offset", placement.output_section_offset),
+                json_usize_field("size_bytes", placement.size_bytes),
+                json_usize_field("alignment", placement.alignment),
+                json_bool_field("zero_fill", placement.zero_fill),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    let bindings = report
+        .symbol_bindings
+        .iter()
+        .map(|binding| {
+            let fields = [
+                json_string_field("symbol", &binding.symbol),
+                json_string_field("reference_object_id", &binding.reference_object_id),
+                json_usize_field("reference_symbol_index", binding.reference_symbol_index),
+                json_string_field("status", &binding.status),
+                json_optional_string_field("target_object_id", binding.target_object_id.as_deref()),
+                json_optional_usize_field("target_symbol_index", binding.target_symbol_index),
+                json_optional_string_field("target_kind", binding.target_kind.as_deref()),
+                json_optional_string_field(
+                    "target_section_id",
+                    binding.target_section_id.as_deref(),
+                ),
+                json_optional_usize_field("target_output_offset", binding.target_output_offset),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    let fields = [
+        json_string_field("contract", &report.contract),
+        json_string_field("status", &report.status),
+        json_string_field("plan_hash", &report.plan_hash),
+        json_usize_field("image_span_bytes", report.image_span_bytes),
+        json_usize_field("merged_section_count", report.merged_sections.len()),
+        json_usize_field("section_placement_count", report.section_placements.len()),
+        json_usize_field("symbol_binding_count", report.symbol_bindings.len()),
+        json_usize_field(
+            "internally_bound_symbol_count",
+            report.internally_bound_symbol_count,
+        ),
+        json_usize_field(
+            "external_compatibility_symbol_count",
+            report.external_compatibility_symbol_count,
+        ),
+        format!("\"merged_sections\":[{merged_sections}]"),
+        format!("\"section_placements\":[{placements}]"),
+        format!("\"symbol_bindings\":[{bindings}]"),
+    ];
+    format!("\"placement_binding\":{{{}}}", fields.join(","))
 }
 
 pub(crate) fn nsld_final_executable_host_invoke_plan_emit_report_json(

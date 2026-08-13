@@ -150,6 +150,24 @@ const FFI_SMOKE_CASES: &[FfiSmokeCase] = &[
         stdout_contains: &["exit_status: 0"],
         expect_manifest: false,
     },
+    FfiSmokeCase {
+        name: "owned_return_buffer_nested_helper_demo",
+        source: "../../examples/ns/ffi/owned_return_buffer_nested_helper_demo.ns",
+        artifact: "owned_return_buffer_nested_helper_demo",
+        yir_contains: &[
+            "function make_registered_buffer cpu helper",
+            "function forward_registered_buffer cpu helper",
+            "return_owned_external_buffer",
+            "call_owned_external_buffer",
+        ],
+        llvm_contains: &[
+            "define { ptr, i64 } @nuis_fn_make_registered_buffer(i64",
+            "define { ptr, i64 } @nuis_fn_forward_registered_buffer(i64",
+            "call i64 @host_owned_buffer_destroy(ptr",
+        ],
+        stdout_contains: &["exit_status: 0"],
+        expect_manifest: false,
+    },
 ];
 
 #[test]
@@ -204,6 +222,7 @@ fn ffi_libc_demos_build_and_run_as_native_artifacts() {
                 case.name
             );
         }
+        fs::remove_dir_all(output_dir).unwrap();
     }
 }
 
@@ -234,4 +253,5 @@ fn clock_test_facade_builds_and_runs_as_native_artifact() {
     assert_success(&run, "nuis run-artifact hello_clock_test_facades");
     let run_stdout = String::from_utf8_lossy(&run.stdout);
     assert!(run_stdout.contains("exit_status: 0"));
+    fs::remove_dir_all(output_dir).unwrap();
 }

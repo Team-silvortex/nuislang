@@ -195,6 +195,7 @@ fn accepts_registered_libc_demo_signatures() {
     compiled_source("../../examples/ns/ffi/owned_return_buffer_demo.ns");
     compiled_source("../../examples/ns/ffi/owned_return_buffer_select_demo.ns");
     compiled_source("../../examples/ns/ffi/owned_return_buffer_helper_demo.ns");
+    compiled_source("../../examples/ns/ffi/owned_return_buffer_nested_helper_demo.ns");
 }
 
 #[test]
@@ -356,19 +357,103 @@ fn rejects_owned_buffer_function_result_without_caller_free() {
 }
 
 #[test]
-fn flattens_nested_owned_buffer_source_helper_to_one_runtime_transfer() {
+fn lowers_one_nested_owned_buffer_helper_transfer_with_static_identity() {
+    let artifacts = nuisc::pipeline::compile_source_path(Path::new(
+        "../../examples/ns/ffi/owned_return_buffer_nested_helper_demo.ns",
+    ))
+    .expect("one nested owned-buffer helper transfer should compile");
+    let returned = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.instruction == "return_owned_external_buffer")
+        .collect::<Vec<_>>();
+    assert_eq!(returned.len(), 2);
+    let expected_destructor_hash = returned[0].op.args[4].clone();
+    let calls = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.instruction == "call_owned_external_buffer")
+        .collect::<Vec<_>>();
+    assert_eq!(calls.len(), 2);
+    for name in ["make_registered_buffer", "forward_registered_buffer"] {
+        assert!(artifacts
+            .yir
+            .functions
+            .iter()
+            .any(|function| function.name == name));
+    }
+    let helper_call = calls
+        .iter()
+        .find(|call| {
+            artifacts.yir.functions.iter().any(|function| {
+                function.name == "forward_registered_buffer"
+                    && function.body_nodes.contains(&call.name)
+            })
+        })
+        .expect("outer helper should own one inner helper transfer");
+    let entry_call =
+        calls
+            .iter()
+            .find(|call| {
+                artifacts.yir.functions.iter().any(|function| {
+                    function.name == "main" && function.body_nodes.contains(&call.name)
+                })
+            })
+            .expect("entry should receive the outer helper owner");
+    for call in [helper_call, entry_call] {
+        let contract =
+            yir_core::ffi::parse_owned_buffer_function_transfer_contract(&call.op.args[1..])
+                .expect("nested transfer identity should revalidate");
+        assert_eq!(contract.abi, "c");
+        assert_eq!(contract.destructor_symbol, "host_owned_buffer_destroy");
+        assert_eq!(contract.destructor_signature_hash, expected_destructor_hash);
+    }
+    for node in returned {
+        let contract =
+            yir_core::ffi::parse_owned_buffer_function_transfer_contract(&node.op.args[1..])
+                .expect("nested helper result identity should revalidate");
+        assert_eq!(contract.abi, "c");
+        assert_eq!(contract.destructor_symbol, "host_owned_buffer_destroy");
+        assert_eq!(contract.destructor_signature_hash, expected_destructor_hash);
+    }
+    let free = artifacts
+        .yir
+        .nodes
+        .iter()
+        .filter(|node| node.op.instruction == "free")
+        .collect::<Vec<_>>();
+    assert_eq!(free.len(), 1);
+    assert_eq!(free[0].op.args.as_slice(), [entry_call.name.as_str()]);
+    assert!(artifacts
+        .llvm_ir
+        .contains("define { ptr, i64 } @nuis_fn_make_registered_buffer(i64"));
+    assert!(artifacts
+        .llvm_ir
+        .contains("define { ptr, i64 } @nuis_fn_forward_registered_buffer(i64"));
+    assert_eq!(
+        artifacts
+            .llvm_ir
+            .matches("call i64 @host_owned_buffer_destroy(ptr")
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn rejects_recursive_owned_buffer_helper_transfer_cycle() {
     let ast = nuisc::frontend::parse_nuis_ast(
         r#"
         mod cffi Main {
-          extern "c" fn host_owned_buffer_make(seed: i64) -> ref Buffer;
-          fn make_registered_buffer(seed: i64) -> ref Buffer {
-            return host_owned_buffer_make(seed);
+          fn first(seed: i64) -> ref Buffer {
+            return second(seed);
           }
-          fn forward_registered_buffer(seed: i64) -> ref Buffer {
-            return make_registered_buffer(seed);
+          fn second(seed: i64) -> ref Buffer {
+            return first(seed);
           }
           fn main() -> i64 {
-            let buffer: ref Buffer = forward_registered_buffer(3);
+            let buffer: ref Buffer = first(7);
             free(buffer);
             return 0;
           }
@@ -376,36 +461,14 @@ fn flattens_nested_owned_buffer_source_helper_to_one_runtime_transfer() {
         "#,
     )
     .unwrap();
-    let artifacts = nuisc::pipeline::compile_ast(ast)
-        .expect("source helper chain should normalize before owner transfer lowering");
-    assert_eq!(
-        artifacts
-            .yir
-            .nodes
-            .iter()
-            .filter(|node| node.op.instruction == "return_owned_external_buffer")
-            .count(),
-        1
+    let error = match nuisc::pipeline::compile_ast(ast) {
+        Ok(_) => panic!("recursive owned-buffer helper transfer must remain closed"),
+        Err(error) => error,
+    };
+    assert!(
+        error.contains("recursive owned-buffer helper transfers remain closed"),
+        "{error}"
     );
-    assert_eq!(
-        artifacts
-            .yir
-            .nodes
-            .iter()
-            .filter(|node| node.op.instruction == "call_owned_external_buffer")
-            .count(),
-        1
-    );
-    assert!(artifacts
-        .yir
-        .functions
-        .iter()
-        .any(|function| function.name == "forward_registered_buffer"));
-    assert!(!artifacts
-        .yir
-        .functions
-        .iter()
-        .any(|function| function.name == "make_registered_buffer"));
 }
 
 #[test]

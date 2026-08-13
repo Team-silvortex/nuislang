@@ -10,15 +10,14 @@ use crate::{
     nsld_final_executable_output_report,
 };
 use nuisc::aot::{BuildManifestContext, CompileArtifacts};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::{env, fs};
 
 #[test]
 fn drive_apply_dispatches_whitelisted_emit_inputs() {
-    let dir = env::temp_dir().join(format!(
-        "nsld-drive-apply-emit-inputs-{}",
-        std::process::id()
-    ));
+    let dir = unique_test_dir("nsld-drive-apply-emit-inputs");
     fs::create_dir_all(&dir).unwrap();
     let mut plan = empty_link_plan();
     plan.output_dir = dir.display().to_string();
@@ -51,10 +50,7 @@ fn drive_apply_dispatches_whitelisted_emit_inputs() {
 
 #[test]
 fn drive_apply_dispatches_whitelisted_emit_object() {
-    let dir = env::temp_dir().join(format!(
-        "nsld-drive-apply-emit-object-{}",
-        std::process::id()
-    ));
+    let dir = unique_test_dir("nsld-drive-apply-emit-object");
     fs::create_dir_all(&dir).unwrap();
     let mut plan = empty_link_plan();
     plan.output_dir = dir.display().to_string();
@@ -84,10 +80,7 @@ fn drive_apply_dispatches_whitelisted_emit_object() {
 
 #[test]
 fn drive_apply_dispatches_whitelisted_launcher_manifest_and_dry_run() {
-    let dir = env::temp_dir().join(format!(
-        "nsld-drive-apply-launcher-evidence-{}",
-        std::process::id()
-    ));
+    let dir = unique_test_dir("nsld-drive-apply-launcher-evidence");
     fs::create_dir_all(&dir).unwrap();
     let artifact_path = dir.join("nuis.compiled.artifact");
     fs::write(&artifact_path, b"compiled-artifact").unwrap();
@@ -170,10 +163,7 @@ fn drive_apply_dispatches_whitelisted_launcher_manifest_and_dry_run() {
 
 #[test]
 fn drive_apply_dispatches_native_object_alias() {
-    let dir = env::temp_dir().join(format!(
-        "nsld-drive-apply-emit-native-object-{}",
-        std::process::id()
-    ));
+    let dir = unique_test_dir("nsld-drive-apply-emit-native-object");
     fs::create_dir_all(&dir).unwrap();
     let mut plan = empty_link_plan();
     plan.output_dir = dir.display().to_string();
@@ -269,10 +259,7 @@ fn drive_until_clean_json_can_report_native_object_alias_step() {
 
 #[test]
 fn drive_apply_until_clean_materializes_self_contained_pipeline() {
-    let dir = env::temp_dir().join(format!(
-        "nsld-drive-until-clean-self-contained-{}",
-        std::process::id()
-    ));
+    let dir = unique_test_dir("nsld-drive-until-clean-self-contained");
     fs::create_dir_all(&dir).unwrap();
     let artifact_path = dir.join("nuis.compiled.artifact");
     fs::write(&artifact_path, b"compiled-artifact").unwrap();
@@ -321,10 +308,7 @@ fn drive_apply_until_clean_materializes_self_contained_pipeline() {
 
 #[test]
 fn drive_apply_until_clean_materializes_manifest_selected_self_contained_route() {
-    let dir = env::temp_dir().join(format!(
-        "nsld-drive-until-clean-manifest-self-contained-{}",
-        std::process::id()
-    ));
+    let dir = unique_test_dir("nsld-drive-until-clean-manifest-self-contained");
     fs::create_dir_all(&dir).unwrap();
     let manifest = write_test_build_manifest_with_packaging_mode(&dir, "nuis-self-contained-image");
     let plan = nuisc::linker::build_link_plan_from_manifest(Path::new(&manifest)).unwrap();
@@ -357,10 +341,7 @@ fn drive_apply_until_clean_materializes_manifest_selected_self_contained_route()
 
 #[test]
 fn drive_apply_until_clean_reaches_host_assisted_pipeline_blockers() {
-    let dir = env::temp_dir().join(format!(
-        "nsld-drive-until-clean-host-assisted-{}",
-        std::process::id()
-    ));
+    let dir = unique_test_dir("nsld-drive-until-clean-host-assisted");
     fs::create_dir_all(&dir).unwrap();
     let artifact_path = dir.join("nuis.compiled.artifact");
     fs::write(&artifact_path, b"compiled-artifact").unwrap();
@@ -430,10 +411,7 @@ fn drive_apply_until_clean_reaches_host_assisted_pipeline_blockers() {
 
 #[test]
 fn drive_apply_command_loads_manifest_directory_and_emits_next_artifact() {
-    let dir = env::temp_dir().join(format!(
-        "nsld-drive-command-manifest-{}",
-        std::process::id()
-    ));
+    let dir = unique_test_dir("nsld-drive-command-manifest");
     fs::create_dir_all(&dir).unwrap();
     let manifest = write_test_build_manifest(&dir);
     let link_inputs = dir.join("nuis.nsld.link-inputs.toml");
@@ -449,10 +427,7 @@ fn drive_apply_command_loads_manifest_directory_and_emits_next_artifact() {
 
 #[test]
 fn drive_until_clean_command_reaches_host_assisted_pipeline_block() {
-    let dir = env::temp_dir().join(format!(
-        "nsld-drive-command-until-clean-{}",
-        std::process::id()
-    ));
+    let dir = unique_test_dir("nsld-drive-command-until-clean");
     fs::create_dir_all(&dir).unwrap();
     let manifest = write_test_build_manifest_with_packaging_mode(&dir, "executable");
 
@@ -582,10 +557,7 @@ fn drive_until_clean_command_reaches_host_assisted_pipeline_block() {
 
 #[test]
 fn drive_until_clean_command_materializes_self_contained_manifest_route() {
-    let dir = env::temp_dir().join(format!(
-        "nsld-drive-command-self-contained-{}",
-        std::process::id()
-    ));
+    let dir = unique_test_dir("nsld-drive-command-self-contained");
     fs::create_dir_all(&dir).unwrap();
     let manifest = write_test_build_manifest_with_packaging_mode(&dir, "nuis-self-contained-image");
 
@@ -632,6 +604,16 @@ fn drive_until_clean_keeps_generic_stop_for_unknown_final_output_boundary() {
 
 fn write_test_build_manifest(dir: &Path) -> String {
     write_test_build_manifest_with_packaging_mode(dir, "native-cpu-llvm")
+}
+
+fn unique_test_dir(label: &str) -> PathBuf {
+    static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system clock must follow Unix epoch")
+        .as_nanos();
+    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+    env::temp_dir().join(format!("{label}-{}-{nanos}-{id}", std::process::id()))
 }
 
 fn write_test_build_manifest_with_packaging_mode(dir: &Path, packaging_mode: &str) -> String {

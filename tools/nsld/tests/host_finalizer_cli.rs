@@ -35,12 +35,18 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     ]);
     let output = run_nsld("final-executable-output", &manifest);
     let invoke_plan = run_nsld("final-executable-host-invoke-plan", &manifest);
+    let invoke_plan_text = run_nsld_args(&[
+        "final-executable-host-invoke-plan",
+        manifest.to_str().unwrap(),
+    ]);
     let check = run_nsld("check", &manifest);
     let artifact_chain = run_nsld("artifact-chain", &manifest);
     let launcher = run_nsld("final-executable-launcher-manifest", &manifest);
     let launcher_dry_run = run_nsld("final-executable-launcher-dry-run", &manifest);
 
     let actual_binary = fs::read(&final_binary).unwrap();
+    let persisted_invoke_plan =
+        fs::read_to_string(dir.join("nuis.nsld.final-executable-host-invoke-plan.toml")).unwrap();
     let executable_mode = fs::metadata(&final_binary).unwrap().permissions().mode();
     let launched = Command::new(&final_binary).output().unwrap();
     fs::remove_dir_all(dir).unwrap();
@@ -58,6 +64,32 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     assert!(invoke_plan.contains("\"relocation_count\":2"));
     assert!(invoke_plan.contains("\"internally_resolved_symbol_count\":1"));
     assert!(invoke_plan.contains("\"unresolved_external_symbols\":[\"_puts\"]"));
+    assert!(invoke_plan.contains("\"contract\":\"nuis-nsld-macho-placement-binding-v1\""));
+    assert!(
+        invoke_plan.contains("\"status\":\"placement-ready-with-external-compatibility-boundary\"")
+    );
+    assert!(invoke_plan.contains("\"merged_section_count\":1"));
+    assert!(invoke_plan.contains("\"section_placement_count\":2"));
+    assert!(invoke_plan.contains("\"symbol_binding_count\":2"));
+    assert!(invoke_plan.contains("\"internally_bound_symbol_count\":1"));
+    assert!(invoke_plan.contains("\"external_compatibility_symbol_count\":1"));
+    assert!(invoke_plan
+        .contains("\"symbol\":\"_nuis_runtime\",\"reference_object_id\":\"host.program-llvm\""));
+    assert!(invoke_plan.contains("\"target_object_id\":\"host.runtime-shim\""));
+    assert!(
+        invoke_plan.contains("\"symbol\":\"_puts\",\"reference_object_id\":\"host.runtime-shim\"")
+    );
+    assert!(invoke_plan.contains("\"status\":\"external-compatibility\""));
+    assert!(invoke_plan_text
+        .contains("finalizer_input_placement_contract: nuis-nsld-macho-placement-binding-v1"));
+    assert!(invoke_plan_text.contains(
+        "finalizer_input_symbol_binding: symbol=_nuis_runtime reference=host.program-llvm:1 status=internal"
+    ));
+    assert!(persisted_invoke_plan
+        .contains("finalizer_input_placement_contract = \"nuis-nsld-macho-placement-binding-v1\""));
+    assert!(persisted_invoke_plan.contains("finalizer_input_merged_section_count = 1"));
+    assert!(persisted_invoke_plan.contains("finalizer_input_section_placement_count = 2"));
+    assert!(persisted_invoke_plan.contains("finalizer_input_symbol_binding_count = 2"));
     assert!(invoke_plan.contains("\"invocation_kind\":\"registered-internal-finalizer\""));
     assert!(invoke_plan.contains("\"invocation_policy\":\"registered-internal\""));
     assert!(invoke_plan.contains("\"requires_explicit_allow\":false"));

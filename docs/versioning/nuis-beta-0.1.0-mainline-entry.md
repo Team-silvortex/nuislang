@@ -431,6 +431,61 @@ deterministic merged-section placement and symbol binding map, reject ambiguous
 definitions, then use that model for relocation writes and final Mach-O shell
 emission.
 
+The nested registered-owner transfer tranche advances
+`host-compatibility/cffi/registered-pointer-string-object-boundary` to
+`usable/95`. One synchronous helper may now call a direct owner-producing
+helper and immediately return that owner through a second
+`nuis-ffi-owned-buffer-function-transfer-v1` boundary. Lowering orders the
+callee before its caller, and YIR plus LLVM preserve one ABI, destructor symbol,
+destructor hash, pointer, and runtime length identity across both boundaries.
+The intermediate helper cannot free or otherwise consume the owner; only the
+entry caller performs the final release. The checked-in native example exits
+`0` with exactly one destructor call.
+
+This does not admit recursive, async, task-carried, loop-carried, or unbounded
+helper transfer. A second helper-to-helper runtime hop is rejected and deeper
+source chains may only enter by inlining below the admitted boundary. With CFFI
+at `usable/95`, deterministic tensor selection moves to
+`package-system/galaxy/source-import-and-lock-resolution` at `usable/93`.
+
+The content-addressed Galaxy tranche advances that coordinate to `usable/96`.
+`sync-deps` now builds a staged `nuis-galaxy-resolution-cache-v1` provider at
+`.nuis/deps/galaxy/sha256/<resolution>`, including the verified packages, a
+minimal resolver index, cache metadata, and a byte-identical root-lock copy.
+It atomically activates the complete cache base, so stale unlocked files vanish
+and a failed refresh preserves the previous tree. Compiler project loads use
+this provider whenever a root lock exists and re-render the cache-resolved
+closure against that lock before AST admission; a locked build cannot fall
+through to mutable workspace package bytes.
+
+Project `release-check` now requires both the committed root lock and its
+synchronized addressed cache before creating outputs. Ordinary unlocked
+development builds retain the workspace fallback for early-beta migration, and
+single-file release checks remain outside project package resolution. Cache
+byte drift, missing cache state, root-lock drift, transactional recovery,
+direct compile, and release admission all have regressions. Remote discovery,
+version solving, registry trust, transport, and cache garbage collection remain
+open; with Galaxy at `usable/96`, deterministic tensor selection returns to
+`linker-toolchain/nsld/os-native-executable-finalization` at `usable/94`.
+
+The Mach-O placement/binding tranche advances Nsld to `usable/96`.
+`nuis-nsld-macho-placement-binding-v1` now derives one canonical plan directly
+from the verified `program-llvm` and `runtime-shim` objects. It deterministically
+orders object contributions, merges compatible segment/section pairs, applies
+checked alignment, assigns output offsets, binds section-backed cross-object
+symbols, and hashes the complete plan. Duplicate external definitions,
+incompatible merged-section flags, missing placements, and referenced
+non-section-backed definitions fail closed. Unresolved C/system names remain an
+explicit `external-compatibility` boundary.
+
+Dry-run JSON, CLI text, and the persisted invoke plan expose the same merged
+sections, placements, symbol bindings, and plan identity. The runnable provider
+still installs Nuisc's embedded compatibility image; ARM64 relocation writes,
+common-symbol allocation, Mach-O load-command synthesis, and independent shell
+emission remain open. With Nsld at `usable/96`, deterministic tensor selection
+returns to `host-compatibility/cffi/registered-pointer-string-object-boundary`
+at `usable/95`.
+
 ## Honesty Boundary
 
 `beta-0.1.0` should not claim:

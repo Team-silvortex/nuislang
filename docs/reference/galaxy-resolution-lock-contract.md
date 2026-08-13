@@ -8,7 +8,9 @@ protocol.
 
 `nuis galaxy lock-deps` writes the canonical root `nuis.galaxy.lock`.
 `verify-lock`, `sync-deps`, `project-status`, and project builds all compare
-that file against the same loaded dependency closure. The old direct-bundle
+that file against the same loaded dependency closure. Locked compilation then
+resolves from the synchronized content-addressed cache rather than rereading
+the workspace provider. The old direct-bundle
 lock, absolute bundle paths, and FNV-only project dependency authority have
 been removed. Local `pack`, `publish-local`, and `install-local` remain a
 separate package-cache surface and do not define compiler resolution.
@@ -21,6 +23,11 @@ payload hash, and rejects a digest mismatch.
 When a committed root lock exists, build admission verifies it before cache
 restore, lowering, linking, or output creation. The generated build lock is
 byte-identical to that verified canonical resolution.
+
+Project `release-check` is stricter than the ordinary early-beta development
+path: it requires both the committed root lock and its synchronized cache
+before compilation or output creation. Single-file release checks are not
+project package-resolution operations and do not require a project lock.
 
 ## Bound State
 
@@ -79,27 +86,47 @@ therefore rejects payload mutation and a lock/manifest digest mismatch.
 
 `nuis galaxy sync-deps` first performs project-aware lock verification. It then
 re-reads every manifest, source module, and library module through its frozen
-byte-count and SHA-256 identity, writes a staged tree under
-`.nuis/deps/galaxy`, copies the canonical root lock into that tree, and only
-then replaces the previous materialization. A verification or staging failure
-leaves the prior tree intact. Files absent from the verified resolution are
-removed on successful replacement.
+byte-count and SHA-256 identity and writes a staged
+`nuis-galaxy-resolution-cache-v1` provider under:
+
+```text
+.nuis/deps/galaxy/sha256/<resolution-digest>/
+```
+
+The addressed root contains a minimal resolver `index.toml`, every verified
+package, `nuis.galaxy.cache.toml`, and a byte-identical canonical lock copy.
+Only after the complete tree exists does sync replace the previous Galaxy
+cache base. A verification or staging failure leaves the prior tree intact.
+Files absent from the verified resolution are removed on successful
+replacement.
 
 Materialized packages use `<name>/<version>/module.toml` plus canonical
 relative source and library paths. No absolute source or bundle path is stored
 in the lock or materialized metadata.
 
+`load_project_for_compile` selects the addressed provider whenever a root lock
+exists. Resolution rereads package identities from that cache and then renders
+the complete closure again; the resulting bytes must equal the committed lock.
+Every resolved package root, manifest, source, and library path is canonicalized
+and must remain beneath the addressed cache root, so index traversal and
+symlink escape fail even when outside bytes happen to match the lock.
+Missing caches, cache-lock drift, manifest/source/library drift, and index
+changes therefore fail before project AST admission. Workspace-backed
+`load_project` remains available to lock, sync, status, and development tools
+that need to inspect or refresh the source provider.
+
 ## Current Boundary
 
 An existing root lock is fail-closed: package, edge, policy, library-selection,
-manifest, source, or library-content drift rejects verification, sync, and
-build admission. `project-status` reports the same resolution digest and
-direct/transitive package identities.
+manifest, source, cache-index, or library-content drift rejects verification,
+sync, and build admission. `project-status` reports the same resolution digest
+and direct/transitive package identities. Project release admission requires
+the lock and addressed cache; it does not silently create or refresh either.
 
 The early-beta development workflow still permits a missing root lock so old
 workspace examples can be checked and built before they are individually
-locked. Release admission does not yet expose a dedicated required-lock mode.
-The resolver also still reads the workspace closure and compares it with the
-lock; it does not yet consume a content-addressed synchronized package cache as
-its primary source. Required-lock release policy, cache-owned resolution,
-remote solving, and registry discovery remain later work.
+locked. This fallback is never used when a root lock exists. Remote candidate
+discovery, version solving, registry trust metadata, transport, and cache
+garbage collection remain later work. Those providers must produce the same
+canonical lock and addressed cache rather than becoming new compiler-side
+resolution authorities.

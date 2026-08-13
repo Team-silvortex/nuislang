@@ -65,15 +65,31 @@ fn validate_return_transfer(
                 returned.name, returned.op.args[0]
             )
         })?;
-    if owner.op.module != "cpu" || owner.op.instruction != "extern_call_owned_buffer" {
-        return Err(format!(
-            "owned-buffer function return `{}` requires one direct registered producer",
-            returned.name
-        ));
-    }
-    let producer = yir_core::ffi::parse_owned_buffer_return_contract(&owner.op.args)
-        .map_err(|error| format!("owned-buffer return producer `{}`: {error}", owner.name))?;
-    if transfer_identity(&transfer) != producer_identity(&producer) {
+    let owner_identity = match (owner.op.module.as_str(), owner.op.instruction.as_str()) {
+        ("cpu", "extern_call_owned_buffer") => {
+            let producer = yir_core::ffi::parse_owned_buffer_return_contract(&owner.op.args)
+                .map_err(|error| {
+                    format!("owned-buffer return producer `{}`: {error}", owner.name)
+                })?;
+            producer_identity(&producer)
+        }
+        ("cpu", "call_owned_external_buffer") => {
+            let call = yir_core::ffi::parse_owned_buffer_function_transfer_contract(
+                owner.op.args.get(1..).unwrap_or_default(),
+            )
+            .map_err(|error| {
+                format!("owned-buffer return helper call `{}`: {error}", owner.name)
+            })?;
+            transfer_identity(&call)
+        }
+        _ => {
+            return Err(format!(
+                "owned-buffer function return `{}` requires one registered producer or helper transfer",
+                returned.name
+            ));
+        }
+    };
+    if transfer_identity(&transfer) != owner_identity {
         return Err(format!(
             "owned-buffer function return `{}` does not match producer ABI/destructor/hash identity",
             returned.name
@@ -170,11 +186,63 @@ fn validate_call_transfer(
         ));
     }
     let caller = unique_containing_function(module, &call.name, "function call")?;
-    if caller.role != YirFunctionRole::Entry {
-        return Err(format!(
-            "owned-buffer call `{}` may currently transfer only into the entry function",
-            call.name
-        ));
+    match caller.role {
+        YirFunctionRole::Entry => {}
+        YirFunctionRole::Helper => {
+            let caller_result = caller.result.as_ref().ok_or_else(|| {
+                format!(
+                    "owned-buffer helper caller `{}` must expose its transferred owner",
+                    caller.name
+                )
+            })?;
+            let caller_return =
+                nodes
+                    .get(caller_result.node.as_str())
+                    .copied()
+                    .ok_or_else(|| {
+                        format!(
+                            "owned-buffer helper caller `{}` has a missing result node",
+                            caller.name
+                        )
+                    })?;
+            if caller_result.ty != "ref Buffer"
+                || caller_result.ownership != YirValueOwnership::Owned
+                || caller_return.op.module != "cpu"
+                || caller_return.op.instruction != "return_owned_external_buffer"
+                || caller_return.op.args.first() != Some(&call.name)
+            {
+                return Err(format!(
+                    "owned-buffer helper call `{}` must move directly into caller `{}` result",
+                    call.name, caller.name
+                ));
+            }
+            let callee_owner = returned
+                .op
+                .args
+                .first()
+                .and_then(|name| nodes.get(name.as_str()))
+                .copied()
+                .ok_or_else(|| {
+                    format!(
+                        "owned-buffer helper `{}` return owner is missing",
+                        callee.name
+                    )
+                })?;
+            if callee_owner.op.module != "cpu"
+                || callee_owner.op.instruction != "extern_call_owned_buffer"
+            {
+                return Err(format!(
+                    "owned-buffer helper call `{}` exceeds the single registered helper-to-helper transfer boundary",
+                    call.name
+                ));
+            }
+        }
+        _ => {
+            return Err(format!(
+                "owned-buffer call `{}` may transfer only into an entry or owned-result helper",
+                call.name
+            ));
+        }
     }
     Ok(())
 }
@@ -198,7 +266,7 @@ fn unique_containing_function<'a>(
 }
 
 fn transfer_identity<'a>(
-    contract: &'a yir_core::ffi::OwnedBufferFunctionTransferContract<'a>,
+    contract: &yir_core::ffi::OwnedBufferFunctionTransferContract<'a>,
 ) -> TransferIdentity<'a> {
     TransferIdentity {
         abi: contract.abi,
@@ -208,7 +276,7 @@ fn transfer_identity<'a>(
 }
 
 fn producer_identity<'a>(
-    contract: &'a yir_core::ffi::OwnedBufferReturnContract<'a>,
+    contract: &yir_core::ffi::OwnedBufferReturnContract<'a>,
 ) -> TransferIdentity<'a> {
     TransferIdentity {
         abi: contract.abi,

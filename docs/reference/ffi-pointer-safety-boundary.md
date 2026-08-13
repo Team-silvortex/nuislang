@@ -126,19 +126,22 @@ helper return. Conditional transfer accepts two direct external producers only
 when ABI, destructor symbol, and destructor signature hash are identical. The
 helper path uses `nuis-ffi-owned-buffer-function-transfer-v1`: YIR and the
 helper signature retain ABI/destructor/hash identity statically, while the
-runtime return payload is exactly LLVM `{ ptr, i64 }`. The caller reconstructs
-the registered owner and must free it exactly once. Native smoke executes both
-conditional directions and two helper calls. Source helper chains may normalize
-to this one boundary, but loop, task/async, recursive runtime transfer,
-helper-to-helper runtime transfer, secondary-extern, and mixed
-heap/external-owner escapes remain closed.
+runtime return payload is exactly LLVM `{ ptr, i64 }`. One non-recursive
+synchronous helper may now receive that result from another helper and move it
+directly into its own result. Both function boundaries retain the same static
+identity, the intermediate helper cannot release the owner, and only the entry
+caller may perform the final exact-once `free(...)`. Native smoke executes both
+conditional directions, direct helper calls, and the nested helper transfer.
+Deeper source chains normalize lower calls by inlining, while loop, task/async,
+recursive runtime transfer, a second helper-to-helper runtime hop,
+secondary-extern, and mixed heap/external-owner escapes remain closed.
 
 This is not generalized pointer-return support. It is one owned `ref Buffer`
 contract with a fixed length policy, linear lifetime, one non-recursive
-conditional transfer, and one direct synchronous helper-to-entry return. A
-valid manifest still cannot authorize arbitrary `ref T`, raw `ptr<T>`,
-retained borrows, nested/recursive runtime return boundaries, or task-carried
-host memory.
+conditional transfer, and at most one synchronous helper-to-helper hop before
+the helper-to-entry return. A valid manifest still cannot authorize arbitrary
+`ref T`, raw `ptr<T>`, retained borrows, recursive or unbounded runtime return
+boundaries, or task-carried host memory.
 
 In `nustar` manifest strings, multi-argument `ffi_symbol:` signatures can use
 the same comma-separated form as source-facing signatures, for example

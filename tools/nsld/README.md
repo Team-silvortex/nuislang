@@ -102,13 +102,19 @@ artifact; Nsld verifies their roles, hashes, and Mach-O object structure before
 parsing their sections, symbol/string tables, and ARM64 relocation records.
 The provider projects `nuis-nsld-macho-host-object-linkage-v1`, including
 internal cross-object resolutions and explicit unresolved C/system symbols,
-before atomically materializing the embedded compatibility executable without
-a second Nsld-side clang invocation. A gated host-command provider remains as
-a fallback; ELF and PE/COFF are explicit `registered-not-implemented`
-providers. This proves the relocatable-input registration, table parsing, and
-materialization boundary, but it does not yet claim final address assignment,
-relocation writes, or complete Mach-O shell emission independently of Nuisc's
-compatibility link.
+then derives `nuis-nsld-macho-placement-binding-v1`. The latter
+deterministically merges compatible sections, applies checked alignment,
+assigns contribution offsets, binds section-backed cross-object symbols, and
+rejects duplicate definitions, incompatible flags, and referenced definitions
+without a section placement. Unresolved C/system symbols remain an explicit
+compatibility boundary. JSON, text, and persisted invoke-plan surfaces expose
+the same plan hash and records before the provider atomically materializes the
+embedded compatibility executable without a second Nsld-side clang invocation.
+A gated host-command provider remains as a fallback; ELF and PE/COFF are
+explicit `registered-not-implemented` providers. This proves relocatable input,
+table parsing, placement, and symbol-binding ownership, but not ARM64 relocation
+writes or complete Mach-O shell emission independently of Nuisc's compatibility
+link.
 
 ## Current Early-Beta Rule
 

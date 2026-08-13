@@ -62,7 +62,24 @@ fn write_project_links_index<W: fmt::Write>(
     Ok(())
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GalaxyProviderMode {
+    Workspace,
+    Compile,
+}
+
 pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
+    load_project_with_galaxy_provider(input, GalaxyProviderMode::Workspace)
+}
+
+pub fn load_project_for_compile(input: &Path) -> Result<LoadedProject, String> {
+    load_project_with_galaxy_provider(input, GalaxyProviderMode::Compile)
+}
+
+fn load_project_with_galaxy_provider(
+    input: &Path,
+    provider_mode: GalaxyProviderMode,
+) -> Result<LoadedProject, String> {
     let manifest_path = if input.is_dir() {
         input.join("nuis.toml")
     } else {
@@ -80,11 +97,21 @@ pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
     let source = fs::read_to_string(&manifest_path)
         .map_err(|error| format!("failed to read `{}`: {error}", manifest_path.display()))?;
     let manifest = parse_project_manifest(&source, &manifest_path)?;
-    let stdlib_root = crate::stdlib_registry::resolve_stdlib_root()?;
+    let locked_cache = match provider_mode {
+        GalaxyProviderMode::Workspace => None,
+        GalaxyProviderMode::Compile => super::galaxy_cache::locked_project_galaxy_cache(&root)?,
+    };
+    let stdlib_root = match &locked_cache {
+        Some((cache_root, _, _, _)) => cache_root.clone(),
+        None => crate::stdlib_registry::resolve_stdlib_root()?,
+    };
     let resolved_galaxies = crate::stdlib_registry::resolve_galaxy_dependencies(
         &stdlib_root,
         &manifest.galaxy_dependencies,
     )?;
+    if locked_cache.is_some() {
+        super::galaxy_cache::verify_resolved_galaxy_cache_paths(&stdlib_root, &resolved_galaxies)?;
+    }
 
     let module_specs = if manifest.modules.is_empty() {
         vec![manifest.entry.clone()]
@@ -192,7 +219,7 @@ pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
     validate_project_links(&manifest, &modules)?;
     validate_project_abi_requirements(&manifest, &modules)?;
 
-    Ok(LoadedProject {
+    let project = LoadedProject {
         root,
         manifest_path,
         manifest,
@@ -200,7 +227,18 @@ pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
         entry_source,
         modules,
         resolved_galaxies,
-    })
+    };
+    if let Some((_, lock_path, lock_source, locked_summary)) = &locked_cache {
+        let resolved_summary =
+            super::verify_project_galaxy_resolution_lock(&project, lock_source, lock_path)?;
+        if &resolved_summary != locked_summary {
+            return Err(format!(
+                "Galaxy resolution cache `{}` changed while loading the project",
+                stdlib_root.display()
+            ));
+        }
+    }
+    Ok(project)
 }
 
 pub fn describe_project(project: &LoadedProject) -> String {

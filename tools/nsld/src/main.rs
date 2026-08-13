@@ -72,6 +72,7 @@ mod final_executable_layout;
 mod final_executable_layout_stage;
 mod final_executable_macho_artifact;
 mod final_executable_macho_input;
+mod final_executable_macho_layout;
 mod final_executable_macho_object;
 mod final_executable_output;
 mod final_executable_output_backend;

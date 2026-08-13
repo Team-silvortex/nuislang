@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use yir_core::{
     parse_branch_effect_args, BranchEffectAccess, BranchEffectResult, EdgeKind, Node, YirFunction,
-    YirModule,
+    YirFunctionRole, YirModule,
 };
 
 #[path = "pipeline_ffi_owned_buffer_return.rs"]
@@ -164,16 +164,17 @@ fn validate_returned_call_owners(
         let contract =
             yir_core::ffi::parse_owned_buffer_function_transfer_contract(&owner.op.args[1..])
                 .map_err(|error| format!("returned owned buffer `{}`: {error}", owner.name))?;
-        let function = module
+        let functions = module
             .functions
             .iter()
-            .find(|function| function.body_nodes.contains(&owner.name))
-            .ok_or_else(|| {
-                format!(
-                    "returned owned buffer `{}` must belong to one caller function",
-                    owner.name
-                )
-            })?;
+            .filter(|function| function.body_nodes.contains(&owner.name))
+            .collect::<Vec<_>>();
+        let [function] = functions.as_slice() else {
+            return Err(format!(
+                "returned owned buffer `{}` must belong to exactly one caller function",
+                owner.name
+            ));
+        };
         let positions = function
             .body_nodes
             .iter()
@@ -192,18 +193,44 @@ fn validate_returned_call_owners(
             .copied()
             .filter(|node| is_exact_free(node, &owner.name))
             .collect::<Vec<_>>();
-        let [free] = free_nodes.as_slice() else {
-            return Err(format!(
-                "returned owned buffer from `{}` must be consumed by exactly one direct caller free(...); found {}",
-                owner.op.args[0],
-                free_nodes.len()
-            ));
+        let return_nodes = consumers
+            .iter()
+            .copied()
+            .filter(|node| is_exact_function_return(node, &owner.name))
+            .collect::<Vec<_>>();
+        let terminal = match (
+            function.role,
+            free_nodes.as_slice(),
+            return_nodes.as_slice(),
+        ) {
+            (YirFunctionRole::Entry, [free], []) => *free,
+            (YirFunctionRole::Helper, [], [returned]) => *returned,
+            (YirFunctionRole::Entry, _, _) => {
+                return Err(format!(
+                    "returned owned buffer from `{}` must be consumed by exactly one direct caller free(...); found {}",
+                    owner.op.args[0],
+                    free_nodes.len()
+                ));
+            }
+            (YirFunctionRole::Helper, _, _) => {
+                return Err(format!(
+                    "returned owned buffer from `{}` must be moved by exactly one direct helper return; found {}",
+                    owner.op.args[0],
+                    return_nodes.len()
+                ));
+            }
+            _ => {
+                return Err(format!(
+                    "returned owned buffer `{}` has unsupported caller role",
+                    owner.name
+                ));
+            }
         };
         validate_owner_tail(
             &format!("{} via {}", owner.op.args[0], contract.destructor_symbol),
             &owner.name,
             owner_index,
-            free,
+            terminal,
             &consumers,
             function,
             &positions,
@@ -293,7 +320,7 @@ fn validate_owner_consumers_before(
         }
         if !is_direct_buffer_access(consumer, owner) {
             return Err(format!(
-                "owned extern buffer `{symbol}` escapes through unsupported `{}.{}`; only buffer_len/load_at/store_at, one registered branch transfer, and one direct free are open",
+                "owned extern buffer `{symbol}` escapes through unsupported `{}.{}`; only buffer_len/load_at/store_at, one registered branch transfer, one registered helper return, and one direct free are open",
                 consumer.op.module, consumer.op.instruction
             ));
         }

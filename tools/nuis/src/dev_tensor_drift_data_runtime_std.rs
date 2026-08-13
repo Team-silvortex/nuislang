@@ -359,6 +359,16 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "cffi-owned-buffer-nested-helper-native",
+        path: "examples/ns/ffi/owned_return_buffer_nested_helper_demo.ns",
+        required_patterns: &[
+            "fn make_registered_buffer",
+            "fn forward_registered_buffer",
+            "return make_registered_buffer(seed)",
+            "free(buffer)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "cffi-memory-capability-fail-closed-regressions",
         path: "tools/nuisc/src/registry_host_ffi_tests.rs",
         required_patterns: &[
@@ -627,6 +637,43 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "nullable=true",
             "null non-nullable buffer owned pointer transfer",
             "node pointer",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "galaxy-content-addressed-resolution-cache",
+        path: "tools/nuisc/src/project/galaxy_cache.rs",
+        required_patterns: &[
+            "nuis-galaxy-resolution-cache-v1",
+            "project_galaxy_cache_root",
+            "materialize_project_galaxy_cache",
+            "verify_required_project_galaxy_resolution_cache",
+            "verify_resolved_galaxy_cache_paths",
+            "PROJECT_GALAXY_CACHE_DIGEST_DIR",
+            "verify_project_galaxy_resolution_lock",
+            "render_cache_provider_index",
+            "escapes resolution cache",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "galaxy-locked-compile-provider",
+        path: "tools/nuisc/src/project/planning.rs",
+        required_patterns: &[
+            "load_project_for_compile",
+            "GalaxyProviderMode::Compile",
+            "locked_project_galaxy_cache",
+            "verify_resolved_galaxy_cache_paths",
+            "verify_project_galaxy_resolution_lock",
+            "changed while loading the project",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "galaxy-release-lock-admission",
+        path: "tools/nuis/src/release_check_command.rs",
+        required_patterns: &[
+            "release-check: galaxy-lock",
+            "verify_required_project_galaxy_resolution_cache",
+            "committed and synchronized Galaxy resolution",
+            "load_project_for_compile",
         ],
     },
     DevTensorDriftCheckSpec {

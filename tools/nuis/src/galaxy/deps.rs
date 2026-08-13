@@ -1,4 +1,3 @@
-use std::path::Component;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::*;
@@ -80,16 +79,23 @@ pub fn sync_project_deps(input: &Path) -> Result<SyncedProjectDeps, String> {
     fs::create_dir(&stage)
         .map_err(|error| format!("failed to create sync stage `{}`: {error}", stage.display()))?;
 
-    if let Err(error) = materialize_resolution(&context, &stage) {
+    let stage_root = nuisc::project::project_galaxy_cache_root_under(&stage, &context.summary)?;
+    if let Err(error) = nuisc::project::materialize_project_galaxy_cache(
+        &context.project,
+        &context.source,
+        &context.path,
+        &stage_root,
+    ) {
         let _ = fs::remove_dir_all(&stage);
         return Err(error);
     }
     replace_materialized_tree(&stage, &deps_root, &backup)?;
+    let cache_root = nuisc::project::project_galaxy_cache_root_under(&deps_root, &context.summary)?;
 
     Ok(SyncedProjectDeps {
         project_root: context.project.root,
         project_plan_summary: context.project_plan_summary,
-        root: deps_root,
+        root: cache_root,
         entries: context.entries,
         summary: context.summary,
     })
@@ -108,20 +114,29 @@ pub fn doctor_project(input: &Path) -> Result<GalaxyDoctorReport, String> {
         .filter(|entry| entry.direct)
         .map(|entry| format!("{}={}", entry.name, entry.version))
         .collect::<BTreeSet<_>>();
-    let installed = collect_installed_project_deps(&deps_root)?;
-
-    let (lock_status, lock_error, locked) = match verify_project_lock(input) {
-        Ok(lock) => (
-            "ok".to_owned(),
-            None,
-            lock.entries
-                .into_iter()
-                .filter(|entry| entry.direct)
-                .map(|entry| format!("{}={}", entry.name, entry.version))
-                .collect::<BTreeSet<_>>(),
+    let (lock_status, lock_error, locked, installed) = match verify_project_lock(input) {
+        Ok(lock) => {
+            let cache_root =
+                nuisc::project::project_galaxy_cache_root(&project.root, &lock.summary)?;
+            let installed = collect_installed_project_deps(&cache_root)?;
+            (
+                "ok".to_owned(),
+                None,
+                lock.entries
+                    .into_iter()
+                    .filter(|entry| entry.direct)
+                    .map(|entry| format!("{}={}", entry.name, entry.version))
+                    .collect::<BTreeSet<_>>(),
+                installed,
+            )
+        }
+        Err(error) if lock_path.exists() => (
+            "invalid".to_owned(),
+            Some(error),
+            BTreeSet::new(),
+            BTreeSet::new(),
         ),
-        Err(error) if lock_path.exists() => ("invalid".to_owned(), Some(error), BTreeSet::new()),
-        Err(_) => ("missing".to_owned(), None, BTreeSet::new()),
+        Err(_) => ("missing".to_owned(), None, BTreeSet::new(), BTreeSet::new()),
     };
 
     let dependencies = project
@@ -190,75 +205,6 @@ fn resolution_entries(project: &nuisc::project::LoadedProject) -> Vec<GalaxyLock
             .then(lhs.package_id.cmp(&rhs.package_id))
     });
     entries
-}
-
-fn materialize_resolution(
-    context: &VerifiedProjectLockContext,
-    stage: &Path,
-) -> Result<(), String> {
-    for dependency in &context.project.resolved_galaxies {
-        validate_galaxy_token("dependency name", &dependency.name, &context.path)?;
-        validate_galaxy_token("dependency version", &dependency.version, &context.path)?;
-        let output = stage.join(&dependency.name).join(&dependency.version);
-        fs::create_dir_all(&output)
-            .map_err(|error| format!("failed to create `{}`: {error}", output.display()))?;
-        write_verified_content(
-            &dependency.manifest_path,
-            &dependency.manifest_content_identity,
-            &output,
-        )?;
-        for (source, identity) in dependency
-            .resolved_source_paths
-            .iter()
-            .zip(&dependency.source_content_identities)
-            .chain(
-                dependency
-                    .resolved_library_paths
-                    .iter()
-                    .zip(&dependency.library_content_identities),
-            )
-        {
-            write_verified_content(source, identity, &output)?;
-        }
-    }
-    fs::write(
-        stage.join(nuisc::project::PROJECT_GALAXY_RESOLUTION_LOCK_FILE),
-        &context.source,
-    )
-    .map_err(|error| format!("failed to materialize canonical Galaxy lock: {error}"))?;
-    Ok(())
-}
-
-fn write_verified_content(
-    source_path: &Path,
-    identity: &nuisc::stdlib_registry::ResolvedGalaxyContentIdentity,
-    output: &Path,
-) -> Result<(), String> {
-    validate_materialized_relative_path(&identity.logical_path)?;
-    let source = nuisc::stdlib_registry::read_verified_galaxy_text(source_path, identity)?;
-    let destination = output.join(&identity.logical_path);
-    if let Some(parent) = destination.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|error| format!("failed to create `{}`: {error}", parent.display()))?;
-    }
-    fs::write(&destination, source.as_bytes())
-        .map_err(|error| format!("failed to write `{}`: {error}", destination.display()))
-}
-
-fn validate_materialized_relative_path(path: &str) -> Result<(), String> {
-    let candidate = Path::new(path);
-    if path.is_empty()
-        || path.contains('\\')
-        || candidate.is_absolute()
-        || candidate
-            .components()
-            .any(|component| !matches!(component, Component::Normal(_)))
-    {
-        return Err(format!(
-            "Galaxy materialization path `{path}` is not a canonical portable relative path"
-        ));
-    }
-    Ok(())
 }
 
 fn replace_materialized_tree(

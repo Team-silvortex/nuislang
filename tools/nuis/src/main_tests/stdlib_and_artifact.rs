@@ -267,6 +267,8 @@ mod cpu Main {
 "#,
     );
     let output_dir = temp_dir("release_check_outputs");
+    crate::galaxy::lock_project_deps(&project_root).expect("write release Galaxy lock");
+    crate::galaxy::sync_project_deps(&project_root).expect("sync release Galaxy cache");
 
     handle_release_check(project_root, output_dir.clone(), None, None, false)
         .expect("release-check passes");
@@ -284,6 +286,39 @@ mod cpu Main {
     .expect("artifact verifies");
     assert!(artifact_report.lifecycle_contract_consistent);
     assert!(artifact_report.artifact_roundtrip_verified);
+}
+
+#[test]
+fn release_check_rejects_project_without_committed_galaxy_lock() {
+    let project_root = write_temp_project_fixture(
+        "release_check_missing_galaxy_lock",
+        "name = \"release_check_missing_galaxy_lock\"\nentry = \"main.ns\"\n",
+        "mod cpu Main {\n  fn main() -> i64 {\n    return 0;\n  }\n}\n",
+    );
+    let output_dir = temp_dir("release_check_missing_galaxy_lock_outputs");
+    let error = handle_release_check(project_root, output_dir.clone(), None, None, false)
+        .expect_err("release-check must reject an unlocked project");
+
+    assert!(error.contains("committed and synchronized Galaxy resolution"));
+    assert!(error.contains("lock-deps"));
+    assert!(!output_dir.join("nuis.build.manifest.toml").exists());
+}
+
+#[test]
+fn release_check_rejects_locked_project_without_synchronized_galaxy_cache() {
+    let project_root = write_temp_project_fixture(
+        "release_check_missing_galaxy_cache",
+        "name = \"release_check_missing_galaxy_cache\"\nentry = \"main.ns\"\n",
+        "mod cpu Main {\n  fn main() -> i64 {\n    return 0;\n  }\n}\n",
+    );
+    crate::galaxy::lock_project_deps(&project_root).expect("write release Galaxy lock");
+    let output_dir = temp_dir("release_check_missing_galaxy_cache_outputs");
+    let error = handle_release_check(project_root, output_dir.clone(), None, None, false)
+        .expect_err("release-check must reject an unsynchronized lock");
+
+    assert!(error.contains("committed and synchronized Galaxy resolution"));
+    assert!(error.contains("sync-deps"));
+    assert!(!output_dir.join("nuis.build.manifest.toml").exists());
 }
 
 #[test]

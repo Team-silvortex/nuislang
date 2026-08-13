@@ -179,6 +179,60 @@ pub(crate) struct NsldFinalExecutableWriterInputVerifyReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOMergedSectionPlan {
+    pub(crate) section_id: String,
+    pub(crate) segment_name: String,
+    pub(crate) section_name: String,
+    pub(crate) flags: u32,
+    pub(crate) alignment: usize,
+    pub(crate) output_offset: usize,
+    pub(crate) size_bytes: usize,
+    pub(crate) contribution_count: usize,
+    pub(crate) zero_fill: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOSectionPlacement {
+    pub(crate) object_id: String,
+    pub(crate) object_role: String,
+    pub(crate) input_section_ordinal: usize,
+    pub(crate) input_segment_name: String,
+    pub(crate) input_section_name: String,
+    pub(crate) output_section_id: String,
+    pub(crate) output_offset: usize,
+    pub(crate) output_section_offset: usize,
+    pub(crate) size_bytes: usize,
+    pub(crate) alignment: usize,
+    pub(crate) zero_fill: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOSymbolBinding {
+    pub(crate) symbol: String,
+    pub(crate) reference_object_id: String,
+    pub(crate) reference_symbol_index: usize,
+    pub(crate) status: String,
+    pub(crate) target_object_id: Option<String>,
+    pub(crate) target_symbol_index: Option<usize>,
+    pub(crate) target_kind: Option<String>,
+    pub(crate) target_section_id: Option<String>,
+    pub(crate) target_output_offset: Option<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOPlacementBindingReport {
+    pub(crate) contract: String,
+    pub(crate) status: String,
+    pub(crate) plan_hash: String,
+    pub(crate) image_span_bytes: usize,
+    pub(crate) merged_sections: Vec<NsldMachOMergedSectionPlan>,
+    pub(crate) section_placements: Vec<NsldMachOSectionPlacement>,
+    pub(crate) symbol_bindings: Vec<NsldMachOSymbolBinding>,
+    pub(crate) internally_bound_symbol_count: usize,
+    pub(crate) external_compatibility_symbol_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldExecutableFinalizerInputSummary {
     pub(crate) contract: String,
     pub(crate) status: String,
@@ -191,6 +245,7 @@ pub(crate) struct NsldExecutableFinalizerInputSummary {
     pub(crate) internally_resolved_symbol_count: usize,
     pub(crate) unresolved_external_symbol_count: usize,
     pub(crate) unresolved_external_symbols: Vec<String>,
+    pub(crate) placement_binding: NsldMachOPlacementBindingReport,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -76,6 +76,15 @@ fn canonical_root_lock_drives_verification_and_transactional_sync() {
 
     let synced = sync_project_deps(project.path()).unwrap();
     assert_eq!(synced.summary, wrote.summary);
+    assert_eq!(
+        synced.root,
+        nuisc::project::project_galaxy_cache_root(project.path(), &wrote.summary).unwrap()
+    );
+    assert!(synced
+        .root
+        .join(nuisc::project::PROJECT_GALAXY_CACHE_MANIFEST_FILE)
+        .is_file());
+    assert!(synced.root.join("index.toml").is_file());
     assert!(synced.root.join("std/workspace/module.toml").is_file());
     assert!(synced
         .root
@@ -86,11 +95,42 @@ fn canonical_root_lock_drives_verification_and_transactional_sync() {
         fs::read_to_string(synced.root.join("nuis.galaxy.lock")).unwrap(),
         lock_source
     );
+    let compile_project = nuisc::project::load_project_for_compile(project.path()).unwrap();
+    assert!(compile_project
+        .resolved_galaxies
+        .iter()
+        .all(|dependency| dependency.module_dir.starts_with(&synced.root)));
+
+    let cache_index = synced.root.join("index.toml");
+    let cache_index_source = fs::read_to_string(&cache_index).unwrap();
+    let workspace_std = nuisc::stdlib_registry::resolve_stdlib_root()
+        .unwrap()
+        .join("std");
+    let workspace_std = workspace_std.display().to_string().replace('\\', "\\\\");
+    let escaped_index = cache_index_source.replacen(
+        "path = \"std/workspace\"",
+        &format!("path = \"{workspace_std}\""),
+        1,
+    );
+    assert_ne!(escaped_index, cache_index_source);
+    fs::write(&cache_index, escaped_index).unwrap();
+    let error = nuisc::project::load_project_for_compile(project.path()).unwrap_err();
+    assert!(
+        error.contains("escapes resolution cache"),
+        "unexpected cache escape error: {error}"
+    );
+    sync_project_deps(project.path()).unwrap();
 
     let stale = synced.root.join("stale-unlocked-file.txt");
     fs::write(&stale, "must disappear").unwrap();
+    let cached_library = synced.root.join("std/workspace/lib/language_core.ns");
+    let cached_library_source = fs::read_to_string(&cached_library).unwrap();
+    fs::write(&cached_library, format!("{cached_library_source}\n")).unwrap();
+    let error = nuisc::project::load_project_for_compile(project.path()).unwrap_err();
+    assert!(error.contains("does not reproduce the current project dependency closure"));
     sync_project_deps(project.path()).unwrap();
     assert!(!stale.exists());
+    nuisc::project::load_project_for_compile(project.path()).unwrap();
 
     let installed = install_project_deps(project.path()).unwrap();
     assert_eq!(installed.lock.summary, wrote.summary);

@@ -22,7 +22,17 @@ pub(crate) fn handle_release_check(
     let _quiet_success_logs = QuietSuccessLogs::enable_if(json);
     let emit_logs = !json && success_logs_enabled();
     if nuisc::project::is_project_input(&input) {
-        let project = nuisc::project::load_project(&input)?;
+        if emit_logs {
+            println!("release-check: galaxy-lock");
+        }
+        nuisc::project::verify_required_project_galaxy_resolution_cache(&input).map_err(
+            |error| {
+                format!(
+                    "release-check requires a committed and synchronized Galaxy resolution: {error}"
+                )
+            },
+        )?;
+        let project = nuisc::project::load_project_for_compile(&input)?;
         let plan = nuisc::project::build_project_compilation_plan(&project)?;
         let abi_checks =
             nuisc::project::validate_project_abi_selections(&project, &plan.abi_resolution)?;

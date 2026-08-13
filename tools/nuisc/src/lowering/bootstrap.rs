@@ -4,6 +4,7 @@ use crate::lowering::direct_calls::collect_owned_external_buffer_return_helpers;
 use crate::lowering::direct_calls::collect_recursive_async_helper_functions;
 use crate::lowering::direct_calls::collect_recursive_direct_call_functions;
 use crate::lowering::direct_calls::collect_scheduler_async_thunk_functions;
+use crate::lowering::direct_calls::owned_external_buffer_helper_lowering_order;
 
 pub(super) trait BootstrapLoweringProvider {
     fn lowering_entry(&self) -> &'static str;
@@ -160,6 +161,9 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
         })
         .map(|function| function.name.clone())
         .collect::<BTreeSet<_>>();
+    let owned_external_buffer_return_helpers = collect_owned_external_buffer_return_helpers(module);
+    let owned_external_buffer_helper_order =
+        owned_external_buffer_helper_lowering_order(module, &owned_external_buffer_return_helpers)?;
     let direct_call_functions = collect_recursive_direct_call_functions(module)
         .union(&super::scoped_loop_lowering::collect_scoped_loop_helper_functions(module))
         .cloned()
@@ -167,7 +171,7 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
         .union(&collect_conditional_owned_return_helpers(module))
         .cloned()
         .collect::<BTreeSet<_>>()
-        .union(&collect_owned_external_buffer_return_helpers(module))
+        .union(&owned_external_buffer_return_helpers)
         .cloned()
         .collect::<BTreeSet<_>>()
         .union(&exported_functions)
@@ -189,7 +193,8 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
         .iter()
         .find(|function| function.name == "main")
         .ok_or_else(|| {
-            "minimal nuisc lowering expects `fn main()`; add `fn main() -> ...` in module `Main`".to_owned()
+            "minimal nuisc lowering expects `fn main()`; add `fn main() -> ...` in module `Main`"
+                .to_owned()
         })?;
 
     let function_map = module
@@ -231,9 +236,19 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
 
     materialize_cpu_target_config_node(&mut state);
 
+    for function_name in &owned_external_buffer_helper_order {
+        let function = module
+            .functions
+            .iter()
+            .find(|function| &function.name == function_name)
+            .expect("collected owned-buffer helper must exist");
+        lower_direct_call_helper_function(function, &mut state)?;
+    }
+
     for function in module.functions.iter().filter(|function| {
-        direct_call_functions.contains(&function.name)
-            || all_async_helper_functions.contains(&function.name)
+        !owned_external_buffer_return_helpers.contains(&function.name)
+            && (direct_call_functions.contains(&function.name)
+                || all_async_helper_functions.contains(&function.name))
     }) {
         lower_direct_call_helper_function(function, &mut state)?;
     }

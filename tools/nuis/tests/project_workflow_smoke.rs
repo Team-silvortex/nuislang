@@ -95,6 +95,11 @@ fn assert_project_workflow_smoke(project_path: &str, label: &str, expected_locke
         assert_contains(&manifest_text, key, "locked manifest");
     }
 
+    let galaxy_lock = run_nuis(&["galaxy", "lock-deps", &project_root_text]);
+    assert_success(&galaxy_lock, "nuis galaxy lock-deps");
+    let galaxy_sync = run_nuis(&["galaxy", "sync-deps", &project_root_text]);
+    assert_success(&galaxy_sync, "nuis galaxy sync-deps");
+
     let output_dir = temp_dir(&format!("{label}_release_check"));
     let release_check = run_nuis(&[
         "release-check",

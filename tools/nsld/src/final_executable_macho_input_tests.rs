@@ -17,6 +17,22 @@ fn parses_sections_symbols_and_external_relocations() {
         parsed.external_undefined,
         BTreeSet::from(["_missing".to_owned()])
     );
+    assert_eq!(parsed.sections[0].ordinal, 1);
+    assert_eq!(parsed.sections[0].segment_name, "__TEXT");
+    assert_eq!(parsed.sections[0].name, "__text");
+    assert_eq!(parsed.sections[0].size, 8);
+    assert_eq!(parsed.sections[0].alignment, 1);
+    assert_eq!(parsed.symbols[0].name, "_defined");
+    assert_eq!(parsed.symbols[0].kind, "section");
+    assert_eq!(parsed.symbols[0].section_ordinal, Some(1));
+    assert_eq!(parsed.symbols[1].name, "_missing");
+    assert_eq!(parsed.symbols[1].kind, "undefined");
+    assert_eq!(parsed.relocations[0].section_ordinal, 1);
+    assert_eq!(parsed.relocations[0].symbol_number, 1);
+    assert_eq!(parsed.relocations[0].width_bytes, 4);
+    assert!(parsed.relocations[0].pc_relative);
+    assert!(parsed.relocations[0].external);
+    assert_eq!(parsed.relocations[0].relocation_type, 2);
 }
 
 #[test]

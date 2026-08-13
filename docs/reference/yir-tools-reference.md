@@ -384,6 +384,8 @@ project-doctor
   -> project-status
   -> scheduler-view
   -> project-lock-abi    (when ABI is still auto-resolved)
+  -> galaxy lock-deps
+  -> galaxy sync-deps
   -> check
   -> test
   -> build
@@ -401,6 +403,9 @@ Read that as:
 * `check` / `build` / `release-check`
   all derive from one shared `ProjectCompilationPlan`, so organization,
   exchange routes, ABI resolution, and synthetic input naming stay unified
+  when a project root lock exists, compile planning resolves packages only
+  from its synchronized SHA-256-addressed cache and re-verifies the resulting
+  closure against that lock
   `release-check --json` is a pure readiness summary; it recommends
   `run-artifact --json` for runtime/nsdb handoff materialization instead of
   running it implicitly.
@@ -438,6 +443,10 @@ Read that as:
 * `release-check`
   final release-facing pass; use this when you want the default compile route
   to end in a reproducible output directory plus build-manifest verification
+  project inputs require a committed `nuis.galaxy.lock` and its synchronized
+  content-addressed cache before any output is created; run `galaxy lock-deps`
+  and `galaxy sync-deps` explicitly rather than expecting release admission to
+  mutate dependency state
 
 For framework/package-aware projects, the current companion `galaxy` flow is:
 
@@ -452,8 +461,11 @@ galaxy init
 
 `lock-deps`, `verify-lock`, and `sync-deps` share
 `nuis-galaxy-resolution-lock-v1`. Sync transactionally materializes only
-SHA-256-verified manifest/source/library files under `.nuis/deps/galaxy` and
-does not use machine-specific bundle paths. `install-deps` is the combined
+SHA-256-verified manifest/source/library files under
+`.nuis/deps/galaxy/sha256/<resolution-digest>`, writes the compiler provider
+index plus `nuis-galaxy-resolution-cache-v1` metadata, and does not use
+machine-specific bundle paths. Locked compiler loads consume this addressed
+provider rather than mutable workspace package bytes. `install-deps` is the combined
 `lock-deps + sync-deps` convenience operation; local bundle publication stays
 independent from compiler resolution.
 

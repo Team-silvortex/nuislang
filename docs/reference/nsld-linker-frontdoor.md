@@ -33,12 +33,13 @@ For the automation frontdoor, see [nsld-driver-frontdoor.md](nsld-driver-frontdo
   compatibility writers
 * final-stage reporting
 * verified relocatable host object handoff identity and Mach-O object parsing
+* deterministic Mach-O section placement and section-backed symbol binding
 * registered Mach-O arm64 compatibility-image materialization
 * the first independent CLI boundary for future linker work
 
 `Nsld` does not yet own:
 
-* Mach-O symbol resolution, relocation application, and shell synthesis
+* Mach-O relocation application, non-section symbol allocation, and shell synthesis
 * final host-native executable wrapping for ELF or PE/COFF
 * binary section assembly independent from `nuisc`
 * stable linker script or relocation formats
@@ -1042,18 +1043,31 @@ through dry-run JSON and persisted in the verified invoke-plan artifact.
 The internal provider parses the compiled artifact and its `NHOB` object
 bundle. It requires one LLVM program object and one runtime shim object,
 validates their LinkPlan identity, content hashes, arm64 `MH_OBJECT` headers,
-and load-command spans, then validates a thin or universal arm64 `MH_EXECUTE`
-compatibility image and installs it atomically with executable permissions. It
-requires neither host policy variables nor a child process, removing the
-former second clang invocation from the Nsld path.
+and load-command spans. `nuis-nsld-macho-host-object-linkage-v1` preserves the
+checked sections, symbols, and relocation records. The nested
+`nuis-nsld-macho-placement-binding-v1` then orders the program before the
+runtime shim, merges compatible segment/section pairs, applies checked
+alignment, assigns deterministic contribution offsets, and binds every
+section-backed cross-object definition. Duplicate definitions, incompatible
+section flags, missing placements, and referenced common/absolute/indirect
+definitions fail closed; unresolved C/system symbols remain explicitly marked
+`external-compatibility`. The canonical plan hash and full merged-section,
+placement, and binding records are identical across JSON, text, and persisted
+invoke-plan surfaces.
+
+After those checks the provider validates a thin or universal arm64
+`MH_EXECUTE` compatibility image and installs it atomically with executable
+permissions. It requires neither host policy variables nor a child process,
+removing the former second clang invocation from the Nsld path.
 Host-command execution remains provider-owned and uses the exact driver path
 resolved by the verified dry-run boundary instead of performing a second
 `PATH` lookup.
 
 This still does not claim a pure Nsld platform linker: Nuisc now hands Nsld
 real relocatable objects, but it also embeds a host-toolchain-linked
-compatibility image. Mach-O symbol resolution, relocation application, shell
-construction, and final native layout ownership remain the next boundary.
+compatibility image. Nsld does not yet allocate non-section definitions, apply
+ARM64 relocation writes, construct Mach-O load commands, or emit the final
+native shell independently. Those remain the next boundary.
 
 `nsld final-executable-host-dry-run` consumes the verified writer input,
 reports `environment_ready`, provider identity, and exact command arguments.

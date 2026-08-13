@@ -262,7 +262,7 @@ The `beta-0.1` calibration baseline is:
   payloads, per-mutex parking/fairness, and a mature parallel Nuis executor
   remain open
 * `host-compatibility/cffi/registered-pointer-string-object-boundary`:
-  `usable/93`, required and now the current weakest bootstrap task; five real
+  `usable/95`, required and now the current weakest bootstrap task; five real
   borrowed UTF-8 calls and one owned
   `ref Buffer` return carry exact signature plus memory-capability hashes
   through compile, project metadata, and Nsld validation; the owned path now
@@ -270,27 +270,35 @@ The `beta-0.1` calibration baseline is:
   destructor dispatch, and native execution; one GLM-typed conditional transfer
   accepts only direct owners with identical ABI/destructor/hash identity, drops
   the unselected owner, and merges pointer plus runtime length; one synchronous
-  helper may now return that owner to its entry caller through a `{ptr,i64}`
-  runtime ABI while YIR retains static ABI/destructor/hash identity and enforces
-  one caller release; source helper chains may normalize to that single
-  boundary, while runtime nested/recursive, task/async/loop-carried,
+  helper may now call one direct owner-producing helper before returning that
+  owner to its entry caller through a `{ptr,i64}` runtime ABI; YIR retains
+  static ABI/destructor/hash identity across both boundaries and enforces one
+  caller release; a second runtime helper hop, recursion, task/async/loop-carried,
   raw-pointer, and generalized ownership remain closed
-* `package-system/galaxy/source-import-and-lock-resolution`: `usable/93`,
+* `package-system/galaxy/source-import-and-lock-resolution`: `usable/96`,
   required; root and generated build locks now share one portable SHA-256-bound
   compiler resolution protocol covering direct/transitive edges, package
   identity, manifest/source/library content, import policy, and actual module
-  selection; existing root-lock drift rejects verify, sync, status, and build,
-  while sync transactionally materializes the verified closure without bundle
-  paths; required-lock release mode and cache-owned resolution remain open
-* `linker-toolchain/nsld/os-native-executable-finalization`: `usable/94`,
-  required; a provider-neutral, hash-bound static registry now consumes an
+  selection; sync transactionally materializes the verified closure as a
+  `sha256/<resolution>` compiler provider with a canonical index, cache
+  manifest, and lock copy; locked compiles consume only that provider and
+  re-render the closure against the root lock; project release admission now
+  requires both lock and synchronized cache before writing outputs; remote
+  discovery, solving, trust metadata, transport, and cache collection remain
+  open
+* `linker-toolchain/nsld/os-native-executable-finalization`: `usable/96`,
+  required; a provider-neutral,
+  hash-bound static registry now consumes an
   `NHOB`-bound pair of actual
   `program-llvm` and `runtime-shim` Mach-O objects, validates their LinkPlan
   identity, hashes, roles, sections, symbol/string tables, and ARM64 relocation
-  references, then projects a structured internal-resolution/external-boundary
-  summary and atomically installs the current compatibility executable without
-  a second Nsld-side clang invocation; final section placement, symbol binding,
-  relocation writes, Mach-O shell synthesis, ELF, and PE/COFF remain open
+  references; `nuis-nsld-macho-placement-binding-v1` now deterministically
+  merges compatible sections, assigns aligned contribution offsets, binds
+  section-backed cross-object definitions, preserves unresolved C/system
+  symbols as a compatibility boundary, and rejects duplicate definitions,
+  incompatible flags, and referenced non-section definitions; ARM64 relocation
+  writes, common-symbol allocation, Mach-O shell synthesis, ELF, and PE/COFF
+  remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

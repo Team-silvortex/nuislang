@@ -2,6 +2,35 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(crate) const DEV_TENSOR_RUNTIME_NSLD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "nsld-macho-placement-binding-contract",
+        path: "tools/nsld/src/final_executable_macho_layout.rs",
+        required_patterns: &[
+            "nuis-nsld-macho-placement-binding-v1",
+            "build_macho_placement_binding_report",
+            "placement-ready-with-external-compatibility-boundary",
+            "duplicate external Mach-O definition",
+            "incompatible flags",
+            "not section-backed and cannot enter placement binding yet",
+            "external-compatibility",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-macho-placement-binding-three-surface-evidence",
+        path: "tools/nsld/tests/host_finalizer_cli.rs",
+        required_patterns: &[
+            "nuis-nsld-macho-placement-binding-v1",
+            "merged_section_count",
+            "section_placement_count",
+            "symbol_binding_count",
+            "internally_bound_symbol_count",
+            "external_compatibility_symbol_count",
+            "_nuis_runtime",
+            "target_object_id",
+            "finalizer_input_placement_contract",
+            "persisted_invoke_plan",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nustar-domain-contract-completeness-status",
         path: "tools/nuisc/src/registry_contract.rs",
         required_patterns: &[

@@ -474,4 +474,139 @@ fn render_finalizer_input_summary(
         toml::toml_string_array_literal(&summary.unresolved_external_symbols)
     )
     .unwrap();
+    let placement = &summary.placement_binding;
+    writeln!(
+        out,
+        "finalizer_input_placement_contract = \"{}\"",
+        toml::escape_toml_string(&placement.contract)
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_placement_status = \"{}\"",
+        toml::escape_toml_string(&placement.status)
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_placement_plan_hash = \"{}\"",
+        toml::escape_toml_string(&placement.plan_hash)
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_placement_image_span_bytes = {}",
+        placement.image_span_bytes
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_merged_section_count = {}",
+        placement.merged_sections.len()
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_section_placement_count = {}",
+        placement.section_placements.len()
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_symbol_binding_count = {}",
+        placement.symbol_bindings.len()
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_internally_bound_symbol_count = {}",
+        placement.internally_bound_symbol_count
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_external_compatibility_symbol_count = {}",
+        placement.external_compatibility_symbol_count
+    )
+    .unwrap();
+    let merged_sections = placement
+        .merged_sections
+        .iter()
+        .map(|section| {
+            format!(
+                "{}|{}|{}|0x{:08x}|{}|{}|{}|{}|{}",
+                section.section_id,
+                section.segment_name,
+                section.section_name,
+                section.flags,
+                section.alignment,
+                section.output_offset,
+                section.size_bytes,
+                section.contribution_count,
+                section.zero_fill
+            )
+        })
+        .collect::<Vec<_>>();
+    writeln!(
+        out,
+        "finalizer_input_merged_sections = [{}]",
+        toml::toml_string_array_literal(&merged_sections)
+    )
+    .unwrap();
+    let section_placements = placement
+        .section_placements
+        .iter()
+        .map(|section| {
+            format!(
+                "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+                section.object_id,
+                section.object_role,
+                section.input_section_ordinal,
+                section.input_segment_name,
+                section.input_section_name,
+                section.output_section_id,
+                section.output_offset,
+                section.output_section_offset,
+                section.size_bytes,
+                section.alignment,
+                section.zero_fill
+            )
+        })
+        .collect::<Vec<_>>();
+    writeln!(
+        out,
+        "finalizer_input_section_placements = [{}]",
+        toml::toml_string_array_literal(&section_placements)
+    )
+    .unwrap();
+    let symbol_bindings = placement
+        .symbol_bindings
+        .iter()
+        .map(|binding| {
+            format!(
+                "{}|{}|{}|{}|{}|{}|{}|{}|{}",
+                binding.symbol,
+                binding.reference_object_id,
+                binding.reference_symbol_index,
+                binding.status,
+                binding.target_object_id.as_deref().unwrap_or("none"),
+                binding
+                    .target_symbol_index
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "none".to_owned()),
+                binding.target_kind.as_deref().unwrap_or("none"),
+                binding.target_section_id.as_deref().unwrap_or("none"),
+                binding
+                    .target_output_offset
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "none".to_owned())
+            )
+        })
+        .collect::<Vec<_>>();
+    writeln!(
+        out,
+        "finalizer_input_symbol_bindings = [{}]",
+        toml::toml_string_array_literal(&symbol_bindings)
+    )
+    .unwrap();
 }

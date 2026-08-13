@@ -278,6 +278,70 @@ fn print_finalizer_input_summary(summary: Option<&NsldExecutableFinalizerInputSu
     for symbol in &summary.unresolved_external_symbols {
         println!("  finalizer_input_unresolved_external_symbol: {symbol}");
     }
+    let placement = &summary.placement_binding;
+    println!(
+        "  finalizer_input_placement_contract: {}",
+        placement.contract
+    );
+    println!("  finalizer_input_placement_status: {}", placement.status);
+    println!(
+        "  finalizer_input_placement_plan_hash: {}",
+        placement.plan_hash
+    );
+    println!(
+        "  finalizer_input_placement_image_span_bytes: {}",
+        placement.image_span_bytes
+    );
+    for section in &placement.merged_sections {
+        println!(
+            "  finalizer_input_merged_section: id={} segment={} section={} flags=0x{:08x} align={} offset={} bytes={} contributions={} zero_fill={}",
+            section.section_id,
+            section.segment_name,
+            section.section_name,
+            section.flags,
+            section.alignment,
+            section.output_offset,
+            section.size_bytes,
+            section.contribution_count,
+            section.zero_fill
+        );
+    }
+    for section in &placement.section_placements {
+        println!(
+            "  finalizer_input_section_placement: object={} role={} ordinal={} input={}:{} output={} offset={} section_offset={} bytes={} align={} zero_fill={}",
+            section.object_id,
+            section.object_role,
+            section.input_section_ordinal,
+            section.input_segment_name,
+            section.input_section_name,
+            section.output_section_id,
+            section.output_offset,
+            section.output_section_offset,
+            section.size_bytes,
+            section.alignment,
+            section.zero_fill
+        );
+    }
+    for binding in &placement.symbol_bindings {
+        println!(
+            "  finalizer_input_symbol_binding: symbol={} reference={}:{} status={} target_object={} target_symbol={} target_kind={} target_section={} target_offset={}",
+            binding.symbol,
+            binding.reference_object_id,
+            binding.reference_symbol_index,
+            binding.status,
+            binding.target_object_id.as_deref().unwrap_or("none"),
+            binding
+                .target_symbol_index
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "none".to_owned()),
+            binding.target_kind.as_deref().unwrap_or("none"),
+            binding.target_section_id.as_deref().unwrap_or("none"),
+            binding
+                .target_output_offset
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "none".to_owned())
+        );
+    }
 }
 
 pub(crate) fn print_nsld_final_executable_host_invoke_plan_emit_report(
