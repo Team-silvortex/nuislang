@@ -309,7 +309,7 @@ fn allows_non_exhaustive_enum_match_in_statement_context() {
     assert_eq!(function.body.len(), 3);
     assert!(matches!(&function.body[0], NirStmt::Let { .. }));
     assert!(matches!(&function.body[1], NirStmt::If { .. }));
-    assert!(matches!(&function.body[2], NirStmt::Expr(_)));
+    assert!(matches!(&function.body[2], NirStmt::Print(_)));
 }
 
 #[test]
@@ -390,7 +390,7 @@ fn allows_non_exhaustive_bool_match_in_statement_context() {
     assert_eq!(function.body.len(), 3);
     assert!(matches!(&function.body[0], NirStmt::Let { .. }));
     assert!(matches!(&function.body[1], NirStmt::If { .. }));
-    assert!(matches!(&function.body[2], NirStmt::Expr(_)));
+    assert!(matches!(&function.body[2], NirStmt::Print(_)));
 }
 
 #[test]

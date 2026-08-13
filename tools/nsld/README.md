@@ -107,14 +107,21 @@ deterministically merges compatible sections, applies checked alignment,
 assigns contribution offsets, binds section-backed cross-object symbols, and
 rejects duplicate definitions, incompatible flags, and referenced definitions
 without a section placement. Unresolved C/system symbols remain an explicit
-compatibility boundary. JSON, text, and persisted invoke-plan surfaces expose
-the same plan hash and records before the provider atomically materializes the
-embedded compatibility executable without a second Nsld-side clang invocation.
+compatibility boundary. The nested
+`nuis-nsld-macho-arm64-relocation-application-v1` plan then maps each checked
+relocation to its placed source and target offsets. Its static registry covers
+the eight ARM64 relocation kinds emitted by the real Nuisc objects, preserves
+ADDEND and SUBTRACTOR pair identity, distinguishes direct writes from
+GOT/external platform structures, and fails closed on malformed or unknown
+kinds. JSON, text, and persisted invoke-plan surfaces expose the same
+placement-bound plan hash and records before the provider atomically
+materializes the embedded compatibility executable without a second Nsld-side
+clang invocation.
 A gated host-command provider remains as a fallback; ELF and PE/COFF are
 explicit `registered-not-implemented` providers. This proves relocatable input,
-table parsing, placement, and symbol-binding ownership, but not ARM64 relocation
-writes or complete Mach-O shell emission independently of Nuisc's compatibility
-link.
+table parsing, placement, binding, and complete relocation planning, but not
+ARM64 byte writes, GOT/stub synthesis, or complete Mach-O shell emission
+independently of Nuisc's compatibility link.
 
 ## Current Early-Beta Rule
 

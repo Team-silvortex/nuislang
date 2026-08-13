@@ -253,6 +253,38 @@ pub(crate) fn lower_cpu_memory_node(
                     ));
                 return Ok(true);
             };
+            if let Some(LlvmValueRef::OwnedExternalUtf8 { len, .. }) =
+                registers.get(&node.op.args[0])
+            {
+                let non_negative = fresh_reg(next_reg);
+                body.push(format!("  {non_negative} = icmp sge i64 {index}, 0"));
+                let below_len = fresh_reg(next_reg);
+                body.push(format!("  {below_len} = icmp slt i64 {index}, {len}"));
+                let in_bounds = fresh_reg(next_reg);
+                body.push(format!(
+                    "  {in_bounds} = and i1 {non_negative}, {below_len}"
+                ));
+                let ready = fresh_block(next_block, "owned_utf8_index_ready");
+                let invalid = fresh_block(next_block, "owned_utf8_index_invalid");
+                body.push(format!(
+                    "  br i1 {in_bounds}, label %{ready}, label %{invalid}"
+                ));
+                body.push(format!("{invalid}:"));
+                body.push("  call void @llvm.trap()".to_owned());
+                body.push("  unreachable".to_owned());
+                body.push(format!("{ready}:"));
+                let slot = fresh_reg(next_reg);
+                body.push(format!(
+                    "  {slot} = getelementptr inbounds i8, ptr {ptr}, i64 {index}"
+                ));
+                let byte = fresh_reg(next_reg);
+                body.push(format!("  {byte} = load i8, ptr {slot}"));
+                let reg = fresh_reg(next_reg);
+                body.push(format!("  {reg} = zext i8 {byte} to i64"));
+                registers.insert(node.name.clone(), LlvmValueRef::I64(reg.clone()));
+                *last_cpu_value = Some(reg);
+                return Ok(true);
+            }
             let slot = fresh_reg(next_reg);
             body.push(format!(
                 "  {slot} = getelementptr inbounds i64, ptr {ptr}, i64 {index}"
@@ -338,6 +370,22 @@ pub(crate) fn lower_cpu_memory_node(
             *last_cpu_value = Some(reg);
         }
         "free" => {
+            if let Some(LlvmValueRef::OwnedExternalUtf8 {
+                ptr,
+                abi,
+                destructor,
+                destructor_signature_hash,
+                ..
+            }) = registers.get(&node.op.args[0])
+            {
+                body.push(format!(
+                    "  ; release registered owned UTF-8 via {abi}::{destructor}@{destructor_signature_hash}"
+                ));
+                let status = fresh_reg(next_reg);
+                body.push(format!("  {status} = call i64 @{destructor}(ptr {ptr})"));
+                registers.insert(node.name.clone(), LlvmValueRef::Void);
+                return Ok(true);
+            }
             if let Some(LlvmValueRef::OwnedExternalBuffer {
                 ptr, destructor, ..
             }) = registers.get(&node.op.args[0])

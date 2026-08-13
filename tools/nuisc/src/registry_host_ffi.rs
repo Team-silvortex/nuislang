@@ -3,13 +3,14 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::registry::NustarPackageManifest;
 use yir_core::ffi::{
     ffi_memory_capability_hash, ffi_symbol_signature_hash, is_ffi_symbol_hash_token,
-    OWNED_BUFFER_DESTRUCTOR_SIGNATURE,
+    OWNED_BUFFER_DESTRUCTOR_SIGNATURE, OWNED_UTF8_DESTRUCTOR_SIGNATURE,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum HostFfiMemoryKind {
     BorrowedUtf8,
     OwnedReturnBuffer,
+    OwnedReturnUtf8,
 }
 
 impl HostFfiMemoryKind {
@@ -17,6 +18,7 @@ impl HostFfiMemoryKind {
         match self {
             Self::BorrowedUtf8 => "borrowed_utf8",
             Self::OwnedReturnBuffer => "owned_return_buffer",
+            Self::OwnedReturnUtf8 => "owned_return_utf8",
         }
     }
 }
@@ -384,6 +386,7 @@ pub(crate) fn parse_memory_capability(
     let kind = match required_descriptor_field(&fields, "kind", package_id)? {
         "borrowed_utf8" => HostFfiMemoryKind::BorrowedUtf8,
         "owned_return_buffer" => HostFfiMemoryKind::OwnedReturnBuffer,
+        "owned_return_utf8" => HostFfiMemoryKind::OwnedReturnUtf8,
         other => {
             return Err(format!(
                 "nustar package `{package_id}` host FFI memory capability has unsupported kind `{other}`"
@@ -526,6 +529,16 @@ fn validate_memory_policy_fields(
                     HostFfiMemoryDestructor::Registered { .. }
                 )
         }
+        HostFfiMemoryKind::OwnedReturnUtf8 => {
+            capability.slot == HostFfiMemorySlot::Return
+                && capability.length == "runtime_header"
+                && capability.mutability == "read_only"
+                && capability.lifetime == "owned"
+                && matches!(
+                    capability.destructor,
+                    HostFfiMemoryDestructor::Registered { .. }
+                )
+        }
     };
     if valid {
         Ok(())
@@ -578,6 +591,33 @@ fn validate_memory_capability_shape(
             if destructor_signature != OWNED_BUFFER_DESTRUCTOR_SIGNATURE {
                 return Err(format!(
                     "nustar package `{package_id}` owned return-buffer destructor `{symbol}` must use `{OWNED_BUFFER_DESTRUCTOR_SIGNATURE}`, found `{destructor_signature}`"
+                ));
+            }
+        }
+        (HostFfiMemoryKind::OwnedReturnUtf8, HostFfiMemorySlot::Return) => {
+            if signature.split_once('(').map(|(ret, _)| ret) != Some("ref_String") {
+                return Err(format!(
+                    "nustar package `{package_id}` owned UTF-8 capability requires `ref_String` return signature, found `{signature}`"
+                ));
+            }
+            let HostFfiMemoryDestructor::Registered {
+                symbol,
+                signature_hash,
+            } = &capability.destructor
+            else {
+                unreachable!("owned UTF-8 policy requires a registered destructor")
+            };
+            let destructor_signature = registry
+                .exact_signature_for_hash(&capability.abi, symbol, signature_hash)
+                .ok_or_else(|| {
+                    format!(
+                        "nustar package `{package_id}` owned UTF-8 destructor `{symbol}` is not exact-signature registered for ABI `{}` hash `{signature_hash}`",
+                        capability.abi
+                    )
+                })?;
+            if destructor_signature != OWNED_UTF8_DESTRUCTOR_SIGNATURE {
+                return Err(format!(
+                    "nustar package `{package_id}` owned UTF-8 destructor `{symbol}` must use `{OWNED_UTF8_DESTRUCTOR_SIGNATURE}`, found `{destructor_signature}`"
                 ));
             }
         }

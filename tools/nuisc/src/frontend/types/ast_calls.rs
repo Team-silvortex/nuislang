@@ -35,6 +35,7 @@ pub(super) fn infer_ast_call_type(input: AstCallInferenceInput<'_>) -> Option<As
     }
 
     match callee {
+        "owned_utf8_byte_at" => Some(ast_named_type("i64")),
         _ if struct_table
             .get(callee)
             .is_some_and(|definition| definition.fields.len() == 1 && args.len() == 1) =>

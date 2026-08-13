@@ -1053,7 +1053,16 @@ section flags, missing placements, and referenced common/absolute/indirect
 definitions fail closed; unresolved C/system symbols remain explicitly marked
 `external-compatibility`. The canonical plan hash and full merged-section,
 placement, and binding records are identical across JSON, text, and persisted
-invoke-plan surfaces.
+invoke-plan surfaces. The provider next derives
+`nuis-nsld-macho-arm64-relocation-application-v1`, which maps every checked
+relocation to a placed source offset and local, internal, or compatibility
+target. Its static registry covers ARM64 `UNSIGNED`, `SUBTRACTOR`, `BRANCH26`,
+`PAGE21`, `PAGEOFF12`, `GOT_LOAD_PAGE21`, `GOT_LOAD_PAGEOFF12`, and `ADDEND`.
+It validates width, PC-relative, external, and pair shapes; preserves explicit
+addends and reciprocal pair ids; distinguishes direct encoding from linker
+platform structures; and fails closed on unregistered kinds. The plan hash is
+bound to the placement hash and the same complete records appear in JSON, text,
+and the persisted invoke plan.
 
 After those checks the provider validates a thin or universal arm64
 `MH_EXECUTE` compatibility image and installs it atomically with executable
@@ -1065,9 +1074,10 @@ resolved by the verified dry-run boundary instead of performing a second
 
 This still does not claim a pure Nsld platform linker: Nuisc now hands Nsld
 real relocatable objects, but it also embeds a host-toolchain-linked
-compatibility image. Nsld does not yet allocate non-section definitions, apply
-ARM64 relocation writes, construct Mach-O load commands, or emit the final
-native shell independently. Those remain the next boundary.
+compatibility image. Nsld does not yet copy input sections into a final merged
+byte image, encode ARM64 relocation writes, allocate non-section definitions,
+synthesize GOT/stubs or Mach-O load commands, or emit the final native shell
+independently. Those remain the next boundary.
 
 `nsld final-executable-host-dry-run` consumes the verified writer input,
 reports `environment_ready`, provider identity, and exact command arguments.

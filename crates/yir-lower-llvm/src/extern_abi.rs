@@ -36,6 +36,24 @@ pub(crate) fn render_dynamic_extern_decls(module: &YirModule) -> Vec<String> {
                 .or_insert(("i64", vec!["ptr"]));
             continue;
         }
+        if node.op.instruction == "extern_call_owned_utf8" {
+            let Ok(contract) = yir_core::ffi::parse_owned_utf8_return_contract(&node.op.args)
+            else {
+                continue;
+            };
+            let arg_types = contract
+                .inputs
+                .iter()
+                .map(|arg| producer_types.get(arg.as_str()).copied().unwrap_or("i64"))
+                .collect::<Vec<_>>();
+            declared
+                .entry(contract.symbol.to_owned())
+                .or_insert(("ptr", arg_types));
+            declared
+                .entry(contract.destructor_symbol.to_owned())
+                .or_insert(("i64", vec!["ptr"]));
+            continue;
+        }
         if node.op.args.len() < 2 {
             continue;
         }
@@ -116,14 +134,17 @@ pub(crate) fn render_extern_call(
 pub(crate) fn is_cpu_extern_call_instruction(instruction: &str) -> bool {
     matches!(
         instruction,
-        "extern_call_i64" | "extern_call_i32" | "extern_call_owned_buffer"
+        "extern_call_i64"
+            | "extern_call_i32"
+            | "extern_call_owned_buffer"
+            | "extern_call_owned_utf8"
     )
 }
 
 pub(crate) fn cpu_extern_call_llvm_return_type(instruction: &str) -> &'static str {
     match instruction {
         "extern_call_i32" => "i32",
-        "extern_call_owned_buffer" => "ptr",
+        "extern_call_owned_buffer" | "extern_call_owned_utf8" => "ptr",
         _ => "i64",
     }
 }
@@ -189,7 +210,8 @@ pub(crate) fn node_result_llvm_abi_type(node: &Node) -> &'static str {
         | "alloc_node"
         | "alloc_buffer"
         | "load_next"
-        | "extern_call_owned_buffer" => "ptr",
+        | "extern_call_owned_buffer"
+        | "extern_call_owned_utf8" => "ptr",
         "const_i32" | "cast_i64_to_i32" | "extern_call_i32" | "call_i32" | "param_i32" => "i32",
         _ => "i64",
     }

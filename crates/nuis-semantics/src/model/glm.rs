@@ -31,7 +31,8 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::VariantFieldAccess { .. }
         | NirExpr::Binary { .. }
         | NirExpr::IsNull(_) => None,
-        NirExpr::CpuExternCallOwnedBuffer { args, .. } => Some(NirGlmProfile {
+        NirExpr::CpuExternCallOwnedBuffer { args, .. }
+        | NirExpr::CpuExternCallOwnedUtf8 { args, .. } => Some(NirGlmProfile {
             result_class: NirGlmValueClass::Res,
             accesses: args
                 .iter()

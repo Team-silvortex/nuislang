@@ -226,6 +226,7 @@ pub(crate) fn get_ptr<'a>(
         Some(LlvmValueRef::Ptr(value)) => Some(value.as_str()),
         Some(LlvmValueRef::BorrowedBuffer { ptr, .. }) => Some(ptr.as_str()),
         Some(LlvmValueRef::OwnedExternalBuffer { ptr, .. }) => Some(ptr.as_str()),
+        Some(LlvmValueRef::OwnedExternalUtf8 { ptr, .. }) => Some(ptr.as_str()),
         _ => None,
     }
 }
@@ -238,6 +239,7 @@ pub(crate) fn borrowed_buffer_parts(
     match registers.get(name)? {
         LlvmValueRef::BorrowedBuffer { ptr, len } => Some((ptr.clone(), len.clone())),
         LlvmValueRef::OwnedExternalBuffer { ptr, len, .. } => Some((ptr.clone(), len.clone())),
+        LlvmValueRef::OwnedExternalUtf8 { ptr, len, .. } => Some((ptr.clone(), len.clone())),
         LlvmValueRef::Ptr(ptr) => Some((ptr.clone(), buffer_lengths.get(name)?.clone())),
         _ => None,
     }

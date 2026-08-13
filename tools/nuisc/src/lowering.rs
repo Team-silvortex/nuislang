@@ -294,7 +294,8 @@ fn lower_expr(
         | NirExpr::CpuPresentFrame(_)
         | NirExpr::CpuExternCall { .. }
         | NirExpr::CpuExternCallI32 { .. }
-        | NirExpr::CpuExternCallOwnedBuffer { .. } => lower_cpu_expr(expr, state, bindings)
+        | NirExpr::CpuExternCallOwnedBuffer { .. }
+        | NirExpr::CpuExternCallOwnedUtf8 { .. } => lower_cpu_expr(expr, state, bindings)
             .expect("cpu expr family must be handled by lower_cpu_expr"),
         NirExpr::NetworkProfileBindCoreRef { .. }
         | NirExpr::NetworkProfileEndpointKindRef { .. }

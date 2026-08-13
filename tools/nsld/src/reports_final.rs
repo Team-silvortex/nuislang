@@ -233,6 +233,47 @@ pub(crate) struct NsldMachOPlacementBindingReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64RelocationApplication {
+    pub(crate) relocation_id: String,
+    pub(crate) object_id: String,
+    pub(crate) object_role: String,
+    pub(crate) input_section_ordinal: usize,
+    pub(crate) source_section_id: String,
+    pub(crate) source_offset: usize,
+    pub(crate) source_output_offset: usize,
+    pub(crate) width_bytes: usize,
+    pub(crate) pc_relative: bool,
+    pub(crate) external: bool,
+    pub(crate) relocation_type: u32,
+    pub(crate) relocation_kind: String,
+    pub(crate) action_kind: String,
+    pub(crate) target_symbol: Option<String>,
+    pub(crate) target_symbol_index: Option<usize>,
+    pub(crate) target_object_id: Option<String>,
+    pub(crate) target_section_id: Option<String>,
+    pub(crate) target_output_offset: Option<usize>,
+    pub(crate) explicit_addend: Option<i64>,
+    pub(crate) pair_relocation_id: Option<String>,
+    pub(crate) resolver_status: String,
+    pub(crate) application_status: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64RelocationApplicationReport {
+    pub(crate) contract: String,
+    pub(crate) status: String,
+    pub(crate) plan_hash: String,
+    pub(crate) placement_plan_hash: String,
+    pub(crate) relocation_count: usize,
+    pub(crate) registered_kind_count: usize,
+    pub(crate) ready_application_count: usize,
+    pub(crate) platform_structure_count: usize,
+    pub(crate) external_compatibility_count: usize,
+    pub(crate) metadata_record_count: usize,
+    pub(crate) applications: Vec<NsldMachOArm64RelocationApplication>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldExecutableFinalizerInputSummary {
     pub(crate) contract: String,
     pub(crate) status: String,
@@ -246,6 +287,7 @@ pub(crate) struct NsldExecutableFinalizerInputSummary {
     pub(crate) unresolved_external_symbol_count: usize,
     pub(crate) unresolved_external_symbols: Vec<String>,
     pub(crate) placement_binding: NsldMachOPlacementBindingReport,
+    pub(crate) relocation_application: NsldMachOArm64RelocationApplicationReport,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

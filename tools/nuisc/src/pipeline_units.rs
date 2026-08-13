@@ -411,7 +411,8 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         }
         NirExpr::CpuExternCall { args, .. }
         | NirExpr::CpuExternCallI32 { args, .. }
-        | NirExpr::CpuExternCallOwnedBuffer { args, .. } => {
+        | NirExpr::CpuExternCallOwnedBuffer { args, .. }
+        | NirExpr::CpuExternCallOwnedUtf8 { args, .. } => {
             for arg in args {
                 collect_instantiated_units_expr(arg, units);
             }

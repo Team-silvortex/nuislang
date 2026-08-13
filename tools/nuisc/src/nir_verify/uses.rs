@@ -181,7 +181,8 @@ pub(super) fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Resu
         | NirExpr::CpuMutexCapability { args, .. }
         | NirExpr::CpuExternCall { args, .. }
         | NirExpr::CpuExternCallI32 { args, .. }
-        | NirExpr::CpuExternCallOwnedBuffer { args, .. } => {
+        | NirExpr::CpuExternCallOwnedBuffer { args, .. }
+        | NirExpr::CpuExternCallOwnedUtf8 { args, .. } => {
             for arg in args {
                 verify_expr_uses(arg, moved)?;
             }

@@ -29,7 +29,7 @@ fn official_cffi_registry_exposes_hash_bound_memory_contracts() {
 
     let capabilities = view.memory_capabilities("libc", "puts", &signature_hash);
 
-    assert_eq!(manifest.host_ffi_memory_capabilities.len(), 6);
+    assert_eq!(manifest.host_ffi_memory_capabilities.len(), 7);
     assert_eq!(capabilities.len(), 1);
     assert_eq!(capabilities[0].kind, HostFfiMemoryKind::BorrowedUtf8);
     assert_eq!(capabilities[0].slot, HostFfiMemorySlot::Arg(0));
@@ -49,6 +49,19 @@ fn official_cffi_registry_exposes_hash_bound_memory_contracts() {
         owned[0].destructor,
         HostFfiMemoryDestructor::Registered { ref symbol, .. }
             if symbol == "host_owned_buffer_destroy"
+    ));
+
+    let utf8_signature_hash =
+        ffi_symbol_signature_hash("c", "host_owned_utf8_make", "ref_String(i64)");
+    let utf8 = view.memory_capabilities("c", "host_owned_utf8_make", &utf8_signature_hash);
+    assert_eq!(utf8.len(), 1);
+    assert_eq!(utf8[0].kind, HostFfiMemoryKind::OwnedReturnUtf8);
+    assert_eq!(utf8[0].slot, HostFfiMemorySlot::Return);
+    assert_eq!(utf8[0].mutability, "read_only");
+    assert!(matches!(
+        utf8[0].destructor,
+        HostFfiMemoryDestructor::Registered { ref symbol, .. }
+            if symbol == "host_owned_utf8_destroy"
     ));
 }
 

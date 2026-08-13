@@ -196,6 +196,7 @@ fn accepts_registered_libc_demo_signatures() {
     compiled_source("../../examples/ns/ffi/owned_return_buffer_select_demo.ns");
     compiled_source("../../examples/ns/ffi/owned_return_buffer_helper_demo.ns");
     compiled_source("../../examples/ns/ffi/owned_return_buffer_nested_helper_demo.ns");
+    compiled_source("../../examples/ns/ffi/owned_return_utf8_demo.ns");
 }
 
 #[test]

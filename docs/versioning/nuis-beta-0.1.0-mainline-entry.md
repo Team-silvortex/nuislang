@@ -486,6 +486,36 @@ emission remain open. With Nsld at `usable/96`, deterministic tensor selection
 returns to `host-compatibility/cffi/registered-pointer-string-object-boundary`
 at `usable/95`.
 
+The owned UTF-8 return tranche advances that CFFI coordinate to `usable/97`.
+`official.cffi` now registers seven real memory capabilities: five borrowed
+UTF-8 parameters, one owned `ref Buffer` return, and one owned read-only
+`ref String` return. The String lane has a distinct
+`nuis-ffi-owned-utf8-v1` contract, dedicated Res-producing NIR/YIR operation,
+runtime header and encoding validation, bounded byte reads, static destructor
+identity, and one exact same-function release. Missing or duplicate cleanup,
+writes, helper/branch transfer, recursion, loops, tasks, and async escape fail
+closed. The native example reads a multibyte value, releases it, observes zero
+live owners, and exits `0`. Deterministic tensor selection therefore moves to
+`linker-toolchain/nsld/os-native-executable-finalization` at `usable/96`.
+
+The ARM64 relocation-application tranche advances Nsld to `usable/98`.
+`nuis-nsld-macho-arm64-relocation-application-v1` consumes only verified object
+records and `nuis-nsld-macho-placement-binding-v1`, then maps every relocation
+to deterministic source and target output offsets. A static fail-closed registry
+covers the eight relocation kinds emitted by the real Nuisc program/runtime
+objects, preserves ADDEND and SUBTRACTOR pair identity, decodes explicit
+addends, and keeps direct writes, platform-structure work, and metadata records
+separate. Its canonical hash is bound to the placement plan, and JSON, CLI text,
+and persisted invoke plans expose the same full record set. Focused malformed
+shape tests and a real-object regression prove complete relocation coverage.
+
+This is still a plan rather than a linker write pass: merged section-byte
+construction, checked instruction encoding, common-symbol allocation,
+GOT/stubs, Mach-O load commands, and independent executable-shell emission
+remain open. The runnable route still installs the embedded compatibility
+image. With Nsld at `usable/98`, deterministic tensor selection moves to
+`package-system/galaxy/source-import-and-lock-resolution` at `usable/96`.
+
 ## Honesty Boundary
 
 `beta-0.1.0` should not claim:

@@ -21,6 +21,10 @@ pub(crate) fn json_isize_field(name: &str, value: isize) -> String {
     format!("\"{name}\":{value}")
 }
 
+pub(crate) fn json_i64_field(name: &str, value: i64) -> String {
+    format!("\"{name}\":{value}")
+}
+
 pub(crate) fn json_optional_usize_field(name: &str, value: Option<usize>) -> String {
     match value {
         Some(value) => json_usize_field(name, value),
@@ -31,6 +35,13 @@ pub(crate) fn json_optional_usize_field(name: &str, value: Option<usize>) -> Str
 pub(crate) fn json_optional_isize_field(name: &str, value: Option<isize>) -> String {
     match value {
         Some(value) => json_isize_field(name, value),
+        None => format!("\"{name}\":null"),
+    }
+}
+
+pub(crate) fn json_optional_i64_field(name: &str, value: Option<i64>) -> String {
+    match value {
+        Some(value) => json_i64_field(name, value),
         None => format!("\"{name}\":null"),
     }
 }

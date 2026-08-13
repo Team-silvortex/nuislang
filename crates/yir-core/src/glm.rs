@@ -191,6 +191,23 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
                 effect: GlmEffect::None,
             }
         }
+        SemanticOp::CpuExternCallOwnedUtf8 => {
+            let inputs = crate::ffi::parse_owned_utf8_return_contract(&op.args)
+                .map(|contract| contract.inputs)
+                .unwrap_or(&[]);
+            GlmNodeProfile {
+                result_class: GlmValueClass::Res,
+                accesses: inputs
+                    .iter()
+                    .map(|input| GlmAccess {
+                        input: input.clone(),
+                        class: GlmValueClass::Val,
+                        mode: GlmUseMode::Read,
+                    })
+                    .collect(),
+                effect: GlmEffect::None,
+            }
+        }
         _ if op.module == "cpu" && op.instruction == "call_owned_external_buffer" => {
             let inputs = crate::ffi::parse_owned_buffer_function_transfer_contract(&op.args[1..])
                 .map(|contract| contract.inputs)

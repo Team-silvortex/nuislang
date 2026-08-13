@@ -115,6 +115,24 @@ const FFI_SMOKE_CASES: &[FfiSmokeCase] = &[
         expect_manifest: false,
     },
     FfiSmokeCase {
+        name: "owned_return_utf8_demo",
+        source: "../../examples/ns/ffi/owned_return_utf8_demo.ns",
+        artifact: "owned_return_utf8_demo",
+        yir_contains: &[
+            "extern_call_owned_utf8",
+            "nuis-ffi-owned-utf8-v1",
+            "host_owned_utf8_destroy",
+        ],
+        llvm_contains: &[
+            "call ptr @host_owned_utf8_make(i64",
+            "call i64 @nuis_host_owned_utf8_validate_v1(ptr",
+            "getelementptr inbounds i8, ptr",
+            "call i64 @host_owned_utf8_destroy(ptr",
+        ],
+        stdout_contains: &["exit_status: 0"],
+        expect_manifest: false,
+    },
+    FfiSmokeCase {
         name: "owned_return_buffer_select_demo",
         source: "../../examples/ns/ffi/owned_return_buffer_select_demo.ns",
         artifact: "owned_return_buffer_select_demo",

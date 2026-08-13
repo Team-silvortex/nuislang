@@ -110,6 +110,26 @@ pub(crate) fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String>
                 );
                 values.insert(node.name.clone(), PointerState::Owned(id));
             }
+            "extern_call_owned_utf8" => {
+                yir_core::ffi::parse_owned_utf8_return_contract(&node.op.args).map_err(
+                    |error| {
+                        format!(
+                            "node `{}` cannot establish registered owned UTF-8 authority: {error}",
+                            node.name
+                        )
+                    },
+                )?;
+                let id = next_id;
+                next_id += 1;
+                heap.insert(
+                    id,
+                    HeapBinding {
+                        live: true,
+                        kind: HeapObjectKind::Utf8 { len: None },
+                    },
+                );
+                values.insert(node.name.clone(), PointerState::Owned(id));
+            }
             "call_owned_external_buffer" => {
                 yir_core::ffi::parse_owned_buffer_function_transfer_contract(&node.op.args[1..])
                     .map_err(|error| {
@@ -246,6 +266,12 @@ pub(crate) fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String>
                                     node.name
                                 ));
                             }
+                            Some(HeapObjectKind::Utf8 { .. }) => {
+                                return Err(format!(
+                                    "node `{}` uses UTF-8 object `&{id}` as linked-list node",
+                                    node.name
+                                ));
+                            }
                             None => PointerState::Unknown,
                         }
                     }
@@ -292,6 +318,12 @@ pub(crate) fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String>
                             HeapObjectKind::Buffer { .. } => {
                                 return Err(format!(
                                     "node `{}` uses buffer object `&{id}` as linked-list node",
+                                    node.name
+                                ));
+                            }
+                            HeapObjectKind::Utf8 { .. } => {
+                                return Err(format!(
+                                    "node `{}` uses UTF-8 object `&{id}` as linked-list node",
                                     node.name
                                 ));
                             }
@@ -393,6 +425,7 @@ fn verify_owned_pointer_branch_merge(
                         (address_kind, heap.get(&id).map(|binding| binding.kind)),
                         ("node", Some(HeapObjectKind::Node { .. }))
                             | ("buffer", Some(HeapObjectKind::Buffer { .. }))
+                            | ("utf8", Some(HeapObjectKind::Utf8 { .. }))
                     );
                     if !kind_matches {
                         return Err(format!(

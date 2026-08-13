@@ -18,6 +18,57 @@ pub(super) fn lower_text_call(
         struct_table,
     } = context;
     match callee {
+        "owned_utf8_len" => {
+            if !is_host_execution_domain(current_domain) {
+                return Err(
+                    "owned_utf8_len(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
+                );
+            }
+            let [text] = args else {
+                return Err("owned_utf8_len(...) expects 1 arg".to_owned());
+            };
+            let lowered = lower_expr(
+                text,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("String")),
+            )?;
+            Ok(Some(NirExpr::BufferLen(Box::new(lowered))))
+        }
+        "owned_utf8_byte_at" => {
+            if !is_host_execution_domain(current_domain) {
+                return Err(
+                    "owned_utf8_byte_at(...) requires a host execution module (`mod cpu` or `mod cffi`)"
+                        .to_owned(),
+                );
+            }
+            let [text, index] = args else {
+                return Err("owned_utf8_byte_at(...) expects 2 args".to_owned());
+            };
+            let text = lower_expr(
+                text,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&ref_type("String")),
+            )?;
+            let index = lower_expr(
+                index,
+                current_domain,
+                bindings,
+                signatures,
+                struct_table,
+                Some(&i64_type()),
+            )?;
+            Ok(Some(NirExpr::LoadAt {
+                buffer: Box::new(text),
+                index: Box::new(index),
+            }))
+        }
         "deserialize_text_equals" => {
             if !is_host_execution_domain(current_domain) {
                 return Err(

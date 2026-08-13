@@ -170,6 +170,21 @@ fn validate_extern_memory_capabilities(
             ));
         }
     }
+    if function.return_type.name == "String"
+        && function.return_type.is_ref
+        && !function.return_type.is_optional
+    {
+        let registered = capabilities.iter().any(|capability| {
+            capability.kind == HostFfiMemoryKind::OwnedReturnUtf8
+                && capability.slot == HostFfiMemorySlot::Return
+        });
+        if !registered {
+            return Err(format!(
+                "extern `{}` ABI `{}` symbol `{symbol}` ref String return requires a hash-bound `owned_return_utf8` host FFI memory capability before lowering",
+                function.name, function.abi
+            ));
+        }
+    }
     Ok(())
 }
 

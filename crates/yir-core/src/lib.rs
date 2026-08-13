@@ -60,6 +60,7 @@ pub enum SemanticOp {
     CpuStoreAt,
     CpuFree,
     CpuExternCallOwnedBuffer,
+    CpuExternCallOwnedUtf8,
     CpuJoin,
     CpuCancel,
     CpuTimeout,

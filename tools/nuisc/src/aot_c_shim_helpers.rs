@@ -149,7 +149,11 @@ pub(crate) fn collect_host_ffi_symbols(ast: &AstModule) -> BTreeMap<String, AstE
         if function.name.starts_with("host_")
             && !matches!(
                 function.name.as_str(),
-                "host_owned_buffer_make" | "host_owned_buffer_destroy"
+                "host_owned_buffer_make"
+                    | "host_owned_buffer_destroy"
+                    | "host_owned_utf8_make"
+                    | "host_owned_utf8_destroy"
+                    | "host_owned_utf8_live_count"
             )
         {
             out.insert(function.name.clone(), function.clone());

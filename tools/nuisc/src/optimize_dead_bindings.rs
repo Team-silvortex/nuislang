@@ -426,6 +426,7 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         | NirExpr::CpuExternCall { args, .. }
         | NirExpr::CpuExternCallI32 { args, .. }
         | NirExpr::CpuExternCallOwnedBuffer { args, .. }
+        | NirExpr::CpuExternCallOwnedUtf8 { args, .. }
         | NirExpr::Call { args, .. } => {
             for arg in args {
                 collect_used_vars_expr(arg, out);

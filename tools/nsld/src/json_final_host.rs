@@ -214,8 +214,64 @@ fn finalizer_input_summary_json(summary: Option<&NsldExecutableFinalizerInputSum
             &summary.unresolved_external_symbols,
         ),
         macho_placement_binding_json(&summary.placement_binding),
+        macho_relocation_application_json(&summary.relocation_application),
     ];
     format!("\"finalizer_input_summary\":{{{}}}", fields.join(","))
+}
+
+fn macho_relocation_application_json(report: &NsldMachOArm64RelocationApplicationReport) -> String {
+    let applications = report
+        .applications
+        .iter()
+        .map(|item| {
+            let fields = [
+                json_string_field("relocation_id", &item.relocation_id),
+                json_string_field("object_id", &item.object_id),
+                json_string_field("object_role", &item.object_role),
+                json_usize_field("input_section_ordinal", item.input_section_ordinal),
+                json_string_field("source_section_id", &item.source_section_id),
+                json_usize_field("source_offset", item.source_offset),
+                json_usize_field("source_output_offset", item.source_output_offset),
+                json_usize_field("width_bytes", item.width_bytes),
+                json_bool_field("pc_relative", item.pc_relative),
+                json_bool_field("external", item.external),
+                json_usize_field("relocation_type", item.relocation_type as usize),
+                json_string_field("relocation_kind", &item.relocation_kind),
+                json_string_field("action_kind", &item.action_kind),
+                json_optional_string_field("target_symbol", item.target_symbol.as_deref()),
+                json_optional_usize_field("target_symbol_index", item.target_symbol_index),
+                json_optional_string_field("target_object_id", item.target_object_id.as_deref()),
+                json_optional_string_field("target_section_id", item.target_section_id.as_deref()),
+                json_optional_usize_field("target_output_offset", item.target_output_offset),
+                json_optional_i64_field("explicit_addend", item.explicit_addend),
+                json_optional_string_field(
+                    "pair_relocation_id",
+                    item.pair_relocation_id.as_deref(),
+                ),
+                json_string_field("resolver_status", &item.resolver_status),
+                json_string_field("application_status", &item.application_status),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    let fields = [
+        json_string_field("contract", &report.contract),
+        json_string_field("status", &report.status),
+        json_string_field("plan_hash", &report.plan_hash),
+        json_string_field("placement_plan_hash", &report.placement_plan_hash),
+        json_usize_field("relocation_count", report.relocation_count),
+        json_usize_field("registered_kind_count", report.registered_kind_count),
+        json_usize_field("ready_application_count", report.ready_application_count),
+        json_usize_field("platform_structure_count", report.platform_structure_count),
+        json_usize_field(
+            "external_compatibility_count",
+            report.external_compatibility_count,
+        ),
+        json_usize_field("metadata_record_count", report.metadata_record_count),
+        format!("\"applications\":[{applications}]"),
+    ];
+    format!("\"relocation_application\":{{{}}}", fields.join(","))
 }
 
 fn macho_placement_binding_json(report: &NsldMachOPlacementBindingReport) -> String {

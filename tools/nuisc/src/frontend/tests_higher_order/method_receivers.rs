@@ -211,7 +211,7 @@ fn lowers_method_call_lambda_when_receiver_comes_from_if_expr() {
 
           fn main() -> i64 {
             let pick_left = true;
-            let host = if pick_left {
+            let host: Host = if pick_left {
               Host {}
             } else {
               Host {}
@@ -265,7 +265,7 @@ fn lowers_method_call_lambda_when_receiver_comes_from_match_expr() {
 
           fn main() -> i64 {
             let choice: i64 = 1;
-            let host = match choice {
+            let host: Host = match choice {
               1 => {
                 Host {}
               }

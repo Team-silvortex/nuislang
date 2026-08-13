@@ -73,6 +73,18 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     assert!(invoke_plan.contains("\"symbol_binding_count\":2"));
     assert!(invoke_plan.contains("\"internally_bound_symbol_count\":1"));
     assert!(invoke_plan.contains("\"external_compatibility_symbol_count\":1"));
+    assert!(
+        invoke_plan.contains("\"contract\":\"nuis-nsld-macho-arm64-relocation-application-v1\"")
+    );
+    assert!(invoke_plan.contains("\"status\":\"planned-with-platform-structure-boundary\""));
+    assert!(invoke_plan.contains("\"relocation_count\":2"));
+    assert!(invoke_plan.contains("\"registered_kind_count\":1"));
+    assert!(invoke_plan.contains("\"ready_application_count\":1"));
+    assert!(invoke_plan.contains("\"platform_structure_count\":1"));
+    assert!(invoke_plan.contains("\"relocation_kind\":\"arm64-branch26\""));
+    assert!(invoke_plan.contains("\"action_kind\":\"rewrite-branch26\""));
+    assert!(invoke_plan.contains("\"source_output_offset\":0"));
+    assert!(invoke_plan.contains("\"target_symbol\":\"_nuis_runtime\""));
     assert!(invoke_plan
         .contains("\"symbol\":\"_nuis_runtime\",\"reference_object_id\":\"host.program-llvm\""));
     assert!(invoke_plan.contains("\"target_object_id\":\"host.runtime-shim\""));
@@ -83,6 +95,10 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     assert!(invoke_plan_text
         .contains("finalizer_input_placement_contract: nuis-nsld-macho-placement-binding-v1"));
     assert!(invoke_plan_text.contains(
+        "finalizer_input_relocation_application_contract: nuis-nsld-macho-arm64-relocation-application-v1"
+    ));
+    assert!(invoke_plan_text.contains("finalizer_input_relocation_application_count: 2"));
+    assert!(invoke_plan_text.contains(
         "finalizer_input_symbol_binding: symbol=_nuis_runtime reference=host.program-llvm:1 status=internal"
     ));
     assert!(persisted_invoke_plan
@@ -90,6 +106,11 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     assert!(persisted_invoke_plan.contains("finalizer_input_merged_section_count = 1"));
     assert!(persisted_invoke_plan.contains("finalizer_input_section_placement_count = 2"));
     assert!(persisted_invoke_plan.contains("finalizer_input_symbol_binding_count = 2"));
+    assert!(persisted_invoke_plan.contains(
+        "finalizer_input_relocation_application_contract = \"nuis-nsld-macho-arm64-relocation-application-v1\""
+    ));
+    assert!(persisted_invoke_plan.contains("finalizer_input_relocation_application_count = 2"));
+    assert!(persisted_invoke_plan.contains("arm64-branch26|rewrite-branch26"));
     assert!(invoke_plan.contains("\"invocation_kind\":\"registered-internal-finalizer\""));
     assert!(invoke_plan.contains("\"invocation_policy\":\"registered-internal\""));
     assert!(invoke_plan.contains("\"requires_explicit_allow\":false"));

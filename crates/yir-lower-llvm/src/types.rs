@@ -43,6 +43,13 @@ pub(crate) enum LlvmValueRef {
         destructor: String,
         destructor_signature_hash: String,
     },
+    OwnedExternalUtf8 {
+        ptr: String,
+        len: String,
+        abi: String,
+        destructor: String,
+        destructor_signature_hash: String,
+    },
     TextHandle {
         ptr: String,
         handle: String,

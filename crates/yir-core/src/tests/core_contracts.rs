@@ -65,6 +65,48 @@ fn glm_profiles_owned_ffi_buffer_as_resource_with_only_real_inputs() {
 }
 
 #[test]
+fn glm_profiles_owned_ffi_utf8_as_distinct_resource() {
+    let signature = "ref_String(i64)";
+    let signature_hash =
+        crate::ffi::ffi_symbol_signature_hash("c", "host_owned_utf8_make", signature);
+    let destructor_hash = crate::ffi::ffi_symbol_signature_hash(
+        "c",
+        "host_owned_utf8_destroy",
+        crate::ffi::OWNED_UTF8_DESTRUCTOR_SIGNATURE,
+    );
+    let descriptor =
+        crate::ffi::owned_utf8_return_descriptor("host_owned_utf8_destroy", &destructor_hash);
+    let capability_hash = crate::ffi::ffi_memory_capability_hash(
+        "c",
+        "host_owned_utf8_make",
+        &signature_hash,
+        &descriptor,
+    );
+    let op = Operation::parse(
+        "cpu.extern_call_owned_utf8",
+        vec![
+            crate::ffi::OWNED_UTF8_RETURN_PROTOCOL.to_owned(),
+            "c".to_owned(),
+            "host_owned_utf8_make".to_owned(),
+            signature.to_owned(),
+            signature_hash,
+            capability_hash,
+            crate::ffi::OWNED_UTF8_RETURN_LENGTH_POLICY.to_owned(),
+            "host_owned_utf8_destroy".to_owned(),
+            destructor_hash,
+            "seed".to_owned(),
+        ],
+    )
+    .unwrap();
+    let profile = crate::glm_profile_for_operation(&op);
+
+    assert_eq!(op.semantic_op(), SemanticOp::CpuExternCallOwnedUtf8);
+    assert_eq!(op.cpu_llvm_lowering_class(), CpuLlvmLoweringClass::Runtime);
+    assert_eq!(profile.result_class, GlmValueClass::Res);
+    assert_eq!(profile.accesses[0].input, "seed");
+}
+
+#[test]
 fn glm_profiles_owned_bytes_select_as_conditional_ownership_transfer() {
     let op = Operation::parse(
         "cpu.select_owned_bytes",

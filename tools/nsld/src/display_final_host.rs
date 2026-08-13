@@ -342,6 +342,80 @@ fn print_finalizer_input_summary(summary: Option<&NsldExecutableFinalizerInputSu
                 .unwrap_or_else(|| "none".to_owned())
         );
     }
+    let relocation = &summary.relocation_application;
+    println!(
+        "  finalizer_input_relocation_application_contract: {}",
+        relocation.contract
+    );
+    println!(
+        "  finalizer_input_relocation_application_status: {}",
+        relocation.status
+    );
+    println!(
+        "  finalizer_input_relocation_application_plan_hash: {}",
+        relocation.plan_hash
+    );
+    println!(
+        "  finalizer_input_relocation_application_placement_plan_hash: {}",
+        relocation.placement_plan_hash
+    );
+    println!(
+        "  finalizer_input_relocation_application_count: {}",
+        relocation.relocation_count
+    );
+    println!(
+        "  finalizer_input_relocation_application_registered_kind_count: {}",
+        relocation.registered_kind_count
+    );
+    println!(
+        "  finalizer_input_relocation_application_ready_count: {}",
+        relocation.ready_application_count
+    );
+    println!(
+        "  finalizer_input_relocation_application_platform_structure_count: {}",
+        relocation.platform_structure_count
+    );
+    println!(
+        "  finalizer_input_relocation_application_external_compatibility_count: {}",
+        relocation.external_compatibility_count
+    );
+    println!(
+        "  finalizer_input_relocation_application_metadata_record_count: {}",
+        relocation.metadata_record_count
+    );
+    for item in &relocation.applications {
+        println!(
+            "  finalizer_input_relocation_application: id={} object={} role={} section_ordinal={} source_section={} source_offset={} output_offset={} width={} pcrel={} external={} type={} kind={} action={} target={} target_index={} target_object={} target_section={} target_offset={} addend={} pair={} resolver={} status={}",
+            item.relocation_id,
+            item.object_id,
+            item.object_role,
+            item.input_section_ordinal,
+            item.source_section_id,
+            item.source_offset,
+            item.source_output_offset,
+            item.width_bytes,
+            item.pc_relative,
+            item.external,
+            item.relocation_type,
+            item.relocation_kind,
+            item.action_kind,
+            item.target_symbol.as_deref().unwrap_or("none"),
+            item.target_symbol_index
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "none".to_owned()),
+            item.target_object_id.as_deref().unwrap_or("none"),
+            item.target_section_id.as_deref().unwrap_or("none"),
+            item.target_output_offset
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "none".to_owned()),
+            item.explicit_addend
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "none".to_owned()),
+            item.pair_relocation_id.as_deref().unwrap_or("none"),
+            item.resolver_status,
+            item.application_status
+        );
+    }
 }
 
 pub(crate) fn print_nsld_final_executable_host_invoke_plan_emit_report(

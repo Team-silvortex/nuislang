@@ -59,6 +59,9 @@ impl Operation {
             (OperationDomainFamily::Cpu, "extern_call_owned_buffer") => {
                 SemanticOp::CpuExternCallOwnedBuffer
             }
+            (OperationDomainFamily::Cpu, "extern_call_owned_utf8") => {
+                SemanticOp::CpuExternCallOwnedUtf8
+            }
             (OperationDomainFamily::Cpu, "join") | (OperationDomainFamily::Cpu, "thread_join") => {
                 SemanticOp::CpuJoin
             }
@@ -304,6 +307,7 @@ impl Operation {
             | "extern_call_i64"
             | "extern_call_i32"
             | "extern_call_owned_buffer"
+            | "extern_call_owned_utf8"
             | "param_bool"
             | "param_i32"
             | "param_i64"

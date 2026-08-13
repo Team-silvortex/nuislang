@@ -276,7 +276,8 @@ pub(super) fn verify_expr_tree(
         | NirExpr::CpuMutexCapability { args, .. }
         | NirExpr::CpuExternCall { args, .. }
         | NirExpr::CpuExternCallI32 { args, .. }
-        | NirExpr::CpuExternCallOwnedBuffer { args, .. } => verify_expr_sequence(
+        | NirExpr::CpuExternCallOwnedBuffer { args, .. }
+        | NirExpr::CpuExternCallOwnedUtf8 { args, .. } => verify_expr_sequence(
             args.iter(),
             moved,
             borrows,

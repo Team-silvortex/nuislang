@@ -54,6 +54,9 @@ Host bridge ladder:
 * [owned_return_buffer_nested_helper_demo.ns](owned_return_buffer_nested_helper_demo.ns)
   moves the same owner through one additional synchronous helper boundary while
   preserving identity and leaving only the entry caller able to release it
+* [owned_return_utf8_demo.ns](owned_return_utf8_demo.ns) validates an
+  exact-registered owned UTF-8 return before byte reads and performs one
+  registered release
 
 Runnable libc smoke:
 
@@ -92,6 +95,9 @@ cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
   "$TMPDIR/nuis_owned_return_buffer_nested_helper_demo"
 cargo run -p nuis -- run-artifact \
   "$TMPDIR/nuis_owned_return_buffer_nested_helper_demo"
+cargo run -p nuis -- build --cpu-abi cpu.arm64.apple_aapcs64 \
+  examples/ns/ffi/owned_return_utf8_demo.ns "$TMPDIR/nuis_owned_return_utf8_demo"
+cargo run -p nuis -- run-artifact "$TMPDIR/nuis_owned_return_utf8_demo"
 ```
 
 Task/runtime ladder:

@@ -128,12 +128,11 @@ pub(super) fn ensure_buffer_index_in_bounds(
         PointerState::Null | PointerState::Unknown => return Ok(()),
     };
 
-    if let Some(HeapBinding {
-        kind: HeapObjectKind::Buffer { len: Some(len) },
-        ..
-    }) = heap.get(&object_id)
-    {
-        if index >= *len {
+    if let Some(len) = heap.get(&object_id).and_then(|binding| match binding.kind {
+        HeapObjectKind::Buffer { len } | HeapObjectKind::Utf8 { len } => len,
+        HeapObjectKind::Node { .. } => None,
+    }) {
+        if index >= len {
             return Err(format!(
                 "node `{}` indexes buffer `&{object_id}` out of bounds: index {} >= len {}",
                 node.name, index, len
@@ -212,6 +211,10 @@ pub(super) fn ensure_node_readable(
                     "node `{}` uses buffer object `&{id}` as linked-list node",
                     node.name
                 )),
+                Some(HeapObjectKind::Utf8 { .. }) => Err(format!(
+                    "node `{}` uses UTF-8 object `&{id}` as linked-list node",
+                    node.name
+                )),
                 None => Ok(()),
             }
         }
@@ -233,6 +236,10 @@ pub(super) fn ensure_node_writable(
                 "node `{}` uses buffer object `&{id}` as linked-list node",
                 node.name
             )),
+            Some(HeapObjectKind::Utf8 { .. }) => Err(format!(
+                "node `{}` uses UTF-8 object `&{id}` as linked-list node",
+                node.name
+            )),
             None => Ok(()),
         },
         PointerState::Borrowed(_) | PointerState::Null | PointerState::Unknown => Ok(()),
@@ -248,7 +255,7 @@ pub(super) fn ensure_buffer_readable(
         PointerState::Owned(id) | PointerState::Borrowed(id) => {
             ensure_live_heap(heap, id, node)?;
             match heap.get(&id).map(|binding| binding.kind) {
-                Some(HeapObjectKind::Buffer { .. }) => Ok(()),
+                Some(HeapObjectKind::Buffer { .. }) | Some(HeapObjectKind::Utf8 { .. }) => Ok(()),
                 Some(HeapObjectKind::Node { .. }) => Err(format!(
                     "node `{}` uses linked-list node `&{id}` as buffer",
                     node.name
@@ -273,6 +280,10 @@ pub(super) fn ensure_buffer_writable(
             ensure_no_active_borrows(borrow_counts, id, node, "write")?;
             match heap.get(&id).map(|binding| binding.kind) {
                 Some(HeapObjectKind::Buffer { .. }) => Ok(()),
+                Some(HeapObjectKind::Utf8 { .. }) => Err(format!(
+                    "node `{}` writes through read-only UTF-8 object `&{id}`",
+                    node.name
+                )),
                 Some(HeapObjectKind::Node { .. }) => Err(format!(
                     "node `{}` uses linked-list node `&{id}` as buffer",
                     node.name
@@ -283,6 +294,10 @@ pub(super) fn ensure_buffer_writable(
         PointerState::Borrowed(id) => match heap.get(&id).map(|binding| binding.kind) {
             Some(HeapObjectKind::Buffer { .. }) => Err(format!(
                 "node `{}` writes through borrowed pointer",
+                node.name
+            )),
+            Some(HeapObjectKind::Utf8 { .. }) => Err(format!(
+                "node `{}` writes through read-only UTF-8 object `&{id}`",
                 node.name
             )),
             Some(HeapObjectKind::Node { .. }) => Err(format!(

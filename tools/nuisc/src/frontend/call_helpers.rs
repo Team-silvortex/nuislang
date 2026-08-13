@@ -236,6 +236,10 @@ pub(super) fn is_owned_extern_buffer_return(signature: &FunctionSignature) -> bo
     signature.return_type.as_ref() == Some(&buffer_ref_type())
 }
 
+pub(super) fn is_owned_extern_utf8_return(signature: &FunctionSignature) -> bool {
+    signature.return_type.as_ref() == Some(&string_ref_type())
+}
+
 pub(super) fn extern_signature_pattern(signature: &FunctionSignature) -> String {
     let return_type = signature
         .return_type
@@ -326,6 +330,15 @@ fn i64_host_value_type() -> NirTypeRef {
 fn buffer_ref_type() -> NirTypeRef {
     NirTypeRef {
         name: "Buffer".to_owned(),
+        generic_args: vec![],
+        is_optional: false,
+        is_ref: true,
+    }
+}
+
+fn string_ref_type() -> NirTypeRef {
+    NirTypeRef {
+        name: "String".to_owned(),
         generic_args: vec![],
         is_optional: false,
         is_ref: true,

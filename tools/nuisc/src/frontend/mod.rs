@@ -107,6 +107,8 @@ mod tests_packet_test_meta;
 #[cfg(test)]
 mod tests_parse_annotations;
 #[cfg(test)]
+mod tests_parse_extern_boundaries;
+#[cfg(test)]
 mod tests_return_inference;
 #[cfg(test)]
 mod tests_test_functions;

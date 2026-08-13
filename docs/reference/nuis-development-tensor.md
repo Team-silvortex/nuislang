@@ -262,9 +262,9 @@ The `beta-0.1` calibration baseline is:
   payloads, per-mutex parking/fairness, and a mature parallel Nuis executor
   remain open
 * `host-compatibility/cffi/registered-pointer-string-object-boundary`:
-  `usable/95`, required and now the current weakest bootstrap task; five real
-  borrowed UTF-8 calls and one owned
-  `ref Buffer` return carry exact signature plus memory-capability hashes
+  `usable/97`, required; five real borrowed UTF-8 calls, one owned
+  `ref Buffer` return, and one owned read-only `ref String` return carry exact
+  signature plus memory-capability hashes
   through compile, project metadata, and Nsld validation; the owned path now
   has self-verifying YIR metadata, runtime-header length recovery, exact
   destructor dispatch, and native execution; one GLM-typed conditional transfer
@@ -273,10 +273,14 @@ The `beta-0.1` calibration baseline is:
   helper may now call one direct owner-producing helper before returning that
   owner to its entry caller through a `{ptr,i64}` runtime ABI; YIR retains
   static ABI/destructor/hash identity across both boundaries and enforces one
-  caller release; a second runtime helper hop, recursion, task/async/loop-carried,
-  raw-pointer, and generalized ownership remain closed
+  caller release; owned UTF-8 has a separate Res-producing operation, runtime
+  validity/length checks, bounded byte reads, one direct exact destructor, and
+  a native zero-live-owner proof; writes and every helper/branch/task/async/loop
+  escape for that String remain closed, as do raw pointers and generalized
+  external objects
 * `package-system/galaxy/source-import-and-lock-resolution`: `usable/96`,
-  required; root and generated build locks now share one portable SHA-256-bound
+  required and now the current weakest bootstrap task; root and generated build
+  locks now share one portable SHA-256-bound
   compiler resolution protocol covering direct/transitive edges, package
   identity, manifest/source/library content, import policy, and actual module
   selection; sync transactionally materializes the verified closure as a
@@ -286,7 +290,7 @@ The `beta-0.1` calibration baseline is:
   requires both lock and synchronized cache before writing outputs; remote
   discovery, solving, trust metadata, transport, and cache collection remain
   open
-* `linker-toolchain/nsld/os-native-executable-finalization`: `usable/96`,
+* `linker-toolchain/nsld/os-native-executable-finalization`: `usable/98`,
   required; a provider-neutral,
   hash-bound static registry now consumes an
   `NHOB`-bound pair of actual
@@ -296,9 +300,14 @@ The `beta-0.1` calibration baseline is:
   merges compatible sections, assigns aligned contribution offsets, binds
   section-backed cross-object definitions, preserves unresolved C/system
   symbols as a compatibility boundary, and rejects duplicate definitions,
-  incompatible flags, and referenced non-section definitions; ARM64 relocation
-  writes, common-symbol allocation, Mach-O shell synthesis, ELF, and PE/COFF
-  remain open
+  incompatible flags, and referenced non-section definitions;
+  `nuis-nsld-macho-arm64-relocation-application-v1` now maps every verified
+  relocation to deterministic source/target offsets, registers all eight kinds
+  emitted by the real fixtures, preserves paired ADDEND/SUBTRACTOR metadata,
+  separates direct and platform-structure work, fails closed on unknown kinds,
+  and projects one placement-bound plan through JSON, text, and persisted invoke
+  plans; byte encoding, common-symbol allocation, GOT/stubs, Mach-O shell
+  synthesis, ELF, and PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

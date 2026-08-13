@@ -1,0 +1,15 @@
+mod cffi Main {
+  extern "c" fn host_owned_utf8_make(seed: i64) -> ref String;
+  extern "c" fn host_owned_utf8_live_count() -> i64;
+
+  fn main() -> i64 {
+    let text: ref String = host_owned_utf8_make(13);
+    let len: i64 = owned_utf8_len(text);
+    let first: i64 = owned_utf8_byte_at(text, 0);
+    let multibyte_head: i64 = owned_utf8_byte_at(text, 5);
+    let multibyte_tail: i64 = owned_utf8_byte_at(text, 6);
+    free(text);
+    let live: i64 = host_owned_utf8_live_count();
+    return len + first + multibyte_head + multibyte_tail + live - 469;
+  }
+}

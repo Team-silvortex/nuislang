@@ -1,6 +1,7 @@
 use crate::{
     final_executable_macho_input::parse_macho_arm64_object_linkage,
     final_executable_macho_layout::{build_macho_placement_binding_report, MachOLayoutObject},
+    final_executable_macho_relocation::build_macho_arm64_relocation_application_report,
     reports::NsldExecutableFinalizerInputSummary,
 };
 use std::collections::BTreeSet;
@@ -99,6 +100,14 @@ pub(crate) fn summarize_macho_host_object_handoff(
         })
         .collect::<Vec<_>>();
     let placement_binding = build_macho_placement_binding_report(&placement_inputs)?;
+    let relocation_application =
+        build_macho_arm64_relocation_application_report(&placement_inputs, &placement_binding)?;
+    if relocation_application.relocation_count != relocation_count {
+        return Err(format!(
+            "Mach-O relocation application coverage drift: parsed={relocation_count}, planned={}",
+            relocation_application.relocation_count
+        ));
+    }
     Ok(NsldExecutableFinalizerInputSummary {
         contract: MACHO_HOST_OBJECT_LINKAGE_CONTRACT.to_owned(),
         status: status.to_owned(),
@@ -112,6 +121,7 @@ pub(crate) fn summarize_macho_host_object_handoff(
         unresolved_external_symbol_count: unresolved_external_symbols.len(),
         unresolved_external_symbols,
         placement_binding,
+        relocation_application,
     })
 }
 

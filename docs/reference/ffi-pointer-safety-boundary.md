@@ -35,6 +35,8 @@ Stable source-facing FFI should be read as:
   surfaces
 * one exact-whitelisted owned `ref Buffer` return whose runtime-header length
   and registered destructor enter the normal GLM ownership pipeline
+* one exact-whitelisted owned `ref String` return whose UTF-8 validity, byte
+  length, read-only access, and registered destructor are checked end to end
 
 Host FFI is also registered through `nustar`.
 
@@ -93,7 +95,7 @@ The descriptor has one canonical field order:
 
 `kind=<kind>,slot=<slot>,length=<policy>,mutability=<policy>,lifetime=<policy>,destructor=<authority>`
 
-The first two admitted capability shapes are deliberately closed sets:
+The first three admitted capability shapes are deliberately closed sets:
 
 * `borrowed_utf8` must target a real `String` argument, use
   `length=nul_terminated`, `mutability=read_only`, `lifetime=call`, and
@@ -101,6 +103,9 @@ The first two admitted capability shapes are deliberately closed sets:
 * `owned_return_buffer` must target a `ref_Buffer` return, use
   `length=runtime_header`, `mutability=unique`, `lifetime=owned`, and name an
   exact registered destructor with signature `i64(ref_Buffer)`
+* `owned_return_utf8` must target a `ref_String` return, use
+  `length=runtime_header`, `mutability=read_only`, `lifetime=owned`, and name an
+  exact registered destructor with signature `i64(ref_String)`
 
 Validation requires the ABI to be declared, the symbol to have an exact
 `ffi_symbol:` signature, both hashes to match, every kind/slot pair to be
@@ -136,10 +141,22 @@ Deeper source chains normalize lower calls by inlining, while loop, task/async,
 recursive runtime transfer, a second helper-to-helper runtime hop,
 secondary-extern, and mixed heap/external-owner escapes remain closed.
 
+Owned UTF-8 uses a separate, intentionally smaller lane.
+`host_owned_utf8_make(i64) -> ref String` is admitted only through its exact
+manifest capability and lowers to `cpu.extern_call_owned_utf8` with
+`nuis-ffi-owned-utf8-v1` metadata. Before source-visible reads, the native
+runtime checks the allocation header, terminator, byte-length bound, and UTF-8
+encoding. `owned_utf8_len(...)` and `owned_utf8_byte_at(...)` provide bounded
+read-only access; mutation is rejected. The post-lowering gate requires all
+reads and one exact registered `free(...)` to remain in the producer function,
+with the release ordered after every read. Missing or duplicate cleanup,
+helper/branch transfer, recursion, loops, tasks, and async escape fail closed.
+The native example reads a multibyte value, releases it once, observes zero
+live owned UTF-8 allocations, and exits `0`.
+
 This is not generalized pointer-return support. It is one owned `ref Buffer`
-contract with a fixed length policy, linear lifetime, one non-recursive
-conditional transfer, and at most one synchronous helper-to-helper hop before
-the helper-to-entry return. A valid manifest still cannot authorize arbitrary
+contract with bounded transfer plus one direct-scope, read-only owned
+`ref String` contract. A valid manifest still cannot authorize arbitrary
 `ref T`, raw `ptr<T>`, retained borrows, recursive or unbounded runtime return
 boundaries, or task-carried host memory.
 
@@ -218,6 +235,8 @@ The narrow buffer bridge means:
   through runtime-header length recovery and one registered destructor
 * one synchronous helper may transfer that exact owner to its entry caller
   through `{ ptr, i64 }`; ABI/destructor/hash identity remains static metadata
+* an exact `owned_return_utf8` capability may return read-only `ref String`, but
+  it remains in one direct function scope and must use its registered destructor
 
 Not currently source-stable:
 
@@ -240,10 +259,11 @@ Current dynamic extern parameter inference is conservative:
 * `extern_call_i32` / `const_i32` / `call_i32` producers can pass `i32`
 * everything else defaults to `i64`
 
-The owned return lane is stricter than that inference. Its dedicated YIR op
-calls the registered producer as `ptr`, traps on null or negative header
-length, records `ptr+len+destructor`, and lowers `cpu.free` to that exact
-destructor rather than libc `free`.
+The owned return lanes are stricter than that inference. Each dedicated YIR op
+calls its registered producer as `ptr`, validates the runtime-header length,
+records `ptr+len+destructor`, and lowers `cpu.free` to that exact destructor
+rather than libc `free`. Owned UTF-8 additionally invokes the fixed runtime
+validator before reads and lowers byte access through checked `i8` loads.
 
 This is an AOT bridge implementation detail, not a source-language raw pointer
 feature.
@@ -258,6 +278,8 @@ The important architectural rule is:
 Current regression anchors:
 
 * [tests.rs](../../crates/yir-lower-llvm/src/tests.rs)
+* [ffi_owned_utf8_compile.rs](../../tools/nuisc/tests/ffi_owned_utf8_compile.rs)
+* [ffi_smoke.rs](../../tools/nuis/tests/ffi_smoke.rs)
 * [ffi_compile.rs](../../tools/nuisc/tests/ffi_compile.rs)
 * [registry_host_ffi_tests.rs](../../tools/nuisc/src/registry_host_ffi_tests.rs)
 * [pipeline_ffi_owned_buffer.rs](../../tools/nuisc/src/pipeline_ffi_owned_buffer.rs)

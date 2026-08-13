@@ -70,6 +70,82 @@ fn lowers_owned_ffi_buffer_header_and_registered_destructor() {
 }
 
 #[test]
+fn lowers_owned_ffi_utf8_validation_byte_read_and_registered_destructor() {
+    let mut module = module_with_cpu0();
+    push_cpu_const_i64(&mut module, "seed", "13");
+    let signature = "ref_String(i64)";
+    let signature_hash =
+        yir_core::ffi::ffi_symbol_signature_hash("c", "host_owned_utf8_make", signature);
+    let destructor_hash = yir_core::ffi::ffi_symbol_signature_hash(
+        "c",
+        "host_owned_utf8_destroy",
+        yir_core::ffi::OWNED_UTF8_DESTRUCTOR_SIGNATURE,
+    );
+    let descriptor =
+        yir_core::ffi::owned_utf8_return_descriptor("host_owned_utf8_destroy", &destructor_hash);
+    let capability_hash = yir_core::ffi::ffi_memory_capability_hash(
+        "c",
+        "host_owned_utf8_make",
+        &signature_hash,
+        &descriptor,
+    );
+    module.nodes.push(Node {
+        name: "owned_text".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: Operation::parse(
+            "cpu.extern_call_owned_utf8",
+            vec![
+                yir_core::ffi::OWNED_UTF8_RETURN_PROTOCOL.to_owned(),
+                "c".to_owned(),
+                "host_owned_utf8_make".to_owned(),
+                signature.to_owned(),
+                signature_hash,
+                capability_hash,
+                yir_core::ffi::OWNED_UTF8_RETURN_LENGTH_POLICY.to_owned(),
+                "host_owned_utf8_destroy".to_owned(),
+                destructor_hash,
+                "seed".to_owned(),
+            ],
+        )
+        .unwrap(),
+    });
+    push_cpu_const_i64(&mut module, "index", "5");
+    push_cpu_node(
+        &mut module,
+        "byte",
+        "cpu.load_at",
+        vec!["owned_text", "index"],
+    );
+    push_cpu_node(&mut module, "release", "cpu.free", vec!["owned_text"]);
+    push_deps(
+        &mut module,
+        &[
+            ("seed", "owned_text"),
+            ("owned_text", "byte"),
+            ("index", "byte"),
+            ("owned_text", "release"),
+        ],
+    );
+    module.edges.push(Edge {
+        kind: EdgeKind::Lifetime,
+        from: "owned_text".to_owned(),
+        to: "release".to_owned(),
+    });
+    module.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: "byte".to_owned(),
+        to: "release".to_owned(),
+    });
+
+    let llvm = emit_module(&module).unwrap();
+    assert!(llvm.contains("declare ptr @host_owned_utf8_make(i64)"));
+    assert!(llvm.contains("call i64 @nuis_host_owned_utf8_validate_v1(ptr"));
+    assert!(llvm.contains("getelementptr inbounds i8, ptr"));
+    assert!(llvm.contains("load i8, ptr"));
+    assert!(llvm.contains("call i64 @host_owned_utf8_destroy(ptr"));
+}
+
+#[test]
 fn emits_dynamic_declare_for_cpu_extern_calls() {
     let mut module = YirModule::new("0.1");
     module.resources.push(Resource {

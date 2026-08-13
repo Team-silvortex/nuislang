@@ -609,4 +609,108 @@ fn render_finalizer_input_summary(
         toml::toml_string_array_literal(&symbol_bindings)
     )
     .unwrap();
+    let relocation = &summary.relocation_application;
+    writeln!(
+        out,
+        "finalizer_input_relocation_application_contract = \"{}\"",
+        toml::escape_toml_string(&relocation.contract)
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_relocation_application_status = \"{}\"",
+        toml::escape_toml_string(&relocation.status)
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_relocation_application_plan_hash = \"{}\"",
+        toml::escape_toml_string(&relocation.plan_hash)
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_relocation_application_placement_plan_hash = \"{}\"",
+        toml::escape_toml_string(&relocation.placement_plan_hash)
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_relocation_application_count = {}",
+        relocation.relocation_count
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_relocation_application_registered_kind_count = {}",
+        relocation.registered_kind_count
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_relocation_application_ready_count = {}",
+        relocation.ready_application_count
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_relocation_application_platform_structure_count = {}",
+        relocation.platform_structure_count
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_relocation_application_external_compatibility_count = {}",
+        relocation.external_compatibility_count
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "finalizer_input_relocation_application_metadata_record_count = {}",
+        relocation.metadata_record_count
+    )
+    .unwrap();
+    let relocation_applications = relocation
+        .applications
+        .iter()
+        .map(|item| {
+            format!(
+                "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+                item.relocation_id,
+                item.object_id,
+                item.object_role,
+                item.input_section_ordinal,
+                item.source_section_id,
+                item.source_offset,
+                item.source_output_offset,
+                item.width_bytes,
+                item.pc_relative,
+                item.external,
+                item.relocation_type,
+                item.relocation_kind,
+                item.action_kind,
+                item.target_symbol.as_deref().unwrap_or("none"),
+                item.target_symbol_index
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "none".to_owned()),
+                item.target_object_id.as_deref().unwrap_or("none"),
+                item.target_section_id.as_deref().unwrap_or("none"),
+                item.target_output_offset
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "none".to_owned()),
+                item.explicit_addend
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "none".to_owned()),
+                item.pair_relocation_id.as_deref().unwrap_or("none"),
+                item.resolver_status,
+                item.application_status
+            )
+        })
+        .collect::<Vec<_>>();
+    writeln!(
+        out,
+        "finalizer_input_relocation_applications = [{}]",
+        toml::toml_string_array_literal(&relocation_applications)
+    )
+    .unwrap();
 }
