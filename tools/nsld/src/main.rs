@@ -77,6 +77,7 @@ mod final_executable_macho_layout;
 mod final_executable_macho_materialization;
 mod final_executable_macho_object;
 mod final_executable_macho_platform;
+mod final_executable_macho_platform_application;
 mod final_executable_macho_relocation;
 mod final_executable_output;
 mod final_executable_output_backend;

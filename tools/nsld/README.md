@@ -142,13 +142,24 @@ working-image-relative offsets with 12-byte/4-aligned stub and 8-byte/8-aligned
 GOT policies, and hashes the registry, layout, targets, bindings, applied image,
 and ledger. Unsupported deferred forms fail closed rather than receiving a
 guessed structure. The report is identical across JSON, text, and persisted
-invoke plans. It allocates structure slots only; no stub/GOT bytes, external
-bind metadata, or load commands are fabricated.
+invoke plans.
+`nuis-nsld-macho-arm64-platform-patch-application-v1` now consumes that exact
+plan, extends the direct-patched image to the checked span, emits standard
+`ADRP x16`/`LDR x16`/`BR x16` 12-byte stubs and 8-byte GOT entries, and rewrites
+every deferred `BRANCH26` or GOT page/pageoff relocation exactly once. Internal
+GOT entries contain audited image-relative targets; unresolved external entries
+remain zero placeholders with explicit symbol-bound bind records. Inherited
+direct spans, structure writes, and deferred patches share a fail-closed
+write-once occupancy map. Plan drift, source drift, malformed instructions,
+overlap, and incomplete coverage block publication. The resulting image and
+ordered write/patch/bind ledgers are projected identically through JSON, text,
+and persisted invoke plans. No Mach-O load commands or executable-shell
+readiness are fabricated.
 A gated host-command provider remains as a fallback; ELF and PE/COFF are
 explicit `registered-not-implemented` providers. This proves relocatable input,
-table parsing, placement, binding, merged-image construction, and complete
-direct relocation encoding plus write-once commitment and deterministic
-GOT/stub allocation, but not platform byte synthesis, common-symbol allocation,
+table parsing, placement, binding, merged-image construction, direct and
+platform relocation encoding, deterministic GOT/stub allocation, platform byte
+synthesis, and unresolved-bind preservation, but not common-symbol allocation
 or complete Mach-O shell emission independently of Nuisc's compatibility link.
 
 ## Current Early-Beta Rule

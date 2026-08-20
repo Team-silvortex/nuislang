@@ -6,6 +6,7 @@ use crate::{
         build_macho_arm64_materialization_preview, MachOImageObject,
     },
     final_executable_macho_platform::build_macho_arm64_platform_structure_plan,
+    final_executable_macho_platform_application::apply_macho_arm64_platform_structure,
     final_executable_macho_relocation::build_macho_arm64_relocation_application_report,
     reports::NsldExecutableFinalizerInputSummary,
 };
@@ -141,6 +142,17 @@ pub(crate) fn summarize_macho_host_object_handoff(
         &relocation_application,
         &applied_image.report,
     )?;
+    let platform_applied_image = apply_macho_arm64_platform_structure(
+        &placement_binding,
+        &relocation_application,
+        &applied_image,
+        &platform_structure_plan,
+    )?;
+    if crate::fnv1a64_hex(&platform_applied_image.bytes)
+        != platform_applied_image.report.platform_image_hash
+    {
+        return Err("Mach-O platform applied image handoff hash drift".to_owned());
+    }
     Ok(NsldExecutableFinalizerInputSummary {
         contract: MACHO_HOST_OBJECT_LINKAGE_CONTRACT.to_owned(),
         status: status.to_owned(),
@@ -158,6 +170,7 @@ pub(crate) fn summarize_macho_host_object_handoff(
         materialization_preview,
         patch_application: applied_image.report,
         platform_structure_plan,
+        platform_patch_application: platform_applied_image.report,
     })
 }
 

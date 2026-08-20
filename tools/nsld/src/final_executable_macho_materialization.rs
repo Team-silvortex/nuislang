@@ -307,6 +307,27 @@ fn encode_patch(
     }
 }
 
+pub(crate) fn encode_macho_arm64_platform_patch(
+    application: &NsldMachOArm64RelocationApplication,
+    source: &[u8],
+    target_output_offset: usize,
+    applications: &BTreeMap<&str, &NsldMachOArm64RelocationApplication>,
+) -> Result<(Vec<u8>, i64), String> {
+    match application.relocation_kind.as_str() {
+        "arm64-branch26" => encode_branch26(application, source, target_output_offset),
+        "arm64-got-load-page21" => {
+            encode_page21(application, source, target_output_offset, applications)
+        }
+        "arm64-got-load-pageoff12" => {
+            encode_pageoff12(application, source, target_output_offset, applications)
+        }
+        other => Err(format!(
+            "Mach-O platform patch `{}` has unsupported kind `{other}`",
+            application.relocation_id
+        )),
+    }
+}
+
 fn encode_unsigned(
     application: &NsldMachOArm64RelocationApplication,
     source: &[u8],

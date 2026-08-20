@@ -158,6 +158,36 @@ pub(crate) const DEV_TENSOR_RUNTIME_NSLD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "nsld-macho-arm64-platform-patch-application-contract",
+        path: "tools/nsld/src/final_executable_macho_platform_application.rs",
+        required_patterns: &[
+            "nuis-nsld-macho-arm64-platform-patch-application-v1",
+            "platform-patches-applied-with-unresolved-binds",
+            "encode_arm64_stub",
+            "arm64-branch-stub",
+            "internal-image-relative-got",
+            "unresolved-external-got-placeholder",
+            "apply_write_once",
+            "platform_application_ledger_hash",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-macho-arm64-platform-patch-three-surface-evidence",
+        path: "tools/nsld/tests/host_finalizer_cli.rs",
+        required_patterns: &[
+            "nuis-nsld-macho-arm64-platform-patch-application-v1",
+            "platform-patches-applied-with-unresolved-binds",
+            "platform_image_span_bytes",
+            "applied_deferred_patch_count",
+            "unresolved_bind_count",
+            "finalizer_input_platform_patch_application_contract",
+            "finalizer_input_platform_write",
+            "finalizer_input_platform_patch",
+            "finalizer_input_platform_bind",
+            "persisted_invoke_plan",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nustar-domain-contract-completeness-status",
         path: "tools/nuisc/src/registry_contract.rs",
         required_patterns: &[

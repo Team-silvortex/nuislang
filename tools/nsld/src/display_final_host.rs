@@ -542,6 +542,72 @@ fn print_finalizer_input_summary(summary: Option<&NsldExecutableFinalizerInputSu
             binding.audit_hash
         );
     }
+    let platform_application = &summary.platform_patch_application;
+    println!(
+        "  finalizer_input_platform_patch_application: contract={} status={} placement_plan_hash={} relocation_plan_hash={} direct_ledger_hash={} platform_plan_hash={} base_image_hash={} platform_image_hash={} ledger_hash={} base_span={} platform_span={} expected={} applied={} stubs={} got={} unresolved_binds={} write_once_spans={}",
+        platform_application.contract,
+        platform_application.status,
+        platform_application.placement_plan_hash,
+        platform_application.relocation_plan_hash,
+        platform_application.direct_patch_application_ledger_hash,
+        platform_application.platform_structure_plan_hash,
+        platform_application.base_applied_image_hash,
+        platform_application.platform_image_hash,
+        platform_application.application_ledger_hash,
+        platform_application.base_image_span_bytes,
+        platform_application.platform_image_span_bytes,
+        platform_application.expected_deferred_patch_count,
+        platform_application.applied_deferred_patch_count,
+        platform_application.stub_write_count,
+        platform_application.got_write_count,
+        platform_application.unresolved_bind_count,
+        platform_application.write_once_span_count
+    );
+    for write in &platform_application.structure_writes {
+        println!(
+            "  finalizer_input_platform_write: id={} target_id={} kind={} symbol={} offset={} width={} encoded={} encoded_hash={} audit_hash={}",
+            write.write_id,
+            write.structure_id,
+            write.write_kind,
+            write.target_symbol,
+            write.output_offset,
+            write.width_bytes,
+            write.encoded_bytes_hex,
+            write.encoded_bytes_hash,
+            write.write_audit_hash
+        );
+    }
+    for patch in &platform_application.patches {
+        println!(
+            "  finalizer_input_platform_patch: relocation={} kind={} source_offset={} width={} target_offset={} addend={} source={} encoded={} source_hash={} encoded_hash={} binding_audit_hash={} write_audit_hash={}",
+            patch.relocation_id,
+            patch.relocation_kind,
+            patch.source_output_offset,
+            patch.width_bytes,
+            patch.patch_target_output_offset,
+            patch.effective_addend,
+            patch.source_bytes_hex,
+            patch.encoded_bytes_hex,
+            patch.source_bytes_hash,
+            patch.encoded_bytes_hash,
+            patch.binding_audit_hash,
+            patch.write_audit_hash
+        );
+    }
+    for bind in &platform_application.bind_records {
+        println!(
+            "  finalizer_input_platform_bind: id={} target_id={} key={} symbol={} got_offset={} width={} placeholder_hash={} status={} audit_hash={}",
+            bind.bind_id,
+            bind.structure_id,
+            bind.target_key,
+            bind.target_symbol,
+            bind.got_output_offset,
+            bind.width_bytes,
+            bind.placeholder_bytes_hash,
+            bind.status,
+            bind.audit_hash
+        );
+    }
 }
 
 fn display_option(value: Option<usize>) -> String {

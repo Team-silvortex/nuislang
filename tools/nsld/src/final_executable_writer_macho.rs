@@ -1,7 +1,7 @@
 use crate::{
     reports::{
         NsldMachOArm64MaterializationPreviewReport, NsldMachOArm64PatchApplicationReport,
-        NsldMachOArm64PlatformStructurePlanReport,
+        NsldMachOArm64PlatformPatchApplicationReport, NsldMachOArm64PlatformStructurePlanReport,
     },
     toml,
 };
@@ -295,6 +295,144 @@ pub(crate) fn render_macho_platform_structure_plan(
         out,
         "finalizer_input_platform_structure_bindings = [{}]",
         toml::toml_string_array_literal(&bindings)
+    )
+    .unwrap();
+}
+
+pub(crate) fn render_macho_platform_patch_application(
+    out: &mut String,
+    report: &NsldMachOArm64PlatformPatchApplicationReport,
+) {
+    let string_fields = [
+        ("contract", report.contract.as_str()),
+        ("status", report.status.as_str()),
+        ("placement_plan_hash", report.placement_plan_hash.as_str()),
+        ("relocation_plan_hash", report.relocation_plan_hash.as_str()),
+        (
+            "direct_patch_application_ledger_hash",
+            report.direct_patch_application_ledger_hash.as_str(),
+        ),
+        (
+            "platform_structure_plan_hash",
+            report.platform_structure_plan_hash.as_str(),
+        ),
+        (
+            "base_applied_image_hash",
+            report.base_applied_image_hash.as_str(),
+        ),
+        ("platform_image_hash", report.platform_image_hash.as_str()),
+        (
+            "application_ledger_hash",
+            report.application_ledger_hash.as_str(),
+        ),
+    ];
+    for (name, value) in string_fields {
+        writeln!(
+            out,
+            "finalizer_input_platform_patch_application_{name} = \"{}\"",
+            toml::escape_toml_string(value)
+        )
+        .unwrap();
+    }
+    let count_fields = [
+        ("base_image_span_bytes", report.base_image_span_bytes),
+        (
+            "platform_image_span_bytes",
+            report.platform_image_span_bytes,
+        ),
+        (
+            "expected_deferred_patch_count",
+            report.expected_deferred_patch_count,
+        ),
+        (
+            "applied_deferred_patch_count",
+            report.applied_deferred_patch_count,
+        ),
+        ("stub_write_count", report.stub_write_count),
+        ("got_write_count", report.got_write_count),
+        ("unresolved_bind_count", report.unresolved_bind_count),
+        ("write_once_span_count", report.write_once_span_count),
+    ];
+    for (name, value) in count_fields {
+        writeln!(
+            out,
+            "finalizer_input_platform_patch_application_{name} = {value}"
+        )
+        .unwrap();
+    }
+    let writes = report
+        .structure_writes
+        .iter()
+        .map(|write| {
+            format!(
+                "{}|{}|{}|{}|{}|{}|{}|{}|{}",
+                write.write_id,
+                write.structure_id,
+                write.write_kind,
+                write.target_symbol,
+                write.output_offset,
+                write.width_bytes,
+                write.encoded_bytes_hex,
+                write.encoded_bytes_hash,
+                write.write_audit_hash
+            )
+        })
+        .collect::<Vec<_>>();
+    writeln!(
+        out,
+        "finalizer_input_platform_patch_application_structure_writes = [{}]",
+        toml::toml_string_array_literal(&writes)
+    )
+    .unwrap();
+    let patches = report
+        .patches
+        .iter()
+        .map(|patch| {
+            format!(
+                "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+                patch.relocation_id,
+                patch.relocation_kind,
+                patch.source_output_offset,
+                patch.width_bytes,
+                patch.patch_target_output_offset,
+                patch.effective_addend,
+                patch.source_bytes_hex,
+                patch.encoded_bytes_hex,
+                patch.source_bytes_hash,
+                patch.encoded_bytes_hash,
+                patch.binding_audit_hash,
+                patch.write_audit_hash
+            )
+        })
+        .collect::<Vec<_>>();
+    writeln!(
+        out,
+        "finalizer_input_platform_patch_application_patches = [{}]",
+        toml::toml_string_array_literal(&patches)
+    )
+    .unwrap();
+    let binds = report
+        .bind_records
+        .iter()
+        .map(|bind| {
+            format!(
+                "{}|{}|{}|{}|{}|{}|{}|{}|{}",
+                bind.bind_id,
+                bind.structure_id,
+                bind.target_key,
+                bind.target_symbol,
+                bind.got_output_offset,
+                bind.width_bytes,
+                bind.placeholder_bytes_hash,
+                bind.status,
+                bind.audit_hash
+            )
+        })
+        .collect::<Vec<_>>();
+    writeln!(
+        out,
+        "finalizer_input_platform_patch_application_bind_records = [{}]",
+        toml::toml_string_array_literal(&binds)
     )
     .unwrap();
 }

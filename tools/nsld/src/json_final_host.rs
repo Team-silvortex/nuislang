@@ -218,8 +218,115 @@ fn finalizer_input_summary_json(summary: Option<&NsldExecutableFinalizerInputSum
         macho_materialization_preview_json(&summary.materialization_preview),
         macho_patch_application_json(&summary.patch_application),
         macho_platform_structure_plan_json(&summary.platform_structure_plan),
+        macho_platform_patch_application_json(&summary.platform_patch_application),
     ];
     format!("\"finalizer_input_summary\":{{{}}}", fields.join(","))
+}
+
+fn macho_platform_patch_application_json(
+    report: &NsldMachOArm64PlatformPatchApplicationReport,
+) -> String {
+    let writes = report
+        .structure_writes
+        .iter()
+        .map(|write| {
+            let fields = [
+                json_string_field("write_id", &write.write_id),
+                json_string_field("structure_id", &write.structure_id),
+                json_string_field("write_kind", &write.write_kind),
+                json_string_field("target_symbol", &write.target_symbol),
+                json_usize_field("output_offset", write.output_offset),
+                json_usize_field("width_bytes", write.width_bytes),
+                json_string_field("encoded_bytes_hex", &write.encoded_bytes_hex),
+                json_string_field("encoded_bytes_hash", &write.encoded_bytes_hash),
+                json_string_field("write_audit_hash", &write.write_audit_hash),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    let patches = report
+        .patches
+        .iter()
+        .map(|patch| {
+            let fields = [
+                json_string_field("relocation_id", &patch.relocation_id),
+                json_string_field("relocation_kind", &patch.relocation_kind),
+                json_usize_field("source_output_offset", patch.source_output_offset),
+                json_usize_field("width_bytes", patch.width_bytes),
+                json_usize_field(
+                    "patch_target_output_offset",
+                    patch.patch_target_output_offset,
+                ),
+                json_i64_field("effective_addend", patch.effective_addend),
+                json_string_field("source_bytes_hex", &patch.source_bytes_hex),
+                json_string_field("encoded_bytes_hex", &patch.encoded_bytes_hex),
+                json_string_field("source_bytes_hash", &patch.source_bytes_hash),
+                json_string_field("encoded_bytes_hash", &patch.encoded_bytes_hash),
+                json_string_field("binding_audit_hash", &patch.binding_audit_hash),
+                json_string_field("write_audit_hash", &patch.write_audit_hash),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    let binds = report
+        .bind_records
+        .iter()
+        .map(|bind| {
+            let fields = [
+                json_string_field("bind_id", &bind.bind_id),
+                json_string_field("structure_id", &bind.structure_id),
+                json_string_field("target_key", &bind.target_key),
+                json_string_field("target_symbol", &bind.target_symbol),
+                json_usize_field("got_output_offset", bind.got_output_offset),
+                json_usize_field("width_bytes", bind.width_bytes),
+                json_string_field("placeholder_bytes_hash", &bind.placeholder_bytes_hash),
+                json_string_field("status", &bind.status),
+                json_string_field("audit_hash", &bind.audit_hash),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    let fields = [
+        json_string_field("contract", &report.contract),
+        json_string_field("status", &report.status),
+        json_string_field("placement_plan_hash", &report.placement_plan_hash),
+        json_string_field("relocation_plan_hash", &report.relocation_plan_hash),
+        json_string_field(
+            "direct_patch_application_ledger_hash",
+            &report.direct_patch_application_ledger_hash,
+        ),
+        json_string_field(
+            "platform_structure_plan_hash",
+            &report.platform_structure_plan_hash,
+        ),
+        json_string_field("base_applied_image_hash", &report.base_applied_image_hash),
+        json_string_field("platform_image_hash", &report.platform_image_hash),
+        json_usize_field("base_image_span_bytes", report.base_image_span_bytes),
+        json_usize_field(
+            "platform_image_span_bytes",
+            report.platform_image_span_bytes,
+        ),
+        json_usize_field(
+            "expected_deferred_patch_count",
+            report.expected_deferred_patch_count,
+        ),
+        json_usize_field(
+            "applied_deferred_patch_count",
+            report.applied_deferred_patch_count,
+        ),
+        json_usize_field("stub_write_count", report.stub_write_count),
+        json_usize_field("got_write_count", report.got_write_count),
+        json_usize_field("unresolved_bind_count", report.unresolved_bind_count),
+        json_usize_field("write_once_span_count", report.write_once_span_count),
+        json_string_field("application_ledger_hash", &report.application_ledger_hash),
+        format!("\"structure_writes\":[{writes}]"),
+        format!("\"patches\":[{patches}]"),
+        format!("\"bind_records\":[{binds}]"),
+    ];
+    format!("\"platform_patch_application\":{{{}}}", fields.join(","))
 }
 
 fn macho_platform_structure_plan_json(

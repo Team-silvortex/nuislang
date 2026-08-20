@@ -226,6 +226,72 @@ pub(crate) struct NsldMachOArm64PlatformStructurePlanReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64PlatformWriteAudit {
+    pub(crate) write_id: String,
+    pub(crate) structure_id: String,
+    pub(crate) write_kind: String,
+    pub(crate) target_symbol: String,
+    pub(crate) output_offset: usize,
+    pub(crate) width_bytes: usize,
+    pub(crate) encoded_bytes_hex: String,
+    pub(crate) encoded_bytes_hash: String,
+    pub(crate) write_audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64PlatformPatchAudit {
+    pub(crate) relocation_id: String,
+    pub(crate) relocation_kind: String,
+    pub(crate) source_output_offset: usize,
+    pub(crate) width_bytes: usize,
+    pub(crate) patch_target_output_offset: usize,
+    pub(crate) effective_addend: i64,
+    pub(crate) source_bytes_hex: String,
+    pub(crate) encoded_bytes_hex: String,
+    pub(crate) source_bytes_hash: String,
+    pub(crate) encoded_bytes_hash: String,
+    pub(crate) binding_audit_hash: String,
+    pub(crate) write_audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64PlatformBindRecord {
+    pub(crate) bind_id: String,
+    pub(crate) structure_id: String,
+    pub(crate) target_key: String,
+    pub(crate) target_symbol: String,
+    pub(crate) got_output_offset: usize,
+    pub(crate) width_bytes: usize,
+    pub(crate) placeholder_bytes_hash: String,
+    pub(crate) status: String,
+    pub(crate) audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64PlatformPatchApplicationReport {
+    pub(crate) contract: String,
+    pub(crate) status: String,
+    pub(crate) placement_plan_hash: String,
+    pub(crate) relocation_plan_hash: String,
+    pub(crate) direct_patch_application_ledger_hash: String,
+    pub(crate) platform_structure_plan_hash: String,
+    pub(crate) base_applied_image_hash: String,
+    pub(crate) platform_image_hash: String,
+    pub(crate) base_image_span_bytes: usize,
+    pub(crate) platform_image_span_bytes: usize,
+    pub(crate) expected_deferred_patch_count: usize,
+    pub(crate) applied_deferred_patch_count: usize,
+    pub(crate) stub_write_count: usize,
+    pub(crate) got_write_count: usize,
+    pub(crate) unresolved_bind_count: usize,
+    pub(crate) write_once_span_count: usize,
+    pub(crate) application_ledger_hash: String,
+    pub(crate) structure_writes: Vec<NsldMachOArm64PlatformWriteAudit>,
+    pub(crate) patches: Vec<NsldMachOArm64PlatformPatchAudit>,
+    pub(crate) bind_records: Vec<NsldMachOArm64PlatformBindRecord>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldExecutableFinalizerInputSummary {
     pub(crate) contract: String,
     pub(crate) status: String,
@@ -243,4 +309,5 @@ pub(crate) struct NsldExecutableFinalizerInputSummary {
     pub(crate) materialization_preview: NsldMachOArm64MaterializationPreviewReport,
     pub(crate) patch_application: NsldMachOArm64PatchApplicationReport,
     pub(crate) platform_structure_plan: NsldMachOArm64PlatformStructurePlanReport,
+    pub(crate) platform_patch_application: NsldMachOArm64PlatformPatchApplicationReport,
 }

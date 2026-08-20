@@ -340,7 +340,12 @@ The `beta-0.1` calibration baseline is:
   8-byte GOT slots, bind every deferred relocation to one target offset, and
   hash the registry, applied-image ledger, layout, targets, and bindings; the
   real `_puts` fixture receives stub offset 16 and aligned GOT offset 32;
-  platform byte synthesis/application, common-symbol allocation, Mach-O shell
+  `nuis-nsld-macho-arm64-platform-patch-application-v1` now extends the applied
+  image to the planned span, emits checked ARM64 stubs and internal/external GOT
+  entries, rewrites every deferred relocation once, keeps external values as
+  explicit unresolved bind records, and publishes identical image/write/patch/
+  bind ledger evidence through JSON, text, and persisted invoke plans; common-
+  symbol allocation, translation into Mach-O bind/load-command metadata, shell
   synthesis, ELF, and PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is

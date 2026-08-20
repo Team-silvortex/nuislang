@@ -1106,8 +1106,25 @@ ledger enter the plan hash. Unknown deferred forms, ambiguous rules, malformed
 internal/external identities, count/hash drift, and arithmetic overflow fail
 closed. The real compatibility fixture deterministically assigns `_puts` to
 stub offset 16 and GOT offset 32. The JSON, text, and persisted writer-input
-surfaces expose the same allocation facts. This stage does not emit structure
-bytes, dynamic bind metadata, or load commands.
+surfaces expose the same allocation facts.
+
+`nuis-nsld-macho-arm64-platform-patch-application-v1` consumes only that plan
+and the hash-bound direct-patched image. It extends the private working image to
+the planned span, emits checked 12-byte `ADRP x16`/`LDR x16`/`BR x16` stubs and
+8-byte GOT entries, then rewrites each registered deferred `BRANCH26`,
+`GOT_LOAD_PAGE21`, or `GOT_LOAD_PAGEOFF12` source exactly once. Internal GOT
+values remain explicitly image-relative at this boundary. External GOT values
+remain zero placeholders and receive deterministic symbol-bound
+`unresolved-external` bind records rather than fabricated addresses. Inherited
+direct patches reserve their spans in the same occupancy map, so overlap,
+duplicate relocation ids, source drift, malformed instructions, plan drift,
+and incomplete structure/patch coverage fail closed. Per-structure writes,
+per-relocation patches, bind records, the final platform-image hash, and one
+ordered application-ledger hash appear identically in JSON, text, and persisted
+writer input. The real fixture extends 16 bytes to 40, writes `_puts`'s stub at
+16 and GOT placeholder at 32, and redirects the external branch to the stub.
+This remains a provider working image, not a claim that Mach-O load commands or
+an executable shell already exist.
 
 After those checks the provider validates a thin or universal arm64
 `MH_EXECUTE` compatibility image and installs it atomically with executable
@@ -1120,11 +1137,12 @@ resolved by the verified dry-run boundary instead of performing a second
 This still does not claim a pure Nsld platform linker: Nuisc now hands Nsld
 real relocatable objects, but it also embeds a host-toolchain-linked
 compatibility image. Nsld now owns the deterministic merged source image,
-checked direct-write encoding previews, and write-once applied working image,
-plus deterministic GOT/stub allocation, but it does not yet allocate
-non-section definitions, synthesize or apply platform bytes, emit bind/load
-commands, or produce the final native shell independently. Those remain the
-next boundary.
+checked direct-write encoding previews, write-once direct and platform working
+images, deterministic GOT/stub allocation and bytes, deferred relocation
+rewrites, and explicit unresolved bind records. It does not yet allocate
+non-section definitions, translate those bind records into Mach-O metadata,
+emit segment/symbol/bind load commands, or produce the final native shell
+independently. Those remain the next boundary.
 
 `nsld final-executable-host-dry-run` consumes the verified writer input,
 reports `environment_ready`, provider identity, and exact command arguments.

@@ -118,6 +118,22 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     assert!(invoke_plan.contains("\"stub_output_offset\":16"));
     assert!(invoke_plan.contains("\"patch_target_kind\":\"branch-stub\""));
     assert!(invoke_plan.contains("\"patch_target_output_offset\":16"));
+    assert!(invoke_plan
+        .contains("\"contract\":\"nuis-nsld-macho-arm64-platform-patch-application-v1\""));
+    assert!(invoke_plan.contains("\"status\":\"platform-patches-applied-with-unresolved-binds\""));
+    assert!(invoke_plan.contains("\"platform_image_span_bytes\":40"));
+    assert!(invoke_plan.contains("\"expected_deferred_patch_count\":1"));
+    assert!(invoke_plan.contains("\"applied_deferred_patch_count\":1"));
+    assert!(invoke_plan.contains("\"stub_write_count\":1"));
+    assert!(invoke_plan.contains("\"got_write_count\":1"));
+    assert!(invoke_plan.contains("\"unresolved_bind_count\":1"));
+    assert!(invoke_plan.contains("\"write_once_span_count\":3"));
+    assert!(invoke_plan.contains("\"write_kind\":\"arm64-branch-stub\""));
+    assert!(invoke_plan.contains("\"encoded_bytes_hex\":\"10000090101240f900021fd6\""));
+    assert!(invoke_plan.contains("\"source_output_offset\":8"));
+    assert!(invoke_plan.contains("\"patch_target_output_offset\":16"));
+    assert!(invoke_plan.contains("\"status\":\"unresolved-external\""));
+    assert!(invoke_plan.contains("\"got_output_offset\":32"));
     assert!(invoke_plan.contains("\"target_symbol\":\"_nuis_runtime\""));
     assert!(invoke_plan
         .contains("\"symbol\":\"_nuis_runtime\",\"reference_object_id\":\"host.program-llvm\""));
@@ -145,6 +161,14 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     assert!(invoke_plan_text.contains("finalizer_input_platform_target: id="));
     assert!(invoke_plan_text.contains("symbol=_puts"));
     assert!(invoke_plan_text.contains("finalizer_input_platform_binding: relocation="));
+    assert!(invoke_plan_text.contains(
+        "finalizer_input_platform_patch_application: contract=nuis-nsld-macho-arm64-platform-patch-application-v1"
+    ));
+    assert!(invoke_plan_text.contains("finalizer_input_platform_write: id="));
+    assert!(invoke_plan_text.contains("kind=arm64-branch-stub"));
+    assert!(invoke_plan_text.contains("finalizer_input_platform_patch: relocation="));
+    assert!(invoke_plan_text.contains("finalizer_input_platform_bind: id="));
+    assert!(invoke_plan_text.contains("status=unresolved-external"));
     assert!(invoke_plan_text.contains(
         "finalizer_input_symbol_binding: symbol=_nuis_runtime reference=host.program-llvm:1 status=internal"
     ));
@@ -184,6 +208,22 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     );
     assert!(persisted_invoke_plan.contains("finalizer_input_platform_structure_targets = ["));
     assert!(persisted_invoke_plan.contains("finalizer_input_platform_structure_bindings = ["));
+    assert!(persisted_invoke_plan.contains(
+        "finalizer_input_platform_patch_application_contract = \"nuis-nsld-macho-arm64-platform-patch-application-v1\""
+    ));
+    assert!(persisted_invoke_plan
+        .contains("finalizer_input_platform_patch_application_platform_image_span_bytes = 40"));
+    assert!(persisted_invoke_plan
+        .contains("finalizer_input_platform_patch_application_applied_deferred_patch_count = 1"));
+    assert!(persisted_invoke_plan
+        .contains("finalizer_input_platform_patch_application_unresolved_bind_count = 1"));
+    assert!(persisted_invoke_plan
+        .contains("finalizer_input_platform_patch_application_structure_writes = ["));
+    assert!(
+        persisted_invoke_plan.contains("finalizer_input_platform_patch_application_patches = [")
+    );
+    assert!(persisted_invoke_plan
+        .contains("finalizer_input_platform_patch_application_bind_records = ["));
     assert!(invoke_plan.contains("\"invocation_kind\":\"registered-internal-finalizer\""));
     assert!(invoke_plan.contains("\"invocation_policy\":\"registered-internal\""));
     assert!(invoke_plan.contains("\"requires_explicit_allow\":false"));
