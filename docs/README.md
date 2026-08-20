@@ -1,131 +1,89 @@
-# Docs Index
+# Documentation Index
 
-This folder is the documentation entry point once you move past the top-level
-`README`.
-
-The docs are currently split into two broad categories:
-
-* current reference / implementation-facing material
-* longer-range design/spec material
-* historical archived material
-
-There is also a practical split inside the current tree:
-
-* mainline docs
-  these explain the repository paths you should rely on today
-* experimental / design docs
-  these explain probe directions, future contracts, and semantic sketches that
-  are intentionally not fully locked yet
+This directory separates present-tense implementation truth from phase history
+and longer-range design. If two documents disagree, prefer checked-in behavior,
+tests, the development tensor, and `docs/reference/` in that order.
 
 ## Read This First
 
-If you want to understand the repository as it exists today, start here:
+Use this short route for the current `beta-0.3.*` repository:
 
-* [current-mainline-map.md](current-mainline-map.md)
-* [versioning/nuis-beta-0.1.0-mainline-entry.md](versioning/nuis-beta-0.1.0-mainline-entry.md)
-* [versioning/nuis-beta-0.1.0-doc-sync-inventory.md](versioning/nuis-beta-0.1.0-doc-sync-inventory.md)
-* [versioning/nuis-beta-0.0.1-mainline-entry.md](versioning/nuis-beta-0.0.1-mainline-entry.md)
-* [versioning/nuis-alpha-0.20-mainline-entry.md](versioning/nuis-alpha-0.20-mainline-entry.md)
-* [versioning/nuis-alpha-0.17-mainline-entry.md](versioning/nuis-alpha-0.17-mainline-entry.md)
-* [versioning/nuis-alpha-0.16-mainline-entry.md](versioning/nuis-alpha-0.16-mainline-entry.md)
-* [versioning/nuis-alpha-0.10-mainline-entry.md](versioning/nuis-alpha-0.10-mainline-entry.md)
-* [versioning/nuis-alpha-0.8-mainline-entry.md](versioning/nuis-alpha-0.8-mainline-entry.md)
-* [versioning/nuis-alpha-0.8-doc-sync-inventory.md](versioning/nuis-alpha-0.8-doc-sync-inventory.md)
-* [versioning/nuis-alpha-0.7-mainline-entry.md](versioning/nuis-alpha-0.7-mainline-entry.md)
-* [versioning/nuis-alpha-0.6-mainline-entry.md](versioning/nuis-alpha-0.6-mainline-entry.md)
-* [versioning/nuis-alpha-0.4-system-inventory.md](versioning/nuis-alpha-0.4-system-inventory.md)
-* [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
-* [versioning/nuis-alpha-0.4-doc-sync-inventory.md](versioning/nuis-alpha-0.4-doc-sync-inventory.md)
-* [versioning/nuis-long-range-heterogeneous-os-roadmap.md](versioning/nuis-long-range-heterogeneous-os-roadmap.md)
-* [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
-* [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
-* [versioning/nuis-alpha-0.1-mainline-status.md](versioning/nuis-alpha-0.1-mainline-status.md)
-* [reference/README.md](reference/README.md)
-* [repo-layout.md](repo-layout.md)
+1. [Current mainline map](current-mainline-map.md)
+2. [Beta 0.3 mainline entry](versioning/nuis-beta-0.3.0-mainline-entry.md)
+3. [Development tensor](reference/nuis-development-tensor.md)
+4. [Native artifact workflow](reference/nuis-native-artifact-workflow.md)
+5. [Nsld linker frontdoor](reference/nsld-linker-frontdoor.md)
+6. [Binary assembly gap map](reference/nsld-binary-assembly-gap-map.md)
+7. [Nustar multi-backend artifact contract](reference/nustar-multi-backend-artifact-contract.md)
+8. [Repository layout](repo-layout.md)
 
-If your immediate question is “what is the canonical compile route today?”,
-start with the `beta-0.1.0` mainline entry, then the development tensor,
-Nsld linker/frontdoor, and binary assembly references before drilling into
-deeper reference material.
+The [versioning index](versioning/README.md) routes older beta, alpha, and
+pre-alpha snapshots. Those files explain how the current shape emerged; they
+are not the default source for current capability claims.
 
-If your immediate question is “which docs are current, which are predecessor
-anchors, and what wording is safe?”, read the `beta-0.1.0` mainline entry
-first, then the `beta-0.0.1` entry as its recorded predecessor and the
-`alpha-0.20.*` entry as the alpha closeout predecessor, the `alpha-0.17.*`
-entry as an earlier predecessor, and the
-`alpha-0.10.*` entry as earlier
-executable-artifact context, then the `alpha-0.8.*` documentation sync
-inventory for predecessor binary-linking convergence context. Use the
-`alpha-0.4.*` documentation sync baseline only when you need the older
-hardening baseline.
+## Truth Layers
 
-If your immediate question is “what is the current minor-line history anchor?”,
-start with the `beta-0.1.0` mainline entry, then use `beta-0.0.1` for the first
-beta snapshot and `alpha-0.20.*` for alpha
-closeout, `alpha-0.17.*` for
-registered heterogeneous worker execution, `alpha-0.16.*` for tensor-guided
-closure, `alpha-0.10.*` for executable-artifact closure,
-`alpha-0.8.*` for binary convergence,
-and `alpha-0.4.*` inventory/hardening docs as baseline context. Use
-`alpha-0.1.*`, pre-alpha `0.20.*`, and `0.19.*` only when you intentionally
-need predecessor lines.
+| Layer | Purpose |
+| --- | --- |
+| [`reference/`](reference) | Current implementation-facing contracts, workflows, and boundaries |
+| [`versioning/`](versioning) | Minor-line phase anchors, transition records, and roadmap policy |
+| [`grammar/`](grammar) | Parser and source grammar notes |
+| [`yir-spec/`](yir-spec) | YIR design and protocol direction |
+| [`glm-spec/`](glm-spec) | GLM and heterogeneous flow-graph design direction |
+| [`fabric-spec/`](fabric-spec) | Data-fabric design material, including historical drafts |
+| [`historical/`](historical) | Explicitly archived whitepapers and predecessor material |
 
-If your immediate question is “what long-range hardware/OS shape should current
-architecture avoid foreclosing?”, read the long-range heterogeneous OS roadmap.
+Current reference material outranks broader design sketches when they differ.
+In particular, `fabric-spec/DFIR.md` is historical draft material rather than a
+current verifier contract.
 
-If your immediate question is “which ABI words came from the final pre-alpha
-`0.20.0` line before alpha closeout broadened the surface further?”, read the
-`0.20.0` ABI compile vocabulary file as predecessor
-context.
+## By Goal
 
-Then branch by the kind of truth you want:
+For the compiler and project frontdoor:
 
-* current runnable project examples
-  - [examples/projects/README.md](../examples/projects/README.md)
-* current source-level `.ns` examples
-  - [examples/ns/README.md](../examples/ns/README.md)
-* current stdlib/source-asset maps
-  - [stdlib/README.md](../stdlib/README.md)
-  - [stdlib/std/README.md](../stdlib/std/README.md)
-* cleanup policy / archiving candidates
-  - [repo-cleanup-candidates.md](repo-cleanup-candidates.md)
-  - [repo-file-line-policy.md](repo-file-line-policy.md)
+* [Nuis frontdoor surface](reference/nuis-frontdoor-surface-reference.md)
+* [Native artifact workflow](reference/nuis-native-artifact-workflow.md)
+* [YIR tools](reference/yir-tools-reference.md)
+* [Control-flow lowering](reference/control-flow-lowering-contract.md)
+* [Generic diagnostic ownership](reference/generic-diagnostic-ownership-contract.md)
 
-## Grammar And Frontend Notes
+For native binaries, runtime, and debugging:
 
-Use these when you want parser/frontend context:
+* [Nuis binary format protocol](reference/nuis-binary-format-protocol.md)
+* [Nsld linker frontdoor](reference/nsld-linker-frontdoor.md)
+* [Nsld binary assembly gap map](reference/nsld-binary-assembly-gap-map.md)
+* [Executable finalizer registry](reference/nsld-executable-finalizer-registry.md)
+* [Nsdb YIR debugger frontdoor](reference/nsdb-yir-debugger-frontdoor.md)
+* [Toolchain capability boundary](reference/toolchain-galaxy-core-boundary.md)
 
-* [grammar/README.md](grammar/README.md)
+For heterogeneous domains and host compatibility:
 
-## Design / Spec Direction
+* [Nustar capability split](reference/nustar-capability-split-boundary.md)
+* [Multi-backend artifact contract](reference/nustar-multi-backend-artifact-contract.md)
+* [CFFI/von-Neumann domain contract](reference/cffi-von-neumann-domain-contract.md)
+* [FFI pointer safety boundary](reference/ffi-pointer-safety-boundary.md)
+* [Linux CUDA provider bring-up](reference/linux-cuda-provider-bringup.md)
+* [Provider completion trust registry](reference/provider-completion-trust-registry.md)
 
-These folders describe broader architecture direction and are useful, but they
-should be read together with the current reference docs above:
+For std and official Galaxies:
 
-* [fabric-spec/README.md](fabric-spec/README.md)
-* [glm-spec/README.md](glm-spec/README.md)
-* [versioning/README.md](versioning/README.md)
-* [yir-spec/README.md](yir-spec/README.md)
-* [historical/README.md](historical/README.md)
+* [Standard library index](../stdlib/README.md)
+* [Std mainline layering](reference/std-mainline-layering-contract.md)
+* [PixelMagic mainline](reference/pixelmagic-mainline-contract.md)
+* [Shader/kernel project contract](reference/std-shader-kernel-project-contract.md)
+* [Project examples](../examples/projects/README.md)
+* [Source examples](../examples/ns/README.md)
 
-Important current reading rule:
+For long-range architecture:
 
-* if a broader design note and the current checked-in tool/reference behavior
-  differ, prefer the current `reference/` documents plus the implementation
-  itself
-* `fabric-spec/DFIR.md` is historical draft material, not a current verifier
-  contract
+* [Heterogeneous OS roadmap](versioning/nuis-long-range-heterogeneous-os-roadmap.md)
+* [GLM heterogeneous flow graph](glm-spec/glm-heterogeneous-flow-graph-positioning.md)
+* [Vulpoya/YIR secondary review](glm-spec/vulpoya-yir-secondary-review-positioning.md)
 
-If your immediate question is "how do `GLM`, compiler-native `YIR` verification,
-and the future `vulpoya` analyzer fit together?", start with:
+## Maintenance Rule
 
-* [glm-spec/glm-heterogeneous-flow-graph-positioning.md](glm-spec/glm-heterogeneous-flow-graph-positioning.md)
-* [glm-spec/vulpoya-yir-secondary-review-positioning.md](glm-spec/vulpoya-yir-secondary-review-positioning.md)
-
-## Historical Archive
-
-These files are kept on purpose, but they are no longer part of the shortest
-path for understanding the current repository:
-
-* [historical/README.md](historical/README.md)
-* [historical/nuislang-whitepaper-v0.44b.md](historical/nuislang-whitepaper-v0.44b.md)
+New present-tense behavior belongs in `reference/` and should be reachable from
+this index or a focused local README. A minor-line transition gets one concise
+versioning anchor; older entries are demoted in the routers rather than
+rewritten. Historical drafts stay available but should never be inserted back
+into the shortest current reading path.

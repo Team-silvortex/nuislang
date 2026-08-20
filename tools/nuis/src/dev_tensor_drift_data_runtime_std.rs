@@ -235,7 +235,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         id: "std-readme-host-io-text-lane",
         path: "stdlib/std/README.md",
         required_patterns: &[
-            "beta-0.1.0",
+            "beta-0.3.*",
             "host I/O and text",
             "filesystem/path/location",
             "worker lease",
@@ -420,11 +420,12 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         ],
     },
     DevTensorDriftCheckSpec {
-        id: "beta-0.1.0-mainline-router",
+        id: "beta-0.3.0-mainline-router",
         path: "docs/current-mainline-map.md",
         required_patterns: &[
-            "current `beta-0.1.0` reading route",
-            "nuis-beta-0.1.0-mainline-entry.md",
+            "current `beta-0.3.*` reading route",
+            "nuis-beta-0.3.0-mainline-entry.md",
+            "previous curated `beta-0.1.0` entry",
             "recorded predecessor `beta-0.0.1` entry",
             "nuis-beta-0.0.1-mainline-entry.md",
             "direct predecessor `alpha-0.20.*` closeout entry",
@@ -434,15 +435,15 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
         ],
     },
     DevTensorDriftCheckSpec {
-        id: "beta-0.1.0-repository-frontdoor",
+        id: "beta-0.3.0-repository-frontdoor",
         path: "README.md",
         required_patterns: &[
-            "now on `beta-0.1.0`",
-            "nuis-beta-0.1.0-mainline-entry.md",
-            "registered Nuis worker / Nustar execution capsule",
-            "verified heterogeneous output carrier",
-            "registered heterogeneous provider closure",
-            "shared Shader body contract",
+            "repository is on `beta-0.3.*`",
+            "nuis-beta-0.3.0-mainline-entry.md",
+            "registered execution domains",
+            "private final-address shell serialization",
+            "OS-native executable finalization",
+            "Development tensor",
         ],
     },
     DevTensorDriftCheckSpec {

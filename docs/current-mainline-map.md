@@ -7,42 +7,27 @@ local README for the area you are actively touching.
 
 ## Fast Reading Order
 
-If you only need the shortest current `beta-0.1.0` reading route, use this order:
+If you only need the shortest current `beta-0.3.*` reading route, use this order:
 
-1. [versioning/nuis-beta-0.1.0-mainline-entry.md](versioning/nuis-beta-0.1.0-mainline-entry.md)
+1. [versioning/nuis-beta-0.3.0-mainline-entry.md](versioning/nuis-beta-0.3.0-mainline-entry.md)
 2. [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
-3. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
-4. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
-5. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
-6. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
-7. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
-8. [reference/nsdb-yir-debugger-frontdoor.md](reference/nsdb-yir-debugger-frontdoor.md)
-9. [reference/provider-completion-trust-registry.md](reference/provider-completion-trust-registry.md)
-10. [reference/linux-cuda-provider-bringup.md](reference/linux-cuda-provider-bringup.md)
-11. [reference/toolchain-galaxy-core-boundary.md](reference/toolchain-galaxy-core-boundary.md)
+3. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
+4. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
+5. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
+6. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
+7. [reference/nsld-executable-finalizer-registry.md](reference/nsld-executable-finalizer-registry.md)
+8. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
+9. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
+10. [reference/provider-completion-trust-registry.md](reference/provider-completion-trust-registry.md)
+11. [reference/nsdb-yir-debugger-frontdoor.md](reference/nsdb-yir-debugger-frontdoor.md)
 12. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
 13. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
-14. [versioning/nuis-alpha-0.17-mainline-entry.md](versioning/nuis-alpha-0.17-mainline-entry.md)
-15. [versioning/nuis-alpha-0.16-mainline-entry.md](versioning/nuis-alpha-0.16-mainline-entry.md)
-16. [versioning/nuis-alpha-0.10-mainline-entry.md](versioning/nuis-alpha-0.10-mainline-entry.md)
-17. [versioning/nuis-alpha-0.8-mainline-entry.md](versioning/nuis-alpha-0.8-mainline-entry.md)
-18. [versioning/nuis-alpha-0.7-mainline-entry.md](versioning/nuis-alpha-0.7-mainline-entry.md)
-19. [versioning/nuis-alpha-0.6-mainline-entry.md](versioning/nuis-alpha-0.6-mainline-entry.md)
-20. [versioning/nuis-alpha-0.4-system-inventory.md](versioning/nuis-alpha-0.4-system-inventory.md)
-21. [versioning/nuis-alpha-0.4-mainline-hardening-plan.md](versioning/nuis-alpha-0.4-mainline-hardening-plan.md)
-22. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
-23. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
-24. [reference/ffi-pointer-safety-boundary.md](reference/ffi-pointer-safety-boundary.md)
-25. [reference/nustar-capability-split-boundary.md](reference/nustar-capability-split-boundary.md)
-26. [versioning/nuis-long-range-heterogeneous-os-roadmap.md](versioning/nuis-long-range-heterogeneous-os-roadmap.md)
-27. [versioning/nuis-alpha-0.1-mainline-status.md](versioning/nuis-alpha-0.1-mainline-status.md)
-28. [versioning/nuis-0.20.0-abi-compile-vocabulary.md](versioning/nuis-0.20.0-abi-compile-vocabulary.md)
-29. [versioning/nuis-0.20.0-std-refactor-frontdoor.md](versioning/nuis-0.20.0-std-refactor-frontdoor.md)
-30. [versioning/nuis-0.20.0-compile-gap-checklist.md](versioning/nuis-0.20.0-compile-gap-checklist.md)
+14. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
+15. [versioning/README.md](versioning/README.md)
 
 Short rule:
 
-`inventory says what exists; hardening plan says what to optimize; workflow says how the route composes; predecessor docs explain how the current shape got here`
+`reference docs describe current behavior; versioning docs explain how that behavior got here`
 
 ## Start Here
 
@@ -50,7 +35,9 @@ Short rule:
   [README.md](../README.md)
 * current development tensor progress model:
   [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
-* current `beta-0.1.0` entry:
+* current `beta-0.3.*` entry:
+  [versioning/nuis-beta-0.3.0-mainline-entry.md](versioning/nuis-beta-0.3.0-mainline-entry.md)
+* previous curated `beta-0.1.0` entry:
   [versioning/nuis-beta-0.1.0-mainline-entry.md](versioning/nuis-beta-0.1.0-mainline-entry.md)
 * recorded predecessor `beta-0.0.1` entry:
   [versioning/nuis-beta-0.0.1-mainline-entry.md](versioning/nuis-beta-0.0.1-mainline-entry.md)
@@ -271,8 +258,8 @@ If you want one shortest checked-in route per question, use:
   known-variant pruning and branch-local shader effects are still future
   hardening work.
 * shader/kernel showcase:
-  [window_controls_demo](../examples/projects/window_controls_demo) /
   [kernel_tensor_demo](../examples/projects/kernel_tensor_demo) /
+  [window_controls_demo](../examples/projects/window_controls_demo) (repair/probe) /
   [kernel_result_profile_demo](../examples/projects/domains/kernel_result_profile_demo)
   current rule:
   kernel Result/profile code is build-report backed with CPU + kernel domain

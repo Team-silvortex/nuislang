@@ -26,6 +26,10 @@ quickly.
 * [subprojects](../subprojects)
   sibling ecosystem projects hosted in-tree for now, currently `vulpoya` and
   `yalivia`, with boundaries kept explicit rather than merged into `nuisc`
+* [tests](../tests)
+  repository-level fixtures and cross-toolchain integration support
+* [scripts](../scripts)
+  portable repository maintenance and developer-machine helpers
 * [docs](./)
   current reference docs, grammar/front-end notes, design notes, and historical
   archive material
@@ -65,6 +69,9 @@ to trust first when implementation and future direction are both present.
 * [target](../target)
   local build outputs and scratch artifacts; not part of the curated source
   layout
+* [examples/bins](../examples/bins)
+  explicitly retained generated example bundles; new scratch builds should use
+  a local output directory unless the bundle is intentionally curated
 * [.github](../.github)
   repository automation/workflow metadata
 

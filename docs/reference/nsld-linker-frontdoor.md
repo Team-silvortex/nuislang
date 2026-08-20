@@ -8,7 +8,7 @@ contract logic in `nuisc::linker`. It does not yet claim to be the final
 self-owned object linker. Its job is to give linker work a stable tool
 boundary before the implementation is split out further.
 
-For the current `beta-0.1.0` line, the emphasis is tensor-guided
+For the current `beta-0.3.*` line, the emphasis is tensor-guided
 executable-artifact hardening: keep the frontdoor/reporting discipline, but
 drive it toward the smallest runnable host-assisted route or explicit blocked
 executable artifact with clear run-artifact / trace readiness evidence.
@@ -35,12 +35,15 @@ For the automation frontdoor, see [nsld-driver-frontdoor.md](nsld-driver-frontdo
 * verified relocatable host object handoff identity and Mach-O object parsing
 * deterministic Mach-O section placement and section-backed symbol binding
 * checked Mach-O arm64 relocation, working-image, stub/GOT, and shell-layout planning
+* deterministic private Mach-O arm64 shell-byte and linkedit serialization with
+  final-address instruction, stub, GOT, and pointer rewriting
 * registered Mach-O arm64 compatibility-image materialization
 * the first independent CLI boundary for future linker work
 
 `Nsld` does not yet own:
 
-* non-section Mach-O symbol allocation and final shell-byte serialization/signing
+* common/non-section Mach-O allocation, code-signature payload generation,
+  independent structural/load validation, and private-image publication
 * final host-native executable wrapping for ELF or PE/COFF
 * binary section assembly independent from `nuisc`
 * stable linker script or relocation formats

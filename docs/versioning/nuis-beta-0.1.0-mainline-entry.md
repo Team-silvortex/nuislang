@@ -1,6 +1,10 @@
 # `nuis` `beta-0.1.0` Mainline Entry
 
-This file is the current short entry point for the second beta minor line.
+> Historical phase snapshot. For current mainline behavior, start with
+> [nuis-beta-0.3.0-mainline-entry.md](nuis-beta-0.3.0-mainline-entry.md).
+> Present-tense wording below is preserved in its `beta-0.1.0` context.
+
+This file is the recorded short entry point for the second beta minor line.
 
 `beta-0.1.0` keeps the early-beta foundation-hardening posture while making
 host compatibility an explicit registered domain. It does not mean stable

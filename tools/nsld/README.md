@@ -2,7 +2,7 @@
 
 `nsld` is the Nuis linker front-door.
 
-In the current `beta-0.1.0` line it is still a CLI wrapper over repository-owned
+In the current `beta-0.3.*` line it is still a CLI wrapper over repository-owned
 linker contract logic, including `nuisc::linker` helpers. That is intentional:
 the tool exists before the final self-owned linker core so the toolchain can
 start exercising linker plans, clock ordering, section/container metadata, and

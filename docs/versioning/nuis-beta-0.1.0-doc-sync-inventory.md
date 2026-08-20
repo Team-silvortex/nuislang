@@ -1,6 +1,9 @@
 # `nuis` `beta-0.1.0` Documentation Sync Inventory
 
-This file records the current-line documentation migration from the first beta
+> Historical synchronization snapshot. For the current mainline, start with
+> [nuis-beta-0.3.0-mainline-entry.md](nuis-beta-0.3.0-mainline-entry.md).
+
+This file records the then-current documentation migration from the first beta
 foundation snapshot to `beta-0.1.0`.
 
 ## Current Entry Rule
@@ -34,7 +37,7 @@ The `beta-0.1.0` refresh covers:
 
 Use:
 
-* `beta-0.1.0` for the exact current release
+* `beta-0.1.0` for the exact release recorded by this snapshot
 * `early beta` for the `beta-0.0.*` through `beta-0.9.*` foundation period
 * `beta-0.0.1` only for the recorded first-beta predecessor snapshot
 * `alpha-0.20.*` for the alpha closeout line

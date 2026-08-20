@@ -72,18 +72,21 @@ Current practical rule:
 
 These are the best current first-entry projects:
 
-* [window_controls_demo](window_controls_demo)
-  current `cpu + data + shader` showcase and the main documented project flow
 * [kernel_tensor_demo](kernel_tensor_demo)
-  current `cpu + data + kernel` showcase for the project pipeline
+  current verified `cpu + data + kernel` first route for the project pipeline
+* [tooling/native_artifact_closure_demo](tooling/native_artifact_closure_demo)
+  current linker/runtime closure pressure route
+* [window_controls_demo](window_controls_demo)
+  richer `cpu + data + shader` showcase, currently kept as a repair/probe route
+  rather than the copy-first workflow example
 
 Useful first commands:
 
 ```bash
-cargo run -p nuis -- project-doctor examples/projects/window_controls_demo
-cargo run -p nuis -- check examples/projects/window_controls_demo
-cargo run -p nuis -- test examples/projects/window_controls_demo
-cargo run -p nuis -- build examples/projects/window_controls_demo examples/bins/window_controls_demo_project
+cargo run -p nuis -- project-doctor examples/projects/kernel_tensor_demo
+cargo run -p nuis -- check examples/projects/kernel_tensor_demo
+cargo run -p nuis -- test examples/projects/kernel_tensor_demo
+cargo run -p nuis -- build examples/projects/kernel_tensor_demo target/nuis-readme/kernel_tensor_demo
 ```
 
 ## Current Layout
@@ -91,8 +94,8 @@ cargo run -p nuis -- build examples/projects/window_controls_demo examples/bins/
 The folder is intentionally split by role:
 
 * showcase projects stay at the root:
-  - [window_controls_demo](window_controls_demo)
   - [kernel_tensor_demo](kernel_tensor_demo)
+  - [window_controls_demo](window_controls_demo), currently a repair/probe route
 * grouped companions live under:
   - [task](task)
   - [tooling](tooling)
@@ -224,7 +227,11 @@ Checked-in canonical build outputs still live under:
 
 * [examples/bins](../../examples/bins)
 
-The two current canonical checked-in bundles remain:
+The two retained checked-in reference bundles remain:
 
 * [window_controls_demo_project](../../examples/bins/window_controls_demo_project/window_controls_demo)
 * [kernel_tensor_demo_project](../../examples/bins/kernel_tensor_demo_project/kernel_tensor_demo)
+
+Use `kernel_tensor_demo` for the copy-first source workflow. The retained
+window bundle remains useful as artifact/reference evidence while its source
+project is a repair/probe route.
