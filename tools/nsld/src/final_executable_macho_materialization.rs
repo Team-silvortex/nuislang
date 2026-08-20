@@ -19,11 +19,11 @@ pub(crate) struct MachOImageObject<'a> {
     pub(crate) linkage: &'a ParsedMachOObjectLinkage,
 }
 
-struct MergedSectionImage {
-    bytes: Vec<u8>,
-    copied_bytes: usize,
-    zero_fill_bytes: usize,
-    section_audits: Vec<NsldMachOMergedSectionImageAudit>,
+pub(crate) struct MergedSectionImage {
+    pub(crate) bytes: Vec<u8>,
+    pub(crate) copied_bytes: usize,
+    pub(crate) zero_fill_bytes: usize,
+    pub(crate) section_audits: Vec<NsldMachOMergedSectionImageAudit>,
 }
 
 pub(crate) fn build_macho_arm64_materialization_preview(
@@ -123,7 +123,7 @@ pub(crate) fn build_macho_arm64_materialization_preview(
         return Err("Mach-O patch preview mutated the provider-owned source image".to_owned());
     }
 
-    let patch_plan_hash = canonical_patch_plan(
+    let patch_plan_hash = materialization_patch_plan_hash(
         &placement.plan_hash,
         &relocations.plan_hash,
         &original_image_hash,
@@ -148,12 +148,12 @@ pub(crate) fn build_macho_arm64_materialization_preview(
         previewed_patch_count: patches.len(),
         deferred_patch_count: relocations.platform_structure_count,
         metadata_record_count: relocations.metadata_record_count,
-        patch_plan_hash: crate::fnv1a64_hex(patch_plan_hash.as_bytes()),
+        patch_plan_hash,
         patches,
     })
 }
 
-fn build_merged_section_image(
+pub(crate) fn build_merged_section_image(
     objects: &[MachOImageObject<'_>],
     placement: &NsldMachOPlacementBindingReport,
 ) -> Result<MergedSectionImage, String> {
@@ -596,7 +596,7 @@ fn checked_range(
     Ok(offset..end)
 }
 
-fn patch_audit_hash(
+pub(crate) fn patch_audit_hash(
     application: &NsldMachOArm64RelocationApplication,
     target: usize,
     effective_addend: i64,
@@ -621,7 +621,7 @@ fn patch_audit_hash(
     crate::fnv1a64_hex(canonical.as_bytes())
 }
 
-fn canonical_patch_plan(
+pub(crate) fn materialization_patch_plan_hash(
     placement_hash: &str,
     relocation_hash: &str,
     image_hash: &str,
@@ -636,7 +636,7 @@ fn canonical_patch_plan(
         append_text(&mut canonical, &patch.relocation_id);
         append_text(&mut canonical, &patch.audit_hash);
     }
-    canonical
+    crate::fnv1a64_hex(canonical.as_bytes())
 }
 
 fn hex_bytes(bytes: &[u8]) -> String {

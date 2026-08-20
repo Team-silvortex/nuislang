@@ -93,6 +93,31 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     assert!(invoke_plan.contains("\"source_bytes_hex\":\"00000094\""));
     assert!(invoke_plan.contains("\"encoded_bytes_hex\":\"02000094\""));
     assert!(invoke_plan.contains("\"source_output_offset\":0"));
+    assert!(invoke_plan.contains("\"contract\":\"nuis-nsld-macho-arm64-patch-application-v1\""));
+    assert!(invoke_plan
+        .contains("\"status\":\"direct-patches-applied-with-platform-structure-boundary\""));
+    assert!(invoke_plan.contains("\"expected_patch_count\":1"));
+    assert!(invoke_plan.contains("\"applied_patch_count\":1"));
+    assert!(invoke_plan.contains("\"write_once_span_count\":1"));
+    assert!(invoke_plan.contains("\"post_write_bytes_hash\":"));
+    assert!(invoke_plan.contains("\"application_ledger_hash\":"));
+    assert!(
+        invoke_plan.contains("\"contract\":\"nuis-nsld-macho-arm64-platform-structure-plan-v1\"")
+    );
+    assert!(invoke_plan.contains("\"status\":\"allocated-ready-for-platform-patching\""));
+    assert!(invoke_plan.contains("\"deferred_relocation_count\":1"));
+    assert!(invoke_plan.contains("\"target_count\":1"));
+    assert!(invoke_plan.contains("\"base_image_span_bytes\":16"));
+    assert!(invoke_plan.contains("\"planned_image_span_bytes\":40"));
+    assert!(invoke_plan.contains("\"stub_region_offset\":16"));
+    assert!(invoke_plan.contains("\"stub_entry_count\":1"));
+    assert!(invoke_plan.contains("\"got_region_offset\":32"));
+    assert!(invoke_plan.contains("\"got_entry_count\":1"));
+    assert!(invoke_plan.contains("\"target_symbol\":\"_puts\""));
+    assert!(invoke_plan.contains("\"got_output_offset\":32"));
+    assert!(invoke_plan.contains("\"stub_output_offset\":16"));
+    assert!(invoke_plan.contains("\"patch_target_kind\":\"branch-stub\""));
+    assert!(invoke_plan.contains("\"patch_target_output_offset\":16"));
     assert!(invoke_plan.contains("\"target_symbol\":\"_nuis_runtime\""));
     assert!(invoke_plan
         .contains("\"symbol\":\"_nuis_runtime\",\"reference_object_id\":\"host.program-llvm\""));
@@ -110,6 +135,16 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     assert!(invoke_plan_text.contains(
         "finalizer_input_materialization: contract=nuis-nsld-macho-arm64-materialization-preview-v1"
     ));
+    assert!(invoke_plan_text.contains(
+        "finalizer_input_patch_application: contract=nuis-nsld-macho-arm64-patch-application-v1"
+    ));
+    assert!(invoke_plan_text.contains("finalizer_input_applied_patch: id="));
+    assert!(invoke_plan_text.contains(
+        "finalizer_input_platform_structure: contract=nuis-nsld-macho-arm64-platform-structure-plan-v1"
+    ));
+    assert!(invoke_plan_text.contains("finalizer_input_platform_target: id="));
+    assert!(invoke_plan_text.contains("symbol=_puts"));
+    assert!(invoke_plan_text.contains("finalizer_input_platform_binding: relocation="));
     assert!(invoke_plan_text.contains(
         "finalizer_input_symbol_binding: symbol=_nuis_runtime reference=host.program-llvm:1 status=internal"
     ));
@@ -130,6 +165,25 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
         persisted_invoke_plan.contains("finalizer_input_materialization_previewed_patch_count = 1")
     );
     assert!(persisted_invoke_plan.contains("00000094|02000094"));
+    assert!(persisted_invoke_plan.contains(
+        "finalizer_input_patch_application_contract = \"nuis-nsld-macho-arm64-patch-application-v1\""
+    ));
+    assert!(
+        persisted_invoke_plan.contains("finalizer_input_patch_application_applied_patch_count = 1")
+    );
+    assert!(persisted_invoke_plan.contains("finalizer_input_patch_application_patches = ["));
+    assert!(persisted_invoke_plan.contains(
+        "finalizer_input_platform_structure_contract = \"nuis-nsld-macho-arm64-platform-structure-plan-v1\""
+    ));
+    assert!(persisted_invoke_plan.contains("finalizer_input_platform_structure_target_count = 1"));
+    assert!(
+        persisted_invoke_plan.contains("finalizer_input_platform_structure_stub_entry_count = 1")
+    );
+    assert!(
+        persisted_invoke_plan.contains("finalizer_input_platform_structure_got_entry_count = 1")
+    );
+    assert!(persisted_invoke_plan.contains("finalizer_input_platform_structure_targets = ["));
+    assert!(persisted_invoke_plan.contains("finalizer_input_platform_structure_bindings = ["));
     assert!(invoke_plan.contains("\"invocation_kind\":\"registered-internal-finalizer\""));
     assert!(invoke_plan.contains("\"invocation_policy\":\"registered-internal\""));
     assert!(invoke_plan.contains("\"requires_explicit_allow\":false"));

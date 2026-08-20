@@ -1,9 +1,11 @@
 use crate::{
+    final_executable_macho_application::apply_macho_arm64_patch_previews,
     final_executable_macho_input::parse_macho_arm64_object_linkage,
     final_executable_macho_layout::{build_macho_placement_binding_report, MachOLayoutObject},
     final_executable_macho_materialization::{
         build_macho_arm64_materialization_preview, MachOImageObject,
     },
+    final_executable_macho_platform::build_macho_arm64_platform_structure_plan,
     final_executable_macho_relocation::build_macho_arm64_relocation_application_report,
     reports::NsldExecutableFinalizerInputSummary,
 };
@@ -125,6 +127,20 @@ pub(crate) fn summarize_macho_host_object_handoff(
         &placement_binding,
         &relocation_application,
     )?;
+    let applied_image = apply_macho_arm64_patch_previews(
+        &image_inputs,
+        &placement_binding,
+        &relocation_application,
+        &materialization_preview,
+    )?;
+    if crate::fnv1a64_hex(&applied_image.bytes) != applied_image.report.applied_image_hash {
+        return Err("Mach-O applied image handoff hash drift".to_owned());
+    }
+    let platform_structure_plan = build_macho_arm64_platform_structure_plan(
+        &placement_binding,
+        &relocation_application,
+        &applied_image.report,
+    )?;
     Ok(NsldExecutableFinalizerInputSummary {
         contract: MACHO_HOST_OBJECT_LINKAGE_CONTRACT.to_owned(),
         status: status.to_owned(),
@@ -140,6 +156,8 @@ pub(crate) fn summarize_macho_host_object_handoff(
         placement_binding,
         relocation_application,
         materialization_preview,
+        patch_application: applied_image.report,
+        platform_structure_plan,
     })
 }
 

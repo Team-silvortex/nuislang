@@ -1,5 +1,6 @@
 use super::*;
 use crate::{
+    final_executable_macho_application::apply_macho_arm64_patch_previews,
     final_executable_macho_input::{
         ParsedMachOObjectLinkage, ParsedMachORelocation, ParsedMachOSection, ParsedMachOSymbol,
     },
@@ -46,6 +47,23 @@ fn merged_image_and_direct_patch_previews_are_deterministic() {
         report.patches[0].source_bytes_hash,
         report.patches[0].encoded_bytes_hash
     );
+    let applied =
+        apply_macho_arm64_patch_previews(&images, &placement, &relocations, &report).unwrap();
+    assert_eq!(applied.report.status, "direct-patches-applied");
+    assert_eq!(applied.report.expected_patch_count, 4);
+    assert_eq!(applied.report.applied_patch_count, 4);
+    assert_eq!(applied.report.write_once_span_count, 4);
+    assert_ne!(
+        applied.report.original_image_hash,
+        applied.report.applied_image_hash
+    );
+    assert_eq!(
+        crate::fnv1a64_hex(&applied.bytes),
+        applied.report.applied_image_hash
+    );
+    assert_eq!(&applied.bytes[0..4], &0x9400_0006u32.to_le_bytes());
+    assert_eq!(&applied.bytes[8..12], &0x9100_6000u32.to_le_bytes());
+    assert_eq!(&applied.bytes[12..20], &24u64.to_le_bytes());
 
     let reversed_layouts = [
         layout("runtime", "runtime-shim", &runtime),
@@ -66,6 +84,113 @@ fn merged_image_and_direct_patch_previews_are_deterministic() {
     )
     .unwrap();
     assert_eq!(report, reversed);
+    let reversed_applied = apply_macho_arm64_patch_previews(
+        &reversed_images,
+        &reversed_placement,
+        &reversed_relocations,
+        &reversed,
+    )
+    .unwrap();
+    assert_eq!(applied.report, reversed_applied.report);
+    assert_eq!(applied.bytes, reversed_applied.bytes);
+}
+
+#[test]
+fn patch_application_rejects_source_and_preview_audit_drift() {
+    let mut drifted_program_bytes = program_bytes();
+    let runtime_bytes = 0xd65f_03c0u32.to_le_bytes();
+    let program = program_linkage();
+    let runtime = runtime_linkage();
+    let layouts = [
+        layout("program", "program-llvm", &program),
+        layout("runtime", "runtime-shim", &runtime),
+    ];
+    let placement = build_macho_placement_binding_report(&layouts).unwrap();
+    let relocations =
+        build_macho_arm64_relocation_application_report(&layouts, &placement).unwrap();
+    let images = [
+        image("program", "program-llvm", &drifted_program_bytes, &program),
+        image("runtime", "runtime-shim", &runtime_bytes, &runtime),
+    ];
+    let report =
+        build_macho_arm64_materialization_preview(&images, &placement, &relocations).unwrap();
+
+    drifted_program_bytes[0] ^= 1;
+    let drifted_images = [
+        image("program", "program-llvm", &drifted_program_bytes, &program),
+        image("runtime", "runtime-shim", &runtime_bytes, &runtime),
+    ];
+    let source_error =
+        apply_macho_arm64_patch_previews(&drifted_images, &placement, &relocations, &report)
+            .unwrap_err();
+    assert!(source_error.contains("source image drift"));
+
+    let stable_program_bytes = program_bytes();
+    let stable_images = [
+        image("program", "program-llvm", &stable_program_bytes, &program),
+        image("runtime", "runtime-shim", &runtime_bytes, &runtime),
+    ];
+    let mut tampered =
+        build_macho_arm64_materialization_preview(&stable_images, &placement, &relocations)
+            .unwrap();
+    tampered.patches[0].encoded_bytes_hex = "07000094".to_owned();
+    tampered.patch_plan_hash = materialization_patch_plan_hash(
+        &placement.plan_hash,
+        &relocations.plan_hash,
+        &tampered.image_hash,
+        &tampered.patches,
+    );
+    let audit_error =
+        apply_macho_arm64_patch_previews(&stable_images, &placement, &relocations, &tampered)
+            .unwrap_err();
+    assert!(audit_error.contains("encoded byte hash drift"));
+
+    let mut source_hash_tampered =
+        build_macho_arm64_materialization_preview(&stable_images, &placement, &relocations)
+            .unwrap();
+    let patch = &mut source_hash_tampered.patches[0];
+    patch.source_bytes_hash = "0000000000000000".to_owned();
+    let application = relocations
+        .applications
+        .iter()
+        .find(|item| item.relocation_id == patch.relocation_id)
+        .unwrap();
+    patch.audit_hash = patch_audit_hash(
+        application,
+        patch.target_output_offset,
+        patch.effective_addend,
+        &patch.source_bytes_hash,
+        &patch.encoded_bytes_hash,
+    );
+    source_hash_tampered.patch_plan_hash = materialization_patch_plan_hash(
+        &placement.plan_hash,
+        &relocations.plan_hash,
+        &source_hash_tampered.image_hash,
+        &source_hash_tampered.patches,
+    );
+    let source_hash_error = apply_macho_arm64_patch_previews(
+        &stable_images,
+        &placement,
+        &relocations,
+        &source_hash_tampered,
+    )
+    .unwrap_err();
+    assert!(source_hash_error.contains("source byte hash drift"));
+
+    let mut reordered =
+        build_macho_arm64_materialization_preview(&stable_images, &placement, &relocations)
+            .unwrap();
+    reordered.patches.reverse();
+    reordered.patch_plan_hash = materialization_patch_plan_hash(
+        &placement.plan_hash,
+        &relocations.plan_hash,
+        &reordered.image_hash,
+        &reordered.patches,
+    );
+    let order_error =
+        apply_macho_arm64_patch_previews(&stable_images, &placement, &relocations, &reordered)
+            .unwrap_err();
+    assert!(order_error.contains("preview order drift"));
 }
 
 #[test]

@@ -1080,6 +1080,35 @@ source image. GOT and unresolved external records remain counted as deferred
 platform structures. JSON, text, and persisted writer input expose the same
 materialization facts.
 
+The next provider-owned boundary is
+`nuis-nsld-macho-arm64-patch-application-v1`. It reconstructs the merged source
+image instead of trusting mutable state from the encoder, verifies the preview
+contract and every placement, relocation, image, source-byte, encoded-byte, and
+patch-audit hash, then commits each direct patch to a private working image once.
+Duplicate ids, overlapping spans, source drift, non-canonical byte encodings,
+and post-write hash drift fail closed. The report binds the original and applied
+image hashes, each preview/write audit pair, and ordered counts into one
+application-ledger hash. JSON, text, and persisted writer input expose this same
+report. A working image with deferred platform structures is not promoted to an
+executable shell.
+
+`nuis-nsld-macho-arm64-platform-structure-plan-v1` then consumes the relocation
+plan and applied-image ledger through a provider-owned, symbol-agnostic rule
+registry. Explicit GOT-load page/pageoff records share one GOT target; an
+external branch receives one branch-stub target backed by one GOT entry.
+Structured target identity, rather than canonical-string encoding length,
+defines semantic sort order and cross-relocation deduplication. The current
+allocation policy reserves 12-byte, 4-aligned stub slots followed by 8-byte,
+8-aligned GOT slots in a checked working-image extension. Every deferred
+relocation receives one binding to a concrete target offset, and target/binding
+audits plus the full rule registry, layout, applied-image hash, and application
+ledger enter the plan hash. Unknown deferred forms, ambiguous rules, malformed
+internal/external identities, count/hash drift, and arithmetic overflow fail
+closed. The real compatibility fixture deterministically assigns `_puts` to
+stub offset 16 and GOT offset 32. The JSON, text, and persisted writer-input
+surfaces expose the same allocation facts. This stage does not emit structure
+bytes, dynamic bind metadata, or load commands.
+
 After those checks the provider validates a thin or universal arm64
 `MH_EXECUTE` compatibility image and installs it atomically with executable
 permissions. It requires neither host policy variables nor a child process,
@@ -1090,11 +1119,12 @@ resolved by the verified dry-run boundary instead of performing a second
 
 This still does not claim a pure Nsld platform linker: Nuisc now hands Nsld
 real relocatable objects, but it also embeds a host-toolchain-linked
-compatibility image. Nsld now owns the deterministic merged source image and
-checked direct-write encoding previews, but it does not yet commit those
-previews into a write-once final image, allocate non-section definitions,
-synthesize GOT/stubs or Mach-O load commands, or emit the final native shell
-independently. Those remain the next boundary.
+compatibility image. Nsld now owns the deterministic merged source image,
+checked direct-write encoding previews, and write-once applied working image,
+plus deterministic GOT/stub allocation, but it does not yet allocate
+non-section definitions, synthesize or apply platform bytes, emit bind/load
+commands, or produce the final native shell independently. Those remain the
+next boundary.
 
 `nsld final-executable-host-dry-run` consumes the verified writer input,
 reports `environment_ready`, provider identity, and exact command arguments.

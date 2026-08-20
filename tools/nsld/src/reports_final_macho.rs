@@ -138,6 +138,94 @@ pub(crate) struct NsldMachOArm64MaterializationPreviewReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64AppliedPatchAudit {
+    pub(crate) relocation_id: String,
+    pub(crate) source_output_offset: usize,
+    pub(crate) width_bytes: usize,
+    pub(crate) source_bytes_hash: String,
+    pub(crate) encoded_bytes_hash: String,
+    pub(crate) post_write_bytes_hash: String,
+    pub(crate) preview_audit_hash: String,
+    pub(crate) write_audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64PatchApplicationReport {
+    pub(crate) contract: String,
+    pub(crate) status: String,
+    pub(crate) placement_plan_hash: String,
+    pub(crate) relocation_plan_hash: String,
+    pub(crate) patch_plan_hash: String,
+    pub(crate) original_image_hash: String,
+    pub(crate) applied_image_hash: String,
+    pub(crate) image_span_bytes: usize,
+    pub(crate) expected_patch_count: usize,
+    pub(crate) applied_patch_count: usize,
+    pub(crate) deferred_patch_count: usize,
+    pub(crate) write_once_span_count: usize,
+    pub(crate) application_ledger_hash: String,
+    pub(crate) patches: Vec<NsldMachOArm64AppliedPatchAudit>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64PlatformTargetPlan {
+    pub(crate) structure_id: String,
+    pub(crate) target_key: String,
+    pub(crate) target_symbol: String,
+    pub(crate) resolver_status: String,
+    pub(crate) target_object_id: Option<String>,
+    pub(crate) target_section_id: Option<String>,
+    pub(crate) target_output_offset: Option<usize>,
+    pub(crate) got_slot_index: Option<usize>,
+    pub(crate) got_output_offset: Option<usize>,
+    pub(crate) stub_slot_index: Option<usize>,
+    pub(crate) stub_output_offset: Option<usize>,
+    pub(crate) relocation_ids: Vec<String>,
+    pub(crate) audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64PlatformRelocationBinding {
+    pub(crate) relocation_id: String,
+    pub(crate) relocation_kind: String,
+    pub(crate) action_kind: String,
+    pub(crate) source_output_offset: usize,
+    pub(crate) width_bytes: usize,
+    pub(crate) structure_id: String,
+    pub(crate) patch_target_kind: String,
+    pub(crate) patch_target_output_offset: usize,
+    pub(crate) audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64PlatformStructurePlanReport {
+    pub(crate) contract: String,
+    pub(crate) status: String,
+    pub(crate) placement_plan_hash: String,
+    pub(crate) relocation_plan_hash: String,
+    pub(crate) patch_application_ledger_hash: String,
+    pub(crate) applied_image_hash: String,
+    pub(crate) base_image_span_bytes: usize,
+    pub(crate) planned_image_span_bytes: usize,
+    pub(crate) registered_rule_count: usize,
+    pub(crate) deferred_relocation_count: usize,
+    pub(crate) target_count: usize,
+    pub(crate) stub_region_offset: usize,
+    pub(crate) stub_region_bytes: usize,
+    pub(crate) stub_entry_size: usize,
+    pub(crate) stub_alignment: usize,
+    pub(crate) stub_entry_count: usize,
+    pub(crate) got_region_offset: usize,
+    pub(crate) got_region_bytes: usize,
+    pub(crate) got_entry_size: usize,
+    pub(crate) got_alignment: usize,
+    pub(crate) got_entry_count: usize,
+    pub(crate) plan_hash: String,
+    pub(crate) targets: Vec<NsldMachOArm64PlatformTargetPlan>,
+    pub(crate) relocation_bindings: Vec<NsldMachOArm64PlatformRelocationBinding>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldExecutableFinalizerInputSummary {
     pub(crate) contract: String,
     pub(crate) status: String,
@@ -153,4 +241,6 @@ pub(crate) struct NsldExecutableFinalizerInputSummary {
     pub(crate) placement_binding: NsldMachOPlacementBindingReport,
     pub(crate) relocation_application: NsldMachOArm64RelocationApplicationReport,
     pub(crate) materialization_preview: NsldMachOArm64MaterializationPreviewReport,
+    pub(crate) patch_application: NsldMachOArm64PatchApplicationReport,
+    pub(crate) platform_structure_plan: NsldMachOArm64PlatformStructurePlanReport,
 }

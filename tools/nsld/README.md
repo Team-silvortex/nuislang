@@ -126,12 +126,30 @@ that image. `UNSIGNED`/`SUBTRACTOR`, `BRANCH26`, and
 alignment, displacement, and range encoding. Each preview exposes source and
 encoded bytes plus independent byte and audit hashes; GOT and unresolved
 external records remain explicit deferred platform-structure work.
+`nuis-nsld-macho-arm64-patch-application-v1` then reconstructs the source image
+from placement inputs and accepts only the audited preview contract. It verifies
+the placement, relocation, image, source-byte, encoded-byte, and preview-audit
+hashes; rejects duplicate or overlapping spans and source drift; writes every
+direct patch exactly once; and emits a stable applied-image hash plus per-patch
+write audits and an application-ledger hash. JSON, text, and persisted invoke
+plans project the same application report. This working image is not mislabeled
+as an executable while deferred platform structures still exist.
+`nuis-nsld-macho-arm64-platform-structure-plan-v1` consumes the applied-image
+ledger and deferred relocation records through a provider-owned rule registry.
+It deduplicates structured target identities, maps GOT loads to shared GOT
+entries and external branches to stub-plus-GOT targets, assigns checked
+working-image-relative offsets with 12-byte/4-aligned stub and 8-byte/8-aligned
+GOT policies, and hashes the registry, layout, targets, bindings, applied image,
+and ledger. Unsupported deferred forms fail closed rather than receiving a
+guessed structure. The report is identical across JSON, text, and persisted
+invoke plans. It allocates structure slots only; no stub/GOT bytes, external
+bind metadata, or load commands are fabricated.
 A gated host-command provider remains as a fallback; ELF and PE/COFF are
 explicit `registered-not-implemented` providers. This proves relocatable input,
 table parsing, placement, binding, merged-image construction, and complete
-direct relocation encoding previews, but not committed ARM64 byte writes,
-GOT/stub synthesis, or complete Mach-O shell emission independently of Nuisc's
-compatibility link.
+direct relocation encoding plus write-once commitment and deterministic
+GOT/stub allocation, but not platform byte synthesis, common-symbol allocation,
+or complete Mach-O shell emission independently of Nuisc's compatibility link.
 
 ## Current Early-Beta Rule
 

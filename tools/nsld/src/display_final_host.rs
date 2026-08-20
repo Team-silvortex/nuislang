@@ -458,6 +458,96 @@ fn print_finalizer_input_summary(summary: Option<&NsldExecutableFinalizerInputSu
             patch.audit_hash
         );
     }
+    let application = &summary.patch_application;
+    println!(
+        "  finalizer_input_patch_application: contract={} status={} placement_plan_hash={} relocation_plan_hash={} image_span={} original_image_hash={} applied_image_hash={} patch_plan_hash={} ledger_hash={} expected={} applied={} deferred={} write_once_spans={}",
+        application.contract,
+        application.status,
+        application.placement_plan_hash,
+        application.relocation_plan_hash,
+        application.image_span_bytes,
+        application.original_image_hash,
+        application.applied_image_hash,
+        application.patch_plan_hash,
+        application.application_ledger_hash,
+        application.expected_patch_count,
+        application.applied_patch_count,
+        application.deferred_patch_count,
+        application.write_once_span_count
+    );
+    for patch in &application.patches {
+        println!(
+            "  finalizer_input_applied_patch: id={} offset={} width={} source_hash={} encoded_hash={} post_write_hash={} preview_audit_hash={} write_audit_hash={}",
+            patch.relocation_id,
+            patch.source_output_offset,
+            patch.width_bytes,
+            patch.source_bytes_hash,
+            patch.encoded_bytes_hash,
+            patch.post_write_bytes_hash,
+            patch.preview_audit_hash,
+            patch.write_audit_hash
+        );
+    }
+    let platform = &summary.platform_structure_plan;
+    println!(
+        "  finalizer_input_platform_structure: contract={} status={} placement_plan_hash={} relocation_plan_hash={} application_ledger_hash={} applied_image_hash={} plan_hash={} base_span={} planned_span={} rules={} deferred={} targets={} stubs={}:{}+{} got={}:{}+{}",
+        platform.contract,
+        platform.status,
+        platform.placement_plan_hash,
+        platform.relocation_plan_hash,
+        platform.patch_application_ledger_hash,
+        platform.applied_image_hash,
+        platform.plan_hash,
+        platform.base_image_span_bytes,
+        platform.planned_image_span_bytes,
+        platform.registered_rule_count,
+        platform.deferred_relocation_count,
+        platform.target_count,
+        platform.stub_entry_count,
+        platform.stub_region_offset,
+        platform.stub_region_bytes,
+        platform.got_entry_count,
+        platform.got_region_offset,
+        platform.got_region_bytes
+    );
+    for target in &platform.targets {
+        println!(
+            "  finalizer_input_platform_target: id={} key={} symbol={} resolver={} target_object={} target_section={} target_offset={} got_slot={} got_offset={} stub_slot={} stub_offset={} relocations={} audit_hash={}",
+            target.structure_id,
+            target.target_key,
+            target.target_symbol,
+            target.resolver_status,
+            target.target_object_id.as_deref().unwrap_or("none"),
+            target.target_section_id.as_deref().unwrap_or("none"),
+            display_option(target.target_output_offset),
+            display_option(target.got_slot_index),
+            display_option(target.got_output_offset),
+            display_option(target.stub_slot_index),
+            display_option(target.stub_output_offset),
+            target.relocation_ids.join(","),
+            target.audit_hash
+        );
+    }
+    for binding in &platform.relocation_bindings {
+        println!(
+            "  finalizer_input_platform_binding: relocation={} kind={} action={} source_offset={} width={} target_id={} patch_target={} patch_offset={} audit_hash={}",
+            binding.relocation_id,
+            binding.relocation_kind,
+            binding.action_kind,
+            binding.source_output_offset,
+            binding.width_bytes,
+            binding.structure_id,
+            binding.patch_target_kind,
+            binding.patch_target_output_offset,
+            binding.audit_hash
+        );
+    }
+}
+
+fn display_option(value: Option<usize>) -> String {
+    value
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "none".to_owned())
 }
 
 pub(crate) fn print_nsld_final_executable_host_invoke_plan_emit_report(

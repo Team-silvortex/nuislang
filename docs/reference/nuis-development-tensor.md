@@ -329,8 +329,19 @@ The `beta-0.1` calibration baseline is:
   section payloads into deterministic merged buffers, audits section/image
   hashes, and generates non-mutating checked byte previews for
   `UNSIGNED`/`SUBTRACTOR`, `BRANCH26`, and paired
-  `PAGE21`/`PAGEOFF12`/`ADDEND`; actual write commitment, common-symbol
-  allocation, GOT/stubs, Mach-O shell synthesis, ELF, and PE/COFF remain open
+  `PAGE21`/`PAGEOFF12`/`ADDEND`;
+  `nuis-nsld-macho-arm64-patch-application-v1` independently reconstructs the
+  source image, accepts only hash- and audit-verified preview bytes, rejects
+  duplicate/overlapping spans and source drift, commits each direct patch once,
+  and emits deterministic post-write image, patch-audit, and ledger hashes
+  through JSON, text, and persisted invoke plans;
+  `nuis-nsld-macho-arm64-platform-structure-plan-v1` uses a provider rule
+  registry to deduplicate semantic targets, assign checked 12-byte stub and
+  8-byte GOT slots, bind every deferred relocation to one target offset, and
+  hash the registry, applied-image ledger, layout, targets, and bindings; the
+  real `_puts` fixture receives stub offset 16 and aligned GOT offset 32;
+  platform byte synthesis/application, common-symbol allocation, Mach-O shell
+  synthesis, ELF, and PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

@@ -717,4 +717,12 @@ fn render_finalizer_input_summary(
         out,
         &summary.materialization_preview,
     );
+    crate::final_executable_writer_macho::render_macho_patch_application(
+        out,
+        &summary.patch_application,
+    );
+    crate::final_executable_writer_macho::render_macho_platform_structure_plan(
+        out,
+        &summary.platform_structure_plan,
+    );
 }
