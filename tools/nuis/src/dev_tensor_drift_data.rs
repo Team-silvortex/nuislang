@@ -3,6 +3,7 @@ use crate::{
     dev_tensor_drift_data_core::DEV_TENSOR_CORE_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime::DEV_TENSOR_RUNTIME_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_bootstrap::DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS,
+    dev_tensor_drift_data_runtime_cffi_object::DEV_TENSOR_RUNTIME_CFFI_OBJECT_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_cuda::DEV_TENSOR_RUNTIME_CUDA_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_dev::DEV_TENSOR_RUNTIME_DEV_DRIFT_CHECKS,
     dev_tensor_drift_data_runtime_dev_lineage::DEV_TENSOR_RUNTIME_DEV_LINEAGE_DRIFT_CHECKS,
@@ -23,6 +24,7 @@ pub(crate) fn dev_tensor_drift_checks() -> impl Iterator<Item = &'static DevTens
         .chain(DEV_TENSOR_RUNTIME_NSLD_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS.iter())
+        .chain(DEV_TENSOR_RUNTIME_CFFI_OBJECT_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_CUDA_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_DISPATCH_CAPABILITY_DRIFT_CHECKS.iter())
         .chain(DEV_TENSOR_RUNTIME_EXECUTION_DRIFT_CHECKS.iter())

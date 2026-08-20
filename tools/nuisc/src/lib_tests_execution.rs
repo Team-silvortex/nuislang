@@ -512,9 +512,8 @@ mod cffi Main {
     assert!(host_ffi_text.contains("destructor=none"));
 
     let manifest_path = output_dir.join("nuis.build.manifest.toml");
-    let manifest_report = aot::verify_build_manifest(&manifest_path).unwrap();
-    let artifact = load_nuis_compiled_artifact(&manifest_path).unwrap();
-    let link_plan = linker::build_link_plan(&manifest_report, &artifact);
+    aot::verify_build_manifest(&manifest_path).unwrap();
+    let link_plan = linker::build_link_plan_from_manifest(&manifest_path).unwrap();
     let link_plan_json = linker::render_link_plan_json(&link_plan);
     assert_eq!(link_plan.host_ffi.memory_capability_count, 1);
     assert!(link_plan.host_ffi.validation.link_allowed);
@@ -530,6 +529,90 @@ mod cffi Main {
     };
     assert!(error.contains("lifetime, length, mutability"));
     assert!(error.contains("policy drift"));
+}
+
+#[test]
+fn compile_command_carries_owned_object_authority_into_nsld_plan() {
+    let project_root = PathBuf::from("../../examples/projects/ffi/owned_return_object_demo");
+    let output_dir = temp_dir("owned_object_host_ffi_capability_outputs");
+
+    run(CommandKind::Compile {
+        input: project_root,
+        output_dir: output_dir.clone(),
+        verbose_cache: false,
+        cpu_abi: None,
+        target: None,
+        packaging_mode: None,
+    })
+    .unwrap();
+
+    let host_ffi_path = output_dir.join("nuis.project.host_ffi.txt");
+    let host_ffi_text = fs::read_to_string(&host_ffi_path).unwrap();
+    let descriptor = "kind=owned_return_object,slot=return,size=static:16,read=i64_slots,mutability=read_only,lifetime=owned,destructor=host_owned_object_destroy@fnv1a64:01380e9c47940d8f";
+    assert!(host_ffi_text.contains("memory_capability_count=1"));
+    assert!(host_ffi_text.contains(descriptor));
+    assert!(host_ffi_text.contains("@nustar-memory-authority"));
+    assert!(host_ffi_text.contains("signature_pattern=i64(ref_FfiObject)"));
+
+    let manifest_path = output_dir.join("nuis.build.manifest.toml");
+    aot::verify_build_manifest(&manifest_path).unwrap();
+    let link_plan = linker::build_link_plan_from_manifest(&manifest_path).unwrap();
+    let link_plan_json = linker::render_link_plan_json(&link_plan);
+    assert_eq!(link_plan.host_ffi.memory_capability_count, 1);
+    assert!(link_plan.host_ffi.validation.link_allowed);
+    assert!(link_plan_json.contains(descriptor));
+    assert!(link_plan.host_ffi.entries.iter().any(|entry| {
+        entry.symbol == "host_owned_object_destroy"
+            && entry.signature_pattern == "i64(ref_FfiObject)"
+    }));
+
+    let signature_hash = yir_core::ffi::ffi_symbol_signature_hash(
+        "c",
+        "host_owned_object_make",
+        "ref_FfiObject(i64)",
+    );
+    for (field, drifted_descriptor) in [
+        (
+            "size",
+            descriptor.replace("size=static:16", "size=static:24"),
+        ),
+        (
+            "read",
+            descriptor.replace("read=i64_slots", "read=raw_bytes"),
+        ),
+    ] {
+        let drifted_hash = yir_core::ffi::ffi_memory_capability_hash(
+            "c",
+            "host_owned_object_make",
+            &signature_hash,
+            &drifted_descriptor,
+        );
+        let damaged = host_ffi_text
+            .replace("fnv1a64:a059d88fe7eccfa6", &drifted_hash)
+            .replace(descriptor, &drifted_descriptor);
+        fs::write(&host_ffi_path, damaged).unwrap();
+        let error = match aot::verify_build_manifest(&manifest_path) {
+            Ok(_) => panic!("hash-consistent owned object policy drift must be rejected"),
+            Err(error) => error,
+        };
+        assert!(
+            error.contains("owned_return_object"),
+            "field={field}: {error}"
+        );
+        assert!(error.contains("size/read policy"), "field={field}: {error}");
+    }
+
+    let missing_destructor = host_ffi_text
+        .lines()
+        .filter(|line| !line.starts_with("@nustar-memory-authority"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    fs::write(&host_ffi_path, missing_destructor).unwrap();
+    let error = match aot::verify_build_manifest(&manifest_path) {
+        Ok(_) => panic!("missing owned object destructor authority must be rejected"),
+        Err(error) => error,
+    };
+    assert!(error.contains("missing or drifted destructor"), "{error}");
 }
 
 #[test]

@@ -157,6 +157,49 @@ pub(crate) fn handle_galaxy(command: cli::GalaxyCommand) -> Result<(), String> {
                 );
             }
         }
+        cli::GalaxyCommand::ResolveDeps {
+            input,
+            provider_root,
+            provider_id,
+            provider_kind,
+        } => {
+            let descriptor = nuisc::stdlib_registry::GalaxyResolutionProviderDescriptor {
+                provider_id,
+                provider_kind,
+                root: provider_root,
+            };
+            let resolved = galaxy::resolve_project_deps_with_provider(&input, &descriptor)?;
+            println!("resolved galaxy dependencies through registered provider");
+            println!("  request_contract: {}", resolved.request.contract);
+            println!("  result_contract: {}", resolved.provider.contract);
+            println!("  status: {}", resolved.provider.status);
+            println!("  provider_id: {}", resolved.provider.provider_id);
+            println!("  provider_kind: {}", resolved.provider.provider_kind);
+            println!("  request_sha256: {}", resolved.provider.request_sha256);
+            println!("  selection_sha256: {}", resolved.provider.selection_sha256);
+            println!("  candidates: {}", resolved.provider.candidate_count);
+            println!("  selected: {}", resolved.provider.selected_count);
+            println!("  lock: {}", resolved.lock.path.display());
+            println!(
+                "  resolution_sha256: {}",
+                resolved.lock.summary.resolution_sha256
+            );
+            println!("  cache: {}", resolved.synced.root.display());
+            for selection in resolved.provider.selections {
+                println!(
+                    "  dep: {}={} package={} scope={} path={}",
+                    selection.name,
+                    selection.version,
+                    selection.package_id,
+                    if selection.direct {
+                        "direct"
+                    } else {
+                        "transitive"
+                    },
+                    selection.relative_path
+                );
+            }
+        }
         cli::GalaxyCommand::SyncDeps { input } => {
             let synced = galaxy::sync_project_deps(&input)?;
             if synced.entries.is_empty() {

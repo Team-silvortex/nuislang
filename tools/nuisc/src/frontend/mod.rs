@@ -65,6 +65,8 @@ mod tests_frontend_core;
 mod tests_frontend_semantics;
 mod text_handle_rewrite;
 
+pub(crate) use annotations::resolve_std_host_symbol;
+
 // Generic specialization and higher-order behavior.
 #[cfg(test)]
 mod tests_generic_constraints;
@@ -144,9 +146,10 @@ use self::call_routing::{lower_routed_call_or_core_builtin, RoutedCallLoweringIn
 use self::const_assembly::assemble_module_consts;
 use self::direct_calls::{lower_direct_call_builtin_or_named_call, DirectCallBuiltinInput};
 use self::expr_lowering::{
-    lower_expr, lower_expr_with_async, lower_nested_expr_with_async,
-    lower_nested_expr_with_async_and_consts, ExprWithAsyncInput, NestedExprWithConstsInput,
-    current_module_structs_contains, with_current_module_structs, with_current_type_aliases,
+    current_module_structs_contains, lower_expr, lower_expr_with_async,
+    lower_nested_expr_with_async, lower_nested_expr_with_async_and_consts,
+    with_current_module_structs, with_current_type_aliases, ExprWithAsyncInput,
+    NestedExprWithConstsInput,
 };
 use self::function_lowering::find_impl_method_signature;
 use self::function_lowering::{

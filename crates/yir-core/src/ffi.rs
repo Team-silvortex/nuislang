@@ -9,6 +9,11 @@ pub const OWNED_UTF8_RETURN_PROTOCOL: &str = "nuis-ffi-owned-utf8-v1";
 pub const OWNED_UTF8_RETURN_LENGTH_POLICY: &str = "runtime_header";
 pub const OWNED_UTF8_RETURN_METADATA_LEN: usize = 9;
 pub const OWNED_UTF8_DESTRUCTOR_SIGNATURE: &str = "i64(ref_String)";
+pub const OWNED_OBJECT_RETURN_PROTOCOL: &str = "nuis-ffi-owned-object-v1";
+pub const OWNED_OBJECT_RETURN_SIZE_POLICY: &str = "static:16";
+pub const OWNED_OBJECT_RETURN_READ_POLICY: &str = "i64_slots";
+pub const OWNED_OBJECT_RETURN_METADATA_LEN: usize = 10;
+pub const OWNED_OBJECT_DESTRUCTOR_SIGNATURE: &str = "i64(ref_FfiObject)";
 pub const OWNED_BUFFER_BRANCH_TRANSFER_ACTION: &str = "take_owned_buffer_drop_other_v1";
 pub const OWNED_BUFFER_FUNCTION_TRANSFER_PROTOCOL: &str =
     "nuis-ffi-owned-buffer-function-transfer-v1";
@@ -33,6 +38,20 @@ pub struct OwnedUtf8ReturnContract<'a> {
     pub signature: &'a str,
     pub signature_hash: &'a str,
     pub capability_hash: &'a str,
+    pub destructor_symbol: &'a str,
+    pub destructor_signature_hash: &'a str,
+    pub inputs: &'a [String],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OwnedObjectReturnContract<'a> {
+    pub abi: &'a str,
+    pub symbol: &'a str,
+    pub signature: &'a str,
+    pub signature_hash: &'a str,
+    pub capability_hash: &'a str,
+    pub size_policy: &'a str,
+    pub read_policy: &'a str,
     pub destructor_symbol: &'a str,
     pub destructor_signature_hash: &'a str,
     pub inputs: &'a [String],
@@ -252,6 +271,89 @@ pub fn parse_owned_utf8_return_contract(
     })
 }
 
+pub fn owned_object_return_descriptor(
+    destructor_symbol: &str,
+    destructor_signature_hash: &str,
+) -> String {
+    format!(
+        "kind=owned_return_object,slot=return,size={OWNED_OBJECT_RETURN_SIZE_POLICY},read={OWNED_OBJECT_RETURN_READ_POLICY},mutability=read_only,lifetime=owned,destructor={destructor_symbol}@{destructor_signature_hash}"
+    )
+}
+
+pub fn parse_owned_object_return_contract(
+    args: &[String],
+) -> Result<OwnedObjectReturnContract<'_>, String> {
+    if args.len() < OWNED_OBJECT_RETURN_METADATA_LEN {
+        return Err(format!(
+            "owned FFI object call expects at least {OWNED_OBJECT_RETURN_METADATA_LEN} contract arguments, found {}",
+            args.len()
+        ));
+    }
+    if args[0] != OWNED_OBJECT_RETURN_PROTOCOL {
+        return Err(format!(
+            "owned FFI object call protocol must be `{OWNED_OBJECT_RETURN_PROTOCOL}`, found `{}`",
+            args[0]
+        ));
+    }
+    if args[1].is_empty() || args[2].is_empty() || args[3].is_empty() || args[8].is_empty() {
+        return Err("owned FFI object call contract contains an empty ABI, symbol, signature, or destructor symbol".to_owned());
+    }
+    if args[6] != OWNED_OBJECT_RETURN_SIZE_POLICY {
+        return Err(format!(
+            "owned FFI object size policy must be `{OWNED_OBJECT_RETURN_SIZE_POLICY}`, found `{}`",
+            args[6]
+        ));
+    }
+    if args[7] != OWNED_OBJECT_RETURN_READ_POLICY {
+        return Err(format!(
+            "owned FFI object read policy must be `{OWNED_OBJECT_RETURN_READ_POLICY}`, found `{}`",
+            args[7]
+        ));
+    }
+    let expected_signature_hash = ffi_symbol_signature_hash(&args[1], &args[2], &args[3]);
+    if args[4] != expected_signature_hash {
+        return Err(format!(
+            "owned FFI object signature hash mismatch: expected `{expected_signature_hash}`, found `{}`",
+            args[4]
+        ));
+    }
+    if !is_ffi_symbol_hash_token(&args[9]) {
+        return Err(format!(
+            "owned FFI object destructor signature hash `{}` is malformed",
+            args[9]
+        ));
+    }
+    let expected_destructor_hash =
+        ffi_symbol_signature_hash(&args[1], &args[8], OWNED_OBJECT_DESTRUCTOR_SIGNATURE);
+    if args[9] != expected_destructor_hash {
+        return Err(format!(
+            "owned FFI object destructor signature hash mismatch: expected `{expected_destructor_hash}`, found `{}`",
+            args[9]
+        ));
+    }
+    let descriptor = owned_object_return_descriptor(&args[8], &args[9]);
+    let expected_capability_hash =
+        ffi_memory_capability_hash(&args[1], &args[2], &args[4], &descriptor);
+    if args[5] != expected_capability_hash {
+        return Err(format!(
+            "owned FFI object capability hash mismatch: expected `{expected_capability_hash}`, found `{}`",
+            args[5]
+        ));
+    }
+    Ok(OwnedObjectReturnContract {
+        abi: &args[1],
+        symbol: &args[2],
+        signature: &args[3],
+        signature_hash: &args[4],
+        capability_hash: &args[5],
+        size_policy: &args[6],
+        read_policy: &args[7],
+        destructor_symbol: &args[8],
+        destructor_signature_hash: &args[9],
+        inputs: &args[OWNED_OBJECT_RETURN_METADATA_LEN..],
+    })
+}
+
 pub fn ffi_symbol_signature_hash(abi: &str, symbol: &str, signature: &str) -> String {
     fnv1a64_token(&ffi_symbol_signature_canonical_input(
         abi, symbol, signature,
@@ -311,11 +413,14 @@ mod tests {
     use super::{
         ffi_memory_capability_canonical_input, ffi_memory_capability_hash,
         ffi_symbol_signature_canonical_input, ffi_symbol_signature_hash, is_ffi_symbol_hash_token,
-        owned_buffer_return_descriptor, owned_utf8_return_descriptor,
-        parse_owned_buffer_function_transfer_contract, parse_owned_buffer_return_contract,
+        owned_buffer_return_descriptor, owned_object_return_descriptor,
+        owned_utf8_return_descriptor, parse_owned_buffer_function_transfer_contract,
+        parse_owned_buffer_return_contract, parse_owned_object_return_contract,
         parse_owned_utf8_return_contract, OWNED_BUFFER_DESTRUCTOR_SIGNATURE,
         OWNED_BUFFER_FUNCTION_TRANSFER_PROTOCOL, OWNED_BUFFER_RETURN_LENGTH_POLICY,
-        OWNED_BUFFER_RETURN_PROTOCOL, OWNED_UTF8_DESTRUCTOR_SIGNATURE,
+        OWNED_BUFFER_RETURN_PROTOCOL, OWNED_OBJECT_DESTRUCTOR_SIGNATURE,
+        OWNED_OBJECT_RETURN_PROTOCOL, OWNED_OBJECT_RETURN_READ_POLICY,
+        OWNED_OBJECT_RETURN_SIZE_POLICY, OWNED_UTF8_DESTRUCTOR_SIGNATURE,
         OWNED_UTF8_RETURN_LENGTH_POLICY, OWNED_UTF8_RETURN_PROTOCOL,
     };
 
@@ -454,6 +559,54 @@ mod tests {
         let mut tampered = args;
         tampered[7] = "other_destroy".to_owned();
         assert!(parse_owned_utf8_return_contract(&tampered)
+            .unwrap_err()
+            .contains("destructor signature hash mismatch"));
+    }
+
+    #[test]
+    fn owned_object_contract_binds_size_read_and_destructor_authority() {
+        let signature = "ref_FfiObject(i64)";
+        let signature_hash = ffi_symbol_signature_hash("c", "host_owned_object_make", signature);
+        let destructor_hash = ffi_symbol_signature_hash(
+            "c",
+            "host_owned_object_destroy",
+            OWNED_OBJECT_DESTRUCTOR_SIGNATURE,
+        );
+        let descriptor =
+            owned_object_return_descriptor("host_owned_object_destroy", &destructor_hash);
+        let capability_hash =
+            ffi_memory_capability_hash("c", "host_owned_object_make", &signature_hash, &descriptor);
+        let args = vec![
+            OWNED_OBJECT_RETURN_PROTOCOL.to_owned(),
+            "c".to_owned(),
+            "host_owned_object_make".to_owned(),
+            signature.to_owned(),
+            signature_hash,
+            capability_hash,
+            OWNED_OBJECT_RETURN_SIZE_POLICY.to_owned(),
+            OWNED_OBJECT_RETURN_READ_POLICY.to_owned(),
+            "host_owned_object_destroy".to_owned(),
+            destructor_hash,
+            "seed".to_owned(),
+        ];
+        let contract = parse_owned_object_return_contract(&args).unwrap();
+        assert_eq!(contract.inputs, ["seed"]);
+
+        let mut size_drift = args.clone();
+        size_drift[6] = "static:24".to_owned();
+        assert!(parse_owned_object_return_contract(&size_drift)
+            .unwrap_err()
+            .contains("size policy"));
+
+        let mut read_drift = args.clone();
+        read_drift[7] = "raw_bytes".to_owned();
+        assert!(parse_owned_object_return_contract(&read_drift)
+            .unwrap_err()
+            .contains("read policy"));
+
+        let mut destructor_drift = args;
+        destructor_drift[8] = "other_destroy".to_owned();
+        assert!(parse_owned_object_return_contract(&destructor_drift)
             .unwrap_err()
             .contains("destructor signature hash mismatch"));
     }

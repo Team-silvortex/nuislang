@@ -1,0 +1,14 @@
+mod cffi Main {
+  extern "c" fn host_owned_object_make(seed: i64) -> ref FfiObject;
+  extern "c" fn host_owned_object_live_count() -> i64;
+
+  fn main() -> i64 {
+    let object: ref FfiObject = host_owned_object_make(7);
+    let size: i64 = owned_object_size(object);
+    let first: i64 = owned_object_read_i64(object, 0);
+    let second: i64 = owned_object_read_i64(object, 1);
+    free(object);
+    let live: i64 = host_owned_object_live_count();
+    return size + first + second + live - 45;
+  }
+}

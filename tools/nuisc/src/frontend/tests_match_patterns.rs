@@ -474,14 +474,19 @@ fn parses_single_element_tuple_type_and_expr_syntax() {
     .unwrap();
 
     let function = &ast.functions[0];
-    let return_type = function.return_type.as_ref().expect("expected explicit return type");
+    let return_type = function
+        .return_type
+        .as_ref()
+        .expect("expected explicit return type");
     assert_eq!(return_type.name, "Tuple");
     assert_eq!(return_type.generic_args.len(), 1);
     assert_eq!(return_type.generic_args[0].name, "i64");
 
     match &function.body[0] {
         AstStmt::Let { ty, value, .. } => {
-            let let_ty = ty.as_ref().expect("expected explicit tuple type annotation");
+            let let_ty = ty
+                .as_ref()
+                .expect("expected explicit tuple type annotation");
             assert_eq!(let_ty.name, "Tuple");
             assert_eq!(let_ty.generic_args.len(), 1);
             assert_eq!(let_ty.generic_args[0].name, "i64");
@@ -521,9 +526,7 @@ fn parses_single_element_tuple_pattern_in_match() {
                 assert_eq!(patterns.len(), 1);
                 assert!(matches!(&patterns[0], AstMatchPattern::Bind(name) if name == "value"));
             }
-            other => panic!(
-                "expected tuple pattern for first arm, found {other:?}"
-            ),
+            other => panic!("expected tuple pattern for first arm, found {other:?}"),
         },
         other => panic!("expected return(match...) statement, found {other:?}"),
     }
@@ -662,20 +665,12 @@ fn lowers_quad_nested_single_element_tuple_pattern_in_match_expression_with_guar
             else_body,
             ..
         } => {
-                match condition {
-                    NirExpr::Binary {
-                        op,
-                    lhs,
-                    rhs,
-                } => {
+            match condition {
+                NirExpr::Binary { op, lhs, rhs } => {
                     assert_eq!(*op, NirBinaryOp::And);
                     assert!(matches!(lhs.as_ref(), NirExpr::Bool(true)));
                     match rhs.as_ref() {
-                        NirExpr::Binary {
-                            op,
-                            lhs,
-                            rhs,
-                        } => {
+                        NirExpr::Binary { op, lhs, rhs } => {
                             assert_eq!(*op, NirBinaryOp::Eq);
                             assert!(matches!(rhs.as_ref(), NirExpr::Int(42)));
                             assert!(matches!(
@@ -709,7 +704,9 @@ fn lowers_quad_nested_single_element_tuple_pattern_in_match_expression_with_guar
                         other => panic!("expected guard equality condition, found {other:?}"),
                     }
                 }
-                other => panic!("expected guarded match condition (and bool + eq), found {other:?}"),
+                other => {
+                    panic!("expected guarded match condition (and bool + eq), found {other:?}")
+                }
             }
             assert!(matches!(
                 then_body.as_slice(),
@@ -781,19 +778,11 @@ fn lowers_quintuple_nested_single_element_tuple_pattern_in_match_expression_with
             ..
         } => {
             match condition {
-                NirExpr::Binary {
-                    op,
-                    lhs,
-                    rhs,
-                } => {
+                NirExpr::Binary { op, lhs, rhs } => {
                     assert_eq!(*op, NirBinaryOp::And);
                     assert!(matches!(lhs.as_ref(), NirExpr::Bool(true)));
                     match rhs.as_ref() {
-                        NirExpr::Binary {
-                            op,
-                            lhs,
-                            rhs,
-                        } => {
+                        NirExpr::Binary { op, lhs, rhs } => {
                             assert_eq!(*op, NirBinaryOp::Eq);
                             assert!(matches!(rhs.as_ref(), NirExpr::Int(42)));
                             assert!(matches!(
@@ -835,7 +824,9 @@ fn lowers_quintuple_nested_single_element_tuple_pattern_in_match_expression_with
                         other => panic!("expected guard equality condition, found {other:?}"),
                     }
                 }
-                other => panic!("expected guarded match condition (and bool + eq), found {other:?}"),
+                other => {
+                    panic!("expected guarded match condition (and bool + eq), found {other:?}")
+                }
             }
 
             assert!(matches!(

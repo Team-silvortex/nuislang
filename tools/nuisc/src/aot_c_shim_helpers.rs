@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use crate::frontend::resolve_std_host_symbol;
 use nuis_semantics::model::{AstExternFunction, AstModule, AstTypeRef};
 
 pub(crate) struct ExportedEntry {
@@ -146,17 +147,25 @@ pub(crate) fn collect_host_ffi_symbols(ast: &AstModule) -> BTreeMap<String, AstE
         },
     );
     for function in &ast.externs {
-        if function.name.starts_with("host_")
+        let symbol = function
+            .host_symbol
+            .as_deref()
+            .and_then(resolve_std_host_symbol)
+            .unwrap_or_else(|| function.name.as_str());
+        if symbol.starts_with("host_")
             && !matches!(
-                function.name.as_str(),
+                symbol,
                 "host_owned_buffer_make"
                     | "host_owned_buffer_destroy"
                     | "host_owned_utf8_make"
                     | "host_owned_utf8_destroy"
                     | "host_owned_utf8_live_count"
+                    | "host_owned_object_make"
+                    | "host_owned_object_destroy"
+                    | "host_owned_object_live_count"
             )
         {
-            out.insert(function.name.clone(), function.clone());
+            out.insert(symbol.to_owned(), function.clone());
         }
     }
     for interface in &ast.extern_interfaces {
@@ -197,6 +206,29 @@ pub(crate) fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) ->
         signature,
         body
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::collect_host_ffi_symbols;
+
+    #[test]
+    fn collects_lowered_symbol_for_std_host_extern() {
+        let ast = crate::frontend::parse_nuis_ast(
+            r#"
+            mod cffi Main {
+              extern "c" @host_symbol("stdout.write") fn stdout_write(text: i64) -> i64;
+              fn main() -> i64 { return stdout_write(1); }
+            }
+            "#,
+        )
+        .expect("parse std host extern");
+
+        let symbols = collect_host_ffi_symbols(&ast);
+        assert!(symbols.contains_key("host_stdout_write"));
+        assert!(!symbols.contains_key("stdout_write"));
+        assert_eq!(symbols["host_stdout_write"].name, "stdout_write");
+    }
 }
 
 pub(crate) fn arg_name(index: usize, function: &AstExternFunction) -> String {

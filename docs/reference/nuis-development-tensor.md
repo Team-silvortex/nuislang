@@ -262,9 +262,9 @@ The `beta-0.1` calibration baseline is:
   payloads, per-mutex parking/fairness, and a mature parallel Nuis executor
   remain open
 * `host-compatibility/cffi/registered-pointer-string-object-boundary`:
-  `usable/97`, required; five real borrowed UTF-8 calls, one owned
-  `ref Buffer` return, and one owned read-only `ref String` return carry exact
-  signature plus memory-capability hashes
+  `stable/100`, required; five real borrowed UTF-8 calls, one owned
+  `ref Buffer` return, one owned read-only `ref String` return, and one opaque
+  owned `ref FfiObject` return carry exact signature plus memory-capability hashes
   through compile, project metadata, and Nsld validation; the owned path now
   has self-verifying YIR metadata, runtime-header length recovery, exact
   destructor dispatch, and native execution; one GLM-typed conditional transfer
@@ -275,11 +275,20 @@ The `beta-0.1` calibration baseline is:
   static ABI/destructor/hash identity across both boundaries and enforces one
   caller release; owned UTF-8 has a separate Res-producing operation, runtime
   validity/length checks, bounded byte reads, one direct exact destructor, and
-  a native zero-live-owner proof; writes and every helper/branch/task/async/loop
-  escape for that String remain closed, as do raw pointers and generalized
-  external objects
-* `package-system/galaxy/source-import-and-lock-resolution`: `usable/96`,
-  required and now the current weakest bootstrap task; root and generated build
+  a native zero-live-owner proof; FfiObject independently binds
+  `size=static:16`, `read=i64_slots`, and its exact destructor, exposes only
+  bounded size/slot reads, rejects generic Buffer fallback, and has its own
+  native zero-live-object proof; writes and every helper/branch/task/async/loop
+  escape for String and FfiObject remain closed, as do raw pointers and
+  arbitrary external object layouts; project metadata now queries
+  `official.cffi` rather than inferring permissions from AST types, includes
+  the registered destructor as a static authority dependency, and carries the
+  exact object descriptor through build-manifest verification and the same
+  link-plan entry used by Nsld; hash-consistent size/read drift and missing
+  destructor authority fail closed, while a full Nsld drive leaves the native
+  project artifact runnable with exit `0`
+* `package-system/galaxy/source-import-and-lock-resolution`: `usable/98`,
+  required; root and generated build
   locks now share one portable SHA-256-bound
   compiler resolution protocol covering direct/transitive edges, package
   identity, manifest/source/library content, import policy, and actual module
@@ -287,9 +296,14 @@ The `beta-0.1` calibration baseline is:
   `sha256/<resolution>` compiler provider with a canonical index, cache
   manifest, and lock copy; locked compiles consume only that provider and
   re-render the closure against the root lock; project release admission now
-  requires both lock and synchronized cache before writing outputs; remote
-  discovery, solving, trust metadata, transport, and cache collection remain
-  open
+  requires both lock and synchronized cache before writing outputs;
+  `nuis-galaxy-resolution-provider-v1` now statically registers workspace,
+  locked-cache, and offline-layout providers, exposes content-bound request and
+  result hashes, resolves exact direct/transitive versions, and rejects
+  ambiguous, conflicting, ranged, malformed, or escaping candidates; two
+  separate offline mirrors produce byte-identical locks and caches, and locked
+  compilation remains valid after provider deletion; remote discovery, semver
+  range solving, trust metadata, transport, and cache collection remain open
 * `linker-toolchain/nsld/os-native-executable-finalization`: `usable/98`,
   required; a provider-neutral,
   hash-bound static registry now consumes an

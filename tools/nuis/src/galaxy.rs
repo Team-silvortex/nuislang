@@ -10,6 +10,9 @@ const GALAXY_BUNDLE_VERSION: u16 = 1;
 mod bundle;
 mod deps;
 #[cfg(test)]
+#[path = "galaxy/deps_provider_tests.rs"]
+mod deps_provider_tests;
+#[cfg(test)]
 #[path = "galaxy/deps_tests.rs"]
 mod deps_tests;
 mod local;
@@ -22,7 +25,8 @@ mod tests;
 
 use deps::remove_dir_if_empty;
 pub use deps::{
-    doctor_project, install_project_deps, lock_project_deps, sync_project_deps, verify_project_lock,
+    doctor_project, install_project_deps, lock_project_deps, resolve_project_deps_with_provider,
+    sync_project_deps, verify_project_lock,
 };
 use local::ensure_local_layout;
 pub use local::{
@@ -191,6 +195,14 @@ pub struct SyncedProjectDeps {
     pub root: PathBuf,
     pub entries: Vec<GalaxyLockEntry>,
     pub summary: nuisc::project::ProjectGalaxyResolutionLockSummary,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderResolvedProjectDeps {
+    pub request: nuisc::stdlib_registry::GalaxyResolutionProviderRequest,
+    pub provider: nuisc::stdlib_registry::GalaxyResolutionProviderReport,
+    pub lock: WroteGalaxyLock,
+    pub synced: SyncedProjectDeps,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

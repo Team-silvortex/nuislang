@@ -17,6 +17,7 @@ impl StdlibLibraryImportPolicy {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StdlibLayout {
+    pub schema: String,
     pub name: String,
     pub default_entry: String,
     pub modules: Vec<StdlibIndexModule>,
@@ -25,11 +26,65 @@ pub struct StdlibLayout {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StdlibIndexModule {
     pub name: String,
+    pub version: String,
     pub kind: String,
     pub path: String,
     pub package_id: String,
     pub depends_on: Vec<String>,
     pub summary: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GalaxyResolutionProviderDescriptor {
+    pub provider_id: String,
+    pub provider_kind: String,
+    pub root: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GalaxyResolutionProviderRequirement {
+    pub name: String,
+    pub exact_version: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GalaxyResolutionProviderRequest {
+    pub contract: String,
+    pub provider_id: String,
+    pub provider_kind: String,
+    pub request_sha256: String,
+    pub requirements: Vec<GalaxyResolutionProviderRequirement>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GalaxyResolutionProviderSelection {
+    pub name: String,
+    pub version: String,
+    pub package_id: String,
+    pub relative_path: String,
+    pub direct: bool,
+    pub requested_by: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GalaxyResolutionProviderReport {
+    pub contract: String,
+    pub status: String,
+    pub provider_id: String,
+    pub provider_kind: String,
+    pub request_sha256: String,
+    pub selection_sha256: String,
+    pub candidate_count: usize,
+    pub selected_count: usize,
+    pub requirements: Vec<GalaxyResolutionProviderRequirement>,
+    pub selections: Vec<GalaxyResolutionProviderSelection>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GalaxyResolutionProviderResolution {
+    pub request: GalaxyResolutionProviderRequest,
+    pub report: GalaxyResolutionProviderReport,
+    pub dependencies: Vec<ResolvedGalaxyDependency>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

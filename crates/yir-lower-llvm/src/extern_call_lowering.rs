@@ -41,6 +41,16 @@ pub(crate) fn lower_cpu_extern_call_node(
             last_cpu_value,
         );
     }
+    if node.op.module == "cpu" && node.op.instruction == "extern_call_owned_object" {
+        return lower_owned_object_call(
+            node,
+            body,
+            registers,
+            next_reg,
+            next_block,
+            last_cpu_value,
+        );
+    }
     let return_ty = match (node.op.module.as_str(), node.op.instruction.as_str()) {
         ("cpu", "extern_call_i64") => "i64",
         ("cpu", "extern_call_i32") => "i32",
@@ -303,6 +313,95 @@ fn lower_owned_utf8_call(
         },
     );
     buffer_lengths.insert(node.name.clone(), len);
+    *last_cpu_value = Some(ptr);
+    Ok(true)
+}
+
+fn lower_owned_object_call(
+    node: &Node,
+    body: &mut Vec<String>,
+    registers: &mut BTreeMap<String, LlvmValueRef>,
+    next_reg: &mut usize,
+    next_block: &mut usize,
+    last_cpu_value: &mut Option<String>,
+) -> Result<bool, String> {
+    let contract =
+        yir_core::ffi::parse_owned_object_return_contract(&node.op.args).map_err(|error| {
+            format!(
+                "node `{}` has invalid owned FFI object contract: {error}",
+                node.name
+            )
+        })?;
+    if contract.abi != "nurs" && contract.abi != "c" && contract.abi != "libc" {
+        body.push(format!(
+            "  ; deferred lowering for cpu.extern_call_owned_object `{}` because ABI `{}` is not supported by the current LLVM bridge",
+            node.name, contract.abi
+        ));
+        return Ok(true);
+    }
+    let lowered_args = contract
+        .inputs
+        .iter()
+        .map(|arg| {
+            registers
+                .get(arg)
+                .and_then(|value| lower_dynamic_extern_arg(value, body, next_reg))
+        })
+        .collect::<Option<Vec<_>>>();
+    let Some(lowered_args) = lowered_args else {
+        body.push(format!(
+            "  ; deferred lowering for cpu.extern_call_owned_object `{}` because one or more inputs are outside the current CPU LLVM slice",
+            node.name
+        ));
+        return Ok(true);
+    };
+    let ptr = fresh_reg(next_reg);
+    let Some(call) = render_extern_call("ptr", contract.symbol, &lowered_args) else {
+        body.push(format!(
+            "  ; deferred lowering for cpu.extern_call_owned_object `{}` because symbol `{}` has unsupported arity {}",
+            node.name,
+            contract.symbol,
+            lowered_args.len()
+        ));
+        return Ok(true);
+    };
+    body.push(format!("  {ptr} = {call}"));
+    let nonnull = fresh_reg(next_reg);
+    body.push(format!("  {nonnull} = icmp ne ptr {ptr}, null"));
+    let validate_block = fresh_block(next_block, "owned_object_validate");
+    let null_block = fresh_block(next_block, "owned_object_null");
+    body.push(format!(
+        "  br i1 {nonnull}, label %{validate_block}, label %{null_block}"
+    ));
+    body.push(format!("{null_block}:"));
+    body.push("  call void @llvm.trap()".to_owned());
+    body.push("  unreachable".to_owned());
+    body.push(format!("{validate_block}:"));
+    let size = fresh_reg(next_reg);
+    body.push(format!(
+        "  {size} = call i64 @nuis_host_owned_object_validate_v1(ptr {ptr})"
+    ));
+    let valid = fresh_reg(next_reg);
+    body.push(format!("  {valid} = icmp eq i64 {size}, 16"));
+    let ready_block = fresh_block(next_block, "owned_object_ready");
+    let invalid_block = fresh_block(next_block, "owned_object_invalid");
+    body.push(format!(
+        "  br i1 {valid}, label %{ready_block}, label %{invalid_block}"
+    ));
+    body.push(format!("{invalid_block}:"));
+    body.push("  call void @llvm.trap()".to_owned());
+    body.push("  unreachable".to_owned());
+    body.push(format!("{ready_block}:"));
+    registers.insert(
+        node.name.clone(),
+        LlvmValueRef::OwnedExternalObject {
+            ptr: ptr.clone(),
+            size,
+            abi: contract.abi.to_owned(),
+            destructor: contract.destructor_symbol.to_owned(),
+            destructor_signature_hash: contract.destructor_signature_hash.to_owned(),
+        },
+    );
     *last_cpu_value = Some(ptr);
     Ok(true)
 }

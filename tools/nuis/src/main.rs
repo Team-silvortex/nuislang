@@ -58,6 +58,7 @@ mod dev_tensor_drift_data;
 mod dev_tensor_drift_data_core;
 mod dev_tensor_drift_data_runtime;
 mod dev_tensor_drift_data_runtime_bootstrap;
+mod dev_tensor_drift_data_runtime_cffi_object;
 mod dev_tensor_drift_data_runtime_cuda;
 mod dev_tensor_drift_data_runtime_dev;
 mod dev_tensor_drift_data_runtime_dev_lineage;
@@ -712,6 +713,7 @@ fn print_help() {
     println!("    nuis galaxy init [project-dir] [--framework <name>]");
     println!("    nuis galaxy check [project-dir|galaxy.toml]");
     println!("    nuis galaxy doctor [project-dir|nuis.toml]");
+    println!("    nuis galaxy resolve-deps [project-dir|nuis.toml] --provider-root <dir> [--provider-id <id>] [--provider-kind <kind>]");
     println!("    nuis galaxy lock-deps [project-dir|nuis.toml]");
     println!("    nuis galaxy verify-lock [project-dir|nuis.toml]");
     println!("    nuis galaxy sync-deps [project-dir|nuis.toml]");

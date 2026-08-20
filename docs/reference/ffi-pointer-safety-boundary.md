@@ -37,6 +37,9 @@ Stable source-facing FFI should be read as:
   and registered destructor enter the normal GLM ownership pipeline
 * one exact-whitelisted owned `ref String` return whose UTF-8 validity, byte
   length, read-only access, and registered destructor are checked end to end
+* one exact-whitelisted opaque `ref FfiObject` return whose static size,
+  read policy, and registered destructor are hash-bound without granting raw
+  pointer or Buffer authority
 
 Host FFI is also registered through `nustar`.
 
@@ -91,11 +94,15 @@ The manifest registration is:
 
 `<abi>:<symbol>@<signature_hash>@<capability_hash>=<descriptor>`
 
-The descriptor has one canonical field order:
+Length-governed descriptors have one canonical field order:
 
 `kind=<kind>,slot=<slot>,length=<policy>,mutability=<policy>,lifetime=<policy>,destructor=<authority>`
 
-The first three admitted capability shapes are deliberately closed sets:
+Opaque static-object descriptors use a separate canonical shape:
+
+`kind=owned_return_object,slot=return,size=<policy>,read=<policy>,mutability=<policy>,lifetime=owned,destructor=<authority>`
+
+The first four admitted capability shapes are deliberately closed sets:
 
 * `borrowed_utf8` must target a real `String` argument, use
   `length=nul_terminated`, `mutability=read_only`, `lifetime=call`, and
@@ -106,6 +113,10 @@ The first three admitted capability shapes are deliberately closed sets:
 * `owned_return_utf8` must target a `ref_String` return, use
   `length=runtime_header`, `mutability=read_only`, `lifetime=owned`, and name an
   exact registered destructor with signature `i64(ref_String)`
+* `owned_return_object` must target a `ref_FfiObject` return, use
+  `size=static:16`, `read=i64_slots`, `mutability=read_only`,
+  `lifetime=owned`, and name an exact registered destructor with signature
+  `i64(ref_FfiObject)`
 
 Validation requires the ABI to be declared, the symbol to have an exact
 `ffi_symbol:` signature, both hashes to match, every kind/slot pair to be
@@ -154,11 +165,27 @@ helper/branch transfer, recursion, loops, tasks, and async escape fail closed.
 The native example reads a multibyte value, releases it once, observes zero
 live owned UTF-8 allocations, and exits `0`.
 
+Opaque owned objects use an independent lane rather than extending Buffer or
+String semantics. `host_owned_object_make(i64) -> ref FfiObject` requires the
+exact `owned_return_object` manifest capability and lowers to
+`cpu.extern_call_owned_object` with self-verifying
+`nuis-ffi-owned-object-v1` metadata. Native lowering rejects null, calls the
+registered validator, requires the result to equal the hash-bound static size,
+and carries the destructor identity with the pointer. Source code can only ask
+for `owned_object_size(...)` or perform a bounded
+`owned_object_read_i64(..., slot)`; generic `load_at`, writes, pointer
+arithmetic, and conversion to Buffer remain closed. The graph gate requires
+one direct same-function `free(...)` after every read and rejects transfer,
+branches, loops, recursion, tasks, and async escape. The native regression
+reads both slots, invokes the exact destructor once, observes zero live
+objects, and exits `0`.
+
 This is not generalized pointer-return support. It is one owned `ref Buffer`
 contract with bounded transfer plus one direct-scope, read-only owned
-`ref String` contract. A valid manifest still cannot authorize arbitrary
-`ref T`, raw `ptr<T>`, retained borrows, recursive or unbounded runtime return
-boundaries, or task-carried host memory.
+`ref String` contract and one direct-scope opaque `ref FfiObject` contract. A
+valid manifest still cannot authorize arbitrary `ref T`, raw `ptr<T>`,
+retained borrows, recursive or unbounded runtime return boundaries, or
+task-carried host memory.
 
 In `nustar` manifest strings, multi-argument `ffi_symbol:` signatures can use
 the same comma-separated form as source-facing signatures, for example
@@ -180,6 +207,15 @@ row. This is the project-level audit trail used by heterogeneous proxy tests
 before the final AOT bundle is packed. `nuisc verify-build-manifest` checks the
 signature hash, capability count, identity, hash, shape, and destructor linkage
 before reporting the build manifest as verified.
+
+The project renderer does not infer memory authority from an AST type. It asks
+the registered `official.cffi` view for an exact ABI, symbol, and signature-hash
+match, serializes only those returned descriptors, and appends each referenced
+destructor as an `@nustar-memory-authority` row. The destructor remains absent
+from source while becoming an explicit static link dependency. Build-manifest
+verification rejects missing authority and hash-consistent object size/read
+drift before `build_link_plan_from_manifest`, the same entry used by Nsld, can
+construct a plan.
 
 The linker-facing plan consumes the same project host FFI index as structured
 data. Its `host_ffi` footprint contains the original index path, symbol and
@@ -237,6 +273,8 @@ The narrow buffer bridge means:
   through `{ ptr, i64 }`; ABI/destructor/hash identity remains static metadata
 * an exact `owned_return_utf8` capability may return read-only `ref String`, but
   it remains in one direct function scope and must use its registered destructor
+* an exact `owned_return_object` capability may return `ref FfiObject`, but its
+  only source-visible authority is static size plus bounded read-only i64 slots
 
 Not currently source-stable:
 
@@ -259,11 +297,13 @@ Current dynamic extern parameter inference is conservative:
 * `extern_call_i32` / `const_i32` / `call_i32` producers can pass `i32`
 * everything else defaults to `i64`
 
-The owned return lanes are stricter than that inference. Each dedicated YIR op
-calls its registered producer as `ptr`, validates the runtime-header length,
-records `ptr+len+destructor`, and lowers `cpu.free` to that exact destructor
-rather than libc `free`. Owned UTF-8 additionally invokes the fixed runtime
-validator before reads and lowers byte access through checked `i8` loads.
+The owned return lanes are stricter than that inference. Buffer and UTF-8 YIR
+operations call their registered producer as `ptr`, validate the runtime-header
+length, record `ptr+len+destructor`, and lower `cpu.free` to that exact
+destructor rather than libc `free`. Owned UTF-8 additionally validates its
+encoding and lowers byte access through checked `i8` loads. Opaque objects
+instead record `ptr+static-size+destructor`; their dedicated validator must
+confirm the exact registered size before checked i64-slot reads are emitted.
 
 This is an AOT bridge implementation detail, not a source-language raw pointer
 feature.
@@ -279,13 +319,16 @@ Current regression anchors:
 
 * [tests.rs](../../crates/yir-lower-llvm/src/tests.rs)
 * [ffi_owned_utf8_compile.rs](../../tools/nuisc/tests/ffi_owned_utf8_compile.rs)
+* [ffi_owned_object_compile.rs](../../tools/nuisc/tests/ffi_owned_object_compile.rs)
 * [ffi_smoke.rs](../../tools/nuis/tests/ffi_smoke.rs)
 * [ffi_compile.rs](../../tools/nuisc/tests/ffi_compile.rs)
 * [registry_host_ffi_tests.rs](../../tools/nuisc/src/registry_host_ffi_tests.rs)
 * [pipeline_ffi_owned_buffer.rs](../../tools/nuisc/src/pipeline_ffi_owned_buffer.rs)
+* [pipeline_ffi_owned_object.rs](../../tools/nuisc/src/pipeline_ffi_owned_object.rs)
 * [ffi_smoke.rs](../../tools/nuis/tests/ffi_smoke.rs)
 * [lib_tests_execution.rs](../../tools/nuisc/src/lib_tests_execution.rs)
 * [owned_return_buffer_select_demo.ns](../../examples/ns/ffi/owned_return_buffer_select_demo.ns)
+* [owned_return_object_demo.ns](../../examples/ns/ffi/owned_return_object_demo.ns)
 
 ## Current String Boundary
 

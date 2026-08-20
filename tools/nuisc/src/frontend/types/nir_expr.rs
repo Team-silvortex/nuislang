@@ -326,6 +326,7 @@ pub(crate) fn infer_nir_expr_type(
         NirExpr::CpuExternCallI32 { .. } => Some(i32_type()),
         NirExpr::CpuExternCallOwnedBuffer { .. } => Some(ref_type("Buffer")),
         NirExpr::CpuExternCallOwnedUtf8 { .. } => Some(ref_type("String")),
+        NirExpr::CpuExternCallOwnedObject { .. } => Some(ref_type("FfiObject")),
         NirExpr::CpuExternCall { callee, .. }
             if callee == "host_text_handle"
                 || callee == "host_text_len"
@@ -424,7 +425,10 @@ pub(crate) fn infer_nir_expr_type(
             let pipe_ty = infer_nir_expr_type(value, bindings, signatures, struct_table)?;
             pipe_ty.generic_args.first().cloned()
         }
-        NirExpr::LoadValue(_) | NirExpr::BufferLen(_) => Some(i64_type()),
+        NirExpr::LoadValue(_)
+        | NirExpr::BufferLen(_)
+        | NirExpr::OwnedObjectSize(_)
+        | NirExpr::OwnedObjectReadI64 { .. } => Some(i64_type()),
         NirExpr::LoadAt { buffer, .. } => {
             let target_ty = infer_nir_expr_type(buffer, bindings, signatures, struct_table)?;
             if target_ty.name == "Slice"

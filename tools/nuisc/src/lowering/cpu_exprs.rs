@@ -115,6 +115,15 @@ pub(super) fn lower_cpu_expr(
         } => Some(lower_cpu_extern_call_owned_utf8(
             abi, callee, signature, args, state, bindings,
         )),
+        NirExpr::CpuExternCallOwnedObject {
+            abi,
+            interface: _,
+            callee,
+            signature,
+            args,
+        } => Some(super::cpu_exprs_object::lower_cpu_extern_call_owned_object(
+            abi, callee, signature, args, state, bindings,
+        )),
         NirExpr::HostBufferHandle(value) => Some(lower_expr(value, state, bindings)),
         _ => None,
     }

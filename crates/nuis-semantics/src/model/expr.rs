@@ -46,6 +46,11 @@ pub enum NirExpr {
     LoadValue(Box<NirExpr>),
     LoadNext(Box<NirExpr>),
     BufferLen(Box<NirExpr>),
+    OwnedObjectSize(Box<NirExpr>),
+    OwnedObjectReadI64 {
+        object: Box<NirExpr>,
+        index: Box<NirExpr>,
+    },
     CopyBufferOwned(Box<NirExpr>),
     BytesLen(Box<NirExpr>),
     DropBytes(Box<NirExpr>),
@@ -526,6 +531,13 @@ pub enum NirExpr {
         args: Vec<NirExpr>,
     },
     CpuExternCallOwnedUtf8 {
+        abi: String,
+        interface: Option<String>,
+        callee: String,
+        signature: String,
+        args: Vec<NirExpr>,
+    },
+    CpuExternCallOwnedObject {
         abi: String,
         interface: Option<String>,
         callee: String,

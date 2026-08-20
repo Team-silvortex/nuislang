@@ -62,24 +62,48 @@ fn write_project_links_index<W: fmt::Write>(
     Ok(())
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum GalaxyProviderMode {
     Workspace,
     Compile,
+    Explicit(crate::stdlib_registry::GalaxyResolutionProviderDescriptor),
 }
 
 pub fn load_project(input: &Path) -> Result<LoadedProject, String> {
     load_project_with_galaxy_provider(input, GalaxyProviderMode::Workspace)
+        .map(|(project, _, _)| project)
 }
 
 pub fn load_project_for_compile(input: &Path) -> Result<LoadedProject, String> {
     load_project_with_galaxy_provider(input, GalaxyProviderMode::Compile)
+        .map(|(project, _, _)| project)
+}
+
+pub fn load_project_with_galaxy_resolution_provider(
+    input: &Path,
+    provider: &crate::stdlib_registry::GalaxyResolutionProviderDescriptor,
+) -> Result<
+    (
+        LoadedProject,
+        crate::stdlib_registry::GalaxyResolutionProviderRequest,
+        crate::stdlib_registry::GalaxyResolutionProviderReport,
+    ),
+    String,
+> {
+    load_project_with_galaxy_provider(input, GalaxyProviderMode::Explicit(provider.clone()))
 }
 
 fn load_project_with_galaxy_provider(
     input: &Path,
     provider_mode: GalaxyProviderMode,
-) -> Result<LoadedProject, String> {
+) -> Result<
+    (
+        LoadedProject,
+        crate::stdlib_registry::GalaxyResolutionProviderRequest,
+        crate::stdlib_registry::GalaxyResolutionProviderReport,
+    ),
+    String,
+> {
     let manifest_path = if input.is_dir() {
         input.join("nuis.toml")
     } else {
@@ -97,20 +121,36 @@ fn load_project_with_galaxy_provider(
     let source = fs::read_to_string(&manifest_path)
         .map_err(|error| format!("failed to read `{}`: {error}", manifest_path.display()))?;
     let manifest = parse_project_manifest(&source, &manifest_path)?;
-    let locked_cache = match provider_mode {
+    let locked_cache = match &provider_mode {
         GalaxyProviderMode::Workspace => None,
         GalaxyProviderMode::Compile => super::galaxy_cache::locked_project_galaxy_cache(&root)?,
+        GalaxyProviderMode::Explicit(_) => None,
     };
-    let stdlib_root = match &locked_cache {
-        Some((cache_root, _, _, _)) => cache_root.clone(),
-        None => crate::stdlib_registry::resolve_stdlib_root()?,
+    let provider = match (&provider_mode, &locked_cache) {
+        (GalaxyProviderMode::Explicit(provider), _) => provider.clone(),
+        (_, Some((cache_root, _, _, _))) => {
+            crate::stdlib_registry::GalaxyResolutionProviderDescriptor {
+                provider_id: "project.locked-cache".to_owned(),
+                provider_kind: "locked-resolution-cache".to_owned(),
+                root: cache_root.clone(),
+            }
+        }
+        _ => crate::stdlib_registry::GalaxyResolutionProviderDescriptor {
+            provider_id: "official.workspace".to_owned(),
+            provider_kind: "workspace-layout".to_owned(),
+            root: crate::stdlib_registry::resolve_stdlib_root()?,
+        },
     };
-    let resolved_galaxies = crate::stdlib_registry::resolve_galaxy_dependencies(
-        &stdlib_root,
+    let provider_resolution = crate::stdlib_registry::resolve_galaxy_dependencies_with_provider(
+        &provider,
         &manifest.galaxy_dependencies,
     )?;
+    let resolved_galaxies = provider_resolution.dependencies;
     if locked_cache.is_some() {
-        super::galaxy_cache::verify_resolved_galaxy_cache_paths(&stdlib_root, &resolved_galaxies)?;
+        super::galaxy_cache::verify_resolved_galaxy_cache_paths(
+            &provider.root,
+            &resolved_galaxies,
+        )?;
     }
 
     let module_specs = if manifest.modules.is_empty() {
@@ -234,11 +274,15 @@ fn load_project_with_galaxy_provider(
         if &resolved_summary != locked_summary {
             return Err(format!(
                 "Galaxy resolution cache `{}` changed while loading the project",
-                stdlib_root.display()
+                provider.root.display()
             ));
         }
     }
-    Ok(project)
+    Ok((
+        project,
+        provider_resolution.request,
+        provider_resolution.report,
+    ))
 }
 
 pub fn describe_project(project: &LoadedProject) -> String {

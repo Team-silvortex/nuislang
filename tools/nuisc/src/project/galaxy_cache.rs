@@ -279,6 +279,12 @@ fn render_cache_provider_index(project: &LoadedProject) -> Result<String, String
             crate::aot_toml::escape_toml_string(&dependency.name)
         )
         .unwrap();
+        writeln!(
+            source,
+            "version = \"{}\"",
+            crate::aot_toml::escape_toml_string(&dependency.version)
+        )
+        .unwrap();
         writeln!(source, "kind = \"locked\"").unwrap();
         writeln!(
             source,

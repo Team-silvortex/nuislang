@@ -516,6 +516,27 @@ remain open. The runnable route still installs the embedded compatibility
 image. With Nsld at `usable/98`, deterministic tensor selection moves to
 `package-system/galaxy/source-import-and-lock-resolution` at `usable/96`.
 
+The registered Galaxy provider tranche advances that coordinate to
+`usable/98`. `nuis-galaxy-resolution-provider-v1` now defines explicit
+request/report records and statically registered `workspace-layout`,
+`locked-resolution-cache`, and `offline-layout` kinds. Exact direct and pinned
+transitive versions resolve independently; ambiguous unpinned, conflicting,
+ranged, malformed, unregistered, traversal, and symlink-escape inputs fail
+closed. Request hashes bind logical provider identity and normalized
+requirements, while selection hashes also bind selected package and content
+identity without admitting physical provider roots as resolution authority.
+
+`nuis galaxy resolve-deps` routes an explicit provider through the generic
+project loader, writes the existing canonical lock, and transactionally
+materializes the existing content-addressed compiler cache. Two physically
+separate offline mirrors produce byte-identical lock files and cache trees; the
+projects still compile from those caches after both mirrors are removed. No
+registry-specific branch enters `nuisc`. Remote discovery, semver range
+solving, transport, registry trust, and cache collection remain open. With
+Galaxy at `usable/98`, deterministic tensor selection returns to
+`host-compatibility/cffi/registered-pointer-string-object-boundary` at
+`usable/97`.
+
 ## Honesty Boundary
 
 `beta-0.1.0` should not claim:

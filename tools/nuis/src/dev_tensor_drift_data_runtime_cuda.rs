@@ -290,12 +290,19 @@ pub(crate) const DEV_TENSOR_RUNTIME_CUDA_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
         ],
     },
     DevTensorDriftCheckSpec {
-        id: "nuisc-galaxy-code-asset-resolution",
+        id: "nuisc-galaxy-code-asset-manifest-parser",
         path: "tools/nuisc/src/stdlib_registry.rs",
         required_patterns: &[
             "code_assets: parse_optional_string_array",
-            "code_assets: manifest.code_assets.clone()",
             "witsage_manifest_exposes_cross_domain_code_asset_requirements",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuisc-galaxy-code-asset-provider-resolution",
+        path: "tools/nuisc/src/stdlib_registry_provider.rs",
+        required_patterns: &[
+            "code_assets: manifest.code_assets",
+            "validate_candidate_manifest",
         ],
     },
     DevTensorDriftCheckSpec {

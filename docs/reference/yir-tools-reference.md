@@ -453,9 +453,8 @@ For framework/package-aware projects, the current companion `galaxy` flow is:
 ```text
 galaxy init
   -> galaxy check
-  -> galaxy lock-deps
-  -> galaxy verify-lock
-  -> galaxy sync-deps
+  -> galaxy resolve-deps  (explicit registered provider: resolve + lock + sync)
+  OR galaxy lock-deps -> galaxy verify-lock -> galaxy sync-deps
   -> project-doctor
 ```
 
@@ -468,6 +467,20 @@ machine-specific bundle paths. Locked compiler loads consume this addressed
 provider rather than mutable workspace package bytes. `install-deps` is the combined
 `lock-deps + sync-deps` convenience operation; local bundle publication stays
 independent from compiler resolution.
+
+`resolve-deps` is the provider-neutral offline entry point:
+
+```bash
+cargo run -p nuis -- galaxy resolve-deps <project-dir|nuis.toml> \
+  --provider-root <offline-layout> \
+  [--provider-id <id>] [--provider-kind <kind>]
+```
+
+It consumes `nuis-galaxy-resolution-provider-v1`, currently accepts only
+registered static provider kinds and exact versions, prints request and
+selection SHA-256 identities, then writes the same canonical lock and addressed
+cache used by ordinary locked compilation. Equivalent mirrors produce the same
+lock/cache bytes because physical provider roots are not resolution authority.
 
 `nuis project-status` and `nuis project-doctor` now also print this same route
 as lightweight front-door hints, using the clearer

@@ -52,6 +52,8 @@ fn is_view_call(callee: &str) -> bool {
         callee,
         "buffer_len"
             | "owned_utf8_len"
+            | "owned_object_size"
+            | "owned_object_read_i64"
             | "slice"
             | "bytes"
             | "slice_len"
@@ -94,7 +96,9 @@ fn infer_view_call_type_inner(input: AstCallInferenceInput<'_>) -> Option<AstTyp
         active_exprs,
     } = input;
     match callee {
-        "buffer_len" | "owned_utf8_len" => Some(ast_named_type("i64")),
+        "buffer_len" | "owned_utf8_len" | "owned_object_size" | "owned_object_read_i64" => {
+            Some(ast_named_type("i64"))
+        }
         "slice" => {
             let [buffer, _, _] = args else {
                 return None;

@@ -5,6 +5,7 @@ modules = ["core", "std", "pixelmagic", "witsage", "ns-nova"]
 
 [[module]]
 name = "core"
+version = "workspace"
 kind = "foundation"
 path = "core"
 package_id = "nuis.core"
@@ -13,6 +14,7 @@ summary = "Minimal semantics-first foundation for primitive values, source contr
 
 [[module]]
 name = "std"
+version = "workspace"
 kind = "systems"
 path = "std"
 package_id = "nuis.std"
@@ -21,6 +23,7 @@ summary = "Practical systems library layered on top of core."
 
 [[module]]
 name = "pixelmagic"
+version = "workspace"
 kind = "framework"
 path = "pixelmagic"
 package_id = "nuis.pixelmagic"
@@ -29,6 +32,7 @@ summary = "GPU-oriented image and texture processing Galaxy built on nuis hetero
 
 [[module]]
 name = "witsage"
+version = "workspace"
 kind = "framework"
 path = "witsage"
 package_id = "nuis.witsage"
@@ -37,6 +41,7 @@ summary = "Classical machine-learning Galaxy for statistics, feature shaping, an
 
 [[module]]
 name = "ns-nova"
+version = "workspace"
 kind = "framework"
 path = "ns-nova"
 package_id = "nuis.ns-nova"

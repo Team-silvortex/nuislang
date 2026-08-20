@@ -29,7 +29,7 @@ fn official_cffi_registry_exposes_hash_bound_memory_contracts() {
 
     let capabilities = view.memory_capabilities("libc", "puts", &signature_hash);
 
-    assert_eq!(manifest.host_ffi_memory_capabilities.len(), 7);
+    assert_eq!(manifest.host_ffi_memory_capabilities.len(), 8);
     assert_eq!(capabilities.len(), 1);
     assert_eq!(capabilities[0].kind, HostFfiMemoryKind::BorrowedUtf8);
     assert_eq!(capabilities[0].slot, HostFfiMemorySlot::Arg(0));
@@ -62,6 +62,21 @@ fn official_cffi_registry_exposes_hash_bound_memory_contracts() {
         utf8[0].destructor,
         HostFfiMemoryDestructor::Registered { ref symbol, .. }
             if symbol == "host_owned_utf8_destroy"
+    ));
+
+    let object_signature_hash =
+        ffi_symbol_signature_hash("c", "host_owned_object_make", "ref_FfiObject(i64)");
+    let object = view.memory_capabilities("c", "host_owned_object_make", &object_signature_hash);
+    assert_eq!(object.len(), 1);
+    assert_eq!(object[0].kind, HostFfiMemoryKind::OwnedReturnObject);
+    assert_eq!(object[0].slot, HostFfiMemorySlot::Return);
+    assert_eq!(object[0].size.as_deref(), Some("static:16"));
+    assert_eq!(object[0].read.as_deref(), Some("i64_slots"));
+    assert_eq!(object[0].mutability, "read_only");
+    assert!(matches!(
+        object[0].destructor,
+        HostFfiMemoryDestructor::Registered { ref symbol, .. }
+            if symbol == "host_owned_object_destroy"
     ));
 }
 
@@ -175,4 +190,42 @@ fn rejects_owned_return_buffer_destructor_drift() {
 
     assert!(error.contains("destructor `test_buffer_release`"));
     assert!(error.contains("not exact-signature registered"));
+}
+
+#[test]
+fn rejects_owned_object_size_and_read_policy_drift() {
+    for field in ["size", "read"] {
+        let mut manifest = cffi_manifest();
+        let signature_hash =
+            ffi_symbol_signature_hash("c", "host_owned_object_make", "ref_FfiObject(i64)");
+        let destructor_hash =
+            ffi_symbol_signature_hash("c", "host_owned_object_destroy", "i64(ref_FfiObject)");
+        let mut capability = HostFfiMemoryCapability::owned_return_object(
+            "c",
+            "host_owned_object_make",
+            &signature_hash,
+            "host_owned_object_destroy",
+            &destructor_hash,
+        );
+        if field == "size" {
+            capability.size = Some("static:24".to_owned());
+        } else {
+            capability.read = Some("raw_bytes".to_owned());
+        }
+        rehash(&mut capability);
+        let index = manifest
+            .host_ffi_memory_capabilities
+            .iter()
+            .position(|entry| entry.starts_with("c:host_owned_object_make@"))
+            .unwrap();
+        manifest.host_ffi_memory_capabilities[index] = capability.render();
+
+        let error = HostFfiRegistryView::try_from_manifest(&manifest)
+            .expect_err("owned object policy drift must be rejected");
+
+        assert!(
+            error.contains("policy drift"),
+            "field={field}, error={error}"
+        );
+    }
 }

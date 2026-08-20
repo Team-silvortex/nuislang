@@ -242,6 +242,70 @@ pub(crate) fn lower_cpu_memory_node(
             body.push(format!("{exit_label}:"));
             registers.insert(node.name.clone(), LlvmValueRef::Void);
         }
+        "ffi_object_size" => {
+            let Some(LlvmValueRef::OwnedExternalObject { size, .. }) =
+                registers.get(&node.op.args[0])
+            else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.ffi_object_size `{}` because its input lacks registered object authority",
+                    node.name
+                ));
+                return Ok(true);
+            };
+            let size = size.clone();
+            registers.insert(node.name.clone(), LlvmValueRef::I64(size.clone()));
+            *last_cpu_value = Some(size);
+        }
+        "ffi_object_read_i64" => {
+            let Some(LlvmValueRef::OwnedExternalObject { ptr, size, .. }) =
+                registers.get(&node.op.args[0])
+            else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.ffi_object_read_i64 `{}` because its input lacks registered object authority",
+                    node.name
+                ));
+                return Ok(true);
+            };
+            let Some(index) = get_i64(registers, &node.op.args[1]) else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.ffi_object_read_i64 `{}` because its index is unavailable",
+                    node.name
+                ));
+                return Ok(true);
+            };
+            let ptr = ptr.clone();
+            let size = size.clone();
+            let index = index.to_owned();
+            let slot_count = fresh_reg(next_reg);
+            body.push(format!("  {slot_count} = udiv i64 {size}, 8"));
+            let non_negative = fresh_reg(next_reg);
+            body.push(format!("  {non_negative} = icmp sge i64 {index}, 0"));
+            let below_count = fresh_reg(next_reg);
+            body.push(format!(
+                "  {below_count} = icmp slt i64 {index}, {slot_count}"
+            ));
+            let in_bounds = fresh_reg(next_reg);
+            body.push(format!(
+                "  {in_bounds} = and i1 {non_negative}, {below_count}"
+            ));
+            let ready = fresh_block(next_block, "owned_object_index_ready");
+            let invalid = fresh_block(next_block, "owned_object_index_invalid");
+            body.push(format!(
+                "  br i1 {in_bounds}, label %{ready}, label %{invalid}"
+            ));
+            body.push(format!("{invalid}:"));
+            body.push("  call void @llvm.trap()".to_owned());
+            body.push("  unreachable".to_owned());
+            body.push(format!("{ready}:"));
+            let slot = fresh_reg(next_reg);
+            body.push(format!(
+                "  {slot} = getelementptr inbounds i64, ptr {ptr}, i64 {index}"
+            ));
+            let value = fresh_reg(next_reg);
+            body.push(format!("  {value} = load i64, ptr {slot}"));
+            registers.insert(node.name.clone(), LlvmValueRef::I64(value.clone()));
+            *last_cpu_value = Some(value);
+        }
         "load_at" => {
             let (Some(ptr), Some(index)) = (
                 get_ptr(registers, &node.op.args[0]),
@@ -370,6 +434,22 @@ pub(crate) fn lower_cpu_memory_node(
             *last_cpu_value = Some(reg);
         }
         "free" => {
+            if let Some(LlvmValueRef::OwnedExternalObject {
+                ptr,
+                abi,
+                destructor,
+                destructor_signature_hash,
+                ..
+            }) = registers.get(&node.op.args[0])
+            {
+                body.push(format!(
+                    "  ; release registered owned object via {abi}::{destructor}@{destructor_signature_hash}"
+                ));
+                let status = fresh_reg(next_reg);
+                body.push(format!("  {status} = call i64 @{destructor}(ptr {ptr})"));
+                registers.insert(node.name.clone(), LlvmValueRef::Void);
+                return Ok(true);
+            }
             if let Some(LlvmValueRef::OwnedExternalUtf8 {
                 ptr,
                 abi,

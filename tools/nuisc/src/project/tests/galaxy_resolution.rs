@@ -771,6 +771,7 @@ fn manual_only_library_policy_disables_auto_injection_during_resolution() {
     fs::write(
         stdlib_root.join("index.toml"),
         r#"
+layout_schema = "nuis-stdlib-layout-v1"
 name = "test-stdlib"
 default_entry = "core"
 

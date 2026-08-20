@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use nuis_semantics::model::{AstFunction, AstModule, AstTypeAlias, NirTypeRef};
 
 use super::{
-    extern_function_symbol_name, function_host_symbol_name, is_public_visibility,
-    build_visible_type_alias_map, lower_type_ref_with_aliases,
+    build_visible_type_alias_map, extern_function_symbol_name, function_host_symbol_name,
+    is_public_visibility, lower_type_ref_with_aliases,
 };
 
 fn is_helper_internal_synthetic(function: &AstFunction) -> bool {
@@ -98,9 +98,7 @@ pub(super) fn build_initial_function_signatures(
                 params: function
                     .params
                     .iter()
-                    .map(|param| {
-                        lower_type_ref_with_aliases(&param.ty, &helper_type_aliases)
-                    })
+                    .map(|param| lower_type_ref_with_aliases(&param.ty, &helper_type_aliases))
                     .collect::<Result<Vec<_>, _>>()?,
                 return_type: Some(lower_type_ref_with_aliases(
                     &function.return_type,
@@ -134,9 +132,7 @@ pub(super) fn build_initial_function_signatures(
                     params: function
                         .params
                         .iter()
-                        .map(|param| {
-                            lower_type_ref_with_aliases(&param.ty, &helper_type_aliases)
-                        })
+                        .map(|param| lower_type_ref_with_aliases(&param.ty, &helper_type_aliases))
                         .collect::<Result<Vec<_>, _>>()?,
                     return_type: Some(lower_type_ref_with_aliases(
                         &function.return_type,
@@ -205,9 +201,7 @@ pub(super) fn build_initial_function_signatures(
                 params: function
                     .params
                     .iter()
-                    .map(|param| {
-                        lower_type_ref_with_aliases(&param.ty, &helper_type_aliases)
-                    })
+                    .map(|param| lower_type_ref_with_aliases(&param.ty, &helper_type_aliases))
                     .collect::<Result<Vec<_>, _>>()?,
                 return_type: function
                     .return_type

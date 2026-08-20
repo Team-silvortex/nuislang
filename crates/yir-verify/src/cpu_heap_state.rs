@@ -11,6 +11,7 @@ pub(super) enum HeapObjectKind {
     Node { next: PointerState },
     Buffer { len: Option<usize> },
     Utf8 { len: Option<usize> },
+    FfiObject { size: usize },
 }
 
 #[derive(Clone, Copy)]

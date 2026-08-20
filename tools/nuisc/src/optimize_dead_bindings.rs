@@ -242,6 +242,7 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
+        | NirExpr::OwnedObjectSize(inner)
         | NirExpr::CopyBufferOwned(inner)
         | NirExpr::BytesLen(inner)
         | NirExpr::DropBytes(inner)
@@ -379,6 +380,10 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
             collect_used_vars_expr(fill, out);
         }
         NirExpr::LoadAt { buffer, index }
+        | NirExpr::OwnedObjectReadI64 {
+            object: buffer,
+            index,
+        }
         | NirExpr::DataReadWindow {
             window: buffer,
             index,
@@ -426,6 +431,7 @@ fn collect_used_vars_expr(expr: &NirExpr, out: &mut BTreeSet<String>) {
         | NirExpr::CpuExternCall { args, .. }
         | NirExpr::CpuExternCallI32 { args, .. }
         | NirExpr::CpuExternCallOwnedBuffer { args, .. }
+        | NirExpr::CpuExternCallOwnedObject { args, .. }
         | NirExpr::CpuExternCallOwnedUtf8 { args, .. }
         | NirExpr::Call { args, .. } => {
             for arg in args {

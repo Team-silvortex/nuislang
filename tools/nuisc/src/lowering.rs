@@ -34,6 +34,8 @@ mod conditional_owned_calls;
 mod core_exprs;
 #[path = "lowering/cpu_exprs.rs"]
 mod cpu_exprs;
+#[path = "lowering/cpu_exprs_object.rs"]
+mod cpu_exprs_object;
 #[path = "lowering/data_cpu_exprs.rs"]
 mod data_cpu_exprs;
 #[path = "lowering/data_profile_refs.rs"]
@@ -295,6 +297,7 @@ fn lower_expr(
         | NirExpr::CpuExternCall { .. }
         | NirExpr::CpuExternCallI32 { .. }
         | NirExpr::CpuExternCallOwnedBuffer { .. }
+        | NirExpr::CpuExternCallOwnedObject { .. }
         | NirExpr::CpuExternCallOwnedUtf8 { .. } => lower_cpu_expr(expr, state, bindings)
             .expect("cpu expr family must be handled by lower_cpu_expr"),
         NirExpr::NetworkProfileBindCoreRef { .. }
@@ -436,6 +439,8 @@ fn lower_expr(
         | NirExpr::LoadValue(_)
         | NirExpr::LoadNext(_)
         | NirExpr::BufferLen(_)
+        | NirExpr::OwnedObjectSize(_)
+        | NirExpr::OwnedObjectReadI64 { .. }
         | NirExpr::CopyBufferOwned(_)
         | NirExpr::BytesLen(_)
         | NirExpr::DropBytes(_)

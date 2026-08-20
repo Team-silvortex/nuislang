@@ -1,4 +1,4 @@
-use super::{parse_args, CommandKind};
+use super::{parse_args, CommandKind, GalaxyCommand};
 use std::path::PathBuf;
 
 #[test]
@@ -44,6 +44,32 @@ fn parses_dev_tensor_json() {
     let command = parse_args(["dev-tensor".to_owned(), "--json".to_owned()].into_iter())
         .expect("dev-tensor parses");
     assert_eq!(command, CommandKind::DevTensor { json: true });
+}
+
+#[test]
+fn parses_galaxy_provider_resolution() {
+    let command = parse_args(
+        [
+            "galaxy".to_owned(),
+            "resolve-deps".to_owned(),
+            "examples/project".to_owned(),
+            "--provider-root".to_owned(),
+            "mirror".to_owned(),
+            "--provider-id".to_owned(),
+            "fixture.offline".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .expect("Galaxy provider resolution parses");
+    assert_eq!(
+        command,
+        CommandKind::Galaxy(GalaxyCommand::ResolveDeps {
+            input: PathBuf::from("examples/project"),
+            provider_root: PathBuf::from("mirror"),
+            provider_id: "fixture.offline".to_owned(),
+            provider_kind: "offline-layout".to_owned(),
+        })
+    );
 }
 
 #[test]

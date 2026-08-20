@@ -29,6 +29,8 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::LoadValue(_)
         | NirExpr::LoadNext(_)
         | NirExpr::BufferLen(_)
+        | NirExpr::OwnedObjectSize(_)
+        | NirExpr::OwnedObjectReadI64 { .. }
         | NirExpr::BytesLen(_)
         | NirExpr::LoadAt { .. } => NirExprEffectClass::LocalReadOnly,
         NirExpr::Await(_) => NirExprEffectClass::AsyncOpaque,
@@ -191,6 +193,7 @@ pub fn nir_expr_effect_class(expr: &NirExpr) -> NirExprEffectClass {
         | NirExpr::CpuExternCall { .. }
         | NirExpr::CpuExternCallI32 { .. }
         | NirExpr::CpuExternCallOwnedBuffer { .. }
+        | NirExpr::CpuExternCallOwnedObject { .. }
         | NirExpr::CpuExternCallOwnedUtf8 { .. }
         | NirExpr::Free(_) => NirExprEffectClass::Stateful,
     }

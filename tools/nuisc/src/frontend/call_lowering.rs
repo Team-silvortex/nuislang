@@ -5,11 +5,10 @@ use nuis_semantics::model::{AstExpr, NirExpr, NirStructDef, NirTypeRef};
 use super::metadata::hidden_private_field_count;
 use super::name_suggestions::suggest_similar_name;
 use super::{
-    impl_method_symbol_names, infer_nir_expr_type, lower_direct_call_builtin_or_named_call,
-    lower_expr_with_async, lower_routed_call_or_core_builtin, resolve_declared_or_inferred,
-    current_module_structs_contains, DirectCallBuiltinInput, ExprWithAsyncInput, FunctionSignature,
-    ModuleConstValue,
-    RoutedCallLoweringInput,
+    current_module_structs_contains, impl_method_symbol_names, infer_nir_expr_type,
+    lower_direct_call_builtin_or_named_call, lower_expr_with_async,
+    lower_routed_call_or_core_builtin, resolve_declared_or_inferred, DirectCallBuiltinInput,
+    ExprWithAsyncInput, FunctionSignature, ModuleConstValue, RoutedCallLoweringInput,
 };
 
 pub(super) struct CallLoweringInput<'a> {

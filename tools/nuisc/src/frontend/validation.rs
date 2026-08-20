@@ -116,11 +116,13 @@ fn validate_extern_abi_surface(
             &format!("{callee_label} parameter `{}`", param.name),
             true,
             false,
+            false,
         )?;
     }
     reject_extern_ref_abi_type(
         &function.return_type,
         &format!("{callee_label} return type"),
+        true,
         true,
         true,
     )?;
@@ -132,6 +134,7 @@ fn reject_extern_ref_abi_type(
     context: &str,
     allow_buffer_param_bridge: bool,
     allow_owned_utf8_return: bool,
+    allow_owned_object_return: bool,
 ) -> Result<(), String> {
     if allow_buffer_param_bridge
         && ty.is_ref
@@ -149,14 +152,22 @@ fn reject_extern_ref_abi_type(
     {
         return Ok(());
     }
+    if allow_owned_object_return
+        && ty.is_ref
+        && ty.name == "FfiObject"
+        && !ty.is_optional
+        && ty.generic_args.is_empty()
+    {
+        return Ok(());
+    }
     if ty.is_ref {
         return Err(format!(
-            "{context} cannot use `{}` in the current extern ABI; only non-optional `ref Buffer` bridge values and hash-bound owned `ref String` returns are open, while other host-boundary pointer types remain unsupported",
+            "{context} cannot use `{}` in the current extern ABI; only non-optional `ref Buffer` bridge values plus hash-bound owned `ref String` and `ref FfiObject` returns may enter capability validation, while other host-boundary pointer types remain unsupported",
             ty.render(),
         ));
     }
     for arg in &ty.generic_args {
-        reject_extern_ref_abi_type(arg, context, false, false)?;
+        reject_extern_ref_abi_type(arg, context, false, false, false)?;
     }
     Ok(())
 }

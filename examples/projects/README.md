@@ -99,6 +99,7 @@ The folder is intentionally split by role:
   - [state](state)
   - [filesystem](filesystem)
   - [domains](domains)
+  - [ffi](ffi)
 * shared domain helper modules live under:
   - [domains/shared](domains/shared)
 
@@ -156,6 +157,12 @@ reading an entire subtree.
   [net_http_client_get_recipe_demo](domains/net_http_client_get_recipe_demo),
   [net_result_enum_recipe_demo](domains/net_result_enum_recipe_demo),
   [shader_result_enum_demo](domains/shader_result_enum_demo)
+* registered host-memory authority:
+  [ffi](ffi)
+  Start with:
+  [owned_return_object_demo](ffi/owned_return_object_demo), which carries one
+  opaque object's size/read/destructor contract through project metadata,
+  native lowering, and exact cleanup
 
 ## Control-Flow Mainline
 

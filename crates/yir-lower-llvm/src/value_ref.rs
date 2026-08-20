@@ -227,6 +227,7 @@ pub(crate) fn get_ptr<'a>(
         Some(LlvmValueRef::BorrowedBuffer { ptr, .. }) => Some(ptr.as_str()),
         Some(LlvmValueRef::OwnedExternalBuffer { ptr, .. }) => Some(ptr.as_str()),
         Some(LlvmValueRef::OwnedExternalUtf8 { ptr, .. }) => Some(ptr.as_str()),
+        Some(LlvmValueRef::OwnedExternalObject { ptr, .. }) => Some(ptr.as_str()),
         _ => None,
     }
 }

@@ -12,10 +12,9 @@ use super::higher_order::{
 use super::stmt_lowering::{lower_stmt_sequence_with_async, StmtSequenceLoweringInput};
 use super::{
     build_default_impl_method, build_default_impl_method_function,
-    build_function_return_type_table, build_impl_method_function, impl_method_lookup_key,
-    build_visible_type_alias_map, impl_method_symbol_name, infer_missing_function_return_type,
-    is_public_visibility,
-    build_module_struct_table, build_visible_struct_defs,
+    build_function_return_type_table, build_impl_method_function, build_module_struct_table,
+    build_visible_struct_defs, build_visible_type_alias_map, impl_method_lookup_key,
+    impl_method_symbol_name, infer_missing_function_return_type, is_public_visibility,
     lower_function, lower_param_with_aliases, lower_type_ref_with_aliases, lower_visibility,
     rewrite_generic_calls_in_function, FunctionSignature, GenericFunctionRewriteInput,
     GenericImplMethodTemplate, ModuleConstValue,
@@ -396,8 +395,7 @@ pub(super) fn build_lowered_functions_and_impls(
             .iter()
             .filter(|function| {
                 function.params.iter().any(|param| {
-                    is_callable_type_with_aliases(&param.ty, &helper_type_aliases)
-                        .unwrap_or(false)
+                    is_callable_type_with_aliases(&param.ty, &helper_type_aliases).unwrap_or(false)
                 })
             })
             .flat_map(|function| {
@@ -459,8 +457,7 @@ pub(super) fn build_lowered_functions_and_impls(
             }
             for method in &impl_methods {
                 if method.params.iter().any(|param| {
-                    is_callable_type_with_aliases(&param.ty, &helper_type_aliases)
-                        .unwrap_or(false)
+                    is_callable_type_with_aliases(&param.ty, &helper_type_aliases).unwrap_or(false)
                 }) {
                     continue;
                 }
@@ -476,9 +473,7 @@ pub(super) fn build_lowered_functions_and_impls(
                     params: method
                         .params
                         .iter()
-                        .map(|param| {
-                            lower_type_ref_with_aliases(&param.ty, &helper_type_aliases)
-                        })
+                        .map(|param| lower_type_ref_with_aliases(&param.ty, &helper_type_aliases))
                         .collect::<Result<Vec<_>, _>>()?,
                     return_type: method
                         .return_type
@@ -548,19 +543,17 @@ pub(super) fn build_lowered_functions_and_impls(
             signatures.insert(name, signature);
         }
 
-        let mut helper_struct_table =
-            build_visible_struct_defs(helper, &[], &helper_type_aliases)?
+        let mut helper_struct_table = build_visible_struct_defs(helper, &[], &helper_type_aliases)?
             .into_iter()
             .map(|definition| (definition.name.clone(), definition))
             .collect::<BTreeMap<_, _>>();
         for (name, definition) in struct_table {
-            helper_struct_table.entry(name.clone()).or_insert_with(|| definition.clone());
+            helper_struct_table
+                .entry(name.clone())
+                .or_insert_with(|| definition.clone());
         }
 
-        let helper_struct_set = build_module_struct_table(helper)
-            .keys()
-            .cloned()
-            .collect();
+        let helper_struct_set = build_module_struct_table(helper).keys().cloned().collect();
         lowered_functions.extend(
             helper_rewritten_functions
                 .iter()

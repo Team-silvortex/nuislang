@@ -5,7 +5,10 @@ use crate::registry::{
     HostFfiMemoryCapability, HostFfiMemoryDestructor, HostFfiMemoryKind, HostFfiMemorySlot,
 };
 use crate::registry_host_ffi::parse_memory_capability;
-use yir_core::ffi::ffi_symbol_signature_hash;
+use yir_core::ffi::{
+    ffi_symbol_signature_hash, OWNED_BUFFER_DESTRUCTOR_SIGNATURE,
+    OWNED_OBJECT_DESTRUCTOR_SIGNATURE, OWNED_UTF8_DESTRUCTOR_SIGNATURE,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct HostFfiIndexFootprint {
@@ -210,6 +213,20 @@ fn validate_index_memory_shape(
                 ));
             }
         }
+        (HostFfiMemoryKind::OwnedReturnUtf8, HostFfiMemorySlot::Return) => {
+            if signature.split_once('(').map(|(ret, _)| ret) != Some("ref_String") {
+                return Err(format!(
+                    "project host_ffi index `{index_path}` line {line_number} owned UTF-8 capability requires `ref_String` return signature"
+                ));
+            }
+        }
+        (HostFfiMemoryKind::OwnedReturnObject, HostFfiMemorySlot::Return) => {
+            if signature.split_once('(').map(|(ret, _)| ret) != Some("ref_FfiObject") {
+                return Err(format!(
+                    "project host_ffi index `{index_path}` line {line_number} owned object capability requires `ref_FfiObject` return signature"
+                ));
+            }
+        }
         _ => {
             return Err(format!(
                 "project host_ffi index `{index_path}` line {line_number} memory capability kind/slot mismatch"
@@ -232,16 +249,27 @@ fn validate_host_ffi_memory_links(
             else {
                 continue;
             };
+            let expected_signature = match capability.kind {
+                HostFfiMemoryKind::OwnedReturnBuffer => OWNED_BUFFER_DESTRUCTOR_SIGNATURE,
+                HostFfiMemoryKind::OwnedReturnUtf8 => OWNED_UTF8_DESTRUCTOR_SIGNATURE,
+                HostFfiMemoryKind::OwnedReturnObject => OWNED_OBJECT_DESTRUCTOR_SIGNATURE,
+                HostFfiMemoryKind::BorrowedUtf8 => {
+                    return Err(format!(
+                        "project host_ffi index `{index_path}` borrowed UTF-8 capability for `{}` cannot own destructor authority",
+                        capability.symbol
+                    ));
+                }
+            };
             let valid = entries.iter().any(|candidate| {
                 candidate.abi == capability.abi
                     && candidate.symbol == *symbol
                     && candidate.signature_hash == *signature_hash
-                    && candidate.signature_pattern == "i64(ref_Buffer)"
+                    && candidate.signature_pattern == expected_signature
             });
             if !valid {
                 return Err(format!(
-                    "project host_ffi index `{index_path}` owned return-buffer capability for `{}` references missing or drifted destructor `{symbol}` hash `{signature_hash}`",
-                    capability.symbol
+                    "project host_ffi index `{index_path}` owned capability `{}` for `{}` references missing or drifted destructor `{symbol}` signature `{expected_signature}` hash `{signature_hash}`",
+                    capability.kind.as_str(), capability.symbol
                 ));
             }
         }

@@ -33,6 +33,12 @@ pub enum GalaxyCommand {
     Doctor {
         input: PathBuf,
     },
+    ResolveDeps {
+        input: PathBuf,
+        provider_root: PathBuf,
+        provider_id: String,
+        provider_kind: String,
+    },
     SyncDeps {
         input: PathBuf,
     },
@@ -122,6 +128,45 @@ where
         "doctor" => Ok(CommandKind::Galaxy(GalaxyCommand::Doctor {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         })),
+        "resolve-deps" => {
+            let mut input = None;
+            let mut provider_root = None;
+            let mut provider_id = "offline.layout".to_owned();
+            let mut provider_kind = "offline-layout".to_owned();
+            while let Some(arg) = args.next() {
+                match arg.as_str() {
+                    "--provider-root" => {
+                        provider_root = Some(PathBuf::from(args.next().ok_or_else(|| {
+                            "usage: nuis galaxy resolve-deps [project-dir|nuis.toml] --provider-root <dir> [--provider-id <id>] [--provider-kind <kind>]".to_owned()
+                        })?));
+                    }
+                    "--provider-id" => {
+                        provider_id = args.next().ok_or_else(|| {
+                            "usage: nuis galaxy resolve-deps [project-dir|nuis.toml] --provider-root <dir> [--provider-id <id>] [--provider-kind <kind>]".to_owned()
+                        })?;
+                    }
+                    "--provider-kind" => {
+                        provider_kind = args.next().ok_or_else(|| {
+                            "usage: nuis galaxy resolve-deps [project-dir|nuis.toml] --provider-root <dir> [--provider-id <id>] [--provider-kind <kind>]".to_owned()
+                        })?;
+                    }
+                    _ if input.is_none() => input = Some(PathBuf::from(arg)),
+                    _ => {
+                        return Err(format!(
+                            "unknown nuis galaxy resolve-deps argument `{arg}`"
+                        ))
+                    }
+                }
+            }
+            Ok(CommandKind::Galaxy(GalaxyCommand::ResolveDeps {
+                input: input.unwrap_or_else(|| PathBuf::from(".")),
+                provider_root: provider_root.ok_or_else(|| {
+                    "usage: nuis galaxy resolve-deps [project-dir|nuis.toml] --provider-root <dir> [--provider-id <id>] [--provider-kind <kind>]".to_owned()
+                })?,
+                provider_id,
+                provider_kind,
+            }))
+        }
         "sync-deps" => Ok(CommandKind::Galaxy(GalaxyCommand::SyncDeps {
             input: PathBuf::from(args.next().unwrap_or_else(|| ".".to_owned())),
         })),
@@ -150,7 +195,7 @@ where
             version: args.next(),
         })),
         other => Err(format!(
-            "unknown nuis galaxy command `{other}`; expected `init`, `check`, `pack`, `inspect`, `publish-local`, `list`, `install-local`, `install-deps`, `doctor`, `sync-deps`, `lock-deps`, `verify-lock`, `inspect-local`, `verify-local`, or `remove-local`"
+            "unknown nuis galaxy command `{other}`; expected `init`, `check`, `pack`, `inspect`, `publish-local`, `list`, `install-local`, `install-deps`, `doctor`, `resolve-deps`, `sync-deps`, `lock-deps`, `verify-lock`, `inspect-local`, `verify-local`, or `remove-local`"
         )),
     }
 }

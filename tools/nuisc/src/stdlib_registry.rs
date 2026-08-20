@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 
 #[path = "stdlib_registry_parser.rs"]
 mod stdlib_registry_parser;
+#[path = "stdlib_registry_provider.rs"]
+mod stdlib_registry_provider;
 #[path = "stdlib_registry_render.rs"]
 mod stdlib_registry_render;
 #[path = "stdlib_registry_types.rs"]
@@ -13,10 +15,17 @@ use stdlib_registry_parser::{
     parse_library_import_policy, parse_optional_string_array, parse_required_string,
     parse_stdlib_index_modules,
 };
+pub use stdlib_registry_provider::{
+    resolve_galaxy_dependencies_with_provider, GALAXY_RESOLUTION_PROVIDER_CONTRACT,
+    GALAXY_RESOLUTION_PROVIDER_KINDS,
+};
 pub(crate) use stdlib_registry_render::summarize_resolved_galaxy_docs;
 pub use stdlib_registry_render::{render_resolved_galaxy_index, write_resolved_galaxy_index};
 pub(crate) use stdlib_registry_types::ResolvedGalaxyDocSummary;
 pub use stdlib_registry_types::{
+    GalaxyResolutionProviderDescriptor, GalaxyResolutionProviderReport,
+    GalaxyResolutionProviderRequest, GalaxyResolutionProviderRequirement,
+    GalaxyResolutionProviderResolution, GalaxyResolutionProviderSelection,
     ResolvedGalaxyContentIdentity, ResolvedGalaxyDependency, StdlibIndexModule, StdlibLayout,
     StdlibLibraryImportPolicy, StdlibModuleManifest,
 };
@@ -24,10 +33,12 @@ pub fn load_stdlib_layout(stdlib_root: &Path) -> Result<StdlibLayout, String> {
     let path = stdlib_root.join("index.toml");
     let source = fs::read_to_string(&path)
         .map_err(|error| format!("failed to read stdlib layout `{}`: {error}", path.display()))?;
+    let schema = parse_required_string(&source, "layout_schema", &path)?;
     let name = parse_required_string(&source, "name", &path)?;
     let default_entry = parse_required_string(&source, "default_entry", &path)?;
     let modules = parse_stdlib_index_modules(&source, &path)?;
     Ok(StdlibLayout {
+        schema,
         name,
         default_entry,
         modules,
@@ -67,7 +78,7 @@ pub fn load_stdlib_module_manifest(
         .map(|(manifest, _)| manifest)
 }
 
-fn load_stdlib_module_manifest_with_identity(
+pub(in crate::stdlib_registry) fn load_stdlib_module_manifest_with_identity(
     stdlib_root: &Path,
     module_path: &str,
 ) -> Result<(StdlibModuleManifest, ResolvedGalaxyContentIdentity), String> {
@@ -98,106 +109,16 @@ pub fn resolve_galaxy_dependencies(
     stdlib_root: &Path,
     requested: &[crate::project::ProjectGalaxyDependency],
 ) -> Result<Vec<ResolvedGalaxyDependency>, String> {
-    if requested.is_empty() {
-        return Ok(vec![]);
-    }
-    let layout = load_stdlib_layout(stdlib_root)?;
-    let entries = layout
-        .modules
-        .iter()
-        .map(|item| (item.name.clone(), item.clone()))
-        .collect::<BTreeMap<_, _>>();
-    let mut resolved = BTreeMap::<String, ResolvedGalaxyDependency>::new();
-    let mut stack = requested
-        .iter()
-        .map(|item| {
-            (
-                item.name.clone(),
-                item.version.clone(),
-                true,
-                item.name.clone(),
-            )
-        })
-        .collect::<Vec<_>>();
-
-    while let Some((name, version, direct, requested_by)) = stack.pop() {
-        let entry = entries.get(&name).ok_or_else(|| {
-            format!(
-                "project galaxy dependency `{}` is not declared in stdlib index `{}`",
-                name,
-                stdlib_root.join("index.toml").display()
-            )
-        })?;
-        let (manifest, manifest_content_identity) =
-            load_stdlib_module_manifest_with_identity(stdlib_root, &entry.path)?;
-        let module_dir = stdlib_root.join(&entry.path);
-        let resolved_source_paths = manifest
-            .source_modules
-            .iter()
-            .map(|item| module_dir.join(item))
-            .collect::<Vec<_>>();
-        let resolved_library_paths = manifest
-            .library_modules
-            .iter()
-            .map(|item| module_dir.join(item))
-            .collect::<Vec<_>>();
-        let source_content_identities =
-            read_content_identities(&manifest.source_modules, &resolved_source_paths)?;
-        let library_content_identities =
-            read_content_identities(&manifest.library_modules, &resolved_library_paths)?;
-        let (auto_injectable, auto_inject_blockers) = detect_auto_injectability(
-            &resolved_library_paths,
-            &library_content_identities,
-            &manifest.library_import_policy,
-        )?;
-
-        let item = resolved
-            .entry(name.clone())
-            .or_insert_with(|| ResolvedGalaxyDependency {
-                name: name.clone(),
-                version: version.clone(),
-                package_id: manifest.package_id.clone(),
-                direct,
-                requested_by: vec![],
-                module_dir: module_dir.clone(),
-                manifest_path: module_dir.join("module.toml"),
-                manifest_content_identity: manifest_content_identity.clone(),
-                depends_on: manifest.depends_on.clone(),
-                surfaces: manifest.surfaces.clone(),
-                code_assets: manifest.code_assets.clone(),
-                source_modules: manifest.source_modules.clone(),
-                resolved_source_paths,
-                source_content_identities,
-                library_modules: manifest.library_modules.clone(),
-                resolved_library_paths,
-                library_content_identities,
-                library_import_policy: manifest.library_import_policy.clone(),
-                auto_injectable,
-                auto_inject_blockers,
-            });
-        item.direct |= direct;
-        if !item.requested_by.iter().any(|value| value == &requested_by) {
-            item.requested_by.push(requested_by.clone());
-            item.requested_by.sort();
-        }
-
-        for dependency in &manifest.depends_on {
-            if !entries.contains_key(dependency) {
-                return Err(format!(
-                    "stdlib module `{}` depends on unknown stdlib module `{}`",
-                    manifest.name, dependency
-                ));
-            }
-            stack.push((dependency.clone(), version.clone(), false, name.clone()));
-        }
-    }
-
-    let mut values = resolved.into_values().collect::<Vec<_>>();
-    values.sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
-    Ok(values)
+    let provider = GalaxyResolutionProviderDescriptor {
+        provider_id: "official.workspace".to_owned(),
+        provider_kind: "workspace-layout".to_owned(),
+        root: stdlib_root.to_path_buf(),
+    };
+    resolve_galaxy_dependencies_with_provider(&provider, requested)
+        .map(|resolution| resolution.dependencies)
 }
 
-fn detect_auto_injectability(
+pub(in crate::stdlib_registry) fn detect_auto_injectability(
     source_paths: &[PathBuf],
     content_identities: &[ResolvedGalaxyContentIdentity],
     import_policy: &StdlibLibraryImportPolicy,
@@ -270,7 +191,7 @@ pub fn read_verified_galaxy_text(
     Ok(source)
 }
 
-fn read_content_identities(
+pub(in crate::stdlib_registry) fn read_content_identities(
     logical_paths: &[String],
     physical_paths: &[PathBuf],
 ) -> Result<Vec<ResolvedGalaxyContentIdentity>, String> {

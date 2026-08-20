@@ -29,9 +29,10 @@ pub use crate::registry_domain_json::{
     domain_registration_object_json,
 };
 pub use crate::registry_host_ffi::{
-    validate_abi_capabilities, HostFfiMemoryCapability, HostFfiMemoryDestructor, HostFfiMemoryKind,
-    HostFfiMemorySlot, HostFfiRegistryView, HostFfiSymbolRegistration,
+    HostFfiMemoryCapability, HostFfiMemoryDestructor, HostFfiMemoryKind, HostFfiMemorySlot,
+    HostFfiRegistryView, HostFfiSymbolRegistration,
 };
+pub use crate::registry_host_ffi_abi::validate_abi_capabilities;
 pub use crate::registry_load::{
     load_all_manifests, load_index, load_manifest, load_manifest_for_domain,
     load_required_manifests, required_package_ids,

@@ -348,6 +348,8 @@ fn default_lane_for_node<'a>(
             | SemanticOp::CpuLoadValue
             | SemanticOp::CpuLoadNext
             | SemanticOp::CpuBufferLen
+            | SemanticOp::CpuFfiObjectSize
+            | SemanticOp::CpuFfiObjectReadI64
             | SemanticOp::CpuLoadAt
             | SemanticOp::CpuStoreValue
             | SemanticOp::CpuStoreNext

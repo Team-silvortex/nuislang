@@ -283,6 +283,7 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
+        | NirExpr::OwnedObjectSize(inner)
         | NirExpr::CopyBufferOwned(inner)
         | NirExpr::BytesLen(inner)
         | NirExpr::DropBytes(inner)
@@ -412,6 +413,7 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
         NirExpr::CpuExternCall { args, .. }
         | NirExpr::CpuExternCallI32 { args, .. }
         | NirExpr::CpuExternCallOwnedBuffer { args, .. }
+        | NirExpr::CpuExternCallOwnedObject { args, .. }
         | NirExpr::CpuExternCallOwnedUtf8 { args, .. } => {
             for arg in args {
                 collect_instantiated_units_expr(arg, units);
@@ -425,7 +427,11 @@ fn collect_instantiated_units_expr(expr: &NirExpr, units: &mut Vec<(String, Stri
             collect_instantiated_units_expr(len, units);
             collect_instantiated_units_expr(fill, units);
         }
-        NirExpr::LoadAt { buffer, index } => {
+        NirExpr::LoadAt { buffer, index }
+        | NirExpr::OwnedObjectReadI64 {
+            object: buffer,
+            index,
+        } => {
             collect_instantiated_units_expr(buffer, units);
             collect_instantiated_units_expr(index, units);
         }

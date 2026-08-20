@@ -11,6 +11,8 @@ pub(in crate::stdlib_registry) fn parse_stdlib_index_modules(
     for block in blocks {
         modules.push(StdlibIndexModule {
             name: parse_required_string(&block, "name", path)?,
+            version: parse_optional_string(&block, "version")
+                .unwrap_or_else(|| "workspace".to_owned()),
             kind: parse_required_string(&block, "kind", path)?,
             path: parse_required_string(&block, "path", path)?,
             package_id: parse_required_string(&block, "package_id", path)?,

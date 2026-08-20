@@ -89,7 +89,10 @@ fn native_compile_embeds_real_relocatable_host_objects() {
     assert!(repaired_output.join("main.host-runtime.o").is_file());
     let repaired_manifest =
         verify_build_manifest(&repaired_output.join("nuis.build.manifest.toml")).unwrap();
-    assert_eq!(repaired_manifest.compile_cache_status.as_deref(), Some("miss"));
+    assert_eq!(
+        repaired_manifest.compile_cache_status.as_deref(),
+        Some("miss")
+    );
 
     let _ = fs::remove_dir_all(cache_key.root.join(cache_key.key));
     fs::remove_dir_all(dir).unwrap();

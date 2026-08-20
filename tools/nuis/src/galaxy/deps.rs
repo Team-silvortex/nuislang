@@ -65,6 +65,52 @@ pub fn verify_project_lock(input: &Path) -> Result<VerifiedGalaxyLock, String> {
 
 pub fn sync_project_deps(input: &Path) -> Result<SyncedProjectDeps, String> {
     let context = load_verified_project_lock(input)?;
+    sync_verified_project_lock(context)
+}
+
+pub fn resolve_project_deps_with_provider(
+    input: &Path,
+    provider: &nuisc::stdlib_registry::GalaxyResolutionProviderDescriptor,
+) -> Result<ProviderResolvedProjectDeps, String> {
+    let (project, provider_request, provider_report) =
+        nuisc::project::load_project_with_galaxy_resolution_provider(input, provider)?;
+    let plan = nuisc::project::build_project_compilation_plan(&project)?;
+    let project_plan_summary = nuisc::project::describe_project_compilation_plan(&plan);
+    let path = nuisc::project::committed_project_galaxy_resolution_lock_path(&project);
+    let summary = nuisc::project::write_project_galaxy_resolution_lock(&path, &project)?;
+    let source = fs::read_to_string(&path)
+        .map_err(|error| format!("failed to read `{}`: {error}", path.display()))?;
+    let verified = nuisc::project::verify_project_galaxy_resolution_lock(&project, &source, &path)?;
+    if verified != summary {
+        return Err("Galaxy provider lock summary changed during materialization".to_owned());
+    }
+    let entries = resolution_entries(&project);
+    let lock = WroteGalaxyLock {
+        project_root: project.root.clone(),
+        project_plan_summary: project_plan_summary.clone(),
+        path: path.clone(),
+        entries: entries.clone(),
+        summary: summary.clone(),
+    };
+    let synced = sync_verified_project_lock(VerifiedProjectLockContext {
+        project,
+        project_plan_summary,
+        path,
+        source,
+        entries,
+        summary,
+    })?;
+    Ok(ProviderResolvedProjectDeps {
+        request: provider_request,
+        provider: provider_report,
+        lock,
+        synced,
+    })
+}
+
+fn sync_verified_project_lock(
+    context: VerifiedProjectLockContext,
+) -> Result<SyncedProjectDeps, String> {
     let deps_parent = context.project.root.join(".nuis").join("deps");
     fs::create_dir_all(&deps_parent)
         .map_err(|error| format!("failed to create `{}`: {error}", deps_parent.display()))?;
@@ -184,7 +230,7 @@ fn load_verified_project_lock(input: &Path) -> Result<VerifiedProjectLockContext
     })
 }
 
-fn resolution_entries(project: &nuisc::project::LoadedProject) -> Vec<GalaxyLockEntry> {
+pub(super) fn resolution_entries(project: &nuisc::project::LoadedProject) -> Vec<GalaxyLockEntry> {
     let mut entries = project
         .resolved_galaxies
         .iter()

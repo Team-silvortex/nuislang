@@ -17,6 +17,8 @@ use super::{
 mod direct_calls_buffer;
 #[path = "direct_calls_http.rs"]
 mod direct_calls_http;
+#[path = "direct_calls_object.rs"]
+mod direct_calls_object;
 #[path = "direct_calls_serialization.rs"]
 mod direct_calls_serialization;
 #[path = "direct_calls_text.rs"]
@@ -82,6 +84,9 @@ pub(super) fn lower_direct_call_builtin_or_named_call(
         return Ok(Some(lowered));
     }
     if let Some(lowered) = direct_calls_text::lower_text_call(callee, args, context)? {
+        return Ok(Some(lowered));
+    }
+    if let Some(lowered) = direct_calls_object::lower_object_call(callee, args, context)? {
         return Ok(Some(lowered));
     }
     if let Some(lowered) = direct_calls_buffer::lower_buffer_call(callee, args, context)? {
@@ -250,6 +255,15 @@ fn lower_named_call(input: NamedCallLoweringInput<'_>) -> Result<Option<NirExpr>
         }
         if is_owned_extern_utf8_return(signature) {
             return Ok(Some(NirExpr::CpuExternCallOwnedUtf8 {
+                abi: signature.abi.clone(),
+                interface: None,
+                callee: signature.symbol_name.clone(),
+                signature: extern_signature_pattern(signature),
+                args: lowered_args,
+            }));
+        }
+        if super::call_helpers::is_owned_extern_object_return(signature) {
+            return Ok(Some(NirExpr::CpuExternCallOwnedObject {
                 abi: signature.abi.clone(),
                 interface: None,
                 callee: signature.symbol_name.clone(),

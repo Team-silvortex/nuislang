@@ -29,6 +29,40 @@ path: it requires both the committed root lock and its synchronized cache
 before compilation or output creation. Single-file release checks are not
 project package-resolution operations and do not require a project lock.
 
+## Resolution Provider
+
+`nuis-galaxy-resolution-provider-v1` is the static request/result boundary in
+front of lock rendering. The currently registered provider kinds are:
+
+* `workspace-layout`
+* `locked-resolution-cache`
+* `offline-layout`
+
+The request binds the provider ID and kind plus sorted exact package
+requirements. The result repeats that request identity and records selected
+name, version, package ID, canonical relative path, direct/transitive status,
+and requester set. `request_sha256` authenticates the normalized request;
+`selection_sha256` also binds selected manifests, source/library identities,
+and dependency facts. Physical provider roots are deliberately excluded, so
+equivalent mirrors remain portable.
+
+Selection is exact in this version. A transitive index edge may pin its own
+exact version; an unpinned edge is accepted only when the provider exposes one
+candidate for that name. Missing, duplicate, conflicting, ambiguous, ranged,
+malformed, unregistered, traversal, and symlink-escape inputs fail closed.
+
+The offline front door is:
+
+```bash
+cargo run -p nuis -- galaxy resolve-deps <project-dir|nuis.toml> \
+  --provider-root <offline-layout> \
+  [--provider-id <id>] [--provider-kind <kind>]
+```
+
+It routes through the same generic project loader, writes the canonical root
+lock, and materializes the same SHA-256-addressed compile cache. It does not add
+registry-specific resolution branches to `nuisc`.
+
 ## Bound State
 
 The canonical payload binds:
@@ -126,7 +160,7 @@ the lock and addressed cache; it does not silently create or refresh either.
 The early-beta development workflow still permits a missing root lock so old
 workspace examples can be checked and built before they are individually
 locked. This fallback is never used when a root lock exists. Remote candidate
-discovery, version solving, registry trust metadata, transport, and cache
+discovery, semantic-version range solving, registry trust metadata, transport, and cache
 garbage collection remain later work. Those providers must produce the same
 canonical lock and addressed cache rather than becoming new compiler-side
 resolution authorities.

@@ -50,6 +50,13 @@ pub(crate) enum LlvmValueRef {
         destructor: String,
         destructor_signature_hash: String,
     },
+    OwnedExternalObject {
+        ptr: String,
+        size: String,
+        abi: String,
+        destructor: String,
+        destructor_signature_hash: String,
+    },
     TextHandle {
         ptr: String,
         handle: String,

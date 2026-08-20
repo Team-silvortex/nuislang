@@ -7,9 +7,9 @@ use nuis_semantics::model::{
 
 use super::types::ast_type_from_nir;
 use super::{
-    infer_nir_expr_type, is_public_visibility, lower_expr_with_async,
-    with_current_type_aliases, lower_visibility, resolve_declared_or_inferred, validate_type_ref,
-    ExprWithAsyncInput, FunctionSignature, ModuleConstValue,
+    infer_nir_expr_type, is_public_visibility, lower_expr_with_async, lower_visibility,
+    resolve_declared_or_inferred, validate_type_ref, with_current_type_aliases, ExprWithAsyncInput,
+    FunctionSignature, ModuleConstValue,
 };
 
 pub(crate) fn lower_param_with_aliases(
@@ -93,8 +93,7 @@ pub(crate) fn resolve_ast_type_ref_aliases_inner(
                 is_optional: raw.is_optional,
                 is_ref: raw.is_ref,
             };
-            let resolved_base =
-                resolve_ast_type_ref_aliases_inner(&alias_base, aliases, visiting)?;
+            let resolved_base = resolve_ast_type_ref_aliases_inner(&alias_base, aliases, visiting)?;
             return Ok(AstTypeRef {
                 name: format!("{}.{}", resolved_base.name, variant_name),
                 generic_args: resolved_base.generic_args,

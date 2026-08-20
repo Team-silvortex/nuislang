@@ -185,6 +185,21 @@ fn validate_extern_memory_capabilities(
             ));
         }
     }
+    if function.return_type.name == "FfiObject"
+        && function.return_type.is_ref
+        && !function.return_type.is_optional
+    {
+        let registered = capabilities.iter().any(|capability| {
+            capability.kind == HostFfiMemoryKind::OwnedReturnObject
+                && capability.slot == HostFfiMemorySlot::Return
+        });
+        if !registered {
+            return Err(format!(
+                "extern `{}` ABI `{}` symbol `{symbol}` ref FfiObject return requires a hash-bound `owned_return_object` host FFI memory capability before lowering",
+                function.name, function.abi
+            ));
+        }
+    }
     Ok(())
 }
 

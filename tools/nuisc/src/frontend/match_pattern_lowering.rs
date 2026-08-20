@@ -77,10 +77,9 @@ pub(super) fn lower_match_pattern_condition_and_bindings(
             let mut conditions = Vec::new();
             let mut bindings = Vec::new();
             for (index, pattern) in patterns.iter().enumerate() {
-                let field_ty = value_ty
-                    .generic_args
-                    .get(index)
-                    .ok_or_else(|| "tuple match pattern arity exceeds scrutinee arity".to_owned())?;
+                let field_ty = value_ty.generic_args.get(index).ok_or_else(|| {
+                    "tuple match pattern arity exceeds scrutinee arity".to_owned()
+                })?;
                 let field_expr = NirExpr::FieldAccess {
                     base: Box::new(lowered_value.clone()),
                     field: index.to_string(),
@@ -285,12 +284,10 @@ pub(super) fn lower_match_pattern_condition_and_bindings(
                 bindings,
             ))
         }
-        (AstMatchPattern::Bool(_), _) => {
-            Err(format!(
-                "`match` arm pattern `true`/`false` requires a `bool` scrutinee, found `{}`",
-                value_ty.render()
-            ))
-        }
+        (AstMatchPattern::Bool(_), _) => Err(format!(
+            "`match` arm pattern `true`/`false` requires a `bool` scrutinee, found `{}`",
+            value_ty.render()
+        )),
         (AstMatchPattern::Int(_) | AstMatchPattern::IntRangeInclusive(_, _), _) => {
             Err("minimal `match` integer patterns require an `i64` scrutinee".to_owned())
         }

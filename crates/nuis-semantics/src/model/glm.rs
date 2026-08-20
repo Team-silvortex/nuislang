@@ -32,6 +32,7 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
         | NirExpr::Binary { .. }
         | NirExpr::IsNull(_) => None,
         NirExpr::CpuExternCallOwnedBuffer { args, .. }
+        | NirExpr::CpuExternCallOwnedObject { args, .. }
         | NirExpr::CpuExternCallOwnedUtf8 { args, .. } => Some(NirGlmProfile {
             result_class: NirGlmValueClass::Res,
             accesses: args
@@ -445,6 +446,28 @@ pub fn nir_glm_profile(expr: &NirExpr) -> Option<NirGlmProfile> {
                 class: NirGlmValueClass::Res,
                 mode: NirGlmUseMode::Read,
             }],
+            effect: NirGlmEffect::None,
+        }),
+        NirExpr::OwnedObjectSize(_) => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Val,
+            accesses: vec![NirGlmAccess {
+                class: NirGlmValueClass::Res,
+                mode: NirGlmUseMode::Read,
+            }],
+            effect: NirGlmEffect::None,
+        }),
+        NirExpr::OwnedObjectReadI64 { .. } => Some(NirGlmProfile {
+            result_class: NirGlmValueClass::Val,
+            accesses: vec![
+                NirGlmAccess {
+                    class: NirGlmValueClass::Res,
+                    mode: NirGlmUseMode::Read,
+                },
+                NirGlmAccess {
+                    class: NirGlmValueClass::Val,
+                    mode: NirGlmUseMode::Read,
+                },
+            ],
             effect: NirGlmEffect::None,
         }),
         NirExpr::StoreValue { .. } | NirExpr::StoreNext { .. } | NirExpr::StoreAt { .. } => {

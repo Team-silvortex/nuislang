@@ -182,6 +182,7 @@ pub(super) fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Resu
         | NirExpr::CpuExternCall { args, .. }
         | NirExpr::CpuExternCallI32 { args, .. }
         | NirExpr::CpuExternCallOwnedBuffer { args, .. }
+        | NirExpr::CpuExternCallOwnedObject { args, .. }
         | NirExpr::CpuExternCallOwnedUtf8 { args, .. } => {
             for arg in args {
                 verify_expr_uses(arg, moved)?;
@@ -357,6 +358,7 @@ pub(super) fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Resu
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
+        | NirExpr::OwnedObjectSize(inner)
         | NirExpr::CopyBufferOwned(inner)
         | NirExpr::BytesLen(inner)
         | NirExpr::DropBytes(inner)
@@ -370,7 +372,11 @@ pub(super) fn verify_expr_uses(expr: &NirExpr, moved: &BTreeSet<String>) -> Resu
             verify_expr_uses(len, moved)?;
             verify_expr_uses(fill, moved)?;
         }
-        NirExpr::LoadAt { buffer, index } => {
+        NirExpr::LoadAt { buffer, index }
+        | NirExpr::OwnedObjectReadI64 {
+            object: buffer,
+            index,
+        } => {
             verify_expr_uses(buffer, moved)?;
             verify_expr_uses(index, moved)?;
         }

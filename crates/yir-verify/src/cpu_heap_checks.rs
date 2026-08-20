@@ -130,7 +130,7 @@ pub(super) fn ensure_buffer_index_in_bounds(
 
     if let Some(len) = heap.get(&object_id).and_then(|binding| match binding.kind {
         HeapObjectKind::Buffer { len } | HeapObjectKind::Utf8 { len } => len,
-        HeapObjectKind::Node { .. } => None,
+        HeapObjectKind::Node { .. } | HeapObjectKind::FfiObject { .. } => None,
     }) {
         if index >= len {
             return Err(format!(
@@ -215,6 +215,10 @@ pub(super) fn ensure_node_readable(
                     "node `{}` uses UTF-8 object `&{id}` as linked-list node",
                     node.name
                 )),
+                Some(HeapObjectKind::FfiObject { .. }) => Err(format!(
+                    "node `{}` uses registered FFI object `&{id}` as linked-list node",
+                    node.name
+                )),
                 None => Ok(()),
             }
         }
@@ -240,6 +244,10 @@ pub(super) fn ensure_node_writable(
                 "node `{}` uses UTF-8 object `&{id}` as linked-list node",
                 node.name
             )),
+            Some(HeapObjectKind::FfiObject { .. }) => Err(format!(
+                "node `{}` uses registered FFI object `&{id}` as linked-list node",
+                node.name
+            )),
             None => Ok(()),
         },
         PointerState::Borrowed(_) | PointerState::Null | PointerState::Unknown => Ok(()),
@@ -258,6 +266,10 @@ pub(super) fn ensure_buffer_readable(
                 Some(HeapObjectKind::Buffer { .. }) | Some(HeapObjectKind::Utf8 { .. }) => Ok(()),
                 Some(HeapObjectKind::Node { .. }) => Err(format!(
                     "node `{}` uses linked-list node `&{id}` as buffer",
+                    node.name
+                )),
+                Some(HeapObjectKind::FfiObject { .. }) => Err(format!(
+                    "node `{}` uses registered FFI object `&{id}` as buffer",
                     node.name
                 )),
                 None => Ok(()),
@@ -288,6 +300,10 @@ pub(super) fn ensure_buffer_writable(
                     "node `{}` uses linked-list node `&{id}` as buffer",
                     node.name
                 )),
+                Some(HeapObjectKind::FfiObject { .. }) => Err(format!(
+                    "node `{}` writes through read-only registered FFI object `&{id}`",
+                    node.name
+                )),
                 None => Ok(()),
             }
         }
@@ -298,6 +314,10 @@ pub(super) fn ensure_buffer_writable(
             )),
             Some(HeapObjectKind::Utf8 { .. }) => Err(format!(
                 "node `{}` writes through read-only UTF-8 object `&{id}`",
+                node.name
+            )),
+            Some(HeapObjectKind::FfiObject { .. }) => Err(format!(
+                "node `{}` writes through read-only registered FFI object `&{id}`",
                 node.name
             )),
             Some(HeapObjectKind::Node { .. }) => Err(format!(
@@ -312,6 +332,55 @@ pub(super) fn ensure_buffer_writable(
         PointerState::Null => Err(format!("node `{}` writes through null pointer", node.name)),
         PointerState::Unknown => Ok(()),
     }
+}
+
+pub(super) fn ensure_ffi_object_readable(
+    pointer: PointerState,
+    heap: &BTreeMap<usize, HeapBinding>,
+    node: &Node,
+) -> Result<(), String> {
+    match pointer {
+        PointerState::Owned(id) | PointerState::Borrowed(id) => {
+            ensure_live_heap(heap, id, node)?;
+            match heap.get(&id).map(|binding| binding.kind) {
+                Some(HeapObjectKind::FfiObject { .. }) => Ok(()),
+                Some(_) => Err(format!(
+                    "node `{}` uses non-object heap value `&{id}` as registered FFI object",
+                    node.name
+                )),
+                None => Ok(()),
+            }
+        }
+        PointerState::Null => Err(format!("node `{}` dereferences null FFI object", node.name)),
+        PointerState::Unknown => Ok(()),
+    }
+}
+
+pub(super) fn ensure_ffi_object_index_in_bounds(
+    pointer: PointerState,
+    heap: &BTreeMap<usize, HeapBinding>,
+    nodes: &BTreeMap<&str, &Node>,
+    index_name: &str,
+    node: &Node,
+) -> Result<(), String> {
+    let Some(index) = known_non_negative_int(nodes, index_name)? else {
+        return Ok(());
+    };
+    let id = match pointer {
+        PointerState::Owned(id) | PointerState::Borrowed(id) => id,
+        PointerState::Null | PointerState::Unknown => return Ok(()),
+    };
+    let Some(HeapObjectKind::FfiObject { size }) = heap.get(&id).map(|entry| entry.kind) else {
+        return Ok(());
+    };
+    let slots = size / std::mem::size_of::<i64>();
+    if index >= slots {
+        return Err(format!(
+            "node `{}` indexes registered FFI object `&{id}` out of bounds: slot {index} >= {slots}",
+            node.name
+        ));
+    }
+    Ok(())
 }
 
 pub(super) fn ensure_no_active_borrows(

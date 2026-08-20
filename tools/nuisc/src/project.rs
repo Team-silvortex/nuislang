@@ -80,8 +80,9 @@ pub use planning::{
     build_project_compilation_plan, describe_project, describe_project_compilation_plan,
     describe_project_dependency_categories, describe_project_exchange_route_classes,
     describe_project_output_intent_categories, load_project, load_project_for_compile,
-    project_docs_summary, project_galaxy_summary, render_project_compilation_plan_index,
-    write_project_compilation_plan_index, write_project_metadata,
+    load_project_with_galaxy_resolution_provider, project_docs_summary, project_galaxy_summary,
+    render_project_compilation_plan_index, write_project_compilation_plan_index,
+    write_project_metadata,
 };
 use profile_apply::{
     apply_support_module_profile, collect_profile_int_bindings, ensure_project_resource,

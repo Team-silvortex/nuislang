@@ -427,9 +427,37 @@ pub(super) fn render_nir_expr(value: &NirExpr) -> String {
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
+        NirExpr::CpuExternCallOwnedObject {
+            abi,
+            interface,
+            callee,
+            signature,
+            args,
+        } => format!(
+            "extern_owned_object \"{}\" {}{} signature=\"{}\"({})",
+            abi,
+            interface
+                .as_ref()
+                .map(|name| format!("{name}::"))
+                .unwrap_or_default(),
+            callee,
+            escape_debug(signature),
+            args.iter()
+                .map(render_nir_expr)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
         NirExpr::LoadValue(value) => format!("load_value({})", render_nir_expr(value)),
         NirExpr::LoadNext(value) => format!("load_next({})", render_nir_expr(value)),
         NirExpr::BufferLen(value) => format!("buffer_len({})", render_nir_expr(value)),
+        NirExpr::OwnedObjectSize(value) => {
+            format!("owned_object_size({})", render_nir_expr(value))
+        }
+        NirExpr::OwnedObjectReadI64 { object, index } => format!(
+            "owned_object_read_i64({}, {})",
+            render_nir_expr(object),
+            render_nir_expr(index)
+        ),
         NirExpr::CopyBufferOwned(value) => format!("copy_bytes({})", render_nir_expr(value)),
         NirExpr::BytesLen(value) => format!("bytes_len({})", render_nir_expr(value)),
         NirExpr::DropBytes(value) => format!("drop_bytes({})", render_nir_expr(value)),

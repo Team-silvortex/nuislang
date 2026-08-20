@@ -67,6 +67,19 @@ pub(super) fn lower_core_expr(
         NirExpr::BufferLen(value) => {
             Some(lower_unary_cpu_expr("buffer_len", value, state, bindings))
         }
+        NirExpr::OwnedObjectSize(value) => Some(lower_unary_cpu_expr(
+            "ffi_object_size",
+            value,
+            state,
+            bindings,
+        )),
+        NirExpr::OwnedObjectReadI64 { object, index } => Some(lower_indexed_read(
+            "ffi_object_read_i64",
+            object,
+            index,
+            state,
+            bindings,
+        )),
         NirExpr::CopyBufferOwned(value) => Some(lower_unary_cpu_expr(
             "copy_buffer_owned",
             value,
@@ -226,6 +239,30 @@ fn lower_load_at(
         },
     });
     push_dep_edges(state, &buffer_name, &name);
+    push_dep_edges(state, &index_name, &name);
+    Ok(name)
+}
+
+fn lower_indexed_read(
+    instruction: &str,
+    object: &NirExpr,
+    index: &NirExpr,
+    state: &mut LoweringState<'_>,
+    bindings: &BTreeMap<String, String>,
+) -> Result<String, String> {
+    let object_name = lower_expr(object, state, bindings)?;
+    let index_name = lower_expr(index, state, bindings)?;
+    let name = next_name(state, instruction);
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: instruction.to_owned(),
+            args: vec![object_name.clone(), index_name.clone()],
+        },
+    });
+    push_dep_edges(state, &object_name, &name);
     push_dep_edges(state, &index_name, &name);
     Ok(name)
 }

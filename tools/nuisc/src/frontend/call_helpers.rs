@@ -240,6 +240,10 @@ pub(super) fn is_owned_extern_utf8_return(signature: &FunctionSignature) -> bool
     signature.return_type.as_ref() == Some(&string_ref_type())
 }
 
+pub(super) fn is_owned_extern_object_return(signature: &FunctionSignature) -> bool {
+    signature.return_type.as_ref() == Some(&ffi_object_ref_type())
+}
+
 pub(super) fn extern_signature_pattern(signature: &FunctionSignature) -> String {
     let return_type = signature
         .return_type
@@ -339,6 +343,15 @@ fn buffer_ref_type() -> NirTypeRef {
 fn string_ref_type() -> NirTypeRef {
     NirTypeRef {
         name: "String".to_owned(),
+        generic_args: vec![],
+        is_optional: false,
+        is_ref: true,
+    }
+}
+
+fn ffi_object_ref_type() -> NirTypeRef {
+    NirTypeRef {
+        name: "FfiObject".to_owned(),
         generic_args: vec![],
         is_optional: false,
         is_ref: true,

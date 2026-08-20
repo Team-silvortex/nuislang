@@ -59,9 +59,14 @@ impl Operation {
             (OperationDomainFamily::Cpu, "extern_call_owned_buffer") => {
                 SemanticOp::CpuExternCallOwnedBuffer
             }
+            (OperationDomainFamily::Cpu, "extern_call_owned_object") => {
+                SemanticOp::CpuExternCallOwnedObject
+            }
             (OperationDomainFamily::Cpu, "extern_call_owned_utf8") => {
                 SemanticOp::CpuExternCallOwnedUtf8
             }
+            (OperationDomainFamily::Cpu, "ffi_object_size") => SemanticOp::CpuFfiObjectSize,
+            (OperationDomainFamily::Cpu, "ffi_object_read_i64") => SemanticOp::CpuFfiObjectReadI64,
             (OperationDomainFamily::Cpu, "join") | (OperationDomainFamily::Cpu, "thread_join") => {
                 SemanticOp::CpuJoin
             }

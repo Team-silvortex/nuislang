@@ -11,6 +11,7 @@ pub(in crate::lowering) fn expr_references_names(expr: &NirExpr, names: &BTreeSe
         | NirExpr::LoadValue(inner)
         | NirExpr::LoadNext(inner)
         | NirExpr::BufferLen(inner)
+        | NirExpr::OwnedObjectSize(inner)
         | NirExpr::CopyBufferOwned(inner)
         | NirExpr::BytesLen(inner)
         | NirExpr::DropBytes(inner)
@@ -71,7 +72,9 @@ pub(in crate::lowering) fn expr_references_names(expr: &NirExpr, names: &BTreeSe
         | NirExpr::CpuMutexCapability { args, .. }
         | NirExpr::CpuExternCall { args, .. }
         | NirExpr::CpuExternCallI32 { args, .. }
-        | NirExpr::CpuExternCallOwnedBuffer { args, .. } => {
+        | NirExpr::CpuExternCallOwnedBuffer { args, .. }
+        | NirExpr::CpuExternCallOwnedObject { args, .. }
+        | NirExpr::CpuExternCallOwnedUtf8 { args, .. } => {
             args.iter().any(|arg| expr_references_names(arg, names))
         }
         NirExpr::MethodCall { receiver, args, .. } => {
@@ -85,6 +88,10 @@ pub(in crate::lowering) fn expr_references_names(expr: &NirExpr, names: &BTreeSe
         | NirExpr::VariantIs { base, .. }
         | NirExpr::VariantFieldAccess { base, .. } => expr_references_names(base, names),
         NirExpr::Binary { lhs, rhs, .. }
+        | NirExpr::OwnedObjectReadI64 {
+            object: lhs,
+            index: rhs,
+        }
         | NirExpr::LoadAt {
             buffer: lhs,
             index: rhs,

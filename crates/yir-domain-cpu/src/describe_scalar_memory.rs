@@ -93,7 +93,7 @@ pub(super) fn describe_cpu_scalar_memory_node(
             Ok(InstructionSemantics::effect(node.op.args.clone()))
         }
         "buffer_len" | "copy_buffer_owned" | "move_owned_bytes" | "owned_bytes_len"
-        | "drop_owned_bytes" => {
+        | "drop_owned_bytes" | "ffi_object_size" => {
             if node.op.args.len() != 1 {
                 return Err(format!(
                     "node `{}` expects `cpu.{} <name> <resource> <buffer_ptr>`",
@@ -106,6 +106,15 @@ pub(super) fn describe_cpu_scalar_memory_node(
             if node.op.args.len() != 2 {
                 return Err(format!(
                     "node `{}` expects `cpu.load_at <name> <resource> <buffer_ptr> <index>`",
+                    node.name
+                ));
+            }
+            Ok(InstructionSemantics::effect(node.op.args.clone()))
+        }
+        "ffi_object_read_i64" => {
+            if node.op.args.len() != 2 {
+                return Err(format!(
+                    "node `{}` expects `cpu.ffi_object_read_i64 <name> <resource> <object> <index>`",
                     node.name
                 ));
             }

@@ -4,7 +4,8 @@ use yir_core::{parse_branch_effect_args, BranchEffectAccess, BranchEffectResult,
 
 use crate::cpu_heap_checks::{
     ensure_buffer_index_in_bounds, ensure_buffer_readable, ensure_buffer_writable,
-    ensure_live_heap, ensure_no_active_borrows, ensure_no_live_heap_aliases, ensure_node_readable,
+    ensure_ffi_object_index_in_bounds, ensure_ffi_object_readable, ensure_live_heap,
+    ensure_no_active_borrows, ensure_no_live_heap_aliases, ensure_node_readable,
     ensure_node_writable, infer_borrow_scope_ends, known_non_negative_int, pointer_arg,
     release_completed_borrows, release_named_borrow,
 };
@@ -126,6 +127,26 @@ pub(crate) fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String>
                     HeapBinding {
                         live: true,
                         kind: HeapObjectKind::Utf8 { len: None },
+                    },
+                );
+                values.insert(node.name.clone(), PointerState::Owned(id));
+            }
+            "extern_call_owned_object" => {
+                yir_core::ffi::parse_owned_object_return_contract(&node.op.args).map_err(
+                    |error| {
+                        format!(
+                            "node `{}` cannot establish registered owned object authority: {error}",
+                            node.name
+                        )
+                    },
+                )?;
+                let id = next_id;
+                next_id += 1;
+                heap.insert(
+                    id,
+                    HeapBinding {
+                        live: true,
+                        kind: HeapObjectKind::FfiObject { size: 16 },
                     },
                 );
                 values.insert(node.name.clone(), PointerState::Owned(id));
@@ -272,6 +293,12 @@ pub(crate) fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String>
                                     node.name
                                 ));
                             }
+                            Some(HeapObjectKind::FfiObject { .. }) => {
+                                return Err(format!(
+                                    "node `{}` uses registered FFI object `&{id}` as linked-list node",
+                                    node.name
+                                ));
+                            }
                             None => PointerState::Unknown,
                         }
                     }
@@ -290,6 +317,15 @@ pub(crate) fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String>
                 let pointer = pointer_arg(&values, &node.op.args[0]);
                 ensure_buffer_readable(pointer, &heap, node)?;
                 ensure_buffer_index_in_bounds(pointer, &heap, &nodes, &node.op.args[1], node)?;
+            }
+            "ffi_object_size" => {
+                let pointer = pointer_arg(&values, &node.op.args[0]);
+                ensure_ffi_object_readable(pointer, &heap, node)?;
+            }
+            "ffi_object_read_i64" => {
+                let pointer = pointer_arg(&values, &node.op.args[0]);
+                ensure_ffi_object_readable(pointer, &heap, node)?;
+                ensure_ffi_object_index_in_bounds(pointer, &heap, &nodes, &node.op.args[1], node)?;
             }
             "store_value" => {
                 ensure_node_writable(
@@ -324,6 +360,12 @@ pub(crate) fn verify_cpu_heap_protocol(module: &YirModule) -> Result<(), String>
                             HeapObjectKind::Utf8 { .. } => {
                                 return Err(format!(
                                     "node `{}` uses UTF-8 object `&{id}` as linked-list node",
+                                    node.name
+                                ));
+                            }
+                            HeapObjectKind::FfiObject { .. } => {
+                                return Err(format!(
+                                    "node `{}` uses registered FFI object `&{id}` as linked-list node",
                                     node.name
                                 ));
                             }
