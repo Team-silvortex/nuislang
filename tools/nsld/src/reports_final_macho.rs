@@ -292,6 +292,165 @@ pub(crate) struct NsldMachOArm64PlatformPatchApplicationReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64ShellSectionPlan {
+    pub(crate) section_id: String,
+    pub(crate) source_kind: String,
+    pub(crate) source_id: String,
+    pub(crate) segment_name: String,
+    pub(crate) section_name: String,
+    pub(crate) section_ordinal: usize,
+    pub(crate) source_image_offset: Option<usize>,
+    pub(crate) source_size_bytes: usize,
+    pub(crate) alignment: usize,
+    pub(crate) file_offset: Option<usize>,
+    pub(crate) file_size_bytes: usize,
+    pub(crate) vm_address: u64,
+    pub(crate) vm_size_bytes: usize,
+    pub(crate) flags: u32,
+    pub(crate) reserved1: u32,
+    pub(crate) reserved2: u32,
+    pub(crate) audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64ShellSegmentPlan {
+    pub(crate) segment_id: String,
+    pub(crate) segment_name: String,
+    pub(crate) segment_index: usize,
+    pub(crate) file_offset: usize,
+    pub(crate) file_size_bytes: usize,
+    pub(crate) vm_address: u64,
+    pub(crate) vm_size_bytes: usize,
+    pub(crate) max_protection: u32,
+    pub(crate) initial_protection: u32,
+    pub(crate) section_ids: Vec<String>,
+    pub(crate) audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64ShellSymbolPlan {
+    pub(crate) symbol_id: String,
+    pub(crate) name: String,
+    pub(crate) record_kind: String,
+    pub(crate) object_id: Option<String>,
+    pub(crate) source_symbol_index: Option<usize>,
+    pub(crate) shell_section_id: Option<String>,
+    pub(crate) source_image_offset: Option<usize>,
+    pub(crate) vm_address: Option<u64>,
+    pub(crate) symbol_table_index: usize,
+    pub(crate) string_table_offset: usize,
+    pub(crate) dylib_ordinal: Option<usize>,
+    pub(crate) audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64ShellIndirectSymbolPlan {
+    pub(crate) indirect_id: String,
+    pub(crate) shell_section_id: String,
+    pub(crate) slot_index: usize,
+    pub(crate) target_symbol: String,
+    pub(crate) symbol_table_index: Option<usize>,
+    pub(crate) marker: Option<String>,
+    pub(crate) audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64ShellBindPlan {
+    pub(crate) bind_id: String,
+    pub(crate) source_bind_id: String,
+    pub(crate) target_symbol: String,
+    pub(crate) dylib_ordinal: usize,
+    pub(crate) got_source_image_offset: usize,
+    pub(crate) shell_section_id: String,
+    pub(crate) segment_index: usize,
+    pub(crate) segment_offset: usize,
+    pub(crate) file_offset: usize,
+    pub(crate) vm_address: u64,
+    pub(crate) encoded_size_bytes: usize,
+    pub(crate) audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64ShellRebasePlan {
+    pub(crate) rebase_id: String,
+    pub(crate) structure_id: String,
+    pub(crate) target_symbol: String,
+    pub(crate) got_source_image_offset: usize,
+    pub(crate) target_source_image_offset: usize,
+    pub(crate) shell_section_id: String,
+    pub(crate) segment_index: usize,
+    pub(crate) segment_offset: usize,
+    pub(crate) file_offset: usize,
+    pub(crate) vm_address: u64,
+    pub(crate) target_vm_address: u64,
+    pub(crate) encoded_size_bytes: usize,
+    pub(crate) audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64ShellLoadCommandPlan {
+    pub(crate) command_id: String,
+    pub(crate) command_kind: String,
+    pub(crate) command_value: u32,
+    pub(crate) command_offset: usize,
+    pub(crate) command_size_bytes: usize,
+    pub(crate) segment_id: Option<String>,
+    pub(crate) status: String,
+    pub(crate) audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64ShellLayoutPlanReport {
+    pub(crate) contract: String,
+    pub(crate) status: String,
+    pub(crate) object_linkage_hash: String,
+    pub(crate) placement_plan_hash: String,
+    pub(crate) platform_structure_plan_hash: String,
+    pub(crate) platform_application_ledger_hash: String,
+    pub(crate) platform_image_hash: String,
+    pub(crate) page_size: usize,
+    pub(crate) image_base_vm_address: u64,
+    pub(crate) header_size_bytes: usize,
+    pub(crate) load_command_count: usize,
+    pub(crate) load_command_size_bytes: usize,
+    pub(crate) first_content_file_offset: usize,
+    pub(crate) entry_rule_id: String,
+    pub(crate) entry_symbol: String,
+    pub(crate) entry_source_image_offset: usize,
+    pub(crate) entry_file_offset: usize,
+    pub(crate) entry_vm_address: u64,
+    pub(crate) segment_count: usize,
+    pub(crate) section_count: usize,
+    pub(crate) defined_symbol_count: usize,
+    pub(crate) undefined_symbol_count: usize,
+    pub(crate) symbol_table_offset: usize,
+    pub(crate) symbol_table_bytes: usize,
+    pub(crate) indirect_symbol_table_offset: usize,
+    pub(crate) indirect_symbol_count: usize,
+    pub(crate) indirect_symbol_table_bytes: usize,
+    pub(crate) string_table_offset: usize,
+    pub(crate) string_table_bytes: usize,
+    pub(crate) rebase_stream_offset: usize,
+    pub(crate) rebase_stream_bytes: usize,
+    pub(crate) bind_stream_offset: usize,
+    pub(crate) bind_stream_bytes: usize,
+    pub(crate) linkedit_file_offset: usize,
+    pub(crate) linkedit_bytes: usize,
+    pub(crate) code_signature_file_offset: usize,
+    pub(crate) code_signature_status: String,
+    pub(crate) required_address_rewrite_count: usize,
+    pub(crate) planned_file_span_bytes: usize,
+    pub(crate) plan_hash: String,
+    pub(crate) segments: Vec<NsldMachOArm64ShellSegmentPlan>,
+    pub(crate) sections: Vec<NsldMachOArm64ShellSectionPlan>,
+    pub(crate) symbols: Vec<NsldMachOArm64ShellSymbolPlan>,
+    pub(crate) indirect_symbols: Vec<NsldMachOArm64ShellIndirectSymbolPlan>,
+    pub(crate) binds: Vec<NsldMachOArm64ShellBindPlan>,
+    pub(crate) rebases: Vec<NsldMachOArm64ShellRebasePlan>,
+    pub(crate) load_commands: Vec<NsldMachOArm64ShellLoadCommandPlan>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldExecutableFinalizerInputSummary {
     pub(crate) contract: String,
     pub(crate) status: String,
@@ -310,4 +469,5 @@ pub(crate) struct NsldExecutableFinalizerInputSummary {
     pub(crate) patch_application: NsldMachOArm64PatchApplicationReport,
     pub(crate) platform_structure_plan: NsldMachOArm64PlatformStructurePlanReport,
     pub(crate) platform_patch_application: NsldMachOArm64PlatformPatchApplicationReport,
+    pub(crate) shell_layout_plan: NsldMachOArm64ShellLayoutPlanReport,
 }

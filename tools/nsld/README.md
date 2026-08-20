@@ -80,6 +80,14 @@ by terminal command formatting:
 * `final_executable_macho_object.rs` validates the relocatable program/runtime
   object handoff, including roles, LinkPlan hashes, `MH_OBJECT`, and load
   command structure.
+* `final_executable_macho_layout.rs`, `final_executable_macho_relocation.rs`,
+  `final_executable_macho_materialization.rs`, and
+  `final_executable_macho_application.rs` own placement through direct writes.
+* `final_executable_macho_platform.rs` and
+  `final_executable_macho_platform_application.rs` own registered stub/GOT
+  allocation, platform writes, and unresolved bind preservation.
+* `final_executable_macho_shell.rs` coordinates the audited shell plan while
+  its layout and linkedit modules own final addresses and metadata requirements.
 * `final_executable_host.rs` owns host finalizer dry-run and invoke-plan gates.
 * `final_executable_layout_stage.rs` owns the Nsld final executable layout plan.
 * `final_executable_image_stage.rs` owns the `NUIFIMG` dry-run image checkpoint.
@@ -153,14 +161,29 @@ direct spans, structure writes, and deferred patches share a fail-closed
 write-once occupancy map. Plan drift, source drift, malformed instructions,
 overlap, and incomplete coverage block publication. The resulting image and
 ordered write/patch/bind ledgers are projected identically through JSON, text,
-and persisted invoke plans. No Mach-O load commands or executable-shell
-readiness are fabricated.
+and persisted invoke plans.
+`nuis-nsld-macho-arm64-shell-layout-plan-v1` now translates that exact
+platform ledger into a deterministic 16 KiB-page Mach-O shell plan. A static
+entry registry selects `_main`, `_nuis_entry`, or `_nuis_yir_entry` by object
+role; merged sections plus provider-created `__stubs` and `__got` regions are
+remapped into checked `__PAGEZERO`, `__TEXT`, `__DATA_CONST`, and `__LINKEDIT`
+segments; and section-backed definitions, unresolved symbols, indirect-symbol
+slots, rebase/bind stream requirements, symbol/string tables, and ordered load
+commands receive final file and VM addresses. External binds use the static
+libSystem compatibility registration rather than symbol-specific linker
+branches. Every segment, section, symbol, indirect entry, bind, rebase, and
+command has an audit hash, and the plan records an explicit pending code-
+signature boundary. JSON, text, and persisted invoke plans expose the same
+contract. The plan does not yet serialize Mach-O header, load-command,
+linkedit, or code-signature bytes, and therefore does not claim independent
+shell readiness.
 A gated host-command provider remains as a fallback; ELF and PE/COFF are
 explicit `registered-not-implemented` providers. This proves relocatable input,
 table parsing, placement, binding, merged-image construction, direct and
 platform relocation encoding, deterministic GOT/stub allocation, platform byte
-synthesis, and unresolved-bind preservation, but not common-symbol allocation
-or complete Mach-O shell emission independently of Nuisc's compatibility link.
+synthesis, unresolved-bind preservation, and complete audited Mach-O shell
+layout planning, but not common-symbol allocation or final shell serialization
+independently of Nuisc's compatibility link.
 
 ## Current Early-Beta Rule
 

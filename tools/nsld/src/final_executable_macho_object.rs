@@ -8,6 +8,7 @@ use crate::{
     final_executable_macho_platform::build_macho_arm64_platform_structure_plan,
     final_executable_macho_platform_application::apply_macho_arm64_platform_structure,
     final_executable_macho_relocation::build_macho_arm64_relocation_application_report,
+    final_executable_macho_shell::build_macho_arm64_shell_layout_plan,
     reports::NsldExecutableFinalizerInputSummary,
 };
 use std::collections::BTreeSet;
@@ -153,6 +154,13 @@ pub(crate) fn summarize_macho_host_object_handoff(
     {
         return Err("Mach-O platform applied image handoff hash drift".to_owned());
     }
+    let shell_layout_plan = build_macho_arm64_shell_layout_plan(
+        &placement_inputs,
+        &placement_binding,
+        &relocation_application,
+        &platform_structure_plan,
+        &platform_applied_image,
+    )?;
     Ok(NsldExecutableFinalizerInputSummary {
         contract: MACHO_HOST_OBJECT_LINKAGE_CONTRACT.to_owned(),
         status: status.to_owned(),
@@ -171,6 +179,7 @@ pub(crate) fn summarize_macho_host_object_handoff(
         patch_application: applied_image.report,
         platform_structure_plan,
         platform_patch_application: platform_applied_image.report,
+        shell_layout_plan,
     })
 }
 

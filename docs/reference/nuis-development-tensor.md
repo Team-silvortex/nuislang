@@ -344,9 +344,17 @@ The `beta-0.1` calibration baseline is:
   image to the planned span, emits checked ARM64 stubs and internal/external GOT
   entries, rewrites every deferred relocation once, keeps external values as
   explicit unresolved bind records, and publishes identical image/write/patch/
-  bind ledger evidence through JSON, text, and persisted invoke plans; common-
-  symbol allocation, translation into Mach-O bind/load-command metadata, shell
-  synthesis, ELF, and PE/COFF remain open
+  bind ledger evidence through JSON, text, and persisted invoke plans;
+  `nuis-nsld-macho-arm64-shell-layout-plan-v1` now maps that hash-bound working
+  image into deterministic 16 KiB-page `__PAGEZERO`, content, and `__LINKEDIT`
+  segments, merged plus provider-owned stub/GOT sections, a role-aware entry,
+  defined/undefined and indirect symbol records, rebase/bind stream
+  requirements, linkedit offsets, and ordered load commands. Every record and
+  the complete plan are audited and appear identically in JSON, text, and
+  persisted invoke plans, while code-signature payload generation remains an
+  explicit pending boundary; common-symbol allocation, final-address byte
+  rewriting, Mach-O header/load-command/linkedit serialization, shell signing,
+  ELF, and PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

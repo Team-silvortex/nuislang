@@ -34,12 +34,13 @@ For the automation frontdoor, see [nsld-driver-frontdoor.md](nsld-driver-frontdo
 * final-stage reporting
 * verified relocatable host object handoff identity and Mach-O object parsing
 * deterministic Mach-O section placement and section-backed symbol binding
+* checked Mach-O arm64 relocation, working-image, stub/GOT, and shell-layout planning
 * registered Mach-O arm64 compatibility-image materialization
 * the first independent CLI boundary for future linker work
 
 `Nsld` does not yet own:
 
-* Mach-O relocation application, non-section symbol allocation, and shell synthesis
+* non-section Mach-O symbol allocation and final shell-byte serialization/signing
 * final host-native executable wrapping for ELF or PE/COFF
 * binary section assembly independent from `nuisc`
 * stable linker script or relocation formats
@@ -1123,8 +1124,28 @@ per-relocation patches, bind records, the final platform-image hash, and one
 ordered application-ledger hash appear identically in JSON, text, and persisted
 writer input. The real fixture extends 16 bytes to 40, writes `_puts`'s stub at
 16 and GOT placeholder at 32, and redirects the external branch to the stub.
-This remains a provider working image, not a claim that Mach-O load commands or
-an executable shell already exist.
+This remains a provider working image, not the executable shell itself.
+
+`nuis-nsld-macho-arm64-shell-layout-plan-v1` consumes that exact image hash,
+platform application ledger, placement hash, and structure-plan hash. It maps
+working-image offsets into deterministic final file and VM addresses using a
+16 KiB ARM64 page policy, preserving merged section identity while introducing
+only provider-owned `__TEXT,__stubs` and `__DATA_CONST,__got` sections. The
+result includes checked `__PAGEZERO`, content, and `__LINKEDIT` segments; a
+static role-aware entry registry; section-backed defined and unresolved symbol
+records; indirect-symbol slots; internal rebase and external bind requirements;
+symbol, string, and dyld-stream offsets; and ordered segment, dyld-info,
+symtab, dysymtab, dylinker, registered libSystem, main, build-version, and
+pending code-signature load commands. The C compatibility library is selected
+through one static provider rule rather than branches for particular symbols.
+All records carry canonical audit hashes, and the complete plan is projected
+identically through JSON, text, and persisted writer input.
+
+The shell plan deliberately stops before byte serialization. It does not yet
+rewrite every address-dependent working-image instruction against final VM
+addresses, emit the Mach-O header/load-command/linkedit byte streams, or produce
+the required code-signature payload. Those remain explicit boundaries rather
+than guessed output.
 
 After those checks the provider validates a thin or universal arm64
 `MH_EXECUTE` compatibility image and installs it atomically with executable
@@ -1139,10 +1160,12 @@ real relocatable objects, but it also embeds a host-toolchain-linked
 compatibility image. Nsld now owns the deterministic merged source image,
 checked direct-write encoding previews, write-once direct and platform working
 images, deterministic GOT/stub allocation and bytes, deferred relocation
-rewrites, and explicit unresolved bind records. It does not yet allocate
-non-section definitions, translate those bind records into Mach-O metadata,
-emit segment/symbol/bind load commands, or produce the final native shell
-independently. Those remain the next boundary.
+rewrites, explicit unresolved bind records, and an audited final-address shell
+layout containing segment, section, symbol, indirect-symbol, rebase, bind,
+linkedit, entry, and load-command requirements. It does not yet allocate
+non-section definitions, serialize those requirements, re-encode the working
+image against final addresses, generate a code signature, or produce the final
+native shell independently. Those remain the next boundary.
 
 `nsld final-executable-host-dry-run` consumes the verified writer input,
 reports `environment_ready`, provider identity, and exact command arguments.

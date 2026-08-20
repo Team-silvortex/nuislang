@@ -608,6 +608,7 @@ fn print_finalizer_input_summary(summary: Option<&NsldExecutableFinalizerInputSu
             bind.audit_hash
         );
     }
+    crate::display_final_macho_shell::print_macho_shell_layout_plan(&summary.shell_layout_plan);
 }
 
 fn display_option(value: Option<usize>) -> String {

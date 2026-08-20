@@ -219,6 +219,7 @@ fn finalizer_input_summary_json(summary: Option<&NsldExecutableFinalizerInputSum
         macho_patch_application_json(&summary.patch_application),
         macho_platform_structure_plan_json(&summary.platform_structure_plan),
         macho_platform_patch_application_json(&summary.platform_patch_application),
+        crate::json_final_macho_shell::macho_shell_layout_plan_json(&summary.shell_layout_plan),
     ];
     format!("\"finalizer_input_summary\":{{{}}}", fields.join(","))
 }

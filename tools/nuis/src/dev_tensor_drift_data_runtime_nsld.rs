@@ -188,6 +188,37 @@ pub(crate) const DEV_TENSOR_RUNTIME_NSLD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "nsld-macho-arm64-shell-layout-plan-contract",
+        path: "tools/nsld/src/final_executable_macho_shell.rs",
+        required_patterns: &[
+            "nuis-nsld-macho-arm64-shell-layout-plan-v1",
+            "layout-planned-with-code-signature-boundary",
+            "build_shell_layout_draft",
+            "build_shell_linkedit_plan",
+            "required-payload-pending",
+            "required_address_rewrite_count",
+            "shell_plan_hash",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-macho-arm64-shell-layout-three-surface-evidence",
+        path: "tools/nsld/tests/host_finalizer_cli.rs",
+        required_patterns: &[
+            "nuis-nsld-macho-arm64-shell-layout-plan-v1",
+            "layout-planned-with-code-signature-boundary",
+            "entry_symbol",
+            "__LINKEDIT",
+            "__stubs",
+            "__got",
+            "finalizer_input_shell_layout_contract",
+            "finalizer_input_shell_entry",
+            "finalizer_input_shell_bind",
+            "finalizer_input_shell_layout_load_commands",
+            "required-payload-pending",
+            "persisted_invoke_plan",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nustar-domain-contract-completeness-status",
         path: "tools/nuisc/src/registry_contract.rs",
         required_patterns: &[
