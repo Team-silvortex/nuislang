@@ -345,16 +345,19 @@ The `beta-0.1` calibration baseline is:
   entries, rewrites every deferred relocation once, keeps external values as
   explicit unresolved bind records, and publishes identical image/write/patch/
   bind ledger evidence through JSON, text, and persisted invoke plans;
-  `nuis-nsld-macho-arm64-shell-layout-plan-v1` now maps that hash-bound working
-  image into deterministic 16 KiB-page `__PAGEZERO`, content, and `__LINKEDIT`
+  `nuis-nsld-macho-arm64-shell-layout-plan-v1` maps that hash-bound working image
+  into deterministic 16 KiB-page `__PAGEZERO`, content, and `__LINKEDIT`
   segments, merged plus provider-owned stub/GOT sections, a role-aware entry,
-  defined/undefined and indirect symbol records, rebase/bind stream
-  requirements, linkedit offsets, and ordered load commands. Every record and
-  the complete plan are audited and appear identically in JSON, text, and
-  persisted invoke plans, while code-signature payload generation remains an
-  explicit pending boundary; common-symbol allocation, final-address byte
-  rewriting, Mach-O header/load-command/linkedit serialization, shell signing,
-  ELF, and PE/COFF remain open
+  symbol/indirect records, rebase/bind requirements, linkedit offsets, and
+  ordered load commands; `nuis-nsld-macho-arm64-shell-image-serialization-v1`
+  now consumes the exact plan and platform ledger, emits private Mach-O header,
+  command, content, dyld, symbol, indirect-symbol, and UTF-8 string-table bytes,
+  and re-encodes direct/platform relocations, stubs, and internal GOT pointers
+  against final VM addresses with deterministic rewrite and image ledgers.
+  Internal-rebase and external-bind fixtures plus JSON/text/TOML CLI evidence
+  pass. The image remains `private-not-published` and stops at an empty pending
+  code-signature payload; signing, independent OS structure/load validation,
+  common-symbol allocation, ELF, and PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

@@ -1,4 +1,62 @@
-use crate::reports::NsldMachOArm64ShellLayoutPlanReport;
+use crate::reports::{
+    NsldMachOArm64ShellImageSerializationReport, NsldMachOArm64ShellLayoutPlanReport,
+};
+
+pub(crate) fn print_macho_shell_image_serialization(
+    report: &NsldMachOArm64ShellImageSerializationReport,
+) {
+    println!(
+        "  finalizer_input_shell_image: contract={} status={} layout_hash={} image_hash={} ledger_hash={} span={} header={} commands={} copied_sections={}:{} rewrites={}:{}:{}:{} publication={}",
+        report.contract,
+        report.status,
+        report.shell_layout_plan_hash,
+        report.shell_image_hash,
+        report.serialization_ledger_hash,
+        report.shell_image_span_bytes,
+        report.header_bytes,
+        report.load_command_bytes,
+        report.copied_section_count,
+        report.copied_section_bytes,
+        report.rewrite_count,
+        report.relocation_rewrite_count,
+        report.stub_rewrite_count,
+        report.got_rewrite_count,
+        report.publication_status
+    );
+    println!(
+        "  finalizer_input_shell_image_linkedit: rebase_hash={} bind_hash={} symbol_hash={} indirect_hash={} string_hash={} linkedit_hash={}",
+        report.rebase_stream_hash,
+        report.bind_stream_hash,
+        report.symbol_table_hash,
+        report.indirect_symbol_table_hash,
+        report.string_table_hash,
+        report.linkedit_hash
+    );
+    println!(
+        "  finalizer_input_shell_image_code_signature: status={} file_offset={}",
+        report.code_signature_status, report.code_signature_file_offset
+    );
+    for rewrite in &report.rewrites {
+        println!(
+            "  finalizer_input_shell_image_rewrite: id={} kind={} source={} source_offset={} file_offset={} vm=0x{:x} target_vm={} addend={} width={} prewrite_hash={} source_hash={} encoded_hash={} audit_hash={}",
+            rewrite.rewrite_id,
+            rewrite.rewrite_kind,
+            rewrite.source_id,
+            rewrite.source_image_offset,
+            rewrite.file_offset,
+            rewrite.vm_address,
+            option_u64_hex(rewrite.target_vm_address),
+            rewrite
+                .effective_addend
+                .map_or_else(|| "none".to_owned(), |value| value.to_string()),
+            rewrite.width_bytes,
+            rewrite.prewrite_bytes_hash,
+            rewrite.encoding_source_bytes_hash,
+            rewrite.encoded_bytes_hash,
+            rewrite.audit_hash
+        );
+    }
+}
 
 pub(crate) fn print_macho_shell_layout_plan(report: &NsldMachOArm64ShellLayoutPlanReport) {
     println!(

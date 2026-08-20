@@ -1141,11 +1141,22 @@ through one static provider rule rather than branches for particular symbols.
 All records carry canonical audit hashes, and the complete plan is projected
 identically through JSON, text, and persisted writer input.
 
-The shell plan deliberately stops before byte serialization. It does not yet
-rewrite every address-dependent working-image instruction against final VM
-addresses, emit the Mach-O header/load-command/linkedit byte streams, or produce
-the required code-signature payload. Those remain explicit boundaries rather
-than guessed output.
+`nuis-nsld-macho-arm64-shell-image-serialization-v1` consumes the shell plan and
+the exact platform application ledger into a private byte image. It emits the
+`mach_header_64`, every planned load command, file-backed section content, dyld
+rebase/bind streams, `nlist_64` records, indirect symbols, and the UTF-8 string
+table. It also re-encodes each direct/platform relocation, provider stub, and
+internal GOT pointer from audited source bytes against final VM addresses.
+Per-write prewrite/source/output hashes and one complete serialization ledger
+make this transition independently inspectable. External bind and internal
+rebase fixtures both pass, and JSON, text, and persisted writer input expose the
+same contract.
+
+The serializer deliberately stops before publication. The private image ends
+at the planned `LC_CODE_SIGNATURE` offset with `datasize = 0`, reports
+`payload-pending` and `private-not-published`, and is not installed as the
+runnable artifact. Provider-owned code-signature generation and independent
+Mach-O structural/load validation remain explicit rather than guessed.
 
 After those checks the provider validates a thin or universal arm64
 `MH_EXECUTE` compatibility image and installs it atomically with executable
@@ -1159,13 +1170,13 @@ This still does not claim a pure Nsld platform linker: Nuisc now hands Nsld
 real relocatable objects, but it also embeds a host-toolchain-linked
 compatibility image. Nsld now owns the deterministic merged source image,
 checked direct-write encoding previews, write-once direct and platform working
-images, deterministic GOT/stub allocation and bytes, deferred relocation
-rewrites, explicit unresolved bind records, and an audited final-address shell
-layout containing segment, section, symbol, indirect-symbol, rebase, bind,
-linkedit, entry, and load-command requirements. It does not yet allocate
-non-section definitions, serialize those requirements, re-encode the working
-image against final addresses, generate a code signature, or produce the final
-native shell independently. Those remain the next boundary.
+images, deterministic GOT/stub allocation and bytes, explicit unresolved bind
+records, an audited final-address shell layout, and deterministic private
+header/command/content/linkedit bytes with all address-dependent writes
+re-encoded for final VM addresses. It does not yet allocate non-section
+definitions, generate and validate a code signature, pass an independent OS
+load gate, or publish the final native shell independently. Those remain the
+next boundary.
 
 `nsld final-executable-host-dry-run` consumes the verified writer input,
 reports `environment_ready`, provider identity, and exact command arguments.

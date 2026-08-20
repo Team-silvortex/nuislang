@@ -96,13 +96,15 @@ driver path resolved during the verified dry-run boundary and may not repeat a
 `PATH` lookup after admission.
 
 This is not yet a pure Nsld linker claim. Nsld now understands the real input
-tables and can distinguish internal from external symbol references, but Nuisc
-still asks the host toolchain to prelink the compatibility executable embedded
-in the same artifact. Nsld does not yet assign final section addresses, create
-the binding map used for relocation writes, apply those writes, or synthesize
-the final Mach-O load commands and executable shell itself. ELF and PE/COFF
-remain visible, selectable, and honestly blocked rather than silently falling
-through a generic linker.
+tables, assigns deterministic final sections and addresses, applies registered
+direct/platform relocations, emits stub/GOT and dyld metadata, and serializes a
+private final-address Mach-O shell through
+`nuis-nsld-macho-arm64-shell-image-serialization-v1`. The private image remains
+unpublished because its `LC_CODE_SIGNATURE` payload is still empty and it has
+not passed an independent OS structural/load gate. Nuisc therefore still
+embeds the host-toolchain-linked compatibility executable used for runnable
+publication. ELF and PE/COFF remain visible, selectable, and honestly blocked
+rather than silently falling through a generic linker.
 
 ## Extension Rule
 
@@ -115,10 +117,9 @@ A future provider must:
    is unsupported;
 5. pass the registry conformance and finalizer CLI regressions.
 
-The next native milestone is a deterministic merged-section layout and
-cross-object symbol binding map, including duplicate-definition rejection and
-an explicit unresolved system-symbol boundary. Relocation application and
-executable-shell emission follow that report. This work must not add Mach-O
+The next native milestone is a provider-owned ad-hoc code-signature payload and
+an independent structural validator over the private shell image, followed by
+an explicit publication-eligibility report. This work must not add Mach-O
 branches to Nuisc, final-stage planning, or the generic emit frontdoor.
 
 ## Validation

@@ -1,5 +1,102 @@
-use crate::{reports::NsldMachOArm64ShellLayoutPlanReport, toml};
+use crate::{
+    reports::{NsldMachOArm64ShellImageSerializationReport, NsldMachOArm64ShellLayoutPlanReport},
+    toml,
+};
 use std::fmt::Write as _;
+
+pub(crate) fn render_macho_shell_image_serialization(
+    out: &mut String,
+    report: &NsldMachOArm64ShellImageSerializationReport,
+) {
+    for (name, value) in [
+        ("contract", report.contract.as_str()),
+        ("status", report.status.as_str()),
+        (
+            "shell_layout_plan_hash",
+            report.shell_layout_plan_hash.as_str(),
+        ),
+        (
+            "platform_application_ledger_hash",
+            report.platform_application_ledger_hash.as_str(),
+        ),
+        ("platform_image_hash", report.platform_image_hash.as_str()),
+        ("header_hash", report.header_hash.as_str()),
+        ("load_commands_hash", report.load_commands_hash.as_str()),
+        ("rebase_stream_hash", report.rebase_stream_hash.as_str()),
+        ("bind_stream_hash", report.bind_stream_hash.as_str()),
+        ("symbol_table_hash", report.symbol_table_hash.as_str()),
+        (
+            "indirect_symbol_table_hash",
+            report.indirect_symbol_table_hash.as_str(),
+        ),
+        ("string_table_hash", report.string_table_hash.as_str()),
+        ("linkedit_hash", report.linkedit_hash.as_str()),
+        ("shell_image_hash", report.shell_image_hash.as_str()),
+        (
+            "serialization_ledger_hash",
+            report.serialization_ledger_hash.as_str(),
+        ),
+        (
+            "code_signature_status",
+            report.code_signature_status.as_str(),
+        ),
+        ("publication_status", report.publication_status.as_str()),
+    ] {
+        writeln!(
+            out,
+            "finalizer_input_shell_image_{name} = \"{}\"",
+            toml::escape_toml_string(value)
+        )
+        .unwrap();
+    }
+    for (name, value) in [
+        ("shell_image_span_bytes", report.shell_image_span_bytes),
+        ("header_bytes", report.header_bytes),
+        ("load_command_bytes", report.load_command_bytes),
+        ("copied_section_count", report.copied_section_count),
+        ("copied_section_bytes", report.copied_section_bytes),
+        ("relocation_rewrite_count", report.relocation_rewrite_count),
+        ("stub_rewrite_count", report.stub_rewrite_count),
+        ("got_rewrite_count", report.got_rewrite_count),
+        ("rewrite_count", report.rewrite_count),
+        (
+            "code_signature_file_offset",
+            report.code_signature_file_offset,
+        ),
+    ] {
+        writeln!(out, "finalizer_input_shell_image_{name} = {value}").unwrap();
+    }
+    let rewrites = report
+        .rewrites
+        .iter()
+        .map(|rewrite| {
+            format!(
+                "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+                rewrite.rewrite_id,
+                rewrite.rewrite_kind,
+                rewrite.source_id,
+                rewrite.source_image_offset,
+                rewrite.file_offset,
+                rewrite.vm_address,
+                option_u64(rewrite.target_vm_address),
+                rewrite
+                    .effective_addend
+                    .map_or_else(|| "none".to_owned(), |value| value.to_string()),
+                rewrite.width_bytes,
+                rewrite.prewrite_bytes_hash,
+                rewrite.encoding_source_bytes_hash,
+                rewrite.encoded_bytes_hash,
+                rewrite.audit_hash
+            )
+        })
+        .collect::<Vec<_>>();
+    writeln!(
+        out,
+        "finalizer_input_shell_image_rewrites = [{}]",
+        toml::toml_string_array_literal(&rewrites)
+    )
+    .unwrap();
+}
 
 pub(crate) fn render_macho_shell_layout_plan(
     out: &mut String,

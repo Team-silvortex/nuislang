@@ -609,6 +609,9 @@ fn print_finalizer_input_summary(summary: Option<&NsldExecutableFinalizerInputSu
         );
     }
     crate::display_final_macho_shell::print_macho_shell_layout_plan(&summary.shell_layout_plan);
+    crate::display_final_macho_shell::print_macho_shell_image_serialization(
+        &summary.shell_image_serialization,
+    );
 }
 
 fn display_option(value: Option<usize>) -> String {

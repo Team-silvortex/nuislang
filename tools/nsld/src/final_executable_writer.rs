@@ -733,4 +733,8 @@ fn render_finalizer_input_summary(
         out,
         &summary.shell_layout_plan,
     );
+    crate::final_executable_writer_macho_shell::render_macho_shell_image_serialization(
+        out,
+        &summary.shell_image_serialization,
+    );
 }

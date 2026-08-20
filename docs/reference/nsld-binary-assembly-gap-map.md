@@ -120,6 +120,14 @@ dispatch selection. The remaining continuity gap is persisting the direct
 dispatch table hash and matched entry in each completion/replay record rather
 than relying only on the broader final-image binding proof.
 
+The Mach-O arm64 compatibility provider now also owns a private final-address
+shell image. `nuis-nsld-macho-arm64-shell-image-serialization-v1` emits the
+header, load commands, copied sections, dyld streams, symbol/indirect/string
+tables, and audited relocation/stub/internal-GOT rewrites from the deterministic
+shell plan. This narrows the OS-native gap to code-signature payload generation,
+independent structural/load validation, and publication policy; the private
+image is not silently substituted for the compatibility executable.
+
 It does not yet own:
 
 * complete Mach-O, ELF, and PE/COFF compatibility object parity

@@ -87,8 +87,9 @@ Implemented or actively usable surfaces:
 * `YIR` as the central semantic execution boundary, with result-family,
   artifact, clock, ABI, and domain validation surfaces.
 * `nsld` as the linker frontdoor over the current linker core, with object,
-  container, closure, final-stage, self-contained image output, and readiness
-  diagnostics.
+  container, closure, final-stage, self-contained image output, and a private
+  ARM64 Mach-O shell serializer that owns final-address rewriting and
+  header/load-command/linkedit bytes while signing/publication remain gated.
 * `nsdb` as the YIR-level debugger metadata frontdoor.
 * Persistent registered provider workers with Nuis-owned lifecycle/ingress,
   PID and sequence binding, descriptor transfer, operation permits, and real
@@ -104,7 +105,8 @@ Implemented or actively usable surfaces:
 
 Still incomplete or intentionally soft:
 
-* final host-shell / OS-native executable linking
+* signed and independently load-validated host-shell / OS-native executable
+  publication across Mach-O, ELF, and PE/COFF
 * stable std import/autoinjection semantics
 * complete unsafe/raw-pointer policy
 * provider-neutral multi-node graph execution across every backend and final

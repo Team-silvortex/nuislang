@@ -173,17 +173,25 @@ commands receive final file and VM addresses. External binds use the static
 libSystem compatibility registration rather than symbol-specific linker
 branches. Every segment, section, symbol, indirect entry, bind, rebase, and
 command has an audit hash, and the plan records an explicit pending code-
-signature boundary. JSON, text, and persisted invoke plans expose the same
-contract. The plan does not yet serialize Mach-O header, load-command,
-linkedit, or code-signature bytes, and therefore does not claim independent
-shell readiness.
+signature boundary.
+`nuis-nsld-macho-arm64-shell-image-serialization-v1` now consumes that exact
+plan and platform ledger. It emits a private `mach_header_64`, ordered load
+commands, copied file-backed sections, dyld rebase/bind streams, `nlist_64`
+records, indirect-symbol entries, and the UTF-8 string table. Direct and
+platform relocations, provider stubs, and internal GOT pointers are re-encoded
+against final VM addresses with per-write source/prewrite/output hashes and a
+complete serialization ledger. Internal-rebase and external-bind fixtures both
+pass, and JSON, text, and persisted invoke-plan TOML expose the same report.
+The image deliberately ends at an `LC_CODE_SIGNATURE` command whose payload
+size is zero and remains `private-not-published`.
 A gated host-command provider remains as a fallback; ELF and PE/COFF are
 explicit `registered-not-implemented` providers. This proves relocatable input,
 table parsing, placement, binding, merged-image construction, direct and
 platform relocation encoding, deterministic GOT/stub allocation, platform byte
-synthesis, unresolved-bind preservation, and complete audited Mach-O shell
-layout planning, but not common-symbol allocation or final shell serialization
-independently of Nuisc's compatibility link.
+synthesis, unresolved-bind preservation, audited Mach-O shell planning, and
+private final-address byte serialization. It does not yet prove code-signature
+payload generation, independent OS structural/load validation, common-symbol
+allocation, or publication independently of Nuisc's compatibility link.
 
 ## Current Early-Beta Rule
 

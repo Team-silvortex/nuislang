@@ -451,6 +451,55 @@ pub(crate) struct NsldMachOArm64ShellLayoutPlanReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64ShellImageRewriteAudit {
+    pub(crate) rewrite_id: String,
+    pub(crate) rewrite_kind: String,
+    pub(crate) source_id: String,
+    pub(crate) source_image_offset: usize,
+    pub(crate) file_offset: usize,
+    pub(crate) vm_address: u64,
+    pub(crate) target_vm_address: Option<u64>,
+    pub(crate) effective_addend: Option<i64>,
+    pub(crate) width_bytes: usize,
+    pub(crate) prewrite_bytes_hash: String,
+    pub(crate) encoding_source_bytes_hash: String,
+    pub(crate) encoded_bytes_hash: String,
+    pub(crate) audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64ShellImageSerializationReport {
+    pub(crate) contract: String,
+    pub(crate) status: String,
+    pub(crate) shell_layout_plan_hash: String,
+    pub(crate) platform_application_ledger_hash: String,
+    pub(crate) platform_image_hash: String,
+    pub(crate) shell_image_span_bytes: usize,
+    pub(crate) header_bytes: usize,
+    pub(crate) load_command_bytes: usize,
+    pub(crate) copied_section_count: usize,
+    pub(crate) copied_section_bytes: usize,
+    pub(crate) relocation_rewrite_count: usize,
+    pub(crate) stub_rewrite_count: usize,
+    pub(crate) got_rewrite_count: usize,
+    pub(crate) rewrite_count: usize,
+    pub(crate) header_hash: String,
+    pub(crate) load_commands_hash: String,
+    pub(crate) rebase_stream_hash: String,
+    pub(crate) bind_stream_hash: String,
+    pub(crate) symbol_table_hash: String,
+    pub(crate) indirect_symbol_table_hash: String,
+    pub(crate) string_table_hash: String,
+    pub(crate) linkedit_hash: String,
+    pub(crate) shell_image_hash: String,
+    pub(crate) serialization_ledger_hash: String,
+    pub(crate) code_signature_file_offset: usize,
+    pub(crate) code_signature_status: String,
+    pub(crate) publication_status: String,
+    pub(crate) rewrites: Vec<NsldMachOArm64ShellImageRewriteAudit>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldExecutableFinalizerInputSummary {
     pub(crate) contract: String,
     pub(crate) status: String,
@@ -470,4 +519,5 @@ pub(crate) struct NsldExecutableFinalizerInputSummary {
     pub(crate) platform_structure_plan: NsldMachOArm64PlatformStructurePlanReport,
     pub(crate) platform_patch_application: NsldMachOArm64PlatformPatchApplicationReport,
     pub(crate) shell_layout_plan: NsldMachOArm64ShellLayoutPlanReport,
+    pub(crate) shell_image_serialization: NsldMachOArm64ShellImageSerializationReport,
 }

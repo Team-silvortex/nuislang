@@ -14,19 +14,20 @@ use crate::{
     },
     final_executable_macho_relocation::build_macho_arm64_relocation_application_report,
     reports::{
-        NsldMachOArm64PlatformStructurePlanReport, NsldMachOArm64RelocationApplicationReport,
-        NsldMachOPlacementBindingReport,
+        NsldMachOArm64MaterializationPreviewReport, NsldMachOArm64PlatformStructurePlanReport,
+        NsldMachOArm64RelocationApplicationReport, NsldMachOPlacementBindingReport,
     },
 };
 use std::collections::BTreeSet;
 
-struct ShellFixture {
-    program: ParsedMachOObjectLinkage,
-    runtime: ParsedMachOObjectLinkage,
-    placement: NsldMachOPlacementBindingReport,
-    relocations: NsldMachOArm64RelocationApplicationReport,
-    platform: NsldMachOArm64PlatformStructurePlanReport,
-    applied: MachOArm64PlatformAppliedImage,
+pub(crate) struct ShellFixture {
+    pub(crate) program: ParsedMachOObjectLinkage,
+    pub(crate) runtime: ParsedMachOObjectLinkage,
+    pub(crate) placement: NsldMachOPlacementBindingReport,
+    pub(crate) relocations: NsldMachOArm64RelocationApplicationReport,
+    pub(crate) preview: NsldMachOArm64MaterializationPreviewReport,
+    pub(crate) platform: NsldMachOArm64PlatformStructurePlanReport,
+    pub(crate) applied: MachOArm64PlatformAppliedImage,
 }
 
 #[test]
@@ -161,7 +162,7 @@ fn non_section_external_definition_is_not_silently_allocated() {
     assert!(error.contains("common/absolute allocation remains explicit"));
 }
 
-fn build_shell(
+pub(crate) fn build_shell(
     fixture: &ShellFixture,
 ) -> Result<crate::reports::NsldMachOArm64ShellLayoutPlanReport, String> {
     let objects = [
@@ -177,7 +178,7 @@ fn build_shell(
     )
 }
 
-fn shell_fixture(program_entry: Option<&str>, runtime_main: bool) -> ShellFixture {
+pub(crate) fn shell_fixture(program_entry: Option<&str>, runtime_main: bool) -> ShellFixture {
     let mut program_symbols = Vec::new();
     if let Some(entry) = program_entry {
         program_symbols.push(defined_symbol(program_symbols.len(), entry));
@@ -229,12 +230,86 @@ fn shell_fixture(program_entry: Option<&str>, runtime_main: bool) -> ShellFixtur
         runtime,
         placement,
         relocations,
+        preview,
+        platform,
+        applied,
+    }
+}
+
+pub(crate) fn internal_got_shell_fixture() -> ShellFixture {
+    let program = linkage_sized(
+        8,
+        vec![
+            defined_symbol(0, "_nuis_entry"),
+            undefined_symbol(1, "_runtime_anchor"),
+        ],
+        vec![
+            ParsedMachORelocation {
+                section_ordinal: 1,
+                offset: 0,
+                symbol_number: 1,
+                width_bytes: 4,
+                pc_relative: true,
+                external: true,
+                relocation_type: 5,
+            },
+            ParsedMachORelocation {
+                section_ordinal: 1,
+                offset: 4,
+                symbol_number: 1,
+                width_bytes: 4,
+                pc_relative: false,
+                external: true,
+                relocation_type: 6,
+            },
+        ],
+    );
+    let runtime = linkage(vec![defined_symbol(0, "_runtime_anchor")], Vec::new());
+    let mut program_bytes = Vec::new();
+    program_bytes.extend_from_slice(&0x9000_0000u32.to_le_bytes());
+    program_bytes.extend_from_slice(&0xf940_0000u32.to_le_bytes());
+    let runtime_bytes = 0xd65f_03c0u32.to_le_bytes();
+    let layouts = [
+        layout("host.program", "program-llvm", &program),
+        layout("host.runtime", "runtime-shim", &runtime),
+    ];
+    let placement = build_macho_placement_binding_report(&layouts).unwrap();
+    let relocations =
+        build_macho_arm64_relocation_application_report(&layouts, &placement).unwrap();
+    let images = [
+        image("host.program", "program-llvm", &program_bytes, &program),
+        image("host.runtime", "runtime-shim", &runtime_bytes, &runtime),
+    ];
+    let preview =
+        build_macho_arm64_materialization_preview(&images, &placement, &relocations).unwrap();
+    let applied =
+        apply_macho_arm64_patch_previews(&images, &placement, &relocations, &preview).unwrap();
+    let platform =
+        build_macho_arm64_platform_structure_plan(&placement, &relocations, &applied.report)
+            .unwrap();
+    let applied =
+        apply_macho_arm64_platform_structure(&placement, &relocations, &applied, &platform)
+            .unwrap();
+    ShellFixture {
+        program,
+        runtime,
+        placement,
+        relocations,
+        preview,
         platform,
         applied,
     }
 }
 
 fn linkage(
+    symbols: Vec<ParsedMachOSymbol>,
+    relocations: Vec<ParsedMachORelocation>,
+) -> ParsedMachOObjectLinkage {
+    linkage_sized(4, symbols, relocations)
+}
+
+fn linkage_sized(
+    section_size: u64,
     symbols: Vec<ParsedMachOSymbol>,
     relocations: Vec<ParsedMachORelocation>,
 ) -> ParsedMachOObjectLinkage {
@@ -261,7 +336,7 @@ fn linkage(
             segment_name: "__TEXT".to_owned(),
             name: "__text".to_owned(),
             address: 0,
-            size: 4,
+            size: section_size,
             alignment: 4,
             flags: 0,
             zero_fill: false,

@@ -66,6 +66,7 @@ mod dev_tensor_drift_data_runtime_dispatch_capability;
 mod dev_tensor_drift_data_runtime_execution;
 mod dev_tensor_drift_data_runtime_mutex;
 mod dev_tensor_drift_data_runtime_nsld;
+mod dev_tensor_drift_data_runtime_nsld_shell_image;
 mod dev_tensor_drift_data_runtime_provider;
 mod dev_tensor_drift_data_runtime_provider_completion;
 mod dev_tensor_drift_data_runtime_shader_graph;

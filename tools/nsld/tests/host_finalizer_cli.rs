@@ -145,6 +145,19 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     assert!(invoke_plan.contains("\"target_symbol\":\"_puts\",\"dylib_ordinal\":1"));
     assert!(invoke_plan.contains("\"command_kind\":\"code-signature\""));
     assert!(invoke_plan.contains("\"code_signature_status\":\"required-payload-pending\""));
+    assert!(invoke_plan.contains("\"shell_image_serialization\":{"));
+    assert!(
+        invoke_plan.contains("\"contract\":\"nuis-nsld-macho-arm64-shell-image-serialization-v1\"")
+    );
+    assert!(invoke_plan
+        .contains("\"status\":\"private-image-serialized-with-code-signature-boundary\""));
+    assert!(invoke_plan.contains("\"publication_status\":\"private-not-published\""));
+    assert!(invoke_plan.contains("\"code_signature_status\":\"payload-pending\""));
+    assert!(invoke_plan.contains("\"relocation_rewrite_count\":2"));
+    assert!(invoke_plan.contains("\"stub_rewrite_count\":1"));
+    assert!(invoke_plan.contains("\"got_rewrite_count\":0"));
+    assert!(invoke_plan.contains("\"rewrite_kind\":\"relocation-final-address\""));
+    assert!(invoke_plan.contains("\"rewrite_kind\":\"stub-final-address\""));
     assert!(invoke_plan.contains("\"target_symbol\":\"_nuis_runtime\""));
     assert!(invoke_plan
         .contains("\"symbol\":\"_nuis_runtime\",\"reference_object_id\":\"host.program-llvm\""));
@@ -190,6 +203,13 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     assert!(invoke_plan_text.contains("name=__LINKEDIT"));
     assert!(invoke_plan_text.contains("finalizer_input_shell_bind: id="));
     assert!(invoke_plan_text.contains("finalizer_input_shell_command: id="));
+    assert!(invoke_plan_text.contains(
+        "finalizer_input_shell_image: contract=nuis-nsld-macho-arm64-shell-image-serialization-v1"
+    ));
+    assert!(invoke_plan_text.contains("publication=private-not-published"));
+    assert!(invoke_plan_text
+        .contains("finalizer_input_shell_image_code_signature: status=payload-pending"));
+    assert!(invoke_plan_text.contains("finalizer_input_shell_image_rewrite: id="));
     assert!(invoke_plan_text.contains(
         "finalizer_input_symbol_binding: symbol=_nuis_runtime reference=host.program-llvm:1 status=internal"
     ));
@@ -257,6 +277,15 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     assert!(persisted_invoke_plan.contains("|__got|"));
     assert!(persisted_invoke_plan.contains("finalizer_input_shell_layout_binds = ["));
     assert!(persisted_invoke_plan.contains("finalizer_input_shell_layout_load_commands = ["));
+    assert!(persisted_invoke_plan.contains(
+        "finalizer_input_shell_image_contract = \"nuis-nsld-macho-arm64-shell-image-serialization-v1\""
+    ));
+    assert!(persisted_invoke_plan
+        .contains("finalizer_input_shell_image_publication_status = \"private-not-published\""));
+    assert!(persisted_invoke_plan
+        .contains("finalizer_input_shell_image_code_signature_status = \"payload-pending\""));
+    assert!(persisted_invoke_plan.contains("finalizer_input_shell_image_rewrite_count = 3"));
+    assert!(persisted_invoke_plan.contains("finalizer_input_shell_image_rewrites = ["));
     assert!(invoke_plan.contains("\"invocation_kind\":\"registered-internal-finalizer\""));
     assert!(invoke_plan.contains("\"invocation_policy\":\"registered-internal\""));
     assert!(invoke_plan.contains("\"requires_explicit_allow\":false"));

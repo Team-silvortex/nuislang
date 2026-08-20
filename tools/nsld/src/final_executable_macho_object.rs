@@ -9,6 +9,7 @@ use crate::{
     final_executable_macho_platform_application::apply_macho_arm64_platform_structure,
     final_executable_macho_relocation::build_macho_arm64_relocation_application_report,
     final_executable_macho_shell::build_macho_arm64_shell_layout_plan,
+    final_executable_macho_shell_image::serialize_macho_arm64_shell_image,
     reports::NsldExecutableFinalizerInputSummary,
 };
 use std::collections::BTreeSet;
@@ -161,6 +162,16 @@ pub(crate) fn summarize_macho_host_object_handoff(
         &platform_structure_plan,
         &platform_applied_image,
     )?;
+    let shell_image = serialize_macho_arm64_shell_image(
+        &relocation_application,
+        &materialization_preview,
+        &platform_structure_plan,
+        &platform_applied_image,
+        &shell_layout_plan,
+    )?;
+    if shell_image.bytes.len() != shell_image.report.shell_image_span_bytes {
+        return Err("Mach-O private shell image/report span drift".to_owned());
+    }
     Ok(NsldExecutableFinalizerInputSummary {
         contract: MACHO_HOST_OBJECT_LINKAGE_CONTRACT.to_owned(),
         status: status.to_owned(),
@@ -180,6 +191,7 @@ pub(crate) fn summarize_macho_host_object_handoff(
         platform_structure_plan,
         platform_patch_application: platform_applied_image.report,
         shell_layout_plan,
+        shell_image_serialization: shell_image.report,
     })
 }
 

@@ -495,4 +495,4 @@ fn append_text(out: &mut String, value: &str) {
 
 #[cfg(test)]
 #[path = "final_executable_macho_shell_tests.rs"]
-mod tests;
+pub(crate) mod tests;

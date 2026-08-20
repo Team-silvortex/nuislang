@@ -10,7 +10,7 @@ pub(crate) const MACHO_ARM64_PAGE_SIZE: usize = 0x4000;
 pub(crate) const MACHO_ARM64_IMAGE_BASE: u64 = 0x1_0000_0000;
 pub(crate) const MACHO_HEADER_SIZE: usize = 32;
 pub(crate) const SYSTEM_DYLIB_PATH: &str = "/usr/lib/libSystem.B.dylib";
-const DYLINKER_PATH: &str = "/usr/lib/dyld";
+pub(crate) const DYLINKER_PATH: &str = "/usr/lib/dyld";
 const SEGMENT_COMMAND_SIZE: usize = 72;
 const SECTION_COMMAND_SIZE: usize = 80;
 
