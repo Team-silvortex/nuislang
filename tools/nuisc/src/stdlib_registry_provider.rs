@@ -1,10 +1,15 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
+use std::fs;
 use std::path::{Component, Path};
 
+use super::stdlib_registry_provider_semver::{parse_requirement, validate_candidate_version};
+use super::stdlib_registry_provider_solver::{parse_dependency_requirement, solve_candidates};
+use super::stdlib_registry_provider_trust::{verify_candidate_set, GALAXY_CANDIDATE_SET_FILE};
 use super::{
-    detect_auto_injectability, load_stdlib_layout, load_stdlib_module_manifest_with_identity,
-    read_content_identities, GalaxyResolutionProviderDescriptor, GalaxyResolutionProviderReport,
+    detect_auto_injectability, load_stdlib_module_manifest_with_identity,
+    parse_stdlib_layout_source, read_content_identities, GalaxyResolutionCandidateSetReport,
+    GalaxyResolutionProviderDescriptor, GalaxyResolutionProviderReport,
     GalaxyResolutionProviderRequest, GalaxyResolutionProviderRequirement,
     GalaxyResolutionProviderResolution, GalaxyResolutionProviderSelection,
     ResolvedGalaxyDependency, StdlibIndexModule,
@@ -16,14 +21,7 @@ pub const GALAXY_RESOLUTION_PROVIDER_KINDS: &[&str] = &[
     "locked-resolution-cache",
     "offline-layout",
 ];
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct PendingRequirement {
-    name: String,
-    exact_version: Option<String>,
-    direct: bool,
-    requested_by: String,
-}
+const MAX_PROVIDER_INDEX_BYTES: u64 = 16 * 1024 * 1024;
 
 pub fn resolve_galaxy_dependencies_with_provider(
     provider: &GalaxyResolutionProviderDescriptor,
@@ -31,7 +29,20 @@ pub fn resolve_galaxy_dependencies_with_provider(
 ) -> Result<GalaxyResolutionProviderResolution, String> {
     validate_provider(provider)?;
     let requirements = normalize_requirements(requested)?;
-    let layout = load_stdlib_layout(&provider.root)?;
+    let index_path = provider.root.join("index.toml");
+    let index_bytes = fs::read(&index_path).map_err(|error| {
+        format!(
+            "failed to read Galaxy provider index `{}`: {error}",
+            index_path.display()
+        )
+    })?;
+    let index_source = std::str::from_utf8(&index_bytes).map_err(|error| {
+        format!(
+            "Galaxy provider index `{}` is not UTF-8: {error}",
+            index_path.display()
+        )
+    })?;
+    let layout = parse_stdlib_layout_source(index_source, &index_path)?;
     if layout.schema != "nuis-stdlib-layout-v1" {
         return Err(format!(
             "Galaxy resolution provider `{}` has unsupported layout schema `{}`",
@@ -39,48 +50,19 @@ pub fn resolve_galaxy_dependencies_with_provider(
         ));
     }
     let candidates = collect_candidates(provider, layout.modules)?;
-    let mut pending = requirements
-        .iter()
-        .map(|requirement| PendingRequirement {
-            name: requirement.name.clone(),
-            exact_version: Some(requirement.exact_version.clone()),
-            direct: true,
-            requested_by: requirement.name.clone(),
-        })
-        .collect::<Vec<_>>();
-    let mut dependencies = BTreeMap::<String, ResolvedGalaxyDependency>::new();
+    let candidate_set = verify_candidate_set(provider, &index_bytes, &candidates)?;
+    let allow_ranges = candidate_set.status == "verified-signed-candidate-set";
+    let solved = solve_candidates(
+        &provider.provider_id,
+        &candidates,
+        &requirements,
+        allow_ranges,
+    )?;
+    let mut dependencies = Vec::<ResolvedGalaxyDependency>::new();
     let mut selected_paths = BTreeMap::<String, String>::new();
 
-    while !pending.is_empty() {
-        pending.sort_by(|lhs, rhs| {
-            lhs.name
-                .cmp(&rhs.name)
-                .then(lhs.exact_version.cmp(&rhs.exact_version))
-                .then(rhs.direct.cmp(&lhs.direct))
-                .then(lhs.requested_by.cmp(&rhs.requested_by))
-        });
-        let requirement = pending.remove(0);
-        if let Some(existing) = dependencies.get_mut(&requirement.name) {
-            if requirement
-                .exact_version
-                .as_ref()
-                .is_some_and(|version| version != &existing.version)
-            {
-                return Err(format!(
-                    "Galaxy provider `{}` selected `{}` at version `{}`, but `{}` requires exact version `{}`",
-                    provider.provider_id,
-                    requirement.name,
-                    existing.version,
-                    requirement.requested_by,
-                    requirement.exact_version.as_deref().unwrap_or("<none>")
-                ));
-            }
-            existing.direct |= requirement.direct;
-            insert_sorted_unique(&mut existing.requested_by, requirement.requested_by);
-            continue;
-        }
-
-        let candidate = select_candidate(provider, &candidates, &requirement)?;
+    for solved_candidate in solved {
+        let candidate = &solved_candidate.candidate;
         let module_dir = provider.root.join(&candidate.path);
         let manifest_path = module_dir.join("module.toml");
         verify_provider_paths(
@@ -90,8 +72,7 @@ pub fn resolve_galaxy_dependencies_with_provider(
         let (manifest, manifest_content_identity) =
             load_stdlib_module_manifest_with_identity(&provider.root, &candidate.path)?;
         validate_candidate_manifest(candidate, &manifest)?;
-        let dependency_requirements =
-            validate_dependency_contract(candidate, &manifest.depends_on)?;
+        validate_dependency_contract(candidate, &manifest.depends_on)?;
         for logical_path in manifest
             .source_modules
             .iter()
@@ -123,15 +104,12 @@ pub fn resolve_galaxy_dependencies_with_provider(
             &library_content_identities,
             &manifest.library_import_policy,
         )?;
-        let mut requested_by = vec![requirement.requested_by];
-        requested_by.sort();
-        requested_by.dedup();
         let dependency = ResolvedGalaxyDependency {
             name: candidate.name.clone(),
             version: candidate.version.clone(),
             package_id: manifest.package_id.clone(),
-            direct: requirement.direct,
-            requested_by,
+            direct: solved_candidate.direct,
+            requested_by: solved_candidate.requested_by,
             module_dir: module_dir.clone(),
             manifest_path,
             manifest_content_identity,
@@ -149,20 +127,9 @@ pub fn resolve_galaxy_dependencies_with_provider(
             auto_inject_blockers,
         };
         selected_paths.insert(candidate.name.clone(), candidate.path.clone());
-        dependencies.insert(candidate.name.clone(), dependency);
-        pending.extend(
-            dependency_requirements
-                .into_iter()
-                .map(|(name, exact_version)| PendingRequirement {
-                    name,
-                    exact_version,
-                    direct: false,
-                    requested_by: candidate.name.clone(),
-                }),
-        );
+        dependencies.push(dependency);
     }
 
-    let dependencies = dependencies.into_values().collect::<Vec<_>>();
     let selections = dependencies
         .iter()
         .map(|dependency| GalaxyResolutionProviderSelection {
@@ -174,26 +141,32 @@ pub fn resolve_galaxy_dependencies_with_provider(
             requested_by: dependency.requested_by.clone(),
         })
         .collect::<Vec<_>>();
-    let request_sha256 = hash_request(provider, &requirements);
+    let request_sha256 = hash_request(provider, &candidate_set, &requirements);
     let selection_sha256 = hash_selection(&dependencies, &selected_paths);
     let request = GalaxyResolutionProviderRequest {
         contract: GALAXY_RESOLUTION_PROVIDER_CONTRACT.to_owned(),
         provider_id: provider.provider_id.clone(),
         provider_kind: provider.provider_kind.clone(),
         request_sha256: request_sha256.clone(),
+        candidate_set: candidate_set.clone(),
         requirements: requirements.clone(),
     };
     Ok(GalaxyResolutionProviderResolution {
         request,
         report: GalaxyResolutionProviderReport {
             contract: GALAXY_RESOLUTION_PROVIDER_CONTRACT.to_owned(),
-            status: "resolved-pinned-provider-closure".to_owned(),
+            status: if allow_ranges {
+                "resolved-signed-provider-closure".to_owned()
+            } else {
+                "resolved-pinned-provider-closure".to_owned()
+            },
             provider_id: provider.provider_id.clone(),
             provider_kind: provider.provider_kind.clone(),
             request_sha256,
             selection_sha256,
             candidate_count: candidates.len(),
             selected_count: selections.len(),
+            candidate_set,
             requirements,
             selections,
         },
@@ -211,13 +184,34 @@ fn validate_provider(provider: &GalaxyResolutionProviderDescriptor) -> Result<()
             GALAXY_RESOLUTION_PROVIDER_KINDS.join(", ")
         ));
     }
-    if !provider.root.join("index.toml").is_file() {
+    let index_path = provider.root.join("index.toml");
+    if !index_path.is_file() {
         return Err(format!(
             "Galaxy resolution provider `{}` is missing `{}`",
             provider.provider_id,
-            provider.root.join("index.toml").display()
+            index_path.display()
         ));
     }
+    let index_bytes = fs::metadata(&index_path)
+        .map_err(|error| {
+            format!(
+                "failed to inspect Galaxy provider index `{}`: {error}",
+                index_path.display()
+            )
+        })?
+        .len();
+    if index_bytes > MAX_PROVIDER_INDEX_BYTES {
+        return Err(format!(
+            "Galaxy provider index `{}` exceeds the {MAX_PROVIDER_INDEX_BYTES}-byte resource limit",
+            index_path.display()
+        ));
+    }
+    let sidecar_path = provider.root.join(GALAXY_CANDIDATE_SET_FILE);
+    let mut confined_paths = vec![index_path.as_path()];
+    if sidecar_path.exists() {
+        confined_paths.push(sidecar_path.as_path());
+    }
+    verify_provider_paths(&provider.root, confined_paths.into_iter())?;
     Ok(())
 }
 
@@ -227,20 +221,21 @@ fn normalize_requirements(
     let mut normalized = BTreeMap::new();
     for item in requested {
         validate_token("Galaxy dependency name", &item.name)?;
-        validate_exact_version(&item.version)?;
-        if let Some(previous) = normalized.insert(item.name.clone(), item.version.clone()) {
+        let requirement = parse_requirement(&item.version)?;
+        let requirement = requirement.canonical().to_owned();
+        if let Some(previous) = normalized.insert(item.name.clone(), requirement.clone()) {
             return Err(format!(
-                "duplicate Galaxy dependency `{}` requests `{previous}` and `{}`",
-                item.name, item.version
+                "duplicate Galaxy dependency `{}` requests `{previous}` and `{requirement}`",
+                item.name
             ));
         }
     }
     Ok(normalized
         .into_iter()
         .map(
-            |(name, exact_version)| GalaxyResolutionProviderRequirement {
+            |(name, version_requirement)| GalaxyResolutionProviderRequirement {
                 name,
-                exact_version,
+                version_requirement,
             },
         )
         .collect())
@@ -253,7 +248,7 @@ fn collect_candidates(
     let mut candidates = BTreeMap::new();
     for candidate in modules {
         validate_token("Galaxy candidate name", &candidate.name)?;
-        validate_exact_version(&candidate.version)?;
+        validate_candidate_version(&candidate.version)?;
         if let Err(error) = validate_relative_path(&candidate.path) {
             if provider.provider_kind == "locked-resolution-cache" {
                 return Err(format!(
@@ -277,46 +272,6 @@ fn collect_candidates(
     Ok(candidates)
 }
 
-fn select_candidate<'a>(
-    provider: &GalaxyResolutionProviderDescriptor,
-    candidates: &'a BTreeMap<(String, String), StdlibIndexModule>,
-    requirement: &PendingRequirement,
-) -> Result<&'a StdlibIndexModule, String> {
-    if let Some(version) = &requirement.exact_version {
-        return candidates
-            .get(&(requirement.name.clone(), version.clone()))
-            .ok_or_else(|| {
-                format!(
-                    "Galaxy provider `{}` has no exact candidate `{}={}`",
-                    provider.provider_id, requirement.name, version
-                )
-            });
-    }
-    let available = candidates
-        .iter()
-        .filter(|((name, _), _)| name == &requirement.name)
-        .map(|((_, version), candidate)| (version, candidate))
-        .collect::<Vec<_>>();
-    match available.as_slice() {
-        [] => Err(format!(
-            "Galaxy provider `{}` has no candidate for transitive dependency `{}` requested by `{}`",
-            provider.provider_id, requirement.name, requirement.requested_by
-        )),
-        [(_, candidate)] => Ok(candidate),
-        _ => Err(format!(
-            "Galaxy provider `{}` has ambiguous unpinned transitive dependency `{}` requested by `{}`; candidates=[{}]",
-            provider.provider_id,
-            requirement.name,
-            requirement.requested_by,
-            available
-                .iter()
-                .map(|(version, _)| version.as_str())
-                .collect::<Vec<_>>()
-                .join(", ")
-        )),
-    }
-}
-
 fn validate_candidate_manifest(
     candidate: &StdlibIndexModule,
     manifest: &super::StdlibModuleManifest,
@@ -338,7 +293,7 @@ fn validate_candidate_manifest(
 fn validate_dependency_contract(
     candidate: &StdlibIndexModule,
     manifest_dependencies: &[String],
-) -> Result<Vec<(String, Option<String>)>, String> {
+) -> Result<(), String> {
     let mut requirements = Vec::new();
     for raw in &candidate.depends_on {
         requirements.push(parse_dependency_requirement(raw)?);
@@ -360,24 +315,7 @@ fn validate_dependency_contract(
             candidate.name, candidate.version
         ));
     }
-    requirements.sort();
-    Ok(requirements)
-}
-
-fn parse_dependency_requirement(raw: &str) -> Result<(String, Option<String>), String> {
-    let (name, version) = raw
-        .split_once('=')
-        .map(|(name, version)| (name, Some(version)))
-        .unwrap_or((raw, None));
-    validate_token("transitive Galaxy dependency name", name)?;
-    let version = match version {
-        Some(version) => {
-            validate_exact_version(version)?;
-            Some(version.to_owned())
-        }
-        None => None,
-    };
-    Ok((name.to_owned(), version))
+    Ok(())
 }
 
 fn verify_provider_paths<'a>(
@@ -422,16 +360,6 @@ fn validate_relative_path(raw: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_exact_version(version: &str) -> Result<(), String> {
-    if version.starts_with(['^', '~', '>', '<', '=']) || version.contains('*') {
-        return Err(format!(
-            "Galaxy version requirement `{version}` is not exact; range solving is not registered yet"
-        ));
-    }
-    validate_token("exact Galaxy version", version)?;
-    Ok(())
-}
-
 fn validate_token(label: &str, value: &str) -> Result<(), String> {
     if value.is_empty()
         || !value
@@ -447,15 +375,27 @@ fn validate_token(label: &str, value: &str) -> Result<(), String> {
 
 fn hash_request(
     provider: &GalaxyResolutionProviderDescriptor,
+    candidate_set: &GalaxyResolutionCandidateSetReport,
     requirements: &[GalaxyResolutionProviderRequirement],
 ) -> String {
     let mut canonical = String::new();
     append_text(&mut canonical, GALAXY_RESOLUTION_PROVIDER_CONTRACT);
     append_text(&mut canonical, &provider.provider_id);
     append_text(&mut canonical, &provider.provider_kind);
+    append_text(&mut canonical, &candidate_set.response_sha256);
+    writeln!(canonical, "generation={}", candidate_set.generation).unwrap();
+    writeln!(
+        canonical,
+        "signature_count={}",
+        candidate_set.signature_count
+    )
+    .unwrap();
+    for signer_id in &candidate_set.signer_ids {
+        append_text(&mut canonical, signer_id);
+    }
     for requirement in requirements {
         append_text(&mut canonical, &requirement.name);
-        append_text(&mut canonical, &requirement.exact_version);
+        append_text(&mut canonical, &requirement.version_requirement);
     }
     format!(
         "sha256:{}",
@@ -500,13 +440,6 @@ fn hash_selection(
 
 fn append_text(out: &mut String, value: &str) {
     writeln!(out, "text:{}:{value}", value.len()).unwrap();
-}
-
-fn insert_sorted_unique(values: &mut Vec<String>, value: String) {
-    if !values.contains(&value) {
-        values.push(value);
-        values.sort();
-    }
 }
 
 #[cfg(test)]

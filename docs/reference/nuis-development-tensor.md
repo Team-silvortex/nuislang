@@ -287,7 +287,7 @@ The `beta-0.1` calibration baseline is:
   link-plan entry used by Nsld; hash-consistent size/read drift and missing
   destructor authority fail closed, while a full Nsld drive leaves the native
   project artifact runnable with exit `0`
-* `package-system/galaxy/source-import-and-lock-resolution`: `usable/98`,
+* `package-system/galaxy/source-import-and-lock-resolution`: `usable/99`,
   required; root and generated build
   locks now share one portable SHA-256-bound
   compiler resolution protocol covering direct/transitive edges, package
@@ -299,11 +299,16 @@ The `beta-0.1` calibration baseline is:
   requires both lock and synchronized cache before writing outputs;
   `nuis-galaxy-resolution-provider-v1` now statically registers workspace,
   locked-cache, and offline-layout providers, exposes content-bound request and
-  result hashes, resolves exact direct/transitive versions, and rejects
-  ambiguous, conflicting, ranged, malformed, or escaping candidates; two
-  separate offline mirrors produce byte-identical locks and caches, and locked
-  compilation remains valid after provider deletion; remote discovery, semver
-  range solving, trust metadata, transport, and cache collection remain open
+  result hashes, and preserves exact or opaque-workspace compatibility;
+  `nuis-galaxy-candidate-set-v1` binds provider identity, generation, raw index,
+  canonical candidates, and unique Ed25519 signers before caret, tilde, or
+  explicit bounded-range solving; the capped deterministic solver selects the
+  highest compatible closure and backtracks across later transitive conflicts;
+  unsigned ranges, malformed/unbounded ranges, response tampering, ambiguity,
+  and escaping candidates fail closed; two separate offline mirrors still
+  produce byte-identical locks and caches, and locked compilation remains valid
+  after provider deletion; persistent signer trust/rollback state, revocation,
+  remote discovery/transport, and cache collection remain open
 * `linker-toolchain/nsld/os-native-executable-finalization`: `usable/99`,
   required; a provider-neutral,
   hash-bound static registry now consumes an

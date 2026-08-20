@@ -44,7 +44,19 @@ pub struct GalaxyResolutionProviderDescriptor {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GalaxyResolutionProviderRequirement {
     pub name: String,
-    pub exact_version: String,
+    pub version_requirement: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GalaxyResolutionCandidateSetReport {
+    pub contract: String,
+    pub status: String,
+    pub generation: u64,
+    pub index_sha256: String,
+    pub candidate_sha256: String,
+    pub response_sha256: String,
+    pub signature_count: usize,
+    pub signer_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,6 +65,7 @@ pub struct GalaxyResolutionProviderRequest {
     pub provider_id: String,
     pub provider_kind: String,
     pub request_sha256: String,
+    pub candidate_set: GalaxyResolutionCandidateSetReport,
     pub requirements: Vec<GalaxyResolutionProviderRequirement>,
 }
 
@@ -76,6 +89,7 @@ pub struct GalaxyResolutionProviderReport {
     pub selection_sha256: String,
     pub candidate_count: usize,
     pub selected_count: usize,
+    pub candidate_set: GalaxyResolutionCandidateSetReport,
     pub requirements: Vec<GalaxyResolutionProviderRequirement>,
     pub selections: Vec<GalaxyResolutionProviderSelection>,
 }

@@ -38,18 +38,60 @@ front of lock rendering. The currently registered provider kinds are:
 * `locked-resolution-cache`
 * `offline-layout`
 
-The request binds the provider ID and kind plus sorted exact package
-requirements. The result repeats that request identity and records selected
-name, version, package ID, canonical relative path, direct/transitive status,
-and requester set. `request_sha256` authenticates the normalized request;
-`selection_sha256` also binds selected manifests, source/library identities,
-and dependency facts. Physical provider roots are deliberately excluded, so
-equivalent mirrors remain portable.
+The request binds the provider ID and kind, sorted normalized package
+requirements, and the exact candidate-set response used by the solver. The
+result repeats that request identity and records selected name, version,
+package ID, canonical relative path, direct/transitive status, and requester
+set. `request_sha256` authenticates the normalized request and candidate-set
+generation/signers; `selection_sha256` also binds selected manifests,
+source/library identities, and dependency facts. Physical provider roots are
+deliberately excluded, so equivalent mirrors remain portable.
 
-Selection is exact in this version. A transitive index edge may pin its own
-exact version; an unpinned edge is accepted only when the provider exposes one
-candidate for that name. Missing, duplicate, conflicting, ambiguous, ranged,
-malformed, unregistered, traversal, and symlink-escape inputs fail closed.
+Exact requirements, including the historical opaque `workspace` version,
+remain valid without trust metadata. Such providers report
+`unsigned-exact-only`; they cannot trigger range selection. A transitive index
+edge may pin its own exact version, and an unpinned edge is accepted only when
+the active constraints leave one candidate.
+
+Range selection requires a verified `nuis-galaxy-candidate-set-v1` response in
+`candidate-set.toml`. The response binds the provider ID and registered kind,
+a nonzero generation, raw `index.toml` SHA-256, canonical candidate count and
+SHA-256, and one or more unique Ed25519 signer identities. Every signature
+covers the same canonical response. Index, candidate, provider, signer,
+generation, signature, or count drift fails before solving.
+
+The bounded solver accepts strict three-component semantic versions through
+`^x.y.z`, `~x.y.z`, or one explicit lower/upper pair such as
+`>=1.2.0,<2.0.0`. It tries the highest compatible candidate first and performs
+deterministic backtracking when later transitive constraints conflict. The
+closure is capped at 256 packages, 128 candidates per package, and 4096 search
+steps. Provider indexes are capped at 16 MiB, candidate-set sidecars at 1 MiB,
+and one response at 32 signatures. Prerelease/build range metadata, wildcards,
+unbounded comparators, malformed ranges, unresolved conflicts, traversal, and
+control/package symlink escapes fail closed.
+
+A minimal signed sidecar is:
+
+```toml
+candidate_set_contract = "nuis-galaxy-candidate-set-v1"
+provider_id = "example.offline"
+provider_kind = "offline-layout"
+generation = 7
+index_sha256 = "sha256:<index-bytes>"
+candidate_count = 3
+candidate_sha256 = "sha256:<canonical-candidates>"
+
+[[signature]]
+signer_id = "ed25519:sha256:<public-key-id>"
+public_key_hex = "<32-byte-public-key>"
+signature_hex = "<64-byte-signature>"
+```
+
+This is a provider-root integrity contract, not yet a global registry identity
+system. The caller explicitly chooses the provider root and ID. Persistent
+trust anchors, generation rollback detection across invocations, revocation,
+remote discovery, and transport remain outside this contract rather than
+being implied by a self-contained public key.
 
 The offline front door is:
 
@@ -159,8 +201,10 @@ the lock and addressed cache; it does not silently create or refresh either.
 
 The early-beta development workflow still permits a missing root lock so old
 workspace examples can be checked and built before they are individually
-locked. This fallback is never used when a root lock exists. Remote candidate
-discovery, semantic-version range solving, registry trust metadata, transport, and cache
-garbage collection remain later work. Those providers must produce the same
-canonical lock and addressed cache rather than becoming new compiler-side
-resolution authorities.
+locked. This fallback is never used when a root lock exists. Signed static
+candidate sets and bounded semantic-version solving now feed the existing
+provider request/report boundary; they do not create a registry-specific
+compiler branch. Remote candidate discovery, persistent registry trust and
+rollback state, revocation, download transport, and cache garbage collection
+remain later work. Those providers must produce the same canonical lock and
+addressed cache rather than becoming new compiler-side resolution authorities.

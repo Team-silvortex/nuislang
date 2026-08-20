@@ -6,6 +6,12 @@ use std::path::{Path, PathBuf};
 mod stdlib_registry_parser;
 #[path = "stdlib_registry_provider.rs"]
 mod stdlib_registry_provider;
+#[path = "stdlib_registry_provider_semver.rs"]
+mod stdlib_registry_provider_semver;
+#[path = "stdlib_registry_provider_solver.rs"]
+mod stdlib_registry_provider_solver;
+#[path = "stdlib_registry_provider_trust.rs"]
+mod stdlib_registry_provider_trust;
 #[path = "stdlib_registry_render.rs"]
 mod stdlib_registry_render;
 #[path = "stdlib_registry_types.rs"]
@@ -19,20 +25,30 @@ pub use stdlib_registry_provider::{
     resolve_galaxy_dependencies_with_provider, GALAXY_RESOLUTION_PROVIDER_CONTRACT,
     GALAXY_RESOLUTION_PROVIDER_KINDS,
 };
+pub use stdlib_registry_provider_trust::{
+    GALAXY_CANDIDATE_SET_CONTRACT, GALAXY_CANDIDATE_SET_FILE,
+};
 pub(crate) use stdlib_registry_render::summarize_resolved_galaxy_docs;
 pub use stdlib_registry_render::{render_resolved_galaxy_index, write_resolved_galaxy_index};
 pub(crate) use stdlib_registry_types::ResolvedGalaxyDocSummary;
 pub use stdlib_registry_types::{
-    GalaxyResolutionProviderDescriptor, GalaxyResolutionProviderReport,
-    GalaxyResolutionProviderRequest, GalaxyResolutionProviderRequirement,
-    GalaxyResolutionProviderResolution, GalaxyResolutionProviderSelection,
-    ResolvedGalaxyContentIdentity, ResolvedGalaxyDependency, StdlibIndexModule, StdlibLayout,
-    StdlibLibraryImportPolicy, StdlibModuleManifest,
+    GalaxyResolutionCandidateSetReport, GalaxyResolutionProviderDescriptor,
+    GalaxyResolutionProviderReport, GalaxyResolutionProviderRequest,
+    GalaxyResolutionProviderRequirement, GalaxyResolutionProviderResolution,
+    GalaxyResolutionProviderSelection, ResolvedGalaxyContentIdentity, ResolvedGalaxyDependency,
+    StdlibIndexModule, StdlibLayout, StdlibLibraryImportPolicy, StdlibModuleManifest,
 };
 pub fn load_stdlib_layout(stdlib_root: &Path) -> Result<StdlibLayout, String> {
     let path = stdlib_root.join("index.toml");
     let source = fs::read_to_string(&path)
         .map_err(|error| format!("failed to read stdlib layout `{}`: {error}", path.display()))?;
+    parse_stdlib_layout_source(&source, &path)
+}
+
+pub(in crate::stdlib_registry) fn parse_stdlib_layout_source(
+    source: &str,
+    path: &Path,
+) -> Result<StdlibLayout, String> {
     let schema = parse_required_string(&source, "layout_schema", &path)?;
     let name = parse_required_string(&source, "name", &path)?;
     let default_entry = parse_required_string(&source, "default_entry", &path)?;

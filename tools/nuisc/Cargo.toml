@@ -9,6 +9,7 @@ readme.workspace = true
 description = "Execution scheduler compiler prototype for Nuis."
 
 [dependencies]
+ed25519-dalek.workspace = true
 nuis-artifact = { path = "../../crates/nuis-artifact" }
 nuis-runtime = { path = "../../crates/nuis-runtime" }
 nuis-semantics = { path = "../../crates/nuis-semantics" }

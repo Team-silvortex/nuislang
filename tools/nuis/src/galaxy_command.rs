@@ -177,6 +177,38 @@ pub(crate) fn handle_galaxy(command: cli::GalaxyCommand) -> Result<(), String> {
             println!("  provider_kind: {}", resolved.provider.provider_kind);
             println!("  request_sha256: {}", resolved.provider.request_sha256);
             println!("  selection_sha256: {}", resolved.provider.selection_sha256);
+            println!(
+                "  candidate_set_contract: {}",
+                resolved.provider.candidate_set.contract
+            );
+            println!(
+                "  candidate_set_status: {}",
+                resolved.provider.candidate_set.status
+            );
+            println!(
+                "  candidate_set_generation: {}",
+                resolved.provider.candidate_set.generation
+            );
+            println!(
+                "  candidate_set_response_sha256: {}",
+                resolved.provider.candidate_set.response_sha256
+            );
+            println!(
+                "  candidate_set_index_sha256: {}",
+                resolved.provider.candidate_set.index_sha256
+            );
+            println!(
+                "  candidate_set_candidate_sha256: {}",
+                resolved.provider.candidate_set.candidate_sha256
+            );
+            println!(
+                "  candidate_set_signature_count: {}",
+                resolved.provider.candidate_set.signature_count
+            );
+            println!(
+                "  candidate_set_signers: {}",
+                resolved.provider.candidate_set.signer_ids.join(",")
+            );
             println!("  candidates: {}", resolved.provider.candidate_count);
             println!("  selected: {}", resolved.provider.selected_count);
             println!("  lock: {}", resolved.lock.path.display());
