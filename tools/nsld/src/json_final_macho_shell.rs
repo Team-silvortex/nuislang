@@ -1,6 +1,9 @@
 use crate::{
     json_fields::*,
-    reports::{NsldMachOArm64ShellImageSerializationReport, NsldMachOArm64ShellLayoutPlanReport},
+    reports::{
+        NsldMachOArm64CodeSignatureReport, NsldMachOArm64ShellImageSerializationReport,
+        NsldMachOArm64ShellLayoutPlanReport,
+    },
 };
 
 pub(crate) fn macho_shell_image_serialization_json(
@@ -72,9 +75,75 @@ pub(crate) fn macho_shell_image_serialization_json(
         ),
         json_string_field("code_signature_status", &report.code_signature_status),
         json_string_field("publication_status", &report.publication_status),
+        macho_code_signature_json(&report.code_signature),
         format!("\"rewrites\":[{rewrites}]"),
     ];
     format!("\"shell_image_serialization\":{{{}}}", fields.join(","))
+}
+
+fn macho_code_signature_json(report: &NsldMachOArm64CodeSignatureReport) -> String {
+    let slots = report
+        .slots
+        .iter()
+        .map(|slot| {
+            let fields = [
+                json_usize_field("slot_index", slot.slot_index),
+                json_usize_field("file_offset", slot.file_offset),
+                json_usize_field("file_size_bytes", slot.file_size_bytes),
+                json_string_field("digest_sha256", &slot.digest_sha256),
+                json_string_field("audit_hash", &slot.audit_hash),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    let fields = [
+        json_string_field("contract", &report.contract),
+        json_string_field("status", &report.status),
+        json_string_field("identifier", &report.identifier),
+        json_u32_field("code_directory_version", report.code_directory_version),
+        json_u32_field("flags", report.flags),
+        json_string_field("hash_type", &report.hash_type),
+        json_usize_field("hash_size_bytes", report.hash_size_bytes),
+        json_usize_field("page_size_bytes", report.page_size_bytes),
+        json_usize_field("code_limit", report.code_limit),
+        json_usize_field("code_slot_count", report.code_slot_count),
+        json_usize_field("verified_code_slot_count", report.verified_code_slot_count),
+        json_usize_field("signature_file_offset", report.signature_file_offset),
+        json_usize_field("signature_blob_bytes", report.signature_blob_bytes),
+        json_usize_field("signature_payload_bytes", report.signature_payload_bytes),
+        json_string_field("signed_content_sha256", &report.signed_content_sha256),
+        json_string_field("code_directory_sha256", &report.code_directory_sha256),
+        json_string_field("cdhash", &report.cdhash),
+        json_string_field("signature_payload_sha256", &report.signature_payload_sha256),
+        json_usize_field("load_command_count", report.load_command_count),
+        json_usize_field(
+            "verified_load_command_count",
+            report.verified_load_command_count,
+        ),
+        json_usize_field("load_command_bytes", report.load_command_bytes),
+        json_bool_field(
+            "linkedit_covers_signature",
+            report.linkedit_covers_signature,
+        ),
+        json_bool_field("signed_ranges_valid", report.signed_ranges_valid),
+        json_bool_field("padding_valid", report.padding_valid),
+        json_string_field("validation_contract", &report.validation_contract),
+        json_string_field("validation_status", &report.validation_status),
+        json_string_field(
+            "publication_eligibility_contract",
+            &report.publication_eligibility_contract,
+        ),
+        json_string_field(
+            "publication_eligibility_status",
+            &report.publication_eligibility_status,
+        ),
+        json_bool_field("publication_eligible", report.publication_eligible),
+        json_string_array_field("publication_blockers", &report.publication_blockers),
+        json_string_field("validation_ledger_hash", &report.validation_ledger_hash),
+        format!("\"slots\":[{slots}]"),
+    ];
+    format!("\"code_signature\":{{{}}}", fields.join(","))
 }
 
 pub(crate) fn macho_shell_layout_plan_json(report: &NsldMachOArm64ShellLayoutPlanReport) -> String {

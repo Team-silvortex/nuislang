@@ -1,5 +1,8 @@
 use crate::{
-    reports::{NsldMachOArm64ShellImageSerializationReport, NsldMachOArm64ShellLayoutPlanReport},
+    reports::{
+        NsldMachOArm64CodeSignatureReport, NsldMachOArm64ShellImageSerializationReport,
+        NsldMachOArm64ShellLayoutPlanReport,
+    },
     toml,
 };
 use std::fmt::Write as _;
@@ -66,6 +69,7 @@ pub(crate) fn render_macho_shell_image_serialization(
     ] {
         writeln!(out, "finalizer_input_shell_image_{name} = {value}").unwrap();
     }
+    render_macho_code_signature(out, &report.code_signature);
     let rewrites = report
         .rewrites
         .iter()
@@ -94,6 +98,114 @@ pub(crate) fn render_macho_shell_image_serialization(
         out,
         "finalizer_input_shell_image_rewrites = [{}]",
         toml::toml_string_array_literal(&rewrites)
+    )
+    .unwrap();
+}
+
+fn render_macho_code_signature(out: &mut String, report: &NsldMachOArm64CodeSignatureReport) {
+    for (name, value) in [
+        ("contract", report.contract.as_str()),
+        ("status", report.status.as_str()),
+        ("identifier", report.identifier.as_str()),
+        ("hash_type", report.hash_type.as_str()),
+        (
+            "signed_content_sha256",
+            report.signed_content_sha256.as_str(),
+        ),
+        (
+            "code_directory_sha256",
+            report.code_directory_sha256.as_str(),
+        ),
+        ("cdhash", report.cdhash.as_str()),
+        ("payload_sha256", report.signature_payload_sha256.as_str()),
+        ("validation_contract", report.validation_contract.as_str()),
+        ("validation_status", report.validation_status.as_str()),
+        (
+            "publication_eligibility_contract",
+            report.publication_eligibility_contract.as_str(),
+        ),
+        (
+            "publication_eligibility_status",
+            report.publication_eligibility_status.as_str(),
+        ),
+        (
+            "validation_ledger_hash",
+            report.validation_ledger_hash.as_str(),
+        ),
+    ] {
+        writeln!(
+            out,
+            "finalizer_input_shell_image_signature_{name} = \"{}\"",
+            toml::escape_toml_string(value)
+        )
+        .unwrap();
+    }
+    for (name, value) in [
+        (
+            "code_directory_version",
+            report.code_directory_version as usize,
+        ),
+        ("flags", report.flags as usize),
+        ("hash_size_bytes", report.hash_size_bytes),
+        ("page_size_bytes", report.page_size_bytes),
+        ("code_limit", report.code_limit),
+        ("code_slot_count", report.code_slot_count),
+        ("verified_code_slot_count", report.verified_code_slot_count),
+        ("file_offset", report.signature_file_offset),
+        ("blob_bytes", report.signature_blob_bytes),
+        ("payload_bytes", report.signature_payload_bytes),
+        ("load_command_count", report.load_command_count),
+        (
+            "verified_load_command_count",
+            report.verified_load_command_count,
+        ),
+        ("load_command_bytes", report.load_command_bytes),
+    ] {
+        writeln!(
+            out,
+            "finalizer_input_shell_image_signature_{name} = {value}"
+        )
+        .unwrap();
+    }
+    for (name, value) in [
+        (
+            "linkedit_covers_signature",
+            report.linkedit_covers_signature,
+        ),
+        ("signed_ranges_valid", report.signed_ranges_valid),
+        ("padding_valid", report.padding_valid),
+        ("publication_eligible", report.publication_eligible),
+    ] {
+        writeln!(
+            out,
+            "finalizer_input_shell_image_signature_{name} = {value}"
+        )
+        .unwrap();
+    }
+    writeln!(
+        out,
+        "finalizer_input_shell_image_signature_publication_blockers = [{}]",
+        toml::toml_string_array_literal(&report.publication_blockers)
+    )
+    .unwrap();
+    let slots = report
+        .slots
+        .iter()
+        .map(|slot| {
+            format!(
+                "{}|{}|{}|{}|{}",
+                slot.slot_index,
+                slot.file_offset,
+                slot.file_size_bytes,
+                slot.digest_sha256,
+                slot.audit_hash
+            )
+        })
+        .collect::<Vec<_>>();
+    writeln!(
+        out,
+        "finalizer_input_shell_image_signature_slots = [{}]",
+        toml::toml_string_array_literal(&slots)
     )
     .unwrap();
 }

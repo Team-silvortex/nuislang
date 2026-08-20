@@ -37,13 +37,14 @@ For the automation frontdoor, see [nsld-driver-frontdoor.md](nsld-driver-frontdo
 * checked Mach-O arm64 relocation, working-image, stub/GOT, and shell-layout planning
 * deterministic private Mach-O arm64 shell-byte and linkedit serialization with
   final-address instruction, stub, GOT, and pointer rewriting
+* SHA-256 ad-hoc Mach-O signing and independent structural/signed-range validation
 * registered Mach-O arm64 compatibility-image materialization
 * the first independent CLI boundary for future linker work
 
 `Nsld` does not yet own:
 
-* common/non-section Mach-O allocation, code-signature payload generation,
-  independent structural/load validation, and private-image publication
+* common/non-section Mach-O allocation, OS loader acceptance, and private-image
+  publication
 * final host-native executable wrapping for ELF or PE/COFF
 * binary section assembly independent from `nuisc`
 * stable linker script or relocation formats
@@ -1144,7 +1145,7 @@ through one static provider rule rather than branches for particular symbols.
 All records carry canonical audit hashes, and the complete plan is projected
 identically through JSON, text, and persisted writer input.
 
-`nuis-nsld-macho-arm64-shell-image-serialization-v1` consumes the shell plan and
+`nuis-nsld-macho-arm64-shell-image-serialization-v2` consumes the shell plan and
 the exact platform application ledger into a private byte image. It emits the
 `mach_header_64`, every planned load command, file-backed section content, dyld
 rebase/bind streams, `nlist_64` records, indirect symbols, and the UTF-8 string
@@ -1155,11 +1156,16 @@ make this transition independently inspectable. External bind and internal
 rebase fixtures both pass, and JSON, text, and persisted writer input expose the
 same contract.
 
-The serializer deliberately stops before publication. The private image ends
-at the planned `LC_CODE_SIGNATURE` offset with `datasize = 0`, reports
-`payload-pending` and `private-not-published`, and is not installed as the
-runnable artifact. Provider-owned code-signature generation and independent
-Mach-O structural/load validation remain explicit rather than guessed.
+The serializer now completes a standard ad-hoc signature envelope before
+stopping at publication. `nuis-nsld-macho-arm64-ad-hoc-signature-v1` writes a
+big-endian SuperBlob and CodeDirectory, SHA-256 hashes every 4 KiB signed code
+slot, extends `__LINKEDIT`, and sets the final non-zero `LC_CODE_SIGNATURE`
+size. A separate parser emits
+`nuis-nsld-macho-arm64-signed-image-validation-v1` only after re-reading every
+load-command boundary, signature field, reserved span, padding byte, and code
+slot. The publication report remains `private-not-published` with
+`independent-os-load-validation-pending`, so the signed image is still not
+installed as the runnable artifact.
 
 After those checks the provider validates a thin or universal arm64
 `MH_EXECUTE` compatibility image and installs it atomically with executable

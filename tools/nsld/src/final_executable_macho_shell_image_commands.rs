@@ -33,7 +33,11 @@ pub(crate) struct EncodedShellCommands {
 
 pub(crate) fn encode_shell_header_and_commands(
     plan: &NsldMachOArm64ShellLayoutPlanReport,
+    code_signature_payload_bytes: usize,
 ) -> Result<EncodedShellCommands, String> {
+    if code_signature_payload_bytes == 0 {
+        return Err("Mach-O code-signature payload must not be empty".to_owned());
+    }
     let header = encode_header(plan)?;
     let mut load_commands = Vec::with_capacity(plan.load_command_size_bytes);
     for command in &plan.load_commands {
@@ -47,7 +51,7 @@ pub(crate) fn encode_shell_header_and_commands(
                 command.command_id, command.command_offset
             ));
         }
-        let encoded = encode_load_command(plan, command)?;
+        let encoded = encode_load_command(plan, command, code_signature_payload_bytes)?;
         if encoded.len() != command.command_size_bytes {
             return Err(format!(
                 "Mach-O command `{}` size drift: plan={}, encoded={}",
@@ -95,6 +99,7 @@ fn encode_header(plan: &NsldMachOArm64ShellLayoutPlanReport) -> Result<Vec<u8>, 
 fn encode_load_command(
     plan: &NsldMachOArm64ShellLayoutPlanReport,
     command: &NsldMachOArm64ShellLoadCommandPlan,
+    code_signature_payload_bytes: usize,
 ) -> Result<Vec<u8>, String> {
     let expected_value = command_value(&command.command_kind)?;
     if command.command_value != expected_value {
@@ -104,7 +109,7 @@ fn encode_load_command(
         ));
     }
     match command.command_kind.as_str() {
-        "segment-64" => encode_segment(plan, command),
+        "segment-64" => encode_segment(plan, command, code_signature_payload_bytes),
         "dyld-info-only" => encode_dyld_info(plan, command),
         "symtab" => encode_symtab(plan, command),
         "dysymtab" => encode_dysymtab(plan, command),
@@ -112,7 +117,7 @@ fn encode_load_command(
         "load-dylib" => encode_dylib_command(command),
         "main" => encode_main(plan, command),
         "build-version" => encode_build_version(command),
-        "code-signature" => encode_code_signature(plan, command),
+        "code-signature" => encode_code_signature(plan, command, code_signature_payload_bytes),
         other => Err(format!(
             "Mach-O shell command kind `{other}` is unregistered"
         )),
@@ -122,6 +127,7 @@ fn encode_load_command(
 fn encode_segment(
     plan: &NsldMachOArm64ShellLayoutPlanReport,
     command: &NsldMachOArm64ShellLoadCommandPlan,
+    code_signature_payload_bytes: usize,
 ) -> Result<Vec<u8>, String> {
     let segment_id = command
         .segment_id
@@ -133,17 +139,38 @@ fn encode_segment(
         .find(|segment| segment.segment_id == segment_id)
         .ok_or_else(|| format!("Mach-O command references missing segment `{segment_id}`"))?;
     let mut bytes = command_buffer(command)?;
+    let (file_size_bytes, vm_size_bytes) =
+        finalized_segment_sizes(plan, segment, code_signature_payload_bytes)?;
     write_fixed_name(&mut bytes, 8, &segment.segment_name)?;
     write_u64(&mut bytes, 24, segment.vm_address)?;
-    write_u64(&mut bytes, 32, checked_u64(segment.vm_size_bytes)?)?;
+    write_u64(&mut bytes, 32, checked_u64(vm_size_bytes)?)?;
     write_u64(&mut bytes, 40, checked_u64(segment.file_offset)?)?;
-    write_u64(&mut bytes, 48, checked_u64(segment.file_size_bytes)?)?;
+    write_u64(&mut bytes, 48, checked_u64(file_size_bytes)?)?;
     write_u32(&mut bytes, 56, segment.max_protection)?;
     write_u32(&mut bytes, 60, segment.initial_protection)?;
     write_u32(&mut bytes, 64, checked_u32(segment.section_ids.len())?)?;
     write_u32(&mut bytes, 68, 0)?;
     encode_segment_sections(plan, segment, &mut bytes)?;
     Ok(bytes)
+}
+
+fn finalized_segment_sizes(
+    plan: &NsldMachOArm64ShellLayoutPlanReport,
+    segment: &NsldMachOArm64ShellSegmentPlan,
+    code_signature_payload_bytes: usize,
+) -> Result<(usize, usize), String> {
+    if segment.segment_name != "__LINKEDIT" {
+        return Ok((segment.file_size_bytes, segment.vm_size_bytes));
+    }
+    let signature_end = plan
+        .code_signature_file_offset
+        .checked_add(code_signature_payload_bytes)
+        .ok_or_else(|| "Mach-O signed __LINKEDIT end overflows".to_owned())?;
+    let file_size = signature_end
+        .checked_sub(segment.file_offset)
+        .ok_or_else(|| "Mach-O signed __LINKEDIT starts before its segment".to_owned())?;
+    let vm_size = align_up(file_size, plan.page_size)?;
+    Ok((file_size, vm_size))
 }
 
 fn encode_segment_sections(
@@ -283,13 +310,14 @@ fn encode_build_version(command: &NsldMachOArm64ShellLoadCommandPlan) -> Result<
 fn encode_code_signature(
     plan: &NsldMachOArm64ShellLayoutPlanReport,
     command: &NsldMachOArm64ShellLoadCommandPlan,
+    code_signature_payload_bytes: usize,
 ) -> Result<Vec<u8>, String> {
     if command.status != "payload-pending" {
         return Err("Mach-O code-signature command lost pending status".to_owned());
     }
     let mut bytes = command_buffer(command)?;
     write_u32(&mut bytes, 8, checked_u32(plan.code_signature_file_offset)?)?;
-    write_u32(&mut bytes, 12, 0)?;
+    write_u32(&mut bytes, 12, checked_u32(code_signature_payload_bytes)?)?;
     Ok(bytes)
 }
 
@@ -382,4 +410,14 @@ fn checked_u32(value: usize) -> Result<u32, String> {
 
 fn checked_u64(value: usize) -> Result<u64, String> {
     u64::try_from(value).map_err(|_| format!("Mach-O value {value} exceeds u64"))
+}
+
+fn align_up(value: usize, alignment: usize) -> Result<usize, String> {
+    if alignment == 0 || !alignment.is_power_of_two() {
+        return Err(format!("Mach-O alignment {alignment} is invalid"));
+    }
+    value
+        .checked_add(alignment - 1)
+        .map(|value| value & !(alignment - 1))
+        .ok_or_else(|| "Mach-O aligned value overflows".to_owned())
 }

@@ -1,5 +1,6 @@
 use crate::reports::{
-    NsldMachOArm64ShellImageSerializationReport, NsldMachOArm64ShellLayoutPlanReport,
+    NsldMachOArm64CodeSignatureReport, NsldMachOArm64ShellImageSerializationReport,
+    NsldMachOArm64ShellLayoutPlanReport,
 };
 
 pub(crate) fn print_macho_shell_image_serialization(
@@ -32,10 +33,7 @@ pub(crate) fn print_macho_shell_image_serialization(
         report.string_table_hash,
         report.linkedit_hash
     );
-    println!(
-        "  finalizer_input_shell_image_code_signature: status={} file_offset={}",
-        report.code_signature_status, report.code_signature_file_offset
-    );
+    print_macho_code_signature(&report.code_signature);
     for rewrite in &report.rewrites {
         println!(
             "  finalizer_input_shell_image_rewrite: id={} kind={} source={} source_offset={} file_offset={} vm=0x{:x} target_vm={} addend={} width={} prewrite_hash={} source_hash={} encoded_hash={} audit_hash={}",
@@ -54,6 +52,56 @@ pub(crate) fn print_macho_shell_image_serialization(
             rewrite.encoding_source_bytes_hash,
             rewrite.encoded_bytes_hash,
             rewrite.audit_hash
+        );
+    }
+}
+
+fn print_macho_code_signature(report: &NsldMachOArm64CodeSignatureReport) {
+    println!(
+        "  finalizer_input_shell_image_code_signature: contract={} status={} identifier={} code_directory=0x{:x} flags=0x{:x} hash={}:{} page={} code={}:{} verified_slots={} signature={}:{}:{} signed_sha256={} directory_sha256={} cdhash={} payload_sha256={} commands={}:{}:{} linkedit_covers={} ranges_valid={} padding_valid={} validation={}:{} ledger_hash={}",
+        report.contract,
+        report.status,
+        report.identifier,
+        report.code_directory_version,
+        report.flags,
+        report.hash_type,
+        report.hash_size_bytes,
+        report.page_size_bytes,
+        report.code_limit,
+        report.code_slot_count,
+        report.verified_code_slot_count,
+        report.signature_file_offset,
+        report.signature_blob_bytes,
+        report.signature_payload_bytes,
+        report.signed_content_sha256,
+        report.code_directory_sha256,
+        report.cdhash,
+        report.signature_payload_sha256,
+        report.load_command_count,
+        report.verified_load_command_count,
+        report.load_command_bytes,
+        report.linkedit_covers_signature,
+        report.signed_ranges_valid,
+        report.padding_valid,
+        report.validation_contract,
+        report.validation_status,
+        report.validation_ledger_hash
+    );
+    println!(
+        "  finalizer_input_shell_image_publication_eligibility: contract={} status={} eligible={} blockers={}",
+        report.publication_eligibility_contract,
+        report.publication_eligibility_status,
+        report.publication_eligible,
+        report.publication_blockers.join(",")
+    );
+    for slot in &report.slots {
+        println!(
+            "  finalizer_input_shell_image_signature_slot: index={} file={}:{} sha256={} audit_hash={}",
+            slot.slot_index,
+            slot.file_offset,
+            slot.file_size_bytes,
+            slot.digest_sha256,
+            slot.audit_hash
         );
     }
 }

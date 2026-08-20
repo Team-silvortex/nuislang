@@ -9,6 +9,10 @@ use crate::{
     final_executable_macho_shell_image_commands::encode_shell_header_and_commands,
     final_executable_macho_shell_image_linkedit::{encode_shell_linkedit, EncodedShellLinkedit},
     final_executable_macho_shell_image_rewrite::rewrite_shell_image_addresses,
+    final_executable_macho_shell_signature::{
+        encode_macho_arm64_ad_hoc_signature, plan_macho_arm64_ad_hoc_signature,
+    },
+    final_executable_macho_shell_signature_validation::validate_macho_arm64_signed_shell_image,
     reports::{
         NsldMachOArm64MaterializationPreviewReport, NsldMachOArm64PlatformStructurePlanReport,
         NsldMachOArm64RelocationApplicationReport, NsldMachOArm64ShellImageSerializationReport,
@@ -18,7 +22,7 @@ use crate::{
 use std::fmt::Write as _;
 
 pub(crate) const MACHO_ARM64_SHELL_IMAGE_SERIALIZATION_CONTRACT: &str =
-    "nuis-nsld-macho-arm64-shell-image-serialization-v1";
+    "nuis-nsld-macho-arm64-shell-image-serialization-v2";
 
 #[derive(Debug)]
 pub(crate) struct MachOArm64SerializedShellImage {
@@ -34,7 +38,8 @@ pub(crate) fn serialize_macho_arm64_shell_image(
     shell: &NsldMachOArm64ShellLayoutPlanReport,
 ) -> Result<MachOArm64SerializedShellImage, String> {
     validate_envelope(relocations, preview, platform, applied, shell)?;
-    let commands = encode_shell_header_and_commands(shell)?;
+    let signature_plan = plan_macho_arm64_ad_hoc_signature(shell)?;
+    let commands = encode_shell_header_and_commands(shell, signature_plan.signature_payload_bytes)?;
     let linkedit = encode_shell_linkedit(shell)?;
     let mut image = vec![0; shell.code_signature_file_offset];
     let mut occupied = Vec::new();
@@ -59,6 +64,9 @@ pub(crate) fn serialize_macho_arm64_shell_image(
         shell,
         &mut image,
     )?;
+    let signature_payload = encode_macho_arm64_ad_hoc_signature(&image, &signature_plan)?;
+    image.extend_from_slice(&signature_payload);
+    let code_signature = validate_macho_arm64_signed_shell_image(&image, shell, &signature_plan)?;
     let header_hash = crate::fnv1a64_hex(&commands.header);
     let load_commands_hash = crate::fnv1a64_hex(&commands.load_commands);
     let rebase_stream_hash = crate::fnv1a64_hex(&linkedit.rebase_stream);
@@ -73,9 +81,9 @@ pub(crate) fn serialize_macho_arm64_shell_image(
         "linkedit",
     )?;
     let shell_image_hash = crate::fnv1a64_hex(&image);
-    let status = "private-image-serialized-with-code-signature-boundary";
+    let status = "signed-private-image-validated";
     let publication_status = "private-not-published";
-    let code_signature_status = "payload-pending";
+    let code_signature_status = code_signature.status.as_str();
     let serialization_ledger_hash = serialization_ledger_hash(
         status,
         publication_status,
@@ -91,6 +99,8 @@ pub(crate) fn serialize_macho_arm64_shell_image(
         &string_table_hash,
         &linkedit_hash,
         &shell_image_hash,
+        &code_signature.validation_ledger_hash,
+        &code_signature.signature_payload_sha256,
         copied_section_count,
         copied_section_bytes,
         &rewrites.audits,
@@ -123,6 +133,7 @@ pub(crate) fn serialize_macho_arm64_shell_image(
         code_signature_file_offset: shell.code_signature_file_offset,
         code_signature_status: code_signature_status.to_owned(),
         publication_status: publication_status.to_owned(),
+        code_signature,
         rewrites: rewrites.audits,
     };
     Ok(MachOArm64SerializedShellImage {
@@ -325,6 +336,8 @@ fn serialization_ledger_hash(
     string_hash: &str,
     linkedit_hash: &str,
     image_hash: &str,
+    signature_validation_hash: &str,
+    signature_payload_hash: &str,
     copied_section_count: usize,
     copied_section_bytes: usize,
     rewrites: &[crate::reports::NsldMachOArm64ShellImageRewriteAudit],
@@ -347,6 +360,8 @@ fn serialization_ledger_hash(
         string_hash,
         linkedit_hash,
         image_hash,
+        signature_validation_hash,
+        signature_payload_hash,
     ] {
         writeln!(out, "text:{}:{value}", value.len()).unwrap();
     }

@@ -172,6 +172,7 @@ dependencies = [
  "nsdb",
  "nuis-runtime",
  "nuisc",
+ "sha2",
 ]
 
 [[package]]

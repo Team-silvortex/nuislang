@@ -12,3 +12,4 @@ description = "Nsld linker front-door prototype for the Nuis toolchain."
 nuis-runtime = { path = "../../crates/nuis-runtime" }
 nuisc = { path = "../nuisc" }
 nsdb = { path = "../nsdb" }
+sha2.workspace = true

@@ -174,7 +174,7 @@ libSystem compatibility registration rather than symbol-specific linker
 branches. Every segment, section, symbol, indirect entry, bind, rebase, and
 command has an audit hash, and the plan records an explicit pending code-
 signature boundary.
-`nuis-nsld-macho-arm64-shell-image-serialization-v1` now consumes that exact
+`nuis-nsld-macho-arm64-shell-image-serialization-v2` now consumes that exact
 plan and platform ledger. It emits a private `mach_header_64`, ordered load
 commands, copied file-backed sections, dyld rebase/bind streams, `nlist_64`
 records, indirect-symbol entries, and the UTF-8 string table. Direct and
@@ -182,16 +182,24 @@ platform relocations, provider stubs, and internal GOT pointers are re-encoded
 against final VM addresses with per-write source/prewrite/output hashes and a
 complete serialization ledger. Internal-rebase and external-bind fixtures both
 pass, and JSON, text, and persisted invoke-plan TOML expose the same report.
-The image deliberately ends at an `LC_CODE_SIGNATURE` command whose payload
-size is zero and remains `private-not-published`.
+`nuis-nsld-macho-arm64-ad-hoc-signature-v1` appends a standard SuperBlob and
+CodeDirectory with SHA-256 hashes over every 4 KiB code slot, extends
+`__LINKEDIT`, and gives `LC_CODE_SIGNATURE` its final non-zero payload size.
+`nuis-nsld-macho-arm64-signed-image-validation-v1` then independently reparses
+the header, every load-command boundary, the signature envelope, reserved
+fields, padding, and every signed range. Signed-content, command-boundary, and
+padding mutations all fail closed. Publication remains separately blocked by
+`nuis-nsld-macho-arm64-publication-eligibility-v1` until an isolated OS loader
+accepts the exact private image.
 A gated host-command provider remains as a fallback; ELF and PE/COFF are
 explicit `registered-not-implemented` providers. This proves relocatable input,
 table parsing, placement, binding, merged-image construction, direct and
 platform relocation encoding, deterministic GOT/stub allocation, platform byte
 synthesis, unresolved-bind preservation, audited Mach-O shell planning, and
-private final-address byte serialization. It does not yet prove code-signature
-payload generation, independent OS structural/load validation, common-symbol
-allocation, or publication independently of Nuisc's compatibility link.
+signed private final-address byte serialization with an independent structural
+validator. It does not yet prove OS loader acceptance, common-symbol allocation,
+ELF or PE/COFF completion, or publication independently of Nuisc's compatibility
+link.
 
 ## Current Early-Beta Rule
 

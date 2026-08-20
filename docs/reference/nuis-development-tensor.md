@@ -349,15 +349,19 @@ The `beta-0.1` calibration baseline is:
   into deterministic 16 KiB-page `__PAGEZERO`, content, and `__LINKEDIT`
   segments, merged plus provider-owned stub/GOT sections, a role-aware entry,
   symbol/indirect records, rebase/bind requirements, linkedit offsets, and
-  ordered load commands; `nuis-nsld-macho-arm64-shell-image-serialization-v1`
+  ordered load commands; `nuis-nsld-macho-arm64-shell-image-serialization-v2`
   now consumes the exact plan and platform ledger, emits private Mach-O header,
   command, content, dyld, symbol, indirect-symbol, and UTF-8 string-table bytes,
   and re-encodes direct/platform relocations, stubs, and internal GOT pointers
-  against final VM addresses with deterministic rewrite and image ledgers.
-  Internal-rebase and external-bind fixtures plus JSON/text/TOML CLI evidence
-  pass. The image remains `private-not-published` and stops at an empty pending
-  code-signature payload; signing, independent OS structure/load validation,
-  common-symbol allocation, ELF, and PE/COFF remain open
+  against final VM addresses with deterministic rewrite and image ledgers;
+  `nuis-nsld-macho-arm64-ad-hoc-signature-v1` appends a SHA-256 SuperBlob and
+  CodeDirectory, while `nuis-nsld-macho-arm64-signed-image-validation-v1`
+  independently reparses all command boundaries, signature fields, padding,
+  and signed slots. Internal-rebase, external-bind, three tamper fixtures, and
+  JSON/text/TOML CLI evidence pass. The image remains
+  `private-not-published` behind `independent-os-load-validation-pending`;
+  actual OS loader acceptance, common-symbol allocation, ELF, and PE/COFF
+  remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

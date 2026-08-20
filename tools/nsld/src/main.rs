@@ -88,6 +88,8 @@ mod final_executable_macho_shell_image_rewrite;
 mod final_executable_macho_shell_image_rewrite_encoding;
 mod final_executable_macho_shell_layout;
 mod final_executable_macho_shell_linkedit;
+mod final_executable_macho_shell_signature;
+mod final_executable_macho_shell_signature_validation;
 mod final_executable_output;
 mod final_executable_output_backend;
 mod final_executable_output_code_asset;

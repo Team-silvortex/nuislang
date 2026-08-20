@@ -147,12 +147,20 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     assert!(invoke_plan.contains("\"code_signature_status\":\"required-payload-pending\""));
     assert!(invoke_plan.contains("\"shell_image_serialization\":{"));
     assert!(
-        invoke_plan.contains("\"contract\":\"nuis-nsld-macho-arm64-shell-image-serialization-v1\"")
+        invoke_plan.contains("\"contract\":\"nuis-nsld-macho-arm64-shell-image-serialization-v2\"")
     );
-    assert!(invoke_plan
-        .contains("\"status\":\"private-image-serialized-with-code-signature-boundary\""));
+    assert!(invoke_plan.contains("\"status\":\"signed-private-image-validated\""));
     assert!(invoke_plan.contains("\"publication_status\":\"private-not-published\""));
-    assert!(invoke_plan.contains("\"code_signature_status\":\"payload-pending\""));
+    assert!(invoke_plan.contains("\"code_signature_status\":\"ad-hoc-payload-validated\""));
+    assert!(invoke_plan.contains("\"code_signature\":{"));
+    assert!(invoke_plan.contains("\"contract\":\"nuis-nsld-macho-arm64-ad-hoc-signature-v1\""));
+    assert!(
+        invoke_plan.contains("\"validation_status\":\"signed-private-image-structurally-valid\"")
+    );
+    assert!(invoke_plan.contains("\"publication_eligible\":false"));
+    assert!(invoke_plan
+        .contains("\"publication_blockers\":[\"independent-os-load-validation-pending\"]"));
+    assert!(invoke_plan.contains("\"slots\":[{"));
     assert!(invoke_plan.contains("\"relocation_rewrite_count\":2"));
     assert!(invoke_plan.contains("\"stub_rewrite_count\":1"));
     assert!(invoke_plan.contains("\"got_rewrite_count\":0"));
@@ -204,11 +212,19 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     assert!(invoke_plan_text.contains("finalizer_input_shell_bind: id="));
     assert!(invoke_plan_text.contains("finalizer_input_shell_command: id="));
     assert!(invoke_plan_text.contains(
-        "finalizer_input_shell_image: contract=nuis-nsld-macho-arm64-shell-image-serialization-v1"
+        "finalizer_input_shell_image: contract=nuis-nsld-macho-arm64-shell-image-serialization-v2"
     ));
     assert!(invoke_plan_text.contains("publication=private-not-published"));
-    assert!(invoke_plan_text
-        .contains("finalizer_input_shell_image_code_signature: status=payload-pending"));
+    assert!(invoke_plan_text.contains(
+        "finalizer_input_shell_image_code_signature: contract=nuis-nsld-macho-arm64-ad-hoc-signature-v1 status=ad-hoc-payload-validated"
+    ));
+    assert!(invoke_plan_text.contains(
+        "finalizer_input_shell_image_publication_eligibility: contract=nuis-nsld-macho-arm64-publication-eligibility-v1"
+    ));
+    assert!(
+        invoke_plan_text.contains("eligible=false blockers=independent-os-load-validation-pending")
+    );
+    assert!(invoke_plan_text.contains("finalizer_input_shell_image_signature_slot: index=0"));
     assert!(invoke_plan_text.contains("finalizer_input_shell_image_rewrite: id="));
     assert!(invoke_plan_text.contains(
         "finalizer_input_symbol_binding: symbol=_nuis_runtime reference=host.program-llvm:1 status=internal"
@@ -278,12 +294,25 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     assert!(persisted_invoke_plan.contains("finalizer_input_shell_layout_binds = ["));
     assert!(persisted_invoke_plan.contains("finalizer_input_shell_layout_load_commands = ["));
     assert!(persisted_invoke_plan.contains(
-        "finalizer_input_shell_image_contract = \"nuis-nsld-macho-arm64-shell-image-serialization-v1\""
+        "finalizer_input_shell_image_contract = \"nuis-nsld-macho-arm64-shell-image-serialization-v2\""
     ));
     assert!(persisted_invoke_plan
         .contains("finalizer_input_shell_image_publication_status = \"private-not-published\""));
+    assert!(persisted_invoke_plan.contains(
+        "finalizer_input_shell_image_code_signature_status = \"ad-hoc-payload-validated\""
+    ));
+    assert!(persisted_invoke_plan.contains(
+        "finalizer_input_shell_image_signature_contract = \"nuis-nsld-macho-arm64-ad-hoc-signature-v1\""
+    ));
+    assert!(persisted_invoke_plan.contains(
+        "finalizer_input_shell_image_signature_validation_status = \"signed-private-image-structurally-valid\""
+    ));
     assert!(persisted_invoke_plan
-        .contains("finalizer_input_shell_image_code_signature_status = \"payload-pending\""));
+        .contains("finalizer_input_shell_image_signature_publication_eligible = false"));
+    assert!(persisted_invoke_plan.contains(
+        "finalizer_input_shell_image_signature_publication_blockers = [\"independent-os-load-validation-pending\"]"
+    ));
+    assert!(persisted_invoke_plan.contains("finalizer_input_shell_image_signature_slots = ["));
     assert!(persisted_invoke_plan.contains("finalizer_input_shell_image_rewrite_count = 3"));
     assert!(persisted_invoke_plan.contains("finalizer_input_shell_image_rewrites = ["));
     assert!(invoke_plan.contains("\"invocation_kind\":\"registered-internal-finalizer\""));

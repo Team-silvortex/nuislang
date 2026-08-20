@@ -121,12 +121,14 @@ dispatch table hash and matched entry in each completion/replay record rather
 than relying only on the broader final-image binding proof.
 
 The Mach-O arm64 compatibility provider now also owns a private final-address
-shell image. `nuis-nsld-macho-arm64-shell-image-serialization-v1` emits the
+shell image. `nuis-nsld-macho-arm64-shell-image-serialization-v2` emits the
 header, load commands, copied sections, dyld streams, symbol/indirect/string
 tables, and audited relocation/stub/internal-GOT rewrites from the deterministic
-shell plan. This narrows the OS-native gap to code-signature payload generation,
-independent structural/load validation, and publication policy; the private
-image is not silently substituted for the compatibility executable.
+shell plan. It also appends a SHA-256 ad-hoc SuperBlob/CodeDirectory, extends
+`__LINKEDIT`, and independently validates every load-command and signed-range
+boundary. This narrows the OS-native gap to actual OS loader acceptance and
+publication policy; the private image is not silently substituted for the
+compatibility executable.
 
 It does not yet own:
 

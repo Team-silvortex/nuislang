@@ -468,6 +468,51 @@ pub(crate) struct NsldMachOArm64ShellImageRewriteAudit {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64CodeSignatureSlotAudit {
+    pub(crate) slot_index: usize,
+    pub(crate) file_offset: usize,
+    pub(crate) file_size_bytes: usize,
+    pub(crate) digest_sha256: String,
+    pub(crate) audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64CodeSignatureReport {
+    pub(crate) contract: String,
+    pub(crate) status: String,
+    pub(crate) identifier: String,
+    pub(crate) code_directory_version: u32,
+    pub(crate) flags: u32,
+    pub(crate) hash_type: String,
+    pub(crate) hash_size_bytes: usize,
+    pub(crate) page_size_bytes: usize,
+    pub(crate) code_limit: usize,
+    pub(crate) code_slot_count: usize,
+    pub(crate) verified_code_slot_count: usize,
+    pub(crate) signature_file_offset: usize,
+    pub(crate) signature_blob_bytes: usize,
+    pub(crate) signature_payload_bytes: usize,
+    pub(crate) signed_content_sha256: String,
+    pub(crate) code_directory_sha256: String,
+    pub(crate) cdhash: String,
+    pub(crate) signature_payload_sha256: String,
+    pub(crate) load_command_count: usize,
+    pub(crate) verified_load_command_count: usize,
+    pub(crate) load_command_bytes: usize,
+    pub(crate) linkedit_covers_signature: bool,
+    pub(crate) signed_ranges_valid: bool,
+    pub(crate) padding_valid: bool,
+    pub(crate) validation_contract: String,
+    pub(crate) validation_status: String,
+    pub(crate) publication_eligibility_contract: String,
+    pub(crate) publication_eligibility_status: String,
+    pub(crate) publication_eligible: bool,
+    pub(crate) publication_blockers: Vec<String>,
+    pub(crate) validation_ledger_hash: String,
+    pub(crate) slots: Vec<NsldMachOArm64CodeSignatureSlotAudit>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldMachOArm64ShellImageSerializationReport {
     pub(crate) contract: String,
     pub(crate) status: String,
@@ -496,6 +541,7 @@ pub(crate) struct NsldMachOArm64ShellImageSerializationReport {
     pub(crate) code_signature_file_offset: usize,
     pub(crate) code_signature_status: String,
     pub(crate) publication_status: String,
+    pub(crate) code_signature: NsldMachOArm64CodeSignatureReport,
     pub(crate) rewrites: Vec<NsldMachOArm64ShellImageRewriteAudit>,
 }
 

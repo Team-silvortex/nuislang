@@ -99,9 +99,13 @@ This is not yet a pure Nsld linker claim. Nsld now understands the real input
 tables, assigns deterministic final sections and addresses, applies registered
 direct/platform relocations, emits stub/GOT and dyld metadata, and serializes a
 private final-address Mach-O shell through
-`nuis-nsld-macho-arm64-shell-image-serialization-v1`. The private image remains
-unpublished because its `LC_CODE_SIGNATURE` payload is still empty and it has
-not passed an independent OS structural/load gate. Nuisc therefore still
+`nuis-nsld-macho-arm64-shell-image-serialization-v2`. The serializer appends a
+standard SHA-256 ad-hoc SuperBlob/CodeDirectory through
+`nuis-nsld-macho-arm64-ad-hoc-signature-v1`; its independent validator reparses
+all Mach-O command boundaries, `__LINKEDIT` coverage, signature fields, padding,
+and code slots before emitting `nuis-nsld-macho-arm64-signed-image-validation-v1`.
+The private image remains unpublished because it has not yet passed an isolated
+OS loader gate. Nuisc therefore still
 embeds the host-toolchain-linked compatibility executable used for runnable
 publication. ELF and PE/COFF remain visible, selectable, and honestly blocked
 rather than silently falling through a generic linker.
@@ -117,10 +121,10 @@ A future provider must:
    is unsupported;
 5. pass the registry conformance and finalizer CLI regressions.
 
-The next native milestone is a provider-owned ad-hoc code-signature payload and
-an independent structural validator over the private shell image, followed by
-an explicit publication-eligibility report. This work must not add Mach-O
-branches to Nuisc, final-stage planning, or the generic emit frontdoor.
+The next native milestone is an isolated, non-publishing OS loader probe over a
+fully internally resolved signed fixture. Its result must bind the exact image
+hash and feed `nuis-nsld-macho-arm64-publication-eligibility-v1` without adding
+Mach-O branches to Nuisc, final-stage planning, or the generic emit frontdoor.
 
 ## Validation
 
