@@ -18,6 +18,7 @@ pub(crate) fn usage() -> &'static str {
         "  nsld emit-final-executable-writer-input <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld verify-final-executable-writer-input <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld final-executable-host-dry-run <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld final-executable-private-image-loader-probe <nuis.build.manifest.toml|artifact-output-dir> [--json] [--apply]\n",
         "  nsld final-executable-host-invoke-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld emit-final-executable-host-invoke-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld verify-final-executable-host-invoke-plan <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",

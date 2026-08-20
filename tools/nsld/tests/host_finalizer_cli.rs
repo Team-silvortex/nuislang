@@ -39,6 +39,15 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
         "final-executable-host-invoke-plan",
         manifest.to_str().unwrap(),
     ]);
+    let private_image_probe = run_nsld_args(&[
+        "final-executable-private-image-loader-probe",
+        manifest.to_str().unwrap(),
+        "--json",
+    ]);
+    let private_image_probe_text = run_nsld_args(&[
+        "final-executable-private-image-loader-probe",
+        manifest.to_str().unwrap(),
+    ]);
     let check = run_nsld("check", &manifest);
     let artifact_chain = run_nsld("artifact-chain", &manifest);
     let launcher = run_nsld("final-executable-launcher-manifest", &manifest);
@@ -315,6 +324,20 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     assert!(persisted_invoke_plan.contains("finalizer_input_shell_image_signature_slots = ["));
     assert!(persisted_invoke_plan.contains("finalizer_input_shell_image_rewrite_count = 3"));
     assert!(persisted_invoke_plan.contains("finalizer_input_shell_image_rewrites = ["));
+    assert!(
+        private_image_probe.contains("\"contract\":\"nuis-nsld-macho-arm64-os-loader-probe-v1\"")
+    );
+    assert!(private_image_probe.contains("\"status\":\"blocked-external-compatibility-input\""));
+    assert!(private_image_probe.contains("\"probe_mode\":\"plan-only\""));
+    assert!(private_image_probe.contains("\"input_eligible\":false"));
+    assert!(private_image_probe.contains("\"attempted\":false"));
+    assert!(private_image_probe.contains("\"publication_eligible\":false"));
+    assert!(private_image_probe.contains(
+        "\"publication_blockers\":[\"private-image-has-external-compatibility-bindings\"]"
+    ));
+    assert!(private_image_probe_text.contains("Nsld Mach-O arm64 private-image loader probe"));
+    assert!(private_image_probe_text.contains("status=blocked-external-compatibility-input"));
+    assert!(private_image_probe_text.contains("attempted=false"));
     assert!(invoke_plan.contains("\"invocation_kind\":\"registered-internal-finalizer\""));
     assert!(invoke_plan.contains("\"invocation_policy\":\"registered-internal\""));
     assert!(invoke_plan.contains("\"requires_explicit_allow\":false"));

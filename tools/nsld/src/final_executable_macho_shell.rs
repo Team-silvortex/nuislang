@@ -38,11 +38,7 @@ pub(crate) fn build_macho_arm64_shell_layout_plan(
         platform_applied,
     )?;
     let object_linkage_hash = macho_object_linkage_hash(objects);
-    let layout = build_shell_layout_draft(
-        placement,
-        platform_plan,
-        has_unresolved_external_symbols(objects),
-    )?;
+    let layout = build_shell_layout_draft(placement, platform_plan, true)?;
     let linkedit = build_shell_linkedit_plan(
         objects,
         placement,
@@ -378,24 +374,6 @@ fn shell_plan_hash(
         append_text(&mut out, &command.audit_hash);
     }
     crate::fnv1a64_hex(out.as_bytes())
-}
-
-fn has_unresolved_external_symbols(objects: &[MachOLayoutObject<'_>]) -> bool {
-    let definitions = objects
-        .iter()
-        .flat_map(|object| object.linkage.symbols.iter())
-        .filter(|symbol| symbol.external && symbol.defined && !symbol.name.is_empty())
-        .map(|symbol| symbol.name.as_str())
-        .collect::<BTreeSet<_>>();
-    objects
-        .iter()
-        .flat_map(|object| object.linkage.symbols.iter())
-        .any(|symbol| {
-            symbol.external
-                && matches!(symbol.kind.as_str(), "undefined" | "prebound-undefined")
-                && !symbol.name.is_empty()
-                && !definitions.contains(symbol.name.as_str())
-        })
 }
 
 fn macho_object_linkage_hash(objects: &[MachOLayoutObject<'_>]) -> String {

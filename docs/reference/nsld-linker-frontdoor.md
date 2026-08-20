@@ -38,13 +38,15 @@ For the automation frontdoor, see [nsld-driver-frontdoor.md](nsld-driver-frontdo
 * deterministic private Mach-O arm64 shell-byte and linkedit serialization with
   final-address instruction, stub, GOT, and pointer rewriting
 * SHA-256 ad-hoc Mach-O signing and independent structural/signed-range validation
+* explicit non-publishing Mach-O arm64 OS-loader probing with bounded execution
+  and cleanup evidence
 * registered Mach-O arm64 compatibility-image materialization
 * the first independent CLI boundary for future linker work
 
 `Nsld` does not yet own:
 
-* common/non-section Mach-O allocation, OS loader acceptance, and private-image
-  publication
+* common/non-section Mach-O allocation, durable loader-admission receipts, and
+  default private-image publication
 * final host-native executable wrapping for ELF or PE/COFF
 * binary section assembly independent from `nuisc`
 * stable linker script or relocation formats
@@ -1140,10 +1142,12 @@ static role-aware entry registry; section-backed defined and unresolved symbol
 records; indirect-symbol slots; internal rebase and external bind requirements;
 symbol, string, and dyld-stream offsets; and ordered segment, dyld-info,
 symtab, dysymtab, dylinker, registered libSystem, main, build-version, and
-pending code-signature load commands. The C compatibility library is selected
-through one static provider rule rather than branches for particular symbols.
-All records carry canonical audit hashes, and the complete plan is projected
-identically through JSON, text, and persisted writer input.
+UUID plus pending code-signature load commands. The C compatibility library is
+selected through one static provider rule rather than branches for particular
+symbols and remains a required executable-shell platform baseline even for an
+internally closed image. The UUID is deterministically derived from the shell-
+plan identity. All records carry canonical audit hashes, and the complete plan
+is projected identically through JSON, text, and persisted writer input.
 
 `nuis-nsld-macho-arm64-shell-image-serialization-v2` consumes the shell plan and
 the exact platform application ledger into a private byte image. It emits the
@@ -1163,9 +1167,17 @@ slot, extends `__LINKEDIT`, and sets the final non-zero `LC_CODE_SIGNATURE`
 size. A separate parser emits
 `nuis-nsld-macho-arm64-signed-image-validation-v1` only after re-reading every
 load-command boundary, signature field, reserved span, padding byte, and code
-slot. The publication report remains `private-not-published` with
+slot, including the deterministic `LC_UUID`. The base publication report
+remains `private-not-published` with
 `independent-os-load-validation-pending`, so the signed image is still not
-installed as the runnable artifact.
+installed as the runnable artifact. A separate
+`nuis-nsld-macho-arm64-os-loader-probe-v1` command is plan-only by default. Its
+explicit apply path admits only a signed zero-unresolved/zero-bind image,
+materializes owner-only temporary bytes, verifies their identity, runs through
+the host kernel with a five-second timeout and bounded captures, and records
+cleanup without retaining the temporary path. The fully internal ARM64 fixture
+is accepted by the real macOS kernel and dyld and exits zero; external-
+compatibility inputs remain blocked before materialization.
 
 After those checks the provider validates a thin or universal arm64
 `MH_EXECUTE` compatibility image and installs it atomically with executable
@@ -1183,9 +1195,10 @@ images, deterministic GOT/stub allocation and bytes, explicit unresolved bind
 records, an audited final-address shell layout, and deterministic private
 header/command/content/linkedit bytes with all address-dependent writes
 re-encoded for final VM addresses. It does not yet allocate non-section
-definitions, generate and validate a code signature, pass an independent OS
-load gate, or publish the final native shell independently. Those remain the
-next boundary.
+definitions, persist and replay-validate successful loader evidence as a
+publication-admission receipt, exercise the ordinary compiled-artifact path
+with a fully internal positive fixture, or publish the final native shell
+independently. Those remain the next boundary.
 
 `nsld final-executable-host-dry-run` consumes the verified writer input,
 reports `environment_ready`, provider identity, and exact command arguments.

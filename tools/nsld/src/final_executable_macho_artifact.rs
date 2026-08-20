@@ -1,7 +1,8 @@
 use crate::content_hash_cache::{file_fingerprint, FileFingerprint};
 use crate::{
     final_executable_macho_object::{
-        summarize_macho_host_object_handoff, validate_macho_host_object_handoff,
+        build_macho_host_object_handoff, validate_macho_host_object_handoff,
+        MachOArm64PrivateShellProduct,
     },
     reports::NsldExecutableFinalizerInputSummary,
 };
@@ -59,6 +60,12 @@ pub(crate) fn macho_artifact_image_validation_issues(
 pub(crate) fn macho_artifact_input_summary(
     plan: &nuisc::linker::LinkPlan,
 ) -> Result<Option<NsldExecutableFinalizerInputSummary>, String> {
+    macho_artifact_private_shell_product(plan).map(|product| Some(product.summary))
+}
+
+pub(crate) fn macho_artifact_private_shell_product(
+    plan: &nuisc::linker::LinkPlan,
+) -> Result<MachOArm64PrivateShellProduct, String> {
     let artifact_path = Path::new(&plan.compiled_artifact.path);
     let artifact = nuisc::aot::parse_nuis_compiled_artifact(artifact_path).map_err(|error| {
         format!(
@@ -66,7 +73,7 @@ pub(crate) fn macho_artifact_input_summary(
             artifact_path.display()
         )
     })?;
-    summarize_macho_host_object_handoff(&artifact, plan).map(Some)
+    build_macho_host_object_handoff(&artifact, plan)
 }
 
 pub(crate) fn materialize_macho_artifact_image(

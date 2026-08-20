@@ -18,6 +18,12 @@ pub(crate) const MACHO_HOST_OBJECT_LINKAGE_CONTRACT: &str =
     "nuis-nsld-macho-host-object-linkage-v1";
 const REQUIRED_HOST_OBJECT_ROLES: [&str; 2] = ["program-llvm", "runtime-shim"];
 
+#[derive(Debug)]
+pub(crate) struct MachOArm64PrivateShellProduct {
+    pub(crate) summary: NsldExecutableFinalizerInputSummary,
+    pub(crate) bytes: Vec<u8>,
+}
+
 pub(crate) fn validate_macho_host_object_handoff(
     artifact: &nuisc::aot::NuisCompiledArtifact,
     plan: &nuisc::linker::LinkPlan,
@@ -29,6 +35,13 @@ pub(crate) fn summarize_macho_host_object_handoff(
     artifact: &nuisc::aot::NuisCompiledArtifact,
     plan: &nuisc::linker::LinkPlan,
 ) -> Result<NsldExecutableFinalizerInputSummary, String> {
+    build_macho_host_object_handoff(artifact, plan).map(|product| product.summary)
+}
+
+pub(crate) fn build_macho_host_object_handoff(
+    artifact: &nuisc::aot::NuisCompiledArtifact,
+    plan: &nuisc::linker::LinkPlan,
+) -> Result<MachOArm64PrivateShellProduct, String> {
     if artifact.host_objects.is_empty() {
         return Err("compiled artifact has no relocatable host objects".to_owned());
     }
@@ -172,7 +185,7 @@ pub(crate) fn summarize_macho_host_object_handoff(
     if shell_image.bytes.len() != shell_image.report.shell_image_span_bytes {
         return Err("Mach-O private shell image/report span drift".to_owned());
     }
-    Ok(NsldExecutableFinalizerInputSummary {
+    let summary = NsldExecutableFinalizerInputSummary {
         contract: MACHO_HOST_OBJECT_LINKAGE_CONTRACT.to_owned(),
         status: status.to_owned(),
         object_count: artifact.host_objects.len(),
@@ -192,6 +205,10 @@ pub(crate) fn summarize_macho_host_object_handoff(
         platform_patch_application: platform_applied_image.report,
         shell_layout_plan,
         shell_image_serialization: shell_image.report,
+    };
+    Ok(MachOArm64PrivateShellProduct {
+        summary,
+        bytes: shell_image.bytes,
     })
 }
 

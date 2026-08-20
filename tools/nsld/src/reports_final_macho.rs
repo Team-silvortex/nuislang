@@ -513,6 +513,46 @@ pub(crate) struct NsldMachOArm64CodeSignatureReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOArm64LoaderProbeReport {
+    pub(crate) contract: String,
+    pub(crate) status: String,
+    pub(crate) probe_mode: String,
+    pub(crate) materialization_kind: String,
+    pub(crate) target_arch: String,
+    pub(crate) target_os: String,
+    pub(crate) host_supported: bool,
+    pub(crate) input_eligible: bool,
+    pub(crate) attempted: bool,
+    pub(crate) image_span_bytes: usize,
+    pub(crate) shell_image_hash: String,
+    pub(crate) signature_validation_ledger_hash: String,
+    pub(crate) unresolved_external_symbol_count: usize,
+    pub(crate) bind_count: usize,
+    pub(crate) probe_timeout_millis: u64,
+    pub(crate) materialized: bool,
+    pub(crate) materialized_hash_matches: bool,
+    pub(crate) kernel_accepted: bool,
+    pub(crate) process_completed: bool,
+    pub(crate) timed_out: bool,
+    pub(crate) exit_code: Option<i32>,
+    pub(crate) termination_signal: Option<i32>,
+    pub(crate) stdout_captured_bytes: usize,
+    pub(crate) stdout_truncated: bool,
+    pub(crate) stdout_hash: String,
+    pub(crate) stderr_captured_bytes: usize,
+    pub(crate) stderr_truncated: bool,
+    pub(crate) stderr_hash: String,
+    pub(crate) failure_kind: Option<String>,
+    pub(crate) cleanup_attempted: bool,
+    pub(crate) cleanup_succeeded: bool,
+    pub(crate) publication_eligibility_contract: String,
+    pub(crate) publication_eligibility_status: String,
+    pub(crate) publication_eligible: bool,
+    pub(crate) publication_blockers: Vec<String>,
+    pub(crate) probe_ledger_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldMachOArm64ShellImageSerializationReport {
     pub(crate) contract: String,
     pub(crate) status: String,

@@ -102,13 +102,19 @@ private final-address Mach-O shell through
 `nuis-nsld-macho-arm64-shell-image-serialization-v2`. The serializer appends a
 standard SHA-256 ad-hoc SuperBlob/CodeDirectory through
 `nuis-nsld-macho-arm64-ad-hoc-signature-v1`; its independent validator reparses
-all Mach-O command boundaries, `__LINKEDIT` coverage, signature fields, padding,
-and code slots before emitting `nuis-nsld-macho-arm64-signed-image-validation-v1`.
-The private image remains unpublished because it has not yet passed an isolated
-OS loader gate. Nuisc therefore still
-embeds the host-toolchain-linked compatibility executable used for runnable
-publication. ELF and PE/COFF remain visible, selectable, and honestly blocked
-rather than silently falling through a generic linker.
+all Mach-O command boundaries, the deterministic `LC_UUID`, `__LINKEDIT`
+coverage, signature fields, padding, and code slots before emitting
+`nuis-nsld-macho-arm64-signed-image-validation-v1`.
+`nuis-nsld-macho-arm64-os-loader-probe-v1` now provides an explicit,
+non-publishing loader gate. It defaults to plan-only and, under `--apply`, only
+materializes signed zero-unresolved/zero-bind inputs in a private temporary
+file, checks exact-byte identity, bounds process time and output, and proves
+cleanup. A fully internal ARM64 fixture is accepted by the real macOS kernel
+and dyld and exits zero. This evidence is not yet persisted as a replay-
+validated publication receipt, so Nuisc still embeds the host-toolchain-linked
+compatibility executable used for runnable publication. ELF and PE/COFF remain
+visible, selectable, and honestly blocked rather than silently falling through
+a generic linker.
 
 ## Extension Rule
 
@@ -121,10 +127,13 @@ A future provider must:
    is unsupported;
 5. pass the registry conformance and finalizer CLI regressions.
 
-The next native milestone is an isolated, non-publishing OS loader probe over a
-fully internally resolved signed fixture. Its result must bind the exact image
-hash and feed `nuis-nsld-macho-arm64-publication-eligibility-v1` without adding
-Mach-O branches to Nuisc, final-stage planning, or the generic emit frontdoor.
+The next native milestone is a provider-owned publication-admission receipt.
+It must bind the exact image hash, signature-validation ledger, loader-probe
+ledger, target identity, zero-bind closure, and successful cleanup, then be
+independently replay-validated before any opt-in private-image installation.
+The ordinary compiled-artifact route also needs a positive fully internal
+fixture. Neither change may add Mach-O branches to Nuisc, final-stage planning,
+or the generic emit frontdoor.
 
 ## Validation
 

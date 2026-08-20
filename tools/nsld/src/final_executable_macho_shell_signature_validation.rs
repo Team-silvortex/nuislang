@@ -6,6 +6,7 @@ use crate::{
         CSMAGIC_EMBEDDED_SIGNATURE, CSSLOT_CODEDIRECTORY, HASH_SIZE_BYTES, HASH_TYPE_SHA256,
         MACHO_ARM64_AD_HOC_SIGNATURE_CONTRACT,
     },
+    final_executable_macho_shell_uuid::macho_arm64_shell_uuid,
     reports::{
         NsldMachOArm64CodeSignatureReport, NsldMachOArm64CodeSignatureSlotAudit,
         NsldMachOArm64ShellLayoutPlanReport,
@@ -23,6 +24,7 @@ const MH_EXECUTE: u32 = 2;
 const MACHO_HEADER_BYTES: usize = 32;
 const LC_SEGMENT_64: u32 = 0x19;
 const LC_CODE_SIGNATURE: u32 = 0x1d;
+const LC_UUID: u32 = 0x1b;
 const SEGMENT_COMMAND_64_BYTES: usize = 72;
 const SECTION_64_BYTES: usize = 80;
 
@@ -160,6 +162,7 @@ fn validate_load_commands(
     let mut cursor = MACHO_HEADER_BYTES;
     let mut signature = None;
     let mut linkedit = None;
+    let mut uuid_seen = false;
     for index in 0..command_count {
         let command = read_le_u32(bytes, cursor, "load-command opcode")?;
         let size = usize::try_from(read_le_u32(bytes, cursor + 4, "load-command size")?)
@@ -201,6 +204,16 @@ fn validate_load_commands(
                     read_le_usize_u32(bytes, cursor + 12, "signature payload size")?,
                 ));
             }
+            LC_UUID => {
+                if size != 24 || uuid_seen {
+                    return Err("Mach-O image has an invalid UUID command".to_owned());
+                }
+                let actual = checked_slice(bytes, cursor + 8, 16, "image UUID")?;
+                if actual != macho_arm64_shell_uuid(&shell.plan_hash) {
+                    return Err("Mach-O image UUID drift".to_owned());
+                }
+                uuid_seen = true;
+            }
             _ => {}
         }
         cursor = end;
@@ -210,6 +223,9 @@ fn validate_load_commands(
     }
     let (signature_offset, signature_bytes) =
         signature.ok_or_else(|| "Mach-O image has no code-signature command".to_owned())?;
+    if !uuid_seen {
+        return Err("Mach-O image has no UUID command".to_owned());
+    }
     let (linkedit_offset, linkedit_bytes) =
         linkedit.ok_or_else(|| "Mach-O image has no __LINKEDIT segment".to_owned())?;
     Ok(LoadCommandValidation {

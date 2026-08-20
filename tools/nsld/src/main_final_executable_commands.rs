@@ -2,12 +2,19 @@ use super::{
     cli::Command,
     context::load_link_input_context,
     display::*,
+    display_final_macho_loader_probe::print_macho_arm64_loader_probe_report,
+    final_executable_macho_artifact::macho_artifact_private_shell_product,
+    final_executable_macho_loader_probe::{
+        probe_macho_arm64_signed_shell_image, MachOArm64LoaderProbeInput,
+    },
     final_executable_output_nsdb_handoff::{
         attach_final_output_nsdb_handoff_summary, persist_final_output_nsdb_handoff,
     },
     final_stage::*,
     json::*,
+    json_final_macho_loader_probe::macho_arm64_loader_probe_report_json,
 };
+use std::path::Path;
 
 pub(crate) fn run_final_executable_command(command: &Command) -> Result<bool, String> {
     match command {
@@ -73,6 +80,35 @@ pub(crate) fn run_final_executable_command(command: &Command) -> Result<bool, St
                 print_nsld_final_executable_host_dry_run_report(&report);
             }
             Ok(true)
+        }
+        Command::FinalExecutablePrivateImageLoaderProbe { input, json, apply } => {
+            let ctx = load_link_input_context(input)?;
+            let product = macho_artifact_private_shell_product(&ctx.plan)?;
+            let report = probe_macho_arm64_signed_shell_image(
+                MachOArm64LoaderProbeInput {
+                    bytes: &product.bytes,
+                    serialization: &product.summary.shell_image_serialization,
+                    unresolved_external_symbol_count: product
+                        .summary
+                        .unresolved_external_symbol_count,
+                    bind_count: product.summary.shell_layout_plan.binds.len(),
+                },
+                Path::new(&ctx.plan.output_dir),
+                *apply,
+            )?;
+            if *json {
+                println!("{}", macho_arm64_loader_probe_report_json(&report));
+            } else {
+                print_macho_arm64_loader_probe_report(&report);
+            }
+            if *apply && !report.publication_eligible {
+                Err(
+                    "nsld private-image loader probe did not pass publication eligibility"
+                        .to_owned(),
+                )
+            } else {
+                Ok(true)
+            }
         }
         Command::FinalExecutableHostInvokePlan { input, json } => {
             let ctx = load_link_input_context(input)?;

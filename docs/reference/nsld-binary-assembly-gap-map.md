@@ -126,9 +126,16 @@ header, load commands, copied sections, dyld streams, symbol/indirect/string
 tables, and audited relocation/stub/internal-GOT rewrites from the deterministic
 shell plan. It also appends a SHA-256 ad-hoc SuperBlob/CodeDirectory, extends
 `__LINKEDIT`, and independently validates every load-command and signed-range
-boundary. This narrows the OS-native gap to actual OS loader acceptance and
-publication policy; the private image is not silently substituted for the
-compatibility executable.
+boundary, including the provider-derived `LC_UUID`.
+`nuis-nsld-macho-arm64-os-loader-probe-v1` now exercises that exact signed image
+without publishing it. The plan-only default is side-effect free; explicit
+application admits only a zero-unresolved/zero-bind input, verifies temporary
+materialization, bounds execution and output, records cleanup, and exposes no
+temporary path. A fully internal ARM64 fixture is accepted by the real macOS
+kernel and dyld and exits zero. This narrows the OS-native gap to a durable,
+replay-validated publication-admission receipt and an ordinary compiled-
+artifact positive fixture; the private image is not silently substituted for
+the compatibility executable.
 
 It does not yet own:
 

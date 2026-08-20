@@ -22,6 +22,7 @@ const LC_LOAD_DYLIB: u32 = 0xc;
 const LC_DYLD_INFO_ONLY: u32 = 0x8000_0022;
 const LC_MAIN: u32 = 0x8000_0028;
 const LC_BUILD_VERSION: u32 = 0x32;
+const LC_UUID: u32 = 0x1b;
 const LC_CODE_SIGNATURE: u32 = 0x1d;
 
 const STUB_FLAGS: u32 = 0x8000_0408;
@@ -80,7 +81,7 @@ pub(crate) fn build_shell_layout_draft(
         .checked_add(2)
         .ok_or_else(|| "Mach-O shell segment count overflows".to_owned())?;
     let load_command_count = segment_count
-        .checked_add(7)
+        .checked_add(8)
         .and_then(|count| count.checked_add(usize::from(has_dylib)))
         .ok_or_else(|| "Mach-O shell load-command count overflows".to_owned())?;
     let load_command_size_bytes = load_command_size(&groups, has_dylib)?;
@@ -465,7 +466,7 @@ fn load_command_size(
         .checked_mul(SEGMENT_COMMAND_SIZE)
         .and_then(|value| value.checked_add(section_bytes))
         .ok_or_else(|| "Mach-O segment command size overflows".to_owned())?;
-    let fixed = 48usize + 24 + 80 + 24 + 24 + 16;
+    let fixed = 48usize + 24 + 80 + 24 + 24 + 24 + 16;
     let dylinker = path_command_size(12, DYLINKER_PATH)?;
     let dylib = if has_dylib {
         path_command_size(24, SYSTEM_DYLIB_PATH)?
@@ -533,6 +534,7 @@ fn build_load_commands(
     }
     specs.extend([
         ("main", LC_MAIN, 24, None, "entry-bound"),
+        ("uuid", LC_UUID, 24, None, "image-bound"),
         (
             "build-version",
             LC_BUILD_VERSION,

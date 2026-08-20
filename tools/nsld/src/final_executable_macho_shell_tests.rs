@@ -101,6 +101,10 @@ fn plans_a_deterministic_arm64_shell_with_static_compatibility_metadata() {
     assert!(first
         .load_commands
         .iter()
+        .any(|command| command.command_kind == "uuid" && command.status == "image-bound"));
+    assert!(first
+        .load_commands
+        .iter()
         .any(|command| command.command_kind == "code-signature"
             && command.status == "payload-pending"));
     assert_eq!(first.code_signature_status, "required-payload-pending");
@@ -268,6 +272,45 @@ pub(crate) fn internal_got_shell_fixture() -> ShellFixture {
     let mut program_bytes = Vec::new();
     program_bytes.extend_from_slice(&0x9000_0000u32.to_le_bytes());
     program_bytes.extend_from_slice(&0xf940_0000u32.to_le_bytes());
+    let runtime_bytes = 0xd65f_03c0u32.to_le_bytes();
+    let layouts = [
+        layout("host.program", "program-llvm", &program),
+        layout("host.runtime", "runtime-shim", &runtime),
+    ];
+    let placement = build_macho_placement_binding_report(&layouts).unwrap();
+    let relocations =
+        build_macho_arm64_relocation_application_report(&layouts, &placement).unwrap();
+    let images = [
+        image("host.program", "program-llvm", &program_bytes, &program),
+        image("host.runtime", "runtime-shim", &runtime_bytes, &runtime),
+    ];
+    let preview =
+        build_macho_arm64_materialization_preview(&images, &placement, &relocations).unwrap();
+    let applied =
+        apply_macho_arm64_patch_previews(&images, &placement, &relocations, &preview).unwrap();
+    let platform =
+        build_macho_arm64_platform_structure_plan(&placement, &relocations, &applied.report)
+            .unwrap();
+    let applied =
+        apply_macho_arm64_platform_structure(&placement, &relocations, &applied, &platform)
+            .unwrap();
+    ShellFixture {
+        program,
+        runtime,
+        placement,
+        relocations,
+        preview,
+        platform,
+        applied,
+    }
+}
+
+pub(crate) fn loader_probe_shell_fixture() -> ShellFixture {
+    let program = linkage_sized(8, vec![defined_symbol(0, "_nuis_entry")], Vec::new());
+    let runtime = linkage(vec![defined_symbol(0, "_runtime_anchor")], Vec::new());
+    let mut program_bytes = Vec::new();
+    program_bytes.extend_from_slice(&0x5280_0000u32.to_le_bytes());
+    program_bytes.extend_from_slice(&0xd65f_03c0u32.to_le_bytes());
     let runtime_bytes = 0xd65f_03c0u32.to_le_bytes();
     let layouts = [
         layout("host.program", "program-llvm", &program),

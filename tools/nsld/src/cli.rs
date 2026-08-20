@@ -71,6 +71,11 @@ pub(crate) enum Command {
         input: PathBuf,
         json: bool,
     },
+    FinalExecutablePrivateImageLoaderProbe {
+        input: PathBuf,
+        json: bool,
+        apply: bool,
+    },
     FinalExecutableHostInvokePlan {
         input: PathBuf,
         json: bool,

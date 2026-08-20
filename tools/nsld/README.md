@@ -171,9 +171,11 @@ segments; and section-backed definitions, unresolved symbols, indirect-symbol
 slots, rebase/bind stream requirements, symbol/string tables, and ordered load
 commands receive final file and VM addresses. External binds use the static
 libSystem compatibility registration rather than symbol-specific linker
-branches. Every segment, section, symbol, indirect entry, bind, rebase, and
-command has an audit hash, and the plan records an explicit pending code-
-signature boundary.
+branches; the executable shell always carries that platform baseline even when
+the private program has no external binds. Every segment, section, symbol,
+indirect entry, bind, rebase, and command has an audit hash. The provider also
+derives a deterministic `LC_UUID` from the shell-plan identity and records an
+explicit pending code-signature boundary.
 `nuis-nsld-macho-arm64-shell-image-serialization-v2` now consumes that exact
 plan and platform ledger. It emits a private `mach_header_64`, ordered load
 commands, copied file-backed sections, dyld rebase/bind streams, `nlist_64`
@@ -186,20 +188,30 @@ pass, and JSON, text, and persisted invoke-plan TOML expose the same report.
 CodeDirectory with SHA-256 hashes over every 4 KiB code slot, extends
 `__LINKEDIT`, and gives `LC_CODE_SIGNATURE` its final non-zero payload size.
 `nuis-nsld-macho-arm64-signed-image-validation-v1` then independently reparses
-the header, every load-command boundary, the signature envelope, reserved
-fields, padding, and every signed range. Signed-content, command-boundary, and
-padding mutations all fail closed. Publication remains separately blocked by
-`nuis-nsld-macho-arm64-publication-eligibility-v1` until an isolated OS loader
-accepts the exact private image.
+the header, every load-command boundary, deterministic UUID, signature
+envelope, reserved fields, padding, and every signed range. Signed-content,
+command-boundary, UUID, and padding mutations all fail closed. The base
+`nuis-nsld-macho-arm64-publication-eligibility-v1` report deliberately remains
+private and pending until runtime evidence is supplied.
+`nuis-nsld-macho-arm64-os-loader-probe-v1` provides that evidence without
+publishing the image. Its default mode is plan-only; explicit `--apply`
+materializes an owner-only temporary executable only for a signed,
+zero-unresolved, zero-external-bind image, verifies the exact bytes, invokes the
+host kernel under bounded time and output limits, records process and cleanup
+results without leaking the temporary path, and removes all probe files. The
+fully internal ARM64 fixture is accepted by the real macOS kernel and dyld,
+exits zero with no output, and earns probe-local publication eligibility. The
+real external-compatibility CLI fixture remains blocked before materialization.
 A gated host-command provider remains as a fallback; ELF and PE/COFF are
 explicit `registered-not-implemented` providers. This proves relocatable input,
 table parsing, placement, binding, merged-image construction, direct and
 platform relocation encoding, deterministic GOT/stub allocation, platform byte
 synthesis, unresolved-bind preservation, audited Mach-O shell planning, and
 signed private final-address byte serialization with an independent structural
-validator. It does not yet prove OS loader acceptance, common-symbol allocation,
-ELF or PE/COFF completion, or publication independently of Nuisc's compatibility
-link.
+validator plus one real isolated OS-loader execution. It does not yet persist a
+replay-validated publication-admission receipt, prove the ordinary compiled-
+artifact route with a fully internal fixture, allocate common symbols, complete
+ELF or PE/COFF, or publish independently of Nuisc's compatibility link.
 
 ## Current Early-Beta Rule
 

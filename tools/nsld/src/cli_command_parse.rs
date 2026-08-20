@@ -39,6 +39,9 @@ where
             Command::VerifyFinalExecutableWriterInput { input, json }
         }
         "final-executable-host-dry-run" => Command::FinalExecutableHostDryRun { input, json },
+        "final-executable-private-image-loader-probe" => {
+            Command::FinalExecutablePrivateImageLoaderProbe { input, json, apply }
+        }
         "final-executable-host-invoke-plan" => {
             Command::FinalExecutableHostInvokePlan { input, json }
         }
@@ -143,7 +146,7 @@ where
         if arg == "--json" {
             json = true;
         } else if arg == "--apply" {
-            if command != "drive" {
+            if command != "drive" && command != "final-executable-private-image-loader-probe" {
                 return Err(format!("unexpected argument `{arg}`"));
             }
             apply = true;

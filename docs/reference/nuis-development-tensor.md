@@ -349,19 +349,26 @@ The `beta-0.1` calibration baseline is:
   into deterministic 16 KiB-page `__PAGEZERO`, content, and `__LINKEDIT`
   segments, merged plus provider-owned stub/GOT sections, a role-aware entry,
   symbol/indirect records, rebase/bind requirements, linkedit offsets, and
-  ordered load commands; `nuis-nsld-macho-arm64-shell-image-serialization-v2`
-  now consumes the exact plan and platform ledger, emits private Mach-O header,
-  command, content, dyld, symbol, indirect-symbol, and UTF-8 string-table bytes,
-  and re-encodes direct/platform relocations, stubs, and internal GOT pointers
-  against final VM addresses with deterministic rewrite and image ledgers;
+  ordered load commands, always includes the libSystem executable baseline,
+  and derives a deterministic `LC_UUID` from the shell-plan identity;
+  `nuis-nsld-macho-arm64-shell-image-serialization-v2` now consumes the exact
+  plan and platform ledger, emits private Mach-O header, command, content, dyld,
+  symbol, indirect-symbol, and UTF-8 string-table bytes, and re-encodes direct/
+  platform relocations, stubs, and internal GOT pointers against final VM
+  addresses with deterministic rewrite and image ledgers;
   `nuis-nsld-macho-arm64-ad-hoc-signature-v1` appends a SHA-256 SuperBlob and
   CodeDirectory, while `nuis-nsld-macho-arm64-signed-image-validation-v1`
-  independently reparses all command boundaries, signature fields, padding,
-  and signed slots. Internal-rebase, external-bind, three tamper fixtures, and
-  JSON/text/TOML CLI evidence pass. The image remains
-  `private-not-published` behind `independent-os-load-validation-pending`;
-  actual OS loader acceptance, common-symbol allocation, ELF, and PE/COFF
-  remain open
+  independently reparses all command boundaries, UUID, signature fields,
+  padding, and signed slots. `nuis-nsld-macho-arm64-os-loader-probe-v1` is
+  plan-only by default and explicitly admits only signed zero-unresolved/zero-
+  bind inputs into a bounded, exact-byte, owner-only temporary execution with
+  complete cleanup evidence. A fully internal ARM64 fixture is accepted by the
+  real macOS kernel and dyld, exits zero, and cleans up; an external CLI fixture
+  remains blocked before materialization. Internal-rebase, external-bind,
+  tamper, probe, and JSON/text/TOML CLI evidence pass. The ordinary publication
+  image remains `private-not-published`; a persisted replay-validated admission
+  receipt, a compiled-artifact positive fixture, common-symbol allocation, ELF,
+  and PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

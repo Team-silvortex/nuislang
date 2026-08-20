@@ -1,5 +1,6 @@
 use crate::{
     final_executable_macho_shell_layout::{DYLINKER_PATH, SYSTEM_DYLIB_PATH},
+    final_executable_macho_shell_uuid::macho_arm64_shell_uuid,
     reports::{
         NsldMachOArm64ShellLayoutPlanReport, NsldMachOArm64ShellLoadCommandPlan,
         NsldMachOArm64ShellSegmentPlan,
@@ -23,6 +24,7 @@ const LC_LOAD_DYLIB: u32 = 0xc;
 const LC_DYLD_INFO_ONLY: u32 = 0x8000_0022;
 const LC_MAIN: u32 = 0x8000_0028;
 const LC_BUILD_VERSION: u32 = 0x32;
+const LC_UUID: u32 = 0x1b;
 const LC_CODE_SIGNATURE: u32 = 0x1d;
 const PLATFORM_MACOS: u32 = 1;
 
@@ -116,6 +118,7 @@ fn encode_load_command(
         "load-dylinker" => encode_path_command(command, DYLINKER_PATH, 12),
         "load-dylib" => encode_dylib_command(command),
         "main" => encode_main(plan, command),
+        "uuid" => encode_uuid(plan, command),
         "build-version" => encode_build_version(command),
         "code-signature" => encode_code_signature(plan, command, code_signature_payload_bytes),
         other => Err(format!(
@@ -307,6 +310,20 @@ fn encode_build_version(command: &NsldMachOArm64ShellLoadCommandPlan) -> Result<
     Ok(bytes)
 }
 
+fn encode_uuid(
+    plan: &NsldMachOArm64ShellLayoutPlanReport,
+    command: &NsldMachOArm64ShellLoadCommandPlan,
+) -> Result<Vec<u8>, String> {
+    let mut bytes = command_buffer(command)?;
+    write_bytes(
+        &mut bytes,
+        8,
+        &macho_arm64_shell_uuid(&plan.plan_hash),
+        "UUID",
+    )?;
+    Ok(bytes)
+}
+
 fn encode_code_signature(
     plan: &NsldMachOArm64ShellLayoutPlanReport,
     command: &NsldMachOArm64ShellLoadCommandPlan,
@@ -344,6 +361,7 @@ fn command_value(kind: &str) -> Result<u32, String> {
         "load-dylib" => Ok(LC_LOAD_DYLIB),
         "main" => Ok(LC_MAIN),
         "build-version" => Ok(LC_BUILD_VERSION),
+        "uuid" => Ok(LC_UUID),
         "code-signature" => Ok(LC_CODE_SIGNATURE),
         other => Err(format!("Mach-O command kind `{other}` has no opcode")),
     }
