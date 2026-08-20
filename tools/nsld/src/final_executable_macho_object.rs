@@ -1,6 +1,9 @@
 use crate::{
     final_executable_macho_input::parse_macho_arm64_object_linkage,
     final_executable_macho_layout::{build_macho_placement_binding_report, MachOLayoutObject},
+    final_executable_macho_materialization::{
+        build_macho_arm64_materialization_preview, MachOImageObject,
+    },
     final_executable_macho_relocation::build_macho_arm64_relocation_application_report,
     reports::NsldExecutableFinalizerInputSummary,
 };
@@ -108,6 +111,20 @@ pub(crate) fn summarize_macho_host_object_handoff(
             relocation_application.relocation_count
         ));
     }
+    let image_inputs = parsed_objects
+        .iter()
+        .map(|(object, linkage)| MachOImageObject {
+            object_id: &object.object_id,
+            role: &object.role,
+            bytes: &object.bytes,
+            linkage,
+        })
+        .collect::<Vec<_>>();
+    let materialization_preview = build_macho_arm64_materialization_preview(
+        &image_inputs,
+        &placement_binding,
+        &relocation_application,
+    )?;
     Ok(NsldExecutableFinalizerInputSummary {
         contract: MACHO_HOST_OBJECT_LINKAGE_CONTRACT.to_owned(),
         status: status.to_owned(),
@@ -122,6 +139,7 @@ pub(crate) fn summarize_macho_host_object_handoff(
         unresolved_external_symbols,
         placement_binding,
         relocation_application,
+        materialization_preview,
     })
 }
 

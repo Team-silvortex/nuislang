@@ -163,6 +163,7 @@ fn linkage(flags: u32, symbols: Vec<ParsedMachOSymbol>) -> ParsedMachOObjectLink
             alignment: 4,
             flags,
             zero_fill: false,
+            payload_offset: 0,
             relocation_offset: 0,
             relocation_count: 0,
         }],

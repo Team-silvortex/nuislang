@@ -713,4 +713,8 @@ fn render_finalizer_input_summary(
         toml::toml_string_array_literal(&relocation_applications)
     )
     .unwrap();
+    crate::final_executable_writer_macho::render_macho_materialization_preview(
+        out,
+        &summary.materialization_preview,
+    );
 }

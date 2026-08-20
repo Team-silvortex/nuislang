@@ -117,11 +117,21 @@ kinds. JSON, text, and persisted invoke-plan surfaces expose the same
 placement-bound plan hash and records before the provider atomically
 materializes the embedded compatibility executable without a second Nsld-side
 clang invocation.
+`nuis-nsld-macho-arm64-materialization-preview-v1` now copies every verified
+section contribution into a deterministic provider-owned merged image, keeps
+alignment gaps and zero-fill bytes explicit, hashes each merged section and the
+complete source image, and previews every direct ARM64 write without mutating
+that image. `UNSIGNED`/`SUBTRACTOR`, `BRANCH26`, and
+`PAGE21`/`PAGEOFF12` with paired `ADDEND` records use checked instruction,
+alignment, displacement, and range encoding. Each preview exposes source and
+encoded bytes plus independent byte and audit hashes; GOT and unresolved
+external records remain explicit deferred platform-structure work.
 A gated host-command provider remains as a fallback; ELF and PE/COFF are
 explicit `registered-not-implemented` providers. This proves relocatable input,
-table parsing, placement, binding, and complete relocation planning, but not
-ARM64 byte writes, GOT/stub synthesis, or complete Mach-O shell emission
-independently of Nuisc's compatibility link.
+table parsing, placement, binding, merged-image construction, and complete
+direct relocation encoding previews, but not committed ARM64 byte writes,
+GOT/stub synthesis, or complete Mach-O shell emission independently of Nuisc's
+compatibility link.
 
 ## Current Early-Beta Rule
 

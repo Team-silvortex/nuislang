@@ -304,7 +304,7 @@ The `beta-0.1` calibration baseline is:
   separate offline mirrors produce byte-identical locks and caches, and locked
   compilation remains valid after provider deletion; remote discovery, semver
   range solving, trust metadata, transport, and cache collection remain open
-* `linker-toolchain/nsld/os-native-executable-finalization`: `usable/98`,
+* `linker-toolchain/nsld/os-native-executable-finalization`: `usable/99`,
   required; a provider-neutral,
   hash-bound static registry now consumes an
   `NHOB`-bound pair of actual
@@ -320,8 +320,12 @@ The `beta-0.1` calibration baseline is:
   emitted by the real fixtures, preserves paired ADDEND/SUBTRACTOR metadata,
   separates direct and platform-structure work, fails closed on unknown kinds,
   and projects one placement-bound plan through JSON, text, and persisted invoke
-  plans; byte encoding, common-symbol allocation, GOT/stubs, Mach-O shell
-  synthesis, ELF, and PE/COFF remain open
+  plans; `nuis-nsld-macho-arm64-materialization-preview-v1` now copies verified
+  section payloads into deterministic merged buffers, audits section/image
+  hashes, and generates non-mutating checked byte previews for
+  `UNSIGNED`/`SUBTRACTOR`, `BRANCH26`, and paired
+  `PAGE21`/`PAGEOFF12`/`ADDEND`; actual write commitment, common-symbol
+  allocation, GOT/stubs, Mach-O shell synthesis, ELF, and PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

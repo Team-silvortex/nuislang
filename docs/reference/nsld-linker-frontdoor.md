@@ -1064,6 +1064,22 @@ platform structures; and fails closed on unregistered kinds. The plan hash is
 bound to the placement hash and the same complete records appear in JSON, text,
 and the persisted invoke plan.
 
+The provider then derives
+`nuis-nsld-macho-arm64-materialization-preview-v1`. It copies checked non-zero
+section payloads into the placement plan's deterministic merged buffers and
+leaves zero-fill contributions and alignment gaps zero-initialized. The report
+binds per-section hashes and the complete source-image hash to both placement
+and relocation plan hashes. Every `planned-direct` record produces a
+non-mutating patch preview containing source bytes, encoded bytes, target and
+effective-addend facts, source/encoded byte hashes, and a canonical audit hash.
+The ARM64 encoder fails closed on invalid instruction classes, unaligned or
+out-of-range `BRANCH26`, invalid `ADRP` page deltas, unsupported or mis-scaled
+`PAGEOFF12`, overflowing absolute writes, malformed `ADDEND`/`SUBTRACTOR`
+pairs, overlapping direct patches, and any attempt to drift or mutate the
+source image. GOT and unresolved external records remain counted as deferred
+platform structures. JSON, text, and persisted writer input expose the same
+materialization facts.
+
 After those checks the provider validates a thin or universal arm64
 `MH_EXECUTE` compatibility image and installs it atomically with executable
 permissions. It requires neither host policy variables nor a child process,
@@ -1074,8 +1090,9 @@ resolved by the verified dry-run boundary instead of performing a second
 
 This still does not claim a pure Nsld platform linker: Nuisc now hands Nsld
 real relocatable objects, but it also embeds a host-toolchain-linked
-compatibility image. Nsld does not yet copy input sections into a final merged
-byte image, encode ARM64 relocation writes, allocate non-section definitions,
+compatibility image. Nsld now owns the deterministic merged source image and
+checked direct-write encoding previews, but it does not yet commit those
+previews into a write-once final image, allocate non-section definitions,
 synthesize GOT/stubs or Mach-O load commands, or emit the final native shell
 independently. Those remain the next boundary.
 

@@ -5,6 +5,9 @@ use crate::{
         ParsedMachOSection, ParsedMachOSymbol,
     },
     final_executable_macho_layout::build_macho_placement_binding_report,
+    final_executable_macho_materialization::{
+        build_macho_arm64_materialization_preview, MachOImageObject,
+    },
 };
 
 #[test]
@@ -175,6 +178,18 @@ fn plans_every_relocation_from_real_nuisc_program_and_runtime_objects() {
         .collect::<Vec<_>>();
     let placement = build_macho_placement_binding_report(&objects).unwrap();
     let report = build_macho_arm64_relocation_application_report(&objects, &placement).unwrap();
+    let images = artifact
+        .host_objects
+        .iter()
+        .zip(&parsed)
+        .map(|(object, linkage)| MachOImageObject {
+            object_id: &object.object_id,
+            role: &object.role,
+            bytes: &object.bytes,
+            linkage,
+        })
+        .collect::<Vec<_>>();
+    let preview = build_macho_arm64_materialization_preview(&images, &placement, &report).unwrap();
     let parsed_count = parsed
         .iter()
         .map(|object| object.relocation_count)
@@ -184,6 +199,13 @@ fn plans_every_relocation_from_real_nuisc_program_and_runtime_objects() {
     assert!(parsed_count > 0);
     assert_eq!(report.relocation_count, parsed_count);
     assert_eq!(report.applications.len(), parsed_count);
+    assert_eq!(preview.image_span_bytes, placement.image_span_bytes);
+    assert_eq!(
+        preview.previewed_patch_count,
+        report.ready_application_count
+    );
+    assert!(!preview.image_hash.is_empty());
+    assert!(!preview.patch_plan_hash.is_empty());
     assert!(report.registered_kind_count >= 6);
     assert!(report
         .applications
@@ -236,6 +258,7 @@ fn linkage(
             alignment: 4,
             flags: 0,
             zero_fill: false,
+            payload_offset: 0,
             relocation_offset: 0,
             relocation_count: relocations.len(),
         }],

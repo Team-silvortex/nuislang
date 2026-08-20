@@ -49,6 +49,7 @@ pub(crate) struct ParsedMachOSection {
     pub(crate) alignment: u64,
     pub(crate) flags: u32,
     pub(crate) zero_fill: bool,
+    pub(crate) payload_offset: usize,
     pub(crate) relocation_offset: usize,
     pub(crate) relocation_count: usize,
 }
@@ -265,6 +266,7 @@ fn parse_segment_command(
             alignment,
             flags,
             zero_fill,
+            payload_offset,
             relocation_offset,
             relocation_count,
         });

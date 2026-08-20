@@ -215,8 +215,69 @@ fn finalizer_input_summary_json(summary: Option<&NsldExecutableFinalizerInputSum
         ),
         macho_placement_binding_json(&summary.placement_binding),
         macho_relocation_application_json(&summary.relocation_application),
+        macho_materialization_preview_json(&summary.materialization_preview),
     ];
     format!("\"finalizer_input_summary\":{{{}}}", fields.join(","))
+}
+
+fn macho_materialization_preview_json(
+    report: &NsldMachOArm64MaterializationPreviewReport,
+) -> String {
+    let sections = report
+        .section_audits
+        .iter()
+        .map(|section| {
+            let fields = [
+                json_string_field("section_id", &section.section_id),
+                json_usize_field("output_offset", section.output_offset),
+                json_usize_field("size_bytes", section.size_bytes),
+                json_usize_field("copied_bytes", section.copied_bytes),
+                json_usize_field("zero_fill_bytes", section.zero_fill_bytes),
+                json_string_field("content_hash", &section.content_hash),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    let patches = report
+        .patches
+        .iter()
+        .map(|patch| {
+            let fields = [
+                json_string_field("relocation_id", &patch.relocation_id),
+                json_string_field("relocation_kind", &patch.relocation_kind),
+                json_usize_field("source_output_offset", patch.source_output_offset),
+                json_usize_field("width_bytes", patch.width_bytes),
+                json_usize_field("target_output_offset", patch.target_output_offset),
+                json_i64_field("effective_addend", patch.effective_addend),
+                json_string_field("source_bytes_hex", &patch.source_bytes_hex),
+                json_string_field("encoded_bytes_hex", &patch.encoded_bytes_hex),
+                json_string_field("source_bytes_hash", &patch.source_bytes_hash),
+                json_string_field("encoded_bytes_hash", &patch.encoded_bytes_hash),
+                json_string_field("audit_hash", &patch.audit_hash),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    let fields = [
+        json_string_field("contract", &report.contract),
+        json_string_field("status", &report.status),
+        json_string_field("placement_plan_hash", &report.placement_plan_hash),
+        json_string_field("relocation_plan_hash", &report.relocation_plan_hash),
+        json_usize_field("image_span_bytes", report.image_span_bytes),
+        json_usize_field("copied_bytes", report.copied_bytes),
+        json_usize_field("zero_fill_bytes", report.zero_fill_bytes),
+        json_string_field("image_hash", &report.image_hash),
+        json_usize_field("planned_direct_count", report.planned_direct_count),
+        json_usize_field("previewed_patch_count", report.previewed_patch_count),
+        json_usize_field("deferred_patch_count", report.deferred_patch_count),
+        json_usize_field("metadata_record_count", report.metadata_record_count),
+        json_string_field("patch_plan_hash", &report.patch_plan_hash),
+        format!("\"section_audits\":[{sections}]"),
+        format!("\"patches\":[{patches}]"),
+    ];
+    format!("\"materialization_preview\":{{{}}}", fields.join(","))
 }
 
 fn macho_relocation_application_json(report: &NsldMachOArm64RelocationApplicationReport) -> String {

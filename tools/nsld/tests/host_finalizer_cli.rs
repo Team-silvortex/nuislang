@@ -83,6 +83,15 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     assert!(invoke_plan.contains("\"platform_structure_count\":1"));
     assert!(invoke_plan.contains("\"relocation_kind\":\"arm64-branch26\""));
     assert!(invoke_plan.contains("\"action_kind\":\"rewrite-branch26\""));
+    assert!(
+        invoke_plan.contains("\"contract\":\"nuis-nsld-macho-arm64-materialization-preview-v1\"")
+    );
+    assert!(invoke_plan.contains("\"status\":\"preview-ready-with-platform-structure-boundary\""));
+    assert!(invoke_plan.contains("\"image_span_bytes\":16"));
+    assert!(invoke_plan.contains("\"previewed_patch_count\":1"));
+    assert!(invoke_plan.contains("\"deferred_patch_count\":1"));
+    assert!(invoke_plan.contains("\"source_bytes_hex\":\"00000094\""));
+    assert!(invoke_plan.contains("\"encoded_bytes_hex\":\"02000094\""));
     assert!(invoke_plan.contains("\"source_output_offset\":0"));
     assert!(invoke_plan.contains("\"target_symbol\":\"_nuis_runtime\""));
     assert!(invoke_plan
@@ -99,6 +108,9 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     ));
     assert!(invoke_plan_text.contains("finalizer_input_relocation_application_count: 2"));
     assert!(invoke_plan_text.contains(
+        "finalizer_input_materialization: contract=nuis-nsld-macho-arm64-materialization-preview-v1"
+    ));
+    assert!(invoke_plan_text.contains(
         "finalizer_input_symbol_binding: symbol=_nuis_runtime reference=host.program-llvm:1 status=internal"
     ));
     assert!(persisted_invoke_plan
@@ -111,6 +123,13 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     ));
     assert!(persisted_invoke_plan.contains("finalizer_input_relocation_application_count = 2"));
     assert!(persisted_invoke_plan.contains("arm64-branch26|rewrite-branch26"));
+    assert!(persisted_invoke_plan.contains(
+        "finalizer_input_materialization_contract = \"nuis-nsld-macho-arm64-materialization-preview-v1\""
+    ));
+    assert!(
+        persisted_invoke_plan.contains("finalizer_input_materialization_previewed_patch_count = 1")
+    );
+    assert!(persisted_invoke_plan.contains("00000094|02000094"));
     assert!(invoke_plan.contains("\"invocation_kind\":\"registered-internal-finalizer\""));
     assert!(invoke_plan.contains("\"invocation_policy\":\"registered-internal\""));
     assert!(invoke_plan.contains("\"requires_explicit_allow\":false"));
@@ -244,6 +263,7 @@ fn arm64_object(defined: &str, undefined: &str) -> Vec<u8> {
     write_u32(&mut bytes, SECTION_OFFSET + 48, PAYLOAD_OFFSET as u32);
     write_u32(&mut bytes, SECTION_OFFSET + 56, RELOCATION_OFFSET as u32);
     write_u32(&mut bytes, SECTION_OFFSET + 60, 1);
+    write_u32(&mut bytes, PAYLOAD_OFFSET, 0x9400_0000);
     write_u32(&mut bytes, SYMTAB_OFFSET, 0x2);
     write_u32(&mut bytes, SYMTAB_OFFSET + 4, 24);
     write_u32(&mut bytes, SYMTAB_OFFSET + 8, SYMBOL_OFFSET as u32);

@@ -416,6 +416,48 @@ fn print_finalizer_input_summary(summary: Option<&NsldExecutableFinalizerInputSu
             item.application_status
         );
     }
+    let materialization = &summary.materialization_preview;
+    println!(
+        "  finalizer_input_materialization: contract={} status={} image_span={} copied={} zero_fill={} image_hash={} patch_plan_hash={} planned={} previewed={} deferred={} metadata={}",
+        materialization.contract,
+        materialization.status,
+        materialization.image_span_bytes,
+        materialization.copied_bytes,
+        materialization.zero_fill_bytes,
+        materialization.image_hash,
+        materialization.patch_plan_hash,
+        materialization.planned_direct_count,
+        materialization.previewed_patch_count,
+        materialization.deferred_patch_count,
+        materialization.metadata_record_count
+    );
+    for section in &materialization.section_audits {
+        println!(
+            "  finalizer_input_materialization_section: id={} offset={} bytes={} copied={} zero_fill={} hash={}",
+            section.section_id,
+            section.output_offset,
+            section.size_bytes,
+            section.copied_bytes,
+            section.zero_fill_bytes,
+            section.content_hash
+        );
+    }
+    for patch in &materialization.patches {
+        println!(
+            "  finalizer_input_materialization_patch: id={} kind={} offset={} width={} target={} addend={} source={} encoded={} source_hash={} encoded_hash={} audit_hash={}",
+            patch.relocation_id,
+            patch.relocation_kind,
+            patch.source_output_offset,
+            patch.width_bytes,
+            patch.target_output_offset,
+            patch.effective_addend,
+            patch.source_bytes_hex,
+            patch.encoded_bytes_hex,
+            patch.source_bytes_hash,
+            patch.encoded_bytes_hash,
+            patch.audit_hash
+        );
+    }
 }
 
 pub(crate) fn print_nsld_final_executable_host_invoke_plan_emit_report(
