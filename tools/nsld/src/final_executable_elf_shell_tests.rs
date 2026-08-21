@@ -538,16 +538,16 @@ fn read_i64(bytes: &[u8], offset: usize) -> i64 {
     i64::from_le_bytes(bytes[offset..offset + 8].try_into().unwrap())
 }
 
-struct Fixture {
+pub(super) struct Fixture {
     program_bytes: Vec<u8>,
     runtime_bytes: Vec<u8>,
     program_hash: String,
     runtime_hash: String,
-    objects: Vec<ElfAmd64ObjectLinkage>,
+    pub(super) objects: Vec<ElfAmd64ObjectLinkage>,
 }
 
 impl Fixture {
-    fn new(runtime_bytes: Vec<u8>) -> Self {
+    pub(super) fn new(runtime_bytes: Vec<u8>) -> Self {
         Self::from_bytes(elf_program_object(R_X86_64_PLT32), runtime_bytes)
     }
 
@@ -579,7 +579,7 @@ impl Fixture {
         }
     }
 
-    fn pipeline(
+    pub(super) fn pipeline(
         &self,
     ) -> (
         ElfAmd64PlacementBindingReport,

@@ -300,6 +300,184 @@ impl ElfAmd64ShellImageSerializationReport {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ElfAmd64ShellImageTableValidation {
+    pub(crate) table_id: String,
+    pub(crate) table_kind: String,
+    pub(crate) file_offset: usize,
+    pub(crate) width_bytes: usize,
+    pub(crate) expected_record_count: usize,
+    pub(crate) verified_record_count: usize,
+    pub(crate) bytes_hash: String,
+    pub(crate) status: String,
+    pub(crate) audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ElfAmd64ShellImageSourceValidation {
+    pub(crate) validation_id: String,
+    pub(crate) section_id: String,
+    pub(crate) section_name: String,
+    pub(crate) preservation_kind: String,
+    pub(crate) source_image_offset: usize,
+    pub(crate) source_size_bytes: usize,
+    pub(crate) result_file_offset: Option<usize>,
+    pub(crate) result_size_bytes: usize,
+    pub(crate) source_bytes_hash: String,
+    pub(crate) result_bytes_hash: String,
+    pub(crate) serialization_audit_hash: String,
+    pub(crate) status: String,
+    pub(crate) audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ElfAmd64ShellImageValidationReport {
+    pub(crate) contract: &'static str,
+    pub(crate) status: String,
+    pub(crate) validation_ledger_hash: String,
+    pub(crate) shell_layout_plan_hash: String,
+    pub(crate) serialization_ledger_hash: String,
+    pub(crate) platform_application_ledger_hash: String,
+    pub(crate) shell_image_hash: String,
+    pub(crate) shell_image_span_bytes: usize,
+    pub(crate) header_valid: bool,
+    pub(crate) expected_table_count: usize,
+    pub(crate) verified_table_count: usize,
+    pub(crate) program_header_count: usize,
+    pub(crate) load_segment_count: usize,
+    pub(crate) dynamic_segment_count: usize,
+    pub(crate) dynamic_entry_count: usize,
+    pub(crate) section_header_count: usize,
+    pub(crate) section_name_count: usize,
+    pub(crate) entry_program_header_index: usize,
+    pub(crate) expected_shell_write_count: usize,
+    pub(crate) verified_shell_write_count: usize,
+    pub(crate) expected_source_validation_count: usize,
+    pub(crate) verified_source_validation_count: usize,
+    pub(crate) preserved_platform_file_bytes: usize,
+    pub(crate) unexplained_platform_change_count: usize,
+    pub(crate) publication_eligibility_contract: &'static str,
+    pub(crate) publication_eligibility_status: String,
+    pub(crate) publication_eligible: bool,
+    pub(crate) publication_blockers: Vec<String>,
+    pub(crate) tables: Vec<ElfAmd64ShellImageTableValidation>,
+    pub(crate) sources: Vec<ElfAmd64ShellImageSourceValidation>,
+}
+
+impl ElfAmd64ShellImageValidationReport {
+    pub(crate) fn canonical_ledger(&self) -> String {
+        let mut out = String::new();
+        for value in [
+            self.contract,
+            &self.status,
+            &self.shell_layout_plan_hash,
+            &self.serialization_ledger_hash,
+            &self.platform_application_ledger_hash,
+            &self.shell_image_hash,
+            self.publication_eligibility_contract,
+            &self.publication_eligibility_status,
+        ] {
+            append_text(&mut out, value);
+        }
+        writeln!(
+            out,
+            "shape={}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+            self.shell_image_span_bytes,
+            self.header_valid,
+            self.program_header_count,
+            self.load_segment_count,
+            self.dynamic_segment_count,
+            self.dynamic_entry_count,
+            self.section_header_count,
+            self.section_name_count,
+            self.entry_program_header_index,
+            self.preserved_platform_file_bytes
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "coverage={}|{}|{}|{}|{}|{}|{}|{}",
+            self.expected_table_count,
+            self.verified_table_count,
+            self.expected_shell_write_count,
+            self.verified_shell_write_count,
+            self.expected_source_validation_count,
+            self.verified_source_validation_count,
+            self.unexplained_platform_change_count,
+            self.publication_eligible
+        )
+        .unwrap();
+        for blocker in &self.publication_blockers {
+            append_text(&mut out, blocker);
+        }
+        for table in &self.tables {
+            append_text(&mut out, &table.table_id);
+            append_text(&mut out, &table.audit_hash);
+        }
+        for source in &self.sources {
+            append_text(&mut out, &source.validation_id);
+            append_text(&mut out, &source.audit_hash);
+        }
+        out
+    }
+}
+
+pub(super) fn shell_image_table_validation_audit_hash(
+    plan_hash: &str,
+    serialization_ledger_hash: &str,
+    image_hash: &str,
+    table: &ElfAmd64ShellImageTableValidation,
+) -> String {
+    let mut out = String::new();
+    append_text(&mut out, plan_hash);
+    append_text(&mut out, serialization_ledger_hash);
+    append_text(&mut out, image_hash);
+    append_text(&mut out, &table.table_id);
+    append_text(&mut out, &table.table_kind);
+    append_text(&mut out, &table.bytes_hash);
+    append_text(&mut out, &table.status);
+    writeln!(
+        out,
+        "table={}|{}|{}|{}",
+        table.file_offset,
+        table.width_bytes,
+        table.expected_record_count,
+        table.verified_record_count
+    )
+    .unwrap();
+    crate::fnv1a64_hex(out.as_bytes())
+}
+
+pub(super) fn shell_image_source_validation_audit_hash(
+    plan_hash: &str,
+    serialization_ledger_hash: &str,
+    image_hash: &str,
+    source: &ElfAmd64ShellImageSourceValidation,
+) -> String {
+    let mut out = String::new();
+    append_text(&mut out, plan_hash);
+    append_text(&mut out, serialization_ledger_hash);
+    append_text(&mut out, image_hash);
+    append_text(&mut out, &source.validation_id);
+    append_text(&mut out, &source.section_id);
+    append_text(&mut out, &source.section_name);
+    append_text(&mut out, &source.preservation_kind);
+    append_text(&mut out, &source.source_bytes_hash);
+    append_text(&mut out, &source.result_bytes_hash);
+    append_text(&mut out, &source.serialization_audit_hash);
+    append_text(&mut out, &source.status);
+    writeln!(
+        out,
+        "source={}|{}|{}|{}",
+        source.source_image_offset,
+        source.source_size_bytes,
+        optional_usize(source.result_file_offset),
+        source.result_size_bytes
+    )
+    .unwrap();
+    crate::fnv1a64_hex(out.as_bytes())
+}
+
 pub(super) fn shell_image_write_audit_hash(
     plan_hash: &str,
     application_ledger_hash: &str,

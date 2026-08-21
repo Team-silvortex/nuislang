@@ -20,7 +20,8 @@ use crate::{
     final_executable_elf_relocation_report::ElfAmd64RelocationApplicationReport,
     final_executable_elf_shell::{
         build_elf_amd64_shell_layout_plan, serialize_elf_amd64_shell_image,
-        ElfAmd64ShellImageSerializationReport, ElfAmd64ShellLayoutPlanReport,
+        validate_elf_amd64_shell_image, ElfAmd64ShellImageSerializationReport,
+        ElfAmd64ShellImageValidationReport, ElfAmd64ShellLayoutPlanReport,
     },
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -62,6 +63,7 @@ pub(crate) struct ElfAmd64HostObjectLinkage {
     pub(crate) platform_patch_application: ElfAmd64PlatformPatchApplicationReport,
     pub(crate) shell_layout_plan: ElfAmd64ShellLayoutPlanReport,
     pub(crate) shell_image_serialization: ElfAmd64ShellImageSerializationReport,
+    pub(crate) shell_image_validation: ElfAmd64ShellImageValidationReport,
     pub(crate) private_shell_image: Vec<u8>,
 }
 
@@ -236,6 +238,20 @@ pub(crate) fn build_elf_amd64_host_object_linkage(
     {
         return Err("ELF private shell image/report handoff drift".to_owned());
     }
+    let shell_image_validation = validate_elf_amd64_shell_image(
+        &shell_image.bytes,
+        &platform_applied_image,
+        &shell_layout_plan,
+        &shell_image.report,
+    )?;
+    if shell_image_validation.validation_ledger_hash
+        != crate::fnv1a64_hex(shell_image_validation.canonical_ledger().as_bytes())
+        || shell_image_validation.shell_image_hash != shell_image.report.shell_image_hash
+        || shell_image_validation.serialization_ledger_hash
+            != shell_image.report.serialization_ledger_hash
+    {
+        return Err("ELF private shell image validation handoff drift".to_owned());
+    }
     Ok(ElfAmd64HostObjectLinkage {
         summary: ElfAmd64HostObjectLinkageSummary {
             contract: ELF_AMD64_HOST_OBJECT_LINKAGE_CONTRACT,
@@ -258,6 +274,7 @@ pub(crate) fn build_elf_amd64_host_object_linkage(
         platform_patch_application: platform_applied_image.report,
         shell_layout_plan,
         shell_image_serialization: shell_image.report,
+        shell_image_validation,
         private_shell_image: shell_image.bytes,
     })
 }

@@ -456,13 +456,15 @@ The `beta-0.1` calibration baseline is:
   bytes at their registered coordinates. Non-overlapping zero-reserved writes
   carry source/encoded/post-write hashes; every file-backed source span remains
   byte-identical, zero-fill remains `SHT_NOBITS`, and the final image plus all
-  audits are bound by one deterministic ledger. Static and external-boundary
-  byte images are regression-backed; drift fails before publication.
+  audits are bound by one deterministic ledger.
+  `nuis-nsld-elf-amd64-shell-image-validation-v1` independently reparses the
+  bytes without using the encoder, checks every header/table/dynamic/name
+  coordinate, source span, write audit, unexplained prefix change, and final
+  ledger, and keeps static and external-boundary images unpublished.
   The provider still atomically installs only the validated compatibility image
   without Clang/LLD. Parsing through private shell serialization is closed;
-  independent private-image reparse/load admission, registered external
-  interpreter/dependency provenance, other ELF architectures, and PE/COFF
-  remain open
+  isolated static OS-loader probing, registered external interpreter/dependency
+  provenance, other ELF architectures, and PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

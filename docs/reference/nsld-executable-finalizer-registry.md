@@ -274,11 +274,14 @@ file-backed source sections remain byte-identical, `SHT_NOBITS` sources remain
 zero-fill, and one canonical ledger binds the final private image. Static and
 external-boundary images are deterministic, but remain unpublished.
 
-The next native milestone is
-`nuis-nsld-elf-amd64-shell-image-validation-v1`: independently reparse those
-bytes and cross-check every table, coordinate, source-preservation audit, and
-final hash before OS-loader admission. Registered external interpreter and
-dependency provenance remain separate. Nuisc must remain free of ELF branches.
+`nuis-nsld-elf-amd64-shell-image-validation-v1` now closes the independent
+private-image boundary. A parser separate from the encoder discovers and checks
+the ELF header, program/dynamic/name/section tables, source spans, write audits,
+unexplained platform-prefix changes, and final ledger. Both static and external
+images remain unpublished. The next native milestone is an explicit bounded,
+validation-ledger-bound OS-loader probe for static closure only; registered
+external interpreter and dependency provenance remain separate. Nuisc remains
+free of ELF branches.
 
 ## Validation
 

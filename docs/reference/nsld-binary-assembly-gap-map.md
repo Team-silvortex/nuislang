@@ -210,16 +210,19 @@ entry. `nuis-nsld-elf-amd64-shell-image-serialization-v1` now copies the exact
 platform file bytes into an isolated private image, emits all planned tables,
 audits each non-overlapping zero-reserved write, preserves every file-backed or
 `SHT_NOBITS` source span, and binds the final bytes under one deterministic
-ledger. The provider still validates and atomically publishes only its ELF64
-`ET_EXEC`/PIE compatibility image without Clang/LLD. The private image is real
-Nsld-owned ELF assembly, but remains deliberately unpublished until an
-encoder-independent parser and OS-loader admission close the next boundary.
+ledger. `nuis-nsld-elf-amd64-shell-image-validation-v1` independently reparses
+that image without the encoder and verifies every header/table coordinate,
+dynamic and section-name record, source-preservation and write audit,
+unexplained platform-prefix byte, and final ledger. The provider still validates
+and atomically publishes only its ELF64 `ET_EXEC`/PIE compatibility image
+without Clang/LLD. The private Nsld-owned image remains deliberately unpublished
+until a bounded static OS-loader probe closes the next boundary.
 
 It does not yet own:
 
 * complete architecture parity across Mach-O, ELF, and PE/COFF
-* independent ELF private-image validation and load admission, registered
-  dynamic interpreter/dependency provenance, plus complete PE/COFF object merging
+* isolated ELF static-image load admission, registered dynamic
+  interpreter/dependency provenance, plus complete PE/COFF object merging
 * a durable embedded Nsdb/YIR debug metadata section
 
 ## Gap 1: Compatibility Object Writer

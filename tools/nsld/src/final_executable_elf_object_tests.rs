@@ -153,6 +153,31 @@ fn summarizes_cross_object_internal_symbol_closure() {
                 .as_bytes()
         )
     );
+    assert_eq!(
+        product.shell_image_validation.contract,
+        "nuis-nsld-elf-amd64-shell-image-validation-v1"
+    );
+    assert_eq!(
+        product.shell_image_validation.status,
+        "independently-validated-private-image"
+    );
+    assert_eq!(
+        product.shell_image_validation.shell_image_hash,
+        product.shell_image_serialization.shell_image_hash
+    );
+    assert_eq!(
+        product.shell_image_validation.serialization_ledger_hash,
+        product.shell_image_serialization.serialization_ledger_hash
+    );
+    assert_eq!(
+        product.shell_image_validation.validation_ledger_hash,
+        crate::fnv1a64_hex(product.shell_image_validation.canonical_ledger().as_bytes())
+    );
+    assert!(!product.shell_image_validation.publication_eligible);
+    assert_eq!(
+        product.shell_image_validation.publication_blockers,
+        ["os-loader-probe-pending"]
+    );
 }
 
 #[test]
@@ -221,6 +246,20 @@ fn object_chain_applies_external_platform_records_and_deferred_call() {
     assert_eq!(
         product.shell_image_serialization.dynamic_table_bytes,
         product.shell_layout_plan.dynamic_table_bytes
+    );
+    assert_eq!(
+        product.shell_image_validation.status,
+        "independently-validated-private-image"
+    );
+    assert_eq!(product.shell_image_validation.dynamic_segment_count, 1);
+    assert_eq!(product.shell_image_validation.dynamic_entry_count, 12);
+    assert!(!product.shell_image_validation.publication_eligible);
+    assert_eq!(
+        product.shell_image_validation.publication_blockers,
+        [
+            "os-loader-probe-pending",
+            "registered-external-resolution-provenance-pending"
+        ]
     );
 }
 

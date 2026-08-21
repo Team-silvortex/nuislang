@@ -6,9 +6,19 @@ mod image_encoding;
 mod layout;
 #[path = "final_executable_elf_shell_report.rs"]
 mod report;
+#[path = "final_executable_elf_shell_validation.rs"]
+mod validation;
+#[path = "final_executable_elf_shell_validation_parser.rs"]
+mod validation_parser;
+#[path = "final_executable_elf_shell_validation_support.rs"]
+mod validation_support;
 
 pub(crate) use image::serialize_elf_amd64_shell_image;
-pub(crate) use report::{ElfAmd64ShellImageSerializationReport, ElfAmd64ShellLayoutPlanReport};
+pub(crate) use report::{
+    ElfAmd64ShellImageSerializationReport, ElfAmd64ShellImageValidationReport,
+    ElfAmd64ShellLayoutPlanReport,
+};
+pub(crate) use validation::validate_elf_amd64_shell_image;
 
 use crate::{
     final_executable_elf_layout::{
@@ -465,3 +475,6 @@ fn optional_usize(value: Option<usize>) -> String {
 #[cfg(test)]
 #[path = "final_executable_elf_shell_tests.rs"]
 mod tests;
+#[cfg(test)]
+#[path = "final_executable_elf_shell_validation_tests.rs"]
+mod validation_tests;
