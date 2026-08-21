@@ -14,6 +14,7 @@ pub(crate) fn elf_program_object(relocation_type: u32) -> Vec<u8> {
         defined_symbol: "__nuis_entry",
         undefined_symbol: Some("nuis_runtime_entry"),
         relocations: &relocations,
+        bss_size: 0,
     })
 }
 
@@ -24,6 +25,7 @@ pub(crate) fn elf_program_object_two_plt32_calls() -> Vec<u8> {
         defined_symbol: "__nuis_entry",
         undefined_symbol: Some("nuis_runtime_entry"),
         relocations: &relocations,
+        bss_size: 0,
     })
 }
 
@@ -33,6 +35,17 @@ pub(crate) fn elf_runtime_object() -> Vec<u8> {
         defined_symbol: "nuis_runtime_entry",
         undefined_symbol: None,
         relocations: &[],
+        bss_size: 0,
+    })
+}
+
+pub(crate) fn elf_runtime_object_with_bss() -> Vec<u8> {
+    build_object(ObjectFixture {
+        text: &[0xc3],
+        defined_symbol: "nuis_runtime_entry",
+        undefined_symbol: None,
+        relocations: &[],
+        bss_size: 32,
     })
 }
 
@@ -42,6 +55,7 @@ pub(crate) fn elf_unrelated_runtime_object() -> Vec<u8> {
         defined_symbol: "nuis_unrelated_runtime_entry",
         undefined_symbol: None,
         relocations: &[],
+        bss_size: 0,
     })
 }
 
@@ -50,15 +64,19 @@ struct ObjectFixture<'a> {
     defined_symbol: &'a str,
     undefined_symbol: Option<&'a str>,
     relocations: &'a [(u64, u32, i64)],
+    bss_size: usize,
 }
 
 fn build_object(fixture: ObjectFixture<'_>) -> Vec<u8> {
     let has_relocation = !fixture.relocations.is_empty();
-    let section_names = if has_relocation {
-        [".text", ".rela.text", ".symtab", ".strtab", ".shstrtab"].as_slice()
-    } else {
-        [".text", ".symtab", ".strtab", ".shstrtab"].as_slice()
-    };
+    let mut section_names = vec![".text"];
+    if has_relocation {
+        section_names.push(".rela.text");
+    }
+    if fixture.bss_size > 0 {
+        section_names.push(".bss");
+    }
+    section_names.extend([".symtab", ".strtab", ".shstrtab"]);
     let section_strings = string_table(section_names.iter().copied());
     let symbol_strings =
         string_table(std::iter::once(fixture.defined_symbol).chain(fixture.undefined_symbol));
@@ -120,7 +138,8 @@ fn build_object(fixture: ObjectFixture<'_>) -> Vec<u8> {
 
     let text_index = 1;
     let relocation_index = has_relocation.then_some(2);
-    let symbol_index = if has_relocation { 3 } else { 2 };
+    let bss_index = (fixture.bss_size > 0).then_some(2 + usize::from(has_relocation));
+    let symbol_index = 2 + usize::from(has_relocation) + usize::from(fixture.bss_size > 0);
     let string_index = symbol_index + 1;
     let section_string_index = string_index + 1;
     write_section_header(
@@ -154,6 +173,24 @@ fn build_object(fixture: ObjectFixture<'_>) -> Vec<u8> {
                 info: text_index,
                 alignment: 8,
                 entry_size: ELF_RELA_SIZE,
+            },
+        );
+    }
+    if let Some(index) = bss_index {
+        write_section_header(
+            &mut bytes,
+            section_table_offset,
+            index,
+            SectionHeader {
+                name: section_strings.offsets[".bss"],
+                kind: 8,
+                flags: 0x3,
+                offset: 0,
+                size: fixture.bss_size,
+                link: 0,
+                info: 0,
+                alignment: 16,
+                entry_size: 0,
             },
         );
     }

@@ -450,16 +450,19 @@ The `beta-0.1` calibration baseline is:
   file-backed executable segment. Every coordinate audit binds the platform
   application ledger; static/external plans remain object-order deterministic,
   while ledger drift and missing entry definitions fail closed.
-  The provider validates an ELF64
-  `ET_EXEC` or PIE
-  compatibility image with bounded program headers and a nonzero entry inside a
-  file-backed executable `PT_LOAD`, then atomically installs it without
-  Clang/LLD invocation. Parsing, placement/binding planning, relocation preview,
-  merged-image preview, direct patch application, platform-structure planning,
-  platform byte application, shell layout planning, and registered compatibility
-  publication are closed; provider-owned ELF shell serialization and load
-  admission, registered external interpreter/dependency provenance, other ELF
-  architectures, and PE/COFF remain open
+  `nuis-nsld-elf-amd64-shell-image-serialization-v1` rebuilds that exact
+  envelope, copies the platform-applied file bytes into a private planned image,
+  and emits checked ELF64, program, dynamic, section-name, and section-header
+  bytes at their registered coordinates. Non-overlapping zero-reserved writes
+  carry source/encoded/post-write hashes; every file-backed source span remains
+  byte-identical, zero-fill remains `SHT_NOBITS`, and the final image plus all
+  audits are bound by one deterministic ledger. Static and external-boundary
+  byte images are regression-backed; drift fails before publication.
+  The provider still atomically installs only the validated compatibility image
+  without Clang/LLD. Parsing through private shell serialization is closed;
+  independent private-image reparse/load admission, registered external
+  interpreter/dependency provenance, other ELF architectures, and PE/COFF
+  remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

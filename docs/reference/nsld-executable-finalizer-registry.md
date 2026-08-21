@@ -265,12 +265,20 @@ Every section, program header, and dynamic entry audit includes the upstream
 application ledger. Static and external-boundary plans are deterministic under
 reversed object order; ledger drift and missing entry definitions fail closed.
 
+`nuis-nsld-elf-amd64-shell-image-serialization-v1` now closes the isolated byte
+image milestone. It rebuilds the exact upstream plan, copies the verified
+platform file image, encodes ELF64/program/dynamic/section-name/section-header
+tables at planned coordinates, and permits shell writes only in non-overlapping
+zero-reserved spans. Every write binds source, encoded, and post-write hashes;
+file-backed source sections remain byte-identical, `SHT_NOBITS` sources remain
+zero-fill, and one canonical ledger binds the final private image. Static and
+external-boundary images are deterministic, but remain unpublished.
+
 The next native milestone is
-`nuis-nsld-elf-amd64-shell-image-serialization-v1`: emit the planned header,
-program, dynamic, section-name, and section-header bytes into an isolated image
-while preserving every platform-applied source span. Publication, loader
-admission, and registered external interpreter/dependency provenance remain
-separate. Nuisc must remain free of ELF branches.
+`nuis-nsld-elf-amd64-shell-image-validation-v1`: independently reparse those
+bytes and cross-check every table, coordinate, source-preservation audit, and
+final hash before OS-loader admission. Registered external interpreter and
+dependency provenance remain separate. Nuisc must remain free of ELF branches.
 
 ## Validation
 

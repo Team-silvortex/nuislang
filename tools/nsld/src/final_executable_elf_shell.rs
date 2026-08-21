@@ -1,9 +1,14 @@
+#[path = "final_executable_elf_shell_image.rs"]
+mod image;
+#[path = "final_executable_elf_shell_image_encoding.rs"]
+mod image_encoding;
 #[path = "final_executable_elf_shell_layout.rs"]
 mod layout;
 #[path = "final_executable_elf_shell_report.rs"]
 mod report;
 
-pub(crate) use report::ElfAmd64ShellLayoutPlanReport;
+pub(crate) use image::serialize_elf_amd64_shell_image;
+pub(crate) use report::{ElfAmd64ShellImageSerializationReport, ElfAmd64ShellLayoutPlanReport};
 
 use crate::{
     final_executable_elf_layout::{

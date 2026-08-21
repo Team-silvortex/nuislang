@@ -204,20 +204,22 @@ PLT/GOT plus `Elf64_Sym`, dynamic-string, and `Elf64_Rela` bytes in an isolated
 extended image, and commits each deferred source exactly once. The second
 ledger hashes every structure and source write as well as the resulting file
 and memory images; repeated external calls share records without sharing patch
-audits. The provider also validates an ELF64 `ET_EXEC`/PIE
-image whose entry belongs to a bounded
-executable `PT_LOAD`. The accepted compatibility image is atomically published
-without a Clang/LLD process. This is deliberate staging evidence, not a
-self-owned ELF link claim: Nsld now owns the deterministic non-mutating ELF shell
-layout over the applied image, but the embedded executable remains
-host-toolchain-linked until Nsld serializes that shell and completes load
-admission.
+audits. `nuis-nsld-elf-amd64-shell-layout-plan-v1` maps the exact result into
+checked ELF/program/dynamic/section coordinates and a file-backed executable
+entry. `nuis-nsld-elf-amd64-shell-image-serialization-v1` now copies the exact
+platform file bytes into an isolated private image, emits all planned tables,
+audits each non-overlapping zero-reserved write, preserves every file-backed or
+`SHT_NOBITS` source span, and binds the final bytes under one deterministic
+ledger. The provider still validates and atomically publishes only its ELF64
+`ET_EXEC`/PIE compatibility image without Clang/LLD. The private image is real
+Nsld-owned ELF assembly, but remains deliberately unpublished until an
+encoder-independent parser and OS-loader admission close the next boundary.
 
 It does not yet own:
 
 * complete architecture parity across Mach-O, ELF, and PE/COFF
-* provider-owned ELF shell serialization and load admission, registered dynamic
-  interpreter/dependency provenance, plus complete PE/COFF object merging
+* independent ELF private-image validation and load admission, registered
+  dynamic interpreter/dependency provenance, plus complete PE/COFF object merging
 * a durable embedded Nsdb/YIR debug metadata section
 
 ## Gap 1: Compatibility Object Writer

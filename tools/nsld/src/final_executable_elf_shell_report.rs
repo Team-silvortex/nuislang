@@ -189,6 +189,162 @@ impl ElfAmd64ShellLayoutPlanReport {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ElfAmd64ShellImageWriteAudit {
+    pub(crate) write_id: String,
+    pub(crate) write_kind: String,
+    pub(crate) file_offset: usize,
+    pub(crate) width_bytes: usize,
+    pub(crate) source_bytes_hash: String,
+    pub(crate) encoded_bytes_hash: String,
+    pub(crate) post_write_bytes_hash: String,
+    pub(crate) status: String,
+    pub(crate) audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ElfAmd64ShellSourcePreservationAudit {
+    pub(crate) preservation_id: String,
+    pub(crate) section_id: String,
+    pub(crate) section_name: String,
+    pub(crate) preservation_kind: String,
+    pub(crate) source_image_offset: usize,
+    pub(crate) source_size_bytes: usize,
+    pub(crate) result_file_offset: Option<usize>,
+    pub(crate) result_size_bytes: usize,
+    pub(crate) source_bytes_hash: String,
+    pub(crate) result_bytes_hash: String,
+    pub(crate) status: String,
+    pub(crate) audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ElfAmd64ShellImageSerializationReport {
+    pub(crate) contract: &'static str,
+    pub(crate) status: String,
+    pub(crate) serialization_ledger_hash: String,
+    pub(crate) shell_layout_plan_hash: String,
+    pub(crate) platform_application_ledger_hash: String,
+    pub(crate) source_file_image_hash: String,
+    pub(crate) source_memory_image_hash: String,
+    pub(crate) shell_image_hash: String,
+    pub(crate) shell_image_span_bytes: usize,
+    pub(crate) copied_platform_file_bytes: usize,
+    pub(crate) preserved_platform_file_bytes: usize,
+    pub(crate) header_bytes: usize,
+    pub(crate) program_header_bytes: usize,
+    pub(crate) dynamic_table_bytes: usize,
+    pub(crate) section_name_table_bytes: usize,
+    pub(crate) section_header_bytes: usize,
+    pub(crate) expected_shell_write_count: usize,
+    pub(crate) applied_shell_write_count: usize,
+    pub(crate) source_preservation_count: usize,
+    pub(crate) file_backed_source_span_count: usize,
+    pub(crate) zero_fill_source_span_count: usize,
+    pub(crate) preserved_file_source_bytes: usize,
+    pub(crate) preserved_zero_fill_bytes: usize,
+    pub(crate) publication_status: String,
+    pub(crate) writes: Vec<ElfAmd64ShellImageWriteAudit>,
+    pub(crate) source_preservations: Vec<ElfAmd64ShellSourcePreservationAudit>,
+}
+
+impl ElfAmd64ShellImageSerializationReport {
+    pub(crate) fn canonical_ledger(&self) -> String {
+        let mut out = String::new();
+        for value in [
+            self.contract,
+            &self.status,
+            &self.shell_layout_plan_hash,
+            &self.platform_application_ledger_hash,
+            &self.source_file_image_hash,
+            &self.source_memory_image_hash,
+            &self.shell_image_hash,
+            &self.publication_status,
+        ] {
+            append_text(&mut out, value);
+        }
+        writeln!(
+            out,
+            "spans={}|{}|{}|{}|{}|{}|{}|{}|{}",
+            self.shell_image_span_bytes,
+            self.copied_platform_file_bytes,
+            self.preserved_platform_file_bytes,
+            self.header_bytes,
+            self.program_header_bytes,
+            self.dynamic_table_bytes,
+            self.section_name_table_bytes,
+            self.section_header_bytes,
+            self.preserved_file_source_bytes
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "counts={}|{}|{}|{}|{}|{}",
+            self.expected_shell_write_count,
+            self.applied_shell_write_count,
+            self.source_preservation_count,
+            self.file_backed_source_span_count,
+            self.zero_fill_source_span_count,
+            self.preserved_zero_fill_bytes
+        )
+        .unwrap();
+        for write in &self.writes {
+            append_text(&mut out, &write.write_id);
+            append_text(&mut out, &write.audit_hash);
+        }
+        for preservation in &self.source_preservations {
+            append_text(&mut out, &preservation.preservation_id);
+            append_text(&mut out, &preservation.audit_hash);
+        }
+        out
+    }
+}
+
+pub(super) fn shell_image_write_audit_hash(
+    plan_hash: &str,
+    application_ledger_hash: &str,
+    write: &ElfAmd64ShellImageWriteAudit,
+) -> String {
+    let mut out = String::new();
+    append_text(&mut out, plan_hash);
+    append_text(&mut out, application_ledger_hash);
+    append_text(&mut out, &write.write_id);
+    append_text(&mut out, &write.write_kind);
+    append_text(&mut out, &write.source_bytes_hash);
+    append_text(&mut out, &write.encoded_bytes_hash);
+    append_text(&mut out, &write.post_write_bytes_hash);
+    append_text(&mut out, &write.status);
+    writeln!(out, "write={}|{}", write.file_offset, write.width_bytes).unwrap();
+    crate::fnv1a64_hex(out.as_bytes())
+}
+
+pub(super) fn source_preservation_audit_hash(
+    plan_hash: &str,
+    application_ledger_hash: &str,
+    audit: &ElfAmd64ShellSourcePreservationAudit,
+) -> String {
+    let mut out = String::new();
+    append_text(&mut out, plan_hash);
+    append_text(&mut out, application_ledger_hash);
+    append_text(&mut out, &audit.preservation_id);
+    append_text(&mut out, &audit.section_id);
+    append_text(&mut out, &audit.section_name);
+    append_text(&mut out, &audit.preservation_kind);
+    append_text(&mut out, &audit.source_bytes_hash);
+    append_text(&mut out, &audit.result_bytes_hash);
+    append_text(&mut out, &audit.status);
+    writeln!(
+        out,
+        "span={}|{}|{}|{}",
+        audit.source_image_offset,
+        audit.source_size_bytes,
+        optional_usize(audit.result_file_offset),
+        audit.result_size_bytes
+    )
+    .unwrap();
+    crate::fnv1a64_hex(out.as_bytes())
+}
+
 pub(super) fn section_audit_hash(ledger_hash: &str, section: &ElfAmd64ShellSectionPlan) -> String {
     let mut out = String::new();
     append_text(&mut out, ledger_hash);

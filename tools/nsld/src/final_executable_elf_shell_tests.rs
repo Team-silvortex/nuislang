@@ -16,7 +16,8 @@ use crate::{
     },
     final_executable_elf_relocation::build_elf_amd64_relocation_application,
     final_executable_elf_test_fixture::{
-        elf_program_object, elf_runtime_object, elf_unrelated_runtime_object, R_X86_64_PLT32,
+        elf_program_object, elf_runtime_object, elf_runtime_object_with_bss,
+        elf_unrelated_runtime_object, R_X86_64_PLT32,
     },
 };
 
@@ -124,6 +125,263 @@ fn plans_permission_segments_dynamic_table_and_section_links() {
         .iter()
         .any(|header| header.program_kind == "dynamic-table" && header.program_type == 2));
     assert_nonoverlapping_loads(&report);
+}
+
+#[test]
+fn serializes_static_shell_into_a_deterministic_private_elf_image() {
+    let fixture = Fixture::new(elf_runtime_object());
+    let (placement, relocations, platform_plan, platform_applied) = fixture.pipeline();
+    let shell = build_elf_amd64_shell_layout_plan(
+        &fixture.objects,
+        &placement,
+        &relocations,
+        &platform_plan,
+        &platform_applied,
+    )
+    .unwrap();
+
+    let first = serialize_elf_amd64_shell_image(
+        &fixture.objects,
+        &placement,
+        &relocations,
+        &platform_plan,
+        &platform_applied,
+        &shell,
+    )
+    .unwrap();
+    let second = serialize_elf_amd64_shell_image(
+        &fixture.objects,
+        &placement,
+        &relocations,
+        &platform_plan,
+        &platform_applied,
+        &shell,
+    )
+    .unwrap();
+
+    assert_eq!(second, first);
+    assert_eq!(first.bytes.get(..4), Some(b"\x7fELF".as_slice()));
+    assert_eq!(read_u16(&first.bytes, 16), 2);
+    assert_eq!(read_u16(&first.bytes, 18), 62);
+    assert_eq!(read_u64(&first.bytes, 24), shell.entry_virtual_address);
+    assert_eq!(read_u64(&first.bytes, 32) as usize, 64);
+    assert_eq!(
+        read_u64(&first.bytes, 40) as usize,
+        shell.section_header_table_file_offset
+    );
+    assert_eq!(read_u16(&first.bytes, 54), 56);
+    assert_eq!(
+        read_u16(&first.bytes, 56) as usize,
+        shell.program_header_count
+    );
+    assert_eq!(read_u16(&first.bytes, 58), 64);
+    assert_eq!(
+        read_u16(&first.bytes, 60) as usize,
+        shell.section_header_count
+    );
+    assert_eq!(
+        read_u16(&first.bytes, 62) as usize,
+        shell.section_name_table_section_index
+    );
+    assert_eq!(
+        first.report.contract,
+        super::image::ELF_AMD64_SHELL_IMAGE_SERIALIZATION_CONTRACT
+    );
+    assert_eq!(first.report.status, "serialized-static-private-image");
+    assert_eq!(first.report.publication_status, "private-not-published");
+    assert_eq!(first.report.applied_shell_write_count, 4);
+    assert_eq!(first.report.dynamic_table_bytes, 0);
+    assert_eq!(first.report.file_backed_source_span_count, 1);
+    assert_eq!(first.report.zero_fill_source_span_count, 0);
+    assert_eq!(first.report.source_preservation_count, 1);
+    assert_eq!(
+        first.report.serialization_ledger_hash,
+        crate::fnv1a64_hex(first.report.canonical_ledger().as_bytes())
+    );
+    assert_eq!(
+        first.report.shell_image_hash,
+        crate::fnv1a64_hex(&first.bytes)
+    );
+    assert_eq!(
+        first.bytes[shell.entry_file_offset],
+        platform_applied.bytes[shell.entry_source_image_offset]
+    );
+    assert!(first
+        .report
+        .writes
+        .iter()
+        .all(|write| write.status == "applied-write-once"));
+    assert!(first
+        .report
+        .source_preservations
+        .iter()
+        .all(|audit| audit.status == "preserved-byte-for-byte"));
+    assert_section_names(&first.bytes, &shell);
+}
+
+#[test]
+fn serializes_dynamic_tags_and_preserves_platform_records() {
+    let fixture = Fixture::new(elf_unrelated_runtime_object());
+    let (placement, relocations, platform_plan, platform_applied) = fixture.pipeline();
+    let shell = build_elf_amd64_shell_layout_plan(
+        &fixture.objects,
+        &placement,
+        &relocations,
+        &platform_plan,
+        &platform_applied,
+    )
+    .unwrap();
+
+    let image = serialize_elf_amd64_shell_image(
+        &fixture.objects,
+        &placement,
+        &relocations,
+        &platform_plan,
+        &platform_applied,
+        &shell,
+    )
+    .unwrap();
+
+    assert_eq!(
+        image.report.status,
+        "serialized-private-image-with-external-resolution-boundary"
+    );
+    assert_eq!(image.report.applied_shell_write_count, 5);
+    assert_eq!(image.report.dynamic_table_bytes, shell.dynamic_table_bytes);
+    assert_eq!(image.report.file_backed_source_span_count, 6);
+    assert_eq!(image.report.zero_fill_source_span_count, 0);
+    let dynamic_offset = shell.dynamic_table_file_offset.unwrap();
+    for entry in &shell.dynamic_entries {
+        let offset = dynamic_offset + entry.dynamic_entry_index * 16;
+        assert_eq!(read_i64(&image.bytes, offset), entry.tag);
+        assert_eq!(read_u64(&image.bytes, offset + 8), entry.value);
+    }
+    let dynamic_header = shell
+        .program_headers
+        .iter()
+        .find(|header| header.program_kind == "dynamic-table")
+        .unwrap();
+    let header_offset = shell.program_header_table_file_offset
+        + dynamic_header.program_header_index * shell.program_header_entry_size_bytes;
+    assert_eq!(read_u32(&image.bytes, header_offset), 2);
+    assert_eq!(
+        read_u64(&image.bytes, header_offset + 8) as usize,
+        dynamic_offset
+    );
+    assert_eq!(
+        image.report.preserved_file_source_bytes,
+        image
+            .report
+            .source_preservations
+            .iter()
+            .map(|audit| audit.source_size_bytes)
+            .sum::<usize>()
+    );
+    assert!(image
+        .report
+        .source_preservations
+        .iter()
+        .all(|audit| audit.source_bytes_hash == audit.result_bytes_hash));
+    assert_section_names(&image.bytes, &shell);
+}
+
+#[test]
+fn serializes_zero_fill_as_nobits_without_file_payload() {
+    let fixture = Fixture::new(elf_runtime_object_with_bss());
+    let (placement, relocations, platform_plan, platform_applied) = fixture.pipeline();
+    let shell = build_elf_amd64_shell_layout_plan(
+        &fixture.objects,
+        &placement,
+        &relocations,
+        &platform_plan,
+        &platform_applied,
+    )
+    .unwrap();
+
+    let image = serialize_elf_amd64_shell_image(
+        &fixture.objects,
+        &placement,
+        &relocations,
+        &platform_plan,
+        &platform_applied,
+        &shell,
+    )
+    .unwrap();
+
+    let bss = section(&shell, ".bss");
+    let bss_audit = image
+        .report
+        .source_preservations
+        .iter()
+        .find(|audit| audit.section_name == ".bss")
+        .unwrap();
+    assert_eq!(bss.section_type, 8);
+    assert_eq!(bss.file_size_bytes, 0);
+    assert_eq!(bss.memory_size_bytes, 32);
+    assert_eq!(image.report.zero_fill_source_span_count, 1);
+    assert_eq!(image.report.preserved_zero_fill_bytes, 32);
+    assert_eq!(bss_audit.preservation_kind, "nobits-zero-fill-span");
+    assert_eq!(bss_audit.result_file_offset, None);
+    assert_eq!(bss_audit.status, "preserved-as-nobits-zero-fill");
+    let section_header = shell.section_header_table_file_offset
+        + bss.section_index * shell.section_header_entry_size_bytes;
+    assert_eq!(read_u32(&image.bytes, section_header + 4), 8);
+    assert_eq!(read_u64(&image.bytes, section_header + 32), 32);
+}
+
+#[test]
+fn serializer_rejects_platform_image_drift() {
+    let fixture = Fixture::new(elf_runtime_object());
+    let (placement, relocations, platform_plan, mut platform_applied) = fixture.pipeline();
+    let shell = build_elf_amd64_shell_layout_plan(
+        &fixture.objects,
+        &placement,
+        &relocations,
+        &platform_plan,
+        &platform_applied,
+    )
+    .unwrap();
+    platform_applied.bytes[shell.entry_source_image_offset] ^= 1;
+
+    let error = serialize_elf_amd64_shell_image(
+        &fixture.objects,
+        &placement,
+        &relocations,
+        &platform_plan,
+        &platform_applied,
+        &shell,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("platform image drift"), "{error}");
+}
+
+#[test]
+fn serializer_rebuilds_and_rejects_rehashed_layout_drift() {
+    let fixture = Fixture::new(elf_runtime_object());
+    let (placement, relocations, platform_plan, platform_applied) = fixture.pipeline();
+    let mut shell = build_elf_amd64_shell_layout_plan(
+        &fixture.objects,
+        &placement,
+        &relocations,
+        &platform_plan,
+        &platform_applied,
+    )
+    .unwrap();
+    shell.entry_virtual_address += 1;
+    shell.plan_hash = crate::fnv1a64_hex(shell.canonical_plan().as_bytes());
+
+    let error = serialize_elf_amd64_shell_image(
+        &fixture.objects,
+        &placement,
+        &relocations,
+        &platform_plan,
+        &platform_applied,
+        &shell,
+    )
+    .unwrap_err();
+
+    assert!(error.contains("layout plan drift"), "{error}");
 }
 
 #[test]
@@ -253,6 +511,31 @@ fn assert_nonoverlapping_loads(report: &ElfAmd64ShellLayoutPlanReport) {
             assert!(load_end <= other.virtual_address || other_end <= load.virtual_address);
         }
     }
+}
+
+fn assert_section_names(bytes: &[u8], report: &ElfAmd64ShellLayoutPlanReport) {
+    for section in &report.sections {
+        let start = report.section_name_table_file_offset + section.section_name_offset;
+        let end = start + section.section_name.len();
+        assert_eq!(&bytes[start..end], section.section_name.as_bytes());
+        assert_eq!(bytes[end], 0);
+    }
+}
+
+fn read_u16(bytes: &[u8], offset: usize) -> u16 {
+    u16::from_le_bytes(bytes[offset..offset + 2].try_into().unwrap())
+}
+
+fn read_u32(bytes: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
+}
+
+fn read_u64(bytes: &[u8], offset: usize) -> u64 {
+    u64::from_le_bytes(bytes[offset..offset + 8].try_into().unwrap())
+}
+
+fn read_i64(bytes: &[u8], offset: usize) -> i64 {
+    i64::from_le_bytes(bytes[offset..offset + 8].try_into().unwrap())
 }
 
 struct Fixture {

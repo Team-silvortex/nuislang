@@ -128,6 +128,31 @@ fn summarizes_cross_object_internal_symbol_closure() {
         product.shell_layout_plan.platform_application_ledger_hash,
         product.platform_patch_application.application_ledger_hash
     );
+    assert_eq!(
+        product.shell_image_serialization.contract,
+        "nuis-nsld-elf-amd64-shell-image-serialization-v1"
+    );
+    assert_eq!(
+        product.shell_image_serialization.status,
+        "serialized-static-private-image"
+    );
+    assert_eq!(
+        product.private_shell_image.get(..4),
+        Some(b"\x7fELF".as_slice())
+    );
+    assert_eq!(
+        product.shell_image_serialization.shell_image_hash,
+        crate::fnv1a64_hex(&product.private_shell_image)
+    );
+    assert_eq!(
+        product.shell_image_serialization.serialization_ledger_hash,
+        crate::fnv1a64_hex(
+            product
+                .shell_image_serialization
+                .canonical_ledger()
+                .as_bytes()
+        )
+    );
 }
 
 #[test]
@@ -185,6 +210,18 @@ fn object_chain_applies_external_platform_records_and_deferred_call() {
         .shell_layout_plan
         .dynamic_table_file_offset
         .is_some());
+    assert_eq!(
+        product.shell_image_serialization.status,
+        "serialized-private-image-with-external-resolution-boundary"
+    );
+    assert_eq!(
+        product.shell_image_serialization.applied_shell_write_count,
+        5
+    );
+    assert_eq!(
+        product.shell_image_serialization.dynamic_table_bytes,
+        product.shell_layout_plan.dynamic_table_bytes
+    );
 }
 
 #[test]
