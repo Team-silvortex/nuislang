@@ -1046,10 +1046,19 @@ format-independent writer input. It canonicalizes architecture, OS, object
 format, and packaging route, rejects absent or ambiguous providers, and hashes
 the static provider set. `native-cpu-llvm` on Mach-O arm64 selects
 `nsld.finalizer.mach-o.arm64.artifact-image-v1`; a host-command provider remains
-the compatibility fallback, while Mach-O wildcard, ELF, and PE/COFF writers
-remain explicit `registered-not-implemented` targets. The selected contract,
+the compatibility fallback. `native-cpu-llvm` on Linux AMD64 now selects
+`nsld.finalizer.elf.amd64.artifact-image-v1`; Mach-O wildcard, other ELF routes,
+and PE/COFF remain explicit `registered-not-implemented` targets. The selected contract,
 registry hash, target key, provider id/status, and execution kind are projected
 through dry-run JSON and persisted in the verified invoke-plan artifact.
+
+The ELF provider uses the same internal invocation shape without teaching the
+frontdoor about ELF. It verifies exact plan/artifact target and ABI identity,
+two LinkPlan-hash-bound ELF64 `ET_REL` host objects, and an `ET_EXEC` or PIE
+compatibility image with bounded program headers and an entry inside a
+file-backed executable `PT_LOAD`. It then uses the shared atomic executable
+writer and never invokes Clang or LLD. Provider-owned ELF object merging and
+relocation remain deliberately open.
 
 The internal provider parses the compiled artifact and its `NHOB` object
 bundle. It requires one LLVM program object and one runtime shim object,
@@ -1222,19 +1231,19 @@ Host-command execution remains provider-owned and uses the exact driver path
 resolved by the verified dry-run boundary instead of performing a second
 `PATH` lookup.
 
-This still does not claim a pure Nsld platform linker: Nuisc now hands Nsld
+This still does not claim complete pure Nsld platform linking: Nuisc hands Nsld
 real relocatable objects, but it also embeds a host-toolchain-linked
-compatibility image. Nsld now owns the deterministic merged source image,
+compatibility image. On Mach-O, Nsld owns the deterministic merged source image,
 checked direct-write encoding previews, write-once direct and platform working
 images, deterministic GOT/stub allocation and bytes, explicit unresolved bind
 records, an audited final-address shell layout, and deterministic private
 header/command/content/linkedit bytes with all address-dependent writes
-re-encoded for final VM addresses. The ordinary internally closed compiled-
-artifact path now has durable replay admission. It does not yet allocate non-
-section definitions. Registered opt-in publication is complete for the current
-internally closed fixture, while default publication continues to use the
-compatibility image unchanged. Common allocation is the next Mach-O boundary;
-ELF and PE/COFF remain later provider-owned closures.
+re-encoded for final VM addresses, including common, absolute, and indirect
+definitions. The ordinary internally closed path has durable replay admission
+and registered opt-in publication. On ELF AMD64, Nsld now validates and
+publishes the compatibility image internally but does not yet build its own
+image from the two host objects. Other ELF architectures and PE/COFF remain
+later provider-owned closures.
 
 `nsld final-executable-host-dry-run` consumes the verified writer input,
 reports `environment_ready`, provider identity, and exact command arguments.

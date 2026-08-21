@@ -7,7 +7,7 @@ fn registry_is_deterministic_and_conformant() {
 
     assert!(validation.valid, "{:?}", validation.issues);
     assert_eq!(validation.contract, EXECUTABLE_FINALIZER_CONTRACT);
-    assert_eq!(validation.registration_count, 5);
+    assert_eq!(validation.registration_count, 6);
     assert!(validation.registry_hash.starts_with("0x"));
 }
 
@@ -50,6 +50,32 @@ fn registry_prefers_internal_artifact_image_for_native_cpu_llvm() {
         selection.private_image_publication_capability(),
         Some(MACHO_ARM64_PRIVATE_IMAGE_PUBLICATION_CAPABILITY)
     );
+}
+
+#[test]
+fn registry_selects_ready_internal_elf_amd64_artifact_provider() {
+    let mut plan = empty_link_plan();
+    plan.packaging_mode = "native-cpu-llvm".to_owned();
+    plan.cpu_target.machine_arch = "amd64".to_owned();
+    plan.cpu_target.machine_os = "linux-gnu".to_owned();
+    plan.cpu_target.object_format = "elf".to_owned();
+    plan.cpu_target.calling_abi = "sysv64".to_owned();
+
+    let selection = select_executable_finalizer(&plan).unwrap();
+
+    assert_eq!(selection.target_key, "x86_64-linux-elf");
+    assert_eq!(
+        selection.provider_id(),
+        "nsld.finalizer.elf.amd64.artifact-image-v1"
+    );
+    assert_eq!(selection.input_kind(), "compiled-artifact-native-handoff");
+    assert_eq!(
+        selection.execution_kind(),
+        "registered-nsld-artifact-image-writer"
+    );
+    assert!(selection.ready());
+    assert!(!selection.requires_host_driver());
+    assert!(!selection.supports_private_image_publication());
 }
 
 #[test]

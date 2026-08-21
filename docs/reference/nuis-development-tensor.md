@@ -390,8 +390,16 @@ The `beta-0.1` calibration baseline is:
   Plan-only calls preserve bytes; apply requires valid receipt replay and binds
   receipt, publication, candidate, and installed SHA-256 identities under
   `nuis-nsld-final-output-selection-evidence-v1`. The real ordinary final-output
-  command selects and executes that private image. Absolute/indirect
-  definitions, ELF, and PE/COFF remain open
+  command selects and executes that private image. The first Linux route,
+  `nsld.finalizer.elf.amd64.artifact-image-v1`, now selects through the same
+  registry for `x86_64-linux-elf + native-cpu-llvm`. It binds one ELF64
+  `program-llvm` and one `runtime-shim` `ET_REL` object to their LinkPlan ids,
+  roles, formats, sizes, and FNV hashes; validates an ELF64 `ET_EXEC` or PIE
+  image with bounded program headers and a nonzero entry inside a file-backed
+  executable `PT_LOAD`; and atomically installs it without Clang/LLD invocation.
+  That closes the registered compatibility-image slice, while provider-owned
+  ELF section/symbol/relocation linking, other ELF architectures, and PE/COFF
+  remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

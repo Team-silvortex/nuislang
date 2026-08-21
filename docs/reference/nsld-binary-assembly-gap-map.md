@@ -165,11 +165,19 @@ candidate, and installed-image evidence under
 installation, while the valid common-symbol fixture selects and executes the
 private Mach-O through the ordinary command.
 
+The finalizer registry now also owns one narrow Linux route:
+`nsld.finalizer.elf.amd64.artifact-image-v1`. It validates exact LinkPlan and
+compiled-artifact target identity, both hash-bound ELF64 `ET_REL` host objects,
+and an ELF64 `ET_EXEC`/PIE image whose entry belongs to a bounded executable
+`PT_LOAD`. The accepted compatibility image is atomically published without a
+Clang/LLD process. This is deliberate staging evidence, not a self-owned ELF
+link claim: the embedded executable remains host-toolchain-linked until Nsld
+owns ELF section placement, symbol resolution, relocation, and shell emission.
+
 It does not yet own:
 
-* complete Mach-O, ELF, and PE/COFF compatibility object parity
-* general native relocation application across those target formats
-* absolute/indirect Mach-O non-section definition lowering
+* complete architecture parity across Mach-O, ELF, and PE/COFF
+* provider-owned ELF/PE object merging and native relocation application
 * a durable embedded Nsdb/YIR debug metadata section
 
 ## Gap 1: Compatibility Object Writer
@@ -299,10 +307,10 @@ platform family into the linker frontdoor.
 fields plus semantic drift in both tables.
 `object-writer-readiness` exposes the same information as a command-level
 readiness gate before `emit-object` attempts compatibility byte emission.
-`emit-object` is now wired to the first minimal compatibility object writer:
-prepared Mach-O arm64 input can be emitted as optional `nuis.nsld.mach-o` from
-the deterministic image bytes. Unprepared input, ELF, and COFF still report
-blockers. The command also materializes diagnostic artifacts: the future byte
+`emit-object` is wired to the first compatibility object writers: prepared
+Mach-O arm64 and ELF AMD64 inputs can be emitted from deterministic image bytes.
+Unprepared input, ELF AArch64, and COFF still report blockers. The command also
+materializes diagnostic artifacts: the future byte
 writer's deterministic input snapshot, the alpha emit report at
 `nuis.nsld.object.blocked.toml`, and the object image dry-run report/bin pair.
 Artifact-chain and drive recommendations use the `emit-native-object` alias for

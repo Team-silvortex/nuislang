@@ -1,4 +1,7 @@
 use super::{
+    final_executable_elf_artifact::{
+        elf_amd64_artifact_image_validation_issues, materialize_elf_amd64_artifact_image,
+    },
     final_executable_macho_artifact::{
         macho_artifact_image_validation_issues, macho_artifact_input_summary,
         materialize_macho_artifact_image,
@@ -48,6 +51,24 @@ struct ExecutableFinalizerRegistration {
 
 const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
     ExecutableFinalizerRegistration {
+        provider_id: "nsld.finalizer.elf.amd64.artifact-image-v1",
+        machine_arch: "x86_64",
+        machine_os: "linux",
+        object_format: "elf",
+        packaging_mode: "native-cpu-llvm",
+        provider_status: "ready",
+        execution_kind: "registered-nsld-artifact-image-writer",
+        input_kind: "compiled-artifact-native-handoff",
+        input_summary_contract: None,
+        requires_host_driver: false,
+        command_planner: plan_internal_artifact_image,
+        input_validator: elf_amd64_artifact_image_validation_issues,
+        input_summarizer: summarize_no_additional_inputs,
+        executor: Some(execute_internal_elf_artifact_image),
+        private_image_publication_capability: None,
+        private_image_publisher: None,
+    },
+    ExecutableFinalizerRegistration {
         provider_id: "nsld.finalizer.elf.registered-v1",
         machine_arch: "*",
         machine_os: "linux",
@@ -79,7 +100,7 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         command_planner: plan_internal_artifact_image,
         input_validator: macho_artifact_image_validation_issues,
         input_summarizer: macho_artifact_input_summary,
-        executor: Some(execute_internal_artifact_image),
+        executor: Some(execute_internal_macho_artifact_image),
         private_image_publication_capability: Some(
             MACHO_ARM64_PRIVATE_IMAGE_PUBLICATION_CAPABILITY,
         ),
@@ -528,7 +549,21 @@ fn plan_host_command(context: &ExecutableFinalizerCommandContext<'_>) -> Vec<Str
     args
 }
 
-fn execute_internal_artifact_image(
+fn execute_internal_macho_artifact_image(
+    context: &ExecutableFinalizerExecutionContext<'_>,
+) -> Result<(), String> {
+    validate_internal_artifact_image_request(context)?;
+    materialize_macho_artifact_image(context.plan, context.output_path)
+}
+
+fn execute_internal_elf_artifact_image(
+    context: &ExecutableFinalizerExecutionContext<'_>,
+) -> Result<(), String> {
+    validate_internal_artifact_image_request(context)?;
+    materialize_elf_amd64_artifact_image(context.plan, context.output_path)
+}
+
+fn validate_internal_artifact_image_request(
     context: &ExecutableFinalizerExecutionContext<'_>,
 ) -> Result<(), String> {
     let expected = plan_internal_artifact_image(&ExecutableFinalizerCommandContext {
@@ -548,7 +583,7 @@ fn execute_internal_artifact_image(
             context.command_args.join(", ")
         ));
     }
-    materialize_macho_artifact_image(context.plan, context.output_path)
+    Ok(())
 }
 
 fn execute_host_command(context: &ExecutableFinalizerExecutionContext<'_>) -> Result<(), String> {

@@ -56,6 +56,7 @@ The current static set is deliberately asymmetric:
 
 | Provider | Target | Packaging | Input | Status |
 | --- | --- | --- | --- | --- |
+| `nsld.finalizer.elf.amd64.artifact-image-v1` | `x86_64-linux-elf` | `native-cpu-llvm` | compiled-artifact native handoff | `ready` |
 | `nsld.finalizer.mach-o.arm64.artifact-image-v1` | `aarch64-macos-mach-o` | `native-cpu-llvm` | compiled-artifact native handoff | `ready` |
 | `nsld.finalizer.mach-o.arm64.host-command-shell-v1` | `aarch64-macos-mach-o` | any | native object | `ready` |
 | `nsld.finalizer.mach-o.registered-v1` | `*-macos-mach-o` | any | native object | `registered-not-implemented` |
@@ -95,6 +96,23 @@ gates still apply before that provider may run. It must execute the exact
 driver path resolved during the verified dry-run boundary and may not repeat a
 `PATH` lookup after admission.
 
+The first ELF route uses the same internal command evidence and provider-neutral
+atomic executable writer. The `x86_64-linux-elf + native-cpu-llvm` provider
+requires exact plan/artifact target and ABI identity, one `program-llvm` and one
+`runtime-shim` object, matching object ids, roles, sizes, formats, and FNV
+hashes. Each object must be a little-endian ELF64 x86-64 `ET_REL` with a bounded
+section table. The compatibility image must be ELF64 `ET_EXEC` or PIE `ET_DYN`,
+own a bounded program-header table and at least one `PT_LOAD`, and place its
+nonzero entry inside a file-backed executable load segment. Rejection occurs
+before output mutation; accepted bytes are installed atomically with executable
+permissions without invoking Clang or LLD.
+
+This closes a registered Linux compatibility-image finalizer, not a pure Nsld
+ELF linker. The accepted executable is still the host-toolchain-linked image
+embedded by Nuisc. Nsld does not yet merge the two ELF objects, resolve their
+symbol tables and `R_X86_64_*` relocations, or serialize a provider-owned ELF
+shell.
+
 This is not yet a pure Nsld linker claim. Nsld now understands the real input
 tables, assigns deterministic final sections and addresses, applies registered
 direct/platform relocations, emits stub/GOT and dyld metadata, and serializes a
@@ -118,7 +136,8 @@ finalizer registry, target, image, signature, and loader-probe identities. The
 ordinary compiled-artifact route has a positive internally closed fixture;
 receipt tamper and rebuilt-product drift fail closed. Nuisc still embeds the
 host-toolchain-linked compatibility executable used for default runnable
-publication. ELF and PE/COFF remain visible, selectable, and honestly blocked
+publication. The narrow AMD64 ELF compatibility route is now ready; other ELF
+architectures and PE/COFF remain visible, selectable, and honestly blocked
 rather than silently falling through a generic linker.
 
 The artifact-image registration also declares the unique capability
@@ -168,14 +187,16 @@ size/SHA-256/executable identity into the ordinary final-output report. Receipt
 tamper remains fail-closed and the compatibility executable remains the
 byte-for-byte default.
 
-The next native milestone is provider-side lowering for absolute and indirect
-Mach-O non-section definitions, including deterministic alias resolution and
-cycle rejection, before the same registry shape expands toward ELF and PE/COFF.
+The next native milestone is a provider-owned ELF64 AMD64 link slice that parses
+the embedded `ET_REL` section/symbol/relocation tables, resolves the
+program/runtime pair deterministically, and emits a private executable candidate
+behind this same registry boundary. Nuisc must remain free of ELF branches.
 
 ## Validation
 
 ```sh
 CARGO_INCREMENTAL=0 cargo test -q -j 1 -p nsld executable_finalizer
+CARGO_INCREMENTAL=0 cargo test -q -j 1 -p nsld final_executable_elf_artifact
 CARGO_INCREMENTAL=0 cargo test -q -j 1 -p nsld final_executable_macho_input
 CARGO_INCREMENTAL=0 cargo test -q -j 1 -p nsld final_executable_host
 CARGO_INCREMENTAL=0 cargo test -q -j 1 -p nsld --test host_finalizer_cli

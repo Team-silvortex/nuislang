@@ -37,7 +37,10 @@ current bootstrap-critical frontier is OS-native executable finalization: Nsld
 now carries ARM64 Mach-O sections, commons, absolute values, and cycle-safe
 symbol aliases through relocation, signed private-shell serialization,
 independent load admission, and explicit provider-registered publication. The
-next format frontier is a native ELF finalizer; PE/COFF parity remains open.
+first `x86_64-linux-elf` internal provider now validates the compiled ELF64
+image plus its two relocatable host objects and atomically publishes it without
+invoking Clang or LLD. Provider-owned ELF object merging and relocation remain
+the next format frontier; PE/COFF parity remains open.
 
 Start with these documents:
 
