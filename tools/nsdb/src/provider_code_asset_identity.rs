@@ -218,7 +218,9 @@ fn validate_project_identity_item(
     else {
         return false;
     };
-    let Some(entries) = item_detail(fields, index, "entries").and_then(parse_entries) else {
+    let Some(entries) =
+        item_detail(fields, index, "entries").and_then(|value| parse_entries(value))
+    else {
         return false;
     };
     let entry_refs = entries.iter().map(String::as_str).collect::<Vec<_>>();
@@ -400,7 +402,7 @@ fn item_detail<'a>(
     item_field(fields, index, name).or_else(|| (index == 0).then(|| field(fields, name)).flatten())
 }
 
-fn parse_entries(value: &String) -> Option<Vec<String>> {
+fn parse_entries(value: &str) -> Option<Vec<String>> {
     let entries = value.split(',').map(str::to_owned).collect::<Vec<_>>();
     (!entries.is_empty()
         && entries.iter().all(|entry| {

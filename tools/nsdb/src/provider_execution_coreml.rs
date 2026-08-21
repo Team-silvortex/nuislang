@@ -39,10 +39,10 @@ fn prepare_worker_adapter(
         || inputs
             .iter()
             .any(|input| input.worker_adapter_argument().is_none())
-        || !request
+        || request
             .model_asset
             .as_ref()
-            .is_some_and(|model| model.input_features.len() == inputs.len())
+            .is_none_or(|model| model.input_features.len() != inputs.len())
     {
         return Ok(None);
     }

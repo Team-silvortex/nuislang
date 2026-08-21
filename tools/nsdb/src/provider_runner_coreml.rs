@@ -386,7 +386,7 @@ fn required_device_set(value: Option<&str>) -> Result<String, String> {
 }
 
 fn decode_hex(value: &str) -> Result<Vec<u8>, String> {
-    if value.len() % 2 != 0 {
+    if !value.len().is_multiple_of(2) {
         return Err("CoreML provider runner output hex has odd length".to_owned());
     }
     (0..value.len())

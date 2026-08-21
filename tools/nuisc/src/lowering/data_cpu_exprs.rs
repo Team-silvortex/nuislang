@@ -96,14 +96,16 @@ pub(super) fn lower_data_cpu_expr(
             input_role_count,
             output_role_count,
         } => Some(lower_data_provider_request_ingress(
-            request_handle,
-            descriptor_table_handle,
-            descriptor_count,
-            provider_key,
-            capability_hash,
-            capsule_token.as_deref(),
-            input_role_count.as_deref(),
-            output_role_count.as_deref(),
+            DataProviderRequestIngress {
+                request_handle,
+                descriptor_table_handle,
+                descriptor_count,
+                provider_key,
+                capability_hash,
+                capsule_token: capsule_token.as_deref(),
+                input_role_count: input_role_count.as_deref(),
+                output_role_count: output_role_count.as_deref(),
+            },
             state,
             bindings,
         )),
@@ -332,18 +334,32 @@ fn lower_data_handle_table(entries: &[(String, String)], state: &mut LoweringSta
     name
 }
 
+struct DataProviderRequestIngress<'a> {
+    request_handle: &'a NirExpr,
+    descriptor_table_handle: &'a NirExpr,
+    descriptor_count: &'a NirExpr,
+    provider_key: &'a NirExpr,
+    capability_hash: &'a NirExpr,
+    capsule_token: Option<&'a NirExpr>,
+    input_role_count: Option<&'a NirExpr>,
+    output_role_count: Option<&'a NirExpr>,
+}
+
 fn lower_data_provider_request_ingress(
-    request_handle: &NirExpr,
-    descriptor_table_handle: &NirExpr,
-    descriptor_count: &NirExpr,
-    provider_key: &NirExpr,
-    capability_hash: &NirExpr,
-    capsule_token: Option<&NirExpr>,
-    input_role_count: Option<&NirExpr>,
-    output_role_count: Option<&NirExpr>,
+    request: DataProviderRequestIngress<'_>,
     state: &mut LoweringState<'_>,
     bindings: &BTreeMap<String, String>,
 ) -> Result<String, String> {
+    let DataProviderRequestIngress {
+        request_handle,
+        descriptor_table_handle,
+        descriptor_count,
+        provider_key,
+        capability_hash,
+        capsule_token,
+        input_role_count,
+        output_role_count,
+    } = request;
     ensure_fabric_resource(state.yir);
     let mut args = vec![
         lower_expr(request_handle, state, bindings)?,

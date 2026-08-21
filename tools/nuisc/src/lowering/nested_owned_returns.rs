@@ -374,9 +374,7 @@ fn selected_leaf_cast<'a>(
     })
 }
 
-fn split_variant_field_prelude<'a>(
-    stmts: &'a [NirStmt],
-) -> (BTreeMap<&'a str, &'a NirExpr>, &'a [NirStmt]) {
+fn split_variant_field_prelude(stmts: &[NirStmt]) -> (BTreeMap<&str, &NirExpr>, &[NirStmt]) {
     let mut projections = BTreeMap::new();
     let mut prefix_len = 0;
     for stmt in stmts {

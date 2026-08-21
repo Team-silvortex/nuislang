@@ -210,12 +210,14 @@ impl UnixWorkerProcessTransport {
         wait_for_worker_reply(&self.socket, &mut self.child, request_id)?;
         let reply = receive_process_reply(
             &self.socket,
-            &self.lease_id,
-            sequence,
-            request_id,
-            self.worker_pid,
-            payload,
-            &descriptor_roles,
+            ExpectedProcessReply {
+                lease_id: &self.lease_id,
+                sequence,
+                request_id,
+                worker_pid: self.worker_pid,
+                payload,
+                descriptor_roles: &descriptor_roles,
+            },
             self.output_descriptor_capability,
         )
         .map_err(|error| {
@@ -471,7 +473,7 @@ fn receive_descriptors(message: &libc::msghdr) -> Result<Vec<OwnedFd>, String> {
                 return Err("provider worker descriptor header is truncated".to_owned());
             }
             let byte_len = (*header).cmsg_len as usize - base_len;
-            if byte_len % size_of::<RawFd>() != 0 {
+            if !byte_len.is_multiple_of(size_of::<RawFd>()) {
                 return Err("provider worker descriptor payload is misaligned".to_owned());
             }
             let count = byte_len / size_of::<RawFd>();
@@ -499,16 +501,28 @@ fn set_close_on_exec(fd: RawFd) -> Result<(), String> {
     Ok(())
 }
 
+struct ExpectedProcessReply<'a> {
+    lease_id: &'a str,
+    sequence: usize,
+    request_id: &'a str,
+    worker_pid: u32,
+    payload: &'a [u8],
+    descriptor_roles: &'a [&'a str],
+}
+
 fn receive_process_reply(
     socket: &UnixDatagram,
-    expected_lease_id: &str,
-    expected_sequence: usize,
-    expected_request_id: &str,
-    expected_worker_pid: u32,
-    expected_payload: &[u8],
-    expected_descriptor_roles: &[&str],
+    expected: ExpectedProcessReply<'_>,
     output_descriptor_capability: ProviderWorkerOutputDescriptorCapability,
 ) -> Result<UnixWorkerProcessReply, String> {
+    let ExpectedProcessReply {
+        lease_id: expected_lease_id,
+        sequence: expected_sequence,
+        request_id: expected_request_id,
+        worker_pid: expected_worker_pid,
+        payload: expected_payload,
+        descriptor_roles: expected_descriptor_roles,
+    } = expected;
     let (packet, output_descriptors) = receive_reply_packet(socket)?;
     let envelope = decode_provider_worker_reply(&packet, output_descriptors.len())?;
     if envelope.output_descriptor_count > output_descriptor_capability.max_output_descriptors {

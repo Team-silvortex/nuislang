@@ -1,16 +1,28 @@
 use super::geometry_overlay::stamp_line;
 use super::BallPacket;
 
+pub(crate) struct SceneRuntimeOverlayLayout {
+    pub(crate) preview_left: usize,
+    pub(crate) preview_right: usize,
+    pub(crate) root_y: usize,
+    pub(crate) ground_y: usize,
+    pub(crate) cluster_root_x: usize,
+    pub(crate) cluster_root_y: usize,
+}
+
 pub(crate) fn draw_scene_runtime_overlay(
     rows: &mut [Vec<char>],
-    preview_left: usize,
-    preview_right: usize,
-    root_y: usize,
-    ground_y: usize,
-    cluster_root_x: usize,
-    cluster_root_y: usize,
+    layout: SceneRuntimeOverlayLayout,
     packet: &BallPacket,
 ) {
+    let SceneRuntimeOverlayLayout {
+        preview_left,
+        preview_right,
+        root_y,
+        ground_y,
+        cluster_root_x,
+        cluster_root_y,
+    } = layout;
     let visibility_span = packet.visibility_visible_nodes.clamp(1, 5) as usize;
     let vis_root_x = preview_left
         .saturating_add(24 + packet.visibility_cluster_slot.rem_euclid(4) as usize)

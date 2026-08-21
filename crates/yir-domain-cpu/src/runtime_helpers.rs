@@ -18,9 +18,7 @@ pub(crate) fn task_lifecycle_state(task: &yir_core::TaskHandle) -> TaskLifecycle
         TaskLifecycleState::Completed => TaskLifecycleState::Completed,
         TaskLifecycleState::Failed => TaskLifecycleState::Failed,
         TaskLifecycleState::Pending => {
-            if matches!(task.limit, Some(limit) if limit <= 0) {
-                TaskLifecycleState::TimedOut
-            } else if matches!(task.limit, Some(limit) if task.ready_delay > limit) {
+            if matches!(task.limit, Some(limit) if limit <= 0 || task.ready_delay > limit) {
                 TaskLifecycleState::TimedOut
             } else {
                 TaskLifecycleState::Completed

@@ -172,8 +172,7 @@ fn non_null_leaf_argument(
     let [source] = args.as_slice() else {
         return false;
     };
-    callee == "__nuis_require_non_null_buffer"
-        && non_null_proofs.iter().any(|proven| *proven == source)
+    callee == "__nuis_require_non_null_buffer" && non_null_proofs.contains(&source)
 }
 
 fn leaf_argument_allowed(ty: &nuis_semantics::model::NirTypeRef, arg: &NirExpr) -> bool {

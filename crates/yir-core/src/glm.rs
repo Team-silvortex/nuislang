@@ -214,7 +214,7 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
                 .unwrap_or(&[]);
             GlmNodeProfile {
                 result_class: GlmValueClass::Res,
-                accesses: inputs.iter().map(value_read).collect(),
+                accesses: inputs.iter().map(|input| value_read(input)).collect(),
                 effect: GlmEffect::None,
             }
         }
@@ -320,7 +320,7 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
                         args.then_scalar_args
                             .iter()
                             .chain(args.else_scalar_args)
-                            .map(value_read),
+                            .map(|input| value_read(input)),
                     );
                 }
                 accesses
@@ -434,7 +434,12 @@ pub fn glm_profile_for_operation(op: &Operation) -> GlmNodeProfile {
 }
 
 fn cpu_effect_loop_profile(op: &Operation) -> GlmNodeProfile {
-    let mut accesses = op.args.iter().take(3).map(value_read).collect::<Vec<_>>();
+    let mut accesses = op
+        .args
+        .iter()
+        .take(3)
+        .map(|input| value_read(input))
+        .collect::<Vec<_>>();
     let operand_start = match op.args.get(6).map(String::as_str) {
         Some("owned_bytes_copy_drop") => 8,
         Some("scoped_call") => 9,
@@ -471,9 +476,9 @@ fn cpu_effect_loop_profile(op: &Operation) -> GlmNodeProfile {
     }
 }
 
-fn value_read(input: &String) -> GlmAccess {
+fn value_read(input: &str) -> GlmAccess {
     GlmAccess {
-        input: input.clone(),
+        input: input.to_owned(),
         class: GlmValueClass::Val,
         mode: GlmUseMode::Read,
     }

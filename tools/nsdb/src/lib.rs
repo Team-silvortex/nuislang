@@ -4,6 +4,7 @@ mod digest_sha256;
 mod final_image_provider_dispatch;
 mod handoff;
 mod handoff_binding;
+mod handoff_status;
 mod model;
 mod provider_adapter_binding;
 mod provider_bundle_registry;

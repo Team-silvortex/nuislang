@@ -7,6 +7,7 @@ mod display;
 mod final_image_provider_dispatch;
 mod handoff;
 mod handoff_binding;
+mod handoff_status;
 mod hetero_trace;
 mod json;
 mod json_replay;

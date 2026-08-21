@@ -2,7 +2,6 @@ use super::control_panel_extended_summary::draw_control_panel_extended_summary;
 use super::control_panel_layout::resolve_control_panel_layout;
 use super::control_panel_summary::draw_control_panel_summary;
 use super::control_panel_widgets::draw_control_panel_widgets;
-use super::packet_helpers::normalize_control_value;
 use super::parse_ball_packet;
 use super::scene_preview::draw_scene_preview;
 use super::surface_primitives::{
@@ -27,24 +26,8 @@ pub(crate) fn draw_control_panel_surface(
     );
     let width = layout.width;
     let height = layout.height;
-    let color_value = normalize_control_value(packet.color_key, packet.color_min, packet.color_max);
-    let speed_value = normalize_control_value(
-        packet.speed.round() as i64,
-        packet.speed_min,
-        packet.speed_max,
-    );
-    let radius_value = normalize_control_value(
-        (packet.radius_scale * 96.0).round() as i64,
-        packet.radius_min,
-        packet.radius_max,
-    );
-    let progress_value = normalize_control_value(packet.progress_value, 0, packet.progress_max);
-    let meter_value = normalize_control_value(packet.meter_value, 0, packet.meter_max);
     let accent = control_panel_accent(packet.accent, packet.contrast);
-    let button_on = packet.button_state != 0;
     let toggle_disabled = packet.toggle_disabled != 0;
-    let viewport_width = layout.viewport_width;
-    let viewport_height = layout.viewport_height;
     let layer_hidden = packet.layer_visibility == 0;
     let blend_fill = match packet.layer_blend.rem_euclid(3) {
         0 => '.',
@@ -131,16 +114,7 @@ pub(crate) fn draw_control_panel_surface(
             '.'
         },
     );
-    draw_control_panel_summary(
-        &mut rows,
-        panel_left,
-        panel_top,
-        panel_right,
-        viewport_width,
-        viewport_height,
-        layer_hidden,
-        &packet,
-    );
+    draw_control_panel_summary(&mut rows, &layout, &packet);
     draw_scene_preview(
         &mut rows,
         viewport_left,
@@ -193,22 +167,7 @@ pub(crate) fn draw_control_panel_surface(
         ),
     );
 
-    draw_control_panel_widgets(
-        &mut rows,
-        &packet,
-        panel_left,
-        panel_top,
-        panel_right,
-        panel_bottom,
-        accent,
-        color_value,
-        speed_value,
-        radius_value,
-        progress_value,
-        meter_value,
-        button_on,
-        toggle_disabled,
-    );
+    draw_control_panel_widgets(&mut rows, &packet, &layout, accent);
 
     let rows = rows
         .into_iter()

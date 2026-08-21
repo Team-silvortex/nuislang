@@ -80,9 +80,7 @@ macro_rules! lower_loop_cond_chain {
                     let mut lower_source = |source: yir_domain_cpu::ParsedCarryBranchSource| {
                         let mut payload_values = Vec::new();
                         for payload_name in source.payload {
-                            let Some(payload_value) = registers.get(&payload_name).cloned() else {
-                                return None;
-                            };
+                            let payload_value = registers.get(&payload_name).cloned()?;
                             carry_source_values.push(payload_value.clone());
                             payload_values.push(payload_value);
                         }

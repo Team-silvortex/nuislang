@@ -1,16 +1,18 @@
+use super::control_panel_layout::ControlPanelLayout;
 use super::surface_primitives::{fill_rect, put_text};
 use super::BallPacket;
 
 pub(crate) fn draw_control_panel_summary(
     rows: &mut [Vec<char>],
-    panel_left: usize,
-    panel_top: usize,
-    panel_right: usize,
-    viewport_width: usize,
-    viewport_height: usize,
-    layer_hidden: bool,
+    layout: &ControlPanelLayout,
     packet: &BallPacket,
 ) {
+    let panel_left = layout.panel_left;
+    let panel_top = layout.panel_top;
+    let panel_right = layout.panel_right;
+    let viewport_width = layout.viewport_width;
+    let viewport_height = layout.viewport_height;
+    let layer_hidden = packet.layer_visibility == 0;
     let status_bar_left = panel_left + 3;
     let status_bar_right = panel_right.saturating_sub(4);
     fill_rect(

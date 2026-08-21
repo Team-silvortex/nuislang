@@ -7,18 +7,28 @@ use super::parse_ball_packet_scene_core_fields::BallPacketSceneCoreFields;
 use super::parse_ball_packet_scene_runtime::BallPacketSceneRuntimeFields;
 use yir_core::Value;
 
+pub(crate) struct BallPacketValueParts<'a> {
+    pub(crate) color: &'a Value,
+    pub(crate) speed: &'a Value,
+    pub(crate) radius_scale: f32,
+    pub(crate) op: &'a str,
+}
+
 impl BallPacket {
     pub(crate) fn from_parts(
-        color: &Value,
-        speed: &Value,
-        radius_scale: f32,
+        values: BallPacketValueParts<'_>,
         scene_core: BallPacketSceneCoreFields,
         scene_runtime: BallPacketSceneRuntimeFields,
         frame_sync: BallPacketFrameSyncFields,
         response: BallPacketResponseFields,
         controls: BallPacketControlFields,
-        op: &str,
     ) -> Result<Self, String> {
+        let BallPacketValueParts {
+            color,
+            speed,
+            radius_scale,
+            op,
+        } = values;
         Ok(Self {
             color_key: scalar_to_color_key(color, op)?,
             speed: scalar_to_f32(speed, op)?,

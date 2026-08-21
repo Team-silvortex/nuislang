@@ -329,7 +329,6 @@ pub(super) fn build_lowered_functions_and_impls(
             lower_function(
                 function,
                 &module.domain,
-                &module.unit,
                 &module_struct_table.keys().cloned().collect(),
                 module_const_values,
                 visible_type_aliases,
@@ -370,7 +369,6 @@ pub(super) fn build_lowered_functions_and_impls(
                 lower_function(
                     function,
                     &module.domain,
-                    &module.unit,
                     &module_struct_table.keys().cloned().collect(),
                     module_const_values,
                     visible_type_aliases,
@@ -561,7 +559,6 @@ pub(super) fn build_lowered_functions_and_impls(
                     lower_function(
                         function,
                         &module.domain,
-                        &helper.unit,
                         &helper_struct_set,
                         helper_const_maps.get(&helper.unit).unwrap(),
                         &helper_type_aliases,
@@ -588,7 +585,6 @@ pub(super) fn build_lowered_functions_and_impls(
             lowered_functions.push(lower_function(
                 &function,
                 &module.domain,
-                &helper.unit,
                 &helper_struct_set,
                 helper_const_maps.get(&helper.unit).unwrap(),
                 &helper_type_aliases,

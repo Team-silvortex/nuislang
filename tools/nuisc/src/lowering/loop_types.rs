@@ -91,9 +91,9 @@ pub(super) enum PreparedHostCallReturn {
     CompareCallResult {
         result_name: String,
         op: NirBinaryOp,
-        expected: NirExpr,
-        matched: NirExpr,
-        unmatched: NirExpr,
+        expected: Box<NirExpr>,
+        matched: Box<NirExpr>,
+        unmatched: Box<NirExpr>,
     },
     WriteFlushExitCode {
         write_name: String,

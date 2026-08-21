@@ -1,4 +1,5 @@
 use super::ball_packet::BallPacket;
+use super::ball_packet_from_parts::BallPacketValueParts;
 use super::packet_helpers::{find_flat_packet_field, find_slider_packet_value, scalar_to_f32};
 use super::parse_ball_packet_controls::parse_ball_packet_controls;
 use super::parse_ball_packet_frame_sync::parse_ball_packet_frame_sync;
@@ -59,14 +60,16 @@ fn parse_ball_packet_struct(packet: &StructValue, op: &str) -> Result<BallPacket
     let controls = parse_ball_packet_controls(packet, op, radius_scale, scene_core.accent, speed)?;
 
     BallPacket::from_parts(
-        color,
-        speed,
-        radius_scale,
+        BallPacketValueParts {
+            color,
+            speed,
+            radius_scale,
+            op,
+        },
         scene_core,
         scene_runtime,
         frame_sync,
         response,
         controls,
-        op,
     )
 }

@@ -101,9 +101,11 @@ pub fn compile_artifacts_for_output_dir_with_packaging_mode(
             output_dir.display()
         ));
     }
-    let host_objects = (packaging_mode == "native-cpu-llvm")
-        .then(|| native_host_objects(&layout.llvm_object_path, &layout.runtime_object_path))
-        .unwrap_or_default();
+    let host_objects = if packaging_mode == "native-cpu-llvm" {
+        native_host_objects(&layout.llvm_object_path, &layout.runtime_object_path)
+    } else {
+        Vec::new()
+    };
     for object in &host_objects {
         if !Path::new(&object.path).is_file() {
             return Err(format!(

@@ -198,17 +198,19 @@ fn parse_registered_collection(input_evidence: &str) -> Option<ProviderRequestCo
     let requests = (0..count)
         .map(|index| {
             build_request(
-                "registered-collection",
                 &fields,
-                &format!("provider_request_{index}_buffer_"),
-                &format!("provider_request_{index}_kernel_"),
-                &format!("provider_request_{index}_output_binding_"),
-                &format!("provider_request_{index}_model_asset_"),
-                &format!("provider_request_{index}_code_asset_"),
-                &format!("provider_request_{index}_output_comparison_"),
-                &format!("provider_request_{index}_dependency_"),
-                &format!("provider_request_{index}_input_binding_"),
-                &format!("provider_request_{index}_adapter_binding_"),
+                ProviderRequestFieldLayout {
+                    source: "registered-collection",
+                    buffer_prefix: &format!("provider_request_{index}_buffer_"),
+                    kernel_prefix: &format!("provider_request_{index}_kernel_"),
+                    output_binding_prefix: &format!("provider_request_{index}_output_binding_"),
+                    model_prefix: &format!("provider_request_{index}_model_asset_"),
+                    code_asset_prefix: &format!("provider_request_{index}_code_asset_"),
+                    comparison_prefix: &format!("provider_request_{index}_output_comparison_"),
+                    dependency_prefix: &format!("provider_request_{index}_dependency_"),
+                    input_binding_prefix: &format!("provider_request_{index}_input_binding_"),
+                    adapter_binding_prefix: &format!("provider_request_{index}_adapter_binding_"),
+                },
             )
         })
         .collect::<Option<Vec<_>>>()?;
@@ -231,17 +233,19 @@ fn parse_registered_request(input_evidence: &str) -> Option<ProviderRequest> {
         == PROVIDER_KERNEL_DESCRIPTOR_CONTRACT)
         .then_some(())?;
     build_request(
-        "registered-descriptors",
         &fields,
-        "provider_buffer_",
-        "provider_kernel_",
-        "provider_output_binding_",
-        "provider_model_asset_",
-        "provider_code_asset_",
-        "provider_output_comparison_",
-        "provider_dependency_",
-        "provider_input_binding_",
-        "provider_adapter_binding_",
+        ProviderRequestFieldLayout {
+            source: "registered-descriptors",
+            buffer_prefix: "provider_buffer_",
+            kernel_prefix: "provider_kernel_",
+            output_binding_prefix: "provider_output_binding_",
+            model_prefix: "provider_model_asset_",
+            code_asset_prefix: "provider_code_asset_",
+            comparison_prefix: "provider_output_comparison_",
+            dependency_prefix: "provider_dependency_",
+            input_binding_prefix: "provider_input_binding_",
+            adapter_binding_prefix: "provider_adapter_binding_",
+        },
     )
 }
 
@@ -318,19 +322,35 @@ fn parse_legacy_pixelmagic_request(input_evidence: &str) -> Option<ProviderReque
     })
 }
 
-fn build_request(
+struct ProviderRequestFieldLayout<'a> {
     source: &'static str,
+    buffer_prefix: &'a str,
+    kernel_prefix: &'a str,
+    output_binding_prefix: &'a str,
+    model_prefix: &'a str,
+    code_asset_prefix: &'a str,
+    comparison_prefix: &'a str,
+    dependency_prefix: &'a str,
+    input_binding_prefix: &'a str,
+    adapter_binding_prefix: &'a str,
+}
+
+fn build_request(
     fields: &BTreeMap<String, String>,
-    buffer_prefix: &str,
-    kernel_prefix: &str,
-    output_binding_prefix: &str,
-    model_prefix: &str,
-    code_asset_prefix: &str,
-    comparison_prefix: &str,
-    dependency_prefix: &str,
-    input_binding_prefix: &str,
-    adapter_binding_prefix: &str,
+    layout: ProviderRequestFieldLayout<'_>,
 ) -> Option<ProviderRequest> {
+    let ProviderRequestFieldLayout {
+        source,
+        buffer_prefix,
+        kernel_prefix,
+        output_binding_prefix,
+        model_prefix,
+        code_asset_prefix,
+        comparison_prefix,
+        dependency_prefix,
+        input_binding_prefix,
+        adapter_binding_prefix,
+    } = layout;
     let buffer = ProviderBufferDescriptor {
         id: field(fields, buffer_prefix, "id")?.clone(),
         element_type: field(fields, buffer_prefix, "element_type")?.clone(),

@@ -17,7 +17,8 @@ fn rejects_ref_parameter_in_extern_function_signature() {
 
     assert!(error.contains("extern function `host_take_ptr` parameter `head`"));
     assert!(error.contains("non-optional `ref Buffer` bridge values"));
-    assert!(error.contains("hash-bound owned `ref String` returns"));
+    assert!(error.contains("hash-bound owned `ref String`"));
+    assert!(error.contains("`ref FfiObject` returns"));
 }
 
 #[test]
@@ -38,7 +39,8 @@ fn rejects_ref_return_in_extern_interface_signature() {
 
     assert!(error.contains("extern method `Nodes.head` return type"));
     assert!(error.contains("non-optional `ref Buffer` bridge values"));
-    assert!(error.contains("hash-bound owned `ref String` returns"));
+    assert!(error.contains("hash-bound owned `ref String`"));
+    assert!(error.contains("`ref FfiObject` returns"));
 }
 
 #[test]

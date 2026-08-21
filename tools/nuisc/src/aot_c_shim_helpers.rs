@@ -151,7 +151,7 @@ pub(crate) fn collect_host_ffi_symbols(ast: &AstModule) -> BTreeMap<String, AstE
             .host_symbol
             .as_deref()
             .and_then(resolve_std_host_symbol)
-            .unwrap_or_else(|| function.name.as_str());
+            .unwrap_or(function.name.as_str());
         if symbol.starts_with("host_")
             && !matches!(
                 symbol,

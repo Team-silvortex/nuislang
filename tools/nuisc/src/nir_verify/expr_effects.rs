@@ -262,17 +262,14 @@ pub(in crate::nir_verify) fn apply_guaranteed_expr_effects(
         | NirExpr::CpuMutexLock(_)
         | NirExpr::CpuMutexUnlock(_)
         | NirExpr::BorrowEnd(_) => note_binding_effects(expr, "_", moved, borrows, borrow_bindings),
-        NirExpr::CpuMutexCapability { op, .. }
-            if matches!(
-                op,
+        NirExpr::CpuMutexCapability {
+            op:
                 NirMutexCapabilityOp::Share
-                    | NirMutexCapabilityOp::SharedClose
-                    | NirMutexCapabilityOp::PermitLock
-                    | NirMutexCapabilityOp::LeaseUnlock
-            ) =>
-        {
-            note_binding_effects(expr, "_", moved, borrows, borrow_bindings)
-        }
+                | NirMutexCapabilityOp::SharedClose
+                | NirMutexCapabilityOp::PermitLock
+                | NirMutexCapabilityOp::LeaseUnlock,
+            ..
+        } => note_binding_effects(expr, "_", moved, borrows, borrow_bindings),
         NirExpr::Borrow(_) | NirExpr::LoadNext(_) if include_temporary_borrows => {
             note_binding_effects(expr, "_", moved, borrows, borrow_bindings)
         }

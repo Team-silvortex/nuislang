@@ -25,7 +25,7 @@ pub(crate) fn validate_spirv_u32_module(
     asset: &ProviderCodeAssetDescriptor,
     bytes: &[u8],
 ) -> Result<VulkanStorageBufferLayout, String> {
-    if bytes.len() < 20 || bytes.len() % 4 != 0 {
+    if bytes.len() < 20 || !bytes.len().is_multiple_of(4) {
         return Err("Vulkan SPIR-V asset has invalid word alignment".to_owned());
     }
     let magic = u32::from_le_bytes(bytes[0..4].try_into().unwrap());

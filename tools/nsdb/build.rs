@@ -46,7 +46,7 @@ fn main() {
 }
 
 fn canonical_manifest(registrations: &[NustarProviderBundleRegistration]) -> String {
-    let mut canonical = format!("nuis-provider-bundle-manifest-v1\n");
+    let mut canonical = "nuis-provider-bundle-manifest-v1\n".to_owned();
     for registration in registrations {
         canonical.push_str(&format!(
             "{}|{}|{}|{}|{}|{}|{}\n",

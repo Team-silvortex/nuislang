@@ -80,9 +80,11 @@ pub(super) fn validate_owned_return_buffer_yir(module: &YirModule) -> Result<(),
             return_nodes.as_slice(),
         ) {
             ([free], [], []) => validate_owner_tail(
-                contract.symbol,
-                &producer.name,
-                producer_index,
+                OwnerTail {
+                    symbol: contract.symbol,
+                    owner: &producer.name,
+                    index: producer_index,
+                },
                 free,
                 &consumers,
                 function,
@@ -130,9 +132,11 @@ pub(super) fn validate_owned_return_buffer_yir(module: &YirModule) -> Result<(),
                 )?;
             }
             ([], [], [returned]) => validate_owner_tail(
-                contract.symbol,
-                &producer.name,
-                producer_index,
+                OwnerTail {
+                    symbol: contract.symbol,
+                    owner: &producer.name,
+                    index: producer_index,
+                },
                 returned,
                 &consumers,
                 function,
@@ -227,9 +231,11 @@ fn validate_returned_call_owners(
             }
         };
         validate_owner_tail(
-            &format!("{} via {}", owner.op.args[0], contract.destructor_symbol),
-            &owner.name,
-            owner_index,
+            OwnerTail {
+                symbol: &format!("{} via {}", owner.op.args[0], contract.destructor_symbol),
+                owner: &owner.name,
+                index: owner_index,
+            },
             terminal,
             &consumers,
             function,
@@ -267,9 +273,11 @@ fn validate_transferred_owner_tail(
         ));
     };
     validate_owner_tail(
-        symbol,
-        &transfer.name,
-        transfer_index,
+        OwnerTail {
+            symbol,
+            owner: &transfer.name,
+            index: transfer_index,
+        },
         free,
         &consumers,
         function,
@@ -278,16 +286,25 @@ fn validate_transferred_owner_tail(
     )
 }
 
+struct OwnerTail<'a> {
+    symbol: &'a str,
+    owner: &'a str,
+    index: usize,
+}
+
 fn validate_owner_tail(
-    symbol: &str,
-    owner: &str,
-    owner_index: usize,
+    tail: OwnerTail<'_>,
     free: &Node,
     consumers: &[&Node],
     function: &YirFunction,
     positions: &BTreeMap<&str, usize>,
     nodes: &BTreeMap<&str, &Node>,
 ) -> Result<(), String> {
+    let OwnerTail {
+        symbol,
+        owner,
+        index: owner_index,
+    } = tail;
     let Some(&free_index) = positions.get(free.name.as_str()) else {
         return Err(format!(
             "owned extern buffer `{symbol}` destructor transfer escapes YIR function `{}`",

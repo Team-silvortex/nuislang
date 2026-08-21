@@ -25,9 +25,9 @@ use expr_lowering_structs::{
 };
 
 thread_local! {
-    static CURRENT_MODULE_STRUCTS: RefCell<BTreeSet<String>> = RefCell::new(BTreeSet::new());
+    static CURRENT_MODULE_STRUCTS: RefCell<BTreeSet<String>> = const { RefCell::new(BTreeSet::new()) };
     static CURRENT_TYPE_ALIASES: RefCell<BTreeMap<String, AstTypeAlias>> =
-        RefCell::new(BTreeMap::new());
+        const { RefCell::new(BTreeMap::new()) };
 }
 
 pub(super) fn with_current_module_structs<T>(

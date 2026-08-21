@@ -190,7 +190,7 @@ fn classify_proof(
             && selected_set_hash == "none";
         let provider_selection_verified = selected_set_contract == SELECTED_SET_CONTRACT
             && selected_set_count > 0
-            && valid_fnv1a64(&selected_set_hash);
+            && valid_fnv1a64(selected_set_hash);
         if provider_selection_absent || provider_selection_verified {
             "verified"
         } else {

@@ -211,7 +211,6 @@ pub(super) fn build_default_impl_method_function(
 pub(super) fn lower_function(
     function: &AstFunction,
     current_domain: &str,
-    _current_unit: &str,
     current_module_structs: &BTreeSet<String>,
     module_consts: &BTreeMap<String, ModuleConstValue>,
     type_aliases: &BTreeMap<String, AstTypeAlias>,

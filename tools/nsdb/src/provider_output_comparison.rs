@@ -93,7 +93,7 @@ pub(crate) fn compare_provider_output(
     if descriptor.element_type != "f32" {
         return compare_exact_provider_output(descriptor, actual, &expected);
     }
-    if actual.len() % 4 != 0 {
+    if !actual.len().is_multiple_of(4) {
         return Err("provider output comparison requires complete f32 elements".to_owned());
     }
     let absolute_tolerance = parse_tolerance("absolute", &descriptor.absolute_tolerance)?;

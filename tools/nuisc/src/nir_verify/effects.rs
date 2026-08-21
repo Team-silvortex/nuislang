@@ -121,15 +121,14 @@ pub(super) fn note_binding_effects(
                 borrows.remove(&source);
             }
         }
-        NirExpr::CpuMutexCapability { op, args }
-            if matches!(
-                op,
+        NirExpr::CpuMutexCapability {
+            op:
                 NirMutexCapabilityOp::Share
-                    | NirMutexCapabilityOp::SharedClose
-                    | NirMutexCapabilityOp::PermitLock
-                    | NirMutexCapabilityOp::LeaseUnlock
-            ) =>
-        {
+                | NirMutexCapabilityOp::SharedClose
+                | NirMutexCapabilityOp::PermitLock
+                | NirMutexCapabilityOp::LeaseUnlock,
+            args,
+        } => {
             if let Some(source) = args.first().and_then(expr_resource_key) {
                 moved.insert(source.clone());
                 borrows.remove(&source);

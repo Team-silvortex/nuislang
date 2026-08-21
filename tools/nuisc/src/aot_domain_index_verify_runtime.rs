@@ -246,7 +246,7 @@ pub(super) fn verify_clock_protocol(
                     protocol_label, unit.domain_family
                 ));
             }
-            if !protocol_source.contains(&format!("source = \"hetero.data_segment.")) {
+            if !protocol_source.contains("source = \"hetero.data_segment.") {
                 return Err(format!(
                     "clock protocol `{}` is missing hetero data segment edge source",
                     protocol_label

@@ -1,7 +1,7 @@
 use super::{
     attach_adapter_control, render_adapter_control, validate_adapter_launch,
-    validate_dispatch_payload_size, ProviderWorkerAdapterLaunch, ProviderWorkerLeaseManager,
-    MAX_PROVIDER_WORKER_DISPATCH_PAYLOAD_BYTES,
+    validate_dispatch_payload_size, ProviderWorkerAdapterLaunch, ProviderWorkerDispatchIdentity,
+    ProviderWorkerLeaseManager, MAX_PROVIDER_WORKER_DISPATCH_PAYLOAD_BYTES,
 };
 use crate::{
     provider_graph_output::{
@@ -200,8 +200,10 @@ fn process_adapter_materializes_and_validates_two_output_carriers() {
         .dispatch(
             "data.host.multi-output-process-adapter",
             "data:host",
-            "lease:process-fan-out",
-            0,
+            ProviderWorkerDispatchIdentity {
+                lease_id: "lease:process-fan-out",
+                sequence: 0,
+            },
             &request,
             &[prepared],
             Some(&launch),
@@ -376,8 +378,10 @@ fn lease_preserves_registered_primary_and_additional_outputs() {
         .dispatch(
             "generic.device.host-simulated",
             "data:host",
-            "lease:fan-out",
-            0,
+            ProviderWorkerDispatchIdentity {
+                lease_id: "lease:fan-out",
+                sequence: 0,
+            },
             &request,
             &[prepared],
             None,

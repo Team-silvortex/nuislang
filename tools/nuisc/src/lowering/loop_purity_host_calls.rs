@@ -123,9 +123,9 @@ pub(in crate::lowering) fn prepare_host_call_compare_return(
         PreparedHostCallReturn::CompareCallResult {
             result_name,
             op,
-            expected,
-            matched: matched.clone(),
-            unmatched: unmatched.clone(),
+            expected: Box::new(expected),
+            matched: Box::new(matched.clone()),
+            unmatched: Box::new(unmatched.clone()),
         },
     ))
 }

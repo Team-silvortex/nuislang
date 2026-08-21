@@ -2,6 +2,8 @@ use nuis_semantics::model::NirStmt;
 
 use super::{finish_loop_edge, CleanupContext, CleanupState};
 
+type RewrittenLoopBranches = Option<(Vec<NirStmt>, Vec<NirStmt>)>;
+
 pub(super) fn rewrite_direct_loop_control_if(
     then_body: Vec<NirStmt>,
     else_body: Vec<NirStmt>,
@@ -9,7 +11,7 @@ pub(super) fn rewrite_direct_loop_control_if(
     entry: &CleanupState,
     scope_start: usize,
     context: &mut CleanupContext<'_>,
-) -> Result<Option<(Vec<NirStmt>, Vec<NirStmt>)>, ()> {
+) -> Result<RewrittenLoopBranches, ()> {
     let then_is_empty = then_body.is_empty();
     let else_is_empty = else_body.is_empty();
     let then_body = if then_is_empty {

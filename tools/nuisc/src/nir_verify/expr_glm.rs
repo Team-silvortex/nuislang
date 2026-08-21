@@ -56,15 +56,14 @@ pub(super) fn verify_glm_expr_access(
                         }
                     }
                 }
-                NirExpr::CpuMutexCapability { op, args }
-                    if matches!(
-                        op,
+                NirExpr::CpuMutexCapability {
+                    op:
                         NirMutexCapabilityOp::Share
-                            | NirMutexCapabilityOp::SharedClose
-                            | NirMutexCapabilityOp::PermitLock
-                            | NirMutexCapabilityOp::LeaseUnlock
-                    ) =>
-                {
+                        | NirMutexCapabilityOp::SharedClose
+                        | NirMutexCapabilityOp::PermitLock
+                        | NirMutexCapabilityOp::LeaseUnlock,
+                    args,
+                } => {
                     if let Some(source) = args.first().and_then(expr_resource_key) {
                         if borrows.get(&source).copied().unwrap_or(0) > 0 {
                             return Err(format!(

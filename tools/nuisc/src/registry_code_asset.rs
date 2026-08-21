@@ -176,8 +176,8 @@ fn parse_registration_fields_into(
     }
     let lowering_source = inline_wgsl_source.as_deref().unwrap_or(&source_bytes);
     let source_is_inline_wgsl = source_extension == Some("wgsl") || inline_wgsl_source.is_some();
-    let bytes = if fields[2] == "metal-source" && inline_metal_source.is_some() {
-        inline_metal_source.expect("checked inline Metal source")
+    let bytes = if let Some(inline_metal_source) = inline_metal_source {
+        inline_metal_source
     } else if fields[2] == "metal-source" && source_is_inline_wgsl {
         crate::shader_msl_emitter::lower_canonical_inline_wgsl_u32_for_profile(
             lowering_source,

@@ -50,6 +50,11 @@ pub(crate) struct ProviderWorkerAdapterLaunch<'a> {
     pub(crate) output_byte_lengths: &'a [usize],
 }
 
+pub(crate) struct ProviderWorkerDispatchIdentity<'a> {
+    pub(crate) lease_id: &'a str,
+    pub(crate) sequence: usize,
+}
+
 struct RenderedProviderDispatch {
     payload: String,
     spilled_control: Option<Vec<u8>>,
@@ -148,12 +153,15 @@ impl ProviderWorkerLeaseManager {
         &mut self,
         adapter_id: &str,
         provider_family: &str,
-        lease_id: &str,
-        expected_sequence: usize,
+        identity: ProviderWorkerDispatchIdentity<'_>,
         request: &ProviderRequest,
         inputs: &[PreparedProviderInput],
         adapter_launch: Option<&ProviderWorkerAdapterLaunch<'_>>,
     ) -> Result<ProviderWorkerDispatchReceipt, String> {
+        let ProviderWorkerDispatchIdentity {
+            lease_id,
+            sequence: expected_sequence,
+        } = identity;
         if !self.leases.contains_key(adapter_id) {
             let adapter_image_dir = self.image_dir.join(adapter_id);
             let image = resolve_provider_worker_image(provider_family, &adapter_image_dir)?;

@@ -26,10 +26,9 @@ pub(crate) fn render_completion_event_fields(
 }
 
 pub(crate) fn parse_completion_event_fields(source: &str) -> CompiledCodeAssetSelectionEvidence {
-    parse_serialized_selection(source).unwrap_or_else(|_| {
-        let mut invalid = CompiledCodeAssetSelectionEvidence::default();
-        invalid.status = "invalid".to_owned();
-        invalid
+    parse_serialized_selection(source).unwrap_or_else(|_| CompiledCodeAssetSelectionEvidence {
+        status: "invalid".to_owned(),
+        ..Default::default()
     })
 }
 

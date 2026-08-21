@@ -5,7 +5,9 @@ use crate::provider_execution_adapter::{
 #[cfg(unix)]
 use crate::provider_graph_output::completed_additional_worker_outputs;
 #[cfg(unix)]
-use crate::provider_worker_lease::{ProviderWorkerAdapterLaunch, ProviderWorkerLeaseManager};
+use crate::provider_worker_lease::{
+    ProviderWorkerAdapterLaunch, ProviderWorkerDispatchIdentity, ProviderWorkerLeaseManager,
+};
 #[cfg(unix)]
 use crate::provider_worker_summary::bind_worker_output;
 use crate::{
@@ -509,13 +511,15 @@ fn execute_native_provider_outputs(
         let session_request =
             session.begin_request_with_output_roles(&request.kernel.id, &output_roles)?;
         let mut execution = execute_native_provider_request(
-            output_dir,
-            record,
-            effective_adapter,
-            request,
-            &completed,
-            provider_family,
-            &session_request,
+            NativeProviderRequestContext {
+                output_dir,
+                record,
+                adapter: effective_adapter,
+                request,
+                completed: &completed,
+                provider_family,
+                session_request: &session_request,
+            },
             #[cfg(unix)]
             &mut worker_leases,
             #[cfg(unix)]
@@ -591,17 +595,30 @@ fn declares_provider_request_contract(input_evidence: &str) -> bool {
     })
 }
 
+struct NativeProviderRequestContext<'a> {
+    output_dir: &'a Path,
+    record: &'a crate::model::NsdbDeviceProviderSampleRecordInfo,
+    adapter: &'a crate::provider_runner_registry::ProviderRunnerAdapter,
+    request: &'a ProviderRequest,
+    completed: &'a CompletedProviderOutputs,
+    provider_family: &'a str,
+    session_request: &'a ProviderSessionRequest,
+}
+
 fn execute_native_provider_request(
-    output_dir: &Path,
-    record: &crate::model::NsdbDeviceProviderSampleRecordInfo,
-    adapter: &crate::provider_runner_registry::ProviderRunnerAdapter,
-    request: &ProviderRequest,
-    completed: &CompletedProviderOutputs,
-    provider_family: &str,
-    session_request: &ProviderSessionRequest,
+    context: NativeProviderRequestContext<'_>,
     #[cfg(unix)] worker_leases: &mut ProviderWorkerLeaseManager,
     #[cfg(unix)] process_adapter_cache: &mut ProviderProcessAdapterCache,
 ) -> Result<ProviderRequestExecution, String> {
+    let NativeProviderRequestContext {
+        output_dir,
+        record,
+        adapter,
+        request,
+        completed,
+        provider_family,
+        session_request,
+    } = context;
     #[cfg(unix)]
     let execution_adapter = select_provider_execution_adapter(adapter.kind).ok_or_else(|| {
         format!(
@@ -656,8 +673,10 @@ fn execute_native_provider_request(
     let mut worker_receipt = worker_leases.dispatch(
         adapter.adapter_id,
         provider_family,
-        &session_request.lease_id,
-        session_request.sequence,
+        ProviderWorkerDispatchIdentity {
+            lease_id: &session_request.lease_id,
+            sequence: session_request.sequence,
+        },
         request,
         &inputs,
         worker_adapter_launch.as_ref(),

@@ -1,5 +1,5 @@
 use super::geometry_overlay::stamp_line;
-use super::scene_runtime_overlay::draw_scene_runtime_overlay;
+use super::scene_runtime_overlay::{draw_scene_runtime_overlay, SceneRuntimeOverlayLayout};
 use super::surface_primitives::{draw_box, fill_rect, put_text, BoxGlyphs};
 use super::BallPacket;
 
@@ -512,12 +512,14 @@ pub(crate) fn draw_scene_preview(
 
     draw_scene_runtime_overlay(
         rows,
-        preview_left,
-        preview_right,
-        root_y,
-        ground_y,
-        cluster_root_x,
-        cluster_root_y,
+        SceneRuntimeOverlayLayout {
+            preview_left,
+            preview_right,
+            root_y,
+            ground_y,
+            cluster_root_x,
+            cluster_root_y,
+        },
         packet,
     );
 }

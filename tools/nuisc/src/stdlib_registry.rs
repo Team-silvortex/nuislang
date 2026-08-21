@@ -49,10 +49,10 @@ pub(in crate::stdlib_registry) fn parse_stdlib_layout_source(
     source: &str,
     path: &Path,
 ) -> Result<StdlibLayout, String> {
-    let schema = parse_required_string(&source, "layout_schema", &path)?;
-    let name = parse_required_string(&source, "name", &path)?;
-    let default_entry = parse_required_string(&source, "default_entry", &path)?;
-    let modules = parse_stdlib_index_modules(&source, &path)?;
+    let schema = parse_required_string(source, "layout_schema", path)?;
+    let name = parse_required_string(source, "name", path)?;
+    let default_entry = parse_required_string(source, "default_entry", path)?;
+    let modules = parse_stdlib_index_modules(source, path)?;
     Ok(StdlibLayout {
         schema,
         name,

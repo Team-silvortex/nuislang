@@ -221,9 +221,7 @@ fn is_exhaustive_enum_match(
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<bool, String> {
     if value_ty.scalar_kind() == Some(NirScalarKind::Bool) {
-        return Ok(match_bool_pattern_coverage(
-            arms, /*require_exhaustive=*/ true,
-        )?);
+        return match_bool_pattern_coverage(arms, /*require_exhaustive=*/ true);
     }
     if arms.is_empty() || arms.iter().any(|arm| arm.guard.is_some()) {
         return Ok(false);
@@ -262,9 +260,7 @@ fn is_non_exhaustive_enum_match(
     struct_table: &BTreeMap<String, NirStructDef>,
 ) -> Result<bool, String> {
     if value_ty.scalar_kind() == Some(NirScalarKind::Bool) {
-        return Ok(match_bool_pattern_coverage(
-            arms, /*require_exhaustive=*/ false,
-        )?);
+        return match_bool_pattern_coverage(arms, /*require_exhaustive=*/ false);
     }
     if arms.is_empty() || arms.iter().any(|arm| arm.guard.is_some()) {
         return Ok(false);

@@ -624,9 +624,21 @@ fn substitute_prepared_host_call_return(
         } => PreparedHostCallReturn::CompareCallResult {
             result_name,
             op,
-            expected: substitute_branch_binding(&expected, binding_name, binding_value),
-            matched: substitute_branch_binding(&matched, binding_name, binding_value),
-            unmatched: substitute_branch_binding(&unmatched, binding_name, binding_value),
+            expected: Box::new(substitute_branch_binding(
+                &expected,
+                binding_name,
+                binding_value,
+            )),
+            matched: Box::new(substitute_branch_binding(
+                &matched,
+                binding_name,
+                binding_value,
+            )),
+            unmatched: Box::new(substitute_branch_binding(
+                &unmatched,
+                binding_name,
+                binding_value,
+            )),
         },
         PreparedHostCallReturn::WriteFlushExitCode {
             write_name,

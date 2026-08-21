@@ -2,6 +2,7 @@ use crate::handoff_binding::{
     from_claim as verify_binding_claim, parse_and_verify as verify_binding_proof, render_fields,
     same_proof,
 };
+use crate::handoff_status::{payload_handoff_status, PayloadHandoffStatus};
 use crate::model::{
     FinalImageBindingProofClaim, NsdbDeviceProviderSampleRecordInfo, NsdbPayloadExecutionEvent,
     NsdbPayloadExecutionHandoffInfo, PayloadExecutionHandoffPersistSummary,
@@ -22,8 +23,7 @@ use crate::provider_completion_integrity::{
     DIGEST_SHA256_SIGNED_CONTRACT as PROVIDER_COMPLETION_DIGEST_SHA256_SIGNED_CONTRACT,
 };
 use crate::provider_completion_signature::{
-    handoff_error_status as provider_completion_signature_error, sign_from_environment,
-    signing_key_configured, verify_from_environment,
+    sign_from_environment, signing_key_configured, verify_from_environment,
     SIGNATURE_CONTRACT as PROVIDER_COMPLETION_SIGNATURE_CONTRACT,
 };
 use crate::runtime_dispatch_receipt::{
@@ -561,18 +561,19 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
     let first_status = parse_string_toml_field(&source, "first_status")
         .or_else(|| first_event.map(|event| event.status.clone()))
         .unwrap_or_else(|| "none".to_owned());
-    let status = payload_handoff_status(
-        &protocol,
-        &debugger_contract,
+    let status = payload_handoff_status(PayloadHandoffStatus {
+        protocol: &protocol,
+        debugger_contract: &debugger_contract,
         record_count,
-        &first_status,
-        &provider_completion_set_hash_validation_status,
-        &provider_completion_claim_authority_status,
-        &provider_completion_signature_status,
-        &final_image_binding_proof.proof_status,
-        &provider_completion_dispatch_identity.status,
-        &runtime_dispatch_receipt.status,
-    );
+        first_status: &first_status,
+        provider_completion_set_hash_validation_status:
+            &provider_completion_set_hash_validation_status,
+        provider_completion_claim_authority_status: &provider_completion_claim_authority_status,
+        provider_completion_signature_status: &provider_completion_signature_status,
+        final_image_binding_proof_status: &final_image_binding_proof.proof_status,
+        provider_completion_dispatch_status: &provider_completion_dispatch_identity.status,
+        runtime_dispatch_receipt_status: &runtime_dispatch_receipt.status,
+    });
     NsdbPayloadExecutionHandoffInfo {
         available: true,
         path: path.display().to_string(),
@@ -635,71 +636,6 @@ pub(crate) fn read_payload_execution_handoff(output_dir: &Path) -> NsdbPayloadEx
         )
         .unwrap_or_else(|| "none".to_owned()),
         events,
-    }
-}
-
-fn payload_handoff_status(
-    protocol: &str,
-    debugger_contract: &str,
-    record_count: usize,
-    first_status: &str,
-    provider_completion_set_hash_validation_status: &str,
-    provider_completion_claim_authority_status: &str,
-    provider_completion_signature_status: &str,
-    final_image_binding_proof_status: &str,
-    provider_completion_dispatch_status: &str,
-    runtime_dispatch_receipt_status: &str,
-) -> String {
-    if protocol != "nuis-nsdb-payload-execution-handoff-v1" {
-        return "unsupported-protocol".to_owned();
-    }
-    if debugger_contract != "nsdb-yir-payload-execution-trace-v1" {
-        return "unsupported-debugger-contract".to_owned();
-    }
-    if record_count == 0 {
-        return "empty".to_owned();
-    }
-    if !matches!(
-        final_image_binding_proof_status,
-        "verified" | "verified-empty" | "legacy-unbound"
-    ) {
-        return format!("final-image-binding-proof-{final_image_binding_proof_status}");
-    }
-    if !matches!(
-        runtime_dispatch_receipt_status,
-        "verified" | "legacy-absent"
-    ) {
-        return format!("runtime-dispatch-receipt-{runtime_dispatch_receipt_status}");
-    }
-    if matches!(
-        provider_completion_dispatch_status,
-        "mismatch" | "final-image-authority-missing"
-    ) {
-        return format!("provider-completion-dispatch-{provider_completion_dispatch_status}");
-    }
-    match provider_completion_set_hash_validation_status {
-        "mismatch" => return "provider-completion-set-hash-mismatch".to_owned(),
-        "unsupported-digest-contract" => {
-            return "provider-completion-digest-contract-unsupported".to_owned()
-        }
-        _ => {}
-    }
-    match provider_completion_claim_authority_status {
-        "authority-missing" => return "provider-completion-claim-authority-missing".to_owned(),
-        "unsupported-authority-contract" => {
-            return "provider-completion-claim-authority-contract-unsupported".to_owned()
-        }
-        "authority-untrusted" => return "provider-completion-claim-authority-untrusted".to_owned(),
-        _ => {}
-    }
-    if let Some(status) = provider_completion_signature_error(provider_completion_signature_status)
-    {
-        return status.to_owned();
-    }
-    if first_status == "ready" {
-        "ready".to_owned()
-    } else {
-        "blocked".to_owned()
     }
 }
 
