@@ -259,6 +259,19 @@ into one canonical report. Direct relocations become non-overlapping
 write-once patch spans with source-byte and encoded-byte hashes; unresolved
 system targets remain deferred. This stage deliberately previews writes and
 does not mutate or publish the image.
+`nuis-nsld-elf-amd64-patch-application-v1` independently rebuilds the exact
+source image and preview, rejects any plan, source, order, width, or byte-hash
+drift, and writes every direct relocation once into a separate buffer. Its
+ledger binds source and applied file/memory hashes, every write span, and every
+preview/write audit. Deferred compatibility relocations remain unchanged, and
+the applied image is not yet passed to a shell serializer or publisher.
+`nuis-nsld-elf-amd64-platform-structure-plan-v1` validates that ledger before
+using a static provider rule registry to group external PLT32 calls. It assigns
+shared 16-byte nonlazy PLT entries, 8-byte GOT slots, deduplicated dynamic
+symbol/string records, and `R_X86_64_JUMP_SLOT` `Elf64_Rela` records across
+page-separated RX, RW, and RO regions. Each deferred source is bound to exactly
+one checked i32 patch preview; unsupported shapes, overlapping sources,
+ambiguous registration, and ledger drift fail before any platform byte write.
 The Mach-O route proves relocatable input,
 table parsing, placement,
 binding, merged-image construction, direct and
@@ -269,8 +282,8 @@ validator, one real isolated OS-loader execution, durable replay admission, and
 registered opt-in publication and ordinary explicit selection. The real internal fixture now executes
 `ADRP`/`ADD`/`STR` against provider-allocated common storage before passing
 signature, loader, receipt replay, ordinary final-output selection, and direct
-execution. ELF direct patch application, platform-structure synthesis, shell
-serialization, load admission, and PE/COFF remain incomplete. The
+execution. ELF platform byte application, shell serialization, load admission,
+and PE/COFF remain incomplete. The
 ordinary default compatibility executable remains byte-for-byte unchanged;
 private installation requires both the explicit policy and `--apply`.
 

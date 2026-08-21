@@ -8,11 +8,22 @@ const ELF_RELA_SIZE: usize = 24;
 pub(crate) const R_X86_64_PLT32: u32 = 4;
 
 pub(crate) fn elf_program_object(relocation_type: u32) -> Vec<u8> {
+    let relocations = [(1, relocation_type, -4)];
     build_object(ObjectFixture {
         text: &[0xe8, 0, 0, 0, 0, 0xc3],
         defined_symbol: "__nuis_entry",
         undefined_symbol: Some("nuis_runtime_entry"),
-        relocation_type: Some(relocation_type),
+        relocations: &relocations,
+    })
+}
+
+pub(crate) fn elf_program_object_two_plt32_calls() -> Vec<u8> {
+    let relocations = [(1, R_X86_64_PLT32, -4), (6, R_X86_64_PLT32, -4)];
+    build_object(ObjectFixture {
+        text: &[0xe8, 0, 0, 0, 0, 0xe8, 0, 0, 0, 0, 0xc3],
+        defined_symbol: "__nuis_entry",
+        undefined_symbol: Some("nuis_runtime_entry"),
+        relocations: &relocations,
     })
 }
 
@@ -21,7 +32,7 @@ pub(crate) fn elf_runtime_object() -> Vec<u8> {
         text: &[0xc3],
         defined_symbol: "nuis_runtime_entry",
         undefined_symbol: None,
-        relocation_type: None,
+        relocations: &[],
     })
 }
 
@@ -29,11 +40,11 @@ struct ObjectFixture<'a> {
     text: &'a [u8],
     defined_symbol: &'a str,
     undefined_symbol: Option<&'a str>,
-    relocation_type: Option<u32>,
+    relocations: &'a [(u64, u32, i64)],
 }
 
 fn build_object(fixture: ObjectFixture<'_>) -> Vec<u8> {
-    let has_relocation = fixture.relocation_type.is_some();
+    let has_relocation = !fixture.relocations.is_empty();
     let section_names = if has_relocation {
         [".text", ".rela.text", ".symtab", ".strtab", ".shstrtab"].as_slice()
     } else {
@@ -46,7 +57,7 @@ fn build_object(fixture: ObjectFixture<'_>) -> Vec<u8> {
     let section_count = section_names.len() + 1;
     let text_offset = ELF_HEADER_SIZE;
     let relocation_offset = align_up(text_offset + fixture.text.len(), 8);
-    let relocation_size = usize::from(has_relocation) * ELF_RELA_SIZE;
+    let relocation_size = fixture.relocations.len() * ELF_RELA_SIZE;
     let symbol_offset = align_up(relocation_offset + relocation_size, 8);
     let symbol_size = symbol_count * ELF_SYMBOL_SIZE;
     let string_offset = symbol_offset + symbol_size;
@@ -61,14 +72,17 @@ fn build_object(fixture: ObjectFixture<'_>) -> Vec<u8> {
         section_count - 1,
     );
     bytes[text_offset..text_offset + fixture.text.len()].copy_from_slice(fixture.text);
-    if let Some(relocation_type) = fixture.relocation_type {
-        write_u64(&mut bytes, relocation_offset, 1);
+    for (index, (source_offset, relocation_type, addend)) in
+        fixture.relocations.iter().copied().enumerate()
+    {
+        let entry_offset = relocation_offset + index * ELF_RELA_SIZE;
+        write_u64(&mut bytes, entry_offset, source_offset);
         write_u64(
             &mut bytes,
-            relocation_offset + 8,
+            entry_offset + 8,
             (2u64 << 32) | u64::from(relocation_type),
         );
-        write_i64(&mut bytes, relocation_offset + 16, -4);
+        write_i64(&mut bytes, entry_offset + 16, addend);
     }
     write_symbol(
         &mut bytes,

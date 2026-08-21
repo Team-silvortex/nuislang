@@ -51,11 +51,19 @@ remain explicit platform-structure work. The provider now also reconstructs
 the merged memory image from hash- and size-bound `ET_REL` payloads, audits
 file-backed copies and zero-fill ranges separately, binds file/memory image
 hashes to both plans, and derives non-overlapping write-once patch spans without
-altering the reconstructed bytes.
+altering the reconstructed bytes. `nuis-nsld-elf-amd64-patch-application-v1`
+then rebuilds and revalidates that source image, applies every direct span once
+in an independent buffer, and binds source/applied file and memory hashes plus
+per-write audits into one deterministic ledger. Deferred compatibility targets
+remain untouched. `nuis-nsld-elf-amd64-platform-structure-plan-v1` then groups
+external PLT32 targets through a static provider rule registry, deduplicates
+dynamic symbols, assigns shared PLT/GOT slots and `R_X86_64_JUMP_SLOT` records
+across page-separated RX/RW/RO regions, and derives a checked second-stage patch
+preview for every deferred source without changing the applied image.
 It still atomically publishes the host-linked compatibility image without
-invoking Clang or LLD at finalization time. Actual patch application,
-platform-structure synthesis, provider-owned ELF shell serialization, and load
-admission remain the next format frontier; PE/COFF parity remains open.
+invoking Clang or LLD at finalization time. Provider-owned platform byte
+application, ELF shell serialization, and load admission remain the next format
+frontier; PE/COFF parity remains open.
 
 Start with these documents:
 

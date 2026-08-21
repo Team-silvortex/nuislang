@@ -116,10 +116,13 @@ without invoking Clang or LLD.
 This closes a registered Linux compatibility-image finalizer, not a pure Nsld
 ELF linker. The accepted executable is still the host-toolchain-linked image
 embedded by Nuisc. Nsld now owns object parsing and cross-object symbol closure,
-deterministic final addresses, and checked non-mutating previews for the parsed
-`R_X86_64_*` relocations. It does not yet materialize a merged image, apply the
-previewed writes, synthesize unresolved platform structures, or serialize a
-provider-owned ELF shell.
+deterministic final addresses, merged-image reconstruction, direct write-once
+relocation application, and `nuis-nsld-elf-amd64-platform-structure-plan-v1`.
+That plan validates the applied-image ledger, groups external PLT32 targets
+through a static provider rule registry, assigns shared nonlazy PLT/GOT slots
+plus dynamic symbol/string and `R_X86_64_JUMP_SLOT` records, and binds every
+deferred source to one non-mutating patch preview. It does not yet materialize
+those platform bytes or serialize and load-admit a provider-owned ELF shell.
 
 This is not yet a pure Nsld linker claim. Nsld now understands the real input
 tables, assigns deterministic final sections and addresses, applies registered
@@ -226,10 +229,25 @@ unresolved compatibility targets stay deferred. Preview construction proves it
 did not mutate or publish the merged image, and reversed object input preserves
 the plan hash.
 
-The next native milestone is `nuis-nsld-elf-amd64-patch-application-v1`:
-rebuild and revalidate that source image, apply every direct span exactly once,
-and emit a pre/post-image and applied-span ledger without publication. Nuisc
-must remain free of ELF branches.
+`nuis-nsld-elf-amd64-patch-application-v1` now closes the direct-write
+milestone. It independently rebuilds both the source image and materialization
+preview, rejects plan/source/order/width/hash drift, and applies every direct
+span exactly once in an isolated buffer. The resulting ledger binds source and
+applied file/memory hashes plus each preview and write audit. Deferred
+compatibility targets remain untouched, and no applied bytes are serialized or
+published.
+
+`nuis-nsld-elf-amd64-platform-structure-plan-v1` now closes the non-mutating
+platform layout milestone. It consumes that applied-image ledger and deferred
+relocation set, groups external PLT32 targets through a registration-owned rule
+table, assigns shared nonlazy PLT/GOT slots plus deduplicated dynamic symbols,
+strings, and `R_X86_64_JUMP_SLOT` records, and binds each deferred source to one
+checked patch preview.
+
+The next native milestone is
+`nuis-nsld-elf-amd64-platform-patch-application-v1`: materialize those exact
+structure records into an extended working image and commit every deferred
+source once under a second write ledger. Nuisc must remain free of ELF branches.
 
 ## Validation
 

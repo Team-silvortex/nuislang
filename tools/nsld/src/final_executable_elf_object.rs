@@ -3,6 +3,13 @@ use crate::{
     final_executable_elf_layout::build_elf_amd64_placement_binding,
     final_executable_elf_layout_report::ElfAmd64PlacementBindingReport,
     final_executable_elf_materialization::{
+        application::{
+            apply_elf_amd64_patch_previews,
+            platform::{
+                build_elf_amd64_platform_structure_plan, ElfAmd64PlatformStructurePlanReport,
+            },
+            ElfAmd64PatchApplicationReport,
+        },
         build_elf_amd64_materialization_preview, ElfAmd64ImageObject,
     },
     final_executable_elf_materialization_report::ElfAmd64MaterializationPreviewReport,
@@ -43,6 +50,8 @@ pub(crate) struct ElfAmd64HostObjectLinkage {
     pub(crate) placement_binding: ElfAmd64PlacementBindingReport,
     pub(crate) relocation_application: ElfAmd64RelocationApplicationReport,
     pub(crate) materialization_preview: ElfAmd64MaterializationPreviewReport,
+    pub(crate) patch_application: ElfAmd64PatchApplicationReport,
+    pub(crate) platform_structure_plan: ElfAmd64PlatformStructurePlanReport,
 }
 
 pub(crate) fn build_elf_amd64_host_object_linkage(
@@ -169,6 +178,20 @@ pub(crate) fn build_elf_amd64_host_object_linkage(
         &placement_binding,
         &relocation_application,
     )?;
+    let applied_image = apply_elf_amd64_patch_previews(
+        &image_objects,
+        &placement_binding,
+        &relocation_application,
+        &materialization_preview,
+    )?;
+    if crate::fnv1a64_hex(&applied_image.bytes) != applied_image.report.applied_memory_image_hash {
+        return Err("ELF applied image handoff hash drift".to_owned());
+    }
+    let platform_structure_plan = build_elf_amd64_platform_structure_plan(
+        &placement_binding,
+        &relocation_application,
+        &applied_image.report,
+    )?;
     Ok(ElfAmd64HostObjectLinkage {
         summary: ElfAmd64HostObjectLinkageSummary {
             contract: ELF_AMD64_HOST_OBJECT_LINKAGE_CONTRACT,
@@ -186,6 +209,8 @@ pub(crate) fn build_elf_amd64_host_object_linkage(
         placement_binding,
         relocation_application,
         materialization_preview,
+        patch_application: applied_image.report,
+        platform_structure_plan,
     })
 }
 

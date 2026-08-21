@@ -452,6 +452,22 @@ fn dev_tensor_drift_checks_are_currently_clean() {
     assert!(drift
         .checks
         .iter()
+        .any(|check| check.id == "nsld-elf-amd64-patch-application-contract"));
+    assert!(drift
+        .checks
+        .iter()
+        .any(|check| check.id == "nsld-elf-amd64-patch-application-regression"));
+    assert!(drift
+        .checks
+        .iter()
+        .any(|check| check.id == "nsld-elf-amd64-platform-structure-plan-contract"));
+    assert!(drift
+        .checks
+        .iter()
+        .any(|check| check.id == "nsld-elf-amd64-platform-structure-plan-regression"));
+    assert!(drift
+        .checks
+        .iter()
         .any(|check| check.id == "scheduler-mutex-yir-contract"));
     assert!(drift
         .checks
@@ -576,6 +592,10 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("drift_check: id=nsld-elf-amd64-relocation-application-regression"));
     assert!(text.contains("drift_check: id=nsld-elf-amd64-materialization-preview-contract"));
     assert!(text.contains("drift_check: id=nsld-elf-amd64-materialization-preview-regression"));
+    assert!(text.contains("drift_check: id=nsld-elf-amd64-patch-application-contract"));
+    assert!(text.contains("drift_check: id=nsld-elf-amd64-patch-application-regression"));
+    assert!(text.contains("drift_check: id=nsld-elf-amd64-platform-structure-plan-contract"));
+    assert!(text.contains("drift_check: id=nsld-elf-amd64-platform-structure-plan-regression"));
     assert!(text.contains("drift_check: id=scheduler-mutex-yir-contract"));
     assert!(text.contains("drift_check: id=scheduler-mutex-runtime-visibility"));
     assert!(text.contains("drift_check: id=scheduler-shared-mutex-llvm-native-lowering"));

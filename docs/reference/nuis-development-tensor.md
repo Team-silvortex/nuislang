@@ -423,13 +423,26 @@ The `beta-0.1` calibration baseline is:
   binds source-object, file-image, memory-image, placement, and relocation
   hashes. Direct relocations become non-overlapping write-once patch spans with
   source and encoded byte evidence without mutating the source image; unresolved
-  compatibility targets remain deferred. The provider validates an ELF64
+  compatibility targets remain deferred.
+  `nuis-nsld-elf-amd64-patch-application-v1` independently rebuilds the source
+  image and preview, rejects identity/order/width/hash drift, applies each
+  direct span once in an isolated buffer, and binds source/applied file and
+  memory hashes plus every write audit into a deterministic ledger. Deferred
+  targets remain untouched.
+  `nuis-nsld-elf-amd64-platform-structure-plan-v1` validates that exact ledger,
+  groups external PLT32 targets through a static provider rule registry,
+  deduplicates dynamic symbols, and assigns shared nonlazy PLT/GOT slots plus
+  dynamic string and `R_X86_64_JUMP_SLOT` records across page-separated
+  RX/RW/RO regions. Every deferred source receives one checked i32 patch
+  preview without changing the applied image; unsupported shapes, overlap,
+  registry ambiguity, and ledger drift fail closed. The provider validates an ELF64
   `ET_EXEC` or PIE
   compatibility image with bounded program headers and a nonzero entry inside a
   file-backed executable `PT_LOAD`, then atomically installs it without
   Clang/LLD invocation. Parsing, placement/binding planning, relocation preview,
-  merged-image preview, and registered compatibility publication are closed;
-  actual patch application, platform structures, provider-owned ELF shell
+  merged-image preview, direct patch application, platform-structure planning,
+  and registered compatibility publication are closed; platform byte
+  application, provider-owned ELF shell
   serialization and load admission, other ELF architectures, and PE/COFF remain
   open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,

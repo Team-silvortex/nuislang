@@ -243,6 +243,55 @@ pub(crate) const DEV_TENSOR_CORE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "nsld-elf-amd64-patch-application-contract",
+        path: "tools/nsld/src/final_executable_elf_application.rs",
+        required_patterns: &[
+            "nuis-nsld-elf-amd64-patch-application-v1",
+            "materialization preview drift",
+            "direct-patches-applied",
+            "applied-write-once",
+            "application_ledger_hash",
+            "apply_write_once",
+            "source image drift",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-elf-amd64-patch-application-regression",
+        path: "tools/nsld/src/final_executable_elf_application_tests.rs",
+        required_patterns: &[
+            "applies_real_plt32_patch_once_and_emits_a_bound_ledger",
+            "unresolved_system_target_stays_deferred_and_preserves_the_image",
+            "application_is_independent_of_image_object_input_order",
+            "source_and_preview_drift_fail_before_any_write",
+            "write_once_primitive_rejects_overlap_and_source_drift",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-elf-amd64-platform-structure-plan-contract",
+        path: "tools/nsld/src/final_executable_elf_platform.rs",
+        required_patterns: &[
+            "nuis-nsld-elf-amd64-platform-structure-plan-v1",
+            "PLATFORM_RULES",
+            "x86_64.external-plt32.nonlazy.v1",
+            "r-x86-64-jump-slot",
+            "dynamic_symbol_slots",
+            "build_relocation_binding",
+            "allocated-ready-for-platform-patching",
+            "validate_registry",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-elf-amd64-platform-structure-plan-regression",
+        path: "tools/nsld/src/final_executable_elf_platform_tests.rs",
+        required_patterns: &[
+            "plans_real_external_plt_got_and_rela_without_mutating_the_applied_ledger",
+            "repeated_external_calls_share_one_target_but_keep_distinct_bindings",
+            "internally_closed_image_does_not_gain_platform_regions",
+            "unregistered_external_shape_and_ledger_drift_fail_closed",
+            "overlapping_deferred_sources_are_rejected_before_slot_assignment",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nsld-elf-amd64-artifact-image-regression",
         path: "tools/nsld/src/final_executable_elf_artifact_tests.rs",
         required_patterns: &[

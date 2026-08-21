@@ -187,19 +187,29 @@ merged memory image, audits zero-fill ranges separately, and binds
 source-object, file-image, memory-image, placement, and relocation hashes. It
 derives non-overlapping write-once direct patch spans with source and encoded
 byte evidence while leaving both source bytes and deferred platform targets
-untouched. The provider also
-validates an ELF64 `ET_EXEC`/PIE image whose entry belongs to a bounded
+untouched. `nuis-nsld-elf-amd64-patch-application-v1` rebuilds that exact source
+image and preview, applies each direct span once in an independent buffer, and
+emits a deterministic ledger over source/applied file and memory hashes plus
+every write audit. Deferred compatibility targets remain unchanged. The
+`nuis-nsld-elf-amd64-platform-structure-plan-v1` stage validates that ledger,
+uses a static provider rule registry to group external PLT32 targets, and
+assigns shared nonlazy PLT/GOT slots plus deduplicated dynamic symbol, string,
+and `R_X86_64_JUMP_SLOT` records in page-separated RX/RW/RO regions. It binds
+every deferred source to one checked second-stage patch preview without
+mutating the applied image; unsupported shapes, overlap, ambiguous rules, and
+ledger drift fail closed. The provider also validates an ELF64 `ET_EXEC`/PIE
+image whose entry belongs to a bounded
 executable `PT_LOAD`. The accepted compatibility image is atomically published
 without a Clang/LLD process. This is deliberate staging evidence, not a
 self-owned ELF link claim: the embedded executable remains host-toolchain-linked
-until Nsld applies each previewed write once, synthesizes platform structures,
-and emits and load-admits the shell.
+until Nsld writes the planned platform structures, emits the shell, and completes
+load admission.
 
 It does not yet own:
 
 * complete architecture parity across Mach-O, ELF, and PE/COFF
-* provider-owned ELF patch application, platform-structure/shell serialization
-  and load admission, plus complete PE/COFF object merging
+* provider-owned ELF platform-structure writing, shell serialization and load
+  admission, plus complete PE/COFF object merging
 * a durable embedded Nsdb/YIR debug metadata section
 
 ## Gap 1: Compatibility Object Writer

@@ -777,3 +777,6 @@ fn object_role_rank(role: &str) -> usize {
 #[cfg(test)]
 #[path = "final_executable_elf_materialization_tests.rs"]
 mod tests;
+
+#[path = "final_executable_elf_application.rs"]
+pub(crate) mod application;

@@ -70,6 +70,25 @@ fn summarizes_cross_object_internal_symbol_closure() {
         product.materialization_preview.patches[0].encoded_bytes,
         [0x0b, 0, 0, 0]
     );
+    assert_eq!(
+        product.patch_application.contract,
+        crate::final_executable_elf_materialization::application::ELF_AMD64_PATCH_APPLICATION_CONTRACT
+    );
+    assert_eq!(product.patch_application.status, "direct-patches-applied");
+    assert_eq!(product.patch_application.applied_patch_count, 1);
+    assert_eq!(
+        product.patch_application.patches[0].status,
+        "applied-write-once"
+    );
+    assert_eq!(
+        product.platform_structure_plan.contract,
+        crate::final_executable_elf_materialization::application::platform::ELF_AMD64_PLATFORM_STRUCTURE_PLAN_CONTRACT
+    );
+    assert_eq!(product.platform_structure_plan.status, "not-required");
+    assert_eq!(
+        product.platform_structure_plan.planned_memory_span_bytes,
+        product.patch_application.memory_span_bytes
+    );
 }
 
 #[test]
