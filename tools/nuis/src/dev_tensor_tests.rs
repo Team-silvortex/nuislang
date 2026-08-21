@@ -554,6 +554,8 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("drift_check: id=cffi-owned-buffer-nested-helper-native"));
     assert!(text.contains("drift_check: id=nsld-macho-placement-binding-contract"));
     assert!(text.contains("drift_check: id=nsld-macho-placement-binding-three-surface-evidence"));
+    assert!(text.contains("drift_check: id=nsld-elf-amd64-placement-binding-contract"));
+    assert!(text.contains("drift_check: id=nsld-elf-amd64-placement-binding-regression"));
     assert!(text.contains("drift_check: id=scheduler-mutex-yir-contract"));
     assert!(text.contains("drift_check: id=scheduler-mutex-runtime-visibility"));
     assert!(text.contains("drift_check: id=scheduler-shared-mutex-llvm-native-lowering"));

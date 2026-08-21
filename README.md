@@ -40,9 +40,15 @@ independent load admission, and explicit provider-registered publication. The
 first `x86_64-linux-elf` internal provider now validates the compiled ELF64
 image plus its two relocatable host objects, parses their section names and
 attributes, symbol tables, and registered `SHT_RELA` records, resolves the
-program/runtime symbol boundary, and atomically publishes the compatibility
-image without invoking Clang or LLD. Provider-owned ELF placement and relocation
-application remain the next format frontier; PE/COFF parity remains open.
+program/runtime symbol boundary, deterministically places allocatable
+`text/rodata/data/bss/common` contributions into page-separated permission
+classes, assigns virtual addresses, and binds section/common/absolute
+definitions, zero-valued unmatched weak references, and unresolved
+compatibility names.
+It still atomically publishes the host-linked compatibility image without
+invoking Clang or LLD at finalization time. Provider-owned ELF relocation
+application and shell serialization remain the next format frontier; PE/COFF
+parity remains open.
 
 Start with these documents:
 

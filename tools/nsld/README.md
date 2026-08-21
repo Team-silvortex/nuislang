@@ -110,15 +110,16 @@ artifact; Nsld verifies their roles, hashes, and Mach-O object structure before
 parsing their sections, symbol/string tables, and ARM64 relocation records.
 The provider projects `nuis-nsld-macho-host-object-linkage-v1`, including
 internal cross-object resolutions and explicit unresolved C/system symbols,
-then derives `nuis-nsld-macho-placement-binding-v2`. The latter
+then derives `nuis-nsld-macho-placement-binding-v3`. The latter
 deterministically merges compatible sections, applies checked alignment,
 assigns contribution offsets, binds section-backed cross-object symbols, and
 coalesces tentative common definitions by maximum size/alignment into the
 reserved provider-owned `__DATA,__nuis_common` zero-fill region. Strong
 definitions override common declarations; duplicate strong definitions,
-incompatible flags, reserved-section claims, and unsupported absolute/indirect
-definitions fail closed. Unresolved C/system symbols remain an explicit
-compatibility boundary. The nested
+incompatible flags, reserved-section claims, missing indirect targets, and
+alias cycles fail closed. Absolute values remain explicit coordinates and
+indirect aliases resolve to a terminal section or absolute definition.
+Unresolved C/system symbols remain an explicit compatibility boundary. The nested
 `nuis-nsld-macho-arm64-relocation-application-v1` plan then maps each checked
 relocation to its placed source and target offsets. Its static registry covers
 the eight ARM64 relocation kinds emitted by the real Nuisc objects, preserves
@@ -235,9 +236,18 @@ cannot bypass receipt replay. The nested
 provider capability, receipt and verification identities, publication ledger,
 candidate SHA-256, and installed size/SHA-256/executable identity. The real
 common-symbol fixture now takes this ordinary route before execution.
-A gated host-command provider remains as a fallback; ELF and PE/COFF are
-explicit `registered-not-implemented` providers. This proves relocatable input,
-table parsing, placement, binding, merged-image construction, direct and
+A gated host-command provider remains as a fallback. PE/COFF is still an
+explicit `registered-not-implemented` provider; the first registered ELF AMD64
+provider now validates and publishes a compatibility image while independently
+parsing its two `ET_REL` inputs and deriving
+`nuis-nsld-elf-amd64-placement-binding-v1`. That canonical plan groups
+allocatable text, read-only data, data, zero-fill, and common storage into
+page-separated permission classes; assigns checked file/image/virtual
+coordinates; coalesces commons; preserves absolute values; and binds internal
+symbols, zero-valued unmatched weak references, or compatibility-external
+symbols without mutating bytes. The Mach-O route proves relocatable input,
+table parsing, placement,
+binding, merged-image construction, direct and
 platform relocation encoding, deterministic GOT/stub allocation, platform byte
 synthesis, unresolved-bind preservation, audited Mach-O shell planning, and
 signed private final-address byte serialization with an independent structural
@@ -245,7 +255,8 @@ validator, one real isolated OS-loader execution, durable replay admission, and
 registered opt-in publication and ordinary explicit selection. The real internal fixture now executes
 `ADRP`/`ADD`/`STR` against provider-allocated common storage before passing
 signature, loader, receipt replay, ordinary final-output selection, and direct
-execution. Absolute/indirect symbols, ELF, and PE/COFF remain incomplete. The
+execution. ELF relocation application/shell serialization and PE/COFF remain
+incomplete. The
 ordinary default compatibility executable remains byte-for-byte unchanged;
 private installation requires both the explicit policy and `--apply`.
 

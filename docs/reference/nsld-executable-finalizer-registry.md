@@ -193,11 +193,23 @@ size/SHA-256/executable identity into the ordinary final-output report. Receipt
 tamper remains fail-closed and the compatibility executable remains the
 byte-for-byte default.
 
-The next native milestone is `nuis-nsld-elf-amd64-placement-binding-v1`: merge
-allocatable input sections into deterministic output classes, assign final
-addresses to section/common/absolute definitions, and bind every registered
-relocation to an exact source patch and target symbol before byte mutation.
-Nuisc must remain free of ELF branches.
+`nuis-nsld-elf-amd64-placement-binding-v1` now closes the first provider-owned
+Linux layout milestone. It merges `SHF_ALLOC` contributions into deterministic
+text, read-only data, data, zero-fill, and common classes; page-separates their
+permission boundaries; orders program before runtime; assigns checked aligned
+file, image, and virtual coordinates; coalesces common declarations by maximum
+size/alignment with strong-definition
+precedence; preserves absolute values; maps unmatched weak references to zero;
+and binds internal references while retaining unresolved system names as an
+explicit compatibility boundary. TLS,
+compressed, writable-executable, malformed zero-fill, excessive-alignment, and
+overflow cases fail before mutation. Reversing object input preserves the same
+plan hash.
+
+The next native milestone is
+`nuis-nsld-elf-amd64-relocation-application-v1`: map each parsed `R_X86_64`
+record to one placed source, one bound target, and one checked signed/unsigned
+patch preview before byte mutation. Nuisc must remain free of ELF branches.
 
 ## Validation
 

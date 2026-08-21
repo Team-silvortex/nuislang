@@ -165,6 +165,33 @@ pub(crate) const DEV_TENSOR_CORE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "nsld-elf-amd64-placement-binding-contract",
+        path: "tools/nsld/src/final_executable_elf_layout.rs",
+        required_patterns: &[
+            "nuis-nsld-elf-amd64-placement-binding-v1",
+            "ELF_AMD64_PAYLOAD_FILE_OFFSET",
+            "ELF_AMD64_PAGE_SIZE",
+            "SectionClass::Text",
+            ".bss.nuis_common",
+            "coalesced-to-definition",
+            "weak-zero",
+            "external-compatibility",
+            "plan_hash",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-elf-amd64-placement-binding-regression",
+        path: "tools/nsld/src/final_executable_elf_layout_tests.rs",
+        required_patterns: &[
+            "places_real_host_objects_and_binds_cross_object_reference",
+            "places_all_runtime_classes_and_binds_common_and_absolute_symbols",
+            "placement_plan_is_independent_of_input_object_order",
+            "preserves_unresolved_system_symbols_as_an_explicit_compatibility_boundary",
+            "resolves_an_unmatched_weak_reference_to_zero",
+            "rejects_tls_until_the_runtime_has_a_tls_placement_contract",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nsld-elf-amd64-artifact-image-regression",
         path: "tools/nsld/src/final_executable_elf_artifact_tests.rs",
         required_patterns: &[

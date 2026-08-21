@@ -36,6 +36,16 @@ fn summarizes_cross_object_internal_symbol_closure() {
     assert!(product.summary.unresolved_external_symbols.is_empty());
     assert_eq!(product.objects[0].role, "program-llvm");
     assert_eq!(product.objects[1].role, "runtime-shim");
+    assert_eq!(
+        product.placement_binding.contract,
+        crate::final_executable_elf_layout::ELF_AMD64_PLACEMENT_BINDING_CONTRACT
+    );
+    assert_eq!(
+        product.placement_binding.status,
+        "placement-and-internal-binding-ready"
+    );
+    assert_eq!(product.placement_binding.section_placements.len(), 2);
+    assert_eq!(product.placement_binding.internally_bound_symbol_count, 1);
 }
 
 #[test]

@@ -170,17 +170,24 @@ The finalizer registry now also owns one narrow Linux route:
 compiled-artifact target identity, both hash-bound ELF64 `ET_REL` host objects,
 their bounded section/name/symbol tables, registered explicit-addend
 `R_X86_64` relocations, cross-object strong-definition uniqueness and internal
-symbol closure, and an ELF64 `ET_EXEC`/PIE image whose entry belongs to a bounded
+symbol closure. `nuis-nsld-elf-amd64-placement-binding-v1` now groups
+allocatable program/runtime contributions into deterministic text, read-only
+data, data, zero-fill, and common page-separated permission classes; assigns
+checked file/image/virtual coordinates; coalesces common declarations;
+preserves absolute values; maps unmatched weak references to zero; and binds
+internal references under one canonical plan hash. The provider also
+validates an ELF64 `ET_EXEC`/PIE image whose entry belongs to a bounded
 executable `PT_LOAD`. The accepted compatibility image is atomically published
 without a Clang/LLD process. This is deliberate staging evidence, not a
 self-owned ELF link claim: the embedded executable remains host-toolchain-linked
-until Nsld owns ELF section placement, relocation application, and shell
-emission.
+until Nsld consumes its owned placement plan for relocation application and
+shell emission.
 
 It does not yet own:
 
 * complete architecture parity across Mach-O, ELF, and PE/COFF
-* provider-owned ELF/PE object merging and native relocation application
+* provider-owned ELF relocation application/shell serialization and complete
+  PE/COFF object merging
 * a durable embedded Nsdb/YIR debug metadata section
 
 ## Gap 1: Compatibility Object Writer

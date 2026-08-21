@@ -398,12 +398,24 @@ The `beta-0.1` calibration baseline is:
   symbol tables plus a registered explicit-addend `R_X86_64` subset; rejects
   malformed symbol partitions, duplicate strong definitions, unsupported
   relocations, and out-of-range patch sites; and derives internal versus external
-  symbol closure across the pair. It validates an ELF64 `ET_EXEC` or PIE image
-  with bounded program headers and a nonzero entry inside a file-backed
-  executable `PT_LOAD`, then atomically installs it without Clang/LLD invocation.
-  That closes parsing and registered compatibility publication, while
-  provider-owned placement, relocation application, other ELF architectures,
-  and PE/COFF remain open
+  symbol closure across the pair.
+  `nuis-nsld-elf-amd64-placement-binding-v1` groups `SHF_ALLOC` contributions
+  into deterministic text, read-only data, data, zero-fill, and common classes;
+  page-separates their permission boundaries; orders program before runtime;
+  assigns checked aligned file/image offsets and x86_64 virtual addresses;
+  coalesces common declarations by maximum size and alignment with
+  strong-definition precedence; preserves absolute values; maps unmatched weak
+  references to zero; binds section/common/absolute definitions and
+  cross-object references; and retains unresolved system symbols as a
+  compatibility boundary. Reversed object order
+  preserves the canonical plan hash, while TLS, compressed,
+  writable-executable, malformed zero-fill, excessive-alignment, and overflow
+  cases fail before mutation. The provider validates an ELF64 `ET_EXEC` or PIE
+  compatibility image with bounded program headers and a nonzero entry inside a
+  file-backed executable `PT_LOAD`, then atomically installs it without
+  Clang/LLD invocation. Parsing, placement/binding planning, and registered
+  compatibility publication are closed; relocation application, provider-owned
+  ELF shell serialization, other ELF architectures, and PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed
