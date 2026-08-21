@@ -162,6 +162,8 @@ pub(crate) const DEV_TENSOR_CORE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
             "strong symbol",
             "internally_resolved_symbols",
             "hash mismatch",
+            "apply_elf_amd64_platform_structure_plan",
+            "platform_patch_application",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -289,6 +291,30 @@ pub(crate) const DEV_TENSOR_CORE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
             "internally_closed_image_does_not_gain_platform_regions",
             "unregistered_external_shape_and_ledger_drift_fail_closed",
             "overlapping_deferred_sources_are_rejected_before_slot_assignment",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-elf-amd64-platform-patch-application-contract",
+        path: "tools/nsld/src/final_executable_elf_platform_application.rs",
+        required_patterns: &[
+            "nuis-nsld-elf-amd64-platform-patch-application-v1",
+            "PLATFORM_ENCODERS",
+            "reserve_direct_patch_spans",
+            "write_dynamic_relocations",
+            "apply_deferred_bindings",
+            "platform-structures-and-deferred-patches-applied-with-unresolved-dynamic-binds",
+            "application_ledger_hash",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-elf-amd64-platform-patch-application-regression",
+        path: "tools/nsld/src/final_executable_elf_platform_application_tests.rs",
+        required_patterns: &[
+            "emits_real_plt_got_dynamic_records_and_deferred_patch_bytes",
+            "repeated_calls_share_structures_but_each_source_is_patched_once",
+            "closed_image_is_preserved_without_platform_writes",
+            "base_image_and_plan_drift_fail_before_platform_publication",
+            "platform_write_once_primitive_rejects_overlap_and_source_drift",
         ],
     },
     DevTensorDriftCheckSpec {

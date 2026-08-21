@@ -60,10 +60,17 @@ external PLT32 targets through a static provider rule registry, deduplicates
 dynamic symbols, assigns shared PLT/GOT slots and `R_X86_64_JUMP_SLOT` records
 across page-separated RX/RW/RO regions, and derives a checked second-stage patch
 preview for every deferred source without changing the applied image.
+`nuis-nsld-elf-amd64-platform-patch-application-v1` now rebuilds that exact
+plan, reserves inherited direct-write spans, extends an isolated image, emits
+checked `ff 25 rel32` nonlazy PLT entries, GOT placeholders, `Elf64_Sym`,
+dynamic strings, and `Elf64_Rela` records, then commits every deferred call
+site exactly once. Per-structure, per-source, final-file, and final-memory
+hashes are bound into a deterministic second write ledger; repeated calls share
+one platform target while retaining distinct write audits.
 It still atomically publishes the host-linked compatibility image without
 invoking Clang or LLD at finalization time. Provider-owned platform byte
-application, ELF shell serialization, and load admission remain the next format
-frontier; PE/COFF parity remains open.
+application is closed; ELF shell layout/serialization and load admission remain
+the next format frontier, while PE/COFF parity remains open.
 
 Start with these documents:
 

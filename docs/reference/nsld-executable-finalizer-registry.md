@@ -121,8 +121,10 @@ relocation application, and `nuis-nsld-elf-amd64-platform-structure-plan-v1`.
 That plan validates the applied-image ledger, groups external PLT32 targets
 through a static provider rule registry, assigns shared nonlazy PLT/GOT slots
 plus dynamic symbol/string and `R_X86_64_JUMP_SLOT` records, and binds every
-deferred source to one non-mutating patch preview. It does not yet materialize
-those platform bytes or serialize and load-admit a provider-owned ELF shell.
+deferred source to one non-mutating patch preview. The platform application
+stage now materializes those records and deferred patches once under a second
+write ledger. Nsld does not yet lay out, serialize, or load-admit a
+provider-owned ELF shell.
 
 This is not yet a pure Nsld linker claim. Nsld now understands the real input
 tables, assigns deterministic final sections and addresses, applies registered
@@ -244,10 +246,18 @@ table, assigns shared nonlazy PLT/GOT slots plus deduplicated dynamic symbols,
 strings, and `R_X86_64_JUMP_SLOT` records, and binds each deferred source to one
 checked patch preview.
 
+`nuis-nsld-elf-amd64-platform-patch-application-v1` now closes the platform
+byte milestone. It rebuilds the exact plan and base image, reserves inherited
+direct patches, emits checked nonlazy PLT/GOT, `Elf64_Sym`, dynamic string, and
+`Elf64_Rela` records into an isolated extended image, and commits every deferred
+source once. A deterministic ledger binds all source/encoded/post-write hashes,
+unresolved dynamic-bind records, and final file/memory hashes.
+
 The next native milestone is
-`nuis-nsld-elf-amd64-platform-patch-application-v1`: materialize those exact
-structure records into an extended working image and commit every deferred
-source once under a second write ledger. Nuisc must remain free of ELF branches.
+`nuis-nsld-elf-amd64-shell-layout-plan-v1`: map the applied base and platform
+regions into deterministic ELF header, program-header, permission-segment,
+dynamic-table, section-table, and entry coordinates before serialization.
+Nuisc must remain free of ELF branches.
 
 ## Validation
 

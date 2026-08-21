@@ -36,6 +36,15 @@ pub(crate) fn elf_runtime_object() -> Vec<u8> {
     })
 }
 
+pub(crate) fn elf_unrelated_runtime_object() -> Vec<u8> {
+    build_object(ObjectFixture {
+        text: &[0xc3],
+        defined_symbol: "nuis_unrelated_runtime_entry",
+        undefined_symbol: None,
+        relocations: &[],
+    })
+}
+
 struct ObjectFixture<'a> {
     text: &'a [u8],
     defined_symbol: &'a str,

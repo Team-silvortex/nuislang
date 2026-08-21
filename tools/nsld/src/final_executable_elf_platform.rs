@@ -1,3 +1,5 @@
+#[path = "final_executable_elf_platform_application.rs"]
+pub(crate) mod application;
 #[path = "final_executable_elf_platform_report.rs"]
 mod report;
 #[path = "final_executable_elf_platform_validation.rs"]

@@ -1,6 +1,8 @@
 use super::*;
 use crate::{
-    final_executable_elf_test_fixture::{elf_program_object, elf_runtime_object, R_X86_64_PLT32},
+    final_executable_elf_test_fixture::{
+        elf_program_object, elf_runtime_object, elf_unrelated_runtime_object, R_X86_64_PLT32,
+    },
     main_test_support::empty_link_plan,
 };
 use nuisc::{
@@ -88,6 +90,77 @@ fn summarizes_cross_object_internal_symbol_closure() {
     assert_eq!(
         product.platform_structure_plan.planned_memory_span_bytes,
         product.patch_application.memory_span_bytes
+    );
+    assert_eq!(
+        product.platform_patch_application.contract,
+        crate::final_executable_elf_materialization::application::platform::application::ELF_AMD64_PLATFORM_PATCH_APPLICATION_CONTRACT
+    );
+    assert_eq!(
+        product.platform_patch_application.status,
+        "not-required-image-preserved"
+    );
+    assert_eq!(
+        product
+            .platform_patch_application
+            .base_applied_memory_image_hash,
+        product.platform_patch_application.applied_memory_image_hash
+    );
+    assert_eq!(
+        product.platform_patch_application.application_ledger_hash,
+        crate::fnv1a64_hex(
+            product
+                .platform_patch_application
+                .canonical_ledger()
+                .as_bytes()
+        )
+    );
+}
+
+#[test]
+fn object_chain_applies_external_platform_records_and_deferred_call() {
+    let (artifact, plan) = artifact_and_plan(
+        elf_program_object(R_X86_64_PLT32),
+        elf_unrelated_runtime_object(),
+    );
+
+    let product = build_elf_amd64_host_object_linkage(&artifact, &plan).unwrap();
+
+    assert_eq!(
+        product.summary.status,
+        "verified-with-external-compatibility-boundary"
+    );
+    assert_eq!(product.platform_structure_plan.target_count, 1);
+    assert_eq!(
+        product.platform_patch_application.status,
+        "platform-structures-and-deferred-patches-applied-with-unresolved-dynamic-binds"
+    );
+    assert_eq!(
+        product
+            .platform_patch_application
+            .applied_structure_write_count,
+        7
+    );
+    assert_eq!(
+        product
+            .platform_patch_application
+            .applied_deferred_patch_count,
+        1
+    );
+    assert_eq!(
+        product
+            .platform_patch_application
+            .unresolved_dynamic_bind_count,
+        1
+    );
+    assert_eq!(
+        product.platform_patch_application.dynamic_bind_records[0].target_symbol,
+        "nuis_runtime_entry"
+    );
+    assert_ne!(
+        product
+            .platform_patch_application
+            .base_applied_memory_image_hash,
+        product.platform_patch_application.applied_memory_image_hash
     );
 }
 

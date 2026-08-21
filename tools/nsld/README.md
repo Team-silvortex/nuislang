@@ -272,6 +272,16 @@ symbol/string records, and `R_X86_64_JUMP_SLOT` `Elf64_Rela` records across
 page-separated RX, RW, and RO regions. Each deferred source is bound to exactly
 one checked i32 patch preview; unsupported shapes, overlapping sources,
 ambiguous registration, and ledger drift fail before any platform byte write.
+`nuis-nsld-elf-amd64-platform-patch-application-v1` rebuilds the plan from the
+exact direct-applied ledger, reserves inherited direct writes, and extends a
+separate working image to the planned span. A provider-owned encoder registry
+writes checked `ff 25 rel32` nonlazy PLT entries, zero-initialized GOT slots,
+global-function `Elf64_Sym` records, NUL-terminated dynamic strings, and
+`R_X86_64_JUMP_SLOT` `Elf64_Rela` records. Every deferred source is then
+committed once without overlap. Structure/source before, encoded, and
+post-write hashes plus final file/memory hashes form a deterministic second
+ledger; multiple calls to one symbol share platform records but retain distinct
+source-write evidence.
 The Mach-O route proves relocatable input,
 table parsing, placement,
 binding, merged-image construction, direct and
@@ -282,8 +292,8 @@ validator, one real isolated OS-loader execution, durable replay admission, and
 registered opt-in publication and ordinary explicit selection. The real internal fixture now executes
 `ADRP`/`ADD`/`STR` against provider-allocated common storage before passing
 signature, loader, receipt replay, ordinary final-output selection, and direct
-execution. ELF platform byte application, shell serialization, load admission,
-and PE/COFF remain incomplete. The
+execution. ELF shell layout/serialization, load admission, and PE/COFF remain
+incomplete. The
 ordinary default compatibility executable remains byte-for-byte unchanged;
 private installation requires both the explicit policy and `--apply`.
 

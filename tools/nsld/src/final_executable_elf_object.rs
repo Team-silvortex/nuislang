@@ -6,6 +6,9 @@ use crate::{
         application::{
             apply_elf_amd64_patch_previews,
             platform::{
+                application::{
+                    apply_elf_amd64_platform_structure_plan, ElfAmd64PlatformPatchApplicationReport,
+                },
                 build_elf_amd64_platform_structure_plan, ElfAmd64PlatformStructurePlanReport,
             },
             ElfAmd64PatchApplicationReport,
@@ -52,6 +55,7 @@ pub(crate) struct ElfAmd64HostObjectLinkage {
     pub(crate) materialization_preview: ElfAmd64MaterializationPreviewReport,
     pub(crate) patch_application: ElfAmd64PatchApplicationReport,
     pub(crate) platform_structure_plan: ElfAmd64PlatformStructurePlanReport,
+    pub(crate) platform_patch_application: ElfAmd64PlatformPatchApplicationReport,
 }
 
 pub(crate) fn build_elf_amd64_host_object_linkage(
@@ -192,6 +196,17 @@ pub(crate) fn build_elf_amd64_host_object_linkage(
         &relocation_application,
         &applied_image.report,
     )?;
+    let platform_applied_image = apply_elf_amd64_platform_structure_plan(
+        &placement_binding,
+        &relocation_application,
+        &applied_image,
+        &platform_structure_plan,
+    )?;
+    if crate::fnv1a64_hex(&platform_applied_image.bytes)
+        != platform_applied_image.report.applied_memory_image_hash
+    {
+        return Err("ELF platform-applied image handoff hash drift".to_owned());
+    }
     Ok(ElfAmd64HostObjectLinkage {
         summary: ElfAmd64HostObjectLinkageSummary {
             contract: ELF_AMD64_HOST_OBJECT_LINKAGE_CONTRACT,
@@ -211,6 +226,7 @@ pub(crate) fn build_elf_amd64_host_object_linkage(
         materialization_preview,
         patch_application: applied_image.report,
         platform_structure_plan,
+        platform_patch_application: platform_applied_image.report,
     })
 }
 
