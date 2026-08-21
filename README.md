@@ -34,9 +34,10 @@ The development tensor currently reports clean hierarchy, milestone, manifest,
 and implementation-drift coverage. That means the checked-in milestone slices
 agree with their evidence; it does not mean every subsystem is complete. The
 current bootstrap-critical frontier is OS-native executable finalization: Nsld
-can serialize deterministic private ARM64 Mach-O shell bytes, but code-signature
-payload generation, independent structural/load validation, publication, ELF,
-and PE/COFF finalization remain open.
+now carries ARM64 Mach-O sections, commons, absolute values, and cycle-safe
+symbol aliases through relocation, signed private-shell serialization,
+independent load admission, and explicit provider-registered publication. The
+next format frontier is a native ELF finalizer; PE/COFF parity remains open.
 
 Start with these documents:
 

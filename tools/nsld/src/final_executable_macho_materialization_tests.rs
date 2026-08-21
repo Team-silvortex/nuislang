@@ -157,7 +157,7 @@ fn patch_application_rejects_source_and_preview_audit_drift() {
         .unwrap();
     patch.audit_hash = patch_audit_hash(
         application,
-        patch.target_output_offset,
+        patch.target_output_offset.unwrap() as u64,
         patch.effective_addend,
         &patch.source_bytes_hash,
         &patch.encoded_bytes_hash,
@@ -429,6 +429,8 @@ fn application(
         target_object_id: Some("object".to_owned()),
         target_section_id: Some("macho-section-0000".to_owned()),
         target_output_offset: Some(target),
+        target_absolute_value: None,
+        target_alias_chain: Vec::new(),
         explicit_addend: None,
         pair_relocation_id: pair.map(str::to_owned),
         resolver_status: "internal".to_owned(),

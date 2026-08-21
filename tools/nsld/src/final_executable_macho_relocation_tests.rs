@@ -99,6 +99,62 @@ fn direct_common_relocations_bind_to_the_allocated_zero_fill_address() {
 }
 
 #[test]
+fn absolute_unsigned_relocation_preserves_value_semantics() {
+    let object = linkage(
+        8,
+        vec![absolute_symbol(0, "_constant", 0x1122_3344_5566_7788)],
+        vec![relocation(0, 0, 8, false, true, ARM64_RELOC_UNSIGNED)],
+    );
+    let bytes = [0u8; 8];
+    let objects = [layout_object("host.program", "program-llvm", &object)];
+    let placement = build_macho_placement_binding_report(&objects).unwrap();
+
+    let report = build_macho_arm64_relocation_application_report(&objects, &placement).unwrap();
+
+    assert_eq!(report.applications[0].target_output_offset, None);
+    assert_eq!(
+        report.applications[0].target_absolute_value,
+        Some(0x1122_3344_5566_7788)
+    );
+    let images = [MachOImageObject {
+        object_id: "host.program",
+        role: "program-llvm",
+        bytes: &bytes,
+        linkage: &object,
+    }];
+    let preview = build_macho_arm64_materialization_preview(&images, &placement, &report).unwrap();
+    assert_eq!(preview.patches[0].target_output_offset, None);
+    assert_eq!(
+        preview.patches[0].target_absolute_value,
+        Some(0x1122_3344_5566_7788)
+    );
+    assert_eq!(preview.patches[0].encoded_bytes_hex, "8877665544332211");
+}
+
+#[test]
+fn indirect_relocation_consumes_the_layout_alias_resolution() {
+    let object = linkage(
+        12,
+        vec![
+            indirect_symbol(0, "_alias", "_target"),
+            defined_symbol(1, "_target", 8),
+        ],
+        vec![relocation(0, 0, 4, true, true, ARM64_RELOC_BRANCH26)],
+    );
+    let objects = [layout_object("host.program", "program-llvm", &object)];
+    let placement = build_macho_placement_binding_report(&objects).unwrap();
+
+    let report = build_macho_arm64_relocation_application_report(&objects, &placement).unwrap();
+
+    assert_eq!(report.applications[0].target_output_offset, Some(8));
+    assert_eq!(report.applications[0].target_absolute_value, None);
+    assert_eq!(
+        report.applications[0].target_alias_chain,
+        ["_alias", "_target"]
+    );
+}
+
+#[test]
 fn paired_addend_subtractor_and_got_records_remain_explicit() {
     let object = linkage(
         32,
@@ -347,6 +403,34 @@ fn common_symbol(index: usize, name: &str, size: u64, alignment: u64) -> ParsedM
         value: size,
         common_alignment: Some(alignment),
         indirect_target: None,
+    }
+}
+
+fn absolute_symbol(index: usize, name: &str, value: u64) -> ParsedMachOSymbol {
+    ParsedMachOSymbol {
+        index,
+        name: name.to_owned(),
+        kind: "absolute".to_owned(),
+        external: true,
+        defined: true,
+        section_ordinal: None,
+        value,
+        common_alignment: None,
+        indirect_target: None,
+    }
+}
+
+fn indirect_symbol(index: usize, name: &str, target: &str) -> ParsedMachOSymbol {
+    ParsedMachOSymbol {
+        index,
+        name: name.to_owned(),
+        kind: "indirect".to_owned(),
+        external: true,
+        defined: true,
+        section_ordinal: None,
+        value: 0,
+        common_alignment: None,
+        indirect_target: Some(target.to_owned()),
     }
 }
 

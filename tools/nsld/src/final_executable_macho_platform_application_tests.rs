@@ -158,6 +158,42 @@ fn empty_platform_plan_preserves_the_direct_applied_image() {
     assert!(output.report.bind_records.is_empty());
 }
 
+#[test]
+fn absolute_got_value_is_written_without_an_image_rebase_placeholder() {
+    let placement = placement(4);
+    let mut absolute = application(
+        "reloc-absolute-got",
+        "arm64-got-load-pageoff12",
+        "rewrite-got-load-pageoff12",
+        0,
+        "internal",
+        "_constant",
+        None,
+    );
+    absolute.target_section_id = None;
+    absolute.target_absolute_value = Some(0x1122_3344_5566_7788);
+    let relocations = relocation_report(vec![absolute]);
+    let applied = applied_image(
+        0xf940_0000u32.to_le_bytes().to_vec(),
+        &placement,
+        &relocations,
+    );
+    let plan = build_macho_arm64_platform_structure_plan(&placement, &relocations, &applied.report)
+        .unwrap();
+
+    let output =
+        apply_macho_arm64_platform_structure(&placement, &relocations, &applied, &plan).unwrap();
+
+    let got = plan.targets[0].got_output_offset.unwrap();
+    assert_eq!(
+        &output.bytes[got..got + 8],
+        &0x1122_3344_5566_7788u64.to_le_bytes()
+    );
+    assert!(output.report.structure_writes.iter().any(|write| {
+        write.write_kind == "internal-absolute-got" && write.output_offset == got
+    }));
+}
+
 fn platform_fixture() -> (
     NsldMachOPlacementBindingReport,
     NsldMachOArm64RelocationApplicationReport,
@@ -311,6 +347,8 @@ fn application(
         target_object_id: internal.then(|| "host.runtime".to_owned()),
         target_section_id: internal.then(|| "macho-section-0000".to_owned()),
         target_output_offset,
+        target_absolute_value: None,
+        target_alias_chain: Vec::new(),
         explicit_addend: None,
         pair_relocation_id: None,
         resolver_status: resolver_status.to_owned(),

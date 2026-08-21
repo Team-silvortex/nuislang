@@ -315,16 +315,19 @@ The `beta-0.1` calibration baseline is:
   `NHOB`-bound pair of actual
   `program-llvm` and `runtime-shim` Mach-O objects, validates their LinkPlan
   identity, hashes, roles, sections, symbol/string tables, and ARM64 relocation
-  references; `nuis-nsld-macho-placement-binding-v2` now deterministically
+  references; `nuis-nsld-macho-placement-binding-v3` now deterministically
   merges compatible sections, assigns aligned contribution offsets, binds
   section-backed cross-object definitions, coalesces common declarations by
   maximum size/alignment into a reserved provider-owned
   `__DATA,__nuis_common` zero-fill section, lets strong definitions override
   tentative ones, preserves unresolved C/system symbols as a compatibility
-  boundary, and rejects duplicate strong definitions, incompatible flags,
-  reserved-section claims, and unsupported absolute/indirect definitions;
+  boundary, preserves `N_ABS` values as absolute coordinates, resolves
+  multi-hop `N_INDR` definitions through one cycle-safe alias graph, and rejects
+  duplicate strong definitions, incompatible flags, reserved-section claims,
+  missing alias targets, and alias cycles before mutation;
   `nuis-nsld-macho-arm64-relocation-application-v1` now maps every verified
-  relocation to deterministic source/target offsets, registers all eight kinds
+  relocation to deterministic source plus image-offset-or-absolute targets,
+  carries alias-chain evidence, registers all eight kinds
   emitted by the real fixtures, preserves paired ADDEND/SUBTRACTOR metadata,
   separates direct and platform-structure work, fails closed on unknown kinds,
   and projects one placement-bound plan through JSON, text, and persisted invoke

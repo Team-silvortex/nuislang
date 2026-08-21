@@ -36,6 +36,8 @@ struct TargetResolution {
     object_id: Option<String>,
     section_id: Option<String>,
     output_offset: Option<usize>,
+    absolute_value: Option<u64>,
+    alias_chain: Vec<String>,
     status: String,
 }
 
@@ -121,6 +123,8 @@ pub(crate) fn build_macho_arm64_relocation_application_report(
                 target_object_id: target.object_id,
                 target_section_id: target.section_id,
                 target_output_offset: target.output_offset,
+                target_absolute_value: target.absolute_value,
+                target_alias_chain: target.alias_chain,
                 explicit_addend,
                 pair_relocation_id,
                 resolver_status: target.status,
@@ -418,7 +422,7 @@ fn resolve_target(
                 object.object_id, relocation.symbol_number
             )
         })?;
-    if symbol.kind == "common" {
+    if matches!(symbol.kind.as_str(), "common" | "absolute" | "indirect") {
         let binding = placement
             .symbol_bindings
             .iter()
@@ -428,7 +432,7 @@ fn resolve_target(
             })
             .ok_or_else(|| {
                 format!(
-                    "Mach-O object `{}` common relocation symbol `{}` has no allocation binding",
+                    "Mach-O object `{}` non-section relocation symbol `{}` has no placement binding",
                     object.object_id, symbol.name
                 )
             })?;
@@ -438,6 +442,8 @@ fn resolve_target(
             object_id: binding.target_object_id.clone(),
             section_id: binding.target_section_id.clone(),
             output_offset: binding.target_output_offset,
+            absolute_value: binding.target_absolute_value,
+            alias_chain: binding.alias_chain.clone(),
             status: binding.status.clone(),
         });
     }
@@ -450,6 +456,7 @@ fn resolve_target(
             section_id: Some(section_id),
             output_offset: Some(output_offset),
             status: "internal-symbol".to_owned(),
+            ..TargetResolution::default()
         });
     }
     let binding = placement
@@ -471,6 +478,8 @@ fn resolve_target(
         object_id: binding.target_object_id.clone(),
         section_id: binding.target_section_id.clone(),
         output_offset: binding.target_output_offset,
+        absolute_value: binding.target_absolute_value,
+        alias_chain: binding.alias_chain.clone(),
         status: binding.status.clone(),
     })
 }
@@ -567,11 +576,14 @@ fn canonical_plan(
             &mut out,
             item.pair_relocation_id.as_deref().unwrap_or("none"),
         );
+        for alias in &item.target_alias_chain {
+            append_text(&mut out, alias);
+        }
         append_text(&mut out, &item.resolver_status);
         append_text(&mut out, &item.application_status);
         writeln!(
             out,
-            "facts={}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+            "facts={}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
             item.input_section_ordinal,
             item.source_offset,
             item.source_output_offset,
@@ -581,6 +593,10 @@ fn canonical_plan(
             item.relocation_type,
             optional_usize(item.target_symbol_index),
             optional_usize(item.target_output_offset),
+            item.target_absolute_value
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "none".to_owned()),
+            item.target_alias_chain.len(),
             item.explicit_addend
                 .map(|value| value.to_string())
                 .unwrap_or_else(|| "none".to_owned())

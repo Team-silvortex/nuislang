@@ -105,6 +105,39 @@ fn parses_common_symbol_size_and_alignment_as_a_tentative_definition() {
 }
 
 #[test]
+fn parses_absolute_symbol_value_without_section_semantics() {
+    let mut bytes = sample_object();
+    let offset = 224 + NLIST_64_SIZE;
+    bytes[offset + 4] = N_ABS | N_EXT;
+    write_u64(&mut bytes, offset + 8, 0x1122_3344_5566_7788);
+
+    let parsed = parse_macho_arm64_object_linkage(&bytes).unwrap();
+    let absolute = &parsed.symbols[1];
+
+    assert_eq!(absolute.kind, "absolute");
+    assert!(absolute.defined);
+    assert_eq!(absolute.section_ordinal, None);
+    assert_eq!(absolute.value, 0x1122_3344_5566_7788);
+    assert_eq!(absolute.indirect_target, None);
+}
+
+#[test]
+fn parses_indirect_symbol_target_from_the_string_table() {
+    let mut bytes = sample_object();
+    let offset = 224 + NLIST_64_SIZE;
+    bytes[offset + 4] = N_INDR | N_EXT;
+    write_u64(&mut bytes, offset + 8, 1);
+
+    let parsed = parse_macho_arm64_object_linkage(&bytes).unwrap();
+    let alias = &parsed.symbols[1];
+
+    assert_eq!(alias.kind, "indirect");
+    assert!(alias.defined);
+    assert_eq!(alias.value, 1);
+    assert_eq!(alias.indirect_target.as_deref(), Some("_defined"));
+}
+
+#[test]
 fn rejects_non_terminated_symbol_name() {
     let mut bytes = sample_object();
     *bytes.last_mut().unwrap() = b'x';

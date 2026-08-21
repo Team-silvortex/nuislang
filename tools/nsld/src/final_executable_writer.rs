@@ -616,7 +616,7 @@ fn render_finalizer_input_summary(
         .iter()
         .map(|binding| {
             format!(
-                "{}|{}|{}|{}|{}|{}|{}|{}|{}",
+                "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
                 binding.symbol,
                 binding.reference_object_id,
                 binding.reference_symbol_index,
@@ -631,7 +631,16 @@ fn render_finalizer_input_summary(
                 binding
                     .target_output_offset
                     .map(|value| value.to_string())
-                    .unwrap_or_else(|| "none".to_owned())
+                    .unwrap_or_else(|| "none".to_owned()),
+                binding
+                    .target_absolute_value
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "none".to_owned()),
+                if binding.alias_chain.is_empty() {
+                    "none".to_owned()
+                } else {
+                    binding.alias_chain.join("->")
+                }
             )
         })
         .collect::<Vec<_>>();
@@ -707,7 +716,7 @@ fn render_finalizer_input_summary(
         .iter()
         .map(|item| {
             format!(
-                "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+                "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
                 item.relocation_id,
                 item.object_id,
                 item.object_role,
@@ -730,6 +739,14 @@ fn render_finalizer_input_summary(
                 item.target_output_offset
                     .map(|value| value.to_string())
                     .unwrap_or_else(|| "none".to_owned()),
+                item.target_absolute_value
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "none".to_owned()),
+                if item.target_alias_chain.is_empty() {
+                    "none".to_owned()
+                } else {
+                    item.target_alias_chain.join("->")
+                },
                 item.explicit_addend
                     .map(|value| value.to_string())
                     .unwrap_or_else(|| "none".to_owned()),

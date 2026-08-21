@@ -13,6 +13,7 @@ use crate::{
         apply_macho_arm64_platform_structure, MachOArm64PlatformAppliedImage,
     },
     final_executable_macho_relocation::build_macho_arm64_relocation_application_report,
+    final_executable_macho_shell_image_linkedit::encode_shell_linkedit,
     reports::{
         NsldMachOArm64MaterializationPreviewReport, NsldMachOArm64PlatformStructurePlanReport,
         NsldMachOArm64RelocationApplicationReport, NsldMachOPlacementBindingReport,
@@ -167,6 +168,51 @@ fn common_definition_becomes_a_vm_only_shell_section_and_defined_symbol() {
     );
     assert_eq!(symbol.vm_address, Some(section.vm_address));
     assert_eq!(report.undefined_symbol_count, 0);
+}
+
+#[test]
+fn absolute_and_alias_definitions_emit_resolved_shell_symbols() {
+    let fixture = symbol_resolution_shell_fixture();
+    let report = build_shell(&fixture).unwrap();
+
+    let absolute = report
+        .symbols
+        .iter()
+        .find(|symbol| symbol.name == "_constant")
+        .unwrap();
+    assert_eq!(absolute.record_kind, "external-absolute");
+    assert_eq!(absolute.shell_section_id, None);
+    assert_eq!(absolute.source_image_offset, None);
+    assert_eq!(absolute.vm_address, Some(0x1122_3344_5566_7788));
+    let absolute_alias = report
+        .symbols
+        .iter()
+        .find(|symbol| symbol.name == "_constant_alias")
+        .unwrap();
+    assert_eq!(absolute_alias.record_kind, "external-absolute-alias");
+    assert_eq!(absolute_alias.vm_address, absolute.vm_address);
+    let section_alias = report
+        .symbols
+        .iter()
+        .find(|symbol| symbol.name == "_entry_alias")
+        .unwrap();
+    assert_eq!(section_alias.record_kind, "external-defined-alias");
+    assert_eq!(section_alias.vm_address, Some(report.entry_vm_address));
+
+    let encoded = encode_shell_linkedit(&report).unwrap();
+    for symbol in [absolute, absolute_alias] {
+        let offset = symbol.symbol_table_index * 16;
+        assert_eq!(encoded.symbol_table[offset + 4], 0x03);
+        assert_eq!(encoded.symbol_table[offset + 5], 0);
+        assert_eq!(
+            u64::from_le_bytes(
+                encoded.symbol_table[offset + 8..offset + 16]
+                    .try_into()
+                    .unwrap()
+            ),
+            0x1122_3344_5566_7788
+        );
+    }
 }
 
 pub(crate) fn build_shell(
@@ -415,6 +461,60 @@ fn common_shell_fixture() -> ShellFixture {
     }
 }
 
+pub(crate) fn symbol_resolution_shell_fixture() -> ShellFixture {
+    let program = linkage_sized(
+        12,
+        vec![
+            defined_symbol(0, "_nuis_entry"),
+            absolute_symbol(1, "_constant", 0x1122_3344_5566_7788),
+            indirect_symbol(2, "_constant_alias", "_constant"),
+            indirect_symbol(3, "_entry_alias", "_nuis_entry"),
+        ],
+        vec![ParsedMachORelocation {
+            section_ordinal: 1,
+            offset: 4,
+            symbol_number: 2,
+            width_bytes: 8,
+            pc_relative: false,
+            external: true,
+            relocation_type: 0,
+        }],
+    );
+    let runtime = linkage(vec![defined_symbol(0, "_runtime_anchor")], Vec::new());
+    let program_bytes = [0xd65f_03c0u32.to_le_bytes().as_slice(), [0u8; 8].as_slice()].concat();
+    let runtime_bytes = 0xd65f_03c0u32.to_le_bytes();
+    let layouts = [
+        layout("host.program", "program-llvm", &program),
+        layout("host.runtime", "runtime-shim", &runtime),
+    ];
+    let placement = build_macho_placement_binding_report(&layouts).unwrap();
+    let relocations =
+        build_macho_arm64_relocation_application_report(&layouts, &placement).unwrap();
+    let images = [
+        image("host.program", "program-llvm", &program_bytes, &program),
+        image("host.runtime", "runtime-shim", &runtime_bytes, &runtime),
+    ];
+    let preview =
+        build_macho_arm64_materialization_preview(&images, &placement, &relocations).unwrap();
+    let applied =
+        apply_macho_arm64_patch_previews(&images, &placement, &relocations, &preview).unwrap();
+    let platform =
+        build_macho_arm64_platform_structure_plan(&placement, &relocations, &applied.report)
+            .unwrap();
+    let applied =
+        apply_macho_arm64_platform_structure(&placement, &relocations, &applied, &platform)
+            .unwrap();
+    ShellFixture {
+        program,
+        runtime,
+        placement,
+        relocations,
+        preview,
+        platform,
+        applied,
+    }
+}
+
 fn linkage(
     symbols: Vec<ParsedMachOSymbol>,
     relocations: Vec<ParsedMachORelocation>,
@@ -502,6 +602,34 @@ fn common_symbol(index: usize, name: &str, size: u64, alignment: u64) -> ParsedM
         value: size,
         common_alignment: Some(alignment),
         indirect_target: None,
+    }
+}
+
+fn absolute_symbol(index: usize, name: &str, value: u64) -> ParsedMachOSymbol {
+    ParsedMachOSymbol {
+        index,
+        name: name.to_owned(),
+        kind: "absolute".to_owned(),
+        external: true,
+        defined: true,
+        section_ordinal: None,
+        value,
+        common_alignment: None,
+        indirect_target: None,
+    }
+}
+
+fn indirect_symbol(index: usize, name: &str, target: &str) -> ParsedMachOSymbol {
+    ParsedMachOSymbol {
+        index,
+        name: name.to_owned(),
+        kind: "indirect".to_owned(),
+        external: true,
+        defined: true,
+        section_ordinal: None,
+        value: 0,
+        common_alignment: None,
+        indirect_target: Some(target.to_owned()),
     }
 }
 

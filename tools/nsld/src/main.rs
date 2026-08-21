@@ -100,6 +100,7 @@ mod final_executable_macho_shell_linkedit;
 mod final_executable_macho_shell_signature;
 mod final_executable_macho_shell_signature_validation;
 mod final_executable_macho_shell_uuid;
+mod final_executable_macho_symbol_resolution;
 mod final_executable_output;
 mod final_executable_output_backend;
 mod final_executable_output_code_asset;

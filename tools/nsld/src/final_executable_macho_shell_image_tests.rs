@@ -1,6 +1,6 @@
 use super::*;
 use crate::final_executable_macho_shell::tests::{
-    build_shell, internal_got_shell_fixture, shell_fixture,
+    build_shell, internal_got_shell_fixture, shell_fixture, symbol_resolution_shell_fixture,
 };
 
 #[test]
@@ -146,6 +146,19 @@ fn serializes_internal_got_rebase_with_final_pointer_value() {
     assert!(output.report.rewrites.iter().any(|rewrite| {
         rewrite.rewrite_kind == "internal-got-final-address"
             && rewrite.target_vm_address == Some(rebase.target_vm_address)
+    }));
+}
+
+#[test]
+fn serializes_absolute_relocation_without_rebasing_its_value() {
+    let fixture = symbol_resolution_shell_fixture();
+    let shell = build_shell(&fixture).unwrap();
+    let output = serialize(&fixture, &shell).unwrap();
+
+    assert_eq!(output.report.relocation_rewrite_count, 1);
+    assert!(output.report.rewrites.iter().any(|rewrite| {
+        rewrite.rewrite_kind == "relocation-final-address"
+            && rewrite.target_vm_address == Some(0x1122_3344_5566_7788)
     }));
 }
 

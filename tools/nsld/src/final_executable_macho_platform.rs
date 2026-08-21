@@ -68,6 +68,7 @@ struct TargetSeed {
     target_object_id: Option<String>,
     target_section_id: Option<String>,
     target_output_offset: Option<usize>,
+    target_absolute_value: Option<u64>,
     requires_got: bool,
     requires_stub: bool,
     relocation_ids: Vec<String>,
@@ -80,6 +81,7 @@ struct TargetIdentity {
     target_object_id: Option<String>,
     target_section_id: Option<String>,
     target_output_offset: Option<usize>,
+    target_absolute_value: Option<u64>,
 }
 
 impl TargetIdentity {
@@ -94,8 +96,11 @@ impl TargetIdentity {
         );
         writeln!(
             out,
-            "target_output_offset={}",
-            optional_usize(self.target_output_offset)
+            "target={}|{}",
+            optional_usize(self.target_output_offset),
+            self.target_absolute_value
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "none".to_owned())
         )
         .unwrap();
         out
@@ -346,6 +351,7 @@ fn target_seed(
             if application.target_object_id.is_some()
                 || application.target_section_id.is_some()
                 || application.target_output_offset.is_some()
+                || application.target_absolute_value.is_some()
             {
                 return Err(format!(
                     "Mach-O external target `{target_symbol}` unexpectedly owns an internal placement"
@@ -353,10 +359,13 @@ fn target_seed(
             }
         }
         "internal" | "internal-symbol" => {
-            if application.target_object_id.is_none()
-                || application.target_section_id.is_none()
-                || application.target_output_offset.is_none()
-            {
+            let image_target = application.target_section_id.is_some()
+                && application.target_output_offset.is_some()
+                && application.target_absolute_value.is_none();
+            let absolute_target = application.target_section_id.is_none()
+                && application.target_output_offset.is_none()
+                && application.target_absolute_value.is_some();
+            if application.target_object_id.is_none() || !(image_target || absolute_target) {
                 return Err(format!(
                     "Mach-O internal platform target `{target_symbol}` has an incomplete placement"
                 ));
@@ -379,6 +388,7 @@ fn target_seed(
             target_object_id: application.target_object_id.clone(),
             target_section_id: application.target_section_id.clone(),
             target_output_offset: application.target_output_offset,
+            target_absolute_value: application.target_absolute_value,
             requires_got: rule.requires_got,
             requires_stub: rule.requires_stub,
             relocation_ids: vec![application.relocation_id.clone()],
@@ -396,6 +406,7 @@ fn target_identity(
         target_object_id: application.target_object_id.clone(),
         target_section_id: application.target_section_id.clone(),
         target_output_offset: application.target_output_offset,
+        target_absolute_value: application.target_absolute_value,
     }
 }
 
@@ -502,6 +513,7 @@ fn assign_target_slots(
                 target_object_id: seed.target_object_id,
                 target_section_id: seed.target_section_id,
                 target_output_offset: seed.target_output_offset,
+                target_absolute_value: seed.target_absolute_value,
                 got_slot_index,
                 got_output_offset,
                 stub_slot_index,

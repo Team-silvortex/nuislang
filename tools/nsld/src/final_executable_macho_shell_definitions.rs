@@ -7,7 +7,14 @@ use std::collections::{BTreeMap, BTreeSet};
 pub(crate) struct MachOShellDefinition<'a> {
     pub(crate) object: &'a MachOLayoutObject<'a>,
     pub(crate) symbol: &'a ParsedMachOSymbol,
-    pub(crate) source_image_offset: usize,
+    pub(crate) value: MachOShellDefinitionValue,
+    pub(crate) alias: bool,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum MachOShellDefinitionValue {
+    ImageOffset(usize),
+    Absolute(u64),
 }
 
 pub(crate) fn collect_shell_definitions<'a>(
@@ -19,14 +26,15 @@ pub(crate) fn collect_shell_definitions<'a>(
         for symbol in object.linkage.symbols.iter().filter(|symbol| {
             symbol.external && symbol.defined && symbol.kind != "common" && !symbol.name.is_empty()
         }) {
-            let source_image_offset = section_definition_source(object, symbol, placement)?;
+            let value = definition_value(object, symbol, placement)?;
             if definitions
                 .insert(
                     symbol.name.clone(),
                     MachOShellDefinition {
                         object,
                         symbol,
-                        source_image_offset,
+                        value,
+                        alias: symbol.kind == "indirect",
                     },
                 )
                 .is_some()
@@ -103,7 +111,8 @@ fn append_common_definitions<'a>(
                 MachOShellDefinition {
                     object,
                     symbol,
-                    source_image_offset: allocation.output_offset,
+                    value: MachOShellDefinitionValue::ImageOffset(allocation.output_offset),
+                    alias: false,
                 },
             )
             .is_some()
@@ -115,6 +124,48 @@ fn append_common_definitions<'a>(
         }
     }
     Ok(())
+}
+
+fn definition_value(
+    object: &MachOLayoutObject<'_>,
+    symbol: &ParsedMachOSymbol,
+    placement: &NsldMachOPlacementBindingReport,
+) -> Result<MachOShellDefinitionValue, String> {
+    if symbol.kind == "section" {
+        return section_definition_source(object, symbol, placement)
+            .map(MachOShellDefinitionValue::ImageOffset);
+    }
+    if matches!(symbol.kind.as_str(), "absolute" | "indirect") {
+        let binding = placement
+            .symbol_bindings
+            .iter()
+            .find(|binding| {
+                binding.reference_object_id == object.object_id
+                    && binding.reference_symbol_index == symbol.index
+            })
+            .ok_or_else(|| {
+                format!(
+                    "Mach-O shell definition `{}` has no provider resolution binding",
+                    symbol.name
+                )
+            })?;
+        return match (binding.target_output_offset, binding.target_absolute_value) {
+            (Some(offset), None) => Ok(MachOShellDefinitionValue::ImageOffset(offset)),
+            (None, Some(value)) => Ok(MachOShellDefinitionValue::Absolute(value)),
+            (None, None) => Err(format!(
+                "Mach-O shell definition `{}` has no resolved target value",
+                symbol.name
+            )),
+            (Some(_), Some(_)) => Err(format!(
+                "Mach-O shell definition `{}` has ambiguous target values",
+                symbol.name
+            )),
+        };
+    }
+    Err(format!(
+        "Mach-O shell cannot lower definition `{}` kind `{}`",
+        symbol.name, symbol.kind
+    ))
 }
 
 fn section_definition_source(

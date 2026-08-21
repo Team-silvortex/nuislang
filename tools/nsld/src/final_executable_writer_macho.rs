@@ -115,12 +115,16 @@ pub(crate) fn render_macho_materialization_preview(
         .iter()
         .map(|patch| {
             format!(
-                "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+                "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
                 patch.relocation_id,
                 patch.relocation_kind,
                 patch.source_output_offset,
                 patch.width_bytes,
-                patch.target_output_offset,
+                option_usize(patch.target_output_offset),
+                patch
+                    .target_absolute_value
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "none".to_owned()),
                 patch.effective_addend,
                 patch.source_bytes_hex,
                 patch.encoded_bytes_hex,
@@ -250,7 +254,7 @@ pub(crate) fn render_macho_platform_structure_plan(
         .iter()
         .map(|target| {
             format!(
-                "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+                "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
                 target.structure_id,
                 target.target_key,
                 target.target_symbol,
@@ -258,6 +262,10 @@ pub(crate) fn render_macho_platform_structure_plan(
                 option_text(target.target_object_id.as_deref()),
                 option_text(target.target_section_id.as_deref()),
                 option_usize(target.target_output_offset),
+                target
+                    .target_absolute_value
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "none".to_owned()),
                 option_usize(target.got_slot_index),
                 option_usize(target.got_output_offset),
                 option_usize(target.stub_slot_index),

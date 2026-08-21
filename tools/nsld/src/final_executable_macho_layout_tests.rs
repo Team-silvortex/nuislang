@@ -244,6 +244,103 @@ fn input_cannot_claim_the_provider_owned_common_section() {
     assert!(error.contains("__DATA,__nuis_common"), "{error}");
 }
 
+#[test]
+fn absolute_definition_binds_as_a_value_without_an_image_offset() {
+    let program = linkage(
+        0,
+        vec![
+            absolute_symbol(0, "_constant", 0x1234_5678),
+            undefined_symbol(1, "_constant"),
+        ],
+    );
+    let objects = [MachOLayoutObject {
+        object_id: "host.program",
+        role: "program-llvm",
+        linkage: &program,
+    }];
+
+    let report = build_macho_placement_binding_report(&objects).unwrap();
+
+    assert_eq!(report.contract, MACHO_PLACEMENT_BINDING_CONTRACT);
+    assert_eq!(report.symbol_bindings.len(), 2);
+    assert!(report.symbol_bindings.iter().all(|binding| {
+        binding.target_kind.as_deref() == Some("absolute")
+            && binding.target_output_offset.is_none()
+            && binding.target_absolute_value == Some(0x1234_5678)
+    }));
+}
+
+#[test]
+fn indirect_alias_chain_resolves_to_one_terminal_placement() {
+    let program = linkage(
+        0,
+        vec![
+            indirect_symbol(0, "_public", "_middle"),
+            indirect_symbol(1, "_middle", "_runtime"),
+            defined_symbol(2, "_runtime", 1, 4),
+            undefined_symbol(3, "_public"),
+        ],
+    );
+    let objects = [MachOLayoutObject {
+        object_id: "host.program",
+        role: "program-llvm",
+        linkage: &program,
+    }];
+
+    let report = build_macho_placement_binding_report(&objects).unwrap();
+
+    let public = report
+        .symbol_bindings
+        .iter()
+        .filter(|binding| binding.symbol == "_public")
+        .collect::<Vec<_>>();
+    assert_eq!(public.len(), 2);
+    assert!(public.iter().all(|binding| {
+        binding.target_kind.as_deref() == Some("section")
+            && binding.target_output_offset == Some(4)
+            && binding.alias_chain == ["_public", "_middle", "_runtime"]
+    }));
+}
+
+#[test]
+fn indirect_alias_missing_target_fails_before_emission() {
+    let program = linkage(0, vec![indirect_symbol(0, "_public", "_missing")]);
+    let objects = [MachOLayoutObject {
+        object_id: "host.program",
+        role: "program-llvm",
+        linkage: &program,
+    }];
+
+    let error = build_macho_placement_binding_report(&objects).unwrap_err();
+
+    assert!(
+        error.contains("alias `_public` target `_missing`"),
+        "{error}"
+    );
+    assert!(error.contains("_public -> _missing"), "{error}");
+}
+
+#[test]
+fn indirect_alias_cycle_fails_with_a_deterministic_path() {
+    let program = linkage(
+        0,
+        vec![
+            indirect_symbol(0, "_first", "_second"),
+            indirect_symbol(1, "_second", "_first"),
+        ],
+    );
+    let objects = [MachOLayoutObject {
+        object_id: "host.program",
+        role: "program-llvm",
+        linkage: &program,
+    }];
+
+    let error = build_macho_placement_binding_report(&objects).unwrap_err();
+
+    assert!(error.contains("indirect alias cycle"), "{error}");
+    assert!(error.contains("_first -> _second -> _first"), "{error}");
+}
+
 fn linkage(flags: u32, symbols: Vec<ParsedMachOSymbol>) -> ParsedMachOObjectLinkage {
     let external_definitions = symbols
         .iter()
@@ -334,5 +431,33 @@ fn common_symbol_with_shape(
         value: size,
         common_alignment: Some(alignment),
         indirect_target: None,
+    }
+}
+
+fn absolute_symbol(index: usize, name: &str, value: u64) -> ParsedMachOSymbol {
+    ParsedMachOSymbol {
+        index,
+        name: name.to_owned(),
+        kind: "absolute".to_owned(),
+        external: true,
+        defined: true,
+        section_ordinal: None,
+        value,
+        common_alignment: None,
+        indirect_target: None,
+    }
+}
+
+fn indirect_symbol(index: usize, name: &str, target: &str) -> ParsedMachOSymbol {
+    ParsedMachOSymbol {
+        index,
+        name: name.to_owned(),
+        kind: "indirect".to_owned(),
+        external: true,
+        defined: true,
+        section_ordinal: None,
+        value: 0,
+        common_alignment: None,
+        indirect_target: Some(target.to_owned()),
     }
 }

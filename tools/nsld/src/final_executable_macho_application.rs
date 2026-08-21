@@ -239,7 +239,8 @@ fn validate_patch_identity(
     if application.relocation_kind != patch.relocation_kind
         || application.source_output_offset != patch.source_output_offset
         || application.width_bytes != patch.width_bytes
-        || application.target_output_offset != Some(patch.target_output_offset)
+        || application.target_output_offset != patch.target_output_offset
+        || application.target_absolute_value != patch.target_absolute_value
     {
         return Err(format!(
             "Mach-O patch `{}` relocation identity drift",
@@ -269,7 +270,7 @@ fn validate_patch_hashes(
     }
     let expected_audit = patch_audit_hash(
         application,
-        patch.target_output_offset,
+        patch_target_value(patch)?,
         patch.effective_addend,
         &patch.source_bytes_hash,
         &patch.encoded_bytes_hash,
@@ -281,6 +282,22 @@ fn validate_patch_hashes(
         ));
     }
     Ok(())
+}
+
+fn patch_target_value(patch: &NsldMachOArm64PatchPreview) -> Result<u64, String> {
+    match (patch.target_output_offset, patch.target_absolute_value) {
+        (Some(offset), None) => u64::try_from(offset)
+            .map_err(|_| format!("Mach-O patch `{}` target overflows", patch.relocation_id)),
+        (None, Some(value)) => Ok(value),
+        (None, None) => Err(format!(
+            "Mach-O patch `{}` has no target value",
+            patch.relocation_id
+        )),
+        (Some(_), Some(_)) => Err(format!(
+            "Mach-O patch `{}` has ambiguous target values",
+            patch.relocation_id
+        )),
+    }
 }
 
 fn decode_canonical_hex(

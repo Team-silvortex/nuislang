@@ -340,7 +340,7 @@ fn print_finalizer_input_summary(summary: Option<&NsldExecutableFinalizerInputSu
     }
     for binding in &placement.symbol_bindings {
         println!(
-            "  finalizer_input_symbol_binding: symbol={} reference={}:{} status={} target_object={} target_symbol={} target_kind={} target_section={} target_offset={}",
+            "  finalizer_input_symbol_binding: symbol={} reference={}:{} status={} target_object={} target_symbol={} target_kind={} target_section={} target_offset={} target_absolute={} aliases={}",
             binding.symbol,
             binding.reference_object_id,
             binding.reference_symbol_index,
@@ -355,7 +355,16 @@ fn print_finalizer_input_summary(summary: Option<&NsldExecutableFinalizerInputSu
             binding
                 .target_output_offset
                 .map(|value| value.to_string())
-                .unwrap_or_else(|| "none".to_owned())
+                .unwrap_or_else(|| "none".to_owned()),
+            binding
+                .target_absolute_value
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "none".to_owned()),
+            if binding.alias_chain.is_empty() {
+                "none".to_owned()
+            } else {
+                binding.alias_chain.join("->")
+            }
         );
     }
     let relocation = &summary.relocation_application;
@@ -401,7 +410,7 @@ fn print_finalizer_input_summary(summary: Option<&NsldExecutableFinalizerInputSu
     );
     for item in &relocation.applications {
         println!(
-            "  finalizer_input_relocation_application: id={} object={} role={} section_ordinal={} source_section={} source_offset={} output_offset={} width={} pcrel={} external={} type={} kind={} action={} target={} target_index={} target_object={} target_section={} target_offset={} addend={} pair={} resolver={} status={}",
+            "  finalizer_input_relocation_application: id={} object={} role={} section_ordinal={} source_section={} source_offset={} output_offset={} width={} pcrel={} external={} type={} kind={} action={} target={} target_index={} target_object={} target_section={} target_offset={} target_absolute={} aliases={} addend={} pair={} resolver={} status={}",
             item.relocation_id,
             item.object_id,
             item.object_role,
@@ -424,6 +433,14 @@ fn print_finalizer_input_summary(summary: Option<&NsldExecutableFinalizerInputSu
             item.target_output_offset
                 .map(|value| value.to_string())
                 .unwrap_or_else(|| "none".to_owned()),
+            item.target_absolute_value
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "none".to_owned()),
+            if item.target_alias_chain.is_empty() {
+                "none".to_owned()
+            } else {
+                item.target_alias_chain.join("->")
+            },
             item.explicit_addend
                 .map(|value| value.to_string())
                 .unwrap_or_else(|| "none".to_owned()),
@@ -460,12 +477,16 @@ fn print_finalizer_input_summary(summary: Option<&NsldExecutableFinalizerInputSu
     }
     for patch in &materialization.patches {
         println!(
-            "  finalizer_input_materialization_patch: id={} kind={} offset={} width={} target={} addend={} source={} encoded={} source_hash={} encoded_hash={} audit_hash={}",
+            "  finalizer_input_materialization_patch: id={} kind={} offset={} width={} target_offset={} target_absolute={} addend={} source={} encoded={} source_hash={} encoded_hash={} audit_hash={}",
             patch.relocation_id,
             patch.relocation_kind,
             patch.source_output_offset,
             patch.width_bytes,
-            patch.target_output_offset,
+            display_option(patch.target_output_offset),
+            patch
+                .target_absolute_value
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "none".to_owned()),
             patch.effective_addend,
             patch.source_bytes_hex,
             patch.encoded_bytes_hex,
@@ -528,7 +549,7 @@ fn print_finalizer_input_summary(summary: Option<&NsldExecutableFinalizerInputSu
     );
     for target in &platform.targets {
         println!(
-            "  finalizer_input_platform_target: id={} key={} symbol={} resolver={} target_object={} target_section={} target_offset={} got_slot={} got_offset={} stub_slot={} stub_offset={} relocations={} audit_hash={}",
+            "  finalizer_input_platform_target: id={} key={} symbol={} resolver={} target_object={} target_section={} target_offset={} target_absolute={} got_slot={} got_offset={} stub_slot={} stub_offset={} relocations={} audit_hash={}",
             target.structure_id,
             target.target_key,
             target.target_symbol,
@@ -536,6 +557,10 @@ fn print_finalizer_input_summary(summary: Option<&NsldExecutableFinalizerInputSu
             target.target_object_id.as_deref().unwrap_or("none"),
             target.target_section_id.as_deref().unwrap_or("none"),
             display_option(target.target_output_offset),
+            target
+                .target_absolute_value
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "none".to_owned()),
             display_option(target.got_slot_index),
             display_option(target.got_output_offset),
             display_option(target.stub_slot_index),

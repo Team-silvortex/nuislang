@@ -2,6 +2,7 @@ use crate::reports::NsldMachOArm64ShellLayoutPlanReport;
 
 const N_EXT: u8 = 0x01;
 const N_SECT: u8 = 0x0e;
+const N_ABS: u8 = 0x02;
 const INDIRECT_SYMBOL_LOCAL: u32 = 0x8000_0000;
 const INDIRECT_SYMBOL_ABS: u32 = 0x4000_0000;
 
@@ -113,7 +114,7 @@ fn encode_symbol_table(plan: &NsldMachOArm64ShellLayoutPlanReport) -> Result<Vec
         }
         bytes.extend_from_slice(&checked_u32(symbol.string_table_offset)?.to_le_bytes());
         match symbol.record_kind.as_str() {
-            "external-defined" => {
+            "external-defined" | "external-defined-alias" => {
                 let section_id = symbol.shell_section_id.as_deref().ok_or_else(|| {
                     format!(
                         "Mach-O defined symbol `{}` has no section",
@@ -146,6 +147,21 @@ fn encode_symbol_table(plan: &NsldMachOArm64ShellLayoutPlanReport) -> Result<Vec
                 bytes.push(ordinal);
                 bytes.extend_from_slice(&0u16.to_le_bytes());
                 bytes.extend_from_slice(&address.to_le_bytes());
+            }
+            "external-absolute" | "external-absolute-alias" => {
+                if symbol.shell_section_id.is_some() || symbol.source_image_offset.is_some() {
+                    return Err(format!(
+                        "Mach-O absolute symbol `{}` unexpectedly owns a section",
+                        symbol.symbol_id
+                    ));
+                }
+                let value = symbol.vm_address.ok_or_else(|| {
+                    format!("Mach-O absolute symbol `{}` has no value", symbol.symbol_id)
+                })?;
+                bytes.push(N_ABS | N_EXT);
+                bytes.push(0);
+                bytes.extend_from_slice(&0u16.to_le_bytes());
+                bytes.extend_from_slice(&value.to_le_bytes());
             }
             "external-undefined" => {
                 let ordinal = u8::try_from(symbol.dylib_ordinal.ok_or_else(|| {

@@ -52,6 +52,8 @@ pub(crate) struct NsldMachOSymbolBinding {
     pub(crate) target_kind: Option<String>,
     pub(crate) target_section_id: Option<String>,
     pub(crate) target_output_offset: Option<usize>,
+    pub(crate) target_absolute_value: Option<u64>,
+    pub(crate) alias_chain: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -88,6 +90,8 @@ pub(crate) struct NsldMachOArm64RelocationApplication {
     pub(crate) target_object_id: Option<String>,
     pub(crate) target_section_id: Option<String>,
     pub(crate) target_output_offset: Option<usize>,
+    pub(crate) target_absolute_value: Option<u64>,
+    pub(crate) target_alias_chain: Vec<String>,
     pub(crate) explicit_addend: Option<i64>,
     pub(crate) pair_relocation_id: Option<String>,
     pub(crate) resolver_status: String,
@@ -125,7 +129,8 @@ pub(crate) struct NsldMachOArm64PatchPreview {
     pub(crate) relocation_kind: String,
     pub(crate) source_output_offset: usize,
     pub(crate) width_bytes: usize,
-    pub(crate) target_output_offset: usize,
+    pub(crate) target_output_offset: Option<usize>,
+    pub(crate) target_absolute_value: Option<u64>,
     pub(crate) effective_addend: i64,
     pub(crate) source_bytes_hex: String,
     pub(crate) encoded_bytes_hex: String,
@@ -192,6 +197,7 @@ pub(crate) struct NsldMachOArm64PlatformTargetPlan {
     pub(crate) target_object_id: Option<String>,
     pub(crate) target_section_id: Option<String>,
     pub(crate) target_output_offset: Option<usize>,
+    pub(crate) target_absolute_value: Option<u64>,
     pub(crate) got_slot_index: Option<usize>,
     pub(crate) got_output_offset: Option<usize>,
     pub(crate) stub_slot_index: Option<usize>,

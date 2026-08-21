@@ -325,19 +325,22 @@ fn got_entry_bytes(
     match target.resolver_status.as_str() {
         "external-compatibility" => Ok(("unresolved-external-got-placeholder", vec![0; GOT_WIDTH])),
         "internal" | "internal-symbol" => {
-            let output_offset = target.target_output_offset.ok_or_else(|| {
-                format!(
-                    "Mach-O internal GOT target `{}` has no output offset",
+            match (target.target_output_offset, target.target_absolute_value) {
+                (Some(output_offset), None) => {
+                    let value = u64::try_from(output_offset).map_err(|_| {
+                        format!(
+                            "Mach-O internal GOT target `{}` exceeds 64-bit image-relative space",
+                            target.structure_id
+                        )
+                    })?;
+                    Ok(("internal-image-relative-got", value.to_le_bytes().to_vec()))
+                }
+                (None, Some(value)) => Ok(("internal-absolute-got", value.to_le_bytes().to_vec())),
+                _ => Err(format!(
+                    "Mach-O internal GOT target `{}` has an invalid target coordinate",
                     target.structure_id
-                )
-            })?;
-            let value = u64::try_from(output_offset).map_err(|_| {
-                format!(
-                    "Mach-O internal GOT target `{}` exceeds 64-bit image-relative space",
-                    target.structure_id
-                )
-            })?;
-            Ok(("internal-image-relative-got", value.to_le_bytes().to_vec()))
+                )),
+            }
         }
         other => Err(format!(
             "Mach-O platform target `{}` has unsupported resolver status `{other}`",

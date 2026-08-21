@@ -23,6 +23,13 @@ pub(crate) fn nsld_final_executable_writer_plan_report_json(
     format!("{{{}}}", fields.join(","))
 }
 
+fn json_optional_u64_value(name: &str, value: Option<u64>) -> String {
+    value.map_or_else(
+        || format!("\"{name}\":null"),
+        |value| format!("\"{name}\":{value}"),
+    )
+}
+
 pub(crate) fn nsld_final_executable_writer_input_emit_report_json(
     report: &NsldFinalExecutableWriterInputEmitReport,
 ) -> String {
@@ -351,6 +358,7 @@ fn macho_platform_structure_plan_json(
                     target.target_section_id.as_deref(),
                 ),
                 json_optional_usize_field("target_output_offset", target.target_output_offset),
+                json_optional_u64_value("target_absolute_value", target.target_absolute_value),
                 json_optional_usize_field("got_slot_index", target.got_slot_index),
                 json_optional_usize_field("got_output_offset", target.got_output_offset),
                 json_optional_usize_field("stub_slot_index", target.stub_slot_index),
@@ -485,7 +493,8 @@ fn macho_materialization_preview_json(
                 json_string_field("relocation_kind", &patch.relocation_kind),
                 json_usize_field("source_output_offset", patch.source_output_offset),
                 json_usize_field("width_bytes", patch.width_bytes),
-                json_usize_field("target_output_offset", patch.target_output_offset),
+                json_optional_usize_field("target_output_offset", patch.target_output_offset),
+                json_optional_u64_value("target_absolute_value", patch.target_absolute_value),
                 json_i64_field("effective_addend", patch.effective_addend),
                 json_string_field("source_bytes_hex", &patch.source_bytes_hex),
                 json_string_field("encoded_bytes_hex", &patch.encoded_bytes_hex),
@@ -541,6 +550,8 @@ fn macho_relocation_application_json(report: &NsldMachOArm64RelocationApplicatio
                 json_optional_string_field("target_object_id", item.target_object_id.as_deref()),
                 json_optional_string_field("target_section_id", item.target_section_id.as_deref()),
                 json_optional_usize_field("target_output_offset", item.target_output_offset),
+                json_optional_u64_value("target_absolute_value", item.target_absolute_value),
+                json_string_array_field("target_alias_chain", &item.target_alias_chain),
                 json_optional_i64_field("explicit_addend", item.explicit_addend),
                 json_optional_string_field(
                     "pair_relocation_id",
@@ -651,6 +662,8 @@ fn macho_placement_binding_json(report: &NsldMachOPlacementBindingReport) -> Str
                     binding.target_section_id.as_deref(),
                 ),
                 json_optional_usize_field("target_output_offset", binding.target_output_offset),
+                json_optional_u64_value("target_absolute_value", binding.target_absolute_value),
+                json_string_array_field("alias_chain", &binding.alias_chain),
             ];
             format!("{{{}}}", fields.join(","))
         })

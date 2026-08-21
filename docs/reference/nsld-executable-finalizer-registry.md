@@ -144,10 +144,14 @@ A future provider must:
 6. register any private-image publication capability with one unique stable ID
    and keep the callback absent when the provider cannot honor replay admission.
 
-The deterministic common-symbol milestone is now closed by
-`nuis-nsld-macho-placement-binding-v2`. The Mach-O provider coalesces tentative
-definitions, allocates a provider-owned zero-fill section, binds relocations and
-shell symbols to final addresses, and carries a real store-using fixture through
+The deterministic non-section-symbol milestone is now closed by
+`nuis-nsld-macho-placement-binding-v3`. The Mach-O provider coalesces tentative
+definitions into provider-owned zero-fill storage, preserves `N_ABS` values as
+absolute coordinates, and resolves `N_INDR` aliases through one deterministic
+graph. Missing targets and cycles fail before mutation. Relocation,
+materialization, platform GOT construction, and shell symbols consume the same
+binding evidence; aliases lower to their terminal section or absolute form and
+the shell emits real `N_ABS` records. A real alias/absolute fixture still passes
 signature, admission, registered publication, and execution without adding
 Mach-O branches to Nuisc or the generic emit frontdoor.
 

@@ -1056,7 +1056,7 @@ bundle. It requires one LLVM program object and one runtime shim object,
 validates their LinkPlan identity, content hashes, arm64 `MH_OBJECT` headers,
 and load-command spans. `nuis-nsld-macho-host-object-linkage-v1` preserves the
 checked sections, symbols, and relocation records. The nested
-`nuis-nsld-macho-placement-binding-v2` then orders the program before the
+`nuis-nsld-macho-placement-binding-v3` then orders the program before the
 runtime shim, merges compatible segment/section pairs, applies checked
 alignment, assigns deterministic contribution offsets, and binds every
 section-backed cross-object definition. Duplicate definitions, incompatible
@@ -1064,14 +1064,17 @@ section-backed cross-object definition. Duplicate definitions, incompatible
   definitions coalesce by symbol name under maximum size/alignment, strong
   section definitions override them, and all remaining commons receive audited
   offsets in the reserved VM-only `__DATA,__nuis_common` section. Reserved-
-  section claims and unsupported absolute/indirect definitions fail closed;
-  unresolved C/system symbols remain explicitly marked `external-compatibility`.
+  section claims fail closed. `N_ABS` definitions retain an explicit absolute
+  value instead of masquerading as an image offset. `N_INDR` definitions follow
+  a deterministic alias graph to a section, common, or absolute terminal;
+  missing targets and cycles fail before mutation. Unresolved C/system symbols
+  remain explicitly marked `external-compatibility`.
   The canonical plan hash and full merged-section, placement, common-allocation,
   and binding records are identical across JSON, text, and persisted invoke-plan
   surfaces. The provider next derives
 `nuis-nsld-macho-arm64-relocation-application-v1`, which maps every checked
-relocation to a placed source offset and local, internal, or compatibility
-target. Its static registry covers ARM64 `UNSIGNED`, `SUBTRACTOR`, `BRANCH26`,
+relocation to a placed source offset and local, internal, absolute, or
+compatibility target. Its static registry covers ARM64 `UNSIGNED`, `SUBTRACTOR`, `BRANCH26`,
 `PAGE21`, `PAGEOFF12`, `GOT_LOAD_PAGE21`, `GOT_LOAD_PAGEOFF12`, and `ADDEND`.
 It validates width, PC-relative, external, and pair shapes; preserves explicit
 addends and reciprocal pair ids; distinguishes direct encoding from linker

@@ -143,13 +143,16 @@ private Mach-O executes through macOS and exits 0. Invalid admission does not
 touch the compatibility output, so the private image is never silently
 substituted.
 
-`nuis-nsld-macho-placement-binding-v2` now also owns tentative common storage.
-It coalesces declarations by symbol name using maximum size and alignment,
-honors strong-definition precedence, and emits canonical allocation records for
-one reserved `__DATA,__nuis_common` zero-fill section. Direct relocations and the
-shell symbol table consume those records. The real published fixture executes
-`ADRP`/`ADD`/`STR` against the VM-only allocation before exiting zero, while the
-ordinary compatibility output remains unchanged by default.
+`nuis-nsld-macho-placement-binding-v3` owns tentative common storage plus
+non-section definition resolution. It coalesces declarations by symbol name,
+honors strong-definition precedence, emits canonical `__DATA,__nuis_common`
+allocations, preserves `N_ABS` values, and resolves multi-hop `N_INDR` aliases.
+Cycles and missing targets fail before byte mutation. Direct and GOT
+relocations, shell symbols, and final-address rewriting consume the same
+image-offset-or-absolute evidence. The real published fixture includes an alias
+and absolute symbol, executes `ADRP`/`ADD`/`STR` against VM-only common storage,
+and exits zero while ordinary compatibility output remains unchanged by
+default.
 
 `nuis-nsld-final-output-selection-registry-v1` now makes that private product an
 explicit ordinary final-output option rather than a separate architecture path.

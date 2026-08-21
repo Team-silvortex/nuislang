@@ -66,7 +66,7 @@ pub(crate) fn rewrite_shell_image_addresses(
         .iter()
         .filter(|application| application.application_status != "paired-metadata")
     {
-        let (source_hex, source_hash, prewrite_hash, target_source_offset) =
+        let (source_hex, source_hash, prewrite_hash, target_source_offset, target_absolute_value) =
             match application.application_status.as_str() {
                 "planned-direct" => {
                     let patch = direct_patches
@@ -81,6 +81,8 @@ pub(crate) fn rewrite_shell_image_addresses(
                     if patch.source_output_offset != application.source_output_offset
                         || patch.width_bytes != application.width_bytes
                         || patch.relocation_kind != application.relocation_kind
+                        || patch.target_output_offset != application.target_output_offset
+                        || patch.target_absolute_value != application.target_absolute_value
                     {
                         return Err(format!(
                             "Mach-O direct patch `{}` shape drift",
@@ -91,12 +93,8 @@ pub(crate) fn rewrite_shell_image_addresses(
                         patch.source_bytes_hex.as_str(),
                         patch.source_bytes_hash.as_str(),
                         patch.encoded_bytes_hash.as_str(),
-                        application.target_output_offset.ok_or_else(|| {
-                            format!(
-                                "Mach-O direct relocation `{}` has no target",
-                                application.relocation_id
-                            )
-                        })?,
+                        application.target_output_offset,
+                        application.target_absolute_value,
                     )
                 }
                 "planned-platform-structure" => {
@@ -134,7 +132,8 @@ pub(crate) fn rewrite_shell_image_addresses(
                         patch.source_bytes_hex.as_str(),
                         patch.source_bytes_hash.as_str(),
                         patch.encoded_bytes_hash.as_str(),
-                        binding.patch_target_output_offset,
+                        Some(binding.patch_target_output_offset),
+                        None,
                     )
                 }
                 other => {
@@ -158,7 +157,24 @@ pub(crate) fn rewrite_shell_image_addresses(
             &shell.sections,
             &shell.segments,
         )?;
-        let target = locate_source_address(target_source_offset, &shell.sections, &shell.segments)?;
+        let target_vm_address = match (target_source_offset, target_absolute_value) {
+            (Some(offset), None) => {
+                locate_source_address(offset, &shell.sections, &shell.segments)?.vm_address
+            }
+            (None, Some(value)) => value,
+            (None, None) => {
+                return Err(format!(
+                    "Mach-O shell relocation `{}` has no target value",
+                    application.relocation_id
+                ));
+            }
+            (Some(_), Some(_)) => {
+                return Err(format!(
+                    "Mach-O shell relocation `{}` has ambiguous target values",
+                    application.relocation_id
+                ));
+            }
+        };
         let file_offset = source.file_offset.ok_or_else(|| {
             format!(
                 "Mach-O shell relocation `{}` source is not file-backed",
@@ -169,7 +185,7 @@ pub(crate) fn rewrite_shell_image_addresses(
             application,
             &encoding_source,
             source.vm_address,
-            target.vm_address,
+            target_vm_address,
             &applications,
             shell,
         )?;
@@ -182,7 +198,7 @@ pub(crate) fn rewrite_shell_image_addresses(
             application.source_output_offset,
             file_offset,
             source.vm_address,
-            Some(target.vm_address),
+            Some(target_vm_address),
             Some(effective_addend),
             prewrite_hash,
             &encoding_source,

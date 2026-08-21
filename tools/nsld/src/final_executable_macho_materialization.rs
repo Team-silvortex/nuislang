@@ -79,21 +79,16 @@ pub(crate) fn build_macho_arm64_materialization_preview(
             source_end,
             &application.relocation_id,
         ));
-        let target_output_offset = application.target_output_offset.ok_or_else(|| {
-            format!(
-                "Mach-O direct patch `{}` has no resolved target offset",
-                application.relocation_id
-            )
-        })?;
+        let target_value = resolved_target_value(application)?;
         let (encoded, effective_addend) =
-            encode_patch(application, source, target_output_offset, &applications)?;
+            encode_patch(application, source, target_value, &applications)?;
         let source_bytes_hex = hex_bytes(source);
         let encoded_bytes_hex = hex_bytes(&encoded);
         let source_bytes_hash = crate::fnv1a64_hex(source);
         let encoded_bytes_hash = crate::fnv1a64_hex(&encoded);
         let audit_hash = patch_audit_hash(
             application,
-            target_output_offset,
+            target_value,
             effective_addend,
             &source_bytes_hash,
             &encoded_bytes_hash,
@@ -103,7 +98,8 @@ pub(crate) fn build_macho_arm64_materialization_preview(
             relocation_kind: application.relocation_kind.clone(),
             source_output_offset: application.source_output_offset,
             width_bytes: application.width_bytes,
-            target_output_offset,
+            target_output_offset: application.target_output_offset,
+            target_absolute_value: application.target_absolute_value,
             effective_addend,
             source_bytes_hex,
             encoded_bytes_hex,
@@ -288,18 +284,14 @@ pub(crate) fn build_merged_section_image(
 fn encode_patch(
     application: &NsldMachOArm64RelocationApplication,
     source: &[u8],
-    target_output_offset: usize,
+    target_value: u64,
     applications: &BTreeMap<&str, &NsldMachOArm64RelocationApplication>,
 ) -> Result<(Vec<u8>, i64), String> {
     match application.relocation_kind.as_str() {
-        "arm64-unsigned" => {
-            encode_unsigned(application, source, target_output_offset, applications)
-        }
-        "arm64-branch26" => encode_branch26(application, source, target_output_offset),
-        "arm64-page21" => encode_page21(application, source, target_output_offset, applications),
-        "arm64-pageoff12" => {
-            encode_pageoff12(application, source, target_output_offset, applications)
-        }
+        "arm64-unsigned" => encode_unsigned(application, source, target_value, applications),
+        "arm64-branch26" => encode_branch26(application, source, target_value),
+        "arm64-page21" => encode_page21(application, source, target_value, applications),
+        "arm64-pageoff12" => encode_pageoff12(application, source, target_value, applications),
         other => Err(format!(
             "Mach-O direct patch `{}` has unsupported preview kind `{other}`",
             application.relocation_id
@@ -313,6 +305,7 @@ pub(crate) fn encode_macho_arm64_platform_patch(
     target_output_offset: usize,
     applications: &BTreeMap<&str, &NsldMachOArm64RelocationApplication>,
 ) -> Result<(Vec<u8>, i64), String> {
+    let target_output_offset = target_output_offset as u64;
     match application.relocation_kind.as_str() {
         "arm64-branch26" => encode_branch26(application, source, target_output_offset),
         "arm64-got-load-page21" => {
@@ -331,7 +324,7 @@ pub(crate) fn encode_macho_arm64_platform_patch(
 fn encode_unsigned(
     application: &NsldMachOArm64RelocationApplication,
     source: &[u8],
-    target: usize,
+    target: u64,
     applications: &BTreeMap<&str, &NsldMachOArm64RelocationApplication>,
 ) -> Result<(Vec<u8>, i64), String> {
     let embedded = read_signed_le(source)? as i128;
@@ -372,7 +365,7 @@ fn encode_unsigned(
 fn encode_branch26(
     application: &NsldMachOArm64RelocationApplication,
     source: &[u8],
-    target: usize,
+    target: u64,
 ) -> Result<(Vec<u8>, i64), String> {
     let word = read_instruction(source, application)?;
     if word & 0x7c00_0000 != 0x1400_0000 {
@@ -397,7 +390,7 @@ fn encode_branch26(
 fn encode_page21(
     application: &NsldMachOArm64RelocationApplication,
     source: &[u8],
-    target: usize,
+    target: u64,
     applications: &BTreeMap<&str, &NsldMachOArm64RelocationApplication>,
 ) -> Result<(Vec<u8>, i64), String> {
     let word = read_instruction(source, application)?;
@@ -437,7 +430,7 @@ fn encode_page21(
 fn encode_pageoff12(
     application: &NsldMachOArm64RelocationApplication,
     source: &[u8],
-    target: usize,
+    target: u64,
     applications: &BTreeMap<&str, &NsldMachOArm64RelocationApplication>,
 ) -> Result<(Vec<u8>, i64), String> {
     let word = read_instruction(source, application)?;
@@ -542,13 +535,31 @@ fn explicit_pair_addend(
     })
 }
 
-fn required_target(application: &NsldMachOArm64RelocationApplication) -> Result<usize, String> {
-    application.target_output_offset.ok_or_else(|| {
-        format!(
-            "Mach-O paired relocation `{}` has no resolved target offset",
+fn required_target(application: &NsldMachOArm64RelocationApplication) -> Result<u64, String> {
+    resolved_target_value(application)
+}
+
+fn resolved_target_value(application: &NsldMachOArm64RelocationApplication) -> Result<u64, String> {
+    match (
+        application.target_output_offset,
+        application.target_absolute_value,
+    ) {
+        (Some(offset), None) => u64::try_from(offset).map_err(|_| {
+            format!(
+                "Mach-O relocation `{}` target offset exceeds 64-bit space",
+                application.relocation_id
+            )
+        }),
+        (None, Some(value)) => Ok(value),
+        (None, None) => Err(format!(
+            "Mach-O relocation `{}` has no resolved target value",
             application.relocation_id
-        )
-    })
+        )),
+        (Some(_), Some(_)) => Err(format!(
+            "Mach-O relocation `{}` ambiguously owns both image-offset and absolute targets",
+            application.relocation_id
+        )),
+    }
 }
 
 fn read_instruction(
@@ -619,7 +630,7 @@ fn checked_range(
 
 pub(crate) fn patch_audit_hash(
     application: &NsldMachOArm64RelocationApplication,
-    target: usize,
+    target: u64,
     effective_addend: i64,
     source_hash: &str,
     encoded_hash: &str,
@@ -631,10 +642,18 @@ pub(crate) fn patch_audit_hash(
     append_text(&mut canonical, encoded_hash);
     writeln!(
         canonical,
-        "facts={}|{}|{}|{}|{}",
+        "facts={}|{}|{}|{}|{}|{}|{}",
         application.source_output_offset,
         application.width_bytes,
         target,
+        application
+            .target_output_offset
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "none".to_owned()),
+        application
+            .target_absolute_value
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "none".to_owned()),
         effective_addend,
         application.action_kind
     )

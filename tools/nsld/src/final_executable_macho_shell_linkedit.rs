@@ -2,6 +2,7 @@ use crate::{
     final_executable_macho_layout::MachOLayoutObject,
     final_executable_macho_shell_definitions::{
         collect_shell_definitions, collect_unresolved_shell_symbols, MachOShellDefinition,
+        MachOShellDefinitionValue,
     },
     final_executable_macho_shell_layout::{
         locate_source_address, ShellLayoutDraft, SYSTEM_DYLIB_PATH,
@@ -183,11 +184,17 @@ fn select_entry(
         if definition.object.role != rule.object_role {
             continue;
         }
-        let address = locate_source_address(
-            definition.source_image_offset,
-            &layout.sections,
-            &layout.segments,
-        )?;
+        let source_image_offset = match definition.value {
+            MachOShellDefinitionValue::ImageOffset(offset) => offset,
+            MachOShellDefinitionValue::Absolute(_) => {
+                return Err(format!(
+                    "Mach-O entry `{}` resolves to an absolute symbol",
+                    rule.symbol
+                ));
+            }
+        };
+        let address =
+            locate_source_address(source_image_offset, &layout.sections, &layout.segments)?;
         let file_offset = address.file_offset.ok_or_else(|| {
             format!(
                 "Mach-O entry `{}` resolves to a zero-fill section",
@@ -205,7 +212,7 @@ fn select_entry(
         return Ok(ShellEntryPlan {
             rule_id: rule.id.to_owned(),
             symbol: rule.symbol.to_owned(),
-            source_image_offset: definition.source_image_offset,
+            source_image_offset,
             file_offset,
             vm_address: address.vm_address,
         });
@@ -228,21 +235,41 @@ fn build_symbols(
     let mut string_offset = 1usize;
     let mut symbols = Vec::with_capacity(definitions.len() + undefined.len());
     for (name, definition) in definitions {
-        let address = locate_source_address(
-            definition.source_image_offset,
-            &layout.sections,
-            &layout.segments,
-        )?;
+        let (record_kind, section_id, source_offset, vm_address) = match definition.value {
+            MachOShellDefinitionValue::ImageOffset(offset) => {
+                let address = locate_source_address(offset, &layout.sections, &layout.segments)?;
+                (
+                    if definition.alias {
+                        "external-defined-alias"
+                    } else {
+                        "external-defined"
+                    },
+                    Some(address.section_id),
+                    Some(offset),
+                    Some(address.vm_address),
+                )
+            }
+            MachOShellDefinitionValue::Absolute(value) => (
+                if definition.alias {
+                    "external-absolute-alias"
+                } else {
+                    "external-absolute"
+                },
+                None,
+                None,
+                Some(value),
+            ),
+        };
         let symbol_id = format!("macho-arm64-shell-symbol-{:04}", symbols.len());
         let audit_hash = symbol_audit_hash(
             &symbol_id,
             name,
-            "external-defined",
+            record_kind,
             Some(definition.object.object_id),
             Some(definition.symbol.index),
-            Some(&address.section_id),
-            Some(definition.source_image_offset),
-            Some(address.vm_address),
+            section_id.as_deref(),
+            source_offset,
+            vm_address,
             symbols.len(),
             string_offset,
             None,
@@ -250,12 +277,12 @@ fn build_symbols(
         symbols.push(NsldMachOArm64ShellSymbolPlan {
             symbol_id,
             name: name.clone(),
-            record_kind: "external-defined".to_owned(),
+            record_kind: record_kind.to_owned(),
             object_id: Some(definition.object.object_id.to_owned()),
             source_symbol_index: Some(definition.symbol.index),
-            shell_section_id: Some(address.section_id),
-            source_image_offset: Some(definition.source_image_offset),
-            vm_address: Some(address.vm_address),
+            shell_section_id: section_id,
+            source_image_offset: source_offset,
+            vm_address,
             symbol_table_index: symbols.len(),
             string_table_offset: string_offset,
             dylib_ordinal: None,
@@ -440,7 +467,9 @@ fn build_rebases(
 ) -> Result<Vec<NsldMachOArm64ShellRebasePlan>, String> {
     let mut rebases = Vec::new();
     for target in platform.targets.iter().filter(|target| {
-        target.got_output_offset.is_some() && target.resolver_status != "external-compatibility"
+        target.got_output_offset.is_some()
+            && target.target_output_offset.is_some()
+            && target.resolver_status != "external-compatibility"
     }) {
         let got_source_image_offset = target.got_output_offset.unwrap();
         let target_source_image_offset = target.target_output_offset.ok_or_else(|| {

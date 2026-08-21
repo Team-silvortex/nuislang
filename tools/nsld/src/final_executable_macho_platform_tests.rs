@@ -52,6 +52,33 @@ fn got_pair_shares_one_deterministic_target_slot() {
 }
 
 #[test]
+fn absolute_got_target_keeps_a_distinct_coordinate() {
+    let placement = placement(8);
+    let mut absolute = application(
+        "reloc-absolute-got",
+        "arm64-got-load-pageoff12",
+        "rewrite-got-load-pageoff12",
+        "internal",
+        "_constant",
+        None,
+    );
+    absolute.target_section_id = None;
+    absolute.target_absolute_value = Some(0x1122_3344_5566_7788);
+    let relocations = relocation_report(vec![absolute]);
+    let applied = applied_report(&placement, &relocations);
+
+    let report =
+        build_macho_arm64_platform_structure_plan(&placement, &relocations, &applied).unwrap();
+
+    assert_eq!(report.target_count, 1);
+    assert_eq!(report.targets[0].target_output_offset, None);
+    assert_eq!(
+        report.targets[0].target_absolute_value,
+        Some(0x1122_3344_5566_7788)
+    );
+}
+
+#[test]
 fn external_branch_targets_are_sorted_but_bindings_keep_relocation_order() {
     let placement = placement(16);
     let relocations = relocation_report(vec![
@@ -284,6 +311,8 @@ fn application(
         target_object_id: internal.then(|| "host.runtime".to_owned()),
         target_section_id: internal.then(|| "macho-section-0000".to_owned()),
         target_output_offset,
+        target_absolute_value: None,
+        target_alias_chain: Vec::new(),
         explicit_addend: None,
         pair_relocation_id: None,
         resolver_status: resolver_status.to_owned(),

@@ -1,6 +1,7 @@
 use crate::{
-    final_executable_macho_input::{
-        ParsedMachOObjectLinkage, ParsedMachOSection, ParsedMachOSymbol,
+    final_executable_macho_input::{ParsedMachOObjectLinkage, ParsedMachOSection},
+    final_executable_macho_symbol_resolution::{
+        collect_definition_catalog, resolve_definition_target, MachODefinitionCatalog,
     },
     reports::{
         NsldMachOCommonAllocation, NsldMachOMergedSectionPlan, NsldMachOPlacementBindingReport,
@@ -10,7 +11,7 @@ use crate::{
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 
-pub(crate) const MACHO_PLACEMENT_BINDING_CONTRACT: &str = "nuis-nsld-macho-placement-binding-v2";
+pub(crate) const MACHO_PLACEMENT_BINDING_CONTRACT: &str = "nuis-nsld-macho-placement-binding-v3";
 const COMMON_SEGMENT_NAME: &str = "__DATA";
 const COMMON_SECTION_NAME: &str = "__nuis_common";
 const COMMON_SECTION_FLAGS: u32 = 0x01;
@@ -27,18 +28,6 @@ struct SectionContribution<'a> {
     object_role: &'a str,
     object_order: usize,
     section: &'a ParsedMachOSection,
-}
-
-#[derive(Clone)]
-struct SymbolDefinition {
-    object_id: String,
-    object_role: String,
-    symbol: ParsedMachOSymbol,
-}
-
-struct DefinitionCatalog {
-    strong: BTreeMap<String, SymbolDefinition>,
-    common: BTreeMap<String, Vec<SymbolDefinition>>,
 }
 
 pub(crate) fn build_macho_placement_binding_report(
@@ -91,64 +80,8 @@ pub(crate) fn build_macho_placement_binding_report(
     })
 }
 
-fn collect_definition_catalog(
-    objects: &[&MachOLayoutObject<'_>],
-) -> Result<DefinitionCatalog, String> {
-    let mut strong = BTreeMap::new();
-    let mut common = BTreeMap::<String, Vec<SymbolDefinition>>::new();
-    for object in objects {
-        for symbol in &object.linkage.symbols {
-            if symbol.kind == "common" {
-                if !symbol.defined || !symbol.external || symbol.name.is_empty() {
-                    return Err(format!(
-                        "Mach-O common symbol {} in object `{}` must be a named external definition",
-                        symbol.index, object.object_id
-                    ));
-                }
-                common
-                    .entry(symbol.name.clone())
-                    .or_default()
-                    .push(SymbolDefinition {
-                        object_id: object.object_id.to_owned(),
-                        object_role: object.role.to_owned(),
-                        symbol: symbol.clone(),
-                    });
-                continue;
-            }
-            if !symbol.external || !symbol.defined || symbol.name.is_empty() {
-                continue;
-            }
-            let definition = SymbolDefinition {
-                object_id: object.object_id.to_owned(),
-                object_role: object.role.to_owned(),
-                symbol: symbol.clone(),
-            };
-            if let Some(previous) = strong.insert(symbol.name.clone(), definition) {
-                return Err(format!(
-                    "duplicate external Mach-O definition `{}` in object `{}` symbol {} and object `{}` symbol {}",
-                    symbol.name,
-                    previous.object_id,
-                    previous.symbol.index,
-                    object.object_id,
-                    symbol.index
-                ));
-            }
-        }
-    }
-    for declarations in common.values_mut() {
-        declarations.sort_by(|lhs, rhs| {
-            object_role_rank(&lhs.object_role)
-                .cmp(&object_role_rank(&rhs.object_role))
-                .then(lhs.object_role.cmp(&rhs.object_role))
-                .then(lhs.object_id.cmp(&rhs.object_id))
-                .then(lhs.symbol.index.cmp(&rhs.symbol.index))
-        });
-    }
-    Ok(DefinitionCatalog { strong, common })
-}
-
 fn append_common_allocations(
-    definitions: &DefinitionCatalog,
+    definitions: &MachODefinitionCatalog,
     merged_sections: &mut Vec<NsldMachOMergedSectionPlan>,
 ) -> Result<Vec<NsldMachOCommonAllocation>, String> {
     let declarations = definitions
@@ -371,7 +304,7 @@ fn build_section_layout(
 
 fn build_symbol_bindings(
     objects: &[&MachOLayoutObject<'_>],
-    definitions: &DefinitionCatalog,
+    definitions: &MachODefinitionCatalog,
     placements: &[NsldMachOSectionPlacement],
     common_allocations: &[NsldMachOCommonAllocation],
 ) -> Result<Vec<NsldMachOSymbolBinding>, String> {
@@ -379,7 +312,8 @@ fn build_symbol_bindings(
     for object in objects {
         for symbol in object.linkage.symbols.iter().filter(|symbol| {
             symbol.external
-                && (!symbol.defined || symbol.kind == "common")
+                && (!symbol.defined
+                    || matches!(symbol.kind.as_str(), "common" | "absolute" | "indirect"))
                 && !symbol.name.is_empty()
         }) {
             let target = definitions.strong.get(&symbol.name).or_else(|| {
@@ -388,7 +322,7 @@ fn build_symbol_bindings(
                     .get(&symbol.name)
                     .and_then(|items| items.first())
             });
-            let Some(target) = target else {
+            let Some(_) = target else {
                 bindings.push(NsldMachOSymbolBinding {
                     symbol: symbol.name.clone(),
                     reference_object_id: object.object_id.to_owned(),
@@ -399,110 +333,34 @@ fn build_symbol_bindings(
                     target_kind: None,
                     target_section_id: None,
                     target_output_offset: None,
+                    target_absolute_value: None,
+                    alias_chain: Vec::new(),
                 });
                 continue;
             };
-            let (target_section_id, target_output_offset) =
-                definition_target(target, objects, placements, common_allocations)?;
+            let target = resolve_definition_target(
+                &symbol.name,
+                definitions,
+                objects,
+                placements,
+                common_allocations,
+            )?;
             bindings.push(NsldMachOSymbolBinding {
                 symbol: symbol.name.clone(),
                 reference_object_id: object.object_id.to_owned(),
                 reference_symbol_index: symbol.index,
                 status: "internal".to_owned(),
-                target_object_id: Some(target.object_id.clone()),
-                target_symbol_index: Some(target.symbol.index),
-                target_kind: Some(target.symbol.kind.clone()),
-                target_section_id,
-                target_output_offset,
+                target_object_id: Some(target.object_id),
+                target_symbol_index: Some(target.symbol_index),
+                target_kind: Some(target.kind),
+                target_section_id: target.section_id,
+                target_output_offset: target.output_offset,
+                target_absolute_value: target.absolute_value,
+                alias_chain: target.alias_chain,
             });
         }
     }
     Ok(bindings)
-}
-
-fn definition_target(
-    target: &SymbolDefinition,
-    objects: &[&MachOLayoutObject<'_>],
-    placements: &[NsldMachOSectionPlacement],
-    common_allocations: &[NsldMachOCommonAllocation],
-) -> Result<(Option<String>, Option<usize>), String> {
-    if target.symbol.kind == "common" {
-        let allocation = common_allocations
-            .iter()
-            .find(|allocation| allocation.symbol == target.symbol.name)
-            .ok_or_else(|| {
-                format!(
-                    "Mach-O common definition `{}` has no provider allocation",
-                    target.symbol.name
-                )
-            })?;
-        return Ok((
-            Some(allocation.output_section_id.clone()),
-            Some(allocation.output_offset),
-        ));
-    }
-    section_symbol_target(&target.object_id, &target.symbol, objects, placements)
-}
-
-fn section_symbol_target(
-    object_id: &str,
-    symbol: &ParsedMachOSymbol,
-    objects: &[&MachOLayoutObject<'_>],
-    placements: &[NsldMachOSectionPlacement],
-) -> Result<(Option<String>, Option<usize>), String> {
-    let Some(ordinal) = symbol.section_ordinal else {
-        return Err(format!(
-            "Mach-O definition `{}` kind `{}` is not section-backed and cannot enter placement binding yet",
-            symbol.name, symbol.kind
-        ));
-    };
-    let object = objects
-        .iter()
-        .find(|object| object.object_id == object_id)
-        .expect("symbol definition object must remain registered");
-    let section = object
-        .linkage
-        .sections
-        .iter()
-        .find(|section| section.ordinal == ordinal)
-        .ok_or_else(|| {
-            format!(
-                "Mach-O definition `{}` references missing section ordinal {ordinal}",
-                symbol.name
-            )
-        })?;
-    let relative = symbol.value.checked_sub(section.address).ok_or_else(|| {
-        format!(
-            "Mach-O definition `{}` value {} precedes section `{}` address {}",
-            symbol.name, symbol.value, section.name, section.address
-        )
-    })?;
-    if relative > section.size {
-        return Err(format!(
-            "Mach-O definition `{}` offset {relative} exceeds section `{}` size {}",
-            symbol.name, section.name, section.size
-        ));
-    }
-    let relative = checked_usize(relative, "symbol section offset")?;
-    let placement = placements
-        .iter()
-        .find(|placement| {
-            placement.object_id == object_id && placement.input_section_ordinal == ordinal
-        })
-        .ok_or_else(|| {
-            format!(
-                "Mach-O definition `{}` has no deterministic section placement",
-                symbol.name
-            )
-        })?;
-    let target_offset = placement
-        .output_offset
-        .checked_add(relative)
-        .ok_or_else(|| "Mach-O symbol output offset overflows".to_owned())?;
-    Ok((
-        Some(placement.output_section_id.clone()),
-        Some(target_offset),
-    ))
 }
 
 fn canonical_plan(
@@ -586,9 +444,12 @@ fn canonical_plan(
             &mut out,
             binding.target_section_id.as_deref().unwrap_or("none"),
         );
+        for alias in &binding.alias_chain {
+            append_text(&mut out, alias);
+        }
         writeln!(
             out,
-            "facts={}|{}|{}",
+            "facts={}|{}|{}|{}|{}",
             binding.reference_symbol_index,
             binding
                 .target_symbol_index
@@ -597,7 +458,12 @@ fn canonical_plan(
             binding
                 .target_output_offset
                 .map(|value| value.to_string())
-                .unwrap_or_else(|| "none".to_owned())
+                .unwrap_or_else(|| "none".to_owned()),
+            binding
+                .target_absolute_value
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "none".to_owned()),
+            binding.alias_chain.len()
         )
         .unwrap();
     }

@@ -34,7 +34,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_NSLD_SHELL_IMAGE_DRIFT_CHECKS: &[DevTensorDr
         id: "nsld-macho-common-allocation-contract",
         path: "tools/nsld/src/final_executable_macho_layout.rs",
         required_patterns: &[
-            "nuis-nsld-macho-placement-binding-v2",
+            "nuis-nsld-macho-placement-binding-v3",
             "__nuis_common",
             "append_common_allocations",
             "common_alignment",

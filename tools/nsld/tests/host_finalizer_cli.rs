@@ -73,7 +73,7 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     assert!(invoke_plan.contains("\"relocation_count\":2"));
     assert!(invoke_plan.contains("\"internally_resolved_symbol_count\":1"));
     assert!(invoke_plan.contains("\"unresolved_external_symbols\":[\"_puts\"]"));
-    assert!(invoke_plan.contains("\"contract\":\"nuis-nsld-macho-placement-binding-v2\""));
+    assert!(invoke_plan.contains("\"contract\":\"nuis-nsld-macho-placement-binding-v3\""));
     assert!(
         invoke_plan.contains("\"status\":\"placement-ready-with-external-compatibility-boundary\"")
     );
@@ -184,7 +184,7 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     );
     assert!(invoke_plan.contains("\"status\":\"external-compatibility\""));
     assert!(invoke_plan_text
-        .contains("finalizer_input_placement_contract: nuis-nsld-macho-placement-binding-v2"));
+        .contains("finalizer_input_placement_contract: nuis-nsld-macho-placement-binding-v3"));
     assert!(invoke_plan_text.contains(
         "finalizer_input_relocation_application_contract: nuis-nsld-macho-arm64-relocation-application-v1"
     ));
@@ -239,7 +239,7 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
         "finalizer_input_symbol_binding: symbol=_nuis_runtime reference=host.program-llvm:1 status=internal"
     ));
     assert!(persisted_invoke_plan
-        .contains("finalizer_input_placement_contract = \"nuis-nsld-macho-placement-binding-v2\""));
+        .contains("finalizer_input_placement_contract = \"nuis-nsld-macho-placement-binding-v3\""));
     assert!(persisted_invoke_plan.contains("finalizer_input_merged_section_count = 1"));
     assert!(persisted_invoke_plan.contains("finalizer_input_section_placement_count = 2"));
     assert!(persisted_invoke_plan.contains("finalizer_input_symbol_binding_count = 2"));
@@ -370,13 +370,18 @@ fn cli_persists_and_replays_internal_private_image_admission_receipt() {
     let receipt_path = dir.join("nuis.nsld.macho-arm64-publication-admission.toml");
     let invoke_plan = run_nsld("final-executable-host-invoke-plan", &manifest);
 
-    assert!(invoke_plan.contains("\"contract\":\"nuis-nsld-macho-placement-binding-v2\""));
+    assert!(invoke_plan.contains("\"contract\":\"nuis-nsld-macho-placement-binding-v3\""));
     assert!(invoke_plan.contains("\"common_allocation_count\":1"));
     assert!(invoke_plan.contains("\"section_name\":\"__nuis_common\""));
     assert!(invoke_plan.contains("\"symbol\":\"_nuis_state\""));
     assert!(invoke_plan.contains("\"declaration_count\":1"));
     assert!(invoke_plan.contains("\"size_bytes\":8,\"alignment\":8"));
     assert!(invoke_plan.contains("\"relocation_count\":3"));
+    assert!(
+        invoke_plan.contains("\"target_alias_chain\":[\"_nuis_runtime_alias\",\"_nuis_runtime\"]")
+    );
+    assert!(invoke_plan.contains("\"name\":\"_nuis_abi_epoch\""));
+    assert!(invoke_plan.contains("\"record_kind\":\"external-absolute\""));
 
     let planned = run_nsld("final-executable-private-image-loader-probe", &manifest);
     assert!(planned.contains("\"probe_mode\":\"plan-only\""));
@@ -638,7 +643,7 @@ fn write_internal_native_cpu_fixture_returning(
     write_native_cpu_fixture_with_objects(
         dir,
         source_executable,
-        arm64_tail_branch_object("_nuis_entry", "_nuis_runtime"),
+        arm64_tail_branch_object("_nuis_entry", "_nuis_runtime_alias"),
         arm64_common_leaf_object_returning("_nuis_runtime", "_nuis_state", return_value),
     )
 }
@@ -775,13 +780,19 @@ fn arm64_common_leaf_object_returning(defined: &str, common: &str, return_value:
     const PAYLOAD_OFFSET: usize = 208;
     const RELOCATION_OFFSET: usize = 228;
     const SYMBOL_OFFSET: usize = 244;
-    const STRING_OFFSET: usize = 276;
+    const STRING_OFFSET: usize = 308;
     let mut strings = vec![0];
     let defined_index = strings.len() as u32;
     strings.extend_from_slice(defined.as_bytes());
     strings.push(0);
     let common_index = strings.len() as u32;
     strings.extend_from_slice(common.as_bytes());
+    strings.push(0);
+    let alias_index = strings.len() as u32;
+    strings.extend_from_slice(b"_nuis_runtime_alias");
+    strings.push(0);
+    let absolute_index = strings.len() as u32;
+    strings.extend_from_slice(b"_nuis_abi_epoch");
     strings.push(0);
     let mut bytes = vec![0u8; STRING_OFFSET + strings.len()];
     bytes[..4].copy_from_slice(&[0xcf, 0xfa, 0xed, 0xfe]);
@@ -811,7 +822,7 @@ fn arm64_common_leaf_object_returning(defined: &str, common: &str, return_value:
     write_u32(&mut bytes, SYMTAB_OFFSET, 0x2);
     write_u32(&mut bytes, SYMTAB_OFFSET + 4, 24);
     write_u32(&mut bytes, SYMTAB_OFFSET + 8, SYMBOL_OFFSET as u32);
-    write_u32(&mut bytes, SYMTAB_OFFSET + 12, 2);
+    write_u32(&mut bytes, SYMTAB_OFFSET + 12, 4);
     write_u32(&mut bytes, SYMTAB_OFFSET + 16, STRING_OFFSET as u32);
     write_u32(&mut bytes, SYMTAB_OFFSET + 20, strings.len() as u32);
     write_u32(&mut bytes, SYMBOL_OFFSET, defined_index);
@@ -833,6 +844,12 @@ fn arm64_common_leaf_object_returning(defined: &str, common: &str, return_value:
     bytes[SYMBOL_OFFSET + 20] = 0x01;
     bytes[SYMBOL_OFFSET + 22..SYMBOL_OFFSET + 24].copy_from_slice(&(3u16 << 8).to_le_bytes());
     write_u64(&mut bytes, SYMBOL_OFFSET + 24, 8);
+    write_u32(&mut bytes, SYMBOL_OFFSET + 32, alias_index);
+    bytes[SYMBOL_OFFSET + 36] = 0x0b;
+    write_u64(&mut bytes, SYMBOL_OFFSET + 40, u64::from(defined_index));
+    write_u32(&mut bytes, SYMBOL_OFFSET + 48, absolute_index);
+    bytes[SYMBOL_OFFSET + 52] = 0x03;
+    write_u64(&mut bytes, SYMBOL_OFFSET + 56, 0x2026_0821);
     bytes[STRING_OFFSET..].copy_from_slice(&strings);
     bytes
 }
