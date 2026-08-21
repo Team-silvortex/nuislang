@@ -121,6 +121,16 @@ host-toolchain-linked compatibility executable used for default runnable
 publication. ELF and PE/COFF remain visible, selectable, and honestly blocked
 rather than silently falling through a generic linker.
 
+The artifact-image registration also declares the unique capability
+`nsld.finalizer.mach-o.arm64.private-image-publication-v1`. Capability identity
+and presence participate in the registry hash. The provider-neutral
+`final-executable-private-image-publication` frontdoor only invokes that
+registered callback. Plan-only mode does not mutate output; explicit apply
+replays admission immediately before atomically installing the exact held image.
+Invalid admission preserves the compatibility output, while the positive
+compiled-artifact fixture publishes an owner-executable Mach-O and runs it
+through the OS loader.
+
 ## Extension Rule
 
 A future provider must:
@@ -131,13 +141,15 @@ A future provider must:
 4. return an error before output mutation when its target or relocation input
    is unsupported;
 5. pass the registry conformance and finalizer CLI regressions.
+6. register any private-image publication capability with one unique stable ID
+   and keep the callback absent when the provider cannot honor replay admission.
 
-The next native milestone is a provider-owned opt-in publication callback. It
-must replay-validate the fixed receipt immediately before atomic installation,
-install only the exact admitted bytes, and reject registry, target, image,
-signature, or probe drift. Plan-only operation and default compatibility
-publication must remain non-mutating, and the callback must not add Mach-O
-branches to Nuisc, final-stage planning, or the generic emit frontdoor.
+The next native milestone is deterministic common/non-section symbol storage.
+The Mach-O provider must allocate zero-filled definitions, bind their final
+addresses into relocations and serialization ledgers, and carry a real fixture
+through signature, admission, registered publication, and execution. This must
+not add Mach-O branches to Nuisc, final-stage planning, or the generic emit
+frontdoor.
 
 ## Validation
 

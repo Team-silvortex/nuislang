@@ -4,8 +4,14 @@ use super::{
         materialize_macho_artifact_image,
     },
     final_executable_macho_object::MACHO_HOST_OBJECT_LINKAGE_CONTRACT,
+    final_executable_macho_publication::{
+        publish_macho_arm64_private_image, MACHO_ARM64_PRIVATE_IMAGE_PUBLICATION_CAPABILITY,
+    },
     fnv1a64_hex,
-    reports::{NsldExecutableFinalizerInputSummary, NsldFinalExecutableWriterPlanReport},
+    reports::{
+        NsldExecutableFinalizerInputSummary, NsldFinalExecutableWriterPlanReport,
+        NsldPrivateImagePublicationReport,
+    },
 };
 use std::{collections::BTreeSet, path::Path, process::Command};
 
@@ -16,6 +22,9 @@ type InputValidator = fn(&nuisc::linker::LinkPlan) -> Vec<String>;
 type InputSummarizer =
     fn(&nuisc::linker::LinkPlan) -> Result<Option<NsldExecutableFinalizerInputSummary>, String>;
 type FinalizerExecutor = for<'a> fn(&ExecutableFinalizerExecutionContext<'a>) -> Result<(), String>;
+type PrivateImagePublisher = for<'a> fn(
+    &ExecutableFinalizerPrivateImagePublicationContext<'a>,
+) -> Result<NsldPrivateImagePublicationReport, String>;
 
 #[derive(Clone, Copy)]
 struct ExecutableFinalizerRegistration {
@@ -33,6 +42,8 @@ struct ExecutableFinalizerRegistration {
     input_validator: InputValidator,
     input_summarizer: InputSummarizer,
     executor: Option<FinalizerExecutor>,
+    private_image_publication_capability: Option<&'static str>,
+    private_image_publisher: Option<PrivateImagePublisher>,
 }
 
 const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
@@ -51,6 +62,8 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         input_validator: validate_no_additional_inputs,
         input_summarizer: summarize_no_additional_inputs,
         executor: None,
+        private_image_publication_capability: None,
+        private_image_publisher: None,
     },
     ExecutableFinalizerRegistration {
         provider_id: "nsld.finalizer.mach-o.arm64.artifact-image-v1",
@@ -67,6 +80,10 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         input_validator: macho_artifact_image_validation_issues,
         input_summarizer: macho_artifact_input_summary,
         executor: Some(execute_internal_artifact_image),
+        private_image_publication_capability: Some(
+            MACHO_ARM64_PRIVATE_IMAGE_PUBLICATION_CAPABILITY,
+        ),
+        private_image_publisher: Some(publish_macho_arm64_private_image),
     },
     ExecutableFinalizerRegistration {
         provider_id: "nsld.finalizer.mach-o.arm64.host-command-shell-v1",
@@ -83,6 +100,8 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         input_validator: validate_no_additional_inputs,
         input_summarizer: summarize_no_additional_inputs,
         executor: Some(execute_host_command),
+        private_image_publication_capability: None,
+        private_image_publisher: None,
     },
     ExecutableFinalizerRegistration {
         provider_id: "nsld.finalizer.mach-o.registered-v1",
@@ -99,6 +118,8 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         input_validator: validate_no_additional_inputs,
         input_summarizer: summarize_no_additional_inputs,
         executor: None,
+        private_image_publication_capability: None,
+        private_image_publisher: None,
     },
     ExecutableFinalizerRegistration {
         provider_id: "nsld.finalizer.pe-coff.registered-v1",
@@ -115,6 +136,8 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         input_validator: validate_no_additional_inputs,
         input_summarizer: summarize_no_additional_inputs,
         executor: None,
+        private_image_publication_capability: None,
+        private_image_publisher: None,
     },
 ];
 
@@ -131,6 +154,15 @@ pub(crate) struct ExecutableFinalizerExecutionContext<'a> {
     pub(crate) command_args: &'a [String],
     pub(crate) resolved_driver_path: Option<&'a str>,
     pub(crate) output_path: &'a Path,
+}
+
+pub(crate) struct ExecutableFinalizerPrivateImagePublicationContext<'a> {
+    pub(crate) plan: &'a nuisc::linker::LinkPlan,
+    pub(crate) provider_id: &'a str,
+    pub(crate) target_key: &'a str,
+    pub(crate) capability_id: &'a str,
+    pub(crate) output_path: &'a Path,
+    pub(crate) apply: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -167,6 +199,21 @@ impl ExecutableFinalizerSelection {
 
     pub(crate) fn requires_host_driver(&self) -> bool {
         self.registration.requires_host_driver
+    }
+
+    pub(crate) fn private_image_publication_capability(&self) -> Option<&'static str> {
+        self.registration.private_image_publication_capability
+    }
+
+    pub(crate) fn supports_private_image_publication(&self) -> bool {
+        self.registration
+            .private_image_publication_capability
+            .is_some()
+            && self.registration.private_image_publisher.is_some()
+    }
+
+    pub(crate) fn private_image_publication_ready(&self) -> bool {
+        self.registration.provider_status == "ready" && self.supports_private_image_publication()
     }
 
     pub(crate) fn ready(&self) -> bool {
@@ -227,12 +274,42 @@ impl ExecutableFinalizerSelection {
         }
         self.registration.executor.expect("ready provider executor")(context)
     }
+
+    pub(crate) fn publish_private_image(
+        &self,
+        plan: &nuisc::linker::LinkPlan,
+        output_path: &Path,
+        apply: bool,
+    ) -> Result<NsldPrivateImagePublicationReport, String> {
+        if !self.private_image_publication_ready() {
+            return Err(format!(
+                "executable finalizer provider `{}` has no ready private-image publication capability",
+                self.provider_id()
+            ));
+        }
+        let capability_id = self
+            .private_image_publication_capability()
+            .expect("publication capability checked above");
+        self.registration
+            .private_image_publisher
+            .expect("publication callback checked above")(
+            &ExecutableFinalizerPrivateImagePublicationContext {
+                plan,
+                provider_id: self.provider_id(),
+                target_key: &self.target_key,
+                capability_id,
+                output_path,
+                apply,
+            },
+        )
+    }
 }
 
 pub(crate) fn executable_finalizer_registry_validation() -> ExecutableFinalizerRegistryValidation {
     let mut issues = Vec::new();
     let mut provider_ids = BTreeSet::new();
     let mut target_keys = BTreeSet::new();
+    let mut publication_capability_ids = BTreeSet::new();
 
     for registration in REGISTERED_FINALIZERS {
         if !provider_ids.insert(registration.provider_id) {
@@ -258,6 +335,33 @@ pub(crate) fn executable_finalizer_registry_validation() -> ExecutableFinalizerR
                 "executable finalizer provider `{}` declares an empty input summary contract",
                 registration.provider_id
             ));
+        }
+        match (
+            registration.private_image_publication_capability,
+            registration.private_image_publisher,
+        ) {
+            (Some(""), _) => issues.push(format!(
+                "executable finalizer provider `{}` declares an empty private-image publication capability",
+                registration.provider_id
+            )),
+            (Some(capability), Some(_)) => {
+                if !publication_capability_ids.insert(capability) {
+                    issues.push(format!(
+                        "duplicate private-image publication capability id `{capability}`"
+                    ));
+                }
+                if registration.provider_status != "ready" || registration.executor.is_none() {
+                    issues.push(format!(
+                        "private-image publication provider `{}` is not a ready executable finalizer",
+                        registration.provider_id
+                    ));
+                }
+            }
+            (None, None) => {}
+            _ => issues.push(format!(
+                "executable finalizer provider `{}` has an incomplete private-image publication registration",
+                registration.provider_id
+            )),
         }
         if registration.provider_status != "ready"
             && registration.provider_status != "registered-not-implemented"
@@ -389,6 +493,14 @@ pub(crate) fn invoke_registered_finalizer(
     })
 }
 
+pub(crate) fn invoke_registered_private_image_publication(
+    plan: &nuisc::linker::LinkPlan,
+    apply: bool,
+) -> Result<NsldPrivateImagePublicationReport, String> {
+    let selection = select_executable_finalizer(plan)?;
+    selection.publish_private_image(plan, Path::new(&plan.final_stage.output_path), apply)
+}
+
 fn plan_internal_artifact_image(context: &ExecutableFinalizerCommandContext<'_>) -> Vec<String> {
     vec![
         "nsld-internal-artifact-image-writer".to_owned(),
@@ -484,14 +596,17 @@ fn executable_finalizer_registry_hash() -> String {
     let mut material = format!("contract={EXECUTABLE_FINALIZER_CONTRACT}\n");
     for registration in registrations {
         material.push_str(&format!(
-            "provider={}\nroute={}\nstatus={}\nexecution={}\ninput={}\ninput_summary={}\nhost_driver={}\n",
+            "provider={}\nroute={}\nstatus={}\nexecution={}\ninput={}\ninput_summary={}\nhost_driver={}\nprivate_image_publication={}\n",
             registration.provider_id,
             registration_route_key(registration),
             registration.provider_status,
             registration.execution_kind,
             registration.input_kind,
             registration.input_summary_contract.unwrap_or("none"),
-            registration.requires_host_driver
+            registration.requires_host_driver,
+            registration
+                .private_image_publication_capability
+                .unwrap_or("none")
         ));
     }
     fnv1a64_hex(material.as_bytes())
@@ -559,133 +674,5 @@ fn canonical_object_format(object_format: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::main_test_support::empty_link_plan;
-
-    #[test]
-    fn registry_is_deterministic_and_conformant() {
-        let validation = executable_finalizer_registry_validation();
-
-        assert!(validation.valid, "{:?}", validation.issues);
-        assert_eq!(validation.contract, EXECUTABLE_FINALIZER_CONTRACT);
-        assert_eq!(validation.registration_count, 5);
-        assert!(validation.registry_hash.starts_with("0x"));
-    }
-
-    #[test]
-    fn registry_selects_ready_mach_o_arm64_provider_after_alias_normalization() {
-        let mut plan = empty_link_plan();
-        plan.cpu_target.machine_arch = "arm64".to_owned();
-        plan.cpu_target.machine_os = "darwin".to_owned();
-        plan.cpu_target.object_format = "macho".to_owned();
-
-        let selection = select_executable_finalizer(&plan).unwrap();
-
-        assert_eq!(selection.target_key, "aarch64-macos-mach-o");
-        assert_eq!(
-            selection.provider_id(),
-            "nsld.finalizer.mach-o.arm64.host-command-shell-v1"
-        );
-        assert!(selection.ready());
-        assert!(selection.requires_host_driver());
-    }
-
-    #[test]
-    fn registry_prefers_internal_artifact_image_for_native_cpu_llvm() {
-        let mut plan = empty_link_plan();
-        plan.packaging_mode = "native-cpu-llvm".to_owned();
-
-        let selection = select_executable_finalizer(&plan).unwrap();
-
-        assert_eq!(selection.target_key, "aarch64-macos-mach-o");
-        assert_eq!(
-            selection.provider_id(),
-            "nsld.finalizer.mach-o.arm64.artifact-image-v1"
-        );
-        assert_eq!(selection.input_kind(), "compiled-artifact-native-handoff");
-        assert!(selection.ready());
-        assert!(!selection.requires_host_driver());
-    }
-
-    #[test]
-    fn registry_keeps_elf_and_pe_coff_as_explicit_open_targets() {
-        let mut elf = empty_link_plan();
-        elf.cpu_target.machine_arch = "riscv64".to_owned();
-        elf.cpu_target.machine_os = "linux-gnu".to_owned();
-        elf.cpu_target.object_format = "elf".to_owned();
-        let mut pe = empty_link_plan();
-        pe.cpu_target.machine_arch = "amd64".to_owned();
-        pe.cpu_target.machine_os = "win64".to_owned();
-        pe.cpu_target.object_format = "pe/coff".to_owned();
-
-        let elf = select_executable_finalizer(&elf).unwrap();
-        let pe = select_executable_finalizer(&pe).unwrap();
-
-        assert_eq!(elf.provider_id(), "nsld.finalizer.elf.registered-v1");
-        assert_eq!(pe.provider_id(), "nsld.finalizer.pe-coff.registered-v1");
-        assert_eq!(elf.provider_status(), "registered-not-implemented");
-        assert_eq!(pe.provider_status(), "registered-not-implemented");
-        assert!(!elf.ready());
-        assert!(!pe.ready());
-    }
-
-    #[test]
-    fn command_planning_is_format_independent_after_provider_selection() {
-        for (machine_os, object_format, expected_provider) in [
-            (
-                "macos",
-                "mach-o",
-                "nsld.finalizer.mach-o.arm64.host-command-shell-v1",
-            ),
-            ("linux", "elf", "nsld.finalizer.elf.registered-v1"),
-            ("windows", "pe/coff", "nsld.finalizer.pe-coff.registered-v1"),
-        ] {
-            let mut plan = empty_link_plan();
-            plan.cpu_target.machine_os = machine_os.to_owned();
-            plan.cpu_target.object_format = object_format.to_owned();
-            let selection = select_executable_finalizer(&plan).unwrap();
-            let args = selection.command_args(&ExecutableFinalizerCommandContext {
-                driver: "registered-driver",
-                target_triple: "registered-target",
-                native_object_path: "input.native-object",
-                compiled_artifact_path: "input.compiled-artifact",
-                output_path: "output.executable",
-            });
-
-            assert_eq!(selection.provider_id(), expected_provider);
-            assert_eq!(args[0], "registered-driver");
-            assert_eq!(args[1..3], ["-target", "registered-target"]);
-            assert_eq!(args[3], "input.native-object");
-            assert_eq!(args[4..], ["-o", "output.executable"]);
-        }
-    }
-
-    #[test]
-    fn registry_rejects_unregistered_object_format() {
-        let mut plan = empty_link_plan();
-        plan.cpu_target.object_format = "wasm".to_owned();
-
-        let error = select_executable_finalizer(&plan)
-            .err()
-            .expect("unregistered object format must fail closed");
-
-        assert!(error.contains("no executable finalizer provider registered"));
-        assert!(error.contains("aarch64-macos-wasm"));
-    }
-
-    #[test]
-    fn ready_host_provider_requires_the_resolved_driver_authority() {
-        let plan = empty_link_plan();
-        let error = invoke_registered_finalizer(
-            &plan,
-            &["clang".to_owned(), "-o".to_owned(), "output".to_owned()],
-            None,
-            Path::new("output"),
-        )
-        .unwrap_err();
-
-        assert!(error.contains("requires a verified host driver path"));
-        assert!(error.contains("nsld.finalizer.mach-o.arm64.host-command-shell-v1"));
-    }
-}
+#[path = "final_executable_finalizer_registry_tests.rs"]
+mod tests;

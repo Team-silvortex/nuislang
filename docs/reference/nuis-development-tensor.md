@@ -371,9 +371,14 @@ The `beta-0.1` calibration baseline is:
   filename. Independent replay rebuilds the current product and checks registry,
   target, private-image, signature, probe, cleanup, and zero-bind identities. A
   real compiled-artifact fixture passes, while receipt tamper and regenerated-
-  artifact drift fail closed. The ordinary publication image remains
-  `private-not-published`; an opt-in installation callback, common-symbol
-  allocation, ELF, and PE/COFF remain open
+  artifact drift fail closed. The selected finalizer now exposes one hash-bound
+  optional private-image publication capability through the provider-neutral
+  registry. Planning is non-mutating; invalid apply preserves compatibility
+  bytes; valid explicit apply writes, syncs, rereads, atomically installs, and
+  verifies the exact owner-executable image. The real installed private Mach-O
+  exits 0 through macOS with empty output. The base serialization report remains
+  `private-not-published` until this separate explicit command runs; common-
+  symbol allocation, ELF, and PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

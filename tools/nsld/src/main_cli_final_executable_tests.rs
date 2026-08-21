@@ -137,6 +137,27 @@ fn parses_private_image_admission_verify_command() {
 }
 
 #[test]
+fn parses_private_image_publication_apply_and_json_flags() {
+    let command = parse_args(
+        vec![
+            "final-executable-private-image-publication".to_owned(),
+            "out".to_owned(),
+            "--apply".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::FinalExecutablePrivateImagePublication {
+            input: PathBuf::from("out"),
+            json: true,
+            apply: true,
+        })
+    );
+}
+
+#[test]
 fn parses_final_executable_host_invoke_plan_input_and_json_flag() {
     let command = parse_args(
         vec![

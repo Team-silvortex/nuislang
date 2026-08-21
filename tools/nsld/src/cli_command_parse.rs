@@ -45,6 +45,9 @@ where
         "verify-final-executable-private-image-admission" => {
             Command::VerifyFinalExecutablePrivateImageAdmission { input, json }
         }
+        "final-executable-private-image-publication" => {
+            Command::FinalExecutablePrivateImagePublication { input, json, apply }
+        }
         "final-executable-host-invoke-plan" => {
             Command::FinalExecutableHostInvokePlan { input, json }
         }
@@ -149,7 +152,10 @@ where
         if arg == "--json" {
             json = true;
         } else if arg == "--apply" {
-            if command != "drive" && command != "final-executable-private-image-loader-probe" {
+            if command != "drive"
+                && command != "final-executable-private-image-loader-probe"
+                && command != "final-executable-private-image-publication"
+            {
                 return Err(format!("unexpected argument `{arg}`"));
             }
             apply = true;

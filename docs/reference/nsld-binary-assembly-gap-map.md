@@ -136,16 +136,19 @@ kernel and dyld and exits zero. Explicit success now persists a canonical,
 SHA-256-bound `nuis-nsld-macho-arm64-publication-admission-v1` receipt. An
 independent verifier rebuilds and checks registry, target, image, signature,
 probe, cleanup, and zero-bind identities; receipt tamper and regenerated-
-artifact drift fail closed in the real CLI fixture. This narrows the OS-native
-gap to a registered opt-in installation callback; the private image is still
-not silently substituted for the compatibility executable.
+artifact drift fail closed in the real CLI fixture. A registry-declared,
+provider-neutral publication frontdoor now stays plan-only by default and, on
+explicit apply, atomically installs those exact admitted bytes. The resulting
+private Mach-O executes through macOS and exits 0. Invalid admission does not
+touch the compatibility output, so the private image is never silently
+substituted.
 
 It does not yet own:
 
 * complete Mach-O, ELF, and PE/COFF compatibility object parity
 * general native relocation application across those target formats
-* an OS-native executable shell finalized without a registered external host
-  finalizer
+* deterministic Mach-O common/non-section symbol allocation
+* default private-image selection in the ordinary final emit pipeline
 * a durable embedded Nsdb/YIR debug metadata section
 
 ## Gap 1: Compatibility Object Writer

@@ -206,6 +206,41 @@ pub(crate) struct NsldFinalExecutableHostDryRunReport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldPrivateImagePublicationReport {
+    pub(crate) contract: String,
+    pub(crate) status: String,
+    pub(crate) provider_id: String,
+    pub(crate) target_key: String,
+    pub(crate) capability_id: String,
+    pub(crate) apply_requested: bool,
+    pub(crate) publication_ready: bool,
+    pub(crate) admission_contract: String,
+    pub(crate) admission_status: String,
+    pub(crate) admission_receipt_file: String,
+    pub(crate) admission_receipt_present: bool,
+    pub(crate) admission_receipt_valid: bool,
+    pub(crate) admission_receipt_hash_sha256: Option<String>,
+    pub(crate) admission_verification_ledger_sha256: String,
+    pub(crate) source_image_span_bytes: usize,
+    pub(crate) source_image_hash: String,
+    pub(crate) source_image_sha256: String,
+    pub(crate) output_path: String,
+    pub(crate) output_present_before: bool,
+    pub(crate) output_sha256_before: Option<String>,
+    pub(crate) installation_attempted: bool,
+    pub(crate) installed: bool,
+    pub(crate) output_present_after: bool,
+    pub(crate) output_span_bytes_after: Option<usize>,
+    pub(crate) output_sha256_after: Option<String>,
+    pub(crate) output_matches_private_image: bool,
+    pub(crate) output_executable: bool,
+    pub(crate) output_changed: bool,
+    pub(crate) issue_count: usize,
+    pub(crate) issues: Vec<String>,
+    pub(crate) publication_ledger_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldFinalExecutableHostInvokePlanReport {
     pub(crate) manifest: String,
     pub(crate) output_path: String,

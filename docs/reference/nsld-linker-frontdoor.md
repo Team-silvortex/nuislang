@@ -1186,6 +1186,14 @@ probe result, cleanup, and zero-bind closure. The separate
 `verify-final-executable-private-image-admission` command rebuilds the product
 and independently replays those identities. Receipt tamper and a regenerated
 compiled artifact with changed runtime bytes both fail closed.
+`final-executable-private-image-publication` is provider-neutral and dispatches
+through the selected finalizer's registry capability. It is plan-only by
+default. Explicit apply replays admission against the held image, writes an
+owner-executable create-new temporary file, verifies exact bytes, atomically
+renames and syncs it, and then checks final SHA-256 identity and permissions.
+Invalid admission leaves the compatibility executable unchanged; the positive
+fixture replaces it only under explicit apply and the installed private image
+runs directly through macOS with exit code 0.
 
 After those checks the provider validates a thin or universal arm64
 `MH_EXECUTE` compatibility image and installs it atomically with executable
@@ -1204,9 +1212,10 @@ records, an audited final-address shell layout, and deterministic private
 header/command/content/linkedit bytes with all address-dependent writes
 re-encoded for final VM addresses. The ordinary internally closed compiled-
 artifact path now has durable replay admission. It does not yet allocate non-
-section definitions or install the admitted native shell through a registered
-opt-in publication callback. Those remain the next boundary, while default
-publication continues to use the compatibility image unchanged.
+section definitions. Registered opt-in publication is complete for the current
+internally closed fixture, while default publication continues to use the
+compatibility image unchanged. Common allocation is the next Mach-O boundary;
+ELF and PE/COFF remain later provider-owned closures.
 
 `nsld final-executable-host-dry-run` consumes the verified writer input,
 reports `environment_ready`, provider identity, and exact command arguments.

@@ -106,6 +106,48 @@ pub(crate) const DEV_TENSOR_RUNTIME_NSLD_SHELL_IMAGE_DRIFT_CHECKS: &[DevTensorDr
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "nsld-registered-private-image-publication-capability",
+        path: "tools/nsld/src/final_executable_finalizer_registry.rs",
+        required_patterns: &[
+            "PrivateImagePublisher",
+            "private_image_publication_capability",
+            "supports_private_image_publication",
+            "invoke_registered_private_image_publication",
+            "MACHO_ARM64_PRIVATE_IMAGE_PUBLICATION_CAPABILITY",
+            "private_image_publication=",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-macho-arm64-private-image-publication-contract",
+        path: "tools/nsld/src/final_executable_macho_publication.rs",
+        required_patterns: &[
+            "nuis-nsld-registered-private-image-publication-v1",
+            "publish_macho_arm64_private_image",
+            "verify_macho_arm64_publication_admission_receipt",
+            "atomic_install_private_image",
+            "options.mode(0o700)",
+            "temporary private-image byte identity drift",
+            "sha256_file",
+            "file_matches_bytes",
+            "64 * 1024",
+            "sync_directory",
+            "publication_ledger_sha256",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-macho-arm64-private-image-publication-cli-evidence",
+        path: "tools/nsld/tests/host_finalizer_cli.rs",
+        required_patterns: &[
+            "final-executable-private-image-publication",
+            "ready-private-image-publication-plan",
+            "blocked-publication-admission-invalid",
+            "private-image-published",
+            "publication-admission:receipt-hash-mismatch",
+            "assert_eq!(private_image_mode, 0o700)",
+            "private_execution.status.success()",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nsld-macho-arm64-shell-image-three-surface-evidence",
         path: "tools/nsld/tests/host_finalizer_cli.rs",
         required_patterns: &[

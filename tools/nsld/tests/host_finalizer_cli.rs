@@ -416,6 +416,26 @@ fn cli_persists_and_replays_internal_private_image_admission_receipt() {
     assert!(verification_text.contains("probe=true valid=true"));
     assert_eq!(compatibility_after, compatibility_before);
 
+    let publication_plan = run_nsld("final-executable-private-image-publication", &manifest);
+    let publication_plan_text = run_nsld_args(&[
+        "final-executable-private-image-publication",
+        manifest.to_str().unwrap(),
+    ]);
+    assert!(publication_plan
+        .contains("\"contract\":\"nuis-nsld-registered-private-image-publication-v1\""));
+    assert!(publication_plan.contains("\"status\":\"ready-private-image-publication-plan\""));
+    assert!(publication_plan.contains("\"apply_requested\":false"));
+    assert!(publication_plan.contains("\"publication_ready\":true"));
+    assert!(publication_plan.contains("\"installation_attempted\":false"));
+    assert!(publication_plan.contains("\"installed\":false"));
+    assert!(publication_plan.contains("\"output_changed\":false"));
+    assert!(publication_plan_text.contains("Nsld registered private-image publication"));
+    assert!(publication_plan_text.contains("attempted=false installed=false"));
+    assert_eq!(
+        fs::read(dir.join("demo.bin")).unwrap(),
+        compatibility_before
+    );
+
     let damaged = receipt.replace(
         "probe_kernel_accepted = true",
         "probe_kernel_accepted = false",
@@ -430,8 +450,54 @@ fn cli_persists_and_replays_internal_private_image_admission_receipt() {
     assert!(rejected_stdout.contains("\"valid\":false"));
     assert!(rejected_stdout.contains("receipt-hash-mismatch"));
     assert!(rejected_stdout.contains("loader-probe-evidence-invalid"));
+    let rejected_publication = run_nsld_failure(&[
+        "final-executable-private-image-publication",
+        manifest.to_str().unwrap(),
+        "--apply",
+        "--json",
+    ]);
+    let rejected_publication_stdout = String::from_utf8(rejected_publication.stdout).unwrap();
+    assert!(rejected_publication_stdout
+        .contains("\"status\":\"blocked-publication-admission-invalid\""));
+    assert!(rejected_publication_stdout.contains("\"installation_attempted\":false"));
+    assert!(rejected_publication_stdout.contains("\"installed\":false"));
+    assert!(rejected_publication_stdout.contains("\"output_changed\":false"));
+    assert!(rejected_publication_stdout.contains("publication-admission:receipt-hash-mismatch"));
+    assert_eq!(
+        fs::read(dir.join("demo.bin")).unwrap(),
+        compatibility_before
+    );
 
     fs::write(&receipt_path, &receipt).unwrap();
+    let publication = run_nsld_args(&[
+        "final-executable-private-image-publication",
+        manifest.to_str().unwrap(),
+        "--apply",
+        "--json",
+    ]);
+    let private_image = fs::read(dir.join("demo.bin")).unwrap();
+    let private_image_mode = fs::metadata(dir.join("demo.bin"))
+        .unwrap()
+        .permissions()
+        .mode()
+        & 0o777;
+    let private_execution = Command::new(dir.join("demo.bin")).output().unwrap();
+    assert!(publication.contains("\"status\":\"private-image-published\""));
+    assert!(publication.contains(
+        "\"capability_id\":\"nsld.finalizer.mach-o.arm64.private-image-publication-v1\""
+    ));
+    assert!(publication.contains("\"apply_requested\":true"));
+    assert!(publication.contains("\"installation_attempted\":true"));
+    assert!(publication.contains("\"installed\":true"));
+    assert!(publication.contains("\"output_matches_private_image\":true"));
+    assert!(publication.contains("\"output_executable\":true"));
+    assert!(publication.contains("\"output_changed\":true"));
+    assert_ne!(private_image, compatibility_before);
+    assert_eq!(private_image_mode, 0o700);
+    assert!(private_execution.status.success());
+    assert!(private_execution.stdout.is_empty());
+    assert!(private_execution.stderr.is_empty());
+
     let rebuilt_manifest = write_internal_native_cpu_fixture_returning(&dir, &source_executable, 1);
     assert_eq!(rebuilt_manifest, manifest);
     let drifted = run_nsld_failure(&[

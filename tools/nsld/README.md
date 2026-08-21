@@ -214,17 +214,25 @@ receipt, rejects missing, duplicate, unknown, noncanonical, or hash-drifted
 fields, rebuilds the current private product, and replays registry, target,
 image, signature, and probe identities. A real ordinary compiled-artifact
 fixture passes; receipt tamper and rebuilt-artifact drift fail closed.
+`final-executable-private-image-publication` then asks only the selected
+finalizer registry entry for its optional private-image publication capability.
+The default plan is non-mutating. Explicit `--apply` requires a freshly valid
+receipt, writes the same verified bytes to a create-new owner-executable
+temporary file, syncs and rereads them, atomically renames the file, syncs the
+directory, and verifies final size, SHA-256 identity, and executable mode. An
+invalid receipt leaves the compatibility image unchanged; a valid real fixture
+publishes and executes directly through macOS with exit code 0.
 A gated host-command provider remains as a fallback; ELF and PE/COFF are
 explicit `registered-not-implemented` providers. This proves relocatable input,
 table parsing, placement, binding, merged-image construction, direct and
 platform relocation encoding, deterministic GOT/stub allocation, platform byte
 synthesis, unresolved-bind preservation, audited Mach-O shell planning, and
 signed private final-address byte serialization with an independent structural
-validator, one real isolated OS-loader execution, and durable replay admission.
-It does not yet install that admitted image through a registered opt-in
-publication callback, allocate common symbols, complete ELF or PE/COFF, or
-publish independently of Nuisc's compatibility link. The ordinary default
-compatibility executable remains byte-for-byte unchanged.
+validator, one real isolated OS-loader execution, durable replay admission, and
+registered opt-in publication. It does not yet allocate common/non-section
+symbols or complete ELF or PE/COFF. The ordinary default compatibility
+executable remains byte-for-byte unchanged unless the dedicated publication
+command receives `--apply`.
 
 ## Current Early-Beta Rule
 

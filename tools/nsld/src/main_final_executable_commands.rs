@@ -4,6 +4,8 @@ use super::{
     display::*,
     display_final_macho_admission::print_macho_arm64_publication_admission_verify_report,
     display_final_macho_loader_probe::print_macho_arm64_loader_probe_report,
+    display_final_private_image_publication::print_private_image_publication_report,
+    final_executable_finalizer_registry::invoke_registered_private_image_publication,
     final_executable_macho_admission::{
         build_macho_arm64_publication_admission_receipt,
         verify_macho_arm64_publication_admission_receipt,
@@ -22,6 +24,7 @@ use super::{
     json::*,
     json_final_macho_admission::macho_arm64_publication_admission_verify_report_json,
     json_final_macho_loader_probe::macho_arm64_loader_probe_report_json,
+    json_final_private_image_publication::private_image_publication_report_json,
 };
 use std::path::Path;
 
@@ -152,6 +155,20 @@ pub(crate) fn run_final_executable_command(command: &Command) -> Result<bool, St
                 Ok(true)
             } else {
                 Err("nsld private-image publication admission verification failed".to_owned())
+            }
+        }
+        Command::FinalExecutablePrivateImagePublication { input, json, apply } => {
+            let ctx = load_link_input_context(input)?;
+            let report = invoke_registered_private_image_publication(&ctx.plan, *apply)?;
+            if *json {
+                println!("{}", private_image_publication_report_json(&report));
+            } else {
+                print_private_image_publication_report(&report);
+            }
+            if *apply && !report.installed {
+                Err("nsld registered private-image publication failed".to_owned())
+            } else {
+                Ok(true)
             }
         }
         Command::FinalExecutableHostInvokePlan { input, json } => {
