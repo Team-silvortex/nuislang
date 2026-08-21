@@ -208,15 +208,16 @@ audits. The provider also validates an ELF64 `ET_EXEC`/PIE
 image whose entry belongs to a bounded
 executable `PT_LOAD`. The accepted compatibility image is atomically published
 without a Clang/LLD process. This is deliberate staging evidence, not a
-self-owned ELF link claim: the embedded executable remains host-toolchain-linked
-until Nsld maps the applied image into a provider-owned shell and completes load
+self-owned ELF link claim: Nsld now owns the deterministic non-mutating ELF shell
+layout over the applied image, but the embedded executable remains
+host-toolchain-linked until Nsld serializes that shell and completes load
 admission.
 
 It does not yet own:
 
 * complete architecture parity across Mach-O, ELF, and PE/COFF
-* provider-owned ELF shell layout/serialization and load admission, plus
-  complete PE/COFF object merging
+* provider-owned ELF shell serialization and load admission, registered dynamic
+  interpreter/dependency provenance, plus complete PE/COFF object merging
 * a durable embedded Nsdb/YIR debug metadata section
 
 ## Gap 1: Compatibility Object Writer

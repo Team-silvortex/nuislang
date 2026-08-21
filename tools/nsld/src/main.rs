@@ -70,6 +70,7 @@ mod final_executable_elf_materialization_report;
 mod final_executable_elf_object;
 mod final_executable_elf_relocation;
 mod final_executable_elf_relocation_report;
+mod final_executable_elf_shell;
 #[cfg(test)]
 mod final_executable_elf_test_fixture;
 mod final_executable_emit;
@@ -287,8 +288,6 @@ mod seal_tests;
 mod toml;
 mod toml_read;
 
-pub(crate) use protocol::*;
-
 use artifact_chain::*;
 use assembly::*;
 use check::*;
@@ -304,6 +303,7 @@ use json::*;
 use link_units::*;
 use main_object_commands::run_object_command;
 use prepare::*;
+pub(crate) use protocol::*;
 use std::{env, process};
 fn main() {
     if let Err(error) = run() {

@@ -442,15 +442,24 @@ The `beta-0.1` calibration baseline is:
   extended image, and applies each deferred source once. Its deterministic
   ledger hashes every structure/source write plus final file/memory images;
   repeated calls share platform records while retaining distinct patch audits.
+  `nuis-nsld-elf-amd64-shell-layout-plan-v1` now rebuilds the deterministic
+  placement/relocation envelope, validates the exact platform image and ledger,
+  maps base and platform RX/RW/RO regions into non-overlapping `PT_LOAD`
+  records, assigns `PT_PHDR` and optional `PT_DYNAMIC`, section-name/header and
+  dynamic-tag coordinates, and selects a registered source entry inside a
+  file-backed executable segment. Every coordinate audit binds the platform
+  application ledger; static/external plans remain object-order deterministic,
+  while ledger drift and missing entry definitions fail closed.
   The provider validates an ELF64
   `ET_EXEC` or PIE
   compatibility image with bounded program headers and a nonzero entry inside a
   file-backed executable `PT_LOAD`, then atomically installs it without
   Clang/LLD invocation. Parsing, placement/binding planning, relocation preview,
   merged-image preview, direct patch application, platform-structure planning,
-  platform byte application, and registered compatibility publication are
-  closed; provider-owned ELF shell layout/serialization and load admission,
-  other ELF architectures, and PE/COFF remain open
+  platform byte application, shell layout planning, and registered compatibility
+  publication are closed; provider-owned ELF shell serialization and load
+  admission, registered external interpreter/dependency provenance, other ELF
+  architectures, and PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

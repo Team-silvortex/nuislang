@@ -114,6 +114,20 @@ fn summarizes_cross_object_internal_symbol_closure() {
                 .as_bytes()
         )
     );
+    assert_eq!(
+        product.shell_layout_plan.contract,
+        crate::final_executable_elf_shell::ELF_AMD64_SHELL_LAYOUT_PLAN_CONTRACT
+    );
+    assert_eq!(
+        product.shell_layout_plan.status,
+        "static-closure-layout-planned"
+    );
+    assert_eq!(product.shell_layout_plan.entry_symbol, "__nuis_entry");
+    assert_eq!(product.shell_layout_plan.dynamic_table_entry_count, 0);
+    assert_eq!(
+        product.shell_layout_plan.platform_application_ledger_hash,
+        product.platform_patch_application.application_ledger_hash
+    );
 }
 
 #[test]
@@ -162,6 +176,15 @@ fn object_chain_applies_external_platform_records_and_deferred_call() {
             .base_applied_memory_image_hash,
         product.platform_patch_application.applied_memory_image_hash
     );
+    assert_eq!(
+        product.shell_layout_plan.status,
+        "layout-planned-with-external-resolution-boundary"
+    );
+    assert_eq!(product.shell_layout_plan.dynamic_table_entry_count, 12);
+    assert!(product
+        .shell_layout_plan
+        .dynamic_table_file_offset
+        .is_some());
 }
 
 #[test]

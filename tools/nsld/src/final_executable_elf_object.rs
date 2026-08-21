@@ -18,6 +18,9 @@ use crate::{
     final_executable_elf_materialization_report::ElfAmd64MaterializationPreviewReport,
     final_executable_elf_relocation::build_elf_amd64_relocation_application,
     final_executable_elf_relocation_report::ElfAmd64RelocationApplicationReport,
+    final_executable_elf_shell::{
+        build_elf_amd64_shell_layout_plan, ElfAmd64ShellLayoutPlanReport,
+    },
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -56,6 +59,7 @@ pub(crate) struct ElfAmd64HostObjectLinkage {
     pub(crate) patch_application: ElfAmd64PatchApplicationReport,
     pub(crate) platform_structure_plan: ElfAmd64PlatformStructurePlanReport,
     pub(crate) platform_patch_application: ElfAmd64PlatformPatchApplicationReport,
+    pub(crate) shell_layout_plan: ElfAmd64ShellLayoutPlanReport,
 }
 
 pub(crate) fn build_elf_amd64_host_object_linkage(
@@ -207,6 +211,13 @@ pub(crate) fn build_elf_amd64_host_object_linkage(
     {
         return Err("ELF platform-applied image handoff hash drift".to_owned());
     }
+    let shell_layout_plan = build_elf_amd64_shell_layout_plan(
+        &objects,
+        &placement_binding,
+        &relocation_application,
+        &platform_structure_plan,
+        &platform_applied_image,
+    )?;
     Ok(ElfAmd64HostObjectLinkage {
         summary: ElfAmd64HostObjectLinkageSummary {
             contract: ELF_AMD64_HOST_OBJECT_LINKAGE_CONTRACT,
@@ -227,6 +238,7 @@ pub(crate) fn build_elf_amd64_host_object_linkage(
         patch_application: applied_image.report,
         platform_structure_plan,
         platform_patch_application: platform_applied_image.report,
+        shell_layout_plan,
     })
 }
 

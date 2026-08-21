@@ -123,8 +123,10 @@ through a static provider rule registry, assigns shared nonlazy PLT/GOT slots
 plus dynamic symbol/string and `R_X86_64_JUMP_SLOT` records, and binds every
 deferred source to one non-mutating patch preview. The platform application
 stage now materializes those records and deferred patches once under a second
-write ledger. Nsld does not yet lay out, serialize, or load-admit a
-provider-owned ELF shell.
+write ledger. `nuis-nsld-elf-amd64-shell-layout-plan-v1` maps that exact ledger
+into deterministic ELF/program/section tables, non-overlapping permission
+segments, an optional dynamic table, and a file-backed executable entry. Nsld
+does not yet serialize or load-admit the provider-owned ELF shell.
 
 This is not yet a pure Nsld linker claim. Nsld now understands the real input
 tables, assigns deterministic final sections and addresses, applies registered
@@ -253,11 +255,22 @@ direct patches, emits checked nonlazy PLT/GOT, `Elf64_Sym`, dynamic string, and
 source once. A deterministic ledger binds all source/encoded/post-write hashes,
 unresolved dynamic-bind records, and final file/memory hashes.
 
+`nuis-nsld-elf-amd64-shell-layout-plan-v1` now closes the non-mutating shell
+coordinate milestone. It rebuilds placement and relocation plans, validates the
+platform application ledger and image hashes, maps base and platform RX/RW/RO
+regions into checked `PT_LOAD` records, emits `PT_PHDR` plus optional
+`PT_DYNAMIC` coordinates, plans section names/headers and dynamic tags, and
+selects a registered source entry inside a file-backed executable segment.
+Every section, program header, and dynamic entry audit includes the upstream
+application ledger. Static and external-boundary plans are deterministic under
+reversed object order; ledger drift and missing entry definitions fail closed.
+
 The next native milestone is
-`nuis-nsld-elf-amd64-shell-layout-plan-v1`: map the applied base and platform
-regions into deterministic ELF header, program-header, permission-segment,
-dynamic-table, section-table, and entry coordinates before serialization.
-Nuisc must remain free of ELF branches.
+`nuis-nsld-elf-amd64-shell-image-serialization-v1`: emit the planned header,
+program, dynamic, section-name, and section-header bytes into an isolated image
+while preserving every platform-applied source span. Publication, loader
+admission, and registered external interpreter/dependency provenance remain
+separate. Nuisc must remain free of ELF branches.
 
 ## Validation
 
