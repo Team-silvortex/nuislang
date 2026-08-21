@@ -60,6 +60,22 @@ pub(crate) fn macho_arm64_loader_probe_report_json(
         json_bool_field("publication_eligible", report.publication_eligible),
         json_string_array_field("publication_blockers", &report.publication_blockers),
         json_string_field("probe_ledger_hash", &report.probe_ledger_hash),
+        json_optional_string_field(
+            "admission_receipt_file",
+            report.admission_receipt_file.as_deref(),
+        ),
+        json_bool_field(
+            "admission_receipt_persisted",
+            report.admission_receipt_persisted,
+        ),
+        json_optional_string_field(
+            "admission_receipt_hash_sha256",
+            report.admission_receipt_hash_sha256.as_deref(),
+        ),
+        json_string_field(
+            "admission_receipt_validation_status",
+            &report.admission_receipt_validation_status,
+        ),
     ];
     format!("{{{}}}", fields.join(","))
 }

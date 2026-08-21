@@ -64,6 +64,48 @@ pub(crate) const DEV_TENSOR_RUNTIME_NSLD_SHELL_IMAGE_DRIFT_CHECKS: &[DevTensorDr
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "nsld-macho-arm64-publication-admission-receipt-contract",
+        path: "tools/nsld/src/final_executable_macho_admission_receipt.rs",
+        required_patterns: &[
+            "nuis-nsld-macho-arm64-publication-admission-v1",
+            "nuis.nsld.macho-arm64-publication-admission.toml",
+            "persist_macho_arm64_publication_admission_receipt",
+            "parse_macho_arm64_publication_admission_receipt",
+            "receipt_hash_sha256",
+            "StrictReceiptFields",
+            "atomic_write_receipt",
+            "options.mode(0o600)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-macho-arm64-publication-admission-validation-contract",
+        path: "tools/nsld/src/final_executable_macho_admission.rs",
+        required_patterns: &[
+            "nuis-nsld-macho-arm64-publication-admission-validation-v1",
+            "build_macho_arm64_publication_admission_receipt",
+            "verify_macho_arm64_publication_admission_receipt",
+            "validate_successful_macho_arm64_loader_probe",
+            "receipt-hash-mismatch",
+            "private-image-identity-mismatch",
+            "signature-identity-mismatch",
+            "loader-probe-evidence-invalid",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-macho-arm64-publication-admission-cli-evidence",
+        path: "tools/nsld/tests/host_finalizer_cli.rs",
+        required_patterns: &[
+            "cli_persists_and_replays_internal_private_image_admission_receipt",
+            "verify-final-executable-private-image-admission",
+            "publication-admission-replay-verified",
+            "receipt-hash-mismatch",
+            "write_internal_native_cpu_fixture_returning",
+            "\\\"private_image_matches\\\":false",
+            "\\\"signature_identity_matches\\\":false",
+            "private-image-identity-mismatch",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nsld-macho-arm64-shell-image-three-surface-evidence",
         path: "tools/nsld/tests/host_finalizer_cli.rs",
         required_patterns: &[

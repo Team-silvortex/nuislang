@@ -202,16 +202,29 @@ results without leaking the temporary path, and removes all probe files. The
 fully internal ARM64 fixture is accepted by the real macOS kernel and dyld,
 exits zero with no output, and earns probe-local publication eligibility. The
 real external-compatibility CLI fixture remains blocked before materialization.
+Successful apply persists
+`nuis-nsld-macho-arm64-publication-admission-v1` at the stable relative file
+`nuis.nsld.macho-arm64-publication-admission.toml`. The canonical strict
+flat-TOML receipt binds the finalizer registry and target, private-image FNV and
+SHA-256 identities, signature ledger and cdhash, zero-bind closure, and complete
+probe/cleanup evidence under its own SHA-256 digest. It is written through an
+owner-only create-new temporary file, sync, atomic rename, and directory sync.
+`verify-final-executable-private-image-admission` independently reparses that
+receipt, rejects missing, duplicate, unknown, noncanonical, or hash-drifted
+fields, rebuilds the current private product, and replays registry, target,
+image, signature, and probe identities. A real ordinary compiled-artifact
+fixture passes; receipt tamper and rebuilt-artifact drift fail closed.
 A gated host-command provider remains as a fallback; ELF and PE/COFF are
 explicit `registered-not-implemented` providers. This proves relocatable input,
 table parsing, placement, binding, merged-image construction, direct and
 platform relocation encoding, deterministic GOT/stub allocation, platform byte
 synthesis, unresolved-bind preservation, audited Mach-O shell planning, and
 signed private final-address byte serialization with an independent structural
-validator plus one real isolated OS-loader execution. It does not yet persist a
-replay-validated publication-admission receipt, prove the ordinary compiled-
-artifact route with a fully internal fixture, allocate common symbols, complete
-ELF or PE/COFF, or publish independently of Nuisc's compatibility link.
+validator, one real isolated OS-loader execution, and durable replay admission.
+It does not yet install that admitted image through a registered opt-in
+publication callback, allocate common symbols, complete ELF or PE/COFF, or
+publish independently of Nuisc's compatibility link. The ordinary default
+compatibility executable remains byte-for-byte unchanged.
 
 ## Current Early-Beta Rule
 

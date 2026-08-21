@@ -42,6 +42,9 @@ where
         "final-executable-private-image-loader-probe" => {
             Command::FinalExecutablePrivateImageLoaderProbe { input, json, apply }
         }
+        "verify-final-executable-private-image-admission" => {
+            Command::VerifyFinalExecutablePrivateImageAdmission { input, json }
+        }
         "final-executable-host-invoke-plan" => {
             Command::FinalExecutableHostInvokePlan { input, json }
         }

@@ -110,11 +110,16 @@ non-publishing loader gate. It defaults to plan-only and, under `--apply`, only
 materializes signed zero-unresolved/zero-bind inputs in a private temporary
 file, checks exact-byte identity, bounds process time and output, and proves
 cleanup. A fully internal ARM64 fixture is accepted by the real macOS kernel
-and dyld and exits zero. This evidence is not yet persisted as a replay-
-validated publication receipt, so Nuisc still embeds the host-toolchain-linked
-compatibility executable used for runnable publication. ELF and PE/COFF remain
-visible, selectable, and honestly blocked rather than silently falling through
-a generic linker.
+and dyld and exits zero. Successful apply now persists a provider-owned,
+SHA-256-bound `nuis-nsld-macho-arm64-publication-admission-v1` receipt at one
+stable relative filename. The independent validation contract strictly reparses
+the canonical flat TOML, rebuilds the current private product, and replays the
+finalizer registry, target, image, signature, and loader-probe identities. The
+ordinary compiled-artifact route has a positive internally closed fixture;
+receipt tamper and rebuilt-product drift fail closed. Nuisc still embeds the
+host-toolchain-linked compatibility executable used for default runnable
+publication. ELF and PE/COFF remain visible, selectable, and honestly blocked
+rather than silently falling through a generic linker.
 
 ## Extension Rule
 
@@ -127,13 +132,12 @@ A future provider must:
    is unsupported;
 5. pass the registry conformance and finalizer CLI regressions.
 
-The next native milestone is a provider-owned publication-admission receipt.
-It must bind the exact image hash, signature-validation ledger, loader-probe
-ledger, target identity, zero-bind closure, and successful cleanup, then be
-independently replay-validated before any opt-in private-image installation.
-The ordinary compiled-artifact route also needs a positive fully internal
-fixture. Neither change may add Mach-O branches to Nuisc, final-stage planning,
-or the generic emit frontdoor.
+The next native milestone is a provider-owned opt-in publication callback. It
+must replay-validate the fixed receipt immediately before atomic installation,
+install only the exact admitted bytes, and reject registry, target, image,
+signature, or probe drift. Plan-only operation and default compatibility
+publication must remain non-mutating, and the callback must not add Mach-O
+branches to Nuisc, final-stage planning, or the generic emit frontdoor.
 
 ## Validation
 

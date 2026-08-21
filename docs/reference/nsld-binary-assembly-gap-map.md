@@ -132,10 +132,13 @@ without publishing it. The plan-only default is side-effect free; explicit
 application admits only a zero-unresolved/zero-bind input, verifies temporary
 materialization, bounds execution and output, records cleanup, and exposes no
 temporary path. A fully internal ARM64 fixture is accepted by the real macOS
-kernel and dyld and exits zero. This narrows the OS-native gap to a durable,
-replay-validated publication-admission receipt and an ordinary compiled-
-artifact positive fixture; the private image is not silently substituted for
-the compatibility executable.
+kernel and dyld and exits zero. Explicit success now persists a canonical,
+SHA-256-bound `nuis-nsld-macho-arm64-publication-admission-v1` receipt. An
+independent verifier rebuilds and checks registry, target, image, signature,
+probe, cleanup, and zero-bind identities; receipt tamper and regenerated-
+artifact drift fail closed in the real CLI fixture. This narrows the OS-native
+gap to a registered opt-in installation callback; the private image is still
+not silently substituted for the compatibility executable.
 
 It does not yet own:
 

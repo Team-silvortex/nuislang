@@ -2,7 +2,15 @@ use super::{
     cli::Command,
     context::load_link_input_context,
     display::*,
+    display_final_macho_admission::print_macho_arm64_publication_admission_verify_report,
     display_final_macho_loader_probe::print_macho_arm64_loader_probe_report,
+    final_executable_macho_admission::{
+        build_macho_arm64_publication_admission_receipt,
+        verify_macho_arm64_publication_admission_receipt,
+    },
+    final_executable_macho_admission_receipt::{
+        persist_macho_arm64_publication_admission_receipt, MACHO_ARM64_PUBLICATION_ADMISSION_FILE,
+    },
     final_executable_macho_artifact::macho_artifact_private_shell_product,
     final_executable_macho_loader_probe::{
         probe_macho_arm64_signed_shell_image, MachOArm64LoaderProbeInput,
@@ -12,6 +20,7 @@ use super::{
     },
     final_stage::*,
     json::*,
+    json_final_macho_admission::macho_arm64_publication_admission_verify_report_json,
     json_final_macho_loader_probe::macho_arm64_loader_probe_report_json,
 };
 use std::path::Path;
@@ -84,7 +93,7 @@ pub(crate) fn run_final_executable_command(command: &Command) -> Result<bool, St
         Command::FinalExecutablePrivateImageLoaderProbe { input, json, apply } => {
             let ctx = load_link_input_context(input)?;
             let product = macho_artifact_private_shell_product(&ctx.plan)?;
-            let report = probe_macho_arm64_signed_shell_image(
+            let mut report = probe_macho_arm64_signed_shell_image(
                 MachOArm64LoaderProbeInput {
                     bytes: &product.bytes,
                     serialization: &product.summary.shell_image_serialization,
@@ -96,18 +105,53 @@ pub(crate) fn run_final_executable_command(command: &Command) -> Result<bool, St
                 Path::new(&ctx.plan.output_dir),
                 *apply,
             )?;
+            if *apply && report.publication_eligible {
+                let receipt =
+                    build_macho_arm64_publication_admission_receipt(&ctx.plan, &product, &report)?;
+                persist_macho_arm64_publication_admission_receipt(&ctx.plan, &receipt)?;
+                let verification =
+                    verify_macho_arm64_publication_admission_receipt(&ctx.plan, &product);
+                report.admission_receipt_file =
+                    Some(MACHO_ARM64_PUBLICATION_ADMISSION_FILE.to_owned());
+                report.admission_receipt_persisted = true;
+                report.admission_receipt_hash_sha256 = Some(receipt.receipt_hash_sha256.clone());
+                report.admission_receipt_validation_status = verification.status.clone();
+            }
             if *json {
                 println!("{}", macho_arm64_loader_probe_report_json(&report));
             } else {
                 print_macho_arm64_loader_probe_report(&report);
             }
-            if *apply && !report.publication_eligible {
+            if *apply
+                && (!report.publication_eligible
+                    || !report.admission_receipt_persisted
+                    || report.admission_receipt_validation_status
+                        != "publication-admission-replay-verified")
+            {
                 Err(
-                    "nsld private-image loader probe did not pass publication eligibility"
+                    "nsld private-image loader probe did not produce a verified admission receipt"
                         .to_owned(),
                 )
             } else {
                 Ok(true)
+            }
+        }
+        Command::VerifyFinalExecutablePrivateImageAdmission { input, json } => {
+            let ctx = load_link_input_context(input)?;
+            let product = macho_artifact_private_shell_product(&ctx.plan)?;
+            let report = verify_macho_arm64_publication_admission_receipt(&ctx.plan, &product);
+            if *json {
+                println!(
+                    "{}",
+                    macho_arm64_publication_admission_verify_report_json(&report)
+                );
+            } else {
+                print_macho_arm64_publication_admission_verify_report(&report);
+            }
+            if report.valid {
+                Ok(true)
+            } else {
+                Err("nsld private-image publication admission verification failed".to_owned())
             }
         }
         Command::FinalExecutableHostInvokePlan { input, json } => {

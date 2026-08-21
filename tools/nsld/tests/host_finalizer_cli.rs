@@ -360,6 +360,94 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     assert!(launcher_dry_run.contains("\"dry_run_ready\":true"));
 }
 
+#[test]
+fn cli_persists_and_replays_internal_private_image_admission_receipt() {
+    let dir = unique_temp_dir("nsld-cli-private-image-admission");
+    fs::create_dir_all(&dir).unwrap();
+    let source_executable = find_path_executable("true");
+    let manifest = write_internal_native_cpu_fixture(&dir, &source_executable);
+    let compatibility_before = fs::read(dir.join("demo.bin")).unwrap();
+    let receipt_path = dir.join("nuis.nsld.macho-arm64-publication-admission.toml");
+
+    let planned = run_nsld("final-executable-private-image-loader-probe", &manifest);
+    assert!(planned.contains("\"probe_mode\":\"plan-only\""));
+    assert!(planned.contains("\"admission_receipt_persisted\":false"));
+    assert!(planned.contains("\"admission_receipt_validation_status\":\"not-requested\""));
+    assert!(!receipt_path.exists());
+
+    let probe = run_nsld_args(&[
+        "final-executable-private-image-loader-probe",
+        manifest.to_str().unwrap(),
+        "--apply",
+        "--json",
+    ]);
+    let receipt = fs::read_to_string(&receipt_path).unwrap();
+    let receipt_mode = fs::metadata(&receipt_path).unwrap().permissions().mode() & 0o777;
+    let verification = run_nsld("verify-final-executable-private-image-admission", &manifest);
+    let verification_text = run_nsld_args(&[
+        "verify-final-executable-private-image-admission",
+        manifest.to_str().unwrap(),
+    ]);
+    let compatibility_after = fs::read(dir.join("demo.bin")).unwrap();
+
+    assert!(probe.contains("\"publication_eligible\":true"), "{probe}");
+    assert!(
+        probe.contains("\"admission_receipt_persisted\":true"),
+        "{probe}"
+    );
+    assert!(probe.contains(
+        "\"admission_receipt_file\":\"nuis.nsld.macho-arm64-publication-admission.toml\""
+    ));
+    assert!(probe.contains(
+        "\"admission_receipt_validation_status\":\"publication-admission-replay-verified\""
+    ));
+    assert!(receipt.contains("contract = \"nuis-nsld-macho-arm64-publication-admission-v1\""));
+    assert!(receipt.contains("probe_kernel_accepted = true"));
+    assert!(receipt.contains("unresolved_external_symbol_count = 0"));
+    assert!(receipt.contains("bind_count = 0"));
+    assert!(receipt.contains("shell_image_sha256 = \""));
+    assert!(receipt.contains("receipt_hash_sha256 = \""));
+    assert!(!receipt.contains(dir.to_str().unwrap()));
+    assert_eq!(receipt_mode, 0o600);
+    assert!(verification.contains("\"valid\":true"), "{verification}");
+    assert!(verification.contains("\"receipt_hash_matches\":true"));
+    assert!(verification.contains("\"private_image_matches\":true"));
+    assert!(verification.contains("\"probe_evidence_valid\":true"));
+    assert!(verification_text.contains("probe=true valid=true"));
+    assert_eq!(compatibility_after, compatibility_before);
+
+    let damaged = receipt.replace(
+        "probe_kernel_accepted = true",
+        "probe_kernel_accepted = false",
+    );
+    fs::write(&receipt_path, damaged).unwrap();
+    let rejected = run_nsld_failure(&[
+        "verify-final-executable-private-image-admission",
+        manifest.to_str().unwrap(),
+        "--json",
+    ]);
+    let rejected_stdout = String::from_utf8(rejected.stdout).unwrap();
+    assert!(rejected_stdout.contains("\"valid\":false"));
+    assert!(rejected_stdout.contains("receipt-hash-mismatch"));
+    assert!(rejected_stdout.contains("loader-probe-evidence-invalid"));
+
+    fs::write(&receipt_path, &receipt).unwrap();
+    let rebuilt_manifest = write_internal_native_cpu_fixture_returning(&dir, &source_executable, 1);
+    assert_eq!(rebuilt_manifest, manifest);
+    let drifted = run_nsld_failure(&[
+        "verify-final-executable-private-image-admission",
+        manifest.to_str().unwrap(),
+        "--json",
+    ]);
+    let drifted_stdout = String::from_utf8(drifted.stdout).unwrap();
+    assert!(drifted_stdout.contains("\"receipt_hash_matches\":true"));
+    assert!(drifted_stdout.contains("\"private_image_matches\":false"));
+    assert!(drifted_stdout.contains("\"signature_identity_matches\":false"));
+    assert!(drifted_stdout.contains("private-image-identity-mismatch"));
+
+    fs::remove_dir_all(dir).unwrap();
+}
+
 fn run_nsld(command: &str, manifest: &Path) -> String {
     run_nsld_args(&[command, manifest.to_str().unwrap(), "--json"])
 }
@@ -383,7 +471,53 @@ fn run_nsld_args(args: &[&str]) -> String {
     String::from_utf8(output.stdout).unwrap()
 }
 
+fn run_nsld_failure(args: &[&str]) -> std::process::Output {
+    let command_label = args.join(" ");
+    let output = Command::new(env!("CARGO_BIN_EXE_nsld"))
+        .args(args)
+        .env_remove("NUIS_NSLD_HOST_FINALIZER_POLICY")
+        .env_remove("NUIS_NSLD_ALLOW_HOST_FINALIZER")
+        .output()
+        .unwrap_or_else(|error| panic!("failed to run nsld {command_label}: {error}"));
+    assert!(
+        !output.status.success(),
+        "nsld {command_label} unexpectedly succeeded"
+    );
+    output
+}
+
 fn write_native_cpu_fixture(dir: &Path, source_executable: &Path) -> PathBuf {
+    write_native_cpu_fixture_with_objects(
+        dir,
+        source_executable,
+        arm64_object("_nuis_entry", "_nuis_runtime"),
+        arm64_object("_nuis_runtime", "_puts"),
+    )
+}
+
+fn write_internal_native_cpu_fixture(dir: &Path, source_executable: &Path) -> PathBuf {
+    write_internal_native_cpu_fixture_returning(dir, source_executable, 0)
+}
+
+fn write_internal_native_cpu_fixture_returning(
+    dir: &Path,
+    source_executable: &Path,
+    return_value: u16,
+) -> PathBuf {
+    write_native_cpu_fixture_with_objects(
+        dir,
+        source_executable,
+        arm64_tail_branch_object("_nuis_entry", "_nuis_runtime"),
+        arm64_leaf_object_returning("_nuis_runtime", return_value),
+    )
+}
+
+fn write_native_cpu_fixture_with_objects(
+    dir: &Path,
+    source_executable: &Path,
+    program_bytes: Vec<u8>,
+    runtime_bytes: Vec<u8>,
+) -> PathBuf {
     let ast = dir.join("demo.ast.txt");
     let nir = dir.join("demo.nir.txt");
     let yir = dir.join("demo.yir");
@@ -397,12 +531,8 @@ fn write_native_cpu_fixture(dir: &Path, source_executable: &Path) -> PathBuf {
     fs::write(&nir, "nir").unwrap();
     fs::write(&yir, "yir").unwrap();
     fs::write(&ll, "llvm").unwrap();
-    fs::write(
-        &program_object,
-        arm64_object("_nuis_entry", "_nuis_runtime"),
-    )
-    .unwrap();
-    fs::write(&runtime_object, arm64_object("_nuis_runtime", "_puts")).unwrap();
+    fs::write(&program_object, program_bytes).unwrap();
+    fs::write(&runtime_object, runtime_bytes).unwrap();
     fs::copy(source_executable, &bin).unwrap();
 
     let manifest = write_build_manifest(
@@ -442,6 +572,19 @@ fn write_native_cpu_fixture(dir: &Path, source_executable: &Path) -> PathBuf {
 }
 
 fn arm64_object(defined: &str, undefined: &str) -> Vec<u8> {
+    arm64_branch_object(defined, undefined, 0x9400_0000, 0)
+}
+
+fn arm64_tail_branch_object(defined: &str, undefined: &str) -> Vec<u8> {
+    arm64_branch_object(defined, undefined, 0x1400_0000, 0xd503_201f)
+}
+
+fn arm64_branch_object(
+    defined: &str,
+    undefined: &str,
+    branch_instruction: u32,
+    trailing_instruction: u32,
+) -> Vec<u8> {
     const SEGMENT_OFFSET: usize = 32;
     const SECTION_OFFSET: usize = 104;
     const SYMTAB_OFFSET: usize = 184;
@@ -471,7 +614,8 @@ fn arm64_object(defined: &str, undefined: &str) -> Vec<u8> {
     write_u32(&mut bytes, SECTION_OFFSET + 48, PAYLOAD_OFFSET as u32);
     write_u32(&mut bytes, SECTION_OFFSET + 56, RELOCATION_OFFSET as u32);
     write_u32(&mut bytes, SECTION_OFFSET + 60, 1);
-    write_u32(&mut bytes, PAYLOAD_OFFSET, 0x9400_0000);
+    write_u32(&mut bytes, PAYLOAD_OFFSET, branch_instruction);
+    write_u32(&mut bytes, PAYLOAD_OFFSET + 4, trailing_instruction);
     write_u32(&mut bytes, SYMTAB_OFFSET, 0x2);
     write_u32(&mut bytes, SYMTAB_OFFSET + 4, 24);
     write_u32(&mut bytes, SYMTAB_OFFSET + 8, SYMBOL_OFFSET as u32);
@@ -489,6 +633,49 @@ fn arm64_object(defined: &str, undefined: &str) -> Vec<u8> {
     bytes[SYMBOL_OFFSET + 5] = 1;
     write_u32(&mut bytes, SYMBOL_OFFSET + 16, undefined_index);
     bytes[SYMBOL_OFFSET + 20] = 0x01;
+    bytes[STRING_OFFSET..].copy_from_slice(&strings);
+    bytes
+}
+
+fn arm64_leaf_object_returning(defined: &str, return_value: u16) -> Vec<u8> {
+    const SEGMENT_OFFSET: usize = 32;
+    const SECTION_OFFSET: usize = 104;
+    const SYMTAB_OFFSET: usize = 184;
+    const PAYLOAD_OFFSET: usize = 208;
+    const SYMBOL_OFFSET: usize = 224;
+    const STRING_OFFSET: usize = 256;
+    let mut strings = vec![0];
+    let defined_index = strings.len() as u32;
+    strings.extend_from_slice(defined.as_bytes());
+    strings.push(0);
+    let mut bytes = vec![0u8; STRING_OFFSET + strings.len()];
+    bytes[..4].copy_from_slice(&[0xcf, 0xfa, 0xed, 0xfe]);
+    bytes[4..8].copy_from_slice(&0x0100_000cu32.to_le_bytes());
+    bytes[12..16].copy_from_slice(&1u32.to_le_bytes());
+    write_u32(&mut bytes, 16, 2);
+    write_u32(&mut bytes, 20, 176);
+    write_u32(&mut bytes, SEGMENT_OFFSET, 0x19);
+    write_u32(&mut bytes, SEGMENT_OFFSET + 4, 152);
+    write_u32(&mut bytes, SEGMENT_OFFSET + 64, 1);
+    bytes[SECTION_OFFSET..SECTION_OFFSET + 6].copy_from_slice(b"__text");
+    bytes[SECTION_OFFSET + 16..SECTION_OFFSET + 22].copy_from_slice(b"__TEXT");
+    write_u64(&mut bytes, SECTION_OFFSET + 40, 8);
+    write_u32(&mut bytes, SECTION_OFFSET + 48, PAYLOAD_OFFSET as u32);
+    write_u32(
+        &mut bytes,
+        PAYLOAD_OFFSET,
+        0x5280_0000 | (u32::from(return_value) << 5),
+    );
+    write_u32(&mut bytes, PAYLOAD_OFFSET + 4, 0xd65f_03c0);
+    write_u32(&mut bytes, SYMTAB_OFFSET, 0x2);
+    write_u32(&mut bytes, SYMTAB_OFFSET + 4, 24);
+    write_u32(&mut bytes, SYMTAB_OFFSET + 8, SYMBOL_OFFSET as u32);
+    write_u32(&mut bytes, SYMTAB_OFFSET + 12, 1);
+    write_u32(&mut bytes, SYMTAB_OFFSET + 16, STRING_OFFSET as u32);
+    write_u32(&mut bytes, SYMTAB_OFFSET + 20, strings.len() as u32);
+    write_u32(&mut bytes, SYMBOL_OFFSET, defined_index);
+    bytes[SYMBOL_OFFSET + 4] = 0x0f;
+    bytes[SYMBOL_OFFSET + 5] = 1;
     bytes[STRING_OFFSET..].copy_from_slice(&strings);
     bytes
 }

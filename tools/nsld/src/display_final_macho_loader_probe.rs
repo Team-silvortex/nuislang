@@ -50,6 +50,16 @@ pub(crate) fn print_macho_arm64_loader_probe_report(report: &NsldMachOArm64Loade
         report.publication_blockers.join(","),
         report.probe_ledger_hash
     );
+    println!(
+        "  admission_receipt: file={} persisted={} hash_sha256={} validation={}",
+        report.admission_receipt_file.as_deref().unwrap_or("none"),
+        report.admission_receipt_persisted,
+        report
+            .admission_receipt_hash_sha256
+            .as_deref()
+            .unwrap_or("none"),
+        report.admission_receipt_validation_status
+    );
 }
 
 fn option_i32(value: Option<i32>) -> String {

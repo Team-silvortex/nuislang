@@ -17,8 +17,10 @@ use std::{
 
 pub(crate) const MACHO_ARM64_LOADER_PROBE_CONTRACT: &str =
     "nuis-nsld-macho-arm64-os-loader-probe-v1";
-const MATERIALIZATION_KIND: &str = "create-new-owner-executable-temporary-file";
-const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
+pub(crate) const MACHO_ARM64_LOADER_PROBE_MATERIALIZATION_KIND: &str =
+    "create-new-owner-executable-temporary-file";
+pub(crate) const MACHO_ARM64_LOADER_PROBE_TIMEOUT_MILLIS: u64 = 5_000;
+const PROBE_TIMEOUT: Duration = Duration::from_millis(MACHO_ARM64_LOADER_PROBE_TIMEOUT_MILLIS);
 const POLL_INTERVAL: Duration = Duration::from_millis(10);
 const CAPTURE_LIMIT_BYTES: u64 = 1024 * 1024;
 static PROBE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
@@ -390,7 +392,7 @@ fn build_report(
         contract: MACHO_ARM64_LOADER_PROBE_CONTRACT.to_owned(),
         status: observation.status,
         probe_mode: if execute { "execute" } else { "plan-only" }.to_owned(),
-        materialization_kind: MATERIALIZATION_KIND.to_owned(),
+        materialization_kind: MACHO_ARM64_LOADER_PROBE_MATERIALIZATION_KIND.to_owned(),
         target_arch: "aarch64".to_owned(),
         target_os: "macos".to_owned(),
         host_supported,
@@ -427,9 +429,62 @@ fn build_report(
         publication_eligible,
         publication_blockers: observation.blockers,
         probe_ledger_hash: String::new(),
+        admission_receipt_file: None,
+        admission_receipt_persisted: false,
+        admission_receipt_hash_sha256: None,
+        admission_receipt_validation_status: "not-requested".to_owned(),
     };
     report.probe_ledger_hash = probe_ledger_hash(&report);
     report
+}
+
+pub(crate) fn validate_successful_macho_arm64_loader_probe(
+    report: &NsldMachOArm64LoaderProbeReport,
+) -> Result<(), String> {
+    if report.contract != MACHO_ARM64_LOADER_PROBE_CONTRACT
+        || report.status != "os-loader-accepted-process-succeeded"
+        || report.probe_mode != "execute"
+        || report.materialization_kind != MACHO_ARM64_LOADER_PROBE_MATERIALIZATION_KIND
+        || report.target_arch != "aarch64"
+        || report.target_os != "macos"
+    {
+        return Err("Mach-O admission rejects the loader-probe contract identity".to_owned());
+    }
+    if !report.host_supported
+        || !report.input_eligible
+        || !report.attempted
+        || report.unresolved_external_symbol_count != 0
+        || report.bind_count != 0
+    {
+        return Err("Mach-O admission rejects loader-probe input eligibility".to_owned());
+    }
+    if !report.materialized
+        || !report.materialized_hash_matches
+        || !report.kernel_accepted
+        || !report.process_completed
+        || report.timed_out
+        || report.exit_code != Some(0)
+        || report.termination_signal.is_some()
+        || report.stdout_truncated
+        || report.stderr_truncated
+        || report.failure_kind.is_some()
+    {
+        return Err("Mach-O admission rejects unsuccessful loader-probe execution".to_owned());
+    }
+    if !report.cleanup_attempted || !report.cleanup_succeeded {
+        return Err("Mach-O admission rejects incomplete loader-probe cleanup".to_owned());
+    }
+    if report.publication_eligibility_contract != MACHO_ARM64_PUBLICATION_ELIGIBILITY_CONTRACT
+        || report.publication_eligibility_status != "eligible-isolated-os-loader-probe-passed"
+        || !report.publication_eligible
+        || !report.publication_blockers.is_empty()
+    {
+        return Err("Mach-O admission rejects loader-probe publication eligibility".to_owned());
+    }
+    if report.probe_ledger_hash != probe_ledger_hash(report) {
+        return Err("Mach-O admission rejects loader-probe ledger drift".to_owned());
+    }
+    Ok(())
 }
 
 fn probe_ledger_hash(report: &NsldMachOArm64LoaderProbeReport) -> String {

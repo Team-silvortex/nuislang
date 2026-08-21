@@ -365,10 +365,15 @@ The `beta-0.1` calibration baseline is:
   complete cleanup evidence. A fully internal ARM64 fixture is accepted by the
   real macOS kernel and dyld, exits zero, and cleans up; an external CLI fixture
   remains blocked before materialization. Internal-rebase, external-bind,
-  tamper, probe, and JSON/text/TOML CLI evidence pass. The ordinary publication
-  image remains `private-not-published`; a persisted replay-validated admission
-  receipt, a compiled-artifact positive fixture, common-symbol allocation, ELF,
-  and PE/COFF remain open
+  tamper, probe, and JSON/text/TOML CLI evidence pass. Successful apply persists
+  a canonical, strict, owner-only, SHA-256-bound
+  `nuis-nsld-macho-arm64-publication-admission-v1` receipt at one stable relative
+  filename. Independent replay rebuilds the current product and checks registry,
+  target, private-image, signature, probe, cleanup, and zero-bind identities. A
+  real compiled-artifact fixture passes, while receipt tamper and regenerated-
+  artifact drift fail closed. The ordinary publication image remains
+  `private-not-published`; an opt-in installation callback, common-symbol
+  allocation, ELF, and PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

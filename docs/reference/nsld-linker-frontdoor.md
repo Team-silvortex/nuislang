@@ -1178,6 +1178,14 @@ the host kernel with a five-second timeout and bounded captures, and records
 cleanup without retaining the temporary path. The fully internal ARM64 fixture
 is accepted by the real macOS kernel and dyld and exits zero; external-
 compatibility inputs remain blocked before materialization.
+Successful apply also persists
+`nuis-nsld-macho-arm64-publication-admission-v1` as canonical strict flat TOML
+at one fixed relative filename. Its SHA-256 digest binds the selected registry
+provider/target, current private image, signature ledger and cdhash, complete
+probe result, cleanup, and zero-bind closure. The separate
+`verify-final-executable-private-image-admission` command rebuilds the product
+and independently replays those identities. Receipt tamper and a regenerated
+compiled artifact with changed runtime bytes both fail closed.
 
 After those checks the provider validates a thin or universal arm64
 `MH_EXECUTE` compatibility image and installs it atomically with executable
@@ -1194,11 +1202,11 @@ checked direct-write encoding previews, write-once direct and platform working
 images, deterministic GOT/stub allocation and bytes, explicit unresolved bind
 records, an audited final-address shell layout, and deterministic private
 header/command/content/linkedit bytes with all address-dependent writes
-re-encoded for final VM addresses. It does not yet allocate non-section
-definitions, persist and replay-validate successful loader evidence as a
-publication-admission receipt, exercise the ordinary compiled-artifact path
-with a fully internal positive fixture, or publish the final native shell
-independently. Those remain the next boundary.
+re-encoded for final VM addresses. The ordinary internally closed compiled-
+artifact path now has durable replay admission. It does not yet allocate non-
+section definitions or install the admitted native shell through a registered
+opt-in publication callback. Those remain the next boundary, while default
+publication continues to use the compatibility image unchanged.
 
 `nsld final-executable-host-dry-run` consumes the verified writer input,
 reports `environment_ready`, provider identity, and exact command arguments.
