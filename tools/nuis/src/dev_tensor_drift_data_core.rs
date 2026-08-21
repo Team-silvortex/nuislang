@@ -218,6 +218,31 @@ pub(crate) const DEV_TENSOR_CORE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "nsld-elf-amd64-materialization-preview-contract",
+        path: "tools/nsld/src/final_executable_elf_materialization.rs",
+        required_patterns: &[
+            "nuis-nsld-elf-amd64-materialization-preview-v1",
+            "build_elf_amd64_merged_image",
+            "verified-plan-bound",
+            "verified-zero-fill",
+            "write-once-preview",
+            "source hash drift",
+            "overlaps an earlier span",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-elf-amd64-materialization-preview-regression",
+        path: "tools/nsld/src/final_executable_elf_materialization_tests.rs",
+        required_patterns: &[
+            "materializes_real_sections_and_previews_plt32_without_mutation",
+            "unresolved_system_target_remains_deferred_after_materialization",
+            "materialization_is_independent_of_image_object_input_order",
+            "source_hash_and_parsed_linkage_drift_fail_before_copy",
+            "plan_hash_drift_and_overlapping_direct_patches_fail_closed",
+            "merged_zero_fill_sections_are_audited_separately",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nsld-elf-amd64-artifact-image-regression",
         path: "tools/nsld/src/final_executable_elf_artifact_tests.rs",
         required_patterns: &[

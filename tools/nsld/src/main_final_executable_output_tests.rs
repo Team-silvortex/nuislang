@@ -560,7 +560,7 @@ fn verify_final_executable_emit_reports_final_output_drift() {
     fs::remove_dir_all(dir).unwrap();
 
     assert!(!verify.valid);
-    assert_eq!(verify.expected_final_output_present, true);
+    assert!(verify.expected_final_output_present);
     assert_eq!(verify.actual_final_output_present, Some(false));
     assert_eq!(verify.actual_final_output_size_bytes, Some(1));
     assert_eq!(

@@ -2,7 +2,9 @@ use super::{
     final_executable_emit_actual::{
         nsld_final_executable_emit_actual_from_source, NsldFinalExecutableEmitActual,
     },
-    final_executable_emit_output_verify::push_final_output_emit_verify_mismatches,
+    final_executable_emit_output_verify::{
+        push_final_output_emit_verify_mismatches, FinalOutputEmitActual,
+    },
     final_executable_emit_shape::nsld_final_executable_emit_report_shape,
     final_executable_finalizer_registry::invoke_registered_finalizer,
     final_executable_output_summary::populate_final_output_emit_summary,
@@ -475,12 +477,14 @@ pub(crate) fn nsld_verify_final_executable_emit_report(
         push_final_output_emit_verify_mismatches(
             &mut issues,
             &expected,
-            actual_final_output_checked,
-            actual_final_output_present,
-            actual_final_output_size_bytes,
-            actual_final_output_hash.clone(),
-            actual_final_output_image_header_valid,
-            actual_final_output_runnable_candidate,
+            FinalOutputEmitActual {
+                checked: actual_final_output_checked,
+                present: actual_final_output_present,
+                size_bytes: actual_final_output_size_bytes,
+                hash: actual_final_output_hash.as_deref(),
+                image_header_valid: actual_final_output_image_header_valid,
+                runnable_candidate: actual_final_output_runnable_candidate,
+            },
         );
         if actual_blocker_count != Some(expected.blockers.len()) {
             issues.push(format!(

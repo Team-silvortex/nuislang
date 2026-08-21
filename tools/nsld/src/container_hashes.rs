@@ -144,19 +144,31 @@ pub(crate) fn container_section_table_hash(
     hash_bytes(material.as_bytes())
 }
 
+pub(crate) struct ContainerMetadataTableHashes<'a> {
+    pub(crate) container_section: &'a str,
+    pub(crate) loader_symbol: &'a str,
+    pub(crate) relocation: &'a str,
+    pub(crate) compatibility_domain: &'a str,
+    pub(crate) external_import: &'a str,
+    pub(crate) backend_artifact_payload: &'a str,
+    pub(crate) provider_dispatch: &'a str,
+    pub(crate) metadata_binding: &'a str,
+}
+
 pub(crate) fn metadata_table_hash(
-    container_section_table_hash: &str,
-    loader_symbol_table_hash: &str,
-    relocation_table_hash: &str,
-    compatibility_domain_table_hash: &str,
-    external_import_table_hash: &str,
-    backend_artifact_payload_table_hash: &str,
-    provider_dispatch_table_hash: &str,
-    metadata_binding_table_hash: &str,
+    hashes: &ContainerMetadataTableHashes<'_>,
     hash_bytes: fn(&[u8]) -> String,
 ) -> String {
     let material = format!(
-        "{container_section_table_hash}\t{loader_symbol_table_hash}\t{relocation_table_hash}\t{compatibility_domain_table_hash}\t{external_import_table_hash}\t{backend_artifact_payload_table_hash}\t{provider_dispatch_table_hash}\t{metadata_binding_table_hash}\n"
+        "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+        hashes.container_section,
+        hashes.loader_symbol,
+        hashes.relocation,
+        hashes.compatibility_domain,
+        hashes.external_import,
+        hashes.backend_artifact_payload,
+        hashes.provider_dispatch,
+        hashes.metadata_binding,
     );
     hash_bytes(material.as_bytes())
 }

@@ -26,7 +26,7 @@ pub(crate) fn encode_elf_amd64_image(
     let mut bytes = vec![0u8; file_layout.total_file_size_bytes];
     let sections = elf_sections(file_layout, &object_plan)?;
     let section_names = string_table(sections.iter().map(|section| section.name.as_str()));
-    let symbol_names = string_table(["__nuis_entry"].into_iter());
+    let symbol_names = string_table(["__nuis_entry"]);
     let symbol_table_index = section_index_by_kind(&sections, "elf-symbol-table")?;
     let string_table_index = section_index_by_kind(&sections, "elf-string-table")?;
     let section_name_table_index = section_index_by_kind(&sections, "elf-section-name-table")?;

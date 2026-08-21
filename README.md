@@ -47,11 +47,15 @@ definitions, zero-valued unmatched weak references, and unresolved
 compatibility names. It now maps every registered `R_X86_64` record to that
 placement, computes checked `S+A` or `S+A-P` values, and emits deterministic
 little-endian patch previews without mutating bytes; unresolved system targets
-remain explicit platform-structure work.
+remain explicit platform-structure work. The provider now also reconstructs
+the merged memory image from hash- and size-bound `ET_REL` payloads, audits
+file-backed copies and zero-fill ranges separately, binds file/memory image
+hashes to both plans, and derives non-overlapping write-once patch spans without
+altering the reconstructed bytes.
 It still atomically publishes the host-linked compatibility image without
-invoking Clang or LLD at finalization time. Provider-owned ELF section
-materialization, write-once patching, platform-structure synthesis, and shell
-serialization remain the next format frontier; PE/COFF parity remains open.
+invoking Clang or LLD at finalization time. Actual patch application,
+platform-structure synthesis, provider-owned ELF shell serialization, and load
+admission remain the next format frontier; PE/COFF parity remains open.
 
 Start with these documents:
 

@@ -251,6 +251,14 @@ maps registered `R_X86_64_NONE/64/PC32/PLT32/32/32S` records to placed sources
 and bound targets, checks `S+A` or `S+A-P` against the relocation width, and
 emits deterministic little-endian previews. Overflow and placement drift fail
 before mutation; unresolved system targets remain platform-structure work.
+`nuis-nsld-elf-amd64-materialization-preview-v1` reparses the hash- and
+size-bound `ET_REL` inputs, copies each file-backed placed section into one
+deterministic merged memory image, audits zero-fill ranges separately, and
+binds source-object, file-image, memory-image, placement, and relocation hashes
+into one canonical report. Direct relocations become non-overlapping
+write-once patch spans with source-byte and encoded-byte hashes; unresolved
+system targets remain deferred. This stage deliberately previews writes and
+does not mutate or publish the image.
 The Mach-O route proves relocatable input,
 table parsing, placement,
 binding, merged-image construction, direct and
@@ -261,9 +269,8 @@ validator, one real isolated OS-loader execution, durable replay admission, and
 registered opt-in publication and ordinary explicit selection. The real internal fixture now executes
 `ADRP`/`ADD`/`STR` against provider-allocated common storage before passing
 signature, loader, receipt replay, ordinary final-output selection, and direct
-execution. ELF merged-image materialization, write-once patch application,
-platform-structure synthesis, shell serialization, and PE/COFF remain
-incomplete. The
+execution. ELF direct patch application, platform-structure synthesis, shell
+serialization, load admission, and PE/COFF remain incomplete. The
 ordinary default compatibility executable remains byte-for-byte unchanged;
 private installation requires both the explicit policy and `--apply`.
 

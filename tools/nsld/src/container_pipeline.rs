@@ -255,14 +255,16 @@ pub(crate) fn nsld_container_report(
     let metadata_binding_table_hash =
         container::metadata_binding_table_hash(&metadata_binding_evidence.bindings, fnv1a64_hex);
     let metadata_table_hash = container::metadata_table_hash(
-        &container_section_table_hash,
-        &loader_symbol_table_hash,
-        &relocation_table_hash,
-        &compatibility_domain_table_hash,
-        &external_import_table_hash,
-        &backend_artifact_payload_table_hash,
-        &provider_dispatch.table_hash,
-        &metadata_binding_table_hash,
+        &container::ContainerMetadataTableHashes {
+            container_section: &container_section_table_hash,
+            loader_symbol: &loader_symbol_table_hash,
+            relocation: &relocation_table_hash,
+            compatibility_domain: &compatibility_domain_table_hash,
+            external_import: &external_import_table_hash,
+            backend_artifact_payload: &backend_artifact_payload_table_hash,
+            provider_dispatch: &provider_dispatch.table_hash,
+            metadata_binding: &metadata_binding_table_hash,
+        },
         fnv1a64_hex,
     );
     let mut blockers = container_plan.blockers.clone();

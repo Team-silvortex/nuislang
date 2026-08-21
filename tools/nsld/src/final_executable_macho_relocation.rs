@@ -65,9 +65,9 @@ pub(crate) fn build_macho_arm64_relocation_application_report(
             let shape = registered_shape(relocation)?;
             registered_kinds.insert(shape.kind);
             let pair_relocation_id =
-                paired_relocation_id(&object.object_id, index, &object.linkage.relocations, &ids)?;
+                paired_relocation_id(object.object_id, index, &object.linkage.relocations, &ids)?;
             let source =
-                source_placement(&object.object_id, relocation, &placement.section_placements)?;
+                source_placement(object.object_id, relocation, &placement.section_placements)?;
             let source_offset = usize::try_from(relocation.offset).map_err(|_| {
                 format!(
                     "Mach-O object `{}` relocation offset {} exceeds host address space",

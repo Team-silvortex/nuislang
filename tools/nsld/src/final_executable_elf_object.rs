@@ -2,6 +2,10 @@ use crate::{
     final_executable_elf_input::{parse_elf64_amd64_object_linkage, ParsedElfObjectLinkage},
     final_executable_elf_layout::build_elf_amd64_placement_binding,
     final_executable_elf_layout_report::ElfAmd64PlacementBindingReport,
+    final_executable_elf_materialization::{
+        build_elf_amd64_materialization_preview, ElfAmd64ImageObject,
+    },
+    final_executable_elf_materialization_report::ElfAmd64MaterializationPreviewReport,
     final_executable_elf_relocation::build_elf_amd64_relocation_application,
     final_executable_elf_relocation_report::ElfAmd64RelocationApplicationReport,
 };
@@ -38,6 +42,7 @@ pub(crate) struct ElfAmd64HostObjectLinkage {
     pub(crate) objects: Vec<ElfAmd64ObjectLinkage>,
     pub(crate) placement_binding: ElfAmd64PlacementBindingReport,
     pub(crate) relocation_application: ElfAmd64RelocationApplicationReport,
+    pub(crate) materialization_preview: ElfAmd64MaterializationPreviewReport,
 }
 
 pub(crate) fn build_elf_amd64_host_object_linkage(
@@ -125,6 +130,45 @@ pub(crate) fn build_elf_amd64_host_object_linkage(
     let placement_binding = build_elf_amd64_placement_binding(&objects)?;
     let relocation_application =
         build_elf_amd64_relocation_application(&objects, &placement_binding)?;
+    let image_objects = objects
+        .iter()
+        .map(|object| {
+            let source = artifact
+                .host_objects
+                .iter()
+                .find(|source| source.object_id == object.object_id)
+                .ok_or_else(|| {
+                    format!(
+                        "ELF materialization source object `{}` is missing",
+                        object.object_id
+                    )
+                })?;
+            let planned = plan
+                .compiled_artifact
+                .host_objects
+                .iter()
+                .find(|planned| planned.object_id == object.object_id)
+                .ok_or_else(|| {
+                    format!(
+                        "ELF materialization planned object `{}` is missing",
+                        object.object_id
+                    )
+                })?;
+            Ok(ElfAmd64ImageObject {
+                object_id: &object.object_id,
+                role: &object.role,
+                bytes: &source.bytes,
+                planned_size_bytes: planned.bytes,
+                planned_source_hash: &planned.content_hash,
+                linkage: &object.linkage,
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    let materialization_preview = build_elf_amd64_materialization_preview(
+        &image_objects,
+        &placement_binding,
+        &relocation_application,
+    )?;
     Ok(ElfAmd64HostObjectLinkage {
         summary: ElfAmd64HostObjectLinkageSummary {
             contract: ELF_AMD64_HOST_OBJECT_LINKAGE_CONTRACT,
@@ -141,6 +185,7 @@ pub(crate) fn build_elf_amd64_host_object_linkage(
         objects,
         placement_binding,
         relocation_application,
+        materialization_preview,
     })
 }
 

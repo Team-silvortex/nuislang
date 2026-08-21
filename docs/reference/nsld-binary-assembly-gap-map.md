@@ -181,19 +181,25 @@ registered relocation to a placed source and bound target, computes checked
 `S+A` or `S+A-P`, and emits deterministic little-endian previews. Overflow,
 shape mismatch, placement drift, and unresolved non-compatibility targets fail
 before mutation; unresolved system targets remain explicit platform-structure
-work. The provider also
+work. `nuis-nsld-elf-amd64-materialization-preview-v1` now reparses hash- and
+size-bound inputs, copies verified file-backed placements into a deterministic
+merged memory image, audits zero-fill ranges separately, and binds
+source-object, file-image, memory-image, placement, and relocation hashes. It
+derives non-overlapping write-once direct patch spans with source and encoded
+byte evidence while leaving both source bytes and deferred platform targets
+untouched. The provider also
 validates an ELF64 `ET_EXEC`/PIE image whose entry belongs to a bounded
 executable `PT_LOAD`. The accepted compatibility image is atomically published
 without a Clang/LLD process. This is deliberate staging evidence, not a
 self-owned ELF link claim: the embedded executable remains host-toolchain-linked
-until Nsld materializes its owned placement and relocation plans, applies each
-write once, synthesizes platform structures, and emits the shell.
+until Nsld applies each previewed write once, synthesizes platform structures,
+and emits and load-admits the shell.
 
 It does not yet own:
 
 * complete architecture parity across Mach-O, ELF, and PE/COFF
-* provider-owned ELF merged-image materialization, patch application,
-  platform-structure/shell serialization, and complete PE/COFF object merging
+* provider-owned ELF patch application, platform-structure/shell serialization
+  and load admission, plus complete PE/COFF object merging
 * a durable embedded Nsdb/YIR debug metadata section
 
 ## Gap 1: Compatibility Object Writer

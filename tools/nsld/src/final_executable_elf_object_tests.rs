@@ -59,6 +59,17 @@ fn summarizes_cross_object_internal_symbol_closure() {
         product.relocation_application.applications[0].encoded_bytes,
         [0x0b, 0, 0, 0]
     );
+    assert_eq!(
+        product.materialization_preview.contract,
+        crate::final_executable_elf_materialization::ELF_AMD64_MATERIALIZATION_PREVIEW_CONTRACT
+    );
+    assert_eq!(product.materialization_preview.status, "preview-ready");
+    assert_eq!(product.materialization_preview.copied_bytes, 7);
+    assert_eq!(product.materialization_preview.previewed_patch_count, 1);
+    assert_eq!(
+        product.materialization_preview.patches[0].encoded_bytes,
+        [0x0b, 0, 0, 0]
+    );
 }
 
 #[test]

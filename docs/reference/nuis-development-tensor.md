@@ -417,13 +417,21 @@ The `beta-0.1` calibration baseline is:
   little-endian previews. Placement drift, shape mismatch, and signed/unsigned
   overflow fail before mutation; unresolved system symbols stay explicit
   platform-structure work. Reversed object order preserves the relocation plan
-  hash. The provider validates an ELF64 `ET_EXEC` or PIE
+  hash. `nuis-nsld-elf-amd64-materialization-preview-v1` reparses the hash- and
+  size-bound objects, copies verified file-backed placements into a
+  deterministic merged memory image, audits zero-fill ranges separately, and
+  binds source-object, file-image, memory-image, placement, and relocation
+  hashes. Direct relocations become non-overlapping write-once patch spans with
+  source and encoded byte evidence without mutating the source image; unresolved
+  compatibility targets remain deferred. The provider validates an ELF64
+  `ET_EXEC` or PIE
   compatibility image with bounded program headers and a nonzero entry inside a
   file-backed executable `PT_LOAD`, then atomically installs it without
   Clang/LLD invocation. Parsing, placement/binding planning, relocation preview,
-  and registered compatibility publication are closed; merged-image
-  materialization, write-once patching, platform structures, provider-owned ELF
-  shell serialization, other ELF architectures, and PE/COFF remain open
+  merged-image preview, and registered compatibility publication are closed;
+  actual patch application, platform structures, provider-owned ELF shell
+  serialization and load admission, other ELF architectures, and PE/COFF remain
+  open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

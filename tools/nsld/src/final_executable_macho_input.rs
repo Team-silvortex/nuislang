@@ -168,7 +168,7 @@ fn parse_load_commands(
         )?;
         let command = read_u32_le(bytes, cursor)?;
         let command_size = read_u32_le(bytes, cursor + 4)? as usize;
-        if command_size < 8 || command_size % 4 != 0 {
+        if command_size < 8 || !command_size.is_multiple_of(4) {
             return Err(format!(
                 "Mach-O object load command {index} has invalid size {command_size}"
             ));

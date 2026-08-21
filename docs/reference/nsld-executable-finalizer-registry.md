@@ -216,12 +216,20 @@ unsupported shapes, and overflow fail before mutation; unresolved compatibility
 targets remain explicit platform-structure work. Reversing object input
 preserves the relocation plan hash.
 
-The next native milestone is
-`nuis-nsld-elf-amd64-materialization-preview-v1`: copy verified file-backed
-section payloads into deterministic merged buffers, bind source-byte evidence
-to the placement and relocation plan hashes, and produce non-overlapping
-write-once patch spans without publishing bytes. Nuisc must remain free of ELF
-branches.
+`nuis-nsld-elf-amd64-materialization-preview-v1` now closes the read-only image
+construction milestone. It reparses hash- and size-bound `ET_REL` inputs,
+copies every verified file-backed placement into a deterministic merged memory
+image, proves zero-fill ranges separately, and binds source-object, file-image,
+memory-image, placement, and relocation hashes. Every direct relocation becomes
+one non-overlapping patch span with source-byte and encoded-byte hashes;
+unresolved compatibility targets stay deferred. Preview construction proves it
+did not mutate or publish the merged image, and reversed object input preserves
+the plan hash.
+
+The next native milestone is `nuis-nsld-elf-amd64-patch-application-v1`:
+rebuild and revalidate that source image, apply every direct span exactly once,
+and emit a pre/post-image and applied-span ledger without publication. Nuisc
+must remain free of ELF branches.
 
 ## Validation
 

@@ -65,6 +65,8 @@ mod final_executable_elf_artifact;
 mod final_executable_elf_input;
 mod final_executable_elf_layout;
 mod final_executable_elf_layout_report;
+mod final_executable_elf_materialization;
+mod final_executable_elf_materialization_report;
 mod final_executable_elf_object;
 mod final_executable_elf_relocation;
 mod final_executable_elf_relocation_report;
@@ -292,9 +294,7 @@ use assembly::*;
 use check::*;
 use cli::{parse_args, Command};
 use closure::*;
-use commands::{
-    run_check_command, run_check_next_action_command, run_plan_command, run_status_command,
-};
+use commands::*;
 use container_pipeline::*;
 use context::load_link_input_context;
 use display::*;

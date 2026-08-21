@@ -339,12 +339,16 @@ fn elf_section_names(
         .iter()
         .map(|section| section.object_section_name.clone())
         .collect::<Vec<_>>();
-    names.extend(sections.iter().filter_map(|section| {
-        relocation_seeds
+    names.extend(
+        sections
             .iter()
-            .any(|seed| seed.source_section_id == section.source_section_id)
-            .then(|| format!(".rela{}", section.object_section_name))
-    }));
+            .filter(|section| {
+                relocation_seeds
+                    .iter()
+                    .any(|seed| seed.source_section_id == section.source_section_id)
+            })
+            .map(|section| format!(".rela{}", section.object_section_name)),
+    );
     names.extend([
         ".symtab".to_owned(),
         ".strtab".to_owned(),

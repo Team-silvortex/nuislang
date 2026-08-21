@@ -109,21 +109,22 @@ pub(crate) fn nsld_device_provider_sample_evidence(
         "device_provider_samples",
         "materialization_status",
     );
-    let status = provider_sample_status(
-        &protocol,
-        &schema,
+    let status = provider_sample_status(ProviderSampleStatusInput {
+        protocol: &protocol,
+        schema: &schema,
         record_count,
         ready_record_count,
         pending_record_count,
         blocked_record_count,
-        provider_bundle_registry_contract.as_deref(),
-        provider_bundle_manifest_contract.as_deref(),
-        provider_bundle_manifest_hash.as_deref(),
+        provider_bundle_registry_contract: provider_bundle_registry_contract.as_deref(),
+        provider_bundle_manifest_contract: provider_bundle_manifest_contract.as_deref(),
+        provider_bundle_manifest_hash: provider_bundle_manifest_hash.as_deref(),
         provider_bundle_manifest_entry_count,
-        first_provider_bundle_package_id.as_deref(),
-        first_provider_bundle_id.as_deref(),
-        &selected_provider_bundle_set_validation_status,
-    );
+        first_provider_bundle_package_id: first_provider_bundle_package_id.as_deref(),
+        first_provider_bundle_id: first_provider_bundle_id.as_deref(),
+        selected_provider_bundle_set_validation_status:
+            &selected_provider_bundle_set_validation_status,
+    });
     let first_blocker = provider_sample_first_blocker(
         &status,
         pending_record_count,
@@ -156,40 +157,44 @@ pub(crate) fn nsld_device_provider_sample_evidence(
     }
 }
 
-fn provider_sample_status(
-    protocol: &str,
-    schema: &str,
+struct ProviderSampleStatusInput<'a> {
+    protocol: &'a str,
+    schema: &'a str,
     record_count: usize,
     ready_record_count: usize,
     pending_record_count: usize,
     blocked_record_count: usize,
-    provider_bundle_registry_contract: Option<&str>,
-    provider_bundle_manifest_contract: Option<&str>,
-    provider_bundle_manifest_hash: Option<&str>,
+    provider_bundle_registry_contract: Option<&'a str>,
+    provider_bundle_manifest_contract: Option<&'a str>,
+    provider_bundle_manifest_hash: Option<&'a str>,
     provider_bundle_manifest_entry_count: Option<usize>,
-    first_provider_bundle_package_id: Option<&str>,
-    first_provider_bundle_id: Option<&str>,
-    selected_provider_bundle_set_validation_status: &str,
-) -> String {
-    if protocol != DEVICE_PROVIDER_SAMPLE_PROTOCOL || schema != DEVICE_PROVIDER_SAMPLE_SCHEMA {
+    first_provider_bundle_package_id: Option<&'a str>,
+    first_provider_bundle_id: Option<&'a str>,
+    selected_provider_bundle_set_validation_status: &'a str,
+}
+
+fn provider_sample_status(input: ProviderSampleStatusInput<'_>) -> String {
+    if input.protocol != DEVICE_PROVIDER_SAMPLE_PROTOCOL
+        || input.schema != DEVICE_PROVIDER_SAMPLE_SCHEMA
+    {
         "unsupported-protocol"
-    } else if record_count == 0 {
+    } else if input.record_count == 0 {
         "empty"
     } else if !provider_bundle_evidence_is_valid(
-        provider_bundle_registry_contract,
-        provider_bundle_manifest_contract,
-        provider_bundle_manifest_hash,
-        provider_bundle_manifest_entry_count,
-        first_provider_bundle_package_id,
-        first_provider_bundle_id,
-    ) || selected_provider_bundle_set_validation_status != "verified"
+        input.provider_bundle_registry_contract,
+        input.provider_bundle_manifest_contract,
+        input.provider_bundle_manifest_hash,
+        input.provider_bundle_manifest_entry_count,
+        input.first_provider_bundle_package_id,
+        input.first_provider_bundle_id,
+    ) || input.selected_provider_bundle_set_validation_status != "verified"
     {
         "provider-bundle-evidence-invalid"
-    } else if blocked_record_count > 0 {
+    } else if input.blocked_record_count > 0 {
         "blocked-provider-sample"
-    } else if pending_record_count > 0 {
+    } else if input.pending_record_count > 0 {
         "awaiting-provider-materialization"
-    } else if ready_record_count == record_count {
+    } else if input.ready_record_count == input.record_count {
         "ready"
     } else {
         "partial"

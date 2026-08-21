@@ -329,7 +329,7 @@ fn encode_unsigned(
 ) -> Result<(Vec<u8>, i64), String> {
     let embedded = read_signed_le(source)? as i128;
     let subtractor = paired_metadata(application, applications, "arm64-subtractor")?
-        .map(|item| required_target(item))
+        .map(required_target)
         .transpose()?
         .unwrap_or(0);
     let effective = embedded - subtractor as i128;
@@ -451,7 +451,7 @@ fn encode_pageoff12(
         ));
     }
     let page_offset = (address as u128 & 0x0fff) as usize;
-    if page_offset % scale != 0 {
+    if !page_offset.is_multiple_of(scale) {
         return Err(format!(
             "Mach-O pageoff12 patch `{}` offset {page_offset} is not aligned to instruction scale {scale}",
             application.relocation_id
@@ -566,7 +566,7 @@ fn read_instruction(
     source: &[u8],
     application: &NsldMachOArm64RelocationApplication,
 ) -> Result<u32, String> {
-    if application.source_output_offset % 4 != 0 {
+    if !application.source_output_offset.is_multiple_of(4) {
         return Err(format!(
             "Mach-O instruction patch `{}` source offset {} is not 4-byte aligned",
             application.relocation_id, application.source_output_offset
