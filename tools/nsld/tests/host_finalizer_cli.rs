@@ -73,7 +73,7 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     assert!(invoke_plan.contains("\"relocation_count\":2"));
     assert!(invoke_plan.contains("\"internally_resolved_symbol_count\":1"));
     assert!(invoke_plan.contains("\"unresolved_external_symbols\":[\"_puts\"]"));
-    assert!(invoke_plan.contains("\"contract\":\"nuis-nsld-macho-placement-binding-v1\""));
+    assert!(invoke_plan.contains("\"contract\":\"nuis-nsld-macho-placement-binding-v2\""));
     assert!(
         invoke_plan.contains("\"status\":\"placement-ready-with-external-compatibility-boundary\"")
     );
@@ -184,7 +184,7 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
     );
     assert!(invoke_plan.contains("\"status\":\"external-compatibility\""));
     assert!(invoke_plan_text
-        .contains("finalizer_input_placement_contract: nuis-nsld-macho-placement-binding-v1"));
+        .contains("finalizer_input_placement_contract: nuis-nsld-macho-placement-binding-v2"));
     assert!(invoke_plan_text.contains(
         "finalizer_input_relocation_application_contract: nuis-nsld-macho-arm64-relocation-application-v1"
     ));
@@ -239,7 +239,7 @@ fn cli_materializes_and_runs_registered_internal_macho_artifact_image() {
         "finalizer_input_symbol_binding: symbol=_nuis_runtime reference=host.program-llvm:1 status=internal"
     ));
     assert!(persisted_invoke_plan
-        .contains("finalizer_input_placement_contract = \"nuis-nsld-macho-placement-binding-v1\""));
+        .contains("finalizer_input_placement_contract = \"nuis-nsld-macho-placement-binding-v2\""));
     assert!(persisted_invoke_plan.contains("finalizer_input_merged_section_count = 1"));
     assert!(persisted_invoke_plan.contains("finalizer_input_section_placement_count = 2"));
     assert!(persisted_invoke_plan.contains("finalizer_input_symbol_binding_count = 2"));
@@ -368,6 +368,15 @@ fn cli_persists_and_replays_internal_private_image_admission_receipt() {
     let manifest = write_internal_native_cpu_fixture(&dir, &source_executable);
     let compatibility_before = fs::read(dir.join("demo.bin")).unwrap();
     let receipt_path = dir.join("nuis.nsld.macho-arm64-publication-admission.toml");
+    let invoke_plan = run_nsld("final-executable-host-invoke-plan", &manifest);
+
+    assert!(invoke_plan.contains("\"contract\":\"nuis-nsld-macho-placement-binding-v2\""));
+    assert!(invoke_plan.contains("\"common_allocation_count\":1"));
+    assert!(invoke_plan.contains("\"section_name\":\"__nuis_common\""));
+    assert!(invoke_plan.contains("\"symbol\":\"_nuis_state\""));
+    assert!(invoke_plan.contains("\"declaration_count\":1"));
+    assert!(invoke_plan.contains("\"size_bytes\":8,\"alignment\":8"));
+    assert!(invoke_plan.contains("\"relocation_count\":3"));
 
     let planned = run_nsld("final-executable-private-image-loader-probe", &manifest);
     assert!(planned.contains("\"probe_mode\":\"plan-only\""));
@@ -574,7 +583,7 @@ fn write_internal_native_cpu_fixture_returning(
         dir,
         source_executable,
         arm64_tail_branch_object("_nuis_entry", "_nuis_runtime"),
-        arm64_leaf_object_returning("_nuis_runtime", return_value),
+        arm64_common_leaf_object_returning("_nuis_runtime", "_nuis_state", return_value),
     )
 }
 
@@ -703,16 +712,20 @@ fn arm64_branch_object(
     bytes
 }
 
-fn arm64_leaf_object_returning(defined: &str, return_value: u16) -> Vec<u8> {
+fn arm64_common_leaf_object_returning(defined: &str, common: &str, return_value: u16) -> Vec<u8> {
     const SEGMENT_OFFSET: usize = 32;
     const SECTION_OFFSET: usize = 104;
     const SYMTAB_OFFSET: usize = 184;
     const PAYLOAD_OFFSET: usize = 208;
-    const SYMBOL_OFFSET: usize = 224;
-    const STRING_OFFSET: usize = 256;
+    const RELOCATION_OFFSET: usize = 228;
+    const SYMBOL_OFFSET: usize = 244;
+    const STRING_OFFSET: usize = 276;
     let mut strings = vec![0];
     let defined_index = strings.len() as u32;
     strings.extend_from_slice(defined.as_bytes());
+    strings.push(0);
+    let common_index = strings.len() as u32;
+    strings.extend_from_slice(common.as_bytes());
     strings.push(0);
     let mut bytes = vec![0u8; STRING_OFFSET + strings.len()];
     bytes[..4].copy_from_slice(&[0xcf, 0xfa, 0xed, 0xfe]);
@@ -725,23 +738,45 @@ fn arm64_leaf_object_returning(defined: &str, return_value: u16) -> Vec<u8> {
     write_u32(&mut bytes, SEGMENT_OFFSET + 64, 1);
     bytes[SECTION_OFFSET..SECTION_OFFSET + 6].copy_from_slice(b"__text");
     bytes[SECTION_OFFSET + 16..SECTION_OFFSET + 22].copy_from_slice(b"__TEXT");
-    write_u64(&mut bytes, SECTION_OFFSET + 40, 8);
+    write_u64(&mut bytes, SECTION_OFFSET + 40, 20);
     write_u32(&mut bytes, SECTION_OFFSET + 48, PAYLOAD_OFFSET as u32);
+    write_u32(&mut bytes, SECTION_OFFSET + 52, 2);
+    write_u32(&mut bytes, SECTION_OFFSET + 56, RELOCATION_OFFSET as u32);
+    write_u32(&mut bytes, SECTION_OFFSET + 60, 2);
+    write_u32(&mut bytes, PAYLOAD_OFFSET, 0x9000_0008);
+    write_u32(&mut bytes, PAYLOAD_OFFSET + 4, 0x9100_0108);
+    write_u32(&mut bytes, PAYLOAD_OFFSET + 8, 0xf900_011f);
     write_u32(
         &mut bytes,
-        PAYLOAD_OFFSET,
+        PAYLOAD_OFFSET + 12,
         0x5280_0000 | (u32::from(return_value) << 5),
     );
-    write_u32(&mut bytes, PAYLOAD_OFFSET + 4, 0xd65f_03c0);
+    write_u32(&mut bytes, PAYLOAD_OFFSET + 16, 0xd65f_03c0);
     write_u32(&mut bytes, SYMTAB_OFFSET, 0x2);
     write_u32(&mut bytes, SYMTAB_OFFSET + 4, 24);
     write_u32(&mut bytes, SYMTAB_OFFSET + 8, SYMBOL_OFFSET as u32);
-    write_u32(&mut bytes, SYMTAB_OFFSET + 12, 1);
+    write_u32(&mut bytes, SYMTAB_OFFSET + 12, 2);
     write_u32(&mut bytes, SYMTAB_OFFSET + 16, STRING_OFFSET as u32);
     write_u32(&mut bytes, SYMTAB_OFFSET + 20, strings.len() as u32);
     write_u32(&mut bytes, SYMBOL_OFFSET, defined_index);
     bytes[SYMBOL_OFFSET + 4] = 0x0f;
     bytes[SYMBOL_OFFSET + 5] = 1;
+    write_u32(&mut bytes, RELOCATION_OFFSET, 0);
+    write_u32(
+        &mut bytes,
+        RELOCATION_OFFSET + 4,
+        1 | (1 << 24) | (2 << 25) | (1 << 27) | (3 << 28),
+    );
+    write_u32(&mut bytes, RELOCATION_OFFSET + 8, 4);
+    write_u32(
+        &mut bytes,
+        RELOCATION_OFFSET + 12,
+        1 | (2 << 25) | (1 << 27) | (4 << 28),
+    );
+    write_u32(&mut bytes, SYMBOL_OFFSET + 16, common_index);
+    bytes[SYMBOL_OFFSET + 20] = 0x01;
+    bytes[SYMBOL_OFFSET + 22..SYMBOL_OFFSET + 24].copy_from_slice(&(3u16 << 8).to_le_bytes());
+    write_u64(&mut bytes, SYMBOL_OFFSET + 24, 8);
     bytes[STRING_OFFSET..].copy_from_slice(&strings);
     bytes
 }

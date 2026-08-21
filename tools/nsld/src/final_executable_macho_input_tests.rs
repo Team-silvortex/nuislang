@@ -83,6 +83,28 @@ fn accepts_arm64_addend_payload_in_symbol_number_bits() {
 }
 
 #[test]
+fn parses_common_symbol_size_and_alignment_as_a_tentative_definition() {
+    let mut bytes = sample_object();
+    let common_offset = 224 + NLIST_64_SIZE;
+    bytes[common_offset + 6..common_offset + 8].copy_from_slice(&(3u16 << 8).to_le_bytes());
+    write_u64(&mut bytes, common_offset + 8, 16);
+
+    let parsed = parse_macho_arm64_object_linkage(&bytes).unwrap();
+    let common = &parsed.symbols[1];
+
+    assert_eq!(common.name, "_missing");
+    assert_eq!(common.kind, "common");
+    assert!(common.defined);
+    assert_eq!(common.section_ordinal, None);
+    assert_eq!(common.value, 16);
+    assert_eq!(common.common_alignment, Some(8));
+    assert_eq!(parsed.defined_symbol_count, 2);
+    assert_eq!(parsed.undefined_symbol_count, 0);
+    assert!(parsed.external_definitions.contains("_missing"));
+    assert!(parsed.external_undefined.is_empty());
+}
+
+#[test]
 fn rejects_non_terminated_symbol_name() {
     let mut bytes = sample_object();
     *bytes.last_mut().unwrap() = b'x';

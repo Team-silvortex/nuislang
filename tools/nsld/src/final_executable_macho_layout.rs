@@ -3,14 +3,17 @@ use crate::{
         ParsedMachOObjectLinkage, ParsedMachOSection, ParsedMachOSymbol,
     },
     reports::{
-        NsldMachOMergedSectionPlan, NsldMachOPlacementBindingReport, NsldMachOSectionPlacement,
-        NsldMachOSymbolBinding,
+        NsldMachOCommonAllocation, NsldMachOMergedSectionPlan, NsldMachOPlacementBindingReport,
+        NsldMachOSectionPlacement, NsldMachOSymbolBinding,
     },
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 
-pub(crate) const MACHO_PLACEMENT_BINDING_CONTRACT: &str = "nuis-nsld-macho-placement-binding-v1";
+pub(crate) const MACHO_PLACEMENT_BINDING_CONTRACT: &str = "nuis-nsld-macho-placement-binding-v2";
+const COMMON_SEGMENT_NAME: &str = "__DATA";
+const COMMON_SECTION_NAME: &str = "__nuis_common";
+const COMMON_SECTION_FLAGS: u32 = 0x01;
 
 pub(crate) struct MachOLayoutObject<'a> {
     pub(crate) object_id: &'a str,
@@ -26,18 +29,31 @@ struct SectionContribution<'a> {
     section: &'a ParsedMachOSection,
 }
 
-#[derive(Clone, Copy)]
-struct SymbolDefinition<'a> {
-    object_id: &'a str,
-    symbol: &'a ParsedMachOSymbol,
+#[derive(Clone)]
+struct SymbolDefinition {
+    object_id: String,
+    object_role: String,
+    symbol: ParsedMachOSymbol,
+}
+
+struct DefinitionCatalog {
+    strong: BTreeMap<String, SymbolDefinition>,
+    common: BTreeMap<String, Vec<SymbolDefinition>>,
 }
 
 pub(crate) fn build_macho_placement_binding_report(
     objects: &[MachOLayoutObject<'_>],
 ) -> Result<NsldMachOPlacementBindingReport, String> {
     let objects = sorted_objects(objects)?;
-    let (merged_sections, section_placements) = build_section_layout(&objects)?;
-    let symbol_bindings = build_symbol_bindings(&objects, &section_placements)?;
+    let definitions = collect_definition_catalog(&objects)?;
+    let (mut merged_sections, section_placements) = build_section_layout(&objects)?;
+    let common_allocations = append_common_allocations(&definitions, &mut merged_sections)?;
+    let symbol_bindings = build_symbol_bindings(
+        &objects,
+        &definitions,
+        &section_placements,
+        &common_allocations,
+    )?;
     let internally_bound_symbol_count = symbol_bindings
         .iter()
         .filter(|binding| binding.status == "internal")
@@ -46,10 +62,7 @@ pub(crate) fn build_macho_placement_binding_report(
         .iter()
         .filter(|binding| binding.status == "external-compatibility")
         .count();
-    let image_span_bytes = merged_sections
-        .last()
-        .map(|section| section.output_offset + section.size_bytes)
-        .unwrap_or(0);
+    let image_span_bytes = merged_image_span(&merged_sections)?;
     let status = if external_compatibility_symbol_count == 0 {
         "placement-and-internal-binding-ready"
     } else {
@@ -60,6 +73,7 @@ pub(crate) fn build_macho_placement_binding_report(
         image_span_bytes,
         &merged_sections,
         &section_placements,
+        &common_allocations,
         &symbol_bindings,
     );
 
@@ -70,9 +84,173 @@ pub(crate) fn build_macho_placement_binding_report(
         image_span_bytes,
         merged_sections,
         section_placements,
+        common_allocations,
         symbol_bindings,
         internally_bound_symbol_count,
         external_compatibility_symbol_count,
+    })
+}
+
+fn collect_definition_catalog(
+    objects: &[&MachOLayoutObject<'_>],
+) -> Result<DefinitionCatalog, String> {
+    let mut strong = BTreeMap::new();
+    let mut common = BTreeMap::<String, Vec<SymbolDefinition>>::new();
+    for object in objects {
+        for symbol in &object.linkage.symbols {
+            if symbol.kind == "common" {
+                if !symbol.defined || !symbol.external || symbol.name.is_empty() {
+                    return Err(format!(
+                        "Mach-O common symbol {} in object `{}` must be a named external definition",
+                        symbol.index, object.object_id
+                    ));
+                }
+                common
+                    .entry(symbol.name.clone())
+                    .or_default()
+                    .push(SymbolDefinition {
+                        object_id: object.object_id.to_owned(),
+                        object_role: object.role.to_owned(),
+                        symbol: symbol.clone(),
+                    });
+                continue;
+            }
+            if !symbol.external || !symbol.defined || symbol.name.is_empty() {
+                continue;
+            }
+            let definition = SymbolDefinition {
+                object_id: object.object_id.to_owned(),
+                object_role: object.role.to_owned(),
+                symbol: symbol.clone(),
+            };
+            if let Some(previous) = strong.insert(symbol.name.clone(), definition) {
+                return Err(format!(
+                    "duplicate external Mach-O definition `{}` in object `{}` symbol {} and object `{}` symbol {}",
+                    symbol.name,
+                    previous.object_id,
+                    previous.symbol.index,
+                    object.object_id,
+                    symbol.index
+                ));
+            }
+        }
+    }
+    for declarations in common.values_mut() {
+        declarations.sort_by(|lhs, rhs| {
+            object_role_rank(&lhs.object_role)
+                .cmp(&object_role_rank(&rhs.object_role))
+                .then(lhs.object_role.cmp(&rhs.object_role))
+                .then(lhs.object_id.cmp(&rhs.object_id))
+                .then(lhs.symbol.index.cmp(&rhs.symbol.index))
+        });
+    }
+    Ok(DefinitionCatalog { strong, common })
+}
+
+fn append_common_allocations(
+    definitions: &DefinitionCatalog,
+    merged_sections: &mut Vec<NsldMachOMergedSectionPlan>,
+) -> Result<Vec<NsldMachOCommonAllocation>, String> {
+    let declarations = definitions
+        .common
+        .iter()
+        .filter(|(name, _)| !definitions.strong.contains_key(*name))
+        .collect::<Vec<_>>();
+    if declarations.is_empty() {
+        return Ok(Vec::new());
+    }
+    if merged_sections.iter().any(|section| {
+        section.segment_name == COMMON_SEGMENT_NAME && section.section_name == COMMON_SECTION_NAME
+    }) {
+        return Err(format!(
+            "Mach-O input reserves provider-owned section `{COMMON_SEGMENT_NAME},{COMMON_SECTION_NAME}`"
+        ));
+    }
+    let section_alignment = declarations
+        .iter()
+        .try_fold(1usize, |maximum, (_, items)| {
+            items.iter().try_fold(maximum, |maximum, item| {
+                let alignment = checked_usize(
+                    item.symbol.common_alignment.ok_or_else(|| {
+                        format!(
+                            "Mach-O common symbol `{}` has no alignment",
+                            item.symbol.name
+                        )
+                    })?,
+                    "common alignment",
+                )?;
+                if alignment == 0 || !alignment.is_power_of_two() {
+                    return Err(format!(
+                        "Mach-O common symbol `{}` has invalid alignment {alignment}",
+                        item.symbol.name
+                    ));
+                }
+                Ok(maximum.max(alignment))
+            })
+        })?;
+    let section_offset = align_up(merged_image_span(merged_sections)?, section_alignment)?;
+    let section_id = format!("macho-section-{:04}", merged_sections.len());
+    let mut section_cursor = 0usize;
+    let mut allocations = Vec::with_capacity(declarations.len());
+    for (name, items) in declarations {
+        let alignment = items.iter().try_fold(1usize, |maximum, item| {
+            let value = checked_usize(
+                item.symbol
+                    .common_alignment
+                    .expect("common alignment was validated"),
+                "common alignment",
+            )?;
+            Ok::<usize, String>(maximum.max(value))
+        })?;
+        let size_bytes = items.iter().try_fold(0usize, |maximum, item| {
+            Ok::<usize, String>(maximum.max(checked_usize(item.symbol.value, "common size")?))
+        })?;
+        if size_bytes == 0 {
+            return Err(format!("Mach-O common symbol `{name}` has zero size"));
+        }
+        section_cursor = align_up(section_cursor, alignment)?;
+        let output_offset = section_offset
+            .checked_add(section_cursor)
+            .ok_or_else(|| "Mach-O common symbol output offset overflows".to_owned())?;
+        let owner = &items[0];
+        allocations.push(NsldMachOCommonAllocation {
+            allocation_id: format!("macho-common-{:04}", allocations.len()),
+            symbol: name.clone(),
+            owner_object_id: owner.object_id.clone(),
+            owner_object_role: owner.object_role.clone(),
+            owner_symbol_index: owner.symbol.index,
+            declaration_count: items.len(),
+            size_bytes,
+            alignment,
+            output_section_id: section_id.clone(),
+            output_offset,
+            output_section_offset: section_cursor,
+        });
+        section_cursor = section_cursor
+            .checked_add(size_bytes)
+            .ok_or_else(|| "Mach-O common section size overflows".to_owned())?;
+    }
+    merged_sections.push(NsldMachOMergedSectionPlan {
+        section_id,
+        segment_name: COMMON_SEGMENT_NAME.to_owned(),
+        section_name: COMMON_SECTION_NAME.to_owned(),
+        flags: COMMON_SECTION_FLAGS,
+        alignment: section_alignment,
+        output_offset: section_offset,
+        size_bytes: section_cursor,
+        contribution_count: allocations.len(),
+        zero_fill: true,
+    });
+    Ok(allocations)
+}
+
+fn merged_image_span(sections: &[NsldMachOMergedSectionPlan]) -> Result<usize, String> {
+    sections.iter().try_fold(0usize, |maximum, section| {
+        let end = section
+            .output_offset
+            .checked_add(section.size_bytes)
+            .ok_or_else(|| "Mach-O merged image span overflows".to_owned())?;
+        Ok(maximum.max(end))
     })
 }
 
@@ -193,44 +371,24 @@ fn build_section_layout(
 
 fn build_symbol_bindings(
     objects: &[&MachOLayoutObject<'_>],
+    definitions: &DefinitionCatalog,
     placements: &[NsldMachOSectionPlacement],
+    common_allocations: &[NsldMachOCommonAllocation],
 ) -> Result<Vec<NsldMachOSymbolBinding>, String> {
-    let mut definitions = BTreeMap::<String, SymbolDefinition<'_>>::new();
-    for object in objects {
-        for symbol in object
-            .linkage
-            .symbols
-            .iter()
-            .filter(|symbol| symbol.external && symbol.defined && !symbol.name.is_empty())
-        {
-            if let Some(previous) = definitions.insert(
-                symbol.name.clone(),
-                SymbolDefinition {
-                    object_id: object.object_id,
-                    symbol,
-                },
-            ) {
-                return Err(format!(
-                    "duplicate external Mach-O definition `{}` in object `{}` symbol {} and object `{}` symbol {}",
-                    symbol.name,
-                    previous.object_id,
-                    previous.symbol.index,
-                    object.object_id,
-                    symbol.index
-                ));
-            }
-        }
-    }
-
     let mut bindings = Vec::new();
     for object in objects {
-        for symbol in object
-            .linkage
-            .symbols
-            .iter()
-            .filter(|symbol| symbol.external && !symbol.defined && !symbol.name.is_empty())
-        {
-            let Some(target) = definitions.get(&symbol.name) else {
+        for symbol in object.linkage.symbols.iter().filter(|symbol| {
+            symbol.external
+                && (!symbol.defined || symbol.kind == "common")
+                && !symbol.name.is_empty()
+        }) {
+            let target = definitions.strong.get(&symbol.name).or_else(|| {
+                definitions
+                    .common
+                    .get(&symbol.name)
+                    .and_then(|items| items.first())
+            });
+            let Some(target) = target else {
                 bindings.push(NsldMachOSymbolBinding {
                     symbol: symbol.name.clone(),
                     reference_object_id: object.object_id.to_owned(),
@@ -245,13 +403,13 @@ fn build_symbol_bindings(
                 continue;
             };
             let (target_section_id, target_output_offset) =
-                section_symbol_target(target.object_id, target.symbol, objects, placements)?;
+                definition_target(target, objects, placements, common_allocations)?;
             bindings.push(NsldMachOSymbolBinding {
                 symbol: symbol.name.clone(),
                 reference_object_id: object.object_id.to_owned(),
                 reference_symbol_index: symbol.index,
                 status: "internal".to_owned(),
-                target_object_id: Some(target.object_id.to_owned()),
+                target_object_id: Some(target.object_id.clone()),
                 target_symbol_index: Some(target.symbol.index),
                 target_kind: Some(target.symbol.kind.clone()),
                 target_section_id,
@@ -260,6 +418,30 @@ fn build_symbol_bindings(
         }
     }
     Ok(bindings)
+}
+
+fn definition_target(
+    target: &SymbolDefinition,
+    objects: &[&MachOLayoutObject<'_>],
+    placements: &[NsldMachOSectionPlacement],
+    common_allocations: &[NsldMachOCommonAllocation],
+) -> Result<(Option<String>, Option<usize>), String> {
+    if target.symbol.kind == "common" {
+        let allocation = common_allocations
+            .iter()
+            .find(|allocation| allocation.symbol == target.symbol.name)
+            .ok_or_else(|| {
+                format!(
+                    "Mach-O common definition `{}` has no provider allocation",
+                    target.symbol.name
+                )
+            })?;
+        return Ok((
+            Some(allocation.output_section_id.clone()),
+            Some(allocation.output_offset),
+        ));
+    }
+    section_symbol_target(&target.object_id, &target.symbol, objects, placements)
 }
 
 fn section_symbol_target(
@@ -328,6 +510,7 @@ fn canonical_plan(
     image_span_bytes: usize,
     merged: &[NsldMachOMergedSectionPlan],
     placements: &[NsldMachOSectionPlacement],
+    common_allocations: &[NsldMachOCommonAllocation],
     bindings: &[NsldMachOSymbolBinding],
 ) -> String {
     let mut out = String::new();
@@ -367,6 +550,25 @@ fn canonical_plan(
             placement.size_bytes,
             placement.alignment,
             placement.zero_fill
+        )
+        .unwrap();
+    }
+    for allocation in common_allocations {
+        out.push_str("common-allocation\n");
+        append_text(&mut out, &allocation.allocation_id);
+        append_text(&mut out, &allocation.symbol);
+        append_text(&mut out, &allocation.owner_object_id);
+        append_text(&mut out, &allocation.owner_object_role);
+        append_text(&mut out, &allocation.output_section_id);
+        writeln!(
+            out,
+            "facts={}|{}|{}|{}|{}|{}",
+            allocation.owner_symbol_index,
+            allocation.declaration_count,
+            allocation.size_bytes,
+            allocation.alignment,
+            allocation.output_offset,
+            allocation.output_section_offset
         )
         .unwrap();
     }

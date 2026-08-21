@@ -541,6 +541,27 @@ Galaxy at `usable/98`, deterministic tensor selection returns to
 `host-compatibility/cffi/registered-pointer-string-object-boundary` at
 `usable/97`.
 
+The Mach-O common-allocation tranche keeps Nsld at `usable/99` while replacing
+the old referenced-common rejection with a complete executable path.
+`nuis-nsld-macho-placement-binding-v2` treats nonzero `N_UNDF` records as
+tentative definitions, coalesces declarations by symbol name using maximum size
+and alignment, honors strong section-definition precedence, and allocates the
+remaining records in one reserved provider-owned `__DATA,__nuis_common`
+zero-fill section. Canonical allocation records bind owner, declaration count,
+shape, section-relative offset, and working-image address through JSON, text,
+persisted invoke plans, relocation resolution, materialization, and shell symbol
+serialization. Duplicate strong definitions and provider-section claims fail
+closed; absolute and indirect non-section forms remain explicit gaps.
+
+The real internally closed compiled-artifact fixture now executes ARM64
+`ADRP`/`ADD`/`STR` against that VM-only common region. The resulting shell passes
+ad-hoc signature validation, macOS loader admission, receipt replay, registered
+publication, and direct execution with exit code 0. The compatibility executable
+remains byte-for-byte unchanged unless publication is explicitly applied. The
+next selected Nsld task is an explicit provider-neutral policy for choosing an
+already admitted private image from the ordinary final-output workflow without
+changing that compatibility-first default.
+
 ## Honesty Boundary
 
 `beta-0.1.0` should not claim:

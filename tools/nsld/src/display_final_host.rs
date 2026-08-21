@@ -322,6 +322,22 @@ fn print_finalizer_input_summary(summary: Option<&NsldExecutableFinalizerInputSu
             section.zero_fill
         );
     }
+    for allocation in &placement.common_allocations {
+        println!(
+            "  finalizer_input_common_allocation: id={} symbol={} owner={}:{}:{} declarations={} bytes={} align={} section={} offset={} section_offset={}",
+            allocation.allocation_id,
+            allocation.symbol,
+            allocation.owner_object_id,
+            allocation.owner_object_role,
+            allocation.owner_symbol_index,
+            allocation.declaration_count,
+            allocation.size_bytes,
+            allocation.alignment,
+            allocation.output_section_id,
+            allocation.output_offset,
+            allocation.output_section_offset
+        );
+    }
     for binding in &placement.symbol_bindings {
         println!(
             "  finalizer_input_symbol_binding: symbol={} reference={}:{} status={} target_object={} target_symbol={} target_kind={} target_section={} target_offset={}",

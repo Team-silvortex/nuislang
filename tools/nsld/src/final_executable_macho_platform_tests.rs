@@ -194,6 +194,7 @@ fn placement(image_span_bytes: usize) -> NsldMachOPlacementBindingReport {
         image_span_bytes,
         merged_sections: Vec::new(),
         section_placements: Vec::new(),
+        common_allocations: Vec::new(),
         symbol_bindings: Vec::new(),
         internally_bound_symbol_count: 0,
         external_compatibility_symbol_count: 0,

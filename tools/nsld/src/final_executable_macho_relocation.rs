@@ -418,6 +418,29 @@ fn resolve_target(
                 object.object_id, relocation.symbol_number
             )
         })?;
+    if symbol.kind == "common" {
+        let binding = placement
+            .symbol_bindings
+            .iter()
+            .find(|item| {
+                item.reference_object_id == object.object_id
+                    && item.reference_symbol_index == symbol.index
+            })
+            .ok_or_else(|| {
+                format!(
+                    "Mach-O object `{}` common relocation symbol `{}` has no allocation binding",
+                    object.object_id, symbol.name
+                )
+            })?;
+        return Ok(TargetResolution {
+            symbol: Some(symbol.name.clone()),
+            symbol_index: Some(symbol.index),
+            object_id: binding.target_object_id.clone(),
+            section_id: binding.target_section_id.clone(),
+            output_offset: binding.target_output_offset,
+            status: binding.status.clone(),
+        });
+    }
     if symbol.defined {
         let (section_id, output_offset) = resolve_defined_symbol(object, symbol, placement)?;
         return Ok(TargetResolution {

@@ -513,6 +513,12 @@ fn render_finalizer_input_summary(
     .unwrap();
     writeln!(
         out,
+        "finalizer_input_common_allocation_count = {}",
+        placement.common_allocations.len()
+    )
+    .unwrap();
+    writeln!(
+        out,
         "finalizer_input_symbol_binding_count = {}",
         placement.symbol_bindings.len()
     )
@@ -577,6 +583,32 @@ fn render_finalizer_input_summary(
         out,
         "finalizer_input_section_placements = [{}]",
         toml::toml_string_array_literal(&section_placements)
+    )
+    .unwrap();
+    let common_allocations = placement
+        .common_allocations
+        .iter()
+        .map(|allocation| {
+            format!(
+                "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+                allocation.allocation_id,
+                allocation.symbol,
+                allocation.owner_object_id,
+                allocation.owner_object_role,
+                allocation.owner_symbol_index,
+                allocation.declaration_count,
+                allocation.size_bytes,
+                allocation.alignment,
+                allocation.output_section_id,
+                allocation.output_offset,
+                allocation.output_section_offset
+            )
+        })
+        .collect::<Vec<_>>();
+    writeln!(
+        out,
+        "finalizer_input_common_allocations = [{}]",
+        toml::toml_string_array_literal(&common_allocations)
     )
     .unwrap();
     let symbol_bindings = placement

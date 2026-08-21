@@ -143,12 +143,20 @@ private Mach-O executes through macOS and exits 0. Invalid admission does not
 touch the compatibility output, so the private image is never silently
 substituted.
 
+`nuis-nsld-macho-placement-binding-v2` now also owns tentative common storage.
+It coalesces declarations by symbol name using maximum size and alignment,
+honors strong-definition precedence, and emits canonical allocation records for
+one reserved `__DATA,__nuis_common` zero-fill section. Direct relocations and the
+shell symbol table consume those records. The real published fixture executes
+`ADRP`/`ADD`/`STR` against the VM-only allocation before exiting zero, while the
+ordinary compatibility output remains unchanged by default.
+
 It does not yet own:
 
 * complete Mach-O, ELF, and PE/COFF compatibility object parity
 * general native relocation application across those target formats
-* deterministic Mach-O common/non-section symbol allocation
 * default private-image selection in the ordinary final emit pipeline
+* absolute/indirect Mach-O non-section definition lowering
 * a durable embedded Nsdb/YIR debug metadata section
 
 ## Gap 1: Compatibility Object Writer

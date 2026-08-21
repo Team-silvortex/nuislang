@@ -58,6 +58,47 @@ fn relocation_application_is_deterministic_and_resolves_placed_targets() {
 }
 
 #[test]
+fn direct_common_relocations_bind_to_the_allocated_zero_fill_address() {
+    let object = linkage(
+        8,
+        vec![
+            defined_symbol(0, "_entry", 0),
+            common_symbol(1, "_state", 16, 8),
+        ],
+        vec![
+            relocation(0, 1, 4, true, true, ARM64_RELOC_PAGE21),
+            relocation(4, 1, 4, false, true, ARM64_RELOC_PAGEOFF12),
+        ],
+    );
+    let bytes = [0x9000_0000u32.to_le_bytes(), 0x9100_0000u32.to_le_bytes()].concat();
+    let objects = [layout_object("host.program", "program-llvm", &object)];
+    let placement = build_macho_placement_binding_report(&objects).unwrap();
+
+    let report = build_macho_arm64_relocation_application_report(&objects, &placement).unwrap();
+
+    assert_eq!(placement.common_allocations[0].output_offset, 8);
+    assert_eq!(report.ready_application_count, 2);
+    assert!(report
+        .applications
+        .iter()
+        .all(|application| application.target_output_offset == Some(8)));
+    assert!(report
+        .applications
+        .iter()
+        .all(|application| application.resolver_status == "internal"));
+    let images = [MachOImageObject {
+        object_id: "host.program",
+        role: "program-llvm",
+        bytes: &bytes,
+        linkage: &object,
+    }];
+    let preview = build_macho_arm64_materialization_preview(&images, &placement, &report).unwrap();
+    assert_eq!(preview.zero_fill_bytes, 16);
+    assert_eq!(preview.patches.len(), 2);
+    assert_eq!(preview.patches[1].encoded_bytes_hex, "00200091");
+}
+
+#[test]
 fn paired_addend_subtractor_and_got_records_remain_explicit() {
     let object = linkage(
         32,
@@ -291,6 +332,20 @@ fn undefined_symbol(index: usize, name: &str) -> ParsedMachOSymbol {
         section_ordinal: None,
         value: 0,
         common_alignment: None,
+        indirect_target: None,
+    }
+}
+
+fn common_symbol(index: usize, name: &str, size: u64, alignment: u64) -> ParsedMachOSymbol {
+    ParsedMachOSymbol {
+        index,
+        name: name.to_owned(),
+        kind: "common".to_owned(),
+        external: true,
+        defined: true,
+        section_ordinal: None,
+        value: size,
+        common_alignment: Some(alignment),
         indirect_target: None,
     }
 }

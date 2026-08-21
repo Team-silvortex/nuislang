@@ -88,6 +88,7 @@ mod final_executable_macho_platform_application;
 mod final_executable_macho_publication;
 mod final_executable_macho_relocation;
 mod final_executable_macho_shell;
+mod final_executable_macho_shell_definitions;
 mod final_executable_macho_shell_image;
 mod final_executable_macho_shell_image_commands;
 mod final_executable_macho_shell_image_linkedit;

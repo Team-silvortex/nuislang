@@ -2,6 +2,33 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(crate) const DEV_TENSOR_RUNTIME_NSLD_SHELL_IMAGE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "nsld-macho-common-allocation-contract",
+        path: "tools/nsld/src/final_executable_macho_layout.rs",
+        required_patterns: &[
+            "nuis-nsld-macho-placement-binding-v2",
+            "__nuis_common",
+            "append_common_allocations",
+            "common_alignment",
+            "declaration_count",
+            "reserves provider-owned section",
+            "COMMON_SECTION_FLAGS",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-macho-common-publication-execution-evidence",
+        path: "tools/nsld/tests/host_finalizer_cli.rs",
+        required_patterns: &[
+            "arm64_common_leaf_object_returning",
+            "common_allocation_count",
+            "__nuis_common",
+            "_nuis_state",
+            "final-executable-private-image-loader-probe",
+            "publication-admission-replay-verified",
+            "final-executable-private-image-publication",
+            "private_execution.status.success()",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nsld-macho-arm64-shell-image-serialization-contract",
         path: "tools/nsld/src/final_executable_macho_shell_image.rs",
         required_patterns: &[

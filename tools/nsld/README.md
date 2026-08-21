@@ -110,11 +110,14 @@ artifact; Nsld verifies their roles, hashes, and Mach-O object structure before
 parsing their sections, symbol/string tables, and ARM64 relocation records.
 The provider projects `nuis-nsld-macho-host-object-linkage-v1`, including
 internal cross-object resolutions and explicit unresolved C/system symbols,
-then derives `nuis-nsld-macho-placement-binding-v1`. The latter
+then derives `nuis-nsld-macho-placement-binding-v2`. The latter
 deterministically merges compatible sections, applies checked alignment,
 assigns contribution offsets, binds section-backed cross-object symbols, and
-rejects duplicate definitions, incompatible flags, and referenced definitions
-without a section placement. Unresolved C/system symbols remain an explicit
+coalesces tentative common definitions by maximum size/alignment into the
+reserved provider-owned `__DATA,__nuis_common` zero-fill region. Strong
+definitions override common declarations; duplicate strong definitions,
+incompatible flags, reserved-section claims, and unsupported absolute/indirect
+definitions fail closed. Unresolved C/system symbols remain an explicit
 compatibility boundary. The nested
 `nuis-nsld-macho-arm64-relocation-application-v1` plan then maps each checked
 relocation to its placed source and target offsets. Its static registry covers
@@ -229,10 +232,13 @@ platform relocation encoding, deterministic GOT/stub allocation, platform byte
 synthesis, unresolved-bind preservation, audited Mach-O shell planning, and
 signed private final-address byte serialization with an independent structural
 validator, one real isolated OS-loader execution, durable replay admission, and
-registered opt-in publication. It does not yet allocate common/non-section
-symbols or complete ELF or PE/COFF. The ordinary default compatibility
-executable remains byte-for-byte unchanged unless the dedicated publication
-command receives `--apply`.
+registered opt-in publication. The real internal fixture now executes
+`ADRP`/`ADD`/`STR` against provider-allocated common storage before passing
+signature, loader, receipt replay, publication, and direct execution. It does
+not yet select that admitted private image from the ordinary final-output
+workflow or complete absolute/indirect symbols, ELF, or PE/COFF. The ordinary
+default compatibility executable remains byte-for-byte unchanged unless the
+dedicated publication command receives `--apply`.
 
 ## Current Early-Beta Rule
 

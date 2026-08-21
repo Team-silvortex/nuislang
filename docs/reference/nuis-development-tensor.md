@@ -315,11 +315,14 @@ The `beta-0.1` calibration baseline is:
   `NHOB`-bound pair of actual
   `program-llvm` and `runtime-shim` Mach-O objects, validates their LinkPlan
   identity, hashes, roles, sections, symbol/string tables, and ARM64 relocation
-  references; `nuis-nsld-macho-placement-binding-v1` now deterministically
+  references; `nuis-nsld-macho-placement-binding-v2` now deterministically
   merges compatible sections, assigns aligned contribution offsets, binds
-  section-backed cross-object definitions, preserves unresolved C/system
-  symbols as a compatibility boundary, and rejects duplicate definitions,
-  incompatible flags, and referenced non-section definitions;
+  section-backed cross-object definitions, coalesces common declarations by
+  maximum size/alignment into a reserved provider-owned
+  `__DATA,__nuis_common` zero-fill section, lets strong definitions override
+  tentative ones, preserves unresolved C/system symbols as a compatibility
+  boundary, and rejects duplicate strong definitions, incompatible flags,
+  reserved-section claims, and unsupported absolute/indirect definitions;
   `nuis-nsld-macho-arm64-relocation-application-v1` now maps every verified
   relocation to deterministic source/target offsets, registers all eight kinds
   emitted by the real fixtures, preserves paired ADDEND/SUBTRACTOR metadata,
@@ -347,7 +350,7 @@ The `beta-0.1` calibration baseline is:
   bind ledger evidence through JSON, text, and persisted invoke plans;
   `nuis-nsld-macho-arm64-shell-layout-plan-v1` maps that hash-bound working image
   into deterministic 16 KiB-page `__PAGEZERO`, content, and `__LINKEDIT`
-  segments, merged plus provider-owned stub/GOT sections, a role-aware entry,
+  segments, merged plus provider-owned common/stub/GOT sections, a role-aware entry,
   symbol/indirect records, rebase/bind requirements, linkedit offsets, and
   ordered load commands, always includes the libSystem executable baseline,
   and derives a deterministic `LC_UUID` from the shell-plan identity;
@@ -376,9 +379,12 @@ The `beta-0.1` calibration baseline is:
   registry. Planning is non-mutating; invalid apply preserves compatibility
   bytes; valid explicit apply writes, syncs, rereads, atomically installs, and
   verifies the exact owner-executable image. The real installed private Mach-O
-  exits 0 through macOS with empty output. The base serialization report remains
-  `private-not-published` until this separate explicit command runs; common-
-  symbol allocation, ELF, and PE/COFF remain open
+  exits 0 through macOS with empty output. The common fixture executes
+  `ADRP`/`ADD`/`STR` against VM-only provider storage before that same admission
+  and publication chain. The base serialization report remains
+  `private-not-published` until this separate explicit command runs; ordinary-
+  pipeline private-image selection, absolute/indirect definitions, ELF, and
+  PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

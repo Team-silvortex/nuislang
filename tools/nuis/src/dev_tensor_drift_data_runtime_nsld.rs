@@ -5,7 +5,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_NSLD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
         id: "nsld-macho-placement-binding-contract",
         path: "tools/nsld/src/final_executable_macho_layout.rs",
         required_patterns: &[
-            "nuis-nsld-macho-placement-binding-v1",
+            "nuis-nsld-macho-placement-binding-v2",
             "build_macho_placement_binding_report",
             "placement-ready-with-external-compatibility-boundary",
             "duplicate external Mach-O definition",
@@ -18,7 +18,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_NSLD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec
         id: "nsld-macho-placement-binding-three-surface-evidence",
         path: "tools/nsld/tests/host_finalizer_cli.rs",
         required_patterns: &[
-            "nuis-nsld-macho-placement-binding-v1",
+            "nuis-nsld-macho-placement-binding-v2",
             "merged_section_count",
             "section_placement_count",
             "symbol_binding_count",

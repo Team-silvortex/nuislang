@@ -144,12 +144,17 @@ A future provider must:
 6. register any private-image publication capability with one unique stable ID
    and keep the callback absent when the provider cannot honor replay admission.
 
-The next native milestone is deterministic common/non-section symbol storage.
-The Mach-O provider must allocate zero-filled definitions, bind their final
-addresses into relocations and serialization ledgers, and carry a real fixture
-through signature, admission, registered publication, and execution. This must
-not add Mach-O branches to Nuisc, final-stage planning, or the generic emit
-frontdoor.
+The deterministic common-symbol milestone is now closed by
+`nuis-nsld-macho-placement-binding-v2`. The Mach-O provider coalesces tentative
+definitions, allocates a provider-owned zero-fill section, binds relocations and
+shell symbols to final addresses, and carries a real store-using fixture through
+signature, admission, registered publication, and execution without adding
+Mach-O branches to Nuisc or the generic emit frontdoor.
+
+The next native milestone is an explicit provider-neutral final-output selection
+policy. It may choose a replay-verified private image through the ordinary drive
+workflow only when requested, must bind receipt and output identities into the
+final-output report, and must preserve the compatibility image as the default.
 
 ## Validation
 

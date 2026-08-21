@@ -27,6 +27,21 @@ pub(crate) struct NsldMachOSectionPlacement {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NsldMachOCommonAllocation {
+    pub(crate) allocation_id: String,
+    pub(crate) symbol: String,
+    pub(crate) owner_object_id: String,
+    pub(crate) owner_object_role: String,
+    pub(crate) owner_symbol_index: usize,
+    pub(crate) declaration_count: usize,
+    pub(crate) size_bytes: usize,
+    pub(crate) alignment: usize,
+    pub(crate) output_section_id: String,
+    pub(crate) output_offset: usize,
+    pub(crate) output_section_offset: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NsldMachOSymbolBinding {
     pub(crate) symbol: String,
     pub(crate) reference_object_id: String,
@@ -47,6 +62,7 @@ pub(crate) struct NsldMachOPlacementBindingReport {
     pub(crate) image_span_bytes: usize,
     pub(crate) merged_sections: Vec<NsldMachOMergedSectionPlan>,
     pub(crate) section_placements: Vec<NsldMachOSectionPlacement>,
+    pub(crate) common_allocations: Vec<NsldMachOCommonAllocation>,
     pub(crate) symbol_bindings: Vec<NsldMachOSymbolBinding>,
     pub(crate) internally_bound_symbol_count: usize,
     pub(crate) external_compatibility_symbol_count: usize,

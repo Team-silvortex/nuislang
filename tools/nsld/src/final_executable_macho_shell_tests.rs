@@ -142,28 +142,31 @@ fn platform_image_drift_fails_before_shell_publication() {
 }
 
 #[test]
-fn non_section_external_definition_is_not_silently_allocated() {
-    let mut fixture = shell_fixture(Some("_nuis_entry"), false);
-    fixture.program.symbols.push(ParsedMachOSymbol {
-        index: 2,
-        name: "_common".to_owned(),
-        kind: "common".to_owned(),
-        external: true,
-        defined: true,
-        section_ordinal: None,
-        value: 8,
-        common_alignment: Some(8),
-        indirect_target: None,
-    });
-    fixture.program.symbol_count += 1;
-    fixture.program.defined_symbol_count += 1;
-    fixture
-        .program
-        .external_definitions
-        .insert("_common".to_owned());
-    let error = build_shell(&fixture).unwrap_err();
+fn common_definition_becomes_a_vm_only_shell_section_and_defined_symbol() {
+    let fixture = common_shell_fixture();
+    let report = build_shell(&fixture).unwrap();
 
-    assert!(error.contains("common/absolute allocation remains explicit"));
+    let section = report
+        .sections
+        .iter()
+        .find(|section| section.section_name == "__nuis_common")
+        .unwrap();
+    assert_eq!(section.segment_name, "__DATA");
+    assert_eq!(section.flags, 1);
+    assert_eq!(section.file_offset, None);
+    assert_eq!(section.file_size_bytes, 0);
+    assert_eq!(section.vm_size_bytes, 16);
+    let symbol = report
+        .symbols
+        .iter()
+        .find(|symbol| symbol.name == "_state")
+        .unwrap();
+    assert_eq!(
+        symbol.shell_section_id.as_deref(),
+        Some(section.section_id.as_str())
+    );
+    assert_eq!(symbol.vm_address, Some(section.vm_address));
+    assert_eq!(report.undefined_symbol_count, 0);
 }
 
 pub(crate) fn build_shell(
@@ -344,6 +347,74 @@ pub(crate) fn loader_probe_shell_fixture() -> ShellFixture {
     }
 }
 
+fn common_shell_fixture() -> ShellFixture {
+    let program = linkage_sized(
+        12,
+        vec![
+            defined_symbol(0, "_nuis_entry"),
+            common_symbol(1, "_state", 16, 8),
+        ],
+        vec![
+            ParsedMachORelocation {
+                section_ordinal: 1,
+                offset: 0,
+                symbol_number: 1,
+                width_bytes: 4,
+                pc_relative: true,
+                external: true,
+                relocation_type: 3,
+            },
+            ParsedMachORelocation {
+                section_ordinal: 1,
+                offset: 4,
+                symbol_number: 1,
+                width_bytes: 4,
+                pc_relative: false,
+                external: true,
+                relocation_type: 4,
+            },
+        ],
+    );
+    let runtime = linkage(vec![defined_symbol(0, "_runtime_anchor")], Vec::new());
+    let program_bytes = [
+        0x9000_0000u32.to_le_bytes(),
+        0x9100_0000u32.to_le_bytes(),
+        0xd65f_03c0u32.to_le_bytes(),
+    ]
+    .concat();
+    let runtime_bytes = 0xd65f_03c0u32.to_le_bytes();
+    let layouts = [
+        layout("host.program", "program-llvm", &program),
+        layout("host.runtime", "runtime-shim", &runtime),
+    ];
+    let placement = build_macho_placement_binding_report(&layouts).unwrap();
+    let relocations =
+        build_macho_arm64_relocation_application_report(&layouts, &placement).unwrap();
+    let images = [
+        image("host.program", "program-llvm", &program_bytes, &program),
+        image("host.runtime", "runtime-shim", &runtime_bytes, &runtime),
+    ];
+    let preview =
+        build_macho_arm64_materialization_preview(&images, &placement, &relocations).unwrap();
+    let applied =
+        apply_macho_arm64_patch_previews(&images, &placement, &relocations, &preview).unwrap();
+    let platform =
+        build_macho_arm64_platform_structure_plan(&placement, &relocations, &applied.report)
+            .unwrap();
+    let applied =
+        apply_macho_arm64_platform_structure(&placement, &relocations, &applied, &platform)
+            .unwrap();
+    ShellFixture {
+        program,
+        runtime,
+        placement,
+        relocations,
+        preview,
+        platform,
+        applied,
+    }
+}
+
 fn linkage(
     symbols: Vec<ParsedMachOSymbol>,
     relocations: Vec<ParsedMachORelocation>,
@@ -416,6 +487,20 @@ fn undefined_symbol(index: usize, name: &str) -> ParsedMachOSymbol {
         section_ordinal: None,
         value: 0,
         common_alignment: None,
+        indirect_target: None,
+    }
+}
+
+fn common_symbol(index: usize, name: &str, size: u64, alignment: u64) -> ParsedMachOSymbol {
+    ParsedMachOSymbol {
+        index,
+        name: name.to_owned(),
+        kind: "common".to_owned(),
+        external: true,
+        defined: true,
+        section_ordinal: None,
+        value: size,
+        common_alignment: Some(alignment),
         indirect_target: None,
     }
 }

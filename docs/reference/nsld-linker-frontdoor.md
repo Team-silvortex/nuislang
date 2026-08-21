@@ -34,6 +34,7 @@ For the automation frontdoor, see [nsld-driver-frontdoor.md](nsld-driver-frontdo
 * final-stage reporting
 * verified relocatable host object handoff identity and Mach-O object parsing
 * deterministic Mach-O section placement and section-backed symbol binding
+* coalesced Mach-O common symbols in provider-owned VM-only zero-fill storage
 * checked Mach-O arm64 relocation, working-image, stub/GOT, and shell-layout planning
 * deterministic private Mach-O arm64 shell-byte and linkedit serialization with
   final-address instruction, stub, GOT, and pointer rewriting
@@ -45,8 +46,8 @@ For the automation frontdoor, see [nsld-driver-frontdoor.md](nsld-driver-frontdo
 
 `Nsld` does not yet own:
 
-* common/non-section Mach-O allocation, durable loader-admission receipts, and
-  default private-image publication
+* explicit private-image selection in the ordinary final-output workflow
+* absolute/indirect Mach-O non-section definitions
 * final host-native executable wrapping for ELF or PE/COFF
 * binary section assembly independent from `nuisc`
 * stable linker script or relocation formats
@@ -1052,15 +1053,19 @@ bundle. It requires one LLVM program object and one runtime shim object,
 validates their LinkPlan identity, content hashes, arm64 `MH_OBJECT` headers,
 and load-command spans. `nuis-nsld-macho-host-object-linkage-v1` preserves the
 checked sections, symbols, and relocation records. The nested
-`nuis-nsld-macho-placement-binding-v1` then orders the program before the
+`nuis-nsld-macho-placement-binding-v2` then orders the program before the
 runtime shim, merges compatible segment/section pairs, applies checked
 alignment, assigns deterministic contribution offsets, and binds every
 section-backed cross-object definition. Duplicate definitions, incompatible
-section flags, missing placements, and referenced common/absolute/indirect
-definitions fail closed; unresolved C/system symbols remain explicitly marked
-`external-compatibility`. The canonical plan hash and full merged-section,
-placement, and binding records are identical across JSON, text, and persisted
-invoke-plan surfaces. The provider next derives
+  section flags, and missing placements fail closed. Tentative common
+  definitions coalesce by symbol name under maximum size/alignment, strong
+  section definitions override them, and all remaining commons receive audited
+  offsets in the reserved VM-only `__DATA,__nuis_common` section. Reserved-
+  section claims and unsupported absolute/indirect definitions fail closed;
+  unresolved C/system symbols remain explicitly marked `external-compatibility`.
+  The canonical plan hash and full merged-section, placement, common-allocation,
+  and binding records are identical across JSON, text, and persisted invoke-plan
+  surfaces. The provider next derives
 `nuis-nsld-macho-arm64-relocation-application-v1`, which maps every checked
 relocation to a placed source offset and local, internal, or compatibility
 target. Its static registry covers ARM64 `UNSIGNED`, `SUBTRACTOR`, `BRANCH26`,

@@ -613,6 +613,27 @@ fn macho_placement_binding_json(report: &NsldMachOPlacementBindingReport) -> Str
         })
         .collect::<Vec<_>>()
         .join(",");
+    let common_allocations = report
+        .common_allocations
+        .iter()
+        .map(|allocation| {
+            let fields = [
+                json_string_field("allocation_id", &allocation.allocation_id),
+                json_string_field("symbol", &allocation.symbol),
+                json_string_field("owner_object_id", &allocation.owner_object_id),
+                json_string_field("owner_object_role", &allocation.owner_object_role),
+                json_usize_field("owner_symbol_index", allocation.owner_symbol_index),
+                json_usize_field("declaration_count", allocation.declaration_count),
+                json_usize_field("size_bytes", allocation.size_bytes),
+                json_usize_field("alignment", allocation.alignment),
+                json_string_field("output_section_id", &allocation.output_section_id),
+                json_usize_field("output_offset", allocation.output_offset),
+                json_usize_field("output_section_offset", allocation.output_section_offset),
+            ];
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>()
+        .join(",");
     let bindings = report
         .symbol_bindings
         .iter()
@@ -642,6 +663,7 @@ fn macho_placement_binding_json(report: &NsldMachOPlacementBindingReport) -> Str
         json_usize_field("image_span_bytes", report.image_span_bytes),
         json_usize_field("merged_section_count", report.merged_sections.len()),
         json_usize_field("section_placement_count", report.section_placements.len()),
+        json_usize_field("common_allocation_count", report.common_allocations.len()),
         json_usize_field("symbol_binding_count", report.symbol_bindings.len()),
         json_usize_field(
             "internally_bound_symbol_count",
@@ -653,6 +675,7 @@ fn macho_placement_binding_json(report: &NsldMachOPlacementBindingReport) -> Str
         ),
         format!("\"merged_sections\":[{merged_sections}]"),
         format!("\"section_placements\":[{placements}]"),
+        format!("\"common_allocations\":[{common_allocations}]"),
         format!("\"symbol_bindings\":[{bindings}]"),
     ];
     format!("\"placement_binding\":{{{}}}", fields.join(","))

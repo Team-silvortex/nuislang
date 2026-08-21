@@ -1,5 +1,8 @@
 use crate::{
     final_executable_macho_layout::MachOLayoutObject,
+    final_executable_macho_shell_definitions::{
+        collect_shell_definitions, collect_unresolved_shell_symbols, MachOShellDefinition,
+    },
     final_executable_macho_shell_layout::{
         locate_source_address, ShellLayoutDraft, SYSTEM_DYLIB_PATH,
     },
@@ -42,12 +45,6 @@ const ENTRY_RULES: &[EntryRule] = &[
     },
 ];
 
-struct Definition<'a> {
-    object: &'a MachOLayoutObject<'a>,
-    symbol: &'a crate::final_executable_macho_input::ParsedMachOSymbol,
-    source_image_offset: usize,
-}
-
 pub(crate) struct ShellEntryPlan {
     pub(crate) rule_id: String,
     pub(crate) symbol: String,
@@ -84,8 +81,8 @@ pub(crate) fn build_shell_linkedit_plan(
     applied: &NsldMachOArm64PlatformPatchApplicationReport,
     layout: &ShellLayoutDraft,
 ) -> Result<ShellLinkeditPlan, String> {
-    let definitions = collect_definitions(objects, placement)?;
-    let undefined = collect_unresolved_symbols(objects, &definitions);
+    let definitions = collect_shell_definitions(objects, placement)?;
+    let undefined = collect_unresolved_shell_symbols(objects, &definitions);
     validate_external_library_boundary(&undefined, applied)?;
     let entry = select_entry(&definitions, layout)?;
     let (symbols, string_table_bytes) = build_symbols(&definitions, &undefined, layout)?;
@@ -157,110 +154,6 @@ pub(crate) fn build_shell_linkedit_plan(
     })
 }
 
-fn collect_definitions<'a>(
-    objects: &'a [MachOLayoutObject<'a>],
-    placement: &NsldMachOPlacementBindingReport,
-) -> Result<BTreeMap<String, Definition<'a>>, String> {
-    let mut definitions = BTreeMap::new();
-    for object in objects {
-        for symbol in object
-            .linkage
-            .symbols
-            .iter()
-            .filter(|symbol| symbol.external && symbol.defined && !symbol.name.is_empty())
-        {
-            let source_image_offset = definition_source(object, symbol, placement)?;
-            if definitions
-                .insert(
-                    symbol.name.clone(),
-                    Definition {
-                        object,
-                        symbol,
-                        source_image_offset,
-                    },
-                )
-                .is_some()
-            {
-                return Err(format!(
-                    "Mach-O shell repeats external definition `{}`",
-                    symbol.name
-                ));
-            }
-        }
-    }
-    Ok(definitions)
-}
-
-fn definition_source(
-    object: &MachOLayoutObject<'_>,
-    symbol: &crate::final_executable_macho_input::ParsedMachOSymbol,
-    placement: &NsldMachOPlacementBindingReport,
-) -> Result<usize, String> {
-    let ordinal = symbol.section_ordinal.ok_or_else(|| {
-        format!(
-            "Mach-O shell cannot place non-section definition `{}` kind `{}`; common/absolute allocation remains explicit",
-            symbol.name, symbol.kind
-        )
-    })?;
-    let section = object
-        .linkage
-        .sections
-        .iter()
-        .find(|section| section.ordinal == ordinal)
-        .ok_or_else(|| {
-            format!(
-                "Mach-O shell definition `{}` references missing section {ordinal}",
-                symbol.name
-            )
-        })?;
-    let relative = symbol.value.checked_sub(section.address).ok_or_else(|| {
-        format!(
-            "Mach-O shell definition `{}` precedes its section address",
-            symbol.name
-        )
-    })?;
-    if relative >= section.size {
-        return Err(format!(
-            "Mach-O shell definition `{}` offset {relative} exceeds section size {}",
-            symbol.name, section.size
-        ));
-    }
-    let placement = placement
-        .section_placements
-        .iter()
-        .find(|item| item.object_id == object.object_id && item.input_section_ordinal == ordinal)
-        .ok_or_else(|| {
-            format!(
-                "Mach-O shell definition `{}` has no section placement",
-                symbol.name
-            )
-        })?;
-    let relative = usize::try_from(relative)
-        .map_err(|_| "Mach-O definition offset exceeds host space".to_owned())?;
-    let source_image_offset = placement
-        .output_offset
-        .checked_add(relative)
-        .ok_or_else(|| "Mach-O definition source offset overflows".to_owned())?;
-    Ok(source_image_offset)
-}
-
-fn collect_unresolved_symbols(
-    objects: &[MachOLayoutObject<'_>],
-    definitions: &BTreeMap<String, Definition<'_>>,
-) -> BTreeSet<String> {
-    objects
-        .iter()
-        .flat_map(|object| object.linkage.symbols.iter())
-        .filter(|symbol| {
-            symbol.external
-                && matches!(symbol.kind.as_str(), "undefined" | "prebound-undefined")
-                && !symbol.name.is_empty()
-        })
-        .filter(|symbol| !definitions.contains_key(&symbol.name))
-        .map(|symbol| symbol.name.clone())
-        .collect()
-}
-
 fn validate_external_library_boundary(
     undefined: &BTreeSet<String>,
     applied: &NsldMachOArm64PlatformPatchApplicationReport,
@@ -280,7 +173,7 @@ fn validate_external_library_boundary(
 }
 
 fn select_entry(
-    definitions: &BTreeMap<String, Definition<'_>>,
+    definitions: &BTreeMap<String, MachOShellDefinition<'_>>,
     layout: &ShellLayoutDraft,
 ) -> Result<ShellEntryPlan, String> {
     for rule in ENTRY_RULES {
@@ -328,7 +221,7 @@ fn select_entry(
 }
 
 fn build_symbols(
-    definitions: &BTreeMap<String, Definition<'_>>,
+    definitions: &BTreeMap<String, MachOShellDefinition<'_>>,
     undefined: &BTreeSet<String>,
     layout: &ShellLayoutDraft,
 ) -> Result<(Vec<NsldMachOArm64ShellSymbolPlan>, usize), String> {
