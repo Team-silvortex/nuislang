@@ -1054,11 +1054,12 @@ through dry-run JSON and persisted in the verified invoke-plan artifact.
 
 The ELF provider uses the same internal invocation shape without teaching the
 frontdoor about ELF. It verifies exact plan/artifact target and ABI identity,
-two LinkPlan-hash-bound ELF64 `ET_REL` host objects, and an `ET_EXEC` or PIE
-compatibility image with bounded program headers and an entry inside a
-file-backed executable `PT_LOAD`. It then uses the shared atomic executable
-writer and never invokes Clang or LLD. Provider-owned ELF object merging and
-relocation remain deliberately open.
+two LinkPlan-hash-bound ELF64 `ET_REL` host objects, their section/name/symbol
+tables, registered `SHT_RELA` records and cross-object symbol closure, and an
+`ET_EXEC` or PIE compatibility image with bounded program headers and an entry
+inside a file-backed executable `PT_LOAD`. It then uses the shared atomic
+executable writer and never invokes Clang or LLD. Provider-owned ELF placement,
+relocation application, and shell serialization remain deliberately open.
 
 The internal provider parses the compiled artifact and its `NHOB` object
 bundle. It requires one LLVM program object and one runtime shim object,
@@ -1241,9 +1242,10 @@ header/command/content/linkedit bytes with all address-dependent writes
 re-encoded for final VM addresses, including common, absolute, and indirect
 definitions. The ordinary internally closed path has durable replay admission
 and registered opt-in publication. On ELF AMD64, Nsld now validates and
-publishes the compatibility image internally but does not yet build its own
-image from the two host objects. Other ELF architectures and PE/COFF remain
-later provider-owned closures.
+publishes the compatibility image internally, parses both object linkage graphs,
+and resolves their internal symbol boundary, but does not yet place or patch its
+own image. Other ELF architectures and PE/COFF remain later provider-owned
+closures.
 
 `nsld final-executable-host-dry-run` consumes the verified writer input,
 reports `environment_ready`, provider identity, and exact command arguments.

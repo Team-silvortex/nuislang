@@ -101,17 +101,23 @@ atomic executable writer. The `x86_64-linux-elf + native-cpu-llvm` provider
 requires exact plan/artifact target and ABI identity, one `program-llvm` and one
 `runtime-shim` object, matching object ids, roles, sizes, formats, and FNV
 hashes. Each object must be a little-endian ELF64 x86-64 `ET_REL` with a bounded
-section table. The compatibility image must be ELF64 `ET_EXEC` or PIE `ET_DYN`,
-own a bounded program-header table and at least one `PT_LOAD`, and place its
-nonzero entry inside a file-backed executable load segment. Rejection occurs
-before output mutation; accepted bytes are installed atomically with executable
-permissions without invoking Clang or LLD.
+section table, one bounded `SHT_SYMTAB`, valid section and symbol string tables,
+and explicit-addend `SHT_RELA` records using the registered `R_X86_64_NONE`,
+`64`, `PC32`, `PLT32`, `32`, or `32S` subset. The provider rejects malformed
+local/global symbol boundaries, duplicate strong definitions, unsupported
+relocations, and out-of-range patch sites, then derives the internally resolved
+and external compatibility symbol sets across the program/runtime pair. The
+compatibility image must be ELF64 `ET_EXEC` or PIE `ET_DYN`, own a bounded
+program-header table and at least one `PT_LOAD`, and place its nonzero entry
+inside a file-backed executable load segment. Rejection occurs before output
+mutation; accepted bytes are installed atomically with executable permissions
+without invoking Clang or LLD.
 
 This closes a registered Linux compatibility-image finalizer, not a pure Nsld
 ELF linker. The accepted executable is still the host-toolchain-linked image
-embedded by Nuisc. Nsld does not yet merge the two ELF objects, resolve their
-symbol tables and `R_X86_64_*` relocations, or serialize a provider-owned ELF
-shell.
+embedded by Nuisc. Nsld now owns object parsing and cross-object symbol closure,
+but does not yet assign final addresses, apply the parsed `R_X86_64_*`
+relocations, or serialize a provider-owned ELF shell.
 
 This is not yet a pure Nsld linker claim. Nsld now understands the real input
 tables, assigns deterministic final sections and addresses, applies registered
@@ -187,10 +193,11 @@ size/SHA-256/executable identity into the ordinary final-output report. Receipt
 tamper remains fail-closed and the compatibility executable remains the
 byte-for-byte default.
 
-The next native milestone is a provider-owned ELF64 AMD64 link slice that parses
-the embedded `ET_REL` section/symbol/relocation tables, resolves the
-program/runtime pair deterministically, and emits a private executable candidate
-behind this same registry boundary. Nuisc must remain free of ELF branches.
+The next native milestone is `nuis-nsld-elf-amd64-placement-binding-v1`: merge
+allocatable input sections into deterministic output classes, assign final
+addresses to section/common/absolute definitions, and bind every registered
+relocation to an exact source patch and target symbol before byte mutation.
+Nuisc must remain free of ELF branches.
 
 ## Validation
 

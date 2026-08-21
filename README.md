@@ -38,9 +38,11 @@ now carries ARM64 Mach-O sections, commons, absolute values, and cycle-safe
 symbol aliases through relocation, signed private-shell serialization,
 independent load admission, and explicit provider-registered publication. The
 first `x86_64-linux-elf` internal provider now validates the compiled ELF64
-image plus its two relocatable host objects and atomically publishes it without
-invoking Clang or LLD. Provider-owned ELF object merging and relocation remain
-the next format frontier; PE/COFF parity remains open.
+image plus its two relocatable host objects, parses their section names and
+attributes, symbol tables, and registered `SHT_RELA` records, resolves the
+program/runtime symbol boundary, and atomically publishes the compatibility
+image without invoking Clang or LLD. Provider-owned ELF placement and relocation
+application remain the next format frontier; PE/COFF parity remains open.
 
 Start with these documents:
 

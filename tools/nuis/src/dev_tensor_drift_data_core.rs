@@ -134,13 +134,34 @@ pub(crate) const DEV_TENSOR_CORE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
         path: "tools/nsld/src/final_executable_elf_artifact.rs",
         required_patterns: &[
             "compiled-artifact-native-handoff",
-            "program-llvm",
-            "runtime-shim",
+            "build_elf_amd64_host_object_linkage",
             "ET_EXEC or ET_DYN",
             "PT_LOAD",
             "ELF_AMD64_CPU_ABI",
-            "hash mismatch",
             "atomic_write_executable",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-elf-amd64-object-input-parser",
+        path: "tools/nsld/src/final_executable_elf_input.rs",
+        required_patterns: &[
+            "ParsedElfObjectLinkage",
+            "parse_elf64_amd64_object_linkage",
+            "explicit-addend SHT_RELA",
+            "R_X86_64_PLT32",
+            "unsupported R_X86_64 type",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-elf-amd64-host-object-linkage",
+        path: "tools/nsld/src/final_executable_elf_object.rs",
+        required_patterns: &[
+            "nuis-nsld-elf-amd64-host-object-linkage-v1",
+            "program-llvm",
+            "runtime-shim",
+            "strong symbol",
+            "internally_resolved_symbols",
+            "hash mismatch",
         ],
     },
     DevTensorDriftCheckSpec {

@@ -168,11 +168,14 @@ private Mach-O through the ordinary command.
 The finalizer registry now also owns one narrow Linux route:
 `nsld.finalizer.elf.amd64.artifact-image-v1`. It validates exact LinkPlan and
 compiled-artifact target identity, both hash-bound ELF64 `ET_REL` host objects,
-and an ELF64 `ET_EXEC`/PIE image whose entry belongs to a bounded executable
-`PT_LOAD`. The accepted compatibility image is atomically published without a
-Clang/LLD process. This is deliberate staging evidence, not a self-owned ELF
-link claim: the embedded executable remains host-toolchain-linked until Nsld
-owns ELF section placement, symbol resolution, relocation, and shell emission.
+their bounded section/name/symbol tables, registered explicit-addend
+`R_X86_64` relocations, cross-object strong-definition uniqueness and internal
+symbol closure, and an ELF64 `ET_EXEC`/PIE image whose entry belongs to a bounded
+executable `PT_LOAD`. The accepted compatibility image is atomically published
+without a Clang/LLD process. This is deliberate staging evidence, not a
+self-owned ELF link claim: the embedded executable remains host-toolchain-linked
+until Nsld owns ELF section placement, relocation application, and shell
+emission.
 
 It does not yet own:
 

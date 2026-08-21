@@ -1,8 +1,11 @@
 use super::*;
 use crate::{
+    final_executable_elf_input::parse_elf64_amd64_object_linkage,
+    final_executable_elf_test_fixture::{elf_program_object, elf_runtime_object, R_X86_64_PLT32},
     final_executable_finalizer_registry::{
         invoke_registered_finalizer, select_executable_finalizer, ExecutableFinalizerCommandContext,
     },
+    fnv1a64_hex,
     main_test_support::empty_link_plan,
 };
 use nuisc::{
@@ -55,7 +58,7 @@ fn rejects_wrong_machine_and_truncated_program_table() {
 
 #[test]
 fn validates_relocatable_host_object_shape() {
-    assert!(validate_elf64_amd64_relocatable(&elf_relocatable()).is_ok());
+    assert!(parse_elf64_amd64_object_linkage(&elf_program_object(R_X86_64_PLT32)).is_ok());
 }
 
 #[test]
@@ -134,6 +137,32 @@ fn materializes_validated_artifact_without_host_driver() {
     assert!(issues[0].contains("CPU ABI mismatch"));
 }
 
+#[test]
+fn rejects_unregistered_object_relocation_before_output_mutation() {
+    let root = temp_dir("unsupported-relocation");
+    fs::create_dir_all(&root).unwrap();
+    let artifact_path = root.join("nuis.compiled.artifact");
+    let output_path = root.join("demo");
+    let (mut artifact, mut plan) = artifact_and_plan(&root, elf_executable(ELF_TYPE_EXECUTABLE));
+    artifact.host_objects[0].bytes = elf_program_object(0x7fff);
+    plan.compiled_artifact.host_objects[0].bytes = artifact.host_objects[0].bytes.len();
+    plan.compiled_artifact.host_objects[0].content_hash =
+        fnv1a64_hex(&artifact.host_objects[0].bytes);
+    fs::write(
+        &artifact_path,
+        encode_nuis_compiled_artifact_section_table_binary(&artifact).unwrap(),
+    )
+    .unwrap();
+    fs::write(&output_path, b"preserve-me").unwrap();
+
+    let error = materialize_elf_amd64_artifact_image(&plan, &output_path).unwrap_err();
+    let output = fs::read(&output_path).unwrap();
+    fs::remove_dir_all(root).unwrap();
+
+    assert!(error.contains("unsupported R_X86_64 type 32767"));
+    assert_eq!(output, b"preserve-me");
+}
+
 fn artifact_and_plan(
     root: &std::path::Path,
     image: Vec<u8>,
@@ -143,13 +172,13 @@ fn artifact_and_plan(
             object_id: "host.program-llvm".to_owned(),
             role: "program-llvm".to_owned(),
             object_format: "elf".to_owned(),
-            bytes: elf_relocatable(),
+            bytes: elf_program_object(R_X86_64_PLT32),
         },
         NuisCompiledArtifactHostObject {
             object_id: "host.runtime-shim".to_owned(),
             role: "runtime-shim".to_owned(),
             object_format: "elf".to_owned(),
-            bytes: elf_relocatable(),
+            bytes: elf_runtime_object(),
         },
     ];
     let manifest = build_manifest(root, image.len());
@@ -241,19 +270,6 @@ fn elf_executable(file_type: u16) -> Vec<u8> {
     write_u64(&mut bytes, ELF64_HEADER_SIZE + 40, image_size);
     write_u64(&mut bytes, ELF64_HEADER_SIZE + 48, 0x1000);
     bytes[0x80] = 0xc3;
-    bytes
-}
-
-fn elf_relocatable() -> Vec<u8> {
-    let mut bytes = vec![0u8; ELF64_HEADER_SIZE + ELF64_SECTION_HEADER_SIZE];
-    write_ident(&mut bytes);
-    write_u16(&mut bytes, 16, ELF_TYPE_RELOCATABLE);
-    write_u16(&mut bytes, 18, ELF_MACHINE_X86_64);
-    write_u32(&mut bytes, 20, 1);
-    write_u64(&mut bytes, 40, ELF64_HEADER_SIZE as u64);
-    write_u16(&mut bytes, 52, ELF64_HEADER_SIZE as u16);
-    write_u16(&mut bytes, 58, ELF64_SECTION_HEADER_SIZE as u16);
-    write_u16(&mut bytes, 60, 1);
     bytes
 }
 

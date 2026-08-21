@@ -394,12 +394,16 @@ The `beta-0.1` calibration baseline is:
   `nsld.finalizer.elf.amd64.artifact-image-v1`, now selects through the same
   registry for `x86_64-linux-elf + native-cpu-llvm`. It binds one ELF64
   `program-llvm` and one `runtime-shim` `ET_REL` object to their LinkPlan ids,
-  roles, formats, sizes, and FNV hashes; validates an ELF64 `ET_EXEC` or PIE
-  image with bounded program headers and a nonzero entry inside a file-backed
-  executable `PT_LOAD`; and atomically installs it without Clang/LLD invocation.
-  That closes the registered compatibility-image slice, while provider-owned
-  ELF section/symbol/relocation linking, other ELF architectures, and PE/COFF
-  remain open
+  roles, formats, sizes, and FNV hashes; parses bounded section/name/string and
+  symbol tables plus a registered explicit-addend `R_X86_64` subset; rejects
+  malformed symbol partitions, duplicate strong definitions, unsupported
+  relocations, and out-of-range patch sites; and derives internal versus external
+  symbol closure across the pair. It validates an ELF64 `ET_EXEC` or PIE image
+  with bounded program headers and a nonzero entry inside a file-backed
+  executable `PT_LOAD`, then atomically installs it without Clang/LLD invocation.
+  That closes parsing and registered compatibility publication, while
+  provider-owned placement, relocation application, other ELF architectures,
+  and PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

@@ -62,6 +62,10 @@ mod final_executable_bootstrap;
 mod final_executable_container_binding;
 mod final_executable_container_loader;
 mod final_executable_elf_artifact;
+mod final_executable_elf_input;
+mod final_executable_elf_object;
+#[cfg(test)]
+mod final_executable_elf_test_fixture;
 mod final_executable_emit;
 mod final_executable_emit_actual;
 mod final_executable_emit_output_verify;

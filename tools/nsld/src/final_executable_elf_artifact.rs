@@ -1,13 +1,14 @@
-use crate::{final_executable_atomic_output::atomic_write_executable, fnv1a64_hex};
-use std::{collections::BTreeSet, path::Path};
+use crate::{
+    final_executable_atomic_output::atomic_write_executable,
+    final_executable_elf_object::build_elf_amd64_host_object_linkage,
+};
+use std::path::Path;
 
 const ELF64_HEADER_SIZE: usize = 64;
 const ELF64_PROGRAM_HEADER_SIZE: usize = 56;
-const ELF64_SECTION_HEADER_SIZE: usize = 64;
 const ELF_CLASS_64: u8 = 2;
 const ELF_DATA_LITTLE_ENDIAN: u8 = 1;
 const ELF_VERSION_CURRENT: u8 = 1;
-const ELF_TYPE_RELOCATABLE: u16 = 1;
 const ELF_TYPE_EXECUTABLE: u16 = 2;
 const ELF_TYPE_SHARED: u16 = 3;
 const ELF_MACHINE_X86_64: u16 = 62;
@@ -111,7 +112,7 @@ fn load_and_validate_elf_amd64_artifact_image(
             artifact.binary_blob.len()
         ));
     }
-    validate_elf_amd64_host_object_handoff(&artifact, plan)?;
+    build_elf_amd64_host_object_linkage(&artifact, plan)?;
     validate_elf64_amd64_executable(&artifact.binary_blob)?;
     Ok(artifact.binary_blob)
 }
@@ -151,96 +152,6 @@ fn validate_plan_target(plan: &nuisc::linker::LinkPlan) -> Result<(), String> {
         return Err(format!(
             "unsupported calling ABI `{}`; expected `{ELF_AMD64_CALLING_ABI}`",
             plan.cpu_target.calling_abi
-        ));
-    }
-    Ok(())
-}
-
-fn validate_elf_amd64_host_object_handoff(
-    artifact: &nuisc::aot::NuisCompiledArtifact,
-    plan: &nuisc::linker::LinkPlan,
-) -> Result<(), String> {
-    if artifact.host_objects.len() != 2 {
-        return Err(format!(
-            "ELF native handoff requires two host objects, found {}",
-            artifact.host_objects.len()
-        ));
-    }
-    if plan.compiled_artifact.host_objects.len() != artifact.host_objects.len() {
-        return Err(format!(
-            "ELF host-object count mismatch: plan={}, artifact={}",
-            plan.compiled_artifact.host_objects.len(),
-            artifact.host_objects.len()
-        ));
-    }
-    let mut object_ids = BTreeSet::new();
-    let mut roles = BTreeSet::new();
-    for object in &artifact.host_objects {
-        if !object_ids.insert(object.object_id.as_str()) {
-            return Err(format!(
-                "ELF native handoff contains duplicate object id `{}`",
-                object.object_id
-            ));
-        }
-        if !roles.insert(object.role.as_str()) {
-            return Err(format!(
-                "ELF native handoff contains duplicate role `{}`",
-                object.role
-            ));
-        }
-        if canonical_object_format(&object.object_format) != "elf" {
-            return Err(format!(
-                "ELF host object `{}` declares format `{}`",
-                object.object_id, object.object_format
-            ));
-        }
-        validate_elf64_amd64_relocatable(&object.bytes).map_err(|error| {
-            format!("ELF host object `{}` is invalid: {error}", object.object_id)
-        })?;
-        let planned = plan
-            .compiled_artifact
-            .host_objects
-            .iter()
-            .find(|planned| planned.object_id == object.object_id)
-            .ok_or_else(|| {
-                format!(
-                    "ELF host object `{}` is missing from the link plan",
-                    object.object_id
-                )
-            })?;
-        if planned.role != object.role {
-            return Err(format!(
-                "ELF host object `{}` role mismatch: plan={}, artifact={}",
-                object.object_id, planned.role, object.role
-            ));
-        }
-        if canonical_object_format(&planned.object_format) != "elf" {
-            return Err(format!(
-                "ELF host object `{}` plan format is `{}`",
-                object.object_id, planned.object_format
-            ));
-        }
-        if planned.bytes != object.bytes.len() {
-            return Err(format!(
-                "ELF host object `{}` size mismatch: plan={}, artifact={}",
-                object.object_id,
-                planned.bytes,
-                object.bytes.len()
-            ));
-        }
-        let actual_hash = fnv1a64_hex(&object.bytes);
-        if planned.content_hash != actual_hash {
-            return Err(format!(
-                "ELF host object `{}` hash mismatch: plan={}, artifact={actual_hash}",
-                object.object_id, planned.content_hash
-            ));
-        }
-    }
-    let expected_roles = BTreeSet::from(["program-llvm", "runtime-shim"]);
-    if roles != expected_roles {
-        return Err(format!(
-            "ELF native handoff roles must be program-llvm and runtime-shim, found {}",
-            roles.into_iter().collect::<Vec<_>>().join(",")
         ));
     }
     Ok(())
@@ -335,44 +246,6 @@ fn validate_elf64_amd64_executable(bytes: &[u8]) -> Result<(), String> {
     }
     if !executable_entry {
         return Err("ELF entry is not inside a file-backed executable PT_LOAD segment".to_owned());
-    }
-    Ok(())
-}
-
-fn validate_elf64_amd64_relocatable(bytes: &[u8]) -> Result<(), String> {
-    validate_elf64_header(bytes, "relocatable object")?;
-    if read_u16(bytes, 16, "ELF object type")? != ELF_TYPE_RELOCATABLE {
-        return Err("ELF host object is not ET_REL".to_owned());
-    }
-    if read_u64(bytes, 24, "ELF object entry")? != 0 {
-        return Err("ELF relocatable object has a nonzero entry".to_owned());
-    }
-    let section_offset = checked_usize(
-        read_u64(bytes, 40, "ELF section-header offset")?,
-        "ELF section-header offset",
-    )?;
-    let section_entry_size = read_u16(bytes, 58, "ELF section-header entry size")? as usize;
-    let section_count = read_u16(bytes, 60, "ELF section-header count")? as usize;
-    if section_entry_size != ELF64_SECTION_HEADER_SIZE || section_count == 0 {
-        return Err(format!(
-            "ELF host-object section-header shape is invalid: entry_size={section_entry_size} count={section_count}"
-        ));
-    }
-    if section_offset < ELF64_HEADER_SIZE {
-        return Err("ELF host-object section table overlaps the file header".to_owned());
-    }
-    checked_table_end(
-        section_offset,
-        section_entry_size,
-        section_count,
-        bytes.len(),
-        "ELF section-header table",
-    )?;
-    let string_table_index = read_u16(bytes, 62, "ELF section-name table index")? as usize;
-    if string_table_index >= section_count {
-        return Err(format!(
-            "ELF section-name table index {string_table_index} exceeds section count {section_count}"
-        ));
     }
     Ok(())
 }
