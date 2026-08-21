@@ -116,8 +116,10 @@ without invoking Clang or LLD.
 This closes a registered Linux compatibility-image finalizer, not a pure Nsld
 ELF linker. The accepted executable is still the host-toolchain-linked image
 embedded by Nuisc. Nsld now owns object parsing and cross-object symbol closure,
-but does not yet assign final addresses, apply the parsed `R_X86_64_*`
-relocations, or serialize a provider-owned ELF shell.
+deterministic final addresses, and checked non-mutating previews for the parsed
+`R_X86_64_*` relocations. It does not yet materialize a merged image, apply the
+previewed writes, synthesize unresolved platform structures, or serialize a
+provider-owned ELF shell.
 
 This is not yet a pure Nsld linker claim. Nsld now understands the real input
 tables, assigns deterministic final sections and addresses, applies registered
@@ -206,10 +208,20 @@ compressed, writable-executable, malformed zero-fill, excessive-alignment, and
 overflow cases fail before mutation. Reversing object input preserves the same
 plan hash.
 
+`nuis-nsld-elf-amd64-relocation-application-v1` now maps every registered
+`R_X86_64_NONE/64/PC32/PLT32/32/32S` record to one placed source and bound
+target. It computes `S+A` or `S+A-P`, checks signed or unsigned width semantics,
+and emits canonical little-endian patch previews. Placement-hash drift,
+unsupported shapes, and overflow fail before mutation; unresolved compatibility
+targets remain explicit platform-structure work. Reversing object input
+preserves the relocation plan hash.
+
 The next native milestone is
-`nuis-nsld-elf-amd64-relocation-application-v1`: map each parsed `R_X86_64`
-record to one placed source, one bound target, and one checked signed/unsigned
-patch preview before byte mutation. Nuisc must remain free of ELF branches.
+`nuis-nsld-elf-amd64-materialization-preview-v1`: copy verified file-backed
+section payloads into deterministic merged buffers, bind source-byte evidence
+to the placement and relocation plan hashes, and produce non-overlapping
+write-once patch spans without publishing bytes. Nuisc must remain free of ELF
+branches.
 
 ## Validation
 

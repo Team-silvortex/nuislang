@@ -66,6 +66,8 @@ mod final_executable_elf_input;
 mod final_executable_elf_layout;
 mod final_executable_elf_layout_report;
 mod final_executable_elf_object;
+mod final_executable_elf_relocation;
+mod final_executable_elf_relocation_report;
 #[cfg(test)]
 mod final_executable_elf_test_fixture;
 mod final_executable_emit;

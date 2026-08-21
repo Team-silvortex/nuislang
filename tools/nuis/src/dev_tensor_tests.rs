@@ -436,6 +436,14 @@ fn dev_tensor_drift_checks_are_currently_clean() {
     assert!(drift
         .checks
         .iter()
+        .any(|check| check.id == "nsld-elf-amd64-relocation-application-contract"));
+    assert!(drift
+        .checks
+        .iter()
+        .any(|check| check.id == "nsld-elf-amd64-relocation-application-regression"));
+    assert!(drift
+        .checks
+        .iter()
         .any(|check| check.id == "scheduler-mutex-yir-contract"));
     assert!(drift
         .checks
@@ -556,6 +564,8 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("drift_check: id=nsld-macho-placement-binding-three-surface-evidence"));
     assert!(text.contains("drift_check: id=nsld-elf-amd64-placement-binding-contract"));
     assert!(text.contains("drift_check: id=nsld-elf-amd64-placement-binding-regression"));
+    assert!(text.contains("drift_check: id=nsld-elf-amd64-relocation-application-contract"));
+    assert!(text.contains("drift_check: id=nsld-elf-amd64-relocation-application-regression"));
     assert!(text.contains("drift_check: id=scheduler-mutex-yir-contract"));
     assert!(text.contains("drift_check: id=scheduler-mutex-runtime-visibility"));
     assert!(text.contains("drift_check: id=scheduler-shared-mutex-llvm-native-lowering"));

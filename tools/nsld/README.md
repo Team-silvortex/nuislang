@@ -245,7 +245,13 @@ allocatable text, read-only data, data, zero-fill, and common storage into
 page-separated permission classes; assigns checked file/image/virtual
 coordinates; coalesces commons; preserves absolute values; and binds internal
 symbols, zero-valued unmatched weak references, or compatibility-external
-symbols without mutating bytes. The Mach-O route proves relocatable input,
+symbols without mutating bytes.
+`nuis-nsld-elf-amd64-relocation-application-v1` consumes that exact plan hash,
+maps registered `R_X86_64_NONE/64/PC32/PLT32/32/32S` records to placed sources
+and bound targets, checks `S+A` or `S+A-P` against the relocation width, and
+emits deterministic little-endian previews. Overflow and placement drift fail
+before mutation; unresolved system targets remain platform-structure work.
+The Mach-O route proves relocatable input,
 table parsing, placement,
 binding, merged-image construction, direct and
 platform relocation encoding, deterministic GOT/stub allocation, platform byte
@@ -255,7 +261,8 @@ validator, one real isolated OS-loader execution, durable replay admission, and
 registered opt-in publication and ordinary explicit selection. The real internal fixture now executes
 `ADRP`/`ADD`/`STR` against provider-allocated common storage before passing
 signature, loader, receipt replay, ordinary final-output selection, and direct
-execution. ELF relocation application/shell serialization and PE/COFF remain
+execution. ELF merged-image materialization, write-once patch application,
+platform-structure synthesis, shell serialization, and PE/COFF remain
 incomplete. The
 ordinary default compatibility executable remains byte-for-byte unchanged;
 private installation requires both the explicit policy and `--apply`.

@@ -192,6 +192,32 @@ pub(crate) const DEV_TENSOR_CORE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "nsld-elf-amd64-relocation-application-contract",
+        path: "tools/nsld/src/final_executable_elf_relocation.rs",
+        required_patterns: &[
+            "nuis-nsld-elf-amd64-relocation-application-v1",
+            "R_X86_64_PC32",
+            "R_X86_64_PLT32",
+            "planned-platform-structure",
+            "relocation_value",
+            "encode_signed32",
+            "placement hash mismatch",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-elf-amd64-relocation-application-regression",
+        path: "tools/nsld/src/final_executable_elf_relocation_tests.rs",
+        required_patterns: &[
+            "previews_real_cross_object_plt32_call",
+            "registered_shapes_produce_checked_little_endian_previews",
+            "unresolved_system_target_remains_a_platform_structure_boundary",
+            "rejects_unsigned_and_signed_32_bit_overflow",
+            "rejects_pc_relative_displacement_outside_i32",
+            "placement_hash_drift_fails_before_relocation_planning",
+            "relocation_plan_is_independent_of_input_object_order",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nsld-elf-amd64-artifact-image-regression",
         path: "tools/nsld/src/final_executable_elf_artifact_tests.rs",
         required_patterns: &[

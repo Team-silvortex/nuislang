@@ -46,6 +46,19 @@ fn summarizes_cross_object_internal_symbol_closure() {
     );
     assert_eq!(product.placement_binding.section_placements.len(), 2);
     assert_eq!(product.placement_binding.internally_bound_symbol_count, 1);
+    assert_eq!(
+        product.relocation_application.contract,
+        crate::final_executable_elf_relocation::ELF_AMD64_RELOCATION_APPLICATION_CONTRACT
+    );
+    assert_eq!(
+        product.relocation_application.status,
+        "ready-for-byte-preview"
+    );
+    assert_eq!(product.relocation_application.direct_preview_count, 1);
+    assert_eq!(
+        product.relocation_application.applications[0].encoded_bytes,
+        [0x0b, 0, 0, 0]
+    );
 }
 
 #[test]

@@ -175,19 +175,25 @@ allocatable program/runtime contributions into deterministic text, read-only
 data, data, zero-fill, and common page-separated permission classes; assigns
 checked file/image/virtual coordinates; coalesces common declarations;
 preserves absolute values; maps unmatched weak references to zero; and binds
-internal references under one canonical plan hash. The provider also
+internal references under one canonical plan hash.
+`nuis-nsld-elf-amd64-relocation-application-v1` consumes that plan to map each
+registered relocation to a placed source and bound target, computes checked
+`S+A` or `S+A-P`, and emits deterministic little-endian previews. Overflow,
+shape mismatch, placement drift, and unresolved non-compatibility targets fail
+before mutation; unresolved system targets remain explicit platform-structure
+work. The provider also
 validates an ELF64 `ET_EXEC`/PIE image whose entry belongs to a bounded
 executable `PT_LOAD`. The accepted compatibility image is atomically published
 without a Clang/LLD process. This is deliberate staging evidence, not a
 self-owned ELF link claim: the embedded executable remains host-toolchain-linked
-until Nsld consumes its owned placement plan for relocation application and
-shell emission.
+until Nsld materializes its owned placement and relocation plans, applies each
+write once, synthesizes platform structures, and emits the shell.
 
 It does not yet own:
 
 * complete architecture parity across Mach-O, ELF, and PE/COFF
-* provider-owned ELF relocation application/shell serialization and complete
-  PE/COFF object merging
+* provider-owned ELF merged-image materialization, patch application,
+  platform-structure/shell serialization, and complete PE/COFF object merging
 * a durable embedded Nsdb/YIR debug metadata section
 
 ## Gap 1: Compatibility Object Writer

@@ -410,12 +410,20 @@ The `beta-0.1` calibration baseline is:
   compatibility boundary. Reversed object order
   preserves the canonical plan hash, while TLS, compressed,
   writable-executable, malformed zero-fill, excessive-alignment, and overflow
-  cases fail before mutation. The provider validates an ELF64 `ET_EXEC` or PIE
+  cases fail before mutation.
+  `nuis-nsld-elf-amd64-relocation-application-v1` maps every registered
+  `R_X86_64_NONE/64/PC32/PLT32/32/32S` record to one placed source and bound
+  target, computes checked `S+A` or `S+A-P`, and emits deterministic
+  little-endian previews. Placement drift, shape mismatch, and signed/unsigned
+  overflow fail before mutation; unresolved system symbols stay explicit
+  platform-structure work. Reversed object order preserves the relocation plan
+  hash. The provider validates an ELF64 `ET_EXEC` or PIE
   compatibility image with bounded program headers and a nonzero entry inside a
   file-backed executable `PT_LOAD`, then atomically installs it without
-  Clang/LLD invocation. Parsing, placement/binding planning, and registered
-  compatibility publication are closed; relocation application, provider-owned
-  ELF shell serialization, other ELF architectures, and PE/COFF remain open
+  Clang/LLD invocation. Parsing, placement/binding planning, relocation preview,
+  and registered compatibility publication are closed; merged-image
+  materialization, write-once patching, platform structures, provider-owned ELF
+  shell serialization, other ELF architectures, and PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

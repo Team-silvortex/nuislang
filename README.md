@@ -44,11 +44,14 @@ program/runtime symbol boundary, deterministically places allocatable
 `text/rodata/data/bss/common` contributions into page-separated permission
 classes, assigns virtual addresses, and binds section/common/absolute
 definitions, zero-valued unmatched weak references, and unresolved
-compatibility names.
+compatibility names. It now maps every registered `R_X86_64` record to that
+placement, computes checked `S+A` or `S+A-P` values, and emits deterministic
+little-endian patch previews without mutating bytes; unresolved system targets
+remain explicit platform-structure work.
 It still atomically publishes the host-linked compatibility image without
-invoking Clang or LLD at finalization time. Provider-owned ELF relocation
-application and shell serialization remain the next format frontier; PE/COFF
-parity remains open.
+invoking Clang or LLD at finalization time. Provider-owned ELF section
+materialization, write-once patching, platform-structure synthesis, and shell
+serialization remain the next format frontier; PE/COFF parity remains open.
 
 Start with these documents:
 

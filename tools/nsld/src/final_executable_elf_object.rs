@@ -2,6 +2,8 @@ use crate::{
     final_executable_elf_input::{parse_elf64_amd64_object_linkage, ParsedElfObjectLinkage},
     final_executable_elf_layout::build_elf_amd64_placement_binding,
     final_executable_elf_layout_report::ElfAmd64PlacementBindingReport,
+    final_executable_elf_relocation::build_elf_amd64_relocation_application,
+    final_executable_elf_relocation_report::ElfAmd64RelocationApplicationReport,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -35,6 +37,7 @@ pub(crate) struct ElfAmd64HostObjectLinkage {
     pub(crate) summary: ElfAmd64HostObjectLinkageSummary,
     pub(crate) objects: Vec<ElfAmd64ObjectLinkage>,
     pub(crate) placement_binding: ElfAmd64PlacementBindingReport,
+    pub(crate) relocation_application: ElfAmd64RelocationApplicationReport,
 }
 
 pub(crate) fn build_elf_amd64_host_object_linkage(
@@ -120,6 +123,8 @@ pub(crate) fn build_elf_amd64_host_object_linkage(
         "verified-with-external-compatibility-boundary"
     };
     let placement_binding = build_elf_amd64_placement_binding(&objects)?;
+    let relocation_application =
+        build_elf_amd64_relocation_application(&objects, &placement_binding)?;
     Ok(ElfAmd64HostObjectLinkage {
         summary: ElfAmd64HostObjectLinkageSummary {
             contract: ELF_AMD64_HOST_OBJECT_LINKAGE_CONTRACT,
@@ -135,6 +140,7 @@ pub(crate) fn build_elf_amd64_host_object_linkage(
         },
         objects,
         placement_binding,
+        relocation_application,
     })
 }
 
