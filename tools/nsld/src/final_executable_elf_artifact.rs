@@ -1,6 +1,9 @@
 use crate::{
     final_executable_atomic_output::atomic_write_executable,
-    final_executable_elf_object::build_elf_amd64_host_object_linkage,
+    final_executable_elf_loader_probe::{
+        probe_elf_amd64_private_shell_image, ElfAmd64LoaderProbeInput,
+    },
+    final_executable_elf_object::{build_elf_amd64_host_object_linkage, ElfAmd64HostObjectLinkage},
 };
 use std::path::Path;
 
@@ -46,6 +49,26 @@ pub(crate) fn materialize_elf_amd64_artifact_image(
 fn load_and_validate_elf_amd64_artifact_image(
     plan: &nuisc::linker::LinkPlan,
 ) -> Result<Vec<u8>, String> {
+    let (artifact, product) = load_elf_amd64_artifact_private_product(plan)?;
+    let probe = probe_elf_amd64_private_shell_image(
+        ElfAmd64LoaderProbeInput {
+            bytes: &product.private_shell_image,
+            validation: &product.shell_image_validation,
+            unresolved_external_symbol_count: product.summary.unresolved_external_symbols.len(),
+        },
+        Path::new("."),
+        false,
+    )?;
+    if probe.attempted || probe.materialized || probe.publication_eligible {
+        return Err("ELF default finalizer path crossed the loader-probe boundary".to_owned());
+    }
+    validate_elf64_amd64_executable(&artifact.binary_blob)?;
+    Ok(artifact.binary_blob)
+}
+
+fn load_elf_amd64_artifact_private_product(
+    plan: &nuisc::linker::LinkPlan,
+) -> Result<(nuisc::aot::NuisCompiledArtifact, ElfAmd64HostObjectLinkage), String> {
     validate_plan_target(plan)?;
     let artifact_path = Path::new(&plan.compiled_artifact.path);
     let artifact = nuisc::aot::parse_nuis_compiled_artifact(artifact_path).map_err(|error| {
@@ -112,9 +135,8 @@ fn load_and_validate_elf_amd64_artifact_image(
             artifact.binary_blob.len()
         ));
     }
-    build_elf_amd64_host_object_linkage(&artifact, plan)?;
-    validate_elf64_amd64_executable(&artifact.binary_blob)?;
-    Ok(artifact.binary_blob)
+    let product = build_elf_amd64_host_object_linkage(&artifact, plan)?;
+    Ok((artifact, product))
 }
 
 fn validate_plan_target(plan: &nuisc::linker::LinkPlan) -> Result<(), String> {

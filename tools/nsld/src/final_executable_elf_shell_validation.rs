@@ -2,6 +2,7 @@ use super::{
     image::ELF_AMD64_SHELL_IMAGE_SERIALIZATION_CONTRACT,
     report::{
         dynamic_entry_audit_hash, program_header_audit_hash, section_audit_hash,
+        shell_image_source_validation_audit_hash, shell_image_table_validation_audit_hash,
         ElfAmd64ShellImageSerializationReport, ElfAmd64ShellImageValidationReport,
         ElfAmd64ShellLayoutPlanReport,
     },
@@ -10,6 +11,7 @@ use super::{
     ELF_AMD64_SHELL_LAYOUT_PLAN_CONTRACT,
 };
 use crate::final_executable_elf_materialization::application::platform::application::ElfAmd64PlatformAppliedImage;
+use std::collections::BTreeSet;
 
 pub(crate) const ELF_AMD64_SHELL_IMAGE_VALIDATION_CONTRACT: &str =
     "nuis-nsld-elf-amd64-shell-image-validation-v1";
@@ -85,7 +87,130 @@ pub(crate) fn validate_elf_amd64_shell_image(
         sources: evidence.sources,
     };
     report.validation_ledger_hash = crate::fnv1a64_hex(report.canonical_ledger().as_bytes());
+    validate_elf_amd64_shell_image_validation_report(&report)?;
     Ok(report)
+}
+
+pub(crate) fn validate_elf_amd64_shell_image_validation_report(
+    report: &ElfAmd64ShellImageValidationReport,
+) -> Result<(), String> {
+    let dynamic = match (report.dynamic_segment_count, report.dynamic_entry_count) {
+        (0, 0) => false,
+        (1, count) if count > 0 => true,
+        _ => return Err("ELF shell validation report has an invalid dynamic shape".to_owned()),
+    };
+    let expected_table_kinds = if dynamic {
+        vec![
+            ("elf64-header", 1),
+            ("program-header-table", report.program_header_count),
+            ("dynamic-table", report.dynamic_entry_count),
+            ("section-name-table", report.section_name_count),
+            ("section-header-table", report.section_header_count),
+        ]
+    } else {
+        vec![
+            ("elf64-header", 1),
+            ("program-header-table", report.program_header_count),
+            ("section-name-table", report.section_name_count),
+            ("section-header-table", report.section_header_count),
+        ]
+    };
+    let (publication_status, publication_blockers): (&str, &[&str]) = if dynamic {
+        (
+            "blocked-os-loader-and-external-resolution-pending",
+            &[
+                "os-loader-probe-pending",
+                "registered-external-resolution-provenance-pending",
+            ],
+        )
+    } else {
+        (
+            "blocked-os-loader-probe-pending",
+            &["os-loader-probe-pending"],
+        )
+    };
+    if report.contract != ELF_AMD64_SHELL_IMAGE_VALIDATION_CONTRACT
+        || report.status != "independently-validated-private-image"
+        || !report.header_valid
+        || report.shell_image_span_bytes == 0
+        || report.program_header_count == 0
+        || report.load_segment_count == 0
+        || report.load_segment_count > report.program_header_count
+        || report.section_header_count == 0
+        || report.section_name_count != report.section_header_count
+        || report.entry_program_header_index >= report.program_header_count
+        || report.expected_table_count != expected_table_kinds.len()
+        || report.verified_table_count != report.tables.len()
+        || report.expected_table_count != report.verified_table_count
+        || report.expected_shell_write_count != report.tables.len()
+        || report.verified_shell_write_count != report.tables.len()
+        || report.expected_source_validation_count != report.sources.len()
+        || report.verified_source_validation_count != report.sources.len()
+        || report.unexplained_platform_change_count != 0
+        || report.publication_eligibility_contract != ELF_AMD64_PUBLICATION_ELIGIBILITY_CONTRACT
+        || report.publication_eligibility_status != publication_status
+        || report.publication_eligible
+        || report
+            .publication_blockers
+            .iter()
+            .map(String::as_str)
+            .ne(publication_blockers.iter().copied())
+    {
+        return Err("ELF shell validation report envelope drift".to_owned());
+    }
+    for (index, (table, (kind, records))) in
+        report.tables.iter().zip(expected_table_kinds).enumerate()
+    {
+        if table.table_id != format!("elf-amd64-shell-image-table-validation-{index:04}")
+            || table.table_kind != kind
+            || table.width_bytes == 0
+            || table.expected_record_count != records
+            || table.verified_record_count != records
+            || table.status != "parsed-and-write-audit-verified"
+            || table.audit_hash
+                != shell_image_table_validation_audit_hash(
+                    &report.shell_layout_plan_hash,
+                    &report.serialization_ledger_hash,
+                    &report.shell_image_hash,
+                    table,
+                )
+        {
+            return Err(format!("ELF shell validation report table {index} drift"));
+        }
+    }
+    let mut section_ids = BTreeSet::new();
+    for (index, source) in report.sources.iter().enumerate() {
+        let preservation_shape_valid = match source.preservation_kind.as_str() {
+            "file-backed-byte-span" => {
+                source.result_file_offset.is_some()
+                    && source.source_size_bytes == source.result_size_bytes
+            }
+            "nobits-zero-fill-span" => {
+                source.result_file_offset.is_none()
+                    && source.source_size_bytes == source.result_size_bytes
+            }
+            _ => false,
+        };
+        if source.validation_id != format!("elf-amd64-shell-image-source-validation-{index:04}")
+            || !section_ids.insert(source.section_id.as_str())
+            || !preservation_shape_valid
+            || source.source_bytes_hash != source.result_bytes_hash
+            || source.status != "independently-preserved"
+            || source.audit_hash
+                != shell_image_source_validation_audit_hash(
+                    &report.shell_layout_plan_hash,
+                    &report.serialization_ledger_hash,
+                    &report.shell_image_hash,
+                    source,
+                )
+        {
+            return Err(format!("ELF shell validation report source {index} drift"));
+        }
+    }
+    if report.validation_ledger_hash != crate::fnv1a64_hex(report.canonical_ledger().as_bytes()) {
+        return Err("ELF shell validation report ledger drift".to_owned());
+    }
+    Ok(())
 }
 
 fn validate_input_envelope(

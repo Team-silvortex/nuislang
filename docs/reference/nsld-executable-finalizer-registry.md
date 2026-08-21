@@ -278,10 +278,18 @@ external-boundary images are deterministic, but remain unpublished.
 private-image boundary. A parser separate from the encoder discovers and checks
 the ELF header, program/dynamic/name/section tables, source spans, write audits,
 unexplained platform-prefix changes, and final ledger. Both static and external
-images remain unpublished. The next native milestone is an explicit bounded,
-validation-ledger-bound OS-loader probe for static closure only; registered
-external interpreter and dependency provenance remain separate. Nuisc remains
-free of ELF branches.
+images remain unpublished. `nuis-nsld-elf-amd64-os-loader-probe-v1` now
+revalidates that complete report, accepts only zero-unresolved static closure,
+keeps the production finalizer plan-only, and rejects external inputs before
+filesystem access. Its object-format-neutral runtime is shared with Mach-O and
+owns create-new owner-only materialization, exact reread, empty environment and
+stdin, bounded wait/capture, and owned-path cleanup. A cross-object Linux
+`_start` fixture binds `R_X86_64_PLT32`, calls the program entry, and exits by
+syscall. Real Linux execution evidence remains pending while the registered host
+is unreachable; exposing apply through the CLI additionally requires a
+provider-owned registry callback rather than an ELF branch. Registered external
+interpreter/dependency provenance remains separate. Nuisc remains free of ELF
+branches.
 
 ## Validation
 

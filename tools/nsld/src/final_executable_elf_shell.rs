@@ -18,7 +18,10 @@ pub(crate) use report::{
     ElfAmd64ShellImageSerializationReport, ElfAmd64ShellImageValidationReport,
     ElfAmd64ShellLayoutPlanReport,
 };
-pub(crate) use validation::validate_elf_amd64_shell_image;
+pub(crate) use validation::{
+    validate_elf_amd64_shell_image, validate_elf_amd64_shell_image_validation_report,
+    ELF_AMD64_PUBLICATION_ELIGIBILITY_CONTRACT, ELF_AMD64_SHELL_IMAGE_VALIDATION_CONTRACT,
+};
 
 use crate::{
     final_executable_elf_layout::{
@@ -474,7 +477,7 @@ fn optional_usize(value: Option<usize>) -> String {
 
 #[cfg(test)]
 #[path = "final_executable_elf_shell_tests.rs"]
-mod tests;
+pub(crate) mod tests;
 #[cfg(test)]
 #[path = "final_executable_elf_shell_validation_tests.rs"]
 mod validation_tests;

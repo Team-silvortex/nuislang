@@ -59,6 +59,32 @@ pub(crate) fn elf_unrelated_runtime_object() -> Vec<u8> {
     })
 }
 
+pub(crate) fn elf_exit_program_object() -> Vec<u8> {
+    build_object(ObjectFixture {
+        text: &[0x31, 0xc0, 0xc3],
+        defined_symbol: "__nuis_entry",
+        undefined_symbol: None,
+        relocations: &[],
+        bss_size: 0,
+    })
+}
+
+pub(crate) fn elf_linux_exit_runtime_object() -> Vec<u8> {
+    let relocations = [(1, R_X86_64_PLT32, -4)];
+    build_object(ObjectFixture {
+        text: &[
+            0xe8, 0, 0, 0, 0, // call __nuis_entry
+            0x89, 0xc7, // mov edi, eax
+            0xb8, 0x3c, 0, 0, 0, // mov eax, SYS_exit
+            0x0f, 0x05, // syscall
+        ],
+        defined_symbol: "_start",
+        undefined_symbol: Some("__nuis_entry"),
+        relocations: &relocations,
+        bss_size: 0,
+    })
+}
+
 struct ObjectFixture<'a> {
     text: &'a [u8],
     defined_symbol: &'a str,

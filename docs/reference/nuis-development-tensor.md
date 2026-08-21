@@ -457,14 +457,15 @@ The `beta-0.1` calibration baseline is:
   carry source/encoded/post-write hashes; every file-backed source span remains
   byte-identical, zero-fill remains `SHT_NOBITS`, and the final image plus all
   audits are bound by one deterministic ledger.
-  `nuis-nsld-elf-amd64-shell-image-validation-v1` independently reparses the
-  bytes without using the encoder, checks every header/table/dynamic/name
-  coordinate, source span, write audit, unexplained prefix change, and final
-  ledger, and keeps static and external-boundary images unpublished.
-  The provider still atomically installs only the validated compatibility image
-  without Clang/LLD. Parsing through private shell serialization is closed;
-  isolated static OS-loader probing, registered external interpreter/dependency
-  provenance, other ELF architectures, and PE/COFF remain open
+  `nuis-nsld-elf-amd64-shell-image-validation-v1` reparses the bytes without the
+  encoder, checking header/table/dynamic/name coordinates, source spans, write
+  audits, unexplained prefix/tail bytes, and the final ledger.
+  `nuis-nsld-elf-amd64-os-loader-probe-v1` revalidates that report, defaults to
+  plan-only, rejects external images before filesystem access, and delegates
+  create-new bounded execution/capture/cleanup to the runtime shared by Mach-O.
+  Its cross-object `_start`/`PLT32`/exit fixture closes the static plan, but real
+  Linux execution awaits a reachable host and registry-neutral CLI callback.
+  Compatibility remains the sole atomic output; dynamic provenance, other ELF architectures, and PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

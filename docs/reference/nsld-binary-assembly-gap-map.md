@@ -215,14 +215,20 @@ that image without the encoder and verifies every header/table coordinate,
 dynamic and section-name record, source-preservation and write audit,
 unexplained platform-prefix byte, and final ledger. The provider still validates
 and atomically publishes only its ELF64 `ET_EXEC`/PIE compatibility image
-without Clang/LLD. The private Nsld-owned image remains deliberately unpublished
-until a bounded static OS-loader probe closes the next boundary.
+without Clang/LLD. `nuis-nsld-elf-amd64-os-loader-probe-v1` now revalidates the
+complete private-image report, permits only zero-unresolved static closure, and
+rejects external inputs before filesystem access. Its execution mechanics share
+the Mach-O runtime for create-new materialization, exact reread, empty process
+inputs, bounded wait/capture, and cleanup. Default finalization remains
+plan-only and still emits compatibility bytes. The Linux `_start` fixture closes
+cross-object `PLT32` and syscall-exit planning, but a reachable x86_64 Linux host
+and a provider-registered CLI callback are still required before load admission.
 
 It does not yet own:
 
 * complete architecture parity across Mach-O, ELF, and PE/COFF
-* isolated ELF static-image load admission, registered dynamic
-  interpreter/dependency provenance, plus complete PE/COFF object merging
+* real ELF static-image load evidence and registry-frontdoor admission,
+  registered dynamic provenance, plus complete PE/COFF object merging
 * a durable embedded Nsdb/YIR debug metadata section
 
 ## Gap 1: Compatibility Object Writer

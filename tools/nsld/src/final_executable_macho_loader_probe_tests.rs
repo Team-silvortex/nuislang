@@ -104,38 +104,6 @@ fn probe_rejects_private_image_byte_drift() {
     fs::remove_dir(root).unwrap();
 }
 
-#[test]
-fn cleanup_preserves_paths_not_created_by_the_probe() {
-    let root = unique_temp_dir("nsld-loader-probe-unowned");
-    fs::create_dir_all(&root).unwrap();
-    let paths = unique_probe_paths(&root);
-    fs::write(&paths.executable, b"preexisting").unwrap();
-
-    assert!(cleanup_probe_paths(&paths, &ProbeCreatedPaths::default()));
-    assert_eq!(fs::read(&paths.executable).unwrap(), b"preexisting");
-
-    fs::remove_file(paths.executable).unwrap();
-    fs::remove_dir(root).unwrap();
-}
-
-#[test]
-fn capture_limit_detects_oversized_probe_output() {
-    let root = unique_temp_dir("nsld-loader-probe-capture-limit");
-    fs::create_dir_all(&root).unwrap();
-    let paths = unique_probe_paths(&root);
-    File::create(&paths.stdout)
-        .unwrap()
-        .set_len(CAPTURE_LIMIT_BYTES + 1)
-        .unwrap();
-    File::create(&paths.stderr).unwrap();
-
-    assert!(capture_limit_exceeded(&paths));
-
-    fs::remove_file(paths.stdout).unwrap();
-    fs::remove_file(paths.stderr).unwrap();
-    fs::remove_dir(root).unwrap();
-}
-
 fn probe(
     image: &MachOArm64SerializedShellImage,
     fixture: &ShellFixture,
