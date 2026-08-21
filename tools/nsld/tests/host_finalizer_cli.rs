@@ -425,6 +425,40 @@ fn cli_persists_and_replays_internal_private_image_admission_receipt() {
     assert!(verification_text.contains("probe=true valid=true"));
     assert_eq!(compatibility_after, compatibility_before);
 
+    let default_output = run_nsld("final-executable-output", &manifest);
+    let selection_plan = run_nsld_args(&[
+        "final-executable-output",
+        manifest.to_str().unwrap(),
+        "--output-policy",
+        "admitted-private-image",
+        "--json",
+    ]);
+    assert!(default_output.contains("\"selection\":{"));
+    assert!(default_output.contains("\"policy_id\":\"compatibility-default\""));
+    assert!(default_output.contains("\"default_policy\":true"));
+    assert!(default_output.contains("\"explicit_request\":false"));
+    assert!(default_output.contains("\"apply_requested\":false"));
+    assert!(
+        selection_plan.contains("\"contract\":\"nuis-nsld-final-output-selection-evidence-v1\"")
+    );
+    assert!(selection_plan.contains("\"policy_id\":\"admitted-private-image\""));
+    assert!(selection_plan.contains("\"status\":\"ready-private-image-selection-plan\""));
+    assert!(selection_plan.contains("\"explicit_request\":true"));
+    assert!(selection_plan.contains("\"apply_requested\":false"));
+    assert!(selection_plan.contains("\"selection_ready\":true"));
+    assert!(selection_plan.contains("\"selected\":false"));
+    assert!(selection_plan
+        .contains("\"provider_id\":\"nsld.finalizer.mach-o.arm64.artifact-image-v1\""));
+    assert!(selection_plan.contains("\"target_key\":\"aarch64-macos-mach-o\""));
+    assert!(selection_plan.contains("\"admission_receipt_valid\":true"));
+    assert!(selection_plan.contains("\"admission_receipt_hash_sha256\":\""));
+    assert!(selection_plan.contains("\"candidate_image_sha256\":\""));
+    assert!(selection_plan.contains("\"selection_ledger_sha256\":\""));
+    assert_eq!(
+        fs::read(dir.join("demo.bin")).unwrap(),
+        compatibility_before
+    );
+
     let publication_plan = run_nsld("final-executable-private-image-publication", &manifest);
     let publication_plan_text = run_nsld_args(&[
         "final-executable-private-image-publication",
@@ -472,6 +506,19 @@ fn cli_persists_and_replays_internal_private_image_admission_receipt() {
     assert!(rejected_publication_stdout.contains("\"installed\":false"));
     assert!(rejected_publication_stdout.contains("\"output_changed\":false"));
     assert!(rejected_publication_stdout.contains("publication-admission:receipt-hash-mismatch"));
+    let rejected_selection = run_nsld_failure(&[
+        "final-executable-output",
+        manifest.to_str().unwrap(),
+        "--output-policy",
+        "admitted-private-image",
+        "--apply",
+        "--json",
+    ]);
+    let rejected_selection_stdout = String::from_utf8(rejected_selection.stdout).unwrap();
+    assert!(rejected_selection_stdout.contains("\"status\":\"blocked-private-image-selection\""));
+    assert!(rejected_selection_stdout.contains("\"admission_receipt_valid\":false"));
+    assert!(rejected_selection_stdout.contains("\"installation_attempted\":false"));
+    assert!(rejected_selection_stdout.contains("\"selected\":false"));
     assert_eq!(
         fs::read(dir.join("demo.bin")).unwrap(),
         compatibility_before
@@ -479,8 +526,10 @@ fn cli_persists_and_replays_internal_private_image_admission_receipt() {
 
     fs::write(&receipt_path, &receipt).unwrap();
     let publication = run_nsld_args(&[
-        "final-executable-private-image-publication",
+        "final-executable-output",
         manifest.to_str().unwrap(),
+        "--output-policy",
+        "admitted-private-image",
         "--apply",
         "--json",
     ]);
@@ -491,16 +540,23 @@ fn cli_persists_and_replays_internal_private_image_admission_receipt() {
         .mode()
         & 0o777;
     let private_execution = Command::new(dir.join("demo.bin")).output().unwrap();
-    assert!(publication.contains("\"status\":\"private-image-published\""));
+    assert!(publication.contains("\"status\":\"private-image-selected\""));
+    assert!(publication.contains("\"publication_status\":\"private-image-published\""));
+    assert!(publication.contains("\"policy_id\":\"admitted-private-image\""));
+    assert!(publication.contains("\"explicit_request\":true"));
     assert!(publication.contains(
         "\"capability_id\":\"nsld.finalizer.mach-o.arm64.private-image-publication-v1\""
     ));
     assert!(publication.contains("\"apply_requested\":true"));
     assert!(publication.contains("\"installation_attempted\":true"));
-    assert!(publication.contains("\"installed\":true"));
-    assert!(publication.contains("\"output_matches_private_image\":true"));
-    assert!(publication.contains("\"output_executable\":true"));
-    assert!(publication.contains("\"output_changed\":true"));
+    assert!(publication.contains("\"installation_attempted\":true"));
+    assert!(publication.contains("\"selected\":true"));
+    assert!(publication.contains("\"selected_output_identity_matches\":true"));
+    assert!(publication.contains("\"selected_output_executable\":true"));
+    assert!(publication.contains("\"selected_output_name\":\"demo.bin\""));
+    assert!(publication.contains("\"selected_output_sha256\":\""));
+    assert!(publication.contains("\"publication_ledger_sha256\":\""));
+    assert!(publication.contains("\"selection_ledger_sha256\":\""));
     assert_ne!(private_image, compatibility_before);
     assert_eq!(private_image_mode, 0o700);
     assert!(private_execution.status.success());

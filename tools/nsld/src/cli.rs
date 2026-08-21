@@ -140,6 +140,8 @@ pub(crate) enum Command {
     FinalExecutableOutput {
         input: PathBuf,
         json: bool,
+        output_policy: Option<String>,
+        apply: bool,
     },
     Seal {
         input: PathBuf,

@@ -2,6 +2,35 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(crate) const DEV_TENSOR_RUNTIME_NSLD_SHELL_IMAGE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "nsld-final-output-selection-registry-contract",
+        path: "tools/nsld/src/final_executable_output_selection.rs",
+        required_patterns: &[
+            "nuis-nsld-final-output-selection-registry-v1",
+            "nuis-nsld-final-output-selection-evidence-v1",
+            "compatibility-default",
+            "admitted-private-image",
+            "evaluate_final_output_selection",
+            "invoke_registered_private_image_publication",
+            "requires an explicit policy",
+            "selection_ledger_sha256",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-final-output-private-selection-execution-evidence",
+        path: "tools/nsld/tests/host_finalizer_cli.rs",
+        required_patterns: &[
+            "final-executable-output",
+            "--output-policy",
+            "admitted-private-image",
+            "ready-private-image-selection-plan",
+            "blocked-private-image-selection",
+            "private-image-selected",
+            "selected_output_identity_matches",
+            "selection_ledger_sha256",
+            "private_execution.status.success()",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nsld-macho-common-allocation-contract",
         path: "tools/nsld/src/final_executable_macho_layout.rs",
         required_patterns: &[

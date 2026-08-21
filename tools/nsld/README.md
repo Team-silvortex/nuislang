@@ -225,6 +225,16 @@ temporary file, syncs and rereads them, atomically renames the file, syncs the
 directory, and verifies final size, SHA-256 identity, and executable mode. An
 invalid receipt leaves the compatibility image unchanged; a valid real fixture
 publishes and executes directly through macOS with exit code 0.
+The ordinary `final-executable-output` boundary now owns a separate
+`nuis-nsld-final-output-selection-registry-v1`. With no policy it selects the
+existing compatibility output without mutation. An explicit
+`--output-policy admitted-private-image` request is plan-only unless paired with
+`--apply`; application reuses the selected finalizer callback and therefore
+cannot bypass receipt replay. The nested
+`nuis-nsld-final-output-selection-evidence-v1` record binds the registry hash,
+provider capability, receipt and verification identities, publication ledger,
+candidate SHA-256, and installed size/SHA-256/executable identity. The real
+common-symbol fixture now takes this ordinary route before execution.
 A gated host-command provider remains as a fallback; ELF and PE/COFF are
 explicit `registered-not-implemented` providers. This proves relocatable input,
 table parsing, placement, binding, merged-image construction, direct and
@@ -232,13 +242,12 @@ platform relocation encoding, deterministic GOT/stub allocation, platform byte
 synthesis, unresolved-bind preservation, audited Mach-O shell planning, and
 signed private final-address byte serialization with an independent structural
 validator, one real isolated OS-loader execution, durable replay admission, and
-registered opt-in publication. The real internal fixture now executes
+registered opt-in publication and ordinary explicit selection. The real internal fixture now executes
 `ADRP`/`ADD`/`STR` against provider-allocated common storage before passing
-signature, loader, receipt replay, publication, and direct execution. It does
-not yet select that admitted private image from the ordinary final-output
-workflow or complete absolute/indirect symbols, ELF, or PE/COFF. The ordinary
-default compatibility executable remains byte-for-byte unchanged unless the
-dedicated publication command receives `--apply`.
+signature, loader, receipt replay, ordinary final-output selection, and direct
+execution. Absolute/indirect symbols, ELF, and PE/COFF remain incomplete. The
+ordinary default compatibility executable remains byte-for-byte unchanged;
+private installation requires both the explicit policy and `--apply`.
 
 ## Current Early-Beta Rule
 

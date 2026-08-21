@@ -31,6 +31,16 @@ fn final_executable_output_reports_missing_until_real_output_exists() {
 
     assert!(!report.present);
     assert_eq!(report.boundary_status, "missing");
+    assert_eq!(
+        report.selection.contract,
+        "nuis-nsld-final-output-selection-evidence-v1"
+    );
+    assert_eq!(report.selection.policy_id, "compatibility-default");
+    assert!(report.selection.default_policy);
+    assert!(!report.selection.explicit_request);
+    assert!(!report.selection.apply_requested);
+    assert_eq!(report.selection.status, "compatibility-output-unavailable");
+    assert!(!report.selection.selected);
     assert_eq!(report.materialization_status, "blocked");
     assert_eq!(
         report.execution_handoff_contract,
@@ -107,6 +117,10 @@ fn final_executable_output_reports_missing_until_real_output_exists() {
         .any(|blocker| blocker == "final-executable-emit:not-emitted"));
     assert!(report_json.contains("\"kind\":\"nsld_final_executable_output\""));
     assert!(report_json.contains("\"boundary_status\":\"missing\""));
+    assert!(report_json.contains("\"selection\":{"));
+    assert!(report_json.contains("\"contract\":\"nuis-nsld-final-output-selection-evidence-v1\""));
+    assert!(report_json.contains("\"policy_id\":\"compatibility-default\""));
+    assert!(report_json.contains("\"explicit_request\":false"));
     assert!(report_json.contains("\"materialization_status\":\"blocked\""));
     assert!(report_json.contains("\"execution_handoff_contract\":\"nsld-final-output-handoff-v1\""));
     assert!(report_json.contains("\"execution_handoff_ready\":false"));

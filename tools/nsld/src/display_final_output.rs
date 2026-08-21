@@ -1,6 +1,7 @@
 use super::{
     display_final_output_runtime_dispatch_receipt::display_runtime_dispatch_receipt,
-    display_final_output_trace::*, display_text::*, reports::NsldFinalExecutableOutputReport,
+    display_final_output_selection::print_final_output_selection, display_final_output_trace::*,
+    display_text::*, reports::NsldFinalExecutableOutputReport,
 };
 
 pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecutableOutputReport) {
@@ -12,6 +13,7 @@ pub(crate) fn print_nsld_final_executable_output_report(report: &NsldFinalExecut
         "  output_validation_mode: {}",
         report.output_validation_mode
     );
+    print_final_output_selection(&report.selection);
     println!("  boundary_status: {}", report.boundary_status);
     println!(
         "  materialization_status: {}",

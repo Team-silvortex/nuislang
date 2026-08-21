@@ -151,10 +151,22 @@ shell symbols to final addresses, and carries a real store-using fixture through
 signature, admission, registered publication, and execution without adding
 Mach-O branches to Nuisc or the generic emit frontdoor.
 
-The next native milestone is an explicit provider-neutral final-output selection
-policy. It may choose a replay-verified private image through the ordinary drive
-workflow only when requested, must bind receipt and output identities into the
-final-output report, and must preserve the compatibility image as the default.
+`nuis-nsld-final-output-selection-registry-v1` now closes the ordinary-output
+selection boundary without adding object-format logic to Nuisc. Its sole
+default, `compatibility-default`, only observes the existing output. The
+explicit `admitted-private-image` policy delegates through the selected
+finalizer capability and may install only bytes accepted by receipt replay.
+Plan-only requests never mutate output; `--apply` is rejected without an
+explicit apply-capable policy. `nuis-nsld-final-output-selection-evidence-v1`
+binds the policy-registry hash, provider/target/capability, admission receipt and
+verification hashes, publication ledger, candidate image, and installed output
+size/SHA-256/executable identity into the ordinary final-output report. Receipt
+tamper remains fail-closed and the compatibility executable remains the
+byte-for-byte default.
+
+The next native milestone is provider-side lowering for absolute and indirect
+Mach-O non-section definitions, including deterministic alias resolution and
+cycle rejection, before the same registry shape expands toward ELF and PE/COFF.
 
 ## Validation
 

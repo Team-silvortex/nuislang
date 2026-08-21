@@ -27,6 +27,8 @@ fn final_executable_output_command_persists_nsdb_handoff_record() {
     let command = Command::FinalExecutableOutput {
         input: Path::new(&manifest).to_path_buf(),
         json: true,
+        output_policy: None,
+        apply: false,
     };
     run_final_executable_command(&command).unwrap();
     let handoff_path = dir.join("nuis.nsdb.payload-execution-handoff.toml");

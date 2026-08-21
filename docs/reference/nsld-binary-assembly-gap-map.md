@@ -151,11 +151,21 @@ shell symbol table consume those records. The real published fixture executes
 `ADRP`/`ADD`/`STR` against the VM-only allocation before exiting zero, while the
 ordinary compatibility output remains unchanged by default.
 
+`nuis-nsld-final-output-selection-registry-v1` now makes that private product an
+explicit ordinary final-output option rather than a separate architecture path.
+`compatibility-default` remains non-mutating. `admitted-private-image` delegates
+through the selected finalizer only after receipt replay, stays plan-only
+without `--apply`, and publishes the exact candidate under an installed-output
+SHA-256 identity. The final report binds registry, policy, receipt, publication,
+candidate, and installed-image evidence under
+`nuis-nsld-final-output-selection-evidence-v1`. A damaged receipt cannot start
+installation, while the valid common-symbol fixture selects and executes the
+private Mach-O through the ordinary command.
+
 It does not yet own:
 
 * complete Mach-O, ELF, and PE/COFF compatibility object parity
 * general native relocation application across those target formats
-* default private-image selection in the ordinary final emit pipeline
 * absolute/indirect Mach-O non-section definition lowering
 * a durable embedded Nsdb/YIR debug metadata section
 

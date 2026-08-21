@@ -20,6 +20,7 @@ use super::{
     final_executable_output_nsdb_handoff::{
         attach_final_output_nsdb_handoff_summary, persist_final_output_nsdb_handoff,
     },
+    final_executable_output_selection::evaluate_final_output_selection,
     final_stage::*,
     json::*,
     json_final_macho_admission::macho_arm64_publication_admission_verify_report_json,
@@ -358,9 +359,18 @@ pub(crate) fn run_final_executable_command(command: &Command) -> Result<bool, St
                 Err("nsld final executable emit verification failed".to_owned())
             }
         }
-        Command::FinalExecutableOutput { input, json } => {
+        Command::FinalExecutableOutput {
+            input,
+            json,
+            output_policy,
+            apply,
+        } => {
             let ctx = load_link_input_context(input)?;
             let mut report = nsld_final_executable_output_report(&ctx.manifest, &ctx.plan);
+            if output_policy.is_some() || *apply {
+                report.selection =
+                    evaluate_final_output_selection(&ctx.plan, output_policy.as_deref(), *apply)?;
+            }
             let summary = persist_final_output_nsdb_handoff(
                 std::path::Path::new(&ctx.plan.output_dir),
                 &report,
@@ -371,7 +381,11 @@ pub(crate) fn run_final_executable_command(command: &Command) -> Result<bool, St
             } else {
                 print_nsld_final_executable_output_report(&report);
             }
-            Ok(true)
+            if *apply && !report.selection.selected {
+                Err("nsld final-output selection apply failed".to_owned())
+            } else {
+                Ok(true)
+            }
         }
         Command::FinalExecutableLauncherManifest { input, json } => {
             let ctx = load_link_input_context(input)?;

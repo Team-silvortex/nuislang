@@ -418,9 +418,50 @@ fn parses_final_executable_output_input_and_json_flag() {
         command,
         Ok(Command::FinalExecutableOutput {
             input: PathBuf::from("out"),
-            json: true
+            json: true,
+            output_policy: None,
+            apply: false
         })
     );
+}
+
+#[test]
+fn parses_explicit_final_output_policy_apply() {
+    let command = parse_args(
+        vec![
+            "final-executable-output".to_owned(),
+            "out".to_owned(),
+            "--output-policy".to_owned(),
+            "admitted-private-image".to_owned(),
+            "--apply".to_owned(),
+            "--json".to_owned(),
+        ]
+        .into_iter(),
+    );
+    assert_eq!(
+        command,
+        Ok(Command::FinalExecutableOutput {
+            input: PathBuf::from("out"),
+            json: true,
+            output_policy: Some("admitted-private-image".to_owned()),
+            apply: true
+        })
+    );
+}
+
+#[test]
+fn final_output_apply_requires_explicit_policy() {
+    let error = parse_args(
+        vec![
+            "final-executable-output".to_owned(),
+            "out".to_owned(),
+            "--apply".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .unwrap_err();
+
+    assert!(error.contains("requires `--output-policy`"));
 }
 
 #[test]

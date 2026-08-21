@@ -9,7 +9,7 @@ pub(crate) fn parse_named_input_command<I>(
 where
     I: Iterator<Item = String>,
 {
-    let (input, json, apply, until_clean) = match parse_input_flags(command, args) {
+    let (input, json, apply, until_clean, output_policy) = match parse_input_flags(command, args) {
         Ok(parsed) => parsed,
         Err(err) => return Some(Err(err)),
     };
@@ -73,7 +73,12 @@ where
         }
         "emit-final-executable" => Command::EmitFinalExecutable { input, json },
         "verify-final-executable-emit" => Command::VerifyFinalExecutableEmit { input, json },
-        "final-executable-output" => Command::FinalExecutableOutput { input, json },
+        "final-executable-output" => Command::FinalExecutableOutput {
+            input,
+            json,
+            output_policy,
+            apply,
+        },
         "seal" => Command::Seal { input, json },
         "final-executable-launcher-manifest" => {
             Command::FinalExecutableLauncherManifest { input, json }
@@ -140,25 +145,45 @@ where
     Some(Ok(parsed))
 }
 
-fn parse_input_flags<I>(command: &str, args: I) -> Result<(PathBuf, bool, bool, bool), String>
+fn parse_input_flags<I>(
+    command: &str,
+    args: I,
+) -> Result<(PathBuf, bool, bool, bool, Option<String>), String>
 where
     I: Iterator<Item = String>,
 {
+    let mut args = args;
     let mut json = false;
     let mut apply = false;
     let mut until_clean = false;
+    let mut output_policy = None;
     let mut input = None;
-    for arg in args {
+    while let Some(arg) = args.next() {
         if arg == "--json" {
             json = true;
         } else if arg == "--apply" {
             if command != "drive"
                 && command != "final-executable-private-image-loader-probe"
                 && command != "final-executable-private-image-publication"
+                && command != "final-executable-output"
             {
                 return Err(format!("unexpected argument `{arg}`"));
             }
             apply = true;
+        } else if arg == "--output-policy" {
+            if command != "final-executable-output" {
+                return Err(format!("unexpected argument `{arg}`"));
+            }
+            if output_policy.is_some() {
+                return Err("duplicate `--output-policy`".to_owned());
+            }
+            let value = args
+                .next()
+                .ok_or_else(|| "`--output-policy` requires a value".to_owned())?;
+            if value.is_empty() || value.starts_with("--") {
+                return Err("`--output-policy` requires a policy id".to_owned());
+            }
+            output_policy = Some(value);
         } else if arg == "--until-clean" {
             if command != "drive" {
                 return Err(format!("unexpected argument `{arg}`"));
@@ -173,6 +198,9 @@ where
     if until_clean && !apply {
         return Err("`--until-clean` requires `--apply`".to_owned());
     }
+    if command == "final-executable-output" && apply && output_policy.is_none() {
+        return Err("`--apply` requires `--output-policy` for final-executable-output".to_owned());
+    }
     let input = input.ok_or_else(|| usage().to_owned())?;
-    Ok((input, json, apply, until_clean))
+    Ok((input, json, apply, until_clean, output_policy))
 }

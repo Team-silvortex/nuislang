@@ -381,10 +381,14 @@ The `beta-0.1` calibration baseline is:
   verifies the exact owner-executable image. The real installed private Mach-O
   exits 0 through macOS with empty output. The common fixture executes
   `ADRP`/`ADD`/`STR` against VM-only provider storage before that same admission
-  and publication chain. The base serialization report remains
-  `private-not-published` until this separate explicit command runs; ordinary-
-  pipeline private-image selection, absolute/indirect definitions, ELF, and
-  PE/COFF remain open
+  and publication chain. `nuis-nsld-final-output-selection-registry-v1` now
+  keeps `compatibility-default` as the non-mutating default while an explicit
+  `admitted-private-image` request delegates through the registered finalizer.
+  Plan-only calls preserve bytes; apply requires valid receipt replay and binds
+  receipt, publication, candidate, and installed SHA-256 identities under
+  `nuis-nsld-final-output-selection-evidence-v1`. The real ordinary final-output
+  command selects and executes that private image. Absolute/indirect
+  definitions, ELF, and PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

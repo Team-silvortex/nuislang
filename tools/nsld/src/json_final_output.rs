@@ -1,6 +1,7 @@
 use super::{
     json_fields::*,
     json_final_output_runtime_dispatch_receipt::runtime_dispatch_receipt_json_fields,
+    json_final_output_selection::final_output_selection_json_field,
     reports::NsldFinalExecutableOutputReport,
 };
 
@@ -14,6 +15,7 @@ pub(crate) fn nsld_final_executable_output_report_json(
         json_string_field("output_path", &report.output_path),
         json_string_field("output_kind", &report.output_kind),
         json_string_field("output_validation_mode", &report.output_validation_mode),
+        final_output_selection_json_field(&report.selection),
         json_string_field("boundary_status", &report.boundary_status),
         json_string_field("materialization_status", &report.materialization_status),
         json_string_field(

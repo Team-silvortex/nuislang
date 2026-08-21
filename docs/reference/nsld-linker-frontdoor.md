@@ -41,12 +41,13 @@ For the automation frontdoor, see [nsld-driver-frontdoor.md](nsld-driver-frontdo
 * SHA-256 ad-hoc Mach-O signing and independent structural/signed-range validation
 * explicit non-publishing Mach-O arm64 OS-loader probing with bounded execution
   and cleanup evidence
+* provider-neutral final-output selection with a compatibility default and an
+  explicit replay-admitted private-image policy
 * registered Mach-O arm64 compatibility-image materialization
 * the first independent CLI boundary for future linker work
 
 `Nsld` does not yet own:
 
-* explicit private-image selection in the ordinary final-output workflow
 * absolute/indirect Mach-O non-section definitions
 * final host-native executable wrapping for ELF or PE/COFF
 * binary section assembly independent from `nuisc`
@@ -100,6 +101,8 @@ cargo run -p nsld -- emit-final-executable <artifact-output-dir>
 cargo run -p nsld -- verify-final-executable-emit <artifact-output-dir> --json
 cargo run -p nsld -- final-executable-output <artifact-output-dir>
 cargo run -p nsld -- final-executable-output <artifact-output-dir> --json
+cargo run -p nsld -- final-executable-output <artifact-output-dir> --output-policy admitted-private-image --json
+cargo run -p nsld -- final-executable-output <artifact-output-dir> --output-policy admitted-private-image --apply --json
 cargo run -p nsld -- prepare <artifact-output-dir>
 cargo run -p nsld -- prepare <artifact-output-dir> --json
 cargo run -p nsld -- assemble-plan <artifact-output-dir>
@@ -1200,6 +1203,14 @@ Invalid admission leaves the compatibility executable unchanged; the positive
 fixture replaces it only under explicit apply and the installed private image
 runs directly through macOS with exit code 0.
 
+The same capability is now consumable from the ordinary final-output boundary
+through `nuis-nsld-final-output-selection-registry-v1`. Its default policy only
+records the compatibility identity. Explicit private-image planning is also
+non-mutating; explicit apply records provider, target, capability, receipt,
+verification, publication, candidate, and installed-image identities under
+`nuis-nsld-final-output-selection-evidence-v1`. The policy layer contains no
+Mach-O branch and can host equivalent future ELF or PE/COFF selections.
+
 After those checks the provider validates a thin or universal arm64
 `MH_EXECUTE` compatibility image and installs it atomically with executable
 permissions. It requires neither host policy variables nor a child process,
@@ -1434,9 +1445,13 @@ blocker for the default host-toolchain route. This keeps final executable
 readiness scriptable without binding Nsld to one platform object format.
 Self-contained routes report `writer_status = "ready"` when the final-stage
 inputs are ready and the writer has no own blockers.
-`nsld final-executable-output` is the read-only boundary for the real runnable
-candidate. It inspects the final output path from the final-stage plan and
-reports presence, size, and hash when a file exists. It keeps explicit blockers
+`nsld final-executable-output` remains read-only under its default
+`compatibility-default` selection policy. It inspects the final output path from
+the final-stage plan and reports presence, size, SHA-256 selection identity, and
+the policy-registry hash when a file exists. Only an explicit
+`--output-policy admitted-private-image --apply` request crosses into mutation;
+that path delegates to the registered finalizer and requires replayed admission.
+The command keeps explicit blockers
 when the final-stage plan or final-executable emit report is invalid, when the
 blocked emit report still says `emitted = false`, or when the output file is
 missing. That separates "protocol snapshots are internally consistent" from "a

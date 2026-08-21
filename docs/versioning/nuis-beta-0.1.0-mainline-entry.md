@@ -557,10 +557,30 @@ The real internally closed compiled-artifact fixture now executes ARM64
 `ADRP`/`ADD`/`STR` against that VM-only common region. The resulting shell passes
 ad-hoc signature validation, macOS loader admission, receipt replay, registered
 publication, and direct execution with exit code 0. The compatibility executable
-remains byte-for-byte unchanged unless publication is explicitly applied. The
-next selected Nsld task is an explicit provider-neutral policy for choosing an
-already admitted private image from the ordinary final-output workflow without
-changing that compatibility-first default.
+remains byte-for-byte unchanged unless publication is explicitly applied. At
+that checkpoint, the selected Nsld task was a provider-neutral policy for
+choosing an already admitted private image from the ordinary final-output
+workflow without changing that compatibility-first default.
+
+That final-output selection tranche is now closed. The static
+`nuis-nsld-final-output-selection-registry-v1` contains exactly one default,
+`compatibility-default`, and one explicit apply-capable policy,
+`admitted-private-image`. The default only records the compatibility output's
+identity. The private policy delegates through the selected finalizer's
+registered callback, so it cannot bypass current product reconstruction or
+admission receipt replay. Plan-only selection leaves bytes unchanged; apply is
+rejected without an explicit policy; receipt tamper blocks installation before
+mutation.
+
+`nuis-nsld-final-output-selection-evidence-v1` is nested directly in the
+ordinary final-output report and binds the policy-registry hash,
+provider/target/capability, receipt and verification hashes, publication ledger,
+candidate image, and installed size/SHA-256/executable identity under its own
+SHA-256 ledger. The real common-symbol compiled-artifact fixture now takes this
+ordinary route and executes the selected private Mach-O with exit code 0, while
+the no-policy and plan-only routes preserve the compatibility bytes. The next
+Nsld gap is deterministic provider-side lowering for absolute and indirect
+Mach-O non-section definitions; ELF and PE/COFF remain open registrations.
 
 ## Honesty Boundary
 

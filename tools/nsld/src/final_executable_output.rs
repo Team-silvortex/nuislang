@@ -16,6 +16,7 @@ use super::{
         final_executable_output_execution_handoff, final_executable_output_materialization_status,
         final_executable_output_recommended_next_action,
     },
+    final_executable_output_selection::default_final_output_selection,
     final_executable_paths::{
         nsld_final_executable_launcher_dry_run_path, nsld_final_executable_launcher_manifest_path,
     },
@@ -386,6 +387,7 @@ pub(crate) fn nsld_final_executable_output_report(
         output_path,
         output_kind,
         output_validation_mode,
+        selection: default_final_output_selection(plan),
         boundary_status,
         materialization_status,
         execution_handoff_contract: execution_handoff.contract,

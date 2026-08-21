@@ -34,7 +34,7 @@ pub(crate) fn usage() -> &'static str {
         "  nsld verify-final-executable-pipeline <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld emit-final-executable <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld verify-final-executable-emit <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
-        "  nsld final-executable-output <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
+        "  nsld final-executable-output <nuis.build.manifest.toml|artifact-output-dir> [--output-policy <compatibility-default|admitted-private-image>] [--apply] [--json]\n",
         "  nsld seal <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld final-executable-launcher-manifest <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
         "  nsld emit-final-executable-launcher-manifest <nuis.build.manifest.toml|artifact-output-dir> [--json]\n",
