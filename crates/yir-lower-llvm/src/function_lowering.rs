@@ -151,21 +151,11 @@ pub(super) fn emit_cpu_function(
         }
 
         match node.op.cpu_llvm_lowering_class() {
-            CpuLlvmLoweringClass::Literal => {
-                if lower_cpu_literal_node(node, &mut state) {
-                    continue;
-                }
+            CpuLlvmLoweringClass::Literal if lower_cpu_literal_node(node, &mut state) => continue,
+            CpuLlvmLoweringClass::Aggregate if lower_cpu_aggregate_node(node, &mut state) => {
+                continue;
             }
-            CpuLlvmLoweringClass::Aggregate => {
-                if lower_cpu_aggregate_node(node, &mut state) {
-                    continue;
-                }
-            }
-            CpuLlvmLoweringClass::Pointer => {
-                if lower_cpu_pointer_node(node, &mut state) {
-                    continue;
-                }
-            }
+            CpuLlvmLoweringClass::Pointer if lower_cpu_pointer_node(node, &mut state) => continue,
             _ => {}
         }
 

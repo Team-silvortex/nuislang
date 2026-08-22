@@ -130,8 +130,20 @@ stage now materializes those records and deferred patches once under a second
 write ledger. `nuis-nsld-elf-amd64-shell-layout-plan-v1` maps that exact ledger
 into deterministic ELF/program/section tables, non-overlapping permission
 segments, an optional dynamic table, and a file-backed executable entry. The
-provider serializes and independently validates that private ELF shell, but OS
-load admission is not yet recorded on a real Linux host.
+provider serializes and independently validates that private ELF shell. A real
+x86_64 Linux run now passes both
+`real_linux_loader_executes_cross_object_static_image_and_cleans_up` and
+`registered_loader_probe_executes_static_image_and_projects_admission`: the
+kernel accepts the exact bytes, execution exits zero, cleanup succeeds, and the
+provider-specific and protocol-neutral ledgers validate. This records positive
+loader evidence. The generic
+`nuis-nsld-registered-loader-probe-admission-v1` receipt now binds that outcome
+to the current registry, selected provider/target/capability, complete CPU target
+identity, private-image hash, validation hash, provider evidence, and neutral
+outcome ledger. `--apply` persists the canonical SHA-256 receipt atomically and
+immediately replays it against a provider-owned plan-only rebuild. Receipt
+tamper and valid rebuilt-image drift fail closed. This is admission evidence,
+not yet an ELF private-image publication capability.
 
 This is not yet a pure Nsld linker claim. Nsld now understands the real input
 tables, assigns deterministic final sections and addresses, applies registered
@@ -293,20 +305,23 @@ filesystem access. Its object-format-neutral runtime is shared with Mach-O and
 owns create-new owner-only materialization, exact reread, empty environment and
 stdin, bounded wait/capture, and owned-path cleanup. A cross-object Linux
 `_start` fixture binds `R_X86_64_PLT32`, calls the program entry, and exits by
-syscall. Real Linux execution evidence remains pending while the registered host
-cannot be reached from the current execution sandbox. The ELF provider now owns
-the unique `nsld.finalizer.elf.amd64.loader-probe-v1` callback and maps its
-report into `nuis-nsld-registered-loader-probe-outcome-v1`. The shared CLI uses
-that registration in plan-only mode and rejects apply until positive host
-evidence is recorded. Registered external interpreter/dependency provenance
-remains separate. Nuisc remains free of ELF branches.
+syscall. Real Linux execution evidence is now recorded: the kernel accepts the
+exact static image and the process exits zero. The ELF provider owns the unique
+`nsld.finalizer.elf.amd64.loader-probe-v1` callback and maps its report into
+`nuis-nsld-registered-loader-probe-outcome-v1`. The shared CLI remains plan-only
+by default; explicit apply executes the callback, persists the generic admission
+receipt, and independently replays it against the current provider rebuild.
+Registered private-image publication and external interpreter/dependency
+provenance remain separate. Nuisc remains free of ELF branches.
 
 ## Validation
 
 ```sh
 CARGO_INCREMENTAL=0 cargo test -q -j 1 -p nsld executable_finalizer
 CARGO_INCREMENTAL=0 cargo test -q -j 1 -p nsld final_executable_elf_artifact
+CARGO_INCREMENTAL=0 cargo test -q -j 1 -p nsld registered_loader_probe
 CARGO_INCREMENTAL=0 cargo test -q -j 1 -p nsld final_executable_macho_input
 CARGO_INCREMENTAL=0 cargo test -q -j 1 -p nsld final_executable_host
 CARGO_INCREMENTAL=0 cargo test -q -j 1 -p nsld --test host_finalizer_cli
+CARGO_INCREMENTAL=0 cargo clippy -q -j 1 -p nsld --all-targets -- -D warnings
 ```

@@ -20,6 +20,26 @@ use std::{
 const MAX_FRAME_BYTES: usize = 64 * 1024;
 const WORKER_IO_TIMEOUT: Duration = Duration::from_secs(120);
 
+#[cfg(target_os = "linux")]
+fn set_message_control_len(
+    message: &mut libc::msghdr,
+    length: usize,
+    _overflow_message: &'static str,
+) -> Result<(), String> {
+    message.msg_controllen = length;
+    Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+fn set_message_control_len(
+    message: &mut libc::msghdr,
+    length: usize,
+    overflow_message: &'static str,
+) -> Result<(), String> {
+    message.msg_controllen = length.try_into().map_err(|_| overflow_message.to_owned())?;
+    Ok(())
+}
+
 pub(crate) struct UnixWorkerProcessTransport {
     child: Child,
     socket: UnixDatagram,
@@ -354,10 +374,11 @@ pub(crate) fn send_worker_request(
     message.msg_iovlen = 1;
     if !descriptors.is_empty() {
         message.msg_control = control.as_mut_ptr().cast();
-        message.msg_controllen = control
-            .len()
-            .try_into()
-            .map_err(|_| "provider worker control length overflow")?;
+        set_message_control_len(
+            &mut message,
+            control.len(),
+            "provider worker control length overflow",
+        )?;
         let header = unsafe { libc::CMSG_FIRSTHDR(&message) };
         if header.is_null() {
             return Err("provider worker descriptor header is unavailable".to_owned());
@@ -430,10 +451,11 @@ fn receive_unchecked(socket: &UnixDatagram) -> Result<UnixWorkerRequest, String>
     message.msg_iov = &mut iov;
     message.msg_iovlen = 1;
     message.msg_control = control.as_mut_ptr().cast();
-    message.msg_controllen = control
-        .len()
-        .try_into()
-        .map_err(|_| "provider worker control length overflow")?;
+    set_message_control_len(
+        &mut message,
+        control.len(),
+        "provider worker control length overflow",
+    )?;
     let received = unsafe { libc::recvmsg(socket.as_raw_fd(), &mut message, 0) };
     if received < 0 {
         return Err(format!(
@@ -582,10 +604,11 @@ fn receive_reply_packet(socket: &UnixDatagram) -> Result<(Vec<u8>, Vec<OwnedFd>)
     message.msg_iov = &mut iov;
     message.msg_iovlen = 1;
     message.msg_control = control.as_mut_ptr().cast();
-    message.msg_controllen = control
-        .len()
-        .try_into()
-        .map_err(|_| "provider worker reply control length overflow")?;
+    set_message_control_len(
+        &mut message,
+        control.len(),
+        "provider worker reply control length overflow",
+    )?;
     let received = unsafe { libc::recvmsg(socket.as_raw_fd(), &mut message, 0) };
     if received < 0 {
         return Err(format!(

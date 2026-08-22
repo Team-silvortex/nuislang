@@ -224,15 +224,24 @@ plan-only and still emits compatibility bytes. The Linux `_start` fixture closes
 cross-object `PLT32` and syscall-exit planning. The ELF finalizer now owns the
 registered `nsld.finalizer.elf.amd64.loader-probe-v1` callback, projects its
 provider evidence through `nuis-nsld-registered-loader-probe-outcome-v1`, and
-serves the shared CLI plan-only path without an ELF branch. A reachable x86_64
-Linux host and positive registered execution outcome are still required before
-the explicitly disabled apply boundary may become load admission.
+serves the shared CLI plan-only path without an ELF branch. On a real x86_64
+Linux host, both the direct static-image probe and the registered callback pass:
+the kernel accepts the exact materialized bytes, the process exits zero with
+bounded empty capture, cleanup succeeds, and both provider and neutral outcome
+ledgers validate. `nuis-nsld-registered-loader-probe-admission-v1` now stores
+that execution under a canonical SHA-256 receipt bound to registry, provider,
+target, capability, image, validation, provider-evidence, and neutral-outcome
+identities. Shared CLI `--apply` executes only through the registered callback,
+atomically persists the receipt, then immediately invokes the same provider in
+plan-only mode to rebuild current image evidence before reporting replay
+verified. Receipt tamper and a different valid rebuilt image fail closed. This
+admits the private image but does not yet publish it.
 
 It does not yet own:
 
 * complete architecture parity across Mach-O, ELF, and PE/COFF
-* real ELF static-image load evidence and registry-frontdoor admission,
-  registered dynamic provenance, plus complete PE/COFF object merging
+* provider-owned registry-frontdoor publication for the now-admitted ELF static
+  image, registered dynamic provenance, plus complete PE/COFF object merging
 * a durable embedded Nsdb/YIR debug metadata section
 
 ## Gap 1: Compatibility Object Writer

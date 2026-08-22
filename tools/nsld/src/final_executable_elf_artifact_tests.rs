@@ -10,9 +10,23 @@ use crate::{
     final_executable_registered_loader_probe::{
         validate_registered_loader_probe_outcome, REGISTERED_LOADER_PROBE_OUTCOME_CONTRACT,
     },
+    final_executable_registered_loader_probe_admission_receipt::registered_loader_probe_admission_path,
     fnv1a64_hex,
     main_final_executable_commands::try_run_registered_loader_probe,
     main_test_support::empty_link_plan,
+};
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+use crate::{
+    final_executable_elf_test_fixture::{
+        elf_alternate_exit_program_object, elf_exit_program_object, elf_linux_exit_runtime_object,
+    },
+    final_executable_registered_loader_probe_admission::verify_registered_loader_probe_admission_receipt,
+    final_executable_registered_loader_probe_admission_receipt::{
+        parse_registered_loader_probe_admission_receipt,
+        persist_registered_loader_probe_admission_receipt,
+        REGISTERED_LOADER_PROBE_ADMISSION_CONTRACT,
+    },
+    json_final_registered_loader_probe_admission::registered_loader_probe_admission_verify_report_json,
 };
 use nuisc::{
     aot::{
@@ -190,7 +204,113 @@ fn registered_loader_probe_projects_protocol_neutral_plan_only_outcome() {
 
     assert!(try_run_registered_loader_probe(&plan, true, false).unwrap());
     let apply_error = try_run_registered_loader_probe(&plan, true, true).unwrap_err();
-    assert!(apply_error.contains("apply remains disabled until host execution evidence"));
+    assert!(apply_error.contains("requires an execution-admitted outcome"));
+    assert!(!registered_loader_probe_admission_path(&plan).exists());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[test]
+fn registered_loader_probe_executes_static_image_and_projects_admission() {
+    let root = temp_dir("registered-loader-probe-execute");
+    fs::create_dir_all(&root).unwrap();
+    let artifact_path = root.join("nuis.compiled.artifact");
+    let (artifact, plan) = artifact_and_plan_with_objects(
+        &root,
+        elf_executable(ELF_TYPE_EXECUTABLE),
+        elf_exit_program_object(),
+        elf_linux_exit_runtime_object(),
+    );
+    fs::write(
+        &artifact_path,
+        encode_nuis_compiled_artifact_section_table_binary(&artifact).unwrap(),
+    )
+    .unwrap();
+
+    let outcome = invoke_registered_loader_probe(&plan, &root, true).unwrap();
+
+    assert_eq!(outcome.status, "execution-admitted", "{outcome:#?}");
+    assert_eq!(outcome.probe_mode, "execute", "{outcome:#?}");
+    assert!(outcome.host_supported, "{outcome:#?}");
+    assert!(outcome.input_eligible, "{outcome:#?}");
+    assert!(outcome.attempted, "{outcome:#?}");
+    assert!(outcome.materialized, "{outcome:#?}");
+    assert!(outcome.materialized_hash_matches, "{outcome:#?}");
+    assert!(outcome.os_loader_accepted, "{outcome:#?}");
+    assert!(outcome.process_completed, "{outcome:#?}");
+    assert!(!outcome.timed_out, "{outcome:#?}");
+    assert_eq!(outcome.exit_code, Some(0), "{outcome:#?}");
+    assert_eq!(outcome.termination_signal, None, "{outcome:#?}");
+    assert_eq!(outcome.stdout_captured_bytes, 0, "{outcome:#?}");
+    assert_eq!(outcome.stderr_captured_bytes, 0, "{outcome:#?}");
+    assert!(outcome.cleanup_attempted, "{outcome:#?}");
+    assert!(outcome.cleanup_succeeded, "{outcome:#?}");
+    assert!(outcome.execution_admitted, "{outcome:#?}");
+    assert!(outcome.blockers.is_empty(), "{outcome:#?}");
+    validate_registered_loader_probe_outcome(&outcome).unwrap();
+
+    assert!(try_run_registered_loader_probe(&plan, true, true).unwrap());
+    let receipt_path = registered_loader_probe_admission_path(&plan);
+    let receipt_source = fs::read_to_string(&receipt_path).unwrap();
+    let receipt = parse_registered_loader_probe_admission_receipt(&receipt_source).unwrap();
+    assert_eq!(receipt.contract, REGISTERED_LOADER_PROBE_ADMISSION_CONTRACT);
+    assert_eq!(
+        receipt.outcome.outcome_ledger_hash,
+        outcome.outcome_ledger_hash
+    );
+    let verification = verify_registered_loader_probe_admission_receipt(&plan);
+    assert!(verification.valid, "{verification:#?}");
+    assert!(verification.outcome_evidence_valid);
+    assert!(verification.current_private_image_matches);
+    let verification_json = registered_loader_probe_admission_verify_report_json(&verification);
+    assert!(verification_json
+        .contains("\"status\":\"registered-loader-probe-admission-replay-verified\""));
+
+    let tampered_source = receipt_source.replacen(
+        &format!(
+            "image_identity_hash = \"{}\"",
+            receipt.outcome.image_identity_hash
+        ),
+        "image_identity_hash = \"0x0000000000000000\"",
+        1,
+    );
+    assert_ne!(tampered_source, receipt_source);
+    fs::write(&receipt_path, tampered_source).unwrap();
+    let tampered = verify_registered_loader_probe_admission_receipt(&plan);
+    assert!(!tampered.valid, "{tampered:#?}");
+    assert!(tampered
+        .issues
+        .iter()
+        .any(|issue| issue.contains("receipt-hash-mismatch")));
+    assert!(tampered
+        .issues
+        .iter()
+        .any(|issue| issue.contains("outcome-invalid")));
+
+    persist_registered_loader_probe_admission_receipt(&plan, &receipt).unwrap();
+    let mut drifted_artifact = artifact.clone();
+    drifted_artifact.host_objects[0].bytes = elf_alternate_exit_program_object();
+    let mut drifted_plan = plan.clone();
+    drifted_plan.compiled_artifact.host_objects[0].bytes =
+        drifted_artifact.host_objects[0].bytes.len();
+    drifted_plan.compiled_artifact.host_objects[0].content_hash =
+        fnv1a64_hex(&drifted_artifact.host_objects[0].bytes);
+    fs::write(
+        &artifact_path,
+        encode_nuis_compiled_artifact_section_table_binary(&drifted_artifact).unwrap(),
+    )
+    .unwrap();
+    let drifted = verify_registered_loader_probe_admission_receipt(&drifted_plan);
+    assert!(!drifted.valid, "{drifted:#?}");
+    assert!(drifted.receipt_hash_matches);
+    assert!(drifted.outcome_evidence_valid);
+    assert!(!drifted.current_private_image_matches);
+    assert!(drifted
+        .issues
+        .iter()
+        .any(|issue| issue.contains("current-image-mismatch")));
+
+    assert_eq!(fs::read_dir(&root).unwrap().count(), 2);
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -224,18 +344,32 @@ fn artifact_and_plan(
     root: &std::path::Path,
     image: Vec<u8>,
 ) -> (NuisCompiledArtifact, nuisc::linker::LinkPlan) {
+    artifact_and_plan_with_objects(
+        root,
+        image,
+        elf_program_object(R_X86_64_PLT32),
+        elf_runtime_object(),
+    )
+}
+
+fn artifact_and_plan_with_objects(
+    root: &std::path::Path,
+    image: Vec<u8>,
+    program_object: Vec<u8>,
+    runtime_object: Vec<u8>,
+) -> (NuisCompiledArtifact, nuisc::linker::LinkPlan) {
     let objects = vec![
         NuisCompiledArtifactHostObject {
             object_id: "host.program-llvm".to_owned(),
             role: "program-llvm".to_owned(),
             object_format: "elf".to_owned(),
-            bytes: elf_program_object(R_X86_64_PLT32),
+            bytes: program_object,
         },
         NuisCompiledArtifactHostObject {
             object_id: "host.runtime-shim".to_owned(),
             role: "runtime-shim".to_owned(),
             object_format: "elf".to_owned(),
-            bytes: elf_runtime_object(),
+            bytes: runtime_object,
         },
     ];
     let manifest = build_manifest(root, image.len());

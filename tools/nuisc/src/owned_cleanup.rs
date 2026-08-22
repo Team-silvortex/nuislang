@@ -7,12 +7,11 @@ mod owned_cleanup_loop;
 use owned_cleanup_loop::rewrite_direct_loop_control_if;
 
 pub(crate) fn insert_owned_bytes_cleanup(module: &mut NirModule) -> bool {
-    module
-        .functions
-        .iter_mut()
-        .fold(false, |changed, function| {
-            insert_function_cleanup(function) || changed
-        })
+    let mut changed = false;
+    for function in &mut module.functions {
+        changed |= insert_function_cleanup(function);
+    }
+    changed
 }
 
 fn insert_function_cleanup(function: &mut NirFunction) -> bool {

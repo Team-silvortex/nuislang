@@ -17,10 +17,18 @@ fn plan_only_probe_requires_explicit_apply_without_materializing() {
     fs::create_dir_all(&root).unwrap();
 
     let report = probe(&image, &fixture, &root, false).unwrap();
+    let host_supported = cfg!(all(target_os = "macos", target_arch = "aarch64"));
 
     assert_eq!(report.contract, MACHO_ARM64_LOADER_PROBE_CONTRACT);
-    assert_eq!(report.status, "ready-explicit-apply-required");
-    assert!(report.host_supported);
+    assert_eq!(report.host_supported, host_supported);
+    assert_eq!(
+        report.status,
+        if host_supported {
+            "ready-explicit-apply-required"
+        } else {
+            "blocked-unsupported-probe-host"
+        }
+    );
     assert!(report.input_eligible);
     assert!(!report.attempted);
     assert!(!report.materialized);
@@ -28,7 +36,11 @@ fn plan_only_probe_requires_explicit_apply_without_materializing() {
     assert!(!report.publication_eligible);
     assert_eq!(
         report.publication_blockers,
-        ["explicit-loader-probe-apply-required"]
+        [if host_supported {
+            "explicit-loader-probe-apply-required"
+        } else {
+            "unsupported-probe-host"
+        }]
     );
     assert!(fs::read_dir(&root).unwrap().next().is_none());
     fs::remove_dir(root).unwrap();

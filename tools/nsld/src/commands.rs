@@ -129,6 +129,7 @@ pub(crate) fn nsld_check_next_action(report: &NsldCheckReport) -> NsldCheckNextA
     let crossing_env_assignments = next_action_crossing_env_assignments(
         report.next_action_source.as_deref(),
         report.next_action_command_id.as_deref(),
+        gate_action.as_deref(),
     );
     let crossing_command_resolved = crossing_command_resolved(
         &crossing_env_assignments,
@@ -169,8 +170,19 @@ fn gate_action_env_assignments(action: Option<&str>) -> Vec<String> {
 fn next_action_crossing_env_assignments(
     source: Option<&str>,
     command_id: Option<&str>,
+    gate_action: Option<&str>,
 ) -> Vec<String> {
-    if source == Some("final-output-boundary") && command_id == Some("final-executable-output") {
+    let gate_is_environment_crossable = matches!(
+        gate_action,
+        Some(
+            "set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke"
+                | "set-env:NUIS_NSLD_ALLOW_HOST_FINALIZER=1"
+        )
+    );
+    if source == Some("final-output-boundary")
+        && command_id == Some("final-executable-output")
+        && gate_is_environment_crossable
+    {
         return vec![
             "NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke".to_owned(),
             "NUIS_NSLD_ALLOW_HOST_FINALIZER=1".to_owned(),
@@ -391,6 +403,32 @@ mod tests {
         assert!(json.contains(
             "\"crossing_command_resolved\":\"env NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke NUIS_NSLD_ALLOW_HOST_FINALIZER=1 nsld final-executable-output manifest.toml\""
         ));
+    }
+
+    #[test]
+    fn check_next_action_does_not_offer_policy_crossing_for_environment_repair() {
+        let mut report = nsld_check_report(Path::new("manifest.toml"), &empty_link_plan());
+        report.next_action_available = true;
+        report.next_action_source = Some("final-output-boundary".to_owned());
+        report.next_action_command_id = Some("final-executable-output".to_owned());
+        report.next_action_command_resolved =
+            Some("nsld final-executable-output manifest.toml".to_owned());
+        report.final_executable_host_finalizer_gate_action =
+            Some("fix-host-finalizer-environment".to_owned());
+
+        let next_action = nsld_check_next_action(&report);
+
+        assert_eq!(
+            next_action.gate_action.as_deref(),
+            Some("fix-host-finalizer-environment")
+        );
+        assert!(next_action.gate_env_assignments.is_empty());
+        assert!(next_action.crossing_env_assignments.is_empty());
+        assert_eq!(next_action.crossing_command_resolved, None);
+        assert_eq!(
+            nsld_check_next_action_dry_run(&report).as_deref(),
+            Some("nsld final-executable-output manifest.toml")
+        );
     }
 
     #[test]

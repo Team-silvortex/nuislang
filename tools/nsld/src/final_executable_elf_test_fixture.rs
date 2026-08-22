@@ -69,6 +69,17 @@ pub(crate) fn elf_exit_program_object() -> Vec<u8> {
     })
 }
 
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub(crate) fn elf_alternate_exit_program_object() -> Vec<u8> {
+    build_object(ObjectFixture {
+        text: &[0xb8, 0, 0, 0, 0, 0xc3],
+        defined_symbol: "__nuis_entry",
+        undefined_symbol: None,
+        relocations: &[],
+        bss_size: 0,
+    })
+}
+
 pub(crate) fn elf_linux_exit_runtime_object() -> Vec<u8> {
     let relocations = [(1, R_X86_64_PLT32, -4)];
     build_object(ObjectFixture {

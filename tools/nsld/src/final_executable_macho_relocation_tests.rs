@@ -1,8 +1,9 @@
 use super::*;
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+use crate::final_executable_macho_input::parse_macho_arm64_object_linkage;
 use crate::{
     final_executable_macho_input::{
-        parse_macho_arm64_object_linkage, ParsedMachOObjectLinkage, ParsedMachORelocation,
-        ParsedMachOSection, ParsedMachOSymbol,
+        ParsedMachOObjectLinkage, ParsedMachORelocation, ParsedMachOSection, ParsedMachOSymbol,
     },
     final_executable_macho_layout::build_macho_placement_binding_report,
     final_executable_macho_materialization::{

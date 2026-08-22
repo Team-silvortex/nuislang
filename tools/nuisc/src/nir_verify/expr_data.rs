@@ -18,13 +18,13 @@ pub(super) fn verify_data_expr_shape(
                 ));
             }
         }
-        NirExpr::DataInputPipe(inner) => {
-            if infer_data_kind(inner, data_bindings) != NirDataKind::PipeOutput {
-                return Err(format!(
-                    "nir verify: data_input_pipe expects output pipe input, got `{}`",
-                    render_data_expr_name(inner)
-                ));
-            }
+        NirExpr::DataInputPipe(inner)
+            if infer_data_kind(inner, data_bindings) != NirDataKind::PipeOutput =>
+        {
+            return Err(format!(
+                "nir verify: data_input_pipe expects output pipe input, got `{}`",
+                render_data_expr_name(inner)
+            ));
         }
         NirExpr::DataCopyWindow { input, .. } | NirExpr::DataImmutableWindow { input, .. } => {
             let source = infer_data_kind(input, data_bindings);

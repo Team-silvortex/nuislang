@@ -32,13 +32,13 @@ pub(crate) fn probe_macho_arm64_signed_shell_image(
     validate_input(&input)?;
     let host_supported = cfg!(all(target_os = "macos", target_arch = "aarch64"));
     let input_eligible = input.unresolved_external_symbol_count == 0 && input.bind_count == 0;
-    let observation = if !host_supported {
-        ProbeObservation::blocked("blocked-unsupported-probe-host", "unsupported-probe-host")
-    } else if !input_eligible {
+    let observation = if !input_eligible {
         ProbeObservation::blocked(
             "blocked-external-compatibility-input",
             "private-image-has-external-compatibility-bindings",
         )
+    } else if !host_supported {
+        ProbeObservation::blocked("blocked-unsupported-probe-host", "unsupported-probe-host")
     } else if !execute {
         ProbeObservation::blocked(
             "ready-explicit-apply-required",

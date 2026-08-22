@@ -438,9 +438,32 @@ fn drive_until_clean_command_reaches_host_assisted_pipeline_block() {
     let drive_report = nsld_drive_apply_until_clean(Path::new(&manifest), &plan).unwrap();
     let drive_json = nsld_drive_until_clean_report_json(&drive_report);
     let expected_boundary_command = format!("nsld final-executable-output {manifest}");
-    let expected_crossing_command = format!(
-        "env NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke NUIS_NSLD_ALLOW_HOST_FINALIZER=1 {expected_boundary_command}"
+    let expected_gate_action = check
+        .final_executable_host_finalizer_gate_action
+        .clone()
+        .expect("final output boundary must expose a host-finalizer gate action");
+    let expected_gate_env_assignments = expected_gate_action
+        .strip_prefix("set-env:")
+        .map(|assignment| vec![assignment.to_owned()])
+        .unwrap_or_default();
+    let crossing_available = matches!(
+        expected_gate_action.as_str(),
+        "set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke"
+            | "set-env:NUIS_NSLD_ALLOW_HOST_FINALIZER=1"
     );
+    let expected_crossing_env_assignments = if crossing_available {
+        vec![
+            "NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke".to_owned(),
+            "NUIS_NSLD_ALLOW_HOST_FINALIZER=1".to_owned(),
+        ]
+    } else {
+        Vec::new()
+    };
+    let expected_crossing_command = crossing_available.then(|| {
+        format!(
+            "env NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke NUIS_NSLD_ALLOW_HOST_FINALIZER=1 {expected_boundary_command}"
+        )
+    });
     let final_output_present = Path::new(&plan.final_stage.output_path).exists();
     fs::remove_dir_all(dir).unwrap();
 
@@ -459,40 +482,46 @@ fn drive_until_clean_command_reaches_host_assisted_pipeline_block() {
         drive_report.stop_command_id.as_deref(),
         Some("final-executable-output")
     );
-    assert!(drive_report
-        .stop_action_reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains(
-            "next_gate_action:set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke"
-        )));
+    assert!(
+        drive_report.stop_action_reason.as_deref().is_some_and(
+            |reason| reason.contains(&format!("next_gate_action:{expected_gate_action}"))
+        )
+    );
     assert_eq!(
         drive_report.stop_gate_action.as_deref(),
-        Some("set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke")
+        Some(expected_gate_action.as_str())
     );
     assert_eq!(
         drive_report.stop_gate_env_assignments,
-        vec!["NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke".to_owned()]
+        expected_gate_env_assignments
     );
     assert_eq!(
         drive_report.stop_crossing_env_assignments,
-        vec![
-            "NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke".to_owned(),
-            "NUIS_NSLD_ALLOW_HOST_FINALIZER=1".to_owned()
-        ]
+        expected_crossing_env_assignments
     );
     assert_eq!(
-        drive_report.stop_crossing_command_resolved.as_deref(),
-        Some(expected_crossing_command.as_str())
-    );
-    assert!(drive_json
-        .contains("\"safe_next_action\":\"explicit-boundary-crossing-command-available\""));
-    assert!(drive_json.contains(&format!(
-        "\"safe_next_command\":\"{}\"",
+        drive_report.stop_crossing_command_resolved,
         expected_crossing_command
-    )));
-    assert!(drive_json.contains(
-        "\"safe_next_reason\":\"drive stopped at an explicit boundary; run the safe_next_command only if you accept the listed gate\""
-    ));
+    );
+    if let Some(expected_crossing_command) = expected_crossing_command.as_deref() {
+        assert!(drive_json
+            .contains("\"safe_next_action\":\"explicit-boundary-crossing-command-available\""));
+        assert!(drive_json.contains(&format!(
+            "\"safe_next_command\":\"{expected_crossing_command}\""
+        )));
+        assert!(drive_json.contains(
+            "\"safe_next_reason\":\"drive stopped at an explicit boundary; run the safe_next_command only if you accept the listed gate\""
+        ));
+    } else {
+        assert!(drive_json.contains("\"safe_next_action\":\"inspect-stop-command\""));
+        assert!(drive_json.contains(&format!(
+            "\"safe_next_command\":\"{expected_boundary_command}\""
+        )));
+        assert!(drive_json.contains("\"safe_next_gate_required\":false"));
+        assert!(drive_json.contains(
+            "\"safe_next_reason\":\"drive stopped before mutating the boundary; inspect the stop command before retrying\""
+        ));
+    }
     assert_eq!(
         check.next_action_source.as_deref(),
         Some("final-output-boundary")
@@ -545,13 +574,10 @@ fn drive_until_clean_command_reaches_host_assisted_pipeline_block() {
         .final_executable_output_blockers
         .iter()
         .any(|blocker| blocker == "final-executable-output:not-nsld-owned"));
-    assert_eq!(
-        check.final_executable_host_finalizer_gate_status.as_deref(),
-        Some("policy-blocked")
-    );
+    assert!(check.final_executable_host_finalizer_gate_status.is_some());
     assert_eq!(
         check.final_executable_host_finalizer_gate_action.as_deref(),
-        Some("set-env:NUIS_NSLD_HOST_FINALIZER_POLICY=allow-host-invoke")
+        Some(expected_gate_action.as_str())
     );
 }
 

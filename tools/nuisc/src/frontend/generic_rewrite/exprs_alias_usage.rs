@@ -255,56 +255,52 @@ fn infer_alias_aware_ast_expr_type_for_pattern(
             type_name,
             type_args,
             fields,
-        } => {
-            if visible_type_aliases.contains_key(type_name) {
-                if let Ok(Some((resolved_name, resolved_args))) =
-                    resolved_struct_literal_alias(StructLiteralAliasInput {
-                        type_name,
-                        type_args,
-                        expected: Some(expected_pattern),
-                        fields,
-                        env,
-                        visible_type_aliases,
-                        impl_lookup,
-                        struct_table,
-                        function_return_types,
-                    })
-                {
-                    return Some(AstTypeRef {
-                        name: resolved_name,
-                        generic_args: resolved_args,
-                        is_optional: false,
-                        is_ref: false,
-                    });
-                }
+        } if visible_type_aliases.contains_key(type_name) => {
+            if let Ok(Some((resolved_name, resolved_args))) =
+                resolved_struct_literal_alias(StructLiteralAliasInput {
+                    type_name,
+                    type_args,
+                    expected: Some(expected_pattern),
+                    fields,
+                    env,
+                    visible_type_aliases,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                })
+            {
+                return Some(AstTypeRef {
+                    name: resolved_name,
+                    generic_args: resolved_args,
+                    is_optional: false,
+                    is_ref: false,
+                });
             }
         }
         AstExpr::Call {
             callee,
             generic_args,
             args,
-        } => {
-            if visible_type_aliases.contains_key(callee) {
-                if let Ok(Some((resolved_name, resolved_args))) =
-                    resolved_struct_constructor_alias(StructConstructorAliasInput {
-                        callee,
-                        generic_args,
-                        expected: Some(expected_pattern),
-                        args,
-                        env,
-                        visible_type_aliases,
-                        impl_lookup,
-                        struct_table,
-                        function_return_types,
-                    })
-                {
-                    return Some(AstTypeRef {
-                        name: resolved_name,
-                        generic_args: resolved_args,
-                        is_optional: false,
-                        is_ref: false,
-                    });
-                }
+        } if visible_type_aliases.contains_key(callee) => {
+            if let Ok(Some((resolved_name, resolved_args))) =
+                resolved_struct_constructor_alias(StructConstructorAliasInput {
+                    callee,
+                    generic_args,
+                    expected: Some(expected_pattern),
+                    args,
+                    env,
+                    visible_type_aliases,
+                    impl_lookup,
+                    struct_table,
+                    function_return_types,
+                })
+            {
+                return Some(AstTypeRef {
+                    name: resolved_name,
+                    generic_args: resolved_args,
+                    is_optional: false,
+                    is_ref: false,
+                });
             }
         }
         _ => {}

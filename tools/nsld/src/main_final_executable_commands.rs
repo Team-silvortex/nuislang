@@ -6,6 +6,7 @@ use super::{
     display_final_macho_loader_probe::print_macho_arm64_loader_probe_report,
     display_final_private_image_publication::print_private_image_publication_report,
     display_final_registered_loader_probe::print_registered_loader_probe_outcome,
+    display_final_registered_loader_probe_admission::print_registered_loader_probe_admission_verify_report,
     final_executable_finalizer_registry::{
         invoke_registered_loader_probe, invoke_registered_private_image_publication,
         selected_loader_probe_capability,
@@ -25,12 +26,18 @@ use super::{
         attach_final_output_nsdb_handoff_summary, persist_final_output_nsdb_handoff,
     },
     final_executable_output_selection::evaluate_final_output_selection,
+    final_executable_registered_loader_probe_admission::{
+        build_registered_loader_probe_admission_receipt,
+        verify_registered_loader_probe_admission_receipt,
+    },
+    final_executable_registered_loader_probe_admission_receipt::persist_registered_loader_probe_admission_receipt,
     final_stage::*,
     json::*,
     json_final_macho_admission::macho_arm64_publication_admission_verify_report_json,
     json_final_macho_loader_probe::macho_arm64_loader_probe_report_json,
     json_final_private_image_publication::private_image_publication_report_json,
     json_final_registered_loader_probe::registered_loader_probe_outcome_json,
+    json_final_registered_loader_probe_admission::registered_loader_probe_admission_verify_report_json,
 };
 use std::path::Path;
 
@@ -43,10 +50,25 @@ pub(crate) fn try_run_registered_loader_probe(
         return Ok(false);
     }
     if apply {
-        return Err(
-            "registered loader-probe apply remains disabled until host execution evidence is recorded"
-                .to_owned(),
-        );
+        let outcome = invoke_registered_loader_probe(plan, Path::new(&plan.output_dir), true)?;
+        let receipt = build_registered_loader_probe_admission_receipt(plan, &outcome)?;
+        persist_registered_loader_probe_admission_receipt(plan, &receipt)?;
+        let verification = verify_registered_loader_probe_admission_receipt(plan);
+        if json {
+            println!(
+                "{}",
+                registered_loader_probe_admission_verify_report_json(&verification)
+            );
+        } else {
+            print_registered_loader_probe_admission_verify_report(&verification);
+        }
+        if !verification.valid {
+            return Err(
+                "nsld registered loader-probe did not produce a verified admission receipt"
+                    .to_owned(),
+            );
+        }
+        return Ok(true);
     }
     let outcome = invoke_registered_loader_probe(plan, Path::new(&plan.output_dir), false)?;
     if json {
@@ -173,6 +195,23 @@ pub(crate) fn run_final_executable_command(command: &Command) -> Result<bool, St
         }
         Command::VerifyFinalExecutablePrivateImageAdmission { input, json } => {
             let ctx = load_link_input_context(input)?;
+            if selected_loader_probe_capability(&ctx.plan)?.is_some() {
+                let report = verify_registered_loader_probe_admission_receipt(&ctx.plan);
+                if *json {
+                    println!(
+                        "{}",
+                        registered_loader_probe_admission_verify_report_json(&report)
+                    );
+                } else {
+                    print_registered_loader_probe_admission_verify_report(&report);
+                }
+                if report.valid {
+                    return Ok(true);
+                }
+                return Err(
+                    "nsld registered private-image admission verification failed".to_owned(),
+                );
+            }
             let product = macho_artifact_private_shell_product(&ctx.plan)?;
             let report = verify_macho_arm64_publication_admission_receipt(&ctx.plan, &product);
             if *json {

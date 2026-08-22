@@ -263,10 +263,7 @@ fn normalize_return_type(raw_tail: &str) -> Option<String> {
         .trim_end_matches(';')
         .trim();
     let mut ty = before_body;
-    loop {
-        let Ok((attrs, rest)) = collect_leading_attributes(ty) else {
-            break;
-        };
+    while let Ok((attrs, rest)) = collect_leading_attributes(ty) {
         if attrs.is_empty() {
             break;
         }
