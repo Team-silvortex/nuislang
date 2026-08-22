@@ -5,7 +5,11 @@ use super::{
     display_final_macho_admission::print_macho_arm64_publication_admission_verify_report,
     display_final_macho_loader_probe::print_macho_arm64_loader_probe_report,
     display_final_private_image_publication::print_private_image_publication_report,
-    final_executable_finalizer_registry::invoke_registered_private_image_publication,
+    display_final_registered_loader_probe::print_registered_loader_probe_outcome,
+    final_executable_finalizer_registry::{
+        invoke_registered_loader_probe, invoke_registered_private_image_publication,
+        selected_loader_probe_capability,
+    },
     final_executable_macho_admission::{
         build_macho_arm64_publication_admission_receipt,
         verify_macho_arm64_publication_admission_receipt,
@@ -26,8 +30,32 @@ use super::{
     json_final_macho_admission::macho_arm64_publication_admission_verify_report_json,
     json_final_macho_loader_probe::macho_arm64_loader_probe_report_json,
     json_final_private_image_publication::private_image_publication_report_json,
+    json_final_registered_loader_probe::registered_loader_probe_outcome_json,
 };
 use std::path::Path;
+
+pub(crate) fn try_run_registered_loader_probe(
+    plan: &nuisc::linker::LinkPlan,
+    json: bool,
+    apply: bool,
+) -> Result<bool, String> {
+    if selected_loader_probe_capability(plan)?.is_none() {
+        return Ok(false);
+    }
+    if apply {
+        return Err(
+            "registered loader-probe apply remains disabled until host execution evidence is recorded"
+                .to_owned(),
+        );
+    }
+    let outcome = invoke_registered_loader_probe(plan, Path::new(&plan.output_dir), false)?;
+    if json {
+        println!("{}", registered_loader_probe_outcome_json(&outcome));
+    } else {
+        print_registered_loader_probe_outcome(&outcome);
+    }
+    Ok(true)
+}
 
 pub(crate) fn run_final_executable_command(command: &Command) -> Result<bool, String> {
     match command {
@@ -96,6 +124,9 @@ pub(crate) fn run_final_executable_command(command: &Command) -> Result<bool, St
         }
         Command::FinalExecutablePrivateImageLoaderProbe { input, json, apply } => {
             let ctx = load_link_input_context(input)?;
+            if try_run_registered_loader_probe(&ctx.plan, *json, *apply)? {
+                return Ok(true);
+            }
             let product = macho_artifact_private_shell_product(&ctx.plan)?;
             let mut report = probe_macho_arm64_signed_shell_image(
                 MachOArm64LoaderProbeInput {

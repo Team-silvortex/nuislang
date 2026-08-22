@@ -4,6 +4,10 @@ use crate::{
         probe_elf_amd64_private_shell_image, ElfAmd64LoaderProbeInput,
     },
     final_executable_elf_object::{build_elf_amd64_host_object_linkage, ElfAmd64HostObjectLinkage},
+    final_executable_registered_loader_probe::{
+        build_registered_loader_probe_outcome, ExecutableFinalizerLoaderProbeContext,
+        NsldRegisteredLoaderProbeOutcome, RegisteredLoaderProbeEvidence,
+    },
 };
 use std::path::Path;
 
@@ -19,6 +23,8 @@ const ELF_PROGRAM_TYPE_LOAD: u32 = 1;
 const ELF_PROGRAM_FLAG_EXECUTE: u32 = 1;
 const ELF_AMD64_CPU_ABI: &str = "cpu.x86_64.sysv64";
 const ELF_AMD64_CALLING_ABI: &str = "sysv64";
+pub(crate) const ELF_AMD64_REGISTERED_LOADER_PROBE_CAPABILITY: &str =
+    "nsld.finalizer.elf.amd64.loader-probe-v1";
 
 pub(crate) fn elf_amd64_artifact_image_validation_issues(
     plan: &nuisc::linker::LinkPlan,
@@ -44,6 +50,58 @@ pub(crate) fn materialize_elf_amd64_artifact_image(
         ));
     }
     atomic_write_executable(output_path, &image)
+}
+
+pub(crate) fn probe_registered_elf_amd64_private_image(
+    context: &ExecutableFinalizerLoaderProbeContext<'_>,
+) -> Result<NsldRegisteredLoaderProbeOutcome, String> {
+    if context.capability_id != ELF_AMD64_REGISTERED_LOADER_PROBE_CAPABILITY {
+        return Err("ELF loader-probe capability identity mismatch".to_owned());
+    }
+    if context.target_key != "x86_64-linux-elf" {
+        return Err("ELF loader-probe target identity mismatch".to_owned());
+    }
+    let (_, product) = load_elf_amd64_artifact_private_product(context.plan)?;
+    let report = probe_elf_amd64_private_shell_image(
+        ElfAmd64LoaderProbeInput {
+            bytes: &product.private_shell_image,
+            validation: &product.shell_image_validation,
+            unresolved_external_symbol_count: product.summary.unresolved_external_symbols.len(),
+        },
+        context.probe_root,
+        context.execute,
+    )?;
+    build_registered_loader_probe_outcome(RegisteredLoaderProbeEvidence {
+        provider_id: context.provider_id,
+        target_key: context.target_key,
+        capability_id: context.capability_id,
+        provider_probe_contract: report.contract,
+        provider_probe_status: &report.status,
+        probe_mode: report.probe_mode,
+        host_supported: report.host_supported,
+        input_eligible: report.input_eligible,
+        attempted: report.attempted,
+        image_span_bytes: report.image_span_bytes,
+        image_identity_hash: &report.shell_image_hash,
+        validation_evidence_hash: &report.validation_ledger_hash,
+        materialized: report.materialized,
+        materialized_hash_matches: report.materialized_hash_matches,
+        os_loader_accepted: report.kernel_accepted,
+        process_completed: report.process_completed,
+        timed_out: report.timed_out,
+        exit_code: report.exit_code,
+        termination_signal: report.termination_signal,
+        stdout_captured_bytes: report.stdout_captured_bytes,
+        stdout_truncated: report.stdout_truncated,
+        stderr_captured_bytes: report.stderr_captured_bytes,
+        stderr_truncated: report.stderr_truncated,
+        failure_kind: report.failure_kind.as_deref(),
+        cleanup_attempted: report.cleanup_attempted,
+        cleanup_succeeded: report.cleanup_succeeded,
+        execution_admitted: report.publication_eligible,
+        blockers: &report.publication_blockers,
+        provider_evidence_hash: &report.probe_ledger_hash,
+    })
 }
 
 fn load_and_validate_elf_amd64_artifact_image(

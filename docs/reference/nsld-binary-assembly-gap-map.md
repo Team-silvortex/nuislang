@@ -221,8 +221,12 @@ rejects external inputs before filesystem access. Its execution mechanics share
 the Mach-O runtime for create-new materialization, exact reread, empty process
 inputs, bounded wait/capture, and cleanup. Default finalization remains
 plan-only and still emits compatibility bytes. The Linux `_start` fixture closes
-cross-object `PLT32` and syscall-exit planning, but a reachable x86_64 Linux host
-and a provider-registered CLI callback are still required before load admission.
+cross-object `PLT32` and syscall-exit planning. The ELF finalizer now owns the
+registered `nsld.finalizer.elf.amd64.loader-probe-v1` callback, projects its
+provider evidence through `nuis-nsld-registered-loader-probe-outcome-v1`, and
+serves the shared CLI plan-only path without an ELF branch. A reachable x86_64
+Linux host and positive registered execution outcome are still required before
+the explicitly disabled apply boundary may become load admission.
 
 It does not yet own:
 

@@ -46,6 +46,8 @@ fn registry_prefers_internal_artifact_image_for_native_cpu_llvm() {
     assert!(!selection.requires_host_driver());
     assert!(selection.supports_private_image_publication());
     assert!(selection.private_image_publication_ready());
+    assert!(!selection.supports_loader_probe());
+    assert!(!selection.loader_probe_ready());
     assert_eq!(
         selection.private_image_publication_capability(),
         Some(MACHO_ARM64_PRIVATE_IMAGE_PUBLICATION_CAPABILITY)
@@ -76,6 +78,16 @@ fn registry_selects_ready_internal_elf_amd64_artifact_provider() {
     assert!(selection.ready());
     assert!(!selection.requires_host_driver());
     assert!(!selection.supports_private_image_publication());
+    assert!(selection.supports_loader_probe());
+    assert!(selection.loader_probe_ready());
+    assert_eq!(
+        selection.loader_probe_capability(),
+        Some(ELF_AMD64_REGISTERED_LOADER_PROBE_CAPABILITY)
+    );
+    assert_eq!(
+        selected_loader_probe_capability(&plan).unwrap(),
+        Some(ELF_AMD64_REGISTERED_LOADER_PROBE_CAPABILITY)
+    );
 }
 
 #[test]
@@ -102,6 +114,19 @@ fn registry_keeps_elf_and_pe_coff_as_explicit_open_targets() {
     assert!(!pe.supports_private_image_publication());
     assert!(!elf.private_image_publication_ready());
     assert!(!pe.private_image_publication_ready());
+    assert!(!elf.supports_loader_probe());
+    assert!(!pe.supports_loader_probe());
+    assert!(!elf.loader_probe_ready());
+    assert!(!pe.loader_probe_ready());
+}
+
+#[test]
+fn provider_without_registered_loader_probe_fails_closed() {
+    let plan = empty_link_plan();
+    let error = invoke_registered_loader_probe(&plan, Path::new("."), false).unwrap_err();
+
+    assert!(error.contains("has no ready loader-probe capability"));
+    assert!(error.contains("nsld.finalizer.mach-o.arm64.host-command-shell-v1"));
 }
 
 #[test]

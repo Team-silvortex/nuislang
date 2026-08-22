@@ -36,6 +36,10 @@ ambiguity fail closed, so registration order never becomes hidden authority.
 
 The registry validates unique provider and target identities, verifies that a
 `ready` provider owns an executor, and hashes its canonical registration set.
+Optional loader-probe capability IDs and callbacks are validated as matched,
+unique pairs and participate in the same registry hash. Providers retain
+object-format-specific parsing while returning the common
+`nuis-nsld-registered-loader-probe-outcome-v1` evidence shape.
 Dry-run JSON and the persisted host invoke plan expose:
 
 * `finalizer_contract`
@@ -125,8 +129,9 @@ deferred source to one non-mutating patch preview. The platform application
 stage now materializes those records and deferred patches once under a second
 write ledger. `nuis-nsld-elf-amd64-shell-layout-plan-v1` maps that exact ledger
 into deterministic ELF/program/section tables, non-overlapping permission
-segments, an optional dynamic table, and a file-backed executable entry. Nsld
-does not yet serialize or load-admit the provider-owned ELF shell.
+segments, an optional dynamic table, and a file-backed executable entry. The
+provider serializes and independently validates that private ELF shell, but OS
+load admission is not yet recorded on a real Linux host.
 
 This is not yet a pure Nsld linker claim. Nsld now understands the real input
 tables, assigns deterministic final sections and addresses, applies registered
@@ -177,6 +182,9 @@ A future provider must:
 5. pass the registry conformance and finalizer CLI regressions.
 6. register any private-image publication capability with one unique stable ID
    and keep the callback absent when the provider cannot honor replay admission.
+7. register any loader-probe capability and callback as one matched pair, keep
+   format-specific evidence inside the provider, and return the common outcome
+   contract before exposing a command-layer apply path.
 
 The deterministic non-section-symbol milestone is now closed by
 `nuis-nsld-macho-placement-binding-v3`. The Mach-O provider coalesces tentative
@@ -286,10 +294,12 @@ owns create-new owner-only materialization, exact reread, empty environment and
 stdin, bounded wait/capture, and owned-path cleanup. A cross-object Linux
 `_start` fixture binds `R_X86_64_PLT32`, calls the program entry, and exits by
 syscall. Real Linux execution evidence remains pending while the registered host
-is unreachable; exposing apply through the CLI additionally requires a
-provider-owned registry callback rather than an ELF branch. Registered external
-interpreter/dependency provenance remains separate. Nuisc remains free of ELF
-branches.
+cannot be reached from the current execution sandbox. The ELF provider now owns
+the unique `nsld.finalizer.elf.amd64.loader-probe-v1` callback and maps its
+report into `nuis-nsld-registered-loader-probe-outcome-v1`. The shared CLI uses
+that registration in plan-only mode and rejects apply until positive host
+evidence is recorded. Registered external interpreter/dependency provenance
+remains separate. Nuisc remains free of ELF branches.
 
 ## Validation
 

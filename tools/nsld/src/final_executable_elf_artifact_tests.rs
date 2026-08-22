@@ -1,11 +1,17 @@
 use super::*;
 use crate::{
     final_executable_elf_input::parse_elf64_amd64_object_linkage,
+    final_executable_elf_loader_probe::ELF_AMD64_LOADER_PROBE_CONTRACT,
     final_executable_elf_test_fixture::{elf_program_object, elf_runtime_object, R_X86_64_PLT32},
     final_executable_finalizer_registry::{
-        invoke_registered_finalizer, select_executable_finalizer, ExecutableFinalizerCommandContext,
+        invoke_registered_finalizer, invoke_registered_loader_probe, select_executable_finalizer,
+        ExecutableFinalizerCommandContext,
+    },
+    final_executable_registered_loader_probe::{
+        validate_registered_loader_probe_outcome, REGISTERED_LOADER_PROBE_OUTCOME_CONTRACT,
     },
     fnv1a64_hex,
+    main_final_executable_commands::try_run_registered_loader_probe,
     main_test_support::empty_link_plan,
 };
 use nuisc::{
@@ -135,6 +141,57 @@ fn materializes_validated_artifact_without_host_driver() {
 
     assert_eq!(issues.len(), 1);
     assert!(issues[0].contains("CPU ABI mismatch"));
+}
+
+#[test]
+fn registered_loader_probe_projects_protocol_neutral_plan_only_outcome() {
+    let root = temp_dir("registered-loader-probe");
+    fs::create_dir_all(&root).unwrap();
+    let artifact_path = root.join("nuis.compiled.artifact");
+    let probe_root = root.join("probe-root");
+    let (artifact, plan) = artifact_and_plan(&root, elf_executable(ELF_TYPE_EXECUTABLE));
+    fs::write(
+        &artifact_path,
+        encode_nuis_compiled_artifact_section_table_binary(&artifact).unwrap(),
+    )
+    .unwrap();
+
+    let outcome = invoke_registered_loader_probe(&plan, &probe_root, false).unwrap();
+
+    assert_eq!(outcome.contract, REGISTERED_LOADER_PROBE_OUTCOME_CONTRACT);
+    assert_eq!(outcome.status, "execution-not-attempted");
+    assert_eq!(
+        outcome.provider_id,
+        "nsld.finalizer.elf.amd64.artifact-image-v1"
+    );
+    assert_eq!(outcome.target_key, "x86_64-linux-elf");
+    assert_eq!(
+        outcome.capability_id,
+        ELF_AMD64_REGISTERED_LOADER_PROBE_CAPABILITY
+    );
+    assert_eq!(
+        outcome.provider_probe_contract,
+        ELF_AMD64_LOADER_PROBE_CONTRACT
+    );
+    assert_eq!(outcome.probe_mode, "plan-only");
+    assert!(outcome.input_eligible);
+    assert!(!outcome.attempted);
+    assert!(!outcome.materialized);
+    assert!(!outcome.execution_admitted);
+    assert_eq!(outcome.blockers.len(), 1);
+    assert!(!probe_root.exists());
+    validate_registered_loader_probe_outcome(&outcome).unwrap();
+
+    let mut drifted = outcome;
+    drifted.provider_probe_status.push_str("-drift");
+    assert!(validate_registered_loader_probe_outcome(&drifted)
+        .unwrap_err()
+        .contains("ledger drift"));
+
+    assert!(try_run_registered_loader_probe(&plan, true, false).unwrap());
+    let apply_error = try_run_registered_loader_probe(&plan, true, true).unwrap_err();
+    assert!(apply_error.contains("apply remains disabled until host execution evidence"));
+    fs::remove_dir_all(root).unwrap();
 }
 
 #[test]

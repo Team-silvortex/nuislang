@@ -196,6 +196,78 @@ pub(crate) const DEV_TENSOR_RUNTIME_NSLD_SHELL_IMAGE_DRIFT_CHECKS: &[DevTensorDr
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "nsld-registered-loader-probe-outcome-contract",
+        path: "tools/nsld/src/final_executable_registered_loader_probe.rs",
+        required_patterns: &[
+            "nuis-nsld-registered-loader-probe-outcome-v1",
+            "ExecutableFinalizerLoaderProbeContext",
+            "RegisteredLoaderProbeEvidence",
+            "NsldRegisteredLoaderProbeOutcome",
+            "build_registered_loader_probe_outcome",
+            "validate_registered_loader_probe_outcome",
+            "execution-admitted",
+            "provider_evidence_hash",
+            "outcome_ledger_hash",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-registered-loader-probe-registry-capability",
+        path: "tools/nsld/src/final_executable_finalizer_registry.rs",
+        required_patterns: &[
+            "LoaderProbe",
+            "loader_probe_capability",
+            "supports_loader_probe",
+            "probe_private_image",
+            "invoke_registered_loader_probe",
+            "selected_loader_probe_capability",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-finalizer-registry-capability-validation-and-hash",
+        path: "tools/nsld/src/final_executable_finalizer_registry_validation.rs",
+        required_patterns: &[
+            "validate_private_image_publication_registration",
+            "validate_loader_probe_registration",
+            "duplicate executable loader-probe capability id",
+            "private_image_publication=",
+            "loader_probe=",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-elf-amd64-registered-loader-probe-provider",
+        path: "tools/nsld/src/final_executable_elf_artifact.rs",
+        required_patterns: &[
+            "nsld.finalizer.elf.amd64.loader-probe-v1",
+            "probe_registered_elf_amd64_private_image",
+            "ELF loader-probe capability identity mismatch",
+            "ELF loader-probe target identity mismatch",
+            "build_registered_loader_probe_outcome",
+            "provider_evidence_hash",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-elf-amd64-registered-loader-probe-evidence",
+        path: "tools/nsld/src/final_executable_elf_artifact_tests.rs",
+        required_patterns: &[
+            "registered_loader_probe_projects_protocol_neutral_plan_only_outcome",
+            "invoke_registered_loader_probe",
+            "execution-not-attempted",
+            "validate_registered_loader_probe_outcome",
+            "ledger drift",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nsld-registered-loader-probe-plan-only-frontdoor",
+        path: "tools/nsld/src/main_final_executable_commands.rs",
+        required_patterns: &[
+            "selected_loader_probe_capability",
+            "invoke_registered_loader_probe",
+            "registered_loader_probe_outcome_json",
+            "print_registered_loader_probe_outcome",
+            "registered loader-probe apply remains disabled until host execution evidence is recorded",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nsld-elf-amd64-default-finalizer-probe-boundary",
         path: "tools/nsld/src/final_executable_elf_artifact.rs",
         required_patterns: &[
@@ -259,7 +331,6 @@ pub(crate) const DEV_TENSOR_RUNTIME_NSLD_SHELL_IMAGE_DRIFT_CHECKS: &[DevTensorDr
             "supports_private_image_publication",
             "invoke_registered_private_image_publication",
             "MACHO_ARM64_PRIVATE_IMAGE_PUBLICATION_CAPABILITY",
-            "private_image_publication=",
         ],
     },
     DevTensorDriftCheckSpec {

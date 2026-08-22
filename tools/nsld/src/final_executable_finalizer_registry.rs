@@ -1,6 +1,7 @@
 use super::{
     final_executable_elf_artifact::{
         elf_amd64_artifact_image_validation_issues, materialize_elf_amd64_artifact_image,
+        probe_registered_elf_amd64_private_image, ELF_AMD64_REGISTERED_LOADER_PROBE_CAPABILITY,
     },
     final_executable_macho_artifact::{
         macho_artifact_image_validation_issues, macho_artifact_input_summary,
@@ -10,13 +11,16 @@ use super::{
     final_executable_macho_publication::{
         publish_macho_arm64_private_image, MACHO_ARM64_PRIVATE_IMAGE_PUBLICATION_CAPABILITY,
     },
-    fnv1a64_hex,
+    final_executable_registered_loader_probe::{
+        validate_registered_loader_probe_outcome, ExecutableFinalizerLoaderProbeContext,
+        NsldRegisteredLoaderProbeOutcome,
+    },
     reports::{
         NsldExecutableFinalizerInputSummary, NsldFinalExecutableWriterPlanReport,
         NsldPrivateImagePublicationReport,
     },
 };
-use std::{collections::BTreeSet, path::Path, process::Command};
+use std::{path::Path, process::Command};
 
 pub(crate) const EXECUTABLE_FINALIZER_CONTRACT: &str = "nuis-nsld-executable-finalizer-registry-v1";
 
@@ -28,6 +32,9 @@ type FinalizerExecutor = for<'a> fn(&ExecutableFinalizerExecutionContext<'a>) ->
 type PrivateImagePublisher = for<'a> fn(
     &ExecutableFinalizerPrivateImagePublicationContext<'a>,
 ) -> Result<NsldPrivateImagePublicationReport, String>;
+type LoaderProbe = for<'a> fn(
+    &ExecutableFinalizerLoaderProbeContext<'a>,
+) -> Result<NsldRegisteredLoaderProbeOutcome, String>;
 
 #[derive(Clone, Copy)]
 struct ExecutableFinalizerRegistration {
@@ -47,6 +54,8 @@ struct ExecutableFinalizerRegistration {
     executor: Option<FinalizerExecutor>,
     private_image_publication_capability: Option<&'static str>,
     private_image_publisher: Option<PrivateImagePublisher>,
+    loader_probe_capability: Option<&'static str>,
+    loader_probe: Option<LoaderProbe>,
 }
 
 const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
@@ -67,6 +76,8 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         executor: Some(execute_internal_elf_artifact_image),
         private_image_publication_capability: None,
         private_image_publisher: None,
+        loader_probe_capability: Some(ELF_AMD64_REGISTERED_LOADER_PROBE_CAPABILITY),
+        loader_probe: Some(probe_registered_elf_amd64_private_image),
     },
     ExecutableFinalizerRegistration {
         provider_id: "nsld.finalizer.elf.registered-v1",
@@ -85,6 +96,8 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         executor: None,
         private_image_publication_capability: None,
         private_image_publisher: None,
+        loader_probe_capability: None,
+        loader_probe: None,
     },
     ExecutableFinalizerRegistration {
         provider_id: "nsld.finalizer.mach-o.arm64.artifact-image-v1",
@@ -105,6 +118,8 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
             MACHO_ARM64_PRIVATE_IMAGE_PUBLICATION_CAPABILITY,
         ),
         private_image_publisher: Some(publish_macho_arm64_private_image),
+        loader_probe_capability: None,
+        loader_probe: None,
     },
     ExecutableFinalizerRegistration {
         provider_id: "nsld.finalizer.mach-o.arm64.host-command-shell-v1",
@@ -123,6 +138,8 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         executor: Some(execute_host_command),
         private_image_publication_capability: None,
         private_image_publisher: None,
+        loader_probe_capability: None,
+        loader_probe: None,
     },
     ExecutableFinalizerRegistration {
         provider_id: "nsld.finalizer.mach-o.registered-v1",
@@ -141,6 +158,8 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         executor: None,
         private_image_publication_capability: None,
         private_image_publisher: None,
+        loader_probe_capability: None,
+        loader_probe: None,
     },
     ExecutableFinalizerRegistration {
         provider_id: "nsld.finalizer.pe-coff.registered-v1",
@@ -159,6 +178,8 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         executor: None,
         private_image_publication_capability: None,
         private_image_publisher: None,
+        loader_probe_capability: None,
+        loader_probe: None,
     },
 ];
 
@@ -235,6 +256,19 @@ impl ExecutableFinalizerSelection {
 
     pub(crate) fn private_image_publication_ready(&self) -> bool {
         self.registration.provider_status == "ready" && self.supports_private_image_publication()
+    }
+
+    pub(crate) fn loader_probe_capability(&self) -> Option<&'static str> {
+        self.registration.loader_probe_capability
+    }
+
+    pub(crate) fn supports_loader_probe(&self) -> bool {
+        self.registration.loader_probe_capability.is_some()
+            && self.registration.loader_probe.is_some()
+    }
+
+    pub(crate) fn loader_probe_ready(&self) -> bool {
+        self.registration.provider_status == "ready" && self.supports_loader_probe()
     }
 
     pub(crate) fn ready(&self) -> bool {
@@ -324,82 +358,46 @@ impl ExecutableFinalizerSelection {
             },
         )
     }
-}
 
-pub(crate) fn executable_finalizer_registry_validation() -> ExecutableFinalizerRegistryValidation {
-    let mut issues = Vec::new();
-    let mut provider_ids = BTreeSet::new();
-    let mut target_keys = BTreeSet::new();
-    let mut publication_capability_ids = BTreeSet::new();
-
-    for registration in REGISTERED_FINALIZERS {
-        if !provider_ids.insert(registration.provider_id) {
-            issues.push(format!(
-                "duplicate executable finalizer provider id `{}`",
-                registration.provider_id
+    pub(crate) fn probe_private_image(
+        &self,
+        plan: &nuisc::linker::LinkPlan,
+        probe_root: &Path,
+        execute: bool,
+    ) -> Result<NsldRegisteredLoaderProbeOutcome, String> {
+        if !self.loader_probe_ready() {
+            return Err(format!(
+                "executable finalizer provider `{}` has no ready loader-probe capability",
+                self.provider_id()
             ));
         }
-        let route_key = registration_route_key(registration);
-        if !target_keys.insert(route_key.clone()) {
-            issues.push(format!(
-                "duplicate executable finalizer route `{route_key}`"
-            ));
-        }
-        if registration.provider_status == "ready" && registration.executor.is_none() {
-            issues.push(format!(
-                "ready executable finalizer provider `{}` has no executor",
-                registration.provider_id
-            ));
-        }
-        if registration.input_summary_contract == Some("") {
-            issues.push(format!(
-                "executable finalizer provider `{}` declares an empty input summary contract",
-                registration.provider_id
-            ));
-        }
-        match (
-            registration.private_image_publication_capability,
-            registration.private_image_publisher,
-        ) {
-            (Some(""), _) => issues.push(format!(
-                "executable finalizer provider `{}` declares an empty private-image publication capability",
-                registration.provider_id
-            )),
-            (Some(capability), Some(_)) => {
-                if !publication_capability_ids.insert(capability) {
-                    issues.push(format!(
-                        "duplicate private-image publication capability id `{capability}`"
-                    ));
-                }
-                if registration.provider_status != "ready" || registration.executor.is_none() {
-                    issues.push(format!(
-                        "private-image publication provider `{}` is not a ready executable finalizer",
-                        registration.provider_id
-                    ));
-                }
-            }
-            (None, None) => {}
-            _ => issues.push(format!(
-                "executable finalizer provider `{}` has an incomplete private-image publication registration",
-                registration.provider_id
-            )),
-        }
-        if registration.provider_status != "ready"
-            && registration.provider_status != "registered-not-implemented"
+        let capability_id = self
+            .loader_probe_capability()
+            .expect("loader-probe capability checked above");
+        let outcome = self
+            .registration
+            .loader_probe
+            .expect("loader-probe checked above")(
+            &ExecutableFinalizerLoaderProbeContext {
+                plan,
+                provider_id: self.provider_id(),
+                target_key: &self.target_key,
+                capability_id,
+                probe_root,
+                execute,
+            },
+        )?;
+        validate_registered_loader_probe_outcome(&outcome)?;
+        if outcome.provider_id != self.provider_id()
+            || outcome.target_key != self.target_key
+            || outcome.capability_id != capability_id
         {
-            issues.push(format!(
-                "executable finalizer provider `{}` has invalid status `{}`",
-                registration.provider_id, registration.provider_status
+            return Err(format!(
+                "executable finalizer provider `{}` returned loader-probe identity drift",
+                self.provider_id()
             ));
         }
-    }
-
-    ExecutableFinalizerRegistryValidation {
-        contract: EXECUTABLE_FINALIZER_CONTRACT,
-        registry_hash: executable_finalizer_registry_hash(),
-        registration_count: REGISTERED_FINALIZERS.len(),
-        valid: issues.is_empty(),
-        issues,
+        Ok(outcome)
     }
 }
 
@@ -522,6 +520,24 @@ pub(crate) fn invoke_registered_private_image_publication(
     selection.publish_private_image(plan, Path::new(&plan.final_stage.output_path), apply)
 }
 
+pub(crate) fn invoke_registered_loader_probe(
+    plan: &nuisc::linker::LinkPlan,
+    probe_root: &Path,
+    execute: bool,
+) -> Result<NsldRegisteredLoaderProbeOutcome, String> {
+    select_executable_finalizer(plan)?.probe_private_image(plan, probe_root, execute)
+}
+
+pub(crate) fn selected_loader_probe_capability(
+    plan: &nuisc::linker::LinkPlan,
+) -> Result<Option<&'static str>, String> {
+    let selection = select_executable_finalizer(plan)?;
+    Ok(selection
+        .loader_probe_ready()
+        .then(|| selection.loader_probe_capability())
+        .flatten())
+}
+
 fn plan_internal_artifact_image(context: &ExecutableFinalizerCommandContext<'_>) -> Vec<String> {
     vec![
         "nsld-internal-artifact-image-writer".to_owned(),
@@ -625,28 +641,6 @@ fn summarize_no_additional_inputs(
     Ok(None)
 }
 
-fn executable_finalizer_registry_hash() -> String {
-    let mut registrations = REGISTERED_FINALIZERS.iter().collect::<Vec<_>>();
-    registrations.sort_by_key(|registration| registration.provider_id);
-    let mut material = format!("contract={EXECUTABLE_FINALIZER_CONTRACT}\n");
-    for registration in registrations {
-        material.push_str(&format!(
-            "provider={}\nroute={}\nstatus={}\nexecution={}\ninput={}\ninput_summary={}\nhost_driver={}\nprivate_image_publication={}\n",
-            registration.provider_id,
-            registration_route_key(registration),
-            registration.provider_status,
-            registration.execution_kind,
-            registration.input_kind,
-            registration.input_summary_contract.unwrap_or("none"),
-            registration.requires_host_driver,
-            registration
-                .private_image_publication_capability
-                .unwrap_or("none")
-        ));
-    }
-    fnv1a64_hex(material.as_bytes())
-}
-
 fn registration_target_key(registration: &ExecutableFinalizerRegistration) -> String {
     canonical_target_key(
         registration.machine_arch,
@@ -707,6 +701,10 @@ fn canonical_object_format(object_format: &str) -> String {
         other => other.to_owned(),
     }
 }
+
+#[path = "final_executable_finalizer_registry_validation.rs"]
+mod validation;
+pub(crate) use validation::executable_finalizer_registry_validation;
 
 #[cfg(test)]
 #[path = "final_executable_finalizer_registry_tests.rs"]

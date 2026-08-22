@@ -463,9 +463,16 @@ The `beta-0.1` calibration baseline is:
   `nuis-nsld-elf-amd64-os-loader-probe-v1` revalidates that report, defaults to
   plan-only, rejects external images before filesystem access, and delegates
   create-new bounded execution/capture/cleanup to the runtime shared by Mach-O.
-  Its cross-object `_start`/`PLT32`/exit fixture closes the static plan, but real
-  Linux execution awaits a reachable host and registry-neutral CLI callback.
-  Compatibility remains the sole atomic output; dynamic provenance, other ELF architectures, and PE/COFF remain open
+  The ELF finalizer now registers
+  `nsld.finalizer.elf.amd64.loader-probe-v1`; its provider-owned callback maps
+  format-specific evidence into
+  `nuis-nsld-registered-loader-probe-outcome-v1`, whose identity, execution,
+  capture, cleanup, blocker, provider-ledger, and outcome-ledger fields are
+  object-format-neutral. The shared CLI consumes that callback in plan-only
+  mode and explicitly rejects apply. Its cross-object `_start`/`PLT32`/exit
+  fixture closes the static plan, but real Linux execution still awaits a
+  reachable host. Compatibility remains the sole atomic output; dynamic
+  provenance, other ELF architectures, and PE/COFF remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed
