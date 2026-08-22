@@ -153,7 +153,7 @@ pub(super) fn patch_audit_hash(patch: &ElfAmd64PlatformPatchAudit) -> String {
     crate::fnv1a64_hex(out.as_bytes())
 }
 
-pub(super) fn bind_audit_hash(bind: &ElfAmd64PlatformDynamicBindRecord) -> String {
+pub(crate) fn bind_audit_hash(bind: &ElfAmd64PlatformDynamicBindRecord) -> String {
     let mut out = String::new();
     append_bind_body(&mut out, bind);
     crate::fnv1a64_hex(out.as_bytes())

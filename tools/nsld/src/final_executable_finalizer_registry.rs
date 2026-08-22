@@ -3,6 +3,9 @@ use super::{
         elf_amd64_artifact_image_validation_issues, materialize_elf_amd64_artifact_image,
         probe_registered_elf_amd64_private_image, ELF_AMD64_REGISTERED_LOADER_PROBE_CAPABILITY,
     },
+    final_executable_elf_publication::{
+        publish_elf_amd64_private_image, ELF_AMD64_PRIVATE_IMAGE_PUBLICATION_CAPABILITY,
+    },
     final_executable_macho_artifact::{
         macho_artifact_image_validation_issues, macho_artifact_input_summary,
         materialize_macho_artifact_image,
@@ -74,8 +77,8 @@ const REGISTERED_FINALIZERS: &[ExecutableFinalizerRegistration] = &[
         input_validator: elf_amd64_artifact_image_validation_issues,
         input_summarizer: summarize_no_additional_inputs,
         executor: Some(execute_internal_elf_artifact_image),
-        private_image_publication_capability: None,
-        private_image_publisher: None,
+        private_image_publication_capability: Some(ELF_AMD64_PRIVATE_IMAGE_PUBLICATION_CAPABILITY),
+        private_image_publisher: Some(publish_elf_amd64_private_image),
         loader_probe_capability: Some(ELF_AMD64_REGISTERED_LOADER_PROBE_CAPABILITY),
         loader_probe: Some(probe_registered_elf_amd64_private_image),
     },

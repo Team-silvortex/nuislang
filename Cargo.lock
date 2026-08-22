@@ -173,6 +173,7 @@ dependencies = [
  "nuis-runtime",
  "nuisc",
  "sha2",
+ "yir-core",
 ]
 
 [[package]]

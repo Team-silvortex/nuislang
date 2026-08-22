@@ -1,4 +1,7 @@
 use crate::{
+    final_executable_elf_dynamic_provenance::{
+        build_elf_amd64_dynamic_resolution_provenance, ElfAmd64DynamicResolutionProvenanceReport,
+    },
     final_executable_elf_input::{parse_elf64_amd64_object_linkage, ParsedElfObjectLinkage},
     final_executable_elf_layout::build_elf_amd64_placement_binding,
     final_executable_elf_layout_report::ElfAmd64PlacementBindingReport,
@@ -64,6 +67,7 @@ pub(crate) struct ElfAmd64HostObjectLinkage {
     pub(crate) shell_layout_plan: ElfAmd64ShellLayoutPlanReport,
     pub(crate) shell_image_serialization: ElfAmd64ShellImageSerializationReport,
     pub(crate) shell_image_validation: ElfAmd64ShellImageValidationReport,
+    pub(crate) dynamic_resolution_provenance: ElfAmd64DynamicResolutionProvenanceReport,
     pub(crate) private_shell_image: Vec<u8>,
 }
 
@@ -252,6 +256,13 @@ pub(crate) fn build_elf_amd64_host_object_linkage(
     {
         return Err("ELF private shell image validation handoff drift".to_owned());
     }
+    let dynamic_resolution_provenance = build_elf_amd64_dynamic_resolution_provenance(
+        plan,
+        &unresolved_external_symbols,
+        &platform_structure_plan,
+        &platform_applied_image.report,
+        &shell_image_validation,
+    )?;
     Ok(ElfAmd64HostObjectLinkage {
         summary: ElfAmd64HostObjectLinkageSummary {
             contract: ELF_AMD64_HOST_OBJECT_LINKAGE_CONTRACT,
@@ -275,6 +286,7 @@ pub(crate) fn build_elf_amd64_host_object_linkage(
         shell_layout_plan,
         shell_image_serialization: shell_image.report,
         shell_image_validation,
+        dynamic_resolution_provenance,
         private_shell_image: shell_image.bytes,
     })
 }

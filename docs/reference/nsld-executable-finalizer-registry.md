@@ -130,7 +130,17 @@ stage now materializes those records and deferred patches once under a second
 write ledger. `nuis-nsld-elf-amd64-shell-layout-plan-v1` maps that exact ledger
 into deterministic ELF/program/section tables, non-overlapping permission
 segments, an optional dynamic table, and a file-backed executable entry. The
-provider serializes and independently validates that private ELF shell. A real
+provider serializes and independently validates that private ELF shell.
+`nuis-nsld-elf-amd64-dynamic-resolution-provenance-v1` then verifies the
+platform and shell lineage, rechecks the CFFI footprint and exact YIR signature
+hashes, and resolves each dynamic bind only through
+`nuis-nsld-elf-dynamic-resolver-provider-registry-v1`. Its first registered
+x86_64 Linux GNU route binds the `libc` ABI to a GNU loader identity,
+`libc.so.6`, default ELF symbol-version policy, and the SysV lazy-PLT resolver.
+No whitelist, a stale hash, an unsupported target/ABI, or multiple signatures
+produces a canonical blocked report. This evidence is deliberately not yet a
+dynamic-execution claim: shell layout still needs a pre-shell projection of the
+same registration before it may emit `PT_INTERP` and `DT_NEEDED`. A real
 x86_64 Linux run now passes both
 `real_linux_loader_executes_cross_object_static_image_and_cleans_up` and
 `registered_loader_probe_executes_static_image_and_projects_admission`: the
@@ -142,8 +152,12 @@ to the current registry, selected provider/target/capability, complete CPU targe
 identity, private-image hash, validation hash, provider evidence, and neutral
 outcome ledger. `--apply` persists the canonical SHA-256 receipt atomically and
 immediately replays it against a provider-owned plan-only rebuild. Receipt
-tamper and valid rebuilt-image drift fail closed. This is admission evidence,
-not yet an ELF private-image publication capability.
+tamper and valid rebuilt-image drift fail closed. The registered
+`nsld.finalizer.elf.amd64.private-image-publication-v1` callback now consumes
+that replay, independently matches the rebuilt shell and validation identities,
+and atomically installs only the exact held private image. Plan-only preserves
+the compatibility output; successful Linux apply produces an owner-executable
+ELF that exits zero. Invalid or stale admission leaves output unchanged.
 
 This is not yet a pure Nsld linker claim. Nsld now understands the real input
 tables, assigns deterministic final sections and addresses, applies registered
@@ -310,9 +324,12 @@ exact static image and the process exits zero. The ELF provider owns the unique
 `nsld.finalizer.elf.amd64.loader-probe-v1` callback and maps its report into
 `nuis-nsld-registered-loader-probe-outcome-v1`. The shared CLI remains plan-only
 by default; explicit apply executes the callback, persists the generic admission
-receipt, and independently replays it against the current provider rebuild.
-Registered private-image publication and external interpreter/dependency
-provenance remain separate. Nuisc remains free of ELF branches.
+receipt, and independently replays it against the current provider rebuild. The
+same provider now registers its private-image publication callback; that callback
+rebuilds and identity-checks the current shell once more before the shared atomic
+publisher installs it. External interpreter/dependency provenance is now
+verified after shell validation, while its pre-shell byte emission and loader
+admission remain blocked capabilities. Nuisc remains free of ELF branches.
 
 ## Validation
 

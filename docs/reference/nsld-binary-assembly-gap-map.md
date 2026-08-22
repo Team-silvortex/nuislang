@@ -213,9 +213,21 @@ audits each non-overlapping zero-reserved write, preserves every file-backed or
 ledger. `nuis-nsld-elf-amd64-shell-image-validation-v1` independently reparses
 that image without the encoder and verifies every header/table coordinate,
 dynamic and section-name record, source-preservation and write audit,
-unexplained platform-prefix byte, and final ledger. The provider still validates
-and atomically publishes only its ELF64 `ET_EXEC`/PIE compatibility image
-without Clang/LLD. `nuis-nsld-elf-amd64-os-loader-probe-v1` now revalidates the
+unexplained platform-prefix byte, and final ledger.
+`nuis-nsld-elf-amd64-dynamic-resolution-provenance-v1` now validates the exact
+platform plan/application and shell-validation lineage, independently rechecks
+the YIR CFFI signature hash and whitelist shape, and asks
+`nuis-nsld-elf-dynamic-resolver-provider-registry-v1` for target-specific
+interpreter, dependency, default symbol-version, and resolver identities. The
+first registration maps hash-whitelisted `libc` calls on x86_64 Linux GNU to
+the GNU loader, `libc.so.6`, and the SysV lazy-PLT resolver. Missing whitelist
+entries, invalid footprints, unknown targets, and multiple signatures fail
+closed under a canonical provenance ledger; static closure reports
+`not-required` without changing its bytes. This is post-shell evidence today:
+the shell does not yet consume it to emit `PT_INTERP` or `DT_NEEDED`, so dynamic
+publication remains blocked. The provider still validates
+and atomically publishes its ELF64 `ET_EXEC`/PIE compatibility image without
+Clang/LLD. `nuis-nsld-elf-amd64-os-loader-probe-v1` now revalidates the
 complete private-image report, permits only zero-unresolved static closure, and
 rejects external inputs before filesystem access. Its execution mechanics share
 the Mach-O runtime for create-new materialization, exact reread, empty process
@@ -234,14 +246,19 @@ target, capability, image, validation, provider-evidence, and neutral-outcome
 identities. Shared CLI `--apply` executes only through the registered callback,
 atomically persists the receipt, then immediately invokes the same provider in
 plan-only mode to rebuild current image evidence before reporting replay
-verified. Receipt tamper and a different valid rebuilt image fail closed. This
-admits the private image but does not yet publish it.
+verified. `nsld.finalizer.elf.amd64.private-image-publication-v1` then rebuilds
+the provider product again, matches shell and validation identities, and passes
+only those held bytes into the object-format-neutral atomic publication engine.
+Plan-only preserves compatibility output; apply installs an owner-executable
+private ELF that exits zero under the real Linux kernel. Receipt tamper and a
+different valid rebuilt image both preserve the compatibility output.
 
 It does not yet own:
 
 * complete architecture parity across Mach-O, ELF, and PE/COFF
-* provider-owned registry-frontdoor publication for the now-admitted ELF static
-  image, registered dynamic provenance, plus complete PE/COFF object merging
+* pre-shell consumption and independent byte replay of registered ELF
+  interpreter/dependency provenance for external-boundary images, plus complete
+  PE/COFF object merging
 * a durable embedded Nsdb/YIR debug metadata section
 
 ## Gap 1: Compatibility Object Writer

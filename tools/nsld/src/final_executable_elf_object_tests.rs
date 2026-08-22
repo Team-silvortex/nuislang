@@ -1,7 +1,8 @@
 use super::*;
 use crate::{
     final_executable_elf_test_fixture::{
-        elf_program_object, elf_runtime_object, elf_unrelated_runtime_object, R_X86_64_PLT32,
+        elf_program_object, elf_program_object_with_external_symbol, elf_runtime_object,
+        elf_unrelated_runtime_object, R_X86_64_PLT32,
     },
     main_test_support::empty_link_plan,
 };
@@ -10,7 +11,10 @@ use nuisc::{
         NuisCompiledArtifact, NuisCompiledArtifactHostObject, NuisExecutableEnvelope,
         NuisLifecycleContract,
     },
-    linker::LinkPlanHostObject,
+    linker::{
+        LinkPlanHostFfiAbiEntry, LinkPlanHostFfiAbiGroup, LinkPlanHostFfiEntry,
+        LinkPlanHostFfiValidationSummary, LinkPlanHostObject,
+    },
 };
 
 #[test]
@@ -178,6 +182,25 @@ fn summarizes_cross_object_internal_symbol_closure() {
         product.shell_image_validation.publication_blockers,
         ["os-loader-probe-pending"]
     );
+    assert_eq!(
+        product.dynamic_resolution_provenance.status,
+        "not-required-static-closure"
+    );
+    assert!(product.dynamic_resolution_provenance.provenance_ready);
+    assert_eq!(
+        product.dynamic_resolution_provenance.provenance_ledger_hash,
+        crate::fnv1a64_hex(
+            product
+                .dynamic_resolution_provenance
+                .canonical_ledger()
+                .as_bytes()
+        )
+    );
+    assert!(product
+        .dynamic_resolution_provenance
+        .dependencies
+        .is_empty());
+    assert!(product.dynamic_resolution_provenance.bindings.is_empty());
 }
 
 #[test]
@@ -261,6 +284,117 @@ fn object_chain_applies_external_platform_records_and_deferred_call() {
             "registered-external-resolution-provenance-pending"
         ]
     );
+    assert_eq!(
+        product.dynamic_resolution_provenance.status,
+        "blocked-dynamic-resolution-provenance"
+    );
+    assert!(!product.dynamic_resolution_provenance.provenance_ready);
+    assert!(product
+        .dynamic_resolution_provenance
+        .issues
+        .iter()
+        .any(|issue| issue == "missing-host-ffi-whitelist:nuis_runtime_entry"));
+    assert!(product.dynamic_resolution_provenance.bindings.is_empty());
+}
+
+#[test]
+fn binds_whitelisted_libc_symbol_to_registered_linux_gnu_provider() {
+    let (artifact, mut plan) = artifact_and_plan(
+        elf_program_object_with_external_symbol(R_X86_64_PLT32, "puts"),
+        elf_unrelated_runtime_object(),
+    );
+    install_host_ffi_entries(
+        &mut plan,
+        vec![host_ffi_entry("libc", "puts", "i32(String)")],
+    );
+
+    let product = build_elf_amd64_host_object_linkage(&artifact, &plan).unwrap();
+    let provenance = &product.dynamic_resolution_provenance;
+
+    assert_eq!(
+        provenance.status,
+        "verified-registered-dynamic-resolution-provenance"
+    );
+    assert!(provenance.provenance_ready);
+    assert!(provenance.issues.is_empty());
+    assert_eq!(provenance.unresolved_symbol_count, 1);
+    assert_eq!(provenance.dynamic_bind_count, 1);
+    assert_eq!(provenance.resolved_binding_count, 1);
+    assert_eq!(provenance.dependencies.len(), 1);
+    assert_eq!(
+        provenance.dependencies[0].provider_id,
+        "nsld.elf.amd64.linux-gnu.libc-v1"
+    );
+    assert_eq!(
+        provenance.dependencies[0].interpreter_path,
+        "/lib64/ld-linux-x86-64.so.2"
+    );
+    assert_eq!(provenance.dependencies[0].needed_name, "libc.so.6");
+    assert_eq!(
+        provenance.dependencies[0].symbol_version_policy,
+        "elf-global-default-symbol-version-v1"
+    );
+    assert_eq!(
+        provenance.dependencies[0].resolver_identity,
+        "elf.sysv.amd64.lazy-plt-v1"
+    );
+    assert_eq!(provenance.bindings[0].target_symbol, "puts");
+    assert_eq!(provenance.bindings[0].host_ffi_abi, "libc");
+    assert_eq!(
+        provenance.bindings[0].platform_bind_audit_hash,
+        product.platform_patch_application.dynamic_bind_records[0].audit_hash
+    );
+    crate::final_executable_elf_dynamic_provenance::validate_elf_amd64_dynamic_resolution_provenance_report(provenance)
+        .unwrap();
+
+    let mut dependency_drift = provenance.clone();
+    dependency_drift.dependencies[0].needed_name = "libm.so.6".to_owned();
+    let error = crate::final_executable_elf_dynamic_provenance::validate_elf_amd64_dynamic_resolution_provenance_report(&dependency_drift)
+        .unwrap_err();
+    assert!(error.contains("dependency provenance"));
+
+    let mut relocated_plan = plan.clone();
+    relocated_plan.host_ffi.index_path = Some("relocated/host_ffi.index".to_owned());
+    let relocated = build_elf_amd64_host_object_linkage(&artifact, &relocated_plan).unwrap();
+    assert_eq!(
+        relocated
+            .dynamic_resolution_provenance
+            .host_ffi_footprint_hash,
+        provenance.host_ffi_footprint_hash
+    );
+
+    let mut target_drift_plan = plan;
+    target_drift_plan.cpu_target.clang_target = "x86_64-unknown-linux-musl".to_owned();
+    let target_drift = build_elf_amd64_host_object_linkage(&artifact, &target_drift_plan).unwrap();
+    assert!(!target_drift.dynamic_resolution_provenance.provenance_ready);
+    assert_eq!(
+        target_drift.dynamic_resolution_provenance.issues,
+        ["registered-dynamic-provider-missing:libc:puts"]
+    );
+}
+
+#[test]
+fn blocks_ambiguous_host_ffi_signatures_before_provider_binding() {
+    let (artifact, mut plan) = artifact_and_plan(
+        elf_program_object_with_external_symbol(R_X86_64_PLT32, "puts"),
+        elf_unrelated_runtime_object(),
+    );
+    install_host_ffi_entries(
+        &mut plan,
+        vec![
+            host_ffi_entry("libc", "puts", "i32(String)"),
+            host_ffi_entry("libc", "puts", "i32(i64)"),
+        ],
+    );
+
+    let product = build_elf_amd64_host_object_linkage(&artifact, &plan).unwrap();
+    let provenance = &product.dynamic_resolution_provenance;
+
+    assert_eq!(provenance.status, "blocked-dynamic-resolution-provenance");
+    assert!(!provenance.provenance_ready);
+    assert_eq!(provenance.issues, ["ambiguous-host-ffi-signature:puts:2"]);
+    assert!(provenance.dependencies.is_empty());
+    assert!(provenance.bindings.is_empty());
 }
 
 #[test]
@@ -332,7 +466,12 @@ fn artifact_and_plan(
     };
     let mut plan = empty_link_plan();
     plan.packaging_mode = "native-cpu-llvm".to_owned();
+    plan.cpu_target.abi = "cpu.x86_64.sysv64".to_owned();
+    plan.cpu_target.machine_arch = "x86_64".to_owned();
+    plan.cpu_target.machine_os = "linux".to_owned();
     plan.cpu_target.object_format = "elf".to_owned();
+    plan.cpu_target.calling_abi = "sysv64".to_owned();
+    plan.cpu_target.clang_target = "x86_64-unknown-linux-gnu".to_owned();
     plan.compiled_artifact.host_objects = objects
         .iter()
         .map(|object| LinkPlanHostObject {
@@ -344,4 +483,66 @@ fn artifact_and_plan(
         })
         .collect();
     (artifact, plan)
+}
+
+fn host_ffi_entry(abi: &str, symbol: &str, signature: &str) -> LinkPlanHostFfiEntry {
+    LinkPlanHostFfiEntry {
+        abi: abi.to_owned(),
+        symbol: symbol.to_owned(),
+        signature_pattern: signature.to_owned(),
+        signature_hash: yir_core::ffi::ffi_symbol_signature_hash(abi, symbol, signature),
+        policy: "signature-whitelist-required".to_owned(),
+        memory_capabilities: Vec::new(),
+    }
+}
+
+fn install_host_ffi_entries(
+    plan: &mut nuisc::linker::LinkPlan,
+    entries: Vec<LinkPlanHostFfiEntry>,
+) {
+    let abi = entries[0].abi.clone();
+    assert!(entries.iter().all(|entry| entry.abi == abi));
+    let notes = (entries.len() > 1).then(|| {
+        format!(
+            "host_ffi ABI `{abi}` symbol `{}` has {} whitelisted signatures",
+            entries[0].symbol,
+            entries.len()
+        )
+    });
+    let validation = LinkPlanHostFfiValidationSummary {
+        checked: entries.len(),
+        valid: true,
+        link_allowed: true,
+        issues: Vec::new(),
+        notes: notes.iter().cloned().collect(),
+    };
+    let abi_entries = entries
+        .iter()
+        .map(|entry| LinkPlanHostFfiAbiEntry {
+            symbol: entry.symbol.clone(),
+            signature_pattern: entry.signature_pattern.clone(),
+            signature_hash: entry.signature_hash.clone(),
+            policy: entry.policy.clone(),
+            memory_capabilities: entry.memory_capabilities.clone(),
+        })
+        .collect::<Vec<_>>();
+    plan.host_ffi.index_path = Some("nuis.project.host_ffi.index".to_owned());
+    plan.host_ffi.symbol_count = entries.len();
+    plan.host_ffi.policy_count = entries.len();
+    plan.host_ffi.memory_capability_count = 0;
+    plan.host_ffi.policy = "signature-whitelist-required".to_owned();
+    plan.host_ffi.abi_groups = vec![LinkPlanHostFfiAbiGroup {
+        abi,
+        symbol_count: entries.len(),
+        policy_count: entries.len(),
+        memory_capability_count: 0,
+        symbols: entries
+            .iter()
+            .map(|entry| format!("{}:{}", entry.symbol, entry.signature_pattern))
+            .collect(),
+        entries: abi_entries,
+        validation: validation.clone(),
+    }];
+    plan.host_ffi.entries = entries;
+    plan.host_ffi.validation = validation;
 }

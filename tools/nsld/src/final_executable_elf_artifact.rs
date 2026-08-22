@@ -124,6 +124,12 @@ fn load_and_validate_elf_amd64_artifact_image(
     Ok(artifact.binary_blob)
 }
 
+pub(crate) fn elf_amd64_artifact_private_product(
+    plan: &nuisc::linker::LinkPlan,
+) -> Result<ElfAmd64HostObjectLinkage, String> {
+    load_elf_amd64_artifact_private_product(plan).map(|(_, product)| product)
+}
+
 fn load_elf_amd64_artifact_private_product(
     plan: &nuisc::linker::LinkPlan,
 ) -> Result<(nuisc::aot::NuisCompiledArtifact, ElfAmd64HostObjectLinkage), String> {

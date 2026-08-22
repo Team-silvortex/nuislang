@@ -77,7 +77,12 @@ fn registry_selects_ready_internal_elf_amd64_artifact_provider() {
     );
     assert!(selection.ready());
     assert!(!selection.requires_host_driver());
-    assert!(!selection.supports_private_image_publication());
+    assert!(selection.supports_private_image_publication());
+    assert!(selection.private_image_publication_ready());
+    assert_eq!(
+        selection.private_image_publication_capability(),
+        Some(ELF_AMD64_PRIVATE_IMAGE_PUBLICATION_CAPABILITY)
+    );
     assert!(selection.supports_loader_probe());
     assert!(selection.loader_probe_ready());
     assert_eq!(

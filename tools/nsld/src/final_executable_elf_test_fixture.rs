@@ -8,11 +8,18 @@ const ELF_RELA_SIZE: usize = 24;
 pub(crate) const R_X86_64_PLT32: u32 = 4;
 
 pub(crate) fn elf_program_object(relocation_type: u32) -> Vec<u8> {
+    elf_program_object_with_external_symbol(relocation_type, "nuis_runtime_entry")
+}
+
+pub(crate) fn elf_program_object_with_external_symbol(
+    relocation_type: u32,
+    external_symbol: &str,
+) -> Vec<u8> {
     let relocations = [(1, relocation_type, -4)];
     build_object(ObjectFixture {
         text: &[0xe8, 0, 0, 0, 0, 0xc3],
         defined_symbol: "__nuis_entry",
-        undefined_symbol: Some("nuis_runtime_entry"),
+        undefined_symbol: Some(external_symbol),
         relocations: &relocations,
         bss_size: 0,
     })

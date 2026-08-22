@@ -20,6 +20,7 @@ use crate::{
     final_executable_elf_test_fixture::{
         elf_alternate_exit_program_object, elf_exit_program_object, elf_linux_exit_runtime_object,
     },
+    final_executable_finalizer_registry::invoke_registered_private_image_publication,
     final_executable_registered_loader_probe_admission::verify_registered_loader_probe_admission_receipt,
     final_executable_registered_loader_probe_admission_receipt::{
         parse_registered_loader_probe_admission_receipt,
@@ -266,6 +267,44 @@ fn registered_loader_probe_executes_static_image_and_projects_admission() {
     assert!(verification_json
         .contains("\"status\":\"registered-loader-probe-admission-replay-verified\""));
 
+    let output_path = Path::new(&plan.final_stage.output_path);
+    let compatibility_output = b"preserve-compatible-output";
+    fs::write(output_path, compatibility_output).unwrap();
+    let publication_plan = invoke_registered_private_image_publication(&plan, false).unwrap();
+    assert_eq!(
+        publication_plan.status,
+        "ready-private-image-publication-plan"
+    );
+    assert!(publication_plan.publication_ready);
+    assert!(!publication_plan.installation_attempted);
+    assert!(!publication_plan.installed);
+    assert!(!publication_plan.output_changed);
+    assert_eq!(fs::read(output_path).unwrap(), compatibility_output);
+
+    let publication = invoke_registered_private_image_publication(&plan, true).unwrap();
+    let private_image = fs::read(output_path).unwrap();
+    assert_eq!(publication.status, "private-image-published");
+    assert!(publication.installation_attempted);
+    assert!(publication.installed);
+    assert!(publication.output_matches_private_image);
+    assert!(publication.output_executable);
+    assert_eq!(publication.source_image_span_bytes, private_image.len());
+    assert_eq!(publication.source_image_hash, fnv1a64_hex(&private_image));
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            fs::metadata(output_path).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+    }
+    let execution = std::process::Command::new(output_path).output().unwrap();
+    assert!(execution.status.success(), "{execution:#?}");
+    assert!(execution.stdout.is_empty());
+    assert!(execution.stderr.is_empty());
+
+    fs::write(output_path, compatibility_output).unwrap();
+
     let tampered_source = receipt_source.replacen(
         &format!(
             "image_identity_hash = \"{}\"",
@@ -286,6 +325,15 @@ fn registered_loader_probe_executes_static_image_and_projects_admission() {
         .issues
         .iter()
         .any(|issue| issue.contains("outcome-invalid")));
+    let tampered_publication = invoke_registered_private_image_publication(&plan, true).unwrap();
+    assert_eq!(
+        tampered_publication.status,
+        "blocked-publication-admission-invalid"
+    );
+    assert!(!tampered_publication.installation_attempted);
+    assert!(!tampered_publication.installed);
+    assert!(!tampered_publication.output_changed);
+    assert_eq!(fs::read(output_path).unwrap(), compatibility_output);
 
     persist_registered_loader_probe_admission_receipt(&plan, &receipt).unwrap();
     let mut drifted_artifact = artifact.clone();
@@ -309,8 +357,22 @@ fn registered_loader_probe_executes_static_image_and_projects_admission() {
         .issues
         .iter()
         .any(|issue| issue.contains("current-image-mismatch")));
+    let drifted_publication =
+        invoke_registered_private_image_publication(&drifted_plan, true).unwrap();
+    assert_eq!(
+        drifted_publication.status,
+        "blocked-publication-admission-invalid"
+    );
+    assert!(!drifted_publication.installation_attempted);
+    assert!(!drifted_publication.installed);
+    assert!(!drifted_publication.output_changed);
+    assert!(drifted_publication
+        .issues
+        .iter()
+        .any(|issue| issue.contains("current-image-mismatch")));
+    assert_eq!(fs::read(output_path).unwrap(), compatibility_output);
 
-    assert_eq!(fs::read_dir(&root).unwrap().count(), 2);
+    assert_eq!(fs::read_dir(&root).unwrap().count(), 3);
     fs::remove_dir_all(root).unwrap();
 }
 

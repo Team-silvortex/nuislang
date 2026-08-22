@@ -4,7 +4,7 @@ mod patching;
 mod report;
 
 pub(crate) use report::{
-    ElfAmd64PlatformDynamicBindRecord, ElfAmd64PlatformPatchApplicationReport,
+    bind_audit_hash, ElfAmd64PlatformDynamicBindRecord, ElfAmd64PlatformPatchApplicationReport,
     ElfAmd64PlatformPatchAudit, ElfAmd64PlatformWriteAudit,
 };
 
