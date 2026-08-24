@@ -51,6 +51,28 @@ fn parse_bootstrap_build_command() {
 }
 
 #[test]
+fn parse_bootstrap_diff_command() {
+    let command = parse_args(
+        [
+            "bootstrap-diff".to_owned(),
+            "stage0/nuis.compiler-component-build.toml".to_owned(),
+            "stage1/nuis.compiler-component-build.toml".to_owned(),
+            "audit/nuis.compiler-component-diff.toml".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .expect("bootstrap-diff parses");
+    assert_eq!(
+        command,
+        CommandKind::BootstrapDiff {
+            stage0_record: PathBuf::from("stage0/nuis.compiler-component-build.toml"),
+            candidate_record: PathBuf::from("stage1/nuis.compiler-component-build.toml"),
+            report: PathBuf::from("audit/nuis.compiler-component-diff.toml"),
+        }
+    );
+}
+
+#[test]
 fn parse_compile_with_packaging_mode() {
     let command = parse_args(
         vec![

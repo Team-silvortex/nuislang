@@ -1,10 +1,12 @@
 use std::{fs, path::Path, path::PathBuf};
 
 use nuis_artifact::{
-    build_compiler_component_build, read_compiler_component_build, read_compiler_stage_handoff,
-    render_compiler_component_build, verify_compiler_component_build_image,
-    CompilerComponentBuildInput, CompilerComponentDependencyInput, COMPILER_COMPONENT_BUILD_FILE,
-    COMPILER_COMPONENT_STAGE0_ROLE,
+    build_compiler_component_build, build_compiler_diagnostic_report,
+    read_compiler_component_build, read_compiler_diagnostic_report, read_compiler_stage_handoff,
+    render_compiler_component_build, render_compiler_diagnostic_report,
+    verify_compiler_component_build_image, CompilerComponentBuildInput,
+    CompilerComponentDependencyInput, CompilerDiagnosticReportInput, COMPILER_COMPONENT_BUILD_FILE,
+    COMPILER_COMPONENT_STAGE0_ROLE, COMPILER_DIAGNOSTIC_REPORT_FILE,
 };
 use nuis_semantics::bootstrap_subset::BOOTSTRAP_SUBSET_PROTOCOL;
 
@@ -105,6 +107,33 @@ pub(crate) fn run_bootstrap_build(input: PathBuf, output_dir: PathBuf) -> Result
         .map_err(|error| format!("failed to verify compiler component build: {error}"))?;
     verify_compiler_component_build_image(&verified, &compiler_image)
         .map_err(|error| format!("failed to verify stage0 compiler image: {error}"))?;
+    let diagnostic_report = build_compiler_diagnostic_report(&CompilerDiagnosticReportInput {
+        producer_id: &verified.producer_id,
+        component_record_sha256: &verified.record_sha256,
+        bootstrap_subset_protocol: &verified.bootstrap_subset_protocol,
+        accepted: true,
+        semantic_pipeline: "checked",
+        semantic_error: None,
+        diagnostics: &[],
+    })
+    .map_err(|error| format!("failed to build compiler diagnostic report: {error}"))?;
+    let diagnostic_path = output_dir.join(COMPILER_DIAGNOSTIC_REPORT_FILE);
+    fs::write(
+        &diagnostic_path,
+        render_compiler_diagnostic_report(&diagnostic_report),
+    )
+    .map_err(|error| {
+        format!(
+            "failed to write compiler diagnostic report `{}`: {error}",
+            diagnostic_path.display()
+        )
+    })?;
+    let verified_diagnostics = read_compiler_diagnostic_report(
+        &diagnostic_path,
+        &verified.record_sha256,
+        &verified.producer_id,
+    )
+    .map_err(|error| format!("failed to verify compiler diagnostic report: {error}"))?;
 
     println!("bootstrap component build: recorded");
     println!("  protocol: {}", verified.protocol);
@@ -129,7 +158,12 @@ pub(crate) fn run_bootstrap_build(input: PathBuf, output_dir: PathBuf) -> Result
         verified.reproducible_build_sha256
     );
     println!("  record_sha256: {}", verified.record_sha256);
+    println!(
+        "  diagnostics_sha256: {}",
+        verified_diagnostics.diagnostics_sha256
+    );
     println!("  record: {}", record_path.display());
+    println!("  diagnostics: {}", diagnostic_path.display());
     Ok(())
 }
 

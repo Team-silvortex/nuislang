@@ -121,6 +121,11 @@ pub enum CommandKind {
         input: PathBuf,
         output_dir: PathBuf,
     },
+    BootstrapDiff {
+        stage0_record: PathBuf,
+        candidate_record: PathBuf,
+        report: PathBuf,
+    },
     Compile {
         input: PathBuf,
         output_dir: PathBuf,

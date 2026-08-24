@@ -95,12 +95,13 @@ producer remain open. See
 
 Coordinate: `compiler-toolchain/bootstrap/stage0-stage1-driver`.
 
-This gate is now `early/55`. `nuis bootstrap-build` is a dedicated project-only
+This gate is now `early/60`. `nuis bootstrap-build` is a dedicated project-only
 driver over the frozen bootstrap gate and normal AOT pipeline. It consumes the
 five-stage handoff and emits `nuis-compiler-component-build-v1`, binding the
 exact stage0 compiler image, native output, build outputs, project/Galaxy/
 Nustar dependency closure, a cache-stable reproducible identity, and an exact
-audit identity. See
+audit identity. It also emits `nuis-compiler-diagnostic-report-v1`, bound to
+the exact component record and producer. See
 [Nuis Compiler Component Build](nuis-compiler-component-build.md).
 
 The driver is not another unchecked application-build alias, but it is still
@@ -111,11 +112,19 @@ exists yet.
 
 Coordinate: `developer-system/bootstrap/differential-reproducibility-gate`.
 
-This is now the weakest readiness coordinate at `early/40`. Compare two
-compiler-component records plus normalized AST, NIR, YIR, diagnostics,
-dependency closure, native output, and deterministic artifact identity across
-producers. Any semantic or reproducibility drift must block component
-replacement rather than being hidden by byte-level shell success.
+This gate is now `early/60`. `nuis bootstrap-diff` consumes verified stage0 and
+explicit `stage1-candidate` records plus their handoffs, payloads, normalized
+diagnostics, dependency closures, and native outputs. Its fixed thirteen-check
+report emits `blocked-drift` or `equivalent-awaiting-authorization`; both keep
+`replacement_authorized = false`. Valid drift is retained as an audit report
+and returns a failing command status. See
+[Nuis Compiler Component Differential Gate](nuis-compiler-component-differential.md).
+
+The comparison engine is implemented, but there is still no real Nuis stage1
+producer. Therefore repository-native cross-producer equivalence and a
+separate reversible replacement authorization remain open. The weakest
+readiness coordinate returns to the producer-neutral AST/NIR boundary rather
+than being hidden behind a missing comparison protocol.
 
 ## Migration Rule
 

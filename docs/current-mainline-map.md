@@ -14,19 +14,20 @@ If you only need the shortest current `beta-0.6.*` reading route, use this order
 3. [reference/nuis-self-hosting-readiness.md](reference/nuis-self-hosting-readiness.md)
 4. [reference/nuis-compiler-stage-handoff.md](reference/nuis-compiler-stage-handoff.md)
 5. [reference/nuis-compiler-component-build.md](reference/nuis-compiler-component-build.md)
-6. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
-7. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
-8. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
-9. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
-10. [reference/nsld-executable-finalizer-registry.md](reference/nsld-executable-finalizer-registry.md)
-11. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
-12. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
-13. [reference/provider-completion-trust-registry.md](reference/provider-completion-trust-registry.md)
-14. [reference/nsdb-yir-debugger-frontdoor.md](reference/nsdb-yir-debugger-frontdoor.md)
-15. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
-16. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
-17. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
-18. [versioning/README.md](versioning/README.md)
+6. [reference/nuis-compiler-component-differential.md](reference/nuis-compiler-component-differential.md)
+7. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
+8. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
+9. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
+10. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
+11. [reference/nsld-executable-finalizer-registry.md](reference/nsld-executable-finalizer-registry.md)
+12. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
+13. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
+14. [reference/provider-completion-trust-registry.md](reference/provider-completion-trust-registry.md)
+15. [reference/nsdb-yir-debugger-frontdoor.md](reference/nsdb-yir-debugger-frontdoor.md)
+16. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
+17. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
+18. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
+19. [versioning/README.md](versioning/README.md)
 
 Short rule:
 
@@ -44,6 +45,8 @@ Short rule:
   [reference/nuis-compiler-stage-handoff.md](reference/nuis-compiler-stage-handoff.md)
 * current stage0 compiler-component build record:
   [reference/nuis-compiler-component-build.md](reference/nuis-compiler-component-build.md)
+* current stage0/stage1 candidate differential gate:
+  [reference/nuis-compiler-component-differential.md](reference/nuis-compiler-component-differential.md)
 * current `beta-0.6.*` entry:
   [versioning/nuis-beta-0.6.0-mainline-entry.md](versioning/nuis-beta-0.6.0-mainline-entry.md)
 * previous curated `beta-0.3.*` entry:
@@ -122,10 +125,10 @@ Short rule:
   [repo-layout.md](repo-layout.md)
 
 Current CLI frontdoor rule:
-`nuis status/help/dev-tensor/bootstrap-status -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build/bootstrap-build -> artifact-doctor/run-artifact -> release-check`
+`nuis status/help/dev-tensor/bootstrap-status -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build/bootstrap-build/bootstrap-diff -> artifact-doctor/run-artifact -> release-check`
 
 Current bootstrap pressure rule:
-`frozen compiler subset -> compiler-owned data -> producer-neutral handoff -> stage0/stage1 driver -> differential replacement gate`
+`frozen compiler subset -> compiler-owned data -> producer-neutral handoff -> stage0/stage1 driver -> fail-closed differential report -> separate replacement authorization`
 
 Current example-tree rule:
 `frontdoor first -> grouped companions next -> explicit probe routes after that`

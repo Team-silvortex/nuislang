@@ -531,6 +531,24 @@ where
             }
             Ok(CommandKind::BootstrapBuild { input, output_dir })
         }
+        "bootstrap-diff" => {
+            let usage = "usage: nuisc bootstrap-diff <stage0-record> <candidate-record> <report>";
+            let stage0_record = PathBuf::from(
+                args.next().ok_or_else(|| usage.to_owned())?,
+            );
+            let candidate_record = PathBuf::from(
+                args.next().ok_or_else(|| usage.to_owned())?,
+            );
+            let report = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            if args.next().is_some() {
+                return Err(usage.to_owned());
+            }
+            Ok(CommandKind::BootstrapDiff {
+                stage0_record,
+                candidate_record,
+                report,
+            })
+        }
         "compile" => {
             let mut verbose_cache = false;
             let mut cpu_abi = None;
@@ -575,7 +593,7 @@ where
             })
         }
         other => Err(format!(
-            "unknown nuisc command `{other}`; expected `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `pack-envelope`, `unpack-envelope`, `inspect-envelope`, `inspect-artifact`, `inspect-execution`, `artifact-report`, `verify-artifact`, `unpack-artifact`, `verify-build-manifest`, `inspect-benchmarks`, `inspect-docs`, `inspect-galaxy-docs`, `inspect-stdlib-docs`, `inspect-project-metadata`, `repair-project-metadata`, `cache-status`, `clean-cache`, `cache-prune`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, `bootstrap-check`, `bootstrap-build`, or `compile`"
+            "unknown nuisc command `{other}`; expected `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `pack-envelope`, `unpack-envelope`, `inspect-envelope`, `inspect-artifact`, `inspect-execution`, `artifact-report`, `verify-artifact`, `unpack-artifact`, `verify-build-manifest`, `inspect-benchmarks`, `inspect-docs`, `inspect-galaxy-docs`, `inspect-stdlib-docs`, `inspect-project-metadata`, `repair-project-metadata`, `cache-status`, `clean-cache`, `cache-prune`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, `bootstrap-check`, `bootstrap-build`, `bootstrap-diff`, or `compile`"
         )),
     }
 }

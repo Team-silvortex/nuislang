@@ -1,0 +1,41 @@
+protocol = "nuis-compiler-diagnostic-report-v1"
+version = 1
+status = "early-implemented"
+manifest_name = "nuis.compiler-diagnostics.toml"
+normalization_contract = "nuis-compiler-diagnostic-normalization-v1"
+component_binding = "exact-component-record-sha256"
+producer_binding = "exact-producer-id"
+text_policy = "canonical-utf8-lf-without-nul"
+path_policy = "portable-logical-path-without-absolute-or-parent-traversal"
+digest = "sha256-lowercase"
+record_order = "module-code-path-message"
+
+normalized_fields = [
+  "accepted-state",
+  "semantic-pipeline-state",
+  "semantic-error",
+  "module",
+  "diagnostic-code",
+  "logical-path",
+  "message",
+]
+
+successful_component_invariants = [
+  "accepted-is-true",
+  "semantic-pipeline-is-checked",
+  "semantic-error-is-empty",
+  "diagnostic-count-is-zero",
+]
+
+verification = [
+  "canonical-toml-roundtrip",
+  "record-ordinal-and-sort-order",
+  "per-record-sha256-recomputation",
+  "normalized-set-sha256-recomputation",
+  "report-sha256-recomputation",
+  "component-record-and-producer-cross-binding",
+]
+
+current_writer = "nuis bootstrap-build"
+current_scope = "successful-stage0-compiler-component"
+future_scope = "accepted-and-rejected-cross-producer-diagnostic-probes"

@@ -1,0 +1,51 @@
+protocol = "nuis-compiler-component-differential-v1"
+version = 1
+status = "early-implemented"
+manifest_name = "nuis.compiler-component-diff.toml"
+gate_contract = "nuis-compiler-component-differential-gate-v1"
+replacement_authority_contract = "nuis-compiler-replacement-authorization-separate-v1"
+frontdoor = "nuis bootstrap-diff"
+stage0_role = "stage0"
+candidate_role = "stage1-candidate"
+producer_policy = "distinct-producer-identities"
+digest = "sha256-lowercase"
+replacement_authorized = false
+
+ordered_comparisons = [
+  "component-id",
+  "component-domain",
+  "component-unit",
+  "bootstrap-subset",
+  "stage-source",
+  "stage-tokens",
+  "stage-ast",
+  "stage-nir",
+  "stage-yir",
+  "stage-bundle",
+  "diagnostics",
+  "dependency-closure",
+  "native-output",
+]
+
+verdicts = [
+  "blocked-drift",
+  "equivalent-awaiting-authorization",
+]
+
+invariants = [
+  "both-component-records-and-payloads-verify-before-comparison",
+  "both-diagnostic-reports-bind-their-exact-component-records",
+  "all-thirteen-comparisons-are-required-and-canonically-ordered",
+  "valid-drift-writes-an-audit-report-and-exits-failure",
+  "report-output-cannot-overwrite-an-input-record",
+  "equivalence-never-implies-replacement-authorization",
+  "report-and-aggregate-verdicts-are-sha256-bound",
+  "tampering-fails-closed",
+]
+
+[open_boundary]
+missing = [
+  "real-nuis-stage1-component-producer",
+  "repository-native-cross-producer-equivalence-run",
+  "reversible-component-replacement-authorization",
+]

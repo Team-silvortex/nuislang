@@ -73,6 +73,7 @@ mod aot_vcs_info;
 mod aot_verify_report;
 pub mod artifact_provider_metadata;
 mod artifact_report;
+mod bootstrap_differential;
 mod bootstrap_stage_driver;
 pub mod cache;
 pub mod cli;
@@ -295,6 +296,11 @@ pub fn run(command: CommandKind) -> Result<(), String> {
         CommandKind::BootstrapBuild { input, output_dir } => {
             bootstrap_stage_driver::run_bootstrap_build(input, output_dir)?
         }
+        CommandKind::BootstrapDiff {
+            stage0_record,
+            candidate_record,
+            report,
+        } => bootstrap_differential::run_bootstrap_diff(stage0_record, candidate_record, report)?,
         CommandKind::Compile {
             input,
             output_dir,

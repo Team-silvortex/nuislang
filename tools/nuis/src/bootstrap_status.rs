@@ -535,11 +535,7 @@ mod tests {
                 "status = \"stable\"\nprogress = 100",
             )
             .replace(
-                "status = \"early\"\nprogress = 55",
-                "status = \"stable\"\nprogress = 100",
-            )
-            .replace(
-                "status = \"early\"\nprogress = 40",
+                "status = \"early\"\nprogress = 60",
                 "status = \"stable\"\nprogress = 100",
             );
         let report = parse_bootstrap_readiness(&complete).expect("complete manifest parses");

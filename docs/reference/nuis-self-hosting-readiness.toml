@@ -42,20 +42,20 @@ blocker = "Rust stage0 emits and verifies all five records, but AST still regene
 id = "stage0-stage1-driver"
 coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
 status = "early"
-progress = 55
+progress = 60
 required_before = "beta-0.10.0"
-next_action = "feed separately attested stage0 and candidate stage1 component records into the differential gate without authorizing replacement"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_build -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1"
-expected_artifact = "two independently attested compiler-component records ready for fail-closed stage0/stage1 comparison"
-blocker = "the stage0 driver now records the compiler image, full dependency closure, handoff, native output, stable reproducible identity, and exact audit identity, but no Nuis stage1 producer or replacement authorization exists"
+next_action = "emit the same component and component-bound diagnostic proof from a separately identified Nuis stage1 candidate"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_build -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_diagnostic_report -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1"
+expected_artifact = "a separately attested Nuis stage1-candidate component record and normalized diagnostic proof ready for the implemented differential gate"
+blocker = "the stage0 driver records compiler image, dependency closure, handoff, native output, diagnostic proof, stable reproducible identity, and exact audit identity, but no Nuis stage1 producer exists"
 
 [[gates]]
 id = "differential-reproducibility-gate"
 coordinate = "developer-system/bootstrap/differential-reproducibility-gate"
 status = "early"
-progress = 40
+progress = 60
 required_before = "beta-0.10.0"
-next_action = "compare two compiler-component records plus normalized AST, NIR, YIR, diagnostics, dependency closure, and native output before allowing replacement"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis bootstrap_status -j 1"
-expected_artifact = "a fail-closed differential report covering normalized AST, NIR, YIR, diagnostics, and deterministic artifact identity"
-blocker = "stage0 now emits a cache-stable component identity, but no cross-producer semantic equivalence report currently protects compiler replacement"
+next_action = "run the implemented thirteen-check gate against a real Nuis-produced leaf stage1 candidate across repeated clean builds"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_diff -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1"
+expected_artifact = "a repository-native stage0/stage1 differential report that remains equivalent across clean rebuilds and still grants no replacement authority"
+blocker = "the fail-closed comparison report and CLI exist, but no Nuis stage1 producer or independent reversible replacement authorization exists"

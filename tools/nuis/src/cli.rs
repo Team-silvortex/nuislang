@@ -27,6 +27,11 @@ pub enum CommandKind {
         input: PathBuf,
         output_dir: PathBuf,
     },
+    BootstrapDiff {
+        stage0_record: PathBuf,
+        candidate_record: PathBuf,
+        report: PathBuf,
+    },
     Registry {
         json: bool,
     },
@@ -237,6 +242,20 @@ where
                 );
             }
             Ok(CommandKind::BootstrapBuild { input, output_dir })
+        }
+        "bootstrap-diff" => {
+            let usage = "usage: nuis bootstrap-diff <stage0-record> <candidate-record> <report>";
+            let stage0_record = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let candidate_record = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let report = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            if args.next().is_some() {
+                return Err(usage.to_owned());
+            }
+            Ok(CommandKind::BootstrapDiff {
+                stage0_record,
+                candidate_record,
+                report,
+            })
         }
         "registry" => {
             let mut json = false;
@@ -497,7 +516,7 @@ where
         }),
         "galaxy" => parse_galaxy_args(args),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `bootstrap-status`, `bootstrap-build`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `debug-request`, `debug-lineage-repair`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `bootstrap-status`, `bootstrap-build`, `bootstrap-diff`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `debug-request`, `debug-lineage-repair`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
         )),
     }
 }

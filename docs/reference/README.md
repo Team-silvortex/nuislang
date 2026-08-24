@@ -56,6 +56,7 @@ Start in this order:
   - [nuis-compiler-data-model.md](nuis-compiler-data-model.md)
   - [nuis-compiler-stage-handoff.md](nuis-compiler-stage-handoff.md)
   - [nuis-compiler-component-build.md](nuis-compiler-component-build.md)
+  - [nuis-compiler-component-differential.md](nuis-compiler-component-differential.md)
   - [nir-memory-model.md](nir-memory-model.md)
   - [nir-optimization-contract.md](nir-optimization-contract.md)
   - [control-flow-lowering-contract.md](control-flow-lowering-contract.md)
@@ -125,6 +126,10 @@ payloads identified without Rust layout coupling?”, start with
 If your question is specifically “how does stage0 attest one complete
 project-form compiler-component build?”, start with
 [nuis-compiler-component-build.md](nuis-compiler-component-build.md).
+
+If your question is specifically “how are stage0 and a candidate stage1
+compared without implicitly authorizing replacement?”, start with
+[nuis-compiler-component-differential.md](nuis-compiler-component-differential.md).
 
 If your question is specifically “what did the alpha-0.20 closeout establish?”,
 read

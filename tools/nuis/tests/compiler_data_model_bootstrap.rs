@@ -6,10 +6,12 @@ use std::{
 };
 
 use nuis_artifact::{
-    parse_build_manifest, read_compiler_component_build, read_compiler_stage_handoff,
-    CompilerStageKind, COMPILER_COMPONENT_BUILD_FILE, COMPILER_COMPONENT_BUILD_PROTOCOL,
-    COMPILER_COMPONENT_DRIVER_CONTRACT, COMPILER_COMPONENT_REPRODUCIBLE_IDENTITY_CONTRACT,
-    COMPILER_STAGE_HANDOFF_PROTOCOL, COMPILER_STAGE_PRODUCER_CONTRACT,
+    parse_build_manifest, read_compiler_component_build, read_compiler_diagnostic_report,
+    read_compiler_stage_handoff, CompilerStageKind, COMPILER_COMPONENT_BUILD_FILE,
+    COMPILER_COMPONENT_BUILD_PROTOCOL, COMPILER_COMPONENT_DRIVER_CONTRACT,
+    COMPILER_COMPONENT_REPRODUCIBLE_IDENTITY_CONTRACT, COMPILER_DIAGNOSTIC_REPORT_FILE,
+    COMPILER_DIAGNOSTIC_REPORT_PROTOCOL, COMPILER_STAGE_HANDOFF_PROTOCOL,
+    COMPILER_STAGE_PRODUCER_CONTRACT,
 };
 
 fn temp_dir() -> PathBuf {
@@ -137,6 +139,20 @@ fn compiler_data_model_bootstrap_builds_and_runs_as_pure_nuis() {
             "expected component build to attest `{kind}`"
         );
     }
+    let diagnostic_path = output_dir.join(COMPILER_DIAGNOSTIC_REPORT_FILE);
+    let first_diagnostics = read_compiler_diagnostic_report(
+        &diagnostic_path,
+        &first_component_build.record_sha256,
+        &first_component_build.producer_id,
+    )
+    .expect("verify compiler diagnostic report");
+    assert_eq!(
+        first_diagnostics.protocol,
+        COMPILER_DIAGNOSTIC_REPORT_PROTOCOL
+    );
+    assert!(first_diagnostics.accepted);
+    assert_eq!(first_diagnostics.semantic_pipeline, "checked");
+    assert_eq!(first_diagnostics.diagnostic_count, 0);
 
     let build_manifest = parse_build_manifest(&output_dir.join("nuis.build.manifest.toml"))
         .expect("parse compiler data model build manifest");
@@ -187,6 +203,31 @@ fn compiler_data_model_bootstrap_builds_and_runs_as_pure_nuis() {
         first_component_build.reproducible_build_sha256,
         second_component_build.reproducible_build_sha256
     );
+    let second_diagnostics = read_compiler_diagnostic_report(
+        &diagnostic_path,
+        &second_component_build.record_sha256,
+        &second_component_build.producer_id,
+    )
+    .expect("verify cached compiler diagnostic report");
+    assert_eq!(
+        first_diagnostics.diagnostics_sha256,
+        second_diagnostics.diagnostics_sha256
+    );
+
+    let candidate_record_path = output_dir.join("candidate.compiler-component-build.toml");
+    fs::copy(&component_build_path, &candidate_record_path)
+        .expect("copy stage0 record into wrong-role candidate fixture");
+    let differential_path = output_dir.join("nuis.compiler-component-diff.toml");
+    let differential = run_nuis(&[
+        "bootstrap-diff",
+        &component_build_path.display().to_string(),
+        &candidate_record_path.display().to_string(),
+        &differential_path.display().to_string(),
+    ]);
+    assert!(!differential.status.success());
+    assert!(String::from_utf8_lossy(&differential.stderr).contains("stage1-candidate"));
+    assert!(!differential_path.exists());
+    fs::remove_file(candidate_record_path).expect("remove wrong-role candidate fixture");
 
     let native_path = output_dir.join("bootstrap_compiler_data_model_demo");
     let mut tampered_native = fs::read(&native_path).expect("read native binary for tamper check");

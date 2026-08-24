@@ -3,6 +3,8 @@ mod bridge_registry;
 mod build_manifest;
 mod clock_protocol;
 mod compiler_component_build;
+mod compiler_component_diff;
+mod compiler_diagnostic_report;
 mod compiler_stage_handoff;
 mod domain_unit;
 mod envelope;
@@ -39,6 +41,22 @@ pub use compiler_component_build::{
     COMPILER_COMPONENT_DEPENDENCY_CLOSURE_CONTRACT, COMPILER_COMPONENT_DRIVER_CONTRACT,
     COMPILER_COMPONENT_REPRODUCIBLE_IDENTITY_CONTRACT, COMPILER_COMPONENT_STAGE0_ROLE,
     COMPILER_COMPONENT_STAGE1_CANDIDATE_ROLE,
+};
+pub use compiler_component_diff::{
+    build_compiler_component_differential, compare_compiler_component_paths,
+    parse_compiler_component_differential, parse_compiler_component_differential_from_source,
+    render_compiler_component_differential, CompilerComponentComparison,
+    CompilerComponentDifferential, CompilerComponentEvidence, COMPILER_COMPONENT_DIFFERENTIAL_FILE,
+    COMPILER_COMPONENT_DIFFERENTIAL_GATE_CONTRACT, COMPILER_COMPONENT_DIFFERENTIAL_PROTOCOL,
+    COMPILER_COMPONENT_REPLACEMENT_AUTHORITY_CONTRACT,
+};
+pub use compiler_diagnostic_report::{
+    build_compiler_diagnostic_report, parse_compiler_diagnostic_report,
+    parse_compiler_diagnostic_report_from_source, read_compiler_diagnostic_report,
+    render_compiler_diagnostic_report, CompilerDiagnosticInput, CompilerDiagnosticRecord,
+    CompilerDiagnosticReport, CompilerDiagnosticReportInput,
+    COMPILER_DIAGNOSTIC_NORMALIZATION_CONTRACT, COMPILER_DIAGNOSTIC_REPORT_FILE,
+    COMPILER_DIAGNOSTIC_REPORT_PROTOCOL,
 };
 pub use compiler_stage_handoff::{
     build_compiler_stage_handoff, parse_compiler_stage_handoff_from_source,

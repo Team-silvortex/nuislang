@@ -33,12 +33,16 @@ nuis source / nuis.toml
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation-drift coverage across `26/26` registered
 coordinates. Five independent self-hosting readiness gates keep the
-bootstrap-critical average honest at `91/100`; the weakest coordinate is now
-`developer-system/bootstrap/differential-reproducibility-gate` at `early`,
-`40/100`. The stage0/stage1 driver has advanced to `early`, `55/100`: the
+bootstrap-critical average honest at `92/100`; the weakest coordinate is now
+`language-core/nuisc/stage-neutral-ir-boundary` at `early`, `45/100`. The
+stage0/stage1 driver and differential gate have both advanced to `early`,
+`60/100`: the
 dedicated `nuis bootstrap-build` frontdoor emits a complete compiler-image,
-stage-handoff, dependency-closure, native-output, reproducible-identity, and
-exact-audit record for one project-form compiler component. The
+stage-handoff, dependency-closure, native-output, reproducible-identity, exact
+audit record, and component-bound diagnostic proof for one project-form
+compiler component. The `nuis bootstrap-diff` frontdoor compares an explicit
+stage0/candidate pair across thirteen semantic, dependency, diagnostic, and
+native-output identities while keeping replacement authorization separate. The
 `nuis bootstrap-status` frontdoor reports `1/5` gates closed, while the bounded
 compiler data model is `usable`, `75/100` and the producer-neutral five-stage
 handoff is `early`, `45/100`. This is preparation progress, not a claim that
@@ -58,10 +62,11 @@ The first GNU resolver providers and symbol-version rows now belong to
 `official.cffi`. Nuisc validates and preserves their registration contract,
 while Nsld generates a static runtime table at build time without changing the
 existing private-image or admission identity. The tensor now routes mainline
-work to the first fail-closed cross-producer differential report over the
-producer-neutral handoff and compiler-component records. Deterministic growth
-beyond the bounded compiler data-model proof, Galaxy hardening, broader ELF
-architecture coverage, and PE/COFF remain separate registered foundation work.
+work to producer-neutral structural AST/NIR codecs and the first real
+Nuis-produced stage1 candidate that can consume the implemented fail-closed
+differential gate. Deterministic growth beyond the bounded compiler data-model
+proof, Galaxy hardening, broader ELF architecture coverage, and PE/COFF remain
+separate registered foundation work.
 
 Start with these documents:
 
@@ -72,6 +77,7 @@ Start with these documents:
 * [Compiler data model](docs/reference/nuis-compiler-data-model.md)
 * [Compiler stage handoff](docs/reference/nuis-compiler-stage-handoff.md)
 * [Compiler component build](docs/reference/nuis-compiler-component-build.md)
+* [Compiler component differential gate](docs/reference/nuis-compiler-component-differential.md)
 * [Native artifact workflow](docs/reference/nuis-native-artifact-workflow.md)
 * [Nsld linker frontdoor](docs/reference/nsld-linker-frontdoor.md)
 * [Binary assembly gap map](docs/reference/nsld-binary-assembly-gap-map.md)

@@ -33,7 +33,9 @@ The driver does not introduce a private compiler pipeline. It first applies
 the frozen bootstrap subset gate, then uses the normal semantic, NIR, YIR,
 LLVM, native-link, and artifact pipeline. It additionally requires and
 consumes the producer-neutral compiler-stage handoff before writing
-`nuis.compiler-component-build.toml`.
+`nuis.compiler-component-build.toml`. A successful build also writes the
+component-bound `nuis.compiler-diagnostics.toml` used by the differential
+gate.
 
 Bootstrap validation, cache identity, compilation, and dependency collection
 share one resolved project snapshot. The driver does not independently reload
@@ -47,6 +49,7 @@ The record binds exact bytes and lowercase SHA-256 identities for:
 * the ordered source, tokens, AST, NIR, and YIR handoff bundle
 * the build manifest and compiled artifact container
 * the native executable
+* the accepted, checked, normalized diagnostic state
 * the project manifest and project-local Nuis sources
 * the generated Galaxy lock plus resolved Galaxy manifests, sources, and
   libraries
@@ -81,6 +84,11 @@ audit identity answers "is this exact build record unchanged?"
 Neither identity alone proves semantic equivalence between two compiler
 producers. That belongs to the differential gate.
 
+The diagnostic sidecar binds the exact `record_sha256` rather than changing
+component-build v1. This keeps diagnostic normalization independently
+versionable while preventing a report from being moved onto another component
+record.
+
 ## Verification
 
 `read_compiler_component_build` parses the canonical TOML, recomputes all
@@ -99,10 +107,12 @@ rejects it.
 ## Honest Boundary
 
 The current stage0 half is reusable and attested, but stage1 is still absent.
-The next boundary is a separately identified candidate producer followed by a
-fail-closed report comparing diagnostics, normalized AST/NIR/YIR, dependency
-closure, native output, and reproducible identity. Only a later reversible
-authorization record may permit replacing one compiler component.
+The fail-closed comparison protocol and `nuis bootstrap-diff` frontdoor now
+exist; see
+[Nuis Compiler Component Differential Gate](nuis-compiler-component-differential.md).
+The next boundary is a separately identified Nuis candidate producer. Only a
+later reversible authorization record may permit replacing one compiler
+component.
 
 ## Validation
 

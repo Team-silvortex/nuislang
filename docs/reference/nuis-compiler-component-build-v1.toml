@@ -11,6 +11,8 @@ current_stage_role = "stage0"
 current_producer = "nuisc-stage0-reference"
 allowed_stage_roles = ["stage0", "stage1-candidate"]
 frontdoor = "nuis bootstrap-build"
+diagnostic_companion_protocol = "nuis-compiler-diagnostic-report-v1"
+diagnostic_companion_name = "nuis.compiler-diagnostics.toml"
 input_policy = "project-or-project-manifest-only"
 path_policy = "portable-logical-identities-and-sibling-output-files"
 text_policy = "utf8-lf-without-nul"
@@ -76,6 +78,7 @@ invariants = [
   "payload-or-record-tampering-fails-closed",
   "record-grants-no-component-replacement-authority",
   "candidate-stage1-role-is-explicit-and-identity-bound",
+  "successful-build-emits-component-bound-clean-diagnostic-proof",
 ]
 
 validation_commands = [
@@ -87,9 +90,7 @@ validation_commands = [
 [open_boundary]
 status = "not-stage1-ready"
 missing = [
-  "nuis-stage1-compiler-component-producer",
-  "cross-producer-diagnostic-equivalence",
-  "cross-producer-ast-nir-yir-equivalence",
-  "cross-producer-native-output-equivalence",
+  "real-nuis-stage1-component-producer",
+  "repository-native-cross-producer-equivalence-run",
   "reversible-component-replacement-authorization",
 ]
