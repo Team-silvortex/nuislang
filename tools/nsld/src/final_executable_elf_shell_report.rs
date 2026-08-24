@@ -1,3 +1,6 @@
+use super::version::{
+    append_version_plan_canonical, ElfAmd64ShellVersionNeedPlan, ElfAmd64ShellVersionSymbolPlan,
+};
 use std::fmt::Write as _;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -115,6 +118,14 @@ pub(crate) struct ElfAmd64ShellLayoutPlanReport {
     pub(crate) dynamic_string_source_image_offset: Option<usize>,
     pub(crate) dynamic_string_source_bytes: usize,
     pub(crate) needed_libraries: Vec<ElfAmd64ShellNeededLibraryPlan>,
+    pub(crate) version_symbol_table_file_offset: Option<usize>,
+    pub(crate) version_symbol_table_virtual_address: Option<u64>,
+    pub(crate) version_symbol_table_bytes: usize,
+    pub(crate) version_need_table_file_offset: Option<usize>,
+    pub(crate) version_need_table_virtual_address: Option<u64>,
+    pub(crate) version_need_table_bytes: usize,
+    pub(crate) version_symbols: Vec<ElfAmd64ShellVersionSymbolPlan>,
+    pub(crate) version_needs: Vec<ElfAmd64ShellVersionNeedPlan>,
     pub(crate) program_headers: Vec<ElfAmd64ShellProgramHeaderPlan>,
     pub(crate) sections: Vec<ElfAmd64ShellSectionPlan>,
     pub(crate) dynamic_entries: Vec<ElfAmd64ShellDynamicEntryPlan>,
@@ -217,6 +228,20 @@ impl ElfAmd64ShellLayoutPlanReport {
             append_text(&mut out, &needed.needed_id);
             append_text(&mut out, &needed.audit_hash);
         }
+        writeln!(
+            out,
+            "versions={}|{}|{}|{}|{}|{}|{}|{}",
+            optional_usize(self.version_symbol_table_file_offset),
+            optional_u64(self.version_symbol_table_virtual_address),
+            self.version_symbol_table_bytes,
+            optional_usize(self.version_need_table_file_offset),
+            optional_u64(self.version_need_table_virtual_address),
+            self.version_need_table_bytes,
+            self.version_symbols.len(),
+            self.version_needs.len()
+        )
+        .unwrap();
+        append_version_plan_canonical(&mut out, &self.version_symbols, &self.version_needs);
         for header in &self.program_headers {
             append_text(&mut out, &header.program_header_id);
             append_text(&mut out, &header.audit_hash);
@@ -408,6 +433,8 @@ pub(crate) struct ElfAmd64ShellImageValidationReport {
     pub(crate) interpreter_segment_count: usize,
     pub(crate) interpreter_path: Option<String>,
     pub(crate) needed_libraries: Vec<String>,
+    pub(crate) version_symbol_indexes: Vec<u16>,
+    pub(crate) version_requirements: Vec<String>,
     pub(crate) section_header_count: usize,
     pub(crate) section_name_count: usize,
     pub(crate) entry_program_header_index: usize,
@@ -460,6 +487,19 @@ impl ElfAmd64ShellImageValidationReport {
         .unwrap();
         for needed in &self.needed_libraries {
             append_text(&mut out, needed);
+        }
+        writeln!(
+            out,
+            "versions={}|{}",
+            self.version_symbol_indexes.len(),
+            self.version_requirements.len()
+        )
+        .unwrap();
+        for index in &self.version_symbol_indexes {
+            writeln!(out, "version-index={index}").unwrap();
+        }
+        for requirement in &self.version_requirements {
+            append_text(&mut out, requirement);
         }
         writeln!(
             out,

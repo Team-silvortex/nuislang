@@ -47,8 +47,10 @@ pub(crate) fn validate_elf_amd64_shell_image(
         .iter()
         .filter(|section| section.source_image_offset.is_some())
         .count();
-    let expected_table_count =
-        4 + usize::from(dynamic_boundary) + parsed.interpreter_segment_count.saturating_mul(2);
+    let expected_table_count = 4
+        + usize::from(dynamic_boundary)
+        + parsed.interpreter_segment_count.saturating_mul(2)
+        + usize::from(!parsed.version_symbol_indexes.is_empty()) * 2;
     if parsed.tables.len() != expected_table_count
         || evidence.tables.len() != expected_table_count
         || evidence.sources.len() != expected_source_count
@@ -74,6 +76,8 @@ pub(crate) fn validate_elf_amd64_shell_image(
         interpreter_segment_count: parsed.interpreter_segment_count,
         interpreter_path: parsed.interpreter_path,
         needed_libraries: parsed.needed_libraries,
+        version_symbol_indexes: parsed.version_symbol_indexes,
+        version_requirements: parsed.version_requirements,
         section_header_count: parsed.section_header_count,
         section_name_count: parsed.section_name_count,
         entry_program_header_index: parsed.entry_program_header_index,
@@ -117,13 +121,38 @@ pub(crate) fn validate_elf_amd64_shell_image_validation_report(
             "ELF shell validation report has an interpreter without dynamic entries".to_owned(),
         );
     }
+    let versioned = match (
+        report.version_symbol_indexes.as_slice(),
+        report.version_requirements.is_empty(),
+    ) {
+        ([], true) => false,
+        ([0, versions @ ..], false)
+            if !versions.is_empty() && versions.iter().all(|value| *value >= 2) =>
+        {
+            true
+        }
+        _ => return Err("ELF shell validation report has an invalid version shape".to_owned()),
+    };
+    if versioned != interpreter {
+        return Err("ELF shell validation report version/interpreter shape differs".to_owned());
+    }
     let mut expected_table_kinds = vec![
         ("elf64-header", 1),
         ("program-header-table", report.program_header_count),
     ];
     if interpreter {
         expected_table_kinds.push(("interpreter-path", 1));
-        expected_table_kinds.push(("final-dynamic-string-table", report.needed_libraries.len()));
+        expected_table_kinds.push((
+            "final-dynamic-string-table",
+            report.needed_libraries.len() + report.version_requirements.len(),
+        ));
+    }
+    if versioned {
+        expected_table_kinds.push((
+            "gnu-version-symbol-table",
+            report.version_symbol_indexes.len(),
+        ));
+        expected_table_kinds.push(("gnu-version-need-table", report.needed_libraries.len()));
     }
     if dynamic {
         expected_table_kinds.push(("dynamic-table", report.dynamic_entry_count));

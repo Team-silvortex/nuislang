@@ -332,10 +332,10 @@ fn binds_whitelisted_libc_symbol_to_registered_linux_gnu_provider() {
         product.shell_layout_plan.needed_libraries[0].needed_name,
         "libc.so.6"
     );
-    assert_eq!(product.shell_layout_plan.dynamic_table_entry_count, 14);
+    assert_eq!(product.shell_layout_plan.dynamic_table_entry_count, 17);
     assert_eq!(
         product.shell_image_serialization.applied_shell_write_count,
-        7
+        9
     );
     assert_eq!(product.shell_image_validation.interpreter_segment_count, 1);
     assert_eq!(
@@ -346,6 +346,21 @@ fn binds_whitelisted_libc_symbol_to_registered_linux_gnu_provider() {
         product.shell_image_validation.needed_libraries,
         ["libc.so.6"]
     );
+    assert_eq!(
+        product.shell_image_validation.version_symbol_indexes,
+        [0, 2]
+    );
+    assert_eq!(
+        product.shell_image_validation.version_requirements,
+        ["libc.so.6@GLIBC_2.2.5#2"]
+    );
+    for tag in ["DT_VERSYM", "DT_VERNEED", "DT_VERNEEDNUM"] {
+        assert!(product
+            .shell_layout_plan
+            .dynamic_entries
+            .iter()
+            .any(|entry| entry.tag_name == tag));
+    }
 
     let mut interpreter_drift = product.private_shell_image.clone();
     interpreter_drift[product.shell_layout_plan.interpreter_file_offset.unwrap()] ^= 0x01;
@@ -372,6 +387,32 @@ fn binds_whitelisted_libc_symbol_to_registered_linux_gnu_provider() {
     .unwrap_err();
     assert!(error.contains("DT_NEEDED name differs"));
 
+    let mut version_symbol_drift = product.private_shell_image.clone();
+    version_symbol_drift[product
+        .shell_layout_plan
+        .version_symbol_table_file_offset
+        .unwrap()
+        + 2] ^= 0x01;
+    let error = crate::final_executable_elf_shell::validate_elf_amd64_shell_bytes_against_plan(
+        &version_symbol_drift,
+        &product.shell_layout_plan,
+    )
+    .unwrap_err();
+    assert!(error.contains("version-symbol value differs"));
+
+    let mut version_need_drift = product.private_shell_image.clone();
+    version_need_drift[product
+        .shell_layout_plan
+        .version_need_table_file_offset
+        .unwrap()
+        + 16] ^= 0x01;
+    let error = crate::final_executable_elf_shell::validate_elf_amd64_shell_bytes_against_plan(
+        &version_need_drift,
+        &product.shell_layout_plan,
+    )
+    .unwrap_err();
+    assert!(error.contains("version auxiliary differs"));
+
     assert_eq!(
         provenance.status,
         "verified-registered-dynamic-resolution-provenance"
@@ -393,13 +434,21 @@ fn binds_whitelisted_libc_symbol_to_registered_linux_gnu_provider() {
     assert_eq!(provenance.dependencies[0].needed_name, "libc.so.6");
     assert_eq!(
         provenance.dependencies[0].symbol_version_policy,
-        "elf-global-default-symbol-version-v1"
+        "elf-registered-symbol-version-whitelist-v1"
     );
     assert_eq!(
         provenance.dependencies[0].resolver_identity,
         "elf.sysv.amd64.bind-now-plt-v1"
     );
     assert_eq!(provenance.bindings[0].target_symbol, "puts");
+    assert_eq!(provenance.bindings[0].dynamic_symbol_index, 1);
+    assert_eq!(
+        provenance.bindings[0].symbol_version_identity,
+        "linux.gnu.glibc.2.2.5-v1"
+    );
+    assert_eq!(provenance.bindings[0].symbol_version_name, "GLIBC_2.2.5");
+    assert_eq!(provenance.bindings[0].symbol_version_index, 2);
+    assert_eq!(provenance.bindings[0].symbol_version_hash, 0x0969_1a75);
     assert_eq!(provenance.bindings[0].host_ffi_abi, "libc");
     assert_eq!(
         provenance.bindings[0].platform_bind_audit_hash,
@@ -505,6 +554,34 @@ fn blocks_ambiguous_host_ffi_signatures_before_provider_binding() {
     assert_eq!(provenance.issues, ["ambiguous-host-ffi-signature:puts:2"]);
     assert!(provenance.dependencies.is_empty());
     assert!(provenance.bindings.is_empty());
+}
+
+#[test]
+fn blocks_unregistered_libc_symbol_version_before_shell_emission() {
+    let (artifact, mut plan) = artifact_and_plan(
+        elf_program_object_with_external_symbol(R_X86_64_PLT32, "getpid"),
+        elf_unrelated_runtime_object(),
+    );
+    install_host_ffi_entries(&mut plan, vec![host_ffi_entry("libc", "getpid", "i32()")]);
+
+    let product = build_elf_amd64_host_object_linkage(&artifact, &plan).unwrap();
+
+    assert!(!product.dynamic_dependency_plan.plan_ready);
+    assert_eq!(
+        product.dynamic_dependency_plan.issues,
+        ["registered-symbol-version-missing:libc:getpid"]
+    );
+    assert!(product.dynamic_dependency_plan.dependencies.is_empty());
+    assert!(product.dynamic_dependency_plan.bindings.is_empty());
+    assert!(product.shell_layout_plan.interpreter_path.is_none());
+    assert!(product.shell_layout_plan.version_symbols.is_empty());
+    assert!(product.shell_layout_plan.version_needs.is_empty());
+    assert!(product
+        .shell_layout_plan
+        .sections
+        .iter()
+        .all(|section| !section.section_name.starts_with(".gnu.version")));
+    assert!(!product.dynamic_resolution_provenance.provenance_ready);
 }
 
 #[test]

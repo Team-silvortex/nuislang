@@ -1,4 +1,10 @@
-use super::report::{needed_library_audit_hash, ElfAmd64ShellNeededLibraryPlan};
+use super::{
+    report::{needed_library_audit_hash, ElfAmd64ShellNeededLibraryPlan},
+    version::{
+        build_elf_amd64_shell_version_metadata_layout, ElfAmd64ShellVersionNeedPlan,
+        ElfAmd64ShellVersionSymbolPlan,
+    },
+};
 use crate::{
     final_executable_elf_dynamic_plan::{
         validate_elf_amd64_dynamic_dependency_plan, ElfAmd64DynamicDependencyPlanReport,
@@ -23,6 +29,12 @@ pub(super) struct ElfAmd64ShellDynamicLayout {
     pub(super) dynamic_string_file_offset: Option<usize>,
     pub(super) dynamic_string_virtual_address: Option<u64>,
     pub(super) dynamic_string_bytes: usize,
+    pub(super) version_symbol_file_offset: Option<usize>,
+    pub(super) version_symbol_virtual_address: Option<u64>,
+    pub(super) version_symbol_bytes: usize,
+    pub(super) version_need_file_offset: Option<usize>,
+    pub(super) version_need_virtual_address: Option<u64>,
+    pub(super) version_need_bytes: usize,
     pub(super) metadata_file_offset: Option<usize>,
     pub(super) metadata_virtual_address: Option<u64>,
     pub(super) metadata_bytes: usize,
@@ -31,6 +43,8 @@ pub(super) struct ElfAmd64ShellDynamicLayout {
     pub(super) dynamic_table_bytes: usize,
     pub(super) planned_memory_span_bytes: usize,
     pub(super) needed_libraries: Vec<ElfAmd64ShellNeededLibraryPlan>,
+    pub(super) version_symbols: Vec<ElfAmd64ShellVersionSymbolPlan>,
+    pub(super) version_needs: Vec<ElfAmd64ShellVersionNeedPlan>,
 }
 
 impl ElfAmd64ShellDynamicLayout {
@@ -66,10 +80,18 @@ pub(super) fn build_elf_amd64_shell_dynamic_layout(
     let mut dynamic_string_file_offset = None;
     let mut dynamic_string_virtual_address = None;
     let mut dynamic_string_bytes = 0usize;
+    let mut version_symbol_file_offset = None;
+    let mut version_symbol_virtual_address = None;
+    let mut version_symbol_bytes = 0usize;
+    let mut version_need_file_offset = None;
+    let mut version_need_virtual_address = None;
+    let mut version_need_bytes = 0usize;
     let mut metadata_file_offset = None;
     let mut metadata_virtual_address = None;
     let mut metadata_bytes = 0usize;
     let mut needed_libraries = Vec::new();
+    let mut version_symbols = Vec::new();
+    let mut version_needs = Vec::new();
 
     let dynamic_base = if emission_ready {
         let plan = dependency_plan.unwrap();
@@ -108,7 +130,18 @@ pub(super) fn build_elf_amd64_shell_dynamic_layout(
             )?;
             needed_libraries.push(needed);
         }
-        let metadata_size = checked_add(interp_bytes, string_cursor, "dynamic metadata")?;
+        let version = build_elf_amd64_shell_version_metadata_layout(
+            plan,
+            &needed_libraries,
+            platform.dynamic_symbol_entry_count,
+            dynstr_offset,
+            string_cursor,
+        )?;
+        string_cursor = version.dynamic_string_bytes;
+        let metadata_size = version
+            .metadata_end
+            .checked_sub(metadata_offset)
+            .ok_or_else(|| "ELF shell dynamic metadata underflows".to_owned())?;
         interpreter_identity = Some((*identity).to_owned());
         interpreter_path = Some((*path).to_owned());
         interpreter_file_offset = Some(metadata_offset);
@@ -119,10 +152,18 @@ pub(super) fn build_elf_amd64_shell_dynamic_layout(
         dynamic_string_file_offset = Some(dynstr_offset);
         dynamic_string_virtual_address = Some(virtual_address(dynstr_offset)?);
         dynamic_string_bytes = string_cursor;
+        version_symbol_file_offset = Some(version.version_symbol_file_offset);
+        version_symbol_virtual_address = Some(version.version_symbol_virtual_address);
+        version_symbol_bytes = version.version_symbol_bytes;
+        version_need_file_offset = Some(version.version_need_file_offset);
+        version_need_virtual_address = Some(version.version_need_virtual_address);
+        version_need_bytes = version.version_need_bytes;
+        version_symbols = version.version_symbols;
+        version_needs = version.version_needs;
         metadata_file_offset = Some(metadata_offset);
         metadata_virtual_address = Some(virtual_address(metadata_offset)?);
         metadata_bytes = metadata_size;
-        checked_add(metadata_offset, metadata_size, "dynamic metadata")?
+        version.metadata_end
     } else {
         platform.planned_memory_span_bytes
     };
@@ -130,7 +171,9 @@ pub(super) fn build_elf_amd64_shell_dynamic_layout(
     let dynamic_entry_count = if dynamic_enabled {
         checked_add(
             BASE_DYNAMIC_ENTRY_COUNT,
-            needed_libraries.len() + usize::from(!needed_libraries.is_empty()),
+            needed_libraries.len()
+                + usize::from(!needed_libraries.is_empty())
+                + usize::from(!version_needs.is_empty()) * 3,
             "dynamic entry count",
         )?
     } else {
@@ -160,6 +203,12 @@ pub(super) fn build_elf_amd64_shell_dynamic_layout(
         dynamic_string_file_offset,
         dynamic_string_virtual_address,
         dynamic_string_bytes,
+        version_symbol_file_offset,
+        version_symbol_virtual_address,
+        version_symbol_bytes,
+        version_need_file_offset,
+        version_need_virtual_address,
+        version_need_bytes,
         metadata_file_offset,
         metadata_virtual_address,
         metadata_bytes,
@@ -168,6 +217,8 @@ pub(super) fn build_elf_amd64_shell_dynamic_layout(
         dynamic_table_bytes,
         planned_memory_span_bytes,
         needed_libraries,
+        version_symbols,
+        version_needs,
     })
 }
 

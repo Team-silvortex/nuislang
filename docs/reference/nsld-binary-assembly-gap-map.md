@@ -218,26 +218,33 @@ unexplained platform-prefix byte, and final ledger.
 platform plan/application before shell layout, independently rechecks the YIR
 CFFI signature hash and whitelist shape, and asks
 `nuis-nsld-elf-dynamic-resolver-provider-registry-v1` for target-specific
-interpreter, dependency, default symbol-version, and resolver identities. The
+interpreter, dependency, symbol-version whitelist, and resolver identities. The
 first registration maps hash-whitelisted `libc` calls on x86_64 Linux GNU to
-the GNU loader, `libc.so.6`, and the SysV bind-now PLT resolver. The shell
-consumes only that immutable plan: it emits `PT_INTERP`, copies the platform
-dynamic-string prefix into a final read-only `.dynstr`, appends registered
-dependency names, and emits `DT_NEEDED` plus `DT_BIND_NOW`. Its independent
-parser reads those bytes back and rejects interpreter or dependency-name drift.
+the GNU loader, `libc.so.6`, and the SysV bind-now PLT resolver. Its provider
+registry explicitly maps `puts` and `sched_yield` to `GLIBC_2.2.5`, version
+identity `linux.gnu.glibc.2.2.5-v1`, index 2, and the GNU ELF name hash. The
+shell consumes only that immutable plan: it emits `PT_INTERP`, copies the
+platform dynamic-string prefix into a final read-only `.dynstr`, appends
+registered dependency and version names, serializes `.gnu.version` plus linked
+`.gnu.version_r` Verneed/Vernaux records, and emits `DT_NEEDED`, `DT_BIND_NOW`,
+`DT_VERSYM`, `DT_VERNEED`, and `DT_VERNEEDNUM`. Its independent parser follows
+the final linked records and rejects interpreter, dependency, version index,
+name, hash, offset, chain, hidden-bit, or unexplained-byte drift.
 `nuis-nsld-elf-amd64-dynamic-resolution-provenance-v1` then binds the pre-shell
-plan to the parsed shell image. Missing whitelist entries, invalid footprints,
-unknown targets, and multiple signatures remain blocked; static closure reports
-`not-required` without changing its bytes.
+plan to those parsed shell bytes. Missing signature or symbol-version whitelist
+entries, invalid footprints, unknown targets, and multiple signatures remain
+blocked before shell mutation; static closure reports `not-required` without
+changing its bytes.
 
 `nuis-nsld-elf-amd64-os-loader-probe-v1` accepts either static closure or a
 dynamic image with ready, hash-bound provenance. Its execution mechanics share
 the Mach-O runtime for create-new materialization, exact reread, empty process
 inputs, bounded wait/capture, and cleanup. Default finalization remains
 plan-only. On a real x86_64 Linux host, both static execution and the registered
-dynamic `sched_yield@libc` route pass: `_start` reaches the external symbol
-through Nsld-owned PLT/GOT and `R_X86_64_JUMP_SLOT`, the system loader resolves
-it, and the process exits zero. Loader admission evidence now hashes shell
+dynamic `sched_yield@GLIBC_2.2.5` route pass: `_start` reaches the external
+symbol through Nsld-owned PLT/GOT and `R_X86_64_JUMP_SLOT`, the system loader
+accepts the Nsld-owned GNU version metadata, resolves it, and the process exits
+zero. Loader admission evidence now hashes shell
 validation together with dynamic provenance before generic receipt replay and
 provider publication. The registered callback still projects through
 `nuis-nsld-registered-loader-probe-outcome-v1`; publication still rebuilds and

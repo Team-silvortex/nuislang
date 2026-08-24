@@ -9,6 +9,10 @@ use super::{
         section_audit_hash, ElfAmd64ShellDynamicEntryPlan, ElfAmd64ShellNeededLibraryPlan,
         ElfAmd64ShellProgramHeaderPlan, ElfAmd64ShellSectionPlan,
     },
+    version::{
+        ElfAmd64ShellVersionNeedPlan, ElfAmd64ShellVersionSymbolPlan,
+        ELF64_VERSION_SYMBOL_ENTRY_SIZE,
+    },
 };
 use crate::{
     final_executable_elf_dynamic_plan::ElfAmd64DynamicDependencyPlanReport,
@@ -47,6 +51,8 @@ const SHT_RELA: u32 = 4;
 const SHT_DYNAMIC: u32 = 6;
 const SHT_NOBITS: u32 = 8;
 const SHT_DYNSYM: u32 = 11;
+const SHT_GNU_VERNEED: u32 = 0x6fff_fffe;
+const SHT_GNU_VERSYM: u32 = 0x6fff_ffff;
 
 struct SectionSeed {
     source_kind: &'static str,
@@ -107,6 +113,14 @@ pub(super) struct ElfAmd64ShellLayoutDraft {
     pub(super) dynamic_string_source_image_offset: Option<usize>,
     pub(super) dynamic_string_source_bytes: usize,
     pub(super) needed_libraries: Vec<ElfAmd64ShellNeededLibraryPlan>,
+    pub(super) version_symbol_table_file_offset: Option<usize>,
+    pub(super) version_symbol_table_virtual_address: Option<u64>,
+    pub(super) version_symbol_table_bytes: usize,
+    pub(super) version_need_table_file_offset: Option<usize>,
+    pub(super) version_need_table_virtual_address: Option<u64>,
+    pub(super) version_need_table_bytes: usize,
+    pub(super) version_symbols: Vec<ElfAmd64ShellVersionSymbolPlan>,
+    pub(super) version_needs: Vec<ElfAmd64ShellVersionNeedPlan>,
 }
 
 pub(super) struct LocatedSourceCoordinate<'a> {
@@ -192,7 +206,7 @@ pub(super) fn build_elf_amd64_shell_layout(
     shstrtab.file_size_bytes = shstrtab_bytes;
     shstrtab.source_size_bytes = shstrtab_bytes;
     shstrtab.audit_hash = section_audit_hash(application_ledger_hash, shstrtab);
-    assign_section_links(&mut sections);
+    assign_section_links(&mut sections, dynamic_layout.version_needs.len());
 
     let section_header_table_file_offset = align_up(
         checked_add(shstrtab_offset, shstrtab_bytes, "section-name table")?,
@@ -249,6 +263,7 @@ pub(super) fn build_elf_amd64_shell_layout(
         &sections,
         dynamic_enabled,
         &dynamic_layout.needed_libraries,
+        dynamic_layout.version_needs.len(),
         application_ledger_hash,
     )?;
     validate_layout(
@@ -286,6 +301,14 @@ pub(super) fn build_elf_amd64_shell_layout(
         dynamic_string_source_image_offset: dynamic_layout.dynamic_string_source_image_offset,
         dynamic_string_source_bytes: dynamic_layout.dynamic_string_source_bytes,
         needed_libraries: dynamic_layout.needed_libraries,
+        version_symbol_table_file_offset: dynamic_layout.version_symbol_file_offset,
+        version_symbol_table_virtual_address: dynamic_layout.version_symbol_virtual_address,
+        version_symbol_table_bytes: dynamic_layout.version_symbol_bytes,
+        version_need_table_file_offset: dynamic_layout.version_need_file_offset,
+        version_need_table_virtual_address: dynamic_layout.version_need_virtual_address,
+        version_need_table_bytes: dynamic_layout.version_need_bytes,
+        version_symbols: dynamic_layout.version_symbols,
+        version_needs: dynamic_layout.version_needs,
     })
 }
 
@@ -440,6 +463,46 @@ fn append_shell_dynamic_metadata_sections(
             .dynamic_string_virtual_address
             .ok_or_else(|| "ELF shell final dynamic string address is absent".to_owned())?,
         memory_size_bytes: dynamic.dynamic_string_bytes,
+        segment_key: Some("shell-dynamic-metadata".to_owned()),
+    });
+    seeds.push(SectionSeed {
+        source_kind: "shell-version-symbol-table",
+        source_id: "elf-amd64-shell-gnu-version".to_owned(),
+        name: ".gnu.version".to_owned(),
+        section_type: SHT_GNU_VERSYM,
+        flags: SHF_ALLOC,
+        alignment: 2,
+        entry_size: ELF64_VERSION_SYMBOL_ENTRY_SIZE,
+        source_image_offset: None,
+        source_size_bytes: 0,
+        file_offset: dynamic
+            .version_symbol_file_offset
+            .ok_or_else(|| "ELF shell version-symbol coordinate is absent".to_owned())?,
+        file_size_bytes: dynamic.version_symbol_bytes,
+        virtual_address: dynamic
+            .version_symbol_virtual_address
+            .ok_or_else(|| "ELF shell version-symbol address is absent".to_owned())?,
+        memory_size_bytes: dynamic.version_symbol_bytes,
+        segment_key: Some("shell-dynamic-metadata".to_owned()),
+    });
+    seeds.push(SectionSeed {
+        source_kind: "shell-version-need-table",
+        source_id: "elf-amd64-shell-gnu-version-r".to_owned(),
+        name: ".gnu.version_r".to_owned(),
+        section_type: SHT_GNU_VERNEED,
+        flags: SHF_ALLOC,
+        alignment: 8,
+        entry_size: 0,
+        source_image_offset: None,
+        source_size_bytes: 0,
+        file_offset: dynamic
+            .version_need_file_offset
+            .ok_or_else(|| "ELF shell version-need coordinate is absent".to_owned())?,
+        file_size_bytes: dynamic.version_need_bytes,
+        virtual_address: dynamic
+            .version_need_virtual_address
+            .ok_or_else(|| "ELF shell version-need address is absent".to_owned())?,
+        memory_size_bytes: dynamic.version_need_bytes,
         segment_key: Some("shell-dynamic-metadata".to_owned()),
     });
     Ok(())

@@ -1,8 +1,17 @@
-use crate::final_executable_elf_materialization::application::platform::{
-    application::{
-        bind_audit_hash, ElfAmd64PlatformDynamicBindRecord, ElfAmd64PlatformPatchApplicationReport,
+use crate::{
+    final_executable_elf_dynamic_provider::{
+        dependency_matches_registered_provider, elf_version_name_hash,
+        matching_dynamic_resolver_providers, provider_target_key,
+        registered_dynamic_symbol_version, validate_dynamic_resolver_provider_registry,
+        DynamicResolverProvider,
     },
-    ElfAmd64PlatformStructurePlanReport,
+    final_executable_elf_materialization::application::platform::{
+        application::{
+            bind_audit_hash, ElfAmd64PlatformDynamicBindRecord,
+            ElfAmd64PlatformPatchApplicationReport,
+        },
+        ElfAmd64PlatformStructurePlanReport,
+    },
 };
 use nuisc::linker::{LinkPlan, LinkPlanHostFfiEntry, LinkPlanHostFfiFootprint};
 use std::{
@@ -12,43 +21,9 @@ use std::{
 
 pub(crate) const ELF_AMD64_DYNAMIC_DEPENDENCY_PLAN_CONTRACT: &str =
     "nuis-nsld-elf-amd64-dynamic-dependency-plan-v1";
-pub(crate) const ELF_DYNAMIC_RESOLVER_PROVIDER_REGISTRY_CONTRACT: &str =
-    "nuis-nsld-elf-dynamic-resolver-provider-registry-v1";
+pub(crate) use crate::final_executable_elf_dynamic_provider::ELF_DYNAMIC_RESOLVER_PROVIDER_REGISTRY_CONTRACT;
 
 const HOST_FFI_POLICY: &str = "signature-whitelist-required";
-
-#[derive(Clone, Copy)]
-struct DynamicResolverProvider {
-    provider_id: &'static str,
-    machine_arch: &'static str,
-    machine_os: &'static str,
-    object_format: &'static str,
-    calling_abi: &'static str,
-    clang_target: &'static str,
-    host_ffi_abi: &'static str,
-    interpreter_identity: &'static str,
-    interpreter_path: &'static str,
-    dependency_identity: &'static str,
-    needed_name: &'static str,
-    symbol_version_policy: &'static str,
-    resolver_identity: &'static str,
-}
-
-const DYNAMIC_RESOLVER_PROVIDERS: &[DynamicResolverProvider] = &[DynamicResolverProvider {
-    provider_id: "nsld.elf.amd64.linux-gnu.libc-v1",
-    machine_arch: "x86_64",
-    machine_os: "linux",
-    object_format: "elf",
-    calling_abi: "sysv64",
-    clang_target: "x86_64-unknown-linux-gnu",
-    host_ffi_abi: "libc",
-    interpreter_identity: "linux.gnu.ld-so.x86-64-v1",
-    interpreter_path: "/lib64/ld-linux-x86-64.so.2",
-    dependency_identity: "linux.gnu.libc.so.6-v1",
-    needed_name: "libc.so.6",
-    symbol_version_policy: "elf-global-default-symbol-version-v1",
-    resolver_identity: "elf.sysv.amd64.bind-now-plt-v1",
-}];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ElfAmd64DynamicDependencyPlan {
@@ -70,6 +45,7 @@ pub(crate) struct ElfAmd64DynamicSymbolPlan {
     pub(crate) binding_id: String,
     pub(crate) target_key: String,
     pub(crate) target_symbol: String,
+    pub(crate) dynamic_symbol_index: usize,
     pub(crate) platform_bind_audit_hash: String,
     pub(crate) host_ffi_abi: String,
     pub(crate) signature_pattern: String,
@@ -77,6 +53,10 @@ pub(crate) struct ElfAmd64DynamicSymbolPlan {
     pub(crate) whitelist_policy: String,
     pub(crate) memory_capabilities: Vec<String>,
     pub(crate) dependency_audit_hash: String,
+    pub(crate) symbol_version_identity: String,
+    pub(crate) symbol_version_name: String,
+    pub(crate) symbol_version_index: u16,
+    pub(crate) symbol_version_hash: u32,
     pub(crate) status: String,
     pub(crate) audit_hash: String,
 }
@@ -130,7 +110,7 @@ pub(crate) fn build_elf_amd64_dynamic_dependency_plan(
     platform_application: &ElfAmd64PlatformPatchApplicationReport,
 ) -> Result<ElfAmd64DynamicDependencyPlanReport, String> {
     validate_upstream(unresolved_symbols, platform_plan, platform_application)?;
-    let registry_hash = validate_provider_registry()?;
+    let registry_hash = validate_dynamic_resolver_provider_registry()?;
     let target_key = target_key(link_plan);
     let host_ffi_footprint_hash = host_ffi_footprint_hash(&link_plan.host_ffi);
     let mut issues = Vec::new();
@@ -216,7 +196,7 @@ fn resolve_dynamic_bind(
     if !footprint_valid {
         return;
     }
-    let providers = matching_providers(plan, &entry.abi);
+    let providers = matching_dynamic_resolver_providers(plan, &entry.abi);
     let provider = match providers.as_slice() {
         [provider] => *provider,
         [] => {
@@ -234,6 +214,15 @@ fn resolve_dynamic_bind(
             return;
         }
     };
+    let Some(symbol_version) =
+        registered_dynamic_symbol_version(provider.provider_id, &bind.target_symbol)
+    else {
+        issues.push(format!(
+            "registered-symbol-version-missing:{}:{}",
+            entry.abi, bind.target_symbol
+        ));
+        return;
+    };
     let dependency_index = match dependency_indexes.get(provider.provider_id).copied() {
         Some(index) => index,
         None => {
@@ -248,6 +237,7 @@ fn resolve_dynamic_bind(
         binding_id: format!("elf-amd64-dynamic-plan-binding-{:06}", bindings.len()),
         target_key: bind.target_key.clone(),
         target_symbol: bind.target_symbol.clone(),
+        dynamic_symbol_index: bind.dynamic_symbol_index,
         platform_bind_audit_hash: bind.audit_hash.clone(),
         host_ffi_abi: entry.abi.clone(),
         signature_pattern: entry.signature_pattern.clone(),
@@ -255,7 +245,11 @@ fn resolve_dynamic_bind(
         whitelist_policy: entry.policy.clone(),
         memory_capabilities: entry.memory_capabilities.clone(),
         dependency_audit_hash: dependency.audit_hash.clone(),
-        status: "whitelist-and-provider-bound".to_owned(),
+        symbol_version_identity: symbol_version.version_identity.to_owned(),
+        symbol_version_name: symbol_version.version_name.to_owned(),
+        symbol_version_index: symbol_version.version_index,
+        symbol_version_hash: elf_version_name_hash(symbol_version.version_name),
+        status: "whitelist-provider-and-version-bound".to_owned(),
         audit_hash: String::new(),
     };
     binding.audit_hash = binding_audit_hash(&binding);
@@ -281,21 +275,6 @@ fn build_dependency(
     };
     dependency.audit_hash = dependency_audit_hash(&dependency);
     dependency
-}
-
-fn matching_providers(plan: &LinkPlan, host_ffi_abi: &str) -> Vec<DynamicResolverProvider> {
-    DYNAMIC_RESOLVER_PROVIDERS
-        .iter()
-        .filter(|provider| {
-            provider.machine_arch == plan.cpu_target.machine_arch
-                && provider.machine_os == plan.cpu_target.machine_os
-                && provider.object_format == plan.cpu_target.object_format
-                && provider.calling_abi == plan.cpu_target.calling_abi
-                && provider.clang_target == plan.cpu_target.clang_target
-                && provider.host_ffi_abi == host_ffi_abi
-        })
-        .copied()
-        .collect()
 }
 
 fn validate_upstream(
@@ -400,7 +379,7 @@ pub(crate) fn validate_elf_amd64_dynamic_dependency_plan(
     let expected_status = dependency_plan_status(report.unresolved_symbol_count, report.plan_ready);
     if report.contract != ELF_AMD64_DYNAMIC_DEPENDENCY_PLAN_CONTRACT
         || report.registry_contract != ELF_DYNAMIC_RESOLVER_PROVIDER_REGISTRY_CONTRACT
-        || report.registry_hash != validate_provider_registry()?
+        || report.registry_hash != validate_dynamic_resolver_provider_registry()?
         || report.status != expected_status
         || report.target_key.is_empty()
         || report.host_ffi_footprint_hash.is_empty()
@@ -444,14 +423,20 @@ fn validate_records(
     }
     let mut used_dependencies = BTreeSet::new();
     let mut symbols = BTreeSet::new();
+    let mut dynamic_symbol_indexes = BTreeSet::new();
     for (index, binding) in bindings.iter().enumerate() {
         let dependency = dependencies
             .iter()
             .find(|dependency| dependency.audit_hash == binding.dependency_audit_hash);
+        let registered_version = dependency.and_then(|dependency| {
+            registered_dynamic_symbol_version(&dependency.provider_id, &binding.target_symbol)
+        });
         if binding.binding_id != format!("elf-amd64-dynamic-plan-binding-{index:06}")
-            || binding.status != "whitelist-and-provider-bound"
+            || binding.status != "whitelist-provider-and-version-bound"
             || binding.audit_hash != binding_audit_hash(binding)
             || !symbols.insert(binding.target_symbol.as_str())
+            || binding.dynamic_symbol_index != index + 1
+            || !dynamic_symbol_indexes.insert(binding.dynamic_symbol_index)
             || !dependency_hashes.contains(binding.dependency_audit_hash.as_str())
             || binding.whitelist_policy != HOST_FFI_POLICY
             || binding.signature_hash
@@ -461,6 +446,12 @@ fn validate_records(
                     &binding.signature_pattern,
                 )
             || dependency.is_none_or(|dependency| dependency.host_ffi_abi != binding.host_ffi_abi)
+            || registered_version.is_none_or(|version| {
+                binding.symbol_version_identity != version.version_identity
+                    || binding.symbol_version_name != version.version_name
+                    || binding.symbol_version_index != version.version_index
+                    || binding.symbol_version_hash != elf_version_name_hash(version.version_name)
+            })
         {
             return Err(format!("ELF dynamic symbol plan record {index} drift"));
         }
@@ -533,66 +524,6 @@ pub(crate) fn canonical_plan_components(
     out
 }
 
-fn validate_provider_registry() -> Result<String, String> {
-    let mut provider_ids = BTreeSet::new();
-    let mut target_abis = BTreeSet::new();
-    let mut canonical = String::new();
-    append_text(
-        &mut canonical,
-        ELF_DYNAMIC_RESOLVER_PROVIDER_REGISTRY_CONTRACT,
-    );
-    for provider in DYNAMIC_RESOLVER_PROVIDERS {
-        let values = [
-            provider.provider_id,
-            provider.machine_arch,
-            provider.machine_os,
-            provider.object_format,
-            provider.calling_abi,
-            provider.clang_target,
-            provider.host_ffi_abi,
-            provider.interpreter_identity,
-            provider.interpreter_path,
-            provider.dependency_identity,
-            provider.needed_name,
-            provider.symbol_version_policy,
-            provider.resolver_identity,
-        ];
-        if values.iter().any(|value| value.is_empty())
-            || !provider_ids.insert(provider.provider_id)
-            || !target_abis.insert((
-                provider.machine_arch,
-                provider.machine_os,
-                provider.object_format,
-                provider.calling_abi,
-                provider.clang_target,
-                provider.host_ffi_abi,
-            ))
-            || !provider.interpreter_path.starts_with('/')
-            || provider.needed_name.contains('/')
-        {
-            return Err("invalid ELF dynamic resolver provider registry".to_owned());
-        }
-        for value in values {
-            append_text(&mut canonical, value);
-        }
-    }
-    Ok(crate::fnv1a64_hex(canonical.as_bytes()))
-}
-
-fn dependency_matches_registered_provider(dependency: &ElfAmd64DynamicDependencyPlan) -> bool {
-    DYNAMIC_RESOLVER_PROVIDERS.iter().any(|provider| {
-        dependency.provider_id == provider.provider_id
-            && dependency.provider_target_key == provider_target_key(*provider)
-            && dependency.host_ffi_abi == provider.host_ffi_abi
-            && dependency.interpreter_identity == provider.interpreter_identity
-            && dependency.interpreter_path == provider.interpreter_path
-            && dependency.dependency_identity == provider.dependency_identity
-            && dependency.needed_name == provider.needed_name
-            && dependency.symbol_version_policy == provider.symbol_version_policy
-            && dependency.resolver_identity == provider.resolver_identity
-    })
-}
-
 fn host_ffi_footprint_hash(footprint: &LinkPlanHostFfiFootprint) -> String {
     let mut out = String::new();
     append_text(
@@ -649,17 +580,6 @@ fn target_key(plan: &LinkPlan) -> String {
     )
 }
 
-fn provider_target_key(provider: DynamicResolverProvider) -> String {
-    format!(
-        "{}|{}|{}|{}|{}",
-        provider.machine_arch,
-        provider.machine_os,
-        provider.object_format,
-        provider.calling_abi,
-        provider.clang_target
-    )
-}
-
 fn dependency_audit_hash(dependency: &ElfAmd64DynamicDependencyPlan) -> String {
     let mut out = String::new();
     append_dependency(&mut out, dependency, false);
@@ -707,10 +627,18 @@ fn append_binding(out: &mut String, binding: &ElfAmd64DynamicSymbolPlan, include
         binding.signature_hash.as_str(),
         binding.whitelist_policy.as_str(),
         binding.dependency_audit_hash.as_str(),
+        binding.symbol_version_identity.as_str(),
+        binding.symbol_version_name.as_str(),
         binding.status.as_str(),
     ] {
         append_text(out, value);
     }
+    writeln!(
+        out,
+        "symbol={}|{}|{}",
+        binding.dynamic_symbol_index, binding.symbol_version_index, binding.symbol_version_hash
+    )
+    .unwrap();
     for capability in &binding.memory_capabilities {
         append_text(out, capability);
     }

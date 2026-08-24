@@ -158,7 +158,45 @@ fn validate_shell_lineage(
     {
         return Err("ELF dynamic provenance rejects parsed loader metadata drift".to_owned());
     }
+    let (expected_version_indexes, expected_version_requirements) =
+        expected_version_metadata(dependency_plan);
+    if shell.version_symbol_indexes != expected_version_indexes
+        || shell.version_requirements != expected_version_requirements
+    {
+        return Err("ELF dynamic provenance rejects parsed symbol-version drift".to_owned());
+    }
     Ok(())
+}
+
+fn expected_version_metadata(
+    plan: &ElfAmd64DynamicDependencyPlanReport,
+) -> (Vec<u16>, Vec<String>) {
+    if !plan.plan_ready || plan.unresolved_symbol_count == 0 {
+        return (Vec::new(), Vec::new());
+    }
+    let mut bindings = plan.bindings.iter().collect::<Vec<_>>();
+    bindings.sort_by_key(|binding| binding.dynamic_symbol_index);
+    let mut indexes = vec![0];
+    indexes.extend(bindings.iter().map(|binding| binding.symbol_version_index));
+    let mut requirements = Vec::new();
+    for dependency in &plan.dependencies {
+        let versions = bindings
+            .iter()
+            .filter(|binding| binding.dependency_audit_hash == dependency.audit_hash)
+            .map(|binding| {
+                (
+                    binding.symbol_version_index,
+                    binding.symbol_version_name.as_str(),
+                )
+            })
+            .collect::<std::collections::BTreeSet<_>>();
+        requirements.extend(
+            versions
+                .into_iter()
+                .map(|(index, name)| format!("{}@{}#{}", dependency.needed_name, name, index)),
+        );
+    }
+    (indexes, requirements)
 }
 
 pub(crate) fn validate_elf_amd64_dynamic_resolution_provenance_report(

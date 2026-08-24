@@ -6,6 +6,7 @@ use super::{
         ElfAmd64ShellImageSerializationReport, ElfAmd64ShellImageWriteAudit,
         ElfAmd64ShellLayoutPlanReport, ElfAmd64ShellSourcePreservationAudit,
     },
+    version::{append_version_names, encode_version_need_table, encode_version_symbol_table},
     ELF_AMD64_SHELL_LAYOUT_PLAN_CONTRACT,
 };
 use crate::{
@@ -45,6 +46,8 @@ struct PreservationSummary {
 struct DynamicPayloads {
     interpreter: Vec<u8>,
     dynamic_strings: Vec<u8>,
+    version_symbols: Vec<u8>,
+    version_needs: Vec<u8>,
 }
 
 #[cfg(test)]
@@ -132,7 +135,9 @@ fn serialize_elf_amd64_shell_image_internal(
     let expected_shell_write_count = 4
         + usize::from(!tables.dynamic_entries.is_empty())
         + usize::from(!dynamic_payloads.interpreter.is_empty())
-        + usize::from(!dynamic_payloads.dynamic_strings.is_empty());
+        + usize::from(!dynamic_payloads.dynamic_strings.is_empty())
+        + usize::from(!dynamic_payloads.version_symbols.is_empty())
+        + usize::from(!dynamic_payloads.version_needs.is_empty());
     if writes.len() != expected_shell_write_count {
         return Err("ELF shell write coverage drift".to_owned());
     }
@@ -189,12 +194,16 @@ fn encode_dynamic_payloads(
             || shell.dynamic_string_source_image_offset.is_some()
             || shell.dynamic_string_source_bytes != 0
             || !shell.needed_libraries.is_empty()
+            || !shell.version_symbols.is_empty()
+            || !shell.version_needs.is_empty()
         {
             return Err("ELF shell dynamic payload plan is incomplete".to_owned());
         }
         return Ok(DynamicPayloads {
             interpreter: Vec::new(),
             dynamic_strings: Vec::new(),
+            version_symbols: Vec::new(),
+            version_needs: Vec::new(),
         });
     };
     if interpreter_path.as_bytes().contains(&0)
@@ -233,6 +242,7 @@ fn encode_dynamic_payloads(
         dynamic_strings.extend_from_slice(needed.needed_name.as_bytes());
         dynamic_strings.push(0);
     }
+    append_version_names(&mut dynamic_strings, &shell.version_needs)?;
     let dynstr = shell
         .sections
         .iter()
@@ -244,9 +254,15 @@ fn encode_dynamic_payloads(
     {
         return Err("ELF shell final dynamic string layout drift".to_owned());
     }
+    let version_symbols =
+        encode_version_symbol_table(shell.version_symbol_table_bytes, &shell.version_symbols)?;
+    let version_needs =
+        encode_version_need_table(shell.version_need_table_bytes, &shell.version_needs)?;
     Ok(DynamicPayloads {
         interpreter,
         dynamic_strings,
+        version_symbols,
+        version_needs,
     })
 }
 
@@ -363,6 +379,32 @@ fn write_tables(
             &dynamic_payloads.dynamic_strings,
             "final-dynamic-string-table",
         )?;
+    }
+    if let Some(offset) = shell.version_symbol_table_file_offset {
+        write_shell_region(
+            image,
+            occupied,
+            writes,
+            shell,
+            offset,
+            &dynamic_payloads.version_symbols,
+            "gnu-version-symbol-table",
+        )?;
+    } else if !dynamic_payloads.version_symbols.is_empty() {
+        return Err("ELF shell version-symbol bytes have no planned coordinate".to_owned());
+    }
+    if let Some(offset) = shell.version_need_table_file_offset {
+        write_shell_region(
+            image,
+            occupied,
+            writes,
+            shell,
+            offset,
+            &dynamic_payloads.version_needs,
+            "gnu-version-need-table",
+        )?;
+    } else if !dynamic_payloads.version_needs.is_empty() {
+        return Err("ELF shell version-need bytes have no planned coordinate".to_owned());
     }
     if let Some(offset) = shell.dynamic_table_file_offset {
         write_shell_region(

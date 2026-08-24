@@ -66,6 +66,7 @@ mod final_executable_container_loader;
 mod final_executable_elf_artifact;
 mod final_executable_elf_dynamic_plan;
 mod final_executable_elf_dynamic_provenance;
+mod final_executable_elf_dynamic_provider;
 mod final_executable_elf_input;
 mod final_executable_elf_layout;
 mod final_executable_elf_layout_report;

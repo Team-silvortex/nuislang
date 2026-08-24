@@ -46,7 +46,10 @@ pub(in crate::final_executable_elf_shell) fn locate_source_coordinate(
     })
 }
 
-pub(super) fn assign_section_links(sections: &mut [ElfAmd64ShellSectionPlan]) {
+pub(super) fn assign_section_links(
+    sections: &mut [ElfAmd64ShellSectionPlan],
+    version_need_count: usize,
+) {
     let indices = sections
         .iter()
         .map(|section| (section.section_name.clone(), section.section_index))
@@ -61,6 +64,11 @@ pub(super) fn assign_section_links(sections: &mut [ElfAmd64ShellSectionPlan]) {
                 section.link_section_index = dynsym;
                 section.info_section_index = got;
             }
+            ".gnu.version" => section.link_section_index = dynsym,
+            ".gnu.version_r" => {
+                section.link_section_index = dynstr;
+                section.info_section_index = version_need_count;
+            }
             _ => {}
         }
     }
@@ -70,6 +78,7 @@ pub(super) fn build_dynamic_entries(
     sections: &[ElfAmd64ShellSectionPlan],
     enabled: bool,
     needed_libraries: &[ElfAmd64ShellNeededLibraryPlan],
+    version_need_count: usize,
     ledger_hash: &str,
 ) -> Result<Vec<ElfAmd64ShellDynamicEntryPlan>, String> {
     if !enabled {
@@ -176,6 +185,37 @@ pub(super) fn build_dynamic_entries(
                 0,
                 None,
             ),
+        );
+    }
+    if version_need_count > 0 {
+        let versym = section_by_name(sections, ".gnu.version")?;
+        let verneed = section_by_name(sections, ".gnu.version_r")?;
+        let terminator = seeds.len() - 1;
+        seeds.splice(
+            terminator..terminator,
+            [
+                (
+                    "DT_VERSYM".to_owned(),
+                    0x6fff_fff0,
+                    "section-address".to_owned(),
+                    versym.virtual_address,
+                    Some(versym.section_id.clone()),
+                ),
+                (
+                    "DT_VERNEED".to_owned(),
+                    0x6fff_fffe,
+                    "section-address".to_owned(),
+                    verneed.virtual_address,
+                    Some(verneed.section_id.clone()),
+                ),
+                (
+                    "DT_VERNEEDNUM".to_owned(),
+                    0x6fff_ffff,
+                    "record-count".to_owned(),
+                    version_need_count as u64,
+                    Some(verneed.section_id.clone()),
+                ),
+            ],
         );
     }
     let mut entries = Vec::with_capacity(seeds.len());

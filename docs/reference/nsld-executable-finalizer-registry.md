@@ -135,16 +135,23 @@ provider serializes and independently validates that private ELF shell.
 before shell layout through
 `nuis-nsld-elf-dynamic-resolver-provider-registry-v1`, while rechecking the CFFI
 footprint and exact YIR signature hashes. Its first x86_64 Linux GNU route binds
-the `libc` ABI to a GNU loader identity, `libc.so.6`, default ELF symbol-version
-policy, and the SysV bind-now PLT resolver. The shell consumes that plan to emit
-and independently reparse `PT_INTERP`, final `.dynstr`, `DT_NEEDED`, and
-`DT_BIND_NOW`; `nuis-nsld-elf-amd64-dynamic-resolution-provenance-v1` then binds
-the parsed bytes back to the pre-shell plan. No whitelist, stale hash,
-unsupported target/ABI, or multiple signatures produces a canonical blocked
-report. A real x86_64 Linux run now passes static closure and the registered
-dynamic `sched_yield@libc` route: the kernel accepts the exact bytes, the system
-loader applies Nsld's `R_X86_64_JUMP_SLOT`, execution exits zero, cleanup
-succeeds, and the provider-specific ledgers validate. The generic
+the `libc` ABI to a GNU loader identity, `libc.so.6`, the explicit
+`elf-registered-symbol-version-whitelist-v1` policy, and the SysV bind-now PLT
+resolver. The provider currently registers `puts` and `sched_yield` as
+`GLIBC_2.2.5` with version identity `linux.gnu.glibc.2.2.5-v1`, index 2, and the
+GNU ELF name hash. The shell consumes that plan to emit and independently
+reparse `PT_INTERP`, final `.dynstr`, `.gnu.version`, `.gnu.version_r`,
+`DT_NEEDED`, `DT_BIND_NOW`, `DT_VERSYM`, `DT_VERNEED`, and `DT_VERNEEDNUM`.
+The parser follows the final Verneed/Vernaux chains, resolves their string-table
+names, and rejects index, hash, offset, chain, hidden-bit, or unexplained-byte
+drift. `nuis-nsld-elf-amd64-dynamic-resolution-provenance-v1` then binds those
+parsed bytes back to the pre-shell plan. A missing signature whitelist or
+registered symbol version, stale hash, unsupported target/ABI, or ambiguous
+signature produces a canonical blocked report. A real x86_64 Linux run passes
+static closure and the versioned `sched_yield@libc` route: the kernel accepts the exact
+bytes, the GNU system loader consumes Nsld's version tables and applies its
+`R_X86_64_JUMP_SLOT`, execution exits zero, cleanup succeeds, and the
+provider-specific ledgers validate. The generic
 `nuis-nsld-registered-loader-probe-admission-v1` receipt now binds that outcome
 to the current registry, selected provider/target/capability, complete CPU target
 identity, private-image hash, validation hash, provider evidence, and neutral

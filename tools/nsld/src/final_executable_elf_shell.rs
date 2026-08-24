@@ -14,6 +14,8 @@ mod validation;
 mod validation_parser;
 #[path = "final_executable_elf_shell_validation_support.rs"]
 mod validation_support;
+#[path = "final_executable_elf_shell_version.rs"]
+mod version;
 
 #[cfg(test)]
 pub(crate) use image::serialize_elf_amd64_shell_image;
@@ -215,6 +217,14 @@ fn build_elf_amd64_shell_layout_plan_internal(
         dynamic_string_source_image_offset: layout.dynamic_string_source_image_offset,
         dynamic_string_source_bytes: layout.dynamic_string_source_bytes,
         needed_libraries: layout.needed_libraries,
+        version_symbol_table_file_offset: layout.version_symbol_table_file_offset,
+        version_symbol_table_virtual_address: layout.version_symbol_table_virtual_address,
+        version_symbol_table_bytes: layout.version_symbol_table_bytes,
+        version_need_table_file_offset: layout.version_need_table_file_offset,
+        version_need_table_virtual_address: layout.version_need_table_virtual_address,
+        version_need_table_bytes: layout.version_need_table_bytes,
+        version_symbols: layout.version_symbols,
+        version_needs: layout.version_needs,
         program_headers: layout.program_headers,
         sections: layout.sections,
         dynamic_entries: layout.dynamic_entries,

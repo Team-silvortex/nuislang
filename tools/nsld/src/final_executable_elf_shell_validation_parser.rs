@@ -1,3 +1,6 @@
+#[path = "final_executable_elf_shell_validation_version.rs"]
+mod version;
+
 use super::report::ElfAmd64ShellLayoutPlanReport;
 
 const ELF64_HEADER_SIZE: usize = 64;
@@ -30,6 +33,8 @@ pub(super) struct ParsedElfAmd64ShellImage {
     pub(super) interpreter_segment_count: usize,
     pub(super) interpreter_path: Option<String>,
     pub(super) needed_libraries: Vec<String>,
+    pub(super) version_symbol_indexes: Vec<u16>,
+    pub(super) version_requirements: Vec<String>,
     pub(super) section_header_count: usize,
     pub(super) section_name_count: usize,
     pub(super) entry_program_header_index: usize,
@@ -47,13 +52,13 @@ struct ProgramHeader {
     alignment: usize,
 }
 
-struct SectionHeader {
+pub(super) struct SectionHeader {
     name_offset: usize,
     section_type: u32,
     flags: u64,
-    virtual_address: u64,
-    file_offset: usize,
-    size: usize,
+    pub(super) virtual_address: u64,
+    pub(super) file_offset: usize,
+    pub(super) size: usize,
     link: usize,
     info: usize,
     alignment: usize,
@@ -76,8 +81,8 @@ struct ParsedProgramHeaders {
     entry_index: usize,
 }
 
-struct ParsedSectionHeaders {
-    records: Vec<SectionHeader>,
+pub(super) struct ParsedSectionHeaders {
+    pub(super) records: Vec<SectionHeader>,
     name_table_span: (usize, usize),
     name_count: usize,
 }
@@ -92,6 +97,7 @@ pub(super) fn parse_and_validate_elf_amd64_shell_image(
     let interpreter_path = parse_interpreter(bytes, shell, programs.interpreter_span)?;
     let (dynamic_entry_count, needed_libraries) =
         parse_dynamic_entries(bytes, shell, programs.dynamic_span, &sections)?;
+    let versions = version::parse_and_validate_version_metadata(bytes, shell, &sections)?;
     validate_load_nonoverlap(&programs.records)?;
 
     let program_bytes = checked_mul(
@@ -128,7 +134,25 @@ pub(super) fn parse_and_validate_elf_amd64_shell_image(
             "final-dynamic-string-table",
             dynstr.file_offset,
             dynstr.size,
-            needed_libraries.len(),
+            needed_libraries.len() + versions.version_requirements.len(),
+        )?);
+    }
+    if let Some((offset, size)) = versions.version_symbol_span {
+        tables.push(table_evidence(
+            bytes,
+            "gnu-version-symbol-table",
+            offset,
+            size,
+            versions.version_symbol_indexes.len(),
+        )?);
+    }
+    if let Some((offset, size)) = versions.version_need_span {
+        tables.push(table_evidence(
+            bytes,
+            "gnu-version-need-table",
+            offset,
+            size,
+            shell.version_needs.len(),
         )?);
     }
     if let Some((offset, size)) = programs.dynamic_span {
@@ -163,6 +187,8 @@ pub(super) fn parse_and_validate_elf_amd64_shell_image(
         interpreter_segment_count: usize::from(programs.interpreter_span.is_some()),
         interpreter_path,
         needed_libraries,
+        version_symbol_indexes: versions.version_symbol_indexes,
+        version_requirements: versions.version_requirements,
         section_header_count: sections.records.len(),
         section_name_count: sections.name_count,
         entry_program_header_index: programs.entry_index,
@@ -531,7 +557,7 @@ fn parse_interpreter(
     Ok(Some(path.to_owned()))
 }
 
-fn section_by_name<'a>(
+pub(super) fn section_by_name<'a>(
     shell: &ElfAmd64ShellLayoutPlanReport,
     sections: &'a ParsedSectionHeaders,
     name: &str,
