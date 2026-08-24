@@ -20,23 +20,23 @@ fn handoff_selection_is_status_aware_and_input_order_independent() {
         ),
         expected
     );
-    assert_eq!(expected, "language-core/nuisc/bootstrap-language-subset");
+    assert_eq!(expected, "standard-library/std/compiler-data-model");
     assert_eq!(selected.status, "early");
 }
 
 #[test]
 fn handoff_advances_in_self_hosting_dependency_order() {
     let mut cells = DEV_TENSOR_CELLS.to_vec();
-    let subset = cells
+    let data_model = cells
         .iter_mut()
-        .find(|cell| cell.function == "bootstrap-language-subset")
-        .expect("bootstrap subset cell");
-    subset.status = "stable";
-    subset.progress = 100;
+        .find(|cell| cell.function == "compiler-data-model")
+        .expect("compiler data model cell");
+    data_model.status = "stable";
+    data_model.progress = 100;
     let selected = select_dev_tensor_handoff_bootstrap_cell(&cells).expect("select handoff cell");
     assert_eq!(
         dev_tensor_coordinate_key(selected.architecture, selected.module, selected.function),
-        "standard-library/std/compiler-data-model"
+        "language-core/nuisc/stage-neutral-ir-boundary"
     );
 }
 
@@ -151,14 +151,14 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
     assert!(summary.weakest_bootstrap_task_card_ready);
     assert_eq!(
         summary.weakest_bootstrap_task_card_coordinate,
-        "language-core/nuisc/bootstrap-language-subset"
+        "standard-library/std/compiler-data-model"
     );
     assert!(summary
         .weakest_bootstrap_task_card_priority_reason
         .contains("weakest bootstrap-critical status/progress ordering"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_handoff_coordinate,
-        "language-core/nuisc/bootstrap-language-subset"
+        "standard-library/std/compiler-data-model"
     );
     assert_eq!(summary.weakest_bootstrap_task_card_handoff_mode, "direct");
     assert!(summary
@@ -199,7 +199,7 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         summary
             .weakest_bootstrap_task_card_lineage
             .common_ancestor_path,
-        "language-core/nuisc/bootstrap-language-subset"
+        "standard-library/std/compiler-data-model"
     );
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.transition_depth,
@@ -276,6 +276,7 @@ fn self_hosting_phase_roadmap_is_protocolized_without_claiming_completion() {
     assert!(cell.evidence.contains("beta-0.9.*"));
     assert!(cell.evidence.contains("beta-0.10.*"));
     assert!(cell.evidence.contains("gamma-0.5.*"));
+    assert!(cell.evidence.contains("gamma-0.10.*"));
     assert!(cell
         .blocker
         .contains("self-hosting implementation intentionally remains future work"));
@@ -368,6 +369,7 @@ fn dev_tensor_json_exposes_coordinate_cells() {
     assert!(json.contains("nuis-self-hosting-phase-roadmap-v1"));
     assert!(json.contains("beta-0.10.*"));
     assert!(json.contains("gamma-0.5.*"));
+    assert!(json.contains("gamma-0.10.*"));
     assert!(json.contains("\"coverage_status\":\"clean\""));
     assert!(json.contains(
         "\"coverage_expected_source\":\"docs/reference/nuis-development-tensor.milestones.toml\""
@@ -577,7 +579,7 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("weakest_bootstrap_task_card_lineage_status: clean"));
     assert!(text.contains("weakest_bootstrap_task_card_lineage_error_count: 0"));
     assert!(text.contains(
-        "weakest_bootstrap_task_card_common_ancestor_path: language-core/nuisc/bootstrap-language-subset"
+        "weakest_bootstrap_task_card_common_ancestor_path: standard-library/std/compiler-data-model"
     ));
     assert!(text.contains("weakest_bootstrap_task_card_transition_depth: 0"));
     assert!(text.contains("weakest bootstrap-critical status/progress ordering"));

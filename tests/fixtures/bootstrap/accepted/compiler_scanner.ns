@@ -1,0 +1,85 @@
+/// Bootstrap-safe scanner state used to exercise the first compiler-authoring subset.
+mod cpu Main {
+  enum ScanError {
+    EmptyInput,
+    InvalidRange,
+  }
+
+  enum Result<T, E> {
+    Ok(T),
+    Err(E),
+  }
+
+  enum TokenKind {
+    Identifier,
+    Number,
+    End,
+  }
+
+  struct Token {
+    kind: TokenKind,
+    start: i64,
+    end: i64
+  }
+
+  fn identity<T>(value: T) -> T {
+    return value;
+  }
+
+  fn classify(value: i64) -> TokenKind {
+    if value >= 48 && value <= 57 {
+      return TokenKind.Number;
+    }
+    if value >= 65 && value <= 122 {
+      return TokenKind.Identifier;
+    }
+    return TokenKind.End;
+  }
+
+  fn scan_ascii(length: i64) -> Result<Token, ScanError> {
+    if length <= 0 {
+      return Result.Err(ScanError.EmptyInput);
+    }
+    let mut cursor: i64 = 0;
+    while cursor < length {
+      cursor = cursor + 1;
+      if cursor >= 4 {
+        break;
+      }
+    }
+    let kind: TokenKind = classify(65 + cursor);
+    return Result.Ok(Token {
+      kind: kind,
+      start: 0,
+      end: cursor
+    });
+  }
+
+  fn token_width(result: Result<Token, ScanError>) -> i64 {
+    match result {
+      Result.Ok(token) => {
+        return token.end - token.start;
+      }
+      Result.Err(_) => {
+        return 0;
+      }
+    }
+  }
+
+  pub fn scan_width(length: i64) -> Result<i64, ScanError> {
+    let token: Token = scan_ascii(length)?;
+    let width: i64 = identity(token.end - token.start);
+    if width > length {
+      return Result.Err(ScanError.InvalidRange);
+    }
+    return Result.Ok(width);
+  }
+
+  pub fn summarize(length: i64) -> i64 {
+    return token_width(scan_ascii(length));
+  }
+
+  fn main() -> i64 {
+    return summarize(4);
+  }
+}

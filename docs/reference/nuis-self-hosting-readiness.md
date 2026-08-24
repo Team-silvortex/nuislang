@@ -4,6 +4,8 @@ This reference defines the executable preparation boundary for beginning the
 formal `stage0 -> stage1` compiler migration at `beta-0.10.*`. The checked-in
 machine-readable source is
 [nuis-self-hosting-readiness.toml](nuis-self-hosting-readiness.toml).
+Completed stage2-equivalent compiler ownership remains a later
+`gamma-0.5.*` through `gamma-0.10.*` closure window.
 
 ## Roadmap Is Not Readiness
 
@@ -51,7 +53,10 @@ Coordinate: `language-core/nuisc/bootstrap-language-subset`.
 Freeze the syntax, type, effect, control-flow, generic, pointer, FFI, and
 library surface permitted in compiler-authoring sources. Both accepted and
 rejected fixtures are required so stage1 cannot acquire accidental dependency
-on an unstable language feature.
+on an unstable language feature. V1 is now executable through
+`nuisc bootstrap-check`; see
+[Nuis Bootstrap Language Subset](nuis-bootstrap-language-subset.md).
+This gate is `stable/100`; widening it requires a new protocol version.
 
 ### `compiler-data-model`
 

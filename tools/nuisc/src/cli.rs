@@ -113,6 +113,10 @@ pub enum CommandKind {
     Check {
         input: PathBuf,
     },
+    BootstrapCheck {
+        input: PathBuf,
+        json: bool,
+    },
     Compile {
         input: PathBuf,
         output_dir: PathBuf,

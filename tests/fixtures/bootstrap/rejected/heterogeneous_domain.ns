@@ -1,0 +1,5 @@
+mod shader BootstrapShader {
+  fn shade(value: i64) -> i64 {
+    return value + 1;
+  }
+}

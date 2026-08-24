@@ -77,6 +77,7 @@ pub mod cache;
 pub mod cli;
 pub mod codegen_wasm;
 mod command_artifact;
+mod command_bootstrap;
 mod command_cache;
 mod command_compile;
 mod command_helpers;
@@ -286,6 +287,9 @@ pub fn run(command: CommandKind) -> Result<(), String> {
         CommandKind::DumpNir { input } => command_compile::run_dump_nir(input)?,
         CommandKind::DumpYir { input } => command_compile::run_dump_yir(input)?,
         CommandKind::Check { input } => command_compile::run_check(input)?,
+        CommandKind::BootstrapCheck { input, json } => {
+            command_bootstrap::run_bootstrap_check(input, json)?
+        }
         CommandKind::Compile {
             input,
             output_dir,

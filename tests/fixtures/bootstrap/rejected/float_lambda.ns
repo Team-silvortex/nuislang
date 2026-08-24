@@ -1,0 +1,8 @@
+mod cpu FloatingCompiler {
+  fn score() -> f64 {
+    let mapper: Fn1<f64, f64> = |value: f64| -> f64 {
+      return value + 0.5;
+    };
+    return mapper(1.0);
+  }
+}

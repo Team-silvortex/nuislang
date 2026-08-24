@@ -20,6 +20,8 @@ mod execute_values;
 mod loop_metadata;
 mod runtime_helpers;
 #[cfg(test)]
+mod tests_loop_describe;
+#[cfg(test)]
 mod tests_mutex_lifecycle;
 
 use branch_effect::{execute_cpu_branch_effect_action, CPU_BRANCH_EFFECT_ACTIONS};

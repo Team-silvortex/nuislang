@@ -2,6 +2,35 @@ use super::{parse_args, CommandKind};
 use std::path::PathBuf;
 
 #[test]
+fn parse_bootstrap_check_json_command() {
+    let command = parse_args(
+        vec![
+            "bootstrap-check".to_owned(),
+            "--json".to_owned(),
+            "compiler.ns".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .unwrap();
+    assert_eq!(
+        command,
+        CommandKind::BootstrapCheck {
+            input: PathBuf::from("compiler.ns"),
+            json: true,
+        }
+    );
+}
+
+#[test]
+fn bootstrap_check_requires_one_input() {
+    let error = parse_args(vec!["bootstrap-check".to_owned()].into_iter()).unwrap_err();
+    assert_eq!(
+        error,
+        "usage: nuisc bootstrap-check [--json] <input.ns|project-dir|nuis.toml>"
+    );
+}
+
+#[test]
 fn parse_compile_with_packaging_mode() {
     let command = parse_args(
         vec![

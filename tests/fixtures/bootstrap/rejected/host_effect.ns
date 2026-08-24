@@ -1,0 +1,6 @@
+mod cpu EffectCompiler {
+  fn run() -> i64 {
+    print(1);
+    return cpu_tick_i64(0, 1);
+  }
+}

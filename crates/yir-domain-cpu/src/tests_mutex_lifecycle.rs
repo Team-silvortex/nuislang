@@ -178,7 +178,7 @@ fn static_cardinality_admits_three_lanes_and_rejects_the_fourth() {
     let cpu = CpuMod;
     let mut state = ExecutionState::default();
     for lane in 0..=3 {
-        state.bind_value(&format!("lane{lane}"), Value::Int(lane));
+        state.bind_value(format!("lane{lane}"), Value::Int(lane));
     }
     shared_mutex_with_cardinality(&cpu, &mut state, "wide", 3);
 

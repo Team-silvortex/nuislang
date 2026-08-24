@@ -1,0 +1,20 @@
+mod cpu TraitCompiler {
+  pub trait CopyLike {
+    fn copy(value: Self) -> Self;
+  }
+
+  impl CopyLike for i64 {
+    fn copy(value: i64) -> i64 {
+      return value;
+    }
+  }
+
+  fn keep<T: CopyLike>(value: T) -> T {
+    return value;
+  }
+
+  @inline
+  test("compiler_harness") fn harness() -> i64 {
+    return keep(1);
+  }
+}

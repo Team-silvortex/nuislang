@@ -1,19 +1,20 @@
 protocol = "nuis-self-hosting-readiness-v1"
 release_line = "beta-0.6.*"
 migration_start = "beta-0.10.*"
-completion_target = "gamma-0.5.*"
+completion_window_start = "gamma-0.5.*"
+completion_window_end = "gamma-0.10.*"
 gate_count = 5
 
 [[gates]]
 id = "bootstrap-language-subset"
 coordinate = "language-core/nuisc/bootstrap-language-subset"
-status = "early"
-progress = 20
+status = "stable"
+progress = 100
 required_before = "beta-0.10.0"
-next_action = "freeze the first compiler-authoring subset and reject unlisted syntax, types, effects, and library dependencies in bootstrap sources"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib -j 1"
-expected_artifact = "a versioned bootstrap-subset contract plus accepted and rejected Nuis source fixtures"
-blocker = "the language surface is broad, but no frozen compiler-authoring subset currently prevents stage1 sources from depending on unstable features"
+next_action = "preserve v1 as the stage0/stage1 dependency ceiling and introduce a new protocol version before admitting another language capability"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc command_bootstrap -j 1"
+expected_artifact = "nuis-bootstrap-language-subset-v1, nuisc bootstrap-check, and accepted plus rejected Nuis fixtures crossing the normal semantic pipeline"
+blocker = "none for subset v1; compiler-owned text, vector, map, arena, span, diagnostic, and path behavior remains the next independent readiness gate"
 
 [[gates]]
 id = "compiler-data-model"

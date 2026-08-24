@@ -494,6 +494,29 @@ where
                     .ok_or_else(|| "usage: nuisc check <input.ns|project-dir|nuis.toml>".to_owned())?,
             ),
         }),
+        "bootstrap-check" => {
+            let mut json = false;
+            let mut input = None;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else if input.is_none() {
+                    input = Some(PathBuf::from(arg));
+                } else {
+                    return Err(
+                        "usage: nuisc bootstrap-check [--json] <input.ns|project-dir|nuis.toml>"
+                            .to_owned(),
+                    );
+                }
+            }
+            Ok(CommandKind::BootstrapCheck {
+                input: input.ok_or_else(|| {
+                    "usage: nuisc bootstrap-check [--json] <input.ns|project-dir|nuis.toml>"
+                        .to_owned()
+                })?,
+                json,
+            })
+        }
         "compile" => {
             let mut verbose_cache = false;
             let mut cpu_abi = None;
@@ -538,7 +561,7 @@ where
             })
         }
         other => Err(format!(
-            "unknown nuisc command `{other}`; expected `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `pack-envelope`, `unpack-envelope`, `inspect-envelope`, `inspect-artifact`, `inspect-execution`, `artifact-report`, `verify-artifact`, `unpack-artifact`, `verify-build-manifest`, `inspect-benchmarks`, `inspect-docs`, `inspect-galaxy-docs`, `inspect-stdlib-docs`, `inspect-project-metadata`, `repair-project-metadata`, `cache-status`, `clean-cache`, `cache-prune`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, or `compile`"
+            "unknown nuisc command `{other}`; expected `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `pack-envelope`, `unpack-envelope`, `inspect-envelope`, `inspect-artifact`, `inspect-execution`, `artifact-report`, `verify-artifact`, `unpack-artifact`, `verify-build-manifest`, `inspect-benchmarks`, `inspect-docs`, `inspect-galaxy-docs`, `inspect-stdlib-docs`, `inspect-project-metadata`, `repair-project-metadata`, `cache-status`, `clean-cache`, `cache-prune`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, `bootstrap-check`, or `compile`"
         )),
     }
 }

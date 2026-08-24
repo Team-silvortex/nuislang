@@ -1,0 +1,9 @@
+mod cpu AsyncCompiler {
+  async fn next_token() -> i64 {
+    return 1;
+  }
+
+  async fn scan() -> i64 {
+    return await next_token();
+  }
+}

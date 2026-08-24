@@ -1740,7 +1740,7 @@ three boundaries are:
 
 * foundation readiness through `beta-0.9.*`
 * formal `stage0 -> stage1` migration from `beta-0.10.*`
-* stage2-equivalent completion targeted for `gamma-0.5.*`
+* stage2-equivalent completion window from `gamma-0.5.*` through `gamma-0.10.*`
 
 Executable readiness is tracked independently by
 `nuis-self-hosting-readiness-v1` and `nuis bootstrap-status --json`.
@@ -1753,8 +1753,8 @@ The five required coordinates are:
 * `compiler-toolchain/bootstrap/stage0-stage1-driver`
 * `developer-system/bootstrap/differential-reproducibility-gate`
 
-None inherits the roadmap score. Readiness becomes true only when all five are
-`stable/100`; until then the command reports the first blocker and next action.
+Subset v1 is `stable/100` through `nuisc bootstrap-check`; no gate inherits the
+roadmap score, and readiness waits for all five to reach `stable/100`.
 
 ## Runtime Lifecycle Loader Bootstrap
 
@@ -1966,7 +1966,7 @@ The first useful jobs are:
 * preserve alpha milestone provenance while early-beta foundation and later self-hosting pressure grow
 * recalibrate completed broad slices into narrower beta coordinates instead of erasing historical closure evidence or reporting a false project-wide 100%
 * preserve the foundation-through-`beta-0.9.*`, migration-from-`beta-0.10.*`,
-  and completion-at-`gamma-0.5.*` self-hosting route without confusing roadmap
+  and `gamma-0.5.*` through `gamma-0.10.*` completion window without confusing roadmap
   agreement with implementation completion
 
 ## Current Honesty Boundary

@@ -20,8 +20,8 @@ beta-0.0.1 through beta-0.9.*
   -> foundation closure, bug fixing, performance, and repeatability
 beta-0.10.*
   -> formal stage0-to-stage1 self-hosting migration begins
-gamma-0.5.*
-  -> target stage2-equivalent compiler ownership
+gamma-0.5.* through gamma-0.10.*
+  -> completion window for stage2-equivalent compiler ownership
 ```
 
 Short rule:

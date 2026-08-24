@@ -184,11 +184,11 @@ The current long-range version posture is:
   a sketch and become a repeated engineering pressure
 * around `beta-0.10.0`
   start formal staged self-hosting after the foundation-readiness period
-* `beta-0.10.*` through roughly `gamma-0.5.*`
+* `beta-0.10.*` through `gamma-0.4.*`
   migrate from the Rust-hosted stage0 toward stage1 and stage2-equivalent
   compiler ownership while Nsld/Nsdb/Nsbdr coordination continues to mature
-* around `gamma-0.5.*`
-  target completed compiler self-hosting; Vulpoya, Yalivia, and native
+* `gamma-0.5.*` through `gamma-0.10.*`
+  close completed compiler self-hosting; Vulpoya, Yalivia, and native
   framework work may evolve alongside it but do not replace that gate
 * `gamma`
   absorb whole-stack coordination, analyzer/runtime cooperation, and

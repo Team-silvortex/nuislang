@@ -102,10 +102,11 @@ The current planning estimate is not "self-host before beta". It is closer to:
 
 The complete current horizon is:
 
-`beta-0.0.1 through beta-0.9.* builds and hardens the foundation -> beta-0.10.* starts formal staged self-hosting -> gamma-0.5.* targets stage2-equivalent self-hosting completion`
+`beta-0.0.1 through beta-0.9.* builds and hardens the foundation -> beta-0.10.* starts formal staged self-hosting -> gamma-0.5.* through gamma-0.10.* is the stage2-equivalent completion window`
 
-This is an approximately fifteen-minor engineering horizon, not a claim that
-self-hosting work should displace foundation closure before `beta-0.10.*`.
+The first completion window begins after roughly fifteen minor lines, but it is
+not a hard completion deadline and self-hosting work should not displace
+foundation closure before `beta-0.10.*`.
 
 That does not require a fake all-at-once jump where every compiler subsystem is
 already written in `nuis`.

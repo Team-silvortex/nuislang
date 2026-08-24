@@ -50,7 +50,8 @@ pub(crate) struct BootstrapReadinessReport {
     protocol: String,
     release_line: String,
     migration_start: String,
-    completion_target: String,
+    completion_window_start: String,
+    completion_window_end: String,
     gates: Vec<BootstrapReadinessGate>,
 }
 
@@ -85,7 +86,8 @@ struct HeaderBuilder {
     protocol: Option<String>,
     release_line: Option<String>,
     migration_start: Option<String>,
-    completion_target: Option<String>,
+    completion_window_start: Option<String>,
+    completion_window_end: Option<String>,
     gate_count: Option<usize>,
 }
 
@@ -162,7 +164,10 @@ fn assign_header_field(
         "protocol" => set_string(&mut header.protocol, key, value, line),
         "release_line" => set_string(&mut header.release_line, key, value, line),
         "migration_start" => set_string(&mut header.migration_start, key, value, line),
-        "completion_target" => set_string(&mut header.completion_target, key, value, line),
+        "completion_window_start" => {
+            set_string(&mut header.completion_window_start, key, value, line)
+        }
+        "completion_window_end" => set_string(&mut header.completion_window_end, key, value, line),
         "gate_count" => set_usize(&mut header.gate_count, key, value, line),
         _ => Err(format!(
             "unknown self-hosting readiness header field {key} at line {line}"
@@ -292,8 +297,11 @@ fn finish_report(
         migration_start: header.migration_start.ok_or_else(|| {
             "self-hosting readiness manifest is missing migration_start".to_owned()
         })?,
-        completion_target: header.completion_target.ok_or_else(|| {
-            "self-hosting readiness manifest is missing completion_target".to_owned()
+        completion_window_start: header.completion_window_start.ok_or_else(|| {
+            "self-hosting readiness manifest is missing completion_window_start".to_owned()
+        })?,
+        completion_window_end: header.completion_window_end.ok_or_else(|| {
+            "self-hosting readiness manifest is missing completion_window_end".to_owned()
         })?,
         gates,
     })
@@ -353,7 +361,8 @@ pub(crate) fn render_bootstrap_readiness_json(
         json_field("manifest", &input.display().to_string()),
         json_field("release_line", &report.release_line),
         json_field("migration_start", &report.migration_start),
-        json_field("completion_target", &report.completion_target),
+        json_field("completion_window_start", &report.completion_window_start),
+        json_field("completion_window_end", &report.completion_window_end),
         json_field("status", report.status()),
         json_bool_field("ready", report.ready()),
         json_usize_field("gate_count", report.gates.len()),
@@ -409,12 +418,13 @@ pub(crate) fn render_bootstrap_readiness_text(
     report: &BootstrapReadinessReport,
 ) -> String {
     let mut out = format!(
-        "nuis self-hosting readiness\n  protocol: {}\n  manifest: {}\n  release_line: {}\n  migration_start: {}\n  completion_target: {}\n  status: {}\n  ready: {}\n  gates: {}/{}\n",
+        "nuis self-hosting readiness\n  protocol: {}\n  manifest: {}\n  release_line: {}\n  migration_start: {}\n  completion_window_start: {}\n  completion_window_end: {}\n  status: {}\n  ready: {}\n  gates: {}/{}\n",
         report.protocol,
         input.display(),
         report.release_line,
         report.migration_start,
-        report.completion_target,
+        report.completion_window_start,
+        report.completion_window_end,
         report.status(),
         report.ready(),
         report.closed_gate_count(),
@@ -455,12 +465,14 @@ mod tests {
     fn checked_in_manifest_is_valid_and_names_the_first_real_gate() {
         let report = parse_bootstrap_readiness(CHECKED_IN_MANIFEST).expect("manifest parses");
         assert_eq!(report.gates.len(), REQUIRED_GATES.len());
-        assert_eq!(report.closed_gate_count(), 0);
+        assert_eq!(report.closed_gate_count(), 1);
         assert!(!report.ready());
         assert_eq!(report.status(), "preparing-foundation");
+        assert_eq!(report.completion_window_start, "gamma-0.5.*");
+        assert_eq!(report.completion_window_end, "gamma-0.10.*");
         assert_eq!(
             report.next_gate().map(|gate| gate.id.as_str()),
-            Some("bootstrap-language-subset")
+            Some("compiler-data-model")
         );
     }
 
@@ -473,8 +485,10 @@ mod tests {
         assert!(json.contains("\"protocol\":\"nuis-self-hosting-readiness-v1\""));
         assert!(json.contains("\"ready\":false"));
         assert!(json.contains("\"gate_count\":5"));
+        assert!(json.contains("\"completion_window_start\":\"gamma-0.5.*\""));
+        assert!(json.contains("\"completion_window_end\":\"gamma-0.10.*\""));
         assert!(text.contains("status: preparing-foundation"));
-        assert!(text.contains("gates: 0/5"));
+        assert!(text.contains("gates: 1/5"));
     }
 
     #[test]
@@ -497,15 +511,15 @@ mod tests {
 
     #[test]
     fn next_gate_follows_bootstrap_dependency_order() {
-        let after_subset = CHECKED_IN_MANIFEST.replacen(
-            "status = \"early\"\nprogress = 20",
+        let after_data_model = CHECKED_IN_MANIFEST.replacen(
+            "status = \"early\"\nprogress = 25",
             "status = \"stable\"\nprogress = 100",
             1,
         );
-        let report = parse_bootstrap_readiness(&after_subset).expect("manifest parses");
+        let report = parse_bootstrap_readiness(&after_data_model).expect("manifest parses");
         assert_eq!(
             report.next_gate().map(|gate| gate.id.as_str()),
-            Some("compiler-data-model")
+            Some("stage-neutral-ir-boundary")
         );
     }
 

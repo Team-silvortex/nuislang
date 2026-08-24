@@ -1,0 +1,7 @@
+use cpu StdIoContracts;
+
+mod cpu DependencyCompiler {
+  fn status(value: i64) -> i64 {
+    return value;
+  }
+}

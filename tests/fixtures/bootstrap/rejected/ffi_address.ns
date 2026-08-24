@@ -1,0 +1,8 @@
+mod cpu AddressCompiler {
+  extern "c" fn host_read_byte(handle: i64) -> i64;
+
+  fn read_node(node: ref Node?) -> i64 {
+    let value: i64 = *node;
+    return host_read_byte(value) + alloc_node(value, node).value;
+  }
+}

@@ -243,6 +243,8 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
         path: "docs/reference/nuis-self-hosting-readiness.toml",
         required_patterns: &[
             "nuis-self-hosting-readiness-v1",
+            "completion_window_start",
+            "completion_window_end",
             "language-core/nuisc/bootstrap-language-subset",
             "standard-library/std/compiler-data-model",
             "language-core/nuisc/stage-neutral-ir-boundary",
@@ -260,6 +262,40 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
             "stable/100 only for a closed gate",
             "render_bootstrap_readiness_json",
             "render_bootstrap_readiness_text",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-bootstrap-language-subset-contract",
+        path: "docs/reference/nuis-bootstrap-language-subset-v1.toml",
+        required_patterns: &[
+            "nuis-bootstrap-language-subset-v1",
+            "nuisc bootstrap-check",
+            "NBS001",
+            "NBS017",
+            "tests/fixtures/bootstrap/accepted/compiler_scanner.ns",
+            "tests/fixtures/bootstrap/rejected",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-bootstrap-language-subset-semantics",
+        path: "crates/nuis-semantics/src/bootstrap_subset.rs",
+        required_patterns: &[
+            "BOOTSTRAP_SUBSET_PROTOCOL",
+            "BootstrapSubsetContext",
+            "validate_bootstrap_subset",
+            "CODE_UNSUPPORTED_DOMAIN",
+            "CODE_INTRINSIC",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-bootstrap-language-subset-frontdoor",
+        path: "tools/nuisc/src/command_bootstrap.rs",
+        required_patterns: &[
+            "run_bootstrap_check",
+            "inspect_bootstrap_modules",
+            "semantic_pipeline",
+            "resolved.compile()",
+            "render_bootstrap_check_json",
         ],
     },
     DevTensorDriftCheckSpec {

@@ -42,7 +42,7 @@ Use:
 * `beta-0.0.1` only for the recorded first-beta predecessor snapshot
 * `alpha-0.20.*` for the alpha closeout line
 * `beta-0.10.*` for the planned start of formal staged self-hosting
-* `gamma-0.5.*` for the current self-hosting completion target
+* `gamma-0.5.*` through `gamma-0.10.*` for the self-hosting completion window
 
 Do not use `beta` as a synonym for stable APIs. Compatibility policy and API
 freezes require their own explicit contracts.
