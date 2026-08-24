@@ -2,6 +2,7 @@ mod artifact;
 mod bridge_registry;
 mod build_manifest;
 mod clock_protocol;
+mod compiler_candidate_execution;
 mod compiler_component_build;
 mod compiler_component_diff;
 mod compiler_diagnostic_report;
@@ -32,6 +33,14 @@ pub use build_manifest::{
 };
 pub use clock_protocol::{
     parse_clock_protocol, parse_clock_protocol_from_source, ClockDomain, ClockEdge, ClockProtocol,
+};
+pub use compiler_candidate_execution::{
+    build_compiler_candidate_execution, parse_compiler_candidate_execution,
+    parse_compiler_candidate_execution_from_source, read_compiler_candidate_execution,
+    render_compiler_candidate_execution, CompilerCandidateExecution,
+    CompilerCandidateExecutionInput, COMPILER_CANDIDATE_EXECUTION_AUTHORITY,
+    COMPILER_CANDIDATE_EXECUTION_FILE, COMPILER_CANDIDATE_EXECUTION_PROTOCOL,
+    COMPILER_CANDIDATE_EXECUTION_ROLE, COMPILER_CANDIDATE_RUNNER_CONTRACT,
 };
 pub use compiler_component_build::{
     build_compiler_component_build, parse_compiler_component_build,

@@ -343,6 +343,7 @@ mod tests {
                 "surface.std.cli-report-file-contracts.v1".to_owned(),
                 "surface.std.language-result-hof-contracts.v1".to_owned(),
                 "surface.std.compiler-data-model.v1".to_owned(),
+                "surface.std.compiler-structural-projection.v1".to_owned(),
                 "surface.std.provider-worker-lifecycle.v1".to_owned(),
                 "surface.std.provider-worker-dispatch.v1".to_owned(),
             ]
@@ -360,6 +361,7 @@ mod tests {
                 "lib/hetero_contracts.ns".to_owned(),
                 "lib/report_contracts.ns".to_owned(),
                 "lib/language_core.ns".to_owned(),
+                "lib/compiler_projection.ns".to_owned(),
                 "lib/language_ops.ns".to_owned(),
                 "lib/provider_worker_contracts.ns".to_owned(),
                 "lib/provider_worker_dispatch_contracts.ns".to_owned(),

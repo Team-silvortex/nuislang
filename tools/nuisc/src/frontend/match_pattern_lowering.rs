@@ -262,6 +262,19 @@ pub(super) fn lower_match_pattern_condition_and_bindings(
             }
             if conditions.is_empty() {
                 if definition.fields.is_empty() {
+                    if lowered_pattern_ty
+                        .name
+                        .rsplit_once('.')
+                        .is_some_and(|(parent, _)| parent == value_ty.name)
+                    {
+                        return Ok((
+                            NirExpr::VariantIs {
+                                base: Box::new(lowered_value.clone()),
+                                variant: lowered_pattern_ty.name,
+                            },
+                            Vec::new(),
+                        ));
+                    }
                     return Ok((NirExpr::Bool(true), Vec::new()));
                 }
                 return Err(format!(

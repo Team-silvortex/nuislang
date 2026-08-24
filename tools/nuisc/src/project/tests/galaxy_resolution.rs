@@ -84,6 +84,7 @@ mod cpu Main {
             "lib/hetero_contracts.ns".to_owned(),
             "lib/report_contracts.ns".to_owned(),
             "lib/language_core.ns".to_owned(),
+            "lib/compiler_projection.ns".to_owned(),
             "lib/language_ops.ns".to_owned(),
             "lib/provider_worker_contracts.ns".to_owned(),
             "lib/provider_worker_dispatch_contracts.ns".to_owned()
@@ -146,19 +147,19 @@ mod cpu Main {
     assert!(galaxy_index.contains("documented_items="));
     assert!(galaxy_index.contains("std\tpackage=nuis.std\tdirect=false"));
     assert!(galaxy_index.contains(
-        "library_modules=lib/task_contracts.ns, lib/io_contracts.ns, lib/fs_contracts.ns, lib/cli_contracts.ns, lib/net_contracts.ns, lib/text_contracts.ns, lib/time_contracts.ns, lib/hetero_contracts.ns, lib/report_contracts.ns, lib/language_core.ns, lib/language_ops.ns"
+        "library_modules=lib/task_contracts.ns, lib/io_contracts.ns, lib/fs_contracts.ns, lib/cli_contracts.ns, lib/net_contracts.ns, lib/text_contracts.ns, lib/time_contracts.ns, lib/hetero_contracts.ns, lib/report_contracts.ns, lib/language_core.ns, lib/compiler_projection.ns, lib/language_ops.ns"
     ));
     assert!(galaxy_index.contains("library_import_policy=project-auto"));
     assert!(galaxy_index.contains("blockers=<none>"));
     assert!(modules_index.contains(
         "main.ns\tmod cpu Main\tentry=true\tsource_kind=project-local\tmanifest_spec=main.ns"
     ));
-    assert!(docs_index.contains("summary\tmodules=21\tdocumented_modules=20\tdocumented_items="));
+    assert!(docs_index.contains("summary\tmodules=22\tdocumented_modules=21\tdocumented_items="));
     assert!(docs_index.contains("module\tcpu.Main\titems=0\tsource_kind=project-local"));
     assert!(docs_index
         .contains("module\tcpu.PixelMagicContracts\titems=34\tsource_kind=galaxy-auto-inject"));
     assert!(imports_index.contains(
-        "summary\tlibraries=20\tvisible_libraries=20\tvisible_modules=21\tdocumented_visible_modules=20\tdocumented_visible_items="
+        "summary\tlibraries=21\tvisible_libraries=21\tvisible_modules=22\tdocumented_visible_modules=21\tdocumented_visible_items="
     ));
     assert!(imports_index.contains(
         "library\tpixelmagic\tlib/image_contracts.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
@@ -198,6 +199,9 @@ mod cpu Main {
     ));
     assert!(imports_index.contains(
         "library\tstd\tlib/language_core.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
+    ));
+    assert!(imports_index.contains(
+        "library\tstd\tlib/compiler_projection.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"
     ));
     assert!(imports_index.contains(
         "library\tstd\tlib/language_ops.ns\timport_policy=project-auto\tauto_injectable=true\tvisible=true"

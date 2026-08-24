@@ -1,0 +1,164 @@
+use cpu StdLanguageCore;
+use cpu StdCompilerProjection;
+
+/// First Nuis-written consumer of the producer-neutral AST/NIR record model.
+mod cpu Main {
+  fn ast_projection() -> CompilerProjectionState {
+    let state0: CompilerProjectionState = compiler_projection_start(
+      compiler_projection_ast_kind()
+    );
+    let state1: CompilerProjectionState = compiler_projection_accept(
+      state0,
+      compiler_projection_module_documentation_record(),
+      0,
+      101,
+      false
+    );
+    let state2: CompilerProjectionState = compiler_projection_accept(
+      state1,
+      compiler_projection_import_record(),
+      0,
+      102,
+      false
+    );
+    let state3: CompilerProjectionState = compiler_projection_accept(
+      state2,
+      compiler_projection_module_header_record(),
+      0,
+      103,
+      false
+    );
+    let state4: CompilerProjectionState = compiler_projection_accept(
+      state3,
+      compiler_projection_item_record(),
+      1,
+      104,
+      false
+    );
+    let state5: CompilerProjectionState = compiler_projection_accept(
+      state4,
+      compiler_projection_member_record(),
+      2,
+      105,
+      false
+    );
+    return compiler_projection_accept(
+      state5,
+      compiler_projection_documentation_record(),
+      2,
+      106,
+      false
+    );
+  }
+
+  fn nir_projection() -> CompilerProjectionState {
+    let state0: CompilerProjectionState = compiler_projection_start(
+      compiler_projection_nir_kind()
+    );
+    let state1: CompilerProjectionState = compiler_projection_accept(
+      state0,
+      compiler_projection_module_header_record(),
+      0,
+      201,
+      false
+    );
+    let state2: CompilerProjectionState = compiler_projection_accept(
+      state1,
+      compiler_projection_item_record(),
+      1,
+      202,
+      true
+    );
+    let state3: CompilerProjectionState = compiler_projection_accept(
+      state2,
+      compiler_projection_opaque_body_record(),
+      0,
+      203,
+      false
+    );
+    let state4: CompilerProjectionState = compiler_projection_accept(
+      state3,
+      compiler_projection_opaque_terminator_record(),
+      0,
+      204,
+      false
+    );
+    return compiler_projection_accept(
+      state4,
+      compiler_projection_item_record(),
+      1,
+      205,
+      false
+    );
+  }
+
+  fn invalid_boundaries_fail_closed() -> bool {
+    let nir: CompilerProjectionState = compiler_projection_start(
+      compiler_projection_nir_kind()
+    );
+    let bad_doc: CompilerProjectionState = compiler_projection_accept(
+      nir,
+      compiler_projection_module_documentation_record(),
+      0,
+      301,
+      false
+    );
+    if bad_doc.error != 4 {
+      return false;
+    }
+
+    let ast0: CompilerProjectionState = compiler_projection_start(
+      compiler_projection_ast_kind()
+    );
+    let ast1: CompilerProjectionState = compiler_projection_accept(
+      ast0,
+      compiler_projection_module_header_record(),
+      0,
+      302,
+      false
+    );
+    if ast1.error != 0 {
+      return false;
+    }
+    let bad_depth: CompilerProjectionState = compiler_projection_accept(
+      ast1,
+      compiler_projection_nested_record(),
+      3,
+      303,
+      false
+    );
+    return bad_depth.error == 4;
+  }
+
+  fn main() -> i64 {
+    let ast: CompilerProjectionState = ast_projection();
+    if ast.error != 0 || ast.record_count != 6 {
+      if ast.module_seen == 0 {
+        return 71;
+      }
+      if ast.previous_depth != 0 {
+        return 72;
+      }
+      return 73;
+    }
+    let nir: CompilerProjectionState = nir_projection();
+    if nir.error != 0 || nir.record_count != 5 {
+      return 20 + nir.record_count;
+    }
+    if ast.hash == 0 || nir.hash == 0 || ast.hash == nir.hash {
+      return 30;
+    }
+    match compiler_projection_finish(ast) {
+      Result.Ok(_) => {}
+      Result.Err(error) => { return 40 + error; }
+    }
+    match compiler_projection_finish(nir) {
+      Result.Ok(_) => {}
+      Result.Err(error) => { return 50 + error; }
+    }
+    if !invalid_boundaries_fail_closed() {
+      return 60;
+    }
+    return 0;
+  }
+}

@@ -31,13 +31,13 @@ nuis source / nuis.toml
 ```
 
 The development tensor currently reports clean recursive hierarchy, milestone,
-manifest, and `621/621` implementation-drift checks across `26/26` registered
+manifest, and `626/626` implementation-drift checks across `26/26` registered
 coordinates. Five independent self-hosting readiness gates keep the
 bootstrap-critical average honest at `93/100`; the weakest coordinate is now
-`compiler-toolchain/bootstrap/stage0-stage1-driver` at `early`, `60/100`. The
-stage-neutral handoff, stage0/stage1 driver, and differential gate are all now
-`early`, `60/100`: the dedicated `nuis bootstrap-build` frontdoor emits a
-complete compiler-image,
+`developer-system/bootstrap/differential-reproducibility-gate` at `early`,
+`60/100`. The stage-neutral handoff is `early/70`, the stage driver is
+`early/65`, and the differential gate remains `early/60`. The dedicated
+`nuis bootstrap-build` frontdoor emits a complete compiler-image,
 stage-handoff, dependency-closure, native-output, reproducible-identity, exact
 audit record, and component-bound diagnostic proof for one project-form
 compiler component. The `nuis bootstrap-diff` frontdoor compares an explicit
@@ -45,10 +45,12 @@ stage0/candidate pair across thirteen semantic, dependency, diagnostic, and
 native-output identities while keeping replacement authorization separate. The
 `nuis bootstrap-status` frontdoor reports `1/5` gates closed, while the bounded
 compiler data model is `usable`, `75/100` and the producer-neutral five-stage
-handoff is `early`, `60/100`. Its shared structural codec independently parses
+handoff is `early`, `70/100`. Its shared structural codec independently parses
 and canonically re-renders AST/NIR payload hierarchy without reconstructing AST
-from source. This is preparation progress, not a claim that the compiler is
-already self-hosted.
+from source. `nuis bootstrap-candidate-probe` now also compiles and executes a
+pure Nuis typed structural consumer, then binds its stage0 component and native
+image to an explicitly execution-only proof. This is preparation progress, not
+a claim that the compiler is already self-hosted.
 
 Nsld now carries the first ARM64 Mach-O and x86_64 Linux ELF routes through
 private shell construction, independent validation, real OS-loader execution,
@@ -64,11 +66,12 @@ The first GNU resolver providers and symbol-version rows now belong to
 `official.cffi`. Nuisc validates and preserves their registration contract,
 while Nsld generates a static runtime table at build time without changing the
 existing private-image or admission identity. With the producer-neutral
-structural AST/NIR codec in place, the tensor now routes mainline work to the
-first real Nuis-produced stage1 candidate that can consume the implemented
-fail-closed differential gate. Deterministic growth beyond the bounded compiler data-model
-proof, Galaxy hardening, broader ELF architecture coverage, and PE/COFF remain
-separate registered foundation work.
+structural codec, typed Nuis consumer, and candidate execution proof in place,
+the tensor now routes mainline work to the first real Nuis-produced stage1
+component record that can enter the implemented fail-closed differential gate.
+Deterministic growth beyond the bounded compiler data-model proof, Galaxy
+hardening, broader ELF architecture coverage, and PE/COFF remain separate
+registered foundation work.
 
 Start with these documents:
 
@@ -79,6 +82,7 @@ Start with these documents:
 * [Compiler data model](docs/reference/nuis-compiler-data-model.md)
 * [Compiler stage handoff](docs/reference/nuis-compiler-stage-handoff.md)
 * [Compiler component build](docs/reference/nuis-compiler-component-build.md)
+* [Compiler candidate execution](docs/reference/nuis-compiler-candidate-execution.md)
 * [Compiler component differential gate](docs/reference/nuis-compiler-component-differential.md)
 * [Native artifact workflow](docs/reference/nuis-native-artifact-workflow.md)
 * [Nsld linker frontdoor](docs/reference/nsld-linker-frontdoor.md)
@@ -136,6 +140,7 @@ When the next command is unclear, ask the workflow frontdoor first:
 cargo run -p nuis -- dev-tensor
 cargo run -p nuis -- bootstrap-status
 cargo run -p nuis -- bootstrap-build examples/projects/tooling/bootstrap_compiler_data_model_demo build/bootstrap-component
+cargo run -p nuis -- bootstrap-candidate-probe examples/projects/tooling/bootstrap_structural_projection_candidate build/bootstrap-candidate
 cargo run -p nuis -- workflow examples/projects/kernel_tensor_demo
 cargo run -p nuis -- project-doctor examples/projects/kernel_tensor_demo
 cargo run -p nuis -- check examples/projects/kernel_tensor_demo

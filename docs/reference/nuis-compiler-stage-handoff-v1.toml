@@ -18,8 +18,15 @@ stage0_writer = "tools/nuisc/src/stage_handoff.rs"
 native_fixture = "examples/projects/tooling/bootstrap_compiler_data_model_demo"
 structural_projection_contract = "nuis-compiler-structural-projection-v1"
 structural_projection_codec = "crates/nuis-artifact/src/compiler_structural_projection.rs"
+nuis_consumer_surface = "surface.std.compiler-structural-projection.v1"
+nuis_consumer_module = "stdlib/std/lib/compiler_projection.ns"
+nuis_consumer_fixture = "examples/projects/tooling/bootstrap_structural_projection_candidate"
+nuis_consumer_native_exit = 0
+nuis_consumer_record_tag_encoding = "stable-i64-protocol-tags"
+candidate_execution_protocol = "nuis-compiler-candidate-execution-v1"
 standalone_structural_ast_decoder = true
 standalone_structural_nir_decoder = true
+nuis_typed_structural_consumer = true
 source_reparse_required_for_ast_verification = false
 
 [[stages]]
@@ -68,12 +75,13 @@ validation_commands = [
   "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection -j 1",
   "CARGO_INCREMENTAL=0 cargo test -q -p yir-syntax -j 1",
   "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1",
 ]
 
 [open_boundary]
 status = "not-stage1-ready"
 missing = [
-  "nuis-owned-typed-ast-nir-consumer",
+  "serialized-five-stage-input-consumption-by-nuis",
   "nuis-stage1-producer",
   "stage0-stage1-differential-authorization",
 ]

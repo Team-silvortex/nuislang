@@ -84,18 +84,23 @@ lengths, payload hashes, and text policy before returning any payload.
 
 The boundary is not yet stage1-ready:
 
-* The structural codec reconstructs canonical hierarchy and bytes, but a
-  Nuis-owned typed compiler model does not consume those records yet.
+* `StdCompilerProjection` now provides a Nuis-owned streaming state machine for
+  typed AST/NIR record tags. The checked-in candidate validates valid AST/NIR
+  sequences, rejects malformed boundaries, and executes natively through the
+  frozen bootstrap and normal AOT pipeline.
+* The Nuis consumer does not yet ingest the serialized five-stage payload bytes
+  or reconstruct full typed compiler nodes from their record bodies.
 * No Nuis-written producer emits this bundle yet.
 * Compiler image and dependency-closure identity are added by the separate
   `nuis-compiler-component-build-v1` stage-driver record.
 * Replacement still requires the separate differential and authorization
   contracts; matching payload hashes alone never authorize it.
 
-The independent AST/NIR codec advances this coordinate to `early/60`. The next
-closure task is a small Nuis stage1-candidate producer that emits the same
-bundle and enters the existing fail-closed differential gate. See
-[Nuis Compiler Component Build](nuis-compiler-component-build.md).
+The independent codec plus native Nuis consumer advance this coordinate to
+`early/70`. The next closure task is a small Nuis stage1-candidate producer
+that emits the same bundle and enters the existing fail-closed differential
+gate. See [Nuis Compiler Candidate Execution](nuis-compiler-candidate-execution.md)
+and [Nuis Compiler Component Build](nuis-compiler-component-build.md).
 
 ## Validation
 
@@ -104,11 +109,13 @@ CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p yir-syntax -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1
+CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1
 ```
 
 The tests cover canonical manifest and AST/NIR structural round trips,
 producer-independent identity, malformed hierarchy, module drift, payload
 tampering after a recomputed SHA/parent/bundle chain, invalid order and paths,
 explicit YIR parsing, empty and escaped YIR arguments, normal AOT artifact
-hashing, cache reuse, and native execution of the pure Nuis compiler-data
-component.
+hashing, cache reuse, native execution of the pure Nuis compiler-data
+component, and native execution plus tamper rejection for the first typed Nuis
+structural consumer.

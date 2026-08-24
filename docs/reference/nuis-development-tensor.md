@@ -1,11 +1,8 @@
 # Nuis Development Tensor
 
 This file defines the repository's lightweight development-progress model.
-
-It answers one narrow question:
-
-`how do we describe current system progress without flattening everything into
-one vague roadmap list?`
+It answers one narrow question: `how do we describe current system progress
+without flattening everything into one vague roadmap list?`
 
 ## Model
 
@@ -43,10 +40,8 @@ Each tensor cell carries:
 * `expected_artifact`
   the concrete artifact or surfaced contract expected after the next action
 
-Short rule:
-
-`architecture tells where the work lives; module tells who owns it; function
-tells what capability is being matured`
+Short rule: `architecture tells where the work lives; module tells who owns it;
+function tells what capability is being matured`.
 
 ## Source Structure
 
@@ -1755,6 +1750,11 @@ The five required coordinates are:
 
 Subset v1 is `stable/100` through `nuisc bootstrap-check`; no gate inherits the
 roadmap score, and readiness waits for all five to reach `stable/100`.
+
+The first pure Nuis structural consumer moves the stage-neutral boundary to
+`early/70`; its identity-bound native probe moves the driver to `early/65`.
+The `early/60` differential gate remains weakest because execution-only evidence
+cannot replace a Nuis-produced `stage1-candidate` component record.
 
 ## Runtime Lifecycle Loader Bootstrap
 

@@ -38,6 +38,7 @@ mod artifact_runtime_command;
 mod artifact_runtime_dispatch_receipt;
 mod artifact_runtime_persistence;
 mod artifact_runtime_trace;
+mod bootstrap_candidate_probe;
 mod bootstrap_status;
 mod build_report_command;
 mod build_report_nsld_status;
@@ -376,6 +377,9 @@ fn run() -> Result<(), String> {
         }
         cli::CommandKind::BootstrapBuild { input, output_dir } => {
             nuisc::run(nuisc::CommandKind::BootstrapBuild { input, output_dir })?;
+        }
+        cli::CommandKind::BootstrapCandidateProbe { input, output_dir } => {
+            bootstrap_candidate_probe::handle_bootstrap_candidate_probe(input, output_dir)?;
         }
         cli::CommandKind::BootstrapDiff {
             stage0_record,

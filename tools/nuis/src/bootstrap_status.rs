@@ -537,6 +537,14 @@ mod tests {
             .replace(
                 "status = \"early\"\nprogress = 60",
                 "status = \"stable\"\nprogress = 100",
+            )
+            .replace(
+                "status = \"early\"\nprogress = 65",
+                "status = \"stable\"\nprogress = 100",
+            )
+            .replace(
+                "status = \"early\"\nprogress = 70",
+                "status = \"stable\"\nprogress = 100",
             );
         let report = parse_bootstrap_readiness(&complete).expect("complete manifest parses");
         let json = render_bootstrap_readiness_json(Path::new("readiness.toml"), &report);

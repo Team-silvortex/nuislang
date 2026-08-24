@@ -104,7 +104,11 @@ Use these as the primary cluster names when placing new work:
     `task_runtime_recipe -> task_lifecycle_recipe -> task_result_policy_recipe -> task_scheduler_recipe -> task_cli_recipe`
 * language contracts
   - auto-injected contract modules:
-    `lib/language_core.ns -> lib/language_ops.ns`
+    `lib/language_core.ns -> lib/compiler_projection.ns -> lib/language_ops.ns`
+  - bootstrap compiler consumer:
+    `bootstrap_structural_projection_candidate` consumes
+    `StdCompilerProjection`, validates typed AST/NIR record transitions, and
+    crosses the native candidate execution proof without FFI or host effects.
   - current smoke:
     `std_language_galaxy_bootstrap_demo` consumes `StdLanguageCore` and
     `StdLanguageOps` through `std=workspace`, proving reusable std-level

@@ -52,6 +52,12 @@ The emitted LLVM must contain no deferred lowering. A dedicated LLVM test also
 pins repeated `Result.Ok` payload selection across nested tagged-union chains;
 the tag and payload must be selected together.
 
+`StdCompilerProjection` is a separate companion module over this owned data
+foundation. Its first native candidate consumes stable scalar AST/NIR record
+tags and carries projection state in Nuis-owned structures. It deliberately
+does not claim that the bounded collection model can parse a complete source
+file yet.
+
 ## Honest Boundary
 
 Four slots are sufficient to pressure ownership, generics, enums, `?`, match

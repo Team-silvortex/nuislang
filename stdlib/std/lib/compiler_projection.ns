@@ -1,0 +1,246 @@
+use cpu StdLanguageCore;
+
+/// Streaming consumer for producer-neutral compiler structural projections.
+mod cpu StdCompilerProjection {
+  pub type CompilerProjectionKind = i64;
+  pub type CompilerProjectionRecordKind = i64;
+
+  pub struct CompilerProjectionState {
+    pub is_ast: i64,
+    pub module_seen: i64,
+    pub imports_started: i64,
+    pub previous_depth: i64,
+    pub opaque_leaf_open: i64,
+    pub record_count: i64,
+    pub hash: i64,
+    pub error: i64
+  }
+
+  pub fn compiler_projection_ast_kind() -> i64 { return 1; }
+  pub fn compiler_projection_nir_kind() -> i64 { return 2; }
+  pub fn compiler_projection_module_documentation_record() -> i64 { return 1; }
+  pub fn compiler_projection_import_record() -> i64 { return 2; }
+  pub fn compiler_projection_module_header_record() -> i64 { return 3; }
+  pub fn compiler_projection_item_record() -> i64 { return 4; }
+  pub fn compiler_projection_member_record() -> i64 { return 5; }
+  pub fn compiler_projection_nested_record() -> i64 { return 6; }
+  pub fn compiler_projection_documentation_record() -> i64 { return 7; }
+  pub fn compiler_projection_opaque_body_record() -> i64 { return 8; }
+  pub fn compiler_projection_opaque_terminator_record() -> i64 { return 9; }
+
+  pub fn compiler_projection_hash(
+    hash: i64,
+    code: i64,
+    depth: i64,
+    body_hash: i64
+  ) -> i64 {
+    return (
+      hash * 65599 + code * 257 + depth * 17 + body_hash + 1
+    ) % 2147483647;
+  }
+
+  pub fn compiler_projection_start(
+    projection: CompilerProjectionKind
+  ) -> CompilerProjectionState {
+    if projection == 1 {
+      return CompilerProjectionState {
+        is_ast: 1,
+        module_seen: 0,
+        imports_started: 0,
+        previous_depth: 0,
+        opaque_leaf_open: 0,
+        record_count: 0,
+        hash: 0,
+        error: 0
+      };
+    }
+    if projection == 2 {
+      return CompilerProjectionState {
+        is_ast: 0,
+        module_seen: 0,
+        imports_started: 0,
+        previous_depth: 0,
+        opaque_leaf_open: 0,
+        record_count: 0,
+        hash: 0,
+        error: 0
+      };
+    }
+    return CompilerProjectionState {
+      is_ast: 0,
+      module_seen: 0,
+      imports_started: 0,
+      previous_depth: 0,
+      opaque_leaf_open: 0,
+      record_count: 0,
+      hash: 0,
+      error: 3
+    };
+  }
+
+  pub fn compiler_projection_reject(
+    state: CompilerProjectionState,
+    error: i64
+  ) -> CompilerProjectionState {
+    return CompilerProjectionState {
+      is_ast: state.is_ast,
+      module_seen: state.module_seen,
+      imports_started: state.imports_started,
+      previous_depth: state.previous_depth,
+      opaque_leaf_open: state.opaque_leaf_open,
+      record_count: state.record_count,
+      hash: state.hash,
+      error: error
+    };
+  }
+
+  pub fn compiler_projection_accept(
+    state: CompilerProjectionState,
+    record: CompilerProjectionRecordKind,
+    depth: i64,
+    body_hash: i64,
+    opens_opaque: bool
+  ) -> CompilerProjectionState {
+    if state.error != 0 {
+      return state;
+    }
+    if depth < 0 || body_hash < 0 {
+      return compiler_projection_reject(state, 3);
+    }
+    let code: i64 = record;
+    if code < 1 || code > 9 {
+      return compiler_projection_reject(state, 3);
+    }
+    let next_hash: i64 = compiler_projection_hash(state.hash, code, depth, body_hash);
+    if state.opaque_leaf_open != 0 {
+      if opens_opaque || depth != 0 {
+        return compiler_projection_reject(state, 4);
+      }
+      if code == 8 {
+        return CompilerProjectionState {
+          is_ast: state.is_ast,
+          module_seen: 1,
+          imports_started: state.imports_started,
+          previous_depth: state.previous_depth,
+          opaque_leaf_open: 1,
+          record_count: state.record_count + 1,
+          hash: next_hash,
+          error: 0
+        };
+      }
+      if code == 9 {
+        return CompilerProjectionState {
+          is_ast: state.is_ast,
+          module_seen: 1,
+          imports_started: state.imports_started,
+          previous_depth: state.previous_depth,
+          opaque_leaf_open: 0,
+          record_count: state.record_count + 1,
+          hash: next_hash,
+          error: 0
+        };
+      }
+      return compiler_projection_reject(state, 4);
+    }
+    if code == 8 || code == 9 {
+      return compiler_projection_reject(state, 4);
+    }
+    if state.module_seen == 0 {
+      if depth != 0 || opens_opaque {
+        return compiler_projection_reject(state, 4);
+      }
+      if code == 1 {
+        if state.is_ast == 0 || state.imports_started != 0 {
+          return compiler_projection_reject(state, 4);
+        }
+        return CompilerProjectionState {
+          is_ast: state.is_ast,
+          module_seen: 0,
+          imports_started: 0,
+          previous_depth: 0,
+          opaque_leaf_open: 0,
+          record_count: state.record_count + 1,
+          hash: next_hash,
+          error: 0
+        };
+      }
+      if code == 2 {
+        return CompilerProjectionState {
+          is_ast: state.is_ast,
+          module_seen: 0,
+          imports_started: 1,
+          previous_depth: 0,
+          opaque_leaf_open: 0,
+          record_count: state.record_count + 1,
+          hash: next_hash,
+          error: 0
+        };
+      }
+      if code == 3 {
+        return CompilerProjectionState {
+          is_ast: state.is_ast,
+          module_seen: 1,
+          imports_started: state.imports_started,
+          previous_depth: 0,
+          opaque_leaf_open: 0,
+          record_count: state.record_count + 1,
+          hash: next_hash,
+          error: 0
+        };
+      }
+      return compiler_projection_reject(state, 4);
+    }
+    if code <= 3 || code >= 8 || depth == 0 || depth > state.previous_depth + 1 {
+      return compiler_projection_reject(state, 4);
+    }
+    if code == 4 && depth != 1 {
+      return compiler_projection_reject(state, 4);
+    }
+    if code == 5 && depth != 2 {
+      return compiler_projection_reject(state, 4);
+    }
+    if code == 6 && depth < 3 {
+      return compiler_projection_reject(state, 4);
+    }
+    if code == 7 && state.is_ast == 0 {
+      return compiler_projection_reject(state, 4);
+    }
+    if opens_opaque {
+      if state.is_ast != 0 || code == 7 {
+        return compiler_projection_reject(state, 4);
+      }
+      return CompilerProjectionState {
+        is_ast: state.is_ast,
+        module_seen: 1,
+        imports_started: state.imports_started,
+        previous_depth: depth,
+        opaque_leaf_open: 1,
+        record_count: state.record_count + 1,
+        hash: next_hash,
+        error: 0
+      };
+    }
+    return CompilerProjectionState {
+      is_ast: state.is_ast,
+      module_seen: 1,
+      imports_started: state.imports_started,
+      previous_depth: depth,
+      opaque_leaf_open: 0,
+      record_count: state.record_count + 1,
+      hash: next_hash,
+      error: 0
+    };
+  }
+
+  pub fn compiler_projection_finish(
+    state: CompilerProjectionState
+  ) -> Result<i64, i64> {
+    if state.error != 0 {
+      return Result.Err(state.error);
+    }
+    if state.module_seen == 0 || state.opaque_leaf_open != 0 {
+      return Result.Err(4);
+    }
+    return Result.Ok(state.hash);
+  }
+}

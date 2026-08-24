@@ -27,6 +27,10 @@ pub enum CommandKind {
         input: PathBuf,
         output_dir: PathBuf,
     },
+    BootstrapCandidateProbe {
+        input: PathBuf,
+        output_dir: PathBuf,
+    },
     BootstrapDiff {
         stage0_record: PathBuf,
         candidate_record: PathBuf,
@@ -242,6 +246,16 @@ where
                 );
             }
             Ok(CommandKind::BootstrapBuild { input, output_dir })
+        }
+        "bootstrap-candidate-probe" => {
+            let usage =
+                "usage: nuis bootstrap-candidate-probe <project-dir|nuis.toml> <output-dir>";
+            let input = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            let output_dir = PathBuf::from(args.next().ok_or_else(|| usage.to_owned())?);
+            if args.next().is_some() {
+                return Err(usage.to_owned());
+            }
+            Ok(CommandKind::BootstrapCandidateProbe { input, output_dir })
         }
         "bootstrap-diff" => {
             let usage = "usage: nuis bootstrap-diff <stage0-record> <candidate-record> <report>";

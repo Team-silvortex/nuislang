@@ -83,21 +83,23 @@ Freeze producer-neutral source, token, AST, NIR, and YIR handoff records. The
 serialized identity must not depend on Rust layout so the existing stage0 and
 a future Nuis stage1 producer can be compared against the same contract.
 
-This gate is now `early/60`. Normal AOT builds emit the ordered five-stage
+This gate is now `early/70`. Normal AOT builds emit the ordered five-stage
 `nuis-compiler-stage-handoff-v1` SHA-256 chain, hash its source/token/manifest
 artifacts in the build manifest, and preserve bundle identity across cache
 hits. The shared `nuis-compiler-structural-projection-v1` codec independently
 parses and canonically re-renders AST/NIR hierarchy and module identity without
 source reconstruction or producer-private layout. Explicit YIR crosses parse,
-verify, and canonical re-render. A Nuis-owned typed consumer and second
-producer remain open. See
+verify, and canonical re-render. `StdCompilerProjection` now supplies a typed
+streaming consumer whose pure Nuis candidate crosses bootstrap-check, native
+AOT execution, malformed-sequence rejection, and tamper-checked execution
+proof. Serialized payload ingestion and a second producer remain open. See
 [Nuis Compiler Stage Handoff](nuis-compiler-stage-handoff.md).
 
 ### `stage0-stage1-driver`
 
 Coordinate: `compiler-toolchain/bootstrap/stage0-stage1-driver`.
 
-This gate is now `early/60`. `nuis bootstrap-build` is a dedicated project-only
+This gate is now `early/65`. `nuis bootstrap-build` is a dedicated project-only
 driver over the frozen bootstrap gate and normal AOT pipeline. It consumes the
 five-stage handoff and emits `nuis-compiler-component-build-v1`, binding the
 exact stage0 compiler image, native output, build outputs, project/Galaxy/
@@ -106,9 +108,14 @@ audit identity. It also emits `nuis-compiler-diagnostic-report-v1`, bound to
 the exact component record and producer. See
 [Nuis Compiler Component Build](nuis-compiler-component-build.md).
 
-The driver is not another unchecked application-build alias, but it is still
-only the stage0 half. No Nuis stage1 producer or replacement authorization
-exists yet.
+`nuis bootstrap-candidate-probe` additionally executes the first pure Nuis
+candidate with empty argv, closed stdin, required exit `0`, and empty output,
+then binds its image and result to
+`nuis-compiler-candidate-execution-v1`. See
+[Nuis Compiler Candidate Execution](nuis-compiler-candidate-execution.md).
+
+The probe authority is explicitly execution-only. The component record remains
+stage0, so no Nuis stage1 producer or replacement authorization exists yet.
 
 ### `differential-reproducibility-gate`
 
@@ -125,9 +132,9 @@ and returns a failing command status. See
 The comparison engine is implemented, but there is still no real Nuis stage1
 producer. Therefore repository-native cross-producer equivalence and a
 separate reversible replacement authorization remain open. The implemented
-structural codec means the next weakest work is no longer a missing comparison
-or handoff protocol. It is the first real leaf component emitted by a Nuis
-stage1-candidate producer.
+codec, typed Nuis consumer, and candidate execution proof mean the next weakest
+work is no longer parsing, execution, comparison, or handoff protocol. It is
+the first real leaf component emitted by a Nuis stage1-candidate producer.
 
 ## Migration Rule
 

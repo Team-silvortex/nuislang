@@ -17,6 +17,8 @@ mod constructors_patterns;
 mod generic_impl_methods;
 #[path = "tests_enums/generic_impl_ops.rs"]
 mod generic_impl_ops;
+#[path = "tests_enums/imported_unit_variants.rs"]
+mod imported_unit_variants;
 #[path = "tests_enums/qualified_helper_methods.rs"]
 mod qualified_helper_methods;
 #[path = "tests_enums/qualified_helper_ops.rs"]

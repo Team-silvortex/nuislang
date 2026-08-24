@@ -13,6 +13,7 @@ pub const BOOTSTRAP_SUBSET_PROTOCOL: &str = "nuis-bootstrap-language-subset-v1";
 pub const BOOTSTRAP_APPROVED_IMPORTS: &[(&str, &str)] = &[
     ("cpu", "CorePrelude"),
     ("cpu", "StdLanguageCore"),
+    ("cpu", "StdCompilerProjection"),
     ("cpu", "StdTextContracts"),
 ];
 
@@ -23,6 +24,9 @@ pub const BOOTSTRAP_APPROVED_EXTERNAL_TYPES: &[&str] = &[
     "CompilerDiagnostic",
     "CompilerMap",
     "CompilerPath",
+    "CompilerProjectionKind",
+    "CompilerProjectionRecordKind",
+    "CompilerProjectionState",
     "CompilerSourceSpan",
     "CompilerText",
     "CompilerVector",

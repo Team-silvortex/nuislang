@@ -31,23 +31,23 @@ blocker = "the v1 proof closes host-layout leakage for one real component, but f
 id = "stage-neutral-ir-boundary"
 coordinate = "language-core/nuisc/stage-neutral-ir-boundary"
 status = "early"
-progress = 60
+progress = 70
 required_before = "beta-0.10.0"
-next_action = "implement one leaf Nuis stage1-candidate producer against nuis-compiler-structural-projection-v1 and emit its component-bound diagnostic proof"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1"
+next_action = "extend the native Nuis structural consumer from stable scalar tags to serialized five-stage payload input, then emit one candidate-owned handoff bundle"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1"
 expected_artifact = "a second Nuis-produced component bundle whose independently decoded AST/NIR projections and complete five-stage semantic identity can enter bootstrap-diff without producer-private reconstruction"
-blocker = "the producer-neutral AST/NIR structural codec is implemented, but only Rust stage0 emits the bundle and no typed Nuis stage1 compiler component consumes it yet"
+blocker = "a pure Nuis typed record-state consumer now executes natively and fails closed, but it does not yet ingest serialized payload bytes or emit a candidate-owned handoff bundle"
 
 [[gates]]
 id = "stage0-stage1-driver"
 coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
 status = "early"
-progress = 60
+progress = 65
 required_before = "beta-0.10.0"
 next_action = "emit the same component and component-bound diagnostic proof from a separately identified Nuis stage1 candidate"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_build -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_diagnostic_report -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_build -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_execution -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1"
 expected_artifact = "a separately attested Nuis stage1-candidate component record and normalized diagnostic proof ready for the implemented differential gate"
-blocker = "the stage0 driver records compiler image, dependency closure, handoff, native output, diagnostic proof, stable reproducible identity, and exact audit identity, but no Nuis stage1 producer exists"
+blocker = "the driver now records and revalidates successful execution of a pure Nuis candidate image without granting production authority, but no Nuis stage1 producer emits a component record"
 
 [[gates]]
 id = "differential-reproducibility-gate"
@@ -56,6 +56,6 @@ status = "early"
 progress = 60
 required_before = "beta-0.10.0"
 next_action = "run the implemented thirteen-check gate against a real Nuis-produced leaf stage1 candidate across repeated clean builds"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_diff -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_diff -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_execution -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1"
 expected_artifact = "a repository-native stage0/stage1 differential report that remains equivalent across clean rebuilds and still grants no replacement authority"
 blocker = "the fail-closed comparison report and CLI exist, but no Nuis stage1 producer or independent reversible replacement authorization exists"

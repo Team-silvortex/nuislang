@@ -107,6 +107,10 @@ rejects it.
 ## Honest Boundary
 
 The current stage0 half is reusable and attested, but stage1 is still absent.
+`nuis bootstrap-candidate-probe` now executes the first pure Nuis structural
+consumer and writes an identity-bound, explicitly non-authoritative execution
+proof. This closes candidate-image execution, not component production; see
+[Nuis Compiler Candidate Execution](nuis-compiler-candidate-execution.md).
 The fail-closed comparison protocol and `nuis bootstrap-diff` frontdoor now
 exist; see
 [Nuis Compiler Component Differential Gate](nuis-compiler-component-differential.md).
@@ -118,6 +122,8 @@ component.
 
 ```bash
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_build -j 1
+CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_candidate_execution -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1
+CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib parse_bootstrap_build_command -j 1
 ```

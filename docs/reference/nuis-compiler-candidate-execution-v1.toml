@@ -1,0 +1,52 @@
+protocol = "nuis-compiler-candidate-execution-v1"
+version = 1
+status = "probe-implemented"
+scope = "nuis-written-compiler-candidate-native-execution"
+manifest_name = "nuis.compiler-candidate-execution.toml"
+runner_contract = "nuis-bootstrap-candidate-runner-v1"
+probe_role = "stage1-candidate-probe"
+authority = "execution-only-no-component-production"
+frontdoor = "nuis bootstrap-candidate-probe"
+source_component_protocol = "nuis-compiler-component-build-v1"
+source_component_role = "stage0"
+arguments_contract = "empty-argv-v1"
+stdin_contract = "closed-stdin-v1"
+required_exit_code = 0
+required_stdout_bytes = 0
+required_stderr_bytes = 0
+digest = "sha256-lowercase"
+identity_encoding = "u64-little-endian-length-prefixed-fields"
+consumer_surface = "surface.std.compiler-structural-projection.v1"
+consumer_module = "stdlib/std/lib/compiler_projection.ns"
+consumer_fixture = "examples/projects/tooling/bootstrap_structural_projection_candidate"
+native_validation = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_structural_projection_candidate -j 1"
+
+bound_inputs = [
+  "exact-component-record-sha256",
+  "component-reproducible-build-sha256",
+  "component-id-and-bootstrap-subset",
+  "stage0-source-component-role",
+  "candidate-native-image-name-length-and-sha256",
+  "empty-arguments-and-closed-stdin-contracts",
+  "exit-code-and-captured-output-identities",
+]
+
+invariants = [
+  "bootstrap-build-precedes-candidate-execution",
+  "candidate-is-executed-without-arguments-or-stdin",
+  "only-exit-zero-with-empty-output-is-attested",
+  "stale-proof-is-removed-before-execution",
+  "reader-reverifies-the-sibling-component-and-native-image",
+  "binary-or-component-tampering-fails-closed",
+  "probe-never-claims-stage1-component-production",
+  "probe-never-grants-replacement-authority",
+]
+
+[open_boundary]
+status = "not-stage1-producer"
+missing = [
+  "serialized-five-stage-input-consumption-by-nuis",
+  "nuis-produced-stage-handoff-bundle",
+  "nuis-produced-component-bound-diagnostics",
+  "stage1-candidate-component-record",
+]

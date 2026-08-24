@@ -51,6 +51,7 @@ pub(crate) fn print_help() {
     println!("    nuis dev-tensor [--json]");
     println!("    nuis bootstrap-status [--json] [manifest]");
     println!("    nuis bootstrap-build <project-dir|nuis.toml> <output-dir>");
+    println!("    nuis bootstrap-candidate-probe <project-dir|nuis.toml> <output-dir>");
     println!("    nuis bootstrap-diff <stage0-record> <candidate-record> <report>");
     println!("    nuis registry");
     println!("    nuis fmt [input.ns|project-dir|nuis.toml]");

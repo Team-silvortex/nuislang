@@ -244,7 +244,10 @@ fn match_on_parent_enum_typed_value_accepts_variant_patterns() {
                 ] if name == "payload" && result == "payload" && is_payload_value_access(value)
             ) && matches!(
                 else_body.as_slice(),
-                [NirStmt::If { condition: NirExpr::Bool(true), .. }]
+                [NirStmt::If {
+                    condition: NirExpr::VariantIs { variant, .. },
+                    ..
+                }] if variant == "Option.None"
             )
     ));
 }

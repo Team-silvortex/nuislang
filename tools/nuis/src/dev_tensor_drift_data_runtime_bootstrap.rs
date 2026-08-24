@@ -380,6 +380,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
             "nuis-compiler-structural-projection-v1",
             "standalone_structural_ast_decoder = true",
             "standalone_structural_nir_decoder = true",
+            "nuis_typed_structural_consumer = true",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -394,6 +395,19 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
             "record depth may increase by at most one level",
             "OpaqueBody",
             "unterminated opaque WGSL leaf",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-structural-projection-nuis-consumer",
+        path: "stdlib/std/lib/compiler_projection.ns",
+        required_patterns: &[
+            "mod cpu StdCompilerProjection",
+            "CompilerProjectionState",
+            "compiler_projection_start",
+            "compiler_projection_accept",
+            "compiler_projection_finish",
+            "compiler_projection_opaque_body_record",
+            "compiler_projection_opaque_terminator_record",
         ],
     },
     DevTensorDriftCheckSpec {
@@ -477,6 +491,53 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
             "bootstrap-diff",
             "tampered native binary must invalidate component build",
             "Some(43)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-candidate-execution-contract",
+        path: "docs/reference/nuis-compiler-candidate-execution-v1.toml",
+        required_patterns: &[
+            "nuis-compiler-candidate-execution-v1",
+            "nuis-bootstrap-candidate-runner-v1",
+            "stage1-candidate-probe",
+            "execution-only-no-component-production",
+            "nuis bootstrap-candidate-probe",
+            "not-stage1-producer",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-candidate-execution-artifact",
+        path: "crates/nuis-artifact/src/compiler_candidate_execution.rs",
+        required_patterns: &[
+            "COMPILER_CANDIDATE_EXECUTION_PROTOCOL",
+            "COMPILER_CANDIDATE_EXECUTION_AUTHORITY",
+            "build_compiler_candidate_execution",
+            "read_compiler_candidate_execution",
+            "execution_identity",
+            "requires an output-free successful process",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-candidate-execution-frontdoor",
+        path: "tools/nuis/src/bootstrap_candidate_probe.rs",
+        required_patterns: &[
+            "handle_bootstrap_candidate_probe",
+            "BootstrapBuild",
+            "Stdio::null",
+            "COMPILER_CANDIDATE_EXECUTION_FILE",
+            "read_compiler_candidate_execution",
+            "bootstrap candidate probe: verified",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-candidate-execution-native-regression",
+        path: "tools/nuis/tests/compiler_structural_projection_candidate.rs",
+        required_patterns: &[
+            "bootstrap-candidate-probe",
+            "read_compiler_candidate_execution",
+            "COMPILER_CANDIDATE_EXECUTION_AUTHORITY",
+            "Some(0)",
+            "tampered candidate binary must invalidate its execution proof",
         ],
     },
     DevTensorDriftCheckSpec {
