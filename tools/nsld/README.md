@@ -2,11 +2,11 @@
 
 `nsld` is the Nuis linker front-door.
 
-In the current `beta-0.3.*` line it is still a CLI wrapper over repository-owned
-linker contract logic, including `nuisc::linker` helpers. That is intentional:
-the tool exists before the final self-owned linker core so the toolchain can
-start exercising linker plans, clock ordering, section/container metadata, and
-heterogeneous binary contracts early.
+In the current `beta-0.6.*` line it remains a CLI adapter over reusable linker
+contracts, including the provider-neutral plan boundary shared with
+`nuisc::linker`. It now owns the first independently validated Mach-O and ELF
+native-finalization routes, while the final reusable linker core and stable
+public API remain future work.
 
 ## Boundary
 
@@ -58,11 +58,12 @@ cosmetic CLI output.
 
 The CLI should remain a human and script entry point for those capabilities.
 
-Current early-beta pressure is not to special-case Metal, CoreML, CUDA, or
-other providers in the linker. Nsld should consume registered heterogeneous
-payload and execution-capsule metadata after the worker boundary verifies it,
-then place those records according to the existing lifecycle, clock, and
-deterministic data-layout contracts.
+Current early-beta pressure is not to special-case Metal, CoreML, CUDA, GNU
+symbol names, or other providers in compiler and CLI code. Nsld consumes
+registered payload and execution-capsule metadata after the worker boundary
+verifies it, then places those records according to lifecycle, clock, and
+deterministic data-layout contracts. The immediate cleanup is to replace its
+first built-in GNU resolver rows with a generated CFFI Nustar registration.
 
 ## Current Module Map
 
@@ -292,7 +293,10 @@ validator, one real isolated OS-loader execution, durable replay admission, and
 registered opt-in publication and ordinary explicit selection. The real internal fixture now executes
 `ADRP`/`ADD`/`STR` against provider-allocated common storage before passing
 signature, loader, receipt replay, ordinary final-output selection, and direct
-execution. ELF shell layout/serialization, load admission, and PE/COFF remain
+execution. The ELF route now continues through deterministic private shell
+layout/serialization, independent validation, registered GNU dependency
+provenance, real loader admission, atomic publication, and ordinary explicit
+selection. PE/COFF and generated CFFI Nustar resolver registration remain
 incomplete. The
 ordinary default compatibility executable remains byte-for-byte unchanged;
 private installation requires both the explicit policy and `--apply`.

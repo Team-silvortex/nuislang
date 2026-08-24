@@ -1,7 +1,7 @@
 # `nuis` `beta-0.1.0` Documentation Sync Inventory
 
 > Historical synchronization snapshot. For the current mainline, start with
-> [nuis-beta-0.3.0-mainline-entry.md](nuis-beta-0.3.0-mainline-entry.md).
+> [nuis-beta-0.6.0-mainline-entry.md](nuis-beta-0.6.0-mainline-entry.md).
 
 This file records the then-current documentation migration from the first beta
 foundation snapshot to `beta-0.1.0`.

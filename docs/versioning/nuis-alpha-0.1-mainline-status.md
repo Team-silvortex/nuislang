@@ -3,7 +3,7 @@
 This file is now a predecessor anchor for the `alpha-0.1.*` line.
 
 For present-tense work, start with
-[nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md).
+[nuis-beta-0.6.0-mainline-entry.md](nuis-beta-0.6.0-mainline-entry.md).
 
 For current hardening-baseline context from the `alpha-0.4.*` line, start with:
 

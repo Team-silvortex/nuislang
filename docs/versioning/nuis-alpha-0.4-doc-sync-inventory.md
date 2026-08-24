@@ -4,7 +4,7 @@ This file records the historical documentation synchronization point for the
 `alpha-0.4.*` line.
 
 For present-tense work, start with
-[nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md).
+[nuis-beta-0.6.0-mainline-entry.md](nuis-beta-0.6.0-mainline-entry.md).
 
 It is intentionally practical: it says which docs are the current front doors,
 which claims are implementation-backed, and which areas should still use

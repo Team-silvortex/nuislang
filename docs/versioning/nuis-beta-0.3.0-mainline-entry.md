@@ -1,6 +1,10 @@
 # `nuis` `beta-0.3.*` Mainline Entry
 
-This file is the short current-line anchor for the `beta-0.3.*` minor line.
+> Historical phase snapshot. For current mainline behavior, start with
+> [nuis-beta-0.6.0-mainline-entry.md](nuis-beta-0.6.0-mainline-entry.md).
+> Present-tense wording below is preserved in its `beta-0.3.*` context.
+
+This file is the recorded short entry point for the `beta-0.3.*` minor line.
 
 Git history is authoritative for the exact patch checkpoint. The repository's
 independent Cargo package versions are implementation-package versions and do

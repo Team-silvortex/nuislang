@@ -3,15 +3,15 @@
 `Nsld` is the Nuis linker toolchain member introduced on the `alpha-0.6.0`
 line.
 
-At this stage, `Nsld` is intentionally a frontdoor over the existing linker
-contract logic in `nuisc::linker`. It does not yet claim to be the final
-self-owned object linker. Its job is to give linker work a stable tool
-boundary before the implementation is split out further.
+`Nsld` remains a frontdoor over reusable linker contracts, including the
+provider-neutral plan boundary shared with `nuisc::linker`. It now owns
+substantial native finalization behavior, but does not claim a finished
+self-hosted linker core or stable public linker API.
 
-For the current `beta-0.3.*` line, the emphasis is tensor-guided
-executable-artifact hardening: keep the frontdoor/reporting discipline, but
-drive it toward the smallest runnable host-assisted route or explicit blocked
-executable artifact with clear run-artifact / trace readiness evidence.
+For the current `beta-0.6.*` line, the emphasis is tensor-guided native
+finalization hardening: preserve the structured frontdoor while moving backend
+registration out of built-in tables and keeping admission, publication, and
+selection evidence independently replayable.
 
 Longer-term, `Nsld` should be read as a CLI adapter over a future reusable
 linker core / galaxy capability boundary, not as a CLI-only tool. See
@@ -35,6 +35,7 @@ For the automation frontdoor, see [nsld-driver-frontdoor.md](nsld-driver-frontdo
 * verified relocatable host object handoff identity and Mach-O object parsing
 * deterministic Mach-O section placement and section-backed symbol binding
 * coalesced Mach-O common symbols in provider-owned VM-only zero-fill storage
+* absolute and cycle-safe multi-hop indirect Mach-O symbol definitions
 * checked Mach-O arm64 relocation, working-image, stub/GOT, and shell-layout planning
 * deterministic private Mach-O arm64 shell-byte and linkedit serialization with
   final-address instruction, stub, GOT, and pointer rewriting
@@ -44,12 +45,18 @@ For the automation frontdoor, see [nsld-driver-frontdoor.md](nsld-driver-frontdo
 * provider-neutral final-output selection with a compatibility default and an
   explicit replay-admitted private-image policy
 * registered Mach-O arm64 compatibility-image materialization
+* x86_64 ELF `ET_REL` parsing, placement, direct/platform relocation,
+  PLT/GOT/dynamic/version structures, and deterministic private-shell bytes
+* registered Linux GNU dependency resolution for the first versioned `libc`
+  and `libm` routes, real loader admission, publication, and selection
+* relocatable owner-private final-output selection evidence
 * the first independent CLI boundary for future linker work
 
 `Nsld` does not yet own:
 
-* absolute/indirect Mach-O non-section definitions
-* final host-native executable wrapping for ELF or PE/COFF
+* generated CFFI Nustar ownership of GNU resolver provider/version rows
+* broader ELF architecture and dependency-provider coverage
+* final host-native executable wrapping for PE/COFF
 * binary section assembly independent from `nuisc`
 * stable linker script or relocation formats
 * finished `nsld-core` galaxy-style API for direct compiler/runtime consumers

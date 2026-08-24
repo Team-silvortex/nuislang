@@ -10,7 +10,7 @@ backends, but they do not define the language model.
 
 ## Current Line
 
-The repository is on `beta-0.3.*`. Git history is the authoritative source for
+The repository is on `beta-0.6.*`. Git history is the authoritative source for
 the exact patch checkpoint; the independent Cargo package versions are not the
 project release number yet.
 
@@ -30,52 +30,33 @@ nuis source / nuis.toml
   -> run-artifact / Nsdb execution evidence and replay metadata
 ```
 
-The development tensor currently reports clean hierarchy, milestone, manifest,
-and implementation-drift coverage. That means the checked-in milestone slices
-agree with their evidence; it does not mean every subsystem is complete. The
-current bootstrap-critical frontier is OS-native executable finalization: Nsld
-now carries ARM64 Mach-O sections, commons, absolute values, and cycle-safe
-symbol aliases through relocation, signed private-shell serialization,
-independent load admission, and explicit provider-registered publication. The
-first `x86_64-linux-elf` internal provider now validates the compiled ELF64
-image plus its two relocatable host objects, parses their section names and
-attributes, symbol tables, and registered `SHT_RELA` records, resolves the
-program/runtime symbol boundary, deterministically places allocatable
-`text/rodata/data/bss/common` contributions into page-separated permission
-classes, assigns virtual addresses, and binds section/common/absolute
-definitions, zero-valued unmatched weak references, and unresolved
-compatibility names. It now maps every registered `R_X86_64` record to that
-placement, computes checked `S+A` or `S+A-P` values, and emits deterministic
-little-endian patch previews without mutating bytes; unresolved system targets
-remain explicit platform-structure work. The provider now also reconstructs
-the merged memory image from hash- and size-bound `ET_REL` payloads, audits
-file-backed copies and zero-fill ranges separately, binds file/memory image
-hashes to both plans, and derives non-overlapping write-once patch spans without
-altering the reconstructed bytes. `nuis-nsld-elf-amd64-patch-application-v1`
-then rebuilds and revalidates that source image, applies every direct span once
-in an independent buffer, and binds source/applied file and memory hashes plus
-per-write audits into one deterministic ledger. Deferred compatibility targets
-remain untouched. `nuis-nsld-elf-amd64-platform-structure-plan-v1` then groups
-external PLT32 targets through a static provider rule registry, deduplicates
-dynamic symbols, assigns shared PLT/GOT slots and `R_X86_64_JUMP_SLOT` records
-across page-separated RX/RW/RO regions, and derives a checked second-stage patch
-preview for every deferred source without changing the applied image.
-`nuis-nsld-elf-amd64-platform-patch-application-v1` now rebuilds that exact
-plan, reserves inherited direct-write spans, extends an isolated image, emits
-checked `ff 25 rel32` nonlazy PLT entries, GOT placeholders, `Elf64_Sym`,
-dynamic strings, and `Elf64_Rela` records, then commits every deferred call
-site exactly once. Per-structure, per-source, final-file, and final-memory
-hashes are bound into a deterministic second write ledger; repeated calls share
-one platform target while retaining distinct write audits.
-It still atomically publishes the host-linked compatibility image without
-invoking Clang or LLD at finalization time. Provider-owned platform byte
-application is closed; ELF shell layout/serialization and load admission remain
-the next format frontier, while PE/COFF parity remains open.
+The development tensor currently reports clean recursive hierarchy, milestone,
+manifest, and implementation-drift coverage. Its 21 registered coordinates are
+all covered; the weakest bootstrap-critical coordinate remains
+`linker-toolchain/nsld/os-native-executable-finalization` at `usable`, `99/100`.
+That means the checked-in slices agree with their evidence, not that every
+subsystem is complete.
+
+Nsld now carries the first ARM64 Mach-O and x86_64 Linux ELF routes through
+private shell construction, independent validation, real OS-loader execution,
+admission replay, atomic publication, and ordinary final-output selection. The
+Linux route exercises versioned, hash-whitelisted `libc` and `libm` symbols in
+one real GNU loader process. Explicit private selection persists relocatable
+owner-private `nuis-nsld-final-output-selection-evidence-file-v1` evidence;
+compatibility output remains the non-mutating default. Stale admission,
+signature, registration, or image identity blocks mutation even when candidate
+ELF bytes have not changed.
+
+The immediate frontier is architectural rather than another hardcoded symbol:
+move the first GNU resolver providers and symbol-version rows out of Nsld-owned
+tables into a generated, statically validated CFFI Nustar registration
+contract. Broader ELF architecture coverage and PE/COFF remain separate
+registered finalizer work.
 
 Start with these documents:
 
 * [Current mainline map](docs/current-mainline-map.md)
-* [Beta 0.3 mainline entry](docs/versioning/nuis-beta-0.3.0-mainline-entry.md)
+* [Beta 0.6 mainline entry](docs/versioning/nuis-beta-0.6.0-mainline-entry.md)
 * [Development tensor](docs/reference/nuis-development-tensor.md)
 * [Native artifact workflow](docs/reference/nuis-native-artifact-workflow.md)
 * [Nsld linker frontdoor](docs/reference/nsld-linker-frontdoor.md)
@@ -101,9 +82,10 @@ The following surfaces are implemented and exercised today:
 * Registered provider paths carry lifecycle, clock, GLM, artifact, and
   completion evidence. Checked-in routes include host CPU, Metal/CoreML, and
   Linux CUDA/Vulkan provider work.
-* `nsld` owns deterministic link planning, closure, NSB assembly, final-output
-  contracts, provider payload placement, native entry planning, ARM64 Mach-O
-  object handling, and private final-address shell serialization.
+* `nsld` owns deterministic link planning, closure, NSB assembly, provider
+  payload placement, native entry planning, the first ARM64 Mach-O and x86_64
+  Linux ELF private-shell routes, loader admission, publication, and persisted
+  final-output selection evidence.
 * `nuis-runtime` and `nuis-host-runner` own the current lifecycle loader and
   host execution bridge; `nsdb` consumes YIR-level trace, handoff, cursor, and
   replay metadata.
@@ -113,8 +95,8 @@ The following surfaces are implemented and exercised today:
 
 The following boundaries are still intentionally incomplete:
 
-* signed and independently load-validated OS-native publication across Mach-O,
-  ELF, and PE/COFF
+* generated CFFI Nustar ownership of GNU resolver registration, broader ELF
+  architecture/provider parity, and a PE/COFF final executable route
 * stable package/import/autoinjection and public API compatibility policy
 * complete raw-pointer and unsafe interoperability policy
 * provider-neutral graph execution with equal maturity across all hardware

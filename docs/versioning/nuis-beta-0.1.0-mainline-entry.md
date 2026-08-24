@@ -1,7 +1,7 @@
 # `nuis` `beta-0.1.0` Mainline Entry
 
 > Historical phase snapshot. For current mainline behavior, start with
-> [nuis-beta-0.3.0-mainline-entry.md](nuis-beta-0.3.0-mainline-entry.md).
+> [nuis-beta-0.6.0-mainline-entry.md](nuis-beta-0.6.0-mainline-entry.md).
 > Present-tense wording below is preserved in its `beta-0.1.0` context.
 
 This file is the recorded short entry point for the second beta minor line.

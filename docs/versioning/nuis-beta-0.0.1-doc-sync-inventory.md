@@ -1,11 +1,14 @@
 # `nuis` `beta-0.0.1` Documentation Sync Inventory
 
+> Historical synchronization snapshot. For the current mainline, start with
+> [nuis-beta-0.6.0-mainline-entry.md](nuis-beta-0.6.0-mainline-entry.md).
+
 This file records the documentation migration from the completed
 `alpha-0.20.*` line to `beta-0.0.1`.
 
 ## Current Entry Rule
 
-Present-tense repository documentation starts with:
+At that checkpoint, present-tense repository documentation started with:
 
 * [nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md)
 * [../current-mainline-map.md](../../docs/current-mainline-map.md)

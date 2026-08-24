@@ -6,10 +6,10 @@ tests, the development tensor, and `docs/reference/` in that order.
 
 ## Read This First
 
-Use this short route for the current `beta-0.3.*` repository:
+Use this short route for the current `beta-0.6.*` repository:
 
 1. [Current mainline map](current-mainline-map.md)
-2. [Beta 0.3 mainline entry](versioning/nuis-beta-0.3.0-mainline-entry.md)
+2. [Beta 0.6 mainline entry](versioning/nuis-beta-0.6.0-mainline-entry.md)
 3. [Development tensor](reference/nuis-development-tensor.md)
 4. [Native artifact workflow](reference/nuis-native-artifact-workflow.md)
 5. [Nsld linker frontdoor](reference/nsld-linker-frontdoor.md)

@@ -14,6 +14,7 @@ task/pointer rules?", read:
 If you want a short current phase summary before drilling into individual
 contracts, start with:
 
+* [../versioning/nuis-beta-0.6.0-mainline-entry.md](../../docs/versioning/nuis-beta-0.6.0-mainline-entry.md)
 * [../versioning/nuis-beta-0.3.0-mainline-entry.md](../../docs/versioning/nuis-beta-0.3.0-mainline-entry.md)
 * [../versioning/nuis-beta-0.1.0-mainline-entry.md](../../docs/versioning/nuis-beta-0.1.0-mainline-entry.md)
 * [../versioning/nuis-beta-0.0.1-mainline-entry.md](../../docs/versioning/nuis-beta-0.0.1-mainline-entry.md)
@@ -106,7 +107,7 @@ container and a runnable Nuis-owned heterogeneous executable?”, start with
 
 If your question is specifically “what is the current early-beta target and
 what wording is safe?”, start with
-[../versioning/nuis-beta-0.3.0-mainline-entry.md](../../docs/versioning/nuis-beta-0.3.0-mainline-entry.md).
+[../versioning/nuis-beta-0.6.0-mainline-entry.md](../../docs/versioning/nuis-beta-0.6.0-mainline-entry.md).
 
 If your question is specifically “what did the alpha-0.20 closeout establish?”,
 read

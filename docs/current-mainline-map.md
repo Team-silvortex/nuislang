@@ -7,9 +7,9 @@ local README for the area you are actively touching.
 
 ## Fast Reading Order
 
-If you only need the shortest current `beta-0.3.*` reading route, use this order:
+If you only need the shortest current `beta-0.6.*` reading route, use this order:
 
-1. [versioning/nuis-beta-0.3.0-mainline-entry.md](versioning/nuis-beta-0.3.0-mainline-entry.md)
+1. [versioning/nuis-beta-0.6.0-mainline-entry.md](versioning/nuis-beta-0.6.0-mainline-entry.md)
 2. [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
 3. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
 4. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
@@ -35,9 +35,11 @@ Short rule:
   [README.md](../README.md)
 * current development tensor progress model:
   [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
-* current `beta-0.3.*` entry:
+* current `beta-0.6.*` entry:
+  [versioning/nuis-beta-0.6.0-mainline-entry.md](versioning/nuis-beta-0.6.0-mainline-entry.md)
+* previous curated `beta-0.3.*` entry:
   [versioning/nuis-beta-0.3.0-mainline-entry.md](versioning/nuis-beta-0.3.0-mainline-entry.md)
-* previous curated `beta-0.1.0` entry:
+* earlier curated `beta-0.1.0` entry:
   [versioning/nuis-beta-0.1.0-mainline-entry.md](versioning/nuis-beta-0.1.0-mainline-entry.md)
 * recorded predecessor `beta-0.0.1` entry:
   [versioning/nuis-beta-0.0.1-mainline-entry.md](versioning/nuis-beta-0.0.1-mainline-entry.md)

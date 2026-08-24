@@ -2,7 +2,7 @@
 
 This file is the direct predecessor entry for the completed `alpha-0.20.*`
 line. For present-tense work, start with
-[nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md).
+[nuis-beta-0.6.0-mainline-entry.md](nuis-beta-0.6.0-mainline-entry.md).
 
 `alpha-0.20.0` is the last alpha minor line. It is an alpha closeout and beta
 foundation-readiness line, not a beta-stability claim.

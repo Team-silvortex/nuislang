@@ -6,7 +6,7 @@ predecessor line.
 
 It does not replace the current beta entry:
 
-* [nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md)
+* [nuis-beta-0.6.0-mainline-entry.md](nuis-beta-0.6.0-mainline-entry.md)
 
 The following files are historical alpha routes:
 

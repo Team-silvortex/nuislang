@@ -3,7 +3,7 @@
 This file is the predecessor short entry point for the `alpha-0.7.*` line.
 
 For present-tense work, start with
-[nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md).
+[nuis-beta-0.6.0-mainline-entry.md](nuis-beta-0.6.0-mainline-entry.md).
 
 It does not replace the `alpha-0.6.*` Nsld entry or the `alpha-0.4.*`
 hardening baseline. Those remain predecessor context. This file records what

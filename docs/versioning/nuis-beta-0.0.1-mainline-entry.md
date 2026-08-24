@@ -1,6 +1,9 @@
 # `nuis` `beta-0.0.1` Mainline Entry
 
-This file is the current short entry point for the first beta line.
+> Historical phase snapshot. For current mainline behavior, start with
+> [nuis-beta-0.6.0-mainline-entry.md](nuis-beta-0.6.0-mainline-entry.md).
+
+This file is the recorded short entry point for the first beta line.
 
 `beta-0.0.1` means the alpha architecture has crossed into a sustained
 foundation-hardening phase. It does not mean stable public APIs, package

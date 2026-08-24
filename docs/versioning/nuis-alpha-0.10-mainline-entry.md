@@ -4,7 +4,7 @@ This file is now the predecessor short entry point for the `alpha-0.10.*`
 line.
 
 For present-tense work, start with
-[nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md).
+[nuis-beta-0.6.0-mainline-entry.md](nuis-beta-0.6.0-mainline-entry.md).
 
 It does not replace the `alpha-0.8.*` binary-linking convergence entry, the
 `alpha-0.7.*` std/tooling smoke entry, the `alpha-0.6.*` Nsld entry, or the

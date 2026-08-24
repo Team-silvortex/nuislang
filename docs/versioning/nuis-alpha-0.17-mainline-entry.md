@@ -2,7 +2,7 @@
 
 This file is a historical entry point for the `alpha-0.17.*` line. For the
 current release, start with
-[nuis-beta-0.0.1-mainline-entry.md](nuis-beta-0.0.1-mainline-entry.md).
+[nuis-beta-0.6.0-mainline-entry.md](nuis-beta-0.6.0-mainline-entry.md).
 
 Do not confuse this line with the historical pre-alpha `0.17.0` documents.
 Files named `nuis-0.17.0-*` describe an earlier compiler phase. Files named
