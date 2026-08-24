@@ -313,3 +313,25 @@ fn keeps_single_line_shader_inline_wgsl_as_string_literal() {
 
     assert_eq!(rendered, "shader_inline_wgsl(\"demo_shader\", \"stub\")");
 }
+
+#[test]
+fn yir_text_projection_round_trips_escaped_arguments() {
+    let mut module = YirModule::new("0.1");
+    module.resources.push(yir_core::Resource {
+        name: "cpu0".to_owned(),
+        kind: yir_core::ResourceKind::parse("cpu.arm64"),
+    });
+    module.nodes.push(yir_core::Node {
+        name: "message".to_owned(),
+        resource: "cpu0".to_owned(),
+        op: yir_core::Operation::parse("cpu.text", vec!["line one\n\"line two\"\\tail".to_owned()])
+            .expect("cpu.text should parse"),
+    });
+
+    let rendered = render_yir(&module);
+    let reparsed =
+        yir_syntax::parse_explicit_module(&rendered).expect("YIR projection should parse");
+
+    assert_eq!(reparsed.nodes[0].op.args, module.nodes[0].op.args);
+    assert_eq!(render_yir(&reparsed), rendered);
+}

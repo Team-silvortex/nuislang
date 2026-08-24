@@ -5,6 +5,11 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use nuis_artifact::{
+    parse_build_manifest, read_compiler_stage_handoff, CompilerStageKind,
+    COMPILER_STAGE_HANDOFF_PROTOCOL, COMPILER_STAGE_PRODUCER_CONTRACT,
+};
+
 fn temp_dir() -> PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -53,6 +58,47 @@ fn compiler_data_model_bootstrap_builds_and_runs_as_pure_nuis() {
         &output_dir.join("bootstrap_compiler_data_model_demo.ll"),
         "deferred lowering",
     );
+
+    let stage_manifest_path = output_dir.join("nuis.compiler-stage-handoff.toml");
+    let (handoff, payloads) =
+        read_compiler_stage_handoff(&stage_manifest_path).expect("verify compiler stage handoff");
+    assert_eq!(handoff.protocol, COMPILER_STAGE_HANDOFF_PROTOCOL);
+    assert_eq!(handoff.producer_contract, COMPILER_STAGE_PRODUCER_CONTRACT);
+    assert_eq!(handoff.producer_id, "nuisc-stage0-reference");
+    assert_eq!(handoff.module_domain, "cpu");
+    assert_eq!(handoff.module_unit, "Main");
+    assert_eq!(handoff.bundle_sha256.len(), 64);
+    assert_eq!(
+        handoff
+            .records
+            .iter()
+            .map(|record| record.stage)
+            .collect::<Vec<_>>(),
+        vec![
+            CompilerStageKind::Source,
+            CompilerStageKind::Tokens,
+            CompilerStageKind::Ast,
+            CompilerStageKind::Nir,
+            CompilerStageKind::Yir,
+        ]
+    );
+    assert_eq!(payloads.len(), 5);
+
+    let build_manifest = parse_build_manifest(&output_dir.join("nuis.build.manifest.toml"))
+        .expect("parse compiler data model build manifest");
+    for kind in [
+        "compiler_source",
+        "compiler_tokens",
+        "compiler_stage_handoff",
+    ] {
+        assert!(
+            build_manifest
+                .artifact_hashes
+                .iter()
+                .any(|artifact| artifact.kind == kind),
+            "expected build manifest to hash `{kind}`"
+        );
+    }
 
     let run = Command::new(output_dir.join("bootstrap_compiler_data_model_demo"))
         .output()

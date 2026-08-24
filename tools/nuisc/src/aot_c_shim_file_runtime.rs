@@ -6,11 +6,15 @@ static int64_t nuis_host_file_open(int64_t path_handle, int64_t flags) {
     const char* path = nuis_host_text_lookup(path_handle);
     if (path == NULL || path[0] == '\0') return 0;
     int fd = open(path, (int)flags, 0644);
-    return fd >= 0 ? (int64_t)fd : 0;
+    if (fd == 0) {
+        close(fd);
+        return 0;
+    }
+    return fd > 0 ? (int64_t)fd : 0;
 }
 
 static int64_t nuis_host_file_read(int64_t file_handle, int64_t buffer_handle, int64_t len) {
-    if (file_handle < 0 || buffer_handle == 0 || len <= 0) return 0;
+    if (file_handle <= 0 || buffer_handle == 0 || len <= 0) return 0;
     char scratch[4096];
     size_t read_len = (size_t)len;
     if (read_len > sizeof(scratch)) read_len = sizeof(scratch);
@@ -24,7 +28,7 @@ static int64_t nuis_host_file_read(int64_t file_handle, int64_t buffer_handle, i
 }
 
 static int64_t nuis_host_file_write(int64_t file_handle, int64_t text_handle) {
-    if (file_handle < 0) return 0;
+    if (file_handle <= 0) return 0;
     const char* text = nuis_host_text_lookup(text_handle);
     size_t len = strlen(text);
     if (len == 0) return 0;
@@ -33,7 +37,7 @@ static int64_t nuis_host_file_write(int64_t file_handle, int64_t text_handle) {
 }
 
 static int64_t nuis_host_file_close(int64_t file_handle) {
-    if (file_handle < 0) return 0;
+    if (file_handle <= 0) return 0;
     return close((int)file_handle) == 0 ? 1 : 0;
 }
 "#,

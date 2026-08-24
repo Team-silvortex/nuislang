@@ -120,6 +120,18 @@ enum ExternValidationMode {
 }
 
 impl ResolvedCompileInput {
+    pub fn source_text(&self) -> Result<String, String> {
+        if let Some(project) = &self.project {
+            return Ok(project.entry_source.clone());
+        }
+        fs::read_to_string(&self.effective_input_path).map_err(|error| {
+            format!(
+                "failed to read `{}`: {error}",
+                self.effective_input_path.display()
+            )
+        })
+    }
+
     pub fn compile(&self) -> Result<PipelineArtifacts, String> {
         self.compile_with_options(&PipelineCompileOptions::default())
     }

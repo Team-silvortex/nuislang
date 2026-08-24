@@ -5,12 +5,13 @@ use yir_core::YirModule;
 
 use crate::aot::CpuBuildTarget;
 use crate::aot_c_shim_source::render_c_shim_source;
-use crate::aot_manifest_types::{CompileArtifacts, CompileHostObject};
+use crate::aot_manifest_types::{
+    CompileArtifacts, CompileHostObject, CompileStageHandoffArtifacts,
+};
 use crate::aot_native_runner::{
     build_window_bundle, compile_native_binary, requires_window_bundle,
 };
 use crate::aot_output_layout::output_layout;
-use crate::render;
 
 pub fn write_and_link(
     input: &Path,
@@ -21,25 +22,69 @@ pub fn write_and_link(
     llvm_ir: &str,
     cpu_target: &CpuBuildTarget,
 ) -> Result<CompileArtifacts, String> {
+    write_and_link_impl(input, output_dir, None, ast, nir, yir, llvm_ir, cpu_target)
+}
+
+pub fn write_and_link_with_source(
+    input: &Path,
+    output_dir: &Path,
+    source: &str,
+    ast: &AstModule,
+    nir: &NirModule,
+    yir: &YirModule,
+    llvm_ir: &str,
+    cpu_target: &CpuBuildTarget,
+) -> Result<CompileArtifacts, String> {
+    write_and_link_impl(
+        input,
+        output_dir,
+        Some(source),
+        ast,
+        nir,
+        yir,
+        llvm_ir,
+        cpu_target,
+    )
+}
+
+fn write_and_link_impl(
+    input: &Path,
+    output_dir: &Path,
+    source: Option<&str>,
+    ast: &AstModule,
+    nir: &NirModule,
+    yir: &YirModule,
+    llvm_ir: &str,
+    cpu_target: &CpuBuildTarget,
+) -> Result<CompileArtifacts, String> {
     fs::create_dir_all(output_dir)
         .map_err(|error| format!("failed to create `{}`: {error}", output_dir.display()))?;
 
     let layout = output_layout(input, output_dir);
-    let ast_path = layout.ast_path;
-    let nir_path = layout.nir_path;
-    let yir_path = layout.yir_path;
-    let ll_path = layout.llvm_ir_path;
-    let shim_path = layout.shim_path;
-    let llvm_object_path = layout.llvm_object_path;
-    let runtime_object_path = layout.runtime_object_path;
-    let exe_path = layout.binary_stub_path;
+    let ast_path = layout.ast_path.clone();
+    let nir_path = layout.nir_path.clone();
+    let yir_path = layout.yir_path.clone();
+    let ll_path = layout.llvm_ir_path.clone();
+    let shim_path = layout.shim_path.clone();
+    let llvm_object_path = layout.llvm_object_path.clone();
+    let runtime_object_path = layout.runtime_object_path.clone();
+    let exe_path = layout.binary_stub_path.clone();
 
-    fs::write(&ast_path, render::render_ast(ast))
-        .map_err(|error| format!("failed to write `{}`: {error}", ast_path.display()))?;
-    fs::write(&nir_path, render::render_nir(nir))
-        .map_err(|error| format!("failed to write `{}`: {error}", nir_path.display()))?;
-    fs::write(&yir_path, render::render_yir(yir))
-        .map_err(|error| format!("failed to write `{}`: {error}", yir_path.display()))?;
+    let stage_handoff = if let Some(source) = source {
+        Some(
+            crate::stage_handoff::write_and_verify_compiler_stage_handoff(
+                source, &layout, ast, nir, yir,
+            )?,
+        )
+    } else {
+        fs::write(&ast_path, crate::render::render_ast(ast))
+            .map_err(|error| format!("failed to write `{}`: {error}", ast_path.display()))?;
+        fs::write(&nir_path, crate::render::render_nir(nir))
+            .map_err(|error| format!("failed to write `{}`: {error}", nir_path.display()))?;
+        fs::write(&yir_path, crate::render::render_yir(yir))
+            .map_err(|error| format!("failed to write `{}`: {error}", yir_path.display()))?;
+        None
+    };
     fs::write(&ll_path, llvm_ir)
         .map_err(|error| format!("failed to write `{}`: {error}", ll_path.display()))?;
     fs::write(&shim_path, render_c_shim_source(ast))
@@ -73,6 +118,7 @@ pub fn write_and_link(
         binary_path,
         packaging_mode,
         host_objects,
+        stage_handoff,
     })
 }
 
@@ -122,6 +168,11 @@ pub fn compile_artifacts_for_output_dir_with_packaging_mode(
         binary_path: layout.binary_stub_path.display().to_string(),
         packaging_mode: packaging_mode.to_owned(),
         host_objects,
+        stage_handoff: Some(CompileStageHandoffArtifacts {
+            manifest_path: layout.stage_handoff_path.display().to_string(),
+            source_path: layout.source_snapshot_path.display().to_string(),
+            tokens_path: layout.token_stream_path.display().to_string(),
+        }),
     })
 }
 

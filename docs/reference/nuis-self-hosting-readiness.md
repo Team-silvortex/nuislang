@@ -83,14 +83,22 @@ Freeze producer-neutral source, token, AST, NIR, and YIR handoff records. The
 serialized identity must not depend on Rust layout so the existing stage0 and
 a future Nuis stage1 producer can be compared against the same contract.
 
+This gate is now `early/45`. Normal AOT builds emit the ordered five-stage
+`nuis-compiler-stage-handoff-v1` SHA-256 chain, hash its source/token/manifest
+artifacts in the build manifest, and preserve bundle identity across cache
+hits. Source regenerates tokens and AST; explicit YIR crosses parse, verify,
+and canonical re-render. Standalone AST/NIR structural decoders and a second
+producer remain open. See
+[Nuis Compiler Stage Handoff](nuis-compiler-stage-handoff.md).
+
 ### `stage0-stage1-driver`
 
 Coordinate: `compiler-toolchain/bootstrap/stage0-stage1-driver`.
 
-Build one Nuis-written compiler component through stage0 while recording exact
-inputs, outputs, compiler identity, dependency closure, and stage identity.
-This is a compiler-stage protocol over the existing AOT chain, not another
-application build alias.
+Build one Nuis-written compiler component through stage0 while consuming the
+new handoff and recording exact compiler image plus dependency closure. The
+handoff protocol now exists; the reusable compiler-stage driver does not. This
+must not become another application build alias.
 
 ### `differential-reproducibility-gate`
 

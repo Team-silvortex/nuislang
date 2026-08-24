@@ -75,6 +75,7 @@ fn write_minimal_cpu_artifact(label: &str) -> (PathBuf, PathBuf) {
         binary_path: bin.display().to_string(),
         packaging_mode: "native-cpu-llvm".to_owned(),
         host_objects: Vec::new(),
+        stage_handoff: None,
     };
     let cpu_target = CpuBuildTarget {
         abi: "cpu.x86_64.sysv64".to_owned(),

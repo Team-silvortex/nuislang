@@ -6,6 +6,17 @@ use yir_core::{
 };
 
 pub fn parse_module(input: &str) -> Result<YirModule, String> {
+    let mut module = parse_explicit_module(input)?;
+
+    ensure_implicit_cpu_nil_node(&mut module);
+    synthesize_dependency_edges(&mut module);
+    synthesize_lane_effect_edges(&mut module);
+
+    Ok(module)
+}
+
+/// Parses only records present in the text, without inferring nodes or edges.
+pub fn parse_explicit_module(input: &str) -> Result<YirModule, String> {
     let mut module = YirModule::new("0.1");
 
     for (index, raw_line) in input.lines().enumerate() {
@@ -17,7 +28,7 @@ pub fn parse_module(input: &str) -> Result<YirModule, String> {
         }
 
         let tokens = tokenize_line(line).map_err(|error| format!("line {line_no}: {error}"))?;
-        match tokens.first().copied() {
+        match tokens.first().map(String::as_str) {
             Some("yir") => parse_header(&mut module, &tokens, line_no)?,
             Some("resource") => parse_resource(&mut module, &tokens, line_no)?,
             Some("function") => parse_function(&mut module, &tokens, line_no)?,
@@ -31,14 +42,10 @@ pub fn parse_module(input: &str) -> Result<YirModule, String> {
         }
     }
 
-    ensure_implicit_cpu_nil_node(&mut module);
-    synthesize_dependency_edges(&mut module);
-    synthesize_lane_effect_edges(&mut module);
-
     Ok(module)
 }
 
-fn parse_function(module: &mut YirModule, tokens: &[&str], line_no: usize) -> Result<(), String> {
+fn parse_function(module: &mut YirModule, tokens: &[String], line_no: usize) -> Result<(), String> {
     if tokens.len() != 4 {
         return Err(format!(
             "line {line_no}: expected `function <name> <domain> <entry|helper|provider>`"
@@ -47,7 +54,7 @@ fn parse_function(module: &mut YirModule, tokens: &[&str], line_no: usize) -> Re
     module.functions.push(YirFunction {
         name: tokens[1].to_owned(),
         domain: tokens[2].to_owned(),
-        role: YirFunctionRole::parse(tokens[3])
+        role: YirFunctionRole::parse(&tokens[3])
             .map_err(|error| format!("line {line_no}: {error}"))?,
         parameters: Vec::new(),
         result: None,
@@ -58,7 +65,7 @@ fn parse_function(module: &mut YirModule, tokens: &[&str], line_no: usize) -> Re
 
 fn parse_function_parameter(
     module: &mut YirModule,
-    tokens: &[&str],
+    tokens: &[String],
     line_no: usize,
 ) -> Result<(), String> {
     if tokens.len() != 6 {
@@ -66,11 +73,11 @@ fn parse_function_parameter(
             "line {line_no}: expected `function-param <function> <name> <type> <value|borrowed|owned> <node>`"
         ));
     }
-    let function = find_function_mut(module, tokens[1], line_no)?;
+    let function = find_function_mut(module, &tokens[1], line_no)?;
     function.parameters.push(YirFunctionParameter {
         name: tokens[2].to_owned(),
         ty: tokens[3].to_owned(),
-        ownership: YirValueOwnership::parse(tokens[4])
+        ownership: YirValueOwnership::parse(&tokens[4])
             .map_err(|error| format!("line {line_no}: {error}"))?,
         node: tokens[5].to_owned(),
     });
@@ -79,7 +86,7 @@ fn parse_function_parameter(
 
 fn parse_function_result(
     module: &mut YirModule,
-    tokens: &[&str],
+    tokens: &[String],
     line_no: usize,
 ) -> Result<(), String> {
     if tokens.len() != 5 {
@@ -87,7 +94,7 @@ fn parse_function_result(
             "line {line_no}: expected `function-result <function> <type> <value|borrowed|owned> <node>`"
         ));
     }
-    let function = find_function_mut(module, tokens[1], line_no)?;
+    let function = find_function_mut(module, &tokens[1], line_no)?;
     if function.result.is_some() {
         return Err(format!(
             "line {line_no}: function `{}` has multiple result records",
@@ -96,7 +103,7 @@ fn parse_function_result(
     }
     function.result = Some(YirFunctionResult {
         ty: tokens[2].to_owned(),
-        ownership: YirValueOwnership::parse(tokens[3])
+        ownership: YirValueOwnership::parse(&tokens[3])
             .map_err(|error| format!("line {line_no}: {error}"))?,
         node: tokens[4].to_owned(),
     });
@@ -105,7 +112,7 @@ fn parse_function_result(
 
 fn parse_function_node(
     module: &mut YirModule,
-    tokens: &[&str],
+    tokens: &[String],
     line_no: usize,
 ) -> Result<(), String> {
     if tokens.len() != 3 {
@@ -113,7 +120,7 @@ fn parse_function_node(
             "line {line_no}: expected `function-node <function> <node>`"
         ));
     }
-    find_function_mut(module, tokens[1], line_no)?
+    find_function_mut(module, &tokens[1], line_no)?
         .body_nodes
         .push(tokens[2].to_owned());
     Ok(())
@@ -133,7 +140,7 @@ fn find_function_mut<'a>(
         })
 }
 
-fn parse_header(module: &mut YirModule, tokens: &[&str], line_no: usize) -> Result<(), String> {
+fn parse_header(module: &mut YirModule, tokens: &[String], line_no: usize) -> Result<(), String> {
     if tokens.len() != 2 {
         return Err(format!("line {line_no}: expected `yir <version>`"));
     }
@@ -142,14 +149,14 @@ fn parse_header(module: &mut YirModule, tokens: &[&str], line_no: usize) -> Resu
     Ok(())
 }
 
-fn parse_resource(module: &mut YirModule, tokens: &[&str], line_no: usize) -> Result<(), String> {
+fn parse_resource(module: &mut YirModule, tokens: &[String], line_no: usize) -> Result<(), String> {
     if tokens.len() != 3 {
         return Err(format!("line {line_no}: expected `resource <name> <kind>`"));
     }
 
     module.resources.push(Resource {
         name: tokens[1].to_owned(),
-        kind: ResourceKind::parse(tokens[2]),
+        kind: ResourceKind::parse(&tokens[2]),
     });
     Ok(())
 }
@@ -157,7 +164,7 @@ fn parse_resource(module: &mut YirModule, tokens: &[&str], line_no: usize) -> Re
 fn parse_node(
     module: &mut YirModule,
     opcode: &str,
-    tokens: &[&str],
+    tokens: &[String],
     line_no: usize,
 ) -> Result<(), String> {
     if tokens.len() < 3 {
@@ -166,15 +173,9 @@ fn parse_node(
         ));
     }
 
-    let (resource_name, lane) = split_resource_lane(tokens[2]);
-    let op = Operation::parse(
-        opcode,
-        tokens[3..]
-            .iter()
-            .map(|token| (*token).to_owned())
-            .collect(),
-    )
-    .map_err(|error| format!("line {line_no}: {error}"))?;
+    let (resource_name, lane) = split_resource_lane(&tokens[2]);
+    let op = Operation::parse(opcode, tokens[3..].iter().cloned().collect())
+        .map_err(|error| format!("line {line_no}: {error}"))?;
 
     module.nodes.push(Node {
         name: tokens[1].to_owned(),
@@ -191,7 +192,7 @@ fn parse_node(
 
 fn parse_shorthand_node(
     module: &mut YirModule,
-    tokens: &[&str],
+    tokens: &[String],
     line_no: usize,
 ) -> Result<(), String> {
     if tokens.len() < 4 {
@@ -200,13 +201,10 @@ fn parse_shorthand_node(
         ));
     }
 
-    let instruction = tokens[1];
-    let name = tokens[2];
-    let resource = tokens[3];
-    let args = tokens[4..]
-        .iter()
-        .map(|token| (*token).to_owned())
-        .collect::<Vec<_>>();
+    let instruction = &tokens[1];
+    let name = &tokens[2];
+    let resource = &tokens[3];
+    let args = tokens[4..].iter().cloned().collect::<Vec<_>>();
     let (resource_name, lane) = split_resource_lane(resource);
     let opcode = canonicalize_shorthand_opcode(module, instruction, name, resource, &args)
         .map_err(|error| format!("line {line_no}: {error}"))?;
@@ -223,7 +221,7 @@ fn parse_shorthand_node(
     Ok(())
 }
 
-fn parse_edge(module: &mut YirModule, tokens: &[&str], line_no: usize) -> Result<(), String> {
+fn parse_edge(module: &mut YirModule, tokens: &[String], line_no: usize) -> Result<(), String> {
     if tokens.len() != 4 {
         return Err(format!(
             "line {line_no}: expected `edge <kind> <from> <to>`"
@@ -231,66 +229,75 @@ fn parse_edge(module: &mut YirModule, tokens: &[&str], line_no: usize) -> Result
     }
 
     module.edges.push(Edge {
-        kind: EdgeKind::parse(tokens[1]).map_err(|error| format!("line {line_no}: {error}"))?,
+        kind: EdgeKind::parse(&tokens[1]).map_err(|error| format!("line {line_no}: {error}"))?,
         from: tokens[2].to_owned(),
         to: tokens[3].to_owned(),
     });
     Ok(())
 }
 
-fn tokenize_line(line: &str) -> Result<Vec<&str>, String> {
+fn tokenize_line(line: &str) -> Result<Vec<String>, String> {
     let mut tokens = Vec::new();
-    let mut start = None::<usize>;
+    let mut token = None::<String>;
     let mut in_string = false;
-    let mut escaped = false;
+    let mut quoted_token_closed = false;
+    let mut chars = line.chars();
 
-    for (index, ch) in line.char_indices() {
+    while let Some(ch) = chars.next() {
         if in_string {
-            if escaped {
-                escaped = false;
-                continue;
-            }
             match ch {
-                '\\' => escaped = true,
-                '"' => {
-                    let token_start = start
-                        .take()
-                        .ok_or_else(|| "internal tokenizer error".to_owned())?;
-                    tokens.push(&line[token_start..index]);
-                    in_string = false;
+                '\\' => {
+                    let escaped = chars
+                        .next()
+                        .ok_or_else(|| "unterminated string escape".to_owned())?;
+                    let value = match escaped {
+                        '\\' => '\\',
+                        '"' => '"',
+                        'n' => '\n',
+                        'r' => '\r',
+                        't' => '\t',
+                        other => return Err(format!("unsupported string escape `\\{other}`")),
+                    };
+                    token.as_mut().expect("quoted token is active").push(value);
                 }
-                _ => {}
+                '"' => {
+                    in_string = false;
+                    quoted_token_closed = true;
+                }
+                other => token.as_mut().expect("quoted token is active").push(other),
             }
             continue;
         }
 
         if ch.is_whitespace() {
-            if let Some(token_start) = start.take() {
-                tokens.push(&line[token_start..index]);
+            if let Some(value) = token.take() {
+                tokens.push(value);
             }
+            quoted_token_closed = false;
             continue;
         }
 
         if ch == '"' {
-            if start.is_some() {
+            if token.is_some() || quoted_token_closed {
                 return Err("unexpected quote inside token".to_owned());
             }
             in_string = true;
-            start = Some(index + ch.len_utf8());
+            token = Some(String::new());
             continue;
         }
 
-        if start.is_none() {
-            start = Some(index);
+        if quoted_token_closed {
+            return Err("expected whitespace after quoted token".to_owned());
         }
+        token.get_or_insert_with(String::new).push(ch);
     }
 
     if in_string {
         return Err("unterminated string literal".to_owned());
     }
 
-    if let Some(token_start) = start.take() {
-        tokens.push(&line[token_start..]);
+    if let Some(value) = token {
+        tokens.push(value);
     }
 
     Ok(tokens)
@@ -504,8 +511,24 @@ fn split_resource_lane(raw: &str) -> (&str, Option<&str>) {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_module;
+    use super::{parse_explicit_module, parse_module};
     use yir_core::EdgeKind;
+
+    #[test]
+    fn explicit_parser_does_not_synthesize_dependency_edges() {
+        let source = r#"yir 0.1
+resource cpu0 cpu.arm64
+cpu.const_i64 left cpu0 1
+cpu.add sum cpu0 left left
+"#;
+
+        let explicit = parse_explicit_module(source).expect("explicit module should parse");
+        let inferred = parse_module(source).expect("inferred module should parse");
+
+        assert!(explicit.edges.is_empty());
+        assert_eq!(inferred.edges.len(), 1);
+        assert_eq!(inferred.edges[0].kind, EdgeKind::Dep);
+    }
 
     #[test]
     fn parses_shorthand_cpu_nodes_and_infers_dep_edges() {

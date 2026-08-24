@@ -131,6 +131,114 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
     Ok(tokens)
 }
 
+const STAGE_NEUTRAL_TOKEN_STREAM_PROTOCOL: &str = "nuis-token-stream-v1";
+
+pub(super) fn render_stage_neutral_token_stream(input: &str) -> Result<String, String> {
+    let tokens = tokenize(input)?;
+    let mut out = format!("{STAGE_NEUTRAL_TOKEN_STREAM_PROTOCOL}\n");
+    for token in tokens {
+        match token {
+            Token::Word(value) => push_hex_token(&mut out, "word", value.as_bytes()),
+            Token::Integer(value) => out.push_str(&format!("integer\t{value}\n")),
+            Token::Float(value) => push_hex_token(&mut out, "float", value.as_bytes()),
+            Token::Symbol(value) => out.push_str(&format!("symbol\t{}\n", value as u32)),
+            Token::Arrow => out.push_str("arrow\n"),
+            Token::String(value) => push_hex_token(&mut out, "string", value.as_bytes()),
+            Token::DocComment(value) => push_hex_token(&mut out, "doc-comment", value.as_bytes()),
+        }
+    }
+    Ok(out)
+}
+
+pub(super) fn verify_stage_neutral_token_stream(input: &str, rendered: &str) -> Result<(), String> {
+    let expected = tokenize(input)?;
+    let decoded = parse_stage_neutral_token_stream(rendered)?;
+    if decoded != expected {
+        return Err("stage-neutral token stream does not match source tokenization".to_owned());
+    }
+    if render_stage_neutral_token_stream(input)? != rendered {
+        return Err("stage-neutral token stream is not canonically rendered".to_owned());
+    }
+    Ok(())
+}
+
+fn parse_stage_neutral_token_stream(source: &str) -> Result<Vec<Token>, String> {
+    if !source.ends_with('\n') || source.contains('\r') {
+        return Err("stage-neutral token stream must use canonical LF lines".to_owned());
+    }
+    let mut lines = source.split_terminator('\n');
+    if lines.next() != Some(STAGE_NEUTRAL_TOKEN_STREAM_PROTOCOL) {
+        return Err(format!(
+            "stage-neutral token stream must begin with `{STAGE_NEUTRAL_TOKEN_STREAM_PROTOCOL}`"
+        ));
+    }
+    let mut tokens = Vec::new();
+    for line in lines {
+        if line == "arrow" {
+            tokens.push(Token::Arrow);
+            continue;
+        }
+        let (kind, payload) = line
+            .split_once('\t')
+            .ok_or_else(|| format!("malformed stage-neutral token record `{line}`"))?;
+        let token = match kind {
+            "word" => Token::Word(decode_hex_utf8(payload, kind)?),
+            "integer" => Token::Integer(
+                payload
+                    .parse::<i64>()
+                    .map_err(|_| format!("invalid integer token payload `{payload}`"))?,
+            ),
+            "float" => Token::Float(decode_hex_utf8(payload, kind)?),
+            "symbol" => {
+                let scalar = payload
+                    .parse::<u32>()
+                    .map_err(|_| format!("invalid symbol token payload `{payload}`"))?;
+                Token::Symbol(char::from_u32(scalar).ok_or_else(|| {
+                    format!("symbol token payload `{payload}` is not a Unicode scalar")
+                })?)
+            }
+            "string" => Token::String(decode_hex_utf8(payload, kind)?),
+            "doc-comment" => Token::DocComment(decode_hex_utf8(payload, kind)?),
+            _ => return Err(format!("unsupported stage-neutral token kind `{kind}`")),
+        };
+        tokens.push(token);
+    }
+    Ok(tokens)
+}
+
+fn push_hex_token(out: &mut String, kind: &str, bytes: &[u8]) {
+    out.push_str(kind);
+    out.push('\t');
+    for byte in bytes {
+        out.push_str(&format!("{byte:02x}"));
+    }
+    out.push('\n');
+}
+
+fn decode_hex_utf8(value: &str, kind: &str) -> Result<String, String> {
+    if value.len() % 2 != 0 {
+        return Err(format!("{kind} token contains odd-length hexadecimal data"));
+    }
+    let mut bytes = Vec::with_capacity(value.len() / 2);
+    for pair in value.as_bytes().chunks_exact(2) {
+        let high = hex_nibble(pair[0])?;
+        let low = hex_nibble(pair[1])?;
+        bytes.push((high << 4) | low);
+    }
+    String::from_utf8(bytes).map_err(|error| format!("{kind} token is not UTF-8: {error}"))
+}
+
+fn hex_nibble(value: u8) -> Result<u8, String> {
+    match value {
+        b'0'..=b'9' => Ok(value - b'0'),
+        b'a'..=b'f' => Ok(value - b'a' + 10),
+        _ => Err(format!(
+            "stage-neutral token contains non-canonical hexadecimal byte `{}`",
+            value as char
+        )),
+    }
+}
+
 pub fn describe_token(token: &Token) -> String {
     match token {
         Token::Word(value) => format!("identifier `{value}`"),
@@ -326,7 +434,10 @@ fn consume_wgsl_block(
 
 #[cfg(test)]
 mod tests {
-    use super::{tokenize, Token};
+    use super::{
+        parse_stage_neutral_token_stream, render_stage_neutral_token_stream, tokenize,
+        verify_stage_neutral_token_stream, Token,
+    };
 
     #[test]
     fn tokenizes_wgsl_block_with_comments_without_breaking_brace_depth() {
@@ -406,5 +517,17 @@ mod cpu main {}
             token,
             Token::DocComment(text) if text == "adds two values"
         )));
+    }
+
+    #[test]
+    fn stage_neutral_token_stream_round_trips_without_rust_layout_identity() {
+        let source =
+            "/// label\nmod cpu Main { fn main() -> i64 { let value = \"\"; return 7; } }\n";
+        let rendered = render_stage_neutral_token_stream(source).expect("render token stream");
+        let parsed = parse_stage_neutral_token_stream(&rendered).expect("parse token stream");
+
+        assert_eq!(parsed, tokenize(source).expect("tokenize source"));
+        assert!(rendered.contains("string\t\n"));
+        verify_stage_neutral_token_stream(source, &rendered).expect("verify token stream");
     }
 }

@@ -22,6 +22,7 @@ fn build_manifest_round_trips_cpu_target_metadata() {
         binary_path: bin.display().to_string(),
         packaging_mode: "native-cpu-llvm".to_owned(),
         host_objects: Vec::new(),
+        stage_handoff: None,
     };
     let cpu_target = CpuBuildTarget {
         abi: "cpu.x86_64.sysv64".to_owned(),

@@ -119,14 +119,16 @@ pub(crate) fn run_compile(
     )?;
     let cache_hit = cache::lookup_compile_cache(&cache_key)?;
     let compile_fresh = || -> Result<(aot::CompileArtifacts, Vec<String>), String> {
+        let source = resolved.source_text()?;
         let artifacts = resolved.compile_with_options(&pipeline::PipelineCompileOptions {
             lowering_target: Some(lowering::LoweringTargetConfig::from_cpu_build_target(
                 &cpu_target,
             )),
         })?;
-        let mut written = aot::write_and_link(
+        let mut written = aot::write_and_link_with_source(
             &resolved.effective_input_path,
             &output_dir,
+            &source,
             &artifacts.ast,
             &artifacts.nir,
             &artifacts.yir,

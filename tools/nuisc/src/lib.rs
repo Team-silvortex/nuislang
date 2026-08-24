@@ -142,6 +142,7 @@ mod shader_canonical_compute;
 mod shader_msl_emitter;
 pub mod shader_source;
 mod shader_spirv_emitter;
+mod stage_handoff;
 pub mod stdlib_registry;
 
 pub use cli::CommandKind;

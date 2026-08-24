@@ -40,6 +40,22 @@ pub(crate) fn prepare_build_manifest_artifacts(
         ("llvm_ir".to_owned(), PathBuf::from(&written.llvm_ir_path)),
         ("binary".to_owned(), PathBuf::from(&written.binary_path)),
     ];
+    if let Some(handoff) = &written.stage_handoff {
+        artifacts.extend([
+            (
+                "compiler_source".to_owned(),
+                PathBuf::from(&handoff.source_path),
+            ),
+            (
+                "compiler_tokens".to_owned(),
+                PathBuf::from(&handoff.tokens_path),
+            ),
+            (
+                "compiler_stage_handoff".to_owned(),
+                PathBuf::from(&handoff.manifest_path),
+            ),
+        ]);
+    }
     let kernel_codegen_table = load_project_kernel_codegen_table(written, domain_build_units)?;
     artifacts.extend(write_domain_build_unit_stubs_with_kernel_codegen_table(
         output_dir,

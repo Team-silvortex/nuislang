@@ -54,6 +54,7 @@ Start in this order:
   - [nuis-self-hosting-readiness.md](nuis-self-hosting-readiness.md)
   - [nuis-bootstrap-language-subset.md](nuis-bootstrap-language-subset.md)
   - [nuis-compiler-data-model.md](nuis-compiler-data-model.md)
+  - [nuis-compiler-stage-handoff.md](nuis-compiler-stage-handoff.md)
   - [nir-memory-model.md](nir-memory-model.md)
   - [nir-optimization-contract.md](nir-optimization-contract.md)
   - [control-flow-lowering-contract.md](control-flow-lowering-contract.md)
@@ -115,6 +116,10 @@ what wording is safe?”, start with
 If your question is specifically “what must close before staged compiler
 self-hosting can begin?”, start with
 [nuis-self-hosting-readiness.md](nuis-self-hosting-readiness.md).
+
+If your question is specifically “how are stage0 and future stage1 compiler
+payloads identified without Rust layout coupling?”, start with
+[nuis-compiler-stage-handoff.md](nuis-compiler-stage-handoff.md).
 
 If your question is specifically “what did the alpha-0.20 closeout establish?”,
 read

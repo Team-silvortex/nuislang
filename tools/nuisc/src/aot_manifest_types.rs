@@ -8,6 +8,14 @@ pub struct CompileArtifacts {
     pub binary_path: String,
     pub packaging_mode: String,
     pub host_objects: Vec<CompileHostObject>,
+    pub stage_handoff: Option<CompileStageHandoffArtifacts>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompileStageHandoffArtifacts {
+    pub manifest_path: String,
+    pub source_path: String,
+    pub tokens_path: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

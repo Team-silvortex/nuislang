@@ -45,6 +45,7 @@ For the compiler and project frontdoor:
 * [Self-hosting readiness](reference/nuis-self-hosting-readiness.md)
 * [Bootstrap language subset](reference/nuis-bootstrap-language-subset.md)
 * [Compiler data model](reference/nuis-compiler-data-model.md)
+* [Compiler stage handoff](reference/nuis-compiler-stage-handoff.md)
 * [Nuis frontdoor surface](reference/nuis-frontdoor-surface-reference.md)
 * [Native artifact workflow](reference/nuis-native-artifact-workflow.md)
 * [YIR tools](reference/yir-tools-reference.md)

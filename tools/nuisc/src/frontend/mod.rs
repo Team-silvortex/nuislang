@@ -249,6 +249,14 @@ pub fn parse_nuis_ast(input: &str) -> Result<AstModule, String> {
     parser.parse_module()
 }
 
+pub(crate) fn render_stage_neutral_token_stream(input: &str) -> Result<String, String> {
+    lexer::render_stage_neutral_token_stream(input)
+}
+
+pub(crate) fn verify_stage_neutral_token_stream(input: &str, rendered: &str) -> Result<(), String> {
+    lexer::verify_stage_neutral_token_stream(input, rendered)
+}
+
 pub fn lower_ast_to_nir(module: &AstModule) -> Result<NirModule, String> {
     lower_project_ast_to_nir(module, &[])
 }

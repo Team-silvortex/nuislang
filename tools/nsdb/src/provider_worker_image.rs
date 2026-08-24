@@ -99,10 +99,17 @@ pub(crate) fn resolve_provider_worker_image(
         )
     })?;
     let pipeline = nuisc::pipeline::compile_source_path(&source)?;
+    let source_text = fs::read_to_string(&source).map_err(|error| {
+        format!(
+            "failed to read provider worker source `{}`: {error}",
+            source.display()
+        )
+    })?;
     let target = nuisc::aot::host_cpu_build_target();
-    let linked = nuisc::aot::write_and_link(
+    let linked = nuisc::aot::write_and_link_with_source(
         &source,
         output_dir,
+        &source_text,
         &pipeline.ast,
         &pipeline.nir,
         &pipeline.yir,

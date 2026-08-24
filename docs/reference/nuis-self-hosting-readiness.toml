@@ -31,12 +31,12 @@ blocker = "the v1 proof closes host-layout leakage for one real component, but f
 id = "stage-neutral-ir-boundary"
 coordinate = "language-core/nuisc/stage-neutral-ir-boundary"
 status = "early"
-progress = 30
+progress = 45
 required_before = "beta-0.10.0"
-next_action = "freeze a producer-neutral source, token, AST, NIR, and YIR handoff boundary that both Rust stage0 and future Nuis stage1 components can consume"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib -j 1"
-expected_artifact = "versioned stage-neutral records with round-trip fixtures and no Rust-layout identity in the serialized contract"
-blocker = "NIR and YIR are exercised, but the compiler component handoff still assumes the current Rust-hosted producer path"
+next_action = "add standalone structural AST and NIR decoders, then require a future Nuis stage1 producer to emit the same semantic bundle identity"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1"
+expected_artifact = "nuis-compiler-stage-handoff-v1 with source, token, AST, NIR, and YIR SHA-256 records, canonical round trips, cache preservation, and producer-independent semantic identity"
+blocker = "Rust stage0 emits and verifies all five records, but AST still regenerates from source, NIR lacks a standalone structural decoder, and no Nuis stage1 producer exists"
 
 [[gates]]
 id = "stage0-stage1-driver"
@@ -44,10 +44,10 @@ coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
 status = "early"
 progress = 35
 required_before = "beta-0.10.0"
-next_action = "add a stage driver that builds one Nuis-written compiler component with stage0 and records its exact inputs, outputs, compiler identity, and dependency closure"
+next_action = "build one Nuis-written compiler component through a reusable driver that consumes the stage handoff and records compiler image plus dependency closure identity"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis bootstrap_status -j 1"
 expected_artifact = "a reproducible stage0-to-stage1 build record for the first Nuis-written compiler component"
-blocker = "the AOT pipeline can build Nuis programs, but no compiler-stage driver or stage identity protocol exists yet"
+blocker = "the AOT pipeline now emits a compiler-stage identity chain, but no reusable stage0-to-stage1 driver or dependency-closure record exists yet"
 
 [[gates]]
 id = "differential-reproducibility-gate"

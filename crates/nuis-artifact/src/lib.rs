@@ -2,6 +2,7 @@ mod artifact;
 mod bridge_registry;
 mod build_manifest;
 mod clock_protocol;
+mod compiler_stage_handoff;
 mod domain_unit;
 mod envelope;
 mod error;
@@ -27,6 +28,13 @@ pub use build_manifest::{
 };
 pub use clock_protocol::{
     parse_clock_protocol, parse_clock_protocol_from_source, ClockDomain, ClockEdge, ClockProtocol,
+};
+pub use compiler_stage_handoff::{
+    build_compiler_stage_handoff, parse_compiler_stage_handoff_from_source,
+    read_compiler_stage_handoff, render_compiler_stage_handoff, CompilerStageHandoff,
+    CompilerStageHandoffRecord, CompilerStageKind, CompilerStagePayloadInput,
+    VerifiedCompilerStagePayload, COMPILER_STAGE_HANDOFF_PROTOCOL,
+    COMPILER_STAGE_PRODUCER_CONTRACT,
 };
 pub use domain_unit::{parse_domain_build_unit_blocks, BuildManifestDomainBuildUnit};
 pub use envelope::{

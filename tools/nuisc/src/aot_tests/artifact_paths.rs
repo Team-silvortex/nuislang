@@ -22,6 +22,7 @@ fn verify_compiled_artifact_preserves_heterogeneous_domain_unit_paths() {
         binary_path: bin.display().to_string(),
         packaging_mode: "window-aot-bundle".to_owned(),
         host_objects: Vec::new(),
+        stage_handoff: None,
     };
     let cpu_target = CpuBuildTarget {
         abi: "cpu.arm64.apple_aapcs64".to_owned(),

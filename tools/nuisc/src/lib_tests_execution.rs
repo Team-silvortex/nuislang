@@ -99,6 +99,8 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
     .unwrap();
 
     for path in [
+        output_dir.join(format!("{output_stem}.source.ns")),
+        output_dir.join(format!("{output_stem}.tokens.txt")),
         output_dir.join(format!("{output_stem}.ast.txt")),
         output_dir.join(format!("{output_stem}.nir.txt")),
         output_dir.join(format!("{output_stem}.yir")),
@@ -106,6 +108,7 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
         output_dir.join(&output_stem),
         output_dir.join("nuis.doc-index.json"),
         output_dir.join("nuis.build.manifest.toml"),
+        output_dir.join("nuis.compiler-stage-handoff.toml"),
         output_dir.join("nuis.executable.envelope.toml"),
         output_dir.join("nuis.compiled.artifact"),
         output_dir.join("nuis.project.toml"),
@@ -158,6 +161,8 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
     assert!(manifest_text.contains("packet_index = "));
     assert!(manifest_text.contains("host_ffi_index = "));
     assert!(manifest_text.contains("abi_index = "));
+
+    super::stage_handoff_tests::assert_compiler_stage_handoff(&output_dir, &manifest_path);
 
     let manifest_report = aot::verify_build_manifest(&manifest_path).unwrap();
     assert!(manifest_report
@@ -243,6 +248,8 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
     let first_report = aot::verify_build_manifest(&manifest_path).unwrap();
     assert_eq!(first_report.compile_cache_status.as_deref(), Some("miss"));
     assert_eq!(first_report.loaded_nustar, vec!["official.cpu".to_owned()]);
+    let first_handoff =
+        super::stage_handoff_tests::assert_compiler_stage_handoff(&output_dir, &manifest_path);
 
     run(CommandKind::Compile {
         input: project_root,
@@ -259,6 +266,10 @@ abi = ["cpu=cpu.arm64.apple_aapcs64"]
     assert_eq!(second_report.loaded_nustar, vec!["official.cpu".to_owned()]);
     assert_eq!(second_report.packaging_mode, "native-cpu-llvm");
     assert!(Path::new(&second_report.artifact_path).exists());
+    let second_handoff =
+        super::stage_handoff_tests::assert_compiler_stage_handoff(&output_dir, &manifest_path);
+    assert_eq!(second_handoff.bundle_sha256, first_handoff.bundle_sha256);
+    assert_eq!(second_handoff.records, first_handoff.records);
 }
 
 #[test]

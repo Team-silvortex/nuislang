@@ -98,6 +98,9 @@ fn c_shim_source_includes_native_file_stdin_and_tty_hooks() {
     assert!(shim.contains("return nuis_host_file_write(file_handle, text_handle);"));
     assert!(shim.contains("return nuis_host_stdin_read(buffer_handle, len);"));
     assert!(shim.contains("return nuis_host_tty_width(fd);"));
+    assert!(shim.contains("if (file_handle <= 0 || buffer_handle == 0 || len <= 0) return 0;"));
+    assert!(shim.contains("if (file_handle <= 0) return 0;"));
+    assert!(shim.contains("if (fd == 0) {"));
 }
 
 #[test]

@@ -764,3 +764,5 @@ mod artifact_tests;
 mod execution_tests;
 #[path = "lib_tests_galaxy_lock.rs"]
 mod galaxy_lock_tests;
+#[path = "lib_tests_stage_handoff.rs"]
+mod stage_handoff_tests;

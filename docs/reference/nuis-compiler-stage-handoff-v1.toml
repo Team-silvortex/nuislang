@@ -1,0 +1,69 @@
+protocol = "nuis-compiler-stage-handoff-v1"
+version = 1
+status = "early-implemented"
+scope = "compiler-stage-semantic-handoff"
+producer_contract = "nuis-compiler-stage-producer-v1"
+manifest_name = "nuis.compiler-stage-handoff.toml"
+record_count = 5
+ordered_stages = ["source", "tokens", "ast", "nir", "yir"]
+producer_identity_in_semantic_hash = false
+path_policy = "single-relative-file-name"
+text_policy = "utf8-lf-without-nul"
+payload_digest = "sha256-lowercase"
+record_identity = "nuis-compiler-stage-record-identity-v1"
+record_field_encoding = "u64-little-endian-length-prefixed-fields"
+bundle_identity = "final-record-sha256"
+implementation_crate = "crates/nuis-artifact"
+stage0_writer = "tools/nuisc/src/stage_handoff.rs"
+native_fixture = "examples/projects/tooling/bootstrap_compiler_data_model_demo"
+
+[[stages]]
+ordinal = 0
+name = "source"
+encoding = "utf8-lf-v1"
+
+[[stages]]
+ordinal = 1
+name = "tokens"
+encoding = "nuis-token-stream-v1"
+
+[[stages]]
+ordinal = 2
+name = "ast"
+encoding = "nuis-ast-canonical-projection-v1"
+
+[[stages]]
+ordinal = 3
+name = "nir"
+encoding = "nuis-nir-canonical-projection-v1"
+
+[[stages]]
+ordinal = 4
+name = "yir"
+encoding = "yir-text-v1"
+
+invariants = [
+  "exact-five-stage-order",
+  "semantic-root-binds-protocol-contract-domain-unit",
+  "each-record-binds-parent-metadata-and-payload",
+  "producer-id-is-auditable-but-not-semantic",
+  "payload-path-cannot-escape-manifest-root",
+  "manifest-and-payload-tampering-fail-closed",
+  "normal-build-manifest-hashes-source-tokens-and-handoff",
+  "cache-hit-preserves-bundle-identity",
+]
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff -j 1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p yir-syntax -j 1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1",
+]
+
+[open_boundary]
+status = "not-stage1-ready"
+missing = [
+  "standalone-structural-ast-decoder",
+  "standalone-structural-nir-decoder",
+  "nuis-stage1-producer",
+  "stage0-stage1-dependency-closure-driver",
+]
