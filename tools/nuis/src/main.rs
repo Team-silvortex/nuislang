@@ -38,6 +38,7 @@ mod artifact_runtime_command;
 mod artifact_runtime_dispatch_receipt;
 mod artifact_runtime_persistence;
 mod artifact_runtime_trace;
+mod bootstrap_status;
 mod build_report_command;
 mod build_report_nsld_status;
 mod build_report_render;
@@ -369,6 +370,9 @@ fn run() -> Result<(), String> {
             );
         }
         cli::CommandKind::DevTensor { json } => handle_dev_tensor(json),
+        cli::CommandKind::BootstrapStatus { input, json } => {
+            bootstrap_status::handle_bootstrap_status(&input, json)?;
+        }
         cli::CommandKind::Registry { json } => {
             nuisc::run(nuisc::CommandKind::Registry { json })?;
         }
@@ -674,6 +678,7 @@ fn print_help() {
     println!("  general:");
     println!("    nuis status");
     println!("    nuis dev-tensor [--json]");
+    println!("    nuis bootstrap-status [--json] [manifest]");
     println!("    nuis registry");
     println!("    nuis fmt [input.ns|project-dir|nuis.toml]");
     println!("    nuis bindings <input.ns|project-dir|nuis.toml>");

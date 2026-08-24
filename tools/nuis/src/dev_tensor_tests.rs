@@ -20,11 +20,24 @@ fn handoff_selection_is_status_aware_and_input_order_independent() {
         ),
         expected
     );
+    assert_eq!(expected, "language-core/nuisc/bootstrap-language-subset");
+    assert_eq!(selected.status, "early");
+}
+
+#[test]
+fn handoff_advances_in_self_hosting_dependency_order() {
+    let mut cells = DEV_TENSOR_CELLS.to_vec();
+    let subset = cells
+        .iter_mut()
+        .find(|cell| cell.function == "bootstrap-language-subset")
+        .expect("bootstrap subset cell");
+    subset.status = "stable";
+    subset.progress = 100;
+    let selected = select_dev_tensor_handoff_bootstrap_cell(&cells).expect("select handoff cell");
     assert_eq!(
-        expected,
-        "package-system/galaxy/source-import-and-lock-resolution"
+        dev_tensor_coordinate_key(selected.architecture, selected.module, selected.function),
+        "standard-library/std/compiler-data-model"
     );
-    assert_eq!(selected.status, "usable");
 }
 
 #[test]
@@ -138,14 +151,14 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
     assert!(summary.weakest_bootstrap_task_card_ready);
     assert_eq!(
         summary.weakest_bootstrap_task_card_coordinate,
-        "package-system/galaxy/source-import-and-lock-resolution"
+        "language-core/nuisc/bootstrap-language-subset"
     );
     assert!(summary
         .weakest_bootstrap_task_card_priority_reason
         .contains("weakest bootstrap-critical status/progress ordering"));
     assert_eq!(
         summary.weakest_bootstrap_task_card_handoff_coordinate,
-        "package-system/galaxy/source-import-and-lock-resolution"
+        "language-core/nuisc/bootstrap-language-subset"
     );
     assert_eq!(summary.weakest_bootstrap_task_card_handoff_mode, "direct");
     assert!(summary
@@ -186,7 +199,7 @@ fn dev_tensor_summary_reports_three_axes_and_cells() {
         summary
             .weakest_bootstrap_task_card_lineage
             .common_ancestor_path,
-        "package-system/galaxy/source-import-and-lock-resolution"
+        "language-core/nuisc/bootstrap-language-subset"
     );
     assert_eq!(
         summary.weakest_bootstrap_task_card_lineage.transition_depth,
@@ -564,7 +577,7 @@ fn dev_tensor_text_exposes_drift_status() {
     assert!(text.contains("weakest_bootstrap_task_card_lineage_status: clean"));
     assert!(text.contains("weakest_bootstrap_task_card_lineage_error_count: 0"));
     assert!(text.contains(
-        "weakest_bootstrap_task_card_common_ancestor_path: package-system/galaxy/source-import-and-lock-resolution"
+        "weakest_bootstrap_task_card_common_ancestor_path: language-core/nuisc/bootstrap-language-subset"
     ));
     assert!(text.contains("weakest_bootstrap_task_card_transition_depth: 0"));
     assert!(text.contains("weakest bootstrap-critical status/progress ordering"));

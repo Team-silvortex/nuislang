@@ -19,6 +19,10 @@ pub enum CommandKind {
     DevTensor {
         json: bool,
     },
+    BootstrapStatus {
+        input: PathBuf,
+        json: bool,
+    },
     Registry {
         json: bool,
     },
@@ -196,6 +200,25 @@ where
                 }
             }
             Ok(CommandKind::DevTensor { json })
+        }
+        "bootstrap-status" => {
+            let mut input = None;
+            let mut json = false;
+            for arg in args.by_ref() {
+                if arg == "--json" {
+                    json = true;
+                } else if arg.starts_with('-') || input.is_some() {
+                    return Err("usage: nuis bootstrap-status [--json] [manifest]".to_owned());
+                } else {
+                    input = Some(PathBuf::from(arg));
+                }
+            }
+            Ok(CommandKind::BootstrapStatus {
+                input: input.unwrap_or_else(|| {
+                    PathBuf::from("docs/reference/nuis-self-hosting-readiness.toml")
+                }),
+                json,
+            })
         }
         "registry" => {
             let mut json = false;

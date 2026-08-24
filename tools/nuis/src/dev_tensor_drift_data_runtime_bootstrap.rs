@@ -238,4 +238,39 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
             "runtime-bootstrap-identity:invalid",
         ],
     },
+    DevTensorDriftCheckSpec {
+        id: "nuis-self-hosting-readiness-manifest",
+        path: "docs/reference/nuis-self-hosting-readiness.toml",
+        required_patterns: &[
+            "nuis-self-hosting-readiness-v1",
+            "language-core/nuisc/bootstrap-language-subset",
+            "standard-library/std/compiler-data-model",
+            "language-core/nuisc/stage-neutral-ir-boundary",
+            "compiler-toolchain/bootstrap/stage0-stage1-driver",
+            "developer-system/bootstrap/differential-reproducibility-gate",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-self-hosting-readiness-frontdoor",
+        path: "tools/nuis/src/bootstrap_status.rs",
+        required_patterns: &[
+            "nuis-self-hosting-readiness-v1",
+            "ready-for-stage0-stage1-migration",
+            "preparing-foundation",
+            "stable/100 only for a closed gate",
+            "render_bootstrap_readiness_json",
+            "render_bootstrap_readiness_text",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-self-hosting-readiness-reference",
+        path: "docs/reference/nuis-self-hosting-readiness.md",
+        required_patterns: &[
+            "Roadmap Is Not Readiness",
+            "bootstrap-language-subset",
+            "stage0-stage1-driver",
+            "differential-reproducibility-gate",
+            "nuis bootstrap-status --json",
+        ],
+    },
 ];

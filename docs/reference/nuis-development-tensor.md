@@ -1733,28 +1733,28 @@ remains outside this metadata-level debugger control.
 
 ## Self-Hosting Phase Roadmap
 
-The tensor owns one required governance coordinate:
+The roadmap governance coordinate is `developer-system/dev-tensor/self-hosting-phase-roadmap`.
 
-`developer-system/dev-tensor/self-hosting-phase-roadmap`
+`stable/100` records schedule agreement, not self-hosting implementation. Its
+three boundaries are:
 
-Its protocol is `nuis-self-hosting-phase-roadmap-v1`. It fixes three phase
-boundaries:
+* foundation readiness through `beta-0.9.*`
+* formal `stage0 -> stage1` migration from `beta-0.10.*`
+* stage2-equivalent completion targeted for `gamma-0.5.*`
 
-* `foundation-readiness`
-  `beta-0.0.1` through `beta-0.9.*`; mainline work remains
-  foundation closure, bug fixing, performance optimization, and stability
-* `self-hosting-migration`
-  starts at `beta-0.10.*`; staged `stage0 -> stage1` compiler replacement
-  becomes a formal mainline objective
-* `self-hosting-completion`
-  targets `gamma-0.5.*`; `stage2` equivalence and a Nuis-owned compiler
-  mainline close the roughly fifteen-minor migration horizon
+Executable readiness is tracked independently by
+`nuis-self-hosting-readiness-v1` and `nuis bootstrap-status --json`.
 
-The coordinate is `stable/100` because the roadmap and its boundaries are
-agreed and machine-visible. That score does not claim that compiler
-self-hosting has already started or completed. Until `beta-0.10.*`, concrete
-work continues to be selected from the existing language, std, binary,
-linker, runtime, and developer-system coordinates.
+The five required coordinates are:
+
+* `language-core/nuisc/bootstrap-language-subset`
+* `standard-library/std/compiler-data-model`
+* `language-core/nuisc/stage-neutral-ir-boundary`
+* `compiler-toolchain/bootstrap/stage0-stage1-driver`
+* `developer-system/bootstrap/differential-reproducibility-gate`
+
+None inherits the roadmap score. Readiness becomes true only when all five are
+`stable/100`; until then the command reports the first blocker and next action.
 
 ## Runtime Lifecycle Loader Bootstrap
 

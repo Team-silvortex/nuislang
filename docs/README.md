@@ -11,11 +11,12 @@ Use this short route for the current `beta-0.6.*` repository:
 1. [Current mainline map](current-mainline-map.md)
 2. [Beta 0.6 mainline entry](versioning/nuis-beta-0.6.0-mainline-entry.md)
 3. [Development tensor](reference/nuis-development-tensor.md)
-4. [Native artifact workflow](reference/nuis-native-artifact-workflow.md)
-5. [Nsld linker frontdoor](reference/nsld-linker-frontdoor.md)
-6. [Binary assembly gap map](reference/nsld-binary-assembly-gap-map.md)
-7. [Nustar multi-backend artifact contract](reference/nustar-multi-backend-artifact-contract.md)
-8. [Repository layout](repo-layout.md)
+4. [Self-hosting readiness](reference/nuis-self-hosting-readiness.md)
+5. [Native artifact workflow](reference/nuis-native-artifact-workflow.md)
+6. [Nsld linker frontdoor](reference/nsld-linker-frontdoor.md)
+7. [Binary assembly gap map](reference/nsld-binary-assembly-gap-map.md)
+8. [Nustar multi-backend artifact contract](reference/nustar-multi-backend-artifact-contract.md)
+9. [Repository layout](repo-layout.md)
 
 The [versioning index](versioning/README.md) routes older beta, alpha, and
 pre-alpha snapshots. Those files explain how the current shape emerged; they
@@ -41,6 +42,7 @@ current verifier contract.
 
 For the compiler and project frontdoor:
 
+* [Self-hosting readiness](reference/nuis-self-hosting-readiness.md)
 * [Nuis frontdoor surface](reference/nuis-frontdoor-surface-reference.md)
 * [Native artifact workflow](reference/nuis-native-artifact-workflow.md)
 * [YIR tools](reference/yir-tools-reference.md)

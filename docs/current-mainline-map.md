@@ -11,19 +11,20 @@ If you only need the shortest current `beta-0.6.*` reading route, use this order
 
 1. [versioning/nuis-beta-0.6.0-mainline-entry.md](versioning/nuis-beta-0.6.0-mainline-entry.md)
 2. [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
-3. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
-4. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
-5. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
-6. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
-7. [reference/nsld-executable-finalizer-registry.md](reference/nsld-executable-finalizer-registry.md)
-8. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
-9. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
-10. [reference/provider-completion-trust-registry.md](reference/provider-completion-trust-registry.md)
-11. [reference/nsdb-yir-debugger-frontdoor.md](reference/nsdb-yir-debugger-frontdoor.md)
-12. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
-13. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
-14. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
-15. [versioning/README.md](versioning/README.md)
+3. [reference/nuis-self-hosting-readiness.md](reference/nuis-self-hosting-readiness.md)
+4. [reference/nuis-frontdoor-surface-reference.md](reference/nuis-frontdoor-surface-reference.md)
+5. [reference/nuis-native-artifact-workflow.md](reference/nuis-native-artifact-workflow.md)
+6. [reference/nsld-linker-frontdoor.md](reference/nsld-linker-frontdoor.md)
+7. [reference/nsld-binary-assembly-gap-map.md](reference/nsld-binary-assembly-gap-map.md)
+8. [reference/nsld-executable-finalizer-registry.md](reference/nsld-executable-finalizer-registry.md)
+9. [reference/nuis-binary-format-protocol.md](reference/nuis-binary-format-protocol.md)
+10. [reference/nustar-multi-backend-artifact-contract.md](reference/nustar-multi-backend-artifact-contract.md)
+11. [reference/provider-completion-trust-registry.md](reference/provider-completion-trust-registry.md)
+12. [reference/nsdb-yir-debugger-frontdoor.md](reference/nsdb-yir-debugger-frontdoor.md)
+13. [reference/cffi-von-neumann-domain-contract.md](reference/cffi-von-neumann-domain-contract.md)
+14. [reference/std-mainline-layering-contract.md](reference/std-mainline-layering-contract.md)
+15. [reference/yir-tools-reference.md](reference/yir-tools-reference.md)
+16. [versioning/README.md](versioning/README.md)
 
 Short rule:
 
@@ -35,6 +36,8 @@ Short rule:
   [README.md](../README.md)
 * current development tensor progress model:
   [reference/nuis-development-tensor.md](reference/nuis-development-tensor.md)
+* current staged self-hosting preparation gates:
+  [reference/nuis-self-hosting-readiness.md](reference/nuis-self-hosting-readiness.md)
 * current `beta-0.6.*` entry:
   [versioning/nuis-beta-0.6.0-mainline-entry.md](versioning/nuis-beta-0.6.0-mainline-entry.md)
 * previous curated `beta-0.3.*` entry:

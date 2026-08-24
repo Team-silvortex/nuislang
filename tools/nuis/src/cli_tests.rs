@@ -47,6 +47,46 @@ fn parses_dev_tensor_json() {
 }
 
 #[test]
+fn parses_bootstrap_status_default_manifest() {
+    let command =
+        parse_args(["bootstrap-status".to_owned()].into_iter()).expect("bootstrap-status parses");
+    assert_eq!(
+        command,
+        CommandKind::BootstrapStatus {
+            input: PathBuf::from("docs/reference/nuis-self-hosting-readiness.toml"),
+            json: false,
+        }
+    );
+}
+
+#[test]
+fn parses_bootstrap_status_json_with_explicit_manifest() {
+    let command = parse_args(
+        [
+            "bootstrap-status".to_owned(),
+            "--json".to_owned(),
+            "target/readiness.toml".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .expect("bootstrap-status json parses");
+    assert_eq!(
+        command,
+        CommandKind::BootstrapStatus {
+            input: PathBuf::from("target/readiness.toml"),
+            json: true,
+        }
+    );
+}
+
+#[test]
+fn rejects_unknown_bootstrap_status_option() {
+    let error = parse_args(["bootstrap-status".to_owned(), "--ready".to_owned()].into_iter())
+        .expect_err("unknown option must fail");
+    assert_eq!(error, "usage: nuis bootstrap-status [--json] [manifest]");
+}
+
+#[test]
 fn parses_galaxy_provider_resolution() {
     let command = parse_args(
         [

@@ -109,6 +109,10 @@ If your question is specifically “what is the current early-beta target and
 what wording is safe?”, start with
 [../versioning/nuis-beta-0.6.0-mainline-entry.md](../../docs/versioning/nuis-beta-0.6.0-mainline-entry.md).
 
+If your question is specifically “what must close before staged compiler
+self-hosting can begin?”, start with
+[nuis-self-hosting-readiness.md](nuis-self-hosting-readiness.md).
+
 If your question is specifically “what did the alpha-0.20 closeout establish?”,
 read
 [../versioning/nuis-alpha-0.20-mainline-entry.md](../../docs/versioning/nuis-alpha-0.20-mainline-entry.md).

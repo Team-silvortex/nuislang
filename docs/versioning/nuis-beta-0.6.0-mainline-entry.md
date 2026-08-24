@@ -23,14 +23,15 @@ Short rule:
 
 1. [../current-mainline-map.md](../current-mainline-map.md)
 2. [../reference/nuis-development-tensor.md](../reference/nuis-development-tensor.md)
-3. [../reference/nuis-native-artifact-workflow.md](../reference/nuis-native-artifact-workflow.md)
-4. [../reference/nsld-linker-frontdoor.md](../reference/nsld-linker-frontdoor.md)
-5. [../reference/nsld-binary-assembly-gap-map.md](../reference/nsld-binary-assembly-gap-map.md)
-6. [../reference/nsld-executable-finalizer-registry.md](../reference/nsld-executable-finalizer-registry.md)
-7. [../reference/nustar-multi-backend-artifact-contract.md](../reference/nustar-multi-backend-artifact-contract.md)
-8. [../reference/nuis-binary-format-protocol.md](../reference/nuis-binary-format-protocol.md)
-9. [../reference/cffi-von-neumann-domain-contract.md](../reference/cffi-von-neumann-domain-contract.md)
-10. [README.md](README.md)
+3. [../reference/nuis-self-hosting-readiness.md](../reference/nuis-self-hosting-readiness.md)
+4. [../reference/nuis-native-artifact-workflow.md](../reference/nuis-native-artifact-workflow.md)
+5. [../reference/nsld-linker-frontdoor.md](../reference/nsld-linker-frontdoor.md)
+6. [../reference/nsld-binary-assembly-gap-map.md](../reference/nsld-binary-assembly-gap-map.md)
+7. [../reference/nsld-executable-finalizer-registry.md](../reference/nsld-executable-finalizer-registry.md)
+8. [../reference/nustar-multi-backend-artifact-contract.md](../reference/nustar-multi-backend-artifact-contract.md)
+9. [../reference/nuis-binary-format-protocol.md](../reference/nuis-binary-format-protocol.md)
+10. [../reference/cffi-von-neumann-domain-contract.md](../reference/cffi-von-neumann-domain-contract.md)
+11. [README.md](README.md)
 
 ## Connected Spine
 
@@ -55,13 +56,13 @@ matrix.
 
 At this documentation refresh the development tensor reports:
 
-* clean recursive hierarchy validation across 46 nodes and three axes
-* `21/21` milestone coordinates covered
-* `589/589` implementation-drift checks passing after current-route guards are
-  migrated to this entry
-* bootstrap-critical average progress at `99/100`
-* `package-system/galaxy/source-import-and-lock-resolution` as the weakest
-  bootstrap-critical coordinate at `usable`, `99/100`
+* clean recursive hierarchy validation across 54 nodes and three axes
+* `26/26` milestone coordinates covered
+* `593/593` implementation-drift checks passing
+* bootstrap-critical average progress at `83/100` after five honest
+  self-hosting preparation coordinates are registered
+* `language-core/nuisc/bootstrap-language-subset` as the weakest
+  bootstrap-critical coordinate at `early`, `20/100`
 * `linker-toolchain/nsld/os-native-executable-finalization` closed at
   `stable`, `100/100`
 
@@ -96,13 +97,13 @@ Nuis model.
 
 ## Current Priorities
 
-1. strengthen Galaxy source/import/lock resolution with persistent signer trust,
-   monotonic generation state, and future remote-provider boundaries
-2. widen ELF architecture and dependency coverage without provider-specific
-   compiler or CLI branches
-3. add PE/COFF finalization as another registered backend
-4. continue package, standard-library, provider, performance, and bug hardening
-   before the staged self-hosting migration begins at `beta-0.10.*`
+1. freeze the compiler-authoring language subset and its rejected-feature
+   fixtures
+2. establish the compiler data model and producer-neutral IR handoff records
+3. add a stage0-to-stage1 driver plus fail-closed differential reproducibility
+   report before the migration boundary at `beta-0.10.*`
+4. continue Galaxy, ELF, PE/COFF, standard-library, provider, performance, and
+   bug hardening without coupling those lanes to the bootstrap driver
 
 The first three resolver-registration objectives from the entry checkpoint are
 closed: `official.cffi` owns two GNU providers and four symbol-version rows,

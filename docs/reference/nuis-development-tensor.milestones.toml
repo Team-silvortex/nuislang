@@ -93,6 +93,17 @@ coordinates = [
 ]
 
 [[milestones]]
+id = "beta-0.6-self-hosting-readiness"
+required = true
+coordinates = [
+  "language-core/nuisc/bootstrap-language-subset",
+  "compiler-toolchain/bootstrap/stage0-stage1-driver",
+  "developer-system/bootstrap/differential-reproducibility-gate",
+  "standard-library/std/compiler-data-model",
+  "language-core/nuisc/stage-neutral-ir-boundary",
+]
+
+[[milestones]]
 id = "beta-0.1-foundation-hardening"
 required = true
 coordinates = [

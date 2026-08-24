@@ -31,11 +31,12 @@ nuis source / nuis.toml
 ```
 
 The development tensor currently reports clean recursive hierarchy, milestone,
-manifest, and implementation-drift coverage. Its 21 registered coordinates are
-all covered; the weakest bootstrap-critical coordinate is now
-`package-system/galaxy/source-import-and-lock-resolution` at `usable`, `99/100`.
-That means the checked-in slices agree with their evidence, not that every
-subsystem is complete.
+manifest, and implementation-drift coverage across `26/26` registered
+coordinates. Five independent self-hosting readiness gates deliberately lower
+the bootstrap-critical average to `83/100`; the weakest coordinate is
+`language-core/nuisc/bootstrap-language-subset` at `early`, `20/100`. The
+`nuis bootstrap-status` frontdoor reports `0/5` gates closed. This is an honest
+preparation baseline, not a regression in the already closed native pipeline.
 
 Nsld now carries the first ARM64 Mach-O and x86_64 Linux ELF routes through
 private shell construction, independent validation, real OS-loader execution,
@@ -51,14 +52,16 @@ The first GNU resolver providers and symbol-version rows now belong to
 `official.cffi`. Nuisc validates and preserves their registration contract,
 while Nsld generates a static runtime table at build time without changing the
 existing private-image or admission identity. The tensor now routes mainline
-work to Galaxy source/import/lock resolution. Broader ELF architecture coverage
-and PE/COFF remain separate registered finalizer work.
+work to freezing the compiler-authoring language subset. Galaxy hardening,
+broader ELF architecture coverage, and PE/COFF remain separate registered
+foundation work.
 
 Start with these documents:
 
 * [Current mainline map](docs/current-mainline-map.md)
 * [Beta 0.6 mainline entry](docs/versioning/nuis-beta-0.6.0-mainline-entry.md)
 * [Development tensor](docs/reference/nuis-development-tensor.md)
+* [Self-hosting readiness](docs/reference/nuis-self-hosting-readiness.md)
 * [Native artifact workflow](docs/reference/nuis-native-artifact-workflow.md)
 * [Nsld linker frontdoor](docs/reference/nsld-linker-frontdoor.md)
 * [Binary assembly gap map](docs/reference/nsld-binary-assembly-gap-map.md)
@@ -113,6 +116,7 @@ When the next command is unclear, ask the workflow frontdoor first:
 
 ```bash
 cargo run -p nuis -- dev-tensor
+cargo run -p nuis -- bootstrap-status
 cargo run -p nuis -- workflow examples/projects/kernel_tensor_demo
 cargo run -p nuis -- project-doctor examples/projects/kernel_tensor_demo
 cargo run -p nuis -- check examples/projects/kernel_tensor_demo

@@ -1,0 +1,60 @@
+protocol = "nuis-self-hosting-readiness-v1"
+release_line = "beta-0.6.*"
+migration_start = "beta-0.10.*"
+completion_target = "gamma-0.5.*"
+gate_count = 5
+
+[[gates]]
+id = "bootstrap-language-subset"
+coordinate = "language-core/nuisc/bootstrap-language-subset"
+status = "early"
+progress = 20
+required_before = "beta-0.10.0"
+next_action = "freeze the first compiler-authoring subset and reject unlisted syntax, types, effects, and library dependencies in bootstrap sources"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib -j 1"
+expected_artifact = "a versioned bootstrap-subset contract plus accepted and rejected Nuis source fixtures"
+blocker = "the language surface is broad, but no frozen compiler-authoring subset currently prevents stage1 sources from depending on unstable features"
+
+[[gates]]
+id = "compiler-data-model"
+coordinate = "standard-library/std/compiler-data-model"
+status = "early"
+progress = 25
+required_before = "beta-0.10.0"
+next_action = "define the minimum owned text, vector, map, arena, source-span, diagnostic, and path contracts needed by one Nuis-written compiler component"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test std_language_galaxy_smoke -j 1"
+expected_artifact = "checked-in Nuis compiler-support modules exercised without host-language collection semantics leaking into their public contract"
+blocker = "std has practical text, buffer, filesystem, IO, and concurrency surfaces, but the compiler-grade data model is not yet frozen or pressure-tested together"
+
+[[gates]]
+id = "stage-neutral-ir-boundary"
+coordinate = "language-core/nuisc/stage-neutral-ir-boundary"
+status = "early"
+progress = 30
+required_before = "beta-0.10.0"
+next_action = "freeze a producer-neutral source, token, AST, NIR, and YIR handoff boundary that both Rust stage0 and future Nuis stage1 components can consume"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib -j 1"
+expected_artifact = "versioned stage-neutral records with round-trip fixtures and no Rust-layout identity in the serialized contract"
+blocker = "NIR and YIR are exercised, but the compiler component handoff still assumes the current Rust-hosted producer path"
+
+[[gates]]
+id = "stage0-stage1-driver"
+coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
+status = "early"
+progress = 35
+required_before = "beta-0.10.0"
+next_action = "add a stage driver that builds one Nuis-written compiler component with stage0 and records its exact inputs, outputs, compiler identity, and dependency closure"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis bootstrap_status -j 1"
+expected_artifact = "a reproducible stage0-to-stage1 build record for the first Nuis-written compiler component"
+blocker = "the AOT pipeline can build Nuis programs, but no compiler-stage driver or stage identity protocol exists yet"
+
+[[gates]]
+id = "differential-reproducibility-gate"
+coordinate = "developer-system/bootstrap/differential-reproducibility-gate"
+status = "early"
+progress = 40
+required_before = "beta-0.10.0"
+next_action = "compare stage0 and candidate stage1 semantic outputs with normalized identities before allowing any component replacement"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis bootstrap_status -j 1"
+expected_artifact = "a fail-closed differential report covering normalized AST, NIR, YIR, diagnostics, and deterministic artifact identity"
+blocker = "artifact reproducibility checks exist, but no cross-stage semantic equivalence gate currently protects compiler replacement"
