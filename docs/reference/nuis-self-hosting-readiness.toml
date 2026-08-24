@@ -31,12 +31,12 @@ blocker = "the v1 proof closes host-layout leakage for one real component, but f
 id = "stage-neutral-ir-boundary"
 coordinate = "language-core/nuisc/stage-neutral-ir-boundary"
 status = "early"
-progress = 45
+progress = 60
 required_before = "beta-0.10.0"
-next_action = "add standalone structural AST and NIR decoders, then require a future Nuis stage1 producer to emit the same semantic bundle identity"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1"
-expected_artifact = "nuis-compiler-stage-handoff-v1 with source, token, AST, NIR, and YIR SHA-256 records, canonical round trips, cache preservation, and producer-independent semantic identity"
-blocker = "Rust stage0 emits and verifies all five records, but AST still regenerates from source, NIR lacks a standalone structural decoder, and no Nuis stage1 producer exists"
+next_action = "implement one leaf Nuis stage1-candidate producer against nuis-compiler-structural-projection-v1 and emit its component-bound diagnostic proof"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1"
+expected_artifact = "a second Nuis-produced component bundle whose independently decoded AST/NIR projections and complete five-stage semantic identity can enter bootstrap-diff without producer-private reconstruction"
+blocker = "the producer-neutral AST/NIR structural codec is implemented, but only Rust stage0 emits the bundle and no typed Nuis stage1 compiler component consumes it yet"
 
 [[gates]]
 id = "stage0-stage1-driver"

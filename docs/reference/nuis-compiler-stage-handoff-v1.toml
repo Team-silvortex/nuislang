@@ -16,6 +16,11 @@ bundle_identity = "final-record-sha256"
 implementation_crate = "crates/nuis-artifact"
 stage0_writer = "tools/nuisc/src/stage_handoff.rs"
 native_fixture = "examples/projects/tooling/bootstrap_compiler_data_model_demo"
+structural_projection_contract = "nuis-compiler-structural-projection-v1"
+structural_projection_codec = "crates/nuis-artifact/src/compiler_structural_projection.rs"
+standalone_structural_ast_decoder = true
+standalone_structural_nir_decoder = true
+source_reparse_required_for_ast_verification = false
 
 [[stages]]
 ordinal = 0
@@ -49,12 +54,18 @@ invariants = [
   "producer-id-is-auditable-but-not-semantic",
   "payload-path-cannot-escape-manifest-root",
   "manifest-and-payload-tampering-fail-closed",
+  "ast-and-nir-parse-without-source-or-producer-private-layout",
+  "ast-and-nir-module-identity-matches-handoff",
+  "ast-and-nir-render-parse-render-is-exact",
+  "recomputed-payload-and-parent-hashes-do-not-bypass-structural-validation",
+  "multiline-inline-wgsl-is-an-exact-framed-opaque-nir-leaf",
   "normal-build-manifest-hashes-source-tokens-and-handoff",
   "cache-hit-preserves-bundle-identity",
 ]
 
 validation_commands = [
   "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff -j 1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection -j 1",
   "CARGO_INCREMENTAL=0 cargo test -q -p yir-syntax -j 1",
   "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1",
 ]
@@ -62,8 +73,7 @@ validation_commands = [
 [open_boundary]
 status = "not-stage1-ready"
 missing = [
-  "standalone-structural-ast-decoder",
-  "standalone-structural-nir-decoder",
+  "nuis-owned-typed-ast-nir-consumer",
   "nuis-stage1-producer",
   "stage0-stage1-differential-authorization",
 ]

@@ -128,7 +128,7 @@ Current CLI frontdoor rule:
 `nuis status/help/dev-tensor/bootstrap-status -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build/bootstrap-build/bootstrap-diff -> artifact-doctor/run-artifact -> release-check`
 
 Current bootstrap pressure rule:
-`frozen compiler subset -> compiler-owned data -> producer-neutral handoff -> stage0/stage1 driver -> fail-closed differential report -> separate replacement authorization`
+`frozen compiler subset -> compiler-owned data -> producer-neutral structural handoff -> first Nuis stage1 candidate -> stage0/stage1 driver -> fail-closed differential report -> separate replacement authorization`
 
 Current example-tree rule:
 `frontdoor first -> grouped companions next -> explicit probe routes after that`

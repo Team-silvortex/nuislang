@@ -99,6 +99,69 @@ fn payload_tampering_fails_closed() {
 }
 
 #[test]
+fn structurally_invalid_ast_fails_even_with_recomputed_hash_chain() {
+    let dir = temp_dir("structural_tamper");
+    for (file, bytes) in payload_bytes() {
+        fs::write(dir.join(file), bytes).expect("write payload");
+    }
+    let malformed_ast = b"ast mod cpu unit Main\nuse text Text\n";
+    fs::write(dir.join("demo.ast.txt"), malformed_ast).expect("tamper AST");
+
+    let mut handoff = build("nuisc-stage0");
+    handoff.records[2].payload_bytes = malformed_ast.len();
+    handoff.records[2].payload_sha256 = sha256_hex(malformed_ast);
+    let mut parent = handoff.records[1].record_sha256.clone();
+    for record in &mut handoff.records[2..] {
+        record.parent_sha256 = parent.clone();
+        record.record_sha256 = record_identity(
+            &handoff.semantic_root_sha256,
+            &parent,
+            record.ordinal,
+            record.stage,
+            &record.encoding,
+            record.payload_bytes,
+            &record.payload_sha256,
+        );
+        parent = record.record_sha256.clone();
+    }
+    handoff.bundle_sha256 = parent;
+
+    let manifest_path = dir.join("nuis.compiler-stage-handoff.toml");
+    fs::write(&manifest_path, render_compiler_stage_handoff(&handoff))
+        .expect("write recomputed manifest");
+    let error = read_compiler_stage_handoff(&manifest_path)
+        .expect_err("structural tampering must fail after hash verification");
+    assert!(
+        error.to_string().contains("structurally indented"),
+        "{error}"
+    );
+    fs::remove_dir_all(dir).expect("remove temp directory");
+}
+
+#[test]
+fn projection_identity_must_match_handoff_during_build() {
+    let payloads = payload_bytes();
+    let mismatched_ast = b"ast mod cpu unit Other\n";
+    let inputs = ORDERED_STAGES
+        .iter()
+        .zip(payloads.iter())
+        .map(|(stage, (file, bytes))| CompilerStagePayloadInput {
+            stage: *stage,
+            payload_file: file,
+            bytes: if *stage == CompilerStageKind::Ast {
+                mismatched_ast
+            } else {
+                bytes
+            },
+        })
+        .collect::<Vec<_>>();
+
+    let error = build_compiler_stage_handoff("nuisc-stage0", "cpu", "Main", &inputs)
+        .expect_err("projection identity drift must fail");
+    assert!(error.to_string().contains("does not match handoff module"));
+}
+
+#[test]
 fn noncanonical_manifest_text_fails_closed() {
     let dir = temp_dir("manifest_canonical");
     for (file, bytes) in payload_bytes() {

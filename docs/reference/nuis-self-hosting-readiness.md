@@ -83,11 +83,13 @@ Freeze producer-neutral source, token, AST, NIR, and YIR handoff records. The
 serialized identity must not depend on Rust layout so the existing stage0 and
 a future Nuis stage1 producer can be compared against the same contract.
 
-This gate is now `early/45`. Normal AOT builds emit the ordered five-stage
+This gate is now `early/60`. Normal AOT builds emit the ordered five-stage
 `nuis-compiler-stage-handoff-v1` SHA-256 chain, hash its source/token/manifest
 artifacts in the build manifest, and preserve bundle identity across cache
-hits. Source regenerates tokens and AST; explicit YIR crosses parse, verify,
-and canonical re-render. Standalone AST/NIR structural decoders and a second
+hits. The shared `nuis-compiler-structural-projection-v1` codec independently
+parses and canonically re-renders AST/NIR hierarchy and module identity without
+source reconstruction or producer-private layout. Explicit YIR crosses parse,
+verify, and canonical re-render. A Nuis-owned typed consumer and second
 producer remain open. See
 [Nuis Compiler Stage Handoff](nuis-compiler-stage-handoff.md).
 
@@ -122,9 +124,10 @@ and returns a failing command status. See
 
 The comparison engine is implemented, but there is still no real Nuis stage1
 producer. Therefore repository-native cross-producer equivalence and a
-separate reversible replacement authorization remain open. The weakest
-readiness coordinate returns to the producer-neutral AST/NIR boundary rather
-than being hidden behind a missing comparison protocol.
+separate reversible replacement authorization remain open. The implemented
+structural codec means the next weakest work is no longer a missing comparison
+or handoff protocol. It is the first real leaf component emitted by a Nuis
+stage1-candidate producer.
 
 ## Migration Rule
 

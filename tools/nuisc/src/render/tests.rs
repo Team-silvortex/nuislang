@@ -302,6 +302,19 @@ fn vs_main() -> VsOut {
     assert!(rendered.contains("@vertex"), "{rendered}");
     assert!(rendered.contains("\n})"), "{rendered}");
     assert!(!rendered.contains("\\n"), "{rendered}");
+
+    let projection_source = format!(
+        "nir mod shader unit Surface\n  fn build()\n    let module: ShaderModule = {rendered}\n"
+    );
+    let projection = nuis_artifact::parse_compiler_structural_projection(
+        nuis_artifact::CompilerProjectionKind::Nir,
+        &projection_source,
+    )
+    .expect("rendered multiline WGSL should cross the shared structural codec");
+    assert_eq!(
+        nuis_artifact::render_compiler_structural_projection(&projection),
+        projection_source
+    );
 }
 
 #[test]

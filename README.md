@@ -31,13 +31,13 @@ nuis source / nuis.toml
 ```
 
 The development tensor currently reports clean recursive hierarchy, milestone,
-manifest, and implementation-drift coverage across `26/26` registered
+manifest, and `621/621` implementation-drift checks across `26/26` registered
 coordinates. Five independent self-hosting readiness gates keep the
-bootstrap-critical average honest at `92/100`; the weakest coordinate is now
-`language-core/nuisc/stage-neutral-ir-boundary` at `early`, `45/100`. The
-stage0/stage1 driver and differential gate have both advanced to `early`,
-`60/100`: the
-dedicated `nuis bootstrap-build` frontdoor emits a complete compiler-image,
+bootstrap-critical average honest at `93/100`; the weakest coordinate is now
+`compiler-toolchain/bootstrap/stage0-stage1-driver` at `early`, `60/100`. The
+stage-neutral handoff, stage0/stage1 driver, and differential gate are all now
+`early`, `60/100`: the dedicated `nuis bootstrap-build` frontdoor emits a
+complete compiler-image,
 stage-handoff, dependency-closure, native-output, reproducible-identity, exact
 audit record, and component-bound diagnostic proof for one project-form
 compiler component. The `nuis bootstrap-diff` frontdoor compares an explicit
@@ -45,8 +45,10 @@ stage0/candidate pair across thirteen semantic, dependency, diagnostic, and
 native-output identities while keeping replacement authorization separate. The
 `nuis bootstrap-status` frontdoor reports `1/5` gates closed, while the bounded
 compiler data model is `usable`, `75/100` and the producer-neutral five-stage
-handoff is `early`, `45/100`. This is preparation progress, not a claim that
-the compiler is already self-hosted.
+handoff is `early`, `60/100`. Its shared structural codec independently parses
+and canonically re-renders AST/NIR payload hierarchy without reconstructing AST
+from source. This is preparation progress, not a claim that the compiler is
+already self-hosted.
 
 Nsld now carries the first ARM64 Mach-O and x86_64 Linux ELF routes through
 private shell construction, independent validation, real OS-loader execution,
@@ -61,10 +63,10 @@ ELF bytes have not changed.
 The first GNU resolver providers and symbol-version rows now belong to
 `official.cffi`. Nuisc validates and preserves their registration contract,
 while Nsld generates a static runtime table at build time without changing the
-existing private-image or admission identity. The tensor now routes mainline
-work to producer-neutral structural AST/NIR codecs and the first real
-Nuis-produced stage1 candidate that can consume the implemented fail-closed
-differential gate. Deterministic growth beyond the bounded compiler data-model
+existing private-image or admission identity. With the producer-neutral
+structural AST/NIR codec in place, the tensor now routes mainline work to the
+first real Nuis-produced stage1 candidate that can consume the implemented
+fail-closed differential gate. Deterministic growth beyond the bounded compiler data-model
 proof, Galaxy hardening, broader ELF architecture coverage, and PE/COFF remain
 separate registered foundation work.
 

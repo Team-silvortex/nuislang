@@ -7,6 +7,10 @@ use std::{
 use sha2::{Digest, Sha256};
 
 use crate::{
+    compiler_structural_projection::{
+        parse_compiler_structural_projection, verify_compiler_projection_identity,
+        CompilerProjectionKind, COMPILER_AST_PROJECTION_ENCODING, COMPILER_NIR_PROJECTION_ENCODING,
+    },
     toml::{
         escape_toml_string, parse_optional_map_usize, parse_required_map_string_in_block,
         parse_required_toml_string, parse_required_toml_usize,
@@ -50,8 +54,8 @@ impl CompilerStageKind {
         match self {
             Self::Source => "utf8-lf-v1",
             Self::Tokens => "nuis-token-stream-v1",
-            Self::Ast => "nuis-ast-canonical-projection-v1",
-            Self::Nir => "nuis-nir-canonical-projection-v1",
+            Self::Ast => COMPILER_AST_PROJECTION_ENCODING,
+            Self::Nir => COMPILER_NIR_PROJECTION_ENCODING,
             Self::Yir => "yir-text-v1",
         }
     }
@@ -139,7 +143,7 @@ pub fn build_compiler_stage_handoff(
                 input.payload_file
             )));
         }
-        validate_text_payload(input.stage, input.bytes)?;
+        validate_stage_payload(input.stage, input.bytes, module_domain, module_unit)?;
         let payload_sha256 = sha256_hex(input.bytes);
         let record_sha256 = record_identity(
             &semantic_root_sha256,
@@ -290,7 +294,12 @@ pub fn read_compiler_stage_handoff(
                 record.payload_file
             )));
         }
-        validate_text_payload(record.stage, &bytes)?;
+        validate_stage_payload(
+            record.stage,
+            &bytes,
+            &handoff.module_domain,
+            &handoff.module_unit,
+        )?;
         payloads.push(VerifiedCompilerStagePayload {
             stage: record.stage,
             bytes,
@@ -518,6 +527,27 @@ fn validate_text_payload(stage: CompilerStageKind, bytes: &[u8]) -> Result<(), A
         )));
     }
     Ok(())
+}
+
+fn validate_stage_payload(
+    stage: CompilerStageKind,
+    bytes: &[u8],
+    module_domain: &str,
+    module_unit: &str,
+) -> Result<(), ArtifactError> {
+    validate_text_payload(stage, bytes)?;
+    let projection_kind = match stage {
+        CompilerStageKind::Ast => Some(CompilerProjectionKind::Ast),
+        CompilerStageKind::Nir => Some(CompilerProjectionKind::Nir),
+        _ => None,
+    };
+    let Some(projection_kind) = projection_kind else {
+        return Ok(());
+    };
+    let source = std::str::from_utf8(bytes)
+        .expect("compiler structural projection was already validated as UTF-8");
+    let projection = parse_compiler_structural_projection(projection_kind, source)?;
+    verify_compiler_projection_identity(&projection, module_domain, module_unit)
 }
 
 fn required_map_usize(

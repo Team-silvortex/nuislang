@@ -6,6 +6,7 @@ mod compiler_component_build;
 mod compiler_component_diff;
 mod compiler_diagnostic_report;
 mod compiler_stage_handoff;
+mod compiler_structural_projection;
 mod domain_unit;
 mod envelope;
 mod error;
@@ -64,6 +65,12 @@ pub use compiler_stage_handoff::{
     CompilerStageHandoffRecord, CompilerStageKind, CompilerStagePayloadInput,
     VerifiedCompilerStagePayload, COMPILER_STAGE_HANDOFF_PROTOCOL,
     COMPILER_STAGE_PRODUCER_CONTRACT,
+};
+pub use compiler_structural_projection::{
+    parse_compiler_structural_projection, render_compiler_structural_projection,
+    verify_compiler_projection_identity, CompilerProjectionKind, CompilerProjectionRecord,
+    CompilerProjectionRecordKind, CompilerStructuralProjection, COMPILER_AST_PROJECTION_ENCODING,
+    COMPILER_NIR_PROJECTION_ENCODING, COMPILER_STRUCTURAL_PROJECTION_CONTRACT,
 };
 pub use domain_unit::{parse_domain_build_unit_blocks, BuildManifestDomainBuildUnit};
 pub use envelope::{

@@ -2,7 +2,9 @@ use std::{fs, path::Path};
 
 use nuis_artifact::{
     build_compiler_stage_handoff, parse_compiler_stage_handoff_from_source,
-    read_compiler_stage_handoff, render_compiler_stage_handoff, CompilerStageHandoff,
+    parse_compiler_structural_projection, read_compiler_stage_handoff,
+    render_compiler_stage_handoff, render_compiler_structural_projection,
+    verify_compiler_projection_identity, CompilerProjectionKind, CompilerStageHandoff,
     CompilerStageKind, CompilerStagePayloadInput, VerifiedCompilerStagePayload,
 };
 use nuis_semantics::model::{AstModule, NirModule};
@@ -102,32 +104,24 @@ pub(crate) fn verify_compiler_stage_handoff(
     let yir_text = payload_text(&payloads, CompilerStageKind::Yir)?;
 
     frontend::verify_stage_neutral_token_stream(source, tokens)?;
-    let reparsed_ast = frontend::parse_nuis_ast(source)?;
-    if render::render_ast(&reparsed_ast) != ast_text {
-        return Err("compiler stage AST projection does not match its source payload".to_owned());
-    }
-    if let Some(expected_ast) = expected_ast {
-        if &reparsed_ast != expected_ast {
-            return Err("compiler stage AST payload differs from the pipeline AST".to_owned());
-        }
+    verify_structural_projection(
+        CompilerProjectionKind::Ast,
+        ast_text,
+        &handoff.module_domain,
+        &handoff.module_unit,
+    )?;
+    if expected_ast.is_some_and(|expected| render::render_ast(expected) != ast_text) {
+        return Err("compiler stage AST payload differs from the pipeline AST".to_owned());
     }
 
-    let expected_nir_header = format!(
-        "nir mod {} unit {}",
-        handoff.module_domain, handoff.module_unit
-    );
-    if nir_text
-        .lines()
-        .filter(|line| *line == expected_nir_header)
-        .count()
-        != 1
-    {
-        return Err("compiler stage NIR projection has a mismatched module identity".to_owned());
-    }
-    if let Some(expected_nir) = expected_nir {
-        if render::render_nir(expected_nir) != nir_text {
-            return Err("compiler stage NIR payload differs from the pipeline NIR".to_owned());
-        }
+    verify_structural_projection(
+        CompilerProjectionKind::Nir,
+        nir_text,
+        &handoff.module_domain,
+        &handoff.module_unit,
+    )?;
+    if expected_nir.is_some_and(|expected| render::render_nir(expected) != nir_text) {
+        return Err("compiler stage NIR payload differs from the pipeline NIR".to_owned());
     }
 
     let reparsed_yir = yir_syntax::parse_explicit_module(yir_text)?;
@@ -140,6 +134,25 @@ pub(crate) fn verify_compiler_stage_handoff(
         return Err("compiler stage YIR payload differs from the pipeline YIR".to_owned());
     }
     Ok(handoff)
+}
+
+fn verify_structural_projection(
+    kind: CompilerProjectionKind,
+    source: &str,
+    module_domain: &str,
+    module_unit: &str,
+) -> Result<(), String> {
+    let projection =
+        parse_compiler_structural_projection(kind, source).map_err(|error| error.to_string())?;
+    verify_compiler_projection_identity(&projection, module_domain, module_unit)
+        .map_err(|error| error.to_string())?;
+    if render_compiler_structural_projection(&projection) != source {
+        return Err(format!(
+            "compiler stage {} projection failed canonical round-trip",
+            kind.as_str()
+        ));
+    }
+    Ok(())
 }
 
 fn payload_text(

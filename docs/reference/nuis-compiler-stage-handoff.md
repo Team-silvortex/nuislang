@@ -51,12 +51,23 @@ strings, and floating literals use lowercase UTF-8 hexadecimal payloads;
 integers use canonical decimal; symbols use Unicode scalar integers; arrows
 have a dedicated record.
 
-Stage0 regenerates tokens and AST from the source before accepting a bundle.
-It compares NIR against the pipeline's canonical projection. YIR uses the
-explicit parser that does not synthesize hidden nodes or edges, then crosses
-YIR verification and an exact render-parse-render check. Quoted YIR arguments
-decode and re-encode spaces, newlines, quotes, tabs, carriage returns, and
-backslashes canonically.
+AST and NIR now share `nuis-compiler-structural-projection-v1`. The codec
+independently decodes module documentation, imports, the exact module
+domain/unit header, and the two-space structural hierarchy. Record depth may
+increase by one level at a time; empty records, odd indentation, trailing
+whitespace, misplaced imports, NIR documentation, duplicate module headers,
+and module-identity drift fail closed. The decoded records canonically
+re-render the exact payload without reparsing source or depending on Rust enum
+layout. Multiline inline WGSL remains an explicitly framed opaque NIR leaf:
+its source lines preserve exact bytes without being mistaken for NIR hierarchy,
+and a missing or malformed `})` terminator fails closed.
+
+Both the shared handoff builder and reader invoke this codec. `nuisc` also
+compares the decoded payload bytes with the in-memory pipeline projection when
+it owns that pipeline object. YIR uses its explicit parser, which does not
+synthesize hidden nodes or edges, then crosses YIR verification and an exact
+render-parse-render check. Quoted YIR arguments decode and re-encode spaces,
+newlines, quotes, tabs, carriage returns, and backslashes canonically.
 
 ## Artifact Integration
 
@@ -73,28 +84,31 @@ lengths, payload hashes, and text policy before returning any payload.
 
 The boundary is not yet stage1-ready:
 
-* AST is independently regenerated from source but has no standalone
-  structural decoder for its projection.
-* NIR is hash-bound and checked against stage0 output but has no standalone
-  structural decoder.
+* The structural codec reconstructs canonical hierarchy and bytes, but a
+  Nuis-owned typed compiler model does not consume those records yet.
 * No Nuis-written producer emits this bundle yet.
-* Compiler image and dependency-closure identity are now added by the separate
+* Compiler image and dependency-closure identity are added by the separate
   `nuis-compiler-component-build-v1` stage-driver record.
+* Replacement still requires the separate differential and authorization
+  contracts; matching payload hashes alone never authorize it.
 
-These limits keep the readiness coordinate at `early/45`. The stage0 driver is
-now available, so the weakest bootstrap-critical task has moved to the
-cross-producer differential gate. See
+The independent AST/NIR codec advances this coordinate to `early/60`. The next
+closure task is a small Nuis stage1-candidate producer that emits the same
+bundle and enters the existing fail-closed differential gate. See
 [Nuis Compiler Component Build](nuis-compiler-component-build.md).
 
 ## Validation
 
 ```bash
 CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_stage_handoff -j 1
+CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_structural_projection -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p yir-syntax -j 1
 CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1
 ```
 
-The tests cover canonical manifest round trips, producer-independent identity,
-payload tampering, invalid order and paths, explicit YIR parsing, empty and escaped YIR
-arguments, normal AOT artifact hashing, cache reuse, and native execution of
-the pure Nuis compiler-data component.
+The tests cover canonical manifest and AST/NIR structural round trips,
+producer-independent identity, malformed hierarchy, module drift, payload
+tampering after a recomputed SHA/parent/bundle chain, invalid order and paths,
+explicit YIR parsing, empty and escaped YIR arguments, normal AOT artifact
+hashing, cache reuse, and native execution of the pure Nuis compiler-data
+component.
