@@ -19,18 +19,21 @@ The current checked-in probes intentionally separate those layers.
 
 ## Important Cache Rule
 
-`nuis build` compile cache keys follow source/project inputs, not compiler
-source files under `tools/nuisc` or `crates/yir-lower-llvm`.
+`nuis build` compile cache keys bind source/project inputs, the resolved project
+plan, registered manifests, engine identity, and the running static compiler
+image. Rebuilding the compiler after a frontend, lowering, runtime, or backend
+change therefore produces a new key instead of restoring an older artifact.
 
-That means:
+For host validation:
 
-* after changing runtime/lowering/compiler code, do **not** trust an old output
-  directory
-* either use a fresh output directory every run
-* or make a tiny source change in the probe project before rebuilding
+* rebuild the compiler normally after implementation changes
+* use `cache-status` when a hit or miss is itself part of the investigation
+* use `clean-cache` only for explicit cache maintenance, not as a routine
+  workaround for backend edits
 
-For host validation, prefer a fresh `target/nuis-host-validation/..._out*`
-directory every time.
+Fresh `target/nuis-host-validation/..._out*` directories remain useful for
+isolating runtime output, but they are no longer required to bypass stale
+compiler implementation results.
 
 ## Probe Order
 

@@ -44,3 +44,29 @@ fn command_bootstrap_cli_rejects_ffi_with_structured_stderr() {
     assert!(stderr.contains("\"semantic_pipeline\":\"skipped\""));
     assert!(stderr.contains("\"code\":\"NBS003\""));
 }
+
+#[test]
+fn command_bootstrap_cli_accepts_the_compiler_data_model_project() {
+    let project = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../examples/projects/tooling/bootstrap_compiler_data_model_demo");
+    let output = Command::new(env!("CARGO_BIN_EXE_nuisc"))
+        .args([
+            "bootstrap-check",
+            "--json",
+            project.to_str().expect("UTF-8 compiler data model path"),
+        ])
+        .output()
+        .expect("run compiler data model bootstrap-check");
+
+    assert!(
+        output.status.success(),
+        "bootstrap-check failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("\"accepted\":true"));
+    assert!(stdout.contains("\"protocol\":\"nuis-bootstrap-language-subset-v1\""));
+    assert!(stdout.contains("\"semantic_pipeline\":\"checked\""));
+    assert!(stdout.contains("\"diagnostic_count\":0"));
+}

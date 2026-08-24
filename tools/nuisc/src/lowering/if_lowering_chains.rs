@@ -20,16 +20,22 @@ pub(super) fn lower_return_if_chain(
             let Some((name, value)) = extract_pure_branch_binding(binding, &pure_helpers) else {
                 return Ok(None);
             };
-            let substituted: Vec<NirStmt> = tail
-                .iter()
-                .map(|stmt| {
-                    super::loop_purity::substitute_stmt_bindings(
-                        stmt,
-                        &[(name.clone(), value.clone())],
-                    )
-                })
-                .collect();
-            lower_return_if_chain(&substituted, state, bindings)
+            if !branch_binding_contains_function_call(&value) {
+                let substituted = tail
+                    .iter()
+                    .map(|stmt| {
+                        super::loop_purity::substitute_stmt_bindings(
+                            stmt,
+                            &[(name.clone(), value.clone())],
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                return lower_return_if_chain(&substituted, state, bindings);
+            }
+            let lowered = lower_expr(&value, state, bindings)?;
+            let mut local_bindings = bindings.clone();
+            local_bindings.insert(name, lowered);
+            lower_return_if_chain(tail, state, &local_bindings)
         }
         [NirStmt::If {
             condition,
@@ -53,19 +59,44 @@ pub(super) fn lower_return_if_chain(
             let condition_name = lower_expr(condition, state, bindings)?;
             let then_value = lower_return_if_chain(then_body, state, bindings)?;
             let else_value = lower_return_if_chain(else_body, state, bindings)?;
-            let tail_value = lower_return_if_chain(tail, state, bindings)?;
 
-            match (then_value, else_value, tail_value) {
-                (Some(lhs), Some(rhs), Some(_)) => {
+            match (then_value, else_value) {
+                (Some(lhs), Some(rhs)) => Ok(Some(lower_select(condition_name, lhs, rhs, state)?)),
+                (Some(lhs), None) => {
+                    let mut continued = else_body.clone();
+                    continued.extend_from_slice(tail);
+                    let Some(rhs) = lower_return_if_chain(&continued, state, bindings)? else {
+                        return Ok(None);
+                    };
                     Ok(Some(lower_select(condition_name, lhs, rhs, state)?))
                 }
-                (Some(lhs), None, Some(rhs)) => {
+                (None, Some(rhs)) => {
+                    let mut continued = then_body.clone();
+                    continued.extend_from_slice(tail);
+                    let Some(lhs) = lower_return_if_chain(&continued, state, bindings)? else {
+                        return Ok(None);
+                    };
                     Ok(Some(lower_select(condition_name, lhs, rhs, state)?))
                 }
-                (None, Some(rhs), Some(lhs)) => {
-                    Ok(Some(lower_select(condition_name, lhs, rhs, state)?))
+                (None, None) => {
+                    let pure_helpers = state.pure_helpers.clone();
+                    let then_binding =
+                        lower_binding_if_chain(then_body, state, bindings, &pure_helpers)?;
+                    let else_binding =
+                        lower_binding_if_chain(else_body, state, bindings, &pure_helpers)?;
+                    if let (Some((then_name, then_value)), Some((else_name, else_value))) =
+                        (then_binding, else_binding)
+                    {
+                        if then_name == else_name {
+                            let selected =
+                                lower_select(condition_name, then_value, else_value, state)?;
+                            let mut local_bindings = bindings.clone();
+                            local_bindings.insert(then_name, selected);
+                            return lower_return_if_chain(tail, state, &local_bindings);
+                        }
+                    }
+                    lower_return_if_chain(tail, state, bindings)
                 }
-                _ => Ok(None),
             }
         }
         _ => Ok(None),
@@ -91,16 +122,54 @@ pub(in crate::lowering) fn lower_guard_return_chain(
             let Some((name, value)) = extract_pure_branch_binding(binding, &pure_helpers) else {
                 return Ok(None);
             };
-            let substituted: Vec<NirStmt> = tail
-                .iter()
-                .map(|stmt| {
-                    super::loop_purity::substitute_stmt_bindings(
-                        stmt,
-                        &[(name.clone(), value.clone())],
-                    )
-                })
-                .collect();
-            lower_guard_return_chain(&substituted, state, bindings)
+            if !branch_binding_contains_function_call(&value) {
+                let substituted = tail
+                    .iter()
+                    .map(|stmt| {
+                        super::loop_purity::substitute_stmt_bindings(
+                            stmt,
+                            &[(name.clone(), value.clone())],
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                return lower_guard_return_chain(&substituted, state, bindings);
+            }
+            let lowered = lower_expr(&value, state, bindings)?;
+            let mut local_bindings = bindings.clone();
+            local_bindings.insert(name, lowered);
+            lower_guard_return_chain(tail, state, &local_bindings)
+        }
+        [NirStmt::If {
+            condition,
+            then_body,
+            else_body,
+        }, tail @ ..]
+            if !else_body.is_empty() =>
+        {
+            if expr_contains_conditional_effect_primitive(condition) {
+                return Ok(None);
+            }
+            let condition_name = lower_expr(condition, state, bindings)?;
+            let then_return = lower_return_if_chain(then_body, state, bindings)?;
+            let else_return = lower_return_if_chain(else_body, state, bindings)?;
+
+            if let Some(lhs) = then_return {
+                let mut continued = else_body.clone();
+                continued.extend_from_slice(tail);
+                let Some(rhs) = lower_return_if_chain(&continued, state, bindings)? else {
+                    return Ok(None);
+                };
+                return Ok(Some(lower_select(condition_name, lhs, rhs, state)?));
+            }
+            if let Some(rhs) = else_return {
+                let mut continued = then_body.clone();
+                continued.extend_from_slice(tail);
+                let Some(lhs) = lower_return_if_chain(&continued, state, bindings)? else {
+                    return Ok(None);
+                };
+                return Ok(Some(lower_select(condition_name, lhs, rhs, state)?));
+            }
+            Ok(None)
         }
         [NirStmt::If {
             condition,
@@ -307,4 +376,20 @@ fn split_shared_branch_context<'a>(
         &else_remaining[..else_core_end],
         &then_remaining[then_core_end..],
     )
+}
+
+fn branch_binding_contains_function_call(expr: &NirExpr) -> bool {
+    match expr {
+        NirExpr::Call { .. } | NirExpr::MethodCall { .. } => true,
+        NirExpr::FieldAccess { base, .. }
+        | NirExpr::VariantIs { base, .. }
+        | NirExpr::VariantFieldAccess { base, .. } => branch_binding_contains_function_call(base),
+        NirExpr::Binary { lhs, rhs, .. } => {
+            branch_binding_contains_function_call(lhs) || branch_binding_contains_function_call(rhs)
+        }
+        NirExpr::StructLiteral { fields, .. } => fields
+            .iter()
+            .any(|(_, value)| branch_binding_contains_function_call(value)),
+        _ => false,
+    }
 }

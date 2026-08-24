@@ -498,3 +498,111 @@ fn lowers_match_return_chain_with_shared_suffix_after_branch_local_binding() {
         "expected shared suffix arithmetic to survive match lowering"
     );
 }
+
+#[test]
+fn lowers_try_propagation_inside_terminal_if_branch() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          fn checked<T>(value: T) -> Result<T, i64> {
+            return Result.Ok(value);
+          }
+
+          fn encode(value: i64) -> Result<i64, i64> {
+            if value > 0 {
+              let accepted: i64 = checked<i64>(value)?;
+              let widened: i64 = checked<i64>(accepted + 1)?;
+              return Result.Ok(widened + 1);
+            }
+            return Result.Err(3);
+          }
+
+          fn main() -> i64 {
+            let ignored: Result<i64, i64> = encode(4);
+            return 0;
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let pure_helpers = super::super::loop_purity::collect_pure_helper_functions(&module);
+    assert!(
+        pure_helpers.contains("checked__i64"),
+        "expected generic try helper to be pure: {pure_helpers:?}"
+    );
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "select"));
+}
+
+#[test]
+fn compiler_data_model_helpers_remain_pure() {
+    let module = parse_nuis_module(include_str!(
+        "../../../../../stdlib/std/lib/language_core.ns"
+    ))
+    .unwrap();
+    let pure_helpers = super::super::loop_purity::collect_pure_helper_functions(&module);
+
+    for expected in [
+        "compiler_vector_push__i64",
+        "compiler_text_append_byte",
+        "compiler_text_push_scalar",
+    ] {
+        assert!(
+            pure_helpers.contains(expected),
+            "expected `{expected}` to be pure: {pure_helpers:?}"
+        );
+    }
+}
+
+#[test]
+fn carries_match_binding_through_return_chain_after_pure_call() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Option<T> {
+            Some(T),
+            None,
+          }
+
+          fn observe(value: i64) -> Option<i64> {
+            return Option.Some(value);
+          }
+
+          fn compile_component(seed: i64) -> i64 {
+            let observed: i64 = match observe(seed) {
+              Option.Some(value) => {
+                value
+              }
+              Option.None => {
+                0
+              }
+            };
+            if seed < 0 {
+              return 80;
+            }
+            return observed + 1;
+          }
+
+          fn main() -> i64 {
+            return compile_component(12);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+    let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
+
+    assert!(yir
+        .nodes
+        .iter()
+        .any(|node| node.op.module == "cpu" && node.op.instruction == "select"));
+}

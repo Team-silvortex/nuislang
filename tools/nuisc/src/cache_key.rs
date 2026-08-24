@@ -31,6 +31,11 @@ fn compute_compile_cache_key_with_plan_and_identity(
 ) -> Result<CompileCacheKey, String> {
     let root = cache_root(input, project);
     let mut records = vec![
+        CacheFingerprintRecord::file_path(
+            "toolchain.compiler.image",
+            std::env::current_exe()
+                .map_err(|error| format!("failed to identify the running compiler: {error}"))?,
+        ),
         CacheFingerprintRecord::inline_bytes(
             "toolchain.nuisc.version",
             env!("CARGO_PKG_VERSION").as_bytes().to_vec(),

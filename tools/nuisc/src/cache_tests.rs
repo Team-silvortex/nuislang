@@ -89,4 +89,20 @@ mod tests {
             .any(|label| label == "compile.cache.identity"));
         fs::remove_dir_all(&temp_dir).unwrap();
     }
+
+    #[test]
+    fn default_cache_key_tracks_the_running_compiler_image() {
+        let temp_dir = temp_path("compiler_image");
+        fs::create_dir_all(&temp_dir).unwrap();
+        let source = temp_dir.join("worker.ns");
+        fs::write(&source, "mod cpu Main { fn main() -> i64 { return 0; } }").unwrap();
+
+        let key = compute_compile_cache_key(&source, None).expect("cache key");
+
+        assert!(key
+            .input_labels
+            .iter()
+            .any(|label| label == "toolchain.compiler.image"));
+        fs::remove_dir_all(&temp_dir).unwrap();
+    }
 }

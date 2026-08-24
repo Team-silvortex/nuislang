@@ -63,9 +63,17 @@ This gate is `stable/100`; widening it requires a new protocol version.
 Coordinate: `standard-library/std/compiler-data-model`.
 
 Provide the minimum owned text, vector, map, arena, source-span, diagnostic,
-and path contracts needed by a real compiler component. Existing application
-IO and collection-like capabilities are evidence, but not a substitute for a
-single pressure-tested compiler data model.
+and path contracts needed by a real compiler component. The bounded v1 model
+is now `usable/75`: `StdLanguageCore` owns the representation, the frozen
+bootstrap subset accepts it, and
+`bootstrap_compiler_data_model_demo` crosses bootstrap-check, NIR/YIR/LLVM,
+native build, and deterministic execution without FFI or host collections.
+See [Nuis Compiler Data Model](nuis-compiler-data-model.md).
+
+This is deliberately not `stable/100`. V1 proves the ownership and lowering
+shape with four-slot vectors/maps and integer map keys. A realistic tokenizer
+or parser still needs deterministic page- or chunk-backed growth, larger
+pressure fixtures, and preserved differential identities.
 
 ### `stage-neutral-ir-boundary`
 

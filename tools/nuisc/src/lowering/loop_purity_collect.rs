@@ -269,31 +269,47 @@ fn is_pure_helper_block(
     memo: &mut BTreeMap<String, bool>,
     visiting: &mut BTreeSet<String>,
 ) -> bool {
+    analyze_pure_helper_block(body, function_map, memo, visiting) == Some(true)
+}
+
+fn analyze_pure_helper_block(
+    body: &[NirStmt],
+    function_map: &BTreeMap<&str, &NirFunction>,
+    memo: &mut BTreeMap<String, bool>,
+    visiting: &mut BTreeSet<String>,
+) -> Option<bool> {
     let Some((first, tail)) = body.split_first() else {
-        return false;
+        return Some(false);
     };
     match first {
         NirStmt::Let { value, .. } | NirStmt::Const { value, .. } => {
-            is_pure_helper_expr(value, function_map, memo, visiting)
-                && is_pure_helper_block(tail, function_map, memo, visiting)
+            if !is_pure_helper_expr(value, function_map, memo, visiting) {
+                return None;
+            }
+            analyze_pure_helper_block(tail, function_map, memo, visiting)
         }
         NirStmt::If {
             condition,
             then_body,
             else_body,
         } => {
-            is_pure_helper_expr(condition, function_map, memo, visiting)
-                && is_pure_helper_block(then_body, function_map, memo, visiting)
-                && if else_body.is_empty() {
-                    is_pure_helper_block(tail, function_map, memo, visiting)
-                } else {
-                    tail.is_empty() && is_pure_helper_block(else_body, function_map, memo, visiting)
-                }
+            if !is_pure_helper_expr(condition, function_map, memo, visiting) {
+                return None;
+            }
+            let then_terminates =
+                analyze_pure_helper_block(then_body, function_map, memo, visiting)?;
+            let else_terminates =
+                analyze_pure_helper_block(else_body, function_map, memo, visiting)?;
+            if then_terminates && else_terminates {
+                return Some(true);
+            }
+            let tail_terminates = analyze_pure_helper_block(tail, function_map, memo, visiting)?;
+            Some((then_terminates || tail_terminates) && (else_terminates || tail_terminates))
         }
         NirStmt::Return(Some(expr)) => {
-            tail.is_empty() && is_pure_helper_expr(expr, function_map, memo, visiting)
+            is_pure_helper_expr(expr, function_map, memo, visiting).then_some(true)
         }
-        _ => false,
+        _ => None,
     }
 }
 

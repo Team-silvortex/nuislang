@@ -250,6 +250,28 @@ pub(super) fn rewrite_generic_calls_in_expr(
                 specialized_signatures,
             },
         )?)),
+        AstExpr::Try(value) => AstExpr::Try(Box::new(rewrite_generic_calls_in_expr(
+            GenericExprRewriteInput {
+                expr: value,
+                context,
+                // The surrounding expectation describes the unwrapped payload,
+                // not the Result-shaped expression below `?`.
+                expected: None,
+                env,
+                visible_type_aliases,
+                generic_templates,
+                generic_impl_method_templates,
+                higher_order_templates,
+                function_table,
+                signatures,
+                impl_lookup,
+                struct_table,
+                function_return_types,
+                specialization_cache,
+                specialized_functions,
+                specialized_signatures,
+            },
+        )?)),
         AstExpr::Unary { op, operand } => {
             let rewritten_operand = rewrite_generic_calls_in_expr(GenericExprRewriteInput {
                 expr: operand,

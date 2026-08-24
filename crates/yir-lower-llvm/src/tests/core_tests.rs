@@ -396,6 +396,93 @@ fn lowers_cpu_select_between_enum_variants_as_tagged_union() {
 }
 
 #[test]
+fn selects_repeated_variant_payload_across_nested_union_chain() {
+    let mut module = module_with_cpu0();
+    push_cpu_node(&mut module, "left_tick", "cpu.tick_i64", vec!["5", "0"]);
+    push_cpu_const_i64(&mut module, "left_expected", "5");
+    push_cpu_node(
+        &mut module,
+        "choose_left",
+        "cpu.eq",
+        vec!["left_tick", "left_expected"],
+    );
+    push_cpu_node(&mut module, "inner_tick", "cpu.tick_i64", vec!["7", "0"]);
+    push_cpu_const_i64(&mut module, "inner_expected", "7");
+    push_cpu_node(
+        &mut module,
+        "choose_inner_ok",
+        "cpu.eq",
+        vec!["inner_tick", "inner_expected"],
+    );
+    push_cpu_const_i64(&mut module, "left_payload", "11");
+    push_cpu_const_i64(&mut module, "inner_payload", "22");
+    push_cpu_const_i64(&mut module, "error_payload", "33");
+    push_cpu_node(
+        &mut module,
+        "left_ok",
+        "cpu.struct",
+        vec!["Result.Ok", "value=left_payload"],
+    );
+    push_cpu_node(
+        &mut module,
+        "inner_ok",
+        "cpu.struct",
+        vec!["Result.Ok", "value=inner_payload"],
+    );
+    push_cpu_node(
+        &mut module,
+        "inner_error",
+        "cpu.struct",
+        vec!["Result.Err", "value=error_payload"],
+    );
+    push_cpu_node(
+        &mut module,
+        "inner_result",
+        "cpu.select",
+        vec!["choose_inner_ok", "inner_ok", "inner_error"],
+    );
+    push_cpu_node(
+        &mut module,
+        "selected",
+        "cpu.select",
+        vec!["choose_left", "left_ok", "inner_result"],
+    );
+    push_cpu_node(
+        &mut module,
+        "selected_ok_value",
+        "cpu.variant_field",
+        vec!["selected", "Result.Ok", "value"],
+    );
+    push_deps(
+        &mut module,
+        &[
+            ("left_tick", "choose_left"),
+            ("left_expected", "choose_left"),
+            ("inner_tick", "choose_inner_ok"),
+            ("inner_expected", "choose_inner_ok"),
+            ("left_payload", "left_ok"),
+            ("inner_payload", "inner_ok"),
+            ("error_payload", "inner_error"),
+            ("choose_inner_ok", "inner_result"),
+            ("inner_ok", "inner_result"),
+            ("inner_error", "inner_result"),
+            ("choose_left", "selected"),
+            ("left_ok", "selected"),
+            ("inner_result", "selected"),
+            ("selected", "selected_ok_value"),
+        ],
+    );
+
+    let llvm_ir = emit_module(&module).expect("LLVM lowering should succeed");
+    assert!(
+        count_occurrences(&llvm_ir, "select i1") >= 3,
+        "expected tag selection plus repeated Result.Ok payload selection\n{llvm_ir}"
+    );
+    assert!(!llvm_ir.contains("deferred lowering for cpu.select `selected`"));
+    assert!(!llvm_ir.contains("deferred lowering for cpu.variant_field `selected_ok_value`"));
+}
+
+#[test]
 fn lowers_const_select_around_unselected_wrong_variant_payload_chain() {
     let mut module = YirModule::new("0.1");
     module.resources.push(Resource {

@@ -119,7 +119,7 @@ Current CLI frontdoor rule:
 `nuis status/help/dev-tensor -> nuis workflow -> nuis project-doctor/project-status/scheduler-view -> check/test/build -> artifact-doctor/run-artifact -> release-check`
 
 Current bootstrap pressure rule:
-`runtime lifecycle loader first -> lowering coverage under real programs -> std/tooling self-use -> package/import stability -> diagnostics/debug metadata`
+`frozen compiler subset -> compiler-owned data -> producer-neutral handoff -> stage0/stage1 driver -> differential replacement gate`
 
 Current example-tree rule:
 `frontdoor first -> grouped companions next -> explicit probe routes after that`

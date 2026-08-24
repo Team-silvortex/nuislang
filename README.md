@@ -32,11 +32,12 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation-drift coverage across `26/26` registered
-coordinates. Five independent self-hosting readiness gates deliberately lower
-the bootstrap-critical average to `83/100`; the weakest coordinate is
-`language-core/nuisc/bootstrap-language-subset` at `early`, `20/100`. The
-`nuis bootstrap-status` frontdoor reports `0/5` gates closed. This is an honest
-preparation baseline, not a regression in the already closed native pipeline.
+coordinates. Five independent self-hosting readiness gates keep the
+bootstrap-critical average honest at `89/100`; the weakest coordinate is now
+`language-core/nuisc/stage-neutral-ir-boundary` at `early`, `30/100`. The
+`nuis bootstrap-status` frontdoor reports `1/5` gates closed, while the bounded
+compiler data model is `usable`, `75/100`. This is preparation progress, not a
+claim that the compiler is already self-hosted.
 
 Nsld now carries the first ARM64 Mach-O and x86_64 Linux ELF routes through
 private shell construction, independent validation, real OS-loader execution,
@@ -52,9 +53,9 @@ The first GNU resolver providers and symbol-version rows now belong to
 `official.cffi`. Nuisc validates and preserves their registration contract,
 while Nsld generates a static runtime table at build time without changing the
 existing private-image or admission identity. The tensor now routes mainline
-work to freezing the compiler-authoring language subset. Galaxy hardening,
-broader ELF architecture coverage, and PE/COFF remain separate registered
-foundation work.
+work to a producer-neutral compiler handoff boundary. Deterministic growth
+beyond the bounded compiler data-model proof, Galaxy hardening, broader ELF
+architecture coverage, and PE/COFF remain separate registered foundation work.
 
 Start with these documents:
 
@@ -62,6 +63,7 @@ Start with these documents:
 * [Beta 0.6 mainline entry](docs/versioning/nuis-beta-0.6.0-mainline-entry.md)
 * [Development tensor](docs/reference/nuis-development-tensor.md)
 * [Self-hosting readiness](docs/reference/nuis-self-hosting-readiness.md)
+* [Compiler data model](docs/reference/nuis-compiler-data-model.md)
 * [Native artifact workflow](docs/reference/nuis-native-artifact-workflow.md)
 * [Nsld linker frontdoor](docs/reference/nsld-linker-frontdoor.md)
 * [Binary assembly gap map](docs/reference/nsld-binary-assembly-gap-map.md)

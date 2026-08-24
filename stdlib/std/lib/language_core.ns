@@ -19,6 +19,71 @@ mod cpu StdLanguageCore {
     Err(E),
   }
 
+  /// Optional value used by bootstrap-safe compiler collections.
+  pub enum Option<T> {
+    Some(T),
+    None,
+  }
+
+  /// Four-slot owned value vector for the first compiler bootstrap boundary.
+  pub struct CompilerVector<T> {
+    pub length: i64,
+    pub slot0: T,
+    pub slot1: T,
+    pub slot2: T,
+    pub slot3: T
+  }
+
+  /// UTF-8 bytes and deterministic identity owned by the compiler component.
+  pub struct CompilerText {
+    pub bytes: CompilerVector<i64>,
+    pub scalar_length: i64,
+    pub hash: i64
+  }
+
+  /// Four-entry integer map for symbol, token, and node identities.
+  pub struct CompilerMap {
+    pub length: i64,
+    pub key0: i64,
+    pub value0: i64,
+    pub key1: i64,
+    pub value1: i64,
+    pub key2: i64,
+    pub value2: i64,
+    pub key3: i64,
+    pub value3: i64
+  }
+
+  /// Monotonic compiler arena represented by stable integer indices.
+  pub struct CompilerArena {
+    pub capacity: i64,
+    pub next_index: i64,
+    pub last_index: i64
+  }
+
+  /// Half-open byte range within one compiler-owned source.
+  pub struct CompilerSourceSpan {
+    pub source_id: i64,
+    pub start: i64,
+    pub end: i64
+  }
+
+  /// Bounded path represented by interned segment identities.
+  pub struct CompilerPath {
+    pub absolute: bool,
+    pub segments: CompilerVector<i64>,
+    pub hash: i64
+  }
+
+  /// Owned compiler diagnostic with no host-language layout in its contract.
+  pub struct CompilerDiagnostic {
+    pub code: i64,
+    pub severity: i64,
+    pub message: CompilerText,
+    pub span: CompilerSourceSpan,
+    pub path: CompilerPath
+  }
+
   pub type Alias<T> = T;
 
   pub type Mapper<T> = Fn1<T, T>;
@@ -31,6 +96,456 @@ mod cpu StdLanguageCore {
   /// Builds an Err result while preserving expected-type inference.
   pub fn err<T, E>(error: E) -> Result<T, E> {
     return Result.Err(error);
+  }
+
+  /// Builds an empty four-slot vector using an explicit filler value.
+  pub fn compiler_vector_empty<T>(fill: T) -> CompilerVector<T> {
+    return CompilerVector {
+      length: 0,
+      slot0: fill,
+      slot1: fill,
+      slot2: fill,
+      slot3: fill
+    };
+  }
+
+  /// Appends one value or reports capacity exhaustion as error code 1.
+  pub fn compiler_vector_push<T>(
+    vector: CompilerVector<T>,
+    value: T
+  ) -> Result<CompilerVector<T>, i64> {
+    if vector.length == 0 {
+      return Result.Ok(CompilerVector {
+        length: 1,
+        slot0: value,
+        slot1: vector.slot1,
+        slot2: vector.slot2,
+        slot3: vector.slot3
+      });
+    }
+    if vector.length == 1 {
+      return Result.Ok(CompilerVector {
+        length: 2,
+        slot0: vector.slot0,
+        slot1: value,
+        slot2: vector.slot2,
+        slot3: vector.slot3
+      });
+    }
+    if vector.length == 2 {
+      return Result.Ok(CompilerVector {
+        length: 3,
+        slot0: vector.slot0,
+        slot1: vector.slot1,
+        slot2: value,
+        slot3: vector.slot3
+      });
+    }
+    if vector.length == 3 {
+      return Result.Ok(CompilerVector {
+        length: 4,
+        slot0: vector.slot0,
+        slot1: vector.slot1,
+        slot2: vector.slot2,
+        slot3: value
+      });
+    }
+    return Result.Err(1);
+  }
+
+  /// Reads one vector value or returns None for an invalid index.
+  pub fn compiler_vector_get<T>(vector: CompilerVector<T>, index: i64) -> Option<T> {
+    if index == 0 && vector.length > 0 {
+      return Option.Some(vector.slot0);
+    }
+    if index == 1 && vector.length > 1 {
+      return Option.Some(vector.slot1);
+    }
+    if index == 2 && vector.length > 2 {
+      return Option.Some(vector.slot2);
+    }
+    if index == 3 && vector.length > 3 {
+      return Option.Some(vector.slot3);
+    }
+    return Option.None;
+  }
+
+  /// Replaces one vector value or reports an invalid index as error code 2.
+  pub fn compiler_vector_set<T>(
+    vector: CompilerVector<T>,
+    index: i64,
+    value: T
+  ) -> Result<CompilerVector<T>, i64> {
+    if index == 0 && vector.length > 0 {
+      return Result.Ok(CompilerVector {
+        length: vector.length,
+        slot0: value,
+        slot1: vector.slot1,
+        slot2: vector.slot2,
+        slot3: vector.slot3
+      });
+    }
+    if index == 1 && vector.length > 1 {
+      return Result.Ok(CompilerVector {
+        length: vector.length,
+        slot0: vector.slot0,
+        slot1: value,
+        slot2: vector.slot2,
+        slot3: vector.slot3
+      });
+    }
+    if index == 2 && vector.length > 2 {
+      return Result.Ok(CompilerVector {
+        length: vector.length,
+        slot0: vector.slot0,
+        slot1: vector.slot1,
+        slot2: value,
+        slot3: vector.slot3
+      });
+    }
+    if index == 3 && vector.length > 3 {
+      return Result.Ok(CompilerVector {
+        length: vector.length,
+        slot0: vector.slot0,
+        slot1: vector.slot1,
+        slot2: vector.slot2,
+        slot3: value
+      });
+    }
+    return Result.Err(2);
+  }
+
+  /// Appends one already-validated UTF-8 byte for the canonical scalar encoder.
+  pub fn compiler_text_append_byte(
+    value: CompilerText,
+    byte: i64
+  ) -> Result<CompilerText, i64> {
+    if byte < 0 || byte > 255 {
+      return Result.Err(3);
+    }
+    let next_bytes: CompilerVector<i64> = compiler_vector_push<i64>(value.bytes, byte)?;
+    return Result.Ok(CompilerText {
+      bytes: next_bytes,
+      scalar_length: value.scalar_length,
+      hash: (value.hash * 257 + byte + 1) % 2147483647
+    });
+  }
+
+  /// Builds empty compiler-owned UTF-8 text.
+  pub fn compiler_text_empty() -> CompilerText {
+    return CompilerText {
+      bytes: compiler_vector_empty<i64>(0),
+      scalar_length: 0,
+      hash: 0
+    };
+  }
+
+  /// Appends one Unicode scalar and encodes it as canonical UTF-8.
+  pub fn compiler_text_push_scalar(
+    value: CompilerText,
+    scalar: i64
+  ) -> Result<CompilerText, i64> {
+    if scalar < 0 || scalar > 1114111 {
+      return Result.Err(3);
+    }
+    if scalar >= 55296 && scalar <= 57343 {
+      return Result.Err(3);
+    }
+    if scalar <= 127 {
+      let encoded: CompilerText = compiler_text_append_byte(value, scalar)?;
+      return Result.Ok(CompilerText {
+        bytes: encoded.bytes,
+        scalar_length: value.scalar_length + 1,
+        hash: encoded.hash
+      });
+    }
+    if scalar <= 2047 {
+      let first: CompilerText = compiler_text_append_byte(value, 192 + scalar / 64)?;
+      let second: CompilerText = compiler_text_append_byte(first, 128 + scalar % 64)?;
+      return Result.Ok(CompilerText {
+        bytes: second.bytes,
+        scalar_length: value.scalar_length + 1,
+        hash: second.hash
+      });
+    }
+    if scalar <= 65535 {
+      let first: CompilerText = compiler_text_append_byte(value, 224 + scalar / 4096)?;
+      let second: CompilerText = compiler_text_append_byte(
+        first,
+        128 + (scalar / 64) % 64
+      )?;
+      let third: CompilerText = compiler_text_append_byte(second, 128 + scalar % 64)?;
+      return Result.Ok(CompilerText {
+        bytes: third.bytes,
+        scalar_length: value.scalar_length + 1,
+        hash: third.hash
+      });
+    }
+    let first: CompilerText = compiler_text_append_byte(value, 240 + scalar / 262144)?;
+    let second: CompilerText = compiler_text_append_byte(
+      first,
+      128 + (scalar / 4096) % 64
+    )?;
+    let third: CompilerText = compiler_text_append_byte(
+      second,
+      128 + (scalar / 64) % 64
+    )?;
+    let fourth: CompilerText = compiler_text_append_byte(third, 128 + scalar % 64)?;
+    return Result.Ok(CompilerText {
+      bytes: fourth.bytes,
+      scalar_length: value.scalar_length + 1,
+      hash: fourth.hash
+    });
+  }
+
+  /// Returns the encoded byte length of compiler-owned text.
+  pub fn compiler_text_byte_length(value: CompilerText) -> i64 {
+    return value.bytes.length;
+  }
+
+  /// Builds an empty deterministic compiler map.
+  pub fn compiler_map_empty() -> CompilerMap {
+    return CompilerMap {
+      length: 0,
+      key0: 0,
+      value0: 0,
+      key1: 0,
+      value1: 0,
+      key2: 0,
+      value2: 0,
+      key3: 0,
+      value3: 0
+    };
+  }
+
+  /// Inserts or replaces one map entry, reporting full capacity as error code 1.
+  pub fn compiler_map_insert(
+    map: CompilerMap,
+    key: i64,
+    value: i64
+  ) -> Result<CompilerMap, i64> {
+    if map.length > 0 && map.key0 == key {
+      return Result.Ok(CompilerMap {
+        length: map.length,
+        key0: key,
+        value0: value,
+        key1: map.key1,
+        value1: map.value1,
+        key2: map.key2,
+        value2: map.value2,
+        key3: map.key3,
+        value3: map.value3
+      });
+    }
+    if map.length > 1 && map.key1 == key {
+      return Result.Ok(CompilerMap {
+        length: map.length,
+        key0: map.key0,
+        value0: map.value0,
+        key1: key,
+        value1: value,
+        key2: map.key2,
+        value2: map.value2,
+        key3: map.key3,
+        value3: map.value3
+      });
+    }
+    if map.length > 2 && map.key2 == key {
+      return Result.Ok(CompilerMap {
+        length: map.length,
+        key0: map.key0,
+        value0: map.value0,
+        key1: map.key1,
+        value1: map.value1,
+        key2: key,
+        value2: value,
+        key3: map.key3,
+        value3: map.value3
+      });
+    }
+    if map.length > 3 && map.key3 == key {
+      return Result.Ok(CompilerMap {
+        length: map.length,
+        key0: map.key0,
+        value0: map.value0,
+        key1: map.key1,
+        value1: map.value1,
+        key2: map.key2,
+        value2: map.value2,
+        key3: key,
+        value3: value
+      });
+    }
+    if map.length == 0 {
+      return Result.Ok(CompilerMap {
+        length: 1,
+        key0: key,
+        value0: value,
+        key1: map.key1,
+        value1: map.value1,
+        key2: map.key2,
+        value2: map.value2,
+        key3: map.key3,
+        value3: map.value3
+      });
+    }
+    if map.length == 1 {
+      return Result.Ok(CompilerMap {
+        length: 2,
+        key0: map.key0,
+        value0: map.value0,
+        key1: key,
+        value1: value,
+        key2: map.key2,
+        value2: map.value2,
+        key3: map.key3,
+        value3: map.value3
+      });
+    }
+    if map.length == 2 {
+      return Result.Ok(CompilerMap {
+        length: 3,
+        key0: map.key0,
+        value0: map.value0,
+        key1: map.key1,
+        value1: map.value1,
+        key2: key,
+        value2: value,
+        key3: map.key3,
+        value3: map.value3
+      });
+    }
+    if map.length == 3 {
+      return Result.Ok(CompilerMap {
+        length: 4,
+        key0: map.key0,
+        value0: map.value0,
+        key1: map.key1,
+        value1: map.value1,
+        key2: map.key2,
+        value2: map.value2,
+        key3: key,
+        value3: value
+      });
+    }
+    return Result.Err(1);
+  }
+
+  /// Looks up one compiler map value without exposing storage layout.
+  pub fn compiler_map_get(map: CompilerMap, key: i64) -> Option<i64> {
+    if map.length > 0 && map.key0 == key {
+      return Option.Some(map.value0);
+    }
+    if map.length > 1 && map.key1 == key {
+      return Option.Some(map.value1);
+    }
+    if map.length > 2 && map.key2 == key {
+      return Option.Some(map.value2);
+    }
+    if map.length > 3 && map.key3 == key {
+      return Option.Some(map.value3);
+    }
+    return Option.None;
+  }
+
+  /// Builds an empty monotonic arena with an explicit capacity.
+  pub fn compiler_arena_new(capacity: i64) -> Result<CompilerArena, i64> {
+    if capacity < 0 {
+      return Result.Err(3);
+    }
+    return Result.Ok(CompilerArena {
+      capacity: capacity,
+      next_index: 0,
+      last_index: -1
+    });
+  }
+
+  /// Allocates the next stable arena index or reports capacity exhaustion.
+  pub fn compiler_arena_allocate(arena: CompilerArena) -> Result<CompilerArena, i64> {
+    if arena.next_index >= arena.capacity {
+      return Result.Err(1);
+    }
+    return Result.Ok(CompilerArena {
+      capacity: arena.capacity,
+      next_index: arena.next_index + 1,
+      last_index: arena.next_index
+    });
+  }
+
+  /// Validates and builds one half-open source span.
+  pub fn compiler_source_span(
+    source_id: i64,
+    start: i64,
+    end: i64
+  ) -> Result<CompilerSourceSpan, i64> {
+    if source_id < 0 || start < 0 || end < start {
+      return Result.Err(3);
+    }
+    return Result.Ok(CompilerSourceSpan {
+      source_id: source_id,
+      start: start,
+      end: end
+    });
+  }
+
+  /// Returns the byte width of one valid source span.
+  pub fn compiler_source_span_width(span: CompilerSourceSpan) -> i64 {
+    return span.end - span.start;
+  }
+
+  /// Builds an empty compiler path using interned segment identities.
+  pub fn compiler_path_empty(absolute: bool) -> CompilerPath {
+    return CompilerPath {
+      absolute: absolute,
+      segments: compiler_vector_empty<i64>(0),
+      hash: 0
+    };
+  }
+
+  /// Appends one non-negative interned path segment identity.
+  pub fn compiler_path_push(
+    path: CompilerPath,
+    segment: i64
+  ) -> Result<CompilerPath, i64> {
+    if segment < 0 {
+      return Result.Err(3);
+    }
+    let segments: CompilerVector<i64> = compiler_vector_push<i64>(path.segments, segment)?;
+    return Result.Ok(CompilerPath {
+      absolute: path.absolute,
+      segments: segments,
+      hash: (path.hash * 131 + segment + 1) % 2147483647
+    });
+  }
+
+  /// Builds a compiler diagnostic after validating its stable scalar fields.
+  pub fn compiler_diagnostic(
+    code: i64,
+    severity: i64,
+    message: CompilerText,
+    span: CompilerSourceSpan,
+    path: CompilerPath
+  ) -> Result<CompilerDiagnostic, i64> {
+    if code <= 0 || severity < 0 || severity > 2 {
+      return Result.Err(3);
+    }
+    return Result.Ok(CompilerDiagnostic {
+      code: code,
+      severity: severity,
+      message: message,
+      span: span,
+      path: path
+    });
+  }
+
+  /// Scores a diagnostic through owned compiler data only.
+  pub fn compiler_diagnostic_score(value: CompilerDiagnostic) -> i64 {
+    return value.code
+      + value.severity
+      + value.message.bytes.length
+      + value.message.scalar_length
+      + compiler_source_span_width(value.span)
+      + value.path.segments.length;
   }
 
   /// Maps an Ok payload and preserves Err values.

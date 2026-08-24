@@ -1,0 +1,125 @@
+use cpu StdLanguageCore;
+
+/// First compiler component written inside the frozen bootstrap subset.
+mod cpu Main {
+  fn build_source_text() -> Result<CompilerText, i64> {
+    let n: CompilerText = compiler_text_push_scalar(compiler_text_empty(), 110)?;
+    let u: CompilerText = compiler_text_push_scalar(n, 117)?;
+    let i: CompilerText = compiler_text_push_scalar(u, 105)?;
+    return compiler_text_push_scalar(i, 115);
+  }
+
+  fn build_token_stream() -> Result<CompilerVector<i64>, i64> {
+    let empty: CompilerVector<i64> = compiler_vector_empty<i64>(0);
+    let identifier: CompilerVector<i64> = compiler_vector_push<i64>(empty, 11)?;
+    let end: CompilerVector<i64> = compiler_vector_push<i64>(identifier, 12)?;
+    return compiler_vector_set<i64>(end, 1, 13);
+  }
+
+  fn build_symbol_map(node_index: i64) -> Result<CompilerMap, i64> {
+    let source_symbol: CompilerMap = compiler_map_insert(compiler_map_empty(), 11, 0)?;
+    return compiler_map_insert(source_symbol, 13, node_index);
+  }
+
+  fn build_path() -> Result<CompilerPath, i64> {
+    let root: CompilerPath = compiler_path_empty(false);
+    let source: CompilerPath = compiler_path_push(root, 41)?;
+    return compiler_path_push(source, 42);
+  }
+
+  fn boundaries_fail_closed(
+    text: CompilerText,
+    tokens: CompilerVector<i64>,
+    symbols: CompilerMap,
+    arena: CompilerArena
+  ) -> i64 {
+    if tokens.length != 2 {
+      return 5;
+    }
+    match compiler_vector_get(tokens, 3) {
+      Option.Some(_) => {
+        return 1;
+      }
+      Option.None => {}
+    }
+    match compiler_map_get(symbols, 99) {
+      Option.Some(_) => {
+        return 2;
+      }
+      Option.None => {}
+    }
+    match compiler_arena_allocate(arena) {
+      Result.Ok(_) => {
+        return 3;
+      }
+      Result.Err(_) => {}
+    }
+    match compiler_text_push_scalar(text, 55296) {
+      Result.Ok(_) => {
+        return 4;
+      }
+      Result.Err(_) => {
+        return 0;
+      }
+    }
+  }
+
+  fn compile_component() -> Result<i64, i64> {
+    let text: CompilerText = build_source_text()?;
+    let tokens: CompilerVector<i64> = build_token_stream()?;
+    let token_kind: i64 = match compiler_vector_get(tokens, 1) {
+      Option.Some(value) => {
+        value
+      }
+      Option.None => {
+        0
+      }
+    };
+
+    let arena0: CompilerArena = compiler_arena_new(2)?;
+    let arena1: CompilerArena = compiler_arena_allocate(arena0)?;
+    let arena2: CompilerArena = compiler_arena_allocate(arena1)?;
+    let symbols: CompilerMap = build_symbol_map(arena2.last_index)?;
+    let node_index: i64 = match compiler_map_get(symbols, 13) {
+      Option.Some(value) => {
+        value
+      }
+      Option.None => {
+        0
+      }
+    };
+
+    let span: CompilerSourceSpan = compiler_source_span(1, 0, 4)?;
+    let path: CompilerPath = build_path()?;
+    let diagnostic: CompilerDiagnostic = compiler_diagnostic(
+      7,
+      2,
+      text,
+      span,
+      path
+    )?;
+
+    let boundary_error: i64 = boundaries_fail_closed(text, tokens, symbols, arena2);
+    if boundary_error != 0 {
+      return Result.Err(boundary_error);
+    }
+    return Result.Ok(
+      compiler_diagnostic_score(diagnostic)
+        + token_kind
+        + node_index
+        + arena2.next_index
+        + text.scalar_length
+    );
+  }
+
+  fn main() -> i64 {
+    match compile_component() {
+      Result.Ok(score) => {
+        return score;
+      }
+      Result.Err(error) => {
+        return 80 + error;
+      }
+    }
+  }
+}

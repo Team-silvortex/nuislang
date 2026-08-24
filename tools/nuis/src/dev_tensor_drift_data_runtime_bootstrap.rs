@@ -299,6 +299,73 @@ pub(crate) const DEV_TENSOR_RUNTIME_BOOTSTRAP_DRIFT_CHECKS: &[DevTensorDriftChec
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "nuis-compiler-data-model-contract",
+        path: "docs/reference/nuis-compiler-data-model-v1.toml",
+        required_patterns: &[
+            "nuis-compiler-data-model-v1",
+            "surface.std.compiler-data-model.v1",
+            "fixed-four-slot-proof",
+            "canonical-unicode-scalar-encoding",
+            "bootstrap_compiler_data_model_demo",
+            "expected_native_exit = 43",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-data-model-stdlib",
+        path: "stdlib/std/lib/language_core.ns",
+        required_patterns: &[
+            "pub struct CompilerVector<T>",
+            "pub struct CompilerText",
+            "pub struct CompilerMap",
+            "pub struct CompilerArena",
+            "pub struct CompilerDiagnostic",
+            "pub fn compiler_text_push_scalar",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-data-model-registration",
+        path: "stdlib/std/module.toml",
+        required_patterns: &["surface.std.compiler-data-model.v1", "lib/language_core.ns"],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-data-model-component",
+        path: "examples/projects/tooling/bootstrap_compiler_data_model_demo/main.ns",
+        required_patterns: &[
+            "use cpu StdLanguageCore",
+            "fn compile_component() -> Result<i64, i64>",
+            "fn boundaries_fail_closed",
+            "compiler_diagnostic_score",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-data-model-native-regression",
+        path: "tools/nuis/tests/compiler_data_model_bootstrap.rs",
+        required_patterns: &[
+            "compiler_data_model_bootstrap_builds_and_runs_as_pure_nuis",
+            "deferred lowering",
+            "Some(43)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-image-cache-identity",
+        path: "tools/nuisc/src/cache_key.rs",
+        required_patterns: &[
+            "toolchain.compiler.image",
+            "std::env::current_exe()",
+            "toolchain.nuisc.cache_epoch",
+            "compile.cache.identity",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "nuis-compiler-image-cache-regression",
+        path: "tools/nuisc/src/cache_tests.rs",
+        required_patterns: &[
+            "default_cache_key_tracks_the_running_compiler_image",
+            "explicit_compile_identity_participates_in_cache_key",
+            "toolchain.compiler.image",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nuis-self-hosting-readiness-reference",
         path: "docs/reference/nuis-self-hosting-readiness.md",
         required_patterns: &[

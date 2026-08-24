@@ -17,6 +17,7 @@ surfaces = [
   "surface.std.hetero-test-benchmark-contracts.v1",
   "surface.std.cli-report-file-contracts.v1",
   "surface.std.language-result-hof-contracts.v1",
+  "surface.std.compiler-data-model.v1",
   "surface.std.provider-worker-lifecycle.v1",
   "surface.std.provider-worker-dispatch.v1"
 ]

@@ -7,6 +7,7 @@ pub(crate) fn validate_struct_annotations(definition: &AstStructDef) -> Result<(
     let mut is_packet_struct = false;
     for attribute in &definition.attributes {
         match attribute.name.as_str() {
+            "doc" => {}
             "packet" => {
                 validate_zero_arg_struct_annotation(definition, "packet", &attribute.args)?;
                 is_packet_struct = true;
@@ -18,7 +19,7 @@ pub(crate) fn validate_struct_annotations(definition: &AstStructDef) -> Result<(
                 ));
             }
         }
-        if !seen_struct_annotations.insert(attribute.name.as_str()) {
+        if attribute.name != "doc" && !seen_struct_annotations.insert(attribute.name.as_str()) {
             return Err(format!(
                 "struct `{}` repeats annotation `@{}`",
                 definition.name, attribute.name
@@ -30,6 +31,7 @@ pub(crate) fn validate_struct_annotations(definition: &AstStructDef) -> Result<(
         let mut seen_field_annotations = BTreeSet::new();
         for attribute in &field.attributes {
             match attribute.name.as_str() {
+                "doc" => {}
                 "packet_field" => {
                     validate_zero_arg_struct_field_annotation(
                         definition,
@@ -65,7 +67,7 @@ pub(crate) fn validate_struct_annotations(definition: &AstStructDef) -> Result<(
                     ));
                 }
             }
-            if !seen_field_annotations.insert(attribute.name.as_str()) {
+            if attribute.name != "doc" && !seen_field_annotations.insert(attribute.name.as_str()) {
                 return Err(format!(
                     "struct `{}` field `{}` repeats annotation `@{}`",
                     definition.name, field.name, attribute.name

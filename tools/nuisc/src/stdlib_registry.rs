@@ -342,6 +342,7 @@ mod tests {
                 "surface.std.hetero-test-benchmark-contracts.v1".to_owned(),
                 "surface.std.cli-report-file-contracts.v1".to_owned(),
                 "surface.std.language-result-hof-contracts.v1".to_owned(),
+                "surface.std.compiler-data-model.v1".to_owned(),
                 "surface.std.provider-worker-lifecycle.v1".to_owned(),
                 "surface.std.provider-worker-dispatch.v1".to_owned(),
             ]

@@ -19,13 +19,13 @@ blocker = "none for subset v1; compiler-owned text, vector, map, arena, span, di
 [[gates]]
 id = "compiler-data-model"
 coordinate = "standard-library/std/compiler-data-model"
-status = "early"
-progress = 25
+status = "usable"
+progress = 75
 required_before = "beta-0.10.0"
-next_action = "define the minimum owned text, vector, map, arena, source-span, diagnostic, and path contracts needed by one Nuis-written compiler component"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test std_language_galaxy_smoke -j 1"
-expected_artifact = "checked-in Nuis compiler-support modules exercised without host-language collection semantics leaking into their public contract"
-blocker = "std has practical text, buffer, filesystem, IO, and concurrency surfaces, but the compiler-grade data model is not yet frozen or pressure-tested together"
+next_action = "replace the bounded four-slot proof containers with deterministic page- or chunk-backed growth while preserving the v1 ownership, UTF-8, error, and layout invariants"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1"
+expected_artifact = "nuis-compiler-data-model-v1 plus a pure Nuis compiler component that passes bootstrap-check, builds without deferred LLVM lowering, and exits with deterministic score 43"
+blocker = "the v1 proof closes host-layout leakage for one real component, but four-slot vector/map capacity and integer-only map keys cannot yet sustain a realistic tokenizer or parser workload"
 
 [[gates]]
 id = "stage-neutral-ir-boundary"

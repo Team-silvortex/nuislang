@@ -512,7 +512,7 @@ mod tests {
     #[test]
     fn next_gate_follows_bootstrap_dependency_order() {
         let after_data_model = CHECKED_IN_MANIFEST.replacen(
-            "status = \"early\"\nprogress = 25",
+            "status = \"usable\"\nprogress = 75",
             "status = \"stable\"\nprogress = 100",
             1,
         );
@@ -527,11 +527,7 @@ mod tests {
     fn completed_manifest_has_stable_null_next_gate_shape() {
         let complete = CHECKED_IN_MANIFEST
             .replace(
-                "status = \"early\"\nprogress = 20",
-                "status = \"stable\"\nprogress = 100",
-            )
-            .replace(
-                "status = \"early\"\nprogress = 25",
+                "status = \"usable\"\nprogress = 75",
                 "status = \"stable\"\nprogress = 100",
             )
             .replace(

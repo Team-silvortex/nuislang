@@ -101,6 +101,40 @@ fn merge_variant_maps(
     merged
 }
 
+fn emit_selected_variant_maps(
+    cond_bool: &str,
+    then_variants: &BTreeMap<String, StructLlvmValueRef>,
+    else_variants: &BTreeMap<String, StructLlvmValueRef>,
+    body: &mut Vec<String>,
+    next_reg: &mut usize,
+) -> Option<BTreeMap<String, StructLlvmValueRef>> {
+    let mut selected = BTreeMap::new();
+    for (name, then_variant) in then_variants {
+        let value = if let Some(else_variant) = else_variants.get(name) {
+            let selected = emit_select_value(
+                cond_bool,
+                &LlvmValueRef::Struct(then_variant.clone()),
+                &LlvmValueRef::Struct(else_variant.clone()),
+                body,
+                next_reg,
+            )?;
+            let LlvmValueRef::Struct(selected) = selected else {
+                return None;
+            };
+            selected
+        } else {
+            then_variant.clone()
+        };
+        selected.insert(name.clone(), value);
+    }
+    for (name, else_variant) in else_variants {
+        selected
+            .entry(name.clone())
+            .or_insert_with(|| else_variant.clone());
+    }
+    Some(selected)
+}
+
 pub(crate) fn emit_select_value(
     cond_bool: &str,
     then_value: &LlvmValueRef,
@@ -272,7 +306,13 @@ pub(crate) fn emit_select_value(
             Some(LlvmValueRef::VariantUnion(VariantUnionLlvmValueRef {
                 parent_type_name: then_union.parent_type_name.clone(),
                 tag_i64,
-                variants: merge_variant_maps(&then_union.variants, &else_union.variants),
+                variants: emit_selected_variant_maps(
+                    cond_bool,
+                    &then_union.variants,
+                    &else_union.variants,
+                    body,
+                    next_reg,
+                )?,
             }))
         }
         (LlvmValueRef::VariantUnion(union), LlvmValueRef::Struct(struct_value))
@@ -294,10 +334,25 @@ pub(crate) fn emit_select_value(
                     union.tag_i64
                 ));
             }
-            let mut variants = union.variants.clone();
-            variants
-                .entry(struct_value.type_name.clone())
-                .or_insert_with(|| struct_value.clone());
+            let struct_variants =
+                BTreeMap::from([(struct_value.type_name.clone(), struct_value.clone())]);
+            let variants = if matches!(then_value, LlvmValueRef::VariantUnion(_)) {
+                emit_selected_variant_maps(
+                    cond_bool,
+                    &union.variants,
+                    &struct_variants,
+                    body,
+                    next_reg,
+                )?
+            } else {
+                emit_selected_variant_maps(
+                    cond_bool,
+                    &struct_variants,
+                    &union.variants,
+                    body,
+                    next_reg,
+                )?
+            };
             Some(LlvmValueRef::VariantUnion(VariantUnionLlvmValueRef {
                 parent_type_name: union.parent_type_name.clone(),
                 tag_i64,

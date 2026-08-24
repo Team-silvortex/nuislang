@@ -458,3 +458,48 @@ fn monomorphizes_nested_result_ok_from_partial_return_expected_type() {
         function.name == "__hof_result_map___lambda_main_0__i64__i64__HelperError"
     }));
 }
+
+#[test]
+fn monomorphizes_explicit_generic_call_below_try() {
+    let module = parse_nuis_module(
+        r#"
+        mod cpu Main {
+          enum Result<T, E> {
+            Ok(T),
+            Err(E),
+          }
+
+          struct Boxed<T> {
+            value: T,
+          }
+
+          fn checked_box<T>(value: Boxed<T>) -> Result<Boxed<T>, i64> {
+            return Result.Ok(value);
+          }
+
+          fn checked_value(value: Boxed<i64>) -> Result<i64, i64> {
+            let boxed: Boxed<i64> = checked_box<i64>(value)?;
+            return Result.Ok(boxed.value);
+          }
+
+          fn main() -> i64 {
+            let result: Result<i64, i64> = checked_value(Boxed { value: 7 });
+            match result {
+              Result.Ok(value) => {
+                return value;
+              }
+              Result.Err(error) => {
+                return error;
+              }
+            }
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert!(module
+        .functions
+        .iter()
+        .any(|function| function.name == "checked_box__i64"));
+}

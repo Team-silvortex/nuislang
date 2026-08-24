@@ -66,7 +66,14 @@ pub(in crate::lowering) fn lower_if_stmt(
     let branch_has_conditional_effect =
         super::if_lowering::stmts_contain_conditional_effect_primitive(then_body)
             || super::if_lowering::stmts_contain_conditional_effect_primitive(else_body);
-    if branch_has_conditional_effect {
+    let is_hoisted_match_wrapper = matches!(condition, NirExpr::Bool(true))
+        && else_body.is_empty()
+        && matches!(
+            then_body.first(),
+            Some(NirStmt::Let { name, .. } | NirStmt::Const { name, .. })
+                if name == "__nuis_match_scrutinee"
+        );
+    if branch_has_conditional_effect || is_hoisted_match_wrapper {
         if let Some(value) = eval_const_bool_with_env(condition, const_bindings) {
             let active_body = if value { then_body } else { else_body };
             let mut branch_const_bindings = const_bindings.clone();

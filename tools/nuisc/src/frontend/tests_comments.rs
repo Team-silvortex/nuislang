@@ -53,6 +53,29 @@ mod cpu math {
 }
 
 #[test]
+fn lowers_documented_struct_and_fields() {
+    let module = parse_nuis_module(
+        r#"
+mod cpu docs {
+    /// compiler record
+    struct Record {
+        /// stable identity
+        id: i64,
+    }
+
+    fn main() -> i64 {
+        let record: Record = Record { id: 7 };
+        return record.id;
+    }
+}
+"#,
+    )
+    .expect("documented struct lowers");
+
+    assert_eq!(module.structs[0].name, "Record");
+}
+
+#[test]
 fn parse_ast_collects_doc_comments_for_top_level_items() {
     let ast = parse_nuis_ast(
         r#"

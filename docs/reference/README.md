@@ -51,6 +51,9 @@ Start in this order:
   - [nsdb-yir-debugger-frontdoor.md](nsdb-yir-debugger-frontdoor.md)
   - [nsbdr-bundler-frontdoor.md](nsbdr-bundler-frontdoor.md)
 * `NIR` safety boundary
+  - [nuis-self-hosting-readiness.md](nuis-self-hosting-readiness.md)
+  - [nuis-bootstrap-language-subset.md](nuis-bootstrap-language-subset.md)
+  - [nuis-compiler-data-model.md](nuis-compiler-data-model.md)
   - [nir-memory-model.md](nir-memory-model.md)
   - [nir-optimization-contract.md](nir-optimization-contract.md)
   - [control-flow-lowering-contract.md](control-flow-lowering-contract.md)
