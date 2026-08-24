@@ -442,7 +442,7 @@ pub(crate) const DEV_TENSOR_RUNTIME_STD_DRIFT_CHECKS: &[DevTensorDriftCheckSpec]
             "nuis-beta-0.6.0-mainline-entry.md",
             "registered execution domains",
             "nuis-nsld-final-output-selection-evidence-file-v1",
-            "CFFI Nustar registration",
+            "generated GNU resolver and symbol-version registry",
             "Development tensor",
         ],
     },

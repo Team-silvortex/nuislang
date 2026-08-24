@@ -373,6 +373,15 @@ pub(crate) const DEV_TENSOR_CORE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
         ],
     },
     DevTensorDriftCheckSpec {
+        id: "nuis-compiled-artifact-verifier-temp-isolation",
+        path: "tools/nuisc/src/aot_compiled_artifact_verify.rs",
+        required_patterns: &[
+            "VERIFY_TEMP_SEQUENCE",
+            "std::process::id()",
+            "fs::create_dir(&temp_root)",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "nsld-executable-finalizer-invoke-plan-projection",
         path: "tools/nsld/src/final_executable_writer.rs",
         required_patterns: &[

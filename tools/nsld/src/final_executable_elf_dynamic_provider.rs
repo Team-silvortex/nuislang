@@ -33,65 +33,10 @@ pub(crate) struct DynamicSymbolVersionRegistration {
     pub(crate) version_name: &'static str,
 }
 
-const DYNAMIC_RESOLVER_PROVIDERS: &[DynamicResolverProvider] = &[
-    DynamicResolverProvider {
-        provider_id: "nsld.elf.amd64.linux-gnu.libc-v1",
-        machine_arch: "x86_64",
-        machine_os: "linux",
-        object_format: "elf",
-        calling_abi: "sysv64",
-        clang_target: "x86_64-unknown-linux-gnu",
-        host_ffi_abi: "libc",
-        interpreter_identity: "linux.gnu.ld-so.x86-64-v1",
-        interpreter_path: "/lib64/ld-linux-x86-64.so.2",
-        dependency_identity: "linux.gnu.libc.so.6-v1",
-        needed_name: "libc.so.6",
-        symbol_version_policy: "elf-registered-symbol-version-whitelist-v1",
-        resolver_identity: "elf.sysv.amd64.bind-now-plt-v1",
-    },
-    DynamicResolverProvider {
-        provider_id: "nsld.elf.amd64.linux-gnu.libm-v1",
-        machine_arch: "x86_64",
-        machine_os: "linux",
-        object_format: "elf",
-        calling_abi: "sysv64",
-        clang_target: "x86_64-unknown-linux-gnu",
-        host_ffi_abi: "libm",
-        interpreter_identity: "linux.gnu.ld-so.x86-64-v1",
-        interpreter_path: "/lib64/ld-linux-x86-64.so.2",
-        dependency_identity: "linux.gnu.libm.so.6-v1",
-        needed_name: "libm.so.6",
-        symbol_version_policy: "elf-registered-symbol-version-whitelist-v1",
-        resolver_identity: "elf.sysv.amd64.bind-now-plt-v1",
-    },
-];
-
-const DYNAMIC_SYMBOL_VERSIONS: &[DynamicSymbolVersionRegistration] = &[
-    DynamicSymbolVersionRegistration {
-        provider_id: "nsld.elf.amd64.linux-gnu.libc-v1",
-        target_symbol: "puts",
-        version_identity: "linux.gnu.glibc.2.2.5-v1",
-        version_name: "GLIBC_2.2.5",
-    },
-    DynamicSymbolVersionRegistration {
-        provider_id: "nsld.elf.amd64.linux-gnu.libc-v1",
-        target_symbol: "sched_yield",
-        version_identity: "linux.gnu.glibc.2.2.5-v1",
-        version_name: "GLIBC_2.2.5",
-    },
-    DynamicSymbolVersionRegistration {
-        provider_id: "nsld.elf.amd64.linux-gnu.libc-v1",
-        target_symbol: "getrandom",
-        version_identity: "linux.gnu.glibc.2.25-v1",
-        version_name: "GLIBC_2.25",
-    },
-    DynamicSymbolVersionRegistration {
-        provider_id: "nsld.elf.amd64.linux-gnu.libm-v1",
-        target_symbol: "cos",
-        version_identity: "linux.gnu.libm.glibc.2.2.5-v1",
-        version_name: "GLIBC_2.2.5",
-    },
-];
+include!(concat!(
+    env!("OUT_DIR"),
+    "/linker_resolver_registry_generated.rs"
+));
 
 pub(crate) fn matching_dynamic_resolver_providers(
     plan: &LinkPlan,
@@ -124,6 +69,12 @@ pub(crate) fn registered_dynamic_symbol_version(
 }
 
 pub(crate) fn validate_dynamic_resolver_provider_registry() -> Result<String, String> {
+    if NUSTAR_LINKER_RESOLVER_PROVIDER_COUNT != DYNAMIC_RESOLVER_PROVIDERS.len()
+        || NUSTAR_LINKER_SYMBOL_VERSION_COUNT != DYNAMIC_SYMBOL_VERSIONS.len()
+        || !is_generated_manifest_hash(NUSTAR_LINKER_RESOLVER_MANIFEST_HASH)
+    {
+        return Err("invalid generated Nustar linker resolver registry".to_owned());
+    }
     let mut provider_ids = BTreeSet::new();
     let mut target_abis = BTreeSet::new();
     let mut canonical = String::new();
@@ -259,6 +210,14 @@ fn append_text(out: &mut String, value: &str) {
     writeln!(out, "text:{}:{value}", value.len()).unwrap();
 }
 
+fn is_generated_manifest_hash(value: &str) -> bool {
+    value.len() == "fnv1a64:".len() + 16
+        && value.starts_with("fnv1a64:")
+        && value["fnv1a64:".len()..]
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -281,6 +240,11 @@ mod tests {
             registered_dynamic_symbol_version("nsld.elf.amd64.linux-gnu.libm-v1", "cos").unwrap();
         assert_eq!(cos.version_name, "GLIBC_2.2.5");
         assert_ne!(cos.version_identity, puts.version_identity);
-        assert!(validate_dynamic_resolver_provider_registry().is_ok());
+        assert_eq!(NUSTAR_LINKER_RESOLVER_PROVIDER_COUNT, 2);
+        assert_eq!(NUSTAR_LINKER_SYMBOL_VERSION_COUNT, 4);
+        assert_eq!(
+            validate_dynamic_resolver_provider_registry().unwrap(),
+            "0xc6631e590d61aca8"
+        );
     }
 }

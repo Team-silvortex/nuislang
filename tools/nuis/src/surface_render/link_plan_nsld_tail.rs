@@ -54,7 +54,7 @@ pub(super) fn nsld_tail_json_fields(
         ),
         crate::json_object_array_field(
             "nsld_final_executable_tail_stage_records",
-            &final_tail_stage_records,
+            final_tail_stage_records,
         ),
         json_optional_bool_field(
             "nsld_final_executable_pipeline_valid",

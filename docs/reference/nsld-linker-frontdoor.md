@@ -47,14 +47,14 @@ For the automation frontdoor, see [nsld-driver-frontdoor.md](nsld-driver-frontdo
 * registered Mach-O arm64 compatibility-image materialization
 * x86_64 ELF `ET_REL` parsing, placement, direct/platform relocation,
   PLT/GOT/dynamic/version structures, and deterministic private-shell bytes
-* registered Linux GNU dependency resolution for the first versioned `libc`
-  and `libm` routes, real loader admission, publication, and selection
+* generated `official.cffi` Linux GNU dependency resolution for the first
+  versioned `libc` and `libm` routes, real loader admission, publication, and
+  selection
 * relocatable owner-private final-output selection evidence
 * the first independent CLI boundary for future linker work
 
 `Nsld` does not yet own:
 
-* generated CFFI Nustar ownership of GNU resolver provider/version rows
 * broader ELF architecture and dependency-provider coverage
 * final host-native executable wrapping for PE/COFF
 * binary section assembly independent from `nuisc`

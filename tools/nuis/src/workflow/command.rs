@@ -782,6 +782,6 @@ fn workflow_run_artifact_prelaunch_summary(
     let resolved_binary = doctor.binary_path.filter(|path| path.exists());
     crate::run_artifact::run_artifact_prelaunch_summary(
         Some(output_dir),
-        resolved_binary.as_ref().map(std::path::PathBuf::as_path),
+        resolved_binary.as_deref(),
     )
 }

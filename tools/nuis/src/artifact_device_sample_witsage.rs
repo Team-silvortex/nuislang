@@ -180,7 +180,7 @@ pub(super) fn resolve_code_asset_evidence(
                 &asset.lowering_target,
                 &asset.format,
                 &asset.target,
-                &[asset.entry.clone()],
+                std::slice::from_ref(&asset.entry),
             )?
             .ok_or_else(|| {
                 format!(

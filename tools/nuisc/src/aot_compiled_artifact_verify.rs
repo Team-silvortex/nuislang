@@ -1,6 +1,7 @@
 use std::{
     fs,
     path::Path,
+    sync::atomic::{AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -16,6 +17,8 @@ use crate::aot_encoding::fnv1a64_hex;
 use crate::aot_lifecycle::build_nuis_lifecycle_contract;
 use crate::aot_manifest_verify::verify_build_manifest;
 use crate::aot_verify_report::NuisCompiledArtifactVerifyReport;
+
+static VERIFY_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 pub(crate) fn verify_nuis_compiled_artifact_impl(
     path: &Path,
@@ -59,8 +62,14 @@ pub(crate) fn verify_nuis_compiled_artifact_impl(
         .duration_since(UNIX_EPOCH)
         .map_err(|error| format!("failed to read current time: {error}"))?
         .as_nanos();
-    let temp_root = std::env::temp_dir().join(format!("nuis_artifact_verify_{nonce}"));
-    fs::create_dir_all(&temp_root)
+    let sequence = VERIFY_TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let temp_root = std::env::temp_dir().join(format!(
+        "nuis_artifact_verify_{}_{}_{}",
+        std::process::id(),
+        nonce,
+        sequence
+    ));
+    fs::create_dir(&temp_root)
         .map_err(|error| format!("failed to create `{}`: {error}", temp_root.display()))?;
 
     let manifest_path = temp_root.join("nuis.build.manifest.toml");

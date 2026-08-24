@@ -109,6 +109,19 @@ fn provider_family_artifact_component(provider_family: &str) -> String {
         .collect()
 }
 
+struct OfficialGalaxyHeteroBuildCase<'a> {
+    label: &'a str,
+    project: &'a str,
+    domain: &'a str,
+    backend_family: &'a str,
+    target_device: &'a str,
+    trace_record_count: usize,
+    expected_trace_id: &'a str,
+    yir_needles: &'a [&'a str],
+    sidecar_needles: &'a [&'a str],
+    payload_needles: &'a [&'a str],
+}
+
 #[path = "official_galaxy_hetero_smoke/build.rs"]
 mod build;
 #[path = "official_galaxy_hetero_smoke/final_image.rs"]
@@ -136,83 +149,83 @@ use provider_execution_evidence::{
 
 #[test]
 fn official_galaxy_hetero_projects_emit_shader_and_kernel_artifacts() {
-    assert_official_galaxy_hetero_build(
-        "pixelmagic_threshold_provider_demo",
-        "../../examples/projects/domains/pixelmagic_threshold_provider_demo",
-        "shader",
-        "metal",
-        "apple-silicon-gpu",
-        2,
-        "hetero-trace:shader:metal:apple-silicon-gpu",
-        &[
+    assert_official_galaxy_hetero_build(OfficialGalaxyHeteroBuildCase {
+        label: "pixelmagic_threshold_provider_demo",
+        project: "../../examples/projects/domains/pixelmagic_threshold_provider_demo",
+        domain: "shader",
+        backend_family: "metal",
+        target_device: "apple-silicon-gpu",
+        trace_record_count: 2,
+        expected_trace_id: "hetero-trace:shader:metal:apple-silicon-gpu",
+        yir_needles: &[
             "shader.begin_pass",
             "shader.draw_instanced",
             "PixelMagicContracts.filter_packet_total",
             "PixelMagicContracts.threshold_op_kind",
         ],
-        &[
+        sidecar_needles: &[
             "shader_stage_model = \"metal-render-pipeline\"",
             "lowering_capabilities",
             "pipeline_lowering = \"metal-render-pipeline-state\"",
             "execution_route = \"unified-render-graph\"",
         ],
-        &[
+        payload_needles: &[
             "backend_family = \"metal\"",
             "target_device = \"apple-silicon-gpu\"",
             "shader.profile.render",
         ],
-    );
+    });
 
-    assert_official_galaxy_hetero_build(
-        "pixelmagic_pipeline_demo",
-        "../../examples/projects/domains/pixelmagic_pipeline_demo",
-        "shader",
-        "metal",
-        "apple-silicon-gpu",
-        3,
-        "hetero-trace:shader:metal:apple-silicon-gpu",
-        &[
+    assert_official_galaxy_hetero_build(OfficialGalaxyHeteroBuildCase {
+        label: "pixelmagic_pipeline_demo",
+        project: "../../examples/projects/domains/pixelmagic_pipeline_demo",
+        domain: "shader",
+        backend_family: "metal",
+        target_device: "apple-silicon-gpu",
+        trace_record_count: 3,
+        expected_trace_id: "hetero-trace:shader:metal:apple-silicon-gpu",
+        yir_needles: &[
             "shader.begin_pass",
             "shader.draw_instanced",
             "shader.inline_wgsl",
             "PixelMagicContracts.shader_pipeline_total",
         ],
-        &[
+        sidecar_needles: &[
             "shader_stage_model = \"metal-render-pipeline\"",
             "lowering_capabilities",
             "pipeline_lowering = \"metal-render-pipeline-state\"",
             "execution_route = \"unified-render-graph\"",
         ],
-        &[
+        payload_needles: &[
             "backend_family = \"metal\"",
             "target_device = \"apple-silicon-gpu\"",
             "shader.inline_wgsl",
         ],
-    );
+    });
 
-    assert_official_galaxy_hetero_build(
-        "witsage_kernel_demo",
-        "../../examples/projects/domains/witsage_kernel_demo",
-        "kernel",
-        "coreml",
-        "apple-ane",
-        1,
-        "hetero-trace:kernel:coreml:apple-ane",
-        &[
+    assert_official_galaxy_hetero_build(OfficialGalaxyHeteroBuildCase {
+        label: "witsage_kernel_demo",
+        project: "../../examples/projects/domains/witsage_kernel_demo",
+        domain: "kernel",
+        backend_family: "coreml",
+        target_device: "apple-ane",
+        trace_record_count: 1,
+        expected_trace_id: "hetero-trace:kernel:coreml:apple-ane",
+        yir_needles: &[
             "kernel.tensor",
             "kernel.reduce_mean_axis",
             "kernel.topk_axis",
             "WitSageContracts.kernel_pipeline_total",
         ],
-        &[
+        sidecar_needles: &[
             "kernel_ir = \"coreml-program\"",
             "kernel_entry_model = \"mlmodelc-function\"",
             "tensor_lowering = \"ranked-tensor-graph\"",
         ],
-        &[
+        payload_needles: &[
             "backend_family = \"coreml\"",
             "target_device = \"apple-ane\"",
             "kernel.reduce_mean_axis",
         ],
-    );
+    });
 }

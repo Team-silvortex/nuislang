@@ -1,17 +1,18 @@
 use super::*;
 
-pub(super) fn assert_official_galaxy_hetero_build(
-    label: &str,
-    project: &str,
-    domain: &str,
-    backend_family: &str,
-    target_device: &str,
-    trace_record_count: usize,
-    expected_trace_id: &str,
-    yir_needles: &[&str],
-    sidecar_needles: &[&str],
-    payload_needles: &[&str],
-) {
+pub(super) fn assert_official_galaxy_hetero_build(case: OfficialGalaxyHeteroBuildCase<'_>) {
+    let OfficialGalaxyHeteroBuildCase {
+        label,
+        project,
+        domain,
+        backend_family,
+        target_device,
+        trace_record_count,
+        expected_trace_id,
+        yir_needles,
+        sidecar_needles,
+        payload_needles,
+    } = case;
     let output_dir = temp_dir(label);
     let output_dir_text = output_dir.display().to_string();
 

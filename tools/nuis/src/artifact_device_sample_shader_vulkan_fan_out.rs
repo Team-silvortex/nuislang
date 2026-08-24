@@ -5,7 +5,7 @@ use crate::{
         render_u32_dependency_edge, render_u32_output_evidence, render_u32_pair_artifact_binding,
         render_u32_prefixed_request_evidence, replace_code_asset_identity_fields,
         validate_code_asset_contribution_selection, validate_code_asset_request_evidence,
-        U32OutputEvidence, U32RequestEvidence, U32_INPUT as INPUT,
+        U32BindingShape, U32OutputEvidence, U32RequestEvidence, U32_INPUT as INPUT,
         U32_PAIR_ADD_EXPECTED as SUM_EXPECTED, U32_PAIR_RIGHT_INPUT as RIGHT_INPUT,
     },
 };
@@ -127,59 +127,72 @@ fn selects_metadata(base: &str, selector: &str) -> bool {
         .any(|(key, value)| key.starts_with("artifact_provider_metadata_") && value == selector)
 }
 
+pub(super) struct VulkanFanOutSampleEvidence<'a> {
+    pub(super) prefix: &'a str,
+    pub(super) asset_id: &'a str,
+    pub(super) entry: &'a str,
+    pub(super) kernel_id: &'a str,
+    pub(super) operation: &'a str,
+    pub(super) xor_file: &'a str,
+    pub(super) xor_expected: &'a [u8],
+    pub(super) xor_shape: &'a str,
+    pub(super) xor_row_stride_bytes: usize,
+}
+
 fn sample_evidence(_base: &str) -> String {
-    render_sample_evidence(
-        "provider_",
-        ASSET_ID,
-        ENTRY,
-        "shader.vulkan.add-xor-pair-u32",
-        "add-xor-pair-u32",
-        XOR_FILE,
-        XOR_EXPECTED,
-        "2x2",
-        8,
-    )
+    render_sample_evidence(VulkanFanOutSampleEvidence {
+        prefix: "provider_",
+        asset_id: ASSET_ID,
+        entry: ENTRY,
+        kernel_id: "shader.vulkan.add-xor-pair-u32",
+        operation: "add-xor-pair-u32",
+        xor_file: XOR_FILE,
+        xor_expected: XOR_EXPECTED,
+        xor_shape: "2x2",
+        xor_row_stride_bytes: 8,
+    })
 }
 
 fn padded_sample_evidence(_base: &str) -> String {
-    render_sample_evidence(
-        "provider_",
-        ASSET_ID,
-        ENTRY,
-        "shader.vulkan.add-xor-pair-u32",
-        "add-xor-pair-u32",
-        PADDED_XOR_FILE,
-        PADDED_XOR_EXPECTED,
-        "2x2",
-        12,
-    )
+    render_sample_evidence(VulkanFanOutSampleEvidence {
+        prefix: "provider_",
+        asset_id: ASSET_ID,
+        entry: ENTRY,
+        kernel_id: "shader.vulkan.add-xor-pair-u32",
+        operation: "add-xor-pair-u32",
+        xor_file: PADDED_XOR_FILE,
+        xor_expected: PADDED_XOR_EXPECTED,
+        xor_shape: "2x2",
+        xor_row_stride_bytes: 12,
+    })
 }
 
 fn reduced_sample_evidence(_base: &str) -> String {
-    render_sample_evidence(
-        "provider_",
-        REDUCED_ASSET_ID,
-        REDUCED_ENTRY,
-        "shader.vulkan.add-xor-pair-reduced-u32",
-        "add-xor-pair-reduced-u32",
-        REDUCED_XOR_FILE,
-        REDUCED_XOR_EXPECTED,
-        "2x1",
-        8,
-    )
+    render_sample_evidence(VulkanFanOutSampleEvidence {
+        prefix: "provider_",
+        asset_id: REDUCED_ASSET_ID,
+        entry: REDUCED_ENTRY,
+        kernel_id: "shader.vulkan.add-xor-pair-reduced-u32",
+        operation: "add-xor-pair-reduced-u32",
+        xor_file: REDUCED_XOR_FILE,
+        xor_expected: REDUCED_XOR_EXPECTED,
+        xor_shape: "2x1",
+        xor_row_stride_bytes: 8,
+    })
 }
 
-pub(super) fn render_sample_evidence(
-    prefix: &str,
-    asset_id: &'static str,
-    entry: &'static str,
-    kernel_id: &'static str,
-    operation: &'static str,
-    xor_file: &'static str,
-    xor_expected: &'static [u8],
-    xor_shape: &'static str,
-    xor_row_stride_bytes: usize,
-) -> String {
+pub(super) fn render_sample_evidence(args: VulkanFanOutSampleEvidence<'_>) -> String {
+    let VulkanFanOutSampleEvidence {
+        prefix,
+        asset_id,
+        entry,
+        kernel_id,
+        operation,
+        xor_file,
+        xor_expected,
+        xor_shape,
+        xor_row_stride_bytes,
+    } = args;
     let asset =
         asset(asset_id, entry).expect("Shader Nustar Vulkan fan-out asset must be registered");
     let output_evidence = render_u32_output_evidence(
@@ -226,10 +239,12 @@ pub(super) fn render_sample_evidence(
         asset: &asset,
         bytes: &asset.bytes,
         input_binding: render_u32_pair_artifact_binding(
-            prefix,
-            "tensor-row-major",
-            "2x2",
-            8,
+            U32BindingShape {
+                prefix,
+                layout: "tensor-row-major",
+                shape: "2x2",
+                row_stride_bytes: 8,
+            },
             INPUT_FILE,
             INPUT,
             RIGHT_FILE,
@@ -251,17 +266,17 @@ fn reduced_graph_evidence(_base: &str) -> String {
         .expect("Shader Nustar reduced Vulkan graph identity must assemble");
     format!(
         "provider_request_collection_contract=nuis-provider-request-collection-v1;provider_request_count=3;{};{};{};{}",
-        render_sample_evidence(
-            "provider_request_0_",
-            REDUCED_ASSET_ID,
-            REDUCED_ENTRY,
-            REDUCED_GRAPH_PRODUCER_ID,
-            "add-xor-pair-reduced-u32",
-            REDUCED_XOR_FILE,
-            REDUCED_XOR_EXPECTED,
-            "2x1",
-            8,
-        ),
+        render_sample_evidence(VulkanFanOutSampleEvidence {
+            prefix: "provider_request_0_",
+            asset_id: REDUCED_ASSET_ID,
+            entry: REDUCED_ENTRY,
+            kernel_id: REDUCED_GRAPH_PRODUCER_ID,
+            operation: "add-xor-pair-reduced-u32",
+            xor_file: REDUCED_XOR_FILE,
+            xor_expected: REDUCED_XOR_EXPECTED,
+            xor_shape: "2x1",
+            xor_row_stride_bytes: 8,
+        }),
         render_reduced_graph_consumer(ReducedGraphConsumer {
             request_index: 1,
             asset: &sum_consumer,
@@ -334,10 +349,12 @@ fn render_reduced_graph_consumer(args: ReducedGraphConsumer<'_>) -> String {
         asset: args.asset,
         bytes: &args.asset.bytes,
         input_binding: render_u32_dependency_binding(
-            &prefix,
-            "tensor-row-major",
-            args.shape,
-            args.row_stride_bytes,
+            U32BindingShape {
+                prefix: &prefix,
+                layout: "tensor-row-major",
+                shape: args.shape,
+                row_stride_bytes: args.row_stride_bytes,
+            },
             &input_hash,
             args.input.len(),
             REDUCED_GRAPH_PRODUCER_ID,

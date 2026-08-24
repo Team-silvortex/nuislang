@@ -89,42 +89,9 @@ pub(crate) fn independently_verify(source: &str) -> PersistedRuntimeDispatchRece
         .and_then(|value| i32::try_from(value).ok());
     let acknowledged = toml_bool(source, "runtime_dispatch_receipt_acknowledged");
     let claimed_hash = toml_string(source, "runtime_dispatch_receipt_hash");
-    let semantic_status = verify_semantics(
-        contract.as_deref(),
-        resolution_protocol.as_deref(),
-        resolution_status.as_deref(),
-        execution_identity_hash.as_deref(),
-        import_identity_hash.as_deref(),
-        table_identity.as_deref(),
-        capability_mask.as_deref(),
-        slot,
-        status_code,
-        acknowledged,
-    );
-    let verification_status = if semantic_status != "verified" {
-        semantic_status
-    } else {
-        let claim = RuntimeDispatchReceipt {
-            resolution_protocol: resolution_protocol.clone().unwrap_or_default(),
-            resolution_status: resolution_status.clone().unwrap_or_default(),
-            execution_identity_hash: execution_identity_hash.clone().unwrap_or_default(),
-            import_identity_hash: import_identity_hash.clone().unwrap_or_default(),
-            table_identity: table_identity.clone().unwrap_or_default(),
-            capability_mask: capability_mask.clone().unwrap_or_default(),
-            slot: slot.unwrap_or_default(),
-            status_code: status_code.unwrap_or_default(),
-            acknowledged: acknowledged.unwrap_or(false),
-            receipt_hash: String::new(),
-        };
-        match claimed_hash.as_deref() {
-            None | Some("") => "hash-missing".to_owned(),
-            Some(value) if value == receipt_hash(&claim) => "verified".to_owned(),
-            Some(_) => "hash-mismatch".to_owned(),
-        }
-    };
-    PersistedRuntimeDispatchReceipt {
+    let mut persisted = PersistedRuntimeDispatchReceipt {
         contract,
-        verification_status,
+        verification_status: String::new(),
         resolution_protocol,
         resolution_status,
         execution_identity_hash,
@@ -135,7 +102,33 @@ pub(crate) fn independently_verify(source: &str) -> PersistedRuntimeDispatchRece
         status_code,
         acknowledged,
         receipt_hash: claimed_hash,
-    }
+    };
+    let semantic_status = verify_semantics(&persisted);
+    persisted.verification_status = if semantic_status != "verified" {
+        semantic_status
+    } else {
+        let claim = RuntimeDispatchReceipt {
+            resolution_protocol: persisted.resolution_protocol.clone().unwrap_or_default(),
+            resolution_status: persisted.resolution_status.clone().unwrap_or_default(),
+            execution_identity_hash: persisted
+                .execution_identity_hash
+                .clone()
+                .unwrap_or_default(),
+            import_identity_hash: persisted.import_identity_hash.clone().unwrap_or_default(),
+            table_identity: persisted.table_identity.clone().unwrap_or_default(),
+            capability_mask: persisted.capability_mask.clone().unwrap_or_default(),
+            slot: persisted.slot.unwrap_or_default(),
+            status_code: persisted.status_code.unwrap_or_default(),
+            acknowledged: persisted.acknowledged.unwrap_or(false),
+            receipt_hash: String::new(),
+        };
+        match persisted.receipt_hash.as_deref() {
+            None | Some("") => "hash-missing".to_owned(),
+            Some(value) if value == receipt_hash(&claim) => "verified".to_owned(),
+            Some(_) => "hash-mismatch".to_owned(),
+        }
+    };
+    persisted
 }
 
 pub(crate) fn render_claim_fields(receipt: &RuntimeDispatchReceipt) -> String {
@@ -245,53 +238,52 @@ impl PersistedRuntimeDispatchReceipt {
     }
 }
 
-fn verify_semantics(
-    contract: Option<&str>,
-    resolution_protocol: Option<&str>,
-    resolution_status: Option<&str>,
-    execution_identity_hash: Option<&str>,
-    import_identity_hash: Option<&str>,
-    table_identity: Option<&str>,
-    capability_mask: Option<&str>,
-    slot: Option<u32>,
-    status_code: Option<i32>,
-    acknowledged: Option<bool>,
-) -> String {
-    if contract != Some(CONTRACT) {
+fn verify_semantics(receipt: &PersistedRuntimeDispatchReceipt) -> String {
+    if receipt.contract.as_deref() != Some(CONTRACT) {
         return "invalid-contract".to_owned();
     }
-    if resolution_protocol != Some(RESOLUTION_PROTOCOL) {
+    if receipt.resolution_protocol.as_deref() != Some(RESOLUTION_PROTOCOL) {
         return "invalid-resolution-protocol".to_owned();
     }
-    if resolution_status != Some("resolved") {
+    if receipt.resolution_status.as_deref() != Some("resolved") {
         return "unresolved".to_owned();
     }
-    if !execution_identity_hash.is_some_and(valid_u64_hex) {
+    if !receipt
+        .execution_identity_hash
+        .as_deref()
+        .is_some_and(valid_u64_hex)
+    {
         return "invalid-execution-identity".to_owned();
     }
-    if !import_identity_hash.is_some_and(valid_u64_hex) {
+    if !receipt
+        .import_identity_hash
+        .as_deref()
+        .is_some_and(valid_u64_hex)
+    {
         return "invalid-import-identity".to_owned();
     }
-    let Some(table_identity) = table_identity
+    let Some(table_identity) = receipt
+        .table_identity
+        .as_deref()
         .and_then(parse_u64_hex)
         .filter(|value| *value != 0)
     else {
         return "invalid-table-identity".to_owned();
     };
     let _ = table_identity;
-    let Some(capability_mask) = capability_mask.and_then(parse_u64_hex) else {
+    let Some(capability_mask) = receipt.capability_mask.as_deref().and_then(parse_u64_hex) else {
         return "invalid-capability-mask".to_owned();
     };
-    let Some(slot) = slot.filter(|value| (1..=64).contains(value)) else {
+    let Some(slot) = receipt.slot.filter(|value| (1..=64).contains(value)) else {
         return "invalid-slot".to_owned();
     };
     if capability_mask & (1_u64 << (slot - 1)) == 0 {
         return "invalid-capability-mask".to_owned();
     }
-    if status_code != Some(0) {
+    if receipt.status_code != Some(0) {
         return "invalid-status-code".to_owned();
     }
-    if acknowledged != Some(true) {
+    if receipt.acknowledged != Some(true) {
         return "not-acknowledged".to_owned();
     }
     "verified".to_owned()

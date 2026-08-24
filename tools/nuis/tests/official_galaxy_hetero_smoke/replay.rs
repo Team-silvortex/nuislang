@@ -189,7 +189,7 @@ pub(super) fn assert_multi_frame_replay_resume(output_dir: &Path) {
                 .strip_prefix("current_hash = \"")
                 .and_then(|value| value.strip_suffix('"'))
         })
-        .last()
+        .next_back()
         .expect("replay cursor lineage latest hash");
     let provider_dispatch_identity_hash = lineage_source
         .lines()
@@ -198,7 +198,7 @@ pub(super) fn assert_multi_frame_replay_resume(output_dir: &Path) {
                 .strip_prefix("provider_dispatch_identity_hash = \"")
                 .and_then(|value| value.strip_suffix('"'))
         })
-        .last()
+        .next_back()
         .expect("replay cursor lineage provider dispatch identity hash");
     let lineage_report = run_nuis(&["build-report", "--json", &output_dir_text]);
     assert_success(&lineage_report, "nuis mirror debugger cursor lineage");

@@ -34,7 +34,9 @@ fn cffi_nustar_owns_the_registered_host_boundary() {
     let cffi = load_manifest_for_domain(Path::new("nustar-packages"), "cffi").unwrap();
     assert_eq!(cffi.package_id, "official.cffi");
     assert_eq!(cffi.yir_lowering_entry, "cffi.yir.lowering.v1");
-    assert_eq!(cffi.host_ffi_abis, ["nurs", "c", "libc"]);
+    assert_eq!(cffi.host_ffi_abis, ["nurs", "c", "libc", "libm"]);
+    assert_eq!(cffi.linker_resolver_providers.len(), 2);
+    assert_eq!(cffi.linker_symbol_versions.len(), 4);
     assert!(cffi
         .capability_tags
         .contains(&"signature-whitelist".to_owned()));

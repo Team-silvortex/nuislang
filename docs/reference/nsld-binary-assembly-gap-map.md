@@ -225,7 +225,9 @@ platform plan/application before shell layout, independently rechecks the YIR
 CFFI signature hash and whitelist shape, and asks
 `nuis-nsld-elf-dynamic-resolver-provider-registry-v1` for target-specific
 interpreter, dependency, symbol-version whitelist, and resolver identities. The
-first registrations map hash-whitelisted `libc` and `libm` calls on x86_64
+first registrations are owned by `official.cffi`, validated and preserved by
+Nuisc, and generated into Nsld's static registry at build time. They map
+hash-whitelisted `libc` and `libm` calls on x86_64
 Linux GNU to the GNU loader, `libc.so.6`, `libm.so.6`, and the SysV bind-now PLT
 resolver. Providers own version identities, names, and GNU name hashes, not
 final-image indexes. The dependency plan assigns globally unique indexes from

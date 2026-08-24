@@ -200,9 +200,8 @@ fn collect_project_validation_snapshot(
 
 pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
     let mut source_kind = "binary".to_owned();
-    let mut output_dir = if input.is_dir() {
-        Some(input.to_path_buf())
-    } else if looks_like_artifact_output_dir(input) {
+    let input_is_output_dir = input.is_dir() || looks_like_artifact_output_dir(input);
+    let mut output_dir = if input_is_output_dir {
         Some(input.to_path_buf())
     } else {
         input.parent().map(Path::to_path_buf)
@@ -211,7 +210,7 @@ pub(crate) fn probe_artifact_doctor(input: &Path) -> ArtifactDoctorReport {
     let mut artifact_path = None;
     let mut binary_path = None;
 
-    if input.is_dir() || looks_like_artifact_output_dir(input) {
+    if input_is_output_dir {
         source_kind = "output_dir".to_owned();
         let candidate_manifest = input.join("nuis.build.manifest.toml");
         let candidate_artifact = input.join("nuis.compiled.artifact");

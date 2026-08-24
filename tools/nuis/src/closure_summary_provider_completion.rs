@@ -90,6 +90,12 @@ pub(crate) fn provider_completion_json_fields(
                 .records
                 .iter()
                 .map(|record| {
+                    let request_completion = format!(
+                        "\"request_completion\":{}",
+                        crate::workflow::request_completion_collection_json(
+                            &record.request_completion,
+                        )
+                    );
                     format!(
                         "{{{},{},{},{},{},{},{}}}",
                         crate::json_field("trace_id", &record.trace_id),
@@ -100,12 +106,7 @@ pub(crate) fn provider_completion_json_fields(
                             "dispatch_selected_set_hash",
                             &record.dispatch_selected_set_hash,
                         ),
-                        format!(
-                            "\"request_completion\":{}",
-                            crate::workflow::request_completion_collection_json(
-                                &record.request_completion,
-                            )
-                        ),
+                        request_completion,
                         crate::json_field("record_hash", &record.record_hash),
                     )
                 })

@@ -62,8 +62,9 @@ Current early-beta pressure is not to special-case Metal, CoreML, CUDA, GNU
 symbol names, or other providers in compiler and CLI code. Nsld consumes
 registered payload and execution-capsule metadata after the worker boundary
 verifies it, then places those records according to lifecycle, clock, and
-deterministic data-layout contracts. The immediate cleanup is to replace its
-first built-in GNU resolver rows with a generated CFFI Nustar registration.
+deterministic data-layout contracts. The first GNU resolver rows now come from
+the generated `official.cffi` Nustar registration. Nsld consumes the validated
+static build output and does not own the provider or symbol-version literals.
 
 ## Current Module Map
 
@@ -296,8 +297,9 @@ signature, loader, receipt replay, ordinary final-output selection, and direct
 execution. The ELF route now continues through deterministic private shell
 layout/serialization, independent validation, registered GNU dependency
 provenance, real loader admission, atomic publication, and ordinary explicit
-selection. PE/COFF and generated CFFI Nustar resolver registration remain
-incomplete. The
+selection. Generated CFFI Nustar resolver registration is closed for the first
+x86_64 Linux GNU `libc`/`libm` route; broader architecture coverage and PE/COFF
+remain incomplete. The
 ordinary default compatibility executable remains byte-for-byte unchanged;
 private installation requires both the explicit policy and `--apply`.
 

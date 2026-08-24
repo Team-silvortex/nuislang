@@ -4,8 +4,8 @@ use crate::{
         fnv1a64_hex, render_u32_dependency_binding, render_u32_dependency_edge,
         render_u32_prefixed_request_evidence_with_scalars, replace_code_asset_identity_fields,
         validate_code_asset_contribution_selection, validate_code_asset_request_evidence,
-        U32RequestEvidence, U32_INPUT as INPUT, U32_PAIR_ADD_EXPECTED as SUM_EXPECTED,
-        U32_PAIR_RIGHT_INPUT as RIGHT_INPUT,
+        U32BindingShape, U32RequestEvidence, U32_INPUT as INPUT,
+        U32_PAIR_ADD_EXPECTED as SUM_EXPECTED, U32_PAIR_RIGHT_INPUT as RIGHT_INPUT,
     },
     artifact_device_sample_shader_vulkan_fan_out as vulkan_fan_out,
 };
@@ -55,17 +55,17 @@ fn sample_evidence(_base: &str) -> String {
         .expect("cross-provider fan-out identity must assemble");
     format!(
         "provider_request_collection_contract=nuis-provider-request-collection-v1;provider_request_count=3;{};{};{};{}",
-        vulkan_fan_out::render_sample_evidence(
-            "provider_request_0_",
-            vulkan_fan_out::REDUCED_ASSET_ID,
-            vulkan_fan_out::REDUCED_ENTRY,
-            PRODUCER_ID,
-            "add-xor-pair-reduced-u32",
-            vulkan_fan_out::REDUCED_XOR_FILE,
-            vulkan_fan_out::REDUCED_XOR_EXPECTED,
-            "2x1",
-            8,
-        ),
+        vulkan_fan_out::render_sample_evidence(vulkan_fan_out::VulkanFanOutSampleEvidence {
+            prefix: "provider_request_0_",
+            asset_id: vulkan_fan_out::REDUCED_ASSET_ID,
+            entry: vulkan_fan_out::REDUCED_ENTRY,
+            kernel_id: PRODUCER_ID,
+            operation: "add-xor-pair-reduced-u32",
+            xor_file: vulkan_fan_out::REDUCED_XOR_FILE,
+            xor_expected: vulkan_fan_out::REDUCED_XOR_EXPECTED,
+            xor_shape: "2x1",
+            xor_row_stride_bytes: 8,
+        }),
         render_consumer(Consumer {
             request_index: 1,
             provider_family: "cuda:nvidia-gpu",
@@ -142,10 +142,12 @@ fn render_consumer(args: Consumer<'_>) -> String {
             asset: args.asset,
             bytes: &args.asset.bytes,
             input_binding: render_u32_dependency_binding(
-                &prefix,
-                "tensor-row-major",
-                args.shape,
-                8,
+                U32BindingShape {
+                    prefix: &prefix,
+                    layout: "tensor-row-major",
+                    shape: args.shape,
+                    row_stride_bytes: 8,
+                },
                 &input_hash,
                 args.input.len(),
                 PRODUCER_ID,

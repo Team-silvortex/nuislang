@@ -566,7 +566,7 @@ mod cpu Main {
     assert!(json.contains("\"artifact_verified\":true"));
     assert!(json.contains("\"artifact_container_kind\":\"compiled-artifact-section-table-v2\""));
     assert!(json.contains("\"artifact_container_version\":2"));
-    assert!(json.contains("\"artifact_section_count\":6"));
+    assert!(json.contains("\"artifact_section_count\":7"));
     assert!(json.contains("\"artifact_section_names\":[\"metadata_toml\""));
     assert!(json.contains("\"artifact_section_table_valid\":true"));
     assert!(json.contains("\"lowering_unit_count\":1"));

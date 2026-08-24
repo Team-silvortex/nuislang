@@ -43,6 +43,8 @@ fn make_manifest(domain: &str) -> NustarPackageManifest {
         abi_profiles,
         abi_capabilities: Vec::new(),
         host_ffi_memory_capabilities: Vec::new(),
+        linker_resolver_providers: Vec::new(),
+        linker_symbol_versions: Vec::new(),
         abi_targets,
         implementation_kinds: vec!["native-stub".to_owned()],
         loader_entry: "nustar.bootstrap.v1".to_owned(),
@@ -171,6 +173,43 @@ fn binary_manifest_round_trip_preserves_host_ffi_memory_capabilities() {
     assert_eq!(
         decoded.manifest.host_ffi_memory_capabilities,
         manifest.host_ffi_memory_capabilities
+    );
+}
+
+#[test]
+fn binary_manifest_round_trip_preserves_linker_resolver_registrations() {
+    let mut manifest = make_manifest("cffi");
+    manifest.abi_targets = vec![
+        "cffi.abi.v1:arch=x86_64|os=linux|object=elf|calling=sysv64|clang=x86_64-unknown-linux-gnu"
+            .to_owned(),
+    ];
+    manifest.abi_capabilities = vec![
+        "cffi.abi.v1:op:cffi.*".to_owned(),
+        "libc:ffi_symbol:puts=i32(String)".to_owned(),
+    ];
+    manifest.host_ffi_abis = vec!["libc".to_owned()];
+    manifest.linker_resolver_providers = vec![
+        "nuis-nustar-linker-resolver-provider-v1|test.elf.amd64.libc-v1|x86_64|linux|elf|sysv64|x86_64-unknown-linux-gnu|libc|linux.gnu.ld-v1|/lib64/ld-linux-x86-64.so.2|linux.gnu.libc-v1|libc.so.6|elf-symbol-version-v1|elf.amd64.plt-v1"
+            .to_owned(),
+    ];
+    manifest.linker_symbol_versions = vec![
+        "nuis-nustar-linker-symbol-version-v1|test.elf.amd64.libc-v1|puts|linux.gnu.glibc.2.2.5-v1|GLIBC_2.2.5"
+            .to_owned(),
+    ];
+    let binary = default_binary(manifest.clone(), vec![1, 2, 3]);
+    let decoded = decode(
+        &encode(&binary),
+        Path::new("linker-resolver-round-trip.nustar"),
+    )
+    .expect("linker resolver binary");
+
+    assert_eq!(
+        decoded.manifest.linker_resolver_providers,
+        manifest.linker_resolver_providers
+    );
+    assert_eq!(
+        decoded.manifest.linker_symbol_versions,
+        manifest.linker_symbol_versions
     );
 }
 

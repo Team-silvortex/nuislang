@@ -309,7 +309,7 @@ The `beta-0.1` calibration baseline is:
   produce byte-identical locks and caches, and locked compilation remains valid
   after provider deletion; persistent signer trust/rollback state, revocation,
   remote discovery/transport, and cache collection remain open
-* `linker-toolchain/nsld/os-native-executable-finalization`: `usable/99`,
+* `linker-toolchain/nsld/os-native-executable-finalization`: `stable/100`,
   required; a provider-neutral,
   hash-bound static registry now consumes an
   `NHOB`-bound pair of actual
@@ -472,7 +472,7 @@ The `beta-0.1` calibration baseline is:
   implicit compatibility, keeps explicit plan-only non-mutating, and installs
   only admitted bytes on apply. Explicit requests atomically persist path-free
   owner-private selection JSON; valid `cos` signature drift keeps ELF bytes but
-  blocks stale admission before mutation. Next: generated CFFI Nustar GNU resolver registrations; architecture and PE/COFF parity remain open
+  blocks stale admission before mutation. `official.cffi` now owns two generated GNU resolver providers and four version rows; Nuisc validates and preserves them, Nsld consumes a static build-time table, and runtime registry identity remains `0xc6631e590d61aca8`. Architecture and PE/COFF parity remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed

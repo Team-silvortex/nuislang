@@ -114,24 +114,6 @@ pub(crate) fn host_runner_binding_first_blocker(
     None
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn runtime_only_binding_table_does_not_require_provider_selection() {
-        let mut host_runner = HostRunnerJsonSurface::not_invoked("test");
-        host_runner.container_loader_metadata_binding_count = Some(2);
-        host_runner.container_loader_metadata_binding_parsed_count = Some(2);
-        host_runner.container_loader_metadata_binding_table_hash =
-            Some("0x1111111111111111".to_owned());
-        host_runner.container_loader_metadata_binding_validation_status =
-            Some("verified".to_owned());
-
-        assert_eq!(host_runner_binding_first_blocker(&host_runner), None);
-    }
-}
-
 fn valid_fnv1a64(value: &str) -> bool {
     value
         .strip_prefix("fnv1a64:")
@@ -151,4 +133,22 @@ fn fnv1a64_hex(bytes: &[u8]) -> String {
         hash = hash.wrapping_mul(0x100000001b3);
     }
     format!("fnv1a64:{hash:016x}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn runtime_only_binding_table_does_not_require_provider_selection() {
+        let mut host_runner = HostRunnerJsonSurface::not_invoked("test");
+        host_runner.container_loader_metadata_binding_count = Some(2);
+        host_runner.container_loader_metadata_binding_parsed_count = Some(2);
+        host_runner.container_loader_metadata_binding_table_hash =
+            Some("0x1111111111111111".to_owned());
+        host_runner.container_loader_metadata_binding_validation_status =
+            Some("verified".to_owned());
+
+        assert_eq!(host_runner_binding_first_blocker(&host_runner), None);
+    }
 }

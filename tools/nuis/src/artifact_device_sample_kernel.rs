@@ -370,7 +370,7 @@ mod tests {
         fs::create_dir_all(&output_dir).unwrap();
         let asset = nuisc::kernel_code_asset::select_kernel_code_asset("cuda.nvidia-gpu").unwrap();
         fs::write(output_dir.join(asset.file_name), asset.bytes).unwrap();
-        let evidence = format!("provider_sample_registration_package=official.kernel");
+        let evidence = "provider_sample_registration_package=official.kernel".to_owned();
         persist_cuda_vector_add_payloads(&output_dir, &[&evidence]).unwrap();
         assert_eq!(fs::read(output_dir.join(LEFT_FILE_NAME)).unwrap(), LEFT);
         assert_eq!(fs::read(output_dir.join(RIGHT_FILE_NAME)).unwrap(), RIGHT);

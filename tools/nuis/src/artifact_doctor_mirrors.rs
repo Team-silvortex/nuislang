@@ -142,12 +142,13 @@ pub(crate) fn collect_device_provider_sample_manifest_mirror(
         );
     let provider_bundle_evidence_status = provider_bundle_evidence_status(
         records.is_empty(),
-        &provider_bundle_registry_contract,
-        &provider_bundle_manifest_contract,
-        &provider_bundle_manifest_hash,
-        provider_bundle_manifest_entry_count,
-        &first_provider_bundle_package_id,
-        &first_provider_bundle_id,
+        (
+            &provider_bundle_registry_contract,
+            &provider_bundle_manifest_contract,
+            &provider_bundle_manifest_hash,
+            provider_bundle_manifest_entry_count,
+        ),
+        (&first_provider_bundle_package_id, &first_provider_bundle_id),
         &selected_provider_bundle_set_validation_status,
     );
     DeviceProviderSampleManifestMirror {
@@ -430,14 +431,12 @@ fn device_provider_sample_manifest_status(
 
 fn provider_bundle_evidence_status(
     empty: bool,
-    registry_contract: &str,
-    manifest_contract: &str,
-    manifest_hash: &str,
-    manifest_entry_count: usize,
-    first_package_id: &str,
-    first_bundle_id: &str,
+    manifest: (&str, &str, &str, usize),
+    first_bundle: (&str, &str),
     selected_provider_bundle_set_validation_status: &str,
 ) -> String {
+    let (registry_contract, manifest_contract, manifest_hash, manifest_entry_count) = manifest;
+    let (first_package_id, first_bundle_id) = first_bundle;
     if empty {
         return "not-applicable".to_owned();
     }
@@ -714,12 +713,13 @@ materialization_status = "provider-sample-blocked"
         assert_eq!(
             provider_bundle_evidence_status(
                 false,
-                PROVIDER_BUNDLE_REGISTRY_CONTRACT,
-                PROVIDER_BUNDLE_MANIFEST_CONTRACT,
-                "fnv1a64:08a971e5a543be2e",
-                3,
-                "official.shader",
-                "metal.apple-silicon-gpu.bundle.v1",
+                (
+                    PROVIDER_BUNDLE_REGISTRY_CONTRACT,
+                    PROVIDER_BUNDLE_MANIFEST_CONTRACT,
+                    "fnv1a64:08a971e5a543be2e",
+                    3,
+                ),
+                ("official.shader", "metal.apple-silicon-gpu.bundle.v1"),
                 "verified",
             ),
             "verified"
@@ -727,12 +727,13 @@ materialization_status = "provider-sample-blocked"
         assert_eq!(
             provider_bundle_evidence_status(
                 false,
-                PROVIDER_BUNDLE_REGISTRY_CONTRACT,
-                PROVIDER_BUNDLE_MANIFEST_CONTRACT,
-                "none",
-                0,
-                "none",
-                "none",
+                (
+                    PROVIDER_BUNDLE_REGISTRY_CONTRACT,
+                    PROVIDER_BUNDLE_MANIFEST_CONTRACT,
+                    "none",
+                    0,
+                ),
+                ("none", "none"),
                 "mismatch",
             ),
             "provider-bundle-evidence-invalid"
@@ -740,12 +741,8 @@ materialization_status = "provider-sample-blocked"
         assert_eq!(
             provider_bundle_evidence_status(
                 true,
-                "none",
-                "none",
-                "none",
-                0,
-                "none",
-                "none",
+                ("none", "none", "none", 0),
+                ("none", "none"),
                 "not-applicable",
             ),
             "not-applicable"

@@ -103,6 +103,7 @@ pub fn validate_registered_domains(root: &Path) -> Result<Vec<NustarRegistryIssu
     let mut seen_provider_rust_consts = BTreeSet::new();
     let mut seen_code_asset_ids = BTreeSet::new();
     let mut seen_code_asset_paths = BTreeSet::new();
+    let mut linker_manifests = Vec::new();
     for entry in &index {
         let manifest_path = manifest_path(&root, entry);
         if !seen_packages.insert(entry.package_id.clone()) {
@@ -122,6 +123,7 @@ pub fn validate_registered_domains(root: &Path) -> Result<Vec<NustarRegistryIssu
         let source = fs::read_to_string(&manifest_path)
             .map_err(|error| format!("failed to read `{}`: {error}", manifest_path.display()))?;
         let manifest = parse_manifest(&source, &manifest_path)?;
+        linker_manifests.push(manifest.clone());
 
         match crate::registry::provider_bundle_registrations(&manifest) {
             Ok(registrations) => {
@@ -346,6 +348,18 @@ pub fn validate_registered_domains(root: &Path) -> Result<Vec<NustarRegistryIssu
             &manifest,
             &manifest_path,
         ));
+    }
+
+    if let Err(error) = crate::registry::linker_resolver_registrations(&linker_manifests) {
+        if !issues.iter().any(|issue| issue.message == error) {
+            issues.push(NustarRegistryIssue {
+                kind: NustarRegistryIssueKind::PackagingContractMismatch,
+                package: None,
+                domain: Some("cffi".to_owned()),
+                manifest_path: Some(root.join(INDEX_FILE).display().to_string()),
+                message: error,
+            });
+        }
     }
 
     Ok(issues)

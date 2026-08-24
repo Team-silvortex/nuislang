@@ -4,8 +4,8 @@ use crate::{
         fnv1a64_hex, render_dependency_count_zero, render_u32_output_evidence,
         render_u32_pair_artifact_binding, render_u32_prefixed_request_evidence,
         replace_code_asset_identity_fields, validate_code_asset_contribution_selection,
-        validate_code_asset_request_evidence, U32OutputEvidence, U32RequestEvidence,
-        U32_INPUT as INPUT, U32_PAIR_ADD_EXPECTED as SUM_EXPECTED,
+        validate_code_asset_request_evidence, U32BindingShape, U32OutputEvidence,
+        U32RequestEvidence, U32_INPUT as INPUT, U32_PAIR_ADD_EXPECTED as SUM_EXPECTED,
         U32_PAIR_RIGHT_INPUT as RIGHT_INPUT,
     },
 };
@@ -90,10 +90,12 @@ fn sample_evidence(_base: &str) -> String {
         asset: &asset,
         bytes: &asset.bytes,
         input_binding: render_u32_pair_artifact_binding(
-            "provider_",
-            "tensor-row-major",
-            "2x2",
-            8,
+            U32BindingShape {
+                prefix: "provider_",
+                layout: "tensor-row-major",
+                shape: "2x2",
+                row_stride_bytes: 8,
+            },
             INPUT_FILE,
             INPUT,
             RIGHT_FILE,

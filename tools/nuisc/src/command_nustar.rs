@@ -227,6 +227,7 @@ pub(crate) fn run_pack_nustar(package_id: String, output: PathBuf) -> Result<(),
             binary.manifest.host_ffi_memory_capabilities.join(", ")
         );
     }
+    print_linker_resolver_surface(&binary.manifest);
     if !binary.manifest.abi_targets.is_empty() {
         println!("  abi_targets: {}", binary.manifest.abi_targets.join(", "));
     }
@@ -404,6 +405,7 @@ fn print_manifest_surface(manifest: &registry::NustarPackageManifest) {
             manifest.host_ffi_memory_capabilities.join(", ")
         );
     }
+    print_linker_resolver_surface(manifest);
     if !manifest.abi_targets.is_empty() {
         println!("  abi_targets: {}", manifest.abi_targets.join(", "));
     }
@@ -414,5 +416,20 @@ fn print_manifest_surface(manifest: &registry::NustarPackageManifest) {
         );
         println!("  host_ffi_abis: {}", manifest.host_ffi_abis.join(", "));
         println!("  host_ffi_bridge: {}", manifest.host_ffi_bridge);
+    }
+}
+
+fn print_linker_resolver_surface(manifest: &registry::NustarPackageManifest) {
+    if !manifest.linker_resolver_providers.is_empty() {
+        println!(
+            "  linker_resolver_providers: {}",
+            manifest.linker_resolver_providers.join(", ")
+        );
+    }
+    if !manifest.linker_symbol_versions.is_empty() {
+        println!(
+            "  linker_symbol_versions: {}",
+            manifest.linker_symbol_versions.join(", ")
+        );
     }
 }

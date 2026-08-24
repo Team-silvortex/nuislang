@@ -127,6 +127,7 @@ mod registry_domain_json;
 mod registry_host_ffi;
 mod registry_host_ffi_abi;
 mod registry_json;
+mod registry_linker_resolver;
 mod registry_load;
 mod registry_manifest_parse;
 mod registry_project_check_render;

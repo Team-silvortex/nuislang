@@ -98,7 +98,7 @@ fn independent_protected_file_backend_requires_explicit_paths() {
     env::set_var(ANCHOR_PATH_ENV, &anchor);
     env::set_var(ANCHOR_ROOT_ENV, anchor_parent);
     env::set_var(ANCHOR_MARKER_ROOT_ENV, marker_parent);
-    let _ = env::remove_var(ANCHOR_MARKER_ENV);
+    env::remove_var(ANCHOR_MARKER_ENV);
     assert!(matches!(
         enforce(
             &root.join("registry.toml"),

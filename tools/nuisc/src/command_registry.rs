@@ -109,6 +109,16 @@ pub(crate) fn run_registry(json: bool) -> Result<(), String> {
                 manifest.host_ffi_memory_capabilities.join(", ")
             );
         }
+        if !manifest.linker_resolver_providers.is_empty() {
+            println!(
+                "  linker_resolver_providers: {}",
+                manifest.linker_resolver_providers.join(", ")
+            );
+            println!(
+                "  linker_symbol_versions: {}",
+                manifest.linker_symbol_versions.join(", ")
+            );
+        }
         println!(
             "  implementation_kinds: {}",
             manifest.implementation_kinds.join(", ")

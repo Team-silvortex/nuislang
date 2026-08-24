@@ -32,8 +32,8 @@ nuis source / nuis.toml
 
 The development tensor currently reports clean recursive hierarchy, milestone,
 manifest, and implementation-drift coverage. Its 21 registered coordinates are
-all covered; the weakest bootstrap-critical coordinate remains
-`linker-toolchain/nsld/os-native-executable-finalization` at `usable`, `99/100`.
+all covered; the weakest bootstrap-critical coordinate is now
+`package-system/galaxy/source-import-and-lock-resolution` at `usable`, `99/100`.
 That means the checked-in slices agree with their evidence, not that every
 subsystem is complete.
 
@@ -47,11 +47,12 @@ compatibility output remains the non-mutating default. Stale admission,
 signature, registration, or image identity blocks mutation even when candidate
 ELF bytes have not changed.
 
-The immediate frontier is architectural rather than another hardcoded symbol:
-move the first GNU resolver providers and symbol-version rows out of Nsld-owned
-tables into a generated, statically validated CFFI Nustar registration
-contract. Broader ELF architecture coverage and PE/COFF remain separate
-registered finalizer work.
+The first GNU resolver providers and symbol-version rows now belong to
+`official.cffi`. Nuisc validates and preserves their registration contract,
+while Nsld generates a static runtime table at build time without changing the
+existing private-image or admission identity. The tensor now routes mainline
+work to Galaxy source/import/lock resolution. Broader ELF architecture coverage
+and PE/COFF remain separate registered finalizer work.
 
 Start with these documents:
 
@@ -78,7 +79,8 @@ The following surfaces are implemented and exercised today:
   production, verification, LLVM lowering, AOT emission, and project metadata.
 * Nustar registration covers `cpu`, `data`, `shader`, `kernel`, `network`, and
   first-class `official.cffi` host compatibility without making the compiler a
-  finite table of backend implementations.
+  finite table of backend implementations. The CFFI package also owns the first
+  generated GNU resolver and symbol-version registry.
 * Registered provider paths carry lifecycle, clock, GLM, artifact, and
   completion evidence. Checked-in routes include host CPU, Metal/CoreML, and
   Linux CUDA/Vulkan provider work.
@@ -95,8 +97,7 @@ The following surfaces are implemented and exercised today:
 
 The following boundaries are still intentionally incomplete:
 
-* generated CFFI Nustar ownership of GNU resolver registration, broader ELF
-  architecture/provider parity, and a PE/COFF final executable route
+* broader ELF architecture/provider parity and a PE/COFF final executable route
 * stable package/import/autoinjection and public API compatibility policy
 * complete raw-pointer and unsafe interoperability policy
 * provider-neutral graph execution with equal maturity across all hardware

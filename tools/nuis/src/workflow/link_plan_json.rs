@@ -10,7 +10,7 @@ use crate::{
     artifact_nsdb_handoff::read_persisted_nsdb_handoff,
     run_artifact::run_artifact_prelaunch_summary,
 };
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 fn workflow_link_plan_json_fields(link_plan: Option<&nuisc::linker::LinkPlan>) -> Vec<String> {
     let domain_unit_records = link_plan
@@ -772,10 +772,7 @@ fn workflow_run_artifact_prelaunch_summary(
 ) -> crate::run_artifact::RunArtifactPrelaunchSummary {
     let doctor = probe_artifact_doctor(output_dir);
     let resolved_binary = doctor.binary_path.filter(|path| path.exists());
-    run_artifact_prelaunch_summary(
-        Some(output_dir),
-        resolved_binary.as_ref().map(PathBuf::as_path),
-    )
+    run_artifact_prelaunch_summary(Some(output_dir), resolved_binary.as_deref())
 }
 
 pub(crate) fn append_workflow_link_plan_json_fields(

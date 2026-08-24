@@ -42,36 +42,45 @@ pub(crate) struct U32OutputEvidence<'a> {
     pub(crate) expected: &'a [u8],
 }
 
-pub(crate) fn render_u32_sample_request_evidence(
-    provider_family: &str,
-    kernel_id: &str,
-    operation: &str,
-    input_file_name: &str,
-    input: &[u8],
-    expected_file_name: &str,
-    expected: &[u8],
-    asset: &nuisc::registry::NustarCodeAssetRegistration,
-    bytes: &[u8],
-) -> String {
+pub(crate) struct U32SampleRequestEvidence<'a> {
+    pub(crate) provider_family: &'a str,
+    pub(crate) kernel_id: &'a str,
+    pub(crate) operation: &'a str,
+    pub(crate) input_file_name: &'a str,
+    pub(crate) input: &'a [u8],
+    pub(crate) expected_file_name: &'a str,
+    pub(crate) expected: &'a [u8],
+    pub(crate) asset: &'a nuisc::registry::NustarCodeAssetRegistration,
+    pub(crate) bytes: &'a [u8],
+}
+
+pub(crate) struct U32BindingShape<'a> {
+    pub(crate) prefix: &'a str,
+    pub(crate) layout: &'a str,
+    pub(crate) shape: &'a str,
+    pub(crate) row_stride_bytes: usize,
+}
+
+pub(crate) fn render_u32_sample_request_evidence(args: U32SampleRequestEvidence<'_>) -> String {
     render_u32_prefixed_request_evidence(U32RequestEvidence {
         prefix: "provider_",
-        provider_family,
-        kernel_id,
-        operation,
+        provider_family: args.provider_family,
+        kernel_id: args.kernel_id,
+        operation: args.operation,
         kernel_input_buffers: "input.values",
         buffer_layout: "tensor-contiguous",
         buffer_shape: "4",
-        row_stride_bytes: input.len(),
+        row_stride_bytes: args.input.len(),
         dispatch: "4x1x1",
         element_count: U32_ELEMENT_COUNT,
-        input_file_name,
-        input_hash: fnv1a64_hex(input),
-        input_byte_length: input.len(),
-        expected_file_name,
-        expected,
-        asset,
-        bytes,
-        input_binding: render_u32_artifact_binding("provider_", input_file_name, input),
+        input_file_name: args.input_file_name,
+        input_hash: fnv1a64_hex(args.input),
+        input_byte_length: args.input.len(),
+        expected_file_name: args.expected_file_name,
+        expected: args.expected,
+        asset: args.asset,
+        bytes: args.bytes,
+        input_binding: render_u32_artifact_binding("provider_", args.input_file_name, args.input),
         dependency: render_dependency_count_zero("provider_"),
         output_evidence: None,
     })
@@ -237,15 +246,18 @@ pub(crate) fn render_u32_artifact_binding(
 }
 
 pub(crate) fn render_u32_pair_artifact_binding(
-    prefix: &str,
-    layout: &str,
-    shape: &str,
-    row_stride_bytes: usize,
+    binding: U32BindingShape<'_>,
     left_file_name: &str,
     left: &[u8],
     right_file_name: &str,
     right: &[u8],
 ) -> String {
+    let U32BindingShape {
+        prefix,
+        layout,
+        shape,
+        row_stride_bytes,
+    } = binding;
     format!(
         "{prefix}input_binding_contract=nuis-provider-input-binding-v2;{prefix}input_binding_count=2;{prefix}input_binding_0_name=input.values;{prefix}input_binding_0_source=artifact;{prefix}input_binding_0_element_type=u32;{prefix}input_binding_0_layout={layout};{prefix}input_binding_0_shape={shape};{prefix}input_binding_0_row_stride_bytes={row_stride_bytes};{prefix}input_binding_0_byte_length={};{prefix}input_binding_0_content_hash={};{prefix}input_binding_0_payload_path={left_file_name};{prefix}input_binding_0_producer_request_id=none;{prefix}input_binding_0_producer_output_buffer=none;{prefix}input_binding_1_name=input.right;{prefix}input_binding_1_source=artifact;{prefix}input_binding_1_element_type=u32;{prefix}input_binding_1_layout={layout};{prefix}input_binding_1_shape={shape};{prefix}input_binding_1_row_stride_bytes={row_stride_bytes};{prefix}input_binding_1_byte_length={};{prefix}input_binding_1_content_hash={};{prefix}input_binding_1_payload_path={right_file_name};{prefix}input_binding_1_producer_request_id=none;{prefix}input_binding_1_producer_output_buffer=none",
         left.len(),
@@ -256,15 +268,18 @@ pub(crate) fn render_u32_pair_artifact_binding(
 }
 
 pub(crate) fn render_u32_dependency_binding(
-    prefix: &str,
-    layout: &str,
-    shape: &str,
-    row_stride_bytes: usize,
+    binding: U32BindingShape<'_>,
     input_hash: &str,
     input_byte_length: usize,
     producer_request_id: &str,
     producer_output_buffer: &str,
 ) -> String {
+    let U32BindingShape {
+        prefix,
+        layout,
+        shape,
+        row_stride_bytes,
+    } = binding;
     format!(
         "{prefix}input_binding_contract=nuis-provider-input-binding-v2;{prefix}input_binding_count=1;{prefix}input_binding_0_name=input.values;{prefix}input_binding_0_source=dependency;{prefix}input_binding_0_element_type=u32;{prefix}input_binding_0_layout={layout};{prefix}input_binding_0_shape={shape};{prefix}input_binding_0_row_stride_bytes={row_stride_bytes};{prefix}input_binding_0_byte_length={input_byte_length};{prefix}input_binding_0_content_hash={input_hash};{prefix}input_binding_0_payload_path=none;{prefix}input_binding_0_producer_request_id={producer_request_id};{prefix}input_binding_0_producer_output_buffer={producer_output_buffer}"
     )

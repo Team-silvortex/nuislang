@@ -385,10 +385,7 @@ fn monomorphizes_no_annotation_try_await_result_binding_through_higher_order_map
         .iter()
         .find(|function| function.name == "compute")
         .unwrap();
-    assert!(compute
-        .body
-        .iter()
-        .any(|stmt| mapped_binding_is_concrete_result(stmt)));
+    assert!(compute.body.iter().any(mapped_binding_is_concrete_result));
     assert!(matches!(
         compute.body.last(),
         Some(NirStmt::Return(Some(NirExpr::Var(name)))) if name == "mapped"

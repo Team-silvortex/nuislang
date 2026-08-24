@@ -57,11 +57,13 @@ At this documentation refresh the development tensor reports:
 
 * clean recursive hierarchy validation across 46 nodes and three axes
 * `21/21` milestone coordinates covered
-* `584/584` implementation-drift checks passing after current-route guards are
+* `589/589` implementation-drift checks passing after current-route guards are
   migrated to this entry
 * bootstrap-critical average progress at `99/100`
-* `linker-toolchain/nsld/os-native-executable-finalization` as the weakest
+* `package-system/galaxy/source-import-and-lock-resolution` as the weakest
   bootstrap-critical coordinate at `usable`, `99/100`
+* `linker-toolchain/nsld/os-native-executable-finalization` closed at
+  `stable`, `100/100`
 
 Tensor `stable` describes the recorded milestone slice. It is not a promise of
 language, ABI, package, or standard-library compatibility.
@@ -94,21 +96,23 @@ Nuis model.
 
 ## Current Priorities
 
-1. define a canonical generated CFFI Nustar resolver-registration artifact
-2. move GNU provider and symbol-version rows out of Nsld-owned built-in tables
-   while preserving private bytes, ledgers, and admission identity
-3. reject stale resolver-registration identity before admission or mutation
-4. widen ELF architecture and dependency coverage without provider-specific
+1. strengthen Galaxy source/import/lock resolution with persistent signer trust,
+   monotonic generation state, and future remote-provider boundaries
+2. widen ELF architecture and dependency coverage without provider-specific
    compiler or CLI branches
-5. add PE/COFF finalization as another registered backend
-6. continue package, standard-library, provider, performance, and bug hardening
+3. add PE/COFF finalization as another registered backend
+4. continue package, standard-library, provider, performance, and bug hardening
    before the staged self-hosting migration begins at `beta-0.10.*`
+
+The first three resolver-registration objectives from the entry checkpoint are
+closed: `official.cffi` owns two GNU providers and four symbol-version rows,
+Nuisc validates and preserves them, and Nsld generates a static table while
+retaining runtime registry identity `0xc6631e590d61aca8`.
 
 ## Honest Boundaries
 
 The current repository still does not claim:
 
-* generated Nustar ownership of the first GNU resolver registry
 * equal native-finalizer maturity across architectures and operating systems
 * a PE/COFF final executable route
 * stable package, source, ABI, linker-script, or public API compatibility

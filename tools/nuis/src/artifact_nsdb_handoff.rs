@@ -178,15 +178,13 @@ impl PersistedNsdbHandoffSummary {
     }
 
     pub(crate) fn hetero_execution_closure_ready(&self) -> bool {
-        match (
-            self.hetero_execution_closure_status.as_deref(),
-            self.hetero_execution_closure_ready.as_deref(),
-        ) {
-            (None, _) => true,
-            (Some("none"), _) => true,
-            (Some("closed"), Some("true")) => true,
-            _ => false,
-        }
+        matches!(
+            (
+                self.hetero_execution_closure_status.as_deref(),
+                self.hetero_execution_closure_ready.as_deref(),
+            ),
+            (None, _) | (Some("none"), _) | (Some("closed"), Some("true"))
+        )
     }
 
     pub(crate) fn hetero_execution_closure_blocker(&self) -> Option<String> {

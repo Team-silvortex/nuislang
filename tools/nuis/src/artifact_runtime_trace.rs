@@ -1,7 +1,7 @@
 use crate::artifact_device_sample::{
     device_sample_contract_for_trace, persist_device_sample_input_payloads,
     push_device_sample_handoff_queue_toml, render_device_provider_sample_manifest_toml,
-    summarize_device_samples, DeviceSampleContract, DeviceSampleSummary,
+    summarize_device_samples, DeviceSampleContract, DeviceSampleSummary, DeviceSampleTraceInput,
     DEVICE_PROVIDER_SAMPLE_FILE_NAME,
 };
 use crate::artifact_doctor::BackendArtifactPayloadEvidence;
@@ -597,17 +597,17 @@ fn trace_record_for_unit(
     };
     let backend_artifact_key = backend_artifact_key(unit);
     let trace_id = format!("hetero-trace:{backend_artifact_key}");
-    let device_sample = device_sample_contract_for_trace(
+    let device_sample = device_sample_contract_for_trace(DeviceSampleTraceInput {
         trace_role,
         status,
-        &unit.domain_family,
-        &trace_id,
-        unit.backend_family.as_deref(),
-        unit.target_device.as_deref(),
-        unit.artifact_payload_format.as_deref(),
-        unit.artifact_payload_blob_path.as_deref(),
+        domain_family: &unit.domain_family,
+        trace_id: &trace_id,
+        backend_family: unit.backend_family.as_deref(),
+        target_device: unit.target_device.as_deref(),
+        payload_format: unit.artifact_payload_format.as_deref(),
+        payload_path: unit.artifact_payload_blob_path.as_deref(),
         artifact_provider_metadata,
-    );
+    });
 
     HeteroRuntimeTraceRecord {
         trace_id,

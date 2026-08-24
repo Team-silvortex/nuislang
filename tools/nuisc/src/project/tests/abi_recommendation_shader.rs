@@ -271,6 +271,8 @@ fn recommend_cpu_abi_profile_prefers_registered_host_target() {
             format!("{}:op:cpu.*", alt.0),
         ],
         host_ffi_memory_capabilities: Vec::new(),
+        linker_resolver_providers: Vec::new(),
+        linker_symbol_versions: Vec::new(),
         abi_targets: vec![
             format!(
                 "cpu.host.match:arch={}|os={}|object={}|calling={}|clang={}",
@@ -394,6 +396,8 @@ fn recommend_data_abi_profile_prefers_registered_host_target() {
             "data.fabric.alt.v1:surface:data.profile.*|op:data.*".to_owned(),
         ],
         host_ffi_memory_capabilities: Vec::new(),
+        linker_resolver_providers: Vec::new(),
+        linker_symbol_versions: Vec::new(),
         abi_targets: vec![
             "data.fabric.v1:arch=host|os=host|object=host|calling=host|clang=host".to_owned(),
             format!(
@@ -515,6 +519,8 @@ fn recommend_kernel_abi_profile_prefers_registered_host_target() {
             "kernel.alt.v1:surface:kernel.profile.*|op:kernel.*".to_owned(),
         ],
         host_ffi_memory_capabilities: Vec::new(),
+        linker_resolver_providers: Vec::new(),
+        linker_symbol_versions: Vec::new(),
         abi_targets: vec![
             "kernel.cpu-fallback.v1:arch=host|os=host|object=host|calling=host|clang=host"
                 .to_owned(),
@@ -637,6 +643,8 @@ fn recommend_shader_abi_profile_prefers_registered_host_target() {
             "shader.alt.v1:surface:shader.profile.*|op:shader.*".to_owned(),
         ],
         host_ffi_memory_capabilities: Vec::new(),
+        linker_resolver_providers: Vec::new(),
+        linker_symbol_versions: Vec::new(),
         abi_targets: vec![
             "shader.render.cpu-fallback.v1:arch=host|os=host|object=host|calling=host|clang=host"
                 .to_owned(),
@@ -766,6 +774,8 @@ fn recommend_shader_abi_profile_prefers_vendor_device_host_trait() {
             "shader.trait-host.v1:surface:shader.profile.*|op:shader.*".to_owned(),
         ],
         host_ffi_memory_capabilities: Vec::new(),
+        linker_resolver_providers: Vec::new(),
+        linker_symbol_versions: Vec::new(),
         abi_targets: vec![
             format!(
                 "shader.generic-host.v1:arch={}|os={}|object={}|calling={}|clang={}|backend=metal|vendor=generic|device=generic-gpu",

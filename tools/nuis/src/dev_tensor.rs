@@ -184,8 +184,7 @@ pub(crate) fn dev_tensor_summary() -> DevTensorSummary {
                 "no bootstrap-critical tensor cell is currently registered".to_owned()
             }
         });
-    let handoff_bootstrap =
-        task_cell.and_then(|weakest| dev_tensor_handoff_bootstrap_cell(weakest));
+    let handoff_bootstrap = task_cell.and_then(dev_tensor_handoff_bootstrap_cell);
     let handoff_coordinate = handoff_bootstrap
         .map(|cell| dev_tensor_coordinate_key(cell.architecture, cell.module, cell.function))
         .unwrap_or_else(|| task_card_coordinate.clone());
@@ -459,7 +458,7 @@ pub(crate) fn dev_tensor_coverage_summary() -> DevTensorCoverageSummary {
         .first()
         .or_else(|| orphaned_coordinates.first())
         .or_else(|| stale_coordinates.first())
-        .or_else(|| milestone.first_gap.as_ref())
+        .or(milestone.first_gap.as_ref())
         .cloned();
     DevTensorCoverageSummary {
         expected_source: expected.source,

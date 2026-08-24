@@ -3,6 +3,8 @@ use std::path::Path;
 pub(crate) const DEVICE_SAMPLE_INPUT_REGISTRATION_CONTRACT: &str =
     "nuis-device-sample-input-registration-v1";
 
+type DeviceSampleEvidenceResolver = fn(&Path, &str) -> Result<String, String>;
+
 pub(crate) struct DeviceSampleInputRegistration {
     pub(crate) package_id: &'static str,
     pub(crate) registration_id: &'static str,
@@ -10,7 +12,7 @@ pub(crate) struct DeviceSampleInputRegistration {
     pub(crate) supports: fn(&str, &str) -> bool,
     pub(crate) metadata_selector: Option<fn(&str) -> bool>,
     pub(crate) enrich_evidence: fn(&str) -> String,
-    pub(crate) resolve_evidence: Option<fn(&Path, &str) -> Result<String, String>>,
+    pub(crate) resolve_evidence: Option<DeviceSampleEvidenceResolver>,
     pub(crate) persist_payloads: fn(&Path, &[&str]) -> Result<(), String>,
 }
 

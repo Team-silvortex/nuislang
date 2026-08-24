@@ -6,9 +6,10 @@ use crate::{
         render_u32_pair_artifact_binding, render_u32_prefixed_request_evidence,
         render_u32_sample_request_evidence, replace_code_asset_identity_fields,
         validate_code_asset_contribution_selection, validate_code_asset_request_evidence,
-        U32RequestEvidence, U32_ADD_EXPECTED as ADD_EXPECTED, U32_INPUT as INPUT,
-        U32_MUL_EXPECTED as MUL_EXPECTED, U32_PAIR_ADD_EXPECTED as PAIR_ADD_EXPECTED,
-        U32_PAIR_RIGHT_INPUT as PAIR_RIGHT_INPUT, U32_ZERO_EXPECTED as SUB_EXPECTED,
+        U32BindingShape, U32RequestEvidence, U32SampleRequestEvidence,
+        U32_ADD_EXPECTED as ADD_EXPECTED, U32_INPUT as INPUT, U32_MUL_EXPECTED as MUL_EXPECTED,
+        U32_PAIR_ADD_EXPECTED as PAIR_ADD_EXPECTED, U32_PAIR_RIGHT_INPUT as PAIR_RIGHT_INPUT,
+        U32_ZERO_EXPECTED as SUB_EXPECTED,
     },
 };
 use std::{fs, path::Path};
@@ -286,10 +287,12 @@ fn metal_sample_evidence(sample: MetalSampleSpec) -> String {
             asset: &asset,
             bytes: &asset.bytes,
             input_binding: render_u32_pair_artifact_binding(
-                "provider_",
-                "tensor-row-major",
-                "2x2",
-                8,
+                U32BindingShape {
+                    prefix: "provider_",
+                    layout: "tensor-row-major",
+                    shape: "2x2",
+                    row_stride_bytes: 8,
+                },
                 sample.input_file_name,
                 INPUT,
                 right_file_name,
@@ -299,17 +302,17 @@ fn metal_sample_evidence(sample: MetalSampleSpec) -> String {
             output_evidence: None,
         });
     }
-    render_u32_sample_request_evidence(
-        "metal:apple-silicon-gpu",
-        sample.kernel_id,
-        sample.operation,
-        sample.input_file_name,
-        INPUT,
-        sample.expected_file_name,
-        sample.expected,
-        &asset,
-        &asset.bytes,
-    )
+    render_u32_sample_request_evidence(U32SampleRequestEvidence {
+        provider_family: "metal:apple-silicon-gpu",
+        kernel_id: sample.kernel_id,
+        operation: sample.operation,
+        input_file_name: sample.input_file_name,
+        input: INPUT,
+        expected_file_name: sample.expected_file_name,
+        expected: sample.expected,
+        asset: &asset,
+        bytes: &asset.bytes,
+    })
 }
 
 fn metal_chain_code_asset_identity(
@@ -404,10 +407,12 @@ fn render_chain_dependency_request(
         asset,
         bytes,
         input_binding: render_u32_dependency_binding(
-            &prefix,
-            "tensor-contiguous",
-            "4",
-            ADD_EXPECTED.len(),
+            U32BindingShape {
+                prefix: &prefix,
+                layout: "tensor-contiguous",
+                shape: "4",
+                row_stride_bytes: ADD_EXPECTED.len(),
+            },
             &input_hash,
             ADD_EXPECTED.len(),
             "shader.metal.chain.add-u32",

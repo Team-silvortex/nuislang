@@ -33,6 +33,12 @@ pub use crate::registry_host_ffi::{
     HostFfiRegistryView, HostFfiSymbolRegistration,
 };
 pub use crate::registry_host_ffi_abi::validate_abi_capabilities;
+pub use crate::registry_linker_resolver::{
+    linker_resolver_registrations, NustarLinkerResolverProviderRegistration,
+    NustarLinkerResolverRegistrations, NustarLinkerSymbolVersionRegistration,
+    NUSTAR_LINKER_RESOLVER_PROVIDER_CONTRACT, NUSTAR_LINKER_RESOLVER_REGISTRY_CONTRACT,
+    NUSTAR_LINKER_SYMBOL_VERSION_CONTRACT,
+};
 pub use crate::registry_load::{
     load_all_manifests, load_index, load_manifest, load_manifest_for_domain,
     load_required_manifests, required_package_ids,

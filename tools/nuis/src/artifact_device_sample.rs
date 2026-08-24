@@ -37,17 +37,32 @@ pub(crate) struct DeviceSampleSummary {
     first_pending_provider_family: String,
 }
 
+pub(crate) struct DeviceSampleTraceInput<'a> {
+    pub(crate) trace_role: &'a str,
+    pub(crate) status: &'a str,
+    pub(crate) domain_family: &'a str,
+    pub(crate) trace_id: &'a str,
+    pub(crate) backend_family: Option<&'a str>,
+    pub(crate) target_device: Option<&'a str>,
+    pub(crate) payload_format: Option<&'a str>,
+    pub(crate) payload_path: Option<&'a str>,
+    pub(crate) artifact_provider_metadata: &'a [String],
+}
+
 pub(crate) fn device_sample_contract_for_trace(
-    trace_role: &str,
-    status: &str,
-    domain_family: &str,
-    trace_id: &str,
-    backend_family: Option<&str>,
-    target_device: Option<&str>,
-    payload_format: Option<&str>,
-    payload_path: Option<&str>,
-    artifact_provider_metadata: &[String],
+    input: DeviceSampleTraceInput<'_>,
 ) -> DeviceSampleContract {
+    let DeviceSampleTraceInput {
+        trace_role,
+        status,
+        domain_family,
+        trace_id,
+        backend_family,
+        target_device,
+        payload_format,
+        payload_path,
+        artifact_provider_metadata,
+    } = input;
     if trace_role != "backend-artifact" {
         return DeviceSampleContract {
             provider: "none".to_owned(),

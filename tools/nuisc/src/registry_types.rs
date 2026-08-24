@@ -29,6 +29,8 @@ pub struct NustarPackageManifest {
     pub abi_profiles: Vec<String>,
     pub abi_capabilities: Vec<String>,
     pub host_ffi_memory_capabilities: Vec<String>,
+    pub linker_resolver_providers: Vec<String>,
+    pub linker_symbol_versions: Vec<String>,
     pub abi_targets: Vec<String>,
     pub implementation_kinds: Vec<String>,
     pub loader_entry: String,

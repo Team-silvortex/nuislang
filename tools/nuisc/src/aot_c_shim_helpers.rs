@@ -208,29 +208,6 @@ pub(crate) fn render_host_ffi_stub(symbol: &str, function: AstExternFunction) ->
     )
 }
 
-#[cfg(test)]
-mod tests {
-    use super::collect_host_ffi_symbols;
-
-    #[test]
-    fn collects_lowered_symbol_for_std_host_extern() {
-        let ast = crate::frontend::parse_nuis_ast(
-            r#"
-            mod cffi Main {
-              extern "c" @host_symbol("stdout.write") fn stdout_write(text: i64) -> i64;
-              fn main() -> i64 { return stdout_write(1); }
-            }
-            "#,
-        )
-        .expect("parse std host extern");
-
-        let symbols = collect_host_ffi_symbols(&ast);
-        assert!(symbols.contains_key("host_stdout_write"));
-        assert!(!symbols.contains_key("stdout_write"));
-        assert_eq!(symbols["host_stdout_write"].name, "stdout_write");
-    }
-}
-
 pub(crate) fn arg_name(index: usize, function: &AstExternFunction) -> String {
     function
         .params
@@ -445,5 +422,28 @@ pub(crate) fn c_type_for_ast_type(ty: &AstTypeRef) -> &'static str {
         "f64" => "double",
         "bool" => "int32_t",
         _ => "int64_t",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::collect_host_ffi_symbols;
+
+    #[test]
+    fn collects_lowered_symbol_for_std_host_extern() {
+        let ast = crate::frontend::parse_nuis_ast(
+            r#"
+            mod cffi Main {
+              extern "c" @host_symbol("stdout.write") fn stdout_write(text: i64) -> i64;
+              fn main() -> i64 { return stdout_write(1); }
+            }
+            "#,
+        )
+        .expect("parse std host extern");
+
+        let symbols = collect_host_ffi_symbols(&ast);
+        assert!(symbols.contains_key("host_stdout_write"));
+        assert!(!symbols.contains_key("stdout_write"));
+        assert_eq!(symbols["host_stdout_write"].name, "stdout_write");
     }
 }

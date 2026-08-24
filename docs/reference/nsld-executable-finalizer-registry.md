@@ -135,7 +135,10 @@ provider serializes and independently validates that private ELF shell.
 before shell layout through
 `nuis-nsld-elf-dynamic-resolver-provider-registry-v1`, while rechecking the CFFI
 footprint and exact YIR signature hashes. Its first x86_64 Linux GNU providers
-bind the `libc` and `libm` ABIs to one GNU loader, `libc.so.6` and `libm.so.6`,
+are declared by `official.cffi` under
+`nuis-nustar-linker-resolver-registry-v1`, validated and preserved by Nuisc,
+then generated into Nsld's static table at build time. They bind the `libc` and
+`libm` ABIs to one GNU loader, `libc.so.6` and `libm.so.6`,
 the explicit `elf-registered-symbol-version-whitelist-v1` policy, and the SysV
 bind-now PLT resolver. Providers register symbol-version identities and names,
 but do not own final-image version indexes. The immutable dependency plan
