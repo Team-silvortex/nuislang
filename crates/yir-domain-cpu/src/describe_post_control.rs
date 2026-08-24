@@ -280,6 +280,26 @@ pub(super) fn describe_cpu_post_control_node(
             }
             Ok(InstructionSemantics::effect(inputs))
         }
+        "guard_loop_continue" => {
+            if node.op.args.len() != 1 {
+                return Err(format!(
+                    "node `{}` expects `cpu.guard_loop_continue <name> <resource> <condition>`",
+                    node.name
+                ));
+            }
+
+            Ok(InstructionSemantics::effect(node.op.args.clone()))
+        }
+        "guard_loop_print_continue" => {
+            if node.op.args.len() != 2 {
+                return Err(format!(
+                    "node `{}` expects `cpu.guard_loop_print_continue <name> <resource> <condition> <print>`",
+                    node.name
+                ));
+            }
+
+            Ok(InstructionSemantics::effect(node.op.args.clone()))
+        }
         "guard_return" => {
             if node.op.args.len() != 2 {
                 return Err(format!(

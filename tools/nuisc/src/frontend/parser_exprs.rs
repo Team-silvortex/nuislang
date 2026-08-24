@@ -321,20 +321,7 @@ impl Parser {
                     body,
                 })
             }
-            Some(Token::Word(word)) if word == "if" => {
-                let condition = self.parse_condition_expr()?;
-                let then_body = self.parse_block_with_tail_expr()?;
-                if !self.peek_word("else") {
-                    return Err("`if` expression currently requires `else`".to_owned());
-                }
-                self.expect_word("else")?;
-                let else_body = self.parse_block_with_tail_expr()?;
-                Ok(AstExpr::If {
-                    condition: Box::new(condition),
-                    then_body,
-                    else_body,
-                })
-            }
+            Some(Token::Word(word)) if word == "if" => self.parse_if_expr_after_keyword(),
             Some(Token::Word(word)) if word == "match" => {
                 self.cursor = self.cursor.saturating_sub(1);
                 let (value, arms) = self.parse_match_expr_parts(true)?;
@@ -393,6 +380,65 @@ impl Parser {
             )),
             None => Err("minimal nuisc frontend expected value, found end of input".to_owned()),
         }
+    }
+
+    fn parse_if_expr_after_keyword(&mut self) -> Result<AstExpr, String> {
+        if self.peek_word("let") {
+            return self.parse_if_let_expr_after_keyword();
+        }
+        let condition = self.parse_condition_expr()?;
+        let then_body = self.parse_block_with_tail_expr()?;
+        if !self.peek_word("else") {
+            return Err("`if` expression currently requires `else`".to_owned());
+        }
+        self.expect_word("else")?;
+        let else_body = if self.peek_word("if") {
+            self.expect_word("if")?;
+            vec![AstStmt::Return(Some(self.parse_if_expr_after_keyword()?))]
+        } else {
+            self.parse_block_with_tail_expr()?
+        };
+        Ok(AstExpr::If {
+            condition: Box::new(condition),
+            then_body,
+            else_body,
+        })
+    }
+
+    fn parse_if_let_expr_after_keyword(&mut self) -> Result<AstExpr, String> {
+        self.expect_word("let")?;
+        let pattern = self.parse_match_pattern()?;
+        if matches!(pattern, AstMatchPattern::Wildcard) {
+            return Err("`if let _ = ...` is irrefutable; use the value directly".to_owned());
+        }
+        self.expect_symbol('=')?;
+        let value = self.parse_match_scrutinee_expr()?;
+        let then_body = self.parse_block_with_tail_expr()?;
+        if !self.peek_word("else") {
+            return Err("`if let` expression currently requires `else`".to_owned());
+        }
+        self.expect_word("else")?;
+        let else_body = if self.peek_word("if") {
+            self.expect_word("if")?;
+            vec![AstStmt::Return(Some(self.parse_if_expr_after_keyword()?))]
+        } else {
+            self.parse_block_with_tail_expr()?
+        };
+        Ok(AstExpr::Match {
+            value: Box::new(value),
+            arms: vec![
+                AstMatchArm {
+                    pattern,
+                    guard: None,
+                    body: then_body,
+                },
+                AstMatchArm {
+                    pattern: AstMatchPattern::Wildcard,
+                    guard: None,
+                    body: else_body,
+                },
+            ],
+        })
     }
 
     pub(super) fn parse_argument_list(&mut self, terminator: char) -> Result<Vec<AstExpr>, String> {

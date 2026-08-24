@@ -115,8 +115,12 @@ pub(super) struct PureHelperBlock {
 }
 
 pub(super) enum PreparedLoopBody {
-    ExitOnly,
-    PrintExit {
+    Break,
+    Continue,
+    PrintBreak {
+        print: NirExpr,
+    },
+    PrintContinue {
         print: NirExpr,
     },
     Return {

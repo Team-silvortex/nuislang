@@ -21,10 +21,7 @@ impl Parser {
             return self.parse_while_stmt();
         }
         if self.peek_word("loop") {
-            return Err(
-                "`loop` is not supported yet; current control flow supports `if` branches, but indefinite loop syntax still needs explicit AST/NIR/YIR loop support"
-                    .to_owned(),
-            );
+            return self.parse_loop_stmt();
         }
         if self.peek_word("break") {
             return self.parse_break_stmt();
@@ -314,14 +311,12 @@ impl Parser {
 
     fn parse_if_stmt(&mut self) -> Result<AstStmt, String> {
         self.expect_word("if")?;
+        if self.peek_word("let") {
+            return self.parse_if_let_stmt_after_keyword();
+        }
         let condition = self.parse_condition_expr()?;
         let then_body = self.parse_stmt_block()?;
-        let else_body = if self.peek_word("else") {
-            self.expect_word("else")?;
-            self.parse_stmt_block()?
-        } else {
-            Vec::new()
-        };
+        let else_body = self.parse_optional_else_stmt_body()?;
         Ok(AstStmt::If {
             condition,
             then_body,
@@ -329,11 +324,61 @@ impl Parser {
         })
     }
 
+    fn parse_if_let_stmt_after_keyword(&mut self) -> Result<AstStmt, String> {
+        self.expect_word("let")?;
+        let pattern = self.parse_match_pattern()?;
+        if matches!(pattern, AstMatchPattern::Wildcard) {
+            return Err("`if let _ = ...` is irrefutable; use the body directly".to_owned());
+        }
+        self.expect_symbol('=')?;
+        let value = self.parse_match_scrutinee_expr()?;
+        let then_body = self.parse_stmt_block()?;
+        let else_body = self.parse_optional_else_stmt_body()?;
+        Ok(AstStmt::Match {
+            value,
+            arms: vec![
+                AstMatchArm {
+                    pattern,
+                    guard: None,
+                    body: then_body,
+                },
+                AstMatchArm {
+                    pattern: AstMatchPattern::Wildcard,
+                    guard: None,
+                    body: else_body,
+                },
+            ],
+        })
+    }
+
+    fn parse_optional_else_stmt_body(&mut self) -> Result<Vec<AstStmt>, String> {
+        let else_body = if self.peek_word("else") {
+            self.expect_word("else")?;
+            if self.peek_word("if") {
+                vec![self.parse_if_stmt()?]
+            } else {
+                self.parse_stmt_block()?
+            }
+        } else {
+            Vec::new()
+        };
+        Ok(else_body)
+    }
+
     fn parse_while_stmt(&mut self) -> Result<AstStmt, String> {
         self.expect_word("while")?;
         let condition = self.parse_condition_expr()?;
         let body = self.parse_stmt_block()?;
         Ok(AstStmt::While { condition, body })
+    }
+
+    fn parse_loop_stmt(&mut self) -> Result<AstStmt, String> {
+        self.expect_word("loop")?;
+        let body = self.parse_stmt_block()?;
+        Ok(AstStmt::While {
+            condition: AstExpr::Bool(true),
+            body,
+        })
     }
 
     fn parse_match_stmt(&mut self) -> Result<AstStmt, String> {

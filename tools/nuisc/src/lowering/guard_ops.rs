@@ -29,6 +29,50 @@ pub(super) fn lower_guard_return(
     });
 }
 
+pub(super) fn lower_guard_loop_continue(condition_name: String, state: &mut LoweringState<'_>) {
+    let name = next_name(state, "guard_loop_continue");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "guard_loop_continue".to_owned(),
+            args: vec![condition_name.clone()],
+        },
+    });
+    push_dep_edges(state, &condition_name, &name);
+    state.yir.edges.push(Edge {
+        kind: EdgeKind::Effect,
+        from: condition_name,
+        to: name,
+    });
+}
+
+pub(super) fn lower_guard_loop_print_continue(
+    condition_name: String,
+    print_name: String,
+    state: &mut LoweringState<'_>,
+) {
+    let name = next_name(state, "guard_loop_print_continue");
+    state.yir.nodes.push(Node {
+        name: name.clone(),
+        resource: "cpu0".to_owned(),
+        op: Operation {
+            module: "cpu".to_owned(),
+            instruction: "guard_loop_print_continue".to_owned(),
+            args: vec![condition_name.clone(), print_name.clone()],
+        },
+    });
+    for input in [condition_name, print_name] {
+        push_dep_edges(state, &input, &name);
+        state.yir.edges.push(Edge {
+            kind: EdgeKind::Effect,
+            from: input,
+            to: name.clone(),
+        });
+    }
+}
+
 pub(super) fn lower_guard_drop_owned_bytes_return(
     condition_name: String,
     bytes_name: String,

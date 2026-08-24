@@ -116,8 +116,9 @@ use edge_helpers::{
 use guard_ops::{
     lower_branch_call_owned_bytes, lower_branch_drop_owned_bytes_return,
     lower_branch_host_call_return, lower_branch_print_return, lower_guard_drop_owned_bytes_return,
-    lower_guard_host_call_return, lower_guard_print, lower_guard_print_return, lower_guard_return,
-    lower_select, lower_select_owned_bytes, lower_select_owned_bytes_drop_unselected,
+    lower_guard_host_call_return, lower_guard_loop_continue, lower_guard_loop_print_continue,
+    lower_guard_print, lower_guard_print_return, lower_guard_return, lower_select,
+    lower_select_owned_bytes, lower_select_owned_bytes_drop_unselected,
     lower_select_owned_bytes_tree, PreparedHostCallReturnSpec,
 };
 use if_lowering::lower_if_pair;
@@ -510,6 +511,9 @@ mod tests_loops_basic;
 #[cfg(test)]
 #[path = "lowering/tests_loops_owned.rs"]
 mod tests_loops_owned;
+#[cfg(test)]
+#[path = "lowering/tests_loops_terminal.rs"]
+mod tests_loops_terminal;
 #[cfg(test)]
 #[path = "lowering/tests_nested_owned.rs"]
 mod tests_nested_owned;

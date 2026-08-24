@@ -13,8 +13,11 @@ enum DirectCallScalarKind {
     OwnedExternalBuffer,
 }
 
+#[path = "direct_calls/control_boundaries.rs"]
+mod control_boundaries;
 #[path = "direct_calls/kinds.rs"]
 mod kinds;
+pub(super) use control_boundaries::collect_guarded_loop_direct_call_functions;
 pub(super) use kinds::{
     collect_owned_external_buffer_return_helpers, owned_external_buffer_helper_lowering_order,
     supports_direct_call_signature,

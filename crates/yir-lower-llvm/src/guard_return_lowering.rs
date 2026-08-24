@@ -156,6 +156,91 @@ pub(crate) fn lower_cpu_guard_return_node(
             }
             body.push(format!("{cont_label}:"));
         }
+        "guard_loop_continue" => {
+            if node.op.args.len() != 1 {
+                return Err(format!(
+                    "cpu.guard_loop_continue `{}` expects one condition input",
+                    node.name
+                ));
+            }
+            let Some(cond_value) = registers.get(&node.op.args[0]).cloned() else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.guard_loop_continue `{}` because its condition is outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return Ok(GuardReturnLoweringOutcome::Continue);
+            };
+            let Some(cond) = coerce_to_i64(&cond_value, body, next_reg) else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.guard_loop_continue `{}` because its condition is not coercible to i64",
+                    node.name
+                ));
+                return Ok(GuardReturnLoweringOutcome::Continue);
+            };
+            let cond_bool = fresh_reg(next_reg);
+            body.push(format!("  {cond_bool} = icmp ne i64 {cond}, 0"));
+            let repeat_label = fresh_block(next_block, "guard_loop_continue_repeat");
+            let cont_label = fresh_block(next_block, "guard_loop_continue_cont");
+            body.push(format!(
+                "  br i1 {cond_bool}, label %{repeat_label}, label %{cont_label}"
+            ));
+            body.push(format!("{repeat_label}:"));
+            body.push(format!("  br label %{repeat_label}"));
+            body.push(format!("{cont_label}:"));
+        }
+        "guard_loop_print_continue" => {
+            if node.op.args.len() != 2 {
+                return Err(format!(
+                    "cpu.guard_loop_print_continue `{}` expects condition and print inputs",
+                    node.name
+                ));
+            }
+            let cond_value = registers.get(&node.op.args[0]).cloned();
+            let print_value = registers.get(&node.op.args[1]).cloned();
+            let (Some(cond_value), Some(print_value)) = (cond_value, print_value) else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.guard_loop_print_continue `{}` because one or more inputs are outside the current CPU LLVM slice",
+                    node.name
+                ));
+                return Ok(GuardReturnLoweringOutcome::Continue);
+            };
+            let Some(cond) = coerce_to_i64(&cond_value, body, next_reg) else {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.guard_loop_print_continue `{}` because its condition is not coercible to i64",
+                    node.name
+                ));
+                return Ok(GuardReturnLoweringOutcome::Continue);
+            };
+            let print_cstr = coerce_to_cstr(&print_value, body, next_reg);
+            let print_i64 = if print_cstr.is_none() {
+                coerce_to_i64(&print_value, body, next_reg)
+            } else {
+                None
+            };
+            if print_cstr.is_none() && print_i64.is_none() {
+                body.push(format!(
+                    "  ; deferred lowering for cpu.guard_loop_print_continue `{}` because its print value is not printable in the current CPU LLVM slice",
+                    node.name
+                ));
+                return Ok(GuardReturnLoweringOutcome::Continue);
+            }
+            let cond_bool = fresh_reg(next_reg);
+            body.push(format!("  {cond_bool} = icmp ne i64 {cond}, 0"));
+            let repeat_label = fresh_block(next_block, "guard_loop_print_continue_repeat");
+            let cont_label = fresh_block(next_block, "guard_loop_print_continue_cont");
+            body.push(format!(
+                "  br i1 {cond_bool}, label %{repeat_label}, label %{cont_label}"
+            ));
+            body.push(format!("{repeat_label}:"));
+            if let Some(input) = print_cstr {
+                let print_reg = fresh_reg(next_reg);
+                body.push(format!("  {print_reg} = call i32 @puts(ptr {input})"));
+            } else if let Some(input) = print_i64 {
+                body.push(format!("  call void @nuis_debug_print_i64(i64 {input})"));
+            }
+            body.push(format!("  br label %{repeat_label}"));
+            body.push(format!("{cont_label}:"));
+        }
         "guard_return" => {
             let cond_value = registers.get(&node.op.args[0]).cloned();
             let return_value = registers.get(&node.op.args[1]).cloned();

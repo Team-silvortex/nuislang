@@ -367,6 +367,8 @@ impl Operation {
             | "loop_while_scalar_post_flow_cond_chain"
             | "loop_while_i64_async_post_flow_cond_chain"
             | "loop_while_scalar_async_post_flow_cond_chain"
+            | "guard_loop_continue"
+            | "guard_loop_print_continue"
             | "guard_print"
             | "guard_return"
             | "guard_drop_owned_bytes_return"

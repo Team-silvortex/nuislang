@@ -2,6 +2,81 @@ use crate::dev_tensor_drift::DevTensorDriftCheckSpec;
 
 pub(crate) const DEV_TENSOR_CORE_DRIFT_CHECKS: &[DevTensorDriftCheckSpec] = &[
     DevTensorDriftCheckSpec {
+        id: "language-control-flow-statement-syntax",
+        path: "tools/nuisc/src/frontend/parser_statements.rs",
+        required_patterns: &[
+            "fn parse_loop_stmt",
+            "fn parse_if_let_stmt_after_keyword",
+            "condition: AstExpr::Bool(true)",
+            "vec![self.parse_if_stmt()?]",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-control-flow-expression-syntax",
+        path: "tools/nuisc/src/frontend/parser_exprs.rs",
+        required_patterns: &[
+            "fn parse_if_expr_after_keyword",
+            "fn parse_if_let_expr_after_keyword",
+            "AstStmt::Return(Some(self.parse_if_expr_after_keyword()?))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-control-flow-syntax-regression",
+        path: "tools/nuisc/src/frontend/tests_control_flow/surface_syntax.rs",
+        required_patterns: &[
+            "lowers_loop_syntax_into_existing_unbounded_while_form",
+            "lowers_else_if_statement_into_nested_if_chain",
+            "lowers_else_if_expression_into_nested_typed_binding_chain",
+            "lowers_if_let_and_else_if_let_into_nested_match_dispatch",
+            "lowers_if_let_expression_binding_into_typed_branch_target",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-control-flow-syntax-compile-regression",
+        path: "tools/nuisc/tests/control_flow_syntax_compile.rs",
+        required_patterns: &[
+            "loop_and_else_if_syntax_cross_the_full_compile_pipeline",
+            "guard_loop_continue",
+            "guard_return",
+            "node.op.module == \"deferred\"",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-loop-terminal-state-lowering",
+        path: "tools/nuisc/src/lowering/loop_execution.rs",
+        required_patterns: &[
+            "PreparedLoopBody::Continue",
+            "fn lower_mixed_prepared_loop_body",
+            "lower_guard_loop_print_continue",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-loop-terminal-state-llvm",
+        path: "crates/yir-lower-llvm/src/guard_return_lowering.rs",
+        required_patterns: &[
+            "guard_loop_continue_repeat",
+            "guard_loop_print_continue_repeat",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-loop-terminal-state-native-regression",
+        path: "tools/nuisc/tests/control_flow_syntax_native.rs",
+        required_patterns: &[
+            "mixed_loop_terminal_tree_runs_as_a_native_binary",
+            "assert_eq!(run.status.code(), Some(10))",
+        ],
+    },
+    DevTensorDriftCheckSpec {
+        id: "language-control-flow-syntax-reference",
+        path: "docs/grammar/nuislang.bnf",
+        required_patterns: &[
+            "<loop_stmt>",
+            "<if_condition>",
+            "<if_expr>",
+            "<continue_stmt>",
+        ],
+    },
+    DevTensorDriftCheckSpec {
         id: "frontdoor-final-output-boundary-status",
         path: "tools/nuis/src/surface_render/link_plan_nsld_tail.rs",
         required_patterns: &[

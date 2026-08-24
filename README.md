@@ -31,7 +31,7 @@ nuis source / nuis.toml
 ```
 
 The development tensor currently reports clean recursive hierarchy, milestone,
-manifest, and `626/626` implementation-drift checks across `26/26` registered
+manifest, and `634/634` implementation-drift checks across `26/26` registered
 coordinates. Five independent self-hosting readiness gates keep the
 bootstrap-critical average honest at `93/100`; the weakest coordinate is now
 `developer-system/bootstrap/differential-reproducibility-gate` at `early`,

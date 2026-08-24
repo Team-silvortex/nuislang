@@ -9,3 +9,5 @@ mod loop_control_await;
 mod match_expressions;
 #[path = "tests_control_flow/mutability_conditions.rs"]
 mod mutability_conditions;
+#[path = "tests_control_flow/surface_syntax.rs"]
+mod surface_syntax;

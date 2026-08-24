@@ -412,8 +412,12 @@ pub(in crate::lowering) fn substitute_prepared_loop_body(
     binding_value: &NirExpr,
 ) -> PreparedLoopBody {
     match body {
-        PreparedLoopBody::ExitOnly => PreparedLoopBody::ExitOnly,
-        PreparedLoopBody::PrintExit { print } => PreparedLoopBody::PrintExit {
+        PreparedLoopBody::Break => PreparedLoopBody::Break,
+        PreparedLoopBody::Continue => PreparedLoopBody::Continue,
+        PreparedLoopBody::PrintBreak { print } => PreparedLoopBody::PrintBreak {
+            print: substitute_branch_binding(&print, binding_name, binding_value),
+        },
+        PreparedLoopBody::PrintContinue { print } => PreparedLoopBody::PrintContinue {
             print: substitute_branch_binding(&print, binding_name, binding_value),
         },
         PreparedLoopBody::Return { returned } => PreparedLoopBody::Return {

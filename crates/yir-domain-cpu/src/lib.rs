@@ -542,6 +542,29 @@ impl RegisteredMod for CpuMod {
                 );
                 Ok(Value::Unit)
             }
+            "guard_loop_continue" => {
+                let condition = state.expect_value(&node.op.args[0])?.clone();
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.guard_loop_continue @{} [{}]: if {} then repeat loop body",
+                        node.resource, resource.kind.raw, condition
+                    ),
+                );
+                Ok(Value::Unit)
+            }
+            "guard_loop_print_continue" => {
+                let condition = state.expect_value(&node.op.args[0])?.clone();
+                let print = state.expect_value(&node.op.args[1])?.clone();
+                state.push_resource_event(
+                    resource,
+                    format!(
+                        "effect cpu.guard_loop_print_continue @{} [{}]: if {} then print {} and repeat loop body",
+                        node.resource, resource.kind.raw, condition, print
+                    ),
+                );
+                Ok(Value::Unit)
+            }
             "guard_drop_owned_bytes_return" => {
                 let condition = state.expect_value(&node.op.args[0])?.clone();
                 let bytes = state.expect_value(&node.op.args[1])?.clone();

@@ -2,9 +2,11 @@ use super::*;
 use crate::lowering::direct_calls::collect_async_loop_step_functions;
 use crate::lowering::direct_calls::collect_owned_external_buffer_return_helpers;
 use crate::lowering::direct_calls::collect_recursive_async_helper_functions;
-use crate::lowering::direct_calls::collect_recursive_direct_call_functions;
 use crate::lowering::direct_calls::collect_scheduler_async_thunk_functions;
 use crate::lowering::direct_calls::owned_external_buffer_helper_lowering_order;
+use crate::lowering::direct_calls::{
+    collect_guarded_loop_direct_call_functions, collect_recursive_direct_call_functions,
+};
 
 pub(super) trait BootstrapLoweringProvider {
     fn lowering_entry(&self) -> &'static str;
@@ -165,6 +167,9 @@ fn lower_nir_to_yir_builtin_cpu_with_registries(
     let owned_external_buffer_helper_order =
         owned_external_buffer_helper_lowering_order(module, &owned_external_buffer_return_helpers)?;
     let direct_call_functions = collect_recursive_direct_call_functions(module)
+        .union(&collect_guarded_loop_direct_call_functions(module))
+        .cloned()
+        .collect::<BTreeSet<_>>()
         .union(&super::scoped_loop_lowering::collect_scoped_loop_helper_functions(module))
         .cloned()
         .collect::<BTreeSet<_>>()

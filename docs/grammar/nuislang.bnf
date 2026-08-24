@@ -113,22 +113,34 @@
               | <return_stmt>
               | <if_stmt>
               | <match_stmt>
+              | <while_stmt>
+              | <loop_stmt>
+              | <break_stmt>
+              | <continue_stmt>
               | <await_stmt>
               | <emit_stmt>
               | <block>
               | <comptime_block>
 
-<var_decl> ::= "let" <identifier> ":" <type_expr> "=" <expression> ";"
-             | "let" <identifier> "=" <expression> ";"
+<var_decl> ::= "let" [ "mut" ] <identifier> [ ":" <type_expr> ] "=" <expression> ";"
 
 <expr_stmt> ::= <expression> ";"
 <return_stmt> ::= "return" [ <expression> ] ";"
 <await_stmt> ::= "await" <expression> ";"
 
-<if_stmt> ::= "if" <expression> <block> [ "else" <block> ]
+<if_condition> ::= <expression> | "let" <pattern> "=" <expression>
+
+<if_stmt> ::= "if" <if_condition> <block>
+              { "else" "if" <if_condition> <block> }
+              [ "else" <block> ]
 
 <match_stmt> ::= "match" <expression> "{" { <match_arm> } "}"
-<match_arm> ::= <pattern> "=>" <block> ";"
+<match_arm> ::= <pattern> [ "if" <expression> ] "=>" <block> [ "," ]
+
+<while_stmt> ::= "while" <expression> <block>
+<loop_stmt> ::= "loop" <block>
+<break_stmt> ::= "break" ";"
+<continue_stmt> ::= "continue" ";"
 
 ;; ------------------------------------------------------------
 ;; Expressions (move by default; 'copy' as explicit unary op)
@@ -138,9 +150,17 @@
                | <function_call>
                | <method_call>
                | <field_access>
+               | <if_expr>
+               | <match_expr>
                | <binary_op_expr>
                | <unary_op_expr>
                | <parenthesized_expr>
+
+<if_expr> ::= "if" <if_condition> <value_block>
+              { "else" "if" <if_condition> <value_block> }
+              "else" <value_block>
+<match_expr> ::= "match" <expression> "{" { <match_arm> } "}"
+<value_block> ::= "{" { <statement> } [ <expression> ] "}"
 
 <parenthesized_expr> ::= "(" <expression> ")"
 

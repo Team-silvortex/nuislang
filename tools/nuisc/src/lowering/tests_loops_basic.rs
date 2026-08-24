@@ -50,7 +50,7 @@ fn lowers_guard_print_break_while_into_guard_print() {
 }
 
 #[test]
-fn lowers_guard_print_continue_while_into_guard_print() {
+fn lowers_guard_print_continue_while_into_repeating_print_backedge() {
     let module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -68,14 +68,13 @@ fn lowers_guard_print_continue_while_into_guard_print() {
     .unwrap();
 
     let yir = lower_nir_to_yir_builtin_cpu(&module).unwrap();
-    assert!(yir
-        .nodes
-        .iter()
-        .any(|node| node.op.module == "cpu" && node.op.instruction == "guard_print"));
+    assert!(yir.nodes.iter().any(|node| {
+        node.op.module == "cpu" && node.op.instruction == "guard_loop_print_continue"
+    }));
 }
 
 #[test]
-fn lowers_guarded_branching_while_into_select_plus_guard_print() {
+fn lowers_guarded_break_continue_print_branches_without_merging_terminal_actions() {
     let module = parse_nuis_module(
         r#"
         mod cpu Main {
@@ -100,11 +99,10 @@ fn lowers_guarded_branching_while_into_select_plus_guard_print() {
     assert!(yir
         .nodes
         .iter()
-        .any(|node| node.op.module == "cpu" && node.op.instruction == "select"));
-    assert!(yir
-        .nodes
-        .iter()
         .any(|node| node.op.module == "cpu" && node.op.instruction == "guard_print"));
+    assert!(yir.nodes.iter().any(|node| {
+        node.op.module == "cpu" && node.op.instruction == "guard_loop_print_continue"
+    }));
 }
 
 #[test]

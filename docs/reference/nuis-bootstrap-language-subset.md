@@ -52,6 +52,11 @@ functions, unbounded generics, local mutation, destructuring, direct and method
 calls, struct literals, field access, integer/Boolean operators, `if`, `match`,
 `while`, `break`, `continue`, `return`, and `?` propagation.
 
+The source spellings `loop { ... }`, `else if`, and `if let` are also accepted.
+They normalize before subset validation to `while true`, nested `if`, and a
+two-arm `match` respectively, so subset v1 gains no new AST capability or
+policy bypass.
+
 Only documentation attributes are allowed. Diagnostics must be returned as
 data rather than printed by a compiler component.
 

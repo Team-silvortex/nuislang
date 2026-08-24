@@ -114,6 +114,66 @@ fn local_cpu_modules_and_cross_module_types_are_approved() {
 }
 
 #[test]
+fn normalized_control_flow_syntax_stays_inside_the_frozen_ast_surface() {
+    let report = inspect_bootstrap_source(
+        r#"
+        mod cpu Main {
+          enum Option {
+            None,
+            Some(i64)
+          }
+
+          fn classify(value: i64) -> i64 {
+            loop {
+              if value < 0 {
+                return 1;
+              } else if value == 0 {
+                return 2;
+              } else {
+                return 3;
+              }
+            }
+            return 0;
+          }
+
+          fn unwrap_or(value: Option) -> i64 {
+            if let Option.Some(payload) = value {
+              return payload;
+            } else if let Option.None = value {
+              return 0;
+            } else {
+              return -1;
+            }
+          }
+
+          fn increment_or_zero(value: Option) -> i64 {
+            return if let Option.Some(payload) = value {
+              payload + 1
+            } else {
+              0
+            };
+          }
+
+          fn main() -> i64 {
+            return classify(0)
+              + unwrap_or(Option.Some(4))
+              + increment_or_zero(Option.None);
+          }
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert!(
+        report.accepted(),
+        "{}",
+        render_bootstrap_check_text(&report)
+    );
+    assert_eq!(report.semantic_pipeline, "checked");
+    assert_eq!(report.diagnostic_count(), 0);
+}
+
+#[test]
 fn rejected_json_is_structured_and_fail_closed() {
     let report = inspect_bootstrap_source(REJECTED_DEPENDENCY).unwrap();
     let json = render_bootstrap_check_json(&report);
