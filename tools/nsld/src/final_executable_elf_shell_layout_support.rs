@@ -1,7 +1,7 @@
 use super::{
-    checked_add, ElfAmd64ShellDynamicEntryPlan, ElfAmd64ShellProgramHeaderPlan,
-    ElfAmd64ShellSectionPlan, LocatedSourceCoordinate, PF_R, PF_W, PF_X, PT_LOAD, SHF_ALLOC,
-    SHF_EXECINSTR, SHF_WRITE,
+    checked_add, ElfAmd64ShellDynamicEntryPlan, ElfAmd64ShellNeededLibraryPlan,
+    ElfAmd64ShellProgramHeaderPlan, ElfAmd64ShellSectionPlan, LocatedSourceCoordinate, PF_R, PF_W,
+    PF_X, PT_LOAD, SHF_ALLOC, SHF_EXECINSTR, SHF_WRITE,
 };
 use crate::final_executable_elf_materialization::application::platform::ElfAmd64PlatformStructurePlanReport;
 use std::collections::BTreeMap;
@@ -69,6 +69,7 @@ pub(super) fn assign_section_links(sections: &mut [ElfAmd64ShellSectionPlan]) {
 pub(super) fn build_dynamic_entries(
     sections: &[ElfAmd64ShellSectionPlan],
     enabled: bool,
+    needed_libraries: &[ElfAmd64ShellNeededLibraryPlan],
     ledger_hash: &str,
 ) -> Result<Vec<ElfAmd64ShellDynamicEntryPlan>, String> {
     if !enabled {
@@ -78,90 +79,115 @@ pub(super) fn build_dynamic_entries(
     let dynsym = section_by_name(sections, ".dynsym")?;
     let dynstr = section_by_name(sections, ".dynstr")?;
     let rela = section_by_name(sections, ".rela.plt")?;
-    let seeds = [
+    let mut seeds = needed_libraries
+        .iter()
+        .map(|needed| {
+            (
+                format!("DT_NEEDED:{}", needed.needed_name),
+                1,
+                "dynamic-string-offset".to_owned(),
+                needed.dynamic_string_offset as u64,
+                Some(dynstr.section_id.clone()),
+            )
+        })
+        .collect::<Vec<_>>();
+    seeds.extend([
         (
-            "DT_PLTGOT",
+            "DT_PLTGOT".to_owned(),
             3,
-            "section-address",
+            "section-address".to_owned(),
             got.virtual_address,
-            Some(got.section_id.as_str()),
+            Some(got.section_id.clone()),
         ),
         (
-            "DT_STRTAB",
+            "DT_STRTAB".to_owned(),
             5,
-            "section-address",
+            "section-address".to_owned(),
             dynstr.virtual_address,
-            Some(dynstr.section_id.as_str()),
+            Some(dynstr.section_id.clone()),
         ),
         (
-            "DT_SYMTAB",
+            "DT_SYMTAB".to_owned(),
             6,
-            "section-address",
+            "section-address".to_owned(),
             dynsym.virtual_address,
-            Some(dynsym.section_id.as_str()),
+            Some(dynsym.section_id.clone()),
         ),
         (
-            "DT_STRSZ",
+            "DT_STRSZ".to_owned(),
             10,
-            "byte-size",
+            "byte-size".to_owned(),
             dynstr.file_size_bytes as u64,
-            Some(dynstr.section_id.as_str()),
+            Some(dynstr.section_id.clone()),
         ),
         (
-            "DT_SYMENT",
+            "DT_SYMENT".to_owned(),
             11,
-            "entry-size",
+            "entry-size".to_owned(),
             dynsym.entry_size as u64,
-            Some(dynsym.section_id.as_str()),
+            Some(dynsym.section_id.clone()),
         ),
         (
-            "DT_RELA",
+            "DT_RELA".to_owned(),
             7,
-            "section-address",
+            "section-address".to_owned(),
             rela.virtual_address,
-            Some(rela.section_id.as_str()),
+            Some(rela.section_id.clone()),
         ),
         (
-            "DT_RELASZ",
+            "DT_RELASZ".to_owned(),
             8,
-            "byte-size",
+            "byte-size".to_owned(),
             rela.file_size_bytes as u64,
-            Some(rela.section_id.as_str()),
+            Some(rela.section_id.clone()),
         ),
         (
-            "DT_RELAENT",
+            "DT_RELAENT".to_owned(),
             9,
-            "entry-size",
+            "entry-size".to_owned(),
             rela.entry_size as u64,
-            Some(rela.section_id.as_str()),
+            Some(rela.section_id.clone()),
         ),
-        ("DT_PLTREL", 20, "tag-value", 7, None),
+        ("DT_PLTREL".to_owned(), 20, "tag-value".to_owned(), 7, None),
         (
-            "DT_JMPREL",
+            "DT_JMPREL".to_owned(),
             23,
-            "section-address",
+            "section-address".to_owned(),
             rela.virtual_address,
-            Some(rela.section_id.as_str()),
+            Some(rela.section_id.clone()),
         ),
         (
-            "DT_PLTRELSZ",
+            "DT_PLTRELSZ".to_owned(),
             2,
-            "byte-size",
+            "byte-size".to_owned(),
             rela.file_size_bytes as u64,
-            Some(rela.section_id.as_str()),
+            Some(rela.section_id.clone()),
         ),
-        ("DT_NULL", 0, "terminator", 0, None),
-    ];
+        ("DT_NULL".to_owned(), 0, "terminator".to_owned(), 0, None),
+    ]);
+    if !needed_libraries.is_empty() {
+        let terminator = seeds.len() - 1;
+        seeds.insert(
+            terminator,
+            (
+                "DT_BIND_NOW".to_owned(),
+                24,
+                "bind-policy".to_owned(),
+                0,
+                None,
+            ),
+        );
+    }
     let mut entries = Vec::with_capacity(seeds.len());
     for (index, (name, tag, value_kind, value, section_id)) in seeds.into_iter().enumerate() {
         let mut entry = ElfAmd64ShellDynamicEntryPlan {
             dynamic_entry_id: format!("elf-amd64-shell-dynamic-entry-{index:04}"),
             dynamic_entry_index: index,
-            tag_name: name.to_owned(),
+            tag_name: name,
             tag,
-            value_kind: value_kind.to_owned(),
+            value_kind,
             value,
-            referenced_section_id: section_id.map(str::to_owned),
+            referenced_section_id: section_id,
             audit_hash: String::new(),
         };
         entry.audit_hash = dynamic_entry_audit_hash(ledger_hash, &entry);

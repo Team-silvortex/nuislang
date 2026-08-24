@@ -1,3 +1,5 @@
+#[path = "final_executable_elf_shell_dynamic.rs"]
+mod dynamic;
 #[path = "final_executable_elf_shell_image.rs"]
 mod image;
 #[path = "final_executable_elf_shell_image_encoding.rs"]
@@ -13,7 +15,9 @@ mod validation_parser;
 #[path = "final_executable_elf_shell_validation_support.rs"]
 mod validation_support;
 
+#[cfg(test)]
 pub(crate) use image::serialize_elf_amd64_shell_image;
+pub(crate) use image::serialize_elf_amd64_shell_image_with_dynamic_plan;
 pub(crate) use report::{
     ElfAmd64ShellImageSerializationReport, ElfAmd64ShellImageValidationReport,
     ElfAmd64ShellLayoutPlanReport,
@@ -24,6 +28,7 @@ pub(crate) use validation::{
 };
 
 use crate::{
+    final_executable_elf_dynamic_plan::ElfAmd64DynamicDependencyPlanReport,
     final_executable_elf_layout::{
         build_elf_amd64_placement_binding, ELF_AMD64_IMAGE_BASE, ELF_AMD64_PAGE_SIZE,
         ELF_AMD64_PLACEMENT_BINDING_CONTRACT,
@@ -50,6 +55,14 @@ use std::fmt::Write as _;
 
 pub(crate) const ELF_AMD64_SHELL_LAYOUT_PLAN_CONTRACT: &str =
     "nuis-nsld-elf-amd64-shell-layout-plan-v1";
+
+#[cfg(test)]
+pub(crate) fn validate_elf_amd64_shell_bytes_against_plan(
+    bytes: &[u8],
+    shell: &ElfAmd64ShellLayoutPlanReport,
+) -> Result<(), String> {
+    validation_parser::parse_and_validate_elf_amd64_shell_image(bytes, shell).map(|_| ())
+}
 
 #[derive(Clone, Copy)]
 struct EntryRule {
@@ -94,6 +107,42 @@ pub(crate) fn build_elf_amd64_shell_layout_plan(
     platform_plan: &ElfAmd64PlatformStructurePlanReport,
     platform_applied: &ElfAmd64PlatformAppliedImage,
 ) -> Result<ElfAmd64ShellLayoutPlanReport, String> {
+    build_elf_amd64_shell_layout_plan_internal(
+        objects,
+        placement,
+        relocations,
+        platform_plan,
+        platform_applied,
+        None,
+    )
+}
+
+pub(crate) fn build_elf_amd64_shell_layout_plan_with_dynamic_plan(
+    objects: &[ElfAmd64ObjectLinkage],
+    placement: &ElfAmd64PlacementBindingReport,
+    relocations: &ElfAmd64RelocationApplicationReport,
+    platform_plan: &ElfAmd64PlatformStructurePlanReport,
+    platform_applied: &ElfAmd64PlatformAppliedImage,
+    dynamic_plan: &ElfAmd64DynamicDependencyPlanReport,
+) -> Result<ElfAmd64ShellLayoutPlanReport, String> {
+    build_elf_amd64_shell_layout_plan_internal(
+        objects,
+        placement,
+        relocations,
+        platform_plan,
+        platform_applied,
+        Some(dynamic_plan),
+    )
+}
+
+fn build_elf_amd64_shell_layout_plan_internal(
+    objects: &[ElfAmd64ObjectLinkage],
+    placement: &ElfAmd64PlacementBindingReport,
+    relocations: &ElfAmd64RelocationApplicationReport,
+    platform_plan: &ElfAmd64PlatformStructurePlanReport,
+    platform_applied: &ElfAmd64PlatformAppliedImage,
+    dynamic_plan: Option<&ElfAmd64DynamicDependencyPlanReport>,
+) -> Result<ElfAmd64ShellLayoutPlanReport, String> {
     validate_input_envelope(
         objects,
         placement,
@@ -106,6 +155,7 @@ pub(crate) fn build_elf_amd64_shell_layout_plan(
         placement,
         platform_plan,
         &platform_applied.report.application_ledger_hash,
+        dynamic_plan,
     )?;
     let entry = select_entry(objects, placement, &layout.sections)?;
     validate_entry_segment(&entry, &layout)?;
@@ -156,6 +206,15 @@ pub(crate) fn build_elf_amd64_shell_layout_plan(
         dynamic_table_entry_size_bytes: ELF64_DYNAMIC_ENTRY_SIZE,
         dynamic_table_entry_count: layout.dynamic_entries.len(),
         dynamic_table_bytes: layout.dynamic_table_bytes,
+        dynamic_dependency_plan_hash: layout.dynamic_dependency_plan_hash,
+        interpreter_identity: layout.interpreter_identity,
+        interpreter_path: layout.interpreter_path,
+        interpreter_file_offset: layout.interpreter_file_offset,
+        interpreter_virtual_address: layout.interpreter_virtual_address,
+        interpreter_bytes: layout.interpreter_bytes,
+        dynamic_string_source_image_offset: layout.dynamic_string_source_image_offset,
+        dynamic_string_source_bytes: layout.dynamic_string_source_bytes,
+        needed_libraries: layout.needed_libraries,
         program_headers: layout.program_headers,
         sections: layout.sections,
         dynamic_entries: layout.dynamic_entries,

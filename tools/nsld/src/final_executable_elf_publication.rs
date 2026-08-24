@@ -1,5 +1,6 @@
 use crate::{
     final_executable_elf_artifact::elf_amd64_artifact_private_product,
+    final_executable_elf_dynamic_provenance::elf_amd64_loader_admission_evidence_hash,
     final_executable_finalizer_registry::ExecutableFinalizerPrivateImagePublicationContext,
     final_executable_private_image_publication::{
         publish_verified_private_image, PrivateImageAdmissionEvidence, PrivateImagePublicationInput,
@@ -17,7 +18,10 @@ pub(crate) fn publish_elf_amd64_private_image(
     let admission = verify_registered_loader_probe_admission_receipt(context.plan);
     let product = elf_amd64_artifact_private_product(context.plan)?;
     let source_image_hash = product.shell_image_serialization.shell_image_hash.clone();
-    let validation_evidence_hash = &product.shell_image_validation.validation_ledger_hash;
+    let validation_evidence_hash = elf_amd64_loader_admission_evidence_hash(
+        &product.shell_image_validation,
+        &product.dynamic_resolution_provenance,
+    )?;
     let mut provider_issues = Vec::new();
 
     if context.capability_id != ELF_AMD64_PRIVATE_IMAGE_PUBLICATION_CAPABILITY {

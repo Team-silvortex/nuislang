@@ -47,7 +47,8 @@ pub(crate) fn validate_elf_amd64_shell_image(
         .iter()
         .filter(|section| section.source_image_offset.is_some())
         .count();
-    let expected_table_count = 4 + usize::from(dynamic_boundary);
+    let expected_table_count =
+        4 + usize::from(dynamic_boundary) + parsed.interpreter_segment_count.saturating_mul(2);
     if parsed.tables.len() != expected_table_count
         || evidence.tables.len() != expected_table_count
         || evidence.sources.len() != expected_source_count
@@ -70,6 +71,9 @@ pub(crate) fn validate_elf_amd64_shell_image(
         load_segment_count: parsed.load_segment_count,
         dynamic_segment_count: parsed.dynamic_segment_count,
         dynamic_entry_count: parsed.dynamic_entry_count,
+        interpreter_segment_count: parsed.interpreter_segment_count,
+        interpreter_path: parsed.interpreter_path,
+        needed_libraries: parsed.needed_libraries,
         section_header_count: parsed.section_header_count,
         section_name_count: parsed.section_name_count,
         entry_program_header_index: parsed.entry_program_header_index,
@@ -99,22 +103,35 @@ pub(crate) fn validate_elf_amd64_shell_image_validation_report(
         (1, count) if count > 0 => true,
         _ => return Err("ELF shell validation report has an invalid dynamic shape".to_owned()),
     };
-    let expected_table_kinds = if dynamic {
-        vec![
-            ("elf64-header", 1),
-            ("program-header-table", report.program_header_count),
-            ("dynamic-table", report.dynamic_entry_count),
-            ("section-name-table", report.section_name_count),
-            ("section-header-table", report.section_header_count),
-        ]
-    } else {
-        vec![
-            ("elf64-header", 1),
-            ("program-header-table", report.program_header_count),
-            ("section-name-table", report.section_name_count),
-            ("section-header-table", report.section_header_count),
-        ]
+    let interpreter = match (
+        report.interpreter_segment_count,
+        report.interpreter_path.as_deref(),
+        report.needed_libraries.is_empty(),
+    ) {
+        (0, None, true) => false,
+        (1, Some(path), false) if !path.is_empty() => true,
+        _ => return Err("ELF shell validation report has an invalid interpreter shape".to_owned()),
     };
+    if interpreter && !dynamic {
+        return Err(
+            "ELF shell validation report has an interpreter without dynamic entries".to_owned(),
+        );
+    }
+    let mut expected_table_kinds = vec![
+        ("elf64-header", 1),
+        ("program-header-table", report.program_header_count),
+    ];
+    if interpreter {
+        expected_table_kinds.push(("interpreter-path", 1));
+        expected_table_kinds.push(("final-dynamic-string-table", report.needed_libraries.len()));
+    }
+    if dynamic {
+        expected_table_kinds.push(("dynamic-table", report.dynamic_entry_count));
+    }
+    expected_table_kinds.extend([
+        ("section-name-table", report.section_name_count),
+        ("section-header-table", report.section_header_count),
+    ]);
     let (publication_status, publication_blockers): (&str, &[&str]) = if dynamic {
         (
             "blocked-os-loader-and-external-resolution-pending",

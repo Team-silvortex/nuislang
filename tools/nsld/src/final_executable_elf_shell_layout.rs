@@ -1,20 +1,27 @@
+#[path = "final_executable_elf_shell_program_headers.rs"]
+mod program_headers;
 #[path = "final_executable_elf_shell_layout_support.rs"]
 mod support;
 
-use super::report::{
-    program_header_audit_hash, section_audit_hash, ElfAmd64ShellDynamicEntryPlan,
-    ElfAmd64ShellProgramHeaderPlan, ElfAmd64ShellSectionPlan,
+use super::{
+    dynamic::{build_elf_amd64_shell_dynamic_layout, ElfAmd64ShellDynamicLayout},
+    report::{
+        section_audit_hash, ElfAmd64ShellDynamicEntryPlan, ElfAmd64ShellNeededLibraryPlan,
+        ElfAmd64ShellProgramHeaderPlan, ElfAmd64ShellSectionPlan,
+    },
 };
 use crate::{
+    final_executable_elf_dynamic_plan::ElfAmd64DynamicDependencyPlanReport,
     final_executable_elf_layout::{ELF_AMD64_IMAGE_BASE, ELF_AMD64_PAGE_SIZE},
     final_executable_elf_layout_report::ElfAmd64PlacementBindingReport,
     final_executable_elf_materialization::application::platform::ElfAmd64PlatformStructurePlanReport,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
+use program_headers::build_program_headers;
 pub(super) use support::locate_source_coordinate;
 use support::{
-    assign_section_links, build_dynamic_entries, section_id, section_index, validate_layout,
+    assign_section_links, build_dynamic_entries, section_index, validate_layout,
     validate_platform_regions,
 };
 
@@ -25,6 +32,7 @@ pub(super) const ELF64_DYNAMIC_ENTRY_SIZE: usize = 16;
 
 const PT_LOAD: u32 = 1;
 const PT_DYNAMIC: u32 = 2;
+const PT_INTERP: u32 = 3;
 const PT_PHDR: u32 = 6;
 const PF_X: u32 = 1;
 const PF_W: u32 = 2;
@@ -39,8 +47,6 @@ const SHT_RELA: u32 = 4;
 const SHT_DYNAMIC: u32 = 6;
 const SHT_NOBITS: u32 = 8;
 const SHT_DYNSYM: u32 = 11;
-
-const DYNAMIC_ENTRY_COUNT: usize = 12;
 
 struct SectionSeed {
     source_kind: &'static str,
@@ -92,6 +98,15 @@ pub(super) struct ElfAmd64ShellLayoutDraft {
     pub(super) dynamic_table_file_offset: Option<usize>,
     pub(super) dynamic_table_virtual_address: Option<u64>,
     pub(super) dynamic_table_bytes: usize,
+    pub(super) dynamic_dependency_plan_hash: Option<String>,
+    pub(super) interpreter_identity: Option<String>,
+    pub(super) interpreter_path: Option<String>,
+    pub(super) interpreter_file_offset: Option<usize>,
+    pub(super) interpreter_virtual_address: Option<u64>,
+    pub(super) interpreter_bytes: usize,
+    pub(super) dynamic_string_source_image_offset: Option<usize>,
+    pub(super) dynamic_string_source_bytes: usize,
+    pub(super) needed_libraries: Vec<ElfAmd64ShellNeededLibraryPlan>,
 }
 
 pub(super) struct LocatedSourceCoordinate<'a> {
@@ -104,27 +119,22 @@ pub(super) fn build_elf_amd64_shell_layout(
     placement: &ElfAmd64PlacementBindingReport,
     platform: &ElfAmd64PlatformStructurePlanReport,
     application_ledger_hash: &str,
+    dependency_plan: Option<&ElfAmd64DynamicDependencyPlanReport>,
 ) -> Result<ElfAmd64ShellLayoutDraft, String> {
     let dynamic_enabled = platform.target_count > 0;
     validate_platform_regions(platform, dynamic_enabled, ELF_AMD64_PAGE_SIZE)?;
-    let dynamic_table_bytes = if dynamic_enabled {
-        DYNAMIC_ENTRY_COUNT
-            .checked_mul(ELF64_DYNAMIC_ENTRY_SIZE)
-            .ok_or_else(|| "ELF shell dynamic table size overflows".to_owned())?
-    } else {
-        0
-    };
-    let dynamic_table_file_offset = dynamic_enabled
-        .then(|| align_up(platform.planned_memory_span_bytes, ELF_AMD64_PAGE_SIZE))
-        .transpose()?;
-    let dynamic_table_virtual_address =
-        dynamic_table_file_offset.map(virtual_address).transpose()?;
-    let planned_memory_span_bytes = match dynamic_table_file_offset {
-        Some(offset) => checked_add(offset, dynamic_table_bytes, "dynamic table")?,
-        None => platform.planned_memory_span_bytes,
-    };
+    let dynamic_layout = build_elf_amd64_shell_dynamic_layout(platform, dependency_plan)?;
+    let dynamic_table_bytes = dynamic_layout.dynamic_table_bytes;
+    let dynamic_table_file_offset = dynamic_layout.dynamic_table_file_offset;
+    let dynamic_table_virtual_address = dynamic_layout.dynamic_table_virtual_address;
+    let planned_memory_span_bytes = dynamic_layout.planned_memory_span_bytes;
 
-    let mut seeds = section_seeds(placement, platform)?;
+    let mut seeds = section_seeds(
+        placement,
+        platform,
+        dynamic_layout.emits_registered_dependencies(),
+    )?;
+    append_shell_dynamic_metadata_sections(&mut seeds, &dynamic_layout)?;
     if let (Some(file_offset), Some(virtual_address)) =
         (dynamic_table_file_offset, dynamic_table_virtual_address)
     {
@@ -198,15 +208,14 @@ pub(super) fn build_elf_amd64_shell_layout(
         "section-header table",
     )?;
 
-    let load_seeds = load_seeds(
-        placement,
-        platform,
-        dynamic_table_file_offset,
-        dynamic_table_virtual_address,
-        dynamic_table_bytes,
-    )?;
+    let load_seeds = load_seeds(placement, platform, &dynamic_layout)?;
     let program_header_count = 1usize
         .checked_add(load_seeds.len())
+        .and_then(|count| {
+            count.checked_add(usize::from(
+                dynamic_layout.interpreter_file_offset.is_some(),
+            ))
+        })
         .and_then(|count| count.checked_add(usize::from(dynamic_enabled)))
         .ok_or_else(|| "ELF shell program-header count overflows".to_owned())?;
     let program_header_table_bytes = program_header_count
@@ -224,6 +233,9 @@ pub(super) fn build_elf_amd64_shell_layout(
         load_seeds,
         &segment_sections,
         &mut sections,
+        dynamic_layout.interpreter_file_offset,
+        dynamic_layout.interpreter_virtual_address,
+        dynamic_layout.interpreter_bytes,
         dynamic_table_file_offset,
         dynamic_table_virtual_address,
         dynamic_table_bytes,
@@ -233,8 +245,12 @@ pub(super) fn build_elf_amd64_shell_layout(
     for section in &mut sections {
         section.audit_hash = section_audit_hash(application_ledger_hash, section);
     }
-    let dynamic_entries =
-        build_dynamic_entries(&sections, dynamic_enabled, application_ledger_hash)?;
+    let dynamic_entries = build_dynamic_entries(
+        &sections,
+        dynamic_enabled,
+        &dynamic_layout.needed_libraries,
+        application_ledger_hash,
+    )?;
     validate_layout(
         &sections,
         &program_headers,
@@ -254,16 +270,29 @@ pub(super) fn build_elf_amd64_shell_layout(
         section_name_table_bytes: shstrtab_bytes,
         planned_file_span_bytes,
         planned_memory_span_bytes,
-        load_segment_count: program_header_count - 1 - usize::from(dynamic_enabled),
+        load_segment_count: program_header_count
+            - 1
+            - usize::from(dynamic_enabled)
+            - usize::from(dynamic_layout.interpreter_file_offset.is_some()),
         dynamic_table_file_offset,
         dynamic_table_virtual_address,
         dynamic_table_bytes,
+        dynamic_dependency_plan_hash: dynamic_layout.dependency_plan_hash,
+        interpreter_identity: dynamic_layout.interpreter_identity,
+        interpreter_path: dynamic_layout.interpreter_path,
+        interpreter_file_offset: dynamic_layout.interpreter_file_offset,
+        interpreter_virtual_address: dynamic_layout.interpreter_virtual_address,
+        interpreter_bytes: dynamic_layout.interpreter_bytes,
+        dynamic_string_source_image_offset: dynamic_layout.dynamic_string_source_image_offset,
+        dynamic_string_source_bytes: dynamic_layout.dynamic_string_source_bytes,
+        needed_libraries: dynamic_layout.needed_libraries,
     })
 }
 
 fn section_seeds(
     placement: &ElfAmd64PlacementBindingReport,
     platform: &ElfAmd64PlatformStructurePlanReport,
+    replace_dynamic_string_table: bool,
 ) -> Result<Vec<SectionSeed>, String> {
     let mut seeds = placement
         .merged_sections
@@ -294,7 +323,7 @@ fn section_seeds(
             })
         })
         .collect::<Result<Vec<_>, String>>()?;
-    append_platform_sections(&mut seeds, platform)?;
+    append_platform_sections(&mut seeds, platform, replace_dynamic_string_table)?;
     seeds.sort_by(|lhs, rhs| {
         lhs.source_image_offset
             .cmp(&rhs.source_image_offset)
@@ -306,6 +335,7 @@ fn section_seeds(
 fn append_platform_sections(
     seeds: &mut Vec<SectionSeed>,
     platform: &ElfAmd64PlatformStructurePlanReport,
+    replace_dynamic_string_table: bool,
 ) -> Result<(), String> {
     append_platform_section(
         seeds,
@@ -340,17 +370,19 @@ fn append_platform_sections(
         8,
         platform.dynamic_symbol_entry_size,
     )?;
-    append_platform_section(
-        seeds,
-        platform.dynamic_string_region_bytes,
-        platform.dynamic_string_region_image_offset,
-        ".dynstr",
-        "platform-metadata",
-        SHT_STRTAB,
-        SHF_ALLOC,
-        1,
-        0,
-    )?;
+    if !replace_dynamic_string_table {
+        append_platform_section(
+            seeds,
+            platform.dynamic_string_region_bytes,
+            platform.dynamic_string_region_image_offset,
+            ".dynstr",
+            "platform-metadata",
+            SHT_STRTAB,
+            SHF_ALLOC,
+            1,
+            0,
+        )?;
+    }
     append_platform_section(
         seeds,
         platform.dynamic_relocation_region_bytes,
@@ -362,6 +394,55 @@ fn append_platform_sections(
         platform.dynamic_relocation_alignment,
         platform.dynamic_relocation_entry_size,
     )
+}
+
+fn append_shell_dynamic_metadata_sections(
+    seeds: &mut Vec<SectionSeed>,
+    dynamic: &ElfAmd64ShellDynamicLayout,
+) -> Result<(), String> {
+    let Some(interpreter_offset) = dynamic.interpreter_file_offset else {
+        return Ok(());
+    };
+    let interpreter_virtual = dynamic
+        .interpreter_virtual_address
+        .ok_or_else(|| "ELF shell interpreter virtual coordinate is absent".to_owned())?;
+    seeds.push(SectionSeed {
+        source_kind: "shell-interpreter",
+        source_id: "elf-amd64-shell-interpreter".to_owned(),
+        name: ".interp".to_owned(),
+        section_type: SHT_PROGBITS,
+        flags: SHF_ALLOC,
+        alignment: 1,
+        entry_size: 0,
+        source_image_offset: None,
+        source_size_bytes: 0,
+        file_offset: interpreter_offset,
+        file_size_bytes: dynamic.interpreter_bytes,
+        virtual_address: interpreter_virtual,
+        memory_size_bytes: dynamic.interpreter_bytes,
+        segment_key: Some("shell-dynamic-metadata".to_owned()),
+    });
+    seeds.push(SectionSeed {
+        source_kind: "shell-final-dynamic-string-table",
+        source_id: "elf-amd64-shell-final-dynstr".to_owned(),
+        name: ".dynstr".to_owned(),
+        section_type: SHT_STRTAB,
+        flags: SHF_ALLOC,
+        alignment: 1,
+        entry_size: 0,
+        source_image_offset: None,
+        source_size_bytes: 0,
+        file_offset: dynamic
+            .dynamic_string_file_offset
+            .ok_or_else(|| "ELF shell final dynamic string coordinate is absent".to_owned())?,
+        file_size_bytes: dynamic.dynamic_string_bytes,
+        virtual_address: dynamic
+            .dynamic_string_virtual_address
+            .ok_or_else(|| "ELF shell final dynamic string address is absent".to_owned())?,
+        memory_size_bytes: dynamic.dynamic_string_bytes,
+        segment_key: Some("shell-dynamic-metadata".to_owned()),
+    });
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -481,9 +562,7 @@ fn build_sections(seeds: Vec<SectionSeed>, ledger_hash: &str) -> Result<BuiltSec
 fn load_seeds(
     placement: &ElfAmd64PlacementBindingReport,
     platform: &ElfAmd64PlatformStructurePlanReport,
-    dynamic_offset: Option<usize>,
-    dynamic_virtual: Option<u64>,
-    dynamic_bytes: usize,
+    dynamic: &ElfAmd64ShellDynamicLayout,
 ) -> Result<Vec<LoadSeed>, String> {
     let mut seeds = vec![LoadSeed {
         segment_key: "shell-header".to_owned(),
@@ -541,15 +620,33 @@ fn load_seeds(
         platform.metadata_region_image_offset,
         platform.metadata_region_bytes,
     )?;
-    if let (Some(offset), Some(virtual_address)) = (dynamic_offset, dynamic_virtual) {
+    if let (Some(offset), Some(virtual_address)) = (
+        dynamic.metadata_file_offset,
+        dynamic.metadata_virtual_address,
+    ) {
+        seeds.push(LoadSeed {
+            segment_key: "shell-dynamic-metadata".to_owned(),
+            permission_class: "read-only-dynamic-metadata",
+            flags: PF_R,
+            file_offset: offset,
+            virtual_address,
+            file_size_bytes: dynamic.metadata_bytes,
+            memory_size_bytes: dynamic.metadata_bytes,
+            alignment: ELF_AMD64_PAGE_SIZE,
+        });
+    }
+    if let (Some(offset), Some(virtual_address)) = (
+        dynamic.dynamic_table_file_offset,
+        dynamic.dynamic_table_virtual_address,
+    ) {
         seeds.push(LoadSeed {
             segment_key: "shell-dynamic".to_owned(),
             permission_class: "read-write",
             flags: PF_R | PF_W,
             file_offset: offset,
             virtual_address,
-            file_size_bytes: dynamic_bytes,
-            memory_size_bytes: dynamic_bytes,
+            file_size_bytes: dynamic.dynamic_table_bytes,
+            memory_size_bytes: dynamic.dynamic_table_bytes,
             alignment: ELF_AMD64_PAGE_SIZE,
         });
     }
@@ -578,150 +675,6 @@ fn append_load_seed(
         });
     }
     Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-fn build_program_headers(
-    loads: Vec<LoadSeed>,
-    segment_sections: &BTreeMap<String, Vec<String>>,
-    sections: &mut [ElfAmd64ShellSectionPlan],
-    dynamic_offset: Option<usize>,
-    dynamic_virtual: Option<u64>,
-    dynamic_bytes: usize,
-    program_header_table_bytes: usize,
-    ledger_hash: &str,
-) -> Result<Vec<ElfAmd64ShellProgramHeaderPlan>, String> {
-    let mut headers = Vec::new();
-    push_program_header(
-        &mut headers,
-        "program-header-table",
-        PT_PHDR,
-        "read-only-metadata",
-        PF_R,
-        ELF64_HEADER_SIZE,
-        virtual_address(ELF64_HEADER_SIZE)?,
-        program_header_table_bytes,
-        program_header_table_bytes,
-        8,
-        Vec::new(),
-        ledger_hash,
-    );
-    for load in loads {
-        let section_ids = segment_sections
-            .get(&load.segment_key)
-            .cloned()
-            .unwrap_or_default();
-        let index = headers.len();
-        let id = format!("elf-amd64-shell-program-header-{index:04}");
-        for section in sections
-            .iter_mut()
-            .filter(|section| section_ids.contains(&section.section_id))
-        {
-            section.load_segment_id = Some(id.clone());
-        }
-        push_program_header_with_id(
-            &mut headers,
-            id,
-            "load",
-            PT_LOAD,
-            load.permission_class,
-            load.flags,
-            load.file_offset,
-            load.virtual_address,
-            load.file_size_bytes,
-            load.memory_size_bytes,
-            load.alignment,
-            section_ids,
-            ledger_hash,
-        );
-    }
-    if let (Some(offset), Some(virtual_address)) = (dynamic_offset, dynamic_virtual) {
-        let dynamic_id = section_id(sections, ".dynamic")?.to_owned();
-        push_program_header(
-            &mut headers,
-            "dynamic-table",
-            PT_DYNAMIC,
-            "read-write-dynamic",
-            PF_R | PF_W,
-            offset,
-            virtual_address,
-            dynamic_bytes,
-            dynamic_bytes,
-            8,
-            vec![dynamic_id],
-            ledger_hash,
-        );
-    }
-    Ok(headers)
-}
-
-#[allow(clippy::too_many_arguments)]
-fn push_program_header(
-    headers: &mut Vec<ElfAmd64ShellProgramHeaderPlan>,
-    program_kind: &str,
-    program_type: u32,
-    permission_class: &str,
-    flags: u32,
-    file_offset: usize,
-    virtual_address: u64,
-    file_size_bytes: usize,
-    memory_size_bytes: usize,
-    alignment: usize,
-    section_ids: Vec<String>,
-    ledger_hash: &str,
-) {
-    let index = headers.len();
-    let id = format!("elf-amd64-shell-program-header-{index:04}");
-    push_program_header_with_id(
-        headers,
-        id,
-        program_kind,
-        program_type,
-        permission_class,
-        flags,
-        file_offset,
-        virtual_address,
-        file_size_bytes,
-        memory_size_bytes,
-        alignment,
-        section_ids,
-        ledger_hash,
-    );
-}
-
-#[allow(clippy::too_many_arguments)]
-fn push_program_header_with_id(
-    headers: &mut Vec<ElfAmd64ShellProgramHeaderPlan>,
-    id: String,
-    program_kind: &str,
-    program_type: u32,
-    permission_class: &str,
-    flags: u32,
-    file_offset: usize,
-    virtual_address: u64,
-    file_size_bytes: usize,
-    memory_size_bytes: usize,
-    alignment: usize,
-    section_ids: Vec<String>,
-    ledger_hash: &str,
-) {
-    let mut header = ElfAmd64ShellProgramHeaderPlan {
-        program_header_id: id,
-        program_header_index: headers.len(),
-        program_kind: program_kind.to_owned(),
-        program_type,
-        permission_class: permission_class.to_owned(),
-        flags,
-        file_offset,
-        virtual_address,
-        file_size_bytes,
-        memory_size_bytes,
-        alignment,
-        section_ids,
-        audit_hash: String::new(),
-    };
-    header.audit_hash = program_header_audit_hash(ledger_hash, &header);
-    headers.push(header);
 }
 
 fn align_up(value: usize, alignment: usize) -> Result<usize, String> {

@@ -434,7 +434,7 @@ fn zero_fill_load_coordinates_remain_inside_the_planned_file_envelope() {
     platform_plan.planned_memory_span_bytes = placement.memory_span_bytes;
 
     let layout =
-        layout::build_elf_amd64_shell_layout(&placement, &platform_plan, "ledger").unwrap();
+        layout::build_elf_amd64_shell_layout(&placement, &platform_plan, "ledger", None).unwrap();
     let bss = layout
         .sections
         .iter()

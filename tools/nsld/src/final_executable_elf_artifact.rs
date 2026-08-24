@@ -1,5 +1,6 @@
 use crate::{
     final_executable_atomic_output::atomic_write_executable,
+    final_executable_elf_dynamic_provenance::elf_amd64_loader_admission_evidence_hash,
     final_executable_elf_loader_probe::{
         probe_elf_amd64_private_shell_image, ElfAmd64LoaderProbeInput,
     },
@@ -62,11 +63,16 @@ pub(crate) fn probe_registered_elf_amd64_private_image(
         return Err("ELF loader-probe target identity mismatch".to_owned());
     }
     let (_, product) = load_elf_amd64_artifact_private_product(context.plan)?;
+    let admission_evidence_hash = elf_amd64_loader_admission_evidence_hash(
+        &product.shell_image_validation,
+        &product.dynamic_resolution_provenance,
+    )?;
     let report = probe_elf_amd64_private_shell_image(
         ElfAmd64LoaderProbeInput {
             bytes: &product.private_shell_image,
             validation: &product.shell_image_validation,
             unresolved_external_symbol_count: product.summary.unresolved_external_symbols.len(),
+            dynamic_provenance: Some(&product.dynamic_resolution_provenance),
         },
         context.probe_root,
         context.execute,
@@ -83,7 +89,7 @@ pub(crate) fn probe_registered_elf_amd64_private_image(
         attempted: report.attempted,
         image_span_bytes: report.image_span_bytes,
         image_identity_hash: &report.shell_image_hash,
-        validation_evidence_hash: &report.validation_ledger_hash,
+        validation_evidence_hash: &admission_evidence_hash,
         materialized: report.materialized,
         materialized_hash_matches: report.materialized_hash_matches,
         os_loader_accepted: report.kernel_accepted,
@@ -113,6 +119,7 @@ fn load_and_validate_elf_amd64_artifact_image(
             bytes: &product.private_shell_image,
             validation: &product.shell_image_validation,
             unresolved_external_symbol_count: product.summary.unresolved_external_symbols.len(),
+            dynamic_provenance: Some(&product.dynamic_resolution_provenance),
         },
         Path::new("."),
         false,

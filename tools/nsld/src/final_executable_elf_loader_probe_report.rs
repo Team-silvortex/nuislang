@@ -16,6 +16,9 @@ pub(crate) struct ElfAmd64LoaderProbeReport {
     pub(crate) validation_contract: &'static str,
     pub(crate) validation_ledger_hash: String,
     pub(crate) serialization_ledger_hash: String,
+    pub(crate) dynamic_provenance_contract: Option<String>,
+    pub(crate) dynamic_provenance_ledger_hash: Option<String>,
+    pub(crate) dynamic_provenance_ready: bool,
     pub(crate) unresolved_external_symbol_count: usize,
     pub(crate) dynamic_segment_count: usize,
     pub(crate) dynamic_entry_count: usize,
@@ -57,6 +60,12 @@ impl ElfAmd64LoaderProbeReport {
             self.validation_contract,
             &self.validation_ledger_hash,
             &self.serialization_ledger_hash,
+            self.dynamic_provenance_contract
+                .as_deref()
+                .unwrap_or("none"),
+            self.dynamic_provenance_ledger_hash
+                .as_deref()
+                .unwrap_or("none"),
             self.failure_kind.as_deref().unwrap_or("none"),
             self.publication_eligibility_contract,
             &self.publication_eligibility_status,
@@ -65,7 +74,7 @@ impl ElfAmd64LoaderProbeReport {
         }
         writeln!(
             out,
-            "input={}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+            "input={}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
             self.host_supported,
             self.input_eligible,
             self.attempted,
@@ -73,6 +82,7 @@ impl ElfAmd64LoaderProbeReport {
             self.unresolved_external_symbol_count,
             self.dynamic_segment_count,
             self.dynamic_entry_count,
+            self.dynamic_provenance_ready,
             self.probe_timeout_millis,
             self.materialized,
             self.materialized_hash_matches,

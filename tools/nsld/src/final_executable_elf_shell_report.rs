@@ -54,6 +54,16 @@ pub(crate) struct ElfAmd64ShellDynamicEntryPlan {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ElfAmd64ShellNeededLibraryPlan {
+    pub(crate) needed_id: String,
+    pub(crate) dependency_audit_hash: String,
+    pub(crate) dependency_identity: String,
+    pub(crate) needed_name: String,
+    pub(crate) dynamic_string_offset: usize,
+    pub(crate) audit_hash: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ElfAmd64ShellLayoutPlanReport {
     pub(crate) contract: &'static str,
     pub(crate) status: String,
@@ -96,6 +106,15 @@ pub(crate) struct ElfAmd64ShellLayoutPlanReport {
     pub(crate) dynamic_table_entry_size_bytes: usize,
     pub(crate) dynamic_table_entry_count: usize,
     pub(crate) dynamic_table_bytes: usize,
+    pub(crate) dynamic_dependency_plan_hash: Option<String>,
+    pub(crate) interpreter_identity: Option<String>,
+    pub(crate) interpreter_path: Option<String>,
+    pub(crate) interpreter_file_offset: Option<usize>,
+    pub(crate) interpreter_virtual_address: Option<u64>,
+    pub(crate) interpreter_bytes: usize,
+    pub(crate) dynamic_string_source_image_offset: Option<usize>,
+    pub(crate) dynamic_string_source_bytes: usize,
+    pub(crate) needed_libraries: Vec<ElfAmd64ShellNeededLibraryPlan>,
     pub(crate) program_headers: Vec<ElfAmd64ShellProgramHeaderPlan>,
     pub(crate) sections: Vec<ElfAmd64ShellSectionPlan>,
     pub(crate) dynamic_entries: Vec<ElfAmd64ShellDynamicEntryPlan>,
@@ -173,6 +192,31 @@ impl ElfAmd64ShellLayoutPlanReport {
             self.dynamic_table_bytes
         )
         .unwrap();
+        for value in [
+            self.dynamic_dependency_plan_hash
+                .as_deref()
+                .unwrap_or("none"),
+            self.interpreter_identity.as_deref().unwrap_or("none"),
+            self.interpreter_path.as_deref().unwrap_or("none"),
+        ] {
+            append_text(&mut out, value);
+        }
+        writeln!(
+            out,
+            "dynamic-loader={}|{}|{}|{}|{}|{}|{}",
+            optional_usize(self.interpreter_file_offset),
+            optional_u64(self.interpreter_virtual_address),
+            self.interpreter_bytes,
+            optional_usize(self.dynamic_string_source_image_offset),
+            self.dynamic_string_source_bytes,
+            self.needed_libraries.len(),
+            self.dynamic_dependency_plan_hash.is_some()
+        )
+        .unwrap();
+        for needed in &self.needed_libraries {
+            append_text(&mut out, &needed.needed_id);
+            append_text(&mut out, &needed.audit_hash);
+        }
         for header in &self.program_headers {
             append_text(&mut out, &header.program_header_id);
             append_text(&mut out, &header.audit_hash);
@@ -187,6 +231,20 @@ impl ElfAmd64ShellLayoutPlanReport {
         }
         out
     }
+}
+
+pub(super) fn needed_library_audit_hash(
+    dependency_plan_hash: &str,
+    needed: &ElfAmd64ShellNeededLibraryPlan,
+) -> String {
+    let mut out = String::new();
+    append_text(&mut out, dependency_plan_hash);
+    append_text(&mut out, &needed.needed_id);
+    append_text(&mut out, &needed.dependency_audit_hash);
+    append_text(&mut out, &needed.dependency_identity);
+    append_text(&mut out, &needed.needed_name);
+    writeln!(out, "offset={}", needed.dynamic_string_offset).unwrap();
+    crate::fnv1a64_hex(out.as_bytes())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -347,6 +405,9 @@ pub(crate) struct ElfAmd64ShellImageValidationReport {
     pub(crate) load_segment_count: usize,
     pub(crate) dynamic_segment_count: usize,
     pub(crate) dynamic_entry_count: usize,
+    pub(crate) interpreter_segment_count: usize,
+    pub(crate) interpreter_path: Option<String>,
+    pub(crate) needed_libraries: Vec<String>,
     pub(crate) section_header_count: usize,
     pub(crate) section_name_count: usize,
     pub(crate) entry_program_header_index: usize,
@@ -374,6 +435,7 @@ impl ElfAmd64ShellImageValidationReport {
             &self.serialization_ledger_hash,
             &self.platform_application_ledger_hash,
             &self.shell_image_hash,
+            self.interpreter_path.as_deref().unwrap_or("none"),
             self.publication_eligibility_contract,
             &self.publication_eligibility_status,
         ] {
@@ -381,19 +443,24 @@ impl ElfAmd64ShellImageValidationReport {
         }
         writeln!(
             out,
-            "shape={}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+            "shape={}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
             self.shell_image_span_bytes,
             self.header_valid,
             self.program_header_count,
             self.load_segment_count,
             self.dynamic_segment_count,
             self.dynamic_entry_count,
+            self.interpreter_segment_count,
+            self.needed_libraries.len(),
             self.section_header_count,
             self.section_name_count,
             self.entry_program_header_index,
             self.preserved_platform_file_bytes
         )
         .unwrap();
+        for needed in &self.needed_libraries {
+            append_text(&mut out, needed);
+        }
         writeln!(
             out,
             "coverage={}|{}|{}|{}|{}|{}|{}|{}",

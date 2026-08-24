@@ -1,4 +1,9 @@
 use crate::{
+    final_executable_elf_dynamic_provenance::{
+        validate_elf_amd64_dynamic_resolution_provenance_report,
+        ElfAmd64DynamicResolutionProvenanceReport,
+        ELF_AMD64_DYNAMIC_RESOLUTION_PROVENANCE_CONTRACT,
+    },
     final_executable_elf_loader_probe_report::ElfAmd64LoaderProbeReport,
     final_executable_elf_shell::{
         validate_elf_amd64_shell_image_validation_report, ElfAmd64ShellImageValidationReport,
@@ -17,6 +22,7 @@ pub(crate) struct ElfAmd64LoaderProbeInput<'a> {
     pub(crate) bytes: &'a [u8],
     pub(crate) validation: &'a ElfAmd64ShellImageValidationReport,
     pub(crate) unresolved_external_symbol_count: usize,
+    pub(crate) dynamic_provenance: Option<&'a ElfAmd64DynamicResolutionProvenanceReport>,
 }
 
 pub(crate) fn probe_elf_amd64_private_shell_image(
@@ -26,9 +32,16 @@ pub(crate) fn probe_elf_amd64_private_shell_image(
 ) -> Result<ElfAmd64LoaderProbeReport, String> {
     validate_input(&input)?;
     let host_supported = cfg!(all(target_os = "linux", target_arch = "x86_64"));
-    let input_eligible = input.unresolved_external_symbol_count == 0
+    let static_eligible = input.unresolved_external_symbol_count == 0
         && input.validation.dynamic_segment_count == 0
         && input.validation.dynamic_entry_count == 0;
+    let dynamic_eligible = input.unresolved_external_symbol_count > 0
+        && input.validation.dynamic_segment_count == 1
+        && input.validation.dynamic_entry_count > 0
+        && input
+            .dynamic_provenance
+            .is_some_and(|provenance| provenance.provenance_ready);
+    let input_eligible = static_eligible || dynamic_eligible;
     let observation = if !input_eligible {
         LoaderProbeRuntimeObservation::blocked(
             "blocked-external-compatibility-input",
@@ -66,6 +79,15 @@ fn validate_input(input: &ElfAmd64LoaderProbeInput<'_>) -> Result<(), String> {
     let dynamic = input.validation.dynamic_segment_count != 0;
     if dynamic != (input.unresolved_external_symbol_count != 0) {
         return Err("ELF loader probe rejects external-boundary lineage drift".to_owned());
+    }
+    if let Some(provenance) = input.dynamic_provenance {
+        validate_elf_amd64_dynamic_resolution_provenance_report(provenance)?;
+        if provenance.shell_validation_ledger_hash != input.validation.validation_ledger_hash
+            || provenance.shell_image_hash != input.validation.shell_image_hash
+            || provenance.unresolved_symbol_count != input.unresolved_external_symbol_count
+        {
+            return Err("ELF loader probe rejects dynamic provenance lineage drift".to_owned());
+        }
     }
     Ok(())
 }
@@ -109,6 +131,15 @@ fn build_report(
         validation_contract: ELF_AMD64_SHELL_IMAGE_VALIDATION_CONTRACT,
         validation_ledger_hash: input.validation.validation_ledger_hash.clone(),
         serialization_ledger_hash: input.validation.serialization_ledger_hash.clone(),
+        dynamic_provenance_contract: input
+            .dynamic_provenance
+            .map(|provenance| provenance.contract.to_owned()),
+        dynamic_provenance_ledger_hash: input
+            .dynamic_provenance
+            .map(|provenance| provenance.provenance_ledger_hash.clone()),
+        dynamic_provenance_ready: input
+            .dynamic_provenance
+            .is_some_and(|provenance| provenance.provenance_ready),
         unresolved_external_symbol_count: input.unresolved_external_symbol_count,
         dynamic_segment_count: input.validation.dynamic_segment_count,
         dynamic_entry_count: input.validation.dynamic_entry_count,
@@ -152,12 +183,23 @@ pub(crate) fn validate_successful_elf_amd64_loader_probe(
     {
         return Err("ELF admission rejects loader-probe contract identity".to_owned());
     }
+    let static_input = report.unresolved_external_symbol_count == 0
+        && report.dynamic_segment_count == 0
+        && report.dynamic_entry_count == 0;
+    let dynamic_input = report.unresolved_external_symbol_count > 0
+        && report.dynamic_segment_count == 1
+        && report.dynamic_entry_count > 0
+        && report.dynamic_provenance_ready
+        && report.dynamic_provenance_contract.as_deref()
+            == Some(ELF_AMD64_DYNAMIC_RESOLUTION_PROVENANCE_CONTRACT)
+        && report
+            .dynamic_provenance_ledger_hash
+            .as_deref()
+            .is_some_and(|hash| !hash.is_empty());
     if !report.host_supported
         || !report.input_eligible
         || !report.attempted
-        || report.unresolved_external_symbol_count != 0
-        || report.dynamic_segment_count != 0
-        || report.dynamic_entry_count != 0
+        || !(static_input || dynamic_input)
     {
         return Err("ELF admission rejects loader-probe input eligibility".to_owned());
     }
@@ -201,6 +243,12 @@ fn validate_elf_amd64_loader_probe_report(
         || report.publication_eligibility_contract != ELF_AMD64_PUBLICATION_ELIGIBILITY_CONTRACT
     {
         return Err("ELF loader-probe report contract drift".to_owned());
+    }
+    if report.dynamic_provenance_ledger_hash.is_some()
+        != report.dynamic_provenance_contract.is_some()
+        || (report.dynamic_provenance_ready && report.dynamic_provenance_ledger_hash.is_none())
+    {
+        return Err("ELF loader-probe report provenance shape drift".to_owned());
     }
     if report.probe_ledger_hash != crate::fnv1a64_hex(report.canonical_ledger().as_bytes()) {
         return Err("ELF loader-probe report ledger drift".to_owned());

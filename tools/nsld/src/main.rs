@@ -64,6 +64,7 @@ mod final_executable_bootstrap;
 mod final_executable_container_binding;
 mod final_executable_container_loader;
 mod final_executable_elf_artifact;
+mod final_executable_elf_dynamic_plan;
 mod final_executable_elf_dynamic_provenance;
 mod final_executable_elf_input;
 mod final_executable_elf_layout;

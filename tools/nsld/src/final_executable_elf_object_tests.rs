@@ -312,6 +312,67 @@ fn binds_whitelisted_libc_symbol_to_registered_linux_gnu_provider() {
     let provenance = &product.dynamic_resolution_provenance;
 
     assert_eq!(
+        product.dynamic_dependency_plan.status,
+        "registered-dynamic-dependency-plan-ready"
+    );
+    assert!(product.dynamic_dependency_plan.plan_ready);
+    assert_eq!(
+        product
+            .shell_layout_plan
+            .dynamic_dependency_plan_hash
+            .as_deref(),
+        Some(product.dynamic_dependency_plan.plan_hash.as_str())
+    );
+    assert_eq!(
+        product.shell_layout_plan.interpreter_path.as_deref(),
+        Some("/lib64/ld-linux-x86-64.so.2")
+    );
+    assert_eq!(product.shell_layout_plan.needed_libraries.len(), 1);
+    assert_eq!(
+        product.shell_layout_plan.needed_libraries[0].needed_name,
+        "libc.so.6"
+    );
+    assert_eq!(product.shell_layout_plan.dynamic_table_entry_count, 14);
+    assert_eq!(
+        product.shell_image_serialization.applied_shell_write_count,
+        7
+    );
+    assert_eq!(product.shell_image_validation.interpreter_segment_count, 1);
+    assert_eq!(
+        product.shell_image_validation.interpreter_path.as_deref(),
+        Some("/lib64/ld-linux-x86-64.so.2")
+    );
+    assert_eq!(
+        product.shell_image_validation.needed_libraries,
+        ["libc.so.6"]
+    );
+
+    let mut interpreter_drift = product.private_shell_image.clone();
+    interpreter_drift[product.shell_layout_plan.interpreter_file_offset.unwrap()] ^= 0x01;
+    let error = crate::final_executable_elf_shell::validate_elf_amd64_shell_bytes_against_plan(
+        &interpreter_drift,
+        &product.shell_layout_plan,
+    )
+    .unwrap_err();
+    assert!(error.contains("PT_INTERP payload differs"));
+
+    let dynstr = product
+        .shell_layout_plan
+        .sections
+        .iter()
+        .find(|section| section.section_name == ".dynstr")
+        .unwrap();
+    let mut needed_drift = product.private_shell_image.clone();
+    needed_drift[dynstr.file_offset
+        + product.shell_layout_plan.needed_libraries[0].dynamic_string_offset] ^= 0x01;
+    let error = crate::final_executable_elf_shell::validate_elf_amd64_shell_bytes_against_plan(
+        &needed_drift,
+        &product.shell_layout_plan,
+    )
+    .unwrap_err();
+    assert!(error.contains("DT_NEEDED name differs"));
+
+    assert_eq!(
         provenance.status,
         "verified-registered-dynamic-resolution-provenance"
     );
@@ -336,7 +397,7 @@ fn binds_whitelisted_libc_symbol_to_registered_linux_gnu_provider() {
     );
     assert_eq!(
         provenance.dependencies[0].resolver_identity,
-        "elf.sysv.amd64.lazy-plt-v1"
+        "elf.sysv.amd64.bind-now-plt-v1"
     );
     assert_eq!(provenance.bindings[0].target_symbol, "puts");
     assert_eq!(provenance.bindings[0].host_ffi_abi, "libc");
@@ -351,7 +412,7 @@ fn binds_whitelisted_libc_symbol_to_registered_linux_gnu_provider() {
     dependency_drift.dependencies[0].needed_name = "libm.so.6".to_owned();
     let error = crate::final_executable_elf_dynamic_provenance::validate_elf_amd64_dynamic_resolution_provenance_report(&dependency_drift)
         .unwrap_err();
-    assert!(error.contains("dependency provenance"));
+    assert!(error.contains("dependency plan record"));
 
     let mut relocated_plan = plan.clone();
     relocated_plan.host_ffi.index_path = Some("relocated/host_ffi.index".to_owned());
@@ -371,6 +432,55 @@ fn binds_whitelisted_libc_symbol_to_registered_linux_gnu_provider() {
         target_drift.dynamic_resolution_provenance.issues,
         ["registered-dynamic-provider-missing:libc:puts"]
     );
+}
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[test]
+fn executes_registered_libc_symbol_through_the_system_loader() {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let (artifact, mut plan) = artifact_and_plan(
+        elf_program_object_with_external_symbol(R_X86_64_PLT32, "sched_yield"),
+        crate::final_executable_elf_test_fixture::elf_linux_exit_runtime_object(),
+    );
+    install_host_ffi_entries(
+        &mut plan,
+        vec![host_ffi_entry("libc", "sched_yield", "i32()")],
+    );
+    let product = build_elf_amd64_host_object_linkage(&artifact, &plan).unwrap();
+    assert!(product.dynamic_dependency_plan.plan_ready);
+    assert_eq!(
+        product.shell_image_validation.needed_libraries,
+        ["libc.so.6"]
+    );
+
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!(
+        "nuis-nsld-dynamic-loader-probe-{}-{nonce}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&root).unwrap();
+    let report = crate::final_executable_elf_loader_probe::probe_elf_amd64_private_shell_image(
+        crate::final_executable_elf_loader_probe::ElfAmd64LoaderProbeInput {
+            bytes: &product.private_shell_image,
+            validation: &product.shell_image_validation,
+            unresolved_external_symbol_count: product.summary.unresolved_external_symbols.len(),
+            dynamic_provenance: Some(&product.dynamic_resolution_provenance),
+        },
+        &root,
+        true,
+    )
+    .unwrap();
+
+    assert!(report.input_eligible, "{report:#?}");
+    assert!(report.dynamic_provenance_ready, "{report:#?}");
+    assert_eq!(report.exit_code, Some(0), "{report:#?}");
+    assert!(report.publication_eligible, "{report:#?}");
+    assert!(std::fs::read_dir(&root).unwrap().next().is_none());
+    std::fs::remove_dir(root).unwrap();
 }
 
 #[test]

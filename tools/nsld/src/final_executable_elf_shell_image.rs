@@ -1,5 +1,5 @@
 use super::{
-    build_elf_amd64_shell_layout_plan,
+    build_elf_amd64_shell_layout_plan, build_elf_amd64_shell_layout_plan_with_dynamic_plan,
     image_encoding::{encode_elf_amd64_shell_tables, EncodedElfAmd64ShellTables},
     report::{
         shell_image_write_audit_hash, source_preservation_audit_hash,
@@ -9,6 +9,7 @@ use super::{
     ELF_AMD64_SHELL_LAYOUT_PLAN_CONTRACT,
 };
 use crate::{
+    final_executable_elf_dynamic_plan::ElfAmd64DynamicDependencyPlanReport,
     final_executable_elf_layout_report::ElfAmd64PlacementBindingReport,
     final_executable_elf_materialization::application::platform::{
         application::ElfAmd64PlatformAppliedImage, ElfAmd64PlatformStructurePlanReport,
@@ -41,6 +42,12 @@ struct PreservationSummary {
     zero_fill_bytes: usize,
 }
 
+struct DynamicPayloads {
+    interpreter: Vec<u8>,
+    dynamic_strings: Vec<u8>,
+}
+
+#[cfg(test)]
 pub(crate) fn serialize_elf_amd64_shell_image(
     objects: &[ElfAmd64ObjectLinkage],
     placement: &ElfAmd64PlacementBindingReport,
@@ -49,15 +56,57 @@ pub(crate) fn serialize_elf_amd64_shell_image(
     platform_applied: &ElfAmd64PlatformAppliedImage,
     shell: &ElfAmd64ShellLayoutPlanReport,
 ) -> Result<ElfAmd64SerializedShellImage, String> {
+    serialize_elf_amd64_shell_image_internal(
+        objects,
+        placement,
+        relocations,
+        platform_plan,
+        platform_applied,
+        None,
+        shell,
+    )
+}
+
+pub(crate) fn serialize_elf_amd64_shell_image_with_dynamic_plan(
+    objects: &[ElfAmd64ObjectLinkage],
+    placement: &ElfAmd64PlacementBindingReport,
+    relocations: &ElfAmd64RelocationApplicationReport,
+    platform_plan: &ElfAmd64PlatformStructurePlanReport,
+    platform_applied: &ElfAmd64PlatformAppliedImage,
+    dynamic_plan: &ElfAmd64DynamicDependencyPlanReport,
+    shell: &ElfAmd64ShellLayoutPlanReport,
+) -> Result<ElfAmd64SerializedShellImage, String> {
+    serialize_elf_amd64_shell_image_internal(
+        objects,
+        placement,
+        relocations,
+        platform_plan,
+        platform_applied,
+        Some(dynamic_plan),
+        shell,
+    )
+}
+
+fn serialize_elf_amd64_shell_image_internal(
+    objects: &[ElfAmd64ObjectLinkage],
+    placement: &ElfAmd64PlacementBindingReport,
+    relocations: &ElfAmd64RelocationApplicationReport,
+    platform_plan: &ElfAmd64PlatformStructurePlanReport,
+    platform_applied: &ElfAmd64PlatformAppliedImage,
+    dynamic_plan: Option<&ElfAmd64DynamicDependencyPlanReport>,
+    shell: &ElfAmd64ShellLayoutPlanReport,
+) -> Result<ElfAmd64SerializedShellImage, String> {
     validate_envelope(
         objects,
         placement,
         relocations,
         platform_plan,
         platform_applied,
+        dynamic_plan,
         shell,
     )?;
     let tables = encode_elf_amd64_shell_tables(shell)?;
+    let dynamic_payloads = encode_dynamic_payloads(platform_applied, shell)?;
     let mut bytes = vec![0; shell.planned_file_span_bytes];
     let source_file = checked_slice(
         &platform_applied.bytes,
@@ -72,8 +121,18 @@ pub(crate) fn serialize_elf_amd64_shell_image(
 
     let mut occupied = Vec::new();
     let mut writes = Vec::new();
-    write_tables(&mut bytes, &mut occupied, &mut writes, shell, &tables)?;
-    let expected_shell_write_count = 4 + usize::from(!tables.dynamic_entries.is_empty());
+    write_tables(
+        &mut bytes,
+        &mut occupied,
+        &mut writes,
+        shell,
+        &tables,
+        &dynamic_payloads,
+    )?;
+    let expected_shell_write_count = 4
+        + usize::from(!tables.dynamic_entries.is_empty())
+        + usize::from(!dynamic_payloads.interpreter.is_empty())
+        + usize::from(!dynamic_payloads.dynamic_strings.is_empty());
     if writes.len() != expected_shell_write_count {
         return Err("ELF shell write coverage drift".to_owned());
     }
@@ -118,24 +177,108 @@ pub(crate) fn serialize_elf_amd64_shell_image(
     Ok(ElfAmd64SerializedShellImage { bytes, report })
 }
 
+fn encode_dynamic_payloads(
+    platform_applied: &ElfAmd64PlatformAppliedImage,
+    shell: &ElfAmd64ShellLayoutPlanReport,
+) -> Result<DynamicPayloads, String> {
+    let Some(interpreter_path) = shell.interpreter_path.as_deref() else {
+        if shell.interpreter_identity.is_some()
+            || shell.interpreter_file_offset.is_some()
+            || shell.interpreter_virtual_address.is_some()
+            || shell.interpreter_bytes != 0
+            || shell.dynamic_string_source_image_offset.is_some()
+            || shell.dynamic_string_source_bytes != 0
+            || !shell.needed_libraries.is_empty()
+        {
+            return Err("ELF shell dynamic payload plan is incomplete".to_owned());
+        }
+        return Ok(DynamicPayloads {
+            interpreter: Vec::new(),
+            dynamic_strings: Vec::new(),
+        });
+    };
+    if interpreter_path.as_bytes().contains(&0)
+        || shell
+            .interpreter_identity
+            .as_deref()
+            .is_none_or(str::is_empty)
+    {
+        return Err("ELF shell interpreter identity is invalid".to_owned());
+    }
+    let mut interpreter = interpreter_path.as_bytes().to_vec();
+    interpreter.push(0);
+    if interpreter.len() != shell.interpreter_bytes {
+        return Err("ELF shell interpreter payload width drift".to_owned());
+    }
+    let source_offset = shell
+        .dynamic_string_source_image_offset
+        .ok_or_else(|| "ELF shell dynamic string source is absent".to_owned())?;
+    let mut dynamic_strings = checked_slice(
+        &platform_applied.bytes,
+        source_offset,
+        shell.dynamic_string_source_bytes,
+        "platform dynamic string source",
+    )?
+    .to_vec();
+    for needed in &shell.needed_libraries {
+        if needed.dynamic_string_offset != dynamic_strings.len()
+            || needed.needed_name.is_empty()
+            || needed.needed_name.as_bytes().contains(&0)
+        {
+            return Err(format!(
+                "ELF shell needed library `{}` has an invalid string slot",
+                needed.needed_id
+            ));
+        }
+        dynamic_strings.extend_from_slice(needed.needed_name.as_bytes());
+        dynamic_strings.push(0);
+    }
+    let dynstr = shell
+        .sections
+        .iter()
+        .find(|section| section.section_name == ".dynstr")
+        .ok_or_else(|| "ELF shell final dynamic string section is absent".to_owned())?;
+    if dynstr.source_kind != "shell-final-dynamic-string-table"
+        || dynstr.file_size_bytes != dynamic_strings.len()
+        || dynstr.memory_size_bytes != dynamic_strings.len()
+    {
+        return Err("ELF shell final dynamic string layout drift".to_owned());
+    }
+    Ok(DynamicPayloads {
+        interpreter,
+        dynamic_strings,
+    })
+}
+
 fn validate_envelope(
     objects: &[ElfAmd64ObjectLinkage],
     placement: &ElfAmd64PlacementBindingReport,
     relocations: &ElfAmd64RelocationApplicationReport,
     platform_plan: &ElfAmd64PlatformStructurePlanReport,
     platform_applied: &ElfAmd64PlatformAppliedImage,
+    dynamic_plan: Option<&ElfAmd64DynamicDependencyPlanReport>,
     shell: &ElfAmd64ShellLayoutPlanReport,
 ) -> Result<(), String> {
     if shell.contract != ELF_AMD64_SHELL_LAYOUT_PLAN_CONTRACT {
         return Err("ELF shell serializer rejects the layout contract".to_owned());
     }
-    let expected = build_elf_amd64_shell_layout_plan(
-        objects,
-        placement,
-        relocations,
-        platform_plan,
-        platform_applied,
-    )?;
+    let expected = match dynamic_plan {
+        Some(plan) => build_elf_amd64_shell_layout_plan_with_dynamic_plan(
+            objects,
+            placement,
+            relocations,
+            platform_plan,
+            platform_applied,
+            plan,
+        )?,
+        None => build_elf_amd64_shell_layout_plan(
+            objects,
+            placement,
+            relocations,
+            platform_plan,
+            platform_applied,
+        )?,
+    };
     if expected != *shell {
         return Err("ELF shell serializer rejects layout plan drift".to_owned());
     }
@@ -172,6 +315,7 @@ fn write_tables(
     writes: &mut Vec<ElfAmd64ShellImageWriteAudit>,
     shell: &ElfAmd64ShellLayoutPlanReport,
     tables: &EncodedElfAmd64ShellTables,
+    dynamic_payloads: &DynamicPayloads,
 ) -> Result<(), String> {
     write_shell_region(
         image,
@@ -191,6 +335,35 @@ fn write_tables(
         &tables.program_headers,
         "program-header-table",
     )?;
+    if let Some(offset) = shell.interpreter_file_offset {
+        write_shell_region(
+            image,
+            occupied,
+            writes,
+            shell,
+            offset,
+            &dynamic_payloads.interpreter,
+            "interpreter-path",
+        )?;
+    } else if !dynamic_payloads.interpreter.is_empty() {
+        return Err("ELF shell interpreter bytes have no planned coordinate".to_owned());
+    }
+    if !dynamic_payloads.dynamic_strings.is_empty() {
+        let dynstr = shell
+            .sections
+            .iter()
+            .find(|section| section.section_name == ".dynstr")
+            .ok_or_else(|| "ELF shell final dynamic string section is absent".to_owned())?;
+        write_shell_region(
+            image,
+            occupied,
+            writes,
+            shell,
+            dynstr.file_offset,
+            &dynamic_payloads.dynamic_strings,
+            "final-dynamic-string-table",
+        )?;
+    }
     if let Some(offset) = shell.dynamic_table_file_offset {
         write_shell_region(
             image,

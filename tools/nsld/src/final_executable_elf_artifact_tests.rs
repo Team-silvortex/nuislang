@@ -19,6 +19,7 @@ use crate::{
 use crate::{
     final_executable_elf_test_fixture::{
         elf_alternate_exit_program_object, elf_exit_program_object, elf_linux_exit_runtime_object,
+        elf_program_object_with_external_symbol,
     },
     final_executable_finalizer_registry::invoke_registered_private_image_publication,
     final_executable_registered_loader_probe_admission::verify_registered_loader_probe_admission_receipt,
@@ -28,6 +29,11 @@ use crate::{
         REGISTERED_LOADER_PROBE_ADMISSION_CONTRACT,
     },
     json_final_registered_loader_probe_admission::registered_loader_probe_admission_verify_report_json,
+};
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+use nuisc::linker::{
+    LinkPlanHostFfiAbiEntry, LinkPlanHostFfiAbiGroup, LinkPlanHostFfiEntry,
+    LinkPlanHostFfiValidationSummary,
 };
 use nuisc::{
     aot::{
@@ -376,6 +382,110 @@ fn registered_loader_probe_executes_static_image_and_projects_admission() {
     fs::remove_dir_all(root).unwrap();
 }
 
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[test]
+fn registered_dynamic_probe_replays_receipt_and_publishes_exact_image() {
+    let root = temp_dir("registered-dynamic-loader-probe");
+    fs::create_dir_all(&root).unwrap();
+    let artifact_path = root.join("nuis.compiled.artifact");
+    let (artifact, mut plan) = artifact_and_plan_with_objects(
+        &root,
+        elf_executable(ELF_TYPE_EXECUTABLE),
+        elf_program_object_with_external_symbol(R_X86_64_PLT32, "sched_yield"),
+        elf_linux_exit_runtime_object(),
+    );
+    install_host_ffi_entries(
+        &mut plan,
+        vec![host_ffi_entry("libc", "sched_yield", "i32()")],
+    );
+    fs::write(
+        &artifact_path,
+        encode_nuis_compiled_artifact_section_table_binary(&artifact).unwrap(),
+    )
+    .unwrap();
+
+    let product = elf_amd64_artifact_private_product(&plan).unwrap();
+    assert!(product.dynamic_dependency_plan.plan_ready);
+    assert!(product.dynamic_resolution_provenance.provenance_ready);
+    assert_eq!(
+        product.shell_image_validation.needed_libraries,
+        ["libc.so.6"]
+    );
+    let expected_private_image = product.private_shell_image;
+
+    let outcome = invoke_registered_loader_probe(&plan, &root, true).unwrap();
+    assert_eq!(outcome.status, "execution-admitted", "{outcome:#?}");
+    assert!(outcome.execution_admitted, "{outcome:#?}");
+    assert_eq!(outcome.exit_code, Some(0), "{outcome:#?}");
+    validate_registered_loader_probe_outcome(&outcome).unwrap();
+
+    assert!(try_run_registered_loader_probe(&plan, true, true).unwrap());
+    let receipt_path = registered_loader_probe_admission_path(&plan);
+    let receipt_source = fs::read_to_string(&receipt_path).unwrap();
+    let receipt = parse_registered_loader_probe_admission_receipt(&receipt_source).unwrap();
+    assert_eq!(
+        receipt.outcome.image_identity_hash,
+        fnv1a64_hex(&expected_private_image)
+    );
+    let verification = verify_registered_loader_probe_admission_receipt(&plan);
+    assert!(verification.valid, "{verification:#?}");
+    assert!(verification.current_private_image_matches);
+
+    let output_path = Path::new(&plan.final_stage.output_path);
+    let compatibility_output = b"preserve-dynamic-compatible-output";
+    fs::write(output_path, compatibility_output).unwrap();
+    let publication_plan = invoke_registered_private_image_publication(&plan, false).unwrap();
+    assert!(publication_plan.publication_ready, "{publication_plan:#?}");
+    assert!(!publication_plan.installation_attempted);
+    assert_eq!(fs::read(output_path).unwrap(), compatibility_output);
+
+    let publication = invoke_registered_private_image_publication(&plan, true).unwrap();
+    assert_eq!(publication.status, "private-image-published");
+    assert!(publication.installed);
+    assert!(publication.output_matches_private_image);
+    assert_eq!(fs::read(output_path).unwrap(), expected_private_image);
+    let execution = std::process::Command::new(output_path).output().unwrap();
+    assert!(execution.status.success(), "{execution:#?}");
+    assert!(execution.stdout.is_empty());
+    assert!(execution.stderr.is_empty());
+
+    fs::write(output_path, compatibility_output).unwrap();
+    let mut dependency_drift_plan = plan.clone();
+    install_host_ffi_entries(
+        &mut dependency_drift_plan,
+        vec![host_ffi_entry("libc", "sched_yield", "i64()")],
+    );
+    let drifted_product = elf_amd64_artifact_private_product(&dependency_drift_plan).unwrap();
+    assert_eq!(drifted_product.private_shell_image, expected_private_image);
+    assert_ne!(
+        drifted_product.dynamic_dependency_plan.plan_hash,
+        product.dynamic_dependency_plan.plan_hash
+    );
+    let stale = verify_registered_loader_probe_admission_receipt(&dependency_drift_plan);
+    assert!(!stale.valid, "{stale:#?}");
+    assert_eq!(
+        stale.current_image_identity_hash, stale.image_identity_hash,
+        "binary identity should remain stable while dependency evidence changes"
+    );
+    assert_ne!(
+        stale.current_validation_evidence_hash,
+        stale.validation_evidence_hash
+    );
+    assert!(stale
+        .issues
+        .iter()
+        .any(|issue| issue.contains("current-image-mismatch")));
+    let blocked =
+        invoke_registered_private_image_publication(&dependency_drift_plan, true).unwrap();
+    assert_eq!(blocked.status, "blocked-publication-admission-invalid");
+    assert!(!blocked.installation_attempted);
+    assert!(!blocked.installed);
+    assert!(!blocked.output_changed);
+    assert_eq!(fs::read(output_path).unwrap(), compatibility_output);
+
+    fs::remove_dir_all(root).unwrap();
+}
+
 #[test]
 fn rejects_unregistered_object_relocation_before_output_mutation() {
     let root = temp_dir("unsupported-relocation");
@@ -494,6 +604,63 @@ fn artifact_and_plan_with_objects(
         .collect();
     plan.final_stage.output_path = root.join("demo").display().to_string();
     (artifact, plan)
+}
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+fn host_ffi_entry(abi: &str, symbol: &str, signature: &str) -> LinkPlanHostFfiEntry {
+    LinkPlanHostFfiEntry {
+        abi: abi.to_owned(),
+        symbol: symbol.to_owned(),
+        signature_pattern: signature.to_owned(),
+        signature_hash: yir_core::ffi::ffi_symbol_signature_hash(abi, symbol, signature),
+        policy: "signature-whitelist-required".to_owned(),
+        memory_capabilities: Vec::new(),
+    }
+}
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+fn install_host_ffi_entries(
+    plan: &mut nuisc::linker::LinkPlan,
+    entries: Vec<LinkPlanHostFfiEntry>,
+) {
+    let abi = entries[0].abi.clone();
+    assert!(entries.iter().all(|entry| entry.abi == abi));
+    let validation = LinkPlanHostFfiValidationSummary {
+        checked: entries.len(),
+        valid: true,
+        link_allowed: true,
+        issues: Vec::new(),
+        notes: Vec::new(),
+    };
+    let abi_entries = entries
+        .iter()
+        .map(|entry| LinkPlanHostFfiAbiEntry {
+            symbol: entry.symbol.clone(),
+            signature_pattern: entry.signature_pattern.clone(),
+            signature_hash: entry.signature_hash.clone(),
+            policy: entry.policy.clone(),
+            memory_capabilities: entry.memory_capabilities.clone(),
+        })
+        .collect::<Vec<_>>();
+    plan.host_ffi.index_path = Some("nuis.project.host_ffi.index".to_owned());
+    plan.host_ffi.symbol_count = entries.len();
+    plan.host_ffi.policy_count = entries.len();
+    plan.host_ffi.memory_capability_count = 0;
+    plan.host_ffi.policy = "signature-whitelist-required".to_owned();
+    plan.host_ffi.abi_groups = vec![LinkPlanHostFfiAbiGroup {
+        abi,
+        symbol_count: entries.len(),
+        policy_count: entries.len(),
+        memory_capability_count: 0,
+        symbols: entries
+            .iter()
+            .map(|entry| format!("{}:{}", entry.symbol, entry.signature_pattern))
+            .collect(),
+        entries: abi_entries,
+        validation: validation.clone(),
+    }];
+    plan.host_ffi.entries = entries;
+    plan.host_ffi.validation = validation;
 }
 
 fn build_manifest(root: &std::path::Path, binary_bytes: usize) -> String {

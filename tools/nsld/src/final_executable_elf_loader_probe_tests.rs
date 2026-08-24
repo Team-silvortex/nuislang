@@ -201,6 +201,7 @@ fn probe(
             bytes: &fixture.bytes,
             validation: &fixture.validation,
             unresolved_external_symbol_count: fixture.unresolved_external_symbol_count,
+            dynamic_provenance: None,
         },
         root,
         execute,

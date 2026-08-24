@@ -8,6 +8,7 @@ const ET_EXEC: u16 = 2;
 const EM_X86_64: u16 = 62;
 const PT_LOAD: u32 = 1;
 const PT_DYNAMIC: u32 = 2;
+const PT_INTERP: u32 = 3;
 const PF_X: u32 = 1;
 const SHT_STRTAB: u32 = 3;
 const SHT_NOBITS: u32 = 8;
@@ -26,6 +27,9 @@ pub(super) struct ParsedElfAmd64ShellImage {
     pub(super) load_segment_count: usize,
     pub(super) dynamic_segment_count: usize,
     pub(super) dynamic_entry_count: usize,
+    pub(super) interpreter_segment_count: usize,
+    pub(super) interpreter_path: Option<String>,
+    pub(super) needed_libraries: Vec<String>,
     pub(super) section_header_count: usize,
     pub(super) section_name_count: usize,
     pub(super) entry_program_header_index: usize,
@@ -68,6 +72,7 @@ struct ParsedProgramHeaders {
     records: Vec<ProgramHeader>,
     load_count: usize,
     dynamic_span: Option<(usize, usize)>,
+    interpreter_span: Option<(usize, usize)>,
     entry_index: usize,
 }
 
@@ -84,7 +89,9 @@ pub(super) fn parse_and_validate_elf_amd64_shell_image(
     let header = parse_header(bytes, shell)?;
     let programs = parse_program_headers(bytes, shell, &header)?;
     let sections = parse_section_headers(bytes, shell, &header)?;
-    let dynamic_entry_count = parse_dynamic_entries(bytes, shell, programs.dynamic_span)?;
+    let interpreter_path = parse_interpreter(bytes, shell, programs.interpreter_span)?;
+    let (dynamic_entry_count, needed_libraries) =
+        parse_dynamic_entries(bytes, shell, programs.dynamic_span, &sections)?;
     validate_load_nonoverlap(&programs.records)?;
 
     let program_bytes = checked_mul(
@@ -111,6 +118,19 @@ pub(super) fn parse_and_validate_elf_amd64_shell_image(
         program_bytes,
         header.program_count,
     )?);
+    if let Some((offset, size)) = programs.interpreter_span {
+        tables.push(table_evidence(bytes, "interpreter-path", offset, size, 1)?);
+    }
+    if !shell.needed_libraries.is_empty() {
+        let dynstr = section_by_name(shell, &sections, ".dynstr")?;
+        tables.push(table_evidence(
+            bytes,
+            "final-dynamic-string-table",
+            dynstr.file_offset,
+            dynstr.size,
+            needed_libraries.len(),
+        )?);
+    }
     if let Some((offset, size)) = programs.dynamic_span {
         tables.push(table_evidence(
             bytes,
@@ -140,6 +160,9 @@ pub(super) fn parse_and_validate_elf_amd64_shell_image(
         load_segment_count: programs.load_count,
         dynamic_segment_count: usize::from(programs.dynamic_span.is_some()),
         dynamic_entry_count,
+        interpreter_segment_count: usize::from(programs.interpreter_span.is_some()),
+        interpreter_path,
+        needed_libraries,
         section_header_count: sections.records.len(),
         section_name_count: sections.name_count,
         entry_program_header_index: programs.entry_index,
@@ -223,6 +246,7 @@ fn parse_program_headers(
 ) -> Result<ParsedProgramHeaders, String> {
     let mut programs = Vec::with_capacity(header.program_count);
     let mut dynamic_span = None;
+    let mut interpreter_span = None;
     let mut entry_index = None;
     let mut load_count = 0usize;
     for index in 0..header.program_count {
@@ -279,6 +303,13 @@ fn parse_program_headers(
         {
             return Err("ELF shell image has multiple PT_DYNAMIC records".to_owned());
         }
+        if program.program_type == PT_INTERP
+            && interpreter_span
+                .replace((program.file_offset, program.file_size))
+                .is_some()
+        {
+            return Err("ELF shell image has multiple PT_INTERP records".to_owned());
+        }
         programs.push(program);
     }
     let entry_index = entry_index
@@ -287,6 +318,7 @@ fn parse_program_headers(
         records: programs,
         load_count,
         dynamic_span,
+        interpreter_span,
         entry_index,
     })
 }
@@ -415,10 +447,11 @@ fn parse_dynamic_entries(
     bytes: &[u8],
     shell: &ElfAmd64ShellLayoutPlanReport,
     dynamic_span: Option<(usize, usize)>,
-) -> Result<usize, String> {
+    sections: &ParsedSectionHeaders,
+) -> Result<(usize, Vec<String>), String> {
     let Some((offset, size)) = dynamic_span else {
         if shell.dynamic_entries.is_empty() {
-            return Ok(0);
+            return Ok((0, Vec::new()));
         }
         return Err("ELF shell dynamic plan has no PT_DYNAMIC".to_owned());
     };
@@ -429,6 +462,7 @@ fn parse_dynamic_entries(
     if count != shell.dynamic_entries.len() {
         return Err("ELF shell dynamic entry count differs from its plan".to_owned());
     }
+    let mut needed_offsets = Vec::new();
     for (index, expected) in shell.dynamic_entries.iter().enumerate() {
         let entry_offset = table_entry_offset(offset, index, ELF64_DYNAMIC_ENTRY_SIZE, "dynamic")?;
         let tag = read_i64(bytes, entry_offset, "dynamic tag")?;
@@ -438,8 +472,79 @@ fn parse_dynamic_entries(
                 "ELF shell dynamic entry {index} differs from its plan"
             ));
         }
+        if tag == 1 {
+            needed_offsets.push(
+                usize::try_from(value)
+                    .map_err(|_| "ELF DT_NEEDED offset exceeds usize".to_owned())?,
+            );
+        }
     }
-    Ok(count)
+    if needed_offsets.len() != shell.needed_libraries.len() {
+        return Err("ELF shell DT_NEEDED coverage differs from its plan".to_owned());
+    }
+    let mut needed_libraries = Vec::with_capacity(needed_offsets.len());
+    if !needed_offsets.is_empty() {
+        let dynstr = section_by_name(shell, sections, ".dynstr")?;
+        let strings = checked_slice(
+            bytes,
+            dynstr.file_offset,
+            dynstr.size,
+            "final dynamic string table",
+        )?;
+        for (offset, expected) in needed_offsets.iter().zip(&shell.needed_libraries) {
+            let name = read_string(strings, *offset, "DT_NEEDED name")?;
+            if *offset != expected.dynamic_string_offset || name != expected.needed_name {
+                return Err("ELF shell DT_NEEDED name differs from its plan".to_owned());
+            }
+            needed_libraries.push(name.to_owned());
+        }
+    }
+    Ok((count, needed_libraries))
+}
+
+fn parse_interpreter(
+    bytes: &[u8],
+    shell: &ElfAmd64ShellLayoutPlanReport,
+    span: Option<(usize, usize)>,
+) -> Result<Option<String>, String> {
+    let Some((offset, size)) = span else {
+        if shell.interpreter_path.is_none() {
+            return Ok(None);
+        }
+        return Err("ELF shell interpreter plan has no PT_INTERP".to_owned());
+    };
+    let payload = checked_slice(bytes, offset, size, "PT_INTERP payload")?;
+    let Some((&0, path_bytes)) = payload.split_last() else {
+        return Err("ELF shell PT_INTERP is not NUL terminated".to_owned());
+    };
+    if path_bytes.is_empty() || path_bytes.contains(&0) {
+        return Err("ELF shell PT_INTERP path is invalid".to_owned());
+    }
+    let path = std::str::from_utf8(path_bytes)
+        .map_err(|_| "ELF shell PT_INTERP path is not UTF-8".to_owned())?;
+    if shell.interpreter_file_offset != Some(offset)
+        || shell.interpreter_bytes != size
+        || shell.interpreter_path.as_deref() != Some(path)
+    {
+        return Err("ELF shell PT_INTERP payload differs from its plan".to_owned());
+    }
+    Ok(Some(path.to_owned()))
+}
+
+fn section_by_name<'a>(
+    shell: &ElfAmd64ShellLayoutPlanReport,
+    sections: &'a ParsedSectionHeaders,
+    name: &str,
+) -> Result<&'a SectionHeader, String> {
+    let index = shell
+        .sections
+        .iter()
+        .position(|section| section.section_name == name)
+        .ok_or_else(|| format!("ELF shell section `{name}` is absent"))?;
+    sections
+        .records
+        .get(index)
+        .ok_or_else(|| format!("ELF shell parsed section `{name}` is absent"))
 }
 
 fn validate_load_nonoverlap(programs: &[ProgramHeader]) -> Result<(), String> {

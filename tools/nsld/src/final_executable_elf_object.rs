@@ -1,4 +1,7 @@
 use crate::{
+    final_executable_elf_dynamic_plan::{
+        build_elf_amd64_dynamic_dependency_plan, ElfAmd64DynamicDependencyPlanReport,
+    },
     final_executable_elf_dynamic_provenance::{
         build_elf_amd64_dynamic_resolution_provenance, ElfAmd64DynamicResolutionProvenanceReport,
     },
@@ -22,9 +25,10 @@ use crate::{
     final_executable_elf_relocation::build_elf_amd64_relocation_application,
     final_executable_elf_relocation_report::ElfAmd64RelocationApplicationReport,
     final_executable_elf_shell::{
-        build_elf_amd64_shell_layout_plan, serialize_elf_amd64_shell_image,
-        validate_elf_amd64_shell_image, ElfAmd64ShellImageSerializationReport,
-        ElfAmd64ShellImageValidationReport, ElfAmd64ShellLayoutPlanReport,
+        build_elf_amd64_shell_layout_plan_with_dynamic_plan,
+        serialize_elf_amd64_shell_image_with_dynamic_plan, validate_elf_amd64_shell_image,
+        ElfAmd64ShellImageSerializationReport, ElfAmd64ShellImageValidationReport,
+        ElfAmd64ShellLayoutPlanReport,
     },
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -64,6 +68,7 @@ pub(crate) struct ElfAmd64HostObjectLinkage {
     pub(crate) patch_application: ElfAmd64PatchApplicationReport,
     pub(crate) platform_structure_plan: ElfAmd64PlatformStructurePlanReport,
     pub(crate) platform_patch_application: ElfAmd64PlatformPatchApplicationReport,
+    pub(crate) dynamic_dependency_plan: ElfAmd64DynamicDependencyPlanReport,
     pub(crate) shell_layout_plan: ElfAmd64ShellLayoutPlanReport,
     pub(crate) shell_image_serialization: ElfAmd64ShellImageSerializationReport,
     pub(crate) shell_image_validation: ElfAmd64ShellImageValidationReport,
@@ -220,19 +225,27 @@ pub(crate) fn build_elf_amd64_host_object_linkage(
     {
         return Err("ELF platform-applied image handoff hash drift".to_owned());
     }
-    let shell_layout_plan = build_elf_amd64_shell_layout_plan(
-        &objects,
-        &placement_binding,
-        &relocation_application,
+    let dynamic_dependency_plan = build_elf_amd64_dynamic_dependency_plan(
+        plan,
+        &unresolved_external_symbols,
         &platform_structure_plan,
-        &platform_applied_image,
+        &platform_applied_image.report,
     )?;
-    let shell_image = serialize_elf_amd64_shell_image(
+    let shell_layout_plan = build_elf_amd64_shell_layout_plan_with_dynamic_plan(
         &objects,
         &placement_binding,
         &relocation_application,
         &platform_structure_plan,
         &platform_applied_image,
+        &dynamic_dependency_plan,
+    )?;
+    let shell_image = serialize_elf_amd64_shell_image_with_dynamic_plan(
+        &objects,
+        &placement_binding,
+        &relocation_application,
+        &platform_structure_plan,
+        &platform_applied_image,
+        &dynamic_dependency_plan,
         &shell_layout_plan,
     )?;
     if shell_image.bytes.len() != shell_image.report.shell_image_span_bytes
@@ -257,10 +270,7 @@ pub(crate) fn build_elf_amd64_host_object_linkage(
         return Err("ELF private shell image validation handoff drift".to_owned());
     }
     let dynamic_resolution_provenance = build_elf_amd64_dynamic_resolution_provenance(
-        plan,
-        &unresolved_external_symbols,
-        &platform_structure_plan,
-        &platform_applied_image.report,
+        &dynamic_dependency_plan,
         &shell_image_validation,
     )?;
     Ok(ElfAmd64HostObjectLinkage {
@@ -283,6 +293,7 @@ pub(crate) fn build_elf_amd64_host_object_linkage(
         patch_application: applied_image.report,
         platform_structure_plan,
         platform_patch_application: platform_applied_image.report,
+        dynamic_dependency_plan,
         shell_layout_plan,
         shell_image_serialization: shell_image.report,
         shell_image_validation,
