@@ -117,6 +117,10 @@ pub enum CommandKind {
         input: PathBuf,
         json: bool,
     },
+    BootstrapBuild {
+        input: PathBuf,
+        output_dir: PathBuf,
+    },
     Compile {
         input: PathBuf,
         output_dir: PathBuf,

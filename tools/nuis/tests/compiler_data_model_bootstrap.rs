@@ -6,7 +6,9 @@ use std::{
 };
 
 use nuis_artifact::{
-    parse_build_manifest, read_compiler_stage_handoff, CompilerStageKind,
+    parse_build_manifest, read_compiler_component_build, read_compiler_stage_handoff,
+    CompilerStageKind, COMPILER_COMPONENT_BUILD_FILE, COMPILER_COMPONENT_BUILD_PROTOCOL,
+    COMPILER_COMPONENT_DRIVER_CONTRACT, COMPILER_COMPONENT_REPRODUCIBLE_IDENTITY_CONTRACT,
     COMPILER_STAGE_HANDOFF_PROTOCOL, COMPILER_STAGE_PRODUCER_CONTRACT,
 };
 
@@ -52,7 +54,7 @@ fn compiler_data_model_bootstrap_builds_and_runs_as_pure_nuis() {
     let project = "../../examples/projects/tooling/bootstrap_compiler_data_model_demo";
     let output_dir = temp_dir();
     let output_dir_text = output_dir.display().to_string();
-    let build = run_nuis(&["build", project, &output_dir_text]);
+    let build = run_nuis(&["bootstrap-build", project, &output_dir_text]);
     assert_success(&build, "compiler data model build");
     assert_file_not_contains(
         &output_dir.join("bootstrap_compiler_data_model_demo.ll"),
@@ -84,6 +86,58 @@ fn compiler_data_model_bootstrap_builds_and_runs_as_pure_nuis() {
     );
     assert_eq!(payloads.len(), 5);
 
+    let component_build_path = output_dir.join(COMPILER_COMPONENT_BUILD_FILE);
+    let first_component_build =
+        read_compiler_component_build(&component_build_path).expect("verify component build");
+    assert_eq!(
+        first_component_build.protocol,
+        COMPILER_COMPONENT_BUILD_PROTOCOL
+    );
+    assert_eq!(
+        first_component_build.driver_contract,
+        COMPILER_COMPONENT_DRIVER_CONTRACT
+    );
+    assert_eq!(first_component_build.stage_role, "stage0");
+    assert_eq!(
+        first_component_build.component_id,
+        "bootstrap_compiler_data_model_demo"
+    );
+    assert_eq!(first_component_build.producer_id, "nuisc-stage0-reference");
+    assert_eq!(
+        first_component_build.stage_handoff_bundle_sha256,
+        handoff.bundle_sha256
+    );
+    assert_eq!(
+        first_component_build.reproducible_identity_contract,
+        COMPILER_COMPONENT_REPRODUCIBLE_IDENTITY_CONTRACT
+    );
+    for identity in [
+        first_component_build.compiler_image_sha256.as_str(),
+        first_component_build.dependency_closure_sha256.as_str(),
+        first_component_build.reproducible_build_sha256.as_str(),
+        first_component_build.record_sha256.as_str(),
+    ] {
+        assert_eq!(identity.len(), 64);
+    }
+    for kind in [
+        "component-manifest",
+        "component-source",
+        "galaxy-lock",
+        "galaxy-manifest",
+        "galaxy-source",
+        "galaxy-library",
+        "nustar-index",
+        "nustar-manifest",
+    ] {
+        assert!(
+            first_component_build
+                .dependencies
+                .iter()
+                .any(|dependency| dependency.kind == kind),
+            "expected component build to attest `{kind}`"
+        );
+    }
+
     let build_manifest = parse_build_manifest(&output_dir.join("nuis.build.manifest.toml"))
         .expect("parse compiler data model build manifest");
     for kind in [
@@ -108,6 +162,41 @@ fn compiler_data_model_bootstrap_builds_and_runs_as_pure_nuis() {
         Some(43),
         "compiler data model binary should return its deterministic compiler score"
     );
+
+    let rebuild = run_nuis(&["bootstrap-build", project, &output_dir_text]);
+    assert_success(&rebuild, "cached compiler data model rebuild");
+    let second_component_build = read_compiler_component_build(&component_build_path)
+        .expect("verify cached component build");
+    assert_eq!(
+        first_component_build.dependency_closure_sha256,
+        second_component_build.dependency_closure_sha256
+    );
+    assert_eq!(
+        first_component_build.stage_handoff_bundle_sha256,
+        second_component_build.stage_handoff_bundle_sha256
+    );
+    assert_eq!(
+        first_component_build.compiler_image_sha256,
+        second_component_build.compiler_image_sha256
+    );
+    assert_eq!(
+        first_component_build.native_binary_sha256,
+        second_component_build.native_binary_sha256
+    );
+    assert_eq!(
+        first_component_build.reproducible_build_sha256,
+        second_component_build.reproducible_build_sha256
+    );
+
+    let native_path = output_dir.join("bootstrap_compiler_data_model_demo");
+    let mut tampered_native = fs::read(&native_path).expect("read native binary for tamper check");
+    tampered_native.push(0);
+    fs::write(&native_path, tampered_native).expect("tamper native binary");
+    let error = read_compiler_component_build(&component_build_path)
+        .expect_err("tampered native binary must invalidate component build");
+    assert!(error
+        .to_string()
+        .contains("native binary length or SHA-256 mismatch"));
 
     fs::remove_dir_all(output_dir).expect("remove compiler data model output directory");
 }

@@ -65,5 +65,5 @@ missing = [
   "standalone-structural-ast-decoder",
   "standalone-structural-nir-decoder",
   "nuis-stage1-producer",
-  "stage0-stage1-dependency-closure-driver",
+  "stage0-stage1-differential-authorization",
 ]

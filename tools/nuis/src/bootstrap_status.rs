@@ -535,7 +535,7 @@ mod tests {
                 "status = \"stable\"\nprogress = 100",
             )
             .replace(
-                "status = \"early\"\nprogress = 35",
+                "status = \"early\"\nprogress = 55",
                 "status = \"stable\"\nprogress = 100",
             )
             .replace(

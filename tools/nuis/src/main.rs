@@ -373,6 +373,9 @@ fn run() -> Result<(), String> {
         cli::CommandKind::BootstrapStatus { input, json } => {
             bootstrap_status::handle_bootstrap_status(&input, json)?;
         }
+        cli::CommandKind::BootstrapBuild { input, output_dir } => {
+            nuisc::run(nuisc::CommandKind::BootstrapBuild { input, output_dir })?;
+        }
         cli::CommandKind::Registry { json } => {
             nuisc::run(nuisc::CommandKind::Registry { json })?;
         }
@@ -679,6 +682,7 @@ fn print_help() {
     println!("    nuis status");
     println!("    nuis dev-tensor [--json]");
     println!("    nuis bootstrap-status [--json] [manifest]");
+    println!("    nuis bootstrap-build <project-dir|nuis.toml> <output-dir>");
     println!("    nuis registry");
     println!("    nuis fmt [input.ns|project-dir|nuis.toml]");
     println!("    nuis bindings <input.ns|project-dir|nuis.toml>");

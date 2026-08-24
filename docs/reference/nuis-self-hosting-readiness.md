@@ -95,18 +95,27 @@ producer remain open. See
 
 Coordinate: `compiler-toolchain/bootstrap/stage0-stage1-driver`.
 
-Build one Nuis-written compiler component through stage0 while consuming the
-new handoff and recording exact compiler image plus dependency closure. The
-handoff protocol now exists; the reusable compiler-stage driver does not. This
-must not become another application build alias.
+This gate is now `early/55`. `nuis bootstrap-build` is a dedicated project-only
+driver over the frozen bootstrap gate and normal AOT pipeline. It consumes the
+five-stage handoff and emits `nuis-compiler-component-build-v1`, binding the
+exact stage0 compiler image, native output, build outputs, project/Galaxy/
+Nustar dependency closure, a cache-stable reproducible identity, and an exact
+audit identity. See
+[Nuis Compiler Component Build](nuis-compiler-component-build.md).
+
+The driver is not another unchecked application-build alias, but it is still
+only the stage0 half. No Nuis stage1 producer or replacement authorization
+exists yet.
 
 ### `differential-reproducibility-gate`
 
 Coordinate: `developer-system/bootstrap/differential-reproducibility-gate`.
 
-Compare normalized AST, NIR, YIR, diagnostics, and deterministic artifact
-identity across stages. Any semantic or reproducibility drift must block
-component replacement rather than being hidden by byte-level shell success.
+This is now the weakest readiness coordinate at `early/40`. Compare two
+compiler-component records plus normalized AST, NIR, YIR, diagnostics,
+dependency closure, native output, and deterministic artifact identity across
+producers. Any semantic or reproducibility drift must block component
+replacement rather than being hidden by byte-level shell success.
 
 ## Migration Rule
 

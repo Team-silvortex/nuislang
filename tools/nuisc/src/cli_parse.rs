@@ -517,6 +517,20 @@ where
                 json,
             })
         }
+        "bootstrap-build" => {
+            let input = PathBuf::from(args.next().ok_or_else(|| {
+                "usage: nuisc bootstrap-build <project-dir|nuis.toml> <output-dir>".to_owned()
+            })?);
+            let output_dir = PathBuf::from(args.next().ok_or_else(|| {
+                "usage: nuisc bootstrap-build <project-dir|nuis.toml> <output-dir>".to_owned()
+            })?);
+            if args.next().is_some() {
+                return Err(
+                    "usage: nuisc bootstrap-build <project-dir|nuis.toml> <output-dir>".to_owned(),
+                );
+            }
+            Ok(CommandKind::BootstrapBuild { input, output_dir })
+        }
         "compile" => {
             let mut verbose_cache = false;
             let mut cpu_abi = None;
@@ -561,7 +575,7 @@ where
             })
         }
         other => Err(format!(
-            "unknown nuisc command `{other}`; expected `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `pack-envelope`, `unpack-envelope`, `inspect-envelope`, `inspect-artifact`, `inspect-execution`, `artifact-report`, `verify-artifact`, `unpack-artifact`, `verify-build-manifest`, `inspect-benchmarks`, `inspect-docs`, `inspect-galaxy-docs`, `inspect-stdlib-docs`, `inspect-project-metadata`, `repair-project-metadata`, `cache-status`, `clean-cache`, `cache-prune`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, `bootstrap-check`, or `compile`"
+            "unknown nuisc command `{other}`; expected `status`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `pack-envelope`, `unpack-envelope`, `inspect-envelope`, `inspect-artifact`, `inspect-execution`, `artifact-report`, `verify-artifact`, `unpack-artifact`, `verify-build-manifest`, `inspect-benchmarks`, `inspect-docs`, `inspect-galaxy-docs`, `inspect-stdlib-docs`, `inspect-project-metadata`, `repair-project-metadata`, `cache-status`, `clean-cache`, `cache-prune`, `dump-ast`, `dump-nir`, `dump-yir`, `check`, `bootstrap-check`, `bootstrap-build`, or `compile`"
         )),
     }
 }

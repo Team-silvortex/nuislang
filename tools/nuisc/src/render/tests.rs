@@ -335,3 +335,29 @@ fn yir_text_projection_round_trips_escaped_arguments() {
     assert_eq!(reparsed.nodes[0].op.args, module.nodes[0].op.args);
     assert_eq!(render_yir(&reparsed), rendered);
 }
+
+#[test]
+fn yir_text_projection_round_trips_empty_and_embedded_quote_arguments() {
+    let mut module = YirModule::new("0.1");
+    module.resources.push(yir_core::Resource {
+        name: "cpu0".to_owned(),
+        kind: yir_core::ResourceKind::parse("cpu.arm64"),
+    });
+    for (name, value) in [("empty", ""), ("quoted", "left\"right")] {
+        module.nodes.push(yir_core::Node {
+            name: name.to_owned(),
+            resource: "cpu0".to_owned(),
+            op: yir_core::Operation::parse("cpu.text", vec![value.to_owned()])
+                .expect("cpu.text should parse"),
+        });
+    }
+
+    let rendered = render_yir(&module);
+    let reparsed =
+        yir_syntax::parse_explicit_module(&rendered).expect("YIR projection should parse");
+
+    assert!(rendered.contains("cpu.text empty cpu0 \"\""));
+    assert!(rendered.contains("cpu.text quoted cpu0 \"left\\\"right\""));
+    assert_eq!(reparsed.nodes, module.nodes);
+    assert_eq!(render_yir(&reparsed), rendered);
+}

@@ -78,12 +78,13 @@ The boundary is not yet stage1-ready:
 * NIR is hash-bound and checked against stage0 output but has no standalone
   structural decoder.
 * No Nuis-written producer emits this bundle yet.
-* Compiler image and dependency-closure identity still belong to the next
-  `stage0-stage1-driver` coordinate.
+* Compiler image and dependency-closure identity are now added by the separate
+  `nuis-compiler-component-build-v1` stage-driver record.
 
-These limits keep the readiness coordinate at `early/45`, while making the
-driver, rather than the serialized handoff format, the next weakest
-bootstrap-critical task.
+These limits keep the readiness coordinate at `early/45`. The stage0 driver is
+now available, so the weakest bootstrap-critical task has moved to the
+cross-producer differential gate. See
+[Nuis Compiler Component Build](nuis-compiler-component-build.md).
 
 ## Validation
 
@@ -94,6 +95,6 @@ CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -
 ```
 
 The tests cover canonical manifest round trips, producer-independent identity,
-payload tampering, invalid order and paths, explicit YIR parsing, escaped YIR
+payload tampering, invalid order and paths, explicit YIR parsing, empty and escaped YIR
 arguments, normal AOT artifact hashing, cache reuse, and native execution of
 the pure Nuis compiler-data component.

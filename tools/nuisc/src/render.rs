@@ -426,7 +426,7 @@ pub fn render_yir(module: &YirModule) -> String {
             node.op.module, node.op.instruction, node.name, node.resource, lane_suffix
         ));
         for arg in &node.op.args {
-            if arg.chars().any(char::is_whitespace) {
+            if arg.is_empty() || arg.contains('"') || arg.chars().any(char::is_whitespace) {
                 out.push_str(&format!(" \"{}\"", escape_debug(arg)));
             } else {
                 out.push_str(&format!(" {}", arg));

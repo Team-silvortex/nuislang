@@ -42,12 +42,12 @@ blocker = "Rust stage0 emits and verifies all five records, but AST still regene
 id = "stage0-stage1-driver"
 coordinate = "compiler-toolchain/bootstrap/stage0-stage1-driver"
 status = "early"
-progress = 35
+progress = 55
 required_before = "beta-0.10.0"
-next_action = "build one Nuis-written compiler component through a reusable driver that consumes the stage handoff and records compiler image plus dependency closure identity"
-validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis bootstrap_status -j 1"
-expected_artifact = "a reproducible stage0-to-stage1 build record for the first Nuis-written compiler component"
-blocker = "the AOT pipeline now emits a compiler-stage identity chain, but no reusable stage0-to-stage1 driver or dependency-closure record exists yet"
+next_action = "feed separately attested stage0 and candidate stage1 component records into the differential gate without authorizing replacement"
+validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_build -j 1 && CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1"
+expected_artifact = "two independently attested compiler-component records ready for fail-closed stage0/stage1 comparison"
+blocker = "the stage0 driver now records the compiler image, full dependency closure, handoff, native output, stable reproducible identity, and exact audit identity, but no Nuis stage1 producer or replacement authorization exists"
 
 [[gates]]
 id = "differential-reproducibility-gate"
@@ -55,7 +55,7 @@ coordinate = "developer-system/bootstrap/differential-reproducibility-gate"
 status = "early"
 progress = 40
 required_before = "beta-0.10.0"
-next_action = "compare stage0 and candidate stage1 semantic outputs with normalized identities before allowing any component replacement"
+next_action = "compare two compiler-component records plus normalized AST, NIR, YIR, diagnostics, dependency closure, and native output before allowing replacement"
 validation_command = "CARGO_INCREMENTAL=0 cargo test -q -p nuis bootstrap_status -j 1"
 expected_artifact = "a fail-closed differential report covering normalized AST, NIR, YIR, diagnostics, and deterministic artifact identity"
-blocker = "artifact reproducibility checks exist, but no cross-stage semantic equivalence gate currently protects compiler replacement"
+blocker = "stage0 now emits a cache-stable component identity, but no cross-producer semantic equivalence report currently protects compiler replacement"

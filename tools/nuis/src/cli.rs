@@ -23,6 +23,10 @@ pub enum CommandKind {
         input: PathBuf,
         json: bool,
     },
+    BootstrapBuild {
+        input: PathBuf,
+        output_dir: PathBuf,
+    },
     Registry {
         json: bool,
     },
@@ -219,6 +223,20 @@ where
                 }),
                 json,
             })
+        }
+        "bootstrap-build" => {
+            let input = PathBuf::from(args.next().ok_or_else(|| {
+                "usage: nuis bootstrap-build <project-dir|nuis.toml> <output-dir>".to_owned()
+            })?);
+            let output_dir = PathBuf::from(args.next().ok_or_else(|| {
+                "usage: nuis bootstrap-build <project-dir|nuis.toml> <output-dir>".to_owned()
+            })?);
+            if args.next().is_some() {
+                return Err(
+                    "usage: nuis bootstrap-build <project-dir|nuis.toml> <output-dir>".to_owned(),
+                );
+            }
+            Ok(CommandKind::BootstrapBuild { input, output_dir })
         }
         "registry" => {
             let mut json = false;
@@ -479,7 +497,7 @@ where
         }),
         "galaxy" => parse_galaxy_args(args),
         other => Err(format!(
-            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `debug-request`, `debug-lineage-repair`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
+            "unknown nuis command `{other}`; expected `help`, `status`, `dev-tensor`, `bootstrap-status`, `bootstrap-build`, `registry`, `fmt`, `bindings`, `pack-nustar`, `inspect-nustar`, `loader-contract`, `inspect-artifact`, `verify-artifact`, `unpack-artifact-support`, `materialize-artifact`, `artifact-doctor`, `build-report`, `verify-build-manifest`, `cache-status`, `clean-cache`, `cache-prune`, `release-check`, `check`, `test`, `build`, `run-artifact`, `debug-resume`, `debug-request`, `debug-lineage-repair`, `dump-ast`, `dump-nir`, `dump-yir`, `workflow`, `scheduler-view`, `rc`, `project-status`, `project-doctor`, `project-imports`, `project-lock-abi`, or `galaxy`"
         )),
     }
 }

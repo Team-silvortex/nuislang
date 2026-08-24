@@ -90,6 +90,26 @@ pub(crate) fn run_compile(
     packaging_mode: Option<String>,
 ) -> Result<(), String> {
     let resolved = resolve_compile_input(&input)?;
+    run_compile_resolved(
+        input,
+        output_dir,
+        verbose_cache,
+        cpu_abi,
+        target,
+        packaging_mode,
+        &resolved,
+    )
+}
+
+pub(crate) fn run_compile_resolved(
+    input: PathBuf,
+    output_dir: PathBuf,
+    verbose_cache: bool,
+    cpu_abi: Option<String>,
+    target: Option<String>,
+    packaging_mode: Option<String>,
+    resolved: &pipeline::ResolvedCompileInput,
+) -> Result<(), String> {
     if let Some(project) = &resolved.project {
         project::verify_committed_project_galaxy_resolution_lock(project)?;
     }

@@ -31,6 +31,26 @@ fn bootstrap_check_requires_one_input() {
 }
 
 #[test]
+fn parse_bootstrap_build_command() {
+    let command = parse_args(
+        [
+            "bootstrap-build".to_owned(),
+            "compiler-project".to_owned(),
+            "build/compiler".to_owned(),
+        ]
+        .into_iter(),
+    )
+    .unwrap();
+    assert_eq!(
+        command,
+        CommandKind::BootstrapBuild {
+            input: PathBuf::from("compiler-project"),
+            output_dir: PathBuf::from("build/compiler"),
+        }
+    );
+}
+
+#[test]
 fn parse_compile_with_packaging_mode() {
     let command = parse_args(
         vec![

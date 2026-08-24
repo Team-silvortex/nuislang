@@ -73,6 +73,7 @@ mod aot_vcs_info;
 mod aot_verify_report;
 pub mod artifact_provider_metadata;
 mod artifact_report;
+mod bootstrap_stage_driver;
 pub mod cache;
 pub mod cli;
 pub mod codegen_wasm;
@@ -290,6 +291,9 @@ pub fn run(command: CommandKind) -> Result<(), String> {
         CommandKind::Check { input } => command_compile::run_check(input)?,
         CommandKind::BootstrapCheck { input, json } => {
             command_bootstrap::run_bootstrap_check(input, json)?
+        }
+        CommandKind::BootstrapBuild { input, output_dir } => {
+            bootstrap_stage_driver::run_bootstrap_build(input, output_dir)?
         }
         CommandKind::Compile {
             input,

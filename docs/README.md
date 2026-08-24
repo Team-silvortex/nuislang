@@ -46,6 +46,7 @@ For the compiler and project frontdoor:
 * [Bootstrap language subset](reference/nuis-bootstrap-language-subset.md)
 * [Compiler data model](reference/nuis-compiler-data-model.md)
 * [Compiler stage handoff](reference/nuis-compiler-stage-handoff.md)
+* [Compiler component build](reference/nuis-compiler-component-build.md)
 * [Nuis frontdoor surface](reference/nuis-frontdoor-surface-reference.md)
 * [Native artifact workflow](reference/nuis-native-artifact-workflow.md)
 * [YIR tools](reference/yir-tools-reference.md)

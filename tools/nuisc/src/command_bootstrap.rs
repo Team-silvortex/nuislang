@@ -7,7 +7,9 @@ use nuis_semantics::bootstrap_subset::{
 use nuis_semantics::model::AstModule;
 
 use crate::command_helpers::resolve_compile_input;
-use crate::{frontend, json_bool_field, json_escape, json_string_field, json_usize_field};
+use crate::{
+    frontend, json_bool_field, json_escape, json_string_field, json_usize_field, pipeline,
+};
 
 #[cfg(test)]
 #[path = "command_bootstrap_tests.rs"]
@@ -53,8 +55,29 @@ pub(crate) fn run_bootstrap_check(input: PathBuf, json: bool) -> Result<(), Stri
     }
 }
 
+pub(crate) fn ensure_bootstrap_resolved(
+    resolved: &pipeline::ResolvedCompileInput,
+) -> Result<(), String> {
+    let report = inspect_bootstrap_resolved(resolved)?;
+    ensure_bootstrap_report(&report)
+}
+
+fn ensure_bootstrap_report(report: &BootstrapCheckReport) -> Result<(), String> {
+    if report.accepted() {
+        Ok(())
+    } else {
+        Err(render_bootstrap_check_text(&report))
+    }
+}
+
 fn inspect_bootstrap_input(input: &std::path::Path) -> Result<BootstrapCheckReport, String> {
     let resolved = resolve_compile_input(input)?;
+    inspect_bootstrap_resolved(&resolved)
+}
+
+fn inspect_bootstrap_resolved(
+    resolved: &pipeline::ResolvedCompileInput,
+) -> Result<BootstrapCheckReport, String> {
     let input_kind = if resolved.project.is_some() {
         "project"
     } else {

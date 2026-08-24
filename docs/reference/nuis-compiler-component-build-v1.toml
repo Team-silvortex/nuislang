@@ -1,0 +1,95 @@
+protocol = "nuis-compiler-component-build-v1"
+version = 1
+status = "early-implemented"
+scope = "stage0-stage1-compiler-component-attestation"
+manifest_name = "nuis.compiler-component-build.toml"
+driver_contract = "nuis-stage0-stage1-driver-v1"
+dependency_closure_contract = "nuis-compiler-dependency-closure-v1"
+reproducible_identity_contract = "nuis-compiler-component-reproducible-build-v1"
+stage_handoff_protocol = "nuis-compiler-stage-handoff-v1"
+current_stage_role = "stage0"
+current_producer = "nuisc-stage0-reference"
+allowed_stage_roles = ["stage0", "stage1-candidate"]
+frontdoor = "nuis bootstrap-build"
+input_policy = "project-or-project-manifest-only"
+path_policy = "portable-logical-identities-and-sibling-output-files"
+text_policy = "utf8-lf-without-nul"
+digest = "sha256-lowercase"
+dependency_order = "unique-kind-then-portable-identity"
+maximum_dependency_count = 4096
+
+identity_layers = [
+  "stage-handoff-semantic-bundle",
+  "dependency-closure",
+  "cache-stable-reproducible-record",
+  "exact-audit-record",
+]
+
+exact_audit_inputs = [
+  "protocol-and-driver-contract",
+  "component-and-producer-identity",
+  "exact-current-compiler-image",
+  "stage-handoff-bundle-and-file",
+  "exact-build-manifest",
+  "exact-compiled-artifact-container",
+  "exact-native-binary",
+  "canonical-dependency-closure",
+  "cache-stable-reproducible-record",
+]
+
+reproducible_inputs = [
+  "protocol-and-driver-contract",
+  "component-and-producer-identity",
+  "exact-current-compiler-image",
+  "stage-handoff-bundle",
+  "exact-native-binary",
+  "canonical-dependency-closure",
+]
+
+reproducible_excludes = [
+  "cache-hit-or-miss-build-manifest-bookkeeping",
+  "cache-sensitive-compiled-artifact-container-bytes",
+  "physical-workspace-and-output-paths",
+]
+
+dependency_kinds = [
+  "component-manifest",
+  "component-source",
+  "galaxy-lock",
+  "galaxy-manifest",
+  "galaxy-source",
+  "galaxy-library",
+  "nustar-index",
+  "nustar-manifest",
+]
+
+invariants = [
+  "bootstrap-subset-check-precedes-component-build",
+  "bootstrap-check-and-aot-share-one-resolved-project-snapshot",
+  "normal-aot-pipeline-remains-the-code-generation-path",
+  "stage-handoff-is-read-and-verified-before-attestation",
+  "current-process-image-is-byte-hashed-and-reverified",
+  "all-output-payloads-are-byte-length-and-sha256-bound",
+  "dependency-identities-cannot-be-absolute-or-traverse",
+  "dependency-closure-is-canonical-and-duplicate-free",
+  "miss-to-hit-rebuild-preserves-reproducible-identity",
+  "payload-or-record-tampering-fails-closed",
+  "record-grants-no-component-replacement-authority",
+  "candidate-stage1-role-is-explicit-and-identity-bound",
+]
+
+validation_commands = [
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis-artifact compiler_component_build -j 1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuis --test compiler_data_model_bootstrap -j 1",
+  "CARGO_INCREMENTAL=0 cargo test -q -p nuisc --lib parse_bootstrap_build_command -j 1",
+]
+
+[open_boundary]
+status = "not-stage1-ready"
+missing = [
+  "nuis-stage1-compiler-component-producer",
+  "cross-producer-diagnostic-equivalence",
+  "cross-producer-ast-nir-yir-equivalence",
+  "cross-producer-native-output-equivalence",
+  "reversible-component-replacement-authorization",
+]
