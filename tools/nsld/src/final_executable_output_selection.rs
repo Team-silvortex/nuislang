@@ -196,6 +196,44 @@ pub(crate) fn default_final_output_selection(
     })
 }
 
+pub(crate) fn validate_final_output_selection_report(
+    report: &NsldFinalOutputSelectionReport,
+) -> Result<(), String> {
+    let validation = final_output_selection_registry_validation();
+    if !validation.valid {
+        return Err("final-output selection evidence refuses an invalid registry".to_owned());
+    }
+    if report.contract != FINAL_OUTPUT_SELECTION_EVIDENCE_CONTRACT
+        || report.registry_contract != FINAL_OUTPUT_SELECTION_REGISTRY_CONTRACT
+        || report.registry_hash != validation.registry_hash
+    {
+        return Err("final-output selection evidence contract or registry drift".to_owned());
+    }
+    let Some(registration) = REGISTERED_SELECTION_POLICIES
+        .iter()
+        .find(|registration| registration.policy_id == report.policy_id)
+    else {
+        return Err("final-output selection evidence references an unknown policy".to_owned());
+    };
+    if report.policy_status != registration.policy_status
+        || report.selection_kind != registration.selection_kind
+        || report.default_policy != registration.default_policy
+        || report.issue_count != report.issues.len()
+    {
+        return Err("final-output selection evidence policy or issue drift".to_owned());
+    }
+    if report.selection_ledger_sha256.len() != 64
+        || !report
+            .selection_ledger_sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        || report.selection_ledger_sha256 != selection_ledger_sha256(report)
+    {
+        return Err("final-output selection evidence ledger drift".to_owned());
+    }
+    Ok(())
+}
+
 fn preserve_compatibility_output(
     context: &FinalOutputSelectionContext<'_>,
 ) -> Result<NsldFinalOutputSelectionReport, String> {

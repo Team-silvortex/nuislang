@@ -129,6 +129,7 @@ mod final_executable_output_code_asset;
 mod final_executable_output_handoff;
 mod final_executable_output_nsdb_handoff;
 mod final_executable_output_selection;
+mod final_executable_output_selection_evidence;
 mod final_executable_output_summary;
 mod final_executable_paths;
 mod final_executable_pipeline;
@@ -191,78 +192,8 @@ mod json_prepare;
 mod link_bundle_pipeline;
 mod link_inputs_pipeline;
 mod link_units;
-#[cfg(test)]
-mod main_check_core_tests;
-#[cfg(test)]
-mod main_check_final_executable_tests;
-#[cfg(test)]
-mod main_check_final_host_tests;
-#[cfg(test)]
-mod main_cli_final_executable_tests;
-#[cfg(test)]
-mod main_cli_link_artifact_tests;
-#[cfg(test)]
-mod main_cli_object_tests;
-#[cfg(test)]
-mod main_cli_tests;
-#[cfg(test)]
-mod main_closure_tests;
-#[cfg(test)]
-mod main_container_domain_assertions;
-#[cfg(test)]
-mod main_container_metadata_binding_tests;
-#[cfg(test)]
-mod main_container_tests;
-#[cfg(test)]
-mod main_container_verify_assertions;
-#[cfg(test)]
-mod main_container_verify_tamper;
-#[cfg(test)]
-mod main_container_verify_tests;
-#[cfg(test)]
-mod main_final_executable_backend_artifact_tests;
 mod main_final_executable_commands;
-#[cfg(test)]
-mod main_final_executable_emit_blocked_tests;
-#[cfg(test)]
-mod main_final_executable_emit_drift_tests;
-#[cfg(test)]
-mod main_final_executable_emit_tests;
-#[cfg(test)]
-mod main_final_executable_frontdoor_tests;
-#[cfg(test)]
-mod main_final_executable_image_backend_payload_tests;
-#[cfg(test)]
-mod main_final_executable_image_tests;
-#[cfg(test)]
-mod main_final_executable_launcher_check_tests;
-#[cfg(test)]
-mod main_final_executable_launcher_output_tests;
-#[cfg(test)]
-mod main_final_executable_layout_tests;
-#[cfg(test)]
-mod main_final_executable_output_nsdb_handoff_tests;
-#[cfg(test)]
-mod main_final_executable_output_tests;
-#[cfg(test)]
-mod main_final_executable_pipeline_tests;
-#[cfg(test)]
-mod main_final_executable_provider_sample_tests;
-#[cfg(test)]
-mod main_final_stage_tests;
-#[cfg(test)]
-mod main_link_pipeline_tests;
-#[cfg(test)]
-mod main_link_table_tests;
 mod main_object_commands;
-#[cfg(test)]
-mod main_sidecar_tests;
-#[cfg(test)]
-mod main_test_support;
-#[cfg(test)]
-mod main_tests;
-#[cfg(test)]
-mod main_toml_tests;
 mod native_entry;
 mod object_byte_layout;
 mod object_elf_image;
@@ -299,10 +230,55 @@ mod reports_final_output;
 mod reports_link_inputs;
 mod reports_object;
 mod seal;
-#[cfg(test)]
-mod seal_tests;
 mod toml;
 mod toml_read;
+
+#[cfg(test)]
+macro_rules! declare_test_modules {
+    ($($module:ident),+ $(,)?) => {
+        $(mod $module;)+
+    };
+}
+
+#[cfg(test)]
+declare_test_modules!(
+    main_check_core_tests,
+    main_check_final_executable_tests,
+    main_check_final_host_tests,
+    main_cli_final_executable_tests,
+    main_cli_link_artifact_tests,
+    main_cli_object_tests,
+    main_cli_tests,
+    main_closure_tests,
+    main_container_domain_assertions,
+    main_container_metadata_binding_tests,
+    main_container_tests,
+    main_container_verify_assertions,
+    main_container_verify_tamper,
+    main_container_verify_tests,
+    main_final_executable_backend_artifact_tests,
+    main_final_executable_emit_blocked_tests,
+    main_final_executable_emit_drift_tests,
+    main_final_executable_emit_tests,
+    main_final_executable_frontdoor_tests,
+    main_final_executable_image_backend_payload_tests,
+    main_final_executable_image_tests,
+    main_final_executable_launcher_check_tests,
+    main_final_executable_launcher_output_tests,
+    main_final_executable_layout_tests,
+    main_final_executable_output_nsdb_handoff_tests,
+    main_final_executable_output_tests,
+    main_final_executable_pipeline_tests,
+    main_final_executable_provider_sample_tests,
+    main_final_stage_tests,
+    main_link_pipeline_tests,
+    main_link_table_tests,
+    main_sidecar_tests,
+    main_test_support,
+    main_tests,
+    main_toml_tests,
+    seal_tests,
+);
 
 use artifact_chain::*;
 use assembly::*;

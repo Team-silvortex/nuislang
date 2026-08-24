@@ -460,19 +460,19 @@ The `beta-0.1` calibration baseline is:
   `nuis-nsld-elf-amd64-shell-image-validation-v1` reparses the bytes without the
   encoder, checking header/table/dynamic/name coordinates, source spans, write
   audits, unexplained prefix/tail bytes, and the final ledger.
-  `nuis-nsld-elf-amd64-os-loader-probe-v1` revalidates that report, defaults to
-  plan-only, rejects external images before filesystem access, and delegates
-  create-new bounded execution/capture/cleanup to the runtime shared by Mach-O.
-  The ELF finalizer now registers
-  `nsld.finalizer.elf.amd64.loader-probe-v1`; its provider-owned callback maps
-  format-specific evidence into
-  `nuis-nsld-registered-loader-probe-outcome-v1`, whose identity, execution,
-  capture, cleanup, blocker, provider-ledger, and outcome-ledger fields are
-  object-format-neutral. The shared CLI consumes that callback in plan-only
-  mode and explicitly rejects apply. Its cross-object `_start`/`PLT32`/exit
-  fixture closes the static plan, but real Linux execution still awaits a
-  reachable host. Compatibility remains the sole atomic output; dynamic
-  provenance, other ELF architectures, and PE/COFF remain open
+  `nuis-nsld-elf-amd64-os-loader-probe-v1` revalidates that report and accepts
+  static closure or hash-bound dynamic provenance through the Mach-O-shared
+  bounded runtime. Real x86_64 Linux runs now pass static `_start`, versioned
+  `sched_yield@libc`, and combined `getrandom@libc`/`cos@libm`/`sched_yield@libc`.
+  The dynamic plan assigns global version indexes, emits and reparses two
+  `DT_NEEDED`, two Verneed, three Vernaux, GNU versym, and bind-now PLT/GOT; the
+  GNU loader executes exact Nsld-owned bytes with exit `0`. Generic admission
+  replays registry, target, capability, image, validation, and dependency
+  evidence before publication. Ordinary `final-executable-output` preserves
+  implicit compatibility, keeps explicit plan-only non-mutating, and installs
+  only admitted bytes on apply. Explicit requests atomically persist path-free
+  owner-private selection JSON; valid `cos` signature drift keeps ELF bytes but
+  blocks stale admission before mutation. Next: generated CFFI Nustar GNU resolver registrations; architecture and PE/COFF parity remain open
 * `heterogeneous-runtime/data/provider-neutral-data-fabric`: `early/32`,
   optional; provider-neutral movement exists, but no physical DPU/IPU backend is
   claimed
@@ -1959,17 +1959,12 @@ layer over the most bootstrap-critical anchors.
 
 The first useful jobs are:
 
-* keep CLI closure, Nsld, std, language-core, Nustar, and native-binary work in
-  one comparable view
+* keep CLI closure, Nsld, std, language-core, Nustar, and native-binary work in one comparable view
 * make weak cells explicit instead of hiding them in broad status prose
-* separate `host runnable`, `Nsld-owned ready`, and `self-owned binary assembly`
-  as different functions instead of one overloaded "binary works" claim
-* let `nuis` name the weakest bootstrap-critical coordinate without requiring
-  a human to reread the whole roadmap
-* preserve alpha milestone provenance while early-beta foundation and later
-  self-hosting pressure grow
-* recalibrate completed broad slices into narrower beta coordinates instead of
-  erasing historical closure evidence or reporting a false project-wide 100%
+* separate `host runnable`, `Nsld-owned ready`, and `self-owned binary assembly` as different functions instead of one overloaded "binary works" claim
+* let `nuis` name the weakest bootstrap-critical coordinate without requiring a human to reread the whole roadmap
+* preserve alpha milestone provenance while early-beta foundation and later self-hosting pressure grow
+* recalibrate completed broad slices into narrower beta coordinates instead of erasing historical closure evidence or reporting a false project-wide 100%
 * preserve the foundation-through-`beta-0.9.*`, migration-from-`beta-0.10.*`,
   and completion-at-`gamma-0.5.*` self-hosting route without confusing roadmap
   agreement with implementation completion
@@ -1993,7 +1988,6 @@ specific Nustar or finite backend combination.
 
 Future work should move cells from static entries toward generated readings
 from:
-
 * checked tests
 * frontdoor JSON fields
 * Nsld reports

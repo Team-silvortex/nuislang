@@ -1,8 +1,9 @@
 use super::*;
 use crate::{
     final_executable_elf_test_fixture::{
-        elf_program_object, elf_program_object_with_external_symbol, elf_runtime_object,
-        elf_unrelated_runtime_object, R_X86_64_PLT32,
+        elf_multi_dependency_program_object, elf_program_object,
+        elf_program_object_with_external_symbol, elf_runtime_object, elf_unrelated_runtime_object,
+        R_X86_64_PLT32,
     },
     main_test_support::empty_link_plan,
 };
@@ -16,6 +17,7 @@ use nuisc::{
         LinkPlanHostFfiValidationSummary, LinkPlanHostObject,
     },
 };
+use std::collections::BTreeMap;
 
 #[test]
 fn summarizes_cross_object_internal_symbol_closure() {
@@ -533,6 +535,122 @@ fn executes_registered_libc_symbol_through_the_system_loader() {
 }
 
 #[test]
+fn plans_multiple_registered_dependencies_and_version_groups() {
+    let product = multi_dependency_dynamic_product();
+
+    assert!(product.dynamic_dependency_plan.plan_ready);
+    assert_eq!(product.dynamic_dependency_plan.dependencies.len(), 2);
+    assert_eq!(product.dynamic_dependency_plan.bindings.len(), 3);
+    assert_eq!(
+        product
+            .dynamic_dependency_plan
+            .dependencies
+            .iter()
+            .map(|dependency| dependency.needed_name.as_str())
+            .collect::<Vec<_>>(),
+        ["libm.so.6", "libc.so.6"]
+    );
+    assert_eq!(
+        product
+            .dynamic_dependency_plan
+            .bindings
+            .iter()
+            .map(|binding| {
+                (
+                    binding.target_symbol.as_str(),
+                    binding.symbol_version_name.as_str(),
+                    binding.symbol_version_index,
+                )
+            })
+            .collect::<Vec<_>>(),
+        [
+            ("cos", "GLIBC_2.2.5", 2),
+            ("getrandom", "GLIBC_2.25", 3),
+            ("sched_yield", "GLIBC_2.2.5", 4),
+        ]
+    );
+    assert_eq!(product.shell_layout_plan.dynamic_table_entry_count, 18);
+    assert_eq!(product.shell_layout_plan.version_needs.len(), 2);
+    assert_eq!(product.shell_layout_plan.version_needs[0].next_offset, 32);
+    assert_eq!(product.shell_layout_plan.version_needs[1].next_offset, 0);
+    assert_eq!(
+        product.shell_layout_plan.version_needs[0].auxiliaries.len(),
+        1
+    );
+    assert_eq!(
+        product.shell_layout_plan.version_needs[1].auxiliaries.len(),
+        2
+    );
+    assert_eq!(
+        product.shell_image_validation.version_symbol_indexes,
+        [0, 2, 3, 4]
+    );
+    assert_eq!(
+        product.shell_image_validation.version_requirements,
+        [
+            "libm.so.6@GLIBC_2.2.5#2",
+            "libc.so.6@GLIBC_2.25#3",
+            "libc.so.6@GLIBC_2.2.5#4",
+        ]
+    );
+    let verneednum = product
+        .shell_layout_plan
+        .dynamic_entries
+        .iter()
+        .find(|entry| entry.tag_name == "DT_VERNEEDNUM")
+        .unwrap();
+    assert_eq!(verneednum.value, 2);
+    assert!(product.dynamic_resolution_provenance.provenance_ready);
+
+    let mut chain_drift = product.private_shell_image.clone();
+    chain_drift[product
+        .shell_layout_plan
+        .version_need_table_file_offset
+        .unwrap()
+        + 12] ^= 0x01;
+    let error = crate::final_executable_elf_shell::validate_elf_amd64_shell_bytes_against_plan(
+        &chain_drift,
+        &product.shell_layout_plan,
+    )
+    .unwrap_err();
+    assert!(error.contains("version-need header differs"));
+}
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[test]
+fn executes_multiple_registered_dependencies_and_versions() {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let product = multi_dependency_dynamic_product();
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let root = std::env::temp_dir().join(format!(
+        "nuis-nsld-multi-dependency-loader-probe-{}-{nonce}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&root).unwrap();
+    let report = crate::final_executable_elf_loader_probe::probe_elf_amd64_private_shell_image(
+        crate::final_executable_elf_loader_probe::ElfAmd64LoaderProbeInput {
+            bytes: &product.private_shell_image,
+            validation: &product.shell_image_validation,
+            unresolved_external_symbol_count: product.summary.unresolved_external_symbols.len(),
+            dynamic_provenance: Some(&product.dynamic_resolution_provenance),
+        },
+        &root,
+        true,
+    )
+    .unwrap();
+
+    assert!(report.dynamic_provenance_ready, "{report:#?}");
+    assert_eq!(report.exit_code, Some(0), "{report:#?}");
+    assert!(report.publication_eligible, "{report:#?}");
+    assert!(std::fs::read_dir(&root).unwrap().next().is_none());
+    std::fs::remove_dir(root).unwrap();
+}
+
+#[test]
 fn blocks_ambiguous_host_ffi_signatures_before_provider_binding() {
     let (artifact, mut plan) = artifact_and_plan(
         elf_program_object_with_external_symbol(R_X86_64_PLT32, "puts"),
@@ -672,6 +790,22 @@ fn artifact_and_plan(
     (artifact, plan)
 }
 
+fn multi_dependency_dynamic_product() -> ElfAmd64HostObjectLinkage {
+    let (artifact, mut plan) = artifact_and_plan(
+        elf_multi_dependency_program_object(),
+        crate::final_executable_elf_test_fixture::elf_linux_exit_runtime_object(),
+    );
+    install_host_ffi_entries(
+        &mut plan,
+        vec![
+            host_ffi_entry("libc", "getrandom", "isize(ref u8, usize, u32)"),
+            host_ffi_entry("libm", "cos", "f64(f64)"),
+            host_ffi_entry("libc", "sched_yield", "i32()"),
+        ],
+    );
+    build_elf_amd64_host_object_linkage(&artifact, &plan).unwrap()
+}
+
 fn host_ffi_entry(abi: &str, symbol: &str, signature: &str) -> LinkPlanHostFfiEntry {
     LinkPlanHostFfiEntry {
         abi: abi.to_owned(),
@@ -687,49 +821,52 @@ fn install_host_ffi_entries(
     plan: &mut nuisc::linker::LinkPlan,
     entries: Vec<LinkPlanHostFfiEntry>,
 ) {
-    let abi = entries[0].abi.clone();
-    assert!(entries.iter().all(|entry| entry.abi == abi));
-    let notes = (entries.len() > 1).then(|| {
-        format!(
-            "host_ffi ABI `{abi}` symbol `{}` has {} whitelisted signatures",
-            entries[0].symbol,
-            entries.len()
-        )
-    });
     let validation = LinkPlanHostFfiValidationSummary {
         checked: entries.len(),
         valid: true,
         link_allowed: true,
         issues: Vec::new(),
-        notes: notes.iter().cloned().collect(),
+        notes: Vec::new(),
     };
-    let abi_entries = entries
-        .iter()
-        .map(|entry| LinkPlanHostFfiAbiEntry {
-            symbol: entry.symbol.clone(),
-            signature_pattern: entry.signature_pattern.clone(),
-            signature_hash: entry.signature_hash.clone(),
-            policy: entry.policy.clone(),
-            memory_capabilities: entry.memory_capabilities.clone(),
-        })
-        .collect::<Vec<_>>();
+    let mut grouped = BTreeMap::<&str, Vec<&LinkPlanHostFfiEntry>>::new();
+    for entry in &entries {
+        grouped.entry(entry.abi.as_str()).or_default().push(entry);
+    }
     plan.host_ffi.index_path = Some("nuis.project.host_ffi.index".to_owned());
     plan.host_ffi.symbol_count = entries.len();
     plan.host_ffi.policy_count = entries.len();
     plan.host_ffi.memory_capability_count = 0;
     plan.host_ffi.policy = "signature-whitelist-required".to_owned();
-    plan.host_ffi.abi_groups = vec![LinkPlanHostFfiAbiGroup {
-        abi,
-        symbol_count: entries.len(),
-        policy_count: entries.len(),
-        memory_capability_count: 0,
-        symbols: entries
-            .iter()
-            .map(|entry| format!("{}:{}", entry.symbol, entry.signature_pattern))
-            .collect(),
-        entries: abi_entries,
-        validation: validation.clone(),
-    }];
+    plan.host_ffi.abi_groups = grouped
+        .into_iter()
+        .map(|(abi, entries)| LinkPlanHostFfiAbiGroup {
+            abi: abi.to_owned(),
+            symbol_count: entries.len(),
+            policy_count: entries.len(),
+            memory_capability_count: 0,
+            symbols: entries
+                .iter()
+                .map(|entry| format!("{}:{}", entry.symbol, entry.signature_pattern))
+                .collect(),
+            entries: entries
+                .iter()
+                .map(|entry| LinkPlanHostFfiAbiEntry {
+                    symbol: entry.symbol.clone(),
+                    signature_pattern: entry.signature_pattern.clone(),
+                    signature_hash: entry.signature_hash.clone(),
+                    policy: entry.policy.clone(),
+                    memory_capabilities: entry.memory_capabilities.clone(),
+                })
+                .collect(),
+            validation: LinkPlanHostFfiValidationSummary {
+                checked: entries.len(),
+                valid: true,
+                link_allowed: true,
+                issues: Vec::new(),
+                notes: Vec::new(),
+            },
+        })
+        .collect();
     plan.host_ffi.entries = entries;
     plan.host_ffi.validation = validation;
 }

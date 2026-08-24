@@ -26,6 +26,7 @@ use super::{
         attach_final_output_nsdb_handoff_summary, persist_final_output_nsdb_handoff,
     },
     final_executable_output_selection::evaluate_final_output_selection,
+    final_executable_output_selection_evidence::persist_final_output_selection_evidence,
     final_executable_registered_loader_probe_admission::{
         build_registered_loader_probe_admission_receipt,
         verify_registered_loader_probe_admission_receipt,
@@ -438,8 +439,13 @@ pub(crate) fn run_final_executable_command(command: &Command) -> Result<bool, St
             let ctx = load_link_input_context(input)?;
             let mut report = nsld_final_executable_output_report(&ctx.manifest, &ctx.plan);
             if output_policy.is_some() || *apply {
-                report.selection =
+                let selection =
                     evaluate_final_output_selection(&ctx.plan, output_policy.as_deref(), *apply)?;
+                persist_final_output_selection_evidence(
+                    std::path::Path::new(&ctx.plan.output_dir),
+                    &selection,
+                )?;
+                report.selection = selection;
             }
             let summary = persist_final_output_nsdb_handoff(
                 std::path::Path::new(&ctx.plan.output_dir),

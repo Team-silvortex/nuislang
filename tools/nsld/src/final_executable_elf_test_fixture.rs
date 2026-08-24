@@ -25,6 +25,51 @@ pub(crate) fn elf_program_object_with_external_symbol(
     })
 }
 
+pub(crate) fn elf_program_object_with_external_calls(
+    text: &[u8],
+    external_symbols: &[&str],
+    relocation_offsets: &[u64],
+) -> Vec<u8> {
+    assert_eq!(external_symbols.len(), relocation_offsets.len());
+    let relocations = relocation_offsets
+        .iter()
+        .enumerate()
+        .map(|(symbol_index, source_offset)| ObjectRelocation {
+            source_offset: *source_offset,
+            relocation_type: R_X86_64_PLT32,
+            addend: -4,
+            undefined_symbol_index: symbol_index,
+        })
+        .collect::<Vec<_>>();
+    build_object_with_symbols(MultiSymbolObjectFixture {
+        text,
+        defined_symbol: "__nuis_entry",
+        undefined_symbols: external_symbols,
+        relocations: &relocations,
+        bss_size: 0,
+    })
+}
+
+pub(crate) fn elf_multi_dependency_program_object() -> Vec<u8> {
+    let text = [
+        0x48, 0x83, 0xec, 0x08, // align stack before external calls
+        0x31, 0xff, // getrandom buffer = null
+        0x31, 0xf6, // getrandom length = 0
+        0x31, 0xd2, // getrandom flags = 0
+        0xe8, 0, 0, 0, 0, // call getrandom
+        0x66, 0x0f, 0x57, 0xc0, // cos input = 0.0
+        0xe8, 0, 0, 0, 0, // call cos
+        0xe8, 0, 0, 0, 0, // call sched_yield
+        0x48, 0x83, 0xc4, 0x08, // restore stack without changing eax
+        0xc3,
+    ];
+    elf_program_object_with_external_calls(
+        &text,
+        &["getrandom", "cos", "sched_yield"],
+        &[11, 20, 25],
+    )
+}
+
 pub(crate) fn elf_program_object_two_plt32_calls() -> Vec<u8> {
     let relocations = [(1, R_X86_64_PLT32, -4), (6, R_X86_64_PLT32, -4)];
     build_object(ObjectFixture {
@@ -112,6 +157,44 @@ struct ObjectFixture<'a> {
 }
 
 fn build_object(fixture: ObjectFixture<'_>) -> Vec<u8> {
+    let undefined_symbols = fixture.undefined_symbol.into_iter().collect::<Vec<_>>();
+    let relocations = fixture
+        .relocations
+        .iter()
+        .map(
+            |(source_offset, relocation_type, addend)| ObjectRelocation {
+                source_offset: *source_offset,
+                relocation_type: *relocation_type,
+                addend: *addend,
+                undefined_symbol_index: 0,
+            },
+        )
+        .collect::<Vec<_>>();
+    build_object_with_symbols(MultiSymbolObjectFixture {
+        text: fixture.text,
+        defined_symbol: fixture.defined_symbol,
+        undefined_symbols: &undefined_symbols,
+        relocations: &relocations,
+        bss_size: fixture.bss_size,
+    })
+}
+
+struct ObjectRelocation {
+    source_offset: u64,
+    relocation_type: u32,
+    addend: i64,
+    undefined_symbol_index: usize,
+}
+
+struct MultiSymbolObjectFixture<'a> {
+    text: &'a [u8],
+    defined_symbol: &'a str,
+    undefined_symbols: &'a [&'a str],
+    relocations: &'a [ObjectRelocation],
+    bss_size: usize,
+}
+
+fn build_object_with_symbols(fixture: MultiSymbolObjectFixture<'_>) -> Vec<u8> {
     let has_relocation = !fixture.relocations.is_empty();
     let mut section_names = vec![".text"];
     if has_relocation {
@@ -122,9 +205,10 @@ fn build_object(fixture: ObjectFixture<'_>) -> Vec<u8> {
     }
     section_names.extend([".symtab", ".strtab", ".shstrtab"]);
     let section_strings = string_table(section_names.iter().copied());
-    let symbol_strings =
-        string_table(std::iter::once(fixture.defined_symbol).chain(fixture.undefined_symbol));
-    let symbol_count = 2 + usize::from(fixture.undefined_symbol.is_some());
+    let symbol_strings = string_table(
+        std::iter::once(fixture.defined_symbol).chain(fixture.undefined_symbols.iter().copied()),
+    );
+    let symbol_count = 2 + fixture.undefined_symbols.len();
     let section_count = section_names.len() + 1;
     let text_offset = ELF_HEADER_SIZE;
     let relocation_offset = align_up(text_offset + fixture.text.len(), 8);
@@ -143,17 +227,17 @@ fn build_object(fixture: ObjectFixture<'_>) -> Vec<u8> {
         section_count - 1,
     );
     bytes[text_offset..text_offset + fixture.text.len()].copy_from_slice(fixture.text);
-    for (index, (source_offset, relocation_type, addend)) in
-        fixture.relocations.iter().copied().enumerate()
-    {
+    for (index, relocation) in fixture.relocations.iter().enumerate() {
+        assert!(relocation.undefined_symbol_index < fixture.undefined_symbols.len());
         let entry_offset = relocation_offset + index * ELF_RELA_SIZE;
-        write_u64(&mut bytes, entry_offset, source_offset);
+        write_u64(&mut bytes, entry_offset, relocation.source_offset);
         write_u64(
             &mut bytes,
             entry_offset + 8,
-            (2u64 << 32) | u64::from(relocation_type),
+            (((2 + relocation.undefined_symbol_index) as u64) << 32)
+                | u64::from(relocation.relocation_type),
         );
-        write_i64(&mut bytes, entry_offset + 16, addend);
+        write_i64(&mut bytes, entry_offset + 16, relocation.addend);
     }
     write_symbol(
         &mut bytes,
@@ -164,11 +248,11 @@ fn build_object(fixture: ObjectFixture<'_>) -> Vec<u8> {
         0,
         fixture.text.len() as u64,
     );
-    if let Some(undefined) = fixture.undefined_symbol {
+    for (index, undefined) in fixture.undefined_symbols.iter().enumerate() {
         write_symbol(
             &mut bytes,
-            symbol_offset + 2 * ELF_SYMBOL_SIZE,
-            symbol_strings.offsets[undefined],
+            symbol_offset + (index + 2) * ELF_SYMBOL_SIZE,
+            symbol_strings.offsets[*undefined],
             0x12,
             0,
             0,

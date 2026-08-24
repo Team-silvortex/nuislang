@@ -116,6 +116,7 @@ pub(crate) fn build_elf_amd64_dynamic_dependency_plan(
     let mut issues = Vec::new();
     let mut dependencies = Vec::new();
     let mut dependency_indexes = BTreeMap::new();
+    let mut version_indexes = BTreeMap::new();
     let mut bindings = Vec::new();
 
     if !unresolved_symbols.is_empty() {
@@ -129,6 +130,7 @@ pub(crate) fn build_elf_amd64_dynamic_dependency_plan(
                 footprint_valid,
                 &mut dependencies,
                 &mut dependency_indexes,
+                &mut version_indexes,
                 &mut bindings,
                 &mut issues,
             );
@@ -171,6 +173,7 @@ fn resolve_dynamic_bind(
     footprint_valid: bool,
     dependencies: &mut Vec<ElfAmd64DynamicDependencyPlan>,
     dependency_indexes: &mut BTreeMap<&'static str, usize>,
+    version_indexes: &mut BTreeMap<(&'static str, &'static str), u16>,
     bindings: &mut Vec<ElfAmd64DynamicSymbolPlan>,
     issues: &mut Vec<String>,
 ) {
@@ -223,6 +226,18 @@ fn resolve_dynamic_bind(
         ));
         return;
     };
+    let version_key = (provider.provider_id, symbol_version.version_identity);
+    let version_index = match version_indexes.get(&version_key).copied() {
+        Some(index) => index,
+        None => {
+            let Ok(index) = u16::try_from(version_indexes.len() + 2) else {
+                issues.push("registered-symbol-version-index-overflow".to_owned());
+                return;
+            };
+            version_indexes.insert(version_key, index);
+            index
+        }
+    };
     let dependency_index = match dependency_indexes.get(provider.provider_id).copied() {
         Some(index) => index,
         None => {
@@ -247,7 +262,7 @@ fn resolve_dynamic_bind(
         dependency_audit_hash: dependency.audit_hash.clone(),
         symbol_version_identity: symbol_version.version_identity.to_owned(),
         symbol_version_name: symbol_version.version_name.to_owned(),
-        symbol_version_index: symbol_version.version_index,
+        symbol_version_index: version_index,
         symbol_version_hash: elf_version_name_hash(symbol_version.version_name),
         status: "whitelist-provider-and-version-bound".to_owned(),
         audit_hash: String::new(),
@@ -424,6 +439,7 @@ fn validate_records(
     let mut used_dependencies = BTreeSet::new();
     let mut symbols = BTreeSet::new();
     let mut dynamic_symbol_indexes = BTreeSet::new();
+    let mut image_version_indexes = BTreeMap::new();
     for (index, binding) in bindings.iter().enumerate() {
         let dependency = dependencies
             .iter()
@@ -431,6 +447,22 @@ fn validate_records(
         let registered_version = dependency.and_then(|dependency| {
             registered_dynamic_symbol_version(&dependency.provider_id, &binding.target_symbol)
         });
+        let expected_version_index = match (dependency, registered_version) {
+            (Some(dependency), Some(version)) => {
+                let version_key = (dependency.provider_id.as_str(), version.version_identity);
+                match image_version_indexes.get(&version_key).copied() {
+                    Some(index) => Some(index),
+                    None => {
+                        let assigned = u16::try_from(image_version_indexes.len() + 2).ok();
+                        if let Some(assigned) = assigned {
+                            image_version_indexes.insert(version_key, assigned);
+                        }
+                        assigned
+                    }
+                }
+            }
+            _ => None,
+        };
         if binding.binding_id != format!("elf-amd64-dynamic-plan-binding-{index:06}")
             || binding.status != "whitelist-provider-and-version-bound"
             || binding.audit_hash != binding_audit_hash(binding)
@@ -449,9 +481,9 @@ fn validate_records(
             || registered_version.is_none_or(|version| {
                 binding.symbol_version_identity != version.version_identity
                     || binding.symbol_version_name != version.version_name
-                    || binding.symbol_version_index != version.version_index
                     || binding.symbol_version_hash != elf_version_name_hash(version.version_name)
             })
+            || expected_version_index != Some(binding.symbol_version_index)
         {
             return Err(format!("ELF dynamic symbol plan record {index} drift"));
         }

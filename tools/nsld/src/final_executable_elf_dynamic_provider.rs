@@ -31,24 +31,40 @@ pub(crate) struct DynamicSymbolVersionRegistration {
     pub(crate) target_symbol: &'static str,
     pub(crate) version_identity: &'static str,
     pub(crate) version_name: &'static str,
-    pub(crate) version_index: u16,
 }
 
-const DYNAMIC_RESOLVER_PROVIDERS: &[DynamicResolverProvider] = &[DynamicResolverProvider {
-    provider_id: "nsld.elf.amd64.linux-gnu.libc-v1",
-    machine_arch: "x86_64",
-    machine_os: "linux",
-    object_format: "elf",
-    calling_abi: "sysv64",
-    clang_target: "x86_64-unknown-linux-gnu",
-    host_ffi_abi: "libc",
-    interpreter_identity: "linux.gnu.ld-so.x86-64-v1",
-    interpreter_path: "/lib64/ld-linux-x86-64.so.2",
-    dependency_identity: "linux.gnu.libc.so.6-v1",
-    needed_name: "libc.so.6",
-    symbol_version_policy: "elf-registered-symbol-version-whitelist-v1",
-    resolver_identity: "elf.sysv.amd64.bind-now-plt-v1",
-}];
+const DYNAMIC_RESOLVER_PROVIDERS: &[DynamicResolverProvider] = &[
+    DynamicResolverProvider {
+        provider_id: "nsld.elf.amd64.linux-gnu.libc-v1",
+        machine_arch: "x86_64",
+        machine_os: "linux",
+        object_format: "elf",
+        calling_abi: "sysv64",
+        clang_target: "x86_64-unknown-linux-gnu",
+        host_ffi_abi: "libc",
+        interpreter_identity: "linux.gnu.ld-so.x86-64-v1",
+        interpreter_path: "/lib64/ld-linux-x86-64.so.2",
+        dependency_identity: "linux.gnu.libc.so.6-v1",
+        needed_name: "libc.so.6",
+        symbol_version_policy: "elf-registered-symbol-version-whitelist-v1",
+        resolver_identity: "elf.sysv.amd64.bind-now-plt-v1",
+    },
+    DynamicResolverProvider {
+        provider_id: "nsld.elf.amd64.linux-gnu.libm-v1",
+        machine_arch: "x86_64",
+        machine_os: "linux",
+        object_format: "elf",
+        calling_abi: "sysv64",
+        clang_target: "x86_64-unknown-linux-gnu",
+        host_ffi_abi: "libm",
+        interpreter_identity: "linux.gnu.ld-so.x86-64-v1",
+        interpreter_path: "/lib64/ld-linux-x86-64.so.2",
+        dependency_identity: "linux.gnu.libm.so.6-v1",
+        needed_name: "libm.so.6",
+        symbol_version_policy: "elf-registered-symbol-version-whitelist-v1",
+        resolver_identity: "elf.sysv.amd64.bind-now-plt-v1",
+    },
+];
 
 const DYNAMIC_SYMBOL_VERSIONS: &[DynamicSymbolVersionRegistration] = &[
     DynamicSymbolVersionRegistration {
@@ -56,14 +72,24 @@ const DYNAMIC_SYMBOL_VERSIONS: &[DynamicSymbolVersionRegistration] = &[
         target_symbol: "puts",
         version_identity: "linux.gnu.glibc.2.2.5-v1",
         version_name: "GLIBC_2.2.5",
-        version_index: 2,
     },
     DynamicSymbolVersionRegistration {
         provider_id: "nsld.elf.amd64.linux-gnu.libc-v1",
         target_symbol: "sched_yield",
         version_identity: "linux.gnu.glibc.2.2.5-v1",
         version_name: "GLIBC_2.2.5",
-        version_index: 2,
+    },
+    DynamicSymbolVersionRegistration {
+        provider_id: "nsld.elf.amd64.linux-gnu.libc-v1",
+        target_symbol: "getrandom",
+        version_identity: "linux.gnu.glibc.2.25-v1",
+        version_name: "GLIBC_2.25",
+    },
+    DynamicSymbolVersionRegistration {
+        provider_id: "nsld.elf.amd64.linux-gnu.libm-v1",
+        target_symbol: "cos",
+        version_identity: "linux.gnu.libm.glibc.2.2.5-v1",
+        version_name: "GLIBC_2.2.5",
     },
 ];
 
@@ -127,23 +153,29 @@ pub(crate) fn validate_dynamic_resolver_provider_registry() -> Result<String, St
         }
     }
     let mut symbols = BTreeSet::new();
-    let mut provider_versions = BTreeMap::new();
+    let mut provider_version_identities = BTreeMap::new();
+    let mut provider_version_names = BTreeMap::new();
     for version in DYNAMIC_SYMBOL_VERSIONS {
         let provider_exists = provider_ids.contains(version.provider_id);
-        let version_identity = (version.version_name, version.version_identity);
-        let version_index_consistent = provider_versions
+        let identity_consistent = provider_version_identities
             .insert(
-                (version.provider_id, version.version_index),
-                version_identity,
+                (version.provider_id, version.version_identity),
+                version.version_name,
             )
-            .is_none_or(|previous| previous == version_identity);
+            .is_none_or(|previous| previous == version.version_name);
+        let name_consistent = provider_version_names
+            .insert(
+                (version.provider_id, version.version_name),
+                version.version_identity,
+            )
+            .is_none_or(|previous| previous == version.version_identity);
         if !provider_exists
             || version.target_symbol.is_empty()
             || version.version_identity.is_empty()
             || version.version_name.is_empty()
-            || version.version_index < 2
             || !symbols.insert((version.provider_id, version.target_symbol))
-            || !version_index_consistent
+            || !identity_consistent
+            || !name_consistent
         {
             return Err("invalid ELF dynamic symbol-version registry".to_owned());
         }
@@ -157,8 +189,7 @@ pub(crate) fn validate_dynamic_resolver_provider_registry() -> Result<String, St
         }
         writeln!(
             canonical,
-            "version={}|{}",
-            version.version_index,
+            "version-hash={}",
             elf_version_name_hash(version.version_name)
         )
         .unwrap();
@@ -233,15 +264,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn registered_glibc_versions_use_the_elf_hash_and_shared_index() {
+    fn registered_versions_use_elf_hashes_without_owning_image_indexes() {
         assert_eq!(elf_version_name_hash("GLIBC_2.2.5"), 0x0969_1a75);
+        assert_eq!(elf_version_name_hash("GLIBC_2.25"), 0x0696_9185);
         let puts =
             registered_dynamic_symbol_version("nsld.elf.amd64.linux-gnu.libc-v1", "puts").unwrap();
         let sched =
             registered_dynamic_symbol_version("nsld.elf.amd64.linux-gnu.libc-v1", "sched_yield")
                 .unwrap();
-        assert_eq!(puts.version_index, sched.version_index);
         assert_eq!(puts.version_name, sched.version_name);
+        let getrandom =
+            registered_dynamic_symbol_version("nsld.elf.amd64.linux-gnu.libc-v1", "getrandom")
+                .unwrap();
+        assert_eq!(getrandom.version_name, "GLIBC_2.25");
+        let cos =
+            registered_dynamic_symbol_version("nsld.elf.amd64.linux-gnu.libm-v1", "cos").unwrap();
+        assert_eq!(cos.version_name, "GLIBC_2.2.5");
+        assert_ne!(cos.version_identity, puts.version_identity);
         assert!(validate_dynamic_resolver_provider_registry().is_ok());
     }
 }

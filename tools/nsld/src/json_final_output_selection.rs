@@ -1,7 +1,20 @@
 use crate::{json_fields::*, reports::NsldFinalOutputSelectionReport};
 
 pub(crate) fn final_output_selection_json_field(report: &NsldFinalOutputSelectionReport) -> String {
-    let fields = [
+    final_output_selection_json_field_with_path(report, true)
+}
+
+pub(crate) fn relocatable_final_output_selection_json_field(
+    report: &NsldFinalOutputSelectionReport,
+) -> String {
+    final_output_selection_json_field_with_path(report, false)
+}
+
+fn final_output_selection_json_field_with_path(
+    report: &NsldFinalOutputSelectionReport,
+    include_output_path: bool,
+) -> String {
+    let mut fields = vec![
         json_string_field("contract", &report.contract),
         json_string_field("registry_contract", &report.registry_contract),
         json_string_field("registry_hash", &report.registry_hash),
@@ -41,7 +54,14 @@ pub(crate) fn final_output_selection_json_field(report: &NsldFinalOutputSelectio
             "candidate_image_sha256",
             report.candidate_image_sha256.as_deref(),
         ),
-        json_string_field("selected_output_path", &report.selected_output_path),
+    ];
+    if include_output_path {
+        fields.push(json_string_field(
+            "selected_output_path",
+            &report.selected_output_path,
+        ));
+    }
+    fields.extend([
         json_string_field("selected_output_name", &report.selected_output_name),
         json_bool_field("selected_output_present", report.selected_output_present),
         json_optional_usize_field(
@@ -72,6 +92,6 @@ pub(crate) fn final_output_selection_json_field(report: &NsldFinalOutputSelectio
         json_usize_field("issue_count", report.issue_count),
         json_string_array_field("issues", &report.issues),
         json_string_field("selection_ledger_sha256", &report.selection_ledger_sha256),
-    ];
+    ]);
     format!("\"selection\":{{{}}}", fields.join(","))
 }

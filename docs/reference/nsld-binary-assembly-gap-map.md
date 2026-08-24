@@ -161,9 +161,15 @@ through the selected finalizer only after receipt replay, stays plan-only
 without `--apply`, and publishes the exact candidate under an installed-output
 SHA-256 identity. The final report binds registry, policy, receipt, publication,
 candidate, and installed-image evidence under
-`nuis-nsld-final-output-selection-evidence-v1`. A damaged receipt cannot start
-installation, while the valid common-symbol fixture selects and executes the
-private Mach-O through the ordinary command.
+`nuis-nsld-final-output-selection-evidence-v1`. Explicit policy requests also
+atomically persist owner-private
+`nuis.nsld.final-output-selection-evidence.json` under
+`nuis-nsld-final-output-selection-evidence-file-v1`. The canonical sidecar
+omits host paths while retaining policy, registry, provider, admission,
+publication, candidate, installed-output, issue, and selection-ledger identity.
+The implicit compatibility default produces no sidecar. A damaged receipt
+cannot start installation, while valid Mach-O and ELF fixtures select and
+execute their private images through the ordinary command.
 
 The finalizer registry now also owns one narrow Linux route:
 `nsld.finalizer.elf.amd64.artifact-image-v1`. It validates exact LinkPlan and
@@ -219,11 +225,15 @@ platform plan/application before shell layout, independently rechecks the YIR
 CFFI signature hash and whitelist shape, and asks
 `nuis-nsld-elf-dynamic-resolver-provider-registry-v1` for target-specific
 interpreter, dependency, symbol-version whitelist, and resolver identities. The
-first registration maps hash-whitelisted `libc` calls on x86_64 Linux GNU to
-the GNU loader, `libc.so.6`, and the SysV bind-now PLT resolver. Its provider
-registry explicitly maps `puts` and `sched_yield` to `GLIBC_2.2.5`, version
-identity `linux.gnu.glibc.2.2.5-v1`, index 2, and the GNU ELF name hash. The
-shell consumes only that immutable plan: it emits `PT_INTERP`, copies the
+first registrations map hash-whitelisted `libc` and `libm` calls on x86_64
+Linux GNU to the GNU loader, `libc.so.6`, `libm.so.6`, and the SysV bind-now PLT
+resolver. Providers own version identities, names, and GNU name hashes, not
+final-image indexes. The dependency plan assigns globally unique indexes from
+the deterministic dynamic-symbol order, so independently registered providers
+do not coordinate layout numbers. Current registrations cover `puts` and
+`sched_yield` at `GLIBC_2.2.5`, `getrandom` at `GLIBC_2.25`, and `cos` from
+`libm.so.6` at `GLIBC_2.2.5`. The shell consumes only that immutable plan: it
+emits `PT_INTERP`, copies the
 platform dynamic-string prefix into a final read-only `.dynstr`, appends
 registered dependency and version names, serializes `.gnu.version` plus linked
 `.gnu.version_r` Verneed/Vernaux records, and emits `DT_NEEDED`, `DT_BIND_NOW`,
@@ -240,20 +250,31 @@ changing its bytes.
 dynamic image with ready, hash-bound provenance. Its execution mechanics share
 the Mach-O runtime for create-new materialization, exact reread, empty process
 inputs, bounded wait/capture, and cleanup. Default finalization remains
-plan-only. On a real x86_64 Linux host, both static execution and the registered
-dynamic `sched_yield@GLIBC_2.2.5` route pass: `_start` reaches the external
-symbol through Nsld-owned PLT/GOT and `R_X86_64_JUMP_SLOT`, the system loader
-accepts the Nsld-owned GNU version metadata, resolves it, and the process exits
-zero. Loader admission evidence now hashes shell
+plan-only. On a real x86_64 Linux host, static execution, the registered dynamic
+`sched_yield@GLIBC_2.2.5` route, and a combined `libc.so.6` plus `libm.so.6`
+route pass. The combined image carries two Verneed records, three Vernaux
+records, and versym indexes `[2, 3, 4]`; `_start` executes
+`getrandom@GLIBC_2.25`, `cos@GLIBC_2.2.5`, and
+`sched_yield@GLIBC_2.2.5` through Nsld-owned PLT/GOT records before exiting
+zero. The system loader therefore accepts the linked records rather than only
+Nsld's parser. Loader admission evidence now hashes shell
 validation together with dynamic provenance before generic receipt replay and
 provider publication. The registered callback still projects through
 `nuis-nsld-registered-loader-probe-outcome-v1`; publication still rebuilds and
 matches the held image before the object-format-neutral atomic writer installs
-it. A Linux regression now carries the dynamic image through canonical receipt
+it. Linux regressions now carry both the single-dependency image and the
+combined `libc.so.6` plus `libm.so.6` image through canonical receipt
 persistence/replay, plan-only publication, atomic installation, and a second
-successful execution. Changing only the registered CFFI signature keeps the
-private bytes identical but changes dependency/admission evidence, so the stale
-receipt and publication fail closed while preserving compatibility output.
+successful execution. On the combined route, changing only the registered
+`cos` signature keeps the two-dependency private bytes identical but changes
+dependency/admission evidence, so the stale receipt and publication fail closed
+while preserving compatibility output. A Linux public-CLI regression now drives
+that same image through `final-executable-output`: implicit compatibility keeps
+the original executable and emits no selection file, explicit plan-only writes
+relocatable selection evidence without changing output, explicit apply installs
+and executes the exact admitted image, and signature-only drift replaces the
+sidecar with blocked evidence before any output mutation. The command layer
+contains no ELF, GNU provider, `libc`, or `libm` branch.
 
 It does not yet own:
 

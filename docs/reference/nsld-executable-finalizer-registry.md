@@ -134,12 +134,16 @@ provider serializes and independently validates that private ELF shell.
 `nuis-nsld-elf-amd64-dynamic-dependency-plan-v1` now resolves each dynamic bind
 before shell layout through
 `nuis-nsld-elf-dynamic-resolver-provider-registry-v1`, while rechecking the CFFI
-footprint and exact YIR signature hashes. Its first x86_64 Linux GNU route binds
-the `libc` ABI to a GNU loader identity, `libc.so.6`, the explicit
-`elf-registered-symbol-version-whitelist-v1` policy, and the SysV bind-now PLT
-resolver. The provider currently registers `puts` and `sched_yield` as
-`GLIBC_2.2.5` with version identity `linux.gnu.glibc.2.2.5-v1`, index 2, and the
-GNU ELF name hash. The shell consumes that plan to emit and independently
+footprint and exact YIR signature hashes. Its first x86_64 Linux GNU providers
+bind the `libc` and `libm` ABIs to one GNU loader, `libc.so.6` and `libm.so.6`,
+the explicit `elf-registered-symbol-version-whitelist-v1` policy, and the SysV
+bind-now PLT resolver. Providers register symbol-version identities and names,
+but do not own final-image version indexes. The immutable dependency plan
+assigns one globally unique index per actually selected provider/version pair,
+starting at 2 in deterministic dynamic-symbol order. Current registrations
+cover `puts` and `sched_yield` at `GLIBC_2.2.5`, `getrandom` at `GLIBC_2.25`,
+and `cos` from `libm.so.6` at `GLIBC_2.2.5`. The shell consumes that plan to emit
+and independently
 reparse `PT_INTERP`, final `.dynstr`, `.gnu.version`, `.gnu.version_r`,
 `DT_NEEDED`, `DT_BIND_NOW`, `DT_VERSYM`, `DT_VERNEED`, and `DT_VERNEEDNUM`.
 The parser follows the final Verneed/Vernaux chains, resolves their string-table
@@ -147,10 +151,13 @@ names, and rejects index, hash, offset, chain, hidden-bit, or unexplained-byte
 drift. `nuis-nsld-elf-amd64-dynamic-resolution-provenance-v1` then binds those
 parsed bytes back to the pre-shell plan. A missing signature whitelist or
 registered symbol version, stale hash, unsupported target/ABI, or ambiguous
-signature produces a canonical blocked report. A real x86_64 Linux run passes
-static closure and the versioned `sched_yield@libc` route: the kernel accepts the exact
-bytes, the GNU system loader consumes Nsld's version tables and applies its
-`R_X86_64_JUMP_SLOT`, execution exits zero, cleanup succeeds, and the
+signature produces a canonical blocked report. Real x86_64 Linux runs pass
+static closure, the versioned `sched_yield@libc` route, and a combined route
+through `getrandom@GLIBC_2.25`, `cos@GLIBC_2.2.5`, and
+`sched_yield@GLIBC_2.2.5`. The latter emits two Verneed records and three
+globally unique version indexes. The kernel accepts the exact bytes, the GNU
+system loader consumes Nsld's version tables and applies all three
+`R_X86_64_JUMP_SLOT` records, execution exits zero, cleanup succeeds, and the
 provider-specific ledgers validate. The generic
 `nuis-nsld-registered-loader-probe-admission-v1` receipt now binds that outcome
 to the current registry, selected provider/target/capability, complete CPU target
@@ -160,13 +167,33 @@ immediately replays it against a provider-owned plan-only rebuild. Receipt
 tamper and valid rebuilt-image drift fail closed. The dynamic Linux regression
 also proves a stricter case: changing only the registered CFFI signature leaves
 the private ELF bytes unchanged but changes dependency/admission evidence, so
-the stale receipt cannot authorize publication. The registered
+the stale receipt cannot authorize publication. This now covers both the first
+`sched_yield@libc` route and the combined `getrandom@libc`, `cos@libm`, and
+`sched_yield@libc` route: the latter survives canonical receipt persistence,
+provider-owned plan-only replay, atomic publication, and a second real GNU
+loader execution. Changing only the registered `cos` signature preserves the
+same two-dependency ELF bytes while invalidating the replay and publication
+evidence before output mutation. The registered
 `nsld.finalizer.elf.amd64.private-image-publication-v1` callback now consumes
 that replay, independently matches the rebuilt shell and validation identities,
 and atomically installs only the exact held private image. Plan-only preserves
 the compatibility output; successful Linux apply produces an owner-executable
-ELF that exits zero for both the static and first registered dynamic route.
+ELF that exits zero for the static, first registered dynamic, and combined
+two-dependency routes.
 Invalid or stale admission leaves output unchanged.
+
+The ordinary `final-executable-output` command now covers the combined Linux
+route as well as Mach-O. An implicit compatibility request remains read-only and
+does not create selection state. Any explicit output policy atomically writes
+owner-private `nuis.nsld.final-output-selection-evidence.json` under
+`nuis-nsld-final-output-selection-evidence-file-v1`; its canonical payload omits
+host paths but binds the current registry, selected policy and capability,
+admission and publication ledgers, candidate and installed output identities,
+issues, and `selection_ledger_sha256`. Linux plan-only preserves the existing
+executable, apply installs and executes the admitted `libc + libm` image, and a
+signature-only `cos` drift persists blocked selection evidence while rejecting
+installation before mutation. This persistence path is shared by every
+registered finalizer and adds no object-format or provider branch to the CLI.
 
 This is not yet a pure Nsld linker claim. Nsld now understands the real input
 tables, assigns deterministic final sections and addresses, applies registered
@@ -241,9 +268,11 @@ Plan-only requests never mutate output; `--apply` is rejected without an
 explicit apply-capable policy. `nuis-nsld-final-output-selection-evidence-v1`
 binds the policy-registry hash, provider/target/capability, admission receipt and
 verification hashes, publication ledger, candidate image, and installed output
-size/SHA-256/executable identity into the ordinary final-output report. Receipt
-tamper remains fail-closed and the compatibility executable remains the
-byte-for-byte default.
+size/SHA-256/executable identity into the ordinary final-output report. Explicit
+requests also persist the same relocatable evidence in the canonical
+owner-private selection sidecar; default compatibility requests do not create
+it. Receipt or dependency-evidence tamper remains fail-closed and the
+compatibility executable remains the byte-for-byte default.
 
 `nuis-nsld-elf-amd64-placement-binding-v1` now closes the first provider-owned
 Linux layout milestone. It merges `SHF_ALLOC` contributions into deterministic
